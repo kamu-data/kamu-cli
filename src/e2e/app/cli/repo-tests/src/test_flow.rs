@@ -20,6 +20,10 @@ pub async fn test_get_dataset_list_flows(kamu_api_server_client: KamuApiServerCl
         .create_player_scores_dataset_with_data(&token, None)
         .await;
 
+    // Workarround: await outbox, we should save a DatasetEntry before query start
+    // TODO: invent a way to flush outbox in e2e tests or to shorten waiting cycles
+    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+
     // The query is almost identical to kamu-web-ui, for ease of later edits.
     // Except for commented dynamic dataset ID fields:
     // - search FlowDescriptionDatasetHardCompaction (datasetId)
@@ -91,6 +95,10 @@ pub async fn test_dataset_all_flows_paused(kamu_api_server_client: KamuApiServer
         .create_player_scores_dataset_with_data(&token, None)
         .await;
 
+    // Workarround: await outbox, we should save a DatasetEntry before query start
+    // TODO: invent a way to flush outbox in e2e tests or to shorten waiting cycles
+    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+
     // The query is almost identical to kamu-web-ui, for ease of later edits.
 
     kamu_api_server_client
@@ -149,6 +157,10 @@ pub async fn test_dataset_flows_initiators(kamu_api_server_client: KamuApiServer
     let dataset_id = kamu_api_server_client
         .create_player_scores_dataset_with_data(&token, None)
         .await;
+
+    // Workarround: await outbox, we should save a DatasetEntry before query start
+    // TODO: invent a way to flush outbox in e2e tests or to shorten waiting cycles
+    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
 
     // The query is almost identical to kamu-web-ui, for ease of later edits.
 
@@ -232,6 +244,10 @@ pub async fn test_dataset_trigger_flow(kamu_api_server_client: KamuApiServerClie
         .await;
 
     let derivative_dataset_id = kamu_api_server_client.create_leaderboard(&token).await;
+
+    // Workarround: await outbox, we should save a DatasetEntry before query start
+    // TODO: invent a way to flush outbox in e2e tests or to shorten waiting cycles
+    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
 
     // The query is almost identical to kamu-web-ui, for ease of later edits.
     // Except for commented dynamic dataset ID fields:

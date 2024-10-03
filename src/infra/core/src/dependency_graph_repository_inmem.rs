@@ -33,7 +33,7 @@ impl DependencyGraphRepository for DependencyGraphRepositoryInMemory {
         use tokio_stream::StreamExt;
 
         Box::pin(async_stream::try_stream! {
-            let mut datasets_stream = self.dataset_repo.get_all_datasets();
+            let mut datasets_stream = self.dataset_repo.all_dataset_handles();
 
             while let Some(Ok(dataset_handle)) = datasets_stream.next().await {
                 let span = tracing::debug_span!("Scanning dataset dependencies", dataset = %dataset_handle);

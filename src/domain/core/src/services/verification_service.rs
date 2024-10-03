@@ -24,16 +24,13 @@ use crate::*;
 pub trait VerificationService: Send + Sync {
     async fn verify(
         &self,
-        dataset_ref: &DatasetRef,
-        block_range: (Option<Multihash>, Option<Multihash>),
-        options: VerificationOptions,
+        request: VerificationRequest<ResolvedDataset>,
         listener: Option<Arc<dyn VerificationListener>>,
     ) -> VerificationResult;
 
     async fn verify_multi(
         &self,
-        requests: Vec<VerificationRequest>,
-        options: VerificationOptions,
+        requests: Vec<VerificationRequest<ResolvedDataset>>,
         listener: Option<Arc<dyn VerificationMultiListener>>,
     ) -> Vec<VerificationResult>;
 }
@@ -42,10 +39,11 @@ pub trait VerificationService: Send + Sync {
 // DTOs
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone)]
-pub struct VerificationRequest {
-    pub dataset_ref: DatasetRef,
+#[derive(Clone)]
+pub struct VerificationRequest<TTarget> {
+    pub target: TTarget,
     pub block_range: (Option<Multihash>, Option<Multihash>),
+    pub options: VerificationOptions,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

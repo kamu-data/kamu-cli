@@ -32,7 +32,7 @@ pub enum LineageOutputFormat {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct InspectLineageCommand {
-    dataset_repo: Arc<dyn DatasetRepository>,
+    dataset_registry: Arc<dyn DatasetRegistry>,
     provenance_svc: Arc<dyn ProvenanceService>,
     workspace_layout: Arc<WorkspaceLayout>,
     dataset_refs: Vec<DatasetRef>,
@@ -43,7 +43,7 @@ pub struct InspectLineageCommand {
 
 impl InspectLineageCommand {
     pub fn new<I>(
-        dataset_repo: Arc<dyn DatasetRepository>,
+        dataset_registry: Arc<dyn DatasetRegistry>,
         provenance_svc: Arc<dyn ProvenanceService>,
         workspace_layout: Arc<WorkspaceLayout>,
         dataset_refs: I,
@@ -55,7 +55,7 @@ impl InspectLineageCommand {
         I: IntoIterator<Item = DatasetRef>,
     {
         Self {
-            dataset_repo,
+            dataset_registry,
             provenance_svc,
             workspace_layout,
             dataset_refs: dataset_refs.into_iter().collect(),
@@ -98,10 +98,13 @@ impl Command for InspectLineageCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
         use futures::{StreamExt, TryStreamExt};
         let mut dataset_handles: Vec<_> = if self.dataset_refs.is_empty() {
-            self.dataset_repo.get_all_datasets().try_collect().await?
+            self.dataset_registry
+                .all_dataset_handles()
+                .try_collect()
+                .await?
         } else {
             futures::stream::iter(&self.dataset_refs)
-                .then(|r| self.dataset_repo.resolve_dataset_ref(r))
+                .then(|r| self.dataset_registry.resolve_dataset_handle_by_ref(r))
                 .try_collect()
                 .await
                 .map_err(CLIError::failure)?

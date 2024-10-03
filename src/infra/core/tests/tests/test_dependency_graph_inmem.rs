@@ -607,7 +607,7 @@ async fn test_in_dependency_order() {
 struct DependencyGraphHarness {
     _workdir: TempDir,
     catalog: dill::Catalog,
-    dataset_repo: Arc<dyn DatasetRepository>,
+    dataset_registry: Arc<dyn DatasetRegistry>,
     dependency_graph_service: Arc<dyn DependencyGraphService>,
     dependency_graph_repository: Arc<dyn DependencyGraphRepository>,
 }
@@ -632,6 +632,7 @@ impl DependencyGraphHarness {
             )
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
             .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
+            .add::<DatasetRegistryRepoBridge>()
             .add_value(CurrentAccountSubject::new_test())
             .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
             .add::<DependencyGraphServiceInMemory>()
@@ -647,6 +648,7 @@ impl DependencyGraphHarness {
         let catalog = b.build();
 
         let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
+        let dataset_registry = catalog.get_one::<dyn DatasetRegistry>().unwrap();
 
         let dependency_graph_service = catalog.get_one::<dyn DependencyGraphService>().unwrap();
 
@@ -657,7 +659,7 @@ impl DependencyGraphHarness {
         Self {
             _workdir: workdir,
             catalog,
-            dataset_repo,
+            dataset_registry,
             dependency_graph_service,
             dependency_graph_repository,
         }
@@ -679,15 +681,15 @@ impl DependencyGraphHarness {
             } = dataset_dependencies;
 
             let downstream_hdl = self
-                .dataset_repo
-                .resolve_dataset_ref(&downstream_dataset_id.as_local_ref())
+                .dataset_registry
+                .resolve_dataset_handle_by_ref(&downstream_dataset_id.as_local_ref())
                 .await
                 .unwrap();
 
             for upstream_dataset_id in upstream_dataset_ids {
                 let upstream_hdl = self
-                    .dataset_repo
-                    .resolve_dataset_ref(&upstream_dataset_id.as_local_ref())
+                    .dataset_registry
+                    .resolve_dataset_handle_by_ref(&upstream_dataset_id.as_local_ref())
                     .await
                     .unwrap();
 
@@ -856,8 +858,8 @@ impl DependencyGraphHarness {
     async fn dataset_id_by_name(&self, dataset_name: &str) -> DatasetID {
         let dataset_alias = DatasetAlias::try_from(dataset_name).unwrap();
         let dataset_hdl = self
-            .dataset_repo
-            .resolve_dataset_ref(&dataset_alias.as_local_ref())
+            .dataset_registry
+            .resolve_dataset_handle_by_ref(&dataset_alias.as_local_ref())
             .await
             .unwrap();
         dataset_hdl.id
@@ -866,8 +868,8 @@ impl DependencyGraphHarness {
     async fn dataset_alias_by_id(&self, dataset_id: &DatasetID) -> DatasetAlias {
         let dataset_ref = dataset_id.as_local_ref();
         let dataset_hdl = self
-            .dataset_repo
-            .resolve_dataset_ref(&dataset_ref)
+            .dataset_registry
+            .resolve_dataset_handle_by_ref(&dataset_ref)
             .await
             .unwrap();
         dataset_hdl.alias
@@ -999,8 +1001,8 @@ impl DependencyGraphHarness {
             DatasetAlias::new(account_name, DatasetName::new_unchecked(dataset_name));
 
         let dataset_handle = self
-            .dataset_repo
-            .resolve_dataset_ref(&dataset_alias.as_local_ref())
+            .dataset_registry
+            .resolve_dataset_handle_by_ref(&dataset_alias.as_local_ref())
             .await
             .unwrap();
 

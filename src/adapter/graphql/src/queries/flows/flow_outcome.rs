@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_core::DatasetRepository;
+use kamu_core::DatasetRegistry;
 use kamu_flow_system::FlowError;
 
 use crate::prelude::*;
@@ -71,10 +71,9 @@ impl FlowOutcome {
                         }),
                     }),
                     FlowError::InputDatasetCompacted(err) => {
-                        let dataset_repository =
-                            from_catalog::<dyn DatasetRepository>(ctx).unwrap();
-                        let hdl = dataset_repository
-                            .resolve_dataset_ref(&err.dataset_id.as_local_ref())
+                        let dataset_registry = from_catalog::<dyn DatasetRegistry>(ctx).unwrap();
+                        let hdl = dataset_registry
+                            .resolve_dataset_handle_by_ref(&err.dataset_id.as_local_ref())
                             .await
                             .int_err()?;
 

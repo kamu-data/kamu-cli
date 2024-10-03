@@ -11,12 +11,13 @@ use std::sync::Arc;
 
 use futures::TryStreamExt as _;
 use kamu::domain::{
+    CompactDatasetUseCase,
     CompactionOptions,
-    CompactionService,
-    DatasetRepository,
+    DatasetRegistry,
     VerificationMultiListener,
     VerificationOptions,
-    VerificationService,
+    VerificationRequest,
+    VerifyDatasetUseCase,
 };
 use opendatafabric::{DatasetHandle, DatasetRefPattern};
 
@@ -31,9 +32,9 @@ use crate::{
 
 pub struct CompactCommand {
     interact: Arc<Interact>,
-    dataset_repo: Arc<dyn DatasetRepository>,
-    verification_svc: Arc<dyn VerificationService>,
-    compaction_svc: Arc<dyn CompactionService>,
+    compact_dataset_use_case: Arc<dyn CompactDatasetUseCase>,
+    verify_dataset_use_case: Arc<dyn VerifyDatasetUseCase>,
+    dataset_registry: Arc<dyn DatasetRegistry>,
     dataset_ref_patterns: Vec<DatasetRefPattern>,
     max_slice_size: u64,
     max_slice_records: u64,
@@ -45,9 +46,9 @@ pub struct CompactCommand {
 impl CompactCommand {
     pub fn new(
         interact: Arc<Interact>,
-        dataset_repo: Arc<dyn DatasetRepository>,
-        verification_svc: Arc<dyn VerificationService>,
-        compaction_svc: Arc<dyn CompactionService>,
+        compact_dataset_use_case: Arc<dyn CompactDatasetUseCase>,
+        verify_dataset_use_case: Arc<dyn VerifyDatasetUseCase>,
+        dataset_registry: Arc<dyn DatasetRegistry>,
         dataset_ref_patterns: Vec<DatasetRefPattern>,
         max_slice_size: u64,
         max_slice_records: u64,
@@ -57,9 +58,9 @@ impl CompactCommand {
     ) -> Self {
         Self {
             interact,
-            dataset_repo,
-            verification_svc,
-            compaction_svc,
+            compact_dataset_use_case,
+            verify_dataset_use_case,
+            dataset_registry,
             dataset_ref_patterns,
             max_slice_size,
             max_slice_records,
@@ -77,11 +78,13 @@ impl CompactCommand {
         });
 
         let result = self
-            .verification_svc
-            .verify(
-                &dataset_handle.as_local_ref(),
-                (None, None),
-                VerificationOptions::default(),
+            .verify_dataset_use_case
+            .execute(
+                VerificationRequest {
+                    target: dataset_handle.clone(),
+                    block_range: (None, None),
+                    options: VerificationOptions::default(),
+                },
                 listener.begin_verify(dataset_handle),
             )
             .await;
@@ -108,7 +111,7 @@ impl Command for CompactCommand {
 
         let dataset_handles: Vec<DatasetHandle> = {
             kamu::utils::datasets_filtering::filter_datasets_by_local_pattern(
-                self.dataset_repo.as_ref(),
+                self.dataset_registry.as_ref(),
                 self.dataset_ref_patterns.clone(),
             )
             .try_collect()
@@ -146,9 +149,9 @@ impl Command for CompactCommand {
         });
 
         let compaction_results = self
-            .compaction_svc
-            .compact_multi(
-                dataset_handles.into_iter().map(Into::into).collect(),
+            .compact_dataset_use_case
+            .execute_multi(
+                dataset_handles,
                 CompactionOptions {
                     max_slice_size: Some(self.max_slice_size),
                     max_slice_records: Some(self.max_slice_records),

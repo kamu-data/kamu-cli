@@ -27,7 +27,7 @@ use crate::output::OutputConfig;
 
 pub struct PullCommand {
     pull_svc: Arc<dyn PullService>,
-    dataset_repo: Arc<dyn DatasetRepository>,
+    dataset_registry: Arc<dyn DatasetRegistry>,
     search_svc: Arc<dyn SearchService>,
     output_config: Arc<OutputConfig>,
     refs: Vec<DatasetRefAnyPattern>,
@@ -39,12 +39,13 @@ pub struct PullCommand {
     add_aliases: bool,
     force: bool,
     reset_derivatives_on_diverged_input: bool,
+    in_multi_tenant_mode: bool,
 }
 
 impl PullCommand {
     pub fn new<I>(
         pull_svc: Arc<dyn PullService>,
-        dataset_repo: Arc<dyn DatasetRepository>,
+        dataset_registry: Arc<dyn DatasetRegistry>,
         search_svc: Arc<dyn SearchService>,
         output_config: Arc<OutputConfig>,
         refs: I,
@@ -56,13 +57,14 @@ impl PullCommand {
         add_aliases: bool,
         force: bool,
         reset_derivatives_on_diverged_input: bool,
+        in_multi_tenant_mode: bool,
     ) -> Self
     where
         I: IntoIterator<Item = DatasetRefAnyPattern>,
     {
         Self {
             pull_svc,
-            dataset_repo,
+            dataset_registry,
             search_svc,
             output_config,
             refs: refs.into_iter().collect(),
@@ -74,6 +76,7 @@ impl PullCommand {
             add_aliases,
             force,
             reset_derivatives_on_diverged_input,
+            in_multi_tenant_mode,
         }
     }
 
@@ -116,10 +119,11 @@ impl PullCommand {
     ) -> Result<Vec<PullResponse>, CLIError> {
         let dataset_refs: Vec<_> = if !self.all {
             filter_datasets_by_any_pattern(
-                self.dataset_repo.as_ref(),
+                self.dataset_registry.as_ref(),
                 self.search_svc.clone(),
                 self.refs.clone(),
                 current_account_name,
+                self.in_multi_tenant_mode,
             )
             .try_collect()
             .await?
@@ -154,7 +158,7 @@ impl PullCommand {
 
     async fn pull_with_progress(&self) -> Result<Vec<PullResponse>, CLIError> {
         let pull_progress =
-            PrettyPullProgress::new(self.fetch_uncacheable, self.dataset_repo.is_multi_tenant());
+            PrettyPullProgress::new(self.fetch_uncacheable, self.in_multi_tenant_mode);
         let listener = Arc::new(pull_progress.clone());
         self.pull(Some(listener)).await
     }

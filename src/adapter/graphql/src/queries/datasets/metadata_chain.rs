@@ -43,8 +43,8 @@ impl MetadataChain {
 
     #[graphql(skip)]
     fn get_dataset(&self, ctx: &Context<'_>) -> std::sync::Arc<dyn domain::Dataset> {
-        let dataset_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
-        dataset_repo.get_dataset_by_handle(&self.dataset_handle)
+        let dataset_registry = from_catalog::<dyn domain::DatasetRegistry>(ctx).unwrap();
+        dataset_registry.get_dataset_by_handle(&self.dataset_handle)
     }
 
     /// Returns all named metadata block references

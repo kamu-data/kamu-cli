@@ -17,7 +17,8 @@ use kamu_core::{
     Dataset,
     DatasetChangesService,
     DatasetIntervalIncrement,
-    DatasetRepository,
+    DatasetRegistry,
+    DatasetRegistryExt,
     GetDatasetError,
     GetIncrementError,
     GetRefError,
@@ -29,7 +30,7 @@ use opendatafabric::{DataSlice, DatasetID, MetadataEvent, Multihash};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct DatasetChangesServiceImpl {
-    dataset_repo: Arc<dyn DatasetRepository>,
+    dataset_registry: Arc<dyn DatasetRegistry>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -37,16 +38,16 @@ pub struct DatasetChangesServiceImpl {
 #[component(pub)]
 #[interface(dyn DatasetChangesService)]
 impl DatasetChangesServiceImpl {
-    pub fn new(dataset_repo: Arc<dyn DatasetRepository>) -> Self {
-        Self { dataset_repo }
+    pub fn new(dataset_registry: Arc<dyn DatasetRegistry>) -> Self {
+        Self { dataset_registry }
     }
 
     async fn resolve_dataset_by_id(
         &self,
         dataset_id: &DatasetID,
     ) -> Result<Arc<dyn Dataset>, GetIncrementError> {
-        self.dataset_repo
-            .find_dataset_by_ref(&dataset_id.as_local_ref())
+        self.dataset_registry
+            .get_dataset_by_ref(&dataset_id.as_local_ref())
             .await
             .map_err(|e| match e {
                 GetDatasetError::NotFound(e) => GetIncrementError::DatasetNotFound(e),

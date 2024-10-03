@@ -8,7 +8,10 @@
 // by the Apache License, Version 2.0.
 
 use futures::TryStreamExt;
-use kamu_core::{self as domain, DatasetRepositoryExt};
+use kamu_core::{
+    DatasetRegistryExt,
+    {self as domain},
+};
 use opendatafabric as odf;
 
 use crate::prelude::*;
@@ -24,9 +27,9 @@ impl Datasets {
 
     /// Returns dataset by its ID
     async fn by_id(&self, ctx: &Context<'_>, dataset_id: DatasetID) -> Result<Option<Dataset>> {
-        let dataset_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
-        let hdl = dataset_repo
-            .try_resolve_dataset_ref(&dataset_id.as_local_ref())
+        let dataset_registry = from_catalog::<dyn domain::DatasetRegistry>(ctx).unwrap();
+        let hdl = dataset_registry
+            .try_resolve_dataset_handle_by_ref(&dataset_id.as_local_ref())
             .await?;
         Ok(match hdl {
             Some(h) => {
@@ -49,9 +52,9 @@ impl Datasets {
     ) -> Result<Option<Dataset>> {
         let dataset_alias = odf::DatasetAlias::new(Some(account_name.into()), dataset_name.into());
 
-        let dataset_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
-        let hdl = dataset_repo
-            .try_resolve_dataset_ref(&dataset_alias.into_local_ref())
+        let dataset_registry = from_catalog::<dyn domain::DatasetRegistry>(ctx).unwrap();
+        let hdl = dataset_registry
+            .try_resolve_dataset_handle_by_ref(&dataset_alias.into_local_ref())
             .await?;
 
         Ok(match hdl {
@@ -74,15 +77,15 @@ impl Datasets {
         page: Option<usize>,
         per_page: Option<usize>,
     ) -> Result<DatasetConnection> {
-        let dataset_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
+        let dataset_registry = from_catalog::<dyn domain::DatasetRegistry>(ctx).unwrap();
 
         let page = page.unwrap_or(0);
         let per_page = per_page.unwrap_or(Self::DEFAULT_PER_PAGE);
 
         let account_name = account_ref.account_name_internal();
 
-        let mut all_datasets: Vec<_> = dataset_repo
-            .get_datasets_by_owner(&account_name.clone().into())
+        let mut all_datasets: Vec<_> = dataset_registry
+            .all_dataset_handles_by_owner(&account_name.clone().into())
             .try_collect()
             .await?;
         let total_count = all_datasets.len();

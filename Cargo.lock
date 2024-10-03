@@ -5052,6 +5052,7 @@ dependencies = [
  "init-on-startup",
  "internal-error",
  "itertools 0.13.0",
+ "kamu",
  "kamu-accounts",
  "kamu-accounts-inmem",
  "kamu-accounts-services",
@@ -5898,6 +5899,7 @@ dependencies = [
  "serde_with",
  "sqlx",
  "thiserror",
+ "tokio-stream",
  "uuid",
 ]
 
@@ -5905,11 +5907,13 @@ dependencies = [
 name = "kamu-datasets-inmem"
 version = "0.205.0"
 dependencies = [
+ "async-stream",
  "async-trait",
  "chrono",
  "database-common",
  "database-common-macros",
  "dill",
+ "futures",
  "internal-error",
  "kamu-accounts-inmem",
  "kamu-datasets",
@@ -5928,11 +5932,13 @@ dependencies = [
 name = "kamu-datasets-postgres"
 version = "0.205.0"
 dependencies = [
+ "async-stream",
  "async-trait",
  "chrono",
  "database-common",
  "database-common-macros",
  "dill",
+ "futures",
  "internal-error",
  "kamu-accounts-postgres",
  "kamu-datasets",
@@ -5954,6 +5960,7 @@ dependencies = [
  "chrono",
  "database-common",
  "dill",
+ "futures",
  "kamu-accounts",
  "kamu-datasets",
  "opendatafabric",
@@ -5965,6 +5972,7 @@ dependencies = [
 name = "kamu-datasets-services"
 version = "0.205.0"
 dependencies = [
+ "async-stream",
  "async-trait",
  "chrono",
  "database-common",
@@ -5996,11 +6004,13 @@ dependencies = [
 name = "kamu-datasets-sqlite"
 version = "0.205.0"
 dependencies = [
+ "async-stream",
  "async-trait",
  "chrono",
  "database-common",
  "database-common-macros",
  "dill",
+ "futures",
  "internal-error",
  "kamu-accounts-sqlite",
  "kamu-datasets",

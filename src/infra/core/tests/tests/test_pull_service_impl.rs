@@ -14,7 +14,6 @@ use std::sync::{Arc, Mutex};
 
 use chrono::prelude::*;
 use dill::*;
-use domain::auth::AlwaysHappyDatasetActionAuthorizer;
 use kamu::domain::*;
 use kamu::testing::*;
 use kamu::*;
@@ -173,7 +172,6 @@ async fn create_graph_remote(
         reg.clone(),
         dataset_repo,
         dataset_repo_writer,
-        Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new()),
         Arc::new(DatasetFactoryImpl::new(
             IpfsGateway::default(),
             Arc::new(auth::DummyOdfServerAccessTokenResolver::new()),
@@ -396,10 +394,8 @@ async fn test_pull_batching_complex_with_remote() {
 
     // Add remote pull alias to E
     harness
-        .remote_alias_reg
         .get_remote_aliases(&rl!("e"))
         .await
-        .unwrap()
         .add(
             &DatasetRefRemote::try_from("kamu.dev/anonymous/e").unwrap(),
             RemoteAliasKind::Pull,
@@ -536,11 +532,7 @@ async fn test_sync_from() {
         }
     );
 
-    let aliases = harness
-        .remote_alias_reg
-        .get_remote_aliases(&rl!("bar"))
-        .await
-        .unwrap();
+    let aliases = harness.get_remote_aliases(&rl!("bar")).await;
     let pull_aliases: Vec<_> = aliases
         .get_by_kind(RemoteAliasKind::Pull)
         .cloned()
@@ -581,11 +573,7 @@ async fn test_sync_from_url_and_local_ref() {
         }
     );
 
-    let aliases = harness
-        .remote_alias_reg
-        .get_remote_aliases(&rl!("bar"))
-        .await
-        .unwrap();
+    let aliases = harness.get_remote_aliases(&rl!("bar")).await;
     let pull_aliases: Vec<_> = aliases
         .get_by_kind(RemoteAliasKind::Pull)
         .cloned()
@@ -626,11 +614,7 @@ async fn test_sync_from_url_and_local_multi_tenant_ref() {
         }
     );
 
-    let aliases = harness
-        .remote_alias_reg
-        .get_remote_aliases(&mrl!("x/bar"))
-        .await
-        .unwrap();
+    let aliases = harness.get_remote_aliases(&mrl!("x/bar")).await;
     let pull_aliases: Vec<_> = aliases
         .get_by_kind(RemoteAliasKind::Pull)
         .cloned()
@@ -671,11 +655,7 @@ async fn test_sync_from_url_only() {
         }
     );
 
-    let aliases = harness
-        .remote_alias_reg
-        .get_remote_aliases(&rl!("bar"))
-        .await
-        .unwrap();
+    let aliases = harness.get_remote_aliases(&rl!("bar")).await;
     let pull_aliases: Vec<_> = aliases
         .get_by_kind(RemoteAliasKind::Pull)
         .cloned()
@@ -717,10 +697,8 @@ async fn test_sync_from_url_only_multi_tenant_case() {
     );
 
     let aliases = harness
-        .remote_alias_reg
         .get_remote_aliases(&mrl!(format!("{}/{}", DEFAULT_ACCOUNT_NAME_STR, "bar")))
-        .await
-        .unwrap();
+        .await;
     let pull_aliases: Vec<_> = aliases
         .get_by_kind(RemoteAliasKind::Pull)
         .cloned()
@@ -737,18 +715,10 @@ async fn test_sync_from_url_only_multi_tenant_case() {
 #[tokio::test]
 async fn test_set_watermark() {
     let tmp_dir = tempfile::tempdir().unwrap();
-    let harness = PullTestHarness::new_with_authorizer(
-        tmp_dir.path(),
-        MockDatasetActionAuthorizer::new().expect_check_write_dataset(
-            &DatasetAlias::new(None, DatasetName::new_unchecked("foo")),
-            4,
-            true,
-        ),
-        false,
-    );
+    let harness = PullTestHarness::new(tmp_dir.path(), false);
 
     let dataset_alias = n!("foo");
-    harness.create_dataset(&dataset_alias).await;
+    let create_result = harness.create_dataset(&dataset_alias).await;
 
     assert_eq!(harness.num_blocks(&dataset_alias).await, 1);
 
@@ -756,7 +726,7 @@ async fn test_set_watermark() {
         harness
             .pull_svc
             .set_watermark(
-                &dataset_alias.as_local_ref(),
+                create_result.dataset.clone(),
                 Utc.with_ymd_and_hms(2000, 1, 2, 0, 0, 0).unwrap()
             )
             .await,
@@ -768,7 +738,7 @@ async fn test_set_watermark() {
         harness
             .pull_svc
             .set_watermark(
-                &dataset_alias.as_local_ref(),
+                create_result.dataset.clone(),
                 Utc.with_ymd_and_hms(2000, 1, 3, 0, 0, 0).unwrap()
             )
             .await,
@@ -780,7 +750,7 @@ async fn test_set_watermark() {
         harness
             .pull_svc
             .set_watermark(
-                &dataset_alias.as_local_ref(),
+                create_result.dataset.clone(),
                 Utc.with_ymd_and_hms(2000, 1, 3, 0, 0, 0).unwrap()
             )
             .await,
@@ -792,7 +762,7 @@ async fn test_set_watermark() {
         harness
             .pull_svc
             .set_watermark(
-                &dataset_alias.as_local_ref(),
+                create_result.dataset,
                 Utc.with_ymd_and_hms(2000, 1, 2, 0, 0, 0).unwrap()
             )
             .await,
@@ -804,45 +774,13 @@ async fn test_set_watermark() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
-async fn test_set_watermark_unauthorized() {
-    let tmp_dir = tempfile::tempdir().unwrap();
-    let harness = PullTestHarness::new_with_authorizer(
-        tmp_dir.path(),
-        MockDatasetActionAuthorizer::denying(),
-        true,
-    );
-
-    let dataset_alias = n!("foo");
-    harness.create_dataset(&dataset_alias).await;
-
-    assert_matches!(
-        harness
-            .pull_svc
-            .set_watermark(
-                &dataset_alias.as_local_ref(),
-                Utc.with_ymd_and_hms(2000, 1, 2, 0, 0, 0).unwrap()
-            )
-            .await,
-        Err(SetWatermarkError::Access(AccessError::Forbidden(_)))
-    );
-
-    assert_eq!(harness.num_blocks(&dataset_alias).await, 1);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[tokio::test]
 async fn test_set_watermark_rejects_on_derivative() {
     let tmp_dir = tempfile::tempdir().unwrap();
-    let harness = PullTestHarness::new_with_authorizer(
-        tmp_dir.path(),
-        AlwaysHappyDatasetActionAuthorizer::new(),
-        true,
-    );
+    let harness = PullTestHarness::new(tmp_dir.path(), true);
 
     let dataset_alias = n!("foo");
 
-    harness
+    let create_result = harness
         .dataset_repo
         .create_dataset(
             &dataset_alias,
@@ -856,7 +794,7 @@ async fn test_set_watermark_rejects_on_derivative() {
         harness
             .pull_svc
             .set_watermark(
-                &dataset_alias.as_local_ref(),
+                create_result.dataset,
                 Utc.with_ymd_and_hms(2000, 1, 2, 0, 0, 0).unwrap()
             )
             .await,
@@ -878,18 +816,6 @@ struct PullTestHarness {
 
 impl PullTestHarness {
     fn new(tmp_path: &Path, multi_tenant: bool) -> Self {
-        Self::new_with_authorizer(
-            tmp_path,
-            auth::AlwaysHappyDatasetActionAuthorizer::new(),
-            multi_tenant,
-        )
-    }
-
-    fn new_with_authorizer<TDatasetAuthorizer: auth::DatasetActionAuthorizer + 'static>(
-        tmp_path: &Path,
-        dataset_action_authorizer: TDatasetAuthorizer,
-        multi_tenant: bool,
-    ) -> Self {
         let calls = Arc::new(Mutex::new(Vec::new()));
 
         let datasets_dir_path = tmp_path.join("datasets");
@@ -898,8 +824,6 @@ impl PullTestHarness {
         let catalog = dill::CatalogBuilder::new()
             .add::<SystemTimeSourceDefault>()
             .add_value(CurrentAccountSubject::new_test())
-            .add_value(dataset_action_authorizer)
-            .bind::<dyn auth::DatasetActionAuthorizer, TDatasetAuthorizer>()
             .add_builder(
                 DatasetRepositoryLocalFs::builder()
                     .with_root(datasets_dir_path)
@@ -928,7 +852,7 @@ impl PullTestHarness {
         }
     }
 
-    async fn create_dataset(&self, dataset_alias: &DatasetAlias) {
+    async fn create_dataset(&self, dataset_alias: &DatasetAlias) -> CreateDatasetResult {
         self.dataset_repo
             .create_dataset_from_snapshot(
                 MetadataFactory::dataset_snapshot()
@@ -936,13 +860,14 @@ impl PullTestHarness {
                     .build(),
             )
             .await
-            .unwrap();
+            .unwrap()
+            .create_dataset_result
     }
 
     async fn num_blocks(&self, dataset_alias: &DatasetAlias) -> usize {
         let ds = self
             .dataset_repo
-            .find_dataset_by_ref(&dataset_alias.as_local_ref())
+            .get_dataset_by_ref(&dataset_alias.as_local_ref())
             .await
             .unwrap();
 
@@ -964,6 +889,18 @@ impl PullTestHarness {
         }
 
         self.collect_calls()
+    }
+
+    async fn get_remote_aliases(&self, dataset_ref: &DatasetRef) -> Box<dyn RemoteAliases> {
+        let dataset = self
+            .dataset_repo
+            .get_dataset_by_ref(dataset_ref)
+            .await
+            .unwrap();
+        self.remote_alias_reg
+            .get_remote_aliases(dataset)
+            .await
+            .unwrap()
     }
 }
 
@@ -1070,14 +1007,14 @@ impl TestIngestService {
 impl PollingIngestService for TestIngestService {
     async fn get_active_polling_source(
         &self,
-        _dataset_ref: &DatasetRef,
+        _target: ResolvedDataset,
     ) -> Result<Option<(Multihash, MetadataBlockTyped<SetPollingSource>)>, GetDatasetError> {
         unimplemented!()
     }
 
     async fn ingest(
         &self,
-        _dataset_ref: &DatasetRef,
+        _target: ResolvedDataset,
         _ingest_options: PollingIngestOptions,
         _maybe_listener: Option<Arc<dyn PollingIngestListener>>,
     ) -> Result<PollingIngestResult, PollingIngestError> {
@@ -1086,14 +1023,14 @@ impl PollingIngestService for TestIngestService {
 
     async fn ingest_multi(
         &self,
-        dataset_refs: Vec<DatasetRef>,
+        targets: Vec<ResolvedDataset>,
         _options: PollingIngestOptions,
         _listener: Option<Arc<dyn PollingIngestMultiListener>>,
     ) -> Vec<PollingIngestResponse> {
-        let results = dataset_refs
+        let results = targets
             .iter()
-            .map(|r| PollingIngestResponse {
-                dataset_ref: r.clone(),
+            .map(|target| PollingIngestResponse {
+                dataset_ref: target.handle.as_local_ref(),
                 result: Ok(PollingIngestResult::UpToDate {
                     no_source_defined: false,
                     uncacheable: false,
@@ -1101,7 +1038,10 @@ impl PollingIngestService for TestIngestService {
             })
             .collect();
         self.calls.lock().unwrap().push(PullBatch::Ingest(
-            dataset_refs.into_iter().map(Into::into).collect(),
+            targets
+                .into_iter()
+                .map(|target| target.handle.as_any_ref())
+                .collect(),
         ));
         results
     }
@@ -1123,14 +1063,14 @@ impl TestTransformService {
 impl TransformService for TestTransformService {
     async fn get_active_transform(
         &self,
-        _dataset_ref: &DatasetRef,
+        _target: ResolvedDataset,
     ) -> Result<Option<(Multihash, MetadataBlockTyped<SetTransform>)>, GetDatasetError> {
         unimplemented!()
     }
 
     async fn transform(
         &self,
-        _dataset_ref: &DatasetRef,
+        _target: ResolvedDataset,
         _options: TransformOptions,
         _maybe_listener: Option<Arc<dyn TransformListener>>,
     ) -> Result<TransformResult, TransformError> {
@@ -1139,23 +1079,23 @@ impl TransformService for TestTransformService {
 
     async fn transform_multi(
         &self,
-        dataset_refs: Vec<DatasetRef>,
+        targets: Vec<ResolvedDataset>,
         _options: TransformOptions,
         _maybe_multi_listener: Option<Arc<dyn TransformMultiListener>>,
     ) -> Vec<(DatasetRef, Result<TransformResult, TransformError>)> {
-        let results = dataset_refs
+        let results = targets
             .iter()
-            .map(|r| (r.clone(), Ok(TransformResult::UpToDate)))
+            .map(|r| (r.handle.as_local_ref(), Ok(TransformResult::UpToDate)))
             .collect();
         self.calls.lock().unwrap().push(PullBatch::Transform(
-            dataset_refs.into_iter().map(Into::into).collect(),
+            targets.into_iter().map(|t| t.handle.as_any_ref()).collect(),
         ));
         results
     }
 
     async fn verify_transform(
         &self,
-        _dataset_ref: &DatasetRef,
+        _target: ResolvedDataset,
         _block_range: (Option<Multihash>, Option<Multihash>),
         _listener: Option<Arc<dyn VerificationListener>>,
     ) -> Result<(), VerificationError> {
@@ -1213,7 +1153,7 @@ impl SyncService for TestSyncService {
 
             match self
                 .dataset_repo
-                .try_resolve_dataset_ref(&local_ref)
+                .try_resolve_dataset_handle_by_ref(&local_ref)
                 .await
                 .unwrap()
             {

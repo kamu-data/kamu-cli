@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -15,6 +15,7 @@ use container_runtime::*;
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_core::engine::*;
 use kamu_core::*;
+use opendatafabric::DatasetHandle;
 
 use super::engine_odf::*;
 use crate::utils::docker_images;
@@ -49,7 +50,6 @@ impl EngineProvisionerLocal {
     pub fn new(
         config: EngineProvisionerLocalConfig,
         container_runtime: Arc<ContainerRuntime>,
-        dataset_repo: Arc<dyn DatasetRepository>,
         run_info_dir: Arc<RunInfoDir>,
     ) -> Self {
         let engine_config = ODFEngineConfig {
@@ -63,28 +63,24 @@ impl EngineProvisionerLocal {
                 engine_config.clone(),
                 &config.spark_image,
                 run_info_dir.clone(),
-                dataset_repo.clone(),
             )),
             flink_engine: Arc::new(ODFEngine::new(
                 container_runtime.clone(),
                 engine_config.clone(),
                 &config.flink_image,
                 run_info_dir.clone(),
-                dataset_repo.clone(),
             )),
             datafusion_engine: Arc::new(ODFEngine::new(
                 container_runtime.clone(),
                 engine_config.clone(),
                 &config.datafusion_image,
                 run_info_dir.clone(),
-                dataset_repo.clone(),
             )),
             risingwave_engine: Arc::new(ODFEngine::new(
                 container_runtime.clone(),
                 engine_config.clone(),
                 &config.risingwave_image,
                 run_info_dir.clone(),
-                dataset_repo.clone(),
             )),
             container_runtime,
             inner: Arc::new(Inner {
@@ -306,8 +302,11 @@ impl Engine for EngineHandle {
     async fn execute_transform(
         &self,
         request: TransformRequestExt,
+        datasets_by_handle: &HashMap<DatasetHandle, Arc<dyn Dataset>>,
     ) -> Result<TransformResponseExt, EngineError> {
-        self.engine.execute_transform(request).await
+        self.engine
+            .execute_transform(request, datasets_by_handle)
+            .await
     }
 }
 

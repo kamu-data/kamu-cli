@@ -15,8 +15,8 @@ use url::Url;
 use crate::{
     Dataset,
     DatasetHandleStream,
-    DatasetRegistry,
     DatasetRepository,
+    DatasetUrlResolver,
     GetDatasetError,
     GetDatasetUrlError,
 };
@@ -27,7 +27,7 @@ mockall::mock! {
     pub DatasetRepository {}
 
     #[async_trait::async_trait]
-    impl DatasetRegistry for DatasetRepository {
+    impl DatasetUrlResolver for DatasetRepository {
         async fn get_dataset_url(&self, dataset_ref: &DatasetRef) -> Result<Url, GetDatasetUrlError>;
     }
 
@@ -35,19 +35,14 @@ mockall::mock! {
     impl DatasetRepository for DatasetRepository {
         fn is_multi_tenant(&self) -> bool;
 
-        async fn resolve_dataset_ref(
+        async fn resolve_dataset_handle_by_ref(
             &self,
             dataset_ref: &DatasetRef,
         ) -> Result<DatasetHandle, GetDatasetError>;
 
-        fn get_all_datasets(&self) -> DatasetHandleStream<'_>;
+        fn all_dataset_handles(&self) -> DatasetHandleStream<'_>;
 
-        fn get_datasets_by_owner(&self, account_name: &AccountName) -> DatasetHandleStream<'_>;
-
-        async fn find_dataset_by_ref(
-            &self,
-            dataset_ref: &DatasetRef,
-        ) -> Result<Arc<dyn Dataset>, GetDatasetError>;
+        fn all_dataset_handles_by_owner(&self, account_name: &AccountName) -> DatasetHandleStream<'_>;
 
         fn get_dataset_by_handle(&self, dataset_handle: &DatasetHandle) -> Arc<dyn Dataset>;
     }

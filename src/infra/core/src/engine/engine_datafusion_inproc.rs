@@ -7,11 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use datafusion::prelude::*;
 use internal_error::*;
 use kamu_core::engine::*;
+use kamu_core::Dataset;
 use opendatafabric::*;
 
 /// An in-process engine using Apache Arrow Datafusion framework.
@@ -114,6 +116,7 @@ impl Engine for EngineDatafusionInproc {
     async fn execute_transform(
         &self,
         _request: TransformRequestExt,
+        _datasets_by_handle: &HashMap<DatasetHandle, Arc<dyn Dataset>>,
     ) -> Result<TransformResponseExt, EngineError> {
         unimplemented!(
             "Derivative transformations must be executed by a versioned out-of-process engine"

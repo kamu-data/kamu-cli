@@ -30,7 +30,6 @@ pub struct SyncServiceImpl {
     remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
     dataset_repo: Arc<dyn DatasetRepository>,
     dataset_repo_writer: Arc<dyn DatasetRepositoryWriter>,
-    dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
     dataset_factory: Arc<dyn DatasetFactory>,
     smart_transfer_protocol: Arc<dyn SmartTransferProtocolClient>,
     ipfs_client: Arc<IpfsClient>,
@@ -45,7 +44,6 @@ impl SyncServiceImpl {
         remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
         dataset_repo: Arc<dyn DatasetRepository>,
         dataset_repo_writer: Arc<dyn DatasetRepositoryWriter>,
-        dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
         dataset_factory: Arc<dyn DatasetFactory>,
         smart_transfer_protocol: Arc<dyn SmartTransferProtocolClient>,
         ipfs_client: Arc<IpfsClient>,
@@ -54,7 +52,6 @@ impl SyncServiceImpl {
             remote_repo_reg,
             dataset_repo,
             dataset_repo_writer,
-            dataset_action_authorizer,
             dataset_factory,
             smart_transfer_protocol,
             ipfs_client,
@@ -96,14 +93,7 @@ impl SyncServiceImpl {
         dataset_ref: &SyncRef,
     ) -> Result<Arc<dyn Dataset>, SyncError> {
         let dataset = match dataset_ref {
-            SyncRef::Local(local_ref) => {
-                let dataset_handle = self.dataset_repo.resolve_dataset_ref(local_ref).await?;
-                self.dataset_action_authorizer
-                    .check_action_allowed(&dataset_handle, auth::DatasetAction::Read)
-                    .await?;
-
-                self.dataset_repo.find_dataset_by_ref(local_ref).await?
-            }
+            SyncRef::Local(local_ref) => self.dataset_repo.get_dataset_by_ref(local_ref).await?,
             SyncRef::Remote(url) => {
                 // TODO: implement authorization checks somehow
                 self.dataset_factory
@@ -134,16 +124,8 @@ impl SyncServiceImpl {
     ) -> Result<(Option<Arc<dyn Dataset>>, Option<DatasetFactoryFn>), SyncError> {
         match dataset_ref {
             SyncRef::Local(local_ref) => {
-                match self.dataset_repo.find_dataset_by_ref(local_ref).await {
-                    Ok(dataset) => {
-                        let dataset_handle =
-                            self.dataset_repo.resolve_dataset_ref(local_ref).await?;
-                        self.dataset_action_authorizer
-                            .check_action_allowed(&dataset_handle, auth::DatasetAction::Write)
-                            .await?;
-
-                        Ok((Some(dataset), None))
-                    }
+                match self.dataset_repo.get_dataset_by_ref(local_ref).await {
+                    Ok(dataset) => Ok((Some(dataset), None)),
                     Err(GetDatasetError::NotFound(_)) if create_if_not_exists => {
                         let alias = local_ref.alias().unwrap().clone();
                         let repo_writer = self.dataset_repo_writer.clone();
@@ -329,13 +311,8 @@ impl SyncServiceImpl {
 
         tracing::info!(key_name = %key.name, key_id = %key.id, "Resolved the key to use for IPNS publishing");
 
-        let src_dataset_handle = self.dataset_repo.resolve_dataset_ref(src).await?;
-        self.dataset_action_authorizer
-            .check_action_allowed(&src_dataset_handle, auth::DatasetAction::Read)
-            .await?;
-
         // Resolve and compare heads
-        let src_dataset = self.dataset_repo.find_dataset_by_ref(src).await?;
+        let src_dataset = self.dataset_repo.get_dataset_by_ref(src).await?;
         let src_head = src_dataset
             .as_metadata_chain()
             .resolve_ref(&BlockRef::Head)

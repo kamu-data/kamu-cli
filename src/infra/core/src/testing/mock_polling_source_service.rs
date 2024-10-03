@@ -19,9 +19,9 @@ use kamu_core::{
     PollingIngestResponse,
     PollingIngestResult,
     PollingIngestService,
+    ResolvedDataset,
 };
 use opendatafabric::{
-    DatasetRef,
     FetchStep,
     FetchStepUrl,
     MergeStrategy,
@@ -41,19 +41,19 @@ mockall::mock! {
     impl PollingIngestService for PollingIngestService {
       async fn get_active_polling_source(
           &self,
-          dataset_ref: &DatasetRef,
+          target: ResolvedDataset,
       ) -> Result<Option<(Multihash, MetadataBlockTyped<SetPollingSource>)>, GetDatasetError>;
 
     async fn ingest(
         &self,
-        dataset_ref: &DatasetRef,
+        target: ResolvedDataset,
         options: PollingIngestOptions,
         listener: Option<Arc<dyn PollingIngestListener>>,
     ) -> Result<PollingIngestResult, PollingIngestError>;
 
     async fn ingest_multi(
         &self,
-        dataset_refs: Vec<DatasetRef>,
+        targets: Vec<ResolvedDataset>,
         options: PollingIngestOptions,
         listener: Option<Arc<dyn PollingIngestMultiListener>>,
     ) -> Vec<PollingIngestResponse>;

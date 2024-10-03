@@ -10,7 +10,7 @@
 use std::sync::Arc;
 
 use internal_error::ResultIntoInternal;
-use kamu::domain::{DatasetRepository, MetadataChainExt};
+use kamu::domain::{DatasetRegistry, DatasetRegistryExt, MetadataChainExt};
 use opendatafabric::DatasetRef;
 
 use super::{CLIError, Command};
@@ -20,14 +20,14 @@ use super::{CLIError, Command};
 pub struct SystemE2ECommand {
     action: String,
     dataset_ref: Option<DatasetRef>,
-    dataset_repo: Arc<dyn DatasetRepository>,
+    dataset_registry: Arc<dyn DatasetRegistry>,
 }
 
 impl SystemE2ECommand {
     pub fn new<S>(
         action: S,
         dataset_ref: Option<DatasetRef>,
-        dataset_repo: Arc<dyn DatasetRepository>,
+        dataset_registry: Arc<dyn DatasetRegistry>,
     ) -> Self
     where
         S: Into<String>,
@@ -35,7 +35,7 @@ impl SystemE2ECommand {
         Self {
             action: action.into(),
             dataset_ref,
-            dataset_repo,
+            dataset_registry,
         }
     }
 }
@@ -49,7 +49,10 @@ impl Command for SystemE2ECommand {
                     return Err(CLIError::usage_error("dataset required"));
                 };
 
-                let dataset = self.dataset_repo.find_dataset_by_ref(dataset_ref).await?;
+                let dataset = self
+                    .dataset_registry
+                    .get_dataset_by_ref(dataset_ref)
+                    .await?;
 
                 let maybe_physical_hash = dataset
                     .as_metadata_chain()

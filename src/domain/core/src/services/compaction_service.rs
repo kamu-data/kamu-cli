@@ -16,24 +16,21 @@ use thiserror::Error;
 
 use crate::*;
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub const DEFAULT_MAX_SLICE_SIZE: u64 = 300_000_000;
 pub const DEFAULT_MAX_SLICE_RECORDS: u64 = 10_000;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 pub trait CompactionService: Send + Sync {
     async fn compact_dataset(
         &self,
-        dataset_handle: &DatasetHandle,
+        target: ResolvedDataset,
         options: CompactionOptions,
         listener: Option<Arc<dyn CompactionListener>>,
     ) -> Result<CompactionResult, CompactionError>;
-
-    async fn compact_multi(
-        &self,
-        dataset_refs: Vec<DatasetRef>,
-        options: CompactionOptions,
-        listener: Option<Arc<dyn CompactionMultiListener>>,
-    ) -> Vec<CompactionResponse>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -117,9 +114,9 @@ impl From<SetRefError> for CompactionError {
 }
 
 #[derive(Error, Debug)]
-#[error("Dataset {dataset_name} in not root kind")]
+#[error("Dataset '{dataset_alias}' in not root kind")]
 pub struct InvalidDatasetKindError {
-    pub dataset_name: DatasetName,
+    pub dataset_alias: DatasetAlias,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -191,3 +188,5 @@ impl Default for CompactionOptions {
         }
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

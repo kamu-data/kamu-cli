@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
@@ -24,7 +24,6 @@ use time_source::SystemTimeSource;
 
 pub struct TransformServiceImpl {
     dataset_repo: Arc<dyn DatasetRepository>,
-    dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
     engine_provisioner: Arc<dyn EngineProvisioner>,
     time_source: Arc<dyn SystemTimeSource>,
     compaction_svc: Arc<dyn CompactionService>,
@@ -35,14 +34,12 @@ pub struct TransformServiceImpl {
 impl TransformServiceImpl {
     pub fn new(
         dataset_repo: Arc<dyn DatasetRepository>,
-        dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
         engine_provisioner: Arc<dyn EngineProvisioner>,
         time_source: Arc<dyn SystemTimeSource>,
         compaction_svc: Arc<dyn CompactionService>,
     ) -> Self {
         Self {
             dataset_repo,
-            dataset_action_authorizer,
             engine_provisioner,
             time_source,
             compaction_svc,
@@ -54,6 +51,7 @@ impl TransformServiceImpl {
     async fn do_transform<CommitFn, Fut>(
         engine_provisioner: Arc<dyn EngineProvisioner>,
         request: TransformRequestExt,
+        datasets_by_handle: &HashMap<DatasetHandle, Arc<dyn Dataset>>,
         commit_fn: CommitFn,
         listener: Arc<dyn TransformListener>,
     ) -> Result<TransformResult, TransformError>
@@ -65,8 +63,14 @@ impl TransformServiceImpl {
 
         listener.begin();
 
-        match Self::do_transform_inner(engine_provisioner, request, commit_fn, listener.clone())
-            .await
+        match Self::do_transform_inner(
+            engine_provisioner,
+            request,
+            datasets_by_handle,
+            commit_fn,
+            listener.clone(),
+        )
+        .await
         {
             Ok(res) => {
                 tracing::info!("Transform successful");
@@ -85,6 +89,7 @@ impl TransformServiceImpl {
     async fn do_transform_inner<CommitFn, Fut>(
         engine_provisioner: Arc<dyn EngineProvisioner>,
         request: TransformRequestExt,
+        datasets_by_handle: &HashMap<DatasetHandle, Arc<dyn Dataset>>,
         commit_fn: CommitFn,
         listener: Arc<dyn TransformListener>,
     ) -> Result<TransformResult, TransformError>
@@ -101,7 +106,9 @@ impl TransformServiceImpl {
             )
             .await?;
 
-        let response = engine.execute_transform(request.clone()).await?;
+        let response = engine
+            .execute_transform(request.clone(), datasets_by_handle)
+            .await?;
         assert_eq!(
             response.new_offset_interval.is_some(),
             response.new_data.is_some()
@@ -306,7 +313,7 @@ impl TransformServiceImpl {
 
         let dataset_handle = self
             .dataset_repo
-            .resolve_dataset_ref(&dataset_id.as_local_ref())
+            .resolve_dataset_handle_by_ref(&dataset_id.as_local_ref())
             .await
             .int_err()?;
         let dataset = self.dataset_repo.get_dataset_by_handle(&dataset_handle);
@@ -361,13 +368,9 @@ impl TransformServiceImpl {
     ) -> Result<TransformRequestInputExt, TransformError> {
         let dataset_handle = self
             .dataset_repo
-            .resolve_dataset_ref(&query_input.dataset_id.as_local_ref())
+            .resolve_dataset_handle_by_ref(&query_input.dataset_id.as_local_ref())
             .await
             .int_err()?;
-
-        self.dataset_action_authorizer
-            .check_action_allowed(&dataset_handle, auth::DatasetAction::Read)
-            .await?;
 
         let dataset = self.dataset_repo.get_dataset_by_handle(&dataset_handle);
         let input_chain = dataset.as_metadata_chain();
@@ -458,7 +461,7 @@ impl TransformServiceImpl {
     ) -> Result<DatasetVocabulary, InternalError> {
         let dataset = self
             .dataset_repo
-            .find_dataset_by_ref(dataset_ref)
+            .get_dataset_by_ref(dataset_ref)
             .await
             .int_err()?;
 
@@ -663,30 +666,36 @@ impl TransformServiceImpl {
     }
 
     #[async_recursion::async_recursion]
-    #[tracing::instrument(level = "info", name = "transform", skip_all, fields(%dataset_ref))]
+    #[tracing::instrument(level = "info", name = "transform", skip_all, fields(target=%target.handle))]
     async fn transform_impl(
         &self,
-        dataset_ref: DatasetRef,
+        target: ResolvedDataset,
         options: TransformOptions,
         maybe_listener: Option<Arc<dyn TransformListener>>,
     ) -> Result<TransformResult, TransformError> {
         let listener = maybe_listener.unwrap_or_else(|| Arc::new(NullTransformListener));
-        let dataset_handle = self.dataset_repo.resolve_dataset_ref(&dataset_ref).await?;
 
-        self.dataset_action_authorizer
-            .check_action_allowed(&dataset_handle, auth::DatasetAction::Write)
-            .await?;
+        let mut datasets_by_handle = HashMap::new();
+        datasets_by_handle.insert(target.handle.clone(), target.dataset.clone());
 
         // TODO: There might be more operations to do
         match self
-            .get_next_operation(&dataset_handle, self.time_source.now())
+            .get_next_operation(&target.handle, self.time_source.now())
             .await
         {
             Ok(Some(operation)) => {
+                for input in &operation.inputs {
+                    let input_dataset = self
+                        .dataset_repo
+                        .get_dataset_by_handle(&input.dataset_handle);
+                    datasets_by_handle.insert(input.dataset_handle.clone(), input_dataset);
+                }
+
                 let dataset_repo = self.dataset_repo.clone();
                 Self::do_transform(
                     self.engine_provisioner.clone(),
                     operation,
+                    &datasets_by_handle,
                     |request, response| async move {
                         Self::commit_execute_transform(dataset_repo, request, response).await
                     },
@@ -721,7 +730,7 @@ impl TransformServiceImpl {
                 let compaction_result = self
                     .compaction_svc
                     .compact_dataset(
-                        &dataset_handle,
+                        target.clone(),
                         CompactionOptions {
                             keep_metadata_only: true,
                             ..Default::default()
@@ -734,7 +743,7 @@ impl TransformServiceImpl {
                 if let CompactionResult::Success { .. } = compaction_result {
                     // Recursing to try again after compaction
                     self.transform_impl(
-                        dataset_ref.clone(),
+                        target.clone(),
                         TransformOptions {
                             reset_derivatives_on_diverged_input: false,
                         },
@@ -752,15 +761,14 @@ impl TransformServiceImpl {
 
 #[async_trait::async_trait]
 impl TransformService for TransformServiceImpl {
-    #[tracing::instrument(level = "info", skip_all, fields(%dataset_ref))]
+    #[tracing::instrument(level = "info", skip_all, fields(target=%target.handle))]
     async fn get_active_transform(
         &self,
-        dataset_ref: &DatasetRef,
+        target: ResolvedDataset,
     ) -> Result<Option<(Multihash, MetadataBlockTyped<SetTransform>)>, GetDatasetError> {
-        let dataset = self.dataset_repo.find_dataset_by_ref(dataset_ref).await?;
-
         // TODO: Support transform evolution
-        Ok(dataset
+        Ok(target
+            .dataset
             .as_metadata_chain()
             .accept_one(SearchSetTransformVisitor::new())
             .await
@@ -770,65 +778,79 @@ impl TransformService for TransformServiceImpl {
 
     async fn transform(
         &self,
-        dataset_ref: &DatasetRef,
+        target: ResolvedDataset,
         options: TransformOptions,
         maybe_listener: Option<Arc<dyn TransformListener>>,
     ) -> Result<TransformResult, TransformError> {
-        tracing::info!(?dataset_ref, "Transforming a single dataset");
-
-        self.transform_impl(dataset_ref.clone(), options, maybe_listener)
-            .await
+        tracing::info!(target=%target.handle, "Transforming a single dataset");
+        self.transform_impl(target, options, maybe_listener).await
     }
 
     async fn transform_multi(
         &self,
-        dataset_refs: Vec<DatasetRef>,
+        targets: Vec<ResolvedDataset>,
         options: TransformOptions,
         maybe_multi_listener: Option<Arc<dyn TransformMultiListener>>,
     ) -> Vec<(DatasetRef, Result<TransformResult, TransformError>)> {
         let multi_listener =
             maybe_multi_listener.unwrap_or_else(|| Arc::new(NullTransformMultiListener));
 
-        tracing::info!(?dataset_refs, "Transforming multiple datasets");
+        let target_refs = targets
+            .iter()
+            .map(|t| t.handle.alias.as_local_ref())
+            .collect::<Vec<_>>();
+        tracing::info!(targets=?target_refs, "Transforming multiple datasets");
 
         let mut futures = Vec::new();
 
-        for dataset_ref in &dataset_refs {
-            let f = match self.dataset_repo.resolve_dataset_ref(dataset_ref).await {
-                Ok(hdl) => {
-                    let maybe_listener = multi_listener.begin_transform(&hdl);
-                    self.transform_impl(hdl.into(), options, maybe_listener)
-                }
-                // Relying on this call to fail to avoid boxing the futures
-                Err(_) => self.transform_impl(dataset_ref.clone(), options, None),
+        for target in &targets {
+            let f = {
+                let maybe_listener = multi_listener.begin_transform(&target.handle);
+                self.transform_impl(target.clone(), options, maybe_listener)
             };
             futures.push(f);
         }
 
         let results = futures::future::join_all(futures).await;
-        dataset_refs.into_iter().zip(results).collect()
+        targets
+            .into_iter()
+            .map(|t| t.handle.as_local_ref())
+            .zip(results)
+            .collect()
     }
 
-    #[tracing::instrument(level = "info", skip_all, fields(%dataset_ref, ?block_range))]
+    #[tracing::instrument(level = "info", skip_all, fields(target=%target.handle, ?block_range))]
     async fn verify_transform(
         &self,
-        dataset_ref: &DatasetRef,
+        target: ResolvedDataset,
         block_range: (Option<Multihash>, Option<Multihash>),
         maybe_listener: Option<Arc<dyn VerificationListener>>,
     ) -> Result<(), VerificationError> {
         let listener = maybe_listener.unwrap_or(Arc::new(NullVerificationListener {}));
 
-        let dataset_handle = self.dataset_repo.resolve_dataset_ref(dataset_ref).await?;
-
         // Note: output dataset read permissions are already checked in
         // VerificationService. But permissions for input datasets have to be
         // checked here
-
-        let dataset = self.dataset_repo.get_dataset_by_handle(&dataset_handle);
-
         let verification_plan = self
-            .get_verification_plan(&dataset_handle, block_range)
+            .get_verification_plan(&target.handle, block_range)
             .await?;
+
+        let mut datasets_by_handle = HashMap::new();
+        for step in &verification_plan {
+            datasets_by_handle.insert(
+                step.request.dataset_handle.clone(),
+                self.dataset_repo
+                    .get_dataset_by_handle(&step.request.dataset_handle),
+            );
+            for input in &step.request.inputs {
+                datasets_by_handle.insert(
+                    input.dataset_handle.clone(),
+                    self.dataset_repo
+                        .get_dataset_by_handle(&input.dataset_handle),
+                );
+            }
+        }
+
         let num_steps = verification_plan.len();
         listener.begin_phase(VerificationPhase::ReplayTransform);
 
@@ -861,7 +883,7 @@ impl TransformService for TransformServiceImpl {
                 .get_transform_listener()
                 .unwrap_or_else(|| Arc::new(NullTransformListener));
 
-            let ds = dataset.clone();
+            let ds = target.dataset.clone();
             let out_event = &mut actual_event;
 
             let result = TransformResult::Updated {
@@ -872,6 +894,7 @@ impl TransformService for TransformServiceImpl {
             Self::do_transform(
                 self.engine_provisioner.clone(),
                 request,
+                &datasets_by_handle,
                 |request, response| async move {
                     let params = ExecuteTransformParams {
                         query_inputs: request.inputs.iter().map(|i| i.clone().into()).collect(),

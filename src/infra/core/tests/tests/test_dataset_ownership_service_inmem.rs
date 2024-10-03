@@ -16,6 +16,7 @@ use kamu::testing::MetadataFactory;
 use kamu::{
     DatasetOwnershipServiceInMemory,
     DatasetOwnershipServiceInMemoryStateInitializer,
+    DatasetRegistryRepoBridge,
     DatasetRepositoryLocalFs,
     DatasetRepositoryWriter,
 };
@@ -121,6 +122,7 @@ impl DatasetOwnershipHarness {
                 )
                 .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
                 .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
+                .add::<DatasetRegistryRepoBridge>()
                 .add_value(CurrentAccountSubject::new_test())
                 .add::<AccessTokenServiceImpl>()
                 .add::<AuthenticationServiceImpl>()

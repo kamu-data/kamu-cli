@@ -29,7 +29,6 @@ pub struct PullServiceImpl {
     sync_svc: Arc<dyn SyncService>,
     system_time_source: Arc<dyn SystemTimeSource>,
     current_account_subject: Arc<CurrentAccountSubject>,
-    dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
 }
 
 #[component(pub)]
@@ -43,7 +42,6 @@ impl PullServiceImpl {
         sync_svc: Arc<dyn SyncService>,
         system_time_source: Arc<dyn SystemTimeSource>,
         current_account_subject: Arc<CurrentAccountSubject>,
-        dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
     ) -> Self {
         Self {
             dataset_repo,
@@ -53,7 +51,6 @@ impl PullServiceImpl {
             sync_svc,
             system_time_source,
             current_account_subject,
-            dataset_action_authorizer,
         }
     }
 
@@ -102,7 +99,10 @@ impl PullServiceImpl {
 
         // Resolve local dataset if it exists
         let local_handle = if let Some(local_ref) = &request.local_ref {
-            let local_handle = self.dataset_repo.try_resolve_dataset_ref(local_ref).await?;
+            let local_handle = self
+                .dataset_repo
+                .try_resolve_dataset_handle_by_ref(local_ref)
+                .await?;
             if local_handle.is_none() && request.remote_ref.is_none() {
                 // Dataset does not exist locally nor remote ref was provided
                 return Err(PullError::NotFound(DatasetNotFoundError {
@@ -179,7 +179,7 @@ impl PullServiceImpl {
         let remote_ref = if let Some(remote_ref) = &request.remote_ref {
             Ok(Some(remote_ref.clone()))
         } else if let Some(hdl) = &local_handle {
-            self.resolve_pull_alias(&hdl.as_local_ref()).await
+            self.resolve_pull_alias(hdl).await
         } else {
             Ok(None)
         }?;
@@ -254,14 +254,15 @@ impl PullServiceImpl {
         if let Some(remote_name) = remote_ref.dataset_name() {
             if let Some(local_handle) = self
                 .dataset_repo
-                .try_resolve_dataset_ref(
+                .try_resolve_dataset_handle_by_ref(
                     &DatasetAlias::new(None, remote_name.clone()).as_local_ref(),
                 )
                 .await?
             {
+                let dataset = self.dataset_repo.get_dataset_by_handle(&local_handle);
                 if self
                     .remote_alias_reg
-                    .get_remote_aliases(&local_handle.as_local_ref())
+                    .get_remote_aliases(dataset)
                     .await
                     .int_err()?
                     .contains(remote_ref, RemoteAliasKind::Pull)
@@ -274,13 +275,16 @@ impl PullServiceImpl {
         // No luck - now have to search through aliases (of current user)
         if let CurrentAccountSubject::Logged(l) = self.current_account_subject.as_ref() {
             use tokio_stream::StreamExt;
-            let mut datasets = self.dataset_repo.get_datasets_by_owner(&l.account_name);
+            let mut datasets = self
+                .dataset_repo
+                .all_dataset_handles_by_owner(&l.account_name);
             while let Some(dataset_handle) = datasets.next().await {
                 let dataset_handle = dataset_handle?;
+                let dataset = self.dataset_repo.get_dataset_by_handle(&dataset_handle);
 
                 if self
                     .remote_alias_reg
-                    .get_remote_aliases(&dataset_handle.as_local_ref())
+                    .get_remote_aliases(dataset)
                     .await
                     .int_err()?
                     .contains(remote_ref, RemoteAliasKind::Pull)
@@ -295,12 +299,15 @@ impl PullServiceImpl {
 
     async fn resolve_pull_alias(
         &self,
-        local_ref: &DatasetRef,
+        hdl: &DatasetHandle,
     ) -> Result<Option<DatasetRefRemote>, PullError> {
-        let remote_aliases = match self.remote_alias_reg.get_remote_aliases(local_ref).await {
+        let dataset = self.dataset_repo.get_dataset_by_handle(hdl);
+
+        let remote_aliases = match self.remote_alias_reg.get_remote_aliases(dataset).await {
             Ok(v) => Ok(v),
-            Err(GetAliasesError::DatasetNotFound(e)) => Err(PullError::NotFound(e)),
-            Err(e) => Err(e.int_err().into()),
+            Err(e) => match e {
+                GetAliasesError::Internal(e) => Err(PullError::Internal(e)),
+            },
         }?;
 
         let mut pull_aliases: Vec<_> = remote_aliases.get_by_kind(RemoteAliasKind::Pull).collect();
@@ -355,7 +362,19 @@ impl PullServiceImpl {
         options: &PullMultiOptions,
         listener: Option<Arc<dyn PollingIngestMultiListener>>,
     ) -> Result<Vec<PullResponse>, InternalError> {
-        let ingest_requests = batch.iter().map(|pi| pi.local_ref.clone()).collect();
+        let mut ingest_requests = Vec::new();
+        for item in batch {
+            let dataset_handle = self
+                .dataset_repo
+                .resolve_dataset_handle_by_ref(&item.local_ref)
+                .await
+                .int_err()?;
+            let dataset = self.dataset_repo.get_dataset_by_handle(&dataset_handle);
+            ingest_requests.push(ResolvedDataset {
+                dataset,
+                handle: dataset_handle.clone(),
+            });
+        }
 
         let ingest_responses = self
             .ingest_svc
@@ -405,8 +424,14 @@ impl PullServiceImpl {
             for res in &results {
                 if let Ok(PullResult::Updated { old_head: None, .. }) = res.result {
                     if let Some(remote_ref) = &res.remote_ref {
+                        let dataset = self
+                            .dataset_repo
+                            .get_dataset_by_ref(res.local_ref.as_ref().unwrap())
+                            .await
+                            .expect("Must resolve a checked dataset ref");
+
                         self.remote_alias_reg
-                            .get_remote_aliases(res.local_ref.as_ref().unwrap())
+                            .get_remote_aliases(dataset)
                             .await
                             .int_err()?
                             .add(remote_ref, RemoteAliasKind::Pull)
@@ -425,7 +450,16 @@ impl PullServiceImpl {
         transform_listener: Option<Arc<dyn TransformMultiListener>>,
         reset_derivatives_on_diverged_input: bool,
     ) -> Result<Vec<PullResponse>, InternalError> {
-        let transform_requests = batch.iter().map(|pi| pi.local_ref.clone()).collect();
+        let mut transform_requests = Vec::new();
+        for item in batch {
+            let hdl = self
+                .dataset_repo
+                .resolve_dataset_handle_by_ref(&item.local_ref)
+                .await
+                .int_err()?;
+            let dataset = self.dataset_repo.get_dataset_by_handle(&hdl);
+            transform_requests.push(ResolvedDataset::new(dataset, hdl));
+        }
 
         let transform_results = self
             .transform_svc
@@ -529,7 +563,7 @@ impl PullService for PullServiceImpl {
         } else {
             use futures::TryStreamExt;
             self.dataset_repo
-                .get_datasets_by_owner(&current_account_name)
+                .all_dataset_handles_by_owner(&current_account_name)
                 .map_ok(|hdl| PullRequest {
                     local_ref: Some(hdl.into()),
                     remote_ref: None,
@@ -609,12 +643,15 @@ impl PullService for PullServiceImpl {
 
     async fn set_watermark(
         &self,
-        dataset_ref: &DatasetRef,
+        dataset: Arc<dyn Dataset>,
         new_watermark: DateTime<Utc>,
     ) -> Result<PullResult, SetWatermarkError> {
-        let aliases = match self.remote_alias_reg.get_remote_aliases(dataset_ref).await {
+        let aliases = match self
+            .remote_alias_reg
+            .get_remote_aliases(dataset.clone())
+            .await
+        {
             Ok(v) => Ok(v),
-            Err(GetAliasesError::DatasetNotFound(e)) => Err(SetWatermarkError::NotFound(e)),
             Err(GetAliasesError::Internal(e)) => Err(SetWatermarkError::Internal(e)),
         }?;
 
@@ -622,12 +659,6 @@ impl PullService for PullServiceImpl {
             return Err(SetWatermarkError::IsRemote);
         }
 
-        let dataset_handle = self.dataset_repo.resolve_dataset_ref(dataset_ref).await?;
-        self.dataset_action_authorizer
-            .check_action_allowed(&dataset_handle, auth::DatasetAction::Write)
-            .await?;
-
-        let dataset = self.dataset_repo.find_dataset_by_ref(dataset_ref).await?;
         let summary = dataset
             .get_summary(GetSummaryOpts::default())
             .await

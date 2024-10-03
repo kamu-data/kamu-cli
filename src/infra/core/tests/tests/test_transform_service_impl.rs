@@ -37,11 +37,7 @@ struct TransformTestHarness {
 }
 
 impl TransformTestHarness {
-    pub fn new_custom<
-        TAuthorizer: auth::DatasetActionAuthorizer + 'static,
-        TEngineProvisioner: EngineProvisioner + 'static,
-    >(
-        dataset_action_authorizer: TAuthorizer,
+    pub fn new_custom<TEngineProvisioner: EngineProvisioner + 'static>(
         engine_provisioner: TEngineProvisioner,
     ) -> Self {
         let tempdir = tempfile::tempdir().unwrap();
@@ -60,8 +56,6 @@ impl TransformTestHarness {
             )
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
             .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
-            .add_value(dataset_action_authorizer)
-            .bind::<dyn auth::DatasetActionAuthorizer, TAuthorizer>()
             .add::<SystemTimeSourceDefault>()
             .add::<ObjectStoreRegistryImpl>()
             .add::<ObjectStoreBuilderLocalFs>()
@@ -86,10 +80,7 @@ impl TransformTestHarness {
     }
 
     pub fn new() -> Self {
-        Self::new_custom(
-            auth::AlwaysHappyDatasetActionAuthorizer::new(),
-            EngineProvisionerNull,
-        )
+        Self::new_custom(EngineProvisionerNull)
     }
 
     pub async fn new_root(&self, name: &str) -> DatasetHandle {
@@ -112,7 +103,7 @@ impl TransformTestHarness {
         &self,
         name: &str,
         inputs: &[DatasetAlias],
-    ) -> (DatasetHandle, SetTransform) {
+    ) -> (CreateDatasetResult, SetTransform) {
         let transform = MetadataFactory::set_transform()
             .inputs_from_refs(inputs)
             .build();
@@ -129,7 +120,7 @@ impl TransformTestHarness {
             .await
             .unwrap()
             .create_dataset_result;
-        (create_result.dataset_handle, transform)
+        (create_result, transform)
     }
 
     pub async fn append_block(
@@ -139,7 +130,7 @@ impl TransformTestHarness {
     ) -> Multihash {
         let ds = self
             .dataset_repo
-            .find_dataset_by_ref(&dataset_ref.into())
+            .get_dataset_by_ref(&dataset_ref.into())
             .await
             .unwrap();
         ds.as_metadata_chain()
@@ -156,7 +147,7 @@ impl TransformTestHarness {
     ) -> (Multihash, MetadataBlockTyped<AddData>) {
         let ds = self
             .dataset_repo
-            .find_dataset_by_ref(&alias.as_local_ref())
+            .get_dataset_by_ref(&alias.as_local_ref())
             .await
             .unwrap();
         let chain = ds.as_metadata_chain();
@@ -188,12 +179,12 @@ impl TransformTestHarness {
         (block_hash, block.into_typed::<AddData>().unwrap())
     }
 
-    async fn ingest_data(&self, data_str: String, dataset_ref: &DatasetRef) {
+    async fn ingest_data(&self, data_str: String, dataset_created: &CreateDatasetResult) {
         let data = std::io::Cursor::new(data_str);
 
         self.push_ingest_svc
             .ingest_from_file_stream(
-                dataset_ref,
+                ResolvedDataset::from(dataset_created),
                 None,
                 Box::new(data),
                 PushIngestOpts::default(),
@@ -217,7 +208,7 @@ async fn test_get_next_operation() {
     assert_eq!(
         harness
             .transform_service
-            .get_next_operation(&bar, Utc::now())
+            .get_next_operation(&bar.dataset_handle, Utc::now())
             .await
             .unwrap(),
         None
@@ -227,7 +218,7 @@ async fn test_get_next_operation() {
     let foo_slice = foo_block.event.new_data.as_ref().unwrap();
 
     assert!(matches!(
-        harness.transform_service.get_next_operation(&bar, Utc::now()).await.unwrap(),
+        harness.transform_service.get_next_operation(&bar.dataset_handle, Utc::now()).await.unwrap(),
         Some(TransformRequestExt{ transform, inputs, .. })
         if transform == bar_source.transform &&
         inputs == vec![TransformRequestInputExt {
@@ -246,63 +237,6 @@ async fn test_get_next_operation() {
             }],
         }]
     ));
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test(tokio::test)]
-async fn test_transform_enforces_authorization() {
-    let mock_dataset_action_authorizer = MockDatasetActionAuthorizer::new()
-        .expect_check_read_dataset(
-            &DatasetAlias::new(None, DatasetName::new_unchecked("foo")),
-            1,
-            true,
-        )
-        .expect_check_write_dataset(
-            &DatasetAlias::new(None, DatasetName::new_unchecked("bar")),
-            1,
-            true,
-        );
-
-    let harness = TransformTestHarness::new_custom(
-        mock_dataset_action_authorizer,
-        mock_engine_provisioner::MockEngineProvisioner::new().stub_provision_engine(),
-    );
-
-    let foo = harness.new_root("foo").await;
-    let (_, _) = harness.append_data_block(&foo.alias, 10).await;
-
-    let (bar, _) = harness.new_deriv("bar", &[foo.alias.clone()]).await;
-
-    let transform_result = harness
-        .transform_service
-        .transform(&bar.as_local_ref(), TransformOptions::default(), None)
-        .await;
-
-    assert_matches!(transform_result, Ok(_));
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test(tokio::test)]
-async fn test_transform_unauthorized() {
-    let harness = TransformTestHarness::new_custom(
-        MockDatasetActionAuthorizer::denying(),
-        EngineProvisionerNull,
-    );
-
-    let foo = harness.new_root("foo").await;
-    let (bar, _) = harness.new_deriv("bar", &[foo.alias.clone()]).await;
-
-    let transform_result = harness
-        .transform_service
-        .transform(&bar.as_local_ref(), TransformOptions::default(), None)
-        .await;
-
-    assert_matches!(
-        transform_result,
-        Err(TransformError::Access(AccessError::Forbidden(_)))
-    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -633,7 +567,6 @@ async fn test_get_verification_plan_one_to_one() {
 #[test_log::test(tokio::test)]
 async fn test_transform_with_compaction_retry() {
     let harness = TransformTestHarness::new_custom(
-        auth::AlwaysHappyDatasetActionAuthorizer::new(),
         mock_engine_provisioner::MockEngineProvisioner::new().always_provision_engine(),
     );
     let root_alias = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
@@ -680,10 +613,7 @@ async fn test_transform_with_compaction_retry() {
             "
     );
     harness
-        .ingest_data(
-            data_str.to_string(),
-            &foo_created_result.dataset_handle.as_local_ref(),
-        )
+        .ingest_data(data_str.to_string(), &foo_created_result)
         .await;
     let data_str = indoc!(
         "
@@ -694,10 +624,7 @@ async fn test_transform_with_compaction_retry() {
             "
     );
     harness
-        .ingest_data(
-            data_str.to_string(),
-            &foo_created_result.dataset_handle.as_local_ref(),
-        )
+        .ingest_data(data_str.to_string(), &foo_created_result)
         .await;
 
     let (bar, _) = harness
@@ -706,15 +633,23 @@ async fn test_transform_with_compaction_retry() {
 
     let transform_result = harness
         .transform_service
-        .transform(&bar.as_local_ref(), TransformOptions::default(), None)
+        .transform(
+            ResolvedDataset::from(&bar),
+            TransformOptions::default(),
+            None,
+        )
         .await;
 
     assert_matches!(transform_result, Ok(TransformResult::Updated { .. }));
 
+    let foo_dataset = harness
+        .dataset_repo
+        .get_dataset_by_handle(&foo_created_result.dataset_handle);
+
     harness
         .compaction_service
         .compact_dataset(
-            &foo_created_result.dataset_handle,
+            ResolvedDataset::new(foo_dataset, foo_created_result.dataset_handle.clone()),
             CompactionOptions::default(),
             None,
         )
@@ -723,7 +658,11 @@ async fn test_transform_with_compaction_retry() {
 
     let transform_result = harness
         .transform_service
-        .transform(&bar.as_local_ref(), TransformOptions::default(), None)
+        .transform(
+            ResolvedDataset::from(&bar),
+            TransformOptions::default(),
+            None,
+        )
         .await;
 
     assert_matches!(
@@ -736,7 +675,7 @@ async fn test_transform_with_compaction_retry() {
     let transform_result = harness
         .transform_service
         .transform(
-            &bar.as_local_ref(),
+            ResolvedDataset::from(&bar),
             TransformOptions {
                 reset_derivatives_on_diverged_input: true,
             },

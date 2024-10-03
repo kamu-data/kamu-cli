@@ -49,39 +49,12 @@ async fn assert_in_sync(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-struct AuthorizationExpectations {
-    pub reads: usize,
-    pub writes: usize,
-}
-
-impl Default for AuthorizationExpectations {
-    fn default() -> Self {
-        Self {
-            reads: 8,
-            writes: 1,
-        }
-    }
-}
-
-fn construct_authorizer(
-    authorization_expectations: &AuthorizationExpectations,
-    alias: &DatasetAlias,
-) -> impl auth::DatasetActionAuthorizer {
-    MockDatasetActionAuthorizer::new()
-        .expect_check_read_dataset(alias, authorization_expectations.reads, true)
-        .expect_check_write_dataset(alias, authorization_expectations.writes, true)
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 async fn do_test_sync(
     tmp_workspace_dir_foo: &Path,
     tmp_workspace_dir_bar: &Path,
     push_ref: &DatasetRefRemote,
     pull_ref: &DatasetRefRemote,
     ipfs: Option<(IpfsGateway, IpfsClient)>,
-    auth_expectations_foo: AuthorizationExpectations,
-    auth_expectations_bar: AuthorizationExpectations,
 ) {
     // Tests sync between "foo" -> remote -> "bar"
     let dataset_alias_foo = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
@@ -89,9 +62,6 @@ async fn do_test_sync(
     let is_ipfs = ipfs.is_none();
 
     let (ipfs_gateway, ipfs_client) = ipfs.unwrap_or_default();
-
-    let dataset_authorizer_foo = construct_authorizer(&auth_expectations_foo, &dataset_alias_foo);
-    let dataset_authorizer_bar = construct_authorizer(&auth_expectations_bar, &dataset_alias_bar);
 
     let datasets_dir_foo = tmp_workspace_dir_foo.join("datasets");
     let datasets_dir_bar = tmp_workspace_dir_bar.join("datasets");
@@ -103,8 +73,6 @@ async fn do_test_sync(
         .add_value(ipfs_gateway.clone())
         .add_value(ipfs_client.clone())
         .add_value(CurrentAccountSubject::new_test())
-        .add_value(dataset_authorizer_foo)
-        .bind::<dyn auth::DatasetActionAuthorizer, MockDatasetActionAuthorizer>()
         .add_builder(
             DatasetRepositoryLocalFs::builder()
                 .with_root(datasets_dir_foo)
@@ -127,8 +95,6 @@ async fn do_test_sync(
         .add_value(ipfs_gateway.clone())
         .add_value(ipfs_client.clone())
         .add_value(CurrentAccountSubject::new_test())
-        .add_value(dataset_authorizer_bar)
-        .bind::<dyn auth::DatasetActionAuthorizer, MockDatasetActionAuthorizer>()
         .add_builder(
             DatasetRepositoryLocalFs::builder()
                 .with_root(datasets_dir_bar)
@@ -495,11 +461,6 @@ async fn test_sync_to_from_local_fs() {
         &DatasetRefRemote::from(&repo_url),
         &DatasetRefRemote::from(&repo_url),
         None,
-        AuthorizationExpectations::default(),
-        AuthorizationExpectations {
-            reads: 2,
-            writes: 4,
-        },
     )
     .await;
 }
@@ -519,11 +480,6 @@ async fn test_sync_to_from_s3() {
         &DatasetRefRemote::from(&s3.url),
         &DatasetRefRemote::from(&s3.url),
         None,
-        AuthorizationExpectations::default(),
-        AuthorizationExpectations {
-            reads: 2,
-            writes: 4,
-        },
     )
     .await;
 }
@@ -549,11 +505,6 @@ async fn test_sync_from_http() {
         &DatasetRefRemote::from(push_repo_url),
         &DatasetRefRemote::from(pull_repo_url),
         None,
-        AuthorizationExpectations::default(),
-        AuthorizationExpectations {
-            reads: 2,
-            writes: 4,
-        },
     )
     .await;
 }
@@ -583,14 +534,6 @@ async fn test_sync_to_from_ipfs() {
             },
             ipfs_client,
         )),
-        AuthorizationExpectations {
-            reads: 7,
-            ..Default::default()
-        },
-        AuthorizationExpectations {
-            reads: 2,
-            writes: 4,
-        },
     )
     .await;
 }

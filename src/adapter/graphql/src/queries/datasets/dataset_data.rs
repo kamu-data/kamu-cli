@@ -28,8 +28,8 @@ impl DatasetData {
     /// Total number of records in this dataset
     #[tracing::instrument(level = "info", skip_all)]
     async fn num_records_total(&self, ctx: &Context<'_>) -> Result<u64> {
-        let dataset_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
-        let dataset = dataset_repo.get_dataset_by_handle(&self.dataset_handle);
+        let dataset_registry = from_catalog::<dyn domain::DatasetRegistry>(ctx).unwrap();
+        let dataset = dataset_registry.get_dataset_by_handle(&self.dataset_handle);
         let summary = dataset
             .get_summary(GetSummaryOpts::default())
             .await
@@ -41,8 +41,8 @@ impl DatasetData {
     /// caching
     #[tracing::instrument(level = "info", skip_all)]
     async fn estimated_size(&self, ctx: &Context<'_>) -> Result<u64> {
-        let dataset_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
-        let dataset = dataset_repo.get_dataset_by_handle(&self.dataset_handle);
+        let dataset_registry = from_catalog::<dyn domain::DatasetRegistry>(ctx).unwrap();
+        let dataset = dataset_registry.get_dataset_by_handle(&self.dataset_handle);
         let summary = dataset
             .get_summary(GetSummaryOpts::default())
             .await

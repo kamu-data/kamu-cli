@@ -181,7 +181,6 @@ impl From<GetDatasetError> for CLIError {
 impl From<GetAliasesError> for CLIError {
     fn from(v: GetAliasesError) -> Self {
         match v {
-            e @ GetAliasesError::DatasetNotFound(_) => Self::failure(e),
             e @ GetAliasesError::Internal(_) => Self::critical(e),
         }
     }

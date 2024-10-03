@@ -14,6 +14,7 @@ use dill::{Catalog, Component};
 use kamu::testing::MetadataFactory;
 use kamu::{
     CreateDatasetFromSnapshotUseCaseImpl,
+    DatasetRegistryRepoBridge,
     DatasetRepositoryLocalFs,
     DatasetRepositoryWriter,
 };
@@ -21,6 +22,8 @@ use kamu_accounts::CurrentAccountSubject;
 use kamu_core::{
     CreateDatasetFromSnapshotUseCase,
     DatasetLifecycleMessage,
+    DatasetRegistry,
+    DatasetRegistryExt,
     DatasetRepository,
     GetDatasetError,
     MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
@@ -131,6 +134,7 @@ impl CreateFromSnapshotUseCaseHarness {
             )
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
             .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
+            .add::<DatasetRegistryRepoBridge>()
             .add_value(CurrentAccountSubject::new_test())
             .add_value(mock_outbox)
             .bind::<dyn Outbox, MockOutbox>()
@@ -146,9 +150,9 @@ impl CreateFromSnapshotUseCaseHarness {
     }
 
     async fn check_dataset_exists(&self, alias: &DatasetAlias) -> Result<(), GetDatasetError> {
-        let dataset_repo = self.catalog.get_one::<dyn DatasetRepository>().unwrap();
-        dataset_repo
-            .find_dataset_by_ref(&alias.as_local_ref())
+        let dataset_registry = self.catalog.get_one::<dyn DatasetRegistry>().unwrap();
+        dataset_registry
+            .get_dataset_by_ref(&alias.as_local_ref())
             .await?;
         Ok(())
     }
