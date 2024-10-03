@@ -50,3 +50,4 @@ mockall = { optional = true, version = "0.13", default-features = false }
 
 
 [dev-dependencies]
+mockall = { version = "0.13", default-features = false }

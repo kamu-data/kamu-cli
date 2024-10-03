@@ -43,12 +43,12 @@ tracing = "0.1"
 
 
 [dev-dependencies]
+kamu = { workspace = true, features = ["testing"] }
 messaging-outbox = { workspace = true }
 time-source = { workspace = true }
 
 hyper = { version = "1", default-features = false }
 indoc = { version = "2" }
-kamu = { workspace = true }
 pretty_assertions = { version = "1" }
 reqwest = { version = "0.12", default-features = false }
 tempfile = { version = "3" }

@@ -53,7 +53,7 @@ serde_with = { version = "3", default-features = false }
 
 
 [dev-dependencies]
-kamu = { workspace = true }
+kamu = { workspace = true, features = ["testing"] }
 kamu-accounts-inmem = { workspace = true }
 kamu-accounts-services = { workspace = true }
 kamu-flow-system-inmem = { workspace = true }

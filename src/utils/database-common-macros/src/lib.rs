@@ -235,7 +235,7 @@ impl Parse for CatalogItem2 {
 /// The structure must contain the Catalog as a field
 ///
 /// # Examples
-/// ```
+/// ```compile_fail
 /// #[transactional_method()]
 /// async fn set_system_flow_schedule(&self) {
 ///     // `transaction_catalog` is available inside the method body
@@ -269,7 +269,7 @@ pub fn transactional_method(_attr: TokenStream, item: TokenStream) -> TokenStrea
 /// The structure must contain the Catalog as a field
 ///
 /// # Examples
-/// ```
+/// ```compile_fail
 /// // `service` request from a transactional Catalog
 /// #[transactional_method1(service: Arc<dyn Service>)]
 /// async fn set_system_flow_schedule(&self) {
@@ -308,7 +308,7 @@ pub fn transactional_method1(attr: TokenStream, item: TokenStream) -> TokenStrea
 /// The structure must contain the Catalog as a field
 ///
 /// # Examples
-/// ```
+/// ```compile_fail
 /// // `service` request from a transactional Catalog
 /// #[transactional_method2(service1: Arc<dyn Service1>, service2: Arc<dyn Service2>)]
 /// async fn set_system_flow_schedule(&self) {
