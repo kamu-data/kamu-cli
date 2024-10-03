@@ -32,7 +32,7 @@ pub trait PasswordHashRepository: Send + Sync {
 #[derive(Error, Debug)]
 pub enum SavePasswordHashError {
     #[error(transparent)]
-    Internal(InternalError),
+    Internal(#[from] InternalError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -40,7 +40,7 @@ pub enum SavePasswordHashError {
 #[derive(Error, Debug)]
 pub enum FindPasswordHashError {
     #[error(transparent)]
-    Internal(InternalError),
+    Internal(#[from] InternalError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

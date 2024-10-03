@@ -40,10 +40,7 @@ impl RebacRepository for PostgresRebacRepository {
     ) -> Result<(), SetEntityPropertyError> {
         let mut tr = self.transaction.lock().await;
 
-        let connection_mut = tr
-            .connection_mut()
-            .await
-            .map_err(SetEntityPropertyError::Internal)?;
+        let connection_mut = tr.connection_mut().await?;
 
         sqlx::query!(
             r#"
@@ -58,7 +55,7 @@ impl RebacRepository for PostgresRebacRepository {
         )
         .execute(connection_mut)
         .await
-        .map_int_err(SetEntityPropertyError::Internal)?;
+        .int_err()?;
 
         Ok(())
     }
@@ -70,10 +67,7 @@ impl RebacRepository for PostgresRebacRepository {
     ) -> Result<(), DeleteEntityPropertyError> {
         let mut tr = self.transaction.lock().await;
 
-        let connection_mut = tr
-            .connection_mut()
-            .await
-            .map_err(DeleteEntityPropertyError::Internal)?;
+        let connection_mut = tr.connection_mut().await?;
 
         let delete_result = sqlx::query!(
             r#"
@@ -89,7 +83,7 @@ impl RebacRepository for PostgresRebacRepository {
         )
         .execute(&mut *connection_mut)
         .await
-        .map_int_err(DeleteEntityPropertyError::Internal)?;
+        .int_err()?;
 
         if delete_result.rows_affected() == 0 {
             return Err(DeleteEntityPropertyError::not_found(entity, property_name));
@@ -104,10 +98,7 @@ impl RebacRepository for PostgresRebacRepository {
     ) -> Result<(), DeleteEntityPropertiesError> {
         let mut tr = self.transaction.lock().await;
 
-        let connection_mut = tr
-            .connection_mut()
-            .await
-            .map_err(DeleteEntityPropertiesError::Internal)?;
+        let connection_mut = tr.connection_mut().await?;
 
         let delete_result = sqlx::query!(
             r#"
@@ -121,7 +112,7 @@ impl RebacRepository for PostgresRebacRepository {
         )
         .execute(&mut *connection_mut)
         .await
-        .map_int_err(DeleteEntityPropertiesError::Internal)?;
+        .int_err()?;
 
         if delete_result.rows_affected() == 0 {
             return Err(DeleteEntityPropertiesError::not_found(entity));
@@ -136,10 +127,7 @@ impl RebacRepository for PostgresRebacRepository {
     ) -> Result<Vec<(PropertyName, PropertyValue)>, GetEntityPropertiesError> {
         let mut tr = self.transaction.lock().await;
 
-        let connection_mut = tr
-            .connection_mut()
-            .await
-            .map_err(GetEntityPropertiesError::Internal)?;
+        let connection_mut = tr.connection_mut().await?;
 
         let row_models = sqlx::query_as!(
             PropertyRowModel,
@@ -154,7 +142,7 @@ impl RebacRepository for PostgresRebacRepository {
         )
         .fetch_all(connection_mut)
         .await
-        .map_int_err(GetEntityPropertiesError::Internal)?;
+        .int_err()?;
 
         row_models
             .into_iter()
@@ -171,10 +159,7 @@ impl RebacRepository for PostgresRebacRepository {
     ) -> Result<(), InsertEntitiesRelationError> {
         let mut tr = self.transaction.lock().await;
 
-        let connection_mut = tr
-            .connection_mut()
-            .await
-            .map_err(InsertEntitiesRelationError::Internal)?;
+        let connection_mut = tr.connection_mut().await?;
 
         sqlx::query!(
             r#"
@@ -213,10 +198,7 @@ impl RebacRepository for PostgresRebacRepository {
     ) -> Result<(), DeleteEntitiesRelationError> {
         let mut tr = self.transaction.lock().await;
 
-        let connection_mut = tr
-            .connection_mut()
-            .await
-            .map_err(DeleteEntitiesRelationError::Internal)?;
+        let connection_mut = tr.connection_mut().await?;
 
         let delete_result = sqlx::query!(
             r#"
@@ -236,7 +218,7 @@ impl RebacRepository for PostgresRebacRepository {
         )
         .execute(&mut *connection_mut)
         .await
-        .map_int_err(DeleteEntitiesRelationError::Internal)?;
+        .int_err()?;
 
         if delete_result.rows_affected() == 0 {
             return Err(DeleteEntitiesRelationError::not_found(
@@ -255,10 +237,7 @@ impl RebacRepository for PostgresRebacRepository {
     ) -> Result<Vec<EntityWithRelation>, SubjectEntityRelationsError> {
         let mut tr = self.transaction.lock().await;
 
-        let connection_mut = tr
-            .connection_mut()
-            .await
-            .map_err(SubjectEntityRelationsError::Internal)?;
+        let connection_mut = tr.connection_mut().await?;
 
         let row_models = sqlx::query_as!(
             EntityWithRelationRowModel,
@@ -275,7 +254,7 @@ impl RebacRepository for PostgresRebacRepository {
         )
         .fetch_all(connection_mut)
         .await
-        .map_int_err(SubjectEntityRelationsError::Internal)?;
+        .int_err()?;
 
         row_models
             .into_iter()
@@ -313,7 +292,7 @@ impl RebacRepository for PostgresRebacRepository {
         )
         .fetch_all(connection_mut)
         .await
-        .map_int_err(SubjectEntityRelationsByObjectTypeError::Internal)?;
+        .int_err()?;
 
         row_models
             .into_iter()
@@ -351,7 +330,7 @@ impl RebacRepository for PostgresRebacRepository {
         )
         .fetch_all(connection_mut)
         .await
-        .map_int_err(GetRelationsBetweenEntitiesError::Internal)?;
+        .int_err()?;
 
         row_models
             .into_iter()

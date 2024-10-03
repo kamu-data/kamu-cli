@@ -13,10 +13,10 @@ mod entities;
 mod jobs;
 mod repos;
 mod services;
-mod testing;
+#[cfg(any(feature = "testing", test))]
+pub mod testing;
 
 pub use entities::*;
 pub use jobs::*;
 pub use repos::*;
 pub use services::*;
-pub use testing::*;

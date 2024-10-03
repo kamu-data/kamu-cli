@@ -11,6 +11,8 @@ use datafusion::common::DFSchema;
 use datafusion::prelude::*;
 use pretty_assertions::assert_eq;
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub fn assert_schema_eq(schema: &DFSchema, expected: &str) {
     let parquet_schema = crate::schema::convert::dataframe_schema_to_parquet_schema(schema);
     let actual = crate::schema::format::format_schema_parquet(&parquet_schema);
@@ -24,3 +26,5 @@ pub async fn assert_data_eq(df: DataFrame, expected: &str) {
     let actual = pretty::pretty_format_batches(&batches).unwrap().to_string();
     assert_eq!(expected.trim(), actual.trim());
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

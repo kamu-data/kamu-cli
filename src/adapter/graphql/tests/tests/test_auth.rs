@@ -10,13 +10,8 @@
 use async_graphql::value;
 use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use indoc::indoc;
-use kamu_accounts::{
-    AuthenticationService,
-    MockAuthenticationService,
-    DEFAULT_ACCOUNT_ID,
-    DEFAULT_ACCOUNT_NAME_STR,
-    DUMMY_LOGIN_METHOD,
-};
+use kamu_accounts::testing::{MockAuthenticationService, DUMMY_LOGIN_METHOD};
+use kamu_accounts::{AuthenticationService, DEFAULT_ACCOUNT_ID, DEFAULT_ACCOUNT_NAME_STR};
 use kamu_accounts_inmem::InMemoryAccessTokenRepository;
 use kamu_accounts_services::AccessTokenServiceImpl;
 use time_source::SystemTimeSourceDefault;

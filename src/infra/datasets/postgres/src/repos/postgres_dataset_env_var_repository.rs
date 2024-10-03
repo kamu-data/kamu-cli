@@ -39,10 +39,7 @@ impl DatasetEnvVarRepository for PostgresDatasetEnvVarRepository {
     ) -> Result<(), SaveDatasetEnvVarError> {
         let mut tr = self.transaction.lock().await;
 
-        let connection_mut = tr
-            .connection_mut()
-            .await
-            .map_err(SaveDatasetEnvVarError::Internal)?;
+        let connection_mut = tr.connection_mut().await?;
 
         sqlx::query!(
             r#"
@@ -82,10 +79,7 @@ impl DatasetEnvVarRepository for PostgresDatasetEnvVarRepository {
     ) -> Result<Vec<DatasetEnvVar>, GetDatasetEnvVarError> {
         let mut tr = self.transaction.lock().await;
 
-        let connection_mut = tr
-            .connection_mut()
-            .await
-            .map_err(GetDatasetEnvVarError::Internal)?;
+        let connection_mut = tr.connection_mut().await?;
 
         let dataset_env_var_rows = sqlx::query_as!(
             DatasetEnvVarRowModel,
@@ -107,8 +101,7 @@ impl DatasetEnvVarRepository for PostgresDatasetEnvVarRepository {
         )
         .fetch_all(connection_mut)
         .await
-        .int_err()
-        .map_err(GetDatasetEnvVarError::Internal)?;
+        .int_err()?;
 
         Ok(dataset_env_var_rows.into_iter().map(Into::into).collect())
     }
@@ -119,10 +112,7 @@ impl DatasetEnvVarRepository for PostgresDatasetEnvVarRepository {
     ) -> Result<usize, GetDatasetEnvVarError> {
         let mut tr = self.transaction.lock().await;
 
-        let connection_mut = tr
-            .connection_mut()
-            .await
-            .map_err(GetDatasetEnvVarError::Internal)?;
+        let connection_mut = tr.connection_mut().await?;
 
         let dataset_env_vars_count = sqlx::query_scalar!(
             r#"
@@ -135,8 +125,7 @@ impl DatasetEnvVarRepository for PostgresDatasetEnvVarRepository {
         )
         .fetch_one(connection_mut)
         .await
-        .int_err()
-        .map_err(GetDatasetEnvVarError::Internal)?;
+        .int_err()?;
 
         Ok(usize::try_from(dataset_env_vars_count.unwrap_or(0)).unwrap())
     }
@@ -148,10 +137,7 @@ impl DatasetEnvVarRepository for PostgresDatasetEnvVarRepository {
     ) -> Result<DatasetEnvVar, GetDatasetEnvVarError> {
         let mut tr = self.transaction.lock().await;
 
-        let connection_mut = tr
-            .connection_mut()
-            .await
-            .map_err(GetDatasetEnvVarError::Internal)?;
+        let connection_mut = tr.connection_mut().await?;
 
         let dataset_env_var_row_maybe = sqlx::query_as!(
             DatasetEnvVarRowModel,
@@ -172,8 +158,7 @@ impl DatasetEnvVarRepository for PostgresDatasetEnvVarRepository {
         )
         .fetch_optional(connection_mut)
         .await
-        .int_err()
-        .map_err(GetDatasetEnvVarError::Internal)?;
+        .int_err()?;
 
         if let Some(dataset_env_var_row) = dataset_env_var_row_maybe {
             return Ok(dataset_env_var_row.into());
@@ -191,10 +176,7 @@ impl DatasetEnvVarRepository for PostgresDatasetEnvVarRepository {
     ) -> Result<DatasetEnvVar, GetDatasetEnvVarError> {
         let mut tr = self.transaction.lock().await;
 
-        let connection_mut = tr
-            .connection_mut()
-            .await
-            .map_err(GetDatasetEnvVarError::Internal)?;
+        let connection_mut = tr.connection_mut().await?;
 
         let dataset_env_var_row_maybe = sqlx::query_as!(
             DatasetEnvVarRowModel,
@@ -213,8 +195,7 @@ impl DatasetEnvVarRepository for PostgresDatasetEnvVarRepository {
         )
         .fetch_optional(connection_mut)
         .await
-        .int_err()
-        .map_err(GetDatasetEnvVarError::Internal)?;
+        .int_err()?;
 
         if let Some(dataset_env_var_row) = dataset_env_var_row_maybe {
             return Ok(dataset_env_var_row.into());
@@ -232,10 +213,7 @@ impl DatasetEnvVarRepository for PostgresDatasetEnvVarRepository {
     ) -> Result<(), DeleteDatasetEnvVarError> {
         let mut tr = self.transaction.lock().await;
 
-        let connection_mut = tr
-            .connection_mut()
-            .await
-            .map_err(DeleteDatasetEnvVarError::Internal)?;
+        let connection_mut = tr.connection_mut().await?;
 
         let delete_result = sqlx::query!(
             r#"
@@ -245,8 +223,7 @@ impl DatasetEnvVarRepository for PostgresDatasetEnvVarRepository {
         )
         .execute(&mut *connection_mut)
         .await
-        .int_err()
-        .map_err(DeleteDatasetEnvVarError::Internal)?;
+        .int_err()?;
 
         if delete_result.rows_affected() == 0 {
             return Err(DeleteDatasetEnvVarError::NotFound(
@@ -266,10 +243,7 @@ impl DatasetEnvVarRepository for PostgresDatasetEnvVarRepository {
     ) -> Result<(), ModifyDatasetEnvVarError> {
         let mut tr = self.transaction.lock().await;
 
-        let connection_mut = tr
-            .connection_mut()
-            .await
-            .map_err(ModifyDatasetEnvVarError::Internal)?;
+        let connection_mut = tr.connection_mut().await?;
 
         let update_result = sqlx::query!(
             r#"
@@ -281,8 +255,7 @@ impl DatasetEnvVarRepository for PostgresDatasetEnvVarRepository {
         )
         .execute(&mut *connection_mut)
         .await
-        .int_err()
-        .map_err(ModifyDatasetEnvVarError::Internal)?;
+        .int_err()?;
 
         if update_result.rows_affected() == 0 {
             return Err(ModifyDatasetEnvVarError::NotFound(
@@ -294,3 +267,5 @@ impl DatasetEnvVarRepository for PostgresDatasetEnvVarRepository {
         Ok(())
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

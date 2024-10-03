@@ -47,6 +47,11 @@ pub async fn test_get_dataset_entry(catalog: &Catalog) {
         );
     }
     {
+        let count_res = dataset_entry_repo.dataset_entries_count().await;
+
+        assert_matches!(count_res, Ok(0));
+    }
+    {
         let save_res = dataset_entry_repo.save_dataset_entry(&dataset_entry).await;
 
         assert_matches!(save_res, Ok(_));
@@ -61,6 +66,11 @@ pub async fn test_get_dataset_entry(catalog: &Catalog) {
             Ok(actual_dataset_entry)
                 if actual_dataset_entry == dataset_entry
         );
+    }
+    {
+        let count_res = dataset_entry_repo.dataset_entries_count().await;
+
+        assert_matches!(count_res, Ok(1));
     }
 }
 
@@ -195,6 +205,11 @@ pub async fn test_get_dataset_entries_by_owner_id(catalog: &Catalog) {
                 if actual_dataset_entries == expected_dataset_entries
         );
     }
+    {
+        let count_res = dataset_entry_repo.dataset_entries_count().await;
+
+        assert_matches!(count_res, Ok(3));
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -282,6 +297,11 @@ pub async fn test_try_set_same_dataset_name_for_another_owned_dataset_entry(cata
 
         assert_matches!(update_res, Ok(_));
     }
+    {
+        let count_res = dataset_entry_repo.dataset_entries_count().await;
+
+        assert_matches!(count_res, Ok(1));
+    }
 
     let dataset_entry_2 = new_dataset_entry_with(&account, "dataset2");
     {
@@ -290,6 +310,11 @@ pub async fn test_try_set_same_dataset_name_for_another_owned_dataset_entry(cata
             .await;
 
         assert_matches!(save_res, Ok(_));
+    }
+    {
+        let count_res = dataset_entry_repo.dataset_entries_count().await;
+
+        assert_matches!(count_res, Ok(2));
     }
 
     let same_dataset_name_as_another_owned_dataset = &dataset_entry_1.name;
@@ -336,11 +361,21 @@ pub async fn test_update_dataset_entry_name(catalog: &Catalog) {
         assert_matches!(save_res, Ok(_));
     }
     {
+        let count_res = dataset_entry_repo.dataset_entries_count().await;
+
+        assert_matches!(count_res, Ok(1));
+    }
+    {
         let update_res = dataset_entry_repo
             .update_dataset_entry_name(&dataset_entry.id, &new_name)
             .await;
 
         assert_matches!(update_res, Ok(_));
+    }
+    {
+        let count_res = dataset_entry_repo.dataset_entries_count().await;
+
+        assert_matches!(count_res, Ok(1));
     }
 }
 
@@ -368,6 +403,23 @@ pub async fn test_delete_dataset_entry(catalog: &Catalog) {
         let save_res = dataset_entry_repo.save_dataset_entry(&dataset_entry).await;
 
         assert_matches!(save_res, Ok(_));
+    }
+    {
+        let count_res = dataset_entry_repo.dataset_entries_count().await;
+
+        assert_matches!(count_res, Ok(1));
+    }
+    {
+        let delete_res = dataset_entry_repo
+            .delete_dataset_entry(&dataset_entry.id)
+            .await;
+
+        assert_matches!(delete_res, Ok(_));
+    }
+    {
+        let count_res = dataset_entry_repo.dataset_entries_count().await;
+
+        assert_matches!(count_res, Ok(0));
     }
 }
 

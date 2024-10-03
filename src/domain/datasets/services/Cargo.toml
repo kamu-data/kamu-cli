@@ -23,20 +23,35 @@ doctest = false
 
 [dependencies]
 database-common = { workspace = true }
-kamu-datasets = { workspace = true }
+init-on-startup = { workspace = true }
 internal-error = { workspace = true }
+kamu-accounts = { workspace = true }
+kamu-core = { workspace = true }
+kamu-datasets = { workspace = true }
+messaging-outbox = { workspace = true }
 opendatafabric = { workspace = true }
 time-source = { workspace = true }
 
 async-trait = { version = "0.1", default-features = false }
 chrono = { version = "0.4", default-features = false }
 dill = "0.9"
-thiserror = { version = "1", default-features = false }
+futures = { version = "0.3", default-features = false }
 secrecy = "0.10"
 serde = "1"
 serde_json = "1"
+thiserror = { version = "1", default-features = false }
 tokio = { version = "1", default-features = false }
 tracing = { version = "0.1", default-features = false }
 uuid = { version = "1", default-features = false }
 
+
 [dev-dependencies]
+kamu = { workspace = true, features = ["testing"] }
+kamu-accounts = { workspace = true, features = ["testing"] }
+kamu-accounts-inmem = { workspace = true }
+kamu-core = { workspace = true, features = ["testing"] }
+kamu-datasets = { workspace = true, features = ["testing"] }
+
+mockall = "0.13"
+pretty_assertions = { version = "1" }
+test-log = { version = "0.2", features = ["trace"] }

@@ -7,8 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::str::FromStr;
 
@@ -24,6 +22,7 @@ use kamu::{
     DatasetRepositoryWriter,
     DependencyGraphServiceInMemory,
 };
+use kamu_accounts::testing::MockAuthenticationService;
 use kamu_accounts::*;
 use messaging_outbox::DummyOutboxImpl;
 use mockall::predicate::{eq, function};

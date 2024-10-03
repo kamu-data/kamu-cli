@@ -42,7 +42,7 @@ tempfile = "3"
 tokio = { version = "1", default-features = false, features = ["rt"] }
 
 # Feature: extensions
-kamu-data-utils = { optional = true, workspace = true }
+kamu-data-utils = { optional = true, workspace = true, features = ["testing"] }
 opendatafabric = { optional = true, workspace = true }
 
 async-trait = { optional = true, version = "0.1" }

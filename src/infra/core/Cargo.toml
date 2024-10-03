@@ -28,6 +28,7 @@ ingest-evm = ["dep:alloy", "dep:datafusion-ethers"]
 ingest-ftp = ["dep:curl", "dep:curl-sys"]
 ingest-mqtt = ["dep:rumqttc"]
 query-extensions-json = ["dep:datafusion-functions-json"]
+testing = ["dep:mockall"]
 
 
 [dependencies]
@@ -99,9 +100,8 @@ hyper = "1"
 itertools = "0.13"
 libc = "0.2" # Signal names
 like = { version = "0.3", default-features = false }
-mockall = "0.13"
 pin-project = "1"
-petgraph = { version = "0.6", default-features = false, features = ["stable_graph"]}
+petgraph = { version = "0.6", default-features = false, features = ["stable_graph"] }
 rand = "0.8"
 regex = "1"
 tempfile = "3"
@@ -142,6 +142,7 @@ curl-sys = { optional = true, version = "0.4" }
 datafusion-ethers = { optional = true, version = "42" }
 datafusion-functions-json = { optional = true, version = "0.42" }
 rumqttc = { optional = true, version = "0.24" }
+mockall = { optional = true, version = "0.13", default-features = false }
 
 
 [target.'cfg(unix)'.dependencies]
@@ -160,11 +161,13 @@ datafusion = { version = "42", default-features = false, features = [
 ] }
 filetime = "0.2"
 indoc = "2"
+mockall = { version = "0.13", default-features = false }
 nanoid = "0.4.0"
 test-group = { version = "1" }
 test-log = { version = "0.2", features = ["trace"] }
 tokio = { version = "1", default-features = false, features = ["rt", "macros"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
 
 [[bench]]
 name = "parallel_simple_transfer_protocol"

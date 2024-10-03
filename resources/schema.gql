@@ -1621,6 +1621,9 @@ type SaveDatasetEnvVarResultSuccess implements SaveDatasetEnvVarResult {
 
 input ScheduleInput @oneOf {
 	timeDelta: TimeDeltaInput
+	"""
+	Supported CRON syntax: min hour dayOfMonth month dayOfWeek
+	"""
 	cron5ComponentExpression: String
 }
 

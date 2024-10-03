@@ -13,6 +13,7 @@ use dill::Component;
 use indoc::indoc;
 use kamu::testing::MetadataFactory;
 use kamu::*;
+use kamu_accounts::testing::MockAuthenticationService;
 use kamu_accounts::*;
 use kamu_core::*;
 use messaging_outbox::{register_message_dispatcher, Outbox, OutboxImmediateImpl};

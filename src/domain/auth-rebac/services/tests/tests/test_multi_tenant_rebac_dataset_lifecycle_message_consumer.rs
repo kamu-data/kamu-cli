@@ -16,7 +16,7 @@ use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 use kamu_auth_rebac_services::{MultiTenantRebacDatasetLifecycleMessageConsumer, RebacServiceImpl};
 use kamu_core::{DatasetLifecycleMessage, DatasetVisibility};
 use messaging_outbox::{consume_deserialized_message, ConsumerFilter, Message};
-use opendatafabric::{AccountID, DatasetID};
+use opendatafabric::{AccountID, DatasetID, DatasetName};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -59,6 +59,7 @@ async fn test_rebac_properties_added() {
                 public_dataset_id.clone(),
                 owner_id.clone(),
                 DatasetVisibility::Public,
+                DatasetName::new_unchecked("public-dataset"),
             ))
             .await;
         harness
@@ -66,6 +67,7 @@ async fn test_rebac_properties_added() {
                 private_dataset_id.clone(),
                 owner_id,
                 DatasetVisibility::Private,
+                DatasetName::new_unchecked("private-dataset"),
             ))
             .await;
     }
@@ -107,6 +109,7 @@ async fn test_rebac_properties_deleted() {
                 dataset_id.clone(),
                 owner_id.clone(),
                 DatasetVisibility::Public,
+                DatasetName::new_unchecked("public-dataset"),
             ))
             .await;
     }

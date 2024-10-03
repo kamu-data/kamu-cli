@@ -39,10 +39,8 @@ impl DatasetEnvVarRepository for SqliteDatasetEnvVarRepository {
     ) -> Result<(), SaveDatasetEnvVarError> {
         let mut tr = self.transaction.lock().await;
 
-        let connection_mut = tr
-            .connection_mut()
-            .await
-            .map_err(SaveDatasetEnvVarError::Internal)?;
+        let connection_mut = tr.connection_mut().await?;
+
         let dataset_env_var_id = dataset_env_var.id;
         let dataset_env_var_key = &dataset_env_var.key;
         let dataset_env_var_value = &dataset_env_var.value;
@@ -88,10 +86,8 @@ impl DatasetEnvVarRepository for SqliteDatasetEnvVarRepository {
     ) -> Result<Vec<DatasetEnvVar>, GetDatasetEnvVarError> {
         let mut tr = self.transaction.lock().await;
 
-        let connection_mut = tr
-            .connection_mut()
-            .await
-            .map_err(GetDatasetEnvVarError::Internal)?;
+        let connection_mut = tr.connection_mut().await?;
+
         let limit = i64::try_from(pagination.limit).unwrap();
         let offset = i64::try_from(pagination.offset).unwrap();
         let dataset_id_string = dataset_id.to_string();
@@ -116,8 +112,7 @@ impl DatasetEnvVarRepository for SqliteDatasetEnvVarRepository {
         )
         .fetch_all(connection_mut)
         .await
-        .int_err()
-        .map_err(GetDatasetEnvVarError::Internal)?;
+        .int_err()?;
 
         Ok(dataset_env_var_rows.into_iter().map(Into::into).collect())
     }
@@ -128,10 +123,8 @@ impl DatasetEnvVarRepository for SqliteDatasetEnvVarRepository {
     ) -> Result<usize, GetDatasetEnvVarError> {
         let mut tr = self.transaction.lock().await;
 
-        let connection_mut = tr
-            .connection_mut()
-            .await
-            .map_err(GetDatasetEnvVarError::Internal)?;
+        let connection_mut = tr.connection_mut().await?;
+
         let dataset_id_string = dataset_id.to_string();
 
         let dataset_env_vars_count = sqlx::query_scalar!(
@@ -145,8 +138,7 @@ impl DatasetEnvVarRepository for SqliteDatasetEnvVarRepository {
         )
         .fetch_one(connection_mut)
         .await
-        .int_err()
-        .map_err(GetDatasetEnvVarError::Internal)?;
+        .int_err()?;
 
         Ok(usize::try_from(dataset_env_vars_count).unwrap_or(0))
     }
@@ -157,10 +149,8 @@ impl DatasetEnvVarRepository for SqliteDatasetEnvVarRepository {
     ) -> Result<DatasetEnvVar, GetDatasetEnvVarError> {
         let mut tr = self.transaction.lock().await;
 
-        let connection_mut = tr
-            .connection_mut()
-            .await
-            .map_err(GetDatasetEnvVarError::Internal)?;
+        let connection_mut = tr.connection_mut().await?;
+
         let dataset_env_var_id_search = dataset_env_var_id;
 
         let dataset_env_var_row_maybe = sqlx::query_as!(
@@ -180,8 +170,7 @@ impl DatasetEnvVarRepository for SqliteDatasetEnvVarRepository {
         )
         .fetch_optional(connection_mut)
         .await
-        .int_err()
-        .map_err(GetDatasetEnvVarError::Internal)?;
+        .int_err()?;
 
         if let Some(dataset_env_var_row) = dataset_env_var_row_maybe {
             return Ok(dataset_env_var_row.into());
@@ -200,10 +189,8 @@ impl DatasetEnvVarRepository for SqliteDatasetEnvVarRepository {
     ) -> Result<DatasetEnvVar, GetDatasetEnvVarError> {
         let mut tr = self.transaction.lock().await;
 
-        let connection_mut = tr
-            .connection_mut()
-            .await
-            .map_err(GetDatasetEnvVarError::Internal)?;
+        let connection_mut = tr.connection_mut().await?;
+
         let dataset_id_string = dataset_id.to_string();
 
         let dataset_env_var_row_maybe = sqlx::query_as!(
@@ -225,8 +212,7 @@ impl DatasetEnvVarRepository for SqliteDatasetEnvVarRepository {
         )
         .fetch_optional(connection_mut)
         .await
-        .int_err()
-        .map_err(GetDatasetEnvVarError::Internal)?;
+        .int_err()?;
 
         if let Some(dataset_env_var_row) = dataset_env_var_row_maybe {
             return Ok(dataset_env_var_row.into());
@@ -244,10 +230,7 @@ impl DatasetEnvVarRepository for SqliteDatasetEnvVarRepository {
     ) -> Result<(), DeleteDatasetEnvVarError> {
         let mut tr = self.transaction.lock().await;
 
-        let connection_mut = tr
-            .connection_mut()
-            .await
-            .map_err(DeleteDatasetEnvVarError::Internal)?;
+        let connection_mut = tr.connection_mut().await?;
 
         let delete_result = sqlx::query!(
             r#"
@@ -257,8 +240,7 @@ impl DatasetEnvVarRepository for SqliteDatasetEnvVarRepository {
         )
         .execute(&mut *connection_mut)
         .await
-        .int_err()
-        .map_err(DeleteDatasetEnvVarError::Internal)?;
+        .int_err()?;
 
         if delete_result.rows_affected() == 0 {
             return Err(DeleteDatasetEnvVarError::NotFound(
@@ -278,10 +260,7 @@ impl DatasetEnvVarRepository for SqliteDatasetEnvVarRepository {
     ) -> Result<(), ModifyDatasetEnvVarError> {
         let mut tr = self.transaction.lock().await;
 
-        let connection_mut = tr
-            .connection_mut()
-            .await
-            .map_err(ModifyDatasetEnvVarError::Internal)?;
+        let connection_mut = tr.connection_mut().await?;
 
         let update_result = sqlx::query!(
             r#"
@@ -293,8 +272,7 @@ impl DatasetEnvVarRepository for SqliteDatasetEnvVarRepository {
         )
         .execute(&mut *connection_mut)
         .await
-        .int_err()
-        .map_err(ModifyDatasetEnvVarError::Internal)?;
+        .int_err()?;
 
         if update_result.rows_affected() == 0 {
             return Err(ModifyDatasetEnvVarError::NotFound(
@@ -306,3 +284,5 @@ impl DatasetEnvVarRepository for SqliteDatasetEnvVarRepository {
         Ok(())
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

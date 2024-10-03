@@ -10,8 +10,17 @@
 use std::sync::Arc;
 
 use dill::{component, interface};
+use kamu_accounts::CurrentAccountSubject;
 use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer};
-use kamu_core::{DatasetRepository, GetDatasetError, RenameDatasetError, RenameDatasetUseCase};
+use kamu_core::{
+    DatasetLifecycleMessage,
+    DatasetRepository,
+    GetDatasetError,
+    RenameDatasetError,
+    RenameDatasetUseCase,
+    MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
+};
+use messaging_outbox::{Outbox, OutboxExt};
 use opendatafabric::{DatasetName, DatasetRef};
 
 use crate::DatasetRepositoryWriter;
@@ -22,6 +31,8 @@ pub struct RenameDatasetUseCaseImpl {
     dataset_repo: Arc<dyn DatasetRepository>,
     dataset_repo_writer: Arc<dyn DatasetRepositoryWriter>,
     dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
+    outbox: Arc<dyn Outbox>,
+    current_account_subject: Arc<CurrentAccountSubject>,
 }
 
 #[component(pub)]
@@ -31,11 +42,15 @@ impl RenameDatasetUseCaseImpl {
         dataset_repo: Arc<dyn DatasetRepository>,
         dataset_repo_writer: Arc<dyn DatasetRepositoryWriter>,
         dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
+        outbox: Arc<dyn Outbox>,
+        current_account_subject: Arc<CurrentAccountSubject>,
     ) -> Self {
         Self {
             dataset_repo,
             dataset_repo_writer,
             dataset_action_authorizer,
+            outbox,
+            current_account_subject,
         }
     }
 }
@@ -47,6 +62,12 @@ impl RenameDatasetUseCase for RenameDatasetUseCaseImpl {
         dataset_ref: &DatasetRef,
         new_name: &DatasetName,
     ) -> Result<(), RenameDatasetError> {
+        let owner_account_id = match self.current_account_subject.as_ref() {
+            CurrentAccountSubject::Anonymous(_) => {
+                panic!("Anonymous account cannot rename dataset");
+            }
+            CurrentAccountSubject::Logged(l) => l.account_id.clone(),
+        };
         let dataset_handle = match self.dataset_repo.resolve_dataset_ref(dataset_ref).await {
             Ok(h) => Ok(h),
             Err(GetDatasetError::NotFound(e)) => Err(RenameDatasetError::NotFound(e)),
@@ -57,8 +78,22 @@ impl RenameDatasetUseCase for RenameDatasetUseCaseImpl {
             .check_action_allowed(&dataset_handle, DatasetAction::Write)
             .await?;
 
+        let old_name = dataset_handle.alias.dataset_name.clone();
+
         self.dataset_repo_writer
             .rename_dataset(&dataset_handle, new_name)
+            .await?;
+
+        self.outbox
+            .post_message(
+                MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
+                DatasetLifecycleMessage::renamed(
+                    dataset_handle.id.clone(),
+                    owner_account_id,
+                    old_name,
+                    new_name.clone(),
+                ),
+            )
             .await?;
 
         Ok(())
