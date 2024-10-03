@@ -64,6 +64,7 @@ uuid = { version = "1", default-features = false }
 # TODO: Limit to mock or in-memory implementations only
 container-runtime = { workspace = true }
 init-on-startup = { workspace = true }
+kamu = { workspace = true, features = ["testing"] }
 kamu-accounts = { workspace = true, features = ["testing"] }
 kamu-accounts-inmem = { workspace = true }
 kamu-accounts-services = { workspace = true }

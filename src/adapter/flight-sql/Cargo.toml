@@ -36,7 +36,8 @@ uuid = { version = "1", default-features = false }
 
 
 [dev-dependencies]
-kamu-data-utils = { workspace = true }
+kamu-data-utils = { workspace = true, features = ["testing"] }
+
 indoc = "2"
 test-log = { version = "0.2", features = ["trace"] }
 tokio = { version = "1", default-features = false, features = [] }
