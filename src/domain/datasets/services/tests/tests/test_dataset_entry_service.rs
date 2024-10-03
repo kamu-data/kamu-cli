@@ -27,7 +27,6 @@ use kamu_datasets_services::{DatasetEntryIndexer, DatasetEntryService};
 use messaging_outbox::{register_message_dispatcher, Outbox, OutboxExt, OutboxImmediateImpl};
 use mockall::predicate::eq;
 use opendatafabric::{AccountID, AccountName, DatasetAlias, DatasetHandle, DatasetID, DatasetName};
-use tempfile::TempDir;
 use time_source::{FakeSystemTimeSource, SystemTimeSource};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -186,7 +185,6 @@ async fn test_indexes_datasets_correctly() {
 
 struct DatasetEntryServiceHarness {
     _catalog: Catalog,
-    _temp_dir: TempDir,
     outbox: Arc<dyn Outbox>,
     dataset_entry_indexer: Arc<DatasetEntryIndexer>,
     account_repo: Arc<dyn AccountRepository>,
@@ -197,50 +195,47 @@ impl DatasetEntryServiceHarness {
         mock_dataset_entry_repository: MockDatasetEntryRepository,
         mock_dataset_repository: MockDatasetRepository,
     ) -> Self {
-        let temp_dir = tempfile::tempdir().unwrap();
-        let datasets_dir = temp_dir.path().join("datasets");
+        let catalog = {
+            let mut b = CatalogBuilder::new();
 
-        std::fs::create_dir(&datasets_dir).unwrap();
+            b.add::<DatasetEntryService>();
+            b.add::<DatasetEntryIndexer>();
 
-        let mut b = CatalogBuilder::new();
+            b.add_value(mock_dataset_entry_repository);
+            b.bind::<dyn DatasetEntryRepository, MockDatasetEntryRepository>();
 
-        b.add::<DatasetEntryService>();
+            let t = frozen_time_point();
+            let fake_system_time_source = FakeSystemTimeSource::new(t);
+            b.add_value(fake_system_time_source);
+            b.bind::<dyn SystemTimeSource, FakeSystemTimeSource>();
 
-        b.add_value(mock_dataset_entry_repository);
-        b.bind::<dyn DatasetEntryRepository, MockDatasetEntryRepository>();
+            b.add_value(mock_dataset_repository);
+            b.bind::<dyn DatasetRepository, MockDatasetRepository>();
 
-        let t = frozen_time_point();
-        let fake_system_time_source = FakeSystemTimeSource::new(t);
-        b.add_value(fake_system_time_source);
-        b.bind::<dyn SystemTimeSource, FakeSystemTimeSource>();
+            b.add_value(MockDatasetRepositoryWriter::new());
+            b.bind::<dyn DatasetRepositoryWriter, MockDatasetRepositoryWriter>();
 
-        b.add_value(mock_dataset_repository);
-        b.bind::<dyn DatasetRepository, MockDatasetRepository>();
+            let account_repository = InMemoryAccountRepository::new();
+            b.add_value(account_repository);
+            b.bind::<dyn AccountRepository, InMemoryAccountRepository>();
 
-        b.add_value(MockDatasetRepositoryWriter::new());
-        b.bind::<dyn DatasetRepositoryWriter, MockDatasetRepositoryWriter>();
+            b.add_builder(
+                OutboxImmediateImpl::builder()
+                    .with_consumer_filter(messaging_outbox::ConsumerFilter::AllConsumers),
+            );
+            b.bind::<dyn Outbox, OutboxImmediateImpl>();
 
-        let account_repository = InMemoryAccountRepository::new();
-        b.add_value(account_repository);
-        b.bind::<dyn AccountRepository, InMemoryAccountRepository>();
+            b.add_value(CurrentAccountSubject::new_test());
 
-        b.add_builder(
-            OutboxImmediateImpl::builder()
-                .with_consumer_filter(messaging_outbox::ConsumerFilter::AllConsumers),
-        );
-        b.bind::<dyn Outbox, OutboxImmediateImpl>();
+            register_message_dispatcher::<DatasetLifecycleMessage>(
+                &mut b,
+                MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
+            );
 
-        b.add_value(CurrentAccountSubject::new_test());
-
-        register_message_dispatcher::<DatasetLifecycleMessage>(
-            &mut b,
-            MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
-        );
-
-        let catalog = b.build();
+            b.build()
+        };
 
         Self {
-            _temp_dir: temp_dir,
             outbox: catalog.get_one().unwrap(),
             dataset_entry_indexer: catalog.get_one().unwrap(),
             account_repo: catalog.get_one().unwrap(),
