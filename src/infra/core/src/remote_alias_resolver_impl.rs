@@ -10,6 +10,7 @@
 use std::str::FromStr;
 use std::sync::Arc;
 
+use auth::OdfServerAccessTokenResolver;
 use dill::*;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_core::*;
@@ -22,6 +23,7 @@ use crate::UrlExt;
 
 pub struct RemoteAliasResolverImpl {
     remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
+    access_token_resolver: Arc<dyn OdfServerAccessTokenResolver>,
     dataset_repo: Arc<dyn DatasetRepository>,
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
 }
@@ -31,11 +33,13 @@ pub struct RemoteAliasResolverImpl {
 impl RemoteAliasResolverImpl {
     pub fn new(
         remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
+        access_token_resolver: Arc<dyn OdfServerAccessTokenResolver>,
         dataset_repo: Arc<dyn DatasetRepository>,
         remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
     ) -> Self {
         Self {
             remote_repo_reg,
+            access_token_resolver,
             dataset_repo,
             remote_alias_reg,
         }
@@ -145,10 +149,15 @@ impl RemoteAliasResolver for RemoteAliasResolverImpl {
         let remote_repo = self.remote_repo_reg.get_repository(&repo_name).int_err()?;
 
         if account_name.is_none() {
-            account_name =
-                RemoteAliasResolverApiHelper::resolve_remote_account_name(&remote_repo.url)
-                    .await
-                    .int_err()?;
+            let access_token_maybe = self
+                .access_token_resolver
+                .resolve_odf_dataset_access_token(&remote_repo.url);
+            account_name = RemoteAliasResolverApiHelper::resolve_remote_account_name(
+                &remote_repo.url,
+                access_token_maybe,
+            )
+            .await
+            .int_err()?;
         }
         let push_dataset_name = dataset_name.unwrap_or(
             self.resolve_remote_dataset_name(local_dataset_handle, &remote_repo.url)
@@ -215,11 +224,20 @@ impl RemoteAliasResolverApiHelper {
     // Return account name if remote workspace is in multi tenant mode
     pub async fn resolve_remote_account_name(
         server_backend_url: &Url,
+        access_token_maybe: Option<String>,
     ) -> Result<Option<odf::AccountName>, GetRemoteAccountError> {
         let client = reqwest::Client::new();
+        let mut header_map = http::HeaderMap::new();
+        if let Some(access_token) = access_token_maybe {
+            header_map.append(
+                http::header::AUTHORIZATION,
+                http::HeaderValue::from_str(format!("Bearer {access_token}").as_str()).unwrap(),
+            );
+        };
 
         let workspace_info_response = client
             .get(server_backend_url.join("workspace/info").unwrap())
+            .headers(header_map.clone())
             .send()
             .await
             .int_err()?
@@ -236,6 +254,7 @@ impl RemoteAliasResolverApiHelper {
 
         let account_response = client
             .get(server_backend_url.join("me").unwrap())
+            .headers(header_map)
             .send()
             .await
             .int_err()?

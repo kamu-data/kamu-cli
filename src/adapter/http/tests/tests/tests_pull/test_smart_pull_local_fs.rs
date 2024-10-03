@@ -11,7 +11,6 @@ use crate::harness::{
     ClientSideHarness,
     ClientSideHarnessOptions,
     ServerSideHarnessOptions,
-    ServerSideHarnessOverrides,
     ServerSideLocalFsHarness,
 };
 use crate::tests::test_client_server_local_fs_harness_permutations;

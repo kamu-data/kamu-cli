@@ -28,7 +28,6 @@ use crate::harness::{
     ClientSideHarnessOptions,
     ServerSideHarness,
     ServerSideHarnessOptions,
-    ServerSideHarnessOverrides,
     ServerSideLocalFsHarness,
 };
 use crate::tests::tests_pull::scenarios::*;
@@ -42,16 +41,11 @@ async fn test_smart_pull_unauthenticated() {
             multi_tenant: false,
             authenticated_remotely: false,
         }),
-        ServerSideLocalFsHarness::new(
-            ServerSideHarnessOptions {
-                multi_tenant: false,
-                authorized_writes: true,
-                base_catalog: None,
-            },
-            ServerSideHarnessOverrides {
-                mock_authentication_service: None,
-            },
-        )
+        ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
+            multi_tenant: false,
+            authorized_writes: true,
+            base_catalog: None,
+        })
         .await,
     )
     .await;
@@ -93,16 +87,11 @@ async fn test_smart_pull_incompatible_version_err() {
             multi_tenant: true,
             authenticated_remotely: true,
         }),
-        ServerSideLocalFsHarness::new(
-            ServerSideHarnessOptions {
-                multi_tenant: true,
-                authorized_writes: true,
-                base_catalog: None,
-            },
-            ServerSideHarnessOverrides {
-                mock_authentication_service: None,
-            },
-        )
+        ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
+            multi_tenant: true,
+            authorized_writes: true,
+            base_catalog: None,
+        })
         .await,
     )
     .await;

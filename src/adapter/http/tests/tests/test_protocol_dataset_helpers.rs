@@ -26,7 +26,6 @@ use crate::harness::{
     make_dataset_ref,
     ServerSideHarness,
     ServerSideHarnessOptions,
-    ServerSideHarnessOverrides,
     ServerSideLocalFsHarness,
     ServerSideS3Harness,
 };
@@ -35,16 +34,11 @@ use crate::harness::{
 
 #[test_log::test(tokio::test)]
 async fn test_object_url_local_fs() {
-    let server_harness = ServerSideLocalFsHarness::new(
-        ServerSideHarnessOptions {
-            multi_tenant: false,
-            authorized_writes: true,
-            base_catalog: None,
-        },
-        ServerSideHarnessOverrides {
-            mock_authentication_service: None,
-        },
-    )
+    let server_harness = ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
+        multi_tenant: false,
+        authorized_writes: true,
+        base_catalog: None,
+    })
     .await;
 
     let test_case = create_test_case(&server_harness).await;

@@ -56,16 +56,11 @@ impl Harness {
             .add::<EngineProvisionerNull>()
             .build();
 
-        let server_harness = ServerSideLocalFsHarness::new(
-            ServerSideHarnessOptions {
-                multi_tenant: true,
-                authorized_writes: true,
-                base_catalog: Some(catalog),
-            },
-            ServerSideHarnessOverrides {
-                mock_authentication_service: None,
-            },
-        )
+        let server_harness = ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
+            multi_tenant: true,
+            authorized_writes: true,
+            base_catalog: Some(catalog),
+        })
         .await;
 
         let system_time = Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap();

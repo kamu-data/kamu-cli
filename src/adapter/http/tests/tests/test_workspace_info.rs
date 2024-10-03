@@ -74,16 +74,11 @@ struct WorkspaceInfoHarness {
 
 impl WorkspaceInfoHarness {
     async fn new(is_multi_tenant: bool) -> Self {
-        let server_harness = ServerSideLocalFsHarness::new(
-            ServerSideHarnessOptions {
-                multi_tenant: is_multi_tenant,
-                authorized_writes: true,
-                base_catalog: None,
-            },
-            ServerSideHarnessOverrides {
-                mock_authentication_service: None,
-            },
-        )
+        let server_harness = ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
+            multi_tenant: is_multi_tenant,
+            authorized_writes: true,
+            base_catalog: None,
+        })
         .await;
 
         let root_url = url::Url::parse(

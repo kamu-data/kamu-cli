@@ -19,6 +19,7 @@
 use axum::extract::Extension;
 use axum::response::Json;
 use chrono::{DateTime, Utc};
+use database_common_macros::transactional_handler;
 use dill::Catalog;
 use http_common::*;
 use kamu_accounts::{
@@ -68,6 +69,7 @@ impl From<Account> for Response {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[transactional_handler]
 pub async fn account_handler(
     Extension(catalog): Extension<Catalog>,
 ) -> Result<Json<Response>, ApiError> {

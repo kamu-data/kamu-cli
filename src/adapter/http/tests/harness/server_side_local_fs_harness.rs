@@ -38,7 +38,7 @@ use kamu::{
     ObjectStoreRegistryImpl,
     RemoteRepositoryRegistryImpl,
 };
-use kamu_accounts::{AuthenticationService, MockAuthenticationService};
+use kamu_accounts::{Account, AuthenticationService, MockAuthenticationService};
 use messaging_outbox::DummyOutboxImpl;
 use opendatafabric::{AccountName, DatasetAlias, DatasetHandle};
 use tempfile::TempDir;
@@ -48,10 +48,10 @@ use url::Url;
 use super::{
     create_cli_user_catalog,
     create_web_user_catalog,
+    get_server_account,
     server_authentication_mock,
     ServerSideHarness,
     ServerSideHarnessOptions,
-    ServerSideHarnessOverrides,
     TestAPIServer,
     SERVER_ACCOUNT_NAME,
 };
@@ -65,13 +65,11 @@ pub(crate) struct ServerSideLocalFsHarness {
     api_server: TestAPIServer,
     options: ServerSideHarnessOptions,
     time_source: SystemTimeSourceStub,
+    account: Account,
 }
 
 impl ServerSideLocalFsHarness {
-    pub async fn new(
-        options: ServerSideHarnessOptions,
-        overrides: ServerSideHarnessOverrides,
-    ) -> Self {
+    pub async fn new(options: ServerSideHarnessOptions) -> Self {
         let tempdir = tempfile::tempdir().unwrap();
 
         let datasets_dir = tempdir.path().join("datasets");
@@ -83,6 +81,8 @@ impl ServerSideLocalFsHarness {
         let cache_dir = tempdir.path().join("cache");
         std::fs::create_dir(&cache_dir).unwrap();
 
+        let account = get_server_account();
+
         let time_source = SystemTimeSourceStub::new();
         let (base_catalog, listener) = {
             let mut b = match &options.base_catalog {
@@ -93,9 +93,6 @@ impl ServerSideLocalFsHarness {
             let addr = SocketAddr::from(([127, 0, 0, 1], 0));
             let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
             let base_url_rest = format!("http://{}", listener.local_addr().unwrap());
-            let mock_auth_service = overrides
-                .mock_authentication_service
-                .unwrap_or(server_authentication_mock());
 
             b.add_value(RunInfoDir::new(run_info_dir))
                 .add_value(CacheDir::new(cache_dir))
@@ -110,7 +107,7 @@ impl ServerSideLocalFsHarness {
                 )
                 .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
                 .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
-                .add_value(mock_auth_service)
+                .add_value(server_authentication_mock(&account))
                 .bind::<dyn AuthenticationService, MockAuthenticationService>()
                 .add_value(ServerUrlConfig::new_test(Some(&base_url_rest)))
                 .add::<CompactionServiceImpl>()
@@ -139,6 +136,7 @@ impl ServerSideLocalFsHarness {
             api_server,
             options,
             time_source,
+            account,
         }
     }
 
@@ -194,6 +192,10 @@ impl ServerSideHarness for ServerSideLocalFsHarness {
 
     fn api_server_addr(&self) -> String {
         self.api_server.local_addr().to_string()
+    }
+
+    fn api_server_account(&self) -> Account {
+        self.account.clone()
     }
 
     fn dataset_url_with_scheme(&self, dataset_alias: &DatasetAlias, scheme: &str) -> Url {
