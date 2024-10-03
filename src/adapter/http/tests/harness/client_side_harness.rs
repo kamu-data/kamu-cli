@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::path::PathBuf;
+use std::str::FromStr;
 use std::sync::Arc;
 
 use auth::OdfServerAccessTokenResolver;
@@ -15,6 +16,7 @@ use container_runtime::ContainerRuntime;
 use database_common::NoOpDatabasePlugin;
 use dill::Component;
 use headers::Header;
+use internal_error::{InternalError, ResultIntoInternal};
 use kamu::domain::*;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
@@ -27,7 +29,8 @@ use opendatafabric::{
     DatasetID,
     DatasetRef,
     DatasetRefAny,
-    DatasetRefRemote,
+    RepoName,
+    TransferDatasetRef,
 };
 use tempfile::TempDir;
 use time_source::SystemTimeSourceDefault;
@@ -240,7 +243,7 @@ impl ClientSideHarness {
     pub async fn push_dataset(
         &self,
         dataset_local_ref: DatasetRef,
-        dataset_remote_ref: DatasetRefRemote,
+        dataset_remote_ref: TransferDatasetRef,
         force: bool,
         dataset_visibility: DatasetVisibility,
     ) -> Vec<PushResponse> {
@@ -248,7 +251,7 @@ impl ClientSideHarness {
             .push_multi_ext(
                 vec![PushRequest {
                     local_ref: Some(dataset_local_ref),
-                    remote_ref: Some(dataset_remote_ref.into()),
+                    remote_ref: Some(dataset_remote_ref),
                 }],
                 PushMultiOptions {
                     sync_options: SyncOptions {
@@ -267,7 +270,7 @@ impl ClientSideHarness {
     pub async fn push_dataset_result(
         &self,
         dataset_local_ref: DatasetRef,
-        dataset_remote_ref: DatasetRefRemote,
+        dataset_remote_ref: TransferDatasetRef,
         force: bool,
         dataset_visibility: DatasetVisibility,
     ) -> SyncResult {
@@ -287,6 +290,24 @@ impl ClientSideHarness {
                 panic!("Failure")
             }
         }
+    }
+
+    pub fn add_repository(
+        &self,
+        repo_name: &RepoName,
+        base_url: &str,
+    ) -> Result<(), InternalError> {
+        let remote_repo_reg = self
+            .catalog
+            .get_one::<dyn RemoteRepositoryRegistry>()
+            .unwrap();
+
+        remote_repo_reg
+            .add_repository(
+                repo_name,
+                Url::from_str(&format!("http://{base_url}")).unwrap(),
+            )
+            .int_err()
     }
 
     pub fn internal_datasets_folder_path(&self) -> PathBuf {

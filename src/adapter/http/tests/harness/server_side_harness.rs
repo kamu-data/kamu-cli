@@ -67,6 +67,8 @@ pub(crate) trait ServerSideHarness {
         self.dataset_url_with_scheme(dataset_alias, "odf+http")
     }
 
+    fn api_server_addr(&self) -> String;
+
     fn system_time_source(&self) -> &SystemTimeSourceStub;
 
     async fn api_server_run(self) -> Result<(), InternalError>;

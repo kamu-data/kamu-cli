@@ -14,7 +14,6 @@ use dill::*;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_core::*;
 use opendatafabric::{self as odf, DatasetRefRemote};
-use serde_json::json;
 use url::Url;
 
 use crate::UrlExt;
@@ -260,37 +259,26 @@ impl RemoteAliasResolverApiHelper {
     }
 
     pub async fn fetch_remote_dataset_name(
-        remote_server_url: &Url,
+        server_backend_url: &Url,
         dataset_id: &odf::DatasetID,
     ) -> Result<Option<odf::DatasetName>, ResolveAliasError> {
         let client = reqwest::Client::new();
-        let mut server_url = remote_server_url.clone();
-        server_url.path_segments_mut().unwrap().push("graphql");
-
-        let gql_query = r#"
-            query Datasets {
-                datasets {
-                    byId(datasetId: "{dataset_id}") {
-                        name
-                    }
-                }
-            }
-            "#
-        .replace("{dataset_id}", &dataset_id.to_string());
-
         let response = client
-            .post(server_url)
-            .json(&json!({"query": gql_query}))
+            .get(
+                server_backend_url
+                    .join(&format!("datasets/{dataset_id}"))
+                    .unwrap(),
+            )
             .send()
             .await
-            .int_err()?
-            .error_for_status()
             .int_err()?;
+        if response.status() == http::StatusCode::NOT_FOUND {
+            return Ok(None);
+        }
+        let json_response: serde_json::Value = response.json().await.int_err()?;
 
-        let gql_response: serde_json::Value = response.json().await.int_err()?;
-
-        if let Some(gql_dataset_name) = gql_response["data"]["datasets"]["byId"]["name"].as_str() {
-            let dataset_name = odf::DatasetName::try_from(gql_dataset_name).int_err()?;
+        if let Some(res_dataset_name) = json_response["datasetName"].as_str() {
+            let dataset_name = odf::DatasetName::try_from(res_dataset_name).int_err()?;
             return Ok(Some(dataset_name));
         }
         Ok(None)

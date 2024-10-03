@@ -6,16 +6,3 @@
 // As of the Change Date specified in that file, in accordance with
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
-
-mod account_handler;
-mod dataset_info_handler;
-mod ingest_handler;
-pub mod metadata_handler;
-mod query_handler;
-pub mod query_types;
-mod router;
-mod tail_handler;
-mod verify_handler;
-mod workspace_info_handler;
-
-pub use router::*;

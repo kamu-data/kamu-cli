@@ -37,6 +37,10 @@ pub fn root_router() -> axum::Router {
             "/me",
             axum::routing::get(super::account_handler::account_handler),
         )
+        .route(
+            "/datasets/:id",
+            axum::routing::get(super::dataset_info_handler::dataset_info_handler),
+        )
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

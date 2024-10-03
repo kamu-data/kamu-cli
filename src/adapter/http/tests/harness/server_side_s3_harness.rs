@@ -135,10 +135,6 @@ impl ServerSideS3Harness {
     pub fn internal_bucket_folder_path(&self) -> PathBuf {
         self.s3.tmp_dir.path().join(&self.s3.bucket)
     }
-
-    fn api_server_addr(&self) -> String {
-        self.api_server.local_addr().to_string()
-    }
 }
 
 #[async_trait::async_trait]
@@ -202,6 +198,10 @@ impl ServerSideHarness for ServerSideS3Harness {
             .as_str(),
         )
         .unwrap()
+    }
+
+    fn api_server_addr(&self) -> String {
+        self.api_server.local_addr().to_string()
     }
 
     fn dataset_layout(&self, dataset_handle: &DatasetHandle) -> DatasetLayout {

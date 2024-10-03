@@ -36,6 +36,7 @@ use kamu::{
     DependencyGraphServiceInMemory,
     ObjectStoreBuilderLocalFs,
     ObjectStoreRegistryImpl,
+    RemoteRepositoryRegistryImpl,
 };
 use kamu_accounts::{AuthenticationService, MockAuthenticationService};
 use messaging_outbox::DummyOutboxImpl;
@@ -115,6 +116,7 @@ impl ServerSideLocalFsHarness {
                 .add::<CompactionServiceImpl>()
                 .add::<ObjectStoreRegistryImpl>()
                 .add::<ObjectStoreBuilderLocalFs>()
+                .add::<RemoteRepositoryRegistryImpl>()
                 .add::<AppendDatasetMetadataBatchUseCaseImpl>()
                 .add::<CreateDatasetUseCaseImpl>()
                 .add::<CreateDatasetFromSnapshotUseCaseImpl>()
@@ -138,10 +140,6 @@ impl ServerSideLocalFsHarness {
             options,
             time_source,
         }
-    }
-
-    pub fn api_server_addr(&self) -> String {
-        self.api_server.local_addr().to_string()
     }
 
     fn internal_datasets_folder_path(&self) -> PathBuf {
@@ -192,6 +190,10 @@ impl ServerSideHarness for ServerSideLocalFsHarness {
     fn cli_compaction_service(&self) -> Arc<dyn CompactionService> {
         let cli_catalog = create_cli_user_catalog(&self.base_catalog);
         cli_catalog.get_one::<dyn CompactionService>().unwrap()
+    }
+
+    fn api_server_addr(&self) -> String {
+        self.api_server.local_addr().to_string()
     }
 
     fn dataset_url_with_scheme(&self, dataset_alias: &DatasetAlias, scheme: &str) -> Url {

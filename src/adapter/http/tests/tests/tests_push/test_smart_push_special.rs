@@ -56,7 +56,7 @@ async fn test_smart_push_new_dataset_unauthenticated() {
             .client_harness
             .push_dataset(
                 scenario.client_dataset_ref,
-                scenario.server_dataset_ref,
+                scenario.server_dataset_ref.into(),
                 false,
                 DatasetVisibility::Private,
             )
@@ -112,7 +112,7 @@ async fn test_smart_push_new_dataset_wrong_user() {
             .client_harness
             .push_dataset(
                 scenario.client_dataset_ref,
-                wrong_server_dataset_ref,
+                wrong_server_dataset_ref.into(),
                 false,
                 DatasetVisibility::Private,
             )
@@ -161,7 +161,7 @@ async fn test_smart_push_existing_dataset_unauthenticated() {
             .client_harness
             .push_dataset(
                 scenario.client_dataset_ref,
-                scenario.server_dataset_ref,
+                scenario.server_dataset_ref.into(),
                 false,
                 DatasetVisibility::Private,
             )
@@ -210,7 +210,7 @@ async fn test_smart_push_existing_dataset_unauthorized() {
             .client_harness
             .push_dataset(
                 scenario.client_dataset_ref,
-                scenario.server_dataset_ref,
+                scenario.server_dataset_ref.into(),
                 false,
                 DatasetVisibility::Private,
             )
@@ -259,7 +259,7 @@ async fn test_smart_push_existing_ref_collision() {
             .client_harness
             .push_dataset(
                 scenario.client_dataset_ref,
-                scenario.server_dataset_ref,
+                scenario.server_dataset_ref.into(),
                 false,
                 DatasetVisibility::Private,
             )
