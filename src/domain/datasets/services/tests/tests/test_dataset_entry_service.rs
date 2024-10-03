@@ -23,7 +23,7 @@ use kamu_core::{
     MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
 };
 use kamu_datasets::{DatasetEntry, DatasetEntryRepository, MockDatasetEntryRepository};
-use kamu_datasets_services::DatasetEntryService;
+use kamu_datasets_services::{DatasetEntryIndexer, DatasetEntryService};
 use messaging_outbox::{register_message_dispatcher, Outbox, OutboxExt, OutboxImmediateImpl};
 use mockall::predicate::eq;
 use opendatafabric::{AccountID, AccountName, DatasetAlias, DatasetHandle, DatasetID, DatasetName};
@@ -148,7 +148,7 @@ async fn test_indexes_datasets_correctly() {
         .unwrap();
 
     harness
-        .dataset_entry_service
+        .dataset_entry_indexer
         .run_initialization()
         .await
         .unwrap();
@@ -188,7 +188,7 @@ struct DatasetEntryServiceHarness {
     _catalog: Catalog,
     _temp_dir: TempDir,
     outbox: Arc<dyn Outbox>,
-    dataset_entry_service: Arc<DatasetEntryService>,
+    dataset_entry_indexer: Arc<DatasetEntryIndexer>,
     account_repo: Arc<dyn AccountRepository>,
 }
 
@@ -242,7 +242,7 @@ impl DatasetEntryServiceHarness {
         Self {
             _temp_dir: temp_dir,
             outbox: catalog.get_one().unwrap(),
-            dataset_entry_service: catalog.get_one().unwrap(),
+            dataset_entry_indexer: catalog.get_one().unwrap(),
             account_repo: catalog.get_one().unwrap(),
             _catalog: catalog,
         }

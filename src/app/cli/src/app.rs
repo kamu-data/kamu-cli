@@ -25,7 +25,7 @@ use kamu_adapter_http::{FileUploadLimitConfig, UploadServiceLocal};
 use kamu_adapter_oauth::GithubAuthenticationConfig;
 use kamu_auth_rebac_services::{MultiTenantRebacDatasetLifecycleMessageConsumer, RebacServiceImpl};
 use kamu_datasets::DatasetEnvVar;
-use kamu_datasets_services::{DatasetEntryService, DatasetEntryServiceInitializationSkipper};
+use kamu_datasets_services::{DatasetEntryIndexer, DatasetEntryService};
 use kamu_flow_system_inmem::domain::{FlowConfigurationUpdatedMessage, FlowProgressMessage};
 use kamu_flow_system_services::{
     MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE,
@@ -135,7 +135,7 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
         );
 
         if !workspace_svc.is_in_workspace() {
-            base_catalog_builder.add_value(DatasetEntryServiceInitializationSkipper {});
+            base_catalog_builder.add::<DatasetEntryIndexer>();
         }
 
         base_catalog_builder.add_value(JwtAuthenticationConfig::load_from_env());
