@@ -134,7 +134,7 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
             args.e2e_output_data_path.is_some(),
         );
 
-        if !workspace_svc.is_in_workspace() {
+        if workspace_svc.is_in_workspace() {
             base_catalog_builder.add::<DatasetEntryIndexer>();
         }
 

@@ -23,17 +23,10 @@ use opendatafabric as odf;
 use opendatafabric::DatasetHandle;
 use time_source::SystemTimeSource;
 
-use crate::JOB_KAMU_DATASETS_DATASET_ENTRY_SERVICE;
+use crate::JOB_KAMU_DATASETS_DATASET_ENTRY_INDEXER;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[component(pub)]
-#[interface(dyn InitOnStartup)]
-#[meta(InitOnStartupMeta {
-    job_name: JOB_KAMU_DATASETS_DATASET_ENTRY_SERVICE,
-    depends_on: &[JOB_KAMU_ACCOUNTS_PREDEFINED_ACCOUNTS_REGISTRATOR],
-    requires_transaction: true,
-})]
 pub struct DatasetEntryIndexer {
     dataset_entry_repo: Arc<dyn DatasetEntryRepository>,
     time_source: Arc<dyn SystemTimeSource>,
@@ -41,6 +34,13 @@ pub struct DatasetEntryIndexer {
     account_repository: Arc<dyn AccountRepository>,
 }
 
+#[component(pub)]
+#[interface(dyn InitOnStartup)]
+#[meta(InitOnStartupMeta {
+    job_name: JOB_KAMU_DATASETS_DATASET_ENTRY_INDEXER,
+    depends_on: &[JOB_KAMU_ACCOUNTS_PREDEFINED_ACCOUNTS_REGISTRATOR],
+    requires_transaction: true,
+})]
 impl DatasetEntryIndexer {
     pub fn new(
         dataset_entry_repo: Arc<dyn DatasetEntryRepository>,
@@ -126,7 +126,7 @@ impl InitOnStartup for DatasetEntryIndexer {
     #[tracing::instrument(
         level = "debug",
         skip_all,
-        name = "DatasetEntryService::run_initialization"
+        name = "DatasetEntryIndexer::run_initialization"
     )]
     async fn run_initialization(&self) -> Result<(), InternalError> {
         if self.has_datasets_indexed().await? {

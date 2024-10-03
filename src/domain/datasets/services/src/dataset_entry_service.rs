@@ -31,6 +31,11 @@ use crate::MESSAGE_CONSUMER_KAMU_DATASET_ENTRY_SERVICE;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub struct DatasetEntryService {
+    dataset_entry_repo: Arc<dyn DatasetEntryRepository>,
+    time_source: Arc<dyn SystemTimeSource>,
+}
+
 #[component(pub)]
 #[interface(dyn MessageConsumer)]
 #[interface(dyn MessageConsumerT<DatasetLifecycleMessage>)]
@@ -41,11 +46,6 @@ use crate::MESSAGE_CONSUMER_KAMU_DATASET_ENTRY_SERVICE;
     ],
     durability: MessageConsumptionDurability::Durable,
 })]
-pub struct DatasetEntryService {
-    dataset_entry_repo: Arc<dyn DatasetEntryRepository>,
-    time_source: Arc<dyn SystemTimeSource>,
-}
-
 impl DatasetEntryService {
     pub fn new(
         dataset_entry_repo: Arc<dyn DatasetEntryRepository>,
