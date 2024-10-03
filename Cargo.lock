@@ -1136,16 +1136,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "71938f30533e4d95a6d17aa530939da3842c2ab6f4f84b9dae68447e4129f74a"
 
 [[package]]
-name = "assert-json-diff"
-version = "2.0.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "47e4f2b81832e72834d7518d8487a0396a28cc408186a2e8854c0f98011faf12"
-dependencies = [
- "serde",
- "serde_json",
-]
-
-[[package]]
 name = "assert_cmd"
 version = "2.0.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2368,16 +2358,6 @@ name = "colorchoice"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d3fd119d74b830634cea2a0f58bbd0d54540518a14397557951e79340abc28c0"
-
-[[package]]
-name = "colored"
-version = "2.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cbf2150cce219b664a8a70df7a1f933836724b503f8a413af9365b4dcc4d90b8"
-dependencies = [
- "lazy_static",
- "windows-sys 0.48.0",
-]
 
 [[package]]
 name = "combine"
@@ -5060,7 +5040,6 @@ dependencies = [
  "like",
  "messaging-outbox",
  "mockall",
- "mockito",
  "nanoid",
  "object_store",
  "opendatafabric",
@@ -5810,6 +5789,7 @@ dependencies = [
  "kamu-accounts",
  "kamu-datasets",
  "messaging-outbox",
+ "mockall",
  "object_store",
  "opendatafabric",
  "pathdiff",
@@ -5882,6 +5862,7 @@ dependencies = [
  "database-common",
  "internal-error",
  "merge",
+ "mockall",
  "opendatafabric",
  "secrecy",
  "serde",
@@ -5959,12 +5940,22 @@ dependencies = [
  "chrono",
  "database-common",
  "dill",
+ "futures",
+ "init-on-startup",
  "internal-error",
+ "kamu",
+ "kamu-accounts",
+ "kamu-accounts-inmem",
+ "kamu-core",
  "kamu-datasets",
+ "messaging-outbox",
+ "mockall",
  "opendatafabric",
+ "pretty_assertions",
  "secrecy",
  "serde",
  "serde_json",
+ "test-log",
  "thiserror",
  "time-source",
  "tokio",
@@ -6897,30 +6888,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.79",
-]
-
-[[package]]
-name = "mockito"
-version = "1.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "09b34bd91b9e5c5b06338d392463e1318d683cf82ec3d3af4014609be6e2108d"
-dependencies = [
- "assert-json-diff",
- "bytes",
- "colored",
- "futures-util",
- "http 1.1.0",
- "http-body 1.0.1",
- "http-body-util",
- "hyper 1.4.1",
- "hyper-util",
- "log",
- "rand",
- "regex",
- "serde_json",
- "serde_urlencoded",
- "similar",
- "tokio",
 ]
 
 [[package]]
@@ -8140,7 +8107,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e9552f850d5f0964a4e4d0bf306459ac29323ddfbae05e35a7c0d35cb0803cc5"
 dependencies = [
  "anyhow",
- "itertools 0.13.0",
+ "itertools 0.10.5",
  "proc-macro2",
  "quote",
  "syn 2.0.79",
@@ -9210,12 +9177,6 @@ name = "simd-adler32"
 version = "0.3.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d66dc143e6b11c1eddc06d5c423cfc97062865baf299914ab64caa38182078fe"
-
-[[package]]
-name = "similar"
-version = "2.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1de1d4f81173b03af4c0cbed3c898f6bff5b870e4a7f5d6f4057d62a7a4b686e"
 
 [[package]]
 name = "simple_asn1"

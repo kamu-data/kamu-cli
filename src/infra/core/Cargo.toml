@@ -163,7 +163,6 @@ filetime = "0.2"
 indoc = "2"
 mockall = { version = "0.13", default-features = false }
 nanoid = "0.4.0"
-mockito = "1.5.0"
 test-group = { version = "1" }
 test-log = { version = "0.2", features = ["trace"] }
 tokio = { version = "1", default-features = false, features = ["rt", "macros"] }

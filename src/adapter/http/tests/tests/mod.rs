@@ -102,7 +102,7 @@ macro_rules! test_client_server_s3_harness_permutations {
         paste::paste! {
             #[test_group::group(containerized)]
             #[test_log::test(tokio::test)]
-            async fn [<$test_name "_st_client_st_local_fs_server">] () {
+            async fn [<$test_name "_st_client_st_s3_server">] () {
                 $test_package::$test_name(
                     ClientSideHarness::new(ClientSideHarnessOptions { multi_tenant: false, authenticated_remotely: true }),
                     ServerSideS3Harness::new(ServerSideHarnessOptions {
@@ -118,7 +118,7 @@ macro_rules! test_client_server_s3_harness_permutations {
         paste::paste! {
             #[test_group::group(containerized)]
             #[test_log::test(tokio::test)]
-            async fn [<$test_name "_st_client_mt_local_fs_server">] () {
+            async fn [<$test_name "_st_client_mt_s3_server">] () {
                 $test_package::$test_name(
                     ClientSideHarness::new(ClientSideHarnessOptions { multi_tenant: false, authenticated_remotely: true }),
                     ServerSideS3Harness::new(ServerSideHarnessOptions {

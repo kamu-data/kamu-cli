@@ -29,7 +29,6 @@ impl SqlitePlugin {
     }
 
     pub fn init_database_components(catalog_builder: &mut CatalogBuilder) {
-        println!("qwe");
         catalog_builder.add::<Self>();
         catalog_builder.add::<SqliteTransactionManager>();
     }

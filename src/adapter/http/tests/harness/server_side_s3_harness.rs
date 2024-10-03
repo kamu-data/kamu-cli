@@ -99,7 +99,7 @@ impl ServerSideS3Harness {
                 .add_builder(
                     DatasetRepositoryS3::builder()
                         .with_s3_context(s3_context.clone())
-                        .with_multi_tenant(false),
+                        .with_multi_tenant(options.multi_tenant),
                 )
                 .bind::<dyn DatasetRepository, DatasetRepositoryS3>()
                 .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryS3>()

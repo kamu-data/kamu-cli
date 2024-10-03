@@ -18,6 +18,7 @@
 
 use axum::extract::{Extension, Path};
 use axum::response::Json;
+use database_common_macros::transactional_handler;
 use dill::Catalog;
 use http_common::*;
 use kamu_core::{DatasetRepository, GetDatasetError};
@@ -35,6 +36,7 @@ pub struct Response {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[transactional_handler]
 pub async fn dataset_info_handler(
     Extension(catalog): Extension<Catalog>,
     Path(dataset_id): Path<DatasetID>,

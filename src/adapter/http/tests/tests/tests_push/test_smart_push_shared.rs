@@ -382,7 +382,7 @@ pub(crate) async fn test_smart_push_via_repo_ref<TServerHarness: ServerSideHarne
             .client_harness
             .push_dataset_result(
                 scenario.client_dataset_ref,
-                scenario.server_dataset_ref.into(),
+                scenario.server_dataset_ref,
                 false,
                 DatasetVisibility::Private,
             )
