@@ -174,24 +174,6 @@ impl MockAuthenticationService {
             .returning(move |_| Ok(expected_account_info.clone()));
         mock_authentication_service
     }
-
-    pub fn resolving_by_id(
-        account_id: &AccountID,
-        access_token: &str,
-        expected_account_info: Account,
-    ) -> Self {
-        let mut mock_authentication_service = MockAuthenticationService::new();
-        let expected_account_info_cloned = expected_account_info.clone();
-        mock_authentication_service
-            .expect_account_by_token()
-            .with(eq(access_token.to_string()))
-            .returning(move |_| Ok(expected_account_info_cloned.clone()));
-        mock_authentication_service
-            .expect_account_by_id()
-            .with(eq(account_id.clone()))
-            .returning(move |_| Ok(Some(expected_account_info.clone())));
-        mock_authentication_service
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
