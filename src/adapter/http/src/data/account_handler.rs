@@ -35,7 +35,7 @@ use opendatafabric::{AccountID, AccountName};
 
 #[derive(Debug, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct Response {
+pub struct AccountResponse {
     pub id: AccountID,
     pub account_name: AccountName,
     pub email: Option<String>,
@@ -43,14 +43,12 @@ pub struct Response {
     pub account_type: AccountType,
     pub avatar_url: Option<String>,
     pub registered_at: DateTime<Utc>,
-    // TODO: ReBAC: absorb the `is_admin` attribute from the Accounts domain
-    //       https://github.com/kamu-data/kamu-cli/issues/766
     pub is_admin: bool,
     pub provider: String,
     pub provider_identity_key: String,
 }
 
-impl From<Account> for Response {
+impl From<Account> for AccountResponse {
     fn from(value: Account) -> Self {
         Self {
             id: value.id,
@@ -72,13 +70,13 @@ impl From<Account> for Response {
 #[transactional_handler]
 pub async fn account_handler(
     Extension(catalog): Extension<Catalog>,
-) -> Result<Json<Response>, ApiError> {
+) -> Result<Json<AccountResponse>, ApiError> {
     let response = get_account(&catalog).await?;
     tracing::debug!(?response, "Get account info response");
     Ok(response)
 }
 
-async fn get_account(catalog: &Catalog) -> Result<Json<Response>, ApiError> {
+async fn get_account(catalog: &Catalog) -> Result<Json<AccountResponse>, ApiError> {
     let current_account_subject = catalog.get_one::<CurrentAccountSubject>().unwrap();
     match current_account_subject.as_ref() {
         CurrentAccountSubject::Anonymous(_) => Err(ApiError::new_unauthorized()),

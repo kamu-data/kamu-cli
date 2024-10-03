@@ -69,7 +69,7 @@ impl AccessTokenRegistryService {
             let registry = registry_ptr
                 .lock()
                 .expect("Could not lock access tokens registry");
-            if let Some(server_record) = registry.iter().find(|c| {
+            let server_record_maybe = registry.iter().find(|c| {
                 if &c.backend_url == odf_server_url {
                     true
                 } else {
@@ -78,7 +78,8 @@ impl AccessTokenRegistryService {
                         _ => false,
                     }
                 }
-            }) {
+            });
+            if let Some(server_record) = server_record_maybe {
                 return server_record
                     .token_for_account(self.account_name())
                     .map(|ac| AccessTokenFindReport {
@@ -100,10 +101,11 @@ impl AccessTokenRegistryService {
                 .lock()
                 .expect("Could not lock access tokens registry");
 
-            if let Some(server_record) = registry.iter().find(|c| match &c.frontend_url {
+            let server_record_maybe = registry.iter().find(|c| match &c.frontend_url {
                 Some(frontend_url) => frontend_url == odf_server_frontend_url,
                 _ => false,
-            }) {
+            });
+            if let Some(server_record) = server_record_maybe {
                 return server_record
                     .token_for_account(self.account_name())
                     .map(|ac| AccessTokenFindReport {

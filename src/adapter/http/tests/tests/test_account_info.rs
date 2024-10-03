@@ -80,7 +80,6 @@ struct AccountInfoHarness {
 
 impl AccountInfoHarness {
     async fn new(is_multi_tenant: bool) -> Self {
-        // TODO: Need access to these from harness level
         let run_info_dir = tempfile::tempdir().unwrap();
 
         let catalog = dill::CatalogBuilder::new()

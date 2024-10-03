@@ -22,16 +22,26 @@ use database_common_macros::transactional_handler;
 use dill::Catalog;
 use http_common::*;
 use kamu_core::{DatasetRepository, GetDatasetError};
-use opendatafabric::{AccountName, DatasetID, DatasetName};
+use opendatafabric::{AccountName, DatasetHandle, DatasetID, DatasetName};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct Response {
+pub struct DatasetInfoResponse {
     pub id: DatasetID,
     pub account_name: Option<AccountName>,
     pub dataset_name: DatasetName,
+}
+
+impl From<DatasetHandle> for DatasetInfoResponse {
+    fn from(value: DatasetHandle) -> Self {
+        Self {
+            id: value.id,
+            account_name: value.alias.account_name,
+            dataset_name: value.alias.dataset_name,
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -40,16 +50,16 @@ pub struct Response {
 pub async fn dataset_info_handler(
     Extension(catalog): Extension<Catalog>,
     Path(dataset_id): Path<DatasetID>,
-) -> Result<Json<Response>, ApiError> {
+) -> Result<Json<DatasetInfoResponse>, ApiError> {
     let response = get_dataset_by_id(&catalog, &dataset_id).await?;
-    tracing::debug!(?response, "Get workspace info response");
+    tracing::debug!(?response, "Get dataset by id info response");
     Ok(response)
 }
 
 async fn get_dataset_by_id(
     catalog: &Catalog,
     dataset_id: &DatasetID,
-) -> Result<Json<Response>, ApiError> {
+) -> Result<Json<DatasetInfoResponse>, ApiError> {
     let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
     let dataset_handle = dataset_repo
         .resolve_dataset_ref(&dataset_id.clone().as_local_ref())
@@ -59,11 +69,7 @@ async fn get_dataset_by_id(
             GetDatasetError::Internal(e) => e.api_err(),
         })?;
 
-    Ok(Json(Response {
-        id: dataset_handle.id,
-        account_name: dataset_handle.alias.account_name,
-        dataset_name: dataset_handle.alias.dataset_name,
-    }))
+    Ok(Json(dataset_handle.into()))
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

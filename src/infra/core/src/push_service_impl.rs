@@ -189,7 +189,7 @@ impl PushService for PushServiceImpl {
             for request in &initial_requests {
                 if let PushRequest {
                     local_ref: Some(local_ref),
-                    remote_ref: Some(_transfer_ref @ TransferDatasetRef::RemoteRef(remote_ref)),
+                    remote_ref: Some(TransferDatasetRef::RemoteRef(remote_ref)),
                 } = request
                 {
                     if let DatasetRefRemote::Alias(_) = &remote_ref {

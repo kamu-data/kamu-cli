@@ -26,7 +26,7 @@ use kamu_core::DatasetRepository;
 
 #[derive(Debug, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct Response {
+pub struct WorkspaceInfoResponse {
     pub is_multi_tenant: bool,
 }
 
@@ -34,16 +34,16 @@ pub struct Response {
 
 pub async fn workspace_info_handler(
     Extension(catalog): Extension<Catalog>,
-) -> Result<Json<Response>, ApiError> {
+) -> Result<Json<WorkspaceInfoResponse>, ApiError> {
     let response = get_workspace_info(&catalog);
     tracing::debug!(?response, "Get workspace info response");
     Ok(response)
 }
 
-fn get_workspace_info(catalog: &Catalog) -> Json<Response> {
+fn get_workspace_info(catalog: &Catalog) -> Json<WorkspaceInfoResponse> {
     let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
 
-    Json(Response {
+    Json(WorkspaceInfoResponse {
         is_multi_tenant: dataset_repo.is_multi_tenant(),
     })
 }

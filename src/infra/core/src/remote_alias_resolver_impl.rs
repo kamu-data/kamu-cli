@@ -56,11 +56,11 @@ impl RemoteAliasResolverImpl {
             .await
             .int_err()?;
 
-        let mut push_aliases: Vec<_> = remote_aliases.get_by_kind(remote_alias_kind).collect();
+        let push_aliases: Vec<_> = remote_aliases.get_by_kind(remote_alias_kind).collect();
 
         match push_aliases.len() {
             0 => Ok(None),
-            1 => Ok(Some(push_aliases.remove(0).clone())),
+            1 => Ok(Some(push_aliases[0].clone())),
             _ => Err(ResolveAliasError::AmbiguousAlias),
         }
     }
@@ -72,10 +72,13 @@ impl RemoteAliasResolverImpl {
         dataset_name: &odf::DatasetName,
     ) -> Result<odf::DatasetRefRemote, InternalError> {
         let mut res_url = repo_url.clone().as_odf_protocol().int_err()?;
-        if let Some(account_name) = account_name_maybe {
-            res_url.path_segments_mut().unwrap().push(&account_name);
+        {
+            let mut path_segments = res_url.path_segments_mut().unwrap();
+            if let Some(account_name) = account_name_maybe {
+                path_segments.push(&account_name);
+            }
+            path_segments.push(dataset_name);
         }
-        res_url.path_segments_mut().unwrap().push(dataset_name);
         Ok(res_url.into())
     }
 
@@ -115,9 +118,9 @@ impl RemoteAliasResolver for RemoteAliasResolverImpl {
 
         if let Some(transfer_dataset_ref) = &transfer_dataset_ref_maybe {
             match transfer_dataset_ref {
-                odf::TransferDatasetRef::RemoteRef(
-                    _dataset_ref_remote @ DatasetRefRemote::Alias(dataset_alias_remote),
-                ) => {
+                odf::TransferDatasetRef::RemoteRef(DatasetRefRemote::Alias(
+                    dataset_alias_remote,
+                )) => {
                     repo_name = dataset_alias_remote.repo_name.clone();
                     account_name.clone_from(&dataset_alias_remote.account_name);
                     dataset_name = Some(dataset_alias_remote.dataset_name.clone());
