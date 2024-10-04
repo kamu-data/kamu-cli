@@ -10,7 +10,7 @@
 use std::assert_matches::assert_matches;
 
 use kamu::domain::{AccessError, PushError, SyncError};
-use kamu_core::DatasetPublicity;
+use kamu_core::DatasetVisibility;
 use opendatafabric::{AccountName, DatasetAlias, DatasetRefRemote};
 
 use crate::harness::{
@@ -52,7 +52,7 @@ async fn test_smart_push_new_dataset_unauthenticated() {
                 scenario.client_dataset_ref,
                 scenario.server_dataset_ref,
                 false,
-                DatasetPublicity::Private,
+                DatasetVisibility::Private,
             )
             .await;
 
@@ -103,7 +103,7 @@ async fn test_smart_push_new_dataset_wrong_user() {
                 scenario.client_dataset_ref,
                 wrong_server_dataset_ref,
                 false,
-                DatasetPublicity::Private,
+                DatasetVisibility::Private,
             )
             .await;
 
@@ -147,7 +147,7 @@ async fn test_smart_push_existing_dataset_unauthenticated() {
                 scenario.client_dataset_ref,
                 scenario.server_dataset_ref,
                 false,
-                DatasetPublicity::Private,
+                DatasetVisibility::Private,
             )
             .await;
 
@@ -191,7 +191,7 @@ async fn test_smart_push_existing_dataset_unauthorized() {
                 scenario.client_dataset_ref,
                 scenario.server_dataset_ref,
                 false,
-                DatasetPublicity::Private,
+                DatasetVisibility::Private,
             )
             .await;
 
@@ -235,7 +235,7 @@ async fn test_smart_push_existing_ref_collision() {
                 scenario.client_dataset_ref,
                 scenario.server_dataset_ref,
                 false,
-                DatasetPublicity::Private,
+                DatasetVisibility::Private,
             )
             .await;
 

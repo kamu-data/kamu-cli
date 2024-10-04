@@ -241,7 +241,7 @@ impl ClientSideHarness {
         dataset_local_ref: DatasetRef,
         dataset_remote_ref: DatasetRefRemote,
         force: bool,
-        dataset_visibility: DatasetPublicity,
+        dataset_visibility: DatasetVisibility,
     ) -> Vec<PushResponse> {
         self.push_service
             .push_multi_ext(
@@ -268,7 +268,7 @@ impl ClientSideHarness {
         dataset_local_ref: DatasetRef,
         dataset_remote_ref: DatasetRefRemote,
         force: bool,
-        dataset_visibility: DatasetPublicity,
+        dataset_visibility: DatasetVisibility,
     ) -> SyncResult {
         let results = self
             .push_dataset(

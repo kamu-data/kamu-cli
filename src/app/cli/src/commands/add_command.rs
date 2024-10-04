@@ -29,7 +29,7 @@ pub struct AddCommand {
     recursive: bool,
     replace: bool,
     stdin: bool,
-    dataset_visibility: DatasetPublicity,
+    dataset_visibility: DatasetVisibility,
     output_config: Arc<OutputConfig>,
 }
 
@@ -45,7 +45,7 @@ impl AddCommand {
         recursive: bool,
         replace: bool,
         stdin: bool,
-        dataset_visibility: DatasetPublicity,
+        dataset_visibility: DatasetVisibility,
         output_config: Arc<OutputConfig>,
     ) -> Self
     where

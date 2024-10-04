@@ -11,10 +11,10 @@ use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
 use dill::{Catalog, CatalogBuilder};
-use kamu_auth_rebac::{PropertyName, RebacService};
+use kamu_auth_rebac::{DatasetPropertyName, RebacService};
 use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 use kamu_auth_rebac_services::{MultiTenantRebacDatasetLifecycleMessageConsumer, RebacServiceImpl};
-use kamu_core::{DatasetLifecycleMessage, DatasetPublicity};
+use kamu_core::{DatasetLifecycleMessage, DatasetVisibility};
 use messaging_outbox::{consume_deserialized_message, ConsumerFilter, Message};
 use opendatafabric::{AccountID, DatasetID, DatasetName};
 
@@ -58,7 +58,7 @@ async fn test_rebac_properties_added() {
             .consume_message(DatasetLifecycleMessage::created(
                 public_dataset_id.clone(),
                 owner_id.clone(),
-                DatasetPublicity::Public,
+                DatasetVisibility::Public,
                 DatasetName::new_unchecked("public-dataset"),
             ))
             .await;
@@ -66,7 +66,7 @@ async fn test_rebac_properties_added() {
             .consume_message(DatasetLifecycleMessage::created(
                 private_dataset_id.clone(),
                 owner_id,
-                DatasetPublicity::Private,
+                DatasetVisibility::Private,
                 DatasetName::new_unchecked("private-dataset"),
             ))
             .await;
@@ -80,7 +80,7 @@ async fn test_rebac_properties_added() {
                 .get_dataset_properties(&public_dataset_id)
                 .await,
             Ok(props)
-                if props == vec![PropertyName::dataset_allows_public_read(true)]
+                if props == vec![DatasetPropertyName::allows_public_read(true)]
         );
         assert_matches!(
             harness
@@ -88,7 +88,7 @@ async fn test_rebac_properties_added() {
                 .get_dataset_properties(&private_dataset_id)
                 .await,
             Ok(props)
-                if props == vec![PropertyName::dataset_allows_public_read(false)]
+                if props == vec![DatasetPropertyName::allows_public_read(false)]
         );
     }
 }
@@ -108,7 +108,7 @@ async fn test_rebac_properties_deleted() {
             .consume_message(DatasetLifecycleMessage::created(
                 dataset_id.clone(),
                 owner_id.clone(),
-                DatasetPublicity::Public,
+                DatasetVisibility::Public,
                 DatasetName::new_unchecked("public-dataset"),
             ))
             .await;
@@ -122,7 +122,7 @@ async fn test_rebac_properties_deleted() {
                 .get_dataset_properties(&dataset_id)
                 .await,
             Ok(props)
-                if props == vec![PropertyName::dataset_allows_public_read(true)]
+                if props == vec![DatasetPropertyName::allows_public_read(true)]
         );
     }
 

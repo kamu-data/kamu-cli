@@ -30,7 +30,6 @@ use crate::utils::{authentication_catalogs, expect_anonymous_access_error};
 #[test_log::test(tokio::test)]
 async fn dataset_by_id_does_not_exist() {
     let harness = GraphQLDatasetsHarness::new(false).await;
-    // todo response?
     let res = harness.execute_anonymous_query(indoc!(
             r#"
             {
@@ -43,8 +42,6 @@ async fn dataset_by_id_does_not_exist() {
             "#
         ))
         .await;
-
-    // todo assert match?
     assert!(res.is_ok(), "{res:?}");
     assert_eq!(
         res.data,

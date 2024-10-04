@@ -260,7 +260,7 @@ impl From<CheckpointRef> for Option<OwnedFile> {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Copy, Clone, Default, Eq, PartialEq, Serialize, Deserialize)]
-pub enum DatasetPublicity {
+pub enum DatasetVisibility {
     #[default]
     #[serde(alias = "private")]
     Private,
@@ -268,18 +268,18 @@ pub enum DatasetPublicity {
     Public,
 }
 
-impl DatasetPublicity {
+impl DatasetVisibility {
     pub fn is_private(&self) -> bool {
         match self {
-            DatasetPublicity::Private => true,
-            DatasetPublicity::Public => false,
+            DatasetVisibility::Private => true,
+            DatasetVisibility::Public => false,
         }
     }
 
     pub fn is_public(&self) -> bool {
         match self {
-            DatasetPublicity::Private => false,
-            DatasetPublicity::Public => true,
+            DatasetVisibility::Private => false,
+            DatasetVisibility::Public => true,
         }
     }
 }
