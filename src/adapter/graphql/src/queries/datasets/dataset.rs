@@ -15,6 +15,8 @@ use crate::prelude::*;
 use crate::queries::*;
 use crate::utils::ensure_dataset_env_vars_enabled;
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Debug, Clone)]
 pub struct Dataset {
     owner: Account,
@@ -161,7 +163,38 @@ impl Dataset {
 
         DatasetEndpoints::new(&self.owner, self.dataset_handle.clone(), config)
     }
+
+    /// Access to dataset properties
+    async fn properties(&self, ctx: &Context<'_>) -> Result<DatasetProperties> {
+        use kamu_auth_rebac::*;
+
+        let rebac_service = from_catalog::<dyn RebacService>(ctx).unwrap();
+
+        let props = rebac_service
+            .get_dataset_properties(&self.dataset_handle.id)
+            .await
+            .int_err()?;
+        let mut res = DatasetProperties::default();
+
+        for (name, value) in props {
+            match name {
+                DatasetPropertyName::AllowsAnonymousRead
+                    if value == PROPERTY_VALUE_BOOLEAN_TRUE =>
+                {
+                    res.anonymous_available = true;
+                }
+                DatasetPropertyName::AllowsPublicRead if value == PROPERTY_VALUE_BOOLEAN_TRUE => {
+                    res.publicly_available = true;
+                }
+                _ => {}
+            }
+        }
+
+        Ok(res)
+    }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct DatasetPermissions {
@@ -171,3 +204,11 @@ pub struct DatasetPermissions {
     can_commit: bool,
     can_schedule: bool,
 }
+
+#[derive(SimpleObject, Debug, Default, Clone, PartialEq, Eq)]
+pub struct DatasetProperties {
+    publicly_available: bool,
+    anonymous_available: bool,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

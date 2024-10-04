@@ -18,6 +18,8 @@ pub const ANONYMOUS_ACCESS_FORBIDDEN_MESSAGE: &str = "Anonymous access forbidden
 pub const INVALID_ACCESS_TOKEN_MESSAGE: &str = "Invalid access token";
 pub const EXPIRED_ACCESS_TOKEN_MESSAGE: &str = "Expired access token";
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub struct LoggedInGuard {}
 
 impl LoggedInGuard {

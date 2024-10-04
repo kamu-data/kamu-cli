@@ -174,7 +174,7 @@ pub struct RevokeResultSuccess {
 #[ComplexObject]
 impl RevokeResultSuccess {
     async fn message(&self) -> String {
-        "Access token revoked succesfully".to_string()
+        "Access token revoked successfully".to_string()
     }
 }
 

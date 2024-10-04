@@ -11,7 +11,7 @@ use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
 use dill::{Catalog, CatalogBuilder};
-use kamu_auth_rebac::{PropertyName, RebacService};
+use kamu_auth_rebac::{DatasetPropertyName, RebacService};
 use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 use kamu_auth_rebac_services::{MultiTenantRebacDatasetLifecycleMessageConsumer, RebacServiceImpl};
 use kamu_core::{DatasetLifecycleMessage, DatasetVisibility};
@@ -80,7 +80,7 @@ async fn test_rebac_properties_added() {
                 .get_dataset_properties(&public_dataset_id)
                 .await,
             Ok(props)
-                if props == vec![PropertyName::dataset_allows_public_read(true)]
+                if props == vec![DatasetPropertyName::allows_public_read(true)]
         );
         assert_matches!(
             harness
@@ -88,7 +88,7 @@ async fn test_rebac_properties_added() {
                 .get_dataset_properties(&private_dataset_id)
                 .await,
             Ok(props)
-                if props == vec![PropertyName::dataset_allows_public_read(false)]
+                if props == vec![DatasetPropertyName::allows_public_read(false)]
         );
     }
 }
@@ -122,7 +122,7 @@ async fn test_rebac_properties_deleted() {
                 .get_dataset_properties(&dataset_id)
                 .await,
             Ok(props)
-                if props == vec![PropertyName::dataset_allows_public_read(true)]
+                if props == vec![DatasetPropertyName::allows_public_read(true)]
         );
     }
 

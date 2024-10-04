@@ -25,6 +25,7 @@ mod multihash;
 mod odf_generated;
 mod os_path;
 mod pagination;
+mod rebac;
 mod task_id;
 mod task_status_outcome;
 
