@@ -9,6 +9,8 @@
 
 use crate::CLIError;
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Debug, Clone)]
 pub struct Interact {
     /// Don't ask user for confirmation and assume 'yes'
@@ -26,17 +28,21 @@ impl Interact {
     pub fn require_confirmation(&self, prompt: impl std::fmt::Display) -> Result<(), CLIError> {
         use read_input::prelude::*;
 
-        let prompt = format!("{prompt}\nDo you wish to continue? [y/N]: ");
-
-        if !self.is_tty {
-            return if self.assume_yes {
-                Ok(())
-            } else {
-                eprintln!("{prompt} Assuming 'no' because --yes flag was not provided");
-                Err(CLIError::Aborted)
-            };
+        // If there's confirmation, we don't need to ask anything of the user
+        if self.assume_yes {
+            return Ok(());
         }
 
+        let prompt = format!("{prompt}\nDo you wish to continue? [y/N]: ");
+
+        // If no data can be entered, we abort
+        if !self.is_tty {
+            eprintln!("{prompt} Assuming 'no' because --yes flag was not provided");
+
+            return Err(CLIError::Aborted);
+        }
+
+        // In other cases, we ask until we get a valid answer
         let answer: String = input()
             .repeat_msg(prompt)
             .default("n".to_owned())
@@ -50,3 +56,5 @@ impl Interact {
         }
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
