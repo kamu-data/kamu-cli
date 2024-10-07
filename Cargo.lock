@@ -5665,6 +5665,7 @@ dependencies = [
  "internal-error",
  "kamu-cli-e2e-common-macros",
  "kamu-cli-puppet",
+ "lazy_static",
  "opendatafabric",
  "pretty_assertions",
  "regex",
