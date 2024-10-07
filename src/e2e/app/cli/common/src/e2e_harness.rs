@@ -34,6 +34,7 @@ pub struct KamuCliApiServerHarnessOptions {
     potential_workspace: PotentialWorkspace,
     env_vars: Vec<(String, String)>,
     frozen_system_time: Option<DateTime<Utc>>,
+    kamu_config: Option<String>,
 }
 
 impl KamuCliApiServerHarnessOptions {
@@ -70,13 +71,18 @@ impl KamuCliApiServerHarnessOptions {
 
         self.with_frozen_system_time(today)
     }
+
+    pub fn with_kamu_config(mut self, content: &str) -> Self {
+        self.kamu_config = Some(content.into());
+
+        self
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct KamuCliApiServerHarness {
     options: KamuCliApiServerHarnessOptions,
-    kamu_config: Option<String>,
 }
 
 impl KamuCliApiServerHarness {
@@ -174,11 +180,21 @@ impl KamuCliApiServerHarness {
         Self::new(options, Some(kamu_config))
     }
 
-    fn new(options: KamuCliApiServerHarnessOptions, kamu_config: Option<String>) -> Self {
-        Self {
-            options,
-            kamu_config,
+    fn new(
+        mut options: KamuCliApiServerHarnessOptions,
+        generated_kamu_config: Option<String>,
+    ) -> Self {
+        assert!(
+            !(options.kamu_config.is_some() && generated_kamu_config.is_some()),
+            "There can be only one configuration file: either preset from the test options or \
+             generated based on the storage type"
+        );
+
+        if options.kamu_config.is_none() {
+            options.kamu_config = generated_kamu_config;
         }
+
+        Self { options }
     }
 
     pub async fn run_api_server<Fixture, FixtureResult>(self, fixture: Fixture)
@@ -208,7 +224,8 @@ impl KamuCliApiServerHarness {
         let KamuCliApiServerHarnessOptions {
             potential_workspace,
             env_vars,
-            frozen_system_time: freeze_system_time,
+            frozen_system_time,
+            kamu_config,
         } = self.options;
 
         let mut kamu = match potential_workspace {
@@ -218,14 +235,14 @@ impl KamuCliApiServerHarness {
 
                 KamuCliPuppet::new_workspace_tmp_with(NewWorkspaceOptions {
                     is_multi_tenant,
-                    kamu_config: self.kamu_config,
+                    kamu_config,
                     env_vars,
                 })
                 .await
             }
         };
 
-        kamu.set_system_time(freeze_system_time);
+        kamu.set_system_time(frozen_system_time);
 
         kamu
     }
