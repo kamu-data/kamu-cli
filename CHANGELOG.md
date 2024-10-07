@@ -18,6 +18,7 @@ Recommendation: for ease of reading, use the following order:
   - `kamu config` command
   - `kamu init` command
   - `kamu add` command
+  - `kamu rename` command
 ### Changed
 - `kamu repo alias list`: added JSON output alongside with other formats mentioned in the command's help
 - Private Datasets, `DatasetEntry` integration that will allow us to build dataset indexing
