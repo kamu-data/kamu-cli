@@ -68,11 +68,21 @@ pub async fn test_add_dataset_with_name(kamu: KamuCliPuppet) {
         );
     }
     {
+        let snapshot_path = kamu.workspace_path().join("player-scores.yaml");
+
+        std::fs::write(
+            snapshot_path.clone(),
+            DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
+        )
+        .unwrap();
+
         let assert = kamu
-            .execute_with_input(
-                ["add", "--stdin", "--name", "player-scores-2"],
-                DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
-            )
+            .execute([
+                "add",
+                "--name",
+                "player-scores-2",
+                snapshot_path.to_str().unwrap(),
+            ])
             .await
             .success();
 
