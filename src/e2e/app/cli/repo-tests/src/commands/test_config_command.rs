@@ -192,20 +192,20 @@ pub async fn test_config_reset_key(kamu: KamuCliPuppet) {
 pub async fn test_config_get_with_default(kamu: KamuCliPuppet) {
     {
         let assert = kamu
-            .execute(["config", "get", "engine.runtime"])
+            .execute(["config", "get", "engine.networkNs"])
             .await
             .failure();
 
         let stderr = std::str::from_utf8(&assert.get_output().stderr).unwrap();
 
         assert!(
-            stderr.contains("Error: Key engine.runtime not found"),
+            stderr.contains("Error: Key engine.networkNs not found"),
             "Unexpected output:\n{stderr}",
         );
     }
     {
         let assert = kamu
-            .execute(["config", "get", "engine.runtime", "--with-defaults"])
+            .execute(["config", "get", "engine.networkNs", "--with-defaults"])
             .await
             .success();
 
@@ -215,7 +215,7 @@ pub async fn test_config_get_with_default(kamu: KamuCliPuppet) {
             stdout,
             indoc::indoc!(
                 r#"
-                docker
+                private
 
                 "#
             )
