@@ -256,6 +256,8 @@ impl ConfigService {
 
     fn path_for_scope(&self, scope: ConfigScope) -> PathBuf {
         match scope {
+            // TODO: Respect `XDG_CONFIG_HOME` when working with configs
+            //       https://github.com/kamu-data/kamu-cli/issues/848
             ConfigScope::User => dirs::home_dir()
                 .expect("Cannot determine user home directory")
                 .join(CONFIG_FILENAME),

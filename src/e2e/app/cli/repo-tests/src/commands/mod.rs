@@ -9,6 +9,7 @@
 
 mod test_add_command;
 mod test_complete_command;
+mod test_config_command;
 mod test_ingest_command;
 mod test_init_command;
 mod test_repo_alias_command;
@@ -18,6 +19,7 @@ mod test_system_generate_token_command;
 
 pub use test_add_command::*;
 pub use test_complete_command::*;
+pub use test_config_command::*;
 pub use test_ingest_command::*;
 pub use test_init_command::*;
 pub use test_repo_alias_command::*;

@@ -5737,6 +5737,7 @@ dependencies = [
  "kamu-cli-e2e-common",
  "kamu-cli-puppet",
  "opendatafabric",
+ "pretty_assertions",
  "reqwest",
  "tokio",
  "tokio-retry",
