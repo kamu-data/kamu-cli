@@ -27,6 +27,13 @@ kamu_cli_execute_command_e2e_test!(
 
 kamu_cli_execute_command_e2e_test!(
     storage = inmem,
+    fixture = kamu_cli_e2e_repo_tests::test_add_dataset_with_replace
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_execute_command_e2e_test!(
+    storage = inmem,
     fixture = kamu_cli_e2e_repo_tests::test_add_recursive
 );
 

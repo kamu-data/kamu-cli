@@ -5765,6 +5765,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "datafusion",
+ "indoc 2.0.5",
  "kamu-data-utils",
  "opendatafabric",
  "serde",
