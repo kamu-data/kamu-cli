@@ -13,6 +13,13 @@ use kamu_cli_e2e_common::prelude::*;
 
 kamu_cli_execute_command_e2e_test!(
     storage = inmem,
+    fixture = kamu_cli_e2e_repo_tests::test_add_dataset_from_stdin
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_execute_command_e2e_test!(
+    storage = inmem,
     fixture = kamu_cli_e2e_repo_tests::test_add_recursive
 );
 
