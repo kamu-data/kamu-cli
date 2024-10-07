@@ -95,7 +95,15 @@ pub async fn test_config_set_value(kamu: KamuCliPuppet) {
 
         let stdout = std::str::from_utf8(&assert.get_output().stdout).unwrap();
 
-        pretty_assertions::assert_eq!(stdout, "42\n\n");
+        pretty_assertions::assert_eq!(
+            stdout,
+            indoc::indoc!(
+                r#"
+                42
+
+                "#
+            )
+        );
     }
     {
         let assert = kamu.execute(["config", "list"]).await.success();
