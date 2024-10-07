@@ -223,7 +223,8 @@ impl Command for AddCommand {
                 "No manifest references or paths were provided",
             ));
         }
-        if self.name.is_some() && (self.recursive || self.snapshot_refs.len() != 1) {
+        if self.name.is_some() && (self.recursive || !(self.snapshot_refs.len() == 1 || self.stdin))
+        {
             return Err(CLIError::usage_error(
                 "Name override can be used only when adding a single manifest",
             ));
