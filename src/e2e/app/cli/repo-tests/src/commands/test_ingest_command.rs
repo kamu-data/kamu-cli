@@ -11,6 +11,12 @@ use std::path::Path;
 
 use chrono::{TimeZone, Utc};
 use indoc::indoc;
+use kamu_cli_e2e_common::{
+    DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
+    DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_2,
+    DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_3,
+    DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
+};
 use kamu_cli_puppet::extensions::KamuCliPuppetExt;
 use kamu_cli_puppet::KamuCliPuppet;
 use opendatafabric::*;
@@ -180,8 +186,69 @@ pub async fn test_push_ingest_from_file_snapshot_with_event_time(mut kamu: KamuC
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub async fn test_ingest_from_stdin(kamu: KamuCliPuppet) {
+    kamu.execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
+        .await
+        .success();
+
+    ingest_data_to_player_scores_from_stdio(
+        &kamu,
+        DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
+    )
+    .await;
+
+    ingest_data_to_player_scores_from_stdio(
+        &kamu,
+        DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_2,
+    )
+    .await;
+
+    ingest_data_to_player_scores_from_stdio(
+        &kamu,
+        DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_3,
+    )
+    .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Helpers
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 fn path(p: &Path) -> &str {
     p.as_os_str().to_str().unwrap()
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+async fn ingest_data_to_player_scores_from_stdio(kamu: &KamuCliPuppet, input: &str) {
+    // Ingest
+    {
+        let assert = kamu
+            .execute_with_input(["ingest", "player-scores", "--stdin"], input)
+            .await
+            .success();
+
+        let stderr = std::str::from_utf8(&assert.get_output().stderr).unwrap();
+
+        assert!(
+            stderr.contains("Dataset updated"),
+            "Unexpected output:\n{stderr}",
+        );
+    }
+    // Trying to ingest the same data
+    {
+        let assert = kamu
+            .execute_with_input(["ingest", "player-scores", "--stdin"], input)
+            .await
+            .success();
+
+        let stderr = std::str::from_utf8(&assert.get_output().stderr).unwrap();
+
+        assert!(
+            stderr.contains("Dataset up-to-date"),
+            "Unexpected output:\n{stderr}",
+        );
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
