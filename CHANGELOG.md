@@ -29,8 +29,6 @@ Recommendation: for ease of reading, use the following order:
 - Simplified error handling code in repositories
 - Hidden part of the test code behind the feature gate
 - Updated our crate dependencies so they can be built in isolation
-### Fixed
-- Fixed `--yes / -y`: removed additional questioning if flag is provided
 
 ## [0.204.4] - 2024-09-30
 ### Changed
