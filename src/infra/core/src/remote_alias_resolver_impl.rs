@@ -88,11 +88,13 @@ impl RemoteAliasResolverImpl {
         &self,
         dataset_handle: &odf::DatasetHandle,
         remote_repo_url: &Url,
+        access_token_maybe: Option<&String>,
     ) -> Result<odf::DatasetName, ResolveAliasError> {
         let result = if let Some(remote_dataset_name) =
             RemoteAliasResolverApiHelper::fetch_remote_dataset_name(
                 remote_repo_url,
                 &dataset_handle.id,
+                access_token_maybe,
             )
             .await?
         {
@@ -161,20 +163,24 @@ impl RemoteAliasResolver for RemoteAliasResolverImpl {
         }
         let remote_repo = self.remote_repo_reg.get_repository(&repo_name).int_err()?;
 
+        let access_token_maybe = self
+            .access_token_resolver
+            .resolve_odf_dataset_access_token(&remote_repo.url);
         if account_name.is_none() {
-            let access_token_maybe = self
-                .access_token_resolver
-                .resolve_odf_dataset_access_token(&remote_repo.url);
             account_name = RemoteAliasResolverApiHelper::resolve_remote_account_name(
                 &remote_repo.url,
-                access_token_maybe,
+                access_token_maybe.as_ref(),
             )
             .await
             .int_err()?;
         }
         let transfer_dataset_name = dataset_name.clone().unwrap_or(
-            self.resolve_remote_dataset_name(local_dataset_handle, &remote_repo.url)
-                .await?,
+            self.resolve_remote_dataset_name(
+                local_dataset_handle,
+                &remote_repo.url,
+                access_token_maybe.as_ref(),
+            )
+            .await?,
         );
 
         let remote_url = self.combine_remote_url(
@@ -197,12 +203,7 @@ impl RemoteAliasResolver for RemoteAliasResolverImpl {
 pub struct RemoteAliasResolverApiHelper {}
 
 impl RemoteAliasResolverApiHelper {
-    // Return account name if remote workspace is in multi tenant mode
-    pub async fn resolve_remote_account_name(
-        server_backend_url: &Url,
-        access_token_maybe: Option<String>,
-    ) -> Result<Option<odf::AccountName>, GetRemoteAccountError> {
-        let client = reqwest::Client::new();
+    fn build_headers_map(access_token_maybe: Option<&String>) -> http::HeaderMap {
         let mut header_map = http::HeaderMap::new();
         if let Some(access_token) = access_token_maybe {
             header_map.append(
@@ -210,6 +211,16 @@ impl RemoteAliasResolverApiHelper {
                 http::HeaderValue::from_str(format!("Bearer {access_token}").as_str()).unwrap(),
             );
         };
+        header_map
+    }
+
+    // Return account name if remote workspace is in multi tenant mode
+    pub async fn resolve_remote_account_name(
+        server_backend_url: &Url,
+        access_token_maybe: Option<&String>,
+    ) -> Result<Option<odf::AccountName>, GetRemoteAccountError> {
+        let client = reqwest::Client::new();
+        let header_map = Self::build_headers_map(access_token_maybe);
 
         let workspace_info_response = client
             .get(server_backend_url.join("info").unwrap())
@@ -256,14 +267,18 @@ impl RemoteAliasResolverApiHelper {
     pub async fn fetch_remote_dataset_name(
         server_backend_url: &Url,
         dataset_id: &odf::DatasetID,
+        access_token_maybe: Option<&String>,
     ) -> Result<Option<odf::DatasetName>, ResolveAliasError> {
         let client = reqwest::Client::new();
+        let header_map = Self::build_headers_map(access_token_maybe);
+
         let response = client
             .get(
                 server_backend_url
                     .join(&format!("datasets/{dataset_id}"))
                     .unwrap(),
             )
+            .headers(header_map)
             .send()
             .await
             .int_err()?;

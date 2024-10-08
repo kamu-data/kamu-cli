@@ -9,6 +9,7 @@
 
 use chrono::Utc;
 use kamu::testing::MetadataFactory;
+use kamu_accounts::DUMMY_ACCESS_TOKEN;
 use opendatafabric::{DatasetAlias, DatasetID, DatasetKind, DatasetName};
 use serde_json::json;
 
@@ -42,6 +43,7 @@ async fn test_get_dataset_info_by_id() {
                 "{}datasets/{}",
                 harness.root_url, create_result.dataset_handle.id
             ))
+            .header("Authorization", format!("Bearer {DUMMY_ACCESS_TOKEN}"))
             .send()
             .await
             .unwrap()
@@ -71,6 +73,7 @@ async fn test_get_dataset_info_by_id_not_found_err() {
 
         let res = cl
             .get(&format!("{}datasets/{dataset_id}", harness.root_url))
+            .header("Authorization", format!("Bearer {DUMMY_ACCESS_TOKEN}"))
             .send()
             .await
             .unwrap();
