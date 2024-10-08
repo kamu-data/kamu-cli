@@ -12,6 +12,7 @@ use std::path::Path;
 use chrono::{TimeZone, Utc};
 use indoc::indoc;
 use kamu_cli_e2e_common::{
+    DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR,
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_2,
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_3,
@@ -285,6 +286,65 @@ pub async fn test_ingest_from_stdin(mut kamu: KamuCliPuppet) {
             )
         );
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_ingest_recursive(mut kamu: KamuCliPuppet) {
+    kamu.set_system_time(Some(Utc.with_ymd_and_hms(2050, 2, 3, 4, 5, 6).unwrap()));
+
+    // 0. Add datasets: the root dataset and its derived dataset
+    kamu.execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
+        .await
+        .success();
+
+    kamu.execute_with_input(
+        ["add", "--stdin"],
+        DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR,
+    )
+    .await
+    .success();
+
+    {
+        let assert = kamu
+            .execute(["tail", "leaderboard", "--output-format", "table"])
+            .await
+            .failure();
+
+        let stderr = std::str::from_utf8(&assert.get_output().stderr).unwrap();
+
+        assert!(
+            stderr.contains("Error: Dataset schema is not yet available: leaderboard"),
+            "Unexpected output:\n{stderr}",
+        );
+    }
+
+    // TODO: `kamu ingest`: implement `--recursive` mode
+    //        https://github.com/kamu-data/kamu-cli/issues/886
+
+    // 1. Ingest data: the first chunk
+    // {
+    //     let assert = kamu
+    //         .execute_with_input(
+    //             ["ingest", "player-scores", "--stdin", "--recursive"],
+    //             DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
+    //         )
+    //         .await
+    //         .success();
+    //
+    //     let stderr =
+    // std::str::from_utf8(&assert.get_output().stderr).unwrap();
+    //
+    //     assert!(
+    //         stderr.contains("Dataset updated"),
+    //         "Unexpected output:\n{stderr}",
+    //     );
+    // }
+
+    // TODO: check via the tail command added data in the derived dataset
+    //       (leaderboard)
+
+    // TODO: do the same for 2nd & 3rd chunks
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
