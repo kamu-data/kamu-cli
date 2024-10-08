@@ -103,6 +103,8 @@ pub async fn test_push_ingest_from_file_ledger(mut kamu: KamuCliPuppet) {
     .await;
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub async fn test_push_ingest_from_file_snapshot_with_event_time(mut kamu: KamuCliPuppet) {
     kamu.set_system_time(Some(Utc.with_ymd_and_hms(2000, 1, 1, 0, 0, 0).unwrap()));
 
@@ -194,98 +196,62 @@ pub async fn test_ingest_from_stdin(mut kamu: KamuCliPuppet) {
         .await
         .success();
 
-    ingest_data_to_player_scores_from_stdio(
+    assert_ingest_data_to_player_scores_from_stdio(
         &kamu,
+        ["ingest", "player-scores", "--stdin"],
         DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
+        indoc::indoc!(
+            r#"
+            ┌────────┬────┬──────────────────────┬──────────────────────┬──────────┬───────────┬───────┐
+            │ offset │ op │     system_time      │      match_time      │ match_id │ player_id │ score │
+            ├────────┼────┼──────────────────────┼──────────────────────┼──────────┼───────────┼───────┤
+            │      0 │ +A │ 2050-02-03T04:05:06Z │ 2000-01-01T00:00:00Z │        1 │     Alice │   100 │
+            │      1 │ +A │ 2050-02-03T04:05:06Z │ 2000-01-01T00:00:00Z │        1 │       Bob │    80 │
+            └────────┴────┴──────────────────────┴──────────────────────┴──────────┴───────────┴───────┘
+            "#
+        )
     )
     .await;
 
-    {
-        let assert = kamu
-            .execute(["tail", "player-scores", "--output-format", "table"])
-            .await
-            .success();
-
-        let stdout = std::str::from_utf8(&assert.get_output().stdout).unwrap();
-
-        pretty_assertions::assert_eq!(
-            stdout,
-            indoc::indoc!(
-                r#"
-                ┌────────┬────┬──────────────────────┬──────────────────────┬──────────┬───────────┬───────┐
-                │ offset │ op │     system_time      │      match_time      │ match_id │ player_id │ score │
-                ├────────┼────┼──────────────────────┼──────────────────────┼──────────┼───────────┼───────┤
-                │      0 │ +A │ 2050-02-03T04:05:06Z │ 2000-01-01T00:00:00Z │        1 │     Alice │   100 │
-                │      1 │ +A │ 2050-02-03T04:05:06Z │ 2000-01-01T00:00:00Z │        1 │       Bob │    80 │
-                └────────┴────┴──────────────────────┴──────────────────────┴──────────┴───────────┴───────┘
-                "#
-            )
-        );
-    }
-
-    ingest_data_to_player_scores_from_stdio(
+    assert_ingest_data_to_player_scores_from_stdio(
         &kamu,
+        ["ingest", "player-scores", "--stdin"],
         DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_2,
+        indoc::indoc!(
+            r#"
+            ┌────────┬────┬──────────────────────┬──────────────────────┬──────────┬───────────┬───────┐
+            │ offset │ op │     system_time      │      match_time      │ match_id │ player_id │ score │
+            ├────────┼────┼──────────────────────┼──────────────────────┼──────────┼───────────┼───────┤
+            │      0 │ +A │ 2050-02-03T04:05:06Z │ 2000-01-01T00:00:00Z │        1 │     Alice │   100 │
+            │      1 │ +A │ 2050-02-03T04:05:06Z │ 2000-01-01T00:00:00Z │        1 │       Bob │    80 │
+            │      2 │ +A │ 2050-02-03T04:05:06Z │ 2000-01-02T00:00:00Z │        2 │   Charlie │    90 │
+            │      3 │ +A │ 2050-02-03T04:05:06Z │ 2000-01-02T00:00:00Z │        2 │     Alice │    70 │
+            └────────┴────┴──────────────────────┴──────────────────────┴──────────┴───────────┴───────┘
+            "#
+        )
     )
     .await;
 
-    {
-        let assert = kamu
-            .execute(["tail", "player-scores", "--output-format", "table"])
-            .await
-            .success();
-
-        let stdout = std::str::from_utf8(&assert.get_output().stdout).unwrap();
-
-        pretty_assertions::assert_eq!(
-            stdout,
-            indoc::indoc!(
-                r#"
-                ┌────────┬────┬──────────────────────┬──────────────────────┬──────────┬───────────┬───────┐
-                │ offset │ op │     system_time      │      match_time      │ match_id │ player_id │ score │
-                ├────────┼────┼──────────────────────┼──────────────────────┼──────────┼───────────┼───────┤
-                │      0 │ +A │ 2050-02-03T04:05:06Z │ 2000-01-01T00:00:00Z │        1 │     Alice │   100 │
-                │      1 │ +A │ 2050-02-03T04:05:06Z │ 2000-01-01T00:00:00Z │        1 │       Bob │    80 │
-                │      2 │ +A │ 2050-02-03T04:05:06Z │ 2000-01-02T00:00:00Z │        2 │   Charlie │    90 │
-                │      3 │ +A │ 2050-02-03T04:05:06Z │ 2000-01-02T00:00:00Z │        2 │     Alice │    70 │
-                └────────┴────┴──────────────────────┴──────────────────────┴──────────┴───────────┴───────┘
-                "#
-            )
-        );
-    }
-
-    ingest_data_to_player_scores_from_stdio(
+    assert_ingest_data_to_player_scores_from_stdio(
         &kamu,
+        ["ingest", "player-scores", "--stdin"],
         DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_3,
+        indoc::indoc!(
+            r#"
+            ┌────────┬────┬──────────────────────┬──────────────────────┬──────────┬───────────┬───────┐
+            │ offset │ op │     system_time      │      match_time      │ match_id │ player_id │ score │
+            ├────────┼────┼──────────────────────┼──────────────────────┼──────────┼───────────┼───────┤
+            │      0 │ +A │ 2050-02-03T04:05:06Z │ 2000-01-01T00:00:00Z │        1 │     Alice │   100 │
+            │      1 │ +A │ 2050-02-03T04:05:06Z │ 2000-01-01T00:00:00Z │        1 │       Bob │    80 │
+            │      2 │ +A │ 2050-02-03T04:05:06Z │ 2000-01-02T00:00:00Z │        2 │   Charlie │    90 │
+            │      3 │ +A │ 2050-02-03T04:05:06Z │ 2000-01-02T00:00:00Z │        2 │     Alice │    70 │
+            │      4 │ +A │ 2050-02-03T04:05:06Z │ 2000-01-03T00:00:00Z │        3 │       Bob │    60 │
+            │      5 │ +A │ 2050-02-03T04:05:06Z │ 2000-01-03T00:00:00Z │        3 │   Charlie │   110 │
+            └────────┴────┴──────────────────────┴──────────────────────┴──────────┴───────────┴───────┘
+            "#
+        )
     )
     .await;
-
-    {
-        let assert = kamu
-            .execute(["tail", "player-scores", "--output-format", "table"])
-            .await
-            .success();
-
-        let stdout = std::str::from_utf8(&assert.get_output().stdout).unwrap();
-
-        pretty_assertions::assert_eq!(
-            stdout,
-            indoc::indoc!(
-                r#"
-                ┌────────┬────┬──────────────────────┬──────────────────────┬──────────┬───────────┬───────┐
-                │ offset │ op │     system_time      │      match_time      │ match_id │ player_id │ score │
-                ├────────┼────┼──────────────────────┼──────────────────────┼──────────┼───────────┼───────┤
-                │      0 │ +A │ 2050-02-03T04:05:06Z │ 2000-01-01T00:00:00Z │        1 │     Alice │   100 │
-                │      1 │ +A │ 2050-02-03T04:05:06Z │ 2000-01-01T00:00:00Z │        1 │       Bob │    80 │
-                │      2 │ +A │ 2050-02-03T04:05:06Z │ 2000-01-02T00:00:00Z │        2 │   Charlie │    90 │
-                │      3 │ +A │ 2050-02-03T04:05:06Z │ 2000-01-02T00:00:00Z │        2 │     Alice │    70 │
-                │      4 │ +A │ 2050-02-03T04:05:06Z │ 2000-01-03T00:00:00Z │        3 │       Bob │    60 │
-                │      5 │ +A │ 2050-02-03T04:05:06Z │ 2000-01-03T00:00:00Z │        3 │   Charlie │   110 │
-                └────────┴────┴──────────────────────┴──────────────────────┴──────────┴───────────┴───────┘
-                "#
-            )
-        );
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -348,6 +314,73 @@ pub async fn test_ingest_recursive(mut kamu: KamuCliPuppet) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_ingest_with_source_name(mut kamu: KamuCliPuppet) {
+    kamu.set_system_time(Some(Utc.with_ymd_and_hms(2050, 2, 3, 4, 5, 6).unwrap()));
+
+    kamu.execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
+        .await
+        .success();
+
+    assert_ingest_data_to_player_scores_from_stdio(
+        &kamu,
+        ["ingest", "player-scores", "--stdin", "--source-name", "default"],
+        DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
+        indoc::indoc!(
+            r#"
+            ┌────────┬────┬──────────────────────┬──────────────────────┬──────────┬───────────┬───────┐
+            │ offset │ op │     system_time      │      match_time      │ match_id │ player_id │ score │
+            ├────────┼────┼──────────────────────┼──────────────────────┼──────────┼───────────┼───────┤
+            │      0 │ +A │ 2050-02-03T04:05:06Z │ 2000-01-01T00:00:00Z │        1 │     Alice │   100 │
+            │      1 │ +A │ 2050-02-03T04:05:06Z │ 2000-01-01T00:00:00Z │        1 │       Bob │    80 │
+            └────────┴────┴──────────────────────┴──────────────────────┴──────────┴───────────┴───────┘
+            "#
+        )
+    )
+    .await;
+
+    assert_ingest_data_to_player_scores_from_stdio(
+        &kamu,
+        ["ingest", "player-scores", "--stdin", "--source-name", "default"],
+        DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_2,
+        indoc::indoc!(
+            r#"
+            ┌────────┬────┬──────────────────────┬──────────────────────┬──────────┬───────────┬───────┐
+            │ offset │ op │     system_time      │      match_time      │ match_id │ player_id │ score │
+            ├────────┼────┼──────────────────────┼──────────────────────┼──────────┼───────────┼───────┤
+            │      0 │ +A │ 2050-02-03T04:05:06Z │ 2000-01-01T00:00:00Z │        1 │     Alice │   100 │
+            │      1 │ +A │ 2050-02-03T04:05:06Z │ 2000-01-01T00:00:00Z │        1 │       Bob │    80 │
+            │      2 │ +A │ 2050-02-03T04:05:06Z │ 2000-01-02T00:00:00Z │        2 │   Charlie │    90 │
+            │      3 │ +A │ 2050-02-03T04:05:06Z │ 2000-01-02T00:00:00Z │        2 │     Alice │    70 │
+            └────────┴────┴──────────────────────┴──────────────────────┴──────────┴───────────┴───────┘
+            "#
+        )
+    )
+    .await;
+
+    assert_ingest_data_to_player_scores_from_stdio(
+        &kamu,
+        ["ingest", "player-scores", "--stdin", "--source-name", "default"],
+        DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_3,
+        indoc::indoc!(
+            r#"
+            ┌────────┬────┬──────────────────────┬──────────────────────┬──────────┬───────────┬───────┐
+            │ offset │ op │     system_time      │      match_time      │ match_id │ player_id │ score │
+            ├────────┼────┼──────────────────────┼──────────────────────┼──────────┼───────────┼───────┤
+            │      0 │ +A │ 2050-02-03T04:05:06Z │ 2000-01-01T00:00:00Z │        1 │     Alice │   100 │
+            │      1 │ +A │ 2050-02-03T04:05:06Z │ 2000-01-01T00:00:00Z │        1 │       Bob │    80 │
+            │      2 │ +A │ 2050-02-03T04:05:06Z │ 2000-01-02T00:00:00Z │        2 │   Charlie │    90 │
+            │      3 │ +A │ 2050-02-03T04:05:06Z │ 2000-01-02T00:00:00Z │        2 │     Alice │    70 │
+            │      4 │ +A │ 2050-02-03T04:05:06Z │ 2000-01-03T00:00:00Z │        3 │       Bob │    60 │
+            │      5 │ +A │ 2050-02-03T04:05:06Z │ 2000-01-03T00:00:00Z │        3 │   Charlie │   110 │
+            └────────┴────┴──────────────────────┴──────────────────────┴──────────┴───────────┴───────┘
+            "#
+        )
+    )
+    .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Helpers
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -357,11 +390,20 @@ fn path(p: &Path) -> &str {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-async fn ingest_data_to_player_scores_from_stdio(kamu: &KamuCliPuppet, input: &str) {
+async fn assert_ingest_data_to_player_scores_from_stdio<I, S, T>(
+    kamu: &KamuCliPuppet,
+    ingest_cmd: I,
+    ingest_data: T,
+    expected_tail_table: &str,
+) where
+    I: IntoIterator<Item = S> + Clone,
+    S: AsRef<std::ffi::OsStr>,
+    T: Into<Vec<u8>> + Clone,
+{
     // Ingest
     {
         let assert = kamu
-            .execute_with_input(["ingest", "player-scores", "--stdin"], input)
+            .execute_with_input(ingest_cmd.clone(), ingest_data.clone())
             .await
             .success();
 
@@ -375,7 +417,7 @@ async fn ingest_data_to_player_scores_from_stdio(kamu: &KamuCliPuppet, input: &s
     // Trying to ingest the same data
     {
         let assert = kamu
-            .execute_with_input(["ingest", "player-scores", "--stdin"], input)
+            .execute_with_input(ingest_cmd, ingest_data)
             .await
             .success();
 
@@ -385,6 +427,17 @@ async fn ingest_data_to_player_scores_from_stdio(kamu: &KamuCliPuppet, input: &s
             stderr.contains("Dataset up-to-date"),
             "Unexpected output:\n{stderr}",
         );
+    }
+    // Assert ingested data
+    {
+        let assert = kamu
+            .execute(["tail", "player-scores", "--output-format", "table"])
+            .await
+            .success();
+
+        let stdout = std::str::from_utf8(&assert.get_output().stdout).unwrap();
+
+        pretty_assertions::assert_eq!(stdout, expected_tail_table);
     }
 }
 
