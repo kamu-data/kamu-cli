@@ -11,7 +11,7 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## [Unreleased]
+## [0.204.5] - 2024-10-08
 ### Added
 - Postgres implementation for dataset entry and account Re-BAC repositories
 ### Changed
@@ -24,6 +24,8 @@ Recommendation: for ease of reading, use the following order:
 - Simplified error handling code in repositories
 - Hidden part of the test code behind the feature gate
 - Updated our crate dependencies so they can be built in isolation
+### Fixed
+- `--yes / -y` flag: fixed when working from a TTY
 
 ## [0.204.4] - 2024-09-30
 ### Changed
