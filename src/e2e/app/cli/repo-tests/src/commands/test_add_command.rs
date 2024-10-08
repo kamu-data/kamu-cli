@@ -8,9 +8,178 @@
 // by the Apache License, Version 2.0.
 
 use kamu::testing::MetadataFactory;
+use kamu_cli_e2e_common::DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR;
 use kamu_cli_puppet::extensions::KamuCliPuppetExt;
 use kamu_cli_puppet::KamuCliPuppet;
 use opendatafabric as odf;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_add_dataset_from_stdin(kamu: KamuCliPuppet) {
+    let assert = kamu
+        .execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
+        .await
+        .success();
+
+    let stderr = std::str::from_utf8(&assert.get_output().stderr).unwrap();
+
+    assert!(
+        stderr.contains(indoc::indoc!(
+            r#"
+            Added: player-scores
+            Added 1 dataset(s)
+            "#
+        )),
+        "Unexpected output:\n{stderr}",
+    );
+
+    let dataset_names = kamu
+        .list_datasets()
+        .await
+        .into_iter()
+        .map(|dataset| dataset.name)
+        .collect::<Vec<_>>();
+
+    assert_eq!(dataset_names, ["player-scores"]);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_add_dataset_with_name(kamu: KamuCliPuppet) {
+    // Add from stdio
+    {
+        let assert = kamu
+            .execute_with_input(
+                ["add", "--stdin", "--name", "player-scores-1"],
+                DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
+            )
+            .await
+            .success();
+
+        let stderr = std::str::from_utf8(&assert.get_output().stderr).unwrap();
+
+        assert!(
+            stderr.contains(indoc::indoc!(
+                r#"
+                Added: player-scores-1
+                Added 1 dataset(s)
+                "#
+            )),
+            "Unexpected output:\n{stderr}",
+        );
+    }
+    // Add from a file
+    {
+        let snapshot_path = kamu.workspace_path().join("player-scores.yaml");
+
+        std::fs::write(
+            snapshot_path.clone(),
+            DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
+        )
+        .unwrap();
+
+        let assert = kamu
+            .execute([
+                "add",
+                "--name",
+                "player-scores-2",
+                snapshot_path.to_str().unwrap(),
+            ])
+            .await
+            .success();
+
+        let stderr = std::str::from_utf8(&assert.get_output().stderr).unwrap();
+
+        assert!(
+            stderr.contains(indoc::indoc!(
+                r#"
+                Added: player-scores-2
+                Added 1 dataset(s)
+                "#
+            )),
+            "Unexpected output:\n{stderr}",
+        );
+    }
+
+    let dataset_names = kamu
+        .list_datasets()
+        .await
+        .into_iter()
+        .map(|dataset| dataset.name)
+        .collect::<Vec<_>>();
+
+    assert_eq!(dataset_names, ["player-scores-1", "player-scores-2"]);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_add_dataset_with_replace(kamu: KamuCliPuppet) {
+    {
+        let assert = kamu
+            .execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
+            .await
+            .success();
+
+        let stderr = std::str::from_utf8(&assert.get_output().stderr).unwrap();
+
+        assert!(
+            stderr.contains(indoc::indoc!(
+                r#"
+                Added: player-scores
+                "#
+            )),
+            "Unexpected output:\n{stderr}",
+        );
+    }
+    {
+        let assert = kamu
+            .execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
+            .await
+            .success();
+
+        let stderr = std::str::from_utf8(&assert.get_output().stderr).unwrap();
+
+        assert!(
+            stderr.contains(indoc::indoc!(
+                r#"
+                Skipped: player-scores: Already exists
+                Added 0 dataset(s)
+                "#
+            )),
+            "Unexpected output:\n{stderr}",
+        );
+    }
+    {
+        let assert = kamu
+            .execute_with_input(
+                ["--yes", "add", "--stdin", "--replace"],
+                DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
+            )
+            .await
+            .success();
+
+        let stderr = std::str::from_utf8(&assert.get_output().stderr).unwrap();
+
+        assert!(
+            stderr.contains(indoc::indoc!(
+                r#"
+                Added: player-scores
+                Added 1 dataset(s)
+                "#
+            )),
+            "Unexpected output:\n{stderr}",
+        );
+    }
+
+    let dataset_names = kamu
+        .list_datasets()
+        .await
+        .into_iter()
+        .map(|dataset| dataset.name)
+        .collect::<Vec<_>>();
+
+    assert_eq!(dataset_names, ["player-scores"]);
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

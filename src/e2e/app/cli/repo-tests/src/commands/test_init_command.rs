@@ -86,3 +86,28 @@ pub async fn test_init_exist_ok_mt(mut kamu: KamuCliPuppet) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_init_in_an_existing_workspace(mut kamu: KamuCliPuppet) {
+    kamu.set_workspace_path_in_tmp_dir();
+
+    {
+        let assert = kamu.execute(["init"]).await.success();
+        let stderr = std::str::from_utf8(&assert.get_output().stderr).unwrap();
+
+        assert!(
+            stderr.contains("Initialized an empty workspace"),
+            "Unexpected output:\n{stderr}",
+        );
+    }
+    {
+        let assert = kamu.execute(["init"]).await.failure();
+        let stderr = std::str::from_utf8(&assert.get_output().stderr).unwrap();
+
+        assert!(
+            stderr.contains("Error: Directory is already a kamu workspace"),
+            "Unexpected output:\n{stderr}",
+        );
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

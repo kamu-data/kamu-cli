@@ -14,6 +14,11 @@ Recommendation: for ease of reading, use the following order:
 ## [Unreleased]
 ### Added
 - Postgres implementation for dataset entry and account Re-BAC repositories
+- Added (or expanded) E2E tests for:
+  - `kamu config` command
+  - `kamu init` command
+  - `kamu add` command
+  - `kamu rename` command
 ### Changed
 - `kamu repo alias list`: added JSON output alongside with other formats mentioned in the command's help
 - Private Datasets, `DatasetEntry` integration that will allow us to build dataset indexing
