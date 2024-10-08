@@ -8,9 +8,98 @@
 // by the Apache License, Version 2.0.
 
 use async_trait::async_trait;
+use lazy_static::lazy_static;
 use reqwest::{Method, StatusCode};
 
 use crate::{KamuApiServerClient, RequestBody};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub const DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR: &str = indoc::indoc!(
+    r#"
+    kind: DatasetSnapshot
+    version: 1
+    content:
+      name: player-scores
+      kind: Root
+      metadata:
+        - kind: AddPushSource
+          sourceName: default
+          read:
+            kind: NdJson
+            schema:
+              - "match_time TIMESTAMP"
+              - "match_id BIGINT"
+              - "player_id STRING"
+              - "score BIGINT"
+          merge:
+            kind: Ledger
+            primaryKey:
+              - match_id
+              - player_id
+        - kind: SetVocab
+          eventTimeColumn: match_time
+    "#
+);
+
+pub const DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR: &str = indoc::indoc!(
+    r#"
+    kind: DatasetSnapshot
+    version: 1
+    content:
+      name: leaderboard
+      kind: Derivative
+      metadata:
+        - kind: SetTransform
+          inputs:
+            - datasetRef: player-scores
+              alias: player_scores
+          transform:
+            kind: Sql
+            engine: risingwave
+            queries:
+              - alias: leaderboard
+                # Note we are using explicit `crate materialized view` statement below
+                # because RW does not currently support Top-N queries directly on sinks.
+                #
+                # Note `partition by 1` is currently required by RW engine
+                # See: https://docs.risingwave.com/docs/current/window-functions/#syntax
+                query: |
+                  create materialized view leaderboard as
+                  select
+                    *
+                  from (
+                    select
+                      row_number() over (partition by 1 order by score desc) as place,
+                      match_time,
+                      match_id,
+                      player_id,
+                      score
+                    from player_scores
+                  )
+                  where place <= 2
+              - query: |
+                  select * from leaderboard
+        - kind: SetVocab
+          eventTimeColumn: match_time
+    "#
+);
+
+lazy_static! {
+    // https://github.com/kamu-data/kamu-cli/blob/master/examples/leaderboard/player-scores.yaml
+    pub static ref DATASET_ROOT_PLAYER_SCORES_SNAPSHOT: String = {
+        DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR
+            .escape_default()
+            .to_string()
+    };
+
+    // https://github.com/kamu-data/kamu-cli/blob/master/examples/leaderboard/leaderboard.yaml
+    pub static ref DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT: String = {
+        DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR
+            .escape_default()
+            .to_string()
+    };
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -108,37 +197,8 @@ impl KamuApiServerClientExt for KamuApiServerClient {
     }
 
     async fn create_player_scores_dataset(&self, token: &AccessToken) -> DatasetId {
-        // https://github.com/kamu-data/kamu-cli/blob/master/examples/leaderboard/player-scores.yaml
-        let snapshot = indoc::indoc!(
-            r#"
-            kind: DatasetSnapshot
-            version: 1
-            content:
-              name: player-scores
-              kind: Root
-              metadata:
-                - kind: AddPushSource
-                  sourceName: default
-                  read:
-                    kind: NdJson
-                    schema:
-                      - "match_time TIMESTAMP"
-                      - "match_id BIGINT"
-                      - "player_id STRING"
-                      - "score BIGINT"
-                  merge:
-                    kind: Ledger
-                    primaryKey:
-                      - match_id
-                      - player_id
-                - kind: SetVocab
-                  eventTimeColumn: match_time
-            "#
-        )
-        .escape_default()
-        .to_string();
-
-        self.create_dataset(&snapshot, token).await
+        self.create_dataset(&DATASET_ROOT_PLAYER_SCORES_SNAPSHOT, token)
+            .await
     }
 
     async fn create_player_scores_dataset_with_data(&self, token: &AccessToken) -> DatasetId {
@@ -166,53 +226,8 @@ impl KamuApiServerClientExt for KamuApiServerClient {
     }
 
     async fn create_leaderboard(&self, token: &AccessToken) -> DatasetId {
-        // https://github.com/kamu-data/kamu-cli/blob/master/examples/leaderboard/leaderboard.yaml
-        let snapshot = indoc::indoc!(
-            r#"
-            kind: DatasetSnapshot
-            version: 1
-            content:
-              name: leaderboard
-              kind: Derivative
-              metadata:
-                - kind: SetTransform
-                  inputs:
-                    - datasetRef: player-scores
-                      alias: player_scores
-                  transform:
-                    kind: Sql
-                    engine: risingwave
-                    queries:
-                      - alias: leaderboard
-                        # Note we are using explicit `crate materialized view` statement below
-                        # because RW does not currently support Top-N queries directly on sinks.
-                        #
-                        # Note `partition by 1` is currently required by RW engine
-                        # See: https://docs.risingwave.com/docs/current/window-functions/#syntax
-                        query: |
-                          create materialized view leaderboard as
-                          select
-                            *
-                          from (
-                            select
-                              row_number() over (partition by 1 order by score desc) as place,
-                              match_time,
-                              match_id,
-                              player_id,
-                              score
-                            from player_scores
-                          )
-                          where place <= 2
-                      - query: |
-                          select * from leaderboard
-                - kind: SetVocab
-                  eventTimeColumn: match_time
-            "#
-        )
-        .escape_default()
-        .to_string();
-
-        self.create_dataset(&snapshot, token).await
+        self.create_dataset(&DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT, token)
+            .await
     }
 }
 

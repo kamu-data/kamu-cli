@@ -9,8 +9,11 @@
 
 mod test_add_command;
 mod test_complete_command;
+mod test_config_command;
+mod test_delete_command;
 mod test_ingest_command;
 mod test_init_command;
+mod test_rename_command;
 mod test_repo_alias_command;
 mod test_sql_command;
 mod test_system_api_server_gql_query;

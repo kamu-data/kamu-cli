@@ -13,41 +13,41 @@ use kamu_cli_e2e_common::prelude::*;
 
 kamu_cli_execute_command_e2e_test!(
     storage = inmem,
-    fixture = kamu_cli_e2e_repo_tests::test_init_multi_tenant_creates_sqlite_database,
-    options = Options::default().with_no_workspace()
+    fixture = kamu_cli_e2e_repo_tests::test_config_set_value
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 kamu_cli_execute_command_e2e_test!(
     storage = inmem,
-    fixture =
-        kamu_cli_e2e_repo_tests::test_init_multi_tenant_with_exists_ok_flag_creates_sqlite_database,
-    options = Options::default().with_no_workspace()
+    fixture = kamu_cli_e2e_repo_tests::test_config_reset_key
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 kamu_cli_execute_command_e2e_test!(
     storage = inmem,
-    fixture = kamu_cli_e2e_repo_tests::test_init_exist_ok_st,
-    options = Options::default().with_no_workspace()
+    fixture = kamu_cli_e2e_repo_tests::test_config_get_with_default
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 kamu_cli_execute_command_e2e_test!(
     storage = inmem,
-    fixture = kamu_cli_e2e_repo_tests::test_init_exist_ok_mt,
-    options = Options::default().with_no_workspace()
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-kamu_cli_execute_command_e2e_test!(
-    storage = inmem,
-    fixture = kamu_cli_e2e_repo_tests::test_init_in_an_existing_workspace,
-    options = Options::default().with_no_workspace()
+    fixture = kamu_cli_e2e_repo_tests::test_config_get_from_config
+    options = Options::default().with_kamu_config(
+        indoc::indoc!(
+            r#"
+            kind: CLIConfig
+            version: 1
+            content:
+                engine:
+                  runtime: podman
+                uploads:
+                  maxFileSizeInMb: 42
+            "#
+        )
+    )
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

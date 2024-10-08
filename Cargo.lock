@@ -1140,8 +1140,7 @@ checksum = "71938f30533e4d95a6d17aa530939da3842c2ab6f4f84b9dae68447e4129f74a"
 [[package]]
 name = "assert_cmd"
 version = "2.0.16"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dc1835b7f27878de8525dc71410b5a31cdcc5f230aed5ba5df968e09c201b23d"
+source = "git+https://github.com/kamu-data/assert_cmd?branch=deactivate-output-truncation#c83b0859dcbce6f9bb941ea07b615cc90aebd003"
 dependencies = [
  "anstyle",
  "bstr",
@@ -5690,6 +5689,7 @@ dependencies = [
  "internal-error",
  "kamu-cli-e2e-common-macros",
  "kamu-cli-puppet",
+ "lazy_static",
  "opendatafabric",
  "pretty_assertions",
  "regex",
@@ -5762,6 +5762,7 @@ dependencies = [
  "kamu-cli-e2e-common",
  "kamu-cli-puppet",
  "opendatafabric",
+ "pretty_assertions",
  "reqwest",
  "tokio",
  "tokio-retry",
