@@ -11,7 +11,7 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## [Unreleased]
+## [0.204.5] - 2024-10-08
 ### Added
 - Postgres implementation for dataset entry and account Re-BAC repositories
 ### Changed
