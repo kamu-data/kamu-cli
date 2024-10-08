@@ -15,7 +15,7 @@ use crate::{KamuApiServerClient, RequestBody};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// https://github.com/kamu-data/kamu-cli/blob/master/examples/leaderboard/player-scores.yaml
+/// <https://github.com/kamu-data/kamu-cli/blob/master/examples/leaderboard/player-scores.yaml>
 pub const DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR: &str = indoc::indoc!(
     r#"
     kind: DatasetSnapshot
@@ -43,7 +43,7 @@ pub const DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR: &str = indoc::indoc!(
     "#
 );
 
-/// https://github.com/kamu-data/kamu-cli/blob/master/examples/leaderboard/leaderboard.yaml
+/// <https://github.com/kamu-data/kamu-cli/blob/master/examples/leaderboard/leaderboard.yaml>
 pub const DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR: &str = indoc::indoc!(
     r#"
     kind: DatasetSnapshot
@@ -88,14 +88,14 @@ pub const DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR: &str = indoc::indoc!(
 );
 
 lazy_static! {
-    /// https://github.com/kamu-data/kamu-cli/blob/master/examples/leaderboard/player-scores.yaml
+    /// <https://github.com/kamu-data/kamu-cli/blob/master/examples/leaderboard/player-scores.yaml>
     pub static ref DATASET_ROOT_PLAYER_SCORES_SNAPSHOT: String = {
         DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR
             .escape_default()
             .to_string()
     };
 
-    /// https://github.com/kamu-data/kamu-cli/blob/master/examples/leaderboard/leaderboard.yaml
+    /// <https://github.com/kamu-data/kamu-cli/blob/master/examples/leaderboard/leaderboard.yaml>
     pub static ref DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT: String = {
         DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR
             .escape_default()
@@ -103,7 +103,7 @@ lazy_static! {
     };
 }
 
-/// https://raw.githubusercontent.com/kamu-data/kamu-cli/refs/heads/master/examples/leaderboard/data/1.ndjson
+/// <https://raw.githubusercontent.com/kamu-data/kamu-cli/refs/heads/master/examples/leaderboard/data/1.ndjson>
 pub const DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1: &str = indoc::indoc!(
     r#"
     {"match_time": "2000-01-01", "match_id": 1, "player_id": "Alice", "score": 100}
@@ -111,7 +111,7 @@ pub const DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1: &str = indoc::i
     "#
 );
 
-/// https://raw.githubusercontent.com/kamu-data/kamu-cli/refs/heads/master/examples/leaderboard/data/2.ndjson
+/// <https://raw.githubusercontent.com/kamu-data/kamu-cli/refs/heads/master/examples/leaderboard/data/2.ndjson>
 pub const DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_2: &str = indoc::indoc!(
     r#"
     {"match_time": "2000-01-02", "match_id": 2, "player_id": "Alice", "score": 70}
@@ -119,7 +119,7 @@ pub const DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_2: &str = indoc::i
     "#
 );
 
-/// https://raw.githubusercontent.com/kamu-data/kamu-cli/refs/heads/master/examples/leaderboard/data/3.ndjson
+/// <https://raw.githubusercontent.com/kamu-data/kamu-cli/refs/heads/master/examples/leaderboard/data/3.ndjson>
 pub const DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_3: &str = indoc::indoc!(
     r#"
     {"match_time": "2000-01-03", "match_id": 3, "player_id": "Bob", "score": 60}
