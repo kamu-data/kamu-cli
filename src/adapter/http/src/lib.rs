@@ -24,6 +24,7 @@ pub mod smart_protocol;
 mod upload;
 mod ws_common;
 pub use upload::*;
+pub mod general;
 
 pub type SmartTransferProtocolClientWs =
     smart_protocol::ws_tungstenite_client::WsSmartTransferProtocolClient;

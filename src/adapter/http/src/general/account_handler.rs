@@ -18,17 +18,10 @@
 
 use axum::extract::Extension;
 use axum::response::Json;
-use chrono::{DateTime, Utc};
 use database_common_macros::transactional_handler;
 use dill::Catalog;
 use http_common::*;
-use kamu_accounts::{
-    Account,
-    AccountDisplayName,
-    AccountType,
-    AuthenticationService,
-    CurrentAccountSubject,
-};
+use kamu_accounts::{Account, AuthenticationService, CurrentAccountSubject};
 use opendatafabric::{AccountID, AccountName};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -38,14 +31,6 @@ use opendatafabric::{AccountID, AccountName};
 pub struct AccountResponse {
     pub id: AccountID,
     pub account_name: AccountName,
-    pub email: Option<String>,
-    pub display_name: AccountDisplayName,
-    pub account_type: AccountType,
-    pub avatar_url: Option<String>,
-    pub registered_at: DateTime<Utc>,
-    pub is_admin: bool,
-    pub provider: String,
-    pub provider_identity_key: String,
 }
 
 impl From<Account> for AccountResponse {
@@ -53,14 +38,6 @@ impl From<Account> for AccountResponse {
         Self {
             id: value.id,
             account_name: value.account_name,
-            email: value.email,
-            display_name: value.display_name,
-            account_type: value.account_type,
-            avatar_url: value.avatar_url,
-            registered_at: value.registered_at,
-            is_admin: value.is_admin,
-            provider: value.provider,
-            provider_identity_key: value.provider_identity_key,
         }
     }
 }
@@ -82,12 +59,11 @@ async fn get_account(catalog: &Catalog) -> Result<Json<AccountResponse>, ApiErro
         CurrentAccountSubject::Anonymous(_) => Err(ApiError::new_unauthorized()),
         CurrentAccountSubject::Logged(account) => {
             let auth_service = catalog.get_one::<dyn AuthenticationService>().unwrap();
-            let full_account_info_maybe = auth_service.account_by_id(&account.account_id).await?;
-            if let Some(full_account_info) = full_account_info_maybe {
-                return Ok(Json(full_account_info.into()));
-            }
-
-            Err(ApiError::not_found_without_body())
+            let full_account_info = auth_service
+                .account_by_id(&account.account_id)
+                .await?
+                .unwrap();
+            Ok(Json(full_account_info.into()))
         }
     }
 }

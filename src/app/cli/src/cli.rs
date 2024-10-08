@@ -912,8 +912,8 @@ pub struct Push {
     pub no_alias: bool,
 
     /// Remote alias or a URL to push to
-    #[arg(long, value_name = "REM", value_parser = parsers::transfer_dataset_ref_remote)]
-    pub to: Option<odf::TransferDatasetRef>,
+    #[arg(long, value_name = "REM", value_parser = parsers::dataset_push_target)]
+    pub to: Option<odf::DatasetPushTarget>,
 
     /// Overwrite remote version with local, even if revisions have diverged
     #[arg(long, short = 'f')]
@@ -924,8 +924,8 @@ pub struct Push {
     pub visibility: parsers::DatasetVisibility,
 
     /// Local or remote dataset reference(s)
-    #[arg(value_parser = parsers::dataset_ref_pattern_any)]
-    pub dataset: Option<Vec<odf::DatasetRefAnyPattern>>,
+    #[arg(value_parser = parsers::dataset_ref_pattern)]
+    pub dataset: Option<Vec<odf::DatasetRefPattern>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

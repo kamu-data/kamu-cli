@@ -26,7 +26,7 @@ pub(crate) struct SmartPushNewDatasetViaRepoRefScenario<TServerHarness: ServerSi
     pub server_harness: TServerHarness,
     pub server_dataset_layout: DatasetLayout,
     pub client_dataset_layout: DatasetLayout,
-    pub server_dataset_ref: TransferDatasetRef,
+    pub server_dataset_ref: DatasetPushTarget,
     pub client_dataset_ref: DatasetRef,
     pub client_commit_result: CommitResult,
 }
@@ -81,7 +81,7 @@ impl<TServerHarness: ServerSideHarness> SmartPushNewDatasetViaRepoRefScenario<TS
                 &server_harness.api_server_addr(),
             )
             .unwrap();
-        let server_dataset_ref = TransferDatasetRef::Repository(RepoName::new_unchecked("foo"));
+        let server_dataset_ref = DatasetPushTarget::Repository(RepoName::new_unchecked("foo"));
 
         Self {
             client_harness,

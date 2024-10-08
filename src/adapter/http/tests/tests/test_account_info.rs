@@ -23,7 +23,7 @@ async fn test_get_account_info_with_wrong_token() {
         let cl = reqwest::Client::new();
 
         let res = cl
-            .get(&format!("{}me", harness.root_url))
+            .get(&format!("{}accounts/me", harness.root_url))
             .send()
             .await
             .unwrap();
@@ -43,7 +43,7 @@ async fn test_get_account_info() {
         let cl = reqwest::Client::new();
 
         let res = cl
-            .get(&format!("{}me", harness.root_url))
+            .get(&format!("{}accounts/me", harness.root_url))
             .header("Authorization", format!("Bearer {DUMMY_ACCESS_TOKEN}"))
             .send()
             .await
@@ -53,15 +53,7 @@ async fn test_get_account_info() {
             res.json::<serde_json::Value>().await.unwrap(),
             json!({
                 "accountName": expected_account.account_name,
-                "accountType": expected_account.account_type,
                 "id": expected_account.id,
-                "avatarUrl": expected_account.avatar_url,
-                "displayName": expected_account.display_name,
-                "email": expected_account.email,
-                "isAdmin": expected_account.is_admin,
-                "provider": expected_account.provider,
-                "providerIdentityKey": expected_account.provider_identity_key,
-                "registeredAt": expected_account.registered_at
             })
         );
     };

@@ -11,6 +11,7 @@ use std::fmt;
 use std::str::FromStr;
 use std::sync::Arc;
 
+use thiserror::Error;
 use url::Url;
 
 use super::grammar::Grammar;
@@ -931,52 +932,70 @@ super::dataset_identity::impl_parse_error!(DatasetRefAnyPattern);
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum TransferDatasetRef {
-    RemoteRef(DatasetRefRemote),
+pub enum DatasetPushTarget {
+    Url(Url),
+    Alias(DatasetAliasRemote),
     Repository(RepoName),
 }
 
-impl std::str::FromStr for TransferDatasetRef {
+impl std::str::FromStr for DatasetPushTarget {
     type Err = ParseError<Self>;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if let Ok(dataset_ref_remote) = DatasetRefRemote::try_from(s) {
-            return Ok(Self::RemoteRef(dataset_ref_remote));
+        match DatasetAliasRemote::from_str(s) {
+            Ok(alias) => Ok(Self::Alias(alias)),
+            Err(_) => match RepoName::from_str(s) {
+                Ok(repo_name) => Ok(Self::Repository(repo_name)),
+                Err(_) => match Grammar::match_url(s) {
+                    Some(_) => match Url::from_str(s) {
+                        Ok(url) => Ok(Self::Url(url)),
+                        Err(_) => Err(Self::Err::new(s)),
+                    },
+                    None => Err(Self::Err::new(s)),
+                },
+            },
         }
-        let repository_ref = RepoName::from_str(s).unwrap();
-        Ok(Self::Repository(repository_ref))
     }
 }
 
-impl TransferDatasetRef {
+impl DatasetPushTarget {
     pub fn into_repo_name(self) -> Option<RepoName> {
         match self {
-            Self::RemoteRef(dataset_ref_remote) => match dataset_ref_remote {
-                DatasetRefRemote::Alias(dataset_alias_remote) => {
-                    Some(dataset_alias_remote.repo_name)
-                }
-                _ => None,
-            },
+            Self::Alias(dataset_alias_remote) => Some(dataset_alias_remote.repo_name),
             Self::Repository(repo_name) => Some(repo_name),
+            Self::Url(_) => None,
         }
     }
 }
 
-impl fmt::Display for TransferDatasetRef {
+impl fmt::Display for DatasetPushTarget {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::RemoteRef(v) => write!(f, "{v}"),
+            Self::Alias(v) => write!(f, "{v}"),
+            Self::Url(v) => write!(f, "{v}"),
             Self::Repository(v) => write!(f, "{v}"),
         }
     }
 }
 
-impl From<DatasetRefRemote> for TransferDatasetRef {
-    fn from(value: DatasetRefRemote) -> Self {
-        Self::RemoteRef(value)
+impl TryFrom<DatasetRefRemote> for DatasetPushTarget {
+    type Error = DatasetPushTargetError;
+
+    fn try_from(value: DatasetRefRemote) -> Result<Self, Self::Error> {
+        match value {
+            DatasetRefRemote::Alias(remote_alias_ref) => Ok(Self::Alias(remote_alias_ref)),
+            DatasetRefRemote::Url(url_ref) => Ok(Self::Url(url_ref.as_ref().clone())),
+            _ => Err(Self::Error::UnsupportedType),
+        }
     }
 }
 
-super::dataset_identity::impl_parse_error!(TransferDatasetRef);
+#[derive(Error, Debug)]
+pub enum DatasetPushTargetError {
+    #[error("Unsupported type to cast")]
+    UnsupportedType,
+}
+
+super::dataset_identity::impl_parse_error!(DatasetPushTarget);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

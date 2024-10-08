@@ -14,7 +14,7 @@ use auth::OdfServerAccessTokenResolver;
 use dill::*;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_core::*;
-use opendatafabric::{self as odf, DatasetRefRemote};
+use opendatafabric as odf;
 use url::Url;
 
 use crate::UrlExt;
@@ -24,7 +24,6 @@ use crate::UrlExt;
 pub struct RemoteAliasResolverImpl {
     remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
     access_token_resolver: Arc<dyn OdfServerAccessTokenResolver>,
-    dataset_repo: Arc<dyn DatasetRepository>,
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
 }
 
@@ -34,52 +33,55 @@ impl RemoteAliasResolverImpl {
     pub fn new(
         remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
         access_token_resolver: Arc<dyn OdfServerAccessTokenResolver>,
-        dataset_repo: Arc<dyn DatasetRepository>,
         remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
     ) -> Self {
         Self {
             remote_repo_reg,
             access_token_resolver,
-            dataset_repo,
             remote_alias_reg,
         }
     }
 
-    async fn fetch_remote_alias(
+    async fn fetch_remote_url(
         &self,
         local_handle: &odf::DatasetHandle,
         remote_alias_kind: RemoteAliasKind,
-    ) -> Result<Option<odf::DatasetRefRemote>, ResolveAliasError> {
+    ) -> Result<Option<Url>, ResolveAliasError> {
         let remote_aliases = self
             .remote_alias_reg
             .get_remote_aliases(&local_handle.as_local_ref())
             .await
             .int_err()?;
 
-        let push_aliases: Vec<_> = remote_aliases.get_by_kind(remote_alias_kind).collect();
+        let aliases: Vec<_> = remote_aliases.get_by_kind(remote_alias_kind).collect();
 
-        match push_aliases.len() {
+        match aliases.len() {
             0 => Ok(None),
-            1 => Ok(Some(push_aliases[0].clone())),
+            1 => {
+                if let odf::DatasetRefRemote::Url(remote_url) = aliases[0].clone() {
+                    return Ok(Some(remote_url.as_ref().clone()));
+                }
+                Ok(None)
+            }
             _ => Err(ResolveAliasError::AmbiguousAlias),
         }
     }
 
-    fn combine_remote_alias(
+    fn combine_remote_url(
         &self,
         repo_url: &Url,
-        account_name_maybe: Option<odf::AccountName>,
+        account_name_maybe: Option<&odf::AccountName>,
         dataset_name: &odf::DatasetName,
-    ) -> Result<odf::DatasetRefRemote, InternalError> {
+    ) -> Result<Url, InternalError> {
         let mut res_url = repo_url.clone().as_odf_protocol().int_err()?;
         {
             let mut path_segments = res_url.path_segments_mut().unwrap();
             if let Some(account_name) = account_name_maybe {
-                path_segments.push(&account_name);
+                path_segments.push(account_name);
             }
             path_segments.push(dataset_name);
         }
-        Ok(res_url.into())
+        Ok(res_url)
     }
 
     async fn resolve_remote_dataset_name(
@@ -109,35 +111,43 @@ impl RemoteAliasResolver for RemoteAliasResolverImpl {
     async fn resolve_remote_alias(
         &self,
         local_dataset_handle: &odf::DatasetHandle,
-        transfer_dataset_ref_maybe: Option<odf::TransferDatasetRef>,
+        dataset_push_target_maybe: Option<odf::DatasetPushTarget>,
         remote_alias_kind: RemoteAliasKind,
-    ) -> Result<odf::DatasetRefRemote, ResolveAliasError> {
+    ) -> Result<RemoteAliasRef, ResolveAliasError> {
         let repo_name: odf::RepoName;
         let mut account_name = None;
         let mut dataset_name = None;
 
-        if let Some(transfer_dataset_ref) = &transfer_dataset_ref_maybe {
-            match transfer_dataset_ref {
-                odf::TransferDatasetRef::RemoteRef(DatasetRefRemote::Alias(
-                    dataset_alias_remote,
-                )) => {
+        if let Some(dataset_push_target) = &dataset_push_target_maybe {
+            match dataset_push_target {
+                odf::DatasetPushTarget::Alias(dataset_alias_remote) => {
                     repo_name = dataset_alias_remote.repo_name.clone();
                     account_name.clone_from(&dataset_alias_remote.account_name);
                     dataset_name = Some(dataset_alias_remote.dataset_name.clone());
                 }
-                odf::TransferDatasetRef::RemoteRef(dataset_ref_remote) => {
-                    return Ok(dataset_ref_remote.clone());
+                odf::DatasetPushTarget::Url(url_ref) => {
+                    return Ok(RemoteAliasRef::new(
+                        url_ref.clone(),
+                        None,
+                        dataset_name,
+                        account_name,
+                    ));
                 }
-                odf::TransferDatasetRef::Repository(repository_name) => {
+                odf::DatasetPushTarget::Repository(repository_name) => {
                     repo_name = repository_name.clone();
                 }
             }
         } else {
-            if let Some(remote_alias) = self
-                .fetch_remote_alias(local_dataset_handle, remote_alias_kind)
+            if let Some(remote_url) = self
+                .fetch_remote_url(local_dataset_handle, remote_alias_kind)
                 .await?
             {
-                return Ok(remote_alias);
+                return Ok(RemoteAliasRef::new(
+                    remote_url,
+                    None,
+                    dataset_name,
+                    account_name,
+                ));
             }
             let remote_repo_names: Vec<_> = self.remote_repo_reg.get_all_repositories().collect();
             if remote_repo_names.len() > 1 {
@@ -162,60 +172,23 @@ impl RemoteAliasResolver for RemoteAliasResolverImpl {
             .await
             .int_err()?;
         }
-        let push_dataset_name = dataset_name.unwrap_or(
+        let transfer_dataset_name = dataset_name.clone().unwrap_or(
             self.resolve_remote_dataset_name(local_dataset_handle, &remote_repo.url)
                 .await?,
         );
 
-        let remote_alias =
-            self.combine_remote_alias(&remote_repo.url, account_name, &push_dataset_name)?;
+        let remote_url = self.combine_remote_url(
+            &remote_repo.url,
+            account_name.as_ref(),
+            &transfer_dataset_name,
+        )?;
 
-        return Ok(remote_alias);
-    }
-
-    // TODO: avoid traversing all datasets for every alias
-    async fn inverse_lookup_dataset_by_alias(
-        &self,
-        transfer_ref: &odf::TransferDatasetRef,
-        remote_alias_kind: RemoteAliasKind,
-    ) -> Result<odf::DatasetHandle, ResolveAliasError> {
-        // Do a quick check when remote and local names match
-        if let odf::TransferDatasetRef::RemoteRef(remote_ref) = transfer_ref {
-            if let Some(remote_name) = remote_ref.dataset_name()
-                && let Some(local_handle) = self
-                    .dataset_repo
-                    .try_resolve_dataset_ref(
-                        &odf::DatasetAlias::new(None, remote_name.clone()).as_local_ref(),
-                    )
-                    .await?
-                && self
-                    .remote_alias_reg
-                    .get_remote_aliases(&local_handle.as_local_ref())
-                    .await
-                    .int_err()?
-                    .contains(remote_ref, remote_alias_kind)
-            {
-                return Ok(local_handle);
-            }
-
-            // No luck - now have to search through aliases
-            use tokio_stream::StreamExt;
-            let mut datasets = self.dataset_repo.get_all_datasets();
-            while let Some(dataset_handle) = datasets.next().await {
-                let dataset_handle = dataset_handle?;
-
-                if self
-                    .remote_alias_reg
-                    .get_remote_aliases(&dataset_handle.as_local_ref())
-                    .await
-                    .int_err()?
-                    .contains(remote_ref, RemoteAliasKind::Push)
-                {
-                    return Ok(dataset_handle);
-                }
-            }
-        }
-        Err(ResolveAliasError::EmptyRepositoryList)
+        return Ok(RemoteAliasRef::new(
+            remote_url,
+            Some(repo_name),
+            dataset_name,
+            account_name,
+        ));
     }
 }
 
@@ -239,7 +212,7 @@ impl RemoteAliasResolverApiHelper {
         };
 
         let workspace_info_response = client
-            .get(server_backend_url.join("workspace/info").unwrap())
+            .get(server_backend_url.join("info").unwrap())
             .headers(header_map.clone())
             .send()
             .await
@@ -256,7 +229,7 @@ impl RemoteAliasResolverApiHelper {
         }
 
         let account_response = client
-            .get(server_backend_url.join("me").unwrap())
+            .get(server_backend_url.join("accounts/me").unwrap())
             .headers(header_map)
             .send()
             .await

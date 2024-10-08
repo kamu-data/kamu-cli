@@ -7,12 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod ingest_handler;
-pub mod metadata_handler;
-mod query_handler;
-pub mod query_types;
+mod account_handler;
+mod dataset_info_handler;
+mod node_info_handler;
 mod router;
-mod tail_handler;
-mod verify_handler;
 
 pub use router::*;

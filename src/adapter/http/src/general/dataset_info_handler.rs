@@ -24,6 +24,8 @@ use http_common::*;
 use kamu_core::{DatasetRepository, GetDatasetError};
 use opendatafabric::{AccountName, DatasetHandle, DatasetID, DatasetName};
 
+use crate::axum_utils::ensure_authenticated_account;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, serde::Serialize)]
@@ -60,6 +62,8 @@ async fn get_dataset_by_id(
     catalog: &Catalog,
     dataset_id: &DatasetID,
 ) -> Result<Json<DatasetInfoResponse>, ApiError> {
+    ensure_authenticated_account(catalog).api_err()?;
+
     let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
     let dataset_handle = dataset_repo
         .resolve_dataset_ref(&dataset_id.clone().as_local_ref())

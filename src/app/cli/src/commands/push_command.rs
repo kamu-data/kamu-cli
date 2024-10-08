@@ -13,8 +13,7 @@ use std::time::Duration;
 use console::style as s;
 use futures::TryStreamExt;
 use kamu::domain::*;
-use kamu::utils::datasets_filtering::filter_datasets_by_any_pattern;
-use kamu_accounts::CurrentAccountSubject;
+use kamu::utils::datasets_filtering::filter_datasets_by_local_pattern;
 use opendatafabric::*;
 
 use super::{BatchError, CLIError, Command};
@@ -27,14 +26,12 @@ use crate::output::OutputConfig;
 pub struct PushCommand {
     push_svc: Arc<dyn PushService>,
     dataset_repo: Arc<dyn DatasetRepository>,
-    search_svc: Arc<dyn SearchService>,
-    refs: Vec<DatasetRefAnyPattern>,
-    current_account_subject: Arc<CurrentAccountSubject>,
+    refs: Vec<DatasetRefPattern>,
     all: bool,
     recursive: bool,
     add_aliases: bool,
     force: bool,
-    to: Option<TransferDatasetRef>,
+    to: Option<DatasetPushTarget>,
     dataset_visibility: DatasetVisibility,
     output_config: Arc<OutputConfig>,
 }
@@ -43,26 +40,22 @@ impl PushCommand {
     pub fn new<I>(
         push_svc: Arc<dyn PushService>,
         dataset_repo: Arc<dyn DatasetRepository>,
-        search_svc: Arc<dyn SearchService>,
         refs: I,
-        current_account_subject: Arc<CurrentAccountSubject>,
         all: bool,
         recursive: bool,
         add_aliases: bool,
         force: bool,
-        to: Option<TransferDatasetRef>,
+        to: Option<DatasetPushTarget>,
         dataset_visibility: DatasetVisibility,
         output_config: Arc<OutputConfig>,
     ) -> Self
     where
-        I: IntoIterator<Item = DatasetRefAnyPattern>,
+        I: IntoIterator<Item = DatasetRefPattern>,
     {
         Self {
             push_svc,
             dataset_repo,
-            search_svc,
             refs: refs.into_iter().collect(),
-            current_account_subject,
             all,
             recursive,
             add_aliases,
@@ -77,71 +70,26 @@ impl PushCommand {
         &self,
         listener: Option<Arc<dyn SyncMultiListener>>,
     ) -> Result<Vec<PushResponse>, CLIError> {
-        let current_account_name = match self.current_account_subject.as_ref() {
-            CurrentAccountSubject::Anonymous(_) => {
-                return Err(CLIError::usage_error(
-                    "Anonymous account misused, use multi-tenant alias",
-                ))
-            }
-            CurrentAccountSubject::Logged(l) => &l.account_name,
-        };
+        let dataset_refs: Vec<_> =
+            filter_datasets_by_local_pattern(self.dataset_repo.as_ref(), self.refs.clone())
+                .map_ok(|dataset_handle| dataset_handle.as_local_ref())
+                .try_collect()
+                .await?;
 
-        if let Some(transfer_ref) = &self.to {
-            let local_ref = match self.refs[0].as_dataset_ref_any() {
-                Some(dataset_ref_any) => dataset_ref_any
-                    .as_local_ref(|_| !self.dataset_repo.is_multi_tenant())
-                    .map_err(|_| {
-                        CLIError::usage_error(
-                            "When using --to reference should point to a local dataset",
-                        )
-                    })?,
-                None => {
-                    return Err(CLIError::usage_error(
-                        "When using --to reference should not point to wildcard pattern",
-                    ))
-                }
-            };
-
-            Ok(self
-                .push_svc
-                .push_multi_ext(
-                    vec![PushRequest {
-                        local_ref: Some(local_ref),
-                        remote_ref: Some(transfer_ref.clone()),
-                    }],
-                    PushMultiOptions {
-                        all: self.all,
-                        recursive: self.recursive,
-                        add_aliases: self.add_aliases,
-                        sync_options: self.sync_options(),
-                    },
-                    listener,
-                )
-                .await)
-        } else {
-            let dataset_refs: Vec<_> = filter_datasets_by_any_pattern(
-                self.dataset_repo.as_ref(),
-                self.search_svc.clone(),
-                self.refs.clone(),
-                current_account_name,
+        Ok(self
+            .push_svc
+            .push_multi(
+                dataset_refs,
+                PushMultiOptions {
+                    all: self.all,
+                    recursive: self.recursive,
+                    add_aliases: self.add_aliases,
+                    sync_options: self.sync_options(),
+                    remote_target: self.to.clone(),
+                },
+                listener,
             )
-            .try_collect()
-            .await?;
-
-            Ok(self
-                .push_svc
-                .push_multi(
-                    dataset_refs,
-                    PushMultiOptions {
-                        all: self.all,
-                        recursive: self.recursive,
-                        add_aliases: self.add_aliases,
-                        sync_options: self.sync_options(),
-                    },
-                    listener,
-                )
-                .await)
-        }
+            .await)
     }
 
     fn sync_options(&self) -> SyncOptions {
@@ -232,10 +180,8 @@ impl Command for PushCommand {
                     .into_iter()
                     .filter(|res| res.result.is_err())
                     .map(|res| {
-                        (
-                            res.result.err().unwrap(),
-                            format!("Failed to push {}", res.original_request),
-                        )
+                        let push_err = format!("Failed to push {res}");
+                        (res.result.err().unwrap(), push_err)
                     }),
             )
             .into())

@@ -37,12 +37,16 @@ impl PushServiceImpl {
         }
     }
 
-    async fn collect_plan(&self, items: &Vec<PushRequest>) -> (Vec<PushItem>, Vec<PushResponse>) {
+    async fn collect_plan(
+        &self,
+        items: &Vec<DatasetRef>,
+        push_target: &Option<DatasetPushTarget>,
+    ) -> (Vec<PushItem>, Vec<PushResponse>) {
         let mut plan = Vec::new();
         let mut errors = Vec::new();
 
-        for request in items {
-            match self.collect_plan_item(request.clone()).await {
+        for dataset_ref in items {
+            match self.collect_plan_item(dataset_ref, push_target).await {
                 Ok(item) => plan.push(item),
                 Err(err) => errors.push(err),
             }
@@ -51,66 +55,38 @@ impl PushServiceImpl {
         (plan, errors)
     }
 
-    async fn collect_plan_item(&self, request: PushRequest) -> Result<PushItem, PushResponse> {
+    async fn collect_plan_item(
+        &self,
+        dataset_ref: &DatasetRef,
+        push_target: &Option<DatasetPushTarget>,
+    ) -> Result<PushItem, PushResponse> {
         // Resolve local dataset if we have a local reference
-        let local_handle = if let Some(local_ref) = &request.local_ref {
-            match self.dataset_repo.resolve_dataset_ref(local_ref).await {
-                Ok(h) => h,
-                Err(e) => {
-                    return Err(PushResponse {
-                        local_handle: None,
-                        remote_ref: request.remote_ref.clone(),
-                        result: Err(e.into()),
-                        original_request: request,
-                    })
-                }
-            }
-        } else {
-            // We are sure that here we will have remote ref
-            let transfer_ref = request.remote_ref.as_ref().unwrap();
-            match self
-                .remote_alias_resolver
-                .inverse_lookup_dataset_by_alias(transfer_ref, RemoteAliasKind::Push)
-                .await
-            {
-                Ok(local_handle) => local_handle,
-                Err(e) => {
-                    return Err(PushResponse {
-                        local_handle: None,
-                        remote_ref: Some(transfer_ref.clone()),
-                        result: Err(e.into()),
-                        original_request: request,
-                    })
-                }
+        let local_handle = match self.dataset_repo.resolve_dataset_ref(dataset_ref).await {
+            Ok(h) => h,
+            Err(e) => {
+                return Err(PushResponse {
+                    local_handle: None,
+                    target: push_target.clone(),
+                    result: Err(e.into()),
+                })
             }
         };
 
-        match &request {
-            PushRequest {
-                local_ref: None,
-                remote_ref: None,
-            } => panic!("Push request must contain either local or remote reference"),
-            push_request => match self
-                .remote_alias_resolver
-                .resolve_remote_alias(
-                    &local_handle,
-                    push_request.remote_ref.clone(),
-                    RemoteAliasKind::Push,
-                )
-                .await
-            {
-                Ok(remote_ref) => Ok(PushItem {
-                    local_handle,
-                    remote_ref,
-                    original_request: request,
-                }),
-                Err(e) => Err(PushResponse {
-                    local_handle: Some(local_handle),
-                    remote_ref: request.remote_ref.clone(),
-                    result: Err(e.into()),
-                    original_request: request,
-                }),
-            },
+        match self
+            .remote_alias_resolver
+            .resolve_remote_alias(&local_handle, push_target.clone(), RemoteAliasKind::Push)
+            .await
+        {
+            Ok(remote_alias_ref) => Ok(PushItem {
+                local_handle,
+                remote_alias_ref,
+                push_target: push_target.clone(),
+            }),
+            Err(e) => Err(PushResponse {
+                local_handle: Some(local_handle),
+                target: push_target.clone(),
+                result: Err(e.into()),
+            }),
         }
     }
 }
@@ -119,32 +95,7 @@ impl PushServiceImpl {
 impl PushService for PushServiceImpl {
     async fn push_multi(
         &self,
-        dataset_refs: Vec<DatasetRefAny>,
-        options: PushMultiOptions,
-        sync_listener: Option<Arc<dyn SyncMultiListener>>,
-    ) -> Vec<PushResponse> {
-        let requests = dataset_refs
-            .into_iter()
-            .map(
-                |r| match r.as_local_ref(|_| !self.dataset_repo.is_multi_tenant()) {
-                    Ok(local_ref) => PushRequest {
-                        local_ref: Some(local_ref),
-                        remote_ref: None,
-                    },
-                    Err(remote_ref) => PushRequest {
-                        local_ref: None,
-                        remote_ref: Some(remote_ref.into()),
-                    },
-                },
-            )
-            .collect();
-
-        self.push_multi_ext(requests, options, sync_listener).await
-    }
-
-    async fn push_multi_ext(
-        &self,
-        initial_requests: Vec<PushRequest>,
+        dataset_refs: Vec<DatasetRef>,
         options: PushMultiOptions,
         sync_listener: Option<Arc<dyn SyncMultiListener>>,
     ) -> Vec<PushResponse> {
@@ -155,7 +106,9 @@ impl PushService for PushServiceImpl {
             unimplemented!("Pushing all datasets is not yet supported")
         }
 
-        let (plan, errors) = self.collect_plan(&initial_requests).await;
+        let (plan, errors) = self
+            .collect_plan(&dataset_refs, &options.remote_target)
+            .await;
         if !errors.is_empty() {
             return errors;
         }
@@ -166,7 +119,7 @@ impl PushService for PushServiceImpl {
                 plan.iter()
                     .map(|pi| SyncRequest {
                         src: pi.local_handle.as_any_ref(),
-                        dst: pi.remote_ref.as_any_ref(),
+                        dst: (&pi.remote_alias_ref.url).into(),
                     })
                     .collect(),
                 options.sync_options,
@@ -176,34 +129,29 @@ impl PushService for PushServiceImpl {
 
         assert_eq!(plan.len(), sync_results.len());
 
-        let results: Vec<_> = std::iter::zip(plan, sync_results)
+        let results: Vec<_> = std::iter::zip(&plan, sync_results)
             .map(|(pi, res)| {
+                let remote_ref: DatasetRefAny = (&pi.remote_alias_ref.url).into();
                 assert_eq!(pi.local_handle.as_any_ref(), res.src);
-                assert_eq!(pi.remote_ref.as_any_ref(), res.dst);
-                pi.into_response(res.result)
+                assert_eq!(remote_ref, res.dst);
+                pi.as_response(res.result)
             })
             .collect();
 
         // If no errors - add aliases to initial items
         if options.add_aliases && results.iter().all(|r| r.result.is_ok()) {
-            for request in &initial_requests {
-                if let PushRequest {
-                    local_ref: Some(local_ref),
-                    remote_ref: Some(TransferDatasetRef::RemoteRef(remote_ref)),
-                } = request
-                {
-                    if let DatasetRefRemote::Alias(_) = &remote_ref {
-                        continue;
-                    }
-                    // TODO: Improve error handling
-                    self.remote_alias_reg
-                        .get_remote_aliases(local_ref)
-                        .await
-                        .unwrap()
-                        .add(remote_ref, RemoteAliasKind::Push)
-                        .await
-                        .unwrap();
-                }
+            for push_item in &plan {
+                // TODO: Improve error handling
+                self.remote_alias_reg
+                    .get_remote_aliases(&(push_item.local_handle.as_local_ref()))
+                    .await
+                    .unwrap()
+                    .add(
+                        &((&push_item.remote_alias_ref.url).into()),
+                        RemoteAliasKind::Push,
+                    )
+                    .await
+                    .unwrap();
             }
         }
 
@@ -213,17 +161,16 @@ impl PushService for PushServiceImpl {
 
 #[derive(Debug)]
 struct PushItem {
-    original_request: PushRequest,
     local_handle: DatasetHandle,
-    remote_ref: DatasetRefRemote,
+    remote_alias_ref: RemoteAliasRef,
+    push_target: Option<DatasetPushTarget>,
 }
 
 impl PushItem {
-    fn into_response(self, result: Result<SyncResult, SyncError>) -> PushResponse {
+    fn as_response(&self, result: Result<SyncResult, SyncError>) -> PushResponse {
         PushResponse {
-            original_request: self.original_request,
-            local_handle: Some(self.local_handle),
-            remote_ref: Some(self.remote_ref.into()),
+            local_handle: Some(self.local_handle.clone()),
+            target: self.push_target.clone(),
             result: result.map_err(Into::into),
         }
     }

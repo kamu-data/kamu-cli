@@ -53,18 +53,39 @@ impl From<GetDatasetError> for GetAliasesError {
 
 #[async_trait]
 pub trait RemoteAliasResolver: Send + Sync {
+    // Resolve remote alias reference.
+    // Firstly try to resolve from AliasRegistry, if cannot do it
+    // try to resolve via repository registry
     async fn resolve_remote_alias(
         &self,
         local_dataset_handle: &DatasetHandle,
-        transfer_dataset_ref_maybe: Option<TransferDatasetRef>,
+        dataset_push_target_maybe: Option<DatasetPushTarget>,
         remote_alias_kind: RemoteAliasKind,
-    ) -> Result<DatasetRefRemote, ResolveAliasError>;
+    ) -> Result<RemoteAliasRef, ResolveAliasError>;
+}
 
-    async fn inverse_lookup_dataset_by_alias(
-        &self,
-        remote_ref: &TransferDatasetRef,
-        remote_alias_kind: RemoteAliasKind,
-    ) -> Result<DatasetHandle, ResolveAliasError>;
+#[derive(Debug, Clone)]
+pub struct RemoteAliasRef {
+    pub url: url::Url,
+    pub repo_name: Option<RepoName>,
+    pub dataset_name: Option<DatasetName>,
+    pub account_name: Option<AccountName>,
+}
+
+impl RemoteAliasRef {
+    pub fn new(
+        url: url::Url,
+        repo_name: Option<RepoName>,
+        dataset_name: Option<DatasetName>,
+        account_name: Option<AccountName>,
+    ) -> Self {
+        Self {
+            url,
+            repo_name,
+            dataset_name,
+            account_name,
+        }
+    }
 }
 
 #[derive(Error, Debug)]

@@ -27,10 +27,10 @@ use opendatafabric::{
     AccountID,
     AccountName,
     DatasetID,
+    DatasetPushTarget,
     DatasetRef,
     DatasetRefAny,
     RepoName,
-    TransferDatasetRef,
 };
 use tempfile::TempDir;
 use time_source::SystemTimeSourceDefault;
@@ -243,16 +243,13 @@ impl ClientSideHarness {
     pub async fn push_dataset(
         &self,
         dataset_local_ref: DatasetRef,
-        dataset_remote_ref: TransferDatasetRef,
+        dataset_remote_ref: DatasetPushTarget,
         force: bool,
         dataset_visibility: DatasetVisibility,
     ) -> Vec<PushResponse> {
         self.push_service
-            .push_multi_ext(
-                vec![PushRequest {
-                    local_ref: Some(dataset_local_ref),
-                    remote_ref: Some(dataset_remote_ref),
-                }],
+            .push_multi(
+                vec![dataset_local_ref],
                 PushMultiOptions {
                     sync_options: SyncOptions {
                         create_if_not_exists: true,
@@ -260,6 +257,7 @@ impl ClientSideHarness {
                         dataset_visibility,
                         ..SyncOptions::default()
                     },
+                    remote_target: Some(dataset_remote_ref),
                     ..PushMultiOptions::default()
                 },
                 None,
@@ -270,7 +268,7 @@ impl ClientSideHarness {
     pub async fn push_dataset_result(
         &self,
         dataset_local_ref: DatasetRef,
-        dataset_remote_ref: TransferDatasetRef,
+        dataset_remote_ref: DatasetPushTarget,
         force: bool,
         dataset_visibility: DatasetVisibility,
     ) -> SyncResult {

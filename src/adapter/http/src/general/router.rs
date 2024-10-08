@@ -16,36 +16,22 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use axum::extract::Extension;
-use axum::response::Json;
-use dill::Catalog;
-use http_common::*;
-use kamu_core::DatasetRepository;
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, serde::Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct WorkspaceInfoResponse {
-    pub is_multi_tenant: bool,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub async fn workspace_info_handler(
-    Extension(catalog): Extension<Catalog>,
-) -> Result<Json<WorkspaceInfoResponse>, ApiError> {
-    let response = get_workspace_info(&catalog);
-    tracing::debug!(?response, "Get workspace info response");
-    Ok(response)
-}
-
-fn get_workspace_info(catalog: &Catalog) -> Json<WorkspaceInfoResponse> {
-    let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
-
-    Json(WorkspaceInfoResponse {
-        is_multi_tenant: dataset_repo.is_multi_tenant(),
-    })
+pub fn root_router() -> axum::Router {
+    axum::Router::new()
+        .route(
+            "/info",
+            axum::routing::get(super::node_info_handler::node_info_handler),
+        )
+        .route(
+            "/accounts/me",
+            axum::routing::get(super::account_handler::account_handler),
+        )
+        .route(
+            "/datasets/:id",
+            axum::routing::get(super::dataset_info_handler::dataset_info_handler),
+        )
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

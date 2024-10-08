@@ -14,14 +14,14 @@ use crate::harness::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_workspace_info_single_tenant() {
-    let harness = WorkspaceInfoHarness::new(false).await;
+async fn test_node_info_single_tenant() {
+    let harness = NodeInfoHarness::new(false).await;
 
     let client = async move {
         let cl = reqwest::Client::new();
 
         let res = cl
-            .get(&format!("{}workspace/info", harness.root_url))
+            .get(&format!("{}info", harness.root_url))
             .send()
             .await
             .unwrap()
@@ -40,14 +40,14 @@ async fn test_workspace_info_single_tenant() {
 }
 
 #[test_log::test(tokio::test)]
-async fn test_workspace_info_multi_tenant() {
-    let harness = WorkspaceInfoHarness::new(true).await;
+async fn test_node_info_multi_tenant() {
+    let harness = NodeInfoHarness::new(true).await;
 
     let client = async move {
         let cl = reqwest::Client::new();
 
         let res = cl
-            .get(&format!("{}workspace/info", harness.root_url))
+            .get(&format!("{}info", harness.root_url))
             .send()
             .await
             .unwrap()
@@ -67,12 +67,12 @@ async fn test_workspace_info_multi_tenant() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-struct WorkspaceInfoHarness {
+struct NodeInfoHarness {
     root_url: url::Url,
     server_harness: ServerSideLocalFsHarness,
 }
 
-impl WorkspaceInfoHarness {
+impl NodeInfoHarness {
     async fn new(is_multi_tenant: bool) -> Self {
         let server_harness = ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
             multi_tenant: is_multi_tenant,

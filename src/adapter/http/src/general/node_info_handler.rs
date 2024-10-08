@@ -16,37 +16,36 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use axum::extract::Extension;
+use axum::response::Json;
+use dill::Catalog;
+use http_common::*;
+use kamu_core::DatasetRepository;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn root_router() -> axum::Router {
-    axum::Router::new()
-        .route(
-            "/query",
-            axum::routing::get(super::query_handler::query_handler)
-                .post(super::query_handler::query_handler_post),
-        )
-        .route(
-            "/verify",
-            axum::routing::post(super::verify_handler::verify_handler),
-        )
+#[derive(Debug, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NodeInfoResponse {
+    pub is_multi_tenant: bool,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn dataset_router() -> axum::Router {
-    axum::Router::new()
-        .route(
-            "/tail",
-            axum::routing::get(super::tail_handler::dataset_tail_handler),
-        )
-        .route(
-            "/metadata",
-            axum::routing::get(super::metadata_handler::dataset_metadata_handler),
-        )
-        .route(
-            "/ingest",
-            axum::routing::post(super::ingest_handler::dataset_ingest_handler),
-        )
+pub async fn node_info_handler(
+    Extension(catalog): Extension<Catalog>,
+) -> Result<Json<NodeInfoResponse>, ApiError> {
+    let response = get_node_info(&catalog);
+    tracing::debug!(?response, "Get node info response");
+    Ok(response)
+}
+
+fn get_node_info(catalog: &Catalog) -> Json<NodeInfoResponse> {
+    let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
+
+    Json(NodeInfoResponse {
+        is_multi_tenant: dataset_repo.is_multi_tenant(),
+    })
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
