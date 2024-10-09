@@ -17,7 +17,7 @@ mod test_inspect_command;
 mod test_log_command;
 mod test_new_command;
 mod test_rename_command;
-mod test_repo_alias_command;
+mod test_repo_command;
 mod test_reset_command;
 mod test_sql_command;
 mod test_system_api_server_gql_query;
