@@ -140,7 +140,7 @@ impl KamuCliPuppetExt for KamuCliPuppet {
         stdout
             .split("---")
             .skip(1)
-            .map(|block_data| block_data.trim())
+            .map(str::trim)
             .map(|block_data| {
                 let Some(pos) = block_data.find('\n') else {
                     unreachable!()

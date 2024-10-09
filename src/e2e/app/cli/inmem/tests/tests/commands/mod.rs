@@ -14,6 +14,7 @@ mod test_delete_command;
 mod test_ingest_command;
 mod test_init_command;
 mod test_inspect_command;
+mod test_log_command;
 mod test_rename_command;
 mod test_repo_alias_command;
 mod test_sql_command;
