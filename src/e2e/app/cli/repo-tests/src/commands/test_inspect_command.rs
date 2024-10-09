@@ -9,6 +9,7 @@
 
 use kamu_cli_e2e_common::{
     DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR,
+    DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
     DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
 };
 use kamu_cli_puppet::extensions::KamuCliPuppetExt;
@@ -135,6 +136,113 @@ pub async fn test_inspect_query(kamu: KamuCliPuppet) {
                   select * from leaderboard
                 "#
             )
+        );
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_inspect_schema(kamu: KamuCliPuppet) {
+    kamu.execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
+        .await
+        .success();
+
+    {
+        let assert = kamu
+            .execute(["inspect", "schema", "player-scores"])
+            .await
+            .success();
+
+        let stderr = std::str::from_utf8(&assert.get_output().stderr).unwrap();
+
+        assert!(
+            stderr.contains("Warning: Dataset schema is not yet available: player-scores"),
+            "Unexpected output:\n{stderr}",
+        );
+    }
+
+    kamu.execute_with_input(
+        ["add", "--stdin"],
+        DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR,
+    )
+    .await
+    .success();
+
+    {
+        let assert = kamu
+            .execute([
+                "inspect",
+                "schema",
+                "leaderboard",
+                "--output-format",
+                "parquet",
+            ])
+            .await
+            .success();
+
+        let stderr = std::str::from_utf8(&assert.get_output().stderr).unwrap();
+
+        assert!(
+            stderr.contains("Warning: Dataset schema is not yet available: leaderboard"),
+            "Unexpected output:\n{stderr}",
+        );
+    }
+
+    kamu.execute_with_input(
+        ["ingest", "player-scores", "--stdin"],
+        DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
+    )
+    .await
+    .success();
+
+    {
+        let assert = kamu
+            .execute([
+                "inspect",
+                "schema",
+                "player-scores",
+                "--output-format",
+                "parquet",
+            ])
+            .await
+            .success();
+
+        let stdout = std::str::from_utf8(&assert.get_output().stdout).unwrap();
+
+        pretty_assertions::assert_eq!(
+            stdout,
+            indoc::indoc!(
+                r#"
+                message arrow_schema {
+                  REQUIRED INT64 offset;
+                  REQUIRED INT32 op;
+                  REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
+                  OPTIONAL INT64 match_time (TIMESTAMP(MILLIS,true));
+                  OPTIONAL INT64 match_id;
+                  OPTIONAL BYTE_ARRAY player_id (STRING);
+                  OPTIONAL INT64 score;
+                }
+                "#
+            )
+        );
+    }
+    {
+        let assert = kamu
+            .execute([
+                "inspect",
+                "schema",
+                "leaderboard",
+                "--output-format",
+                "parquet",
+            ])
+            .await
+            .success();
+
+        let stderr = std::str::from_utf8(&assert.get_output().stderr).unwrap();
+
+        assert!(
+            stderr.contains("Warning: Dataset schema is not yet available: leaderboard"),
+            "Unexpected output:\n{stderr}",
         );
     }
 }
