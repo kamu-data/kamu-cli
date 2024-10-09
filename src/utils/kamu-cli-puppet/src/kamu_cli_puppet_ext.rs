@@ -262,7 +262,7 @@ pub struct RepoAlias {
     pub alias: String,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct BlockRecord {
     pub block_hash: Multihash,
     pub block: MetadataBlock,
