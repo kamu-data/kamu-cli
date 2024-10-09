@@ -9,7 +9,7 @@
 
 use std::future::Future;
 
-use chrono::{DateTime, NaiveTime, Utc};
+use chrono::{DateTime, NaiveTime, TimeZone, Utc};
 use kamu_cli_puppet::extensions::KamuCliPuppetExt;
 use kamu_cli_puppet::{KamuCliPuppet, NewWorkspaceOptions};
 use regex::Regex;
@@ -55,10 +55,16 @@ impl KamuCliApiServerHarnessOptions {
         self
     }
 
-    pub fn with_frozen_system_time(mut self, value: DateTime<Utc>) -> Self {
+    pub fn with_custom_frozen_system_time(mut self, value: DateTime<Utc>) -> Self {
         self.frozen_system_time = Some(value);
 
         self
+    }
+
+    pub fn with_frozen_system_time(self) -> Self {
+        let t = Utc.with_ymd_and_hms(2050, 1, 2, 3, 4, 5).unwrap();
+
+        self.with_custom_frozen_system_time(t)
     }
 
     pub fn with_today_as_frozen_system_time(self) -> Self {
@@ -69,7 +75,7 @@ impl KamuCliApiServerHarnessOptions {
                 .unwrap()
         };
 
-        self.with_frozen_system_time(today)
+        self.with_custom_frozen_system_time(today)
     }
 
     pub fn with_kamu_config(mut self, content: &str) -> Self {

@@ -9,7 +9,6 @@
 
 use std::path::Path;
 
-use chrono::{TimeZone, Utc};
 use indoc::indoc;
 use kamu_cli_e2e_common::{
     DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR,
@@ -24,9 +23,7 @@ use opendatafabric::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_push_ingest_from_file_ledger(mut kamu: KamuCliPuppet) {
-    kamu.set_system_time(Some(Utc.with_ymd_and_hms(2000, 1, 1, 0, 0, 0).unwrap()));
-
+pub async fn test_push_ingest_from_file_ledger(kamu: KamuCliPuppet) {
     kamu.add_dataset(DatasetSnapshot {
         name: "population".try_into().unwrap(),
         kind: DatasetKind::Root,
@@ -93,9 +90,9 @@ pub async fn test_push_ingest_from_file_ledger(mut kamu: KamuCliPuppet) {
             +--------+----+----------------------+----------------------+------+------------+
             | offset | op | system_time          | event_time           | city | population |
             +--------+----+----------------------+----------------------+------+------------+
-            | 0      | 0  | 2000-01-01T00:00:00Z | 2020-01-01T00:00:00Z | A    | 1000       |
-            | 1      | 0  | 2000-01-01T00:00:00Z | 2020-01-01T00:00:00Z | B    | 2000       |
-            | 2      | 0  | 2000-01-01T00:00:00Z | 2020-01-01T00:00:00Z | C    | 3000       |
+            | 0      | 0  | 2050-01-02T03:04:05Z | 2020-01-01T00:00:00Z | A    | 1000       |
+            | 1      | 0  | 2050-01-02T03:04:05Z | 2020-01-01T00:00:00Z | B    | 2000       |
+            | 2      | 0  | 2050-01-02T03:04:05Z | 2020-01-01T00:00:00Z | C    | 3000       |
             +--------+----+----------------------+----------------------+------+------------+
             "#
         ),
@@ -105,9 +102,7 @@ pub async fn test_push_ingest_from_file_ledger(mut kamu: KamuCliPuppet) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_push_ingest_from_file_snapshot_with_event_time(mut kamu: KamuCliPuppet) {
-    kamu.set_system_time(Some(Utc.with_ymd_and_hms(2000, 1, 1, 0, 0, 0).unwrap()));
-
+pub async fn test_push_ingest_from_file_snapshot_with_event_time(kamu: KamuCliPuppet) {
     kamu.add_dataset(DatasetSnapshot {
         name: "population".try_into().unwrap(),
         kind: DatasetKind::Root,
@@ -177,9 +172,9 @@ pub async fn test_push_ingest_from_file_snapshot_with_event_time(mut kamu: KamuC
             +--------+----+----------------------+----------------------+------+------------+
             | offset | op | system_time          | event_time           | city | population |
             +--------+----+----------------------+----------------------+------+------------+
-            | 0      | 0  | 2000-01-01T00:00:00Z | 2050-01-01T00:00:00Z | A    | 1000       |
-            | 1      | 0  | 2000-01-01T00:00:00Z | 2050-01-01T00:00:00Z | B    | 2000       |
-            | 2      | 0  | 2000-01-01T00:00:00Z | 2050-01-01T00:00:00Z | C    | 3000       |
+            | 0      | 0  | 2050-01-02T03:04:05Z | 2050-01-01T00:00:00Z | A    | 1000       |
+            | 1      | 0  | 2050-01-02T03:04:05Z | 2050-01-01T00:00:00Z | B    | 2000       |
+            | 2      | 0  | 2050-01-02T03:04:05Z | 2050-01-01T00:00:00Z | C    | 3000       |
             +--------+----+----------------------+----------------------+------+------------+
             "#
         ),
@@ -189,9 +184,7 @@ pub async fn test_push_ingest_from_file_snapshot_with_event_time(mut kamu: KamuC
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_ingest_from_stdin(mut kamu: KamuCliPuppet) {
-    kamu.set_system_time(Some(Utc.with_ymd_and_hms(2050, 2, 3, 4, 5, 6).unwrap()));
-
+pub async fn test_ingest_from_stdin(kamu: KamuCliPuppet) {
     kamu.execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
         .await
         .success();
@@ -205,8 +198,8 @@ pub async fn test_ingest_from_stdin(mut kamu: KamuCliPuppet) {
             ┌────────┬────┬──────────────────────┬──────────────────────┬──────────┬───────────┬───────┐
             │ offset │ op │     system_time      │      match_time      │ match_id │ player_id │ score │
             ├────────┼────┼──────────────────────┼──────────────────────┼──────────┼───────────┼───────┤
-            │      0 │ +A │ 2050-02-03T04:05:06Z │ 2000-01-01T00:00:00Z │        1 │     Alice │   100 │
-            │      1 │ +A │ 2050-02-03T04:05:06Z │ 2000-01-01T00:00:00Z │        1 │       Bob │    80 │
+            │      0 │ +A │ 2050-01-02T03:04:05Z │ 2000-01-01T00:00:00Z │        1 │     Alice │   100 │
+            │      1 │ +A │ 2050-01-02T03:04:05Z │ 2000-01-01T00:00:00Z │        1 │       Bob │    80 │
             └────────┴────┴──────────────────────┴──────────────────────┴──────────┴───────────┴───────┘
             "#
         )
@@ -222,10 +215,10 @@ pub async fn test_ingest_from_stdin(mut kamu: KamuCliPuppet) {
             ┌────────┬────┬──────────────────────┬──────────────────────┬──────────┬───────────┬───────┐
             │ offset │ op │     system_time      │      match_time      │ match_id │ player_id │ score │
             ├────────┼────┼──────────────────────┼──────────────────────┼──────────┼───────────┼───────┤
-            │      0 │ +A │ 2050-02-03T04:05:06Z │ 2000-01-01T00:00:00Z │        1 │     Alice │   100 │
-            │      1 │ +A │ 2050-02-03T04:05:06Z │ 2000-01-01T00:00:00Z │        1 │       Bob │    80 │
-            │      2 │ +A │ 2050-02-03T04:05:06Z │ 2000-01-02T00:00:00Z │        2 │   Charlie │    90 │
-            │      3 │ +A │ 2050-02-03T04:05:06Z │ 2000-01-02T00:00:00Z │        2 │     Alice │    70 │
+            │      0 │ +A │ 2050-01-02T03:04:05Z │ 2000-01-01T00:00:00Z │        1 │     Alice │   100 │
+            │      1 │ +A │ 2050-01-02T03:04:05Z │ 2000-01-01T00:00:00Z │        1 │       Bob │    80 │
+            │      2 │ +A │ 2050-01-02T03:04:05Z │ 2000-01-02T00:00:00Z │        2 │   Charlie │    90 │
+            │      3 │ +A │ 2050-01-02T03:04:05Z │ 2000-01-02T00:00:00Z │        2 │     Alice │    70 │
             └────────┴────┴──────────────────────┴──────────────────────┴──────────┴───────────┴───────┘
             "#
         )
@@ -241,12 +234,12 @@ pub async fn test_ingest_from_stdin(mut kamu: KamuCliPuppet) {
             ┌────────┬────┬──────────────────────┬──────────────────────┬──────────┬───────────┬───────┐
             │ offset │ op │     system_time      │      match_time      │ match_id │ player_id │ score │
             ├────────┼────┼──────────────────────┼──────────────────────┼──────────┼───────────┼───────┤
-            │      0 │ +A │ 2050-02-03T04:05:06Z │ 2000-01-01T00:00:00Z │        1 │     Alice │   100 │
-            │      1 │ +A │ 2050-02-03T04:05:06Z │ 2000-01-01T00:00:00Z │        1 │       Bob │    80 │
-            │      2 │ +A │ 2050-02-03T04:05:06Z │ 2000-01-02T00:00:00Z │        2 │   Charlie │    90 │
-            │      3 │ +A │ 2050-02-03T04:05:06Z │ 2000-01-02T00:00:00Z │        2 │     Alice │    70 │
-            │      4 │ +A │ 2050-02-03T04:05:06Z │ 2000-01-03T00:00:00Z │        3 │       Bob │    60 │
-            │      5 │ +A │ 2050-02-03T04:05:06Z │ 2000-01-03T00:00:00Z │        3 │   Charlie │   110 │
+            │      0 │ +A │ 2050-01-02T03:04:05Z │ 2000-01-01T00:00:00Z │        1 │     Alice │   100 │
+            │      1 │ +A │ 2050-01-02T03:04:05Z │ 2000-01-01T00:00:00Z │        1 │       Bob │    80 │
+            │      2 │ +A │ 2050-01-02T03:04:05Z │ 2000-01-02T00:00:00Z │        2 │   Charlie │    90 │
+            │      3 │ +A │ 2050-01-02T03:04:05Z │ 2000-01-02T00:00:00Z │        2 │     Alice │    70 │
+            │      4 │ +A │ 2050-01-02T03:04:05Z │ 2000-01-03T00:00:00Z │        3 │       Bob │    60 │
+            │      5 │ +A │ 2050-01-02T03:04:05Z │ 2000-01-03T00:00:00Z │        3 │   Charlie │   110 │
             └────────┴────┴──────────────────────┴──────────────────────┴──────────┴───────────┴───────┘
             "#
         )
@@ -256,9 +249,7 @@ pub async fn test_ingest_from_stdin(mut kamu: KamuCliPuppet) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_ingest_recursive(mut kamu: KamuCliPuppet) {
-    kamu.set_system_time(Some(Utc.with_ymd_and_hms(2050, 2, 3, 4, 5, 6).unwrap()));
-
+pub async fn test_ingest_recursive(kamu: KamuCliPuppet) {
     // 0. Add datasets: the root dataset and its derived dataset
     kamu.execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
         .await
@@ -315,9 +306,7 @@ pub async fn test_ingest_recursive(mut kamu: KamuCliPuppet) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_ingest_with_source_name(mut kamu: KamuCliPuppet) {
-    kamu.set_system_time(Some(Utc.with_ymd_and_hms(2050, 2, 3, 4, 5, 6).unwrap()));
-
+pub async fn test_ingest_with_source_name(kamu: KamuCliPuppet) {
     kamu.execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
         .await
         .success();
@@ -331,8 +320,8 @@ pub async fn test_ingest_with_source_name(mut kamu: KamuCliPuppet) {
             ┌────────┬────┬──────────────────────┬──────────────────────┬──────────┬───────────┬───────┐
             │ offset │ op │     system_time      │      match_time      │ match_id │ player_id │ score │
             ├────────┼────┼──────────────────────┼──────────────────────┼──────────┼───────────┼───────┤
-            │      0 │ +A │ 2050-02-03T04:05:06Z │ 2000-01-01T00:00:00Z │        1 │     Alice │   100 │
-            │      1 │ +A │ 2050-02-03T04:05:06Z │ 2000-01-01T00:00:00Z │        1 │       Bob │    80 │
+            │      0 │ +A │ 2050-01-02T03:04:05Z │ 2000-01-01T00:00:00Z │        1 │     Alice │   100 │
+            │      1 │ +A │ 2050-01-02T03:04:05Z │ 2000-01-01T00:00:00Z │        1 │       Bob │    80 │
             └────────┴────┴──────────────────────┴──────────────────────┴──────────┴───────────┴───────┘
             "#
         )
@@ -348,10 +337,10 @@ pub async fn test_ingest_with_source_name(mut kamu: KamuCliPuppet) {
             ┌────────┬────┬──────────────────────┬──────────────────────┬──────────┬───────────┬───────┐
             │ offset │ op │     system_time      │      match_time      │ match_id │ player_id │ score │
             ├────────┼────┼──────────────────────┼──────────────────────┼──────────┼───────────┼───────┤
-            │      0 │ +A │ 2050-02-03T04:05:06Z │ 2000-01-01T00:00:00Z │        1 │     Alice │   100 │
-            │      1 │ +A │ 2050-02-03T04:05:06Z │ 2000-01-01T00:00:00Z │        1 │       Bob │    80 │
-            │      2 │ +A │ 2050-02-03T04:05:06Z │ 2000-01-02T00:00:00Z │        2 │   Charlie │    90 │
-            │      3 │ +A │ 2050-02-03T04:05:06Z │ 2000-01-02T00:00:00Z │        2 │     Alice │    70 │
+            │      0 │ +A │ 2050-01-02T03:04:05Z │ 2000-01-01T00:00:00Z │        1 │     Alice │   100 │
+            │      1 │ +A │ 2050-01-02T03:04:05Z │ 2000-01-01T00:00:00Z │        1 │       Bob │    80 │
+            │      2 │ +A │ 2050-01-02T03:04:05Z │ 2000-01-02T00:00:00Z │        2 │   Charlie │    90 │
+            │      3 │ +A │ 2050-01-02T03:04:05Z │ 2000-01-02T00:00:00Z │        2 │     Alice │    70 │
             └────────┴────┴──────────────────────┴──────────────────────┴──────────┴───────────┴───────┘
             "#
         )
@@ -367,12 +356,12 @@ pub async fn test_ingest_with_source_name(mut kamu: KamuCliPuppet) {
             ┌────────┬────┬──────────────────────┬──────────────────────┬──────────┬───────────┬───────┐
             │ offset │ op │     system_time      │      match_time      │ match_id │ player_id │ score │
             ├────────┼────┼──────────────────────┼──────────────────────┼──────────┼───────────┼───────┤
-            │      0 │ +A │ 2050-02-03T04:05:06Z │ 2000-01-01T00:00:00Z │        1 │     Alice │   100 │
-            │      1 │ +A │ 2050-02-03T04:05:06Z │ 2000-01-01T00:00:00Z │        1 │       Bob │    80 │
-            │      2 │ +A │ 2050-02-03T04:05:06Z │ 2000-01-02T00:00:00Z │        2 │   Charlie │    90 │
-            │      3 │ +A │ 2050-02-03T04:05:06Z │ 2000-01-02T00:00:00Z │        2 │     Alice │    70 │
-            │      4 │ +A │ 2050-02-03T04:05:06Z │ 2000-01-03T00:00:00Z │        3 │       Bob │    60 │
-            │      5 │ +A │ 2050-02-03T04:05:06Z │ 2000-01-03T00:00:00Z │        3 │   Charlie │   110 │
+            │      0 │ +A │ 2050-01-02T03:04:05Z │ 2000-01-01T00:00:00Z │        1 │     Alice │   100 │
+            │      1 │ +A │ 2050-01-02T03:04:05Z │ 2000-01-01T00:00:00Z │        1 │       Bob │    80 │
+            │      2 │ +A │ 2050-01-02T03:04:05Z │ 2000-01-02T00:00:00Z │        2 │   Charlie │    90 │
+            │      3 │ +A │ 2050-01-02T03:04:05Z │ 2000-01-02T00:00:00Z │        2 │     Alice │    70 │
+            │      4 │ +A │ 2050-01-02T03:04:05Z │ 2000-01-03T00:00:00Z │        3 │       Bob │    60 │
+            │      5 │ +A │ 2050-01-02T03:04:05Z │ 2000-01-03T00:00:00Z │        3 │   Charlie │   110 │
             └────────┴────┴──────────────────────┴──────────────────────┴──────────┴───────────┴───────┘
             "#
         )
