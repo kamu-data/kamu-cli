@@ -634,7 +634,7 @@ pub struct Log {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Authentiates with a remote ODF server interactively
+/// Authenticates with a remote ODF server interactively
 #[derive(Debug, clap::Args)]
 pub struct Login {
     #[command(subcommand)]
