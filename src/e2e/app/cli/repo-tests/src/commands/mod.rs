@@ -25,6 +25,7 @@ mod test_system_api_server_gql_query;
 mod test_system_gc_command;
 mod test_system_generate_token_command;
 mod test_system_info_command;
+mod test_system_info_diagnose;
 
 pub use test_add_command::*;
 pub use test_complete_command::*;
@@ -44,3 +45,4 @@ pub use test_system_api_server_gql_query::*;
 pub use test_system_gc_command::*;
 pub use test_system_generate_token_command::*;
 pub use test_system_info_command::*;
+pub use test_system_info_diagnose::*;
