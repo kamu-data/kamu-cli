@@ -22,11 +22,11 @@ use reqwest::Url;
 pub async fn test_search_multi_user(kamu_node_api_client: KamuApiServerClient) {
     let kamu = KamuCliPuppet::new_workspace_tmp().await;
 
-    add_kamu_node_repo_to_workspace(&kamu_node_api_client, &kamu).await;
+    add_repo_to_workspace(&kamu_node_api_client, &kamu, "kamu-node").await;
 
     assert_search(
         &kamu,
-        "player",
+        ["search", "player", "--output-format", "table"],
         indoc::indoc!(
             r#"
             ┌───────┬──────┬─────────────┬────────┬─────────┬──────┐
@@ -47,7 +47,7 @@ pub async fn test_search_multi_user(kamu_node_api_client: KamuApiServerClient) {
 
     assert_search(
         &kamu,
-        "player",
+        ["search", "player", "--output-format", "table"],
         indoc::indoc!(
             r#"
             ┌──────────────────────────────────┬──────┬─────────────┬────────┬─────────┬──────┐
@@ -75,7 +75,7 @@ pub async fn test_search_multi_user(kamu_node_api_client: KamuApiServerClient) {
 
     assert_search(
         &kamu,
-        "player",
+        ["search", "player", "--output-format", "table"],
         indoc::indoc!(
             r#"
             ┌──────────────────────────────────┬──────┬─────────────┬────────┬─────────┬──────────┐
@@ -139,7 +139,7 @@ pub async fn test_search_multi_user(kamu_node_api_client: KamuApiServerClient) {
 
     assert_search(
         &kamu,
-        "player",
+        ["search", "player", "--output-format", "table"],
         indoc::indoc!(
             r#"
             ┌───────────────────────────────────────┬────────────┬─────────────┬────────┬─────────┬──────────┐
@@ -161,7 +161,7 @@ pub async fn test_search_multi_user(kamu_node_api_client: KamuApiServerClient) {
 
     assert_search(
         &kamu,
-        "player",
+        ["search", "player", "--output-format", "table"],
         indoc::indoc!(
             r#"
             ┌───────────────────────────────────────┬────────────┬─────────────┬────────┬─────────┬──────────┐
@@ -182,7 +182,7 @@ pub async fn test_search_multi_user(kamu_node_api_client: KamuApiServerClient) {
 pub async fn test_search_by_name(kamu_node_api_client: KamuApiServerClient) {
     let kamu = KamuCliPuppet::new_workspace_tmp().await;
 
-    add_kamu_node_repo_to_workspace(&kamu_node_api_client, &kamu).await;
+    add_repo_to_workspace(&kamu_node_api_client, &kamu, "kamu-node").await;
 
     let e2e_user_token = kamu_node_api_client.login_as_e2e_user().await;
 
@@ -196,7 +196,7 @@ pub async fn test_search_by_name(kamu_node_api_client: KamuApiServerClient) {
 
     assert_search(
         &kamu,
-        "player",
+        ["search", "player", "--output-format", "table"],
         indoc::indoc!(
             r#"
             ┌──────────────────────────────────┬──────┬─────────────┬────────┬─────────┬──────┐
@@ -211,7 +211,7 @@ pub async fn test_search_by_name(kamu_node_api_client: KamuApiServerClient) {
 
     assert_search(
         &kamu,
-        "scores",
+        ["search", "scores", "--output-format", "table"],
         indoc::indoc!(
             r#"
             ┌──────────────────────────────────┬──────┬─────────────┬────────┬─────────┬──────┐
@@ -226,7 +226,7 @@ pub async fn test_search_by_name(kamu_node_api_client: KamuApiServerClient) {
 
     assert_search(
         &kamu,
-        "not-relevant-query",
+        ["search", "not-relevant-query", "--output-format", "table"],
         indoc::indoc!(
             r#"
             ┌───────┬──────┬─────────────┬────────┬─────────┬──────┐
@@ -241,7 +241,7 @@ pub async fn test_search_by_name(kamu_node_api_client: KamuApiServerClient) {
 
     assert_search(
         &kamu,
-        "lead",
+        ["search", "lead", "--output-format", "table"],
         indoc::indoc!(
             r#"
             ┌────────────────────────────────┬────────────┬─────────────┬────────┬─────────┬──────┐
@@ -256,12 +256,93 @@ pub async fn test_search_by_name(kamu_node_api_client: KamuApiServerClient) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_search_by_repo(kamu_node_api_client: KamuApiServerClient) {
+    let kamu = KamuCliPuppet::new_workspace_tmp().await;
+
+    // As a test, add two repos pointing to the same node
+    add_repo_to_workspace(&kamu_node_api_client, &kamu, "kamu-node").await;
+    add_repo_to_workspace(&kamu_node_api_client, &kamu, "acme-org-node").await;
+
+    let e2e_user_token = kamu_node_api_client.login_as_e2e_user().await;
+
+    kamu_node_api_client
+        .create_player_scores_dataset(&e2e_user_token)
+        .await;
+
+    kamu_node_api_client
+        .create_leaderboard(&e2e_user_token)
+        .await;
+
+    assert_search(
+        &kamu,
+        ["search", "player", "--output-format", "table"],
+        indoc::indoc!(
+            r#"
+            ┌──────────────────────────────────────┬──────┬─────────────┬────────┬─────────┬──────┐
+            │                Alias                 │ Kind │ Description │ Blocks │ Records │ Size │
+            ├──────────────────────────────────────┼──────┼─────────────┼────────┼─────────┼──────┤
+            │ acme-org-node/e2e-user/player-scores │ Root │ -           │      3 │       - │    - │
+            │ kamu-node/e2e-user/player-scores     │ Root │ -           │      3 │       - │    - │
+            └──────────────────────────────────────┴──────┴─────────────┴────────┴─────────┴──────┘
+            "#
+        ),
+    )
+    .await;
+
+    assert_search(
+        &kamu,
+        [
+            "search",
+            "player",
+            "--repo",
+            "acme-org-node",
+            "--output-format",
+            "table",
+        ],
+        indoc::indoc!(
+            r#"
+            ┌──────────────────────────────────────┬──────┬─────────────┬────────┬─────────┬──────┐
+            │                Alias                 │ Kind │ Description │ Blocks │ Records │ Size │
+            ├──────────────────────────────────────┼──────┼─────────────┼────────┼─────────┼──────┤
+            │ acme-org-node/e2e-user/player-scores │ Root │ -           │      3 │       - │    - │
+            └──────────────────────────────────────┴──────┴─────────────┴────────┴─────────┴──────┘
+            "#
+        ),
+    )
+    .await;
+
+    assert_search(
+        &kamu,
+        [
+            "search",
+            "player",
+            "--repo",
+            "kamu-node",
+            "--output-format",
+            "table",
+        ],
+        indoc::indoc!(
+            r#"
+            ┌──────────────────────────────────┬──────┬─────────────┬────────┬─────────┬──────┐
+            │              Alias               │ Kind │ Description │ Blocks │ Records │ Size │
+            ├──────────────────────────────────┼──────┼─────────────┼────────┼─────────┼──────┤
+            │ kamu-node/e2e-user/player-scores │ Root │ -           │      3 │       - │    - │
+            └──────────────────────────────────┴──────┴─────────────┴────────┴─────────┴──────┘
+            "#
+        ),
+    )
+    .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Helpers
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-async fn add_kamu_node_repo_to_workspace(
+async fn add_repo_to_workspace(
     kamu_node_api_client: &KamuApiServerClient,
     kamu: &KamuCliPuppet,
+    repo_name: &str,
 ) {
     let http_repo = {
         let mut url = Url::parse("odf+http://host").unwrap();
@@ -272,25 +353,26 @@ async fn add_kamu_node_repo_to_workspace(
     };
 
     let assert = kamu
-        .execute(["repo", "add", "kamu-node", http_repo.as_str()])
+        .execute(["repo", "add", repo_name, http_repo.as_str()])
         .await
         .success();
 
     let stderr = std::str::from_utf8(&assert.get_output().stderr).unwrap();
 
     assert!(
-        stderr.contains("Added: kamu-node"),
+        stderr.contains(format!("Added: {repo_name}").as_str()),
         "Unexpected output:\n{stderr}",
     );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-async fn assert_search(kamu: &KamuCliPuppet, query: &str, expected_table_output: &str) {
-    let assert = kamu
-        .execute(["search", query, "--output-format", "table"])
-        .await
-        .success();
+async fn assert_search<I, S>(kamu: &KamuCliPuppet, search_cmd: I, expected_table_output: &str)
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<std::ffi::OsStr>,
+{
+    let assert = kamu.execute(search_cmd).await.success();
 
     let stdout = std::str::from_utf8(&assert.get_output().stdout).unwrap();
 
