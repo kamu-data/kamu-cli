@@ -93,24 +93,16 @@ pub async fn test_sql_command(kamu: KamuCliPuppet) {
         );
     }
 
-    // TODO: Remove the name overwriting, after solving this bug
-    //
-    //       Datafusion: cannot access a table in SQL if its name contains `-`
-    //       https://github.com/kamu-data/kamu-cli/issues/892
-
-    kamu.execute_with_input(
-        ["add", "--stdin", "--name", "scores"],
-        DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
-    )
-    .await
-    .success();
+    kamu.execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
+        .await
+        .success();
 
     {
         let assert = kamu
             .execute([
                 "sql",
                 "--command",
-                "SELECT * FROM scores;",
+                "SELECT * FROM \"player-scores\";",
                 "--output-format",
                 "table",
             ])
@@ -134,7 +126,7 @@ pub async fn test_sql_command(kamu: KamuCliPuppet) {
     }
 
     kamu.execute_with_input(
-        ["ingest", "scores", "--stdin"],
+        ["ingest", "player-scores", "--stdin"],
         DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
     )
     .await
@@ -145,7 +137,7 @@ pub async fn test_sql_command(kamu: KamuCliPuppet) {
             .execute([
                 "sql",
                 "--command",
-                "SELECT * FROM scores;",
+                "SELECT * FROM \"player-scores\";",
                 "--output-format",
                 "table",
             ])
