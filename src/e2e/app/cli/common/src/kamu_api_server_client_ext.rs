@@ -9,6 +9,7 @@
 
 use async_trait::async_trait;
 use lazy_static::lazy_static;
+use opendatafabric::AccountName;
 use reqwest::{Method, StatusCode};
 
 use crate::{KamuApiServerClient, RequestBody};
@@ -114,7 +115,11 @@ pub trait KamuApiServerClientExt {
     async fn login_as_e2e_user(&self) -> AccessToken;
     async fn create_dataset(&self, dataset_snapshot_yaml: &str, token: &AccessToken) -> DatasetId;
     async fn create_player_scores_dataset(&self, token: &AccessToken) -> DatasetId;
-    async fn create_player_scores_dataset_with_data(&self, token: &AccessToken) -> DatasetId;
+    async fn create_player_scores_dataset_with_data(
+        &self,
+        token: &AccessToken,
+        account_name_maybe: Option<&AccountName>,
+    ) -> DatasetId;
     async fn create_leaderboard(&self, token: &AccessToken) -> DatasetId;
 }
 
@@ -201,13 +206,21 @@ impl KamuApiServerClientExt for KamuApiServerClient {
             .await
     }
 
-    async fn create_player_scores_dataset_with_data(&self, token: &AccessToken) -> DatasetId {
+    async fn create_player_scores_dataset_with_data(
+        &self,
+        token: &AccessToken,
+        account_name_maybe: Option<&AccountName>,
+    ) -> DatasetId {
         let dataset_id = self.create_player_scores_dataset(token).await;
+        let mut base_path = "player-scores/ingest".to_string();
+        if let Some(account_name) = account_name_maybe {
+            base_path = format!("{account_name}/{base_path}");
+        }
 
         self.rest_api_call_assert(
             Some(token.clone()),
             Method::POST,
-            "player-scores/ingest",
+            base_path.as_str(),
             Some(RequestBody::NdJson(
                 indoc::indoc!(
                     r#"

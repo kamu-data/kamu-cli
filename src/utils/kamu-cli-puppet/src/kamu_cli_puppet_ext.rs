@@ -29,6 +29,8 @@ pub trait KamuCliPuppetExt {
 
     async fn add_dataset(&self, dataset_snapshot: DatasetSnapshot);
 
+    async fn ingest_data(&self, dataset_name: &DatasetName, data: &str);
+
     async fn get_list_of_repo_aliases(&self, dataset_ref: &DatasetRef) -> Vec<RepoAlias>;
 
     async fn complete<T>(&self, input: T, current: usize) -> Vec<String>
@@ -175,6 +177,18 @@ impl KamuCliPuppetExt for KamuCliPuppet {
 
         kamu_data_utils::testing::assert_data_eq(df.clone(), expected_data).await;
         kamu_data_utils::testing::assert_schema_eq(df.schema(), expected_schema);
+    }
+
+    async fn ingest_data(&self, dataset_name: &DatasetName, data: &str) {
+        let dataset_data_path = self
+            .workspace_path()
+            .join(format!("{dataset_name}.data.ndjson"));
+
+        std::fs::write(dataset_data_path.clone(), data).unwrap();
+
+        self.execute(["ingest", dataset_name, dataset_data_path.to_str().unwrap()])
+            .await
+            .success();
     }
 }
 
