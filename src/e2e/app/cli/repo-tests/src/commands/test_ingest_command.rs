@@ -234,12 +234,12 @@ pub async fn test_ingest_from_stdin(kamu: KamuCliPuppet) {
             ┌────┬──────────────────────┬──────────────────────┬──────────┬───────────┬───────┐
             │ op │     system_time      │      match_time      │ match_id │ player_id │ score │
             ├────┼──────────────────────┼──────────────────────┼──────────┼───────────┼───────┤
-            │  0 │ 2050-01-02T03:04:05Z │ 2000-01-03T00:00:00Z │        3 │       Bob │    60 │
-            │  0 │ 2050-01-02T03:04:05Z │ 2000-01-03T00:00:00Z │        3 │   Charlie │   110 │
             │  0 │ 2050-01-02T03:04:05Z │ 2000-01-01T00:00:00Z │        1 │     Alice │   100 │
             │  0 │ 2050-01-02T03:04:05Z │ 2000-01-01T00:00:00Z │        1 │       Bob │    80 │
             │  0 │ 2050-01-02T03:04:05Z │ 2000-01-02T00:00:00Z │        2 │   Charlie │    90 │
             │  0 │ 2050-01-02T03:04:05Z │ 2000-01-02T00:00:00Z │        2 │     Alice │    70 │
+            │  0 │ 2050-01-02T03:04:05Z │ 2000-01-03T00:00:00Z │        3 │       Bob │    60 │
+            │  0 │ 2050-01-02T03:04:05Z │ 2000-01-03T00:00:00Z │        3 │   Charlie │   110 │
             └────┴──────────────────────┴──────────────────────┴──────────┴───────────┴───────┘
             "#
         ),
@@ -448,7 +448,7 @@ async fn assert_ingest_data_to_player_scores_from_stdio<I, S, T>(
                     r#"
                     SELECT op, system_time, match_time, match_id, player_id, score
                     FROM "player-scores"
-                    OREDER BY match_time;
+                    ORDER BY match_time;
                     "#
                 ),
                 "--output-format",
