@@ -19,6 +19,7 @@ mod test_new_command;
 mod test_rename_command;
 mod test_repo_command;
 mod test_reset_command;
+mod test_search_command;
 mod test_sql_command;
 mod test_system_api_server_gql_query;
 mod test_system_generate_token_command;
