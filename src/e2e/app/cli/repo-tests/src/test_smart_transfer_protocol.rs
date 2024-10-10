@@ -1147,13 +1147,6 @@ pub async fn test_smart_push_pull_s3(mut kamu: KamuCliPuppet) {
         .await
         .success();
 
-    kamu.execute_with_input(
-        ["add", "--stdin"],
-        DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR,
-    )
-    .await
-    .success();
-
     let data = indoc::indoc!(
         r#"
             {"match_time": "2000-01-01", "match_id": 1, "player_id": "Alice", "score": 100}
