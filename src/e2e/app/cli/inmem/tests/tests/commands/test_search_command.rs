@@ -35,3 +35,16 @@ kamu_cli_run_api_server_e2e_test!(
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_run_api_server_e2e_test!(
+    storage = inmem,
+    fixture = kamu_cli_e2e_repo_tests::test_search_by_name
+    // We need synthetic time for the tests, but the third-party JWT code
+    // uses the current time. Assuming that the token lifetime is 24 hours, we will
+    // use the projected date (the current day) as a workaround.
+    options = Options::default()
+        .with_multi_tenant()
+        .with_today_as_frozen_system_time()
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
