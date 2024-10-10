@@ -9,10 +9,16 @@
 
 use std::sync::Arc;
 
-use chrono::{DateTime, Duration, Utc};
+use chrono::{DateTime, Duration, TimeDelta, Utc};
 use internal_error::{InternalError, ResultIntoInternal};
 
 use crate::WorkspaceLayout;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+const EVICTION_THRESHOLD: TimeDelta = Duration::hours(24);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct GcService {
     workspace_layout: Arc<WorkspaceLayout>,
@@ -56,9 +62,6 @@ impl GcService {
     /// Evict stale entries to manage cache size
     #[tracing::instrument(level = "debug", skip_all)]
     pub fn evict_cache(&self) -> Result<GcResult, InternalError> {
-        // TODO: Make const after https://github.com/chronotope/chrono/issues/309
-        // Or make into a config option
-        let eviction_threshold: Duration = Duration::hours(24);
         let now = Utc::now();
         let mut entries_freed = 0;
         let mut bytes_freed = 0;
@@ -69,7 +72,7 @@ impl GcService {
                 let mtime: DateTime<Utc> =
                     chrono::DateTime::from(entry.metadata().int_err()?.modified().int_err()?);
 
-                if (now - mtime) > eviction_threshold {
+                if (now - mtime) > EVICTION_THRESHOLD {
                     if entry.path().is_dir() {
                         bytes_freed += fs_extra::dir::get_size(entry.path()).int_err()?;
                         std::fs::remove_dir_all(entry.path()).int_err()?;
@@ -93,7 +96,11 @@ impl GcService {
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub struct GcResult {
     pub entries_freed: usize,
     pub bytes_freed: u64,
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

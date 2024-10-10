@@ -22,6 +22,7 @@ mod test_reset_command;
 mod test_search_command;
 mod test_sql_command;
 mod test_system_api_server_gql_query;
+mod test_system_gc_command;
 mod test_system_generate_token_command;
 
 pub use test_add_command::*;
@@ -39,4 +40,5 @@ pub use test_reset_command::*;
 pub use test_search_command::*;
 pub use test_sql_command::*;
 pub use test_system_api_server_gql_query::*;
+pub use test_system_gc_command::*;
 pub use test_system_generate_token_command::*;

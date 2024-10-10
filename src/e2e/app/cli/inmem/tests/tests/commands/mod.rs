@@ -11,6 +11,7 @@ mod test_add_command;
 mod test_complete_command;
 mod test_config_command;
 mod test_delete_command;
+mod test_gc_command;
 mod test_ingest_command;
 mod test_init_command;
 mod test_inspect_command;
