@@ -14,6 +14,10 @@ use chrono::{DateTime, Utc};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub type ExecuteCommandResult = assert_cmd::assert::Assert;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub struct KamuCliPuppet {
     workspace_path: PathBuf,
     system_time: Option<DateTime<Utc>>,
@@ -88,7 +92,7 @@ impl KamuCliPuppet {
         temp_dir.join("e2e-output-data.txt")
     }
 
-    pub async fn execute<I, S>(&self, cmd: I) -> assert_cmd::assert::Assert
+    pub async fn execute<I, S>(&self, cmd: I) -> ExecuteCommandResult
     where
         I: IntoIterator<Item = S>,
         S: AsRef<ffi::OsStr>,
@@ -96,7 +100,7 @@ impl KamuCliPuppet {
         self.execute_impl(cmd, None::<Vec<u8>>).await
     }
 
-    pub async fn execute_with_input<I, S, T>(&self, cmd: I, input: T) -> assert_cmd::assert::Assert
+    pub async fn execute_with_input<I, S, T>(&self, cmd: I, input: T) -> ExecuteCommandResult
     where
         I: IntoIterator<Item = S>,
         S: AsRef<ffi::OsStr>,
@@ -105,11 +109,7 @@ impl KamuCliPuppet {
         self.execute_impl(cmd, Some(input)).await
     }
 
-    async fn execute_impl<I, S, T>(
-        &self,
-        cmd: I,
-        maybe_input: Option<T>,
-    ) -> assert_cmd::assert::Assert
+    async fn execute_impl<I, S, T>(&self, cmd: I, maybe_input: Option<T>) -> ExecuteCommandResult
     where
         I: IntoIterator<Item = S>,
         S: AsRef<ffi::OsStr>,

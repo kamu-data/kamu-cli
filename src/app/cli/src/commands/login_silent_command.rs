@@ -16,16 +16,19 @@ use crate::{odf_server, CLIError, Command};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Debug)]
 pub enum LoginSilentMode {
     OAuth(LoginSilentModeOAuth),
     Password(LoginSilentModePassword),
 }
 
+#[derive(Debug)]
 pub struct LoginSilentModeOAuth {
     pub provider: String,
     pub access_token: String,
 }
 
+#[derive(Debug)]
 pub struct LoginSilentModePassword {
     pub login: String,
     pub password: String,
