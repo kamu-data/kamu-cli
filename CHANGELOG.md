@@ -24,6 +24,19 @@ Recommendation: for ease of reading, use the following order:
   - `kamu init` command
   - `kamu add` command
   - `kamu rename` command
+  - `kamu ingest` command
+  - `kamu inspect` command
+  - `kamu log` command
+  - `kamu new` command
+  - `kamu reset` command
+  - `kamu search` command
+  - `kamu sql` command
+  - `kamu system gc` command
+  - `kamu system info` command
+  - `kamu system diagnose` command
+  - `kamu tail` command
+  - `kamu login` command
+  - `kamu logout` command
 ### Changed
 - `kamu repo alias list`: added JSON output alongside with other formats mentioned in the command's help
 - Private Datasets, `DatasetEntry` integration that will allow us to build dataset indexing
