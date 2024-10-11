@@ -9,7 +9,7 @@
 
 use std::assert_matches::assert_matches;
 
-use chrono::{TimeZone, Utc};
+use chrono::{TimeZone, Timelike, Utc};
 use kamu_cli_e2e_common::{
     DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR,
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
@@ -162,23 +162,29 @@ pub async fn test_log(kamu: KamuCliPuppet) {
             pretty_assertions::assert_eq!(4, block.sequence_number);
 
             let actual_add_data = block.event.as_variant::<AddData>().unwrap();
+
+            pretty_assertions::assert_eq!(None, actual_add_data.prev_checkpoint);
+            pretty_assertions::assert_eq!(None, actual_add_data.prev_offset);
+
             let actual_new_data = actual_add_data.new_data.as_ref().unwrap();
 
             pretty_assertions::assert_eq!(
                 OffsetInterval { start: 0, end: 1 },
                 actual_new_data.offset_interval
             );
-            pretty_assertions::assert_eq!(1665, actual_new_data.size);
+            pretty_assertions::assert_eq!(1674, actual_new_data.size);
 
-            assert_matches!(
-                block.event,
-                MetadataEvent::AddData(event)
-                    if event.prev_checkpoint.is_none()
-                        && event.prev_offset.is_none()
-                        && event.new_checkpoint.is_none()
-                        && event.new_watermark == Some(Utc.with_ymd_and_hms(2000, 1, 1, 0, 0, 0).unwrap())
-                        && event.new_source_state.is_none()
+            pretty_assertions::assert_eq!(None, actual_add_data.new_checkpoint);
+            pretty_assertions::assert_eq!(
+                Some(
+                    Utc.with_ymd_and_hms(2000, 1, 1, 0, 0, 0)
+                        .unwrap()
+                        .with_nanosecond(1_000_000) // 1 ms
+                        .unwrap()
+                ),
+                actual_add_data.new_watermark
             );
+            pretty_assertions::assert_eq!(None, actual_add_data.new_source_state);
         }
         {
             let block = metadata_blocks.pop().unwrap();
@@ -186,23 +192,29 @@ pub async fn test_log(kamu: KamuCliPuppet) {
             pretty_assertions::assert_eq!(5, block.sequence_number);
 
             let actual_add_data = block.event.as_variant::<AddData>().unwrap();
+
+            pretty_assertions::assert_eq!(None, actual_add_data.prev_checkpoint);
+            pretty_assertions::assert_eq!(Some(1), actual_add_data.prev_offset);
+
             let actual_new_data = actual_add_data.new_data.as_ref().unwrap();
 
             pretty_assertions::assert_eq!(
                 OffsetInterval { start: 2, end: 3 },
                 actual_new_data.offset_interval
             );
-            pretty_assertions::assert_eq!(actual_new_data.size, 1681);
+            pretty_assertions::assert_eq!(1690, actual_new_data.size);
 
-            assert_matches!(
-                block.event,
-                MetadataEvent::AddData(event)
-                    if event.prev_checkpoint.is_none()
-                        && event.prev_offset == Some(1)
-                        && event.new_checkpoint.is_none()
-                        && event.new_watermark == Some(Utc.with_ymd_and_hms(2000, 1, 2, 0, 0, 0).unwrap())
-                        && event.new_source_state.is_none()
+            pretty_assertions::assert_eq!(None, actual_add_data.new_checkpoint);
+            pretty_assertions::assert_eq!(
+                Some(
+                    Utc.with_ymd_and_hms(2000, 1, 2, 0, 0, 0)
+                        .unwrap()
+                        .with_nanosecond(1_000_000) // 1 ms
+                        .unwrap()
+                ),
+                actual_add_data.new_watermark
             );
+            pretty_assertions::assert_eq!(None, actual_add_data.new_source_state);
         }
     }
 

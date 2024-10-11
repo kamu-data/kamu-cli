@@ -104,33 +104,33 @@ lazy_static! {
     };
 }
 
-/// NOTE: 1 nanosecond for stable order within tests
+/// NOTE: 1 millisecond for stable order within tests
 ///
 /// <https://raw.githubusercontent.com/kamu-data/kamu-cli/refs/heads/master/examples/leaderboard/data/1.ndjson>
 pub const DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1: &str = indoc::indoc!(
     r#"
     {"match_time": "2000-01-01", "match_id": 1, "player_id": "Alice", "score": 100}
-    {"match_time": "2000-01-01 00:00:00.000000001", "match_id": 1, "player_id": "Bob", "score": 80}
+    {"match_time": "2000-01-01 00:00:00.001", "match_id": 1, "player_id": "Bob", "score": 80}
     "#
 );
 
-/// NOTE: 1 nanosecond for stable order within tests
+/// NOTE: 1 millisecond for stable order within tests
 ///
 /// <https://raw.githubusercontent.com/kamu-data/kamu-cli/refs/heads/master/examples/leaderboard/data/2.ndjson>
 pub const DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_2: &str = indoc::indoc!(
     r#"
     {"match_time": "2000-01-02", "match_id": 2, "player_id": "Alice", "score": 70}
-    {"match_time": "2000-01-02 00:00:00.000000001", "match_id": 2, "player_id": "Charlie", "score": 90}
+    {"match_time": "2000-01-02 00:00:00.001", "match_id": 2, "player_id": "Charlie", "score": 90}
     "#
 );
 
-/// NOTE: 1 nanosecond for stable order within tests
+/// NOTE: 1 millisecond for stable order within tests
 ///
 /// <https://raw.githubusercontent.com/kamu-data/kamu-cli/refs/heads/master/examples/leaderboard/data/3.ndjson>
 pub const DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_3: &str = indoc::indoc!(
     r#"
     {"match_time": "2000-01-03", "match_id": 3, "player_id": "Bob", "score": 60}
-    {"match_time": "2000-01-03 00:00:00.000000001", "match_id": 3, "player_id": "Charlie", "score": 110}
+    {"match_time": "2000-01-03 00:00:00.001", "match_id": 3, "player_id": "Charlie", "score": 110}
     "#
 );
 

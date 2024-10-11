@@ -443,10 +443,16 @@ async fn assert_ingest_data_to_player_scores_from_stdio<I, S, T>(
                 "--engine",
                 "datafusion",
                 "--command",
-                // Without unstable "offset" column
+                // Without unstable "offset" column.
+                // For a beautiful output, cut to seconds
                 indoc::indoc!(
                     r#"
-                    SELECT op, system_time, match_time, match_id, player_id, score
+                    SELECT op,
+                           system_time,
+                           DATE_TRUNC('second', match_time) as match_time,
+                           match_id,
+                           player_id,
+                           score
                     FROM "player-scores"
                     ORDER BY match_time;
                     "#
