@@ -56,7 +56,7 @@ impl QueryServiceImpl {
             .with_information_schema(true)
             .with_default_catalog_and_schema("kamu", "kamu");
 
-        // Forcing cese-sensitive identifiers in case-insensitive language seems to
+        // Forcing case-sensitive identifiers in case-insensitive language seems to
         // be a lesser evil than following DataFusion's default behavior of forcing
         // identifiers to lowercase instead of case-insensitive matching.
         //

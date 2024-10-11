@@ -31,7 +31,7 @@ pub enum LineageOutputFormat {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct LineageCommand {
+pub struct InspectLineageCommand {
     dataset_repo: Arc<dyn DatasetRepository>,
     provenance_svc: Arc<dyn ProvenanceService>,
     workspace_layout: Arc<WorkspaceLayout>,
@@ -41,7 +41,7 @@ pub struct LineageCommand {
     output_config: Arc<OutputConfig>,
 }
 
-impl LineageCommand {
+impl InspectLineageCommand {
     pub fn new<I>(
         dataset_repo: Arc<dyn DatasetRepository>,
         provenance_svc: Arc<dyn ProvenanceService>,
@@ -94,7 +94,7 @@ impl LineageCommand {
 
 // TODO: Support temporality and evolution
 #[async_trait::async_trait(?Send)]
-impl Command for LineageCommand {
+impl Command for InspectLineageCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
         use futures::{StreamExt, TryStreamExt};
         let mut dataset_handles: Vec<_> = if self.dataset_refs.is_empty() {

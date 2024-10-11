@@ -145,6 +145,8 @@ impl Command for IngestCommand {
             _ => Ok(()),
         }?;
 
+        // TODO: `kamu ingest`: implement `--recursive` mode
+        //        https://github.com/kamu-data/kamu-cli/issues/886
         if self.recursive {
             unimplemented!("Sorry, recursive ingest is not yet implemented")
         }

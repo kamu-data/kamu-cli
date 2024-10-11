@@ -29,6 +29,8 @@ use crate::output::OutputConfig;
 pub enum MetadataLogOutputFormat {
     Shell,
     Yaml,
+    // TODO: `kamu log`: support `--output-format json`
+    //       https://github.com/kamu-data/kamu-cli/issues/887
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

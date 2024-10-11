@@ -14,9 +14,21 @@ use std::path::PathBuf;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use datafusion::prelude::{ParquetReadOptions, SessionContext};
-use opendatafabric::serde::yaml::{DatasetKindDef, YamlDatasetSnapshotSerializer};
-use opendatafabric::serde::DatasetSnapshotSerializer;
-use opendatafabric::{DatasetID, DatasetKind, DatasetName, DatasetRef, DatasetSnapshot, Multihash};
+use opendatafabric::serde::yaml::{
+    DatasetKindDef,
+    YamlDatasetSnapshotSerializer,
+    YamlMetadataBlockDeserializer,
+};
+use opendatafabric::serde::{DatasetSnapshotSerializer, MetadataBlockDeserializer};
+use opendatafabric::{
+    DatasetID,
+    DatasetKind,
+    DatasetName,
+    DatasetRef,
+    DatasetSnapshot,
+    MetadataBlock,
+    Multihash,
+};
 use serde::Deserialize;
 
 use crate::KamuCliPuppet;
@@ -34,6 +46,8 @@ pub trait KamuCliPuppetExt {
     async fn complete<T>(&self, input: T, current: usize) -> Vec<String>
     where
         T: Into<String> + Send;
+
+    async fn list_blocks(&self, dataset_name: &DatasetName) -> Vec<BlockRecord>;
 
     async fn start_api_server(self, e2e_data_file_path: PathBuf) -> ServerOutput;
 
@@ -109,6 +123,43 @@ impl KamuCliPuppetExt for KamuCliPuppet {
         let stdout = std::str::from_utf8(&assert.get_output().stdout).unwrap();
 
         stdout.lines().map(ToString::to_string).collect()
+    }
+
+    async fn list_blocks(&self, dataset_name: &DatasetName) -> Vec<BlockRecord> {
+        let assert = self
+            .execute(["log", dataset_name.as_str(), "--output-format", "yaml"])
+            .await
+            .success();
+
+        let stdout = std::str::from_utf8(&assert.get_output().stdout).unwrap();
+
+        // TODO: Don't parse the output, after implementation:
+        //       `kamu log`: support `--output-format json`
+        //       https://github.com/kamu-data/kamu-cli/issues/887
+
+        stdout
+            .split("---")
+            .skip(1)
+            .map(str::trim)
+            .map(|block_data| {
+                let Some(pos) = block_data.find('\n') else {
+                    unreachable!()
+                };
+                let (first_line_with_block_hash, metadata_block_str) = block_data.split_at(pos);
+
+                let block_hash = first_line_with_block_hash
+                    .strip_prefix("# Block: ")
+                    .unwrap();
+                let block = YamlMetadataBlockDeserializer {}
+                    .read_manifest(metadata_block_str.as_ref())
+                    .unwrap();
+
+                BlockRecord {
+                    block_hash: Multihash::from_multibase(block_hash).unwrap(),
+                    block,
+                }
+            })
+            .collect()
     }
 
     async fn start_api_server(self, e2e_data_file_path: PathBuf) -> ServerOutput {
@@ -209,6 +260,12 @@ pub struct RepoAlias {
     pub dataset: DatasetName,
     pub kind: String,
     pub alias: String,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct BlockRecord {
+    pub block_hash: Multihash,
+    pub block: MetadataBlock,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
