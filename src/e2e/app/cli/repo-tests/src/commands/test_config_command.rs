@@ -34,14 +34,14 @@ pub async fn test_config_set_value(kamu: KamuCliPuppet) {
         let stdout = std::str::from_utf8(&assert.get_output().stdout).unwrap();
 
         pretty_assertions::assert_eq!(
-            stdout,
             indoc::indoc!(
                 r#"
                 engine:
                   runtime: podman
 
                 "#
-            )
+            ),
+            stdout
         );
     }
     {
@@ -66,13 +66,13 @@ pub async fn test_config_set_value(kamu: KamuCliPuppet) {
         let stdout = std::str::from_utf8(&assert.get_output().stdout).unwrap();
 
         pretty_assertions::assert_eq!(
-            stdout,
             indoc::indoc!(
                 r#"
                 host
 
                 "#
-            )
+            ),
+            stdout
         );
     }
     {
@@ -80,7 +80,6 @@ pub async fn test_config_set_value(kamu: KamuCliPuppet) {
         let stdout = std::str::from_utf8(&assert.get_output().stdout).unwrap();
 
         pretty_assertions::assert_eq!(
-            stdout,
             indoc::indoc!(
                 r#"
                 engine:
@@ -88,7 +87,8 @@ pub async fn test_config_set_value(kamu: KamuCliPuppet) {
                   networkNs: host
 
                 "#
-            )
+            ),
+            stdout
         );
     }
     // 2. Set flow for the "uploads.maxFileSizeInMb" key
@@ -114,13 +114,13 @@ pub async fn test_config_set_value(kamu: KamuCliPuppet) {
         let stdout = std::str::from_utf8(&assert.get_output().stdout).unwrap();
 
         pretty_assertions::assert_eq!(
-            stdout,
             indoc::indoc!(
                 r#"
                 42
 
                 "#
-            )
+            ),
+            stdout
         );
     }
     {
@@ -128,7 +128,6 @@ pub async fn test_config_set_value(kamu: KamuCliPuppet) {
         let stdout = std::str::from_utf8(&assert.get_output().stdout).unwrap();
 
         pretty_assertions::assert_eq!(
-            stdout,
             indoc::indoc!(
                 r#"
                 engine:
@@ -138,7 +137,8 @@ pub async fn test_config_set_value(kamu: KamuCliPuppet) {
                   maxFileSizeInMb: 42
 
                 "#
-            )
+            ),
+            stdout
         );
     }
 }
@@ -212,13 +212,13 @@ pub async fn test_config_get_with_default(kamu: KamuCliPuppet) {
         let stdout = std::str::from_utf8(&assert.get_output().stdout).unwrap();
 
         pretty_assertions::assert_eq!(
-            stdout,
             indoc::indoc!(
                 r#"
                 private
 
                 "#
-            )
+            ),
+            stdout
         );
     }
 }
@@ -230,7 +230,6 @@ pub async fn test_config_get_from_config(kamu: KamuCliPuppet) {
     let stdout = std::str::from_utf8(&assert.get_output().stdout).unwrap();
 
     pretty_assertions::assert_eq!(
-        stdout,
         indoc::indoc!(
             r#"
             engine:
@@ -239,7 +238,8 @@ pub async fn test_config_get_from_config(kamu: KamuCliPuppet) {
               maxFileSizeInMb: 42
 
             "#
-        )
+        ),
+        stdout
     );
 }
 

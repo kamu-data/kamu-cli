@@ -80,7 +80,6 @@ pub async fn test_sql_command(kamu: KamuCliPuppet) {
         let stdout = std::str::from_utf8(&assert.get_output().stdout).unwrap();
 
         pretty_assertions::assert_eq!(
-            stdout,
             indoc::indoc!(
                 r#"
                 ┌────────┐
@@ -89,7 +88,8 @@ pub async fn test_sql_command(kamu: KamuCliPuppet) {
                 │     42 │
                 └────────┘
                 "#
-            )
+            ),
+            stdout
         );
     }
 
@@ -112,7 +112,6 @@ pub async fn test_sql_command(kamu: KamuCliPuppet) {
         let stdout = std::str::from_utf8(&assert.get_output().stdout).unwrap();
 
         pretty_assertions::assert_eq!(
-            stdout,
             indoc::indoc!(
                 r#"
                 ┌┐
@@ -121,7 +120,8 @@ pub async fn test_sql_command(kamu: KamuCliPuppet) {
                 ││
                 └┘
                 "#
-            )
+            ),
+            stdout
         );
     }
 
@@ -147,7 +147,6 @@ pub async fn test_sql_command(kamu: KamuCliPuppet) {
         let stdout = std::str::from_utf8(&assert.get_output().stdout).unwrap();
 
         pretty_assertions::assert_eq!(
-            stdout,
             indoc::indoc!(
                 r#"
                 ┌────────┬────┬──────────────────────┬──────────────────────────┬──────────┬───────────┬───────┐
@@ -157,7 +156,8 @@ pub async fn test_sql_command(kamu: KamuCliPuppet) {
                 │      1 │  0 │ 2050-01-02T03:04:05Z │ 2000-01-01T00:00:00.001Z │        1 │       Bob │    80 │
                 └────────┴────┴──────────────────────┴──────────────────────────┴──────────┴───────────┴───────┘
                 "#
-            )
+            ),
+            stdout
         );
     }
 }

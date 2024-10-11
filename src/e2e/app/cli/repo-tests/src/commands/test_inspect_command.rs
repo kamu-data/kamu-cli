@@ -110,7 +110,6 @@ pub async fn test_inspect_query(kamu: KamuCliPuppet) {
         let stdout = std::str::from_utf8(&assert.get_output().stdout).unwrap();
 
         pretty_assertions::assert_eq!(
-            stdout,
             indoc::formatdoc!(
                 r#"
                 Transform: {leaderboard_transform_block_hash}
@@ -135,7 +134,8 @@ pub async fn test_inspect_query(kamu: KamuCliPuppet) {
                 Query: leaderboard
                   select * from leaderboard
                 "#
-            )
+            ),
+            stdout
         );
     }
 }
@@ -210,7 +210,6 @@ pub async fn test_inspect_schema(kamu: KamuCliPuppet) {
         let stdout = std::str::from_utf8(&assert.get_output().stdout).unwrap();
 
         pretty_assertions::assert_eq!(
-            stdout,
             indoc::indoc!(
                 r#"
                 message arrow_schema {
@@ -223,7 +222,8 @@ pub async fn test_inspect_schema(kamu: KamuCliPuppet) {
                   OPTIONAL INT64 score;
                 }
                 "#
-            )
+            ),
+            stdout
         );
     }
     {
