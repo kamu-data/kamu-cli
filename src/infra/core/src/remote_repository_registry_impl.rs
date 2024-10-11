@@ -44,7 +44,7 @@ impl RemoteRepositoryRegistryImpl {
         let file_path = self.repos_dir.join(repo_name);
 
         if !file_path.exists() {
-            // run full scan to support case-insensetive matches
+            // run full scan to support case-insensitive matches
             let all_repositories_stream = self.get_all_repositories();
             for repository_name in all_repositories_stream {
                 if &repository_name == repo_name {
@@ -157,6 +157,7 @@ impl RemoteRepositoryRegistry for RemoteRepositoryRegistryNull {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Config
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub struct RemoteReposDir(PathBuf);
 
 impl RemoteReposDir {

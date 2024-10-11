@@ -9,12 +9,14 @@
 
 use async_trait::async_trait;
 use lazy_static::lazy_static;
+use opendatafabric::{DatasetAlias, DatasetName};
 use reqwest::{Method, StatusCode};
 
 use crate::{KamuApiServerClient, RequestBody};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// <https://github.com/kamu-data/kamu-cli/blob/master/examples/leaderboard/player-scores.yaml>
 pub const DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR: &str = indoc::indoc!(
     r#"
     kind: DatasetSnapshot
@@ -42,6 +44,7 @@ pub const DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR: &str = indoc::indoc!(
     "#
 );
 
+/// <https://github.com/kamu-data/kamu-cli/blob/master/examples/leaderboard/leaderboard.yaml>
 pub const DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR: &str = indoc::indoc!(
     r#"
     kind: DatasetSnapshot
@@ -86,20 +89,50 @@ pub const DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR: &str = indoc::indoc!(
 );
 
 lazy_static! {
-    // https://github.com/kamu-data/kamu-cli/blob/master/examples/leaderboard/player-scores.yaml
+    /// <https://github.com/kamu-data/kamu-cli/blob/master/examples/leaderboard/player-scores.yaml>
     pub static ref DATASET_ROOT_PLAYER_SCORES_SNAPSHOT: String = {
         DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR
             .escape_default()
             .to_string()
     };
 
-    // https://github.com/kamu-data/kamu-cli/blob/master/examples/leaderboard/leaderboard.yaml
+    /// <https://github.com/kamu-data/kamu-cli/blob/master/examples/leaderboard/leaderboard.yaml>
     pub static ref DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT: String = {
         DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR
             .escape_default()
             .to_string()
     };
 }
+
+/// NOTE: 1 millisecond for stable order within tests
+///
+/// <https://raw.githubusercontent.com/kamu-data/kamu-cli/refs/heads/master/examples/leaderboard/data/1.ndjson>
+pub const DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1: &str = indoc::indoc!(
+    r#"
+    {"match_time": "2000-01-01", "match_id": 1, "player_id": "Alice", "score": 100}
+    {"match_time": "2000-01-01 00:00:00.001", "match_id": 1, "player_id": "Bob", "score": 80}
+    "#
+);
+
+/// NOTE: 1 millisecond for stable order within tests
+///
+/// <https://raw.githubusercontent.com/kamu-data/kamu-cli/refs/heads/master/examples/leaderboard/data/2.ndjson>
+pub const DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_2: &str = indoc::indoc!(
+    r#"
+    {"match_time": "2000-01-02", "match_id": 2, "player_id": "Alice", "score": 70}
+    {"match_time": "2000-01-02 00:00:00.001", "match_id": 2, "player_id": "Charlie", "score": 90}
+    "#
+);
+
+/// NOTE: 1 millisecond for stable order within tests
+///
+/// <https://raw.githubusercontent.com/kamu-data/kamu-cli/refs/heads/master/examples/leaderboard/data/3.ndjson>
+pub const DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_3: &str = indoc::indoc!(
+    r#"
+    {"match_time": "2000-01-03", "match_id": 3, "player_id": "Bob", "score": 60}
+    {"match_time": "2000-01-03 00:00:00.001", "match_id": 3, "player_id": "Charlie", "score": 110}
+    "#
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -111,11 +144,26 @@ pub type DatasetId = String;
 #[async_trait]
 pub trait KamuApiServerClientExt {
     async fn login_as_kamu(&self) -> AccessToken;
+
     async fn login_as_e2e_user(&self) -> AccessToken;
+
+    // TODO: also return alias, after solving this bug:
+    //       https://github.com/kamu-data/kamu-cli/issues/891
     async fn create_dataset(&self, dataset_snapshot_yaml: &str, token: &AccessToken) -> DatasetId;
+
     async fn create_player_scores_dataset(&self, token: &AccessToken) -> DatasetId;
+
+    /// NOTE: only for single-tenant workspaces
     async fn create_player_scores_dataset_with_data(&self, token: &AccessToken) -> DatasetId;
+
     async fn create_leaderboard(&self, token: &AccessToken) -> DatasetId;
+
+    async fn ingest_data(
+        &self,
+        dataset_alias: &DatasetAlias,
+        data: RequestBody,
+        token: &AccessToken,
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -204,21 +252,16 @@ impl KamuApiServerClientExt for KamuApiServerClient {
     async fn create_player_scores_dataset_with_data(&self, token: &AccessToken) -> DatasetId {
         let dataset_id = self.create_player_scores_dataset(token).await;
 
-        self.rest_api_call_assert(
-            Some(token.clone()),
-            Method::POST,
-            "player-scores/ingest",
-            Some(RequestBody::NdJson(
-                indoc::indoc!(
-                    r#"
-                    {"match_time": "2000-01-01", "match_id": 1, "player_id": "Alice", "score": 100}
-                    {"match_time": "2000-01-01", "match_id": 1, "player_id": "Bob", "score": 80}
-                    "#,
-                )
-                .into(),
-            )),
-            StatusCode::OK,
-            None,
+        // TODO: Use the alias from the reply, after fixing the bug:
+        //       https://github.com/kamu-data/kamu-cli/issues/891
+
+        // At the moment, only single-tenant
+        let dataset_alias = DatasetAlias::new(None, DatasetName::new_unchecked("player-scores"));
+
+        self.ingest_data(
+            &dataset_alias,
+            RequestBody::NdJson(DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1.into()),
+            token,
         )
         .await;
 
@@ -228,6 +271,25 @@ impl KamuApiServerClientExt for KamuApiServerClient {
     async fn create_leaderboard(&self, token: &AccessToken) -> DatasetId {
         self.create_dataset(&DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT, token)
             .await
+    }
+
+    async fn ingest_data(
+        &self,
+        dataset_alias: &DatasetAlias,
+        data: RequestBody,
+        token: &AccessToken,
+    ) {
+        let endpoint = format!("{dataset_alias}/ingest");
+
+        self.rest_api_call_assert(
+            Some(token.clone()),
+            Method::POST,
+            endpoint.as_str(),
+            Some(data),
+            StatusCode::OK,
+            None,
+        )
+        .await;
     }
 }
 

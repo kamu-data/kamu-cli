@@ -13,26 +13,14 @@ use kamu_cli_e2e_common::prelude::*;
 
 kamu_cli_execute_command_e2e_test!(
     storage = inmem,
-    fixture = kamu_cli_e2e_repo_tests::test_datafusion_cli,
-    extra_test_groups = "engine, datafusion"
+    fixture = kamu_cli_e2e_repo_tests::test_new_root,
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 kamu_cli_execute_command_e2e_test!(
     storage = inmem,
-    fixture = kamu_cli_e2e_repo_tests::test_datafusion_cli_not_launched_in_root_ws,
-    options = Options::default().with_no_workspace(),
-    extra_test_groups = "engine, datafusion"
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-kamu_cli_execute_command_e2e_test!(
-    storage = inmem,
-    fixture = kamu_cli_e2e_repo_tests::test_sql_command,
-    options = Options::default().with_frozen_system_time(),
-    extra_test_groups = "engine, datafusion"
+    fixture = kamu_cli_e2e_repo_tests::test_new_derivative,
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

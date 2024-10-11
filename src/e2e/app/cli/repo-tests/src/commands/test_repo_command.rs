@@ -87,6 +87,8 @@ pub async fn test_repository_pull_aliases_commands(kamu: KamuCliPuppet) {
     assert!(aliases.is_empty());
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub async fn test_repository_push_aliases_commands(kamu: KamuCliPuppet) {
     kamu.add_dataset(DatasetSnapshot {
         name: "foo".try_into().unwrap(),
