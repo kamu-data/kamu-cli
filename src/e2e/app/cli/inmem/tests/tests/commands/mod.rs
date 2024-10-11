@@ -15,6 +15,7 @@ mod test_ingest_command;
 mod test_init_command;
 mod test_inspect_command;
 mod test_log_command;
+mod test_login_command;
 mod test_new_command;
 mod test_rename_command;
 mod test_repo_command;
