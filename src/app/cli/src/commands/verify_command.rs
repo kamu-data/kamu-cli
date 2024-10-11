@@ -192,14 +192,14 @@ impl VerifyCommand {
 
                 let mut current_missed_dependencies = vec![];
 
-                for dependecy in summary.dependencies {
+                for dependency in summary.dependencies {
                     if self
                         .dataset_repo
-                        .resolve_dataset_ref(&DatasetRef::ID(dependecy.clone()))
+                        .resolve_dataset_ref(&DatasetRef::ID(dependency.clone()))
                         .await
                         .is_err()
                     {
-                        current_missed_dependencies.push(dependecy.to_string());
+                        current_missed_dependencies.push(dependency.to_string());
                     }
                 }
                 if !current_missed_dependencies.is_empty() {
