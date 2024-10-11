@@ -932,21 +932,22 @@ pub async fn test_smart_pull_set_watermark(kamu: KamuCliPuppet) {
         .await
         .success();
 
-    kamu.execute([
-        "pull",
-        dataset_name.as_str(),
-        "--set-watermark",
-        "2000-01-01T00:00:00Z",
-    ])
-    .await
-    .success();
+    let assert = kamu
+        .execute([
+            "pull",
+            dataset_name.as_str(),
+            "--set-watermark",
+            "2000-01-01T00:00:00Z",
+        ])
+        .await
+        .success();
 
-    // let stdout = std::str::from_utf8(&assert.get_output().stdout).unwrap();
+    let stderr = std::str::from_utf8(&assert.get_output().stderr).unwrap();
 
-    // assert!(
-    //     stdout.contains(indoc::indoc!(r#"Committed new block"#).trim()),
-    //     "Unexpected output:\n{stdout}",
-    // );
+    assert!(
+        stderr.contains(indoc::indoc!(r#"Committed new block"#).trim()),
+        "Unexpected output:\n{stderr}",
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

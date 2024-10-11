@@ -152,7 +152,6 @@ impl VerifyCommand {
 
         Ok(self
             .verification_svc
-            .clone()
             .verify_multi(filtered_requests, options, listener)
             .await)
     }
