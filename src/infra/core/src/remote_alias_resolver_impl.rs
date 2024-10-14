@@ -162,14 +162,16 @@ impl RemoteAliasResolver for RemoteAliasResolverImpl {
             .await
             .int_err()?;
         }
-        let transfer_dataset_name = dataset_name.clone().unwrap_or(
+        let transfer_dataset_name = if let Some(dn) = dataset_name.clone() {
+            dn
+        } else {
             self.resolve_remote_dataset_name(
                 local_dataset_handle,
                 &remote_repo.url,
                 access_token_maybe.as_ref(),
             )
-            .await?,
-        );
+            .await?
+        };
 
         let remote_url = self.combine_remote_url(
             &remote_repo.url,
@@ -210,15 +212,15 @@ impl RemoteAliasResolverApiHelper {
         let client = reqwest::Client::new();
         let header_map = Self::build_headers_map(access_token_maybe);
 
-        let workspace_info_response = match client
+        let workspace_info_response = client
             .get(server_backend_url.join("info").unwrap())
             .headers(header_map.clone())
             .send()
             .await
-        {
-            Ok(response) => response,
-            Err(_) => return Ok(None),
-        };
+            .int_err()?;
+        if workspace_info_response.status().is_client_error() {
+            return Ok(None);
+        }
 
         let json_workspace_info_response: serde_json::Value =
             workspace_info_response.json().await.int_err()?;
@@ -229,15 +231,16 @@ impl RemoteAliasResolverApiHelper {
             return Ok(None);
         }
 
-        let account_response = match client
+        let account_response = client
             .get(server_backend_url.join("accounts/me").unwrap())
             .headers(header_map)
             .send()
             .await
-        {
-            Ok(response) => response,
-            Err(_) => return Ok(None),
-        };
+            .int_err()?;
+        if account_response.status().is_client_error() {
+            return Ok(None);
+        }
+
         let json_account_response: serde_json::Value = account_response.json().await.int_err()?;
 
         if let Some(api_account_name) = json_account_response["accountName"].as_str() {
@@ -263,7 +266,7 @@ impl RemoteAliasResolverApiHelper {
         let client = reqwest::Client::new();
         let header_map = Self::build_headers_map(access_token_maybe);
 
-        let response = match client
+        let response = client
             .get(
                 server_backend_url
                     .join(&format!("datasets/{dataset_id}"))
@@ -272,11 +275,9 @@ impl RemoteAliasResolverApiHelper {
             .headers(header_map)
             .send()
             .await
-        {
-            Ok(response) => response,
-            Err(_) => return Ok(None),
-        };
-        if response.status() == http::StatusCode::NOT_FOUND {
+            .int_err()?;
+
+        if response.status().is_client_error() {
             return Ok(None);
         }
         let json_response: serde_json::Value = response.json().await.int_err()?;
