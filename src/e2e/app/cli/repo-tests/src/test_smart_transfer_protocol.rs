@@ -1161,13 +1161,13 @@ pub async fn test_smart_push_pull_s3(mut kamu: KamuCliPuppet) {
         let expected_schema = indoc::indoc!(
             r#"
             message arrow_schema {
-                REQUIRED INT64 offset;
-                REQUIRED INT32 op;
-                REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
-                OPTIONAL INT64 match_time (TIMESTAMP(MILLIS,true));
-                OPTIONAL INT64 match_id;
-                OPTIONAL BYTE_ARRAY player_id (STRING);
-                OPTIONAL INT64 score;
+              REQUIRED INT64 offset;
+              REQUIRED INT32 op;
+              REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
+              OPTIONAL INT64 match_time (TIMESTAMP(MILLIS,true));
+              OPTIONAL INT64 match_id;
+              OPTIONAL BYTE_ARRAY player_id (STRING);
+              OPTIONAL INT64 score;
             }
             "#
         );

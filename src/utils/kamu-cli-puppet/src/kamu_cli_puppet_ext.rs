@@ -67,7 +67,6 @@ impl KamuCliPuppetExt for KamuCliPuppet {
             .success();
 
         let stdout = std::str::from_utf8(&assert.get_output().stdout).unwrap();
-        println!("@@@@@ stdout: {:?}", stdout);
 
         serde_json::from_str(stdout).unwrap()
     }
