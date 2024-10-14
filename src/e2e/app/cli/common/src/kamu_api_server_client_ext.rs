@@ -260,11 +260,6 @@ impl KamuApiServerClientExt for KamuApiServerClient {
         account_name_maybe: Option<AccountName>,
     ) -> DatasetId {
         let dataset_id = self.create_player_scores_dataset(token).await;
-
-        // TODO: Use the alias from the reply, after fixing the bug:
-        //       https://github.com/kamu-data/kamu-cli/issues/891
-
-        // At the moment, only single-tenant
         let dataset_alias = DatasetAlias::new(
             account_name_maybe,
             DatasetName::new_unchecked("player-scores"),

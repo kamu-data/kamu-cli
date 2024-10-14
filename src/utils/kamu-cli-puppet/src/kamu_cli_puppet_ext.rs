@@ -253,6 +253,8 @@ pub struct DatasetRecord {
     #[serde(rename = "ID")]
     pub id: DatasetID,
     pub name: DatasetName,
+    // CLI returns regular ENUM DatasetKind(Root/Derivative) for local datasets
+    // but for remote it is Remote(DatasetKind) type
     pub kind: String,
     pub head: Multihash,
     pub pulled: Option<DateTime<Utc>>,

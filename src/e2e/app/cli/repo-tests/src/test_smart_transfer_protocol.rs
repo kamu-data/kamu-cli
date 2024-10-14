@@ -452,7 +452,7 @@ pub async fn test_smart_push_pull_all(kamu_api_server_client: KamuApiServerClien
     // 2. Pushing datasets to the API server
     {
         kamu_in_push_workspace
-            .set_system_time(Some(DateTime::from_str("2000-01-01T00:00:00Z").unwrap()));
+            .set_system_time(Some(DateTime::from_str("2050-01-02T03:04:05Z").unwrap()));
 
         // 2.1. Add datasets
         {
@@ -566,8 +566,8 @@ pub async fn test_smart_push_pull_all(kamu_api_server_client: KamuApiServerClien
             +--------+----+----------------------+--------------------------+----------+-----------+-------+
             | offset | op | system_time          | match_time               | match_id | player_id | score |
             +--------+----+----------------------+--------------------------+----------+-----------+-------+
-            | 0      | 0  | 2000-01-01T00:00:00Z | 2000-01-01T00:00:00Z     | 1        | Alice     | 100   |
-            | 1      | 0  | 2000-01-01T00:00:00Z | 2000-01-01T00:00:00.001Z | 1        | Bob       | 80    |
+            | 0      | 0  | 2050-01-02T03:04:05Z | 2000-01-01T00:00:00Z     | 1        | Alice     | 100   |
+            | 1      | 0  | 2050-01-02T03:04:05Z | 2000-01-01T00:00:00.001Z | 1        | Bob       | 80    |
             +--------+----+----------------------+--------------------------+----------+-----------+-------+
             "#
         );
@@ -590,8 +590,8 @@ pub async fn test_smart_push_pull_all(kamu_api_server_client: KamuApiServerClien
             +--------+----+----------------------+--------------------------+-------+----------+-----------+-------+
             | offset | op | system_time          | match_time               | place | match_id | player_id | score |
             +--------+----+----------------------+--------------------------+-------+----------+-----------+-------+
-            | 0      | 0  | 2000-01-01T00:00:00Z | 2000-01-01T00:00:00Z     | 1     | 1        | Alice     | 100   |
-            | 1      | 0  | 2000-01-01T00:00:00Z | 2000-01-01T00:00:00.001Z | 2     | 1        | Bob       | 80    |
+            | 0      | 0  | 2050-01-02T03:04:05Z | 2000-01-01T00:00:00Z     | 1     | 1        | Alice     | 100   |
+            | 1      | 0  | 2050-01-02T03:04:05Z | 2000-01-01T00:00:00.001Z | 2     | 1        | Bob       | 80    |
             +--------+----+----------------------+--------------------------+-------+----------+-----------+-------+
             "#
         );
@@ -659,8 +659,8 @@ pub async fn test_smart_push_pull_all(kamu_api_server_client: KamuApiServerClien
             +--------+----+----------------------+--------------------------+----------+-----------+-------+
             | offset | op | system_time          | match_time               | match_id | player_id | score |
             +--------+----+----------------------+--------------------------+----------+-----------+-------+
-            | 2      | 0  | 2000-01-01T00:00:00Z | 2000-01-02T00:00:00Z     | 2        | Alice     | 70    |
-            | 3      | 0  | 2000-01-01T00:00:00Z | 2000-01-02T00:00:00.001Z | 2        | Charlie   | 90    |
+            | 2      | 0  | 2050-01-02T03:04:05Z | 2000-01-02T00:00:00Z     | 2        | Alice     | 70    |
+            | 3      | 0  | 2050-01-02T03:04:05Z | 2000-01-02T00:00:00.001Z | 2        | Charlie   | 90    |
             +--------+----+----------------------+--------------------------+----------+-----------+-------+
             "#
         );
@@ -669,8 +669,8 @@ pub async fn test_smart_push_pull_all(kamu_api_server_client: KamuApiServerClien
             +--------+----+----------------------+--------------------------+-------+----------+-----------+-------+
             | offset | op | system_time          | match_time               | place | match_id | player_id | score |
             +--------+----+----------------------+--------------------------+-------+----------+-----------+-------+
-            | 2      | 1  | 2000-01-01T00:00:00Z | 2000-01-01T00:00:00.001Z | 2     | 1        | Bob       | 80    |
-            | 3      | 0  | 2000-01-01T00:00:00Z | 2000-01-02T00:00:00.001Z | 2     | 2        | Charlie   | 90    |
+            | 2      | 1  | 2050-01-02T03:04:05Z | 2000-01-01T00:00:00.001Z | 2     | 1        | Bob       | 80    |
+            | 3      | 0  | 2050-01-02T03:04:05Z | 2000-01-02T00:00:00.001Z | 2     | 2        | Charlie   | 90    |
             +--------+----+----------------------+--------------------------+-------+----------+-----------+-------+
             "#
         );
@@ -707,7 +707,7 @@ pub async fn test_smart_push_pull_recursive(kamu_api_server_client: KamuApiServe
     // 2. Pushing datasets to the API server
     {
         kamu_in_push_workspace
-            .set_system_time(Some(DateTime::from_str("2000-01-01T00:00:00Z").unwrap()));
+            .set_system_time(Some(DateTime::from_str("2050-01-02T03:04:05Z").unwrap()));
 
         // 2.1. Add datasets
         {
@@ -764,7 +764,7 @@ pub async fn test_smart_push_pull_recursive(kamu_api_server_client: KamuApiServe
     {
         let mut kamu_in_pull_workspace = KamuCliPuppet::new_workspace_tmp().await;
         kamu_in_pull_workspace
-            .set_system_time(Some(DateTime::from_str("2000-01-01T00:00:00Z").unwrap()));
+            .set_system_time(Some(DateTime::from_str("2050-01-02T03:04:05Z").unwrap()));
 
         // Pull datasets one by one and check data
         run_and_assert_command_success(
@@ -807,8 +807,8 @@ pub async fn test_smart_push_pull_recursive(kamu_api_server_client: KamuApiServe
             +--------+----+----------------------+--------------------------+----------+-----------+-------+
             | offset | op | system_time          | match_time               | match_id | player_id | score |
             +--------+----+----------------------+--------------------------+----------+-----------+-------+
-            | 0      | 0  | 2000-01-01T00:00:00Z | 2000-01-01T00:00:00Z     | 1        | Alice     | 100   |
-            | 1      | 0  | 2000-01-01T00:00:00Z | 2000-01-01T00:00:00.001Z | 1        | Bob       | 80    |
+            | 0      | 0  | 2050-01-02T03:04:05Z | 2000-01-01T00:00:00Z     | 1        | Alice     | 100   |
+            | 1      | 0  | 2050-01-02T03:04:05Z | 2000-01-01T00:00:00.001Z | 1        | Bob       | 80    |
             +--------+----+----------------------+--------------------------+----------+-----------+-------+
             "#
         );
@@ -831,8 +831,8 @@ pub async fn test_smart_push_pull_recursive(kamu_api_server_client: KamuApiServe
             +--------+----+----------------------+--------------------------+-------+----------+-----------+-------+
             | offset | op | system_time          | match_time               | place | match_id | player_id | score |
             +--------+----+----------------------+--------------------------+-------+----------+-----------+-------+
-            | 0      | 0  | 2000-01-01T00:00:00Z | 2000-01-01T00:00:00Z     | 1     | 1        | Alice     | 100   |
-            | 1      | 0  | 2000-01-01T00:00:00Z | 2000-01-01T00:00:00.001Z | 2     | 1        | Bob       | 80    |
+            | 0      | 0  | 2050-01-02T03:04:05Z | 2000-01-01T00:00:00Z     | 1     | 1        | Alice     | 100   |
+            | 1      | 0  | 2050-01-02T03:04:05Z | 2000-01-01T00:00:00.001Z | 2     | 1        | Bob       | 80    |
             +--------+----+----------------------+--------------------------+-------+----------+-----------+-------+
             "#
         );
@@ -882,8 +882,8 @@ pub async fn test_smart_push_pull_recursive(kamu_api_server_client: KamuApiServe
             +--------+----+----------------------+--------------------------+----------+-----------+-------+
             | offset | op | system_time          | match_time               | match_id | player_id | score |
             +--------+----+----------------------+--------------------------+----------+-----------+-------+
-            | 2      | 0  | 2000-01-01T00:00:00Z | 2000-01-02T00:00:00Z     | 2        | Alice     | 70    |
-            | 3      | 0  | 2000-01-01T00:00:00Z | 2000-01-02T00:00:00.001Z | 2        | Charlie   | 90    |
+            | 2      | 0  | 2050-01-02T03:04:05Z | 2000-01-02T00:00:00Z     | 2        | Alice     | 70    |
+            | 3      | 0  | 2050-01-02T03:04:05Z | 2000-01-02T00:00:00.001Z | 2        | Charlie   | 90    |
             +--------+----+----------------------+--------------------------+----------+-----------+-------+
             "#
         );
@@ -892,8 +892,8 @@ pub async fn test_smart_push_pull_recursive(kamu_api_server_client: KamuApiServe
             +--------+----+----------------------+--------------------------+-------+----------+-----------+-------+
             | offset | op | system_time          | match_time               | place | match_id | player_id | score |
             +--------+----+----------------------+--------------------------+-------+----------+-----------+-------+
-            | 2      | 1  | 2000-01-01T00:00:00Z | 2000-01-01T00:00:00.001Z | 2     | 1        | Bob       | 80    |
-            | 3      | 0  | 2000-01-01T00:00:00Z | 2000-01-02T00:00:00.001Z | 2     | 2        | Charlie   | 90    |
+            | 2      | 1  | 2050-01-02T03:04:05Z | 2000-01-01T00:00:00.001Z | 2     | 1        | Bob       | 80    |
+            | 3      | 0  | 2050-01-02T03:04:05Z | 2000-01-02T00:00:00.001Z | 2     | 2        | Charlie   | 90    |
             +--------+----+----------------------+--------------------------+-------+----------+-----------+-------+
             "#
         );
@@ -925,7 +925,7 @@ pub async fn test_smart_pull_set_watermark(kamu: KamuCliPuppet) {
             "pull",
             dataset_name.as_str(),
             "--set-watermark",
-            "2000-01-01T00:00:00Z",
+            "2051-01-02T03:04:05Z",
         ])
         .await
         .success();
@@ -940,8 +940,7 @@ pub async fn test_smart_pull_set_watermark(kamu: KamuCliPuppet) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_smart_pull_reset_derivative(mut kamu: KamuCliPuppet) {
-    kamu.set_system_time(Some(DateTime::from_str("2000-01-01T00:00:00Z").unwrap()));
+pub async fn test_smart_pull_reset_derivative(kamu: KamuCliPuppet) {
     let dataset_name = DatasetName::new_unchecked("player-scores");
     let dataset_derivative_name = DatasetName::new_unchecked("leaderboard");
 
@@ -988,8 +987,8 @@ pub async fn test_smart_pull_reset_derivative(mut kamu: KamuCliPuppet) {
         +--------+----+----------------------+--------------------------+-------+----------+-----------+-------+
         | offset | op | system_time          | match_time               | place | match_id | player_id | score |
         +--------+----+----------------------+--------------------------+-------+----------+-----------+-------+
-        | 0      | 0  | 2000-01-01T00:00:00Z | 2000-01-01T00:00:00Z     | 1     | 1        | Alice     | 100   |
-        | 1      | 0  | 2000-01-01T00:00:00Z | 2000-01-01T00:00:00.001Z | 2     | 1        | Bob       | 80    |
+        | 0      | 0  | 2050-01-02T03:04:05Z | 2000-01-01T00:00:00Z     | 1     | 1        | Alice     | 100   |
+        | 1      | 0  | 2050-01-02T03:04:05Z | 2000-01-01T00:00:00.001Z | 2     | 1        | Bob       | 80    |
         +--------+----+----------------------+--------------------------+-------+----------+-----------+-------+
         "#
     );
@@ -1043,8 +1042,8 @@ pub async fn test_smart_pull_reset_derivative(mut kamu: KamuCliPuppet) {
         +--------+----+----------------------+--------------------------+-------+----------+-----------+-------+
         | offset | op | system_time          | match_time               | place | match_id | player_id | score |
         +--------+----+----------------------+--------------------------+-------+----------+-----------+-------+
-        | 0      | 0  | 2000-01-01T00:00:00Z | 2000-01-02T00:00:00Z     | 2     | 2        | Alice     | 70    |
-        | 1      | 0  | 2000-01-01T00:00:00Z | 2000-01-02T00:00:00.001Z | 1     | 2        | Charlie   | 90    |
+        | 0      | 0  | 2050-01-02T03:04:05Z | 2000-01-02T00:00:00Z     | 2     | 2        | Alice     | 70    |
+        | 1      | 0  | 2050-01-02T03:04:05Z | 2000-01-02T00:00:00.001Z | 1     | 2        | Charlie   | 90    |
         +--------+----+----------------------+--------------------------+-------+----------+-----------+-------+
         "#
     );
@@ -1123,8 +1122,7 @@ pub async fn test_smart_push_visibility(kamu_api_server_client: KamuApiServerCli
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_smart_push_pull_s3(mut kamu: KamuCliPuppet) {
-    kamu.set_system_time(Some(DateTime::from_str("2000-01-01T00:00:00Z").unwrap()));
+pub async fn test_smart_push_pull_s3(kamu: KamuCliPuppet) {
     let dataset_name = DatasetName::new_unchecked("player-scores");
 
     kamu.execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
@@ -1176,8 +1174,8 @@ pub async fn test_smart_push_pull_s3(mut kamu: KamuCliPuppet) {
             +--------+----+----------------------+--------------------------+----------+-----------+-------+
             | offset | op | system_time          | match_time               | match_id | player_id | score |
             +--------+----+----------------------+--------------------------+----------+-----------+-------+
-            | 0      | 0  | 2000-01-01T00:00:00Z | 2000-01-01T00:00:00Z     | 1        | Alice     | 100   |
-            | 1      | 0  | 2000-01-01T00:00:00Z | 2000-01-01T00:00:00.001Z | 1        | Bob       | 80    |
+            | 0      | 0  | 2050-01-02T03:04:05Z | 2000-01-01T00:00:00Z     | 1        | Alice     | 100   |
+            | 1      | 0  | 2050-01-02T03:04:05Z | 2000-01-01T00:00:00.001Z | 1        | Bob       | 80    |
             +--------+----+----------------------+--------------------------+----------+-----------+-------+
             "#
         );
@@ -1188,8 +1186,7 @@ pub async fn test_smart_push_pull_s3(mut kamu: KamuCliPuppet) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_smart_pull_derivative(mut kamu: KamuCliPuppet) {
-    kamu.set_system_time(Some(DateTime::from_str("2000-01-01T00:00:00Z").unwrap()));
+pub async fn test_smart_pull_derivative(kamu: KamuCliPuppet) {
     let dataset_name = DatasetName::new_unchecked("player-scores");
     let dataset_derivative_name = DatasetName::new_unchecked("leaderboard");
 
@@ -1249,8 +1246,8 @@ pub async fn test_smart_pull_derivative(mut kamu: KamuCliPuppet) {
         +--------+----+----------------------+--------------------------+-------+----------+-----------+-------+
         | offset | op | system_time          | match_time               | place | match_id | player_id | score |
         +--------+----+----------------------+--------------------------+-------+----------+-----------+-------+
-        | 0      | 0  | 2000-01-01T00:00:00Z | 2000-01-01T00:00:00Z     | 1     | 1        | Alice     | 100   |
-        | 1      | 0  | 2000-01-01T00:00:00Z | 2000-01-01T00:00:00.001Z | 2     | 1        | Bob       | 80    |
+        | 0      | 0  | 2050-01-02T03:04:05Z | 2000-01-01T00:00:00Z     | 1     | 1        | Alice     | 100   |
+        | 1      | 0  | 2050-01-02T03:04:05Z | 2000-01-01T00:00:00.001Z | 2     | 1        | Bob       | 80    |
         +--------+----+----------------------+--------------------------+-------+----------+-----------+-------+
         "#
     );

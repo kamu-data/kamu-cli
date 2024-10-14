@@ -83,6 +83,7 @@ kamu_cli_run_api_server_e2e_test!(
 kamu_cli_execute_command_e2e_test!(
     storage = inmem,
     fixture = kamu_cli_e2e_repo_tests::test_smart_pull_set_watermark,
+    options = Options::default().with_frozen_system_time(),
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -90,6 +91,7 @@ kamu_cli_execute_command_e2e_test!(
 kamu_cli_execute_command_e2e_test!(
     storage = inmem,
     fixture = kamu_cli_e2e_repo_tests::test_smart_pull_reset_derivative,
+    options = Options::default().with_frozen_system_time(),
     extra_test_groups = "containerized, engine, ingest, transform, datafusion"
 );
 
@@ -109,6 +111,7 @@ kamu_cli_run_api_server_e2e_test!(
 kamu_cli_execute_command_e2e_test!(
     storage = inmem,
     fixture = kamu_cli_e2e_repo_tests::test_smart_push_pull_s3,
+    options = Options::default().with_frozen_system_time(),
     extra_test_groups = "containerized, engine, ingest, datafusion"
 );
 
@@ -117,6 +120,7 @@ kamu_cli_execute_command_e2e_test!(
 kamu_cli_execute_command_e2e_test!(
     storage = inmem,
     fixture = kamu_cli_e2e_repo_tests::test_smart_pull_derivative,
+    options = Options::default().with_frozen_system_time(),
     extra_test_groups = "containerized, engine, ingest, transform, datafusion"
 );
 
