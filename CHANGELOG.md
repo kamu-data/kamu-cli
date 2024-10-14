@@ -31,6 +31,8 @@ Recommendation: for ease of reading, use the following order:
   - `kamu tail` command
   - `kamu login` command
   - `kamu logout` command
+  - `kamu push` command
+  - `kamu pull` command
 - E2E: HTTP middleware is implemented, which improves stability of E2E tests 
 
 ## [0.205.0] - 2024-10-15
