@@ -9,7 +9,11 @@
 
 use std::assert_matches::assert_matches;
 
-use kamu_cli_e2e_common::DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR;
+use kamu_cli_e2e_common::{
+    DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
+    DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_2,
+    DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
+};
 use kamu_cli_puppet::extensions::KamuCliPuppetExt;
 use kamu_cli_puppet::KamuCliPuppet;
 use opendatafabric::{DatasetName, MetadataEvent};
@@ -23,20 +27,16 @@ pub async fn test_compact_hard(kamu: KamuCliPuppet) {
         .await
         .success();
 
-    let data = indoc::indoc!(
-        r#"
-            {"match_time": "2000-01-01", "match_id": 2, "player_id": "Bob", "score": 90}
-        "#,
-    );
-
-    kamu.ingest_data(&dataset_name, data).await;
-    let data = indoc::indoc!(
-        r#"
-            {"match_time": "2000-01-01", "match_id": 1, "player_id": "Alice", "score": 90}
-        "#,
-    );
-
-    kamu.ingest_data(&dataset_name, data).await;
+    kamu.ingest_data(
+        &dataset_name,
+        DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
+    )
+    .await;
+    kamu.ingest_data(
+        &dataset_name,
+        DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_2,
+    )
+    .await;
 
     let blocks_before_compacting = kamu.list_blocks(&dataset_name).await;
 
@@ -82,20 +82,16 @@ pub async fn test_compact_keep_metadata_only(kamu: KamuCliPuppet) {
         .await
         .success();
 
-    let data = indoc::indoc!(
-        r#"
-            {"match_time": "2000-01-01", "match_id": 2, "player_id": "Bob", "score": 90}
-        "#,
-    );
-
-    kamu.ingest_data(&dataset_name, data).await;
-    let data = indoc::indoc!(
-        r#"
-            {"match_time": "2000-01-01", "match_id": 1, "player_id": "Alice", "score": 90}
-        "#,
-    );
-
-    kamu.ingest_data(&dataset_name, data).await;
+    kamu.ingest_data(
+        &dataset_name,
+        DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
+    )
+    .await;
+    kamu.ingest_data(
+        &dataset_name,
+        DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_2,
+    )
+    .await;
 
     let blocks_before_compacting = kamu.list_blocks(&dataset_name).await;
 
@@ -142,20 +138,16 @@ pub async fn test_compact_verify(kamu: KamuCliPuppet) {
         .await
         .success();
 
-    let data = indoc::indoc!(
-        r#"
-            {"match_time": "2000-01-01", "match_id": 2, "player_id": "Bob", "score": 90}
-        "#,
-    );
-
-    kamu.ingest_data(&dataset_name, data).await;
-    let data = indoc::indoc!(
-        r#"
-            {"match_time": "2000-01-01", "match_id": 1, "player_id": "Alice", "score": 90}
-        "#,
-    );
-
-    kamu.ingest_data(&dataset_name, data).await;
+    kamu.ingest_data(
+        &dataset_name,
+        DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
+    )
+    .await;
+    kamu.ingest_data(
+        &dataset_name,
+        DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_2,
+    )
+    .await;
 
     let blocks_before_compacting = kamu.list_blocks(&dataset_name).await;
 

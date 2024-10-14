@@ -14,15 +14,10 @@ use std::path::PathBuf;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use datafusion::prelude::{ParquetReadOptions, SessionContext};
-use opendatafabric::serde::yaml::{
-    DatasetKindDef,
-    YamlDatasetSnapshotSerializer,
-    YamlMetadataBlockDeserializer,
-};
+use opendatafabric::serde::yaml::{YamlDatasetSnapshotSerializer, YamlMetadataBlockDeserializer};
 use opendatafabric::serde::{DatasetSnapshotSerializer, MetadataBlockDeserializer};
 use opendatafabric::{
     DatasetID,
-    DatasetKind,
     DatasetName,
     DatasetRef,
     DatasetSnapshot,
@@ -51,8 +46,6 @@ pub trait KamuCliPuppetExt {
     where
         T: Into<String> + Send;
 
-    async fn list_blocks(&self, dataset_name: &DatasetName) -> Vec<BlockRecord>;
-
     async fn start_api_server(self, e2e_data_file_path: PathBuf) -> ServerOutput;
 
     async fn assert_last_data_slice(
@@ -74,6 +67,7 @@ impl KamuCliPuppetExt for KamuCliPuppet {
             .success();
 
         let stdout = std::str::from_utf8(&assert.get_output().stdout).unwrap();
+        println!("@@@@@ stdout: {:?}", stdout);
 
         serde_json::from_str(stdout).unwrap()
     }
@@ -243,43 +237,6 @@ impl KamuCliPuppetExt for KamuCliPuppet {
             .await
             .success();
     }
-
-    async fn list_blocks(&self, dataset_name: &DatasetName) -> Vec<BlockRecord> {
-        let assert = self
-            .execute(["log", dataset_name.as_str(), "--output-format", "yaml"])
-            .await
-            .success();
-
-        let stdout = std::str::from_utf8(&assert.get_output().stdout).unwrap();
-
-        // TODO: Don't parse the output, after implementation:
-        //       `kamu log`: support `--output-format json`
-        //       https://github.com/kamu-data/kamu-cli/issues/887
-
-        stdout
-            .split("---")
-            .skip(1)
-            .map(str::trim)
-            .map(|block_data| {
-                let Some(pos) = block_data.find('\n') else {
-                    unreachable!()
-                };
-                let (first_line_with_block_hash, metadata_block_str) = block_data.split_at(pos);
-
-                let block_hash = first_line_with_block_hash
-                    .strip_prefix("# Block: ")
-                    .unwrap();
-                let block = YamlMetadataBlockDeserializer {}
-                    .read_manifest(metadata_block_str.as_ref())
-                    .unwrap();
-
-                BlockRecord {
-                    block_hash: Multihash::from_multibase(block_hash).unwrap(),
-                    block,
-                }
-            })
-            .collect()
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -297,8 +254,7 @@ pub struct DatasetRecord {
     #[serde(rename = "ID")]
     pub id: DatasetID,
     pub name: DatasetName,
-    #[serde(with = "DatasetKindDef")]
-    pub kind: DatasetKind,
+    pub kind: String,
     pub head: Multihash,
     pub pulled: Option<DateTime<Utc>>,
     pub records: usize,
