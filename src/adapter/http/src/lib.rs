@@ -18,6 +18,7 @@ mod access_token;
 pub use access_token::*;
 mod axum_utils;
 pub mod data;
+#[cfg(feature = "e2e")]
 pub mod e2e;
 mod simple_protocol;
 pub mod smart_protocol;

@@ -5372,6 +5372,7 @@ dependencies = [
  "futures",
  "headers",
  "http 1.1.0",
+ "http-body-util",
  "http-common",
  "hyper 1.4.1",
  "indoc 2.0.5",
