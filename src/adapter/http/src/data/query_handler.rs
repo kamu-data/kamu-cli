@@ -143,7 +143,7 @@ pub(crate) async fn query_handler_post_v2(
             },
         })
     } else {
-        Err(ApiError::not_implemented(ResponseSigningNotCongigured))?
+        Err(ApiError::not_implemented(ResponseSigningNotConfigured))?
     };
 
     Ok(Json(response))
@@ -223,4 +223,4 @@ pub async fn query_handler(
 
 #[derive(Debug, thiserror::Error)]
 #[error("Response signing is not enabled by the node operator")]
-struct ResponseSigningNotCongigured;
+struct ResponseSigningNotConfigured;
