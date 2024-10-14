@@ -74,12 +74,12 @@ impl PushServiceImpl {
 
         match self
             .remote_alias_resolver
-            .resolve_remote_alias(&local_handle, push_target.clone(), RemoteAliasKind::Push)
+            .resolve_push_target(&local_handle, push_target.clone())
             .await
         {
-            Ok(remote_alias_ref) => Ok(PushItem {
+            Ok(remote_target) => Ok(PushItem {
                 local_handle,
-                remote_alias_ref,
+                remote_target,
                 push_target: push_target.clone(),
             }),
             Err(e) => Err(PushResponse {
@@ -119,7 +119,7 @@ impl PushService for PushServiceImpl {
                 plan.iter()
                     .map(|pi| SyncRequest {
                         src: pi.local_handle.as_any_ref(),
-                        dst: (&pi.remote_alias_ref.url).into(),
+                        dst: (&pi.remote_target.url).into(),
                     })
                     .collect(),
                 options.sync_options,
@@ -131,7 +131,7 @@ impl PushService for PushServiceImpl {
 
         let results: Vec<_> = std::iter::zip(&plan, sync_results)
             .map(|(pi, res)| {
-                let remote_ref: DatasetRefAny = (&pi.remote_alias_ref.url).into();
+                let remote_ref: DatasetRefAny = (&pi.remote_target.url).into();
                 assert_eq!(pi.local_handle.as_any_ref(), res.src);
                 assert_eq!(remote_ref, res.dst);
                 pi.as_response(res.result)
@@ -147,7 +147,7 @@ impl PushService for PushServiceImpl {
                     .await
                     .unwrap()
                     .add(
-                        &((&push_item.remote_alias_ref.url).into()),
+                        &((&push_item.remote_target.url).into()),
                         RemoteAliasKind::Push,
                     )
                     .await
@@ -162,7 +162,7 @@ impl PushService for PushServiceImpl {
 #[derive(Debug)]
 struct PushItem {
     local_handle: DatasetHandle,
-    remote_alias_ref: RemoteAliasRef,
+    remote_target: RemoteTarget,
     push_target: Option<DatasetPushTarget>,
 }
 

@@ -55,7 +55,7 @@ async fn test_get_dataset_info_by_id() {
             json!({
                 "id": create_result.dataset_handle.id,
                 "datasetName": create_result.dataset_handle.alias.dataset_name,
-                "accountName": create_result.dataset_handle.alias.account_name,
+                "owner": create_result.dataset_handle.alias.account_name,
             })
         );
     };

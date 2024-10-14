@@ -110,12 +110,11 @@ impl RemoteAliasResolverImpl {
 
 #[async_trait::async_trait]
 impl RemoteAliasResolver for RemoteAliasResolverImpl {
-    async fn resolve_remote_alias(
+    async fn resolve_push_target(
         &self,
         local_dataset_handle: &odf::DatasetHandle,
         dataset_push_target_maybe: Option<odf::DatasetPushTarget>,
-        remote_alias_kind: RemoteAliasKind,
-    ) -> Result<RemoteAliasRef, ResolveAliasError> {
+    ) -> Result<RemoteTarget, ResolveAliasError> {
         let repo_name: odf::RepoName;
         let mut account_name = None;
         let mut dataset_name = None;
@@ -128,7 +127,7 @@ impl RemoteAliasResolver for RemoteAliasResolverImpl {
                     dataset_name = Some(dataset_alias_remote.dataset_name.clone());
                 }
                 odf::DatasetPushTarget::Url(url_ref) => {
-                    return Ok(RemoteAliasRef::new(
+                    return Ok(RemoteTarget::new(
                         url_ref.clone(),
                         None,
                         dataset_name,
@@ -141,10 +140,10 @@ impl RemoteAliasResolver for RemoteAliasResolverImpl {
             }
         } else {
             if let Some(remote_url) = self
-                .fetch_remote_url(local_dataset_handle, remote_alias_kind)
+                .fetch_remote_url(local_dataset_handle, RemoteAliasKind::Push)
                 .await?
             {
-                return Ok(RemoteAliasRef::new(
+                return Ok(RemoteTarget::new(
                     remote_url,
                     None,
                     dataset_name,
@@ -189,7 +188,7 @@ impl RemoteAliasResolver for RemoteAliasResolverImpl {
             &transfer_dataset_name,
         )?;
 
-        return Ok(RemoteAliasRef::new(
+        return Ok(RemoteTarget::new(
             remote_url,
             Some(repo_name),
             dataset_name,

@@ -21,8 +21,9 @@ use axum::response::Json;
 use database_common_macros::transactional_handler;
 use dill::Catalog;
 use http_common::*;
+use kamu_accounts::AuthenticationService;
 use kamu_core::{DatasetRepository, GetDatasetError};
-use opendatafabric::{AccountName, DatasetHandle, DatasetID, DatasetName};
+use opendatafabric::{AccountID, AccountName, DatasetHandle, DatasetID, DatasetName};
 
 use crate::axum_utils::ensure_authenticated_account;
 
@@ -30,18 +31,31 @@ use crate::axum_utils::ensure_authenticated_account;
 
 #[derive(Debug, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct DatasetOwnerInfo {
+    pub account_name: AccountName,
+    pub account_id: Option<AccountID>,
+}
+
+#[derive(Debug, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct DatasetInfoResponse {
     pub id: DatasetID,
-    pub account_name: Option<AccountName>,
+    pub owner: Option<DatasetOwnerInfo>,
     pub dataset_name: DatasetName,
 }
 
-impl From<DatasetHandle> for DatasetInfoResponse {
-    fn from(value: DatasetHandle) -> Self {
+impl DatasetInfoResponse {
+    fn into_response(dataset_handle: DatasetHandle, account_id_maybe: Option<AccountID>) -> Self {
         Self {
-            id: value.id,
-            account_name: value.alias.account_name,
-            dataset_name: value.alias.dataset_name,
+            id: dataset_handle.id,
+            owner: dataset_handle
+                .alias
+                .account_name
+                .map(|account_name| DatasetOwnerInfo {
+                    account_name,
+                    account_id: account_id_maybe,
+                }),
+            dataset_name: dataset_handle.alias.dataset_name,
         }
     }
 }
@@ -73,7 +87,20 @@ async fn get_dataset_by_id(
             GetDatasetError::Internal(e) => e.api_err(),
         })?;
 
-    Ok(Json(dataset_handle.into()))
+    let account_id = if let Some(account_name) = dataset_handle.alias.account_name.as_ref() {
+        let auth_service = catalog.get_one::<dyn AuthenticationService>().unwrap();
+        auth_service
+            .account_by_name(account_name)
+            .await?
+            .map(|account| account.id)
+    } else {
+        None
+    };
+
+    Ok(Json(DatasetInfoResponse::into_response(
+        dataset_handle,
+        account_id,
+    )))
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

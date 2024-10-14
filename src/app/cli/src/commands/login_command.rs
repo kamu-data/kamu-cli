@@ -75,15 +75,14 @@ impl LoginCommand {
             odf_server_backend_url,
             access_token.to_string(),
         )?;
-        self.add_repository(odf_server_backend_url, odf_server_backend_url)?;
+        if !self.skip_add_repo {
+            self.add_repository(odf_server_backend_url, odf_server_backend_url)?;
+        }
 
         Ok(())
     }
 
     fn add_repository(&self, frontend_url: &Url, backend_url: &Url) -> Result<(), CLIError> {
-        if self.skip_add_repo {
-            return Ok(());
-        }
         let repo_name = self.repo_name.clone().unwrap_or(
             RepoName::try_from(frontend_url.host_str().unwrap()).map_err(CLIError::failure)?,
         );
@@ -116,10 +115,12 @@ impl LoginCommand {
             login_callback_response.access_token,
         )?;
 
-        self.add_repository(
-            &odf_server_frontend_url,
-            &login_callback_response.backend_url,
-        )?;
+        if !self.skip_add_repo {
+            self.add_repository(
+                &odf_server_frontend_url,
+                &login_callback_response.backend_url,
+            )?;
+        }
 
         eprintln!(
             "{}: {}",
