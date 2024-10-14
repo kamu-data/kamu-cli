@@ -115,27 +115,20 @@ impl RemoteAliasResolver for RemoteAliasResolverImpl {
         local_dataset_handle: &odf::DatasetHandle,
         dataset_push_target_maybe: Option<odf::DatasetPushTarget>,
     ) -> Result<RemoteTarget, ResolveAliasError> {
-        let repo_name: odf::RepoName;
-        let mut account_name = None;
-        let mut dataset_name = None;
-
-        if let Some(dataset_push_target) = &dataset_push_target_maybe {
+        let (repo_name, mut account_name, dataset_name) = if let Some(dataset_push_target) =
+            &dataset_push_target_maybe
+        {
             match dataset_push_target {
-                odf::DatasetPushTarget::Alias(dataset_alias_remote) => {
-                    repo_name = dataset_alias_remote.repo_name.clone();
-                    account_name.clone_from(&dataset_alias_remote.account_name);
-                    dataset_name = Some(dataset_alias_remote.dataset_name.clone());
-                }
+                odf::DatasetPushTarget::Alias(dataset_alias_remote) => (
+                    dataset_alias_remote.repo_name.clone(),
+                    dataset_alias_remote.account_name.clone(),
+                    Some(dataset_alias_remote.dataset_name.clone()),
+                ),
                 odf::DatasetPushTarget::Url(url_ref) => {
-                    return Ok(RemoteTarget::new(
-                        url_ref.clone(),
-                        None,
-                        dataset_name,
-                        account_name,
-                    ));
+                    return Ok(RemoteTarget::new(url_ref.clone(), None, None, None));
                 }
                 odf::DatasetPushTarget::Repository(repository_name) => {
-                    repo_name = repository_name.clone();
+                    (repository_name.clone(), None, None)
                 }
             }
         } else {
@@ -143,24 +136,20 @@ impl RemoteAliasResolver for RemoteAliasResolverImpl {
                 .fetch_remote_url(local_dataset_handle, RemoteAliasKind::Push)
                 .await?
             {
-                return Ok(RemoteTarget::new(
-                    remote_url,
-                    None,
-                    dataset_name,
-                    account_name,
-                ));
+                return Ok(RemoteTarget::new(remote_url, None, None, None));
             }
             let remote_repo_names: Vec<_> = self.remote_repo_reg.get_all_repositories().collect();
             if remote_repo_names.len() > 1 {
                 return Err(ResolveAliasError::AmbiguousRepository);
             }
             if let Some(repository_name) = remote_repo_names.first() {
-                repo_name = repository_name.clone();
+                (repository_name.clone(), None, None)
             } else {
                 return Err(ResolveAliasError::EmptyRepositoryList);
             }
-        }
-        let remote_repo = self.remote_repo_reg.get_repository(&repo_name).int_err()?;
+        };
+
+        let remote_repo = self.remote_repo_reg.get_repository(&repo_name)?;
 
         let access_token_maybe = self
             .access_token_resolver
@@ -221,14 +210,16 @@ impl RemoteAliasResolverApiHelper {
         let client = reqwest::Client::new();
         let header_map = Self::build_headers_map(access_token_maybe);
 
-        let workspace_info_response = client
+        let workspace_info_response = match client
             .get(server_backend_url.join("info").unwrap())
             .headers(header_map.clone())
             .send()
             .await
-            .int_err()?
-            .error_for_status()
-            .int_err()?;
+        {
+            Ok(response) => response,
+            Err(_) => return Ok(None),
+        };
+
         let json_workspace_info_response: serde_json::Value =
             workspace_info_response.json().await.int_err()?;
 
@@ -238,14 +229,15 @@ impl RemoteAliasResolverApiHelper {
             return Ok(None);
         }
 
-        let account_response = client
+        let account_response = match client
             .get(server_backend_url.join("accounts/me").unwrap())
             .headers(header_map)
             .send()
             .await
-            .int_err()?
-            .error_for_status()
-            .int_err()?;
+        {
+            Ok(response) => response,
+            Err(_) => return Ok(None),
+        };
         let json_account_response: serde_json::Value = account_response.json().await.int_err()?;
 
         if let Some(api_account_name) = json_account_response["accountName"].as_str() {
@@ -271,7 +263,7 @@ impl RemoteAliasResolverApiHelper {
         let client = reqwest::Client::new();
         let header_map = Self::build_headers_map(access_token_maybe);
 
-        let response = client
+        let response = match client
             .get(
                 server_backend_url
                     .join(&format!("datasets/{dataset_id}"))
@@ -280,7 +272,10 @@ impl RemoteAliasResolverApiHelper {
             .headers(header_map)
             .send()
             .await
-            .int_err()?;
+        {
+            Ok(response) => response,
+            Err(_) => return Ok(None),
+        };
         if response.status() == http::StatusCode::NOT_FOUND {
             return Ok(None);
         }

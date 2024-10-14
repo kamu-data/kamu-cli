@@ -109,6 +109,15 @@ pub enum ResolveAliasError {
     ),
 }
 
+impl From<GetRepoError> for ResolveAliasError {
+    fn from(val: GetRepoError) -> Self {
+        match val {
+            GetRepoError::NotFound(err) => Self::RepositoryNotFound(err),
+            GetRepoError::Internal(err) => Self::Internal(err),
+        }
+    }
+}
+
 impl From<ResolveAliasError> for PushError {
     fn from(val: ResolveAliasError) -> Self {
         match val {

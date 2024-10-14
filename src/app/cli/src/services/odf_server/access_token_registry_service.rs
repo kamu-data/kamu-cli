@@ -261,10 +261,12 @@ impl kamu::domain::auth::OdfServerAccessTokenResolver for AccessTokenRegistrySer
         assert!(!odf_dataset_http_url.scheme().starts_with("odf+"));
 
         let origin = odf_dataset_http_url.origin().unicode_serialization();
-        let odf_server_backend_url = Url::parse(origin.as_str()).unwrap();
-
-        self.find_by_backend_url(&odf_server_backend_url)
-            .map(|token_report| token_report.access_token.access_token)
+        if let Ok(odf_server_backend_url) = Url::parse(origin.as_str()) {
+            return self
+                .find_by_backend_url(&odf_server_backend_url)
+                .map(|token_report| token_report.access_token.access_token);
+        }
+        None
     }
 }
 
