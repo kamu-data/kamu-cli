@@ -17,7 +17,7 @@ pub async fn test_get_dataset_list_flows(kamu_api_server_client: KamuApiServerCl
     let token = kamu_api_server_client.login_as_kamu().await;
 
     let dataset_id = kamu_api_server_client
-        .create_player_scores_dataset_with_data(&token)
+        .create_player_scores_dataset_with_data(&token, None)
         .await;
 
     // The query is almost identical to kamu-web-ui, for ease of later edits.
@@ -88,7 +88,7 @@ pub async fn test_dataset_all_flows_paused(kamu_api_server_client: KamuApiServer
     let token = kamu_api_server_client.login_as_kamu().await;
 
     let dataset_id = kamu_api_server_client
-        .create_player_scores_dataset_with_data(&token)
+        .create_player_scores_dataset_with_data(&token, None)
         .await;
 
     // The query is almost identical to kamu-web-ui, for ease of later edits.
@@ -147,7 +147,7 @@ pub async fn test_dataset_flows_initiators(kamu_api_server_client: KamuApiServer
     let token = kamu_api_server_client.login_as_kamu().await;
 
     let dataset_id = kamu_api_server_client
-        .create_player_scores_dataset_with_data(&token)
+        .create_player_scores_dataset_with_data(&token, None)
         .await;
 
     // The query is almost identical to kamu-web-ui, for ease of later edits.
@@ -228,7 +228,7 @@ pub async fn test_dataset_trigger_flow(kamu_api_server_client: KamuApiServerClie
     let token = kamu_api_server_client.login_as_kamu().await;
 
     let _root_dataset_id = kamu_api_server_client
-        .create_player_scores_dataset_with_data(&token)
+        .create_player_scores_dataset_with_data(&token, None)
         .await;
 
     let derivative_dataset_id = kamu_api_server_client.create_leaderboard(&token).await;

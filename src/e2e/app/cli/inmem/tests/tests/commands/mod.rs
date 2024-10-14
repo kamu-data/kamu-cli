@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 mod test_add_command;
+mod test_compact_command;
 mod test_complete_command;
 mod test_config_command;
 mod test_delete_command;
@@ -28,3 +29,4 @@ mod test_system_gc_command;
 mod test_system_generate_token_command;
 mod test_system_info_command;
 mod test_tail_command;
+mod test_verify_command;

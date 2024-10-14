@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 mod test_add_command;
+mod test_compact_command;
 mod test_complete_command;
 mod test_config_command;
 mod test_delete_command;
@@ -28,8 +29,10 @@ mod test_system_generate_token_command;
 mod test_system_info_command;
 mod test_system_info_diagnose;
 mod test_tail_command;
+mod test_verify_command;
 
 pub use test_add_command::*;
+pub use test_compact_command::*;
 pub use test_complete_command::*;
 pub use test_config_command::*;
 pub use test_delete_command::*;
@@ -50,3 +53,4 @@ pub use test_system_generate_token_command::*;
 pub use test_system_info_command::*;
 pub use test_system_info_diagnose::*;
 pub use test_tail_command::*;
+pub use test_verify_command::*;
