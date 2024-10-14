@@ -11,14 +11,8 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## [0.205.0] - 2024-10-15
-### Changed
-- `kamu push <dataset>` command now can be called without `--to` reference and Alias or Remote dataset repository will be used as destination
-- `kamu login` command now will store repository to Repository registry. Name can be provided with `--repo-name` flag and to skip creating repo can be used `--skip-add-repo` flag
-
-## [0.204.5] - 2024-10-08
+## [Unreleased]
 ### Added
-- Postgres implementation for dataset entry and account Re-BAC repositories
 - Added (or expanded) E2E tests for:
   - `kamu config` command
   - `kamu init` command
@@ -38,6 +32,15 @@ Recommendation: for ease of reading, use the following order:
   - `kamu login` command
   - `kamu logout` command
 - E2E: HTTP middleware is implemented, which improves stability of E2E tests 
+
+## [0.205.0] - 2024-10-15
+### Changed
+- `kamu push <dataset>` command now can be called without `--to` reference and Alias or Remote dataset repository will be used as destination
+- `kamu login` command now will store repository to Repository registry. Name can be provided with `--repo-name` flag and to skip creating repo can be used `--skip-add-repo` flag
+
+## [0.204.5] - 2024-10-08
+### Added
+- Postgres implementation for dataset entry and account Re-BAC repositories
 ### Changed
 - `kamu repo alias list`: added JSON output alongside with other formats mentioned in the command's help
 - Private Datasets, `DatasetEntry` integration that will allow us to build dataset indexing
