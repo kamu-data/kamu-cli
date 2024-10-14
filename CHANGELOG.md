@@ -33,7 +33,9 @@ Recommendation: for ease of reading, use the following order:
   - `kamu logout` command
   - `kamu push` command
   - `kamu pull` command
-- E2E: HTTP middleware is implemented, which improves stability of E2E tests 
+- E2E: HTTP middleware is implemented, which improves stability of E2E tests
+### Fixed
+- `kamu add`: fixed behavior when using `--stdin` and `--name` arguments
 
 ## [0.204.5] - 2024-10-08
 ### Added
