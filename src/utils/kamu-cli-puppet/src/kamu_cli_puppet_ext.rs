@@ -226,13 +226,7 @@ impl KamuCliPuppetExt for KamuCliPuppet {
     }
 
     async fn ingest_data(&self, dataset_name: &DatasetName, data: &str) {
-        let dataset_data_path = self
-            .workspace_path()
-            .join(format!("{dataset_name}.data.ndjson"));
-
-        std::fs::write(dataset_data_path.clone(), data).unwrap();
-
-        self.execute(["ingest", dataset_name, dataset_data_path.to_str().unwrap()])
+        self.execute_with_input(["ingest", dataset_name, "--stdin"], data)
             .await
             .success();
     }
