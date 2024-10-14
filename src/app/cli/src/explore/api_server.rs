@@ -14,7 +14,7 @@ use std::path::PathBuf;
 use std::pin::Pin;
 use std::sync::Arc;
 
-use axum::Extension;
+use axum::{middleware, Extension};
 use database_common_macros::transactional_handler;
 use dill::{Catalog, CatalogBuilder};
 use http_common::ApiError;
@@ -94,6 +94,8 @@ impl APIServer {
         let mut app = axum::Router::new()
             .route("/", axum::routing::get(root))
             .route(
+                // IMPORTANT: The same name is used inside e2e_middleware_fn().
+                //            If there is a need to change, please update there too.
                 "/graphql",
                 axum::routing::get(graphql_playground_handler).post(graphql_handler),
             )
@@ -134,7 +136,17 @@ impl APIServer {
                         .nest("/", kamu_adapter_http::data::dataset_router()),
                     multi_tenant_workspace,
                 ),
-            )
+            );
+
+        let is_e2e_testing = e2e_output_data_path.is_some();
+
+        if is_e2e_testing {
+            app = app.layer(middleware::from_fn(
+                kamu_adapter_http::e2e::e2e_middleware_fn,
+            ));
+        }
+
+        app = app
             .layer(kamu_adapter_http::AuthenticationLayer::new())
             .layer(
                 tower_http::cors::CorsLayer::new()
@@ -156,7 +168,6 @@ impl APIServer {
             .layer(Extension(gql_schema))
             .layer(Extension(api_server_catalog));
 
-        let is_e2e_testing = e2e_output_data_path.is_some();
         let maybe_shutdown_notify = if is_e2e_testing {
             let shutdown_notify = Arc::new(Notify::new());
 
