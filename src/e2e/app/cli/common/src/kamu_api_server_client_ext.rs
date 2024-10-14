@@ -9,7 +9,7 @@
 
 use async_trait::async_trait;
 use lazy_static::lazy_static;
-use opendatafabric::{DatasetAlias, DatasetName};
+use opendatafabric::{AccountName, DatasetAlias, DatasetName};
 use reqwest::{Method, StatusCode};
 
 use crate::{KamuApiServerClient, RequestBody};
@@ -134,6 +134,8 @@ pub const DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_3: &str = indoc::i
     "#
 );
 
+pub const E2E_USER_ACCOUNT_NAME_STR: &str = "e2e-user";
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub type AccessToken = String;
@@ -153,8 +155,11 @@ pub trait KamuApiServerClientExt {
 
     async fn create_player_scores_dataset(&self, token: &AccessToken) -> DatasetId;
 
-    /// NOTE: only for single-tenant workspaces
-    async fn create_player_scores_dataset_with_data(&self, token: &AccessToken) -> DatasetId;
+    async fn create_player_scores_dataset_with_data(
+        &self,
+        token: &AccessToken,
+        account_name_maybe: Option<AccountName>,
+    ) -> DatasetId;
 
     async fn create_leaderboard(&self, token: &AccessToken) -> DatasetId;
 
@@ -249,14 +254,19 @@ impl KamuApiServerClientExt for KamuApiServerClient {
             .await
     }
 
-    async fn create_player_scores_dataset_with_data(&self, token: &AccessToken) -> DatasetId {
+    async fn create_player_scores_dataset_with_data(
+        &self,
+        token: &AccessToken,
+        account_name_maybe: Option<AccountName>,
+    ) -> DatasetId {
         let dataset_id = self.create_player_scores_dataset(token).await;
 
         // TODO: Use the alias from the reply, after fixing the bug:
         //       https://github.com/kamu-data/kamu-cli/issues/891
-
-        // At the moment, only single-tenant
-        let dataset_alias = DatasetAlias::new(None, DatasetName::new_unchecked("player-scores"));
+        let dataset_alias = DatasetAlias::new(
+            account_name_maybe,
+            DatasetName::new_unchecked("player-scores"),
+        );
 
         self.ingest_data(
             &dataset_alias,

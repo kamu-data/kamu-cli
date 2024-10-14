@@ -14,15 +14,10 @@ use std::path::PathBuf;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use datafusion::prelude::{ParquetReadOptions, SessionContext};
-use opendatafabric::serde::yaml::{
-    DatasetKindDef,
-    YamlDatasetSnapshotSerializer,
-    YamlMetadataBlockDeserializer,
-};
+use opendatafabric::serde::yaml::{YamlDatasetSnapshotSerializer, YamlMetadataBlockDeserializer};
 use opendatafabric::serde::{DatasetSnapshotSerializer, MetadataBlockDeserializer};
 use opendatafabric::{
     DatasetID,
-    DatasetKind,
     DatasetName,
     DatasetRef,
     DatasetSnapshot,
@@ -41,13 +36,15 @@ pub trait KamuCliPuppetExt {
 
     async fn add_dataset(&self, dataset_snapshot: DatasetSnapshot);
 
+    async fn list_blocks(&self, dataset_name: &DatasetName) -> Vec<BlockRecord>;
+
+    async fn ingest_data(&self, dataset_name: &DatasetName, data: &str);
+
     async fn get_list_of_repo_aliases(&self, dataset_ref: &DatasetRef) -> Vec<RepoAlias>;
 
     async fn complete<T>(&self, input: T, current: usize) -> Vec<String>
     where
         T: Into<String> + Send;
-
-    async fn list_blocks(&self, dataset_name: &DatasetName) -> Vec<BlockRecord>;
 
     async fn start_api_server(self, e2e_data_file_path: PathBuf) -> ServerOutput;
 
@@ -227,6 +224,18 @@ impl KamuCliPuppetExt for KamuCliPuppet {
         kamu_data_utils::testing::assert_data_eq(df.clone(), expected_data).await;
         kamu_data_utils::testing::assert_schema_eq(df.schema(), expected_schema);
     }
+
+    async fn ingest_data(&self, dataset_name: &DatasetName, data: &str) {
+        let dataset_data_path = self
+            .workspace_path()
+            .join(format!("{dataset_name}.data.ndjson"));
+
+        std::fs::write(dataset_data_path.clone(), data).unwrap();
+
+        self.execute(["ingest", dataset_name, dataset_data_path.to_str().unwrap()])
+            .await
+            .success();
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -244,8 +253,9 @@ pub struct DatasetRecord {
     #[serde(rename = "ID")]
     pub id: DatasetID,
     pub name: DatasetName,
-    #[serde(with = "DatasetKindDef")]
-    pub kind: DatasetKind,
+    // CLI returns regular ENUM DatasetKind(Root/Derivative) for local datasets
+    // but for remote it is Remote(DatasetKind) type
+    pub kind: String,
     pub head: Multihash,
     pub pulled: Option<DateTime<Utc>>,
     pub records: usize,
