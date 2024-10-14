@@ -59,30 +59,20 @@ pub const DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR: &str = indoc::indoc!(
               alias: player_scores
           transform:
             kind: Sql
-            engine: risingwave
-            queries:
-              - alias: leaderboard
-                # Note we are using explicit `crate materialized view` statement below
-                # because RW does not currently support Top-N queries directly on sinks.
-                #
-                # Note `partition by 1` is currently required by RW engine
-                # See: https://docs.risingwave.com/docs/current/window-functions/#syntax
-                query: |
-                  create materialized view leaderboard as
-                  select
-                    *
-                  from (
-                    select
-                      row_number() over (partition by 1 order by score desc) as place,
-                      match_time,
-                      match_id,
-                      player_id,
-                      score
-                    from player_scores
-                  )
-                  where place <= 2
-              - query: |
-                  select * from leaderboard
+            engine: datafusion
+            query: |
+              select
+                *
+              from (
+                select
+                  row_number() over (partition by 1 order by score desc) as place,
+                  match_time,
+                  match_id,
+                  player_id,
+                  score
+                from player_scores
+              )
+              where place <= 2
         - kind: SetVocab
           eventTimeColumn: match_time
     "#

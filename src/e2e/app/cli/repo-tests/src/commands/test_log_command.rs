@@ -263,12 +263,10 @@ pub async fn test_log(kamu: KamuCliPuppet) {
                 engine: "risingwave".into(),
                 version: None,
                 query: None,
-                queries: Some(vec![
-                    SqlQueryStep {
-                        alias: Some("leaderboard".into()),
-                        query: indoc::indoc!(
-                            r#"
-                            create materialized view leaderboard as
+                queries: Some(vec![SqlQueryStep {
+                    alias: Some("leaderboard".into()),
+                    query: indoc::indoc!(
+                        r#"
                             select
                               *
                             from (
@@ -282,14 +280,9 @@ pub async fn test_log(kamu: KamuCliPuppet) {
                             )
                             where place <= 2
                             "#
-                        )
-                        .into(),
-                    },
-                    SqlQueryStep {
-                        alias: None,
-                        query: "select * from leaderboard".into(),
-                    },
-                ]),
+                    )
+                    .into(),
+                }]),
                 temporal_tables: None,
             });
 

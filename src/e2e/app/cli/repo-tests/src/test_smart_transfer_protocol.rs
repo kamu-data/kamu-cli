@@ -578,7 +578,7 @@ pub async fn test_smart_push_pull_all(kamu_api_server_client: KamuApiServerClien
               REQUIRED INT32 op;
               REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
               OPTIONAL INT64 match_time (TIMESTAMP(MILLIS,true));
-              OPTIONAL INT64 place;
+              OPTIONAL INT64 place (INTEGER(64,false));
               OPTIONAL INT64 match_id;
               OPTIONAL BYTE_ARRAY player_id (STRING);
               OPTIONAL INT64 score;
@@ -819,7 +819,7 @@ pub async fn test_smart_push_pull_recursive(kamu_api_server_client: KamuApiServe
               REQUIRED INT32 op;
               REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
               OPTIONAL INT64 match_time (TIMESTAMP(MILLIS,true));
-              OPTIONAL INT64 place;
+              OPTIONAL INT64 place (INTEGER(64,false));
               OPTIONAL INT64 match_id;
               OPTIONAL BYTE_ARRAY player_id (STRING);
               OPTIONAL INT64 score;
@@ -975,7 +975,7 @@ pub async fn test_smart_pull_reset_derivative(kamu: KamuCliPuppet) {
           REQUIRED INT32 op;
           REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
           OPTIONAL INT64 match_time (TIMESTAMP(MILLIS,true));
-          OPTIONAL INT64 place;
+          OPTIONAL INT64 place (INTEGER(64,false));
           OPTIONAL INT64 match_id;
           OPTIONAL BYTE_ARRAY player_id (STRING);
           OPTIONAL INT64 score;
@@ -1042,8 +1042,8 @@ pub async fn test_smart_pull_reset_derivative(kamu: KamuCliPuppet) {
         +--------+----+----------------------+--------------------------+-------+----------+-----------+-------+
         | offset | op | system_time          | match_time               | place | match_id | player_id | score |
         +--------+----+----------------------+--------------------------+-------+----------+-----------+-------+
-        | 0      | 0  | 2050-01-02T03:04:05Z | 2000-01-02T00:00:00Z     | 2     | 2        | Alice     | 70    |
-        | 1      | 0  | 2050-01-02T03:04:05Z | 2000-01-02T00:00:00.001Z | 1     | 2        | Charlie   | 90    |
+        | 0      | 0  | 2050-01-02T03:04:05Z | 2000-01-02T00:00:00.001Z | 1     | 2        | Charlie   | 90    |
+        | 1      | 0  | 2050-01-02T03:04:05Z | 2000-01-02T00:00:00Z     | 2     | 2        | Alice     | 70    |
         +--------+----+----------------------+--------------------------+-------+----------+-----------+-------+
         "#
     );
@@ -1233,7 +1233,7 @@ pub async fn test_smart_pull_derivative(kamu: KamuCliPuppet) {
           REQUIRED INT32 op;
           REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
           OPTIONAL INT64 match_time (TIMESTAMP(MILLIS,true));
-          OPTIONAL INT64 place;
+          OPTIONAL INT64 place (INTEGER(64,false));
           OPTIONAL INT64 match_id;
           OPTIONAL BYTE_ARRAY player_id (STRING);
           OPTIONAL INT64 score;

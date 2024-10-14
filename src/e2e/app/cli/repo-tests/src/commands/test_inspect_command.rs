@@ -118,7 +118,6 @@ pub async fn test_inspect_query(kamu: KamuCliPuppet) {
                   player_scores  {player_scores_dataset_id}
                 Engine: risingwave (None)
                 Query: leaderboard
-                  create materialized view leaderboard as
                   select
                     *
                   from (
@@ -131,8 +130,6 @@ pub async fn test_inspect_query(kamu: KamuCliPuppet) {
                     from player_scores
                   )
                   where place <= 2
-                Query: leaderboard
-                  select * from leaderboard
                 "#
             ),
             stdout
