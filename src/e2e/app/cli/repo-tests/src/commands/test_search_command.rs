@@ -104,25 +104,20 @@ pub async fn test_search_multi_user(kamu_node_api_client: KamuApiServerClient) {
                   alias: player_scores
               transform:
                 kind: Sql
-                engine: risingwave
-                queries:
-                  - alias: leaderboard
-                    query: |
-                      create materialized view leaderboard as
-                      select
-                        *
-                      from (
-                        select
-                          row_number() over (partition by 1 order by score desc) as place,
-                          match_time,
-                          match_id,
-                          player_id,
-                          score
-                        from player_scores
-                      )
-                      where place <= 2
-                  - query: |
-                      select * from leaderboard
+                engine: datafusion
+                query: |
+                    select
+                    *
+                    from (
+                    select
+                        row_number() over (order by score desc) as place,
+                        match_time,
+                        match_id,
+                        player_id,
+                        score
+                    from player_scores
+                    )
+                    where place <= 2
             - kind: SetVocab
               eventTimeColumn: match_time
         "#

@@ -122,7 +122,7 @@ pub async fn test_inspect_query(kamu: KamuCliPuppet) {
                     *
                   from (
                     select
-                      row_number() over (partition by 1 order by score desc) as place,
+                      row_number() over (order by score desc) as place,
                       match_time,
                       match_id,
                       player_id,
