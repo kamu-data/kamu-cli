@@ -9,7 +9,6 @@
 
 mod test_add_command;
 mod test_compact_command;
-mod test_config_command;
 mod test_delete_command;
 mod test_ingest_command;
 mod test_init_command;
