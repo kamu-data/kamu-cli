@@ -209,6 +209,10 @@ impl RemoteAliasResolverApiHelper {
         server_backend_url: &Url,
         access_token_maybe: Option<&String>,
     ) -> Result<Option<odf::AccountName>, GetRemoteAccountError> {
+        if !(server_backend_url.scheme() == "http" || server_backend_url.scheme() == "https") {
+            return Ok(None);
+        }
+
         let client = reqwest::Client::new();
         let header_map = Self::build_headers_map(access_token_maybe);
 
@@ -263,6 +267,10 @@ impl RemoteAliasResolverApiHelper {
         dataset_id: &odf::DatasetID,
         access_token_maybe: Option<&String>,
     ) -> Result<Option<odf::DatasetName>, ResolveAliasError> {
+        if !(server_backend_url.scheme() == "http" || server_backend_url.scheme() == "https") {
+            return Ok(None);
+        }
+
         let client = reqwest::Client::new();
         let header_map = Self::build_headers_map(access_token_maybe);
 
