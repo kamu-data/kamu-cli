@@ -116,7 +116,7 @@ pub async fn test_inspect_query(kamu: KamuCliPuppet) {
                 As Of: 2050-01-02T03:04:05Z
                 Inputs:
                   player_scores  {player_scores_dataset_id}
-                Engine: risingwave (None)
+                Engine: datafusion (None)
                 Query: leaderboard
                   select
                     *

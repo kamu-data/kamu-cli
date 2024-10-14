@@ -260,11 +260,11 @@ pub async fn test_log(kamu: KamuCliPuppet) {
             );
 
             let expected_transform = Transform::Sql(TransformSql {
-                engine: "risingwave".into(),
+                engine: "datafusion".into(),
                 version: None,
                 query: None,
                 queries: Some(vec![SqlQueryStep {
-                    alias: Some("leaderboard".into()),
+                    alias: None,
                     query: indoc::indoc!(
                         r#"
                             select
@@ -278,8 +278,7 @@ pub async fn test_log(kamu: KamuCliPuppet) {
                                 score
                               from player_scores
                             )
-                            where place <= 2
-                            "#
+                            where place <= 2"#
                     )
                     .into(),
                 }]),
