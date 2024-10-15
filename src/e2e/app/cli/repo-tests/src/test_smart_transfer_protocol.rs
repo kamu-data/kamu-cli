@@ -117,22 +117,18 @@ pub async fn test_smart_force_push_pull(kamu_api_server_client: KamuApiServerCli
         let kamu_in_push_workspace = KamuCliPuppet::new_workspace_tmp().await;
 
         // 2.1. Add the dataset
-        {
-            kamu_in_push_workspace
-                .execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
-                .await
-                .success();
-        }
+        kamu_in_push_workspace
+            .execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
+            .await
+            .success();
 
         // 2.1. Ingest data to the dataset
-        {
-            kamu_in_push_workspace
-                .ingest_data(
-                    &dataset_alias.dataset_name,
-                    DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
-                )
-                .await;
-        }
+        kamu_in_push_workspace
+            .ingest_data(
+                &dataset_alias.dataset_name,
+                DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
+            )
+            .await;
 
         // 2.2. Login to the API server
         kamu_in_push_workspace
@@ -266,22 +262,18 @@ pub async fn test_smart_push_pull_add_alias(kamu_api_server_client: KamuApiServe
         let kamu_in_push_workspace = KamuCliPuppet::new_workspace_tmp().await;
 
         // Add the dataset
-        {
-            kamu_in_push_workspace
-                .execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
-                .await
-                .success();
-        }
+        kamu_in_push_workspace
+            .execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
+            .await
+            .success();
 
         // Ingest data to the dataset
-        {
-            kamu_in_push_workspace
-                .ingest_data(
-                    &dataset_alias.dataset_name,
-                    DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
-                )
-                .await;
-        }
+        kamu_in_push_workspace
+            .ingest_data(
+                &dataset_alias.dataset_name,
+                DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
+            )
+            .await;
 
         // Login to the API server
         kamu_in_push_workspace
@@ -979,22 +971,17 @@ pub async fn test_smart_pull_set_watermark(kamu: KamuCliPuppet) {
         .await
         .success();
 
-    let assert = kamu
-        .execute([
+    kamu.assert_success_command_execution(
+        [
             "pull",
             dataset_name.as_str(),
             "--set-watermark",
             "2051-01-02T03:04:05Z",
-        ])
-        .await
-        .success();
-
-    let stderr = std::str::from_utf8(&assert.get_output().stderr).unwrap();
-
-    assert!(
-        stderr.contains(indoc::indoc!(r#"Committed new block"#).trim()),
-        "Unexpected output:\n{stderr}",
-    );
+        ],
+        None,
+        Some(["Committed new block"]),
+    )
+    .await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1132,22 +1119,18 @@ pub async fn test_smart_push_visibility(kamu_api_server_client: KamuApiServerCli
         let kamu_in_push_workspace = KamuCliPuppet::new_workspace_tmp().await;
 
         // 2.1. Add the dataset
-        {
-            kamu_in_push_workspace
-                .execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
-                .await
-                .success();
-        }
+        kamu_in_push_workspace
+            .execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
+            .await
+            .success();
 
         // 2.1. Ingest data to the dataset
-        {
-            kamu_in_push_workspace
-                .ingest_data(
-                    &dataset_alias.dataset_name,
-                    DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
-                )
-                .await;
-        }
+        kamu_in_push_workspace
+            .ingest_data(
+                &dataset_alias.dataset_name,
+                DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
+            )
+            .await;
 
         // 2.2. Login to the API server
         kamu_in_push_workspace
