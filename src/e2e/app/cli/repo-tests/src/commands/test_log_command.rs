@@ -9,7 +9,7 @@
 
 use std::assert_matches::assert_matches;
 
-use chrono::{TimeZone, Timelike, Utc};
+use chrono::{TimeZone, Utc};
 use kamu_cli_e2e_common::{
     DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR,
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
@@ -172,16 +172,11 @@ pub async fn test_log(kamu: KamuCliPuppet) {
                 OffsetInterval { start: 0, end: 1 },
                 actual_new_data.offset_interval
             );
-            pretty_assertions::assert_eq!(1674, actual_new_data.size);
+            pretty_assertions::assert_eq!(1665, actual_new_data.size);
 
             pretty_assertions::assert_eq!(None, actual_add_data.new_checkpoint);
             pretty_assertions::assert_eq!(
-                Some(
-                    Utc.with_ymd_and_hms(2000, 1, 1, 0, 0, 0)
-                        .unwrap()
-                        .with_nanosecond(1_000_000) // 1 ms
-                        .unwrap()
-                ),
+                Some(Utc.with_ymd_and_hms(2000, 1, 1, 0, 0, 0).unwrap()),
                 actual_add_data.new_watermark
             );
             pretty_assertions::assert_eq!(None, actual_add_data.new_source_state);
@@ -202,16 +197,11 @@ pub async fn test_log(kamu: KamuCliPuppet) {
                 OffsetInterval { start: 2, end: 3 },
                 actual_new_data.offset_interval
             );
-            pretty_assertions::assert_eq!(1690, actual_new_data.size);
+            pretty_assertions::assert_eq!(1681, actual_new_data.size);
 
             pretty_assertions::assert_eq!(None, actual_add_data.new_checkpoint);
             pretty_assertions::assert_eq!(
-                Some(
-                    Utc.with_ymd_and_hms(2000, 1, 2, 0, 0, 0)
-                        .unwrap()
-                        .with_nanosecond(1_000_000) // 1 ms
-                        .unwrap()
-                ),
+                Some(Utc.with_ymd_and_hms(2000, 1, 2, 0, 0, 0).unwrap()),
                 actual_add_data.new_watermark
             );
             pretty_assertions::assert_eq!(None, actual_add_data.new_source_state);
