@@ -615,7 +615,7 @@ pub async fn test_dataset_trigger_flow(kamu_api_server_client: KamuApiServerClie
                                       "__typename": "FlowDescriptionUpdateResultSuccess",
                                       "numBlocks": 2,
                                       "numRecords": 2,
-                                      "updatedWatermark": "2000-01-01T00:00:00.001+00:00"
+                                      "updatedWatermark": "2000-01-01T00:00:00+00:00"
                                     }
                                   },
                                   "initiator": {
@@ -649,7 +649,7 @@ pub async fn test_dataset_trigger_flow(kamu_api_server_client: KamuApiServerClie
                                     "__typename": "FlowDescriptionUpdateResultSuccess",
                                     "numBlocks": 2,
                                     "numRecords": 2,
-                                    "updatedWatermark": "2000-01-01T00:00:00.001+00:00"
+                                    "updatedWatermark": "2000-01-01T00:00:00+00:00"
                                   }
                                 },
                                 "initiator": {
