@@ -30,25 +30,18 @@ pub async fn test_inspect_lineage(kamu: KamuCliPuppet) {
     .await
     .success();
 
-    {
-        let assert = kamu
-            .execute(["inspect", "lineage", "--output-format", "shell"])
-            .await
-            .success();
-
-        let stdout = std::str::from_utf8(&assert.get_output().stdout).unwrap();
-
-        pretty_assertions::assert_eq!(
-            stdout,
-            indoc::indoc!(
-                r#"
-                leaderboard: Derivative
-                └── player-scores: Root
-                player-scores: Root
-                "#
-            )
-        );
-    }
+    kamu.assert_success_command_execution(
+        ["inspect", "lineage", "--output-format", "shell"],
+        Some(indoc::indoc!(
+            r#"
+            leaderboard: Derivative
+            └── player-scores: Root
+            player-scores: Root
+            "#
+        )),
+        None,
+    )
+    .await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -91,25 +84,12 @@ pub async fn test_inspect_query(kamu: KamuCliPuppet) {
         })
         .unwrap();
 
-    {
-        let assert = kamu
-            .execute(["inspect", "query", "player-scores"])
-            .await
-            .success();
+    kamu.assert_success_command_execution(["inspect", "query", "player-scores"], Some(""), None)
+        .await;
 
-        let stdout = std::str::from_utf8(&assert.get_output().stdout).unwrap();
-
-        pretty_assertions::assert_eq!(stdout, "");
-    }
-    {
-        let assert = kamu
-            .execute(["inspect", "query", "leaderboard"])
-            .await
-            .success();
-
-        let stdout = std::str::from_utf8(&assert.get_output().stdout).unwrap();
-
-        pretty_assertions::assert_eq!(
+    kamu.assert_success_command_execution(
+        ["inspect", "query", "leaderboard"],
+        Some(
             indoc::formatdoc!(
                 r#"
                 Transform: {leaderboard_transform_block_hash}
@@ -134,10 +114,12 @@ pub async fn test_inspect_query(kamu: KamuCliPuppet) {
                 Query: leaderboard
                   select * from leaderboard
                 "#
-            ),
-            stdout
-        );
-    }
+            )
+            .as_str(),
+        ),
+        None,
+    )
+    .await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -147,19 +129,12 @@ pub async fn test_inspect_schema(kamu: KamuCliPuppet) {
         .await
         .success();
 
-    {
-        let assert = kamu
-            .execute(["inspect", "schema", "player-scores"])
-            .await
-            .success();
-
-        let stderr = std::str::from_utf8(&assert.get_output().stderr).unwrap();
-
-        assert!(
-            stderr.contains("Warning: Dataset schema is not yet available: player-scores"),
-            "Unexpected output:\n{stderr}",
-        );
-    }
+    kamu.assert_success_command_execution(
+        ["inspect", "schema", "player-scores"],
+        None,
+        Some("Warning: Dataset schema is not yet available: player-scores"),
+    )
+    .await;
 
     kamu.execute_with_input(
         ["add", "--stdin"],
@@ -168,25 +143,18 @@ pub async fn test_inspect_schema(kamu: KamuCliPuppet) {
     .await
     .success();
 
-    {
-        let assert = kamu
-            .execute([
-                "inspect",
-                "schema",
-                "leaderboard",
-                "--output-format",
-                "parquet",
-            ])
-            .await
-            .success();
-
-        let stderr = std::str::from_utf8(&assert.get_output().stderr).unwrap();
-
-        assert!(
-            stderr.contains("Warning: Dataset schema is not yet available: leaderboard"),
-            "Unexpected output:\n{stderr}",
-        );
-    }
+    kamu.assert_success_command_execution(
+        [
+            "inspect",
+            "schema",
+            "leaderboard",
+            "--output-format",
+            "parquet",
+        ],
+        None,
+        Some("Warning: Dataset schema is not yet available: leaderboard"),
+    )
+    .await;
 
     kamu.execute_with_input(
         ["ingest", "player-scores", "--stdin"],
@@ -195,56 +163,43 @@ pub async fn test_inspect_schema(kamu: KamuCliPuppet) {
     .await
     .success();
 
-    {
-        let assert = kamu
-            .execute([
-                "inspect",
-                "schema",
-                "player-scores",
-                "--output-format",
-                "parquet",
-            ])
-            .await
-            .success();
+    kamu.assert_success_command_execution(
+        [
+            "inspect",
+            "schema",
+            "player-scores",
+            "--output-format",
+            "parquet",
+        ],
+        Some(indoc::indoc!(
+            r#"
+            message arrow_schema {
+              REQUIRED INT64 offset;
+              REQUIRED INT32 op;
+              REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
+              OPTIONAL INT64 match_time (TIMESTAMP(MILLIS,true));
+              OPTIONAL INT64 match_id;
+              OPTIONAL BYTE_ARRAY player_id (STRING);
+              OPTIONAL INT64 score;
+            }
+            "#
+        )),
+        None,
+    )
+    .await;
 
-        let stdout = std::str::from_utf8(&assert.get_output().stdout).unwrap();
-
-        pretty_assertions::assert_eq!(
-            indoc::indoc!(
-                r#"
-                message arrow_schema {
-                  REQUIRED INT64 offset;
-                  REQUIRED INT32 op;
-                  REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
-                  OPTIONAL INT64 match_time (TIMESTAMP(MILLIS,true));
-                  OPTIONAL INT64 match_id;
-                  OPTIONAL BYTE_ARRAY player_id (STRING);
-                  OPTIONAL INT64 score;
-                }
-                "#
-            ),
-            stdout
-        );
-    }
-    {
-        let assert = kamu
-            .execute([
-                "inspect",
-                "schema",
-                "leaderboard",
-                "--output-format",
-                "parquet",
-            ])
-            .await
-            .success();
-
-        let stderr = std::str::from_utf8(&assert.get_output().stderr).unwrap();
-
-        assert!(
-            stderr.contains("Warning: Dataset schema is not yet available: leaderboard"),
-            "Unexpected output:\n{stderr}",
-        );
-    }
+    kamu.assert_success_command_execution(
+        [
+            "inspect",
+            "schema",
+            "leaderboard",
+            "--output-format",
+            "parquet",
+        ],
+        None,
+        Some("Warning: Dataset schema is not yet available: leaderboard"),
+    )
+    .await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
