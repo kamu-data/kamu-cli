@@ -208,7 +208,7 @@ async fn test_get_next_operation() {
     assert_eq!(
         harness
             .transform_service
-            .get_next_operation(&bar.dataset_handle, Utc::now())
+            .get_next_operation(ResolvedDataset::from(&bar), Utc::now())
             .await
             .unwrap(),
         None
@@ -218,7 +218,7 @@ async fn test_get_next_operation() {
     let foo_slice = foo_block.event.new_data.as_ref().unwrap();
 
     assert!(matches!(
-        harness.transform_service.get_next_operation(&bar.dataset_handle, Utc::now()).await.unwrap(),
+        harness.transform_service.get_next_operation(ResolvedDataset::from(&bar), Utc::now()).await.unwrap(),
         Some(TransformRequestExt{ transform, inputs, .. })
         if transform == bar_source.transform &&
         inputs == vec![TransformRequestInputExt {
@@ -324,7 +324,7 @@ async fn test_get_verification_plan_one_to_one() {
         .unwrap()
         .new_head;
 
-    let deriv_hdl = deriv_create_result.dataset_handle;
+    let deriv_hdl = &deriv_create_result.dataset_handle;
     let deriv_initial_sequence_number = 2;
 
     // T1: Root data added
@@ -365,13 +365,13 @@ async fn test_get_verification_plan_one_to_one() {
     let t2 = Utc.with_ymd_and_hms(2020, 1, 2, 12, 0, 0).unwrap();
     let deriv_req_t2 = harness
         .transform_service
-        .get_next_operation(&deriv_hdl, t2)
+        .get_next_operation(ResolvedDataset::from(&deriv_create_result), t2)
         .await
         .unwrap()
         .unwrap();
     let deriv_head_t2 = harness
         .append_block(
-            &deriv_hdl,
+            deriv_hdl,
             MetadataFactory::metadata_block(ExecuteTransform {
                 query_inputs: vec![ExecuteTransformInput {
                     dataset_id: root_hdl.id.clone(),
@@ -437,13 +437,13 @@ async fn test_get_verification_plan_one_to_one() {
     let t4 = Utc.with_ymd_and_hms(2020, 1, 4, 12, 0, 0).unwrap();
     let deriv_req_t4 = harness
         .transform_service
-        .get_next_operation(&deriv_hdl, t4)
+        .get_next_operation(ResolvedDataset::from(&deriv_create_result), t4)
         .await
         .unwrap()
         .unwrap();
     let deriv_head_t4 = harness
         .append_block(
-            &deriv_hdl,
+            deriv_hdl,
             MetadataFactory::metadata_block(ExecuteTransform {
                 query_inputs: vec![ExecuteTransformInput {
                     dataset_id: root_hdl.id.clone(),
@@ -495,13 +495,13 @@ async fn test_get_verification_plan_one_to_one() {
     let t6 = Utc.with_ymd_and_hms(2020, 1, 6, 12, 0, 0).unwrap();
     let deriv_req_t6 = harness
         .transform_service
-        .get_next_operation(&deriv_hdl, t6)
+        .get_next_operation(ResolvedDataset::from(&deriv_create_result), t6)
         .await
         .unwrap()
         .unwrap();
     let deriv_head_t6 = harness
         .append_block(
-            &deriv_hdl,
+            deriv_hdl,
             MetadataFactory::metadata_block(ExecuteTransform {
                 query_inputs: vec![ExecuteTransformInput {
                     dataset_id: root_hdl.id.clone(),
@@ -532,12 +532,11 @@ async fn test_get_verification_plan_one_to_one() {
 
     let plan = harness
         .transform_service
-        .get_verification_plan(&deriv_hdl, (None, None))
+        .get_verification_plan(ResolvedDataset::from(&deriv_create_result), (None, None))
         .await
         .unwrap();
 
-    let deriv_ds = harness.dataset_repo.get_dataset_by_handle(&deriv_hdl);
-    let deriv_chain = deriv_ds.as_metadata_chain();
+    let deriv_chain = deriv_create_result.dataset.as_metadata_chain();
 
     assert_eq!(plan.len(), 3);
 
