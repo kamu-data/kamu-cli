@@ -437,35 +437,8 @@ async fn assert_ingest_data_to_player_scores_from_stdio<I, S, T>(
     }
     // Assert ingested data
     {
-        let assert = kamu
-            .execute([
-                "sql",
-                "--engine",
-                "datafusion",
-                "--command",
-                // Without unstable "offset" column.
-                // For a beautiful output, cut to seconds
-                indoc::indoc!(
-                    r#"
-                    SELECT op,
-                           system_time,
-                           match_time,
-                           match_id,
-                           player_id,
-                           score
-                    FROM "player-scores"
-                    ORDER BY match_id, score, player_id;
-                    "#
-                ),
-                "--output-format",
-                "table",
-            ])
-            .await
-            .success();
-
-        let stdout = std::str::from_utf8(&assert.get_output().stdout).unwrap();
-
-        pretty_assertions::assert_eq!(expected_tail_table, stdout);
+        kamu.assert_player_scores_dataset_data(expected_tail_table)
+            .await;
     }
 }
 

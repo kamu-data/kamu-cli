@@ -1251,49 +1251,17 @@ pub async fn test_smart_pull_derivative(kamu: KamuCliPuppet) {
     )
     .await;
 
-    {
-        let assert = kamu
-            .execute([
-                "sql",
-                "--engine",
-                "datafusion",
-                "--command",
-                // Without unstable "offset" column.
-                // For a beautiful output, cut to seconds
-                indoc::indoc!(
-                    r#"
-                    SELECT op,
-                           system_time,
-                           DATE_TRUNC('second', match_time) as match_time,
-                           match_id,
-                           player_id,
-                           score
-                    FROM "player-scores"
-                    ORDER BY match_time;
-                    "#
-                ),
-                "--output-format",
-                "table",
-            ])
-            .await
-            .success();
-
-        let stdout = std::str::from_utf8(&assert.get_output().stdout).unwrap();
-
-        pretty_assertions::assert_eq!(
-            indoc::indoc!(
-                r#"
-                ┌────┬──────────────────────┬──────────────────────┬──────────┬───────────┬───────┐
-                │ op │     system_time      │      match_time      │ match_id │ player_id │ score │
-                ├────┼──────────────────────┼──────────────────────┼──────────┼───────────┼───────┤
-                │  0 │ 2050-01-02T03:04:05Z │ 2000-01-01T00:00:00Z │        1 │     Alice │   100 │
-                │  0 │ 2050-01-02T03:04:05Z │ 2000-01-01T00:00:00Z │        1 │       Bob │    80 │
-                └────┴──────────────────────┴──────────────────────┴──────────┴───────────┴───────┘
-                "#
-            ),
-            stdout
-        );
-    }
+    kamu.assert_player_scores_dataset_data(indoc::indoc!(
+        r#"
+        ┌────┬──────────────────────┬──────────────────────┬──────────┬───────────┬───────┐
+        │ op │     system_time      │      match_time      │ match_id │ player_id │ score │
+        ├────┼──────────────────────┼──────────────────────┼──────────┼───────────┼───────┤
+        │  0 │ 2050-01-02T03:04:05Z │ 2000-01-01T00:00:00Z │        1 │       Bob │    80 │
+        │  0 │ 2050-01-02T03:04:05Z │ 2000-01-01T00:00:00Z │        1 │     Alice │   100 │
+        └────┴──────────────────────┴──────────────────────┴──────────┴───────────┴───────┘
+        "#
+    ))
+    .await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

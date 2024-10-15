@@ -48,6 +48,8 @@ pub trait KamuCliPuppetExt {
 
     async fn start_api_server(self, e2e_data_file_path: PathBuf) -> ServerOutput;
 
+    async fn assert_player_scores_dataset_data(&self, expected_player_scores_table: &str);
+
     async fn assert_last_data_slice(
         &self,
         dataset_name: &DatasetName,
@@ -182,6 +184,38 @@ impl KamuCliPuppetExt for KamuCliPuppet {
             .to_owned();
 
         ServerOutput { stdout, stderr }
+    }
+
+    async fn assert_player_scores_dataset_data(&self, expected_player_scores_table: &str) {
+        let assert = self
+            .execute([
+                "sql",
+                "--engine",
+                "datafusion",
+                "--command",
+                // Without unstable "offset" column.
+                // For a beautiful output, cut to seconds
+                indoc::indoc!(
+                    r#"
+                    SELECT op,
+                           system_time,
+                           match_time,
+                           match_id,
+                           player_id,
+                           score
+                    FROM "player-scores"
+                    ORDER BY match_id, score, player_id;
+                    "#
+                ),
+                "--output-format",
+                "table",
+            ])
+            .await
+            .success();
+
+        let stdout = std::str::from_utf8(&assert.get_output().stdout).unwrap();
+
+        pretty_assertions::assert_eq!(expected_player_scores_table, stdout);
     }
 
     async fn assert_last_data_slice(
