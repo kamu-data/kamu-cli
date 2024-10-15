@@ -1226,37 +1226,33 @@ pub async fn test_smart_pull_derivative(kamu: KamuCliPuppet) {
     )
     .await;
 
-    let expected_derivative_schema = indoc::indoc!(
-        r#"
-        message arrow_schema {
-          OPTIONAL INT64 offset;
-          REQUIRED INT32 op;
-          REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
-          OPTIONAL INT64 match_time (TIMESTAMP(MILLIS,true));
-          OPTIONAL INT64 place;
-          OPTIONAL INT64 match_id;
-          OPTIONAL BYTE_ARRAY player_id (STRING);
-          OPTIONAL INT64 score;
-        }
-        "#
-    );
+    {
+        let assert = kamu
+            .execute([
+                "tail",
+                dataset_derivative_name.as_str(),
+                "--output-format",
+                "table",
+            ])
+            .await
+            .success();
 
-    let expected_derivative_data = indoc::indoc!(
-        r#"
-        +--------+----+----------------------+--------------------------+-------+----------+-----------+-------+
-        | offset | op | system_time          | match_time               | place | match_id | player_id | score |
-        +--------+----+----------------------+--------------------------+-------+----------+-----------+-------+
-        | 0      | 0  | 2050-01-02T03:04:05Z | 2000-01-01T00:00:00Z     | 1     | 1        | Alice     | 100   |
-        | 1      | 0  | 2050-01-02T03:04:05Z | 2000-01-01T00:00:00.001Z | 2     | 1        | Bob       | 80    |
-        +--------+----+----------------------+--------------------------+-------+----------+-----------+-------+
-        "#
-    );
-    kamu.assert_last_data_slice(
-        &dataset_derivative_name,
-        expected_derivative_schema,
-        expected_derivative_data,
-    )
-    .await;
+        let stdout = std::str::from_utf8(&assert.get_output().stdout).unwrap();
+
+        pretty_assertions::assert_eq!(
+            indoc::indoc!(
+                r#"
+                ┌────────┬────┬──────────────────────┬──────────────────────────┬───────┬──────────┬───────────┬───────┐
+                │ offset │ op │     system_time      │        match_time        │ place │ match_id │ player_id │ score │
+                ├────────┼────┼──────────────────────┼──────────────────────────┼───────┼──────────┼───────────┼───────┤
+                │      0 │ +A │ 2050-01-02T03:04:05Z │     2000-01-01T00:00:00Z │     1 │        1 │     Alice │   100 │
+                │      1 │ +A │ 2050-01-02T03:04:05Z │ 2000-01-01T00:00:00.001Z │     2 │        1 │       Bob │    80 │
+                └────────┴────┴──────────────────────┴──────────────────────────┴───────┴──────────┴───────────┴───────┘
+                "#
+            ),
+            stdout
+        );
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
