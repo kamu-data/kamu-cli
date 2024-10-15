@@ -14,6 +14,7 @@ use kamu::domain::*;
 use kamu::testing::{MetadataFactory, ParquetWriterHelper};
 use kamu::*;
 use kamu_cli::*;
+use kamu_cli_puppet::extensions::KamuCliPuppetExt;
 use kamu_cli_puppet::KamuCliPuppet;
 use opendatafabric::serde::yaml::Manifest;
 use opendatafabric::*;
@@ -46,16 +47,15 @@ async fn test_workspace_upgrade() {
 
     let kamu = KamuCliPuppet::new(temp_dir.path());
 
-    let assert = kamu.execute(["list"]).await.failure();
-    let stderr = std::str::from_utf8(&assert.get_output().stderr).unwrap();
-
-    assert!(
-        stderr.contains(
+    kamu.assert_failure_command_execution(
+        ["list"],
+        None,
+        Some([
             "Error: Workspace needs to be upgraded before continuing - please run `kamu system \
-             upgrade-workspace`"
-        ),
-        "Unexpected output:\n{stderr}",
-    );
+             upgrade-workspace`",
+        ]),
+    )
+    .await;
 
     // TODO: Restore this test upon the first upgrade post V5 breaking changes
     /*
