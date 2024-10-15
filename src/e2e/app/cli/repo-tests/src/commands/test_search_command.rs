@@ -35,7 +35,7 @@ pub async fn test_search_multi_user(kamu_node_api_client: KamuApiServerClient) {
             └───────┴──────┴─────────────┴────────┴─────────┴──────┘
             "#
         )),
-        None,
+        None::<Vec<&str>>,
     )
     .await;
 
@@ -56,7 +56,7 @@ pub async fn test_search_multi_user(kamu_node_api_client: KamuApiServerClient) {
             └──────────────────────────────────┴──────┴─────────────┴────────┴─────────┴──────┘
             "#
         )),
-        None,
+        None::<Vec<&str>>,
     )
     .await;
 
@@ -84,7 +84,7 @@ pub async fn test_search_multi_user(kamu_node_api_client: KamuApiServerClient) {
             └──────────────────────────────────┴──────┴─────────────┴────────┴─────────┴──────────┘
             "#
         )),
-        None,
+        None::<Vec<&str>>,
     )
     .await;
 
@@ -149,7 +149,7 @@ pub async fn test_search_multi_user(kamu_node_api_client: KamuApiServerClient) {
             └───────────────────────────────────────┴────────────┴─────────────┴────────┴─────────┴──────────┘
             "#
         )),
-        None,
+        None::<Vec<&str>>,
     )
     .await;
 
@@ -172,7 +172,7 @@ pub async fn test_search_multi_user(kamu_node_api_client: KamuApiServerClient) {
             └───────────────────────────────────────┴────────────┴─────────────┴────────┴─────────┴──────────┘
             "#
         )),
-        None,
+        None::<Vec<&str>>,
     )
     .await;
 }
@@ -205,7 +205,7 @@ pub async fn test_search_by_name(kamu_node_api_client: KamuApiServerClient) {
             └──────────────────────────────────┴──────┴─────────────┴────────┴─────────┴──────┘
             "#
         )),
-        None,
+        None::<Vec<&str>>,
     )
     .await;
 
@@ -220,7 +220,7 @@ pub async fn test_search_by_name(kamu_node_api_client: KamuApiServerClient) {
             └──────────────────────────────────┴──────┴─────────────┴────────┴─────────┴──────┘
             "#
         )),
-        None,
+        None::<Vec<&str>>,
     )
     .await;
 
@@ -235,7 +235,7 @@ pub async fn test_search_by_name(kamu_node_api_client: KamuApiServerClient) {
             └───────┴──────┴─────────────┴────────┴─────────┴──────┘
             "#
         )),
-        None,
+        None::<Vec<&str>>,
     )
     .await;
 
@@ -250,7 +250,7 @@ pub async fn test_search_by_name(kamu_node_api_client: KamuApiServerClient) {
             └────────────────────────────────┴────────────┴─────────────┴────────┴─────────┴──────┘
             "#
         )),
-        None,
+        None::<Vec<&str>>,
     )
     .await;
 }
@@ -286,7 +286,7 @@ pub async fn test_search_by_repo(kamu_node_api_client: KamuApiServerClient) {
             └──────────────────────────────────────┴──────┴─────────────┴────────┴─────────┴──────┘
             "#
         )),
-        None,
+        None::<Vec<&str>>,
     )
     .await;
 
@@ -308,7 +308,7 @@ pub async fn test_search_by_repo(kamu_node_api_client: KamuApiServerClient) {
             └──────────────────────────────────────┴──────┴─────────────┴────────┴─────────┴──────┘
             "#
         )),
-        None,
+        None::<Vec<&str>>,
     )
     .await;
 
@@ -330,7 +330,7 @@ pub async fn test_search_by_repo(kamu_node_api_client: KamuApiServerClient) {
             └──────────────────────────────────┴──────┴─────────────┴────────┴─────────┴──────┘
             "#
         )),
-        None,
+        None::<Vec<&str>>,
     )
     .await;
 }
@@ -352,7 +352,7 @@ async fn add_repo_to_workspace(
             kamu_node_api_client.get_node_url().as_str(),
         ],
         None,
-        Some(format!("Added: {repo_name}").as_str()),
+        Some([format!("Added: {repo_name}").as_str()]),
     )
     .await;
 }

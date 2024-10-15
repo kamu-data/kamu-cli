@@ -36,7 +36,7 @@ pub trait KamuCliPuppetExt {
         &self,
         cmd: I,
         maybe_expected_stdout: Option<&str>,
-        maybe_expected_stderr: Option<&str>,
+        maybe_expected_stderr: Option<impl IntoIterator<Item = &str> + Send>,
     ) where
         I: IntoIterator<Item = S> + Send,
         S: AsRef<std::ffi::OsStr>;
@@ -46,7 +46,7 @@ pub trait KamuCliPuppetExt {
         cmd: I,
         input: T,
         maybe_expected_stdout: Option<&str>,
-        maybe_expected_stderr: Option<&str>,
+        maybe_expected_stderr: Option<impl IntoIterator<Item = &str> + Send>,
     ) where
         I: IntoIterator<Item = S> + Send,
         S: AsRef<std::ffi::OsStr>,
@@ -56,7 +56,7 @@ pub trait KamuCliPuppetExt {
         &self,
         cmd: I,
         maybe_expected_stdout: Option<&str>,
-        maybe_expected_stderr: Option<&str>,
+        maybe_expected_stderr: Option<impl IntoIterator<Item = &str> + Send>,
     ) where
         I: IntoIterator<Item = S> + Send,
         S: AsRef<std::ffi::OsStr>;
@@ -66,7 +66,7 @@ pub trait KamuCliPuppetExt {
         cmd: I,
         input: T,
         maybe_expected_stdout: Option<&str>,
-        maybe_expected_stderr: Option<&str>,
+        maybe_expected_stderr: Option<impl IntoIterator<Item = &str> + Send>,
     ) where
         I: IntoIterator<Item = S> + Send,
         S: AsRef<std::ffi::OsStr>,
@@ -251,7 +251,7 @@ impl KamuCliPuppetExt for KamuCliPuppet {
                 "table",
             ],
             Some(expected_player_scores_table),
-            None,
+            None::<Vec<&str>>,
         )
         .await;
     }
@@ -307,7 +307,7 @@ impl KamuCliPuppetExt for KamuCliPuppet {
         &self,
         cmd: I,
         maybe_expected_stdout: Option<&str>,
-        maybe_expected_stderr: Option<&str>,
+        maybe_expected_stderr: Option<impl IntoIterator<Item = &str> + Send>,
     ) where
         I: IntoIterator<Item = S> + Send,
         S: AsRef<std::ffi::OsStr>,
@@ -324,7 +324,7 @@ impl KamuCliPuppetExt for KamuCliPuppet {
         cmd: I,
         input: T,
         maybe_expected_stdout: Option<&str>,
-        maybe_expected_stderr: Option<&str>,
+        maybe_expected_stderr: Option<impl IntoIterator<Item = &str> + Send>,
     ) where
         I: IntoIterator<Item = S> + Send,
         S: AsRef<std::ffi::OsStr>,
@@ -341,7 +341,7 @@ impl KamuCliPuppetExt for KamuCliPuppet {
         &self,
         cmd: I,
         maybe_expected_stdout: Option<&str>,
-        maybe_expected_stderr: Option<&str>,
+        maybe_expected_stderr: Option<impl IntoIterator<Item = &str> + Send>,
     ) where
         I: IntoIterator<Item = S> + Send,
         S: AsRef<std::ffi::OsStr>,
@@ -358,7 +358,7 @@ impl KamuCliPuppetExt for KamuCliPuppet {
         _cmd: I,
         _input: T,
         _maybe_expected_stdout: Option<&str>,
-        _maybe_expected_stderr: Option<&str>,
+        _maybe_expected_stderr: Option<impl IntoIterator<Item = &str> + Send>,
     ) where
         I: IntoIterator<Item = S> + Send,
         S: AsRef<std::ffi::OsStr>,
@@ -410,10 +410,10 @@ pub struct BlockRecord {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn assert_execute_command_result(
+fn assert_execute_command_result<'a>(
     command_result: &ExecuteCommandResult,
     maybe_expected_stdout: Option<&str>,
-    maybe_expected_stderr: Option<&str>,
+    maybe_expected_stderr: Option<impl IntoIterator<Item = &'a str>>,
 ) {
     let actual_stdout = std::str::from_utf8(&command_result.get_output().stdout).unwrap();
 
@@ -421,13 +421,15 @@ fn assert_execute_command_result(
         pretty_assertions::assert_eq!(expected_stdout, actual_stdout);
     }
 
-    if let Some(expected_stderr) = maybe_expected_stderr {
+    if let Some(expected_stderr_items) = maybe_expected_stderr {
         let stderr = std::str::from_utf8(&command_result.get_output().stderr).unwrap();
 
-        assert!(
-            stderr.contains(expected_stderr),
-            "Unexpected output:\n{stderr}",
-        );
+        for expected_stderr_item in expected_stderr_items {
+            assert!(
+                stderr.contains(expected_stderr_item),
+                "Unexpected output:\n{stderr}",
+            );
+        }
     }
 }
 

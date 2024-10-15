@@ -39,7 +39,7 @@ pub async fn test_inspect_lineage(kamu: KamuCliPuppet) {
             player-scores: Root
             "#
         )),
-        None,
+        None::<Vec<&str>>,
     )
     .await;
 }
@@ -84,8 +84,12 @@ pub async fn test_inspect_query(kamu: KamuCliPuppet) {
         })
         .unwrap();
 
-    kamu.assert_success_command_execution(["inspect", "query", "player-scores"], Some(""), None)
-        .await;
+    kamu.assert_success_command_execution(
+        ["inspect", "query", "player-scores"],
+        Some(""),
+        None::<Vec<&str>>,
+    )
+    .await;
 
     kamu.assert_success_command_execution(
         ["inspect", "query", "leaderboard"],
@@ -117,7 +121,7 @@ pub async fn test_inspect_query(kamu: KamuCliPuppet) {
             )
             .as_str(),
         ),
-        None,
+        None::<Vec<&str>>,
     )
     .await;
 }
@@ -132,7 +136,7 @@ pub async fn test_inspect_schema(kamu: KamuCliPuppet) {
     kamu.assert_success_command_execution(
         ["inspect", "schema", "player-scores"],
         None,
-        Some("Warning: Dataset schema is not yet available: player-scores"),
+        Some(["Warning: Dataset schema is not yet available: player-scores"]),
     )
     .await;
 
@@ -152,7 +156,7 @@ pub async fn test_inspect_schema(kamu: KamuCliPuppet) {
             "parquet",
         ],
         None,
-        Some("Warning: Dataset schema is not yet available: leaderboard"),
+        Some(["Warning: Dataset schema is not yet available: leaderboard"]),
     )
     .await;
 
@@ -184,7 +188,7 @@ pub async fn test_inspect_schema(kamu: KamuCliPuppet) {
             }
             "#
         )),
-        None,
+        None::<Vec<&str>>,
     )
     .await;
 
@@ -197,7 +201,7 @@ pub async fn test_inspect_schema(kamu: KamuCliPuppet) {
             "parquet",
         ],
         None,
-        Some("Warning: Dataset schema is not yet available: leaderboard"),
+        Some(["Warning: Dataset schema is not yet available: leaderboard"]),
     )
     .await;
 }

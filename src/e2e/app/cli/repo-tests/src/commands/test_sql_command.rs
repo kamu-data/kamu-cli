@@ -53,7 +53,7 @@ pub async fn test_datafusion_cli_not_launched_in_root_ws(kamu: KamuCliPuppet) {
     kamu.assert_failure_command_execution(
         ["list"],
         None,
-        Some("Error: Directory is not a kamu workspace"),
+        Some(["Error: Directory is not a kamu workspace"]),
     )
     .await;
 }
@@ -78,7 +78,7 @@ pub async fn test_sql_command(kamu: KamuCliPuppet) {
             └────────┘
             "#
         )),
-        None,
+        None::<Vec<&str>>,
     )
     .await;
 
@@ -103,7 +103,7 @@ pub async fn test_sql_command(kamu: KamuCliPuppet) {
             └┘
             "#
         )),
-        None,
+        None::<Vec<&str>>,
     )
     .await;
 
@@ -132,7 +132,7 @@ pub async fn test_sql_command(kamu: KamuCliPuppet) {
             └────────┴────┴──────────────────────┴──────────────────────┴──────────┴───────────┴───────┘
             "#
         )),
-        None,
+        None::<Vec<&str>>,
     )
     .await;
 }

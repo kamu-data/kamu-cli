@@ -412,7 +412,7 @@ async fn assert_ingest_data_to_player_scores_from_stdio<I, S, T>(
         ingest_cmd.clone(),
         ingest_data.clone(),
         None,
-        Some("Dataset updated"),
+        Some(["Dataset updated"]),
     )
     .await;
 
@@ -421,7 +421,7 @@ async fn assert_ingest_data_to_player_scores_from_stdio<I, S, T>(
         ingest_cmd,
         ingest_data,
         None,
-        Some("Dataset up-to-date"),
+        Some(["Dataset up-to-date"]),
     )
     .await;
 

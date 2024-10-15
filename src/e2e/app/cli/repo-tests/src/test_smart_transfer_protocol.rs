@@ -80,7 +80,7 @@ pub async fn test_smart_push_pull_sequence(kamu_api_server_client: KamuApiServer
                     kamu_api_server_dataset_endpoint.as_str(),
                 ],
                 None,
-                Some("1 dataset(s) pushed"),
+                Some(["1 dataset(s) pushed"]),
             )
             .await;
     }
@@ -93,7 +93,7 @@ pub async fn test_smart_push_pull_sequence(kamu_api_server_client: KamuApiServer
             .assert_success_command_execution(
                 ["pull", kamu_api_server_dataset_endpoint.as_str()],
                 None,
-                Some("1 dataset(s) updated"),
+                Some(["1 dataset(s) updated"]),
             )
             .await;
     }
@@ -155,7 +155,7 @@ pub async fn test_smart_force_push_pull(kamu_api_server_client: KamuApiServerCli
                     kamu_api_server_dataset_endpoint.as_str(),
                 ],
                 None,
-                Some("1 dataset(s) pushed"),
+                Some(["1 dataset(s) pushed"]),
             )
             .await;
 
@@ -182,7 +182,7 @@ pub async fn test_smart_force_push_pull(kamu_api_server_client: KamuApiServerCli
                     kamu_api_server_dataset_endpoint.as_str(),
                 ],
                 None,
-                Some("Failed to push 1 dataset(s)"),
+                Some(["Failed to push 1 dataset(s)"]),
             )
             .await;
 
@@ -197,7 +197,7 @@ pub async fn test_smart_force_push_pull(kamu_api_server_client: KamuApiServerCli
                     "--force",
                 ],
                 None,
-                Some("1 dataset(s) pushed"),
+                Some(["1 dataset(s) pushed"]),
             )
             .await;
     }
@@ -215,7 +215,7 @@ pub async fn test_smart_force_push_pull(kamu_api_server_client: KamuApiServerCli
                     "--no-alias",
                 ],
                 None,
-                Some("1 dataset(s) updated"),
+                Some(["1 dataset(s) updated"]),
             )
             .await;
 
@@ -233,7 +233,7 @@ pub async fn test_smart_force_push_pull(kamu_api_server_client: KamuApiServerCli
             .assert_failure_command_execution(
                 ["pull", kamu_api_server_dataset_endpoint.as_str()],
                 None,
-                Some("Failed to update 1 dataset(s)"),
+                Some(["Failed to update 1 dataset(s)"]),
             )
             .await;
 
@@ -242,7 +242,7 @@ pub async fn test_smart_force_push_pull(kamu_api_server_client: KamuApiServerCli
             .assert_success_command_execution(
                 ["pull", kamu_api_server_dataset_endpoint.as_str(), "--force"],
                 None,
-                Some("1 dataset(s) updated"),
+                Some(["1 dataset(s) updated"]),
             )
             .await;
     }
@@ -305,7 +305,7 @@ pub async fn test_smart_push_pull_add_alias(kamu_api_server_client: KamuApiServe
                     "--no-alias",
                 ],
                 None,
-                Some("1 dataset(s) pushed"),
+                Some(["1 dataset(s) pushed"]),
             )
             .await;
 
@@ -325,7 +325,7 @@ pub async fn test_smart_push_pull_add_alias(kamu_api_server_client: KamuApiServe
                     kamu_api_server_dataset_endpoint.as_str(),
                 ],
                 None,
-                Some("1 dataset(s) up-to-date"),
+                Some(["1 dataset(s) up-to-date"]),
             )
             .await;
 
@@ -353,7 +353,7 @@ pub async fn test_smart_push_pull_add_alias(kamu_api_server_client: KamuApiServe
                     "--no-alias",
                 ],
                 None,
-                Some("1 dataset(s) updated"),
+                Some(["1 dataset(s) updated"]),
             )
             .await;
 
@@ -374,7 +374,7 @@ pub async fn test_smart_push_pull_add_alias(kamu_api_server_client: KamuApiServe
             .assert_success_command_execution(
                 ["pull", kamu_api_server_dataset_endpoint.as_str()],
                 None,
-                Some("1 dataset(s) updated"),
+                Some(["1 dataset(s) updated"]),
             )
             .await;
 
@@ -423,7 +423,7 @@ pub async fn test_smart_pull_as(kamu_api_server_client: KamuApiServerClient) {
                     new_dataset_name.as_str(),
                 ],
                 None,
-                Some("1 dataset(s) updated"),
+                Some(["1 dataset(s) updated"]),
             )
             .await;
 
@@ -507,7 +507,7 @@ pub async fn test_smart_push_pull_all(kamu_api_server_client: KamuApiServerClien
             .assert_failure_command_execution(
                 ["push", "--all"],
                 None,
-                Some("Pushing all datasets is not yet supported"),
+                Some(["Pushing all datasets is not yet supported"]),
             )
             .await;
 
@@ -521,7 +521,7 @@ pub async fn test_smart_push_pull_all(kamu_api_server_client: KamuApiServerClien
                     kamu_api_server_root_dataset_endpoint.as_str(),
                 ],
                 None,
-                Some("1 dataset(s) pushed"),
+                Some(["1 dataset(s) pushed"]),
             )
             .await;
 
@@ -539,7 +539,7 @@ pub async fn test_smart_push_pull_all(kamu_api_server_client: KamuApiServerClien
                     kamu_api_server_derivative_dataset_endpoint.as_str(),
                 ],
                 None,
-                Some("1 dataset(s) pushed"),
+                Some(["1 dataset(s) pushed"]),
             )
             .await;
     }
@@ -553,7 +553,7 @@ pub async fn test_smart_push_pull_all(kamu_api_server_client: KamuApiServerClien
             .assert_success_command_execution(
                 ["pull", kamu_api_server_root_dataset_endpoint.as_str()],
                 None,
-                Some("1 dataset(s) updated"),
+                Some(["1 dataset(s) updated"]),
             )
             .await;
 
@@ -561,7 +561,7 @@ pub async fn test_smart_push_pull_all(kamu_api_server_client: KamuApiServerClien
             .assert_success_command_execution(
                 ["pull", kamu_api_server_derivative_dataset_endpoint.as_str()],
                 None,
-                Some("1 dataset(s) updated"),
+                Some(["1 dataset(s) updated"]),
             )
             .await;
 
@@ -641,7 +641,7 @@ pub async fn test_smart_push_pull_all(kamu_api_server_client: KamuApiServerClien
             .assert_success_command_execution(
                 ["pull", derivative_dataset_alias.dataset_name.as_str()],
                 None,
-                Some("1 dataset(s) updated"),
+                Some(["1 dataset(s) updated"]),
             )
             .await;
 
@@ -654,7 +654,7 @@ pub async fn test_smart_push_pull_all(kamu_api_server_client: KamuApiServerClien
                     kamu_api_server_root_dataset_endpoint.as_str(),
                 ],
                 None,
-                Some("1 dataset(s) pushed"),
+                Some(["1 dataset(s) pushed"]),
             )
             .await;
 
@@ -667,13 +667,17 @@ pub async fn test_smart_push_pull_all(kamu_api_server_client: KamuApiServerClien
                     kamu_api_server_derivative_dataset_endpoint.as_str(),
                 ],
                 None,
-                Some("1 dataset(s) pushed"),
+                Some(["1 dataset(s) pushed"]),
             )
             .await;
 
         // Pull all datasets
         kamu_in_pull_workspace
-            .assert_success_command_execution(["pull", "--all"], None, Some("2 dataset(s) updated"))
+            .assert_success_command_execution(
+                ["pull", "--all"],
+                None,
+                Some(["2 dataset(s) updated"]),
+            )
             .await;
 
         // Perform dataslices checks
@@ -778,7 +782,7 @@ pub async fn test_smart_push_pull_recursive(kamu_api_server_client: KamuApiServe
                     "--recursive",
                 ],
                 None,
-                Some("Recursive push is not yet supported"),
+                Some(["Recursive push is not yet supported"]),
             )
             .await;
 
@@ -792,7 +796,7 @@ pub async fn test_smart_push_pull_recursive(kamu_api_server_client: KamuApiServe
                     kamu_api_server_root_dataset_endpoint.as_str(),
                 ],
                 None,
-                Some("1 dataset(s) pushed"),
+                Some(["1 dataset(s) pushed"]),
             )
             .await;
     }
@@ -809,7 +813,7 @@ pub async fn test_smart_push_pull_recursive(kamu_api_server_client: KamuApiServe
             .assert_success_command_execution(
                 ["pull", kamu_api_server_root_dataset_endpoint.as_str()],
                 None,
-                Some("1 dataset(s) updated"),
+                Some(["1 dataset(s) updated"]),
             )
             .await;
 
@@ -825,7 +829,7 @@ pub async fn test_smart_push_pull_recursive(kamu_api_server_client: KamuApiServe
             .assert_success_command_execution(
                 ["pull", derivative_dataset_alias.dataset_name.as_str()],
                 None,
-                Some("1 dataset(s) updated"),
+                Some(["1 dataset(s) updated"]),
             )
             .await;
 
@@ -910,7 +914,7 @@ pub async fn test_smart_push_pull_recursive(kamu_api_server_client: KamuApiServe
                     kamu_api_server_root_dataset_endpoint.as_str(),
                 ],
                 None,
-                Some("1 dataset(s) pushed"),
+                Some(["1 dataset(s) pushed"]),
             )
             .await;
 
@@ -923,7 +927,7 @@ pub async fn test_smart_push_pull_recursive(kamu_api_server_client: KamuApiServe
                     "--recursive",
                 ],
                 None,
-                Some("2 dataset(s) updated"),
+                Some(["2 dataset(s) updated"]),
             )
             .await;
 
@@ -1019,7 +1023,7 @@ pub async fn test_smart_pull_reset_derivative(kamu: KamuCliPuppet) {
     kamu.assert_success_command_execution(
         ["pull", dataset_derivative_name.as_str()],
         None,
-        Some("1 dataset(s) updated"),
+        Some(["1 dataset(s) updated"]),
     )
     .await;
 
@@ -1070,7 +1074,7 @@ pub async fn test_smart_pull_reset_derivative(kamu: KamuCliPuppet) {
     kamu.assert_failure_command_execution(
         ["pull", dataset_derivative_name.as_str()],
         None,
-        Some("Failed to update 1 dataset(s)"),
+        Some(["Failed to update 1 dataset(s)"]),
     )
     .await;
 
@@ -1088,7 +1092,7 @@ pub async fn test_smart_pull_reset_derivative(kamu: KamuCliPuppet) {
             "--reset-derivatives-on-diverged-input",
         ],
         None,
-        Some("1 dataset(s) updated"),
+        Some(["1 dataset(s) updated"]),
     )
     .await;
 
@@ -1167,7 +1171,7 @@ pub async fn test_smart_push_visibility(kamu_api_server_client: KamuApiServerCli
                     "private",
                 ],
                 None,
-                Some("1 dataset(s) pushed"),
+                Some(["1 dataset(s) pushed"]),
             )
             .await;
 
@@ -1197,7 +1201,7 @@ pub async fn test_smart_push_pull_s3(kamu: KamuCliPuppet) {
     kamu.assert_success_command_execution(
         ["push", dataset_name.as_str(), "--to", dataset_url.as_str()],
         None,
-        Some("1 dataset(s) pushed"),
+        Some(["1 dataset(s) pushed"]),
     )
     .await;
 
@@ -1208,7 +1212,7 @@ pub async fn test_smart_push_pull_s3(kamu: KamuCliPuppet) {
             .assert_success_command_execution(
                 ["pull", dataset_url.as_str()],
                 None,
-                Some("1 dataset(s) updated"),
+                Some(["1 dataset(s) updated"]),
             )
             .await;
 
@@ -1271,14 +1275,14 @@ pub async fn test_smart_pull_derivative(kamu: KamuCliPuppet) {
             "table",
         ],
         None,
-        Some("Error: Dataset schema is not yet available: leaderboard"),
+        Some(["Error: Dataset schema is not yet available: leaderboard"]),
     )
     .await;
 
     kamu.assert_success_command_execution(
         ["pull", dataset_derivative_name.as_str()],
         None,
-        Some("1 dataset(s) updated"),
+        Some(["1 dataset(s) updated"]),
     )
     .await;
 

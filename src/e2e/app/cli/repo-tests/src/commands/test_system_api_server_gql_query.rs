@@ -27,7 +27,7 @@ pub async fn test_gql_query_api_version(kamu: KamuCliPuppet) {
             }
             "#
         )),
-        None,
+        None::<Vec<&str>>,
     )
     .await;
 }

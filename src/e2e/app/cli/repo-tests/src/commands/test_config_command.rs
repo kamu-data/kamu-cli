@@ -18,7 +18,7 @@ pub async fn test_config_set_value(kamu: KamuCliPuppet) {
     kamu.assert_success_command_execution(
         ["config", "set", "engine.runtime", "podman"],
         None,
-        Some("Set engine.runtime to podman in workspace scope"),
+        Some(["Set engine.runtime to podman in workspace scope"]),
     )
     .await;
 
@@ -32,14 +32,14 @@ pub async fn test_config_set_value(kamu: KamuCliPuppet) {
 
             "#
         )),
-        None,
+        None::<Vec<&str>>,
     )
     .await;
 
     kamu.assert_success_command_execution(
         ["config", "set", "engine.networkNs", "host"],
         None,
-        Some("Set engine.networkNs to host in workspace scope"),
+        Some(["Set engine.networkNs to host in workspace scope"]),
     )
     .await;
 
@@ -51,7 +51,7 @@ pub async fn test_config_set_value(kamu: KamuCliPuppet) {
 
             "#
         )),
-        None,
+        None::<Vec<&str>>,
     )
     .await;
 
@@ -65,7 +65,7 @@ pub async fn test_config_set_value(kamu: KamuCliPuppet) {
 
             "#
         )),
-        None,
+        None::<Vec<&str>>,
     )
     .await;
 
@@ -73,7 +73,7 @@ pub async fn test_config_set_value(kamu: KamuCliPuppet) {
     kamu.assert_success_command_execution(
         ["config", "set", "uploads.maxFileSizeInMb", "42"],
         None,
-        Some("Set uploads.maxFileSizeInMb to 42 in workspace scope"),
+        Some(["Set uploads.maxFileSizeInMb to 42 in workspace scope"]),
     )
     .await;
 
@@ -85,7 +85,7 @@ pub async fn test_config_set_value(kamu: KamuCliPuppet) {
 
             "#
         )),
-        None,
+        None::<Vec<&str>>,
     )
     .await;
 
@@ -101,7 +101,7 @@ pub async fn test_config_set_value(kamu: KamuCliPuppet) {
 
             "#
         )),
-        None,
+        None::<Vec<&str>>,
     )
     .await;
 }
@@ -112,21 +112,21 @@ pub async fn test_config_reset_key(kamu: KamuCliPuppet) {
     kamu.assert_success_command_execution(
         ["config", "set", "engine.networkNs", "host"],
         None,
-        Some("Set engine.networkNs to host in workspace scope"),
+        Some(["Set engine.networkNs to host in workspace scope"]),
     )
     .await;
 
     kamu.assert_success_command_execution(
         ["config", "set", "engine.networkNs"],
         None,
-        Some("Removed engine.networkNs from workspace scope"),
+        Some(["Removed engine.networkNs from workspace scope"]),
     )
     .await;
 
     kamu.assert_failure_command_execution(
         ["config", "get", "engine.networkNs"],
         None,
-        Some("Error: Key engine.networkNs not found"),
+        Some(["Error: Key engine.networkNs not found"]),
     )
     .await;
 }
@@ -137,7 +137,7 @@ pub async fn test_config_get_with_default(kamu: KamuCliPuppet) {
     kamu.assert_failure_command_execution(
         ["config", "get", "engine.networkNs"],
         None,
-        Some("Error: Key engine.networkNs not found"),
+        Some(["Error: Key engine.networkNs not found"]),
     )
     .await;
 
@@ -149,7 +149,7 @@ pub async fn test_config_get_with_default(kamu: KamuCliPuppet) {
 
             "#
         )),
-        None,
+        None::<Vec<&str>>,
     )
     .await;
 }
@@ -168,7 +168,7 @@ pub async fn test_config_get_from_config(kamu: KamuCliPuppet) {
 
             "#
         )),
-        None,
+        None::<Vec<&str>>,
     )
     .await;
 }
