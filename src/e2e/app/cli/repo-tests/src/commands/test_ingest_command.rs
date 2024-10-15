@@ -262,19 +262,12 @@ pub async fn test_ingest_recursive(kamu: KamuCliPuppet) {
     .await
     .success();
 
-    {
-        let assert = kamu
-            .execute(["tail", "leaderboard", "--output-format", "table"])
-            .await
-            .failure();
-
-        let stderr = std::str::from_utf8(&assert.get_output().stderr).unwrap();
-
-        assert!(
-            stderr.contains("Error: Dataset schema is not yet available: leaderboard"),
-            "Unexpected output:\n{stderr}",
-        );
-    }
+    kamu.assert_failure_command_execution(
+        ["tail", "leaderboard", "--output-format", "table"],
+        None,
+        Some(["Error: Dataset schema is not yet available: leaderboard"]),
+    )
+    .await;
 
     // TODO: `kamu ingest`: implement `--recursive` mode
     //        https://github.com/kamu-data/kamu-cli/issues/886
