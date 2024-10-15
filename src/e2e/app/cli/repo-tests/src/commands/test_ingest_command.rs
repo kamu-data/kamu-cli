@@ -408,38 +408,26 @@ async fn assert_ingest_data_to_player_scores_from_stdio<I, S, T>(
     T: Into<Vec<u8>> + Clone,
 {
     // Ingest
-    {
-        let assert = kamu
-            .execute_with_input(ingest_cmd.clone(), ingest_data.clone())
-            .await
-            .success();
+    kamu.assert_success_command_execution_with_input(
+        ingest_cmd.clone(),
+        ingest_data.clone(),
+        None,
+        Some("Dataset updated"),
+    )
+    .await;
 
-        let stderr = std::str::from_utf8(&assert.get_output().stderr).unwrap();
-
-        assert!(
-            stderr.contains("Dataset updated"),
-            "Unexpected output:\n{stderr}",
-        );
-    }
     // Trying to ingest the same data
-    {
-        let assert = kamu
-            .execute_with_input(ingest_cmd, ingest_data)
-            .await
-            .success();
+    kamu.assert_success_command_execution_with_input(
+        ingest_cmd,
+        ingest_data,
+        None,
+        Some("Dataset up-to-date"),
+    )
+    .await;
 
-        let stderr = std::str::from_utf8(&assert.get_output().stderr).unwrap();
-
-        assert!(
-            stderr.contains("Dataset up-to-date"),
-            "Unexpected output:\n{stderr}",
-        );
-    }
     // Assert ingested data
-    {
-        kamu.assert_player_scores_dataset_data(expected_tail_table)
-            .await;
-    }
+    kamu.assert_player_scores_dataset_data(expected_tail_table)
+        .await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
