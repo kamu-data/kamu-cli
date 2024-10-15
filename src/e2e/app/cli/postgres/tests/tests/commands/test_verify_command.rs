@@ -13,7 +13,7 @@ use kamu_cli_e2e_common::prelude::*;
 
 kamu_cli_execute_command_e2e_test!(
     storage = postgres,
-    fixture = kamu_cli_e2e_repo_tests::test_verify_regular_dataset
+    fixture = kamu_cli_e2e_repo_tests::test_verify_regular_dataset,
     extra_test_groups = "engine, ingest, datafusion"
 );
 
@@ -21,15 +21,15 @@ kamu_cli_execute_command_e2e_test!(
 
 kamu_cli_execute_command_e2e_test!(
     storage = postgres,
-    fixture = kamu_cli_e2e_repo_tests::test_verify_recursive
-    extra_test_groups = "containerized, engine, ingest, datafusion"
+    fixture = kamu_cli_e2e_repo_tests::test_verify_recursive,
+    extra_test_groups = "containerized, engine, ingest, datafusion, risingwave"
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 kamu_cli_execute_command_e2e_test!(
     storage = postgres,
-    fixture = kamu_cli_e2e_repo_tests::test_verify_integrity
+    fixture = kamu_cli_e2e_repo_tests::test_verify_integrity,
     extra_test_groups = "engine, ingest, datafusion"
 );
 
