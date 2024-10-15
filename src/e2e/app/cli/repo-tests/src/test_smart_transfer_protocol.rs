@@ -71,29 +71,31 @@ pub async fn test_smart_push_pull_sequence(kamu_api_server_client: KamuApiServer
             .success();
 
         // 2.3. Push the dataset to the API server
-        run_and_assert_command_success(
-            &kamu_in_push_workspace,
-            vec![
-                "push",
-                dataset_alias.dataset_name.as_str(),
-                "--to",
-                kamu_api_server_dataset_endpoint.as_str(),
-            ],
-            "1 dataset(s) pushed",
-        )
-        .await;
+        kamu_in_push_workspace
+            .assert_success_command_execution(
+                [
+                    "push",
+                    dataset_alias.dataset_name.as_str(),
+                    "--to",
+                    kamu_api_server_dataset_endpoint.as_str(),
+                ],
+                None,
+                Some("1 dataset(s) pushed"),
+            )
+            .await;
     }
 
     // 3. Pulling the dataset from the API server
     {
         let kamu_in_pull_workspace = KamuCliPuppet::new_workspace_tmp().await;
 
-        run_and_assert_command_success(
-            &kamu_in_pull_workspace,
-            vec!["pull", kamu_api_server_dataset_endpoint.as_str()],
-            "1 dataset(s) updated",
-        )
-        .await;
+        kamu_in_pull_workspace
+            .assert_success_command_execution(
+                ["pull", kamu_api_server_dataset_endpoint.as_str()],
+                None,
+                Some("1 dataset(s) updated"),
+            )
+            .await;
     }
 }
 
@@ -144,17 +146,18 @@ pub async fn test_smart_force_push_pull(kamu_api_server_client: KamuApiServerCli
             .success();
 
         // Initial dataset push
-        run_and_assert_command_success(
-            &kamu_in_push_workspace,
-            vec![
-                "push",
-                dataset_alias.dataset_name.as_str(),
-                "--to",
-                kamu_api_server_dataset_endpoint.as_str(),
-            ],
-            "1 dataset(s) pushed",
-        )
-        .await;
+        kamu_in_push_workspace
+            .assert_success_command_execution(
+                [
+                    "push",
+                    dataset_alias.dataset_name.as_str(),
+                    "--to",
+                    kamu_api_server_dataset_endpoint.as_str(),
+                ],
+                None,
+                Some("1 dataset(s) pushed"),
+            )
+            .await;
 
         // Hard compact dataset
         kamu_in_push_workspace
@@ -183,18 +186,19 @@ pub async fn test_smart_force_push_pull(kamu_api_server_client: KamuApiServerCli
         .await;
 
         // Should successfully push with force flag
-        run_and_assert_command_success(
-            &kamu_in_push_workspace,
-            vec![
-                "push",
-                dataset_alias.dataset_name.as_str(),
-                "--to",
-                kamu_api_server_dataset_endpoint.as_str(),
-                "--force",
-            ],
-            "1 dataset(s) pushed",
-        )
-        .await;
+        kamu_in_push_workspace
+            .assert_success_command_execution(
+                [
+                    "push",
+                    dataset_alias.dataset_name.as_str(),
+                    "--to",
+                    kamu_api_server_dataset_endpoint.as_str(),
+                    "--force",
+                ],
+                None,
+                Some("1 dataset(s) pushed"),
+            )
+            .await;
     }
 
     // 3. Pulling the dataset from the API server
@@ -202,16 +206,17 @@ pub async fn test_smart_force_push_pull(kamu_api_server_client: KamuApiServerCli
         let kamu_in_pull_workspace = KamuCliPuppet::new_workspace_tmp().await;
 
         // Call with no-alias flag to avoid remote ingest checking in next step
-        run_and_assert_command_success(
-            &kamu_in_pull_workspace,
-            vec![
-                "pull",
-                kamu_api_server_dataset_endpoint.as_str(),
-                "--no-alias",
-            ],
-            "1 dataset(s) updated",
-        )
-        .await;
+        kamu_in_pull_workspace
+            .assert_success_command_execution(
+                [
+                    "pull",
+                    kamu_api_server_dataset_endpoint.as_str(),
+                    "--no-alias",
+                ],
+                None,
+                Some("1 dataset(s) updated"),
+            )
+            .await;
 
         // Ingest data in pulled dataset
 
@@ -231,12 +236,13 @@ pub async fn test_smart_force_push_pull(kamu_api_server_client: KamuApiServerCli
         .await;
 
         // Should successfully pull with force flag
-        run_and_assert_command_success(
-            &kamu_in_pull_workspace,
-            vec!["pull", kamu_api_server_dataset_endpoint.as_str(), "--force"],
-            "1 dataset(s) updated",
-        )
-        .await;
+        kamu_in_pull_workspace
+            .assert_success_command_execution(
+                ["pull", kamu_api_server_dataset_endpoint.as_str(), "--force"],
+                None,
+                Some("1 dataset(s) updated"),
+            )
+            .await;
     }
 }
 
@@ -287,18 +293,19 @@ pub async fn test_smart_push_pull_add_alias(kamu_api_server_client: KamuApiServe
             .success();
 
         // Dataset push without storing alias
-        run_and_assert_command_success(
-            &kamu_in_push_workspace,
-            vec![
-                "push",
-                dataset_alias.dataset_name.as_str(),
-                "--to",
-                kamu_api_server_dataset_endpoint.as_str(),
-                "--no-alias",
-            ],
-            "1 dataset(s) pushed",
-        )
-        .await;
+        kamu_in_push_workspace
+            .assert_success_command_execution(
+                [
+                    "push",
+                    dataset_alias.dataset_name.as_str(),
+                    "--to",
+                    kamu_api_server_dataset_endpoint.as_str(),
+                    "--no-alias",
+                ],
+                None,
+                Some("1 dataset(s) pushed"),
+            )
+            .await;
 
         // Check alias should be empty
         let aliases = kamu_in_push_workspace
@@ -307,17 +314,18 @@ pub async fn test_smart_push_pull_add_alias(kamu_api_server_client: KamuApiServe
         assert!(aliases.is_empty());
 
         // Dataset push with storing alias
-        run_and_assert_command_success(
-            &kamu_in_push_workspace,
-            vec![
-                "push",
-                dataset_alias.dataset_name.as_str(),
-                "--to",
-                kamu_api_server_dataset_endpoint.as_str(),
-            ],
-            "1 dataset(s) up-to-date",
-        )
-        .await;
+        kamu_in_push_workspace
+            .assert_success_command_execution(
+                [
+                    "push",
+                    dataset_alias.dataset_name.as_str(),
+                    "--to",
+                    kamu_api_server_dataset_endpoint.as_str(),
+                ],
+                None,
+                Some("1 dataset(s) up-to-date"),
+            )
+            .await;
 
         let aliases = kamu_in_push_workspace
             .get_list_of_repo_aliases(&dataset_alias.dataset_name.clone().into())
@@ -335,16 +343,17 @@ pub async fn test_smart_push_pull_add_alias(kamu_api_server_client: KamuApiServe
         let kamu_in_pull_workspace = KamuCliPuppet::new_workspace_tmp().await;
 
         // Dataset pull without storing alias
-        run_and_assert_command_success(
-            &kamu_in_pull_workspace,
-            vec![
-                "pull",
-                kamu_api_server_dataset_endpoint.as_str(),
-                "--no-alias",
-            ],
-            "1 dataset(s) updated",
-        )
-        .await;
+        kamu_in_pull_workspace
+            .assert_success_command_execution(
+                [
+                    "pull",
+                    kamu_api_server_dataset_endpoint.as_str(),
+                    "--no-alias",
+                ],
+                None,
+                Some("1 dataset(s) updated"),
+            )
+            .await;
 
         // Check alias should be empty
         let aliases = kamu_in_pull_workspace
@@ -359,12 +368,13 @@ pub async fn test_smart_push_pull_add_alias(kamu_api_server_client: KamuApiServe
             .success();
 
         // Dataset pull with storing alias
-        run_and_assert_command_success(
-            &kamu_in_pull_workspace,
-            vec!["pull", kamu_api_server_dataset_endpoint.as_str()],
-            "1 dataset(s) updated",
-        )
-        .await;
+        kamu_in_pull_workspace
+            .assert_success_command_execution(
+                ["pull", kamu_api_server_dataset_endpoint.as_str()],
+                None,
+                Some("1 dataset(s) updated"),
+            )
+            .await;
 
         let aliases = kamu_in_pull_workspace
             .get_list_of_repo_aliases(&dataset_alias.dataset_name.clone().into())
@@ -400,19 +410,20 @@ pub async fn test_smart_pull_as(kamu_api_server_client: KamuApiServerClient) {
 
     {
         let kamu_in_pull_workspace = KamuCliPuppet::new_workspace_tmp().await;
-
         let new_dataset_name = DatasetName::new_unchecked("foo");
-        run_and_assert_command_success(
-            &kamu_in_pull_workspace,
-            vec![
-                "pull",
-                kamu_api_server_dataset_endpoint.as_str(),
-                "--as",
-                new_dataset_name.as_str(),
-            ],
-            "1 dataset(s) updated",
-        )
-        .await;
+
+        kamu_in_pull_workspace
+            .assert_success_command_execution(
+                [
+                    "pull",
+                    kamu_api_server_dataset_endpoint.as_str(),
+                    "--as",
+                    new_dataset_name.as_str(),
+                ],
+                None,
+                Some("1 dataset(s) updated"),
+            )
+            .await;
 
         let expected_dataset_list = kamu_in_pull_workspace
             .list_datasets()
@@ -498,34 +509,36 @@ pub async fn test_smart_push_pull_all(kamu_api_server_client: KamuApiServerClien
         .await;
 
         // Push datasets one by one
-        run_and_assert_command_success(
-            &kamu_in_push_workspace,
-            vec![
-                "push",
-                root_dataset_alias.dataset_name.as_str(),
-                "--to",
-                kamu_api_server_root_dataset_endpoint.as_str(),
-            ],
-            "1 dataset(s) pushed",
-        )
-        .await;
+        kamu_in_push_workspace
+            .assert_success_command_execution(
+                [
+                    "push",
+                    root_dataset_alias.dataset_name.as_str(),
+                    "--to",
+                    kamu_api_server_root_dataset_endpoint.as_str(),
+                ],
+                None,
+                Some("1 dataset(s) pushed"),
+            )
+            .await;
 
         kamu_in_push_workspace
             .execute(["pull", derivative_dataset_alias.dataset_name.as_str()])
             .await
             .success();
 
-        run_and_assert_command_success(
-            &kamu_in_push_workspace,
-            vec![
-                "push",
-                derivative_dataset_alias.dataset_name.as_str(),
-                "--to",
-                kamu_api_server_derivative_dataset_endpoint.as_str(),
-            ],
-            "1 dataset(s) pushed",
-        )
-        .await;
+        kamu_in_push_workspace
+            .assert_success_command_execution(
+                [
+                    "push",
+                    derivative_dataset_alias.dataset_name.as_str(),
+                    "--to",
+                    kamu_api_server_derivative_dataset_endpoint.as_str(),
+                ],
+                None,
+                Some("1 dataset(s) pushed"),
+            )
+            .await;
     }
 
     // 3. Pulling datasets from the API server
@@ -533,18 +546,21 @@ pub async fn test_smart_push_pull_all(kamu_api_server_client: KamuApiServerClien
         let kamu_in_pull_workspace = KamuCliPuppet::new_workspace_tmp().await;
 
         // Pull datasets one by one and check data
-        run_and_assert_command_success(
-            &kamu_in_pull_workspace,
-            vec!["pull", kamu_api_server_root_dataset_endpoint.as_str()],
-            "1 dataset(s) updated",
-        )
-        .await;
-        run_and_assert_command_success(
-            &kamu_in_pull_workspace,
-            vec!["pull", kamu_api_server_derivative_dataset_endpoint.as_str()],
-            "1 dataset(s) updated",
-        )
-        .await;
+        kamu_in_pull_workspace
+            .assert_success_command_execution(
+                ["pull", kamu_api_server_root_dataset_endpoint.as_str()],
+                None,
+                Some("1 dataset(s) updated"),
+            )
+            .await;
+
+        kamu_in_pull_workspace
+            .assert_success_command_execution(
+                ["pull", kamu_api_server_derivative_dataset_endpoint.as_str()],
+                None,
+                Some("1 dataset(s) updated"),
+            )
+            .await;
 
         let expected_schema = indoc::indoc!(
             r#"
@@ -617,43 +633,45 @@ pub async fn test_smart_push_pull_all(kamu_api_server_client: KamuApiServerClien
                 DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_2,
             )
             .await;
-        run_and_assert_command_success(
-            &kamu_in_push_workspace,
-            vec!["pull", derivative_dataset_alias.dataset_name.as_str()],
-            "1 dataset(s) updated",
-        )
-        .await;
 
-        run_and_assert_command_success(
-            &kamu_in_push_workspace,
-            vec![
-                "push",
-                root_dataset_alias.dataset_name.as_str(),
-                "--to",
-                kamu_api_server_root_dataset_endpoint.as_str(),
-            ],
-            "1 dataset(s) pushed",
-        )
-        .await;
-        run_and_assert_command_success(
-            &kamu_in_push_workspace,
-            vec![
-                "push",
-                derivative_dataset_alias.dataset_name.as_str(),
-                "--to",
-                kamu_api_server_derivative_dataset_endpoint.as_str(),
-            ],
-            "1 dataset(s) pushed",
-        )
-        .await;
+        kamu_in_push_workspace
+            .assert_success_command_execution(
+                ["pull", derivative_dataset_alias.dataset_name.as_str()],
+                None,
+                Some("1 dataset(s) updated"),
+            )
+            .await;
+
+        kamu_in_push_workspace
+            .assert_success_command_execution(
+                [
+                    "push",
+                    root_dataset_alias.dataset_name.as_str(),
+                    "--to",
+                    kamu_api_server_root_dataset_endpoint.as_str(),
+                ],
+                None,
+                Some("1 dataset(s) pushed"),
+            )
+            .await;
+
+        kamu_in_push_workspace
+            .assert_success_command_execution(
+                [
+                    "push",
+                    derivative_dataset_alias.dataset_name.as_str(),
+                    "--to",
+                    kamu_api_server_derivative_dataset_endpoint.as_str(),
+                ],
+                None,
+                Some("1 dataset(s) pushed"),
+            )
+            .await;
 
         // Pull all datasets
-        run_and_assert_command_success(
-            &kamu_in_pull_workspace,
-            vec!["pull", "--all"],
-            "2 dataset(s) updated",
-        )
-        .await;
+        kamu_in_pull_workspace
+            .assert_success_command_execution(["pull", "--all"], None, Some("2 dataset(s) updated"))
+            .await;
 
         // Perform dataslices checks
         let expected_data = indoc::indoc!(
@@ -761,32 +779,35 @@ pub async fn test_smart_push_pull_recursive(kamu_api_server_client: KamuApiServe
         .await;
 
         // Push dataset
-        run_and_assert_command_success(
-            &kamu_in_push_workspace,
-            vec![
-                "push",
-                root_dataset_alias.dataset_name.as_str(),
-                "--to",
-                kamu_api_server_root_dataset_endpoint.as_str(),
-            ],
-            "1 dataset(s) pushed",
-        )
-        .await;
+        kamu_in_push_workspace
+            .assert_success_command_execution(
+                [
+                    "push",
+                    root_dataset_alias.dataset_name.as_str(),
+                    "--to",
+                    kamu_api_server_root_dataset_endpoint.as_str(),
+                ],
+                None,
+                Some("1 dataset(s) pushed"),
+            )
+            .await;
     }
 
     // 3. Pulling datasets from the API server
     {
         let mut kamu_in_pull_workspace = KamuCliPuppet::new_workspace_tmp().await;
+
         kamu_in_pull_workspace
             .set_system_time(Some(DateTime::from_str("2050-01-02T03:04:05Z").unwrap()));
 
         // Pull datasets one by one and check data
-        run_and_assert_command_success(
-            &kamu_in_pull_workspace,
-            vec!["pull", kamu_api_server_root_dataset_endpoint.as_str()],
-            "1 dataset(s) updated",
-        )
-        .await;
+        kamu_in_pull_workspace
+            .assert_success_command_execution(
+                ["pull", kamu_api_server_root_dataset_endpoint.as_str()],
+                None,
+                Some("1 dataset(s) updated"),
+            )
+            .await;
 
         kamu_in_pull_workspace
             .execute_with_input(
@@ -796,12 +817,13 @@ pub async fn test_smart_push_pull_recursive(kamu_api_server_client: KamuApiServe
             .await
             .success();
 
-        run_and_assert_command_success(
-            &kamu_in_pull_workspace,
-            vec!["pull", derivative_dataset_alias.dataset_name.as_str()],
-            "1 dataset(s) updated",
-        )
-        .await;
+        kamu_in_pull_workspace
+            .assert_success_command_execution(
+                ["pull", derivative_dataset_alias.dataset_name.as_str()],
+                None,
+                Some("1 dataset(s) updated"),
+            )
+            .await;
 
         let expected_schema = indoc::indoc!(
             r#"
@@ -874,29 +896,32 @@ pub async fn test_smart_push_pull_recursive(kamu_api_server_client: KamuApiServe
                 DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_2,
             )
             .await;
-        run_and_assert_command_success(
-            &kamu_in_push_workspace,
-            vec![
-                "push",
-                root_dataset_alias.dataset_name.as_str(),
-                "--to",
-                kamu_api_server_root_dataset_endpoint.as_str(),
-            ],
-            "1 dataset(s) pushed",
-        )
-        .await;
+
+        kamu_in_push_workspace
+            .assert_success_command_execution(
+                [
+                    "push",
+                    root_dataset_alias.dataset_name.as_str(),
+                    "--to",
+                    kamu_api_server_root_dataset_endpoint.as_str(),
+                ],
+                None,
+                Some("1 dataset(s) pushed"),
+            )
+            .await;
 
         // Pull all datasets
-        run_and_assert_command_success(
-            &kamu_in_pull_workspace,
-            vec![
-                "pull",
-                derivative_dataset_alias.dataset_name.as_str(),
-                "--recursive",
-            ],
-            "2 dataset(s) updated",
-        )
-        .await;
+        kamu_in_pull_workspace
+            .assert_success_command_execution(
+                [
+                    "pull",
+                    derivative_dataset_alias.dataset_name.as_str(),
+                    "--recursive",
+                ],
+                None,
+                Some("2 dataset(s) updated"),
+            )
+            .await;
 
         // Perform dataslices checks
         let expected_data = indoc::indoc!(
@@ -987,10 +1012,10 @@ pub async fn test_smart_pull_reset_derivative(kamu: KamuCliPuppet) {
     )
     .await;
 
-    run_and_assert_command_success(
-        &kamu,
-        vec!["pull", dataset_derivative_name.as_str()],
-        "1 dataset(s) updated",
+    kamu.assert_success_command_execution(
+        ["pull", dataset_derivative_name.as_str()],
+        None,
+        Some("1 dataset(s) updated"),
     )
     .await;
 
@@ -1052,14 +1077,14 @@ pub async fn test_smart_pull_reset_derivative(kamu: KamuCliPuppet) {
     )
     .await;
 
-    run_and_assert_command_success(
-        &kamu,
-        vec![
+    kamu.assert_success_command_execution(
+        [
             "pull",
             dataset_derivative_name.as_str(),
             "--reset-derivatives-on-diverged-input",
         ],
-        "1 dataset(s) updated",
+        None,
+        Some("1 dataset(s) updated"),
     )
     .await;
 
@@ -1127,19 +1152,20 @@ pub async fn test_smart_push_visibility(kamu_api_server_client: KamuApiServerCli
             .await
             .success();
 
-        run_and_assert_command_success(
-            &kamu_in_push_workspace,
-            vec![
-                "push",
-                dataset_alias.dataset_name.as_str(),
-                "--to",
-                kamu_api_server_dataset_endpoint.as_str(),
-                "--visibility",
-                "private",
-            ],
-            "1 dataset(s) pushed",
-        )
-        .await;
+        kamu_in_push_workspace
+            .assert_success_command_execution(
+                [
+                    "push",
+                    dataset_alias.dataset_name.as_str(),
+                    "--to",
+                    kamu_api_server_dataset_endpoint.as_str(),
+                    "--visibility",
+                    "private",
+                ],
+                None,
+                Some("1 dataset(s) pushed"),
+            )
+            .await;
 
         // ToDo add visibility check
     }
@@ -1161,25 +1187,26 @@ pub async fn test_smart_push_pull_s3(kamu: KamuCliPuppet) {
     .await;
 
     let s3_server = LocalS3Server::new().await;
-
     let dataset_url = format!("{}/e2e-user/{dataset_name}", s3_server.url);
+
     // Push dataset
-    run_and_assert_command_success(
-        &kamu,
-        vec!["push", dataset_name.as_str(), "--to", dataset_url.as_str()],
-        "1 dataset(s) pushed",
+    kamu.assert_success_command_execution(
+        ["push", dataset_name.as_str(), "--to", dataset_url.as_str()],
+        None,
+        Some("1 dataset(s) pushed"),
     )
     .await;
 
     {
         let kamu_in_pull_workspace = KamuCliPuppet::new_workspace_tmp().await;
 
-        run_and_assert_command_success(
-            &kamu_in_pull_workspace,
-            vec!["pull", dataset_url.as_str()],
-            "1 dataset(s) updated",
-        )
-        .await;
+        kamu_in_pull_workspace
+            .assert_success_command_execution(
+                ["pull", dataset_url.as_str()],
+                None,
+                Some("1 dataset(s) updated"),
+            )
+            .await;
 
         let expected_schema = indoc::indoc!(
             r#"
@@ -1244,10 +1271,10 @@ pub async fn test_smart_pull_derivative(kamu: KamuCliPuppet) {
     )
     .await;
 
-    run_and_assert_command_success(
-        &kamu,
-        vec!["pull", dataset_derivative_name.as_str()],
-        "1 dataset(s) updated",
+    kamu.assert_success_command_execution(
+        ["pull", dataset_derivative_name.as_str()],
+        None,
+        Some("1 dataset(s) updated"),
     )
     .await;
 
@@ -1267,21 +1294,6 @@ pub async fn test_smart_pull_derivative(kamu: KamuCliPuppet) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Helpers
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-async fn run_and_assert_command_success(
-    kamu: &KamuCliPuppet,
-    args: Vec<&str>,
-    expected_message: &str,
-) {
-    let assert = kamu.execute(args).await.success();
-
-    let stderr = std::str::from_utf8(&assert.get_output().stderr).unwrap();
-
-    assert!(
-        stderr.contains(expected_message),
-        "Unexpected output:\n{stderr}",
-    );
-}
 
 async fn run_and_assert_command_failure(
     kamu: &KamuCliPuppet,

@@ -26,12 +26,38 @@ use opendatafabric::{
 };
 use serde::Deserialize;
 
-use crate::KamuCliPuppet;
+use crate::{ExecuteCommandResult, KamuCliPuppet};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait]
 pub trait KamuCliPuppetExt {
+    async fn assert_success_command_execution<I, S>(
+        &self,
+        cmd: I,
+        maybe_expected_stdout: Option<&str>,
+        maybe_expected_stderr: Option<&str>,
+    ) where
+        I: IntoIterator<Item = S> + Send,
+        S: AsRef<std::ffi::OsStr>;
+
+    async fn assert_success_command_execution_with_input<I, S, T>(&self, cmd: I, input: T)
+    where
+        I: IntoIterator<Item = S> + Send,
+        S: AsRef<std::ffi::OsStr>,
+        T: Into<Vec<u8>> + Send;
+
+    async fn assert_failure_command_execution<I, S>(&self, cmd: I)
+    where
+        I: IntoIterator<Item = S> + Send,
+        S: AsRef<std::ffi::OsStr>;
+
+    async fn assert_failure_command_execution_with_input<I, S, T>(&self, cmd: I, input: T)
+    where
+        I: IntoIterator<Item = S> + Send,
+        S: AsRef<std::ffi::OsStr>,
+        T: Into<Vec<u8>> + Send;
+
     async fn list_datasets(&self) -> Vec<DatasetRecord>;
 
     async fn add_dataset(&self, dataset_snapshot: DatasetSnapshot);
@@ -264,6 +290,49 @@ impl KamuCliPuppetExt for KamuCliPuppet {
             .await
             .success();
     }
+
+    async fn assert_success_command_execution<I, S>(
+        &self,
+        cmd: I,
+        maybe_expected_stdout: Option<&str>,
+        maybe_expected_stderr: Option<&str>,
+    ) where
+        I: IntoIterator<Item = S> + Send,
+        S: AsRef<std::ffi::OsStr>,
+    {
+        assert_execute_command_result(
+            self.execute(cmd).await.success(),
+            maybe_expected_stdout,
+            maybe_expected_stderr,
+        )
+        .await;
+    }
+
+    async fn assert_failure_command_execution<I, S>(&self, _cmd: I)
+    where
+        I: IntoIterator<Item = S> + Send,
+        S: AsRef<std::ffi::OsStr>,
+    {
+        todo!()
+    }
+
+    async fn assert_success_command_execution_with_input<I, S, T>(&self, _cmd: I, _input: T)
+    where
+        I: IntoIterator<Item = S> + Send,
+        S: AsRef<std::ffi::OsStr>,
+        T: Into<Vec<u8>> + Send,
+    {
+        todo!()
+    }
+
+    async fn assert_failure_command_execution_with_input<I, S, T>(&self, _cmd: I, _input: T)
+    where
+        I: IntoIterator<Item = S> + Send,
+        S: AsRef<std::ffi::OsStr>,
+        T: Into<Vec<u8>> + Send,
+    {
+        todo!()
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -304,6 +373,29 @@ pub struct RepoAlias {
 pub struct BlockRecord {
     pub block_hash: Multihash,
     pub block: MetadataBlock,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+async fn assert_execute_command_result(
+    command_result: ExecuteCommandResult,
+    maybe_expected_stdout: Option<&str>,
+    maybe_expected_stderr: Option<&str>,
+) {
+    let actual_stdout = std::str::from_utf8(&command_result.get_output().stdout).unwrap();
+
+    if let Some(expected_stdout) = maybe_expected_stdout {
+        pretty_assertions::assert_eq!(expected_stdout, actual_stdout);
+    }
+
+    if let Some(expected_stderr) = maybe_expected_stderr {
+        let stderr = std::str::from_utf8(&command_result.get_output().stderr).unwrap();
+
+        assert!(
+            stderr.contains(expected_stderr),
+            "Unexpected output:\n{stderr}",
+        );
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
