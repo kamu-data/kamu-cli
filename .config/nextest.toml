@@ -3,7 +3,7 @@ fail-fast = false
 
 [test-groups]
 mysql = { max-threads = 1 } # Explanation below
-postgres = { max-threads = 1 } # Explanation below
+postgres = { max-threads = 8 } # Explanation below
 setup = { max-threads = 1 }  # Serialize the setup steps
 containerized = { max-threads = 8 }  # Don't use too much memory
 engine = { max-threads = 2 }  # Engine tests are very memory-hungry
