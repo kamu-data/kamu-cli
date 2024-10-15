@@ -22,6 +22,7 @@ use crate::UrlExt;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct RemoteAliasResolverImpl {
+    dataset_repo: Arc<dyn DatasetRepository>,
     remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
     access_token_resolver: Arc<dyn OdfServerAccessTokenResolver>,
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
@@ -31,11 +32,13 @@ pub struct RemoteAliasResolverImpl {
 #[interface(dyn RemoteAliasResolver)]
 impl RemoteAliasResolverImpl {
     pub fn new(
+        dataset_repo: Arc<dyn DatasetRepository>,
         remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
         access_token_resolver: Arc<dyn OdfServerAccessTokenResolver>,
         remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
     ) -> Self {
         Self {
+            dataset_repo,
             remote_repo_reg,
             access_token_resolver,
             remote_alias_reg,
@@ -47,9 +50,11 @@ impl RemoteAliasResolverImpl {
         local_handle: &odf::DatasetHandle,
         remote_alias_kind: RemoteAliasKind,
     ) -> Result<Option<Url>, ResolveAliasError> {
+        let dataset = self.dataset_repo.get_dataset_by_handle(local_handle);
+
         let remote_aliases = self
             .remote_alias_reg
-            .get_remote_aliases(&local_handle.as_local_ref())
+            .get_remote_aliases(dataset)
             .await
             .int_err()?;
 
