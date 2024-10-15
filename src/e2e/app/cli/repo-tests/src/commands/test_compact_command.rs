@@ -40,27 +40,18 @@ pub async fn test_compact_hard(kamu: KamuCliPuppet) {
 
     let blocks_before_compacting = kamu.list_blocks(&dataset_name).await;
 
-    let assert = kamu
-        .execute([
+    kamu.assert_success_command_execution(
+        [
             "--yes",
             "system",
             "compact",
             dataset_name.as_str(),
             "--hard",
-        ])
-        .await
-        .success();
-
-    let stderr = std::str::from_utf8(&assert.get_output().stderr).unwrap();
-
-    assert!(
-        stderr.contains(indoc::indoc!(
-            r#"
-                1 dataset(s) were compacted
-            "#
-        )),
-        "Unexpected output:\n{stderr}",
-    );
+        ],
+        None,
+        Some(["1 dataset(s) were compacted"]),
+    )
+    .await;
 
     let blocks_after_compacting = kamu.list_blocks(&dataset_name).await;
     assert_eq!(
@@ -95,28 +86,19 @@ pub async fn test_compact_keep_metadata_only(kamu: KamuCliPuppet) {
 
     let blocks_before_compacting = kamu.list_blocks(&dataset_name).await;
 
-    let assert = kamu
-        .execute([
+    kamu.assert_success_command_execution(
+        [
             "--yes",
             "system",
             "compact",
             dataset_name.as_str(),
             "--hard",
             "--keep-metadata-only",
-        ])
-        .await
-        .success();
-
-    let stderr = std::str::from_utf8(&assert.get_output().stderr).unwrap();
-
-    assert!(
-        stderr.contains(indoc::indoc!(
-            r#"
-                1 dataset(s) were compacted
-            "#
-        )),
-        "Unexpected output:\n{stderr}",
-    );
+        ],
+        None,
+        Some(["1 dataset(s) were compacted"]),
+    )
+    .await;
 
     let blocks_after_compacting = kamu.list_blocks(&dataset_name).await;
     assert_eq!(
@@ -151,40 +133,22 @@ pub async fn test_compact_verify(kamu: KamuCliPuppet) {
 
     let blocks_before_compacting = kamu.list_blocks(&dataset_name).await;
 
-    let assert = kamu
-        .execute([
+    kamu.assert_success_command_execution(
+        [
             "--yes",
             "system",
             "compact",
             dataset_name.as_str(),
             "--hard",
             "--verify",
-        ])
-        .await
-        .success();
-
-    let stderr = std::str::from_utf8(&assert.get_output().stderr).unwrap();
-
-    assert!(
-        stderr.contains(
-            indoc::indoc!(
-                r#"
-                verify with dataset_ref: player-scores
-            "#
-            )
-            .trim()
-        ),
-        "Unexpected output:\n{stderr}",
-    );
-
-    assert!(
-        stderr.contains(indoc::indoc!(
-            r#"
-                1 dataset(s) were compacted
-            "#
-        )),
-        "Unexpected output:\n{stderr}",
-    );
+        ],
+        None,
+        Some([
+            "verify with dataset_ref: player-scores",
+            "1 dataset(s) were compacted",
+        ]),
+    )
+    .await;
 
     let blocks_after_compacting = kamu.list_blocks(&dataset_name).await;
     assert_eq!(
