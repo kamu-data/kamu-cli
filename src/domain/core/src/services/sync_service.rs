@@ -12,6 +12,7 @@ use std::sync::Arc;
 use internal_error::{BoxedError, InternalError};
 use opendatafabric::*;
 use thiserror::Error;
+use url::Url;
 
 use crate::utils::metadata_chain_comparator::CompareChainsError;
 use crate::*;
@@ -30,9 +31,23 @@ pub trait SyncService: Send + Sync {
         listener: Option<Arc<dyn SyncListener>>,
     ) -> Result<SyncResult, SyncError>;
 
+    async fn sync_new(
+        &self,
+        request: SyncRequestNew,
+        options: SyncOptions,
+        listener: Option<Arc<dyn SyncListener>>,
+    ) -> Result<SyncResult, SyncError>;
+
     async fn sync_multi(
         &self,
         requests: Vec<SyncRequest>,
+        options: SyncOptions,
+        listener: Option<Arc<dyn SyncMultiListener>>,
+    ) -> Vec<SyncResultMulti>;
+
+    async fn sync_multi_new(
+        &self,
+        requests: Vec<SyncRequestNew>,
         options: SyncOptions,
         listener: Option<Arc<dyn SyncMultiListener>>,
     ) -> Vec<SyncResultMulti>;
@@ -46,6 +61,24 @@ pub trait SyncService: Send + Sync {
 pub struct SyncRequest {
     pub src: DatasetRefAny,
     pub dst: DatasetRefAny,
+}
+
+pub struct SyncRequestNew {
+    pub src: SyncRequestSource,
+    pub dst: SyncRequestDestination,
+}
+
+pub struct SyncRequestSource {
+    pub dataset: Arc<dyn Dataset>,
+    pub src_ref: DatasetRefAny,
+    pub sync_ref: SyncRef,
+}
+
+pub struct SyncRequestDestination {
+    pub maybe_dataset: Option<Arc<dyn Dataset>>,
+    pub maybe_dataset_factory: Option<DatasetFactoryFn>,
+    pub dst_ref: DatasetRefAny,
+    pub sync_ref: SyncRef,
 }
 
 #[derive(Debug, Clone)]
@@ -91,6 +124,28 @@ pub struct SyncResultMulti {
     pub src: DatasetRefAny,
     pub dst: DatasetRefAny,
     pub result: Result<SyncResult, SyncError>,
+}
+
+#[derive(Debug, Clone)]
+pub enum SyncRef {
+    Local(DatasetRef),
+    Remote(Arc<Url>),
+}
+
+impl SyncRef {
+    pub fn is_local(&self) -> bool {
+        match self {
+            Self::Local(_) => true,
+            Self::Remote(_) => false,
+        }
+    }
+
+    pub fn as_any_ref(&self) -> DatasetRefAny {
+        match self {
+            Self::Local(local_ref) => local_ref.as_any_ref(),
+            Self::Remote(url) => DatasetRefAny::Url(Arc::clone(url)),
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

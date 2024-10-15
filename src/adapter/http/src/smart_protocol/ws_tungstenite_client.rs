@@ -15,11 +15,7 @@ use dill::*;
 use futures::SinkExt;
 use headers::Header;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
-use kamu::utils::smart_transfer_protocol::{
-    DatasetFactoryFn,
-    SmartTransferProtocolClient,
-    TransferOptions,
-};
+use kamu::utils::smart_transfer_protocol::{SmartTransferProtocolClient, TransferOptions};
 use kamu_core::*;
 use opendatafabric::{AsTypedBlock, Multihash};
 use serde::de::DeserializeOwned;

@@ -49,7 +49,7 @@ pub(crate) struct ClientSideHarness {
     tempdir: TempDir,
     catalog: dill::Catalog,
     pull_service: Arc<dyn PullService>,
-    push_service: Arc<dyn PushService>,
+    push_dataset_use_case: Arc<dyn PushDatasetUseCase>,
     access_token_resover: Arc<dyn OdfServerAccessTokenResolver>,
     options: ClientSideHarnessOptions,
 }
@@ -143,6 +143,7 @@ impl ClientSideHarness {
         b.add::<CreateDatasetFromSnapshotUseCaseImpl>();
         b.add::<CommitDatasetEventUseCaseImpl>();
         b.add::<CreateDatasetUseCaseImpl>();
+        b.add::<PushDatasetUseCaseImpl>();
 
         b.add_value(ContainerRuntime::default());
         b.add_value(kamu::utils::ipfs_wrapper::IpfsClient::default());
@@ -153,7 +154,7 @@ impl ClientSideHarness {
         let catalog = b.build();
 
         let pull_service = catalog.get_one::<dyn PullService>().unwrap();
-        let push_service = catalog.get_one::<dyn PushService>().unwrap();
+        let push_dataset_use_case = catalog.get_one::<dyn PushDatasetUseCase>().unwrap();
         let access_token_resover = catalog
             .get_one::<dyn OdfServerAccessTokenResolver>()
             .unwrap();
@@ -162,7 +163,7 @@ impl ClientSideHarness {
             tempdir,
             catalog,
             pull_service,
-            push_service,
+            push_dataset_use_case,
             access_token_resover,
             options,
         }
@@ -248,9 +249,15 @@ impl ClientSideHarness {
         force: bool,
         dataset_visibility: DatasetVisibility,
     ) -> Vec<PushResponse> {
-        self.push_service
-            .push_multi(
-                vec![dataset_local_ref],
+        let dataset_handle = self
+            .dataset_repository()
+            .resolve_dataset_handle_by_ref(&dataset_local_ref)
+            .await
+            .unwrap();
+
+        self.push_dataset_use_case
+            .execute_multi(
+                vec![dataset_handle],
                 PushMultiOptions {
                     sync_options: SyncOptions {
                         create_if_not_exists: true,
@@ -264,6 +271,7 @@ impl ClientSideHarness {
                 None,
             )
             .await
+            .unwrap()
     }
 
     pub async fn push_dataset_result(

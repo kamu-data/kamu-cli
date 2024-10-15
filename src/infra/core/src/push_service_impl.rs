@@ -76,9 +76,14 @@ impl PushServiceImpl {
             }
         };
 
+        let dataset = self.dataset_repo.get_dataset_by_handle(&local_handle);
+
         match self
             .remote_alias_resolver
-            .resolve_push_target(&local_handle, push_target.clone())
+            .resolve_push_target(
+                ResolvedDataset::new(dataset, local_handle.clone()),
+                push_target.clone(),
+            )
             .await
         {
             Ok(remote_target) => Ok(PushItem {
