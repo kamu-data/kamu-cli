@@ -440,6 +440,7 @@ pub fn configure_base_catalog(
     b.add::<SearchServiceImpl>();
 
     b.add::<SyncServiceImpl>();
+    b.add::<SyncRequestBuilder>();
 
     b.add::<PullServiceImpl>();
 
