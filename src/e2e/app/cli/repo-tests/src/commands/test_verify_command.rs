@@ -9,6 +9,7 @@
 
 use kamu_cli_e2e_common::{
     DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR,
+    DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
     DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
 };
 use kamu_cli_puppet::extensions::KamuCliPuppetExt;
@@ -24,13 +25,11 @@ pub async fn test_verify_regular_dataset(kamu: KamuCliPuppet) {
         .await
         .success();
 
-    let data = indoc::indoc!(
-        r#"
-            {"match_time": "2000-01-01", "match_id": 2, "player_id": "Bob", "score": 90}
-        "#,
-    );
-
-    kamu.ingest_data(&dataset_name, data).await;
+    kamu.ingest_data(
+        &dataset_name,
+        DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
+    )
+    .await;
 
     let assert = kamu
         .execute(["verify", dataset_name.as_str()])
@@ -66,13 +65,11 @@ pub async fn test_verify_recursive(kamu: KamuCliPuppet) {
     .await
     .success();
 
-    let data = indoc::indoc!(
-        r#"
-            {"match_time": "2000-01-01", "match_id": 2, "player_id": "Bob", "score": 90}
-        "#,
-    );
-
-    kamu.ingest_data(&dataset_name, data).await;
+    kamu.ingest_data(
+        &dataset_name,
+        DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
+    )
+    .await;
 
     kamu.execute(["pull", dataset_derivative_name.as_str()])
         .await
@@ -122,13 +119,11 @@ pub async fn test_verify_integrity(kamu: KamuCliPuppet) {
         .await
         .success();
 
-    let data = indoc::indoc!(
-        r#"
-            {"match_time": "2000-01-01", "match_id": 2, "player_id": "Bob", "score": 90}
-        "#,
-    );
-
-    kamu.ingest_data(&dataset_name, data).await;
+    kamu.ingest_data(
+        &dataset_name,
+        DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
+    )
+    .await;
 
     let assert = kamu
         .execute(["verify", dataset_name.as_str(), "--integrity"])
