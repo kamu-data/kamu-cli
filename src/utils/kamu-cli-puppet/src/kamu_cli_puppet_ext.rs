@@ -227,8 +227,8 @@ impl KamuCliPuppetExt for KamuCliPuppet {
     }
 
     async fn assert_player_scores_dataset_data(&self, expected_player_scores_table: &str) {
-        let assert = self
-            .execute([
+        self.assert_success_command_execution(
+            [
                 "sql",
                 "--engine",
                 "datafusion",
@@ -249,13 +249,11 @@ impl KamuCliPuppetExt for KamuCliPuppet {
                 ),
                 "--output-format",
                 "table",
-            ])
-            .await
-            .success();
-
-        let stdout = std::str::from_utf8(&assert.get_output().stdout).unwrap();
-
-        pretty_assertions::assert_eq!(expected_player_scores_table, stdout);
+            ],
+            Some(expected_player_scores_table),
+            None,
+        )
+        .await;
     }
 
     async fn assert_last_data_slice(
