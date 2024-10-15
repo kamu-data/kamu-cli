@@ -22,22 +22,20 @@ use kamu_cli_e2e_common::{
 };
 use kamu_cli_puppet::extensions::{KamuCliPuppetExt, RepoAlias};
 use kamu_cli_puppet::KamuCliPuppet;
-use opendatafabric::{AccountName, DatasetName};
-use reqwest::Url;
+use opendatafabric::{AccountName, DatasetAlias, DatasetName};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_smart_push_pull_sequence(kamu_api_server_client: KamuApiServerClient) {
-    let dataset_name = DatasetName::new_unchecked("player-scores");
+    let dataset_alias = DatasetAlias::new(
+        Some(AccountName::new_unchecked("e2e-user")),
+        DatasetName::new_unchecked("player-scores"),
+    );
+    let kamu_api_server_dataset_endpoint =
+        kamu_api_server_client.get_dataset_endpoint(&dataset_alias);
 
     // 1. Grub a token
     let token = kamu_api_server_client.login_as_e2e_user().await;
-
-    let kamu_api_server_dataset_endpoint = get_dataset_endpoint(
-        kamu_api_server_client.get_base_url(),
-        &dataset_name,
-        E2E_USER_ACCOUNT_NAME_STR,
-    );
 
     // 2. Pushing the dataset to the API server
     {
@@ -55,7 +53,7 @@ pub async fn test_smart_push_pull_sequence(kamu_api_server_client: KamuApiServer
         {
             kamu_in_push_workspace
                 .ingest_data(
-                    &dataset_name,
+                    &dataset_alias.dataset_name,
                     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
                 )
                 .await;
@@ -77,7 +75,7 @@ pub async fn test_smart_push_pull_sequence(kamu_api_server_client: KamuApiServer
             &kamu_in_push_workspace,
             vec![
                 "push",
-                dataset_name.as_str(),
+                dataset_alias.dataset_name.as_str(),
                 "--to",
                 kamu_api_server_dataset_endpoint.as_str(),
             ],
@@ -102,15 +100,15 @@ pub async fn test_smart_push_pull_sequence(kamu_api_server_client: KamuApiServer
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_smart_force_push_pull(kamu_api_server_client: KamuApiServerClient) {
-    let dataset_name = DatasetName::new_unchecked("player-scores");
+    let dataset_alias = DatasetAlias::new(
+        Some(AccountName::new_unchecked("e2e-user")),
+        DatasetName::new_unchecked("player-scores"),
+    );
+    let kamu_api_server_dataset_endpoint =
+        kamu_api_server_client.get_dataset_endpoint(&dataset_alias);
+
     // 1. Grub a token
     let token = kamu_api_server_client.login_as_e2e_user().await;
-
-    let kamu_api_server_dataset_endpoint = get_dataset_endpoint(
-        kamu_api_server_client.get_base_url(),
-        &dataset_name,
-        E2E_USER_ACCOUNT_NAME_STR,
-    );
 
     // 2. Pushing the dataset to the API server
     {
@@ -128,7 +126,7 @@ pub async fn test_smart_force_push_pull(kamu_api_server_client: KamuApiServerCli
         {
             kamu_in_push_workspace
                 .ingest_data(
-                    &dataset_name,
+                    &dataset_alias.dataset_name,
                     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
                 )
                 .await;
@@ -150,7 +148,7 @@ pub async fn test_smart_force_push_pull(kamu_api_server_client: KamuApiServerCli
             &kamu_in_push_workspace,
             vec![
                 "push",
-                dataset_name.as_str(),
+                dataset_alias.dataset_name.as_str(),
                 "--to",
                 kamu_api_server_dataset_endpoint.as_str(),
             ],
@@ -164,7 +162,7 @@ pub async fn test_smart_force_push_pull(kamu_api_server_client: KamuApiServerCli
                 "--yes",
                 "system",
                 "compact",
-                dataset_name.as_str(),
+                dataset_alias.dataset_name.as_str(),
                 "--hard",
                 "--keep-metadata-only",
             ])
@@ -176,7 +174,7 @@ pub async fn test_smart_force_push_pull(kamu_api_server_client: KamuApiServerCli
             &kamu_in_push_workspace,
             vec![
                 "push",
-                dataset_name.as_str(),
+                dataset_alias.dataset_name.as_str(),
                 "--to",
                 kamu_api_server_dataset_endpoint.as_str(),
             ],
@@ -189,7 +187,7 @@ pub async fn test_smart_force_push_pull(kamu_api_server_client: KamuApiServerCli
             &kamu_in_push_workspace,
             vec![
                 "push",
-                dataset_name.as_str(),
+                dataset_alias.dataset_name.as_str(),
                 "--to",
                 kamu_api_server_dataset_endpoint.as_str(),
                 "--force",
@@ -219,7 +217,7 @@ pub async fn test_smart_force_push_pull(kamu_api_server_client: KamuApiServerCli
 
         kamu_in_pull_workspace
             .ingest_data(
-                &dataset_name,
+                &dataset_alias.dataset_name,
                 DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_2,
             )
             .await;
@@ -245,15 +243,15 @@ pub async fn test_smart_force_push_pull(kamu_api_server_client: KamuApiServerCli
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_smart_push_pull_add_alias(kamu_api_server_client: KamuApiServerClient) {
-    let dataset_name = DatasetName::new_unchecked("player-scores");
+    let dataset_alias = DatasetAlias::new(
+        Some(AccountName::new_unchecked("e2e-user")),
+        DatasetName::new_unchecked("player-scores"),
+    );
+    let kamu_api_server_dataset_endpoint =
+        kamu_api_server_client.get_dataset_endpoint(&dataset_alias);
+
     // 1. Grub a token
     let token = kamu_api_server_client.login_as_e2e_user().await;
-
-    let kamu_api_server_dataset_endpoint = get_dataset_endpoint(
-        kamu_api_server_client.get_base_url(),
-        &dataset_name,
-        E2E_USER_ACCOUNT_NAME_STR,
-    );
 
     // 2. Push command
     {
@@ -271,7 +269,7 @@ pub async fn test_smart_push_pull_add_alias(kamu_api_server_client: KamuApiServe
         {
             kamu_in_push_workspace
                 .ingest_data(
-                    &dataset_name,
+                    &dataset_alias.dataset_name,
                     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
                 )
                 .await;
@@ -293,7 +291,7 @@ pub async fn test_smart_push_pull_add_alias(kamu_api_server_client: KamuApiServe
             &kamu_in_push_workspace,
             vec![
                 "push",
-                dataset_name.as_str(),
+                dataset_alias.dataset_name.as_str(),
                 "--to",
                 kamu_api_server_dataset_endpoint.as_str(),
                 "--no-alias",
@@ -304,7 +302,7 @@ pub async fn test_smart_push_pull_add_alias(kamu_api_server_client: KamuApiServe
 
         // Check alias should be empty
         let aliases = kamu_in_push_workspace
-            .get_list_of_repo_aliases(&opendatafabric::DatasetRef::from(dataset_name.clone()))
+            .get_list_of_repo_aliases(&dataset_alias.dataset_name.clone().into())
             .await;
         assert!(aliases.is_empty());
 
@@ -313,7 +311,7 @@ pub async fn test_smart_push_pull_add_alias(kamu_api_server_client: KamuApiServe
             &kamu_in_push_workspace,
             vec![
                 "push",
-                dataset_name.as_str(),
+                dataset_alias.dataset_name.as_str(),
                 "--to",
                 kamu_api_server_dataset_endpoint.as_str(),
             ],
@@ -322,12 +320,12 @@ pub async fn test_smart_push_pull_add_alias(kamu_api_server_client: KamuApiServe
         .await;
 
         let aliases = kamu_in_push_workspace
-            .get_list_of_repo_aliases(&opendatafabric::DatasetRef::from(dataset_name.clone()))
+            .get_list_of_repo_aliases(&dataset_alias.dataset_name.clone().into())
             .await;
         let expected_aliases = vec![RepoAlias {
-            dataset: dataset_name.clone(),
+            dataset: dataset_alias.dataset_name.clone(),
             kind: "Push".to_string(),
-            alias: kamu_api_server_dataset_endpoint.clone(),
+            alias: kamu_api_server_dataset_endpoint.to_string(),
         }];
         pretty_assertions::assert_eq!(aliases, expected_aliases);
     }
@@ -350,13 +348,13 @@ pub async fn test_smart_push_pull_add_alias(kamu_api_server_client: KamuApiServe
 
         // Check alias should be empty
         let aliases = kamu_in_pull_workspace
-            .get_list_of_repo_aliases(&opendatafabric::DatasetRef::from(dataset_name.clone()))
+            .get_list_of_repo_aliases(&dataset_alias.dataset_name.clone().into())
             .await;
         assert!(aliases.is_empty());
 
         // Delete local dataset
         kamu_in_pull_workspace
-            .execute(["--yes", "delete", dataset_name.as_str()])
+            .execute(["--yes", "delete", dataset_alias.dataset_name.as_str()])
             .await
             .success();
 
@@ -369,12 +367,12 @@ pub async fn test_smart_push_pull_add_alias(kamu_api_server_client: KamuApiServe
         .await;
 
         let aliases = kamu_in_pull_workspace
-            .get_list_of_repo_aliases(&opendatafabric::DatasetRef::from(dataset_name.clone()))
+            .get_list_of_repo_aliases(&dataset_alias.dataset_name.clone().into())
             .await;
         let expected_aliases = vec![RepoAlias {
-            dataset: dataset_name.clone(),
+            dataset: dataset_alias.dataset_name.clone(),
             kind: "Pull".to_string(),
-            alias: kamu_api_server_dataset_endpoint.clone(),
+            alias: kamu_api_server_dataset_endpoint.to_string(),
         }];
         pretty_assertions::assert_eq!(aliases, expected_aliases);
     }
@@ -383,7 +381,13 @@ pub async fn test_smart_push_pull_add_alias(kamu_api_server_client: KamuApiServe
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_smart_pull_as(kamu_api_server_client: KamuApiServerClient) {
-    let dataset_name = DatasetName::new_unchecked("player-scores");
+    let dataset_alias = DatasetAlias::new(
+        Some(AccountName::new_unchecked("e2e-user")),
+        DatasetName::new_unchecked("player-scores"),
+    );
+    let kamu_api_server_dataset_endpoint =
+        kamu_api_server_client.get_dataset_endpoint(&dataset_alias);
+
     // 1. Grub a token
     let token = kamu_api_server_client.login_as_e2e_user().await;
 
@@ -393,12 +397,6 @@ pub async fn test_smart_pull_as(kamu_api_server_client: KamuApiServerClient) {
             Some(AccountName::new_unchecked(E2E_USER_ACCOUNT_NAME_STR)),
         )
         .await;
-
-    let kamu_api_server_dataset_endpoint = get_dataset_endpoint(
-        kamu_api_server_client.get_base_url(),
-        &dataset_name,
-        E2E_USER_ACCOUNT_NAME_STR,
-    );
 
     {
         let kamu_in_pull_workspace = KamuCliPuppet::new_workspace_tmp().await;
@@ -430,22 +428,22 @@ pub async fn test_smart_pull_as(kamu_api_server_client: KamuApiServerClient) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_smart_push_pull_all(kamu_api_server_client: KamuApiServerClient) {
-    let dataset_name = DatasetName::new_unchecked("player-scores");
-    let dataset_derivative_name = DatasetName::new_unchecked("leaderboard");
+    let root_dataset_alias = DatasetAlias::new(
+        Some(AccountName::new_unchecked("e2e-user")),
+        DatasetName::new_unchecked("player-scores"),
+    );
+    let kamu_api_server_root_dataset_endpoint =
+        kamu_api_server_client.get_dataset_endpoint(&root_dataset_alias);
+
+    let derivative_dataset_alias = DatasetAlias::new(
+        Some(AccountName::new_unchecked("e2e-user")),
+        DatasetName::new_unchecked("leaderboard"),
+    );
+    let kamu_api_server_derivative_dataset_endpoint =
+        kamu_api_server_client.get_dataset_endpoint(&derivative_dataset_alias);
 
     // 1. Grub a token
     let token = kamu_api_server_client.login_as_e2e_user().await;
-
-    let kamu_api_server_root_dataset_endpoint = get_dataset_endpoint(
-        kamu_api_server_client.get_base_url(),
-        &dataset_name,
-        E2E_USER_ACCOUNT_NAME_STR,
-    );
-    let kamu_api_server_derivative_dataset_endpoint = get_dataset_endpoint(
-        kamu_api_server_client.get_base_url(),
-        &dataset_derivative_name,
-        E2E_USER_ACCOUNT_NAME_STR,
-    );
 
     let mut kamu_in_push_workspace = KamuCliPuppet::new_workspace_tmp().await;
 
@@ -474,7 +472,7 @@ pub async fn test_smart_push_pull_all(kamu_api_server_client: KamuApiServerClien
         {
             kamu_in_push_workspace
                 .ingest_data(
-                    &dataset_name,
+                    &root_dataset_alias.dataset_name,
                     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
                 )
                 .await;
@@ -504,7 +502,7 @@ pub async fn test_smart_push_pull_all(kamu_api_server_client: KamuApiServerClien
             &kamu_in_push_workspace,
             vec![
                 "push",
-                dataset_name.as_str(),
+                root_dataset_alias.dataset_name.as_str(),
                 "--to",
                 kamu_api_server_root_dataset_endpoint.as_str(),
             ],
@@ -513,7 +511,7 @@ pub async fn test_smart_push_pull_all(kamu_api_server_client: KamuApiServerClien
         .await;
 
         kamu_in_push_workspace
-            .execute(["pull", dataset_derivative_name.as_str()])
+            .execute(["pull", derivative_dataset_alias.dataset_name.as_str()])
             .await
             .success();
 
@@ -521,7 +519,7 @@ pub async fn test_smart_push_pull_all(kamu_api_server_client: KamuApiServerClien
             &kamu_in_push_workspace,
             vec![
                 "push",
-                dataset_derivative_name.as_str(),
+                derivative_dataset_alias.dataset_name.as_str(),
                 "--to",
                 kamu_api_server_derivative_dataset_endpoint.as_str(),
             ],
@@ -597,11 +595,15 @@ pub async fn test_smart_push_pull_all(kamu_api_server_client: KamuApiServerClien
         );
 
         kamu_in_pull_workspace
-            .assert_last_data_slice(&dataset_name, expected_schema, expected_data)
+            .assert_last_data_slice(
+                &root_dataset_alias.dataset_name,
+                expected_schema,
+                expected_data,
+            )
             .await;
         kamu_in_pull_workspace
             .assert_last_data_slice(
-                &dataset_derivative_name,
+                &derivative_dataset_alias.dataset_name,
                 expected_derivative_schema,
                 expected_derivative_data,
             )
@@ -611,13 +613,13 @@ pub async fn test_smart_push_pull_all(kamu_api_server_client: KamuApiServerClien
 
         kamu_in_push_workspace
             .ingest_data(
-                &dataset_name,
+                &root_dataset_alias.dataset_name,
                 DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_2,
             )
             .await;
         run_and_assert_command_success(
             &kamu_in_push_workspace,
-            vec!["pull", dataset_derivative_name.as_str()],
+            vec!["pull", derivative_dataset_alias.dataset_name.as_str()],
             "1 dataset(s) updated",
         )
         .await;
@@ -626,7 +628,7 @@ pub async fn test_smart_push_pull_all(kamu_api_server_client: KamuApiServerClien
             &kamu_in_push_workspace,
             vec![
                 "push",
-                dataset_name.as_str(),
+                root_dataset_alias.dataset_name.as_str(),
                 "--to",
                 kamu_api_server_root_dataset_endpoint.as_str(),
             ],
@@ -637,7 +639,7 @@ pub async fn test_smart_push_pull_all(kamu_api_server_client: KamuApiServerClien
             &kamu_in_push_workspace,
             vec![
                 "push",
-                dataset_derivative_name.as_str(),
+                derivative_dataset_alias.dataset_name.as_str(),
                 "--to",
                 kamu_api_server_derivative_dataset_endpoint.as_str(),
             ],
@@ -676,11 +678,15 @@ pub async fn test_smart_push_pull_all(kamu_api_server_client: KamuApiServerClien
         );
 
         kamu_in_pull_workspace
-            .assert_last_data_slice(&dataset_name, expected_schema, expected_data)
+            .assert_last_data_slice(
+                &root_dataset_alias.dataset_name,
+                expected_schema,
+                expected_data,
+            )
             .await;
         kamu_in_pull_workspace
             .assert_last_data_slice(
-                &dataset_derivative_name,
+                &derivative_dataset_alias.dataset_name,
                 expected_derivative_schema,
                 expected_derivative_data,
             )
@@ -691,17 +697,21 @@ pub async fn test_smart_push_pull_all(kamu_api_server_client: KamuApiServerClien
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_smart_push_pull_recursive(kamu_api_server_client: KamuApiServerClient) {
-    let dataset_name = DatasetName::new_unchecked("player-scores");
-    let dataset_derivative_name = DatasetName::new_unchecked("leaderboard");
+    let root_dataset_alias = DatasetAlias::new(
+        Some(AccountName::new_unchecked("e2e-user")),
+        DatasetName::new_unchecked("player-scores"),
+    );
+    let kamu_api_server_root_dataset_endpoint =
+        kamu_api_server_client.get_dataset_endpoint(&root_dataset_alias);
+
+    let derivative_dataset_alias = DatasetAlias::new(
+        Some(AccountName::new_unchecked("e2e-user")),
+        DatasetName::new_unchecked("leaderboard"),
+    );
 
     // 1. Grub a token
     let token = kamu_api_server_client.login_as_e2e_user().await;
 
-    let kamu_api_server_root_dataset_endpoint = get_dataset_endpoint(
-        kamu_api_server_client.get_base_url(),
-        &dataset_name,
-        E2E_USER_ACCOUNT_NAME_STR,
-    );
     let mut kamu_in_push_workspace = KamuCliPuppet::new_workspace_tmp().await;
 
     // 2. Pushing datasets to the API server
@@ -721,7 +731,7 @@ pub async fn test_smart_push_pull_recursive(kamu_api_server_client: KamuApiServe
         {
             kamu_in_push_workspace
                 .ingest_data(
-                    &dataset_name,
+                    &root_dataset_alias.dataset_name,
                     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
                 )
                 .await;
@@ -741,7 +751,11 @@ pub async fn test_smart_push_pull_recursive(kamu_api_server_client: KamuApiServe
         // Push all datasets should fail
         run_and_assert_command_failure(
             &kamu_in_push_workspace,
-            vec!["push", dataset_name.as_str(), "--recursive"],
+            vec![
+                "push",
+                root_dataset_alias.dataset_name.as_str(),
+                "--recursive",
+            ],
             "Recursive push is not yet supported",
         )
         .await;
@@ -751,7 +765,7 @@ pub async fn test_smart_push_pull_recursive(kamu_api_server_client: KamuApiServe
             &kamu_in_push_workspace,
             vec![
                 "push",
-                dataset_name.as_str(),
+                root_dataset_alias.dataset_name.as_str(),
                 "--to",
                 kamu_api_server_root_dataset_endpoint.as_str(),
             ],
@@ -784,7 +798,7 @@ pub async fn test_smart_push_pull_recursive(kamu_api_server_client: KamuApiServe
 
         run_and_assert_command_success(
             &kamu_in_pull_workspace,
-            vec!["pull", dataset_derivative_name.as_str()],
+            vec!["pull", derivative_dataset_alias.dataset_name.as_str()],
             "1 dataset(s) updated",
         )
         .await;
@@ -838,11 +852,15 @@ pub async fn test_smart_push_pull_recursive(kamu_api_server_client: KamuApiServe
         );
 
         kamu_in_pull_workspace
-            .assert_last_data_slice(&dataset_name, expected_schema, expected_data)
+            .assert_last_data_slice(
+                &root_dataset_alias.dataset_name,
+                expected_schema,
+                expected_data,
+            )
             .await;
         kamu_in_pull_workspace
             .assert_last_data_slice(
-                &dataset_derivative_name,
+                &derivative_dataset_alias.dataset_name,
                 expected_derivative_schema,
                 expected_derivative_data,
             )
@@ -852,7 +870,7 @@ pub async fn test_smart_push_pull_recursive(kamu_api_server_client: KamuApiServe
 
         kamu_in_push_workspace
             .ingest_data(
-                &dataset_name,
+                &root_dataset_alias.dataset_name,
                 DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_2,
             )
             .await;
@@ -860,7 +878,7 @@ pub async fn test_smart_push_pull_recursive(kamu_api_server_client: KamuApiServe
             &kamu_in_push_workspace,
             vec![
                 "push",
-                dataset_name.as_str(),
+                root_dataset_alias.dataset_name.as_str(),
                 "--to",
                 kamu_api_server_root_dataset_endpoint.as_str(),
             ],
@@ -871,7 +889,11 @@ pub async fn test_smart_push_pull_recursive(kamu_api_server_client: KamuApiServe
         // Pull all datasets
         run_and_assert_command_success(
             &kamu_in_pull_workspace,
-            vec!["pull", dataset_derivative_name.as_str(), "--recursive"],
+            vec![
+                "pull",
+                derivative_dataset_alias.dataset_name.as_str(),
+                "--recursive",
+            ],
             "2 dataset(s) updated",
         )
         .await;
@@ -899,11 +921,15 @@ pub async fn test_smart_push_pull_recursive(kamu_api_server_client: KamuApiServe
         );
 
         kamu_in_pull_workspace
-            .assert_last_data_slice(&dataset_name, expected_schema, expected_data)
+            .assert_last_data_slice(
+                &root_dataset_alias.dataset_name,
+                expected_schema,
+                expected_data,
+            )
             .await;
         kamu_in_pull_workspace
             .assert_last_data_slice(
-                &dataset_derivative_name,
+                &derivative_dataset_alias.dataset_name,
                 expected_derivative_schema,
                 expected_derivative_data,
             )
@@ -1058,16 +1084,15 @@ pub async fn test_smart_pull_reset_derivative(kamu: KamuCliPuppet) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_smart_push_visibility(kamu_api_server_client: KamuApiServerClient) {
-    let dataset_name = DatasetName::new_unchecked("player-scores");
+    let dataset_alias = DatasetAlias::new(
+        Some(AccountName::new_unchecked("e2e-user")),
+        DatasetName::new_unchecked("player-scores"),
+    );
+    let kamu_api_server_dataset_endpoint =
+        kamu_api_server_client.get_dataset_endpoint(&dataset_alias);
 
     // 1. Grub a token
     let token = kamu_api_server_client.login_as_e2e_user().await;
-
-    let kamu_api_server_dataset_endpoint = get_dataset_endpoint(
-        kamu_api_server_client.get_base_url(),
-        &dataset_name,
-        E2E_USER_ACCOUNT_NAME_STR,
-    );
 
     // 2. Pushing the dataset to the API server
     {
@@ -1085,7 +1110,7 @@ pub async fn test_smart_push_visibility(kamu_api_server_client: KamuApiServerCli
         {
             kamu_in_push_workspace
                 .ingest_data(
-                    &dataset_name,
+                    &dataset_alias.dataset_name,
                     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
                 )
                 .await;
@@ -1106,7 +1131,7 @@ pub async fn test_smart_push_visibility(kamu_api_server_client: KamuApiServerCli
             &kamu_in_push_workspace,
             vec![
                 "push",
-                dataset_name.as_str(),
+                dataset_alias.dataset_name.as_str(),
                 "--to",
                 kamu_api_server_dataset_endpoint.as_str(),
                 "--visibility",
@@ -1274,22 +1299,6 @@ pub async fn test_smart_pull_derivative(kamu: KamuCliPuppet) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Helpers
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-fn get_dataset_endpoint(
-    base_url: &Url,
-    dataset_name: &DatasetName,
-    account_name_str: &str,
-) -> String {
-    let mut dataset_endpoint = Url::parse("odf+http://host").unwrap();
-
-    dataset_endpoint.set_host(base_url.host_str()).unwrap();
-    dataset_endpoint.set_port(base_url.port()).unwrap();
-
-    dataset_endpoint
-        .join(format!("{account_name_str}/{dataset_name}").as_str())
-        .unwrap()
-        .to_string()
-}
 
 async fn run_and_assert_command_success(
     kamu: &KamuCliPuppet,

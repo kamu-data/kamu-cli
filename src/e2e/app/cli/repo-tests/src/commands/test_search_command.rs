@@ -15,7 +15,6 @@ use kamu_cli_e2e_common::{
 };
 use kamu_cli_puppet::KamuCliPuppet;
 use opendatafabric::*;
-use reqwest::Url;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -344,16 +343,13 @@ async fn add_repo_to_workspace(
     kamu: &KamuCliPuppet,
     repo_name: &str,
 ) {
-    let http_repo = {
-        let mut url = Url::parse("odf+http://host").unwrap();
-        let base_url = kamu_node_api_client.get_base_url();
-        url.set_host(base_url.host_str()).unwrap();
-        url.set_port(base_url.port()).unwrap();
-        url
-    };
-
     let assert = kamu
-        .execute(["repo", "add", repo_name, http_repo.as_str()])
+        .execute([
+            "repo",
+            "add",
+            repo_name,
+            kamu_node_api_client.get_node_url().as_str(),
+        ])
         .await
         .success();
 
