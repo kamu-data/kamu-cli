@@ -1229,8 +1229,24 @@ pub async fn test_smart_pull_derivative(kamu: KamuCliPuppet) {
     {
         let assert = kamu
             .execute([
-                "tail",
-                dataset_derivative_name.as_str(),
+                "sql",
+                "--engine",
+                "datafusion",
+                "--command",
+                // Without unstable "offset" column.
+                // For a beautiful output, cut to seconds
+                indoc::indoc!(
+                    r#"
+                    SELECT op,
+                           system_time,
+                           DATE_TRUNC('second', match_time) as match_time,
+                           match_id,
+                           player_id,
+                           score
+                    FROM "player-scores"
+                    ORDER BY match_time;
+                    "#
+                ),
                 "--output-format",
                 "table",
             ])
@@ -1242,12 +1258,12 @@ pub async fn test_smart_pull_derivative(kamu: KamuCliPuppet) {
         pretty_assertions::assert_eq!(
             indoc::indoc!(
                 r#"
-                ┌────────┬────┬──────────────────────┬──────────────────────────┬───────┬──────────┬───────────┬───────┐
-                │ offset │ op │     system_time      │        match_time        │ place │ match_id │ player_id │ score │
-                ├────────┼────┼──────────────────────┼──────────────────────────┼───────┼──────────┼───────────┼───────┤
-                │      0 │ +A │ 2050-01-02T03:04:05Z │     2000-01-01T00:00:00Z │     1 │        1 │     Alice │   100 │
-                │      1 │ +A │ 2050-01-02T03:04:05Z │ 2000-01-01T00:00:00.001Z │     2 │        1 │       Bob │    80 │
-                └────────┴────┴──────────────────────┴──────────────────────────┴───────┴──────────┴───────────┴───────┘
+                ┌────┬──────────────────────┬──────────────────────┬──────────┬───────────┬───────┐
+                │ op │     system_time      │      match_time      │ match_id │ player_id │ score │
+                ├────┼──────────────────────┼──────────────────────┼──────────┼───────────┼───────┤
+                │  0 │ 2050-01-02T03:04:05Z │ 2000-01-01T00:00:00Z │        1 │     Alice │   100 │
+                │  0 │ 2050-01-02T03:04:05Z │ 2000-01-01T00:00:00Z │        1 │       Bob │    80 │
+                └────┴──────────────────────┴──────────────────────┴──────────┴───────────┴───────┘
                 "#
             ),
             stdout
