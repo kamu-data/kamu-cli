@@ -355,16 +355,20 @@ impl KamuCliPuppetExt for KamuCliPuppet {
 
     async fn assert_failure_command_execution_with_input<I, S, T>(
         &self,
-        _cmd: I,
-        _input: T,
-        _maybe_expected_stdout: Option<&str>,
-        _maybe_expected_stderr: Option<impl IntoIterator<Item = &str> + Send>,
+        cmd: I,
+        input: T,
+        maybe_expected_stdout: Option<&str>,
+        maybe_expected_stderr: Option<impl IntoIterator<Item = &str> + Send>,
     ) where
         I: IntoIterator<Item = S> + Send,
         S: AsRef<std::ffi::OsStr>,
         T: Into<Vec<u8>> + Send,
     {
-        todo!()
+        assert_execute_command_result(
+            &self.execute_with_input(cmd, input).await.failure(),
+            maybe_expected_stdout,
+            maybe_expected_stderr,
+        );
     }
 }
 
