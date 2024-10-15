@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use kamu_cli_puppet::extensions::KamuCliPuppetExt;
 use kamu_cli_puppet::KamuCliPuppet;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -14,223 +15,151 @@ use kamu_cli_puppet::KamuCliPuppet;
 pub async fn test_config_set_value(kamu: KamuCliPuppet) {
     // 0. CI sets container runtime to podman for some targets, so we simulate this
     //    behavior for all others.
-    {
-        let assert = kamu
-            .execute(["config", "set", "engine.runtime", "podman"])
-            .await
-            .success();
-
-        let stderr = std::str::from_utf8(&assert.get_output().stderr).unwrap();
-
-        assert!(
-            stderr.contains("Set engine.runtime to podman in workspace scope"),
-            "Unexpected output:\n{stderr}",
-        );
-    }
+    kamu.assert_success_command_execution(
+        ["config", "set", "engine.runtime", "podman"],
+        None,
+        Some("Set engine.runtime to podman in workspace scope"),
+    )
+    .await;
 
     // 1. Set flow for the "engine.networkNs" key
-    {
-        let assert = kamu.execute(["config", "list"]).await.success();
-        let stdout = std::str::from_utf8(&assert.get_output().stdout).unwrap();
+    kamu.assert_success_command_execution(
+        ["config", "list"],
+        Some(indoc::indoc!(
+            r#"
+            engine:
+              runtime: podman
 
-        pretty_assertions::assert_eq!(
-            indoc::indoc!(
-                r#"
-                engine:
-                  runtime: podman
+            "#
+        )),
+        None,
+    )
+    .await;
 
-                "#
-            ),
-            stdout
-        );
-    }
-    {
-        let assert = kamu
-            .execute(["config", "set", "engine.networkNs", "host"])
-            .await
-            .success();
+    kamu.assert_success_command_execution(
+        ["config", "set", "engine.networkNs", "host"],
+        None,
+        Some("Set engine.networkNs to host in workspace scope"),
+    )
+    .await;
 
-        let stderr = std::str::from_utf8(&assert.get_output().stderr).unwrap();
+    kamu.assert_success_command_execution(
+        ["config", "get", "engine.networkNs"],
+        Some(indoc::indoc!(
+            r#"
+            host
 
-        assert!(
-            stderr.contains("Set engine.networkNs to host in workspace scope"),
-            "Unexpected output:\n{stderr}",
-        );
-    }
-    {
-        let assert = kamu
-            .execute(["config", "get", "engine.networkNs"])
-            .await
-            .success();
+            "#
+        )),
+        None,
+    )
+    .await;
 
-        let stdout = std::str::from_utf8(&assert.get_output().stdout).unwrap();
+    kamu.assert_success_command_execution(
+        ["config", "list"],
+        Some(indoc::indoc!(
+            r#"
+            engine:
+              runtime: podman
+              networkNs: host
 
-        pretty_assertions::assert_eq!(
-            indoc::indoc!(
-                r#"
-                host
+            "#
+        )),
+        None,
+    )
+    .await;
 
-                "#
-            ),
-            stdout
-        );
-    }
-    {
-        let assert = kamu.execute(["config", "list"]).await.success();
-        let stdout = std::str::from_utf8(&assert.get_output().stdout).unwrap();
-
-        pretty_assertions::assert_eq!(
-            indoc::indoc!(
-                r#"
-                engine:
-                  runtime: podman
-                  networkNs: host
-
-                "#
-            ),
-            stdout
-        );
-    }
     // 2. Set flow for the "uploads.maxFileSizeInMb" key
-    {
-        let assert = kamu
-            .execute(["config", "set", "uploads.maxFileSizeInMb", "42"])
-            .await
-            .success();
+    kamu.assert_success_command_execution(
+        ["config", "set", "uploads.maxFileSizeInMb", "42"],
+        None,
+        Some("Set uploads.maxFileSizeInMb to 42 in workspace scope"),
+    )
+    .await;
 
-        let stderr = std::str::from_utf8(&assert.get_output().stderr).unwrap();
+    kamu.assert_success_command_execution(
+        ["config", "get", "uploads.maxFileSizeInMb"],
+        Some(indoc::indoc!(
+            r#"
+            42
 
-        assert!(
-            stderr.contains("Set uploads.maxFileSizeInMb to 42 in workspace scope"),
-            "Unexpected output:\n{stderr}",
-        );
-    }
-    {
-        let assert = kamu
-            .execute(["config", "get", "uploads.maxFileSizeInMb"])
-            .await
-            .success();
+            "#
+        )),
+        None,
+    )
+    .await;
 
-        let stdout = std::str::from_utf8(&assert.get_output().stdout).unwrap();
+    kamu.assert_success_command_execution(
+        ["config", "list"],
+        Some(indoc::indoc!(
+            r#"
+            engine:
+              runtime: podman
+              networkNs: host
+            uploads:
+              maxFileSizeInMb: 42
 
-        pretty_assertions::assert_eq!(
-            indoc::indoc!(
-                r#"
-                42
-
-                "#
-            ),
-            stdout
-        );
-    }
-    {
-        let assert = kamu.execute(["config", "list"]).await.success();
-        let stdout = std::str::from_utf8(&assert.get_output().stdout).unwrap();
-
-        pretty_assertions::assert_eq!(
-            indoc::indoc!(
-                r#"
-                engine:
-                  runtime: podman
-                  networkNs: host
-                uploads:
-                  maxFileSizeInMb: 42
-
-                "#
-            ),
-            stdout
-        );
-    }
+            "#
+        )),
+        None,
+    )
+    .await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_config_reset_key(kamu: KamuCliPuppet) {
-    {
-        let assert = kamu
-            .execute(["config", "set", "engine.networkNs", "host"])
-            .await
-            .success();
+    kamu.assert_success_command_execution(
+        ["config", "set", "engine.networkNs", "host"],
+        None,
+        Some("Set engine.networkNs to host in workspace scope"),
+    )
+    .await;
 
-        let stderr = std::str::from_utf8(&assert.get_output().stderr).unwrap();
+    kamu.assert_success_command_execution(
+        ["config", "set", "engine.networkNs"],
+        None,
+        Some("Removed engine.networkNs from workspace scope"),
+    )
+    .await;
 
-        assert!(
-            stderr.contains("Set engine.networkNs to host in workspace scope"),
-            "Unexpected output:\n{stderr}",
-        );
-    }
-    {
-        let assert = kamu
-            .execute(["config", "set", "engine.networkNs"])
-            .await
-            .success();
-
-        let stderr = std::str::from_utf8(&assert.get_output().stderr).unwrap();
-
-        assert!(
-            stderr.contains("Removed engine.networkNs from workspace scope"),
-            "Unexpected output:\n{stderr}",
-        );
-    }
-    {
-        let assert = kamu
-            .execute(["config", "get", "engine.networkNs"])
-            .await
-            .failure();
-
-        let stderr = std::str::from_utf8(&assert.get_output().stderr).unwrap();
-
-        assert!(
-            stderr.contains("Error: Key engine.networkNs not found"),
-            "Unexpected output:\n{stderr}",
-        );
-    }
+    kamu.assert_failure_command_execution(
+        ["config", "get", "engine.networkNs"],
+        None,
+        Some("Error: Key engine.networkNs not found"),
+    )
+    .await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_config_get_with_default(kamu: KamuCliPuppet) {
-    {
-        let assert = kamu
-            .execute(["config", "get", "engine.networkNs"])
-            .await
-            .failure();
+    kamu.assert_failure_command_execution(
+        ["config", "get", "engine.networkNs"],
+        None,
+        Some("Error: Key engine.networkNs not found"),
+    )
+    .await;
 
-        let stderr = std::str::from_utf8(&assert.get_output().stderr).unwrap();
+    kamu.assert_success_command_execution(
+        ["config", "get", "engine.networkNs", "--with-defaults"],
+        Some(indoc::indoc!(
+            r#"
+            private
 
-        assert!(
-            stderr.contains("Error: Key engine.networkNs not found"),
-            "Unexpected output:\n{stderr}",
-        );
-    }
-    {
-        let assert = kamu
-            .execute(["config", "get", "engine.networkNs", "--with-defaults"])
-            .await
-            .success();
-
-        let stdout = std::str::from_utf8(&assert.get_output().stdout).unwrap();
-
-        pretty_assertions::assert_eq!(
-            indoc::indoc!(
-                r#"
-                private
-
-                "#
-            ),
-            stdout
-        );
-    }
+            "#
+        )),
+        None,
+    )
+    .await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_config_get_from_config(kamu: KamuCliPuppet) {
-    let assert = kamu.execute(["config", "list"]).await.success();
-    let stdout = std::str::from_utf8(&assert.get_output().stdout).unwrap();
-
-    pretty_assertions::assert_eq!(
-        indoc::indoc!(
+    kamu.assert_success_command_execution(
+        ["config", "list"],
+        Some(indoc::indoc!(
             r#"
             engine:
               runtime: podman
@@ -238,9 +167,10 @@ pub async fn test_config_get_from_config(kamu: KamuCliPuppet) {
               maxFileSizeInMb: 42
 
             "#
-        ),
-        stdout
-    );
+        )),
+        None,
+    )
+    .await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

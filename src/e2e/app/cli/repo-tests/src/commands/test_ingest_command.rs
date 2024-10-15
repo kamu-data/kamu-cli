@@ -403,9 +403,9 @@ async fn assert_ingest_data_to_player_scores_from_stdio<I, S, T>(
     ingest_data: T,
     expected_tail_table: &str,
 ) where
-    I: IntoIterator<Item = S> + Clone,
+    I: IntoIterator<Item = S> + Send + Clone,
     S: AsRef<std::ffi::OsStr>,
-    T: Into<Vec<u8>> + Clone,
+    T: Into<Vec<u8>> + Send + Clone,
 {
     // Ingest
     kamu.assert_success_command_execution_with_input(
