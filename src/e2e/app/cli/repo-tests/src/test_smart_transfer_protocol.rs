@@ -173,17 +173,18 @@ pub async fn test_smart_force_push_pull(kamu_api_server_client: KamuApiServerCli
             .success();
 
         // Should fail without force flag
-        run_and_assert_command_failure(
-            &kamu_in_push_workspace,
-            vec![
-                "push",
-                dataset_alias.dataset_name.as_str(),
-                "--to",
-                kamu_api_server_dataset_endpoint.as_str(),
-            ],
-            "Failed to push 1 dataset(s)",
-        )
-        .await;
+        kamu_in_push_workspace
+            .assert_failure_command_execution(
+                [
+                    "push",
+                    dataset_alias.dataset_name.as_str(),
+                    "--to",
+                    kamu_api_server_dataset_endpoint.as_str(),
+                ],
+                None,
+                Some("Failed to push 1 dataset(s)"),
+            )
+            .await;
 
         // Should successfully push with force flag
         kamu_in_push_workspace
@@ -228,12 +229,13 @@ pub async fn test_smart_force_push_pull(kamu_api_server_client: KamuApiServerCli
             .await;
 
         // Should fail without force flag
-        run_and_assert_command_failure(
-            &kamu_in_pull_workspace,
-            vec!["pull", kamu_api_server_dataset_endpoint.as_str()],
-            "Failed to update 1 dataset(s)",
-        )
-        .await;
+        kamu_in_pull_workspace
+            .assert_failure_command_execution(
+                ["pull", kamu_api_server_dataset_endpoint.as_str()],
+                None,
+                Some("Failed to update 1 dataset(s)"),
+            )
+            .await;
 
         // Should successfully pull with force flag
         kamu_in_pull_workspace
@@ -501,12 +503,13 @@ pub async fn test_smart_push_pull_all(kamu_api_server_client: KamuApiServerClien
             .success();
 
         // Push all datasets should fail
-        run_and_assert_command_failure(
-            &kamu_in_push_workspace,
-            vec!["push", "--all"],
-            "Pushing all datasets is not yet supported",
-        )
-        .await;
+        kamu_in_push_workspace
+            .assert_failure_command_execution(
+                ["push", "--all"],
+                None,
+                Some("Pushing all datasets is not yet supported"),
+            )
+            .await;
 
         // Push datasets one by one
         kamu_in_push_workspace
@@ -767,16 +770,17 @@ pub async fn test_smart_push_pull_recursive(kamu_api_server_client: KamuApiServe
             .success();
 
         // Push all datasets should fail
-        run_and_assert_command_failure(
-            &kamu_in_push_workspace,
-            vec![
-                "push",
-                root_dataset_alias.dataset_name.as_str(),
-                "--recursive",
-            ],
-            "Recursive push is not yet supported",
-        )
-        .await;
+        kamu_in_push_workspace
+            .assert_failure_command_execution(
+                [
+                    "push",
+                    root_dataset_alias.dataset_name.as_str(),
+                    "--recursive",
+                ],
+                None,
+                Some("Recursive push is not yet supported"),
+            )
+            .await;
 
         // Push dataset
         kamu_in_push_workspace
@@ -1063,10 +1067,10 @@ pub async fn test_smart_pull_reset_derivative(kamu: KamuCliPuppet) {
     .success();
 
     // Pull derivative should fail
-    run_and_assert_command_failure(
-        &kamu,
-        vec!["pull", dataset_derivative_name.as_str()],
-        "Failed to update 1 dataset(s)",
+    kamu.assert_failure_command_execution(
+        ["pull", dataset_derivative_name.as_str()],
+        None,
+        Some("Failed to update 1 dataset(s)"),
     )
     .await;
 
@@ -1259,15 +1263,15 @@ pub async fn test_smart_pull_derivative(kamu: KamuCliPuppet) {
     )
     .await;
 
-    run_and_assert_command_failure(
-        &kamu,
-        vec![
+    kamu.assert_failure_command_execution(
+        [
             "tail",
             dataset_derivative_name.as_str(),
             "--output-format",
             "table",
         ],
-        "Error: Dataset schema is not yet available: leaderboard",
+        None,
+        Some("Error: Dataset schema is not yet available: leaderboard"),
     )
     .await;
 
@@ -1289,25 +1293,6 @@ pub async fn test_smart_pull_derivative(kamu: KamuCliPuppet) {
         "#
     ))
     .await;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Helpers
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-async fn run_and_assert_command_failure(
-    kamu: &KamuCliPuppet,
-    args: Vec<&str>,
-    expected_message: &str,
-) {
-    let assert = kamu.execute(args).await.failure();
-
-    let stderr = std::str::from_utf8(&assert.get_output().stderr).unwrap();
-
-    assert!(
-        stderr.contains(expected_message),
-        "Unexpected output:\n{stderr}",
-    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

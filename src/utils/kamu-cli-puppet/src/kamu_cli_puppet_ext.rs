@@ -41,19 +41,33 @@ pub trait KamuCliPuppetExt {
         I: IntoIterator<Item = S> + Send,
         S: AsRef<std::ffi::OsStr>;
 
-    async fn assert_success_command_execution_with_input<I, S, T>(&self, cmd: I, input: T)
-    where
+    async fn assert_success_command_execution_with_input<I, S, T>(
+        &self,
+        cmd: I,
+        input: T,
+        maybe_expected_stdout: Option<&str>,
+        maybe_expected_stderr: Option<&str>,
+    ) where
         I: IntoIterator<Item = S> + Send,
         S: AsRef<std::ffi::OsStr>,
         T: Into<Vec<u8>> + Send;
 
-    async fn assert_failure_command_execution<I, S>(&self, cmd: I)
-    where
+    async fn assert_failure_command_execution<I, S>(
+        &self,
+        cmd: I,
+        maybe_expected_stdout: Option<&str>,
+        maybe_expected_stderr: Option<&str>,
+    ) where
         I: IntoIterator<Item = S> + Send,
         S: AsRef<std::ffi::OsStr>;
 
-    async fn assert_failure_command_execution_with_input<I, S, T>(&self, cmd: I, input: T)
-    where
+    async fn assert_failure_command_execution_with_input<I, S, T>(
+        &self,
+        cmd: I,
+        input: T,
+        maybe_expected_stdout: Option<&str>,
+        maybe_expected_stderr: Option<&str>,
+    ) where
         I: IntoIterator<Item = S> + Send,
         S: AsRef<std::ffi::OsStr>,
         T: Into<Vec<u8>> + Send;
@@ -308,16 +322,30 @@ impl KamuCliPuppetExt for KamuCliPuppet {
         .await;
     }
 
-    async fn assert_failure_command_execution<I, S>(&self, _cmd: I)
-    where
+    async fn assert_failure_command_execution<I, S>(
+        &self,
+        cmd: I,
+        maybe_expected_stdout: Option<&str>,
+        maybe_expected_stderr: Option<&str>,
+    ) where
         I: IntoIterator<Item = S> + Send,
         S: AsRef<std::ffi::OsStr>,
     {
-        todo!()
+        assert_execute_command_result(
+            self.execute(cmd).await.failure(),
+            maybe_expected_stdout,
+            maybe_expected_stderr,
+        )
+        .await;
     }
 
-    async fn assert_success_command_execution_with_input<I, S, T>(&self, _cmd: I, _input: T)
-    where
+    async fn assert_success_command_execution_with_input<I, S, T>(
+        &self,
+        _cmd: I,
+        _input: T,
+        _maybe_expected_stdout: Option<&str>,
+        _maybe_expected_stderr: Option<&str>,
+    ) where
         I: IntoIterator<Item = S> + Send,
         S: AsRef<std::ffi::OsStr>,
         T: Into<Vec<u8>> + Send,
@@ -325,8 +353,13 @@ impl KamuCliPuppetExt for KamuCliPuppet {
         todo!()
     }
 
-    async fn assert_failure_command_execution_with_input<I, S, T>(&self, _cmd: I, _input: T)
-    where
+    async fn assert_failure_command_execution_with_input<I, S, T>(
+        &self,
+        _cmd: I,
+        _input: T,
+        _maybe_expected_stdout: Option<&str>,
+        _maybe_expected_stderr: Option<&str>,
+    ) where
         I: IntoIterator<Item = S> + Send,
         S: AsRef<std::ffi::OsStr>,
         T: Into<Vec<u8>> + Send,
