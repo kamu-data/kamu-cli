@@ -11,7 +11,7 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## [Unreleased]
+## [0.205.0] - 2024-10-15
 ### Changed
 - `kamu push <dataset>` command now can be called without `--to` reference and Alias or Remote dataset repository will be used as destination
 - `kamu login` command now will store repository to Repository registry. Name can be provided with `--repo-name` flag and to skip creating repo can be used `--skip-add-repo` flag
