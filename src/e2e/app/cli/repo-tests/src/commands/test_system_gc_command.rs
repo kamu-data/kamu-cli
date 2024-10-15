@@ -7,19 +7,18 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use kamu_cli_puppet::extensions::KamuCliPuppetExt;
 use kamu_cli_puppet::KamuCliPuppet;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_gc(kamu: KamuCliPuppet) {
-    let assert = kamu.execute(["system", "gc"]).await.success();
-
-    let stderr = std::str::from_utf8(&assert.get_output().stderr).unwrap();
-
-    assert!(
-        stderr.contains("Cleaning cache...") && stderr.contains("Workspace is already clean"),
-        "Unexpected output:\n{stderr}",
-    );
+    kamu.assert_success_command_execution(
+        ["system", "gc"],
+        None,
+        Some(["Cleaning cache...", "Workspace is already clean"]),
+    )
+    .await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
