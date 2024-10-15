@@ -7,32 +7,29 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use kamu_cli_puppet::extensions::KamuCliPuppetExt;
 use kamu_cli_puppet::KamuCliPuppet;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_gql_query_api_version(kamu: KamuCliPuppet) {
-    let assert = kamu
-        .execute([
+    kamu.assert_success_command_execution(
+        [
             "system",
             "api-server",
             "gql-query",
             "{apiVersion}".escape_default().to_string().as_str(),
-        ])
-        .await
-        .success();
-    let stdout = std::str::from_utf8(&assert.get_output().stdout).unwrap();
-
-    assert_eq!(
-        stdout,
-        indoc::indoc!(
+        ],
+        Some(indoc::indoc!(
             r#"
             {
               "apiVersion": "0.1"
             }
             "#
-        )
-    );
+        )),
+        None,
+    )
+    .await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
