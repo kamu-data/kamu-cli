@@ -1138,6 +1138,15 @@ impl SyncService for TestSyncService {
         unimplemented!()
     }
 
+    async fn sync_new(
+        &self,
+        _request: SyncRequestNew,
+        _options: SyncOptions,
+        _listener: Option<Arc<dyn SyncListener>>,
+    ) -> Result<SyncResult, SyncError> {
+        unimplemented!()
+    }
+
     async fn sync_multi(
         &self,
         requests: Vec<SyncRequest>,
@@ -1182,6 +1191,15 @@ impl SyncService for TestSyncService {
         }
         self.calls.lock().unwrap().push(PullBatch::Sync(call));
         results
+    }
+
+    async fn sync_multi_new(
+        &self,
+        _requests: Vec<SyncRequestNew>,
+        _options: SyncOptions,
+        _listener: Option<Arc<dyn SyncMultiListener>>,
+    ) -> Vec<SyncResultMulti> {
+        unimplemented!()
     }
 
     async fn ipfs_add(&self, _src: &DatasetRef) -> Result<String, SyncError> {

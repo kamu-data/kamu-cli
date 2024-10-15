@@ -12,6 +12,7 @@ use std::collections::HashSet;
 use internal_error::InternalError;
 use kamu_core::auth::{
     self,
+    ClassifyByAllowanceResponse,
     DatasetAction,
     DatasetActionAuthorizer,
     DatasetActionNotEnoughPermissionsError,
@@ -41,6 +42,12 @@ mockall::mock! {
             dataset_handles: Vec<DatasetHandle>,
             action: DatasetAction,
         ) -> Result<Vec<DatasetHandle>, InternalError>;
+
+        async fn classify_datasets_by_allowance(
+            &self,
+            dataset_handles: Vec<DatasetHandle>,
+            action: DatasetAction,
+        ) -> Result<ClassifyByAllowanceResponse, InternalError>;
     }
 }
 

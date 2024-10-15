@@ -10,7 +10,7 @@
 use std::sync::Arc;
 
 use internal_error::InternalError;
-use opendatafabric::{AccountName, DatasetHandle, DatasetName, DatasetPushTarget, RepoName};
+use opendatafabric::{AccountName, DatasetName, DatasetPushTarget, RepoName};
 use thiserror::Error;
 
 use crate::*;
@@ -48,10 +48,12 @@ pub trait RemoteAliasResolver: Send + Sync {
     // try to resolve via repository registry
     async fn resolve_push_target(
         &self,
-        local_dataset_handle: &DatasetHandle,
+        local_target: ResolvedDataset,
         dataset_push_target_maybe: Option<DatasetPushTarget>,
     ) -> Result<RemoteTarget, ResolveAliasError>;
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone)]
 pub struct RemoteTarget {

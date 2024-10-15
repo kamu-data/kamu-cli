@@ -467,6 +467,7 @@ pub fn configure_base_catalog(
     b.add::<CreateDatasetUseCaseImpl>();
     b.add::<CreateDatasetFromSnapshotUseCaseImpl>();
     b.add::<DeleteDatasetUseCaseImpl>();
+    b.add::<PushDatasetUseCaseImpl>();
     b.add::<RenameDatasetUseCaseImpl>();
     b.add::<ResetDatasetUseCaseImpl>();
     b.add::<SetWatermarkUseCaseImpl>();

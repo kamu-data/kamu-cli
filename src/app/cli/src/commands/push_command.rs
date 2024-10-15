@@ -24,7 +24,7 @@ use crate::output::OutputConfig;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct PushCommand {
-    push_svc: Arc<dyn PushService>,
+    push_dataset_use_case: Arc<dyn PushDatasetUseCase>,
     dataset_registry: Arc<dyn DatasetRegistry>,
     refs: Vec<DatasetRefPattern>,
     all: bool,
@@ -39,7 +39,7 @@ pub struct PushCommand {
 
 impl PushCommand {
     pub fn new<I>(
-        push_svc: Arc<dyn PushService>,
+        push_dataset_use_case: Arc<dyn PushDatasetUseCase>,
         dataset_registry: Arc<dyn DatasetRegistry>,
         refs: I,
         all: bool,
@@ -55,7 +55,7 @@ impl PushCommand {
         I: IntoIterator<Item = DatasetRefPattern>,
     {
         Self {
-            push_svc,
+            push_dataset_use_case,
             dataset_registry,
             refs: refs.into_iter().collect(),
             all,
@@ -79,10 +79,37 @@ impl PushCommand {
                 .try_collect()
                 .await?;
 
-        Ok(self
-            .push_svc
-            .push_multi(
-                dataset_refs,
+        let mut dataset_handles = Vec::new();
+        let mut error_responses = Vec::new();
+        // TODO: batch resolution
+        for dataset_ref in &dataset_refs {
+            match self
+                .dataset_registry
+                .resolve_dataset_handle_by_ref(dataset_ref)
+                .await
+            {
+                Ok(hdl) => dataset_handles.push(hdl),
+                Err(e) => {
+                    let push_error = match e {
+                        GetDatasetError::NotFound(e) => PushError::SourceNotFound(e),
+                        GetDatasetError::Internal(e) => PushError::Internal(e),
+                    };
+                    error_responses.push(PushResponse {
+                        local_handle: None,
+                        target: None,
+                        result: Err(push_error),
+                    });
+                }
+            }
+        }
+
+        if !error_responses.is_empty() {
+            return Ok(error_responses);
+        }
+
+        self.push_dataset_use_case
+            .execute_multi(
+                dataset_handles,
                 PushMultiOptions {
                     all: self.all,
                     recursive: self.recursive,
@@ -92,7 +119,8 @@ impl PushCommand {
                 },
                 listener,
             )
-            .await)
+            .await
+            .map_err(CLIError::failure)
     }
 
     fn sync_options(&self) -> SyncOptions {

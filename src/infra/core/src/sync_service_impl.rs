@@ -20,7 +20,7 @@ use url::Url;
 
 use super::utils::smart_transfer_protocol::SmartTransferProtocolClient;
 use crate::utils::ipfs_wrapper::*;
-use crate::utils::simple_transfer_protocol::{DatasetFactoryFn, SimpleTransferProtocol};
+use crate::utils::simple_transfer_protocol::SimpleTransferProtocol;
 use crate::utils::smart_transfer_protocol::TransferOptions;
 use crate::DatasetRepositoryWriter;
 
@@ -178,17 +178,12 @@ impl SyncServiceImpl {
 
     async fn sync_generic(
         &self,
-        src_ref: &SyncRef,
-        dst_ref: &SyncRef,
+        src: SyncRequestSource,
+        dst: SyncRequestDestination,
         opts: SyncOptions,
         listener: Arc<dyn SyncListener>,
     ) -> Result<SyncResult, SyncError> {
-        let src_is_local = src_ref.is_local();
-
-        let src_dataset = self.get_dataset_reader(src_ref).await?;
-        let (dst_dataset, dst_factory) = self
-            .get_dataset_writer(dst_ref, opts.create_if_not_exists)
-            .await?;
+        let src_is_local = src.sync_ref.is_local();
 
         let validation = if opts.trust_source.unwrap_or(src_is_local) {
             AppendValidation::None
@@ -202,10 +197,10 @@ impl SyncServiceImpl {
 
         SimpleTransferProtocol
             .sync(
-                &src_ref.as_any_ref(),
-                src_dataset,
-                dst_dataset,
-                dst_factory,
+                &src.src_ref,
+                src.dataset,
+                dst.maybe_dataset,
+                dst.maybe_dataset_factory,
                 validation,
                 trust_source_hashes,
                 opts.force,
@@ -217,23 +212,19 @@ impl SyncServiceImpl {
     async fn sync_smart_pull_transfer_protocol(
         &self,
         src_url: &Url,
-        dst_ref: &SyncRef,
+        dst: SyncRequestDestination,
         opts: SyncOptions,
         listener: Arc<dyn SyncListener>,
     ) -> Result<SyncResult, SyncError> {
         let http_src_url = src_url.odf_to_transport_protocol()?;
-
-        let (dst_dataset, dst_factory) = self
-            .get_dataset_writer(dst_ref, opts.create_if_not_exists)
-            .await?;
 
         tracing::info!("Starting sync using Smart Transfer Protocol (Pull flow)");
 
         self.smart_transfer_protocol
             .pull_protocol_client_flow(
                 &http_src_url,
-                dst_dataset,
-                dst_factory,
+                dst.maybe_dataset,
+                dst.maybe_dataset_factory,
                 listener,
                 TransferOptions {
                     force_update_if_diverged: opts.force,
@@ -245,13 +236,11 @@ impl SyncServiceImpl {
 
     async fn sync_smart_push_transfer_protocol<'a>(
         &'a self,
-        src: &SyncRef,
+        src: SyncRequestSource,
         dst_url: &Url,
         opts: SyncOptions,
         listener: Arc<dyn SyncListener>,
     ) -> Result<SyncResult, SyncError> {
-        let src_dataset = self.get_dataset_reader(src).await?;
-
         let http_dst_url = dst_url.odf_to_transport_protocol()?;
 
         // TODO: move head check into the protocol
@@ -276,7 +265,7 @@ impl SyncServiceImpl {
         tracing::info!("Starting sync using Smart Transfer Protocol (Push flow)");
         self.smart_transfer_protocol
             .push_protocol_client_flow(
-                src_dataset,
+                src.dataset,
                 &http_dst_url,
                 maybe_dst_head.as_ref(),
                 listener,
@@ -501,19 +490,36 @@ impl SyncServiceImpl {
         Ok(cid)
     }
 
-    #[tracing::instrument(level = "info", name = "sync", skip_all, fields(%src, %dst))]
+    #[tracing::instrument(level = "info", name = "sync", skip_all, fields(%src_ref, %dst_ref))]
     async fn sync_impl(
         &self,
-        src: &DatasetRefAny,
-        dst: &DatasetRefAny,
+        src_ref: &DatasetRefAny,
+        dst_ref: &DatasetRefAny,
         opts: SyncOptions,
         listener: Arc<dyn SyncListener>,
     ) -> Result<SyncResult, SyncError> {
-        let src = self.resolve_sync_ref(src)?;
-        let dst = self.resolve_sync_ref(dst)?;
-        tracing::info!(src_loc = ?src, dst_loc = ?dst, "Resolved source / destination");
+        let src_sync_ref = self.resolve_sync_ref(src_ref)?;
+        let dst_sync_ref = self.resolve_sync_ref(dst_ref)?;
+        tracing::info!(src_loc = ?src_sync_ref, dst_loc = ?dst_sync_ref, "Resolved source / destination");
 
-        match (&src, &dst) {
+        let src_dataset = self.get_dataset_reader(&src_sync_ref).await?;
+        let src_new = SyncRequestSource {
+            src_ref: src_ref.clone(),
+            sync_ref: src_sync_ref.clone(),
+            dataset: src_dataset,
+        };
+
+        let (maybe_dst_dataset, maybe_dst_ataset_factory) = self
+            .get_dataset_writer(&dst_sync_ref, opts.create_if_not_exists)
+            .await?;
+        let dst_new = SyncRequestDestination {
+            maybe_dataset: maybe_dst_dataset,
+            maybe_dataset_factory: maybe_dst_ataset_factory,
+            dst_ref: dst_ref.clone(),
+            sync_ref: dst_sync_ref.clone(),
+        };
+
+        match (&src_sync_ref, &dst_sync_ref) {
             // * -> ipfs
             (_, SyncRef::Remote(dst_url)) if dst_url.scheme() == "ipfs" => {
                 Err(UnsupportedProtocolError {
@@ -581,16 +587,105 @@ impl SyncServiceImpl {
             }
             // odf -> *
             (SyncRef::Remote(src_url), _) if src_url.is_odf_protocol() => {
-                self.sync_smart_pull_transfer_protocol(src_url.as_ref(), &dst, opts, listener)
+                self.sync_smart_pull_transfer_protocol(src_url.as_ref(), dst_new, opts, listener)
                     .await
             }
             // * -> odf
             (_, SyncRef::Remote(dst_url)) if dst_url.is_odf_protocol() => {
-                self.sync_smart_push_transfer_protocol(&src, dst_url.as_ref(), opts, listener)
+                self.sync_smart_push_transfer_protocol(src_new, dst_url.as_ref(), opts, listener)
                     .await
             }
             // * -> *
-            (_, _) => self.sync_generic(&src, &dst, opts, listener).await,
+            (_, _) => self.sync_generic(src_new, dst_new, opts, listener).await,
+        }
+    }
+
+    #[tracing::instrument(level = "info", name = "sync", skip_all, fields(src=%src.src_ref, dst=%dst.dst_ref))]
+    async fn sync_impl_new(
+        &self,
+        src: SyncRequestSource,
+        dst: SyncRequestDestination,
+        opts: SyncOptions,
+        listener: Arc<dyn SyncListener>,
+    ) -> Result<SyncResult, SyncError> {
+        match (&src.sync_ref, &dst.sync_ref) {
+            // * -> ipfs
+            (_, SyncRef::Remote(dst_url)) if dst_url.scheme() == "ipfs" => {
+                Err(UnsupportedProtocolError {
+                    url: dst_url.as_ref().clone(),
+                    message: Some(
+                        concat!(
+                            "Cannot sync to ipfs://{CID} URLs since IPFS ",
+                            "is a content-addressable system ",
+                            "and the CID changes with every update ",
+                            "to the data. Consider using IPNS instead.",
+                        )
+                        .to_owned(),
+                    ),
+                }
+                .into())
+            }
+            // <remote> -> ipns
+            (SyncRef::Remote(_), SyncRef::Remote(dst_url)) if dst_url.scheme() == "ipns" => {
+                Err(UnsupportedProtocolError {
+                    url: dst_url.as_ref().clone(),
+                    message: Some(
+                        concat!(
+                            "Syncing from a remote repository directly to IPFS ",
+                            "is not currently supported. Consider pulling the dataset ",
+                            "locally and then pushing to IPFS.",
+                        )
+                        .to_owned(),
+                    ),
+                }
+                .into())
+            }
+            // <local> -> ipns
+            (SyncRef::Local(src_ref), SyncRef::Remote(dst_url)) if dst_url.scheme() == "ipns" => {
+                match dst_url.path() {
+                    "" | "/" => self.sync_to_ipfs(src_ref, dst_url, opts).await,
+                    _ => Err(UnsupportedProtocolError {
+                        url: dst_url.as_ref().clone(),
+                        message: Some(
+                            concat!(
+                                "Cannot use a sub-path when syncing to ipns:// URL. ",
+                                "Only a single dataset per IPNS key is supported.",
+                            )
+                            .to_owned(),
+                        ),
+                    }
+                    .into()),
+                }
+            }
+            // odf -> odf
+            (SyncRef::Remote(src_url), SyncRef::Remote(dst_url))
+                if src_url.is_odf_protocol() && dst_url.is_odf_protocol() =>
+            {
+                Err(UnsupportedProtocolError {
+                    url: dst_url.as_ref().clone(),
+                    message: Some(
+                        concat!(
+                            "Syncing from a remote ODF repository directly to remote ODF ",
+                            "repository is not currently supported. Consider pulling the ",
+                            "dataset locally and then pushing to ODF repository.",
+                        )
+                        .to_owned(),
+                    ),
+                }
+                .into())
+            }
+            // odf -> *
+            (SyncRef::Remote(src_url), _) if src_url.is_odf_protocol() => {
+                self.sync_smart_pull_transfer_protocol(src_url.as_ref(), dst, opts, listener)
+                    .await
+            }
+            // * -> odf
+            (_, SyncRef::Remote(dst_url)) if dst_url.is_odf_protocol() => {
+                self.sync_smart_push_transfer_protocol(src, dst_url.as_ref(), opts, listener)
+                    .await
+            }
+            // * -> *
+            (_, _) => self.sync_generic(src, dst, opts, listener).await,
         }
     }
 }
@@ -621,6 +716,30 @@ impl SyncService for SyncServiceImpl {
         }
     }
 
+    async fn sync_new(
+        &self,
+        request: SyncRequestNew,
+        options: SyncOptions,
+        listener: Option<Arc<dyn SyncListener>>,
+    ) -> Result<SyncResult, SyncError> {
+        let listener = listener.unwrap_or(Arc::new(NullSyncListener));
+        listener.begin();
+
+        match self
+            .sync_impl_new(request.src, request.dst, options, listener.clone())
+            .await
+        {
+            Ok(result) => {
+                listener.success(&result);
+                Ok(result)
+            }
+            Err(err) => {
+                listener.error(&err);
+                Err(err)
+            }
+        }
+    }
+
     // TODO: Parallelism
     async fn sync_multi(
         &self,
@@ -639,32 +758,35 @@ impl SyncService for SyncServiceImpl {
         results
     }
 
+    async fn sync_multi_new(
+        &self,
+        requests: Vec<SyncRequestNew>,
+        options: SyncOptions,
+        listener: Option<Arc<dyn SyncMultiListener>>,
+    ) -> Vec<SyncResultMulti> {
+        let mut results = Vec::new();
+
+        for request in requests {
+            let listener = listener
+                .as_ref()
+                .and_then(|l| l.begin_sync(&request.src.src_ref, &request.dst.dst_ref));
+
+            let src_ref = request.src.src_ref.clone();
+            let dst_ref = request.dst.dst_ref.clone();
+            let result = self.sync_new(request, options.clone(), listener).await;
+
+            results.push(SyncResultMulti {
+                src: src_ref,
+                dst: dst_ref,
+                result,
+            });
+        }
+
+        results
+    }
+
     async fn ipfs_add(&self, src: &DatasetRef) -> Result<String, SyncError> {
         self.add_to_ipfs(src).await
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Clone)]
-enum SyncRef {
-    Local(DatasetRef),
-    Remote(Arc<Url>),
-}
-
-impl SyncRef {
-    fn is_local(&self) -> bool {
-        match self {
-            Self::Local(_) => true,
-            Self::Remote(_) => false,
-        }
-    }
-
-    fn as_any_ref(&self) -> DatasetRefAny {
-        match self {
-            Self::Local(local_ref) => local_ref.as_any_ref(),
-            Self::Remote(url) => DatasetRefAny::Url(Arc::clone(url)),
-        }
     }
 }
 

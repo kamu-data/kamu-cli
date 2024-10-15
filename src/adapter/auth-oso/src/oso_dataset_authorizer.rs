@@ -146,45 +146,45 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
         Ok(matched_dataset_handles)
     }
 
-    /*
-    fn get_readable_datasets(&self) -> DatasetHandleStream<'_> {
-        Box::pin(async_stream::try_stream! {
-            // Tracking pagination progress
-            let mut offset = 0;
-            let limit = 100;
+    async fn classify_datasets_by_allowance(
+        &self,
+        dataset_handles: Vec<DatasetHandle>,
+        action: DatasetAction,
+    ) -> Result<ClassifyByAllowanceResponse, InternalError> {
+        let mut matched_dataset_handles = Vec::new();
+        let mut unmatched_results = Vec::new();
 
-            loop {
-                // Load a page of dataset entries
-                let entries_page = self
-                    .dataset_entry_service
-                    .list_all_entries(PaginationOpts { limit, offset })
-                    .await
-                    .int_err()?;
-
-                // Actually read entires
-                let loaded_entries_count = entries_page.list.len();
-
-                // Convert entries to handles
-                let handles = self.dataset_entry_service.entries_as_handles(entries_page.list).await.int_err()?;
-
-                // Stream the entries that match ReBAC
-                for hdl in handles {
-                    if self
-                        .oso
-                        .is_allowed(self.actor(), DatasetAction::Read.to_string(), self.dataset_resource(&hdl)).int_err()? {
-                            yield hdl;
+        for hdl in dataset_handles {
+            let is_allowed = self
+                .oso
+                .is_allowed(
+                    self.actor(),
+                    action.to_string(),
+                    self.dataset_resource(&hdl),
+                )
+                .int_err()?;
+            if is_allowed {
+                matched_dataset_handles.push(hdl);
+            } else {
+                let dataset_ref = hdl.as_local_ref();
+                unmatched_results.push((
+                    hdl,
+                    DatasetActionUnauthorizedError::Access(AccessError::Forbidden(
+                        DatasetActionNotEnoughPermissionsError {
+                            action,
+                            dataset_ref,
                         }
-
-                }
-
-                // Next page
-                offset += loaded_entries_count;
-                if offset >= entries_page.total_count {
-                    break;
-                }
+                        .into(),
+                    )),
+                ));
             }
+        }
+
+        Ok(ClassifyByAllowanceResponse {
+            authorized_handles: matched_dataset_handles,
+            unauthorized_handles_with_errors: unmatched_results,
         })
-    }*/
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

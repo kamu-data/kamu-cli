@@ -27,13 +27,6 @@ const DEFAULT_SIMPLE_PROTOCOL_MAX_PARALLEL_TRANSFERS: usize = 10;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-type BoxedCreateDatasetFuture = std::pin::Pin<
-    Box<dyn std::future::Future<Output = Result<CreateDatasetResult, CreateDatasetError>> + Send>,
->;
-
-pub type DatasetFactoryFn =
-    Box<dyn FnOnce(MetadataBlockTyped<Seed>) -> BoxedCreateDatasetFuture + Send>;
-
 #[derive(Debug, Eq, PartialEq)]
 pub struct SimpleProtocolTransferOptions {
     pub max_parallel_transfers: usize,

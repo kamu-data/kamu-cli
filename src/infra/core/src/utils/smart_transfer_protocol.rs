@@ -9,11 +9,16 @@
 
 use std::sync::Arc;
 
-use kamu_core::{Dataset, DatasetVisibility, SyncError, SyncListener, SyncResult};
+use kamu_core::{
+    Dataset,
+    DatasetFactoryFn,
+    DatasetVisibility,
+    SyncError,
+    SyncListener,
+    SyncResult,
+};
 use opendatafabric::Multihash;
 use url::Url;
-
-pub use super::simple_transfer_protocol::DatasetFactoryFn;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

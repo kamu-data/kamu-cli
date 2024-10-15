@@ -22,7 +22,6 @@ use crate::UrlExt;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct RemoteAliasResolverImpl {
-    dataset_repo: Arc<dyn DatasetRepository>,
     remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
     access_token_resolver: Arc<dyn OdfServerAccessTokenResolver>,
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
@@ -32,13 +31,11 @@ pub struct RemoteAliasResolverImpl {
 #[interface(dyn RemoteAliasResolver)]
 impl RemoteAliasResolverImpl {
     pub fn new(
-        dataset_repo: Arc<dyn DatasetRepository>,
         remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
         access_token_resolver: Arc<dyn OdfServerAccessTokenResolver>,
         remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
     ) -> Self {
         Self {
-            dataset_repo,
             remote_repo_reg,
             access_token_resolver,
             remote_alias_reg,
@@ -47,11 +44,9 @@ impl RemoteAliasResolverImpl {
 
     async fn fetch_remote_url(
         &self,
-        local_handle: &odf::DatasetHandle,
+        dataset: Arc<dyn Dataset>,
         remote_alias_kind: RemoteAliasKind,
     ) -> Result<Option<Url>, ResolveAliasError> {
-        let dataset = self.dataset_repo.get_dataset_by_handle(local_handle);
-
         let remote_aliases = self
             .remote_alias_reg
             .get_remote_aliases(dataset)
@@ -117,7 +112,7 @@ impl RemoteAliasResolverImpl {
 impl RemoteAliasResolver for RemoteAliasResolverImpl {
     async fn resolve_push_target(
         &self,
-        local_dataset_handle: &odf::DatasetHandle,
+        local_target: ResolvedDataset,
         dataset_push_target_maybe: Option<odf::DatasetPushTarget>,
     ) -> Result<RemoteTarget, ResolveAliasError> {
         let (repo_name, mut account_name, dataset_name) = if let Some(dataset_push_target) =
@@ -138,7 +133,7 @@ impl RemoteAliasResolver for RemoteAliasResolverImpl {
             }
         } else {
             if let Some(remote_url) = self
-                .fetch_remote_url(local_dataset_handle, RemoteAliasKind::Push)
+                .fetch_remote_url(local_target.dataset, RemoteAliasKind::Push)
                 .await?
             {
                 return Ok(RemoteTarget::new(remote_url, None, None, None));
@@ -171,7 +166,7 @@ impl RemoteAliasResolver for RemoteAliasResolverImpl {
             dn
         } else {
             self.resolve_remote_dataset_name(
-                local_dataset_handle,
+                &local_target.handle,
                 &remote_repo.url,
                 access_token_maybe.as_ref(),
             )
