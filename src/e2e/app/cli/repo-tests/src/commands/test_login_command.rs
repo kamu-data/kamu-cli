@@ -12,6 +12,7 @@ use kamu_cli_e2e_common::{
     KamuApiServerClientExt,
     DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
 };
+use kamu_cli_puppet::extensions::KamuCliPuppetExt;
 use kamu_cli_puppet::KamuCliPuppet;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -20,90 +21,57 @@ pub async fn test_login_logout_password(kamu_node_api_client: KamuApiServerClien
     let kamu_node_url = kamu_node_api_client.get_base_url().as_str();
     let kamu = KamuCliPuppet::new_workspace_tmp().await;
 
-    {
-        let assert = kamu.execute(["logout", kamu_node_url]).await.success();
+    kamu.assert_success_command_execution(
+        ["logout", kamu_node_url],
+        None,
+        Some([format!("Not logged in to {kamu_node_url}").as_str()]),
+    )
+    .await;
 
-        let stderr = std::str::from_utf8(&assert.get_output().stderr).unwrap();
+    kamu.assert_failure_command_execution(
+        ["login", kamu_node_url, "--check"],
+        None,
+        Some([format!("Error: No access token found for: {kamu_node_url}").as_str()]),
+    )
+    .await;
 
-        assert!(
-            stderr.contains(format!("Not logged in to {kamu_node_url}").as_str()),
-            "Unexpected output:\n{stderr}",
-        );
-    }
-    {
-        let assert = kamu
-            .execute(["login", kamu_node_url, "--check"])
-            .await
-            .failure();
+    kamu.assert_success_command_execution(
+        ["login", "password", "kamu", "kamu", kamu_node_url],
+        None,
+        Some([format!("Login successful: {kamu_node_url}").as_str()]),
+    )
+    .await;
 
-        let stderr = std::str::from_utf8(&assert.get_output().stderr).unwrap();
-
-        assert!(
-            stderr.contains(format!("Error: No access token found for: {kamu_node_url}").as_str()),
-            "Unexpected output:\n{stderr}",
-        );
-    }
-
-    {
-        let assert = kamu
-            .execute(["login", "password", "kamu", "kamu", kamu_node_url])
-            .await
-            .success();
-
-        let stderr = std::str::from_utf8(&assert.get_output().stderr).unwrap();
-
-        assert!(
-            stderr.contains(format!("Login successful: {kamu_node_url}").as_str()),
-            "Unexpected output:\n{stderr}",
-        );
-    }
-    {
-        let assert = kamu
-            .execute(["login", kamu_node_url, "--check"])
-            .await
-            .success();
-
-        let stderr = std::str::from_utf8(&assert.get_output().stderr).unwrap();
-
-        assert!(
-            stderr.contains(format!("Access token valid: {kamu_node_url}").as_str()),
-            "Unexpected output:\n{stderr}",
-        );
-    }
+    kamu.assert_success_command_execution(
+        ["login", kamu_node_url, "--check"],
+        None,
+        Some([format!("Access token valid: {kamu_node_url}").as_str()]),
+    )
+    .await;
 
     kamu.execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
         .await
         .success();
 
     // Token validation, via an API call that requires authorization
-    {
-        let assert = kamu
-            .execute([
-                "push",
-                "player-scores",
-                "--to",
-                &format!("odf+{kamu_node_url}player-scores"),
-            ])
-            .await
-            .success();
+    kamu.assert_success_command_execution(
+        [
+            "push",
+            "player-scores",
+            "--to",
+            &format!("odf+{kamu_node_url}player-scores"),
+        ],
+        None,
+        Some(["1 dataset(s) pushed"]),
+    )
+    .await;
 
-        let stderr = std::str::from_utf8(&assert.get_output().stderr).unwrap();
-
-        assert!(
-            stderr.contains("1 dataset(s) pushed"),
-            "Unexpected output:\n{stderr}",
-        );
-    }
-    {
-        let assert = kamu.execute(["logout", kamu_node_url]).await.success();
-
-        let stderr = std::str::from_utf8(&assert.get_output().stderr).unwrap();
-
-        assert!(
-            stderr.contains(format!("Logged out of {kamu_node_url}").as_str()),
-            "Unexpected output:\n{stderr}",
-        );
-    }
+    kamu.assert_success_command_execution(
+        ["logout", kamu_node_url],
+        None,
+        Some([format!("Logged out of {kamu_node_url}").as_str()]),
+    )
+    .await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -112,74 +80,47 @@ pub async fn test_login_logout_oauth(kamu_node_api_client: KamuApiServerClient) 
     let kamu_node_url = kamu_node_api_client.get_base_url().as_str();
     let kamu = KamuCliPuppet::new_workspace_tmp().await;
 
-    {
-        let assert = kamu.execute(["logout", kamu_node_url]).await.success();
+    kamu.assert_success_command_execution(
+        ["logout", kamu_node_url],
+        None,
+        Some([format!("Not logged in to {kamu_node_url}").as_str()]),
+    )
+    .await;
 
-        let stderr = std::str::from_utf8(&assert.get_output().stderr).unwrap();
-
-        assert!(
-            stderr.contains(format!("Not logged in to {kamu_node_url}").as_str()),
-            "Unexpected output:\n{stderr}",
-        );
-    }
-    {
-        let assert = kamu
-            .execute(["login", kamu_node_url, "--check"])
-            .await
-            .failure();
-
-        let stderr = std::str::from_utf8(&assert.get_output().stderr).unwrap();
-
-        assert!(
-            stderr.contains(format!("Error: No access token found for: {kamu_node_url}").as_str()),
-            "Unexpected output:\n{stderr}",
-        );
-    }
+    kamu.assert_failure_command_execution(
+        ["login", kamu_node_url, "--check"],
+        None,
+        Some([format!("Error: No access token found for: {kamu_node_url}").as_str()]),
+    )
+    .await;
 
     let oauth_token = kamu_node_api_client.login_as_e2e_user().await;
 
-    {
-        let assert = kamu
-            .execute(["login", "oauth", "github", &oauth_token, kamu_node_url])
-            .await
-            .success();
+    kamu.assert_success_command_execution(
+        ["login", "oauth", "github", &oauth_token, kamu_node_url],
+        None,
+        Some([format!("Login successful: {kamu_node_url}").as_str()]),
+    )
+    .await;
 
-        let stderr = std::str::from_utf8(&assert.get_output().stderr).unwrap();
-
-        assert!(
-            stderr.contains(format!("Login successful: {kamu_node_url}").as_str()),
-            "Unexpected output:\n{stderr}",
-        );
-    }
-    {
-        let assert = kamu
-            .execute(["login", kamu_node_url, "--check"])
-            .await
-            .success();
-
-        let stderr = std::str::from_utf8(&assert.get_output().stderr).unwrap();
-
-        assert!(
-            stderr.contains(format!("Access token valid: {kamu_node_url}").as_str()),
-            "Unexpected output:\n{stderr}",
-        );
-    }
+    kamu.assert_success_command_execution(
+        ["login", kamu_node_url, "--check"],
+        None,
+        Some([format!("Access token valid: {kamu_node_url}").as_str()]),
+    )
+    .await;
 
     // Token validation, via an API call that requires authorization
     kamu_node_api_client
         .create_player_scores_dataset(&oauth_token)
         .await;
 
-    {
-        let assert = kamu.execute(["logout", kamu_node_url]).await.success();
-
-        let stderr = std::str::from_utf8(&assert.get_output().stderr).unwrap();
-
-        assert!(
-            stderr.contains(format!("Logged out of {kamu_node_url}").as_str()),
-            "Unexpected output:\n{stderr}",
-        );
-    }
+    kamu.assert_success_command_execution(
+        ["logout", kamu_node_url],
+        None,
+        Some([format!("Logged out of {kamu_node_url}").as_str()]),
+    )
+    .await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
