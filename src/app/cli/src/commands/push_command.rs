@@ -74,7 +74,7 @@ impl PushCommand {
         listener: Option<Arc<dyn SyncMultiListener>>,
     ) -> Result<Vec<PushResponse>, CLIError> {
         let dataset_refs: Vec<_> =
-            filter_datasets_by_local_pattern(self.dataset_repo.as_ref(), self.refs.clone())
+            filter_datasets_by_local_pattern(self.dataset_registry.as_ref(), self.refs.clone())
                 .map_ok(|dataset_handle| dataset_handle.as_local_ref())
                 .try_collect()
                 .await?;

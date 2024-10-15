@@ -883,7 +883,7 @@ async fn test_ingest_polling_schema_case_sensitivity() {
 
     let dataset_alias = dataset_snapshot.name.clone();
 
-    harness.create_dataset(dataset_snapshot).await;
+    let created = harness.create_dataset(dataset_snapshot).await;
     let data_helper = harness.dataset_data_helper(&dataset_alias).await;
 
     // Round 1
@@ -900,7 +900,7 @@ async fn test_ingest_polling_schema_case_sensitivity() {
     )
     .unwrap();
 
-    harness.ingest(&dataset_alias).await.unwrap();
+    harness.ingest(&created).await.unwrap();
 
     data_helper
         .assert_last_data_eq(
@@ -959,7 +959,7 @@ async fn test_ingest_polling_schema_case_sensitivity() {
         .time_source
         .set(Utc.with_ymd_and_hms(2050, 1, 2, 12, 0, 0).unwrap());
 
-    harness.ingest(&dataset_alias).await.unwrap();
+    harness.ingest(&created).await.unwrap();
 
     data_helper
         .assert_last_data_records_eq(indoc!(
@@ -1002,7 +1002,7 @@ async fn test_ingest_polling_schema_case_sensitivity() {
         .time_source
         .set(Utc.with_ymd_and_hms(2050, 1, 3, 12, 0, 0).unwrap());
 
-    harness.ingest(&dataset_alias).await.unwrap();
+    harness.ingest(&created).await.unwrap();
     let event = data_helper.get_last_block_typed::<AddData>().await.event;
 
     assert_eq!(event.new_data, None);

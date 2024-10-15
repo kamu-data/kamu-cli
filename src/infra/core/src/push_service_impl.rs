@@ -61,7 +61,11 @@ impl PushServiceImpl {
         push_target: &Option<DatasetPushTarget>,
     ) -> Result<PushItem, PushResponse> {
         // Resolve local dataset if we have a local reference
-        let local_handle = match self.dataset_repo.resolve_dataset_ref(dataset_ref).await {
+        let local_handle = match self
+            .dataset_repo
+            .resolve_dataset_handle_by_ref(dataset_ref)
+            .await
+        {
             Ok(h) => h,
             Err(e) => {
                 return Err(PushResponse {
@@ -142,8 +146,11 @@ impl PushService for PushServiceImpl {
         if options.add_aliases && results.iter().all(|r| r.result.is_ok()) {
             for push_item in &plan {
                 // TODO: Improve error handling
+                let dataset = self
+                    .dataset_repo
+                    .get_dataset_by_handle(&push_item.local_handle);
                 self.remote_alias_reg
-                    .get_remote_aliases(&(push_item.local_handle.as_local_ref()))
+                    .get_remote_aliases(dataset)
                     .await
                     .unwrap()
                     .add(
