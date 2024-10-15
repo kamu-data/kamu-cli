@@ -13,9 +13,9 @@ use kamu_cli_e2e_common::{
     RequestBody,
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
 };
+use kamu_cli_puppet::extensions::KamuCliPuppetExt;
 use kamu_cli_puppet::KamuCliPuppet;
 use opendatafabric::*;
-use reqwest::Url;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -24,10 +24,9 @@ pub async fn test_search_multi_user(kamu_node_api_client: KamuApiServerClient) {
 
     add_repo_to_workspace(&kamu_node_api_client, &kamu, "kamu-node").await;
 
-    assert_search(
-        &kamu,
+    kamu.assert_success_command_execution(
         ["search", "player", "--output-format", "table"],
-        indoc::indoc!(
+        Some(indoc::indoc!(
             r#"
             ┌───────┬──────┬─────────────┬────────┬─────────┬──────┐
             │ Alias │ Kind │ Description │ Blocks │ Records │ Size │
@@ -35,7 +34,8 @@ pub async fn test_search_multi_user(kamu_node_api_client: KamuApiServerClient) {
             │       │      │             │        │         │      │
             └───────┴──────┴─────────────┴────────┴─────────┴──────┘
             "#
-        ),
+        )),
+        None::<Vec<&str>>,
     )
     .await;
 
@@ -45,10 +45,9 @@ pub async fn test_search_multi_user(kamu_node_api_client: KamuApiServerClient) {
         .create_player_scores_dataset(&e2e_user_token)
         .await;
 
-    assert_search(
-        &kamu,
+    kamu.assert_success_command_execution(
         ["search", "player", "--output-format", "table"],
-        indoc::indoc!(
+        Some(indoc::indoc!(
             r#"
             ┌──────────────────────────────────┬──────┬─────────────┬────────┬─────────┬──────┐
             │              Alias               │ Kind │ Description │ Blocks │ Records │ Size │
@@ -56,7 +55,8 @@ pub async fn test_search_multi_user(kamu_node_api_client: KamuApiServerClient) {
             │ kamu-node/e2e-user/player-scores │ Root │ -           │      3 │       - │    - │
             └──────────────────────────────────┴──────┴─────────────┴────────┴─────────┴──────┘
             "#
-        ),
+        )),
+        None::<Vec<&str>>,
     )
     .await;
 
@@ -73,10 +73,9 @@ pub async fn test_search_multi_user(kamu_node_api_client: KamuApiServerClient) {
         )
         .await;
 
-    assert_search(
-        &kamu,
+    kamu.assert_success_command_execution(
         ["search", "player", "--output-format", "table"],
-        indoc::indoc!(
+        Some(indoc::indoc!(
             r#"
             ┌──────────────────────────────────┬──────┬─────────────┬────────┬─────────┬──────────┐
             │              Alias               │ Kind │ Description │ Blocks │ Records │   Size   │
@@ -84,7 +83,8 @@ pub async fn test_search_multi_user(kamu_node_api_client: KamuApiServerClient) {
             │ kamu-node/e2e-user/player-scores │ Root │ -           │      5 │       2 │ 1.63 KiB │
             └──────────────────────────────────┴──────┴─────────────┴────────┴─────────┴──────────┘
             "#
-        ),
+        )),
+        None::<Vec<&str>>,
     )
     .await;
 
@@ -137,10 +137,9 @@ pub async fn test_search_multi_user(kamu_node_api_client: KamuApiServerClient) {
         )
         .await;
 
-    assert_search(
-        &kamu,
+    kamu.assert_success_command_execution(
         ["search", "player", "--output-format", "table"],
-        indoc::indoc!(
+        Some(indoc::indoc!(
             r#"
             ┌───────────────────────────────────────┬────────────┬─────────────┬────────┬─────────┬──────────┐
             │                 Alias                 │    Kind    │ Description │ Blocks │ Records │   Size   │
@@ -149,7 +148,8 @@ pub async fn test_search_multi_user(kamu_node_api_client: KamuApiServerClient) {
             │ kamu-node/e2e-user/player-scores      │    Root    │ -           │      5 │       2 │ 1.63 KiB │
             └───────────────────────────────────────┴────────────┴─────────────┴────────┴─────────┴──────────┘
             "#
-        ),
+        )),
+        None::<Vec<&str>>,
     )
     .await;
 
@@ -159,10 +159,9 @@ pub async fn test_search_multi_user(kamu_node_api_client: KamuApiServerClient) {
         .create_player_scores_dataset(&kamu_token)
         .await;
 
-    assert_search(
-        &kamu,
+    kamu.assert_success_command_execution(
         ["search", "player", "--output-format", "table"],
-        indoc::indoc!(
+        Some(indoc::indoc!(
             r#"
             ┌───────────────────────────────────────┬────────────┬─────────────┬────────┬─────────┬──────────┐
             │                 Alias                 │    Kind    │ Description │ Blocks │ Records │   Size   │
@@ -172,7 +171,8 @@ pub async fn test_search_multi_user(kamu_node_api_client: KamuApiServerClient) {
             │ kamu-node/kamu/player-scores          │    Root    │ -           │      3 │       - │        - │
             └───────────────────────────────────────┴────────────┴─────────────┴────────┴─────────┴──────────┘
             "#
-        ),
+        )),
+        None::<Vec<&str>>,
     )
     .await;
 }
@@ -194,10 +194,9 @@ pub async fn test_search_by_name(kamu_node_api_client: KamuApiServerClient) {
         .create_leaderboard(&e2e_user_token)
         .await;
 
-    assert_search(
-        &kamu,
+    kamu.assert_success_command_execution(
         ["search", "player", "--output-format", "table"],
-        indoc::indoc!(
+        Some(indoc::indoc!(
             r#"
             ┌──────────────────────────────────┬──────┬─────────────┬────────┬─────────┬──────┐
             │              Alias               │ Kind │ Description │ Blocks │ Records │ Size │
@@ -205,14 +204,14 @@ pub async fn test_search_by_name(kamu_node_api_client: KamuApiServerClient) {
             │ kamu-node/e2e-user/player-scores │ Root │ -           │      3 │       - │    - │
             └──────────────────────────────────┴──────┴─────────────┴────────┴─────────┴──────┘
             "#
-        ),
+        )),
+        None::<Vec<&str>>,
     )
     .await;
 
-    assert_search(
-        &kamu,
+    kamu.assert_success_command_execution(
         ["search", "scores", "--output-format", "table"],
-        indoc::indoc!(
+        Some(indoc::indoc!(
             r#"
             ┌──────────────────────────────────┬──────┬─────────────┬────────┬─────────┬──────┐
             │              Alias               │ Kind │ Description │ Blocks │ Records │ Size │
@@ -220,14 +219,14 @@ pub async fn test_search_by_name(kamu_node_api_client: KamuApiServerClient) {
             │ kamu-node/e2e-user/player-scores │ Root │ -           │      3 │       - │    - │
             └──────────────────────────────────┴──────┴─────────────┴────────┴─────────┴──────┘
             "#
-        ),
+        )),
+        None::<Vec<&str>>,
     )
     .await;
 
-    assert_search(
-        &kamu,
+    kamu.assert_success_command_execution(
         ["search", "not-relevant-query", "--output-format", "table"],
-        indoc::indoc!(
+        Some(indoc::indoc!(
             r#"
             ┌───────┬──────┬─────────────┬────────┬─────────┬──────┐
             │ Alias │ Kind │ Description │ Blocks │ Records │ Size │
@@ -235,14 +234,14 @@ pub async fn test_search_by_name(kamu_node_api_client: KamuApiServerClient) {
             │       │      │             │        │         │      │
             └───────┴──────┴─────────────┴────────┴─────────┴──────┘
             "#
-        ),
+        )),
+        None::<Vec<&str>>,
     )
     .await;
 
-    assert_search(
-        &kamu,
+    kamu.assert_success_command_execution(
         ["search", "lead", "--output-format", "table"],
-        indoc::indoc!(
+        Some(indoc::indoc!(
             r#"
             ┌────────────────────────────────┬────────────┬─────────────┬────────┬─────────┬──────┐
             │             Alias              │    Kind    │ Description │ Blocks │ Records │ Size │
@@ -250,7 +249,8 @@ pub async fn test_search_by_name(kamu_node_api_client: KamuApiServerClient) {
             │ kamu-node/e2e-user/leaderboard │ Derivative │ -           │      3 │       - │    - │
             └────────────────────────────────┴────────────┴─────────────┴────────┴─────────┴──────┘
             "#
-        ),
+        )),
+        None::<Vec<&str>>,
     )
     .await;
 }
@@ -274,10 +274,9 @@ pub async fn test_search_by_repo(kamu_node_api_client: KamuApiServerClient) {
         .create_leaderboard(&e2e_user_token)
         .await;
 
-    assert_search(
-        &kamu,
+    kamu.assert_success_command_execution(
         ["search", "player", "--output-format", "table"],
-        indoc::indoc!(
+        Some(indoc::indoc!(
             r#"
             ┌──────────────────────────────────────┬──────┬─────────────┬────────┬─────────┬──────┐
             │                Alias                 │ Kind │ Description │ Blocks │ Records │ Size │
@@ -286,12 +285,12 @@ pub async fn test_search_by_repo(kamu_node_api_client: KamuApiServerClient) {
             │ kamu-node/e2e-user/player-scores     │ Root │ -           │      3 │       - │    - │
             └──────────────────────────────────────┴──────┴─────────────┴────────┴─────────┴──────┘
             "#
-        ),
+        )),
+        None::<Vec<&str>>,
     )
     .await;
 
-    assert_search(
-        &kamu,
+    kamu.assert_success_command_execution(
         [
             "search",
             "player",
@@ -300,7 +299,7 @@ pub async fn test_search_by_repo(kamu_node_api_client: KamuApiServerClient) {
             "--output-format",
             "table",
         ],
-        indoc::indoc!(
+        Some(indoc::indoc!(
             r#"
             ┌──────────────────────────────────────┬──────┬─────────────┬────────┬─────────┬──────┐
             │                Alias                 │ Kind │ Description │ Blocks │ Records │ Size │
@@ -308,12 +307,12 @@ pub async fn test_search_by_repo(kamu_node_api_client: KamuApiServerClient) {
             │ acme-org-node/e2e-user/player-scores │ Root │ -           │      3 │       - │    - │
             └──────────────────────────────────────┴──────┴─────────────┴────────┴─────────┴──────┘
             "#
-        ),
+        )),
+        None::<Vec<&str>>,
     )
     .await;
 
-    assert_search(
-        &kamu,
+    kamu.assert_success_command_execution(
         [
             "search",
             "player",
@@ -322,7 +321,7 @@ pub async fn test_search_by_repo(kamu_node_api_client: KamuApiServerClient) {
             "--output-format",
             "table",
         ],
-        indoc::indoc!(
+        Some(indoc::indoc!(
             r#"
             ┌──────────────────────────────────┬──────┬─────────────┬────────┬─────────┬──────┐
             │              Alias               │ Kind │ Description │ Blocks │ Records │ Size │
@@ -330,7 +329,8 @@ pub async fn test_search_by_repo(kamu_node_api_client: KamuApiServerClient) {
             │ kamu-node/e2e-user/player-scores │ Root │ -           │      3 │       - │    - │
             └──────────────────────────────────┴──────┴─────────────┴────────┴─────────┴──────┘
             "#
-        ),
+        )),
+        None::<Vec<&str>>,
     )
     .await;
 }
@@ -344,39 +344,17 @@ async fn add_repo_to_workspace(
     kamu: &KamuCliPuppet,
     repo_name: &str,
 ) {
-    let http_repo = {
-        let mut url = Url::parse("odf+http://host").unwrap();
-        let base_url = kamu_node_api_client.get_base_url();
-        url.set_host(base_url.host_str()).unwrap();
-        url.set_port(base_url.port()).unwrap();
-        url
-    };
-
-    let assert = kamu
-        .execute(["repo", "add", repo_name, http_repo.as_str()])
-        .await
-        .success();
-
-    let stderr = std::str::from_utf8(&assert.get_output().stderr).unwrap();
-
-    assert!(
-        stderr.contains(format!("Added: {repo_name}").as_str()),
-        "Unexpected output:\n{stderr}",
-    );
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-async fn assert_search<I, S>(kamu: &KamuCliPuppet, search_cmd: I, expected_table_output: &str)
-where
-    I: IntoIterator<Item = S>,
-    S: AsRef<std::ffi::OsStr>,
-{
-    let assert = kamu.execute(search_cmd).await.success();
-
-    let stdout = std::str::from_utf8(&assert.get_output().stdout).unwrap();
-
-    pretty_assertions::assert_eq!(stdout, expected_table_output);
+    kamu.assert_success_command_execution(
+        [
+            "repo",
+            "add",
+            repo_name,
+            kamu_node_api_client.get_node_url().as_str(),
+        ],
+        None,
+        Some([format!("Added: {repo_name}").as_str()]),
+    )
+    .await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

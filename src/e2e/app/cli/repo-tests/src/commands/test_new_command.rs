@@ -7,27 +7,23 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use kamu_cli_puppet::extensions::KamuCliPuppetExt;
 use kamu_cli_puppet::KamuCliPuppet;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_new_root(kamu: KamuCliPuppet) {
-    let assert = kamu
-        .execute(["new", "--root", "test-dataset"])
-        .await
-        .success();
-
-    let stderr = std::str::from_utf8(&assert.get_output().stderr).unwrap();
-
-    assert!(
-        stderr.contains(indoc::indoc!(
+    kamu.assert_success_command_execution(
+        ["new", "--root", "test-dataset"],
+        None,
+        Some([indoc::indoc!(
             r#"
             Written new manifest template to: test-dataset.yaml
             Follow directions in the file's comments and use `kamu add test-dataset.yaml` when ready.
             "#
-        )),
-        "Unexpected output:\n{stderr}",
-    );
+        )]),
+    )
+    .await;
 
     // TODO: After solving this issue, add `kamu add` calls and populate with
     //       data
@@ -40,22 +36,17 @@ pub async fn test_new_root(kamu: KamuCliPuppet) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_new_derivative(kamu: KamuCliPuppet) {
-    let assert = kamu
-        .execute(["new", "--derivative", "test-dataset"])
-        .await
-        .success();
-
-    let stderr = std::str::from_utf8(&assert.get_output().stderr).unwrap();
-
-    assert!(
-        stderr.contains(indoc::indoc!(
+    kamu.assert_success_command_execution(
+        ["new", "--derivative", "test-dataset"],
+        None,
+        Some([indoc::indoc!(
             r#"
             Written new manifest template to: test-dataset.yaml
             Follow directions in the file's comments and use `kamu add test-dataset.yaml` when ready.
             "#
-        )),
-        "Unexpected output:\n{stderr}",
-    );
+        )]),
+    )
+    .await;
 
     // TODO: After solving this issue, add `kamu add` calls and populate with
     //       data

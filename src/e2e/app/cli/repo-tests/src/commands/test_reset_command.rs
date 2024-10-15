@@ -58,24 +58,17 @@ pub async fn test_reset(kamu: KamuCliPuppet) {
         .as_multibase()
         .to_stack_string();
 
-    {
-        let assert = kamu
-            .execute([
-                "--yes",
-                "reset",
-                "player-scores",
-                set_vocab_block_hash.as_str(),
-            ])
-            .await
-            .success();
-
-        let stderr = std::str::from_utf8(&assert.get_output().stderr).unwrap();
-
-        assert!(
-            stderr.contains("Dataset was reset"),
-            "Unexpected output:\n{stderr}",
-        );
-    }
+    kamu.assert_success_command_execution(
+        [
+            "--yes",
+            "reset",
+            "player-scores",
+            set_vocab_block_hash.as_str(),
+        ],
+        None,
+        Some(["Dataset was reset"]),
+    )
+    .await;
 
     let block_records_after_resetting = kamu
         .list_blocks(&DatasetName::new_unchecked("player-scores"))

@@ -9,6 +9,7 @@
 
 use kamu_cli_e2e_common::{
     DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR,
+    DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
     DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
 };
 use kamu_cli_puppet::extensions::KamuCliPuppetExt;
@@ -24,29 +25,18 @@ pub async fn test_verify_regular_dataset(kamu: KamuCliPuppet) {
         .await
         .success();
 
-    let data = indoc::indoc!(
-        r#"
-            {"match_time": "2000-01-01", "match_id": 2, "player_id": "Bob", "score": 90}
-        "#,
-    );
+    kamu.ingest_data(
+        &dataset_name,
+        DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
+    )
+    .await;
 
-    kamu.ingest_data(&dataset_name, data).await;
-
-    let assert = kamu
-        .execute(["verify", dataset_name.as_str()])
-        .await
-        .success();
-
-    let stderr = std::str::from_utf8(&assert.get_output().stderr).unwrap();
-
-    assert!(
-        stderr.contains(indoc::indoc!(
-            r#"
-                1 dataset(s) are valid
-            "#
-        )),
-        "Unexpected output:\n{stderr}",
-    );
+    kamu.assert_success_command_execution(
+        ["verify", dataset_name.as_str()],
+        None,
+        Some(["1 dataset(s) are valid"]),
+    )
+    .await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -66,51 +56,31 @@ pub async fn test_verify_recursive(kamu: KamuCliPuppet) {
     .await
     .success();
 
-    let data = indoc::indoc!(
-        r#"
-            {"match_time": "2000-01-01", "match_id": 2, "player_id": "Bob", "score": 90}
-        "#,
-    );
-
-    kamu.ingest_data(&dataset_name, data).await;
+    kamu.ingest_data(
+        &dataset_name,
+        DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
+    )
+    .await;
 
     kamu.execute(["pull", dataset_derivative_name.as_str()])
         .await
         .success();
 
     // Call verify without recursive flag
-    let assert = kamu
-        .execute(["verify", dataset_derivative_name.as_str()])
-        .await
-        .success();
-
-    let stderr = std::str::from_utf8(&assert.get_output().stderr).unwrap();
-
-    assert!(
-        stderr.contains(indoc::indoc!(
-            r#"
-                1 dataset(s) are valid
-            "#
-        )),
-        "Unexpected output:\n{stderr}",
-    );
+    kamu.assert_success_command_execution(
+        ["verify", dataset_derivative_name.as_str()],
+        None,
+        Some(["1 dataset(s) are valid"]),
+    )
+    .await;
 
     // Call verify wit recursive flag
-    let assert = kamu
-        .execute(["verify", dataset_derivative_name.as_str(), "--recursive"])
-        .await
-        .success();
-
-    let stderr = std::str::from_utf8(&assert.get_output().stderr).unwrap();
-
-    assert!(
-        stderr.contains(indoc::indoc!(
-            r#"
-                2 dataset(s) are valid
-            "#
-        )),
-        "Unexpected output:\n{stderr}",
-    );
+    kamu.assert_success_command_execution(
+        ["verify", dataset_derivative_name.as_str(), "--recursive"],
+        None,
+        Some(["2 dataset(s) are valid"]),
+    )
+    .await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -122,29 +92,18 @@ pub async fn test_verify_integrity(kamu: KamuCliPuppet) {
         .await
         .success();
 
-    let data = indoc::indoc!(
-        r#"
-            {"match_time": "2000-01-01", "match_id": 2, "player_id": "Bob", "score": 90}
-        "#,
-    );
+    kamu.ingest_data(
+        &dataset_name,
+        DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
+    )
+    .await;
 
-    kamu.ingest_data(&dataset_name, data).await;
-
-    let assert = kamu
-        .execute(["verify", dataset_name.as_str(), "--integrity"])
-        .await
-        .success();
-
-    let stderr = std::str::from_utf8(&assert.get_output().stderr).unwrap();
-
-    assert!(
-        stderr.contains(indoc::indoc!(
-            r#"
-                1 dataset(s) are valid
-            "#
-        )),
-        "Unexpected output:\n{stderr}",
-    );
+    kamu.assert_success_command_execution(
+        ["verify", dataset_name.as_str(), "--integrity"],
+        None,
+        Some(["1 dataset(s) are valid"]),
+    )
+    .await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

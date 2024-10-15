@@ -262,19 +262,12 @@ pub async fn test_ingest_recursive(kamu: KamuCliPuppet) {
     .await
     .success();
 
-    {
-        let assert = kamu
-            .execute(["tail", "leaderboard", "--output-format", "table"])
-            .await
-            .failure();
-
-        let stderr = std::str::from_utf8(&assert.get_output().stderr).unwrap();
-
-        assert!(
-            stderr.contains("Error: Dataset schema is not yet available: leaderboard"),
-            "Unexpected output:\n{stderr}",
-        );
-    }
+    kamu.assert_failure_command_execution(
+        ["tail", "leaderboard", "--output-format", "table"],
+        None,
+        Some(["Error: Dataset schema is not yet available: leaderboard"]),
+    )
+    .await;
 
     // TODO: `kamu ingest`: implement `--recursive` mode
     //        https://github.com/kamu-data/kamu-cli/issues/886
@@ -403,70 +396,31 @@ async fn assert_ingest_data_to_player_scores_from_stdio<I, S, T>(
     ingest_data: T,
     expected_tail_table: &str,
 ) where
-    I: IntoIterator<Item = S> + Clone,
+    I: IntoIterator<Item = S> + Send + Clone,
     S: AsRef<std::ffi::OsStr>,
-    T: Into<Vec<u8>> + Clone,
+    T: Into<Vec<u8>> + Send + Clone,
 {
     // Ingest
-    {
-        let assert = kamu
-            .execute_with_input(ingest_cmd.clone(), ingest_data.clone())
-            .await
-            .success();
+    kamu.assert_success_command_execution_with_input(
+        ingest_cmd.clone(),
+        ingest_data.clone(),
+        None,
+        Some(["Dataset updated"]),
+    )
+    .await;
 
-        let stderr = std::str::from_utf8(&assert.get_output().stderr).unwrap();
-
-        assert!(
-            stderr.contains("Dataset updated"),
-            "Unexpected output:\n{stderr}",
-        );
-    }
     // Trying to ingest the same data
-    {
-        let assert = kamu
-            .execute_with_input(ingest_cmd, ingest_data)
-            .await
-            .success();
+    kamu.assert_success_command_execution_with_input(
+        ingest_cmd,
+        ingest_data,
+        None,
+        Some(["Dataset up-to-date"]),
+    )
+    .await;
 
-        let stderr = std::str::from_utf8(&assert.get_output().stderr).unwrap();
-
-        assert!(
-            stderr.contains("Dataset up-to-date"),
-            "Unexpected output:\n{stderr}",
-        );
-    }
     // Assert ingested data
-    {
-        let assert = kamu
-            .execute([
-                "sql",
-                "--engine",
-                "datafusion",
-                "--command",
-                // Without unstable "offset" column.
-                // For a beautiful output, cut to seconds
-                indoc::indoc!(
-                    r#"
-                    SELECT op,
-                           system_time,
-                           match_time,
-                           match_id,
-                           player_id,
-                           score
-                    FROM "player-scores"
-                    ORDER BY match_id, score, player_id;
-                    "#
-                ),
-                "--output-format",
-                "table",
-            ])
-            .await
-            .success();
-
-        let stdout = std::str::from_utf8(&assert.get_output().stdout).unwrap();
-
-        pretty_assertions::assert_eq!(expected_tail_table, stdout);
-    }
+    kamu.assert_player_scores_dataset_data(expected_tail_table)
+        .await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use kamu_cli::{DEFAULT_MULTI_TENANT_SQLITE_DATABASE_NAME, KAMU_WORKSPACE_DIR_NAME};
+use kamu_cli_puppet::extensions::KamuCliPuppetExt;
 use kamu_cli_puppet::KamuCliPuppet;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -90,24 +91,15 @@ pub async fn test_init_exist_ok_mt(mut kamu: KamuCliPuppet) {
 pub async fn test_init_in_an_existing_workspace(mut kamu: KamuCliPuppet) {
     kamu.set_workspace_path_in_tmp_dir();
 
-    {
-        let assert = kamu.execute(["init"]).await.success();
-        let stderr = std::str::from_utf8(&assert.get_output().stderr).unwrap();
+    kamu.assert_success_command_execution(["init"], None, Some(["Initialized an empty workspace"]))
+        .await;
 
-        assert!(
-            stderr.contains("Initialized an empty workspace"),
-            "Unexpected output:\n{stderr}",
-        );
-    }
-    {
-        let assert = kamu.execute(["init"]).await.failure();
-        let stderr = std::str::from_utf8(&assert.get_output().stderr).unwrap();
-
-        assert!(
-            stderr.contains("Error: Directory is already a kamu workspace"),
-            "Unexpected output:\n{stderr}",
-        );
-    }
+    kamu.assert_failure_command_execution(
+        ["init"],
+        None,
+        Some(["Error: Directory is already a kamu workspace"]),
+    )
+    .await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

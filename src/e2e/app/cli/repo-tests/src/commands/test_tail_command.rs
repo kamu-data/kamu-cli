@@ -11,6 +11,7 @@ use kamu_cli_e2e_common::{
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
     DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
 };
+use kamu_cli_puppet::extensions::KamuCliPuppetExt;
 use kamu_cli_puppet::KamuCliPuppet;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -20,19 +21,12 @@ pub async fn test_tail(kamu: KamuCliPuppet) {
         .await
         .success();
 
-    {
-        let assert = kamu
-            .execute(["tail", "player-scores", "--output-format", "table"])
-            .await
-            .failure();
-
-        let stderr = std::str::from_utf8(&assert.get_output().stderr).unwrap();
-
-        assert!(
-            stderr.contains("Error: Dataset schema is not yet available: player-scores"),
-            "Unexpected output:\n{stderr}",
-        );
-    }
+    kamu.assert_failure_command_execution(
+        ["tail", "player-scores", "--output-format", "table"],
+        None,
+        Some(["Error: Dataset schema is not yet available: player-scores"]),
+    )
+    .await;
 
     kamu.execute_with_input(
         ["ingest", "player-scores", "--stdin"],
@@ -41,28 +35,21 @@ pub async fn test_tail(kamu: KamuCliPuppet) {
     .await
     .success();
 
-    {
-        let assert = kamu
-            .execute(["tail", "player-scores", "--output-format", "table"])
-            .await
-            .success();
-
-        let stdout = std::str::from_utf8(&assert.get_output().stdout).unwrap();
-
-        pretty_assertions::assert_eq!(
-            indoc::indoc!(
-                r#"
-                ┌────────┬────┬──────────────────────┬──────────────────────┬──────────┬───────────┬───────┐
-                │ offset │ op │     system_time      │      match_time      │ match_id │ player_id │ score │
-                ├────────┼────┼──────────────────────┼──────────────────────┼──────────┼───────────┼───────┤
-                │      0 │ +A │ 2050-01-02T03:04:05Z │ 2000-01-01T00:00:00Z │        1 │     Alice │   100 │
-                │      1 │ +A │ 2050-01-02T03:04:05Z │ 2000-01-01T00:00:00Z │        1 │       Bob │    80 │
-                └────────┴────┴──────────────────────┴──────────────────────┴──────────┴───────────┴───────┘
-                "#
-            ),
-            stdout
-        );
-    }
+    kamu.assert_success_command_execution(
+        ["tail", "player-scores", "--output-format", "table"],
+        Some(indoc::indoc!(
+            r#"
+            ┌────────┬────┬──────────────────────┬──────────────────────┬──────────┬───────────┬───────┐
+            │ offset │ op │     system_time      │      match_time      │ match_id │ player_id │ score │
+            ├────────┼────┼──────────────────────┼──────────────────────┼──────────┼───────────┼───────┤
+            │      0 │ +A │ 2050-01-02T03:04:05Z │ 2000-01-01T00:00:00Z │        1 │     Alice │   100 │
+            │      1 │ +A │ 2050-01-02T03:04:05Z │ 2000-01-01T00:00:00Z │        1 │       Bob │    80 │
+            └────────┴────┴──────────────────────┴──────────────────────┴──────────┴───────────┴───────┘
+            "#
+        )),
+        None::<Vec<&str>>,
+    )
+    .await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

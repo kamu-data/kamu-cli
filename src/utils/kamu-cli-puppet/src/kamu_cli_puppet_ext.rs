@@ -26,12 +26,52 @@ use opendatafabric::{
 };
 use serde::Deserialize;
 
-use crate::KamuCliPuppet;
+use crate::{ExecuteCommandResult, KamuCliPuppet};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait]
 pub trait KamuCliPuppetExt {
+    async fn assert_success_command_execution<I, S>(
+        &self,
+        cmd: I,
+        maybe_expected_stdout: Option<&str>,
+        maybe_expected_stderr: Option<impl IntoIterator<Item = &str> + Send>,
+    ) where
+        I: IntoIterator<Item = S> + Send,
+        S: AsRef<std::ffi::OsStr>;
+
+    async fn assert_success_command_execution_with_input<I, S, T>(
+        &self,
+        cmd: I,
+        input: T,
+        maybe_expected_stdout: Option<&str>,
+        maybe_expected_stderr: Option<impl IntoIterator<Item = &str> + Send>,
+    ) where
+        I: IntoIterator<Item = S> + Send,
+        S: AsRef<std::ffi::OsStr>,
+        T: Into<Vec<u8>> + Send;
+
+    async fn assert_failure_command_execution<I, S>(
+        &self,
+        cmd: I,
+        maybe_expected_stdout: Option<&str>,
+        maybe_expected_stderr: Option<impl IntoIterator<Item = &str> + Send>,
+    ) where
+        I: IntoIterator<Item = S> + Send,
+        S: AsRef<std::ffi::OsStr>;
+
+    async fn assert_failure_command_execution_with_input<I, S, T>(
+        &self,
+        cmd: I,
+        input: T,
+        maybe_expected_stdout: Option<&str>,
+        maybe_expected_stderr: Option<impl IntoIterator<Item = &str> + Send>,
+    ) where
+        I: IntoIterator<Item = S> + Send,
+        S: AsRef<std::ffi::OsStr>,
+        T: Into<Vec<u8>> + Send;
+
     async fn list_datasets(&self) -> Vec<DatasetRecord>;
 
     async fn add_dataset(&self, dataset_snapshot: DatasetSnapshot);
@@ -47,6 +87,8 @@ pub trait KamuCliPuppetExt {
         T: Into<String> + Send;
 
     async fn start_api_server(self, e2e_data_file_path: PathBuf) -> ServerOutput;
+
+    async fn assert_player_scores_dataset_data(&self, expected_player_scores_table: &str);
 
     async fn assert_last_data_slice(
         &self,
@@ -184,6 +226,36 @@ impl KamuCliPuppetExt for KamuCliPuppet {
         ServerOutput { stdout, stderr }
     }
 
+    async fn assert_player_scores_dataset_data(&self, expected_player_scores_table: &str) {
+        self.assert_success_command_execution(
+            [
+                "sql",
+                "--engine",
+                "datafusion",
+                "--command",
+                // Without unstable "offset" column.
+                // For a beautiful output, cut to seconds
+                indoc::indoc!(
+                    r#"
+                    SELECT op,
+                           system_time,
+                           match_time,
+                           match_id,
+                           player_id,
+                           score
+                    FROM "player-scores"
+                    ORDER BY match_id, score, player_id;
+                    "#
+                ),
+                "--output-format",
+                "table",
+            ],
+            Some(expected_player_scores_table),
+            None::<Vec<&str>>,
+        )
+        .await;
+    }
+
     async fn assert_last_data_slice(
         &self,
         dataset_name: &DatasetName,
@@ -230,6 +302,74 @@ impl KamuCliPuppetExt for KamuCliPuppet {
             .await
             .success();
     }
+
+    async fn assert_success_command_execution<I, S>(
+        &self,
+        cmd: I,
+        maybe_expected_stdout: Option<&str>,
+        maybe_expected_stderr: Option<impl IntoIterator<Item = &str> + Send>,
+    ) where
+        I: IntoIterator<Item = S> + Send,
+        S: AsRef<std::ffi::OsStr>,
+    {
+        assert_execute_command_result(
+            &self.execute(cmd).await.success(),
+            maybe_expected_stdout,
+            maybe_expected_stderr,
+        );
+    }
+
+    async fn assert_success_command_execution_with_input<I, S, T>(
+        &self,
+        cmd: I,
+        input: T,
+        maybe_expected_stdout: Option<&str>,
+        maybe_expected_stderr: Option<impl IntoIterator<Item = &str> + Send>,
+    ) where
+        I: IntoIterator<Item = S> + Send,
+        S: AsRef<std::ffi::OsStr>,
+        T: Into<Vec<u8>> + Send,
+    {
+        assert_execute_command_result(
+            &self.execute_with_input(cmd, input).await.success(),
+            maybe_expected_stdout,
+            maybe_expected_stderr,
+        );
+    }
+
+    async fn assert_failure_command_execution<I, S>(
+        &self,
+        cmd: I,
+        maybe_expected_stdout: Option<&str>,
+        maybe_expected_stderr: Option<impl IntoIterator<Item = &str> + Send>,
+    ) where
+        I: IntoIterator<Item = S> + Send,
+        S: AsRef<std::ffi::OsStr>,
+    {
+        assert_execute_command_result(
+            &self.execute(cmd).await.failure(),
+            maybe_expected_stdout,
+            maybe_expected_stderr,
+        );
+    }
+
+    async fn assert_failure_command_execution_with_input<I, S, T>(
+        &self,
+        cmd: I,
+        input: T,
+        maybe_expected_stdout: Option<&str>,
+        maybe_expected_stderr: Option<impl IntoIterator<Item = &str> + Send>,
+    ) where
+        I: IntoIterator<Item = S> + Send,
+        S: AsRef<std::ffi::OsStr>,
+        T: Into<Vec<u8>> + Send,
+    {
+        assert_execute_command_result(
+            &self.execute_with_input(cmd, input).await.failure(),
+            maybe_expected_stdout,
+            maybe_expected_stderr,
+        );
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -270,6 +410,31 @@ pub struct RepoAlias {
 pub struct BlockRecord {
     pub block_hash: Multihash,
     pub block: MetadataBlock,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn assert_execute_command_result<'a>(
+    command_result: &ExecuteCommandResult,
+    maybe_expected_stdout: Option<&str>,
+    maybe_expected_stderr: Option<impl IntoIterator<Item = &'a str>>,
+) {
+    let actual_stdout = std::str::from_utf8(&command_result.get_output().stdout).unwrap();
+
+    if let Some(expected_stdout) = maybe_expected_stdout {
+        pretty_assertions::assert_eq!(expected_stdout, actual_stdout);
+    }
+
+    if let Some(expected_stderr_items) = maybe_expected_stderr {
+        let stderr = std::str::from_utf8(&command_result.get_output().stderr).unwrap();
+
+        for expected_stderr_item in expected_stderr_items {
+            assert!(
+                stderr.contains(expected_stderr_item),
+                "Unexpected output:\n{stderr}",
+            );
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

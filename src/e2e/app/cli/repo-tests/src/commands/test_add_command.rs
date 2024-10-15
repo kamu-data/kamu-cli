@@ -16,22 +16,18 @@ use opendatafabric as odf;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_add_dataset_from_stdin(kamu: KamuCliPuppet) {
-    let assert = kamu
-        .execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
-        .await
-        .success();
-
-    let stderr = std::str::from_utf8(&assert.get_output().stderr).unwrap();
-
-    assert!(
-        stderr.contains(indoc::indoc!(
+    kamu.assert_success_command_execution_with_input(
+        ["add", "--stdin"],
+        DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
+        None,
+        Some([indoc::indoc!(
             r#"
             Added: player-scores
             Added 1 dataset(s)
             "#
-        )),
-        "Unexpected output:\n{stderr}",
-    );
+        )]),
+    )
+    .await;
 
     let dataset_names = kamu
         .list_datasets()
@@ -47,59 +43,44 @@ pub async fn test_add_dataset_from_stdin(kamu: KamuCliPuppet) {
 
 pub async fn test_add_dataset_with_name(kamu: KamuCliPuppet) {
     // Add from stdio
-    {
-        let assert = kamu
-            .execute_with_input(
-                ["add", "--stdin", "--name", "player-scores-1"],
-                DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
-            )
-            .await
-            .success();
+    kamu.assert_success_command_execution_with_input(
+        ["add", "--stdin", "--name", "player-scores-1"],
+        DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
+        None,
+        Some([indoc::indoc!(
+            r#"
+            Added: player-scores-1
+            Added 1 dataset(s)
+            "#
+        )]),
+    )
+    .await;
 
-        let stderr = std::str::from_utf8(&assert.get_output().stderr).unwrap();
-
-        assert!(
-            stderr.contains(indoc::indoc!(
-                r#"
-                Added: player-scores-1
-                Added 1 dataset(s)
-                "#
-            )),
-            "Unexpected output:\n{stderr}",
-        );
-    }
     // Add from a file
-    {
-        let snapshot_path = kamu.workspace_path().join("player-scores.yaml");
+    let snapshot_path = kamu.workspace_path().join("player-scores.yaml");
 
-        std::fs::write(
-            snapshot_path.clone(),
-            DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
-        )
-        .unwrap();
+    std::fs::write(
+        snapshot_path.clone(),
+        DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
+    )
+    .unwrap();
 
-        let assert = kamu
-            .execute([
-                "add",
-                "--name",
-                "player-scores-2",
-                snapshot_path.to_str().unwrap(),
-            ])
-            .await
-            .success();
-
-        let stderr = std::str::from_utf8(&assert.get_output().stderr).unwrap();
-
-        assert!(
-            stderr.contains(indoc::indoc!(
-                r#"
-                Added: player-scores-2
-                Added 1 dataset(s)
-                "#
-            )),
-            "Unexpected output:\n{stderr}",
-        );
-    }
+    kamu.assert_success_command_execution(
+        [
+            "add",
+            "--name",
+            "player-scores-2",
+            snapshot_path.to_str().unwrap(),
+        ],
+        None,
+        Some([indoc::indoc!(
+            r#"
+            Added: player-scores-2
+            Added 1 dataset(s)
+            "#
+        )]),
+    )
+    .await;
 
     let dataset_names = kamu
         .list_datasets()
@@ -114,62 +95,43 @@ pub async fn test_add_dataset_with_name(kamu: KamuCliPuppet) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_add_dataset_with_replace(kamu: KamuCliPuppet) {
-    {
-        let assert = kamu
-            .execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
-            .await
-            .success();
+    kamu.assert_success_command_execution_with_input(
+        ["add", "--stdin"],
+        DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
+        None,
+        Some([indoc::indoc!(
+            r#"
+            Added: player-scores
+            "#
+        )]),
+    )
+    .await;
 
-        let stderr = std::str::from_utf8(&assert.get_output().stderr).unwrap();
+    kamu.assert_success_command_execution_with_input(
+        ["add", "--stdin"],
+        DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
+        None,
+        Some([indoc::indoc!(
+            r#"
+            Skipped: player-scores: Already exists
+            Added 0 dataset(s)
+            "#
+        )]),
+    )
+    .await;
 
-        assert!(
-            stderr.contains(indoc::indoc!(
-                r#"
-                Added: player-scores
-                "#
-            )),
-            "Unexpected output:\n{stderr}",
-        );
-    }
-    {
-        let assert = kamu
-            .execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
-            .await
-            .success();
-
-        let stderr = std::str::from_utf8(&assert.get_output().stderr).unwrap();
-
-        assert!(
-            stderr.contains(indoc::indoc!(
-                r#"
-                Skipped: player-scores: Already exists
-                Added 0 dataset(s)
-                "#
-            )),
-            "Unexpected output:\n{stderr}",
-        );
-    }
-    {
-        let assert = kamu
-            .execute_with_input(
-                ["--yes", "add", "--stdin", "--replace"],
-                DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
-            )
-            .await
-            .success();
-
-        let stderr = std::str::from_utf8(&assert.get_output().stderr).unwrap();
-
-        assert!(
-            stderr.contains(indoc::indoc!(
-                r#"
-                Added: player-scores
-                Added 1 dataset(s)
-                "#
-            )),
-            "Unexpected output:\n{stderr}",
-        );
-    }
+    kamu.assert_success_command_execution_with_input(
+        ["--yes", "add", "--stdin", "--replace"],
+        DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
+        None,
+        Some([indoc::indoc!(
+            r#"
+            Added: player-scores
+            Added 1 dataset(s)
+            "#
+        )]),
+    )
+    .await;
 
     let dataset_names = kamu
         .list_datasets()
@@ -229,14 +191,23 @@ pub async fn test_add_recursive(kamu: KamuCliPuppet) {
     )
     .unwrap();
 
-    kamu.execute([
-        "-v",
-        "add",
-        "--recursive",
-        kamu.workspace_path().as_os_str().to_str().unwrap(),
-    ])
-    .await
-    .success();
+    kamu.assert_success_command_execution(
+        [
+            "-v",
+            "add",
+            "--recursive",
+            kamu.workspace_path().as_os_str().to_str().unwrap(),
+        ],
+        None,
+        Some([indoc::indoc!(
+            r#"
+            Added: commented
+            Added: plain
+            Added 2 dataset(s)
+            "#
+        )]),
+    )
+    .await;
 
     let dataset_names = kamu
         .list_datasets()

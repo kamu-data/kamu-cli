@@ -17,34 +17,23 @@ use kamu_cli_puppet::KamuCliPuppet;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_delete_dataset(kamu: KamuCliPuppet) {
-    {
-        let assert = kamu.execute(["delete", "player-scores"]).await.failure();
-
-        let stderr = std::str::from_utf8(&assert.get_output().stderr).unwrap();
-
-        assert!(
-            stderr.contains("Error: Dataset not found: player-scores"),
-            "Unexpected output:\n{stderr}",
-        );
-    }
+    kamu.assert_failure_command_execution(
+        ["delete", "player-scores"],
+        None,
+        Some(["Error: Dataset not found: player-scores"]),
+    )
+    .await;
 
     kamu.execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
         .await
         .success();
 
-    {
-        let assert = kamu
-            .execute(["--yes", "delete", "player-scores"])
-            .await
-            .success();
-
-        let stderr = std::str::from_utf8(&assert.get_output().stderr).unwrap();
-
-        assert!(
-            stderr.contains("Deleted 1 dataset(s)"),
-            "Unexpected output:\n{stderr}",
-        );
-    }
+    kamu.assert_success_command_execution(
+        ["--yes", "delete", "player-scores"],
+        None,
+        Some(["Deleted 1 dataset(s)"]),
+    )
+    .await;
 
     let dataset_names = kamu
         .list_datasets()
@@ -96,19 +85,14 @@ pub async fn test_delete_dataset_recursive(kamu: KamuCliPuppet) {
             ["another-root", "leaderboard", "player-scores"]
         );
     }
-    {
-        let assert = kamu
-            .execute(["--yes", "delete", "player-scores", "--recursive"])
-            .await
-            .success();
 
-        let stderr = std::str::from_utf8(&assert.get_output().stderr).unwrap();
+    kamu.assert_success_command_execution(
+        ["--yes", "delete", "player-scores", "--recursive"],
+        None,
+        Some(["Deleted 2 dataset(s)"]),
+    )
+    .await;
 
-        assert!(
-            stderr.contains("Deleted 2 dataset(s)"),
-            "Unexpected output:\n{stderr}",
-        );
-    }
     {
         let dataset_names = kamu
             .list_datasets()
@@ -158,16 +142,14 @@ pub async fn test_delete_dataset_all(kamu: KamuCliPuppet) {
             ["another-root", "leaderboard", "player-scores"]
         );
     }
-    {
-        let assert = kamu.execute(["--yes", "delete", "--all"]).await.success();
 
-        let stderr = std::str::from_utf8(&assert.get_output().stderr).unwrap();
+    kamu.assert_success_command_execution(
+        ["--yes", "delete", "--all"],
+        None,
+        Some(["Deleted 3 dataset(s)"]),
+    )
+    .await;
 
-        assert!(
-            stderr.contains("Deleted 3 dataset(s)"),
-            "Unexpected output:\n{stderr}",
-        );
-    }
     {
         let dataset_names = kamu
             .list_datasets()
