@@ -128,6 +128,7 @@ impl ClientSideHarness {
         b.add::<SmartTransferProtocolClientWs>();
 
         b.add::<SyncServiceImpl>();
+        b.add::<SyncRequestBuilder>();
 
         b.add::<TransformServiceImpl>();
 
