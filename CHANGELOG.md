@@ -11,6 +11,11 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Unreleased]
+### Changed
+- `kamu push <dataset>` command now can be called without `--to` reference and Alias or Remote dataset repository will be used as destination
+- `kamu login` command now will store repository to Repository registry. Name can be provided with `--repo-name` flag and to skip creating repo can be used `--skip-add-repo` flag
+
 ## [0.204.5] - 2024-10-08
 ### Added
 - Postgres implementation for dataset entry and account Re-BAC repositories

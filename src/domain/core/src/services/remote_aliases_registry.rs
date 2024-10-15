@@ -46,3 +46,111 @@ impl From<GetDatasetError> for GetAliasesError {
         }
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// RemoteAliasResolver
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait]
+pub trait RemoteAliasResolver: Send + Sync {
+    // Resolve remote push target.
+    // Firstly try to resolve from AliasRegistry, if cannot do it
+    // try to resolve via repository registry
+    async fn resolve_push_target(
+        &self,
+        local_dataset_handle: &DatasetHandle,
+        dataset_push_target_maybe: Option<DatasetPushTarget>,
+    ) -> Result<RemoteTarget, ResolveAliasError>;
+}
+
+#[derive(Debug, Clone)]
+pub struct RemoteTarget {
+    pub url: url::Url,
+    pub repo_name: Option<RepoName>,
+    pub dataset_name: Option<DatasetName>,
+    pub account_name: Option<AccountName>,
+}
+
+impl RemoteTarget {
+    pub fn new(
+        url: url::Url,
+        repo_name: Option<RepoName>,
+        dataset_name: Option<DatasetName>,
+        account_name: Option<AccountName>,
+    ) -> Self {
+        Self {
+            url,
+            repo_name,
+            dataset_name,
+            account_name,
+        }
+    }
+}
+
+#[derive(Error, Debug)]
+pub enum ResolveAliasError {
+    #[error(transparent)]
+    RepositoryNotFound(
+        #[from]
+        #[backtrace]
+        RepositoryNotFoundError,
+    ),
+    #[error("Cannot choose between multiple repositories")]
+    AmbiguousRepository,
+    #[error("Cannot choose between multiple push aliases")]
+    AmbiguousAlias,
+    #[error("Repositories list is empty")]
+    EmptyRepositoryList,
+    #[error(transparent)]
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
+}
+
+impl From<GetRepoError> for ResolveAliasError {
+    fn from(val: GetRepoError) -> Self {
+        match val {
+            GetRepoError::NotFound(err) => Self::RepositoryNotFound(err),
+            GetRepoError::Internal(err) => Self::Internal(err),
+        }
+    }
+}
+
+impl From<ResolveAliasError> for PushError {
+    fn from(val: ResolveAliasError) -> Self {
+        match val {
+            ResolveAliasError::AmbiguousAlias | ResolveAliasError::AmbiguousRepository => {
+                Self::AmbiguousTarget
+            }
+            ResolveAliasError::EmptyRepositoryList | ResolveAliasError::RepositoryNotFound(_) => {
+                Self::NoTarget
+            }
+            ResolveAliasError::Internal(e) => Self::Internal(e),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Error)]
+pub enum GetRemoteAccountError {
+    #[error(transparent)]
+    InvalidResponse(InvalidApiResponseError),
+
+    #[error(transparent)]
+    Internal(InternalError),
+}
+
+#[derive(Debug, Error)]
+#[error("Invalid gql response: {response}")]
+pub struct InvalidApiResponseError {
+    pub response: String,
+}
+
+impl From<InternalError> for GetRemoteAccountError {
+    fn from(value: InternalError) -> Self {
+        Self::Internal(value)
+    }
+}

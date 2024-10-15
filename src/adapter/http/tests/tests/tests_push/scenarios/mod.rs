@@ -15,6 +15,7 @@ mod scenario_existing_evolved_dataset;
 mod scenario_existing_ref_collision;
 mod scenario_existing_up_to_date_dataset;
 mod scenario_new_dataset;
+mod scenario_new_dataset_via_repo_ref;
 mod scenario_new_empty_dataset;
 
 pub(crate) use scenario_aborted_write_of_new_rewrite_succeeds::*;
@@ -25,4 +26,5 @@ pub(crate) use scenario_existing_evolved_dataset::*;
 pub(crate) use scenario_existing_ref_collision::*;
 pub(crate) use scenario_existing_up_to_date_dataset::*;
 pub(crate) use scenario_new_dataset::*;
+pub(crate) use scenario_new_dataset_via_repo_ref::*;
 pub(crate) use scenario_new_empty_dataset::*;

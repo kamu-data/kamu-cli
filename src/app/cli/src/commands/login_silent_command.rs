@@ -178,7 +178,7 @@ impl Command for LoginSilentCommand {
         // Validate token and trigger browser login flow if needed
         if let Some(token_find_report) = self
             .access_token_registry_service
-            .find_by_backend_url(self.scope, &odf_server_backend_url)
+            .find_by_backend_url(&odf_server_backend_url)
         {
             match self.validate_login(token_find_report).await {
                 Ok(_) => {

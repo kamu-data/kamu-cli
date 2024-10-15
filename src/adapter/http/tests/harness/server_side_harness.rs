@@ -62,6 +62,10 @@ pub(crate) trait ServerSideHarness {
         self.dataset_url_with_scheme(dataset_alias, "odf+http")
     }
 
+    fn api_server_addr(&self) -> String;
+
+    fn api_server_account(&self) -> Account;
+
     fn system_time_source(&self) -> &SystemTimeSourceStub;
 
     async fn api_server_run(self) -> Result<(), InternalError>;
@@ -77,22 +81,23 @@ pub(crate) struct ServerSideHarnessOptions {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn server_authentication_mock() -> MockAuthenticationService {
-    MockAuthenticationService::resolving_token(
-        kamu_accounts::DUMMY_ACCESS_TOKEN,
-        Account {
-            id: AccountID::new_seeded_ed25519(SERVER_ACCOUNT_NAME.as_bytes()),
-            account_name: AccountName::new_unchecked(SERVER_ACCOUNT_NAME),
-            account_type: AccountType::User,
-            display_name: SERVER_ACCOUNT_NAME.to_string(),
-            email: None,
-            avatar_url: None,
-            registered_at: Utc::now(),
-            is_admin: false,
-            provider: String::from(PROVIDER_PASSWORD),
-            provider_identity_key: String::from(SERVER_ACCOUNT_NAME),
-        },
-    )
+pub(crate) fn server_authentication_mock(account: &Account) -> MockAuthenticationService {
+    MockAuthenticationService::resolving_token(kamu_accounts::DUMMY_ACCESS_TOKEN, account.clone())
+}
+
+pub(crate) fn get_server_account() -> Account {
+    Account {
+        id: AccountID::new_seeded_ed25519(SERVER_ACCOUNT_NAME.as_bytes()),
+        account_name: AccountName::new_unchecked(SERVER_ACCOUNT_NAME),
+        account_type: AccountType::User,
+        display_name: SERVER_ACCOUNT_NAME.to_string(),
+        email: None,
+        avatar_url: None,
+        registered_at: Utc::now(),
+        is_admin: false,
+        provider: String::from(PROVIDER_PASSWORD),
+        provider_identity_key: String::from(SERVER_ACCOUNT_NAME),
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

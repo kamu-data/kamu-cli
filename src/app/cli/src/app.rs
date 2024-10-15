@@ -419,6 +419,8 @@ pub fn configure_base_catalog(
 
     b.add::<RemoteAliasesRegistryImpl>();
 
+    b.add::<RemoteAliasResolverImpl>();
+
     b.add::<ResourceLoaderImpl>();
 
     b.add::<DataFormatRegistryImpl>();

@@ -286,3 +286,50 @@ fn test_dataset_ref_any_pattern() {
         ),
     );
 }
+
+#[test]
+fn test_dataset_push_target() {
+    // Parse valid remote url ref
+    let param = "http://net.example.com";
+    let res = DatasetPushTarget::from_str(param).unwrap();
+
+    assert_eq!(res, DatasetPushTarget::Url(Url::from_str(param).unwrap()));
+
+    // Parse valid remote single tenant alias ref
+    let repo_name = RepoName::new_unchecked("net.example.com");
+    let dataset_name = DatasetName::new_unchecked("foo");
+
+    let res = DatasetPushTarget::from_str(&format!("{repo_name}/{dataset_name}")).unwrap();
+
+    assert_eq!(
+        res,
+        DatasetPushTarget::Alias(DatasetAliasRemote::new(
+            repo_name.clone(),
+            None,
+            dataset_name.clone()
+        ))
+    );
+
+    // Parse valid remote single tenant alias ref
+    let account_name = AccountName::new_unchecked("bar");
+    let res =
+        DatasetPushTarget::from_str(&format!("{repo_name}/{account_name}/{dataset_name}")).unwrap();
+
+    assert_eq!(
+        res,
+        DatasetPushTarget::Alias(DatasetAliasRemote::new(
+            repo_name.clone(),
+            Some(account_name.clone()),
+            dataset_name.clone()
+        ))
+    );
+
+    // Parse valid repository ref
+    let param = "net.example.com";
+    let res = DatasetPushTarget::from_str(param).unwrap();
+
+    assert_eq!(
+        res,
+        DatasetPushTarget::Repository(RepoName::new_unchecked(param))
+    );
+}

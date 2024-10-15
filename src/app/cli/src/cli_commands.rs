@@ -211,6 +211,7 @@ pub fn get_command(
                 cli_catalog.get_one()?,
                 cli_catalog.get_one()?,
                 cli_catalog.get_one()?,
+                cli_catalog.get_one()?,
                 if c.user {
                     odf_server::AccessTokenStoreScope::User
                 } else {
@@ -219,6 +220,8 @@ pub fn get_command(
                 c.server.map(Into::into),
                 c.access_token,
                 c.check,
+                c.repo_name,
+                c.skip_add_repo,
             )),
         },
         cli::Command::Logout(c) => Box::new(LogoutCommand::new(
@@ -278,9 +281,7 @@ pub fn get_command(
         cli::Command::Push(c) => Box::new(PushCommand::new(
             cli_catalog.get_one()?,
             cli_catalog.get_one()?,
-            cli_catalog.get_one()?,
             c.dataset.unwrap_or_default(),
-            cli_catalog.get_one()?,
             c.all,
             c.recursive,
             !c.no_alias,

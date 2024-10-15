@@ -526,6 +526,8 @@ Authentiates with a remote ODF server interactively
 * `--user` — Store access token in the user home folder rather than in the workspace
 * `--check` — Check whether existing authorization is still valid without triggering a login flow
 * `--access-token <ACCESS_TOKEN>` — Provide an existing access token
+* `--repo-name <REPO_NAME>` — Repository name which will be used to store in repositories list
+* `--skip-add-repo` — Don't automatically add a remote repository for this host
 
 
 

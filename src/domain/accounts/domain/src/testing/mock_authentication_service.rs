@@ -163,6 +163,11 @@ impl MockAuthenticationService {
 
     pub fn resolving_token(access_token: &str, expected_account_info: Account) -> Self {
         let mut mock_authentication_service = MockAuthenticationService::new();
+        let account_cloned = expected_account_info.clone();
+        mock_authentication_service
+            .expect_account_by_id()
+            .with(eq(account_cloned.id.clone()))
+            .returning(move |_| Ok(Some(account_cloned.clone())));
         mock_authentication_service
             .expect_account_by_token()
             .with(eq(access_token.to_string()))

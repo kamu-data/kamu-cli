@@ -36,9 +36,10 @@ use kamu::{
     DependencyGraphServiceInMemory,
     ObjectStoreBuilderLocalFs,
     ObjectStoreRegistryImpl,
+    RemoteRepositoryRegistryImpl,
 };
 use kamu_accounts::testing::MockAuthenticationService;
-use kamu_accounts::AuthenticationService;
+use kamu_accounts::{Account, AuthenticationService};
 use messaging_outbox::DummyOutboxImpl;
 use opendatafabric::{AccountName, DatasetAlias, DatasetHandle};
 use tempfile::TempDir;
@@ -48,6 +49,7 @@ use url::Url;
 use super::{
     create_cli_user_catalog,
     create_web_user_catalog,
+    get_server_account,
     server_authentication_mock,
     ServerSideHarness,
     ServerSideHarnessOptions,
@@ -64,6 +66,7 @@ pub(crate) struct ServerSideLocalFsHarness {
     api_server: TestAPIServer,
     options: ServerSideHarnessOptions,
     time_source: SystemTimeSourceStub,
+    account: Account,
 }
 
 impl ServerSideLocalFsHarness {
@@ -78,6 +81,8 @@ impl ServerSideLocalFsHarness {
 
         let cache_dir = tempdir.path().join("cache");
         std::fs::create_dir(&cache_dir).unwrap();
+
+        let account = get_server_account();
 
         let time_source = SystemTimeSourceStub::new();
         let (base_catalog, listener) = {
@@ -103,12 +108,13 @@ impl ServerSideLocalFsHarness {
                 )
                 .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
                 .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
-                .add_value(server_authentication_mock())
+                .add_value(server_authentication_mock(&account))
                 .bind::<dyn AuthenticationService, MockAuthenticationService>()
                 .add_value(ServerUrlConfig::new_test(Some(&base_url_rest)))
                 .add::<CompactionServiceImpl>()
                 .add::<ObjectStoreRegistryImpl>()
                 .add::<ObjectStoreBuilderLocalFs>()
+                .add::<RemoteRepositoryRegistryImpl>()
                 .add::<AppendDatasetMetadataBatchUseCaseImpl>()
                 .add::<CreateDatasetUseCaseImpl>()
                 .add::<CreateDatasetFromSnapshotUseCaseImpl>()
@@ -131,11 +137,8 @@ impl ServerSideLocalFsHarness {
             api_server,
             options,
             time_source,
+            account,
         }
-    }
-
-    pub fn api_server_addr(&self) -> String {
-        self.api_server.local_addr().to_string()
     }
 
     fn internal_datasets_folder_path(&self) -> PathBuf {
@@ -186,6 +189,14 @@ impl ServerSideHarness for ServerSideLocalFsHarness {
     fn cli_compaction_service(&self) -> Arc<dyn CompactionService> {
         let cli_catalog = create_cli_user_catalog(&self.base_catalog);
         cli_catalog.get_one::<dyn CompactionService>().unwrap()
+    }
+
+    fn api_server_addr(&self) -> String {
+        self.api_server.local_addr().to_string()
+    }
+
+    fn api_server_account(&self) -> Account {
+        self.account.clone()
     }
 
     fn dataset_url_with_scheme(&self, dataset_alias: &DatasetAlias, scheme: &str) -> Url {

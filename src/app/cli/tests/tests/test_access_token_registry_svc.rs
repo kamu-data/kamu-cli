@@ -134,16 +134,12 @@ async fn test_find_token() {
     )
     .unwrap();
 
-    let report = svc
-        .find_by_frontend_url(AccessTokenStoreScope::User, &frontend_url)
-        .unwrap();
+    let report = svc.find_by_frontend_url(&frontend_url).unwrap();
     assert_eq!(report.frontend_url.as_ref(), Some(&frontend_url));
     assert_eq!(report.backend_url, backend_url);
     assert_eq!(&report.access_token.access_token, "random-token-user");
 
-    let report = svc
-        .find_by_backend_url(AccessTokenStoreScope::User, &backend_url)
-        .unwrap();
+    let report = svc.find_by_backend_url(&backend_url).unwrap();
     assert_eq!(report.frontend_url.as_ref(), Some(&frontend_url));
     assert_eq!(report.backend_url, backend_url);
     assert_eq!(&report.access_token.access_token, "random-token-user");
@@ -187,19 +183,9 @@ async fn test_drop_token() {
         .unwrap();
     assert!(res);
 
-    assert!(svc
-        .find_by_frontend_url(AccessTokenStoreScope::User, &frontend_url)
-        .is_none());
-    assert!(svc
-        .find_by_frontend_url(AccessTokenStoreScope::Workspace, &frontend_url)
-        .is_none());
+    assert!(svc.find_by_frontend_url(&frontend_url).is_none());
 
-    assert!(svc
-        .find_by_backend_url(AccessTokenStoreScope::User, &backend_url)
-        .is_none());
-    assert!(svc
-        .find_by_backend_url(AccessTokenStoreScope::Workspace, &backend_url)
-        .is_none());
+    assert!(svc.find_by_backend_url(&backend_url).is_none());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

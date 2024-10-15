@@ -7,10 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod test_account_info;
 mod test_authentication_layer;
 mod test_data_ingest;
 mod test_data_query;
 mod test_dataset_authorization_layer;
+mod test_dataset_info;
+mod test_node_info;
 mod test_platform_login_validate;
 mod test_protocol_dataset_helpers;
 mod test_routing;
@@ -100,7 +103,7 @@ macro_rules! test_client_server_s3_harness_permutations {
         paste::paste! {
             #[test_group::group(containerized)]
             #[test_log::test(tokio::test)]
-            async fn [<$test_name "_st_client_st_local_fs_server">] () {
+            async fn [<$test_name "_st_client_st_s3_server">] () {
                 $test_package::$test_name(
                     ClientSideHarness::new(ClientSideHarnessOptions { multi_tenant: false, authenticated_remotely: true }),
                     ServerSideS3Harness::new(ServerSideHarnessOptions {
@@ -116,7 +119,7 @@ macro_rules! test_client_server_s3_harness_permutations {
         paste::paste! {
             #[test_group::group(containerized)]
             #[test_log::test(tokio::test)]
-            async fn [<$test_name "_st_client_mt_local_fs_server">] () {
+            async fn [<$test_name "_st_client_mt_s3_server">] () {
                 $test_package::$test_name(
                     ClientSideHarness::new(ClientSideHarnessOptions { multi_tenant: false, authenticated_remotely: true }),
                     ServerSideS3Harness::new(ServerSideHarnessOptions {

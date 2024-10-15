@@ -10,6 +10,8 @@
 use std::sync::Arc;
 
 use console::style as s;
+use kamu::domain::{AddRepoError, RemoteRepositoryRegistry};
+use opendatafabric::RepoName;
 use url::Url;
 
 use crate::{odf_server, CLIError, Command, OutputConfig};
@@ -19,31 +21,40 @@ use crate::{odf_server, CLIError, Command, OutputConfig};
 pub struct LoginCommand {
     login_service: Arc<odf_server::LoginService>,
     access_token_registry_service: Arc<odf_server::AccessTokenRegistryService>,
+    remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
     output_config: Arc<OutputConfig>,
     scope: odf_server::AccessTokenStoreScope,
     server: Option<Url>,
     access_token: Option<String>,
     check: bool,
+    repo_name: Option<RepoName>,
+    skip_add_repo: bool,
 }
 
 impl LoginCommand {
     pub fn new(
         login_service: Arc<odf_server::LoginService>,
         access_token_registry_service: Arc<odf_server::AccessTokenRegistryService>,
+        remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
         output_config: Arc<OutputConfig>,
         scope: odf_server::AccessTokenStoreScope,
         server: Option<Url>,
         access_token: Option<String>,
         check: bool,
+        repo_name: Option<RepoName>,
+        skip_add_repo: bool,
     ) -> Self {
         Self {
             login_service,
             access_token_registry_service,
+            remote_repo_reg,
             output_config,
             scope,
             server,
             access_token,
             check,
+            repo_name,
+            skip_add_repo,
         }
     }
 
@@ -55,16 +66,34 @@ impl LoginCommand {
 
     fn new_login_with_token(
         &self,
-        odf_server_frontend_url: &Url,
+        odf_server_backend_url: &Url,
         access_token: &str,
     ) -> Result<(), CLIError> {
         self.access_token_registry_service.save_access_token(
             self.scope,
-            Some(odf_server_frontend_url),
-            odf_server_frontend_url,
+            Some(odf_server_backend_url),
+            odf_server_backend_url,
             access_token.to_string(),
         )?;
+        if !self.skip_add_repo {
+            self.add_repository(odf_server_backend_url, odf_server_backend_url)?;
+        }
+
         Ok(())
+    }
+
+    fn add_repository(&self, frontend_url: &Url, backend_url: &Url) -> Result<(), CLIError> {
+        let repo_name = self.repo_name.clone().unwrap_or(
+            RepoName::try_from(frontend_url.host_str().unwrap()).map_err(CLIError::failure)?,
+        );
+        match self
+            .remote_repo_reg
+            .add_repository(&repo_name, backend_url.clone())
+        {
+            Ok(_) => Ok(()),
+            Err(_err @ AddRepoError::AlreadyExists(_)) => Ok(()),
+            Err(e) => Err(CLIError::failure(e)),
+        }
     }
 
     async fn new_login(&self, odf_server_frontend_url: Url) -> Result<(), CLIError> {
@@ -85,6 +114,13 @@ impl LoginCommand {
             &login_callback_response.backend_url,
             login_callback_response.access_token,
         )?;
+
+        if !self.skip_add_repo {
+            self.add_repository(
+                &odf_server_frontend_url,
+                &login_callback_response.backend_url,
+            )?;
+        }
 
         eprintln!(
             "{}: {}",
@@ -174,7 +210,7 @@ impl Command for LoginCommand {
         if self.check {
             return if let Some(token_find_report) = self
                 .access_token_registry_service
-                .find_by_frontend_or_backend_url(self.scope, &odf_server_url)
+                .find_by_frontend_or_backend_url(&odf_server_url)
             {
                 match self.validate_login(token_find_report).await {
                     Ok(_) => {
@@ -212,7 +248,7 @@ impl Command for LoginCommand {
         // non-interactive login, only the interactive one with the browser
         if let Some(token_find_report) = self
             .access_token_registry_service
-            .find_by_frontend_url(self.scope, &odf_server_url)
+            .find_by_frontend_url(&odf_server_url)
         {
             match self.validate_login(token_find_report).await {
                 Ok(_) => {

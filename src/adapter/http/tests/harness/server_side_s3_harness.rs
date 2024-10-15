@@ -41,7 +41,7 @@ use kamu::{
     ObjectStoreRegistryImpl,
 };
 use kamu_accounts::testing::MockAuthenticationService;
-use kamu_accounts::AuthenticationService;
+use kamu_accounts::{Account, AuthenticationService};
 use messaging_outbox::DummyOutboxImpl;
 use opendatafabric::{AccountName, DatasetAlias, DatasetHandle};
 use time_source::{SystemTimeSource, SystemTimeSourceStub};
@@ -50,6 +50,7 @@ use url::Url;
 use super::{
     create_cli_user_catalog,
     create_web_user_catalog,
+    get_server_account,
     server_authentication_mock,
     ServerSideHarness,
     ServerSideHarnessOptions,
@@ -67,6 +68,7 @@ pub(crate) struct ServerSideS3Harness {
     options: ServerSideHarnessOptions,
     time_source: SystemTimeSourceStub,
     _temp_dir: tempfile::TempDir,
+    account: Account,
 }
 
 impl ServerSideS3Harness {
@@ -79,6 +81,8 @@ impl ServerSideS3Harness {
         let s3_context = S3Context::from_url(&s3.url).await;
 
         let time_source = SystemTimeSourceStub::new();
+
+        let account = get_server_account();
 
         let (base_catalog, listener) = {
             let addr = SocketAddr::from(([127, 0, 0, 1], 0));
@@ -95,11 +99,11 @@ impl ServerSideS3Harness {
                 .add_builder(
                     DatasetRepositoryS3::builder()
                         .with_s3_context(s3_context.clone())
-                        .with_multi_tenant(false),
+                        .with_multi_tenant(options.multi_tenant),
                 )
                 .bind::<dyn DatasetRepository, DatasetRepositoryS3>()
                 .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryS3>()
-                .add_value(server_authentication_mock())
+                .add_value(server_authentication_mock(&account))
                 .bind::<dyn AuthenticationService, MockAuthenticationService>()
                 .add_value(ServerUrlConfig::new_test(Some(&base_url_rest)))
                 .add::<CompactionServiceImpl>()
@@ -130,15 +134,12 @@ impl ServerSideS3Harness {
             options,
             time_source,
             _temp_dir: temp_dir,
+            account,
         }
     }
 
     pub fn internal_bucket_folder_path(&self) -> PathBuf {
         self.s3.tmp_dir.path().join(&self.s3.bucket)
-    }
-
-    fn api_server_addr(&self) -> String {
-        self.api_server.local_addr().to_string()
     }
 }
 
@@ -203,6 +204,14 @@ impl ServerSideHarness for ServerSideS3Harness {
             .as_str(),
         )
         .unwrap()
+    }
+
+    fn api_server_addr(&self) -> String {
+        self.api_server.local_addr().to_string()
+    }
+
+    fn api_server_account(&self) -> Account {
+        self.account.clone()
     }
 
     fn dataset_layout(&self, dataset_handle: &DatasetHandle) -> DatasetLayout {

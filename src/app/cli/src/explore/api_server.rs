@@ -114,6 +114,7 @@ impl APIServer {
                 axum::routing::post(kamu_adapter_http::platform_file_upload_post_handler),
             )
             .nest("/", kamu_adapter_http::data::root_router())
+            .nest("/", kamu_adapter_http::general::root_router())
             .nest(
                 "/odata",
                 if multi_tenant_workspace {

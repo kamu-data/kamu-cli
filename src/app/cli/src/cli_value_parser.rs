@@ -74,6 +74,20 @@ pub(crate) fn dataset_ref_remote(s: &str) -> Result<odf::DatasetRefRemote, Strin
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub(crate) fn dataset_push_target(s: &str) -> Result<odf::DatasetPushTarget, String> {
+    match odf::DatasetPushTarget::from_str(s) {
+        Ok(push_dataset_ref) => Ok(push_dataset_ref),
+        Err(_) => Err(
+            "Remote reference should be in form: `repository/account/dataset-name` or \
+             `scheme://some-url` or repository reference can only contain alphanumerics, dashes, \
+             and dots"
+                .to_string(),
+        ),
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub(crate) fn repo_name(s: &str) -> Result<odf::RepoName, String> {
     match odf::RepoName::try_from(s) {
         Ok(v) => Ok(v),

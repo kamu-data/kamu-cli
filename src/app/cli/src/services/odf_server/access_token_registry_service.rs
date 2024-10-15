@@ -63,98 +63,84 @@ impl AccessTokenRegistryService {
 
     pub fn find_by_frontend_or_backend_url(
         &self,
-        scope: AccessTokenStoreScope,
         odf_server_url: &Url,
     ) -> Option<AccessTokenFindReport> {
-        let registry_ptr = match scope {
-            AccessTokenStoreScope::User => &self.user_registry,
-            AccessTokenStoreScope::Workspace => &self.workspace_registry,
-        };
-
-        let registry = registry_ptr
-            .lock()
-            .expect("Could not lock access tokens registry");
-
-        if let Some(server_record) = registry.iter().find(|c| {
-            if &c.backend_url == odf_server_url {
-                true
-            } else {
-                match &c.frontend_url {
-                    Some(frontend_url) => frontend_url == odf_server_url,
-                    _ => false,
+        for registry_ptr in [&self.workspace_registry, &self.user_registry] {
+            let registry = registry_ptr
+                .lock()
+                .expect("Could not lock access tokens registry");
+            let server_record_maybe = registry.iter().find(|c| {
+                if &c.backend_url == odf_server_url {
+                    true
+                } else {
+                    match &c.frontend_url {
+                        Some(frontend_url) => frontend_url == odf_server_url,
+                        _ => false,
+                    }
                 }
+            });
+            if let Some(server_record) = server_record_maybe {
+                return server_record
+                    .token_for_account(self.account_name())
+                    .map(|ac| AccessTokenFindReport {
+                        backend_url: server_record.backend_url.clone(),
+                        frontend_url: server_record.frontend_url.clone(),
+                        access_token: ac.clone(),
+                    });
             }
-        }) {
-            server_record
-                .token_for_account(self.account_name())
-                .map(|ac| AccessTokenFindReport {
-                    backend_url: server_record.backend_url.clone(),
-                    frontend_url: server_record.frontend_url.clone(),
-                    access_token: ac.clone(),
-                })
-        } else {
-            None
         }
+        None
     }
 
     pub fn find_by_frontend_url(
         &self,
-        scope: AccessTokenStoreScope,
         odf_server_frontend_url: &Url,
     ) -> Option<AccessTokenFindReport> {
-        let registry_ptr = match scope {
-            AccessTokenStoreScope::User => &self.user_registry,
-            AccessTokenStoreScope::Workspace => &self.workspace_registry,
-        };
+        for registry_ptr in [&self.workspace_registry, &self.user_registry] {
+            let registry = registry_ptr
+                .lock()
+                .expect("Could not lock access tokens registry");
 
-        let registry = registry_ptr
-            .lock()
-            .expect("Could not lock access tokens registry");
-
-        if let Some(server_record) = registry.iter().find(|c| match &c.frontend_url {
-            Some(frontend_url) => frontend_url == odf_server_frontend_url,
-            _ => false,
-        }) {
-            server_record
-                .token_for_account(self.account_name())
-                .map(|ac| AccessTokenFindReport {
-                    backend_url: server_record.backend_url.clone(),
-                    frontend_url: server_record.frontend_url.clone(),
-                    access_token: ac.clone(),
-                })
-        } else {
-            None
+            let server_record_maybe = registry.iter().find(|c| match &c.frontend_url {
+                Some(frontend_url) => frontend_url == odf_server_frontend_url,
+                _ => false,
+            });
+            if let Some(server_record) = server_record_maybe {
+                return server_record
+                    .token_for_account(self.account_name())
+                    .map(|ac| AccessTokenFindReport {
+                        backend_url: server_record.backend_url.clone(),
+                        frontend_url: server_record.frontend_url.clone(),
+                        access_token: ac.clone(),
+                    });
+            }
         }
+        None
     }
 
     pub fn find_by_backend_url(
         &self,
-        scope: AccessTokenStoreScope,
         odf_server_backend_url: &Url,
     ) -> Option<AccessTokenFindReport> {
-        let registry_ptr = match scope {
-            AccessTokenStoreScope::User => &self.user_registry,
-            AccessTokenStoreScope::Workspace => &self.workspace_registry,
-        };
+        for registry_ptr in [&self.workspace_registry, &self.user_registry] {
+            let registry = registry_ptr
+                .lock()
+                .expect("Could not lock access tokens registry");
 
-        let registry = registry_ptr
-            .lock()
-            .expect("Could not lock access tokens registry");
-
-        if let Some(token_map) = registry
-            .iter()
-            .find(|c| &c.backend_url == odf_server_backend_url)
-        {
-            token_map
-                .token_for_account(self.account_name())
-                .map(|ac| AccessTokenFindReport {
-                    backend_url: token_map.backend_url.clone(),
-                    frontend_url: token_map.frontend_url.clone(),
-                    access_token: ac.clone(),
-                })
-        } else {
-            None
+            if let Some(token_map) = registry
+                .iter()
+                .find(|c| &c.backend_url == odf_server_backend_url)
+            {
+                return token_map.token_for_account(self.account_name()).map(|ac| {
+                    AccessTokenFindReport {
+                        backend_url: token_map.backend_url.clone(),
+                        frontend_url: token_map.frontend_url.clone(),
+                        access_token: ac.clone(),
+                    }
+                });
+            }
         }
+        None
     }
 
     pub fn save_access_token(
@@ -275,19 +261,12 @@ impl kamu::domain::auth::OdfServerAccessTokenResolver for AccessTokenRegistrySer
         assert!(!odf_dataset_http_url.scheme().starts_with("odf+"));
 
         let origin = odf_dataset_http_url.origin().unicode_serialization();
-        let odf_server_backend_url = Url::parse(origin.as_str()).unwrap();
-
-        if let Some(token_find_report) =
-            self.find_by_backend_url(AccessTokenStoreScope::Workspace, &odf_server_backend_url)
-        {
-            Some(token_find_report.access_token.access_token)
-        } else if let Some(token_find_report) =
-            self.find_by_backend_url(AccessTokenStoreScope::User, &odf_server_backend_url)
-        {
-            Some(token_find_report.access_token.access_token)
-        } else {
-            None
+        if let Ok(odf_server_backend_url) = Url::parse(origin.as_str()) {
+            return self
+                .find_by_backend_url(&odf_server_backend_url)
+                .map(|token_report| token_report.access_token.access_token);
         }
+        None
     }
 }
 

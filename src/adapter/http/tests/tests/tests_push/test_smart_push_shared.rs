@@ -28,7 +28,7 @@ pub(crate) async fn test_smart_push_new_dataset<TServerHarness: ServerSideHarnes
             .client_harness
             .push_dataset_result(
                 scenario.client_dataset_ref,
-                scenario.server_dataset_ref,
+                scenario.server_dataset_ref.try_into().unwrap(),
                 false,
                 DatasetVisibility::Private,
             )
@@ -67,7 +67,7 @@ pub(crate) async fn test_smart_push_new_dataset_as_public<TServerHarness: Server
             .client_harness
             .push_dataset_result(
                 scenario.client_dataset_ref,
-                scenario.server_dataset_ref,
+                scenario.server_dataset_ref.try_into().unwrap(),
                 false,
                 DatasetVisibility::Public,
             )
@@ -107,7 +107,7 @@ pub(crate) async fn test_smart_push_new_empty_dataset<TServerHarness: ServerSide
             .client_harness
             .push_dataset_result(
                 scenario.client_dataset_ref,
-                scenario.server_dataset_ref,
+                scenario.server_dataset_ref.try_into().unwrap(),
                 false,
                 DatasetVisibility::Private,
             )
@@ -148,7 +148,7 @@ pub(crate) async fn test_smart_push_existing_up_to_date_dataset<
             .client_harness
             .push_dataset_result(
                 scenario.client_dataset_ref,
-                scenario.server_dataset_ref,
+                scenario.server_dataset_ref.try_into().unwrap(),
                 false,
                 DatasetVisibility::Private,
             )
@@ -181,7 +181,7 @@ pub(crate) async fn test_smart_push_existing_evolved_dataset<TServerHarness: Ser
             .client_harness
             .push_dataset_result(
                 scenario.client_dataset_ref,
-                scenario.server_dataset_ref,
+                scenario.server_dataset_ref.try_into().unwrap(),
                 false,
                 DatasetVisibility::Private,
             )
@@ -221,7 +221,7 @@ pub(crate) async fn test_smart_push_existing_diverged_dataset<TServerHarness: Se
             .client_harness
             .push_dataset_result(
                 scenario.client_dataset_ref,
-                scenario.server_dataset_ref,
+                scenario.server_dataset_ref.try_into().unwrap(),
                 true, /* diverged! */
                 DatasetVisibility::Private,
             )
@@ -270,7 +270,7 @@ pub(crate) async fn test_smart_push_existing_dataset_fails_as_server_advanced<
             .client_harness
             .push_dataset(
                 scenario.client_dataset_ref,
-                scenario.server_dataset_ref,
+                scenario.server_dataset_ref.try_into().unwrap(),
                 false,
                 DatasetVisibility::Private,
             )
@@ -300,7 +300,7 @@ pub(crate) async fn test_smart_push_aborted_write_of_new_rewrite_succeeds<
             .client_harness
             .push_dataset_result(
                 scenario.client_dataset_ref,
-                scenario.server_dataset_ref,
+                scenario.server_dataset_ref.try_into().unwrap(),
                 false,
                 DatasetVisibility::Private,
             )
@@ -342,7 +342,7 @@ pub(crate) async fn test_smart_push_aborted_write_of_updated_rewrite_succeeds<
             .client_harness
             .push_dataset_result(
                 scenario.client_dataset_ref,
-                scenario.server_dataset_ref,
+                scenario.server_dataset_ref.try_into().unwrap(),
                 false,
                 DatasetVisibility::Private,
             )
@@ -353,6 +353,46 @@ pub(crate) async fn test_smart_push_aborted_write_of_updated_rewrite_succeeds<
                 old_head: Some(scenario.client_create_result.head),
                 new_head: scenario.client_commit_result.new_head,
                 num_blocks: 2,
+            },
+            push_result
+        );
+
+        DatasetTestHelper::assert_datasets_in_sync(
+            &scenario.server_dataset_layout,
+            &scenario.client_dataset_layout,
+        );
+    };
+
+    await_client_server_flow!(api_server_handle, client_handle);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) async fn test_smart_push_via_repo_ref<TServerHarness: ServerSideHarness>(
+    a_client_harness: ClientSideHarness,
+    a_server_harness: TServerHarness,
+) {
+    let scenario =
+        SmartPushNewDatasetViaRepoRefScenario::prepare(a_client_harness, a_server_harness).await;
+
+    let api_server_handle = scenario.server_harness.api_server_run();
+
+    let client_handle = async {
+        let push_result = scenario
+            .client_harness
+            .push_dataset_result(
+                scenario.client_dataset_ref,
+                scenario.server_dataset_ref,
+                false,
+                DatasetVisibility::Private,
+            )
+            .await;
+
+        assert_eq!(
+            SyncResult::Updated {
+                old_head: None,
+                new_head: scenario.client_commit_result.new_head,
+                num_blocks: 4,
             },
             push_result
         );
