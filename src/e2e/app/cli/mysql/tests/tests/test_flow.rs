@@ -38,7 +38,7 @@ kamu_cli_run_api_server_e2e_test!(
 kamu_cli_run_api_server_e2e_test!(
     storage = mysql,
     fixture = kamu_cli_e2e_repo_tests::test_dataset_trigger_flow,
-    extra_test_groups = "containerized, engine, transform, datafusion"
+    extra_test_groups = "containerized, engine, transform, datafusion, risingwave"
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
