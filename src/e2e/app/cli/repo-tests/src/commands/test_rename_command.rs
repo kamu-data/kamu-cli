@@ -14,37 +14,23 @@ use kamu_cli_puppet::KamuCliPuppet;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_rename_dataset(kamu: KamuCliPuppet) {
-    {
-        let assert = kamu
-            .execute(["rename", "player-scores", "top-player-scores"])
-            .await
-            .failure();
-
-        let stderr = std::str::from_utf8(&assert.get_output().stderr).unwrap();
-
-        assert!(
-            stderr.contains("Error: Dataset not found: player-scores"),
-            "Unexpected output:\n{stderr}",
-        );
-    }
+    kamu.assert_failure_command_execution(
+        ["rename", "player-scores", "top-player-scores"],
+        None,
+        Some(["Error: Dataset not found: player-scores"]),
+    )
+    .await;
 
     kamu.execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
         .await
         .success();
 
-    {
-        let assert = kamu
-            .execute(["rename", "player-scores", "top-player-scores"])
-            .await
-            .success();
-
-        let stderr = std::str::from_utf8(&assert.get_output().stderr).unwrap();
-
-        assert!(
-            stderr.contains("Dataset renamed"),
-            "Unexpected output:\n{stderr}",
-        );
-    }
+    kamu.assert_success_command_execution(
+        ["rename", "player-scores", "top-player-scores"],
+        None,
+        Some(["Dataset renamed"]),
+    )
+    .await;
 
     let dataset_names = kamu
         .list_datasets()
