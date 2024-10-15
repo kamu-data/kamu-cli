@@ -1169,7 +1169,7 @@ async fn wait_for_flows_to_finish(
     dataset_id: &str,
     token: AccessToken,
 ) {
-    let retry_strategy = FixedInterval::from_millis(5_000).take(10);
+    let retry_strategy = FixedInterval::from_millis(5_000).take(18); // 1m 30s
 
     Retry::spawn(retry_strategy, || async {
         let response = kamu_api_server_client
