@@ -36,7 +36,7 @@ pub async fn test_add_dataset_from_stdin(kamu: KamuCliPuppet) {
         .map(|dataset| dataset.name)
         .collect::<Vec<_>>();
 
-    assert_eq!(dataset_names, ["player-scores"]);
+    pretty_assertions::assert_eq!(dataset_names, ["player-scores"]);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -89,7 +89,7 @@ pub async fn test_add_dataset_with_name(kamu: KamuCliPuppet) {
         .map(|dataset| dataset.name)
         .collect::<Vec<_>>();
 
-    assert_eq!(dataset_names, ["player-scores-1", "player-scores-2"]);
+    pretty_assertions::assert_eq!(dataset_names, ["player-scores-1", "player-scores-2"]);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -140,7 +140,7 @@ pub async fn test_add_dataset_with_replace(kamu: KamuCliPuppet) {
         .map(|dataset| dataset.name)
         .collect::<Vec<_>>();
 
-    assert_eq!(dataset_names, ["player-scores"]);
+    pretty_assertions::assert_eq!(dataset_names, ["player-scores"]);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -216,7 +216,7 @@ pub async fn test_add_recursive(kamu: KamuCliPuppet) {
         .map(|dataset| dataset.name)
         .collect::<Vec<_>>();
 
-    assert_eq!(dataset_names, ["commented", "plain"]);
+    pretty_assertions::assert_eq!(dataset_names, ["commented", "plain"]);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

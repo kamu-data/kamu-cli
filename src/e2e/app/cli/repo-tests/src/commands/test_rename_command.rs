@@ -39,7 +39,7 @@ pub async fn test_rename_dataset(kamu: KamuCliPuppet) {
         .map(|dataset| dataset.name)
         .collect::<Vec<_>>();
 
-    assert_eq!(dataset_names, ["top-player-scores"]);
+    pretty_assertions::assert_eq!(dataset_names, ["top-player-scores"]);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -230,7 +230,7 @@ impl KamuApiServerClientExt for KamuApiServerClient {
             )
             .await;
 
-        assert_eq!(
+        pretty_assertions::assert_eq!(
             create_response["datasets"]["createFromSnapshot"]["message"].as_str(),
             Some("Success")
         );

@@ -80,7 +80,7 @@ pub async fn test_delete_dataset_recursive(kamu: KamuCliPuppet) {
             .map(|dataset| dataset.name)
             .collect::<Vec<_>>();
 
-        assert_eq!(
+        pretty_assertions::assert_eq!(
             dataset_names,
             ["another-root", "leaderboard", "player-scores"]
         );
@@ -137,7 +137,7 @@ pub async fn test_delete_dataset_all(kamu: KamuCliPuppet) {
             .map(|dataset| dataset.name)
             .collect::<Vec<_>>();
 
-        assert_eq!(
+        pretty_assertions::assert_eq!(
             dataset_names,
             ["another-root", "leaderboard", "player-scores"]
         );
