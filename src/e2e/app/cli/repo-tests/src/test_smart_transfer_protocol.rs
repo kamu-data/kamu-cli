@@ -1318,6 +1318,7 @@ pub async fn test_smart_push_from_registered_repo(kamu_api_server_client: KamuAp
         }
 
         // 2.2. Login to the API server
+        // It will register new repo
         kamu_in_push_workspace
             .execute([
                 "login",
