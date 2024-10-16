@@ -8,9 +8,140 @@
 // by the Apache License, Version 2.0.
 
 use kamu::testing::MetadataFactory;
+use kamu_cli_e2e_common::DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR;
 use kamu_cli_puppet::extensions::KamuCliPuppetExt;
 use kamu_cli_puppet::KamuCliPuppet;
 use opendatafabric as odf;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_add_dataset_from_stdin(kamu: KamuCliPuppet) {
+    kamu.assert_success_command_execution_with_input(
+        ["add", "--stdin"],
+        DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
+        None,
+        Some([indoc::indoc!(
+            r#"
+            Added: player-scores
+            Added 1 dataset(s)
+            "#
+        )]),
+    )
+    .await;
+
+    let dataset_names = kamu
+        .list_datasets()
+        .await
+        .into_iter()
+        .map(|dataset| dataset.name)
+        .collect::<Vec<_>>();
+
+    assert_eq!(dataset_names, ["player-scores"]);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_add_dataset_with_name(kamu: KamuCliPuppet) {
+    // Add from stdio
+    kamu.assert_success_command_execution_with_input(
+        ["add", "--stdin", "--name", "player-scores-1"],
+        DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
+        None,
+        Some([indoc::indoc!(
+            r#"
+            Added: player-scores-1
+            Added 1 dataset(s)
+            "#
+        )]),
+    )
+    .await;
+
+    // Add from a file
+    let snapshot_path = kamu.workspace_path().join("player-scores.yaml");
+
+    std::fs::write(
+        snapshot_path.clone(),
+        DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
+    )
+    .unwrap();
+
+    kamu.assert_success_command_execution(
+        [
+            "add",
+            "--name",
+            "player-scores-2",
+            snapshot_path.to_str().unwrap(),
+        ],
+        None,
+        Some([indoc::indoc!(
+            r#"
+            Added: player-scores-2
+            Added 1 dataset(s)
+            "#
+        )]),
+    )
+    .await;
+
+    let dataset_names = kamu
+        .list_datasets()
+        .await
+        .into_iter()
+        .map(|dataset| dataset.name)
+        .collect::<Vec<_>>();
+
+    assert_eq!(dataset_names, ["player-scores-1", "player-scores-2"]);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_add_dataset_with_replace(kamu: KamuCliPuppet) {
+    kamu.assert_success_command_execution_with_input(
+        ["add", "--stdin"],
+        DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
+        None,
+        Some([indoc::indoc!(
+            r#"
+            Added: player-scores
+            "#
+        )]),
+    )
+    .await;
+
+    kamu.assert_success_command_execution_with_input(
+        ["add", "--stdin"],
+        DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
+        None,
+        Some([indoc::indoc!(
+            r#"
+            Skipped: player-scores: Already exists
+            Added 0 dataset(s)
+            "#
+        )]),
+    )
+    .await;
+
+    kamu.assert_success_command_execution_with_input(
+        ["--yes", "add", "--stdin", "--replace"],
+        DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
+        None,
+        Some([indoc::indoc!(
+            r#"
+            Added: player-scores
+            Added 1 dataset(s)
+            "#
+        )]),
+    )
+    .await;
+
+    let dataset_names = kamu
+        .list_datasets()
+        .await
+        .into_iter()
+        .map(|dataset| dataset.name)
+        .collect::<Vec<_>>();
+
+    assert_eq!(dataset_names, ["player-scores"]);
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -60,14 +191,23 @@ pub async fn test_add_recursive(kamu: KamuCliPuppet) {
     )
     .unwrap();
 
-    kamu.execute([
-        "-v",
-        "add",
-        "--recursive",
-        kamu.workspace_path().as_os_str().to_str().unwrap(),
-    ])
-    .await
-    .success();
+    kamu.assert_success_command_execution(
+        [
+            "-v",
+            "add",
+            "--recursive",
+            kamu.workspace_path().as_os_str().to_str().unwrap(),
+        ],
+        None,
+        Some([indoc::indoc!(
+            r#"
+            Added: commented
+            Added: plain
+            Added 2 dataset(s)
+            "#
+        )]),
+    )
+    .await;
 
     let dataset_names = kamu
         .list_datasets()

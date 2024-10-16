@@ -7,5 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod e2e_middleware;
 mod e2e_router;
+
+pub use e2e_middleware::*;
 pub use e2e_router::*;

@@ -13,6 +13,7 @@ use kamu_cli_e2e_common::{
     KamuApiServerClient,
     KamuApiServerClientExt,
     RequestBody,
+    DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
 };
 use reqwest::{Method, StatusCode};
 
@@ -46,13 +47,7 @@ pub async fn test_rest_api_request_dataset_tail(kamu_api_server_client: KamuApiS
             Method::POST,
             "player-scores/ingest",
             Some(RequestBody::NdJson(
-                indoc::indoc!(
-                    r#"
-                    {"match_time": "2000-01-01", "match_id": 1, "player_id": "Alice", "score": 100}
-                    {"match_time": "2000-01-01", "match_id": 1, "player_id": "Bob", "score": 80}
-                    "#,
-                )
-                .into(),
+                DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1.into(),
             )),
             StatusCode::OK,
             None,

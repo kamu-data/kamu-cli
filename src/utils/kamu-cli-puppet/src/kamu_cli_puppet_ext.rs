@@ -14,20 +14,71 @@ use std::path::PathBuf;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use datafusion::prelude::{ParquetReadOptions, SessionContext};
-use opendatafabric::serde::yaml::{DatasetKindDef, YamlDatasetSnapshotSerializer};
-use opendatafabric::serde::DatasetSnapshotSerializer;
-use opendatafabric::{DatasetID, DatasetKind, DatasetName, DatasetRef, DatasetSnapshot, Multihash};
+use opendatafabric::serde::yaml::{YamlDatasetSnapshotSerializer, YamlMetadataBlockDeserializer};
+use opendatafabric::serde::{DatasetSnapshotSerializer, MetadataBlockDeserializer};
+use opendatafabric::{
+    DatasetID,
+    DatasetName,
+    DatasetRef,
+    DatasetSnapshot,
+    MetadataBlock,
+    Multihash,
+};
 use serde::Deserialize;
 
-use crate::KamuCliPuppet;
+use crate::{ExecuteCommandResult, KamuCliPuppet};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait]
 pub trait KamuCliPuppetExt {
+    async fn assert_success_command_execution<I, S>(
+        &self,
+        cmd: I,
+        maybe_expected_stdout: Option<&str>,
+        maybe_expected_stderr: Option<impl IntoIterator<Item = &str> + Send>,
+    ) where
+        I: IntoIterator<Item = S> + Send,
+        S: AsRef<std::ffi::OsStr>;
+
+    async fn assert_success_command_execution_with_input<I, S, T>(
+        &self,
+        cmd: I,
+        input: T,
+        maybe_expected_stdout: Option<&str>,
+        maybe_expected_stderr: Option<impl IntoIterator<Item = &str> + Send>,
+    ) where
+        I: IntoIterator<Item = S> + Send,
+        S: AsRef<std::ffi::OsStr>,
+        T: Into<Vec<u8>> + Send;
+
+    async fn assert_failure_command_execution<I, S>(
+        &self,
+        cmd: I,
+        maybe_expected_stdout: Option<&str>,
+        maybe_expected_stderr: Option<impl IntoIterator<Item = &str> + Send>,
+    ) where
+        I: IntoIterator<Item = S> + Send,
+        S: AsRef<std::ffi::OsStr>;
+
+    async fn assert_failure_command_execution_with_input<I, S, T>(
+        &self,
+        cmd: I,
+        input: T,
+        maybe_expected_stdout: Option<&str>,
+        maybe_expected_stderr: Option<impl IntoIterator<Item = &str> + Send>,
+    ) where
+        I: IntoIterator<Item = S> + Send,
+        S: AsRef<std::ffi::OsStr>,
+        T: Into<Vec<u8>> + Send;
+
     async fn list_datasets(&self) -> Vec<DatasetRecord>;
 
     async fn add_dataset(&self, dataset_snapshot: DatasetSnapshot);
+
+    async fn list_blocks(&self, dataset_name: &DatasetName) -> Vec<BlockRecord>;
+
+    async fn ingest_data(&self, dataset_name: &DatasetName, data: &str);
 
     async fn get_list_of_repo_aliases(&self, dataset_ref: &DatasetRef) -> Vec<RepoAlias>;
 
@@ -36,6 +87,8 @@ pub trait KamuCliPuppetExt {
         T: Into<String> + Send;
 
     async fn start_api_server(self, e2e_data_file_path: PathBuf) -> ServerOutput;
+
+    async fn assert_player_scores_dataset_data(&self, expected_player_scores_table: &str);
 
     async fn assert_last_data_slice(
         &self,
@@ -111,6 +164,43 @@ impl KamuCliPuppetExt for KamuCliPuppet {
         stdout.lines().map(ToString::to_string).collect()
     }
 
+    async fn list_blocks(&self, dataset_name: &DatasetName) -> Vec<BlockRecord> {
+        let assert = self
+            .execute(["log", dataset_name.as_str(), "--output-format", "yaml"])
+            .await
+            .success();
+
+        let stdout = std::str::from_utf8(&assert.get_output().stdout).unwrap();
+
+        // TODO: Don't parse the output, after implementation:
+        //       `kamu log`: support `--output-format json`
+        //       https://github.com/kamu-data/kamu-cli/issues/887
+
+        stdout
+            .split("---")
+            .skip(1)
+            .map(str::trim)
+            .map(|block_data| {
+                let Some(pos) = block_data.find('\n') else {
+                    unreachable!()
+                };
+                let (first_line_with_block_hash, metadata_block_str) = block_data.split_at(pos);
+
+                let block_hash = first_line_with_block_hash
+                    .strip_prefix("# Block: ")
+                    .unwrap();
+                let block = YamlMetadataBlockDeserializer {}
+                    .read_manifest(metadata_block_str.as_ref())
+                    .unwrap();
+
+                BlockRecord {
+                    block_hash: Multihash::from_multibase(block_hash).unwrap(),
+                    block,
+                }
+            })
+            .collect()
+    }
+
     async fn start_api_server(self, e2e_data_file_path: PathBuf) -> ServerOutput {
         let host = Ipv4Addr::LOCALHOST.to_string();
 
@@ -134,6 +224,36 @@ impl KamuCliPuppetExt for KamuCliPuppet {
             .to_owned();
 
         ServerOutput { stdout, stderr }
+    }
+
+    async fn assert_player_scores_dataset_data(&self, expected_player_scores_table: &str) {
+        self.assert_success_command_execution(
+            [
+                "sql",
+                "--engine",
+                "datafusion",
+                "--command",
+                // Without unstable "offset" column.
+                // For a beautiful output, cut to seconds
+                indoc::indoc!(
+                    r#"
+                    SELECT op,
+                           system_time,
+                           match_time,
+                           match_id,
+                           player_id,
+                           score
+                    FROM "player-scores"
+                    ORDER BY match_id, score, player_id;
+                    "#
+                ),
+                "--output-format",
+                "table",
+            ],
+            Some(expected_player_scores_table),
+            None::<Vec<&str>>,
+        )
+        .await;
     }
 
     async fn assert_last_data_slice(
@@ -176,6 +296,80 @@ impl KamuCliPuppetExt for KamuCliPuppet {
         kamu_data_utils::testing::assert_data_eq(df.clone(), expected_data).await;
         kamu_data_utils::testing::assert_schema_eq(df.schema(), expected_schema);
     }
+
+    async fn ingest_data(&self, dataset_name: &DatasetName, data: &str) {
+        self.execute_with_input(["ingest", dataset_name, "--stdin"], data)
+            .await
+            .success();
+    }
+
+    async fn assert_success_command_execution<I, S>(
+        &self,
+        cmd: I,
+        maybe_expected_stdout: Option<&str>,
+        maybe_expected_stderr: Option<impl IntoIterator<Item = &str> + Send>,
+    ) where
+        I: IntoIterator<Item = S> + Send,
+        S: AsRef<std::ffi::OsStr>,
+    {
+        assert_execute_command_result(
+            &self.execute(cmd).await.success(),
+            maybe_expected_stdout,
+            maybe_expected_stderr,
+        );
+    }
+
+    async fn assert_success_command_execution_with_input<I, S, T>(
+        &self,
+        cmd: I,
+        input: T,
+        maybe_expected_stdout: Option<&str>,
+        maybe_expected_stderr: Option<impl IntoIterator<Item = &str> + Send>,
+    ) where
+        I: IntoIterator<Item = S> + Send,
+        S: AsRef<std::ffi::OsStr>,
+        T: Into<Vec<u8>> + Send,
+    {
+        assert_execute_command_result(
+            &self.execute_with_input(cmd, input).await.success(),
+            maybe_expected_stdout,
+            maybe_expected_stderr,
+        );
+    }
+
+    async fn assert_failure_command_execution<I, S>(
+        &self,
+        cmd: I,
+        maybe_expected_stdout: Option<&str>,
+        maybe_expected_stderr: Option<impl IntoIterator<Item = &str> + Send>,
+    ) where
+        I: IntoIterator<Item = S> + Send,
+        S: AsRef<std::ffi::OsStr>,
+    {
+        assert_execute_command_result(
+            &self.execute(cmd).await.failure(),
+            maybe_expected_stdout,
+            maybe_expected_stderr,
+        );
+    }
+
+    async fn assert_failure_command_execution_with_input<I, S, T>(
+        &self,
+        cmd: I,
+        input: T,
+        maybe_expected_stdout: Option<&str>,
+        maybe_expected_stderr: Option<impl IntoIterator<Item = &str> + Send>,
+    ) where
+        I: IntoIterator<Item = S> + Send,
+        S: AsRef<std::ffi::OsStr>,
+        T: Into<Vec<u8>> + Send,
+    {
+        assert_execute_command_result(
+            &self.execute_with_input(cmd, input).await.failure(),
+            maybe_expected_stdout,
+            maybe_expected_stderr,
+        );
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -193,8 +387,9 @@ pub struct DatasetRecord {
     #[serde(rename = "ID")]
     pub id: DatasetID,
     pub name: DatasetName,
-    #[serde(with = "DatasetKindDef")]
-    pub kind: DatasetKind,
+    // CLI returns regular ENUM DatasetKind(Root/Derivative) for local datasets
+    // but for remote it is Remote(DatasetKind) type
+    pub kind: String,
     pub head: Multihash,
     pub pulled: Option<DateTime<Utc>>,
     pub records: usize,
@@ -209,6 +404,37 @@ pub struct RepoAlias {
     pub dataset: DatasetName,
     pub kind: String,
     pub alias: String,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct BlockRecord {
+    pub block_hash: Multihash,
+    pub block: MetadataBlock,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn assert_execute_command_result<'a>(
+    command_result: &ExecuteCommandResult,
+    maybe_expected_stdout: Option<&str>,
+    maybe_expected_stderr: Option<impl IntoIterator<Item = &'a str>>,
+) {
+    let actual_stdout = std::str::from_utf8(&command_result.get_output().stdout).unwrap();
+
+    if let Some(expected_stdout) = maybe_expected_stdout {
+        pretty_assertions::assert_eq!(expected_stdout, actual_stdout);
+    }
+
+    if let Some(expected_stderr_items) = maybe_expected_stderr {
+        let stderr = std::str::from_utf8(&command_result.get_output().stderr).unwrap();
+
+        for expected_stderr_item in expected_stderr_items {
+            assert!(
+                stderr.contains(expected_stderr_item),
+                "Unexpected output:\n{stderr}",
+            );
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

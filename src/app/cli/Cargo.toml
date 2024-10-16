@@ -57,7 +57,7 @@ kamu-data-utils = { workspace = true }
 kamu-adapter-auth-oso = { workspace = true }
 kamu-adapter-flight-sql = { optional = true, workspace = true }
 kamu-adapter-graphql = { workspace = true }
-kamu-adapter-http = { workspace = true }
+kamu-adapter-http = { workspace = true, features = ["e2e"], default-features = false }
 kamu-adapter-oauth = { workspace = true }
 kamu-adapter-odata = { workspace = true }
 kamu-datafusion-cli = { workspace = true }

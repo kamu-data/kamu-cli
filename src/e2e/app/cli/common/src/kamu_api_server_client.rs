@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::{InternalError, ResultIntoInternal};
+use opendatafabric::DatasetAlias;
 use reqwest::{Method, Response, StatusCode, Url};
 use serde::Deserialize;
 use tokio_retry::strategy::FixedInterval;
@@ -77,6 +78,22 @@ impl KamuApiServerClient {
 
     pub fn get_base_url(&self) -> &Url {
         &self.server_base_url
+    }
+
+    pub fn get_node_url(&self) -> Url {
+        let mut node_url = Url::parse("odf+http://host").unwrap();
+        let base_url = self.get_base_url();
+
+        node_url.set_host(base_url.host_str()).unwrap();
+        node_url.set_port(base_url.port()).unwrap();
+
+        node_url
+    }
+
+    pub fn get_dataset_endpoint(&self, dataset_alias: &DatasetAlias) -> Url {
+        let node_url = self.get_node_url();
+
+        node_url.join(format!("{dataset_alias}").as_str()).unwrap()
     }
 
     pub async fn rest_api_call_assert(

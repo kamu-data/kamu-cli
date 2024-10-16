@@ -127,7 +127,7 @@ pub fn get_command(
             }
         }
         cli::Command::Inspect(c) => match c.subcommand {
-            cli::InspectSubCommand::Lineage(sc) => Box::new(LineageCommand::new(
+            cli::InspectSubCommand::Lineage(sc) => Box::new(InspectLineageCommand::new(
                 cli_catalog.get_one()?,
                 cli_catalog.get_one()?,
                 cli_catalog.get_one()?,

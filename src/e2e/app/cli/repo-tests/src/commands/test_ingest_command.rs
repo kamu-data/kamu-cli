@@ -9,17 +9,21 @@
 
 use std::path::Path;
 
-use chrono::{TimeZone, Utc};
 use indoc::indoc;
+use kamu_cli_e2e_common::{
+    DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR,
+    DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
+    DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_2,
+    DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_3,
+    DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
+};
 use kamu_cli_puppet::extensions::KamuCliPuppetExt;
 use kamu_cli_puppet::KamuCliPuppet;
 use opendatafabric::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_push_ingest_from_file_ledger(mut kamu: KamuCliPuppet) {
-    kamu.set_system_time(Some(Utc.with_ymd_and_hms(2000, 1, 1, 0, 0, 0).unwrap()));
-
+pub async fn test_push_ingest_from_file_ledger(kamu: KamuCliPuppet) {
     kamu.add_dataset(DatasetSnapshot {
         name: "population".try_into().unwrap(),
         kind: DatasetKind::Root,
@@ -86,9 +90,9 @@ pub async fn test_push_ingest_from_file_ledger(mut kamu: KamuCliPuppet) {
             +--------+----+----------------------+----------------------+------+------------+
             | offset | op | system_time          | event_time           | city | population |
             +--------+----+----------------------+----------------------+------+------------+
-            | 0      | 0  | 2000-01-01T00:00:00Z | 2020-01-01T00:00:00Z | A    | 1000       |
-            | 1      | 0  | 2000-01-01T00:00:00Z | 2020-01-01T00:00:00Z | B    | 2000       |
-            | 2      | 0  | 2000-01-01T00:00:00Z | 2020-01-01T00:00:00Z | C    | 3000       |
+            | 0      | 0  | 2050-01-02T03:04:05Z | 2020-01-01T00:00:00Z | A    | 1000       |
+            | 1      | 0  | 2050-01-02T03:04:05Z | 2020-01-01T00:00:00Z | B    | 2000       |
+            | 2      | 0  | 2050-01-02T03:04:05Z | 2020-01-01T00:00:00Z | C    | 3000       |
             +--------+----+----------------------+----------------------+------+------------+
             "#
         ),
@@ -96,9 +100,9 @@ pub async fn test_push_ingest_from_file_ledger(mut kamu: KamuCliPuppet) {
     .await;
 }
 
-pub async fn test_push_ingest_from_file_snapshot_with_event_time(mut kamu: KamuCliPuppet) {
-    kamu.set_system_time(Some(Utc.with_ymd_and_hms(2000, 1, 1, 0, 0, 0).unwrap()));
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub async fn test_push_ingest_from_file_snapshot_with_event_time(kamu: KamuCliPuppet) {
     kamu.add_dataset(DatasetSnapshot {
         name: "population".try_into().unwrap(),
         kind: DatasetKind::Root,
@@ -168,9 +172,9 @@ pub async fn test_push_ingest_from_file_snapshot_with_event_time(mut kamu: KamuC
             +--------+----+----------------------+----------------------+------+------------+
             | offset | op | system_time          | event_time           | city | population |
             +--------+----+----------------------+----------------------+------+------------+
-            | 0      | 0  | 2000-01-01T00:00:00Z | 2050-01-01T00:00:00Z | A    | 1000       |
-            | 1      | 0  | 2000-01-01T00:00:00Z | 2050-01-01T00:00:00Z | B    | 2000       |
-            | 2      | 0  | 2000-01-01T00:00:00Z | 2050-01-01T00:00:00Z | C    | 3000       |
+            | 0      | 0  | 2050-01-02T03:04:05Z | 2050-01-01T00:00:00Z | A    | 1000       |
+            | 1      | 0  | 2050-01-02T03:04:05Z | 2050-01-01T00:00:00Z | B    | 2000       |
+            | 2      | 0  | 2050-01-02T03:04:05Z | 2050-01-01T00:00:00Z | C    | 3000       |
             +--------+----+----------------------+----------------------+------+------------+
             "#
         ),
@@ -180,8 +184,243 @@ pub async fn test_push_ingest_from_file_snapshot_with_event_time(mut kamu: KamuC
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub async fn test_ingest_from_stdin(kamu: KamuCliPuppet) {
+    kamu.execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
+        .await
+        .success();
+
+    assert_ingest_data_to_player_scores_from_stdio(
+        &kamu,
+        ["ingest", "player-scores", "--stdin"],
+        DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
+        indoc::indoc!(
+            r#"
+            ┌────┬──────────────────────┬──────────────────────┬──────────┬───────────┬───────┐
+            │ op │     system_time      │      match_time      │ match_id │ player_id │ score │
+            ├────┼──────────────────────┼──────────────────────┼──────────┼───────────┼───────┤
+            │  0 │ 2050-01-02T03:04:05Z │ 2000-01-01T00:00:00Z │        1 │       Bob │    80 │
+            │  0 │ 2050-01-02T03:04:05Z │ 2000-01-01T00:00:00Z │        1 │     Alice │   100 │
+            └────┴──────────────────────┴──────────────────────┴──────────┴───────────┴───────┘
+            "#
+        ),
+    )
+    .await;
+
+    assert_ingest_data_to_player_scores_from_stdio(
+        &kamu,
+        ["ingest", "player-scores", "--stdin"],
+        DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_2,
+        indoc::indoc!(
+            r#"
+            ┌────┬──────────────────────┬──────────────────────┬──────────┬───────────┬───────┐
+            │ op │     system_time      │      match_time      │ match_id │ player_id │ score │
+            ├────┼──────────────────────┼──────────────────────┼──────────┼───────────┼───────┤
+            │  0 │ 2050-01-02T03:04:05Z │ 2000-01-01T00:00:00Z │        1 │       Bob │    80 │
+            │  0 │ 2050-01-02T03:04:05Z │ 2000-01-01T00:00:00Z │        1 │     Alice │   100 │
+            │  0 │ 2050-01-02T03:04:05Z │ 2000-01-02T00:00:00Z │        2 │     Alice │    70 │
+            │  0 │ 2050-01-02T03:04:05Z │ 2000-01-02T00:00:00Z │        2 │   Charlie │    90 │
+            └────┴──────────────────────┴──────────────────────┴──────────┴───────────┴───────┘
+            "#
+        ),
+    )
+    .await;
+
+    assert_ingest_data_to_player_scores_from_stdio(
+        &kamu,
+        ["ingest", "player-scores", "--stdin"],
+        DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_3,
+        indoc::indoc!(
+            r#"
+            ┌────┬──────────────────────┬──────────────────────┬──────────┬───────────┬───────┐
+            │ op │     system_time      │      match_time      │ match_id │ player_id │ score │
+            ├────┼──────────────────────┼──────────────────────┼──────────┼───────────┼───────┤
+            │  0 │ 2050-01-02T03:04:05Z │ 2000-01-01T00:00:00Z │        1 │       Bob │    80 │
+            │  0 │ 2050-01-02T03:04:05Z │ 2000-01-01T00:00:00Z │        1 │     Alice │   100 │
+            │  0 │ 2050-01-02T03:04:05Z │ 2000-01-02T00:00:00Z │        2 │     Alice │    70 │
+            │  0 │ 2050-01-02T03:04:05Z │ 2000-01-02T00:00:00Z │        2 │   Charlie │    90 │
+            │  0 │ 2050-01-02T03:04:05Z │ 2000-01-03T00:00:00Z │        3 │       Bob │    60 │
+            │  0 │ 2050-01-02T03:04:05Z │ 2000-01-03T00:00:00Z │        3 │   Charlie │   110 │
+            └────┴──────────────────────┴──────────────────────┴──────────┴───────────┴───────┘
+            "#
+        ),
+    )
+    .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_ingest_recursive(kamu: KamuCliPuppet) {
+    // 0. Add datasets: the root dataset and its derived dataset
+    kamu.execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
+        .await
+        .success();
+
+    kamu.execute_with_input(
+        ["add", "--stdin"],
+        DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR,
+    )
+    .await
+    .success();
+
+    kamu.assert_failure_command_execution(
+        ["tail", "leaderboard", "--output-format", "table"],
+        None,
+        Some(["Error: Dataset schema is not yet available: leaderboard"]),
+    )
+    .await;
+
+    // TODO: `kamu ingest`: implement `--recursive` mode
+    //        https://github.com/kamu-data/kamu-cli/issues/886
+
+    // 1. Ingest data: the first chunk
+    // {
+    //     let assert = kamu
+    //         .execute_with_input(
+    //             ["ingest", "player-scores", "--stdin", "--recursive"],
+    //             DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
+    //         )
+    //         .await
+    //         .success();
+    //
+    //     let stderr =
+    // std::str::from_utf8(&assert.get_output().stderr).unwrap();
+    //
+    //     assert!(
+    //         stderr.contains("Dataset updated"),
+    //         "Unexpected output:\n{stderr}",
+    //     );
+    // }
+
+    // TODO: check via the tail command added data in the derived dataset
+    //       (leaderboard)
+
+    // TODO: do the same for 2nd & 3rd chunks
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_ingest_with_source_name(kamu: KamuCliPuppet) {
+    kamu.execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
+        .await
+        .success();
+
+    assert_ingest_data_to_player_scores_from_stdio(
+        &kamu,
+        [
+            "ingest",
+            "player-scores",
+            "--stdin",
+            "--source-name",
+            "default",
+        ],
+        DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
+        indoc::indoc!(
+            r#"
+            ┌────┬──────────────────────┬──────────────────────┬──────────┬───────────┬───────┐
+            │ op │     system_time      │      match_time      │ match_id │ player_id │ score │
+            ├────┼──────────────────────┼──────────────────────┼──────────┼───────────┼───────┤
+            │  0 │ 2050-01-02T03:04:05Z │ 2000-01-01T00:00:00Z │        1 │       Bob │    80 │
+            │  0 │ 2050-01-02T03:04:05Z │ 2000-01-01T00:00:00Z │        1 │     Alice │   100 │
+            └────┴──────────────────────┴──────────────────────┴──────────┴───────────┴───────┘
+            "#
+        ),
+    )
+    .await;
+
+    assert_ingest_data_to_player_scores_from_stdio(
+        &kamu,
+        [
+            "ingest",
+            "player-scores",
+            "--stdin",
+            "--source-name",
+            "default",
+        ],
+        DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_2,
+        indoc::indoc!(
+            r#"
+            ┌────┬──────────────────────┬──────────────────────┬──────────┬───────────┬───────┐
+            │ op │     system_time      │      match_time      │ match_id │ player_id │ score │
+            ├────┼──────────────────────┼──────────────────────┼──────────┼───────────┼───────┤
+            │  0 │ 2050-01-02T03:04:05Z │ 2000-01-01T00:00:00Z │        1 │       Bob │    80 │
+            │  0 │ 2050-01-02T03:04:05Z │ 2000-01-01T00:00:00Z │        1 │     Alice │   100 │
+            │  0 │ 2050-01-02T03:04:05Z │ 2000-01-02T00:00:00Z │        2 │     Alice │    70 │
+            │  0 │ 2050-01-02T03:04:05Z │ 2000-01-02T00:00:00Z │        2 │   Charlie │    90 │
+            └────┴──────────────────────┴──────────────────────┴──────────┴───────────┴───────┘
+            "#
+        ),
+    )
+    .await;
+
+    assert_ingest_data_to_player_scores_from_stdio(
+        &kamu,
+        [
+            "ingest",
+            "player-scores",
+            "--stdin",
+            "--source-name",
+            "default",
+        ],
+        DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_3,
+        indoc::indoc!(
+            r#"
+            ┌────┬──────────────────────┬──────────────────────┬──────────┬───────────┬───────┐
+            │ op │     system_time      │      match_time      │ match_id │ player_id │ score │
+            ├────┼──────────────────────┼──────────────────────┼──────────┼───────────┼───────┤
+            │  0 │ 2050-01-02T03:04:05Z │ 2000-01-01T00:00:00Z │        1 │       Bob │    80 │
+            │  0 │ 2050-01-02T03:04:05Z │ 2000-01-01T00:00:00Z │        1 │     Alice │   100 │
+            │  0 │ 2050-01-02T03:04:05Z │ 2000-01-02T00:00:00Z │        2 │     Alice │    70 │
+            │  0 │ 2050-01-02T03:04:05Z │ 2000-01-02T00:00:00Z │        2 │   Charlie │    90 │
+            │  0 │ 2050-01-02T03:04:05Z │ 2000-01-03T00:00:00Z │        3 │       Bob │    60 │
+            │  0 │ 2050-01-02T03:04:05Z │ 2000-01-03T00:00:00Z │        3 │   Charlie │   110 │
+            └────┴──────────────────────┴──────────────────────┴──────────┴───────────┴───────┘
+            "#
+        ),
+    )
+    .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Helpers
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 fn path(p: &Path) -> &str {
     p.as_os_str().to_str().unwrap()
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+async fn assert_ingest_data_to_player_scores_from_stdio<I, S, T>(
+    kamu: &KamuCliPuppet,
+    ingest_cmd: I,
+    ingest_data: T,
+    expected_tail_table: &str,
+) where
+    I: IntoIterator<Item = S> + Send + Clone,
+    S: AsRef<std::ffi::OsStr>,
+    T: Into<Vec<u8>> + Send + Clone,
+{
+    // Ingest
+    kamu.assert_success_command_execution_with_input(
+        ingest_cmd.clone(),
+        ingest_data.clone(),
+        None,
+        Some(["Dataset updated"]),
+    )
+    .await;
+
+    // Trying to ingest the same data
+    kamu.assert_success_command_execution_with_input(
+        ingest_cmd,
+        ingest_data,
+        None,
+        Some(["Dataset up-to-date"]),
+    )
+    .await;
+
+    // Assert ingested data
+    kamu.assert_player_scores_dataset_data(expected_tail_table)
+        .await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

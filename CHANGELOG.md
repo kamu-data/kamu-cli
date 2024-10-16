@@ -11,6 +11,32 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Unreleased]
+### Added
+- Added (or expanded) E2E tests for:
+  - `kamu config` command
+  - `kamu init` command
+  - `kamu add` command
+  - `kamu rename` command
+  - `kamu ingest` command
+  - `kamu inspect` command
+  - `kamu log` command
+  - `kamu new` command
+  - `kamu reset` command
+  - `kamu search` command
+  - `kamu sql` command
+  - `kamu system gc` command
+  - `kamu system info` command
+  - `kamu system diagnose` command
+  - `kamu tail` command
+  - `kamu login` command
+  - `kamu logout` command
+  - `kamu push` command
+  - `kamu pull` command
+- E2E: HTTP middleware is implemented, which improves stability of E2E tests
+### Fixed
+- `kamu add`: fixed behavior when using `--stdin` and `--name` arguments
+
 ## [0.205.0] - 2024-10-15
 ### Changed
 - `kamu push <dataset>` command now can be called without `--to` reference and Alias or Remote dataset repository will be used as destination
