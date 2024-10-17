@@ -22,27 +22,27 @@ pub async fn test_insert_bytes(repo: &dyn ObjectRepository) {
     assert!(!repo.contains(&hash_foo).await.unwrap());
     assert_matches!(repo.get_bytes(&hash_foo).await, Err(GetError::NotFound(_)),);
 
-    assert_eq!(
-        repo.insert_bytes(b"foo", InsertOpts::default())
-            .await
-            .unwrap(),
+    pretty_assertions::assert_eq!(
         InsertResult {
             hash: hash_foo.clone(),
-        }
-    );
-    assert_eq!(
-        repo.insert_bytes(b"bar", InsertOpts::default())
+        },
+        repo.insert_bytes(b"foo", InsertOpts::default())
             .await
-            .unwrap(),
+            .unwrap()
+    );
+    pretty_assertions::assert_eq!(
         InsertResult {
             hash: hash_bar.clone(),
-        }
+        },
+        repo.insert_bytes(b"bar", InsertOpts::default())
+            .await
+            .unwrap()
     );
 
     assert!(repo.contains(&hash_foo).await.unwrap());
     assert!(repo.contains(&hash_bar).await.unwrap());
-    assert_eq!(&repo.get_bytes(&hash_foo).await.unwrap()[..], b"foo");
-    assert_eq!(&repo.get_bytes(&hash_bar).await.unwrap()[..], b"bar");
+    pretty_assertions::assert_eq!(b"foo", &repo.get_bytes(&hash_foo).await.unwrap()[..]);
+    pretty_assertions::assert_eq!(b"bar", &repo.get_bytes(&hash_bar).await.unwrap()[..]);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -50,27 +50,27 @@ pub async fn test_insert_bytes(repo: &dyn ObjectRepository) {
 pub async fn test_delete(repo: &dyn ObjectRepository) {
     let hash_foo = Multihash::from_digest_sha3_256(b"foo");
 
-    assert_eq!(
-        repo.insert_bytes(b"foo", InsertOpts::default())
-            .await
-            .unwrap(),
+    pretty_assertions::assert_eq!(
         InsertResult {
             hash: hash_foo.clone(),
-        }
-    );
-
-    assert_eq!(&repo.get_bytes(&hash_foo).await.unwrap()[..], b"foo");
-
-    assert_eq!(
+        },
         repo.insert_bytes(b"foo", InsertOpts::default())
             .await
-            .unwrap(),
-        InsertResult {
-            hash: hash_foo.clone(),
-        }
+            .unwrap()
     );
 
-    assert_eq!(&repo.get_bytes(&hash_foo).await.unwrap()[..], b"foo");
+    pretty_assertions::assert_eq!(b"foo", &repo.get_bytes(&hash_foo).await.unwrap()[..]);
+
+    pretty_assertions::assert_eq!(
+        InsertResult {
+            hash: hash_foo.clone(),
+        },
+        repo.insert_bytes(b"foo", InsertOpts::default())
+            .await
+            .unwrap()
+    );
+
+    pretty_assertions::assert_eq!(b"foo", &repo.get_bytes(&hash_foo).await.unwrap()[..]);
 
     repo.delete(&hash_foo).await.unwrap();
 
@@ -86,7 +86,10 @@ pub async fn test_insert_precomputed(repo: &dyn ObjectRepository) {
     let hash_foo = Multihash::from_digest_sha3_256(b"foo");
     let hash_bar = Multihash::from_digest_sha3_256(b"bar");
 
-    assert_eq!(
+    pretty_assertions::assert_eq!(
+        InsertResult {
+            hash: hash_bar.clone(),
+        },
         repo.insert_bytes(
             b"foo",
             InsertOpts {
@@ -95,12 +98,9 @@ pub async fn test_insert_precomputed(repo: &dyn ObjectRepository) {
             },
         )
         .await
-        .unwrap(),
-        InsertResult {
-            hash: hash_bar.clone(),
-        }
+        .unwrap()
     );
-    assert_eq!(&repo.get_bytes(&hash_bar).await.unwrap()[..], b"foo");
+    pretty_assertions::assert_eq!(b"foo", &repo.get_bytes(&hash_bar).await.unwrap()[..]);
     assert_matches!(repo.get_bytes(&hash_foo).await, Err(GetError::NotFound(_)));
 }
 
@@ -110,7 +110,10 @@ pub async fn test_insert_expect(repo: &dyn ObjectRepository) {
     let hash_foo = Multihash::from_digest_sha3_256(b"foo");
     let hash_bar = Multihash::from_digest_sha3_256(b"bar");
 
-    assert_eq!(
+    pretty_assertions::assert_eq!(
+        InsertResult {
+            hash: hash_foo.clone(),
+        },
         repo.insert_bytes(
             b"foo",
             InsertOpts {
@@ -119,12 +122,9 @@ pub async fn test_insert_expect(repo: &dyn ObjectRepository) {
             },
         )
         .await
-        .unwrap(),
-        InsertResult {
-            hash: hash_foo.clone(),
-        }
+        .unwrap()
     );
-    assert_eq!(&repo.get_bytes(&hash_foo).await.unwrap()[..], b"foo");
+    pretty_assertions::assert_eq!(b"foo", &repo.get_bytes(&hash_foo).await.unwrap()[..]);
 
     assert_matches!(
         repo.insert_bytes(
