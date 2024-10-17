@@ -11,6 +11,7 @@ use std::assert_matches::assert_matches;
 
 use kamu::domain::*;
 use opendatafabric::Multihash;
+use url::Url;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -140,6 +141,55 @@ pub async fn test_insert_expect(repo: &dyn ObjectRepository) {
         })) if expected == hash_foo && actual == hash_bar
     );
     assert_matches!(repo.get_bytes(&hash_bar).await, Err(GetError::NotFound(_)));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct ExternalUrlTestOptions {
+    pub(crate) cut_query_params: bool,
+}
+
+pub async fn test_external_urls(
+    repo: &dyn ObjectRepository,
+    hash: &Multihash,
+    expected_external_download_url: Result<Url, GetExternalUrlError>,
+    expected_external_upload_url_result: Result<Url, GetExternalUrlError>,
+    opts: ExternalUrlTestOptions,
+) {
+    {
+        let actual_external_download_url = repo
+            .get_external_download_url(hash, ExternalTransferOpts { expiration: None })
+            .await
+            .map(|res| {
+                let mut url = res.url;
+                if opts.cut_query_params {
+                    url.set_query(None);
+                }
+                url
+            });
+
+        pretty_assertions::assert_eq!(
+            format!("{expected_external_download_url:?}"),
+            format!("{actual_external_download_url:?}")
+        );
+    }
+    {
+        let actual_external_upload_url = repo
+            .get_external_upload_url(hash, ExternalTransferOpts { expiration: None })
+            .await
+            .map(|res| {
+                let mut url = res.url;
+                if opts.cut_query_params {
+                    url.set_query(None);
+                }
+                url
+            });
+
+        pretty_assertions::assert_eq!(
+            format!("{expected_external_upload_url_result:?}"),
+            format!("{actual_external_upload_url:?}")
+        );
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

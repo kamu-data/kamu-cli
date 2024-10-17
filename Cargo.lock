@@ -5026,6 +5026,7 @@ dependencies = [
  "parking_lot",
  "petgraph",
  "pin-project",
+ "pretty_assertions",
  "rand",
  "random-names",
  "regex",
