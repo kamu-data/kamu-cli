@@ -121,14 +121,14 @@ impl DatasetFactoryImpl {
         Ok(DatasetImpl::new(
             MetadataChainImpl::new(
                 MetadataBlockRepositoryCachingInMem::new(MetadataBlockRepositoryImpl::new(
-                    ObjectRepositoryS3Sha3::new(s3_context.sub_context("blocks/")),
+                    ObjectRepositoryS3Sha3::new(s3_context.sub_context("blocks/"), None),
                 )),
                 ReferenceRepositoryImpl::new(NamedObjectRepositoryS3::new(
                     s3_context.sub_context("refs/"),
                 )),
             ),
-            ObjectRepositoryS3Sha3::new(s3_context.sub_context("data/")),
-            ObjectRepositoryS3Sha3::new(s3_context.sub_context("checkpoints/")),
+            ObjectRepositoryS3Sha3::new(s3_context.sub_context("data/"), None),
+            ObjectRepositoryS3Sha3::new(s3_context.sub_context("checkpoints/"), None),
             NamedObjectRepositoryS3::new(s3_context.into_sub_context("info/")),
         ))
     }

@@ -18,15 +18,19 @@ use opendatafabric::*;
 
 use super::test_object_repository_shared;
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[test_group::group(containerized)]
 #[test_log::test(tokio::test)]
 async fn test_protocol() {
     let s3 = LocalS3Server::new().await;
     std::env::set_var("AWS_SECRET_ACCESS_KEY", "BAD_KEY");
-    let repo = ObjectRepositoryS3Sha3::new(S3Context::from_url(&s3.url).await);
+    let repo = ObjectRepositoryS3Sha3::new(S3Context::from_url(&s3.url).await, None);
 
     assert_matches!(repo.protocol(), ObjectRepositoryProtocol::S3);
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(containerized)]
 #[ignore = "We do not yet handle unauthorized errors correctly"]
@@ -34,7 +38,7 @@ async fn test_protocol() {
 async fn test_unauthorized() {
     let s3 = LocalS3Server::new().await;
     std::env::set_var("AWS_SECRET_ACCESS_KEY", "BAD_KEY");
-    let repo = ObjectRepositoryS3Sha3::new(S3Context::from_url(&s3.url).await);
+    let repo = ObjectRepositoryS3Sha3::new(S3Context::from_url(&s3.url).await, None);
 
     assert_matches!(
         repo.insert_bytes(b"foo", InsertOpts::default()).await,
@@ -42,20 +46,24 @@ async fn test_unauthorized() {
     );
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[test_group::group(containerized)]
 #[test_log::test(tokio::test)]
 async fn test_insert_bytes() {
     let s3 = LocalS3Server::new().await;
-    let repo = ObjectRepositoryS3Sha3::new(S3Context::from_url(&s3.url).await);
+    let repo = ObjectRepositoryS3Sha3::new(S3Context::from_url(&s3.url).await, None);
 
     test_object_repository_shared::test_insert_bytes(&repo).await;
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(containerized)]
 #[test_log::test(tokio::test)]
 async fn test_insert_bytes_long() {
     let s3 = LocalS3Server::new().await;
-    let repo = ObjectRepositoryS3Sha3::new(S3Context::from_url(&s3.url).await);
+    let repo = ObjectRepositoryS3Sha3::new(S3Context::from_url(&s3.url).await, None);
 
     use rand::RngCore;
 
@@ -74,11 +82,13 @@ async fn test_insert_bytes_long() {
     assert_eq!(&repo.get_bytes(&hash).await.unwrap()[..], data);
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[test_group::group(containerized)]
 #[test_log::test(tokio::test)]
 async fn test_insert_stream() {
     let s3 = LocalS3Server::new().await;
-    let repo = ObjectRepositoryS3Sha3::new(S3Context::from_url(&s3.url).await);
+    let repo = ObjectRepositoryS3Sha3::new(S3Context::from_url(&s3.url).await, None);
 
     let hash_foobar = Multihash::from_digest_sha3_256(b"foobar");
 
@@ -111,11 +121,13 @@ async fn test_insert_stream() {
     assert_eq!(data, b"foobar");
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[test_group::group(containerized)]
 #[test_log::test(tokio::test)]
 async fn test_insert_stream_long() {
     let s3 = LocalS3Server::new().await;
-    let repo = ObjectRepositoryS3Sha3::new(S3Context::from_url(&s3.url).await);
+    let repo = ObjectRepositoryS3Sha3::new(S3Context::from_url(&s3.url).await, None);
 
     use rand::RngCore;
 
@@ -145,29 +157,37 @@ async fn test_insert_stream_long() {
     assert_eq!(data, data_received[..]);
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[test_group::group(containerized)]
 #[test_log::test(tokio::test)]
 async fn test_delete() {
     let s3 = LocalS3Server::new().await;
-    let repo = ObjectRepositoryS3Sha3::new(S3Context::from_url(&s3.url).await);
+    let repo = ObjectRepositoryS3Sha3::new(S3Context::from_url(&s3.url).await, None);
 
     test_object_repository_shared::test_delete(&repo).await;
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(containerized)]
 #[test_log::test(tokio::test)]
 async fn test_insert_precomputed() {
     let s3 = LocalS3Server::new().await;
-    let repo = ObjectRepositoryS3Sha3::new(S3Context::from_url(&s3.url).await);
+    let repo = ObjectRepositoryS3Sha3::new(S3Context::from_url(&s3.url).await, None);
 
     test_object_repository_shared::test_insert_precomputed(&repo).await;
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(containerized)]
 #[test_log::test(tokio::test)]
 async fn test_insert_expect() {
     let s3 = LocalS3Server::new().await;
-    let repo = ObjectRepositoryS3Sha3::new(S3Context::from_url(&s3.url).await);
+    let repo = ObjectRepositoryS3Sha3::new(S3Context::from_url(&s3.url).await, None);
 
     test_object_repository_shared::test_insert_expect(&repo).await;
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
