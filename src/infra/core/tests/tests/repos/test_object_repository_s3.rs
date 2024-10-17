@@ -11,22 +11,28 @@ use std::assert_matches::assert_matches;
 use std::convert::TryFrom;
 
 use kamu::domain::*;
-use kamu::testing::LocalS3Server;
+use kamu::testing::{LocalS3Server, TEST_BUCKET_NAME};
 use kamu::utils::s3_context::S3Context;
 use kamu::*;
 use opendatafabric::*;
+use url::Url;
 
 use super::test_object_repository_shared;
+use super::test_object_repository_shared::ExternalUrlTestOptions;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(containerized)]
 #[test_log::test(tokio::test)]
 async fn test_protocol() {
     let s3 = LocalS3Server::new().await;
     std::env::set_var("AWS_SECRET_ACCESS_KEY", "BAD_KEY");
-    let repo = ObjectRepositoryS3Sha3::new(S3Context::from_url(&s3.url).await);
+    let repo = ObjectRepositoryS3Sha3::new(S3Context::from_url(&s3.url).await, None);
 
     assert_matches!(repo.protocol(), ObjectRepositoryProtocol::S3);
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(containerized)]
 #[ignore = "We do not yet handle unauthorized errors correctly"]
@@ -34,7 +40,7 @@ async fn test_protocol() {
 async fn test_unauthorized() {
     let s3 = LocalS3Server::new().await;
     std::env::set_var("AWS_SECRET_ACCESS_KEY", "BAD_KEY");
-    let repo = ObjectRepositoryS3Sha3::new(S3Context::from_url(&s3.url).await);
+    let repo = ObjectRepositoryS3Sha3::new(S3Context::from_url(&s3.url).await, None);
 
     assert_matches!(
         repo.insert_bytes(b"foo", InsertOpts::default()).await,
@@ -42,20 +48,24 @@ async fn test_unauthorized() {
     );
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[test_group::group(containerized)]
 #[test_log::test(tokio::test)]
 async fn test_insert_bytes() {
     let s3 = LocalS3Server::new().await;
-    let repo = ObjectRepositoryS3Sha3::new(S3Context::from_url(&s3.url).await);
+    let repo = ObjectRepositoryS3Sha3::new(S3Context::from_url(&s3.url).await, None);
 
     test_object_repository_shared::test_insert_bytes(&repo).await;
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(containerized)]
 #[test_log::test(tokio::test)]
 async fn test_insert_bytes_long() {
     let s3 = LocalS3Server::new().await;
-    let repo = ObjectRepositoryS3Sha3::new(S3Context::from_url(&s3.url).await);
+    let repo = ObjectRepositoryS3Sha3::new(S3Context::from_url(&s3.url).await, None);
 
     use rand::RngCore;
 
@@ -74,11 +84,13 @@ async fn test_insert_bytes_long() {
     assert_eq!(&repo.get_bytes(&hash).await.unwrap()[..], data);
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[test_group::group(containerized)]
 #[test_log::test(tokio::test)]
 async fn test_insert_stream() {
     let s3 = LocalS3Server::new().await;
-    let repo = ObjectRepositoryS3Sha3::new(S3Context::from_url(&s3.url).await);
+    let repo = ObjectRepositoryS3Sha3::new(S3Context::from_url(&s3.url).await, None);
 
     let hash_foobar = Multihash::from_digest_sha3_256(b"foobar");
 
@@ -111,11 +123,13 @@ async fn test_insert_stream() {
     assert_eq!(data, b"foobar");
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[test_group::group(containerized)]
 #[test_log::test(tokio::test)]
 async fn test_insert_stream_long() {
     let s3 = LocalS3Server::new().await;
-    let repo = ObjectRepositoryS3Sha3::new(S3Context::from_url(&s3.url).await);
+    let repo = ObjectRepositoryS3Sha3::new(S3Context::from_url(&s3.url).await, None);
 
     use rand::RngCore;
 
@@ -145,29 +159,99 @@ async fn test_insert_stream_long() {
     assert_eq!(data, data_received[..]);
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[test_group::group(containerized)]
 #[test_log::test(tokio::test)]
 async fn test_delete() {
     let s3 = LocalS3Server::new().await;
-    let repo = ObjectRepositoryS3Sha3::new(S3Context::from_url(&s3.url).await);
+    let repo = ObjectRepositoryS3Sha3::new(S3Context::from_url(&s3.url).await, None);
 
     test_object_repository_shared::test_delete(&repo).await;
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(containerized)]
 #[test_log::test(tokio::test)]
 async fn test_insert_precomputed() {
     let s3 = LocalS3Server::new().await;
-    let repo = ObjectRepositoryS3Sha3::new(S3Context::from_url(&s3.url).await);
+    let repo = ObjectRepositoryS3Sha3::new(S3Context::from_url(&s3.url).await, None);
 
     test_object_repository_shared::test_insert_precomputed(&repo).await;
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(containerized)]
 #[test_log::test(tokio::test)]
 async fn test_insert_expect() {
     let s3 = LocalS3Server::new().await;
-    let repo = ObjectRepositoryS3Sha3::new(S3Context::from_url(&s3.url).await);
+    let repo = ObjectRepositoryS3Sha3::new(S3Context::from_url(&s3.url).await, None);
 
     test_object_repository_shared::test_insert_expect(&repo).await;
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(containerized)]
+#[test_log::test(tokio::test)]
+async fn test_external_urls() {
+    let s3 = LocalS3Server::new().await;
+    let repo = ObjectRepositoryS3Sha3::new(S3Context::from_url(&s3.url).await, None);
+
+    let hash_foo = Multihash::from_digest_sha3_256(b"foo");
+
+    let expected_external_download_url = {
+        let mut url =
+            Url::parse(&format!("http://127.0.0.1/{TEST_BUCKET_NAME}/{hash_foo}")).unwrap();
+        url.set_port(s3.url.port()).unwrap();
+        url
+    };
+    let expected_external_upload_url_result = expected_external_download_url.clone();
+
+    test_object_repository_shared::test_external_urls(
+        &repo,
+        &hash_foo,
+        Ok(expected_external_download_url),
+        Ok(expected_external_upload_url_result),
+        ExternalUrlTestOptions {
+            cut_query_params: true,
+        },
+    )
+    .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(containerized)]
+#[test_log::test(tokio::test)]
+async fn test_external_urls_with_override() {
+    let s3 = LocalS3Server::new().await;
+    let external_address_override = Url::parse("https://example.com:8443").unwrap();
+    let repo = ObjectRepositoryS3Sha3::new(
+        S3Context::from_url(&s3.url).await,
+        Some(external_address_override),
+    );
+
+    let hash_foo = Multihash::from_digest_sha3_256(b"foo");
+
+    let expected_external_download_url = Url::parse(&format!(
+        "https://example.com:8443/{TEST_BUCKET_NAME}/{hash_foo}"
+    ))
+    .unwrap();
+    let expected_external_upload_url_result = expected_external_download_url.clone();
+
+    test_object_repository_shared::test_external_urls(
+        &repo,
+        &hash_foo,
+        Ok(expected_external_download_url),
+        Ok(expected_external_upload_url_result),
+        ExternalUrlTestOptions {
+            cut_query_params: true,
+        },
+    )
+    .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
