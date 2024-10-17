@@ -39,8 +39,7 @@ pub type ObjectRepositoryS3Sha3 =
 // TODO: Verify atomic behavior
 pub struct ObjectRepositoryS3<D, const C: u32> {
     s3_context: S3Context,
-    maybe_external_address_host_override: Option<String>,
-    maybe_external_address_port_override: Option<u16>,
+    maybe_external_address_override: Option<Url>,
     _phantom: PhantomData<D>,
 }
 
@@ -52,16 +51,9 @@ where
     D: digest::Digest,
 {
     pub fn new(s3_context: S3Context, maybe_external_address_override: Option<Url>) -> Self {
-        let (host, port) = if let Some(url) = maybe_external_address_override {
-            (url.host().map(|host| host.to_string()), url.port())
-        } else {
-            (None, None)
-        };
-
         Self {
             s3_context,
-            maybe_external_address_host_override: host,
-            maybe_external_address_port_override: port,
+            maybe_external_address_override,
             _phantom: PhantomData,
         }
     }
@@ -82,14 +74,26 @@ where
     }
 
     fn get_external_url(&self, mut url: Url) -> Result<Url, InternalError> {
-        if let Some(host) = &self.maybe_external_address_host_override {
+        let Some(external_address_host_override) = &self.maybe_external_address_override else {
+            return Ok(url);
+        };
+
+        let new_scheme = external_address_host_override.scheme();
+
+        url.set_scheme(new_scheme).map_err(|_| {
+            format!("Error setting '{new_scheme}' schema from external address override: '{url}'")
+                .int_err()
+        })?;
+
+        if let Some(host) = external_address_host_override.host_str() {
             url.set_host(Some(host)).int_err()?;
         };
 
-        if let Some(port) = &self.maybe_external_address_port_override {
-            // SAFETY: Result type Result<(), ()>: the error can occur only
-            //         in case of an empty host, which is simply impossible in our case
-            url.set_port(Some(*port)).unwrap();
+        if let Some(port) = external_address_host_override.port() {
+            url.set_port(Some(port)).map_err(|_| {
+                format!("Error setting '{port}' port from external address override: '{url}'")
+                    .int_err()
+            })?;
         };
 
         Ok(url)
