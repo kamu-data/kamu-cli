@@ -11,6 +11,7 @@ use std::path::PathBuf;
 
 use clap::{ArgAction, Parser};
 use opendatafabric as odf;
+use url::Url;
 
 use crate::cli_value_parser::{self as parsers};
 use crate::{
@@ -1314,6 +1315,11 @@ pub struct SystemApiServer {
     /// launching inside a container
     #[arg(long)]
     pub external_address: Option<std::net::IpAddr>,
+
+    /// Allows changing the repo address, in case external references to objects
+    /// are requested
+    #[arg(long)]
+    pub repo_external_address: Option<Url>,
 }
 
 #[derive(Debug, clap::Subcommand)]
