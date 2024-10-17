@@ -12,7 +12,6 @@ use std::convert::TryFrom;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
-use chrono::prelude::*;
 use dill::*;
 use kamu::domain::*;
 use kamu::testing::*;
@@ -712,100 +711,6 @@ async fn test_sync_from_url_only_multi_tenant_case() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[tokio::test]
-async fn test_set_watermark() {
-    let tmp_dir = tempfile::tempdir().unwrap();
-    let harness = PullTestHarness::new(tmp_dir.path(), false);
-
-    let dataset_alias = n!("foo");
-    let create_result = harness.create_dataset(&dataset_alias).await;
-
-    assert_eq!(harness.num_blocks(&dataset_alias).await, 1);
-
-    assert_matches!(
-        harness
-            .pull_svc
-            .set_watermark(
-                create_result.dataset.clone(),
-                Utc.with_ymd_and_hms(2000, 1, 2, 0, 0, 0).unwrap()
-            )
-            .await,
-        Ok(PullResult::Updated { .. })
-    );
-    assert_eq!(harness.num_blocks(&dataset_alias).await, 2);
-
-    assert_matches!(
-        harness
-            .pull_svc
-            .set_watermark(
-                create_result.dataset.clone(),
-                Utc.with_ymd_and_hms(2000, 1, 3, 0, 0, 0).unwrap()
-            )
-            .await,
-        Ok(PullResult::Updated { .. })
-    );
-    assert_eq!(harness.num_blocks(&dataset_alias).await, 3);
-
-    assert_matches!(
-        harness
-            .pull_svc
-            .set_watermark(
-                create_result.dataset.clone(),
-                Utc.with_ymd_and_hms(2000, 1, 3, 0, 0, 0).unwrap()
-            )
-            .await,
-        Ok(PullResult::UpToDate(_))
-    );
-    assert_eq!(harness.num_blocks(&dataset_alias).await, 3);
-
-    assert_matches!(
-        harness
-            .pull_svc
-            .set_watermark(
-                create_result.dataset,
-                Utc.with_ymd_and_hms(2000, 1, 2, 0, 0, 0).unwrap()
-            )
-            .await,
-        Ok(PullResult::UpToDate(_))
-    );
-    assert_eq!(harness.num_blocks(&dataset_alias).await, 3);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[tokio::test]
-async fn test_set_watermark_rejects_on_derivative() {
-    let tmp_dir = tempfile::tempdir().unwrap();
-    let harness = PullTestHarness::new(tmp_dir.path(), true);
-
-    let dataset_alias = n!("foo");
-
-    let create_result = harness
-        .dataset_repo
-        .create_dataset(
-            &dataset_alias,
-            MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Derivative).build())
-                .build_typed(),
-        )
-        .await
-        .unwrap();
-
-    assert_matches!(
-        harness
-            .pull_svc
-            .set_watermark(
-                create_result.dataset,
-                Utc.with_ymd_and_hms(2000, 1, 2, 0, 0, 0).unwrap()
-            )
-            .await,
-        Err(SetWatermarkError::IsDerivative)
-    );
-
-    assert_eq!(harness.num_blocks(&dataset_alias).await, 1);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 struct PullTestHarness {
     calls: Arc<Mutex<Vec<PullBatch>>>,
     dataset_repo: Arc<DatasetRepositoryLocalFs>,
@@ -850,29 +755,6 @@ impl PullTestHarness {
             remote_alias_reg: catalog.get_one().unwrap(),
             pull_svc: catalog.get_one().unwrap(),
         }
-    }
-
-    async fn create_dataset(&self, dataset_alias: &DatasetAlias) -> CreateDatasetResult {
-        self.dataset_repo
-            .create_dataset_from_snapshot(
-                MetadataFactory::dataset_snapshot()
-                    .name(DatasetAlias::new(None, dataset_alias.dataset_name.clone()))
-                    .build(),
-            )
-            .await
-            .unwrap()
-            .create_dataset_result
-    }
-
-    async fn num_blocks(&self, dataset_alias: &DatasetAlias) -> usize {
-        let ds = self
-            .dataset_repo
-            .get_dataset_by_ref(&dataset_alias.as_local_ref())
-            .await
-            .unwrap();
-
-        use futures::StreamExt;
-        ds.as_metadata_chain().iter_blocks().count().await
     }
 
     fn collect_calls(&self) -> Vec<PullBatch> {

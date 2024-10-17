@@ -94,11 +94,11 @@ impl Command for SetWatermarkCommand {
             .execute(&dataset_handle, watermark.into())
             .await
         {
-            Ok(PullResult::UpToDate(_)) => {
+            Ok(SetWatermarkResult::UpToDate) => {
                 eprintln!("{}", console::style("Watermark was up-to-date").yellow());
                 Ok(())
             }
-            Ok(PullResult::Updated { new_head, .. }) => {
+            Ok(SetWatermarkResult::Updated { new_head, .. }) => {
                 eprintln!(
                     "{}",
                     console::style(format!(

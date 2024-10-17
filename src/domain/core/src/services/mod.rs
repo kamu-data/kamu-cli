@@ -32,6 +32,7 @@ pub mod server_url_config;
 pub mod sync_service;
 pub mod transform_service;
 pub mod verification_service;
+pub mod watermark_service;
 
 pub use compaction_service::*;
 pub use dataset_changes_service::*;
@@ -55,3 +56,4 @@ pub use server_url_config::*;
 pub use sync_service::*;
 pub use transform_service::*;
 pub use verification_service::*;
+pub use watermark_service::*;

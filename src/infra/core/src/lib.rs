@@ -49,6 +49,7 @@ mod sync_request_builder;
 mod sync_service_impl;
 mod transform_service_impl;
 mod verification_service_impl;
+mod watermark_service_impl;
 
 pub use compaction_service_impl::*;
 pub use dataset_changes_service_impl::*;
@@ -76,3 +77,4 @@ pub use sync_service_impl::*;
 pub use transform_service_impl::*;
 pub use use_cases::*;
 pub use verification_service_impl::*;
+pub use watermark_service_impl::*;

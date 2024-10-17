@@ -446,6 +446,8 @@ pub fn configure_base_catalog(
 
     b.add::<PushServiceImpl>();
 
+    b.add::<WatermarkServiceImpl>();
+
     b.add::<ResetServiceImpl>();
 
     b.add::<ProvenanceServiceImpl>();

@@ -11,14 +11,11 @@ use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use chrono::prelude::*;
 use dill::*;
-use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
+use internal_error::{InternalError, ResultIntoInternal};
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::*;
-use kamu_ingest_datafusion::DataWriterDataFusion;
 use opendatafabric::*;
-use time_source::SystemTimeSource;
 use url::Url;
 
 pub struct PullServiceImpl {
@@ -27,7 +24,6 @@ pub struct PullServiceImpl {
     ingest_svc: Arc<dyn PollingIngestService>,
     transform_svc: Arc<dyn TransformService>,
     sync_svc: Arc<dyn SyncService>,
-    system_time_source: Arc<dyn SystemTimeSource>,
     current_account_subject: Arc<CurrentAccountSubject>,
 }
 
@@ -40,7 +36,6 @@ impl PullServiceImpl {
         ingest_svc: Arc<dyn PollingIngestService>,
         transform_svc: Arc<dyn TransformService>,
         sync_svc: Arc<dyn SyncService>,
-        system_time_source: Arc<dyn SystemTimeSource>,
         current_account_subject: Arc<CurrentAccountSubject>,
     ) -> Self {
         Self {
@@ -49,7 +44,6 @@ impl PullServiceImpl {
             ingest_svc,
             transform_svc,
             sync_svc,
-            system_time_source,
             current_account_subject,
         }
     }
@@ -98,18 +92,18 @@ impl PullServiceImpl {
         tracing::debug!(?request, "Entering node");
 
         // Resolve local dataset if it exists
-        let local_handle = if let Some(local_ref) = &request.local_ref {
-            let local_handle = self
+        let maybe_local_handle = if let Some(local_ref) = &request.local_ref {
+            let maybe_local_handle = self
                 .dataset_repo
                 .try_resolve_dataset_handle_by_ref(local_ref)
                 .await?;
-            if local_handle.is_none() && request.remote_ref.is_none() {
+            if maybe_local_handle.is_none() && request.remote_ref.is_none() {
                 // Dataset does not exist locally nor remote ref was provided
                 return Err(PullError::NotFound(DatasetNotFoundError {
                     dataset_ref: local_ref.clone(),
                 }));
             }
-            local_handle
+            maybe_local_handle
         } else if let Some(remote_ref) = &request.remote_ref {
             self.try_inverse_lookup_dataset_by_pull_alias(remote_ref)
                 .await?
@@ -120,7 +114,7 @@ impl PullServiceImpl {
         // Resolve the name of a local dataset if it exists
         // or a name to create dataset with if syncing from remote and creation is
         // allowed
-        let local_alias = if let Some(hdl) = &local_handle {
+        let local_alias = if let Some(hdl) = &maybe_local_handle {
             // Target exists
             hdl.alias.clone()
         } else if let Some(local_ref) = &request.local_ref {
@@ -160,7 +154,7 @@ impl PullServiceImpl {
             }
         };
 
-        if local_handle.is_none() && !options.sync_options.create_if_not_exists {
+        if maybe_local_handle.is_none() && !options.sync_options.create_if_not_exists {
             return Err(PullError::InvalidOperation(
                 "Dataset does not exist and auto-create is switched off".to_owned(),
             ));
@@ -178,7 +172,7 @@ impl PullServiceImpl {
         // Resolve remote alias, if any
         let remote_ref = if let Some(remote_ref) = &request.remote_ref {
             Ok(Some(remote_ref.clone()))
-        } else if let Some(hdl) = &local_handle {
+        } else if let Some(hdl) = &maybe_local_handle {
             self.resolve_pull_alias(hdl).await
         } else {
             Ok(None)
@@ -189,14 +183,14 @@ impl PullServiceImpl {
             PullItem {
                 original_request: None, // May be set below
                 depth: 0,
-                local_ref: local_handle
+                local_ref: maybe_local_handle
                     .map(Into::into)
                     .unwrap_or(local_alias.clone().into()),
                 remote_ref,
             }
         } else {
             // Pulling an existing local root or derivative dataset
-            let local_handle = local_handle.unwrap();
+            let local_handle = maybe_local_handle.unwrap();
 
             let summary = self
                 .dataset_repo
@@ -639,64 +633,6 @@ impl PullService for PullServiceImpl {
         }
 
         Ok(results)
-    }
-
-    async fn set_watermark(
-        &self,
-        dataset: Arc<dyn Dataset>,
-        new_watermark: DateTime<Utc>,
-    ) -> Result<PullResult, SetWatermarkError> {
-        let aliases = match self
-            .remote_alias_reg
-            .get_remote_aliases(dataset.clone())
-            .await
-        {
-            Ok(v) => Ok(v),
-            Err(GetAliasesError::Internal(e)) => Err(SetWatermarkError::Internal(e)),
-        }?;
-
-        if !aliases.is_empty(RemoteAliasKind::Pull) {
-            return Err(SetWatermarkError::IsRemote);
-        }
-
-        let summary = dataset
-            .get_summary(GetSummaryOpts::default())
-            .await
-            .int_err()?;
-
-        if summary.kind != DatasetKind::Root {
-            return Err(SetWatermarkError::IsDerivative);
-        }
-
-        let mut writer =
-            DataWriterDataFusion::builder(dataset, datafusion::prelude::SessionContext::new())
-                .with_metadata_state_scanned(None)
-                .await
-                .int_err()?
-                .build();
-
-        match writer
-            .write_watermark(
-                new_watermark,
-                WriteWatermarkOpts {
-                    system_time: self.system_time_source.now(),
-                    new_source_state: None,
-                },
-            )
-            .await
-        {
-            Ok(res) => Ok(PullResult::Updated {
-                old_head: Some(res.old_head),
-                new_head: res.new_head,
-            }),
-            Err(
-                WriteWatermarkError::EmptyCommit(_)
-                | WriteWatermarkError::CommitError(CommitError::MetadataAppendError(
-                    AppendError::InvalidBlock(AppendValidationError::WatermarkIsNotMonotonic),
-                )),
-            ) => Ok(PullResult::UpToDate(PullResultUpToDate::SetWatermark)),
-            Err(e) => Err(e.int_err().into()),
-        }
     }
 }
 
