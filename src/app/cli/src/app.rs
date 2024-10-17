@@ -37,7 +37,7 @@ use time_source::{SystemTimeSource, SystemTimeSourceDefault, SystemTimeSourceStu
 use tracing::{warn, Instrument};
 
 use crate::accounts::AccountService;
-use crate::cli::Command;
+use crate::cli::{Command, SystemSubCommand};
 use crate::error::*;
 use crate::explore::TraceServer;
 use crate::output::*;
@@ -114,6 +114,13 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
         is_multi_tenant_workspace,
         is_init_command,
     );
+    let maybe_repo_external_address = match &args.command {
+        Command::System(system) => match &system.subcommand {
+            SystemSubCommand::ApiServer(api_server) => api_server.repo_external_address.clone(),
+            _ => None,
+        },
+        _ => None,
+    };
     let (database_config, maybe_temp_database_path) = app_database_config.into_inner();
     let maybe_db_connection_settings = database_config
         .as_ref()
@@ -133,6 +140,10 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
             args.system_time.map(Into::into),
             args.e2e_output_data_path.is_some(),
         );
+
+        if let Some(external_address) = maybe_repo_external_address {
+            base_catalog_builder.add_value(RepoExternalAddressConfig { external_address });
+        }
 
         if workspace_svc.is_in_workspace() {
             base_catalog_builder.add::<DatasetEntryIndexer>();
