@@ -10,7 +10,6 @@
 use std::sync::Arc;
 
 use ::serde::{Deserialize, Serialize};
-use chrono::{DateTime, Utc};
 use internal_error::InternalError;
 use opendatafabric::*;
 use thiserror::Error;
@@ -51,13 +50,6 @@ pub trait PullService: Send + Sync {
         options: PullMultiOptions,
         listener: Option<Arc<dyn PullMultiListener>>,
     ) -> Result<Vec<PullResponse>, InternalError>;
-
-    /// Manually advances the watermark of a root dataset
-    async fn set_watermark(
-        &self,
-        dataset: Arc<dyn Dataset>,
-        watermark: DateTime<Utc>,
-    ) -> Result<PullResult, SetWatermarkError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -186,7 +178,6 @@ pub enum PullResultUpToDate {
     PushIngest(PushInsgestResultUpToDate),
     Transform,
     Sync,
-    SetWatermark,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]

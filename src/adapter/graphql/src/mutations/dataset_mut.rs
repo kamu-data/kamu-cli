@@ -129,12 +129,12 @@ impl DatasetMut {
             .execute(&self.dataset_handle, watermark)
             .await
         {
-            Ok(domain::PullResult::UpToDate(_)) => {
+            Ok(domain::SetWatermarkResult::UpToDate) => {
                 Ok(SetWatermarkResult::UpToDate(SetWatermarkUpToDate {
                     _dummy: String::new(),
                 }))
             }
-            Ok(domain::PullResult::Updated { new_head, .. }) => {
+            Ok(domain::SetWatermarkResult::Updated { new_head, .. }) => {
                 Ok(SetWatermarkResult::Updated(SetWatermarkUpdated {
                     new_head: new_head.into(),
                 }))

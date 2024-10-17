@@ -12,7 +12,13 @@ use std::sync::Arc;
 use chrono::{DateTime, Utc};
 use dill::{component, interface};
 use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer};
-use kamu_core::{DatasetRegistry, PullResult, PullService, SetWatermarkError, SetWatermarkUseCase};
+use kamu_core::{
+    DatasetRegistry,
+    SetWatermarkError,
+    SetWatermarkResult,
+    SetWatermarkUseCase,
+    WatermarkService,
+};
 use opendatafabric::DatasetHandle;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -20,19 +26,19 @@ use opendatafabric::DatasetHandle;
 #[component(pub)]
 #[interface(dyn SetWatermarkUseCase)]
 pub struct SetWatermarkUseCaseImpl {
-    pull_service: Arc<dyn PullService>,
+    watermark_service: Arc<dyn WatermarkService>,
     dataset_registry: Arc<dyn DatasetRegistry>,
     dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
 }
 
 impl SetWatermarkUseCaseImpl {
     pub fn new(
-        pull_service: Arc<dyn PullService>,
+        watermark_service: Arc<dyn WatermarkService>,
         dataset_registry: Arc<dyn DatasetRegistry>,
         dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
     ) -> Self {
         Self {
-            pull_service,
+            watermark_service,
             dataset_registry,
             dataset_action_authorizer,
         }
@@ -45,7 +51,7 @@ impl SetWatermarkUseCase for SetWatermarkUseCaseImpl {
         &self,
         dataset_handle: &DatasetHandle,
         new_watermark: DateTime<Utc>,
-    ) -> Result<PullResult, SetWatermarkError> {
+    ) -> Result<SetWatermarkResult, SetWatermarkError> {
         // Permission check
         self.dataset_action_authorizer
             .check_action_allowed(dataset_handle, DatasetAction::Write)
@@ -55,7 +61,7 @@ impl SetWatermarkUseCase for SetWatermarkUseCaseImpl {
         let dataset = self.dataset_registry.get_dataset_by_handle(dataset_handle);
 
         // Actual action
-        self.pull_service
+        self.watermark_service
             .set_watermark(dataset, new_watermark)
             .await
     }

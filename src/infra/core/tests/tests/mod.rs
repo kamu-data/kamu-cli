@@ -27,4 +27,5 @@ mod test_setup;
 mod test_sync_service_impl;
 mod test_transform_service_impl;
 mod test_verification_service_impl;
+mod test_watermark_service_impl;
 mod use_cases;

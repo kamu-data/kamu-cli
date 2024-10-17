@@ -121,9 +121,7 @@ impl From<ts::TaskResult> for FlowResult {
             ts::TaskResult::UpdateDatasetResult(task_update_result) => {
                 match task_update_result.pull_result {
                     PullResult::UpToDate(up_to_date_result) => match up_to_date_result {
-                        PullResultUpToDate::Sync
-                        | PullResultUpToDate::Transform
-                        | PullResultUpToDate::SetWatermark => Self::Empty,
+                        PullResultUpToDate::Sync | PullResultUpToDate::Transform => Self::Empty,
                         PullResultUpToDate::PollingIngest(result) => Self::DatasetUpdate(
                             FlowResultDatasetUpdate::UpToDate(FlowResultDatasetUpdateUpToDate {
                                 uncacheable: result.uncacheable,

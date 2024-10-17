@@ -7,20 +7,35 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use chrono::{DateTime, Utc};
-use opendatafabric::DatasetHandle;
+use std::sync::Arc;
 
-use crate::{SetWatermarkError, SetWatermarkResult};
+use chrono::{DateTime, Utc};
+use opendatafabric::Multihash;
+
+use super::SetWatermarkError;
+use crate::Dataset;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait SetWatermarkUseCase: Send + Sync {
-    async fn execute(
+pub trait WatermarkService: Send + Sync {
+    /// Manually advances the watermark of a root dataset
+    async fn set_watermark(
         &self,
-        dataset_handle: &DatasetHandle,
+        dataset: Arc<dyn Dataset>,
         new_watermark: DateTime<Utc>,
     ) -> Result<SetWatermarkResult, SetWatermarkError>;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug)]
+pub enum SetWatermarkResult {
+    UpToDate,
+    Updated {
+        old_head: Option<Multihash>,
+        new_head: Multihash,
+    },
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
