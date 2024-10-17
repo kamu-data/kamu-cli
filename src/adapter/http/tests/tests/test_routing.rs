@@ -127,7 +127,7 @@ async fn setup_client(dataset_url: url::Url, head_expected: Multihash) {
         .add::<auth::DummyOdfServerAccessTokenResolver>()
         .build();
 
-    let dataset = DatasetFactoryImpl::new(IpfsGateway::default(), catalog.get_one().unwrap())
+    let dataset = DatasetFactoryImpl::new(IpfsGateway::default(), catalog.get_one().unwrap(), None)
         .get_dataset(&dataset_url, false)
         .await
         .unwrap();

@@ -22,6 +22,7 @@ use crate::*;
 pub struct DatasetFactoryImpl {
     ipfs_gateway: IpfsGateway,
     access_token_resolver: Arc<dyn kamu_core::auth::OdfServerAccessTokenResolver>,
+    maybe_repo_external_address_config: Option<Arc<RepoExternalAddressConfig>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -47,10 +48,12 @@ impl DatasetFactoryImpl {
     pub fn new(
         ipfs_gateway: IpfsGateway,
         access_token_resolver: Arc<dyn kamu_core::auth::OdfServerAccessTokenResolver>,
+        maybe_repo_external_address_config: Option<Arc<RepoExternalAddressConfig>>,
     ) -> Self {
         Self {
             ipfs_gateway,
             access_token_resolver,
+            maybe_repo_external_address_config,
         }
     }
 
@@ -110,25 +113,44 @@ impl DatasetFactoryImpl {
     /// credential resolution from scratch which can be very expensive. If you
     /// already have an established [S3Context] use
     /// [DatasetFactoryImpl::get_s3_from_context()] function instead.
-    pub async fn get_s3_from_url(base_url: Url) -> Result<impl Dataset, InternalError> {
+    pub async fn get_s3_from_url(
+        base_url: Url,
+        maybe_repo_external_address_config: &Option<Arc<RepoExternalAddressConfig>>,
+    ) -> Result<impl Dataset, InternalError> {
         // TODO: We should ensure optimal credential reuse. Perhaps in future we should
         // create a cache of S3Contexts keyed by an endpoint.
         let s3_context = S3Context::from_url(&base_url).await;
-        Self::get_s3_from_context(s3_context)
+        Self::get_s3_from_context(s3_context, maybe_repo_external_address_config)
     }
 
-    pub fn get_s3_from_context(s3_context: S3Context) -> Result<impl Dataset, InternalError> {
+    pub fn get_s3_from_context(
+        s3_context: S3Context,
+        maybe_repo_external_address_config: &Option<Arc<RepoExternalAddressConfig>>,
+    ) -> Result<impl Dataset, InternalError> {
+        let maybe_external_address_override = maybe_repo_external_address_config
+            .as_ref()
+            .map(|config| config.external_address.clone());
+
         Ok(DatasetImpl::new(
             MetadataChainImpl::new(
                 MetadataBlockRepositoryCachingInMem::new(MetadataBlockRepositoryImpl::new(
-                    ObjectRepositoryS3Sha3::new(s3_context.sub_context("blocks/"), None),
+                    ObjectRepositoryS3Sha3::new(
+                        s3_context.sub_context("blocks/"),
+                        maybe_external_address_override.clone(),
+                    ),
                 )),
                 ReferenceRepositoryImpl::new(NamedObjectRepositoryS3::new(
                     s3_context.sub_context("refs/"),
                 )),
             ),
-            ObjectRepositoryS3Sha3::new(s3_context.sub_context("data/"), None),
-            ObjectRepositoryS3Sha3::new(s3_context.sub_context("checkpoints/"), None),
+            ObjectRepositoryS3Sha3::new(
+                s3_context.sub_context("data/"),
+                maybe_external_address_override.clone(),
+            ),
+            ObjectRepositoryS3Sha3::new(
+                s3_context.sub_context("checkpoints/"),
+                maybe_external_address_override.clone(),
+            ),
             NamedObjectRepositoryS3::new(s3_context.into_sub_context("info/")),
         ))
     }
@@ -294,7 +316,9 @@ impl DatasetFactory for DatasetFactoryImpl {
                 Ok(Arc::new(ds))
             }
             "s3" | "s3+http" | "s3+https" => {
-                let ds = Self::get_s3_from_url(url.clone()).await?;
+                let ds =
+                    Self::get_s3_from_url(url.clone(), &self.maybe_repo_external_address_config)
+                        .await?;
                 Ok(Arc::new(ds))
             }
             _ => Err(UnsupportedProtocolError {
