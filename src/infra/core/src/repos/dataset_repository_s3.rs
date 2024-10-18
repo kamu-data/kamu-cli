@@ -33,7 +33,6 @@ pub struct DatasetRepositoryS3 {
     registry_cache: Option<Arc<S3RegistryCache>>,
     metadata_cache_local_fs_path: Option<Arc<PathBuf>>,
     system_time_source: Arc<dyn SystemTimeSource>,
-    maybe_repo_external_address_config: Option<Arc<RepoExternalAddressConfig>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -56,7 +55,6 @@ impl DatasetRepositoryS3 {
         registry_cache: Option<Arc<S3RegistryCache>>,
         metadata_cache_local_fs_path: Option<Arc<PathBuf>>,
         system_time_source: Arc<dyn SystemTimeSource>,
-        maybe_repo_external_address_config: Option<Arc<RepoExternalAddressConfig>>,
     ) -> Self {
         Self {
             s3_context,
@@ -65,7 +63,6 @@ impl DatasetRepositoryS3 {
             registry_cache,
             metadata_cache_local_fs_path,
             system_time_source,
-            maybe_repo_external_address_config,
         }
     }
 
@@ -73,10 +70,6 @@ impl DatasetRepositoryS3 {
         let s3_context = self
             .s3_context
             .sub_context(&format!("{}/", &dataset_id.as_multibase()));
-        let maybe_external_address_override = self
-            .maybe_repo_external_address_config
-            .as_ref()
-            .map(|config| config.external_address.clone());
 
         // TODO: Consider switching DatasetImpl to dynamic dispatch to simplify
         // configurability
@@ -85,10 +78,7 @@ impl DatasetRepositoryS3 {
                 MetadataChainImpl::new(
                     MetadataBlockRepositoryCachingInMem::new(MetadataBlockRepositoryImpl::new(
                         ObjectRepositoryCachingLocalFs::new(
-                            ObjectRepositoryS3Sha3::new(
-                                s3_context.sub_context("blocks/"),
-                                maybe_external_address_override.clone(),
-                            ),
+                            ObjectRepositoryS3Sha3::new(s3_context.sub_context("blocks/")),
                             metadata_cache_local_fs_path.clone(),
                         ),
                     )),
@@ -96,37 +86,22 @@ impl DatasetRepositoryS3 {
                         s3_context.sub_context("refs/"),
                     )),
                 ),
-                ObjectRepositoryS3Sha3::new(
-                    s3_context.sub_context("data/"),
-                    maybe_external_address_override.clone(),
-                ),
-                ObjectRepositoryS3Sha3::new(
-                    s3_context.sub_context("checkpoints/"),
-                    maybe_external_address_override,
-                ),
+                ObjectRepositoryS3Sha3::new(s3_context.sub_context("data/")),
+                ObjectRepositoryS3Sha3::new(s3_context.sub_context("checkpoints/")),
                 NamedObjectRepositoryS3::new(s3_context.into_sub_context("info/")),
             ))
         } else {
             Arc::new(DatasetImpl::new(
                 MetadataChainImpl::new(
                     MetadataBlockRepositoryCachingInMem::new(MetadataBlockRepositoryImpl::new(
-                        ObjectRepositoryS3Sha3::new(
-                            s3_context.sub_context("blocks/"),
-                            maybe_external_address_override.clone(),
-                        ),
+                        ObjectRepositoryS3Sha3::new(s3_context.sub_context("blocks/")),
                     )),
                     ReferenceRepositoryImpl::new(NamedObjectRepositoryS3::new(
                         s3_context.sub_context("refs/"),
                     )),
                 ),
-                ObjectRepositoryS3Sha3::new(
-                    s3_context.sub_context("data/"),
-                    maybe_external_address_override.clone(),
-                ),
-                ObjectRepositoryS3Sha3::new(
-                    s3_context.sub_context("checkpoints/"),
-                    maybe_external_address_override,
-                ),
+                ObjectRepositoryS3Sha3::new(s3_context.sub_context("data/")),
+                ObjectRepositoryS3Sha3::new(s3_context.sub_context("checkpoints/")),
                 NamedObjectRepositoryS3::new(s3_context.into_sub_context("info/")),
             ))
         }
