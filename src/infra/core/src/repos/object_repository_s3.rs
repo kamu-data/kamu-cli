@@ -16,7 +16,7 @@ use aws_sdk_s3::operation::get_object::GetObjectError;
 use aws_sdk_s3::operation::head_object::HeadObjectError;
 use aws_sdk_s3::presigning::PresigningConfig;
 use bytes::Bytes;
-use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
+use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_core::*;
 use opendatafabric::{Multicodec, Multihash};
 use url::Url;
@@ -39,7 +39,6 @@ pub type ObjectRepositoryS3Sha3 =
 // TODO: Verify atomic behavior
 pub struct ObjectRepositoryS3<D, const C: u32> {
     s3_context: S3Context,
-    maybe_external_address_override: Option<Url>,
     _phantom: PhantomData<D>,
 }
 
@@ -50,10 +49,9 @@ where
     D: Send + Sync,
     D: digest::Digest,
 {
-    pub fn new(s3_context: S3Context, maybe_external_address_override: Option<Url>) -> Self {
+    pub fn new(s3_context: S3Context) -> Self {
         Self {
             s3_context,
-            maybe_external_address_override,
             _phantom: PhantomData,
         }
     }
@@ -71,32 +69,6 @@ where
             )
         })
         .collect()
-    }
-
-    fn get_external_url(&self, mut url: Url) -> Result<Url, InternalError> {
-        let Some(external_address_host_override) = &self.maybe_external_address_override else {
-            return Ok(url);
-        };
-
-        let new_scheme = external_address_host_override.scheme();
-
-        url.set_scheme(new_scheme).map_err(|_| {
-            format!("Error setting '{new_scheme}' schema from external address override: '{url}'")
-                .int_err()
-        })?;
-
-        if let Some(host) = external_address_host_override.host_str() {
-            url.set_host(Some(host)).int_err()?;
-        };
-
-        if let Some(port) = external_address_host_override.port() {
-            url.set_port(Some(port)).map_err(|_| {
-                format!("Error setting '{port}' port from external address override: '{url}'")
-                    .int_err()
-            })?;
-        };
-
-        Ok(url)
     }
 }
 
@@ -223,12 +195,10 @@ where
             .presigned(presigned_conf)
             .await
             .int_err()?;
-
         let presigned_request_url = Url::parse(presigned_request.uri()).int_err()?;
-        let url = self.get_external_url(presigned_request_url)?;
 
         Ok(GetExternalUrlResult {
-            url,
+            url: presigned_request_url,
             header_map: Self::into_header_map(presigned_request.headers()),
             expires_at: Some(expires_at.into()),
         })
@@ -256,12 +226,10 @@ where
             .presigned(presigned_conf)
             .await
             .int_err()?;
-
         let presigned_request_url = Url::parse(presigned_request.uri()).int_err()?;
-        let url = self.get_external_url(presigned_request_url)?;
 
         Ok(GetExternalUrlResult {
-            url,
+            url: presigned_request_url,
             header_map: Self::into_header_map(presigned_request.headers()),
             expires_at: Some(expires_at.into()),
         })

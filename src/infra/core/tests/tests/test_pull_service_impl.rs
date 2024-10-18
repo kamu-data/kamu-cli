@@ -177,7 +177,6 @@ async fn create_graph_remote(
         Arc::new(DatasetFactoryImpl::new(
             IpfsGateway::default(),
             Arc::new(auth::DummyOdfServerAccessTokenResolver::new()),
-            None,
         )),
         Arc::new(DummySmartTransferProtocolClient::new()),
         Arc::new(kamu::utils::ipfs_wrapper::IpfsClient::default()),
