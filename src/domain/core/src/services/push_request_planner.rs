@@ -7,13 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::sync::Arc;
-
 use internal_error::InternalError;
 use opendatafabric::*;
 use thiserror::Error;
 
 use super::sync_service::*;
+use super::RemoteTarget;
 use crate::{DatasetNotFoundError, GetDatasetError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -21,14 +20,34 @@ use crate::{DatasetNotFoundError, GetDatasetError};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait PushService: Send + Sync {
-    async fn push_multi(
+pub trait PushRequestPlanner: Send + Sync {
+    async fn collect_plan(
         &self,
-        dataset_refs: Vec<DatasetRef>,
-        options: PushMultiOptions,
-        sync_listener: Option<Arc<dyn SyncMultiListener>>,
-    ) -> Vec<PushResponse>;
+        dataset_handles: &[DatasetHandle],
+        push_target: Option<&DatasetPushTarget>,
+    ) -> (Vec<PushItem>, Vec<PushResponse>);
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug)]
+pub struct PushItem {
+    pub local_handle: DatasetHandle,
+    pub remote_target: RemoteTarget,
+    pub push_target: Option<DatasetPushTarget>,
+}
+
+impl PushItem {
+    pub fn as_response(&self, result: Result<SyncResult, SyncError>) -> PushResponse {
+        PushResponse {
+            local_handle: Some(self.local_handle.clone()),
+            target: self.push_target.clone(),
+            result: result.map_err(Into::into),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug)]
 pub struct PushResponse {
@@ -50,6 +69,8 @@ impl std::fmt::Display for PushResponse {
         }
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone)]
 pub struct PushMultiOptions {
@@ -115,3 +136,5 @@ impl From<GetDatasetError> for PushError {
         }
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

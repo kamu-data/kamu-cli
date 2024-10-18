@@ -444,7 +444,7 @@ pub fn configure_base_catalog(
 
     b.add::<PullServiceImpl>();
 
-    b.add::<PushServiceImpl>();
+    b.add::<PushRequestPlannerImpl>();
 
     b.add::<WatermarkServiceImpl>();
 

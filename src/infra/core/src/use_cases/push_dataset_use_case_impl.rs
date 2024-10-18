@@ -19,20 +19,18 @@ use kamu_core::auth::{
 };
 use kamu_core::{
     DatasetRegistry,
-    DatasetRegistryExt,
     PushDatasetUseCase,
     PushError,
+    PushItem,
     PushMultiOptions,
+    PushRequestPlanner,
     PushResponse,
     RemoteAliasKind,
-    RemoteAliasResolver,
     RemoteAliasesRegistry,
-    RemoteTarget,
     SyncError,
     SyncMultiListener,
     SyncOptions,
     SyncRequestNew,
-    SyncResult,
     SyncService,
 };
 use opendatafabric::{DatasetHandle, DatasetPushTarget, DatasetRefAny};
@@ -44,32 +42,29 @@ use crate::SyncRequestBuilder;
 #[component(pub)]
 #[interface(dyn PushDatasetUseCase)]
 pub struct PushDatasetUseCaseImpl {
-    //push_service: Arc<dyn PushService>,
+    push_request_planner: Arc<dyn PushRequestPlanner>,
     sync_request_builder: Arc<SyncRequestBuilder>,
     sync_service: Arc<dyn SyncService>,
     dataset_registry: Arc<dyn DatasetRegistry>,
     dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
-    remote_alias_resolver: Arc<dyn RemoteAliasResolver>,
     remote_alias_registry: Arc<dyn RemoteAliasesRegistry>,
 }
 
 impl PushDatasetUseCaseImpl {
     pub fn new(
-        //push_service: Arc<dyn PushService>,
+        push_request_planner: Arc<dyn PushRequestPlanner>,
         sync_request_builder: Arc<SyncRequestBuilder>,
         sync_service: Arc<dyn SyncService>,
         dataset_registry: Arc<dyn DatasetRegistry>,
         dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
-        remote_alias_resolver: Arc<dyn RemoteAliasResolver>,
         remote_alias_registry: Arc<dyn RemoteAliasesRegistry>,
     ) -> Self {
         Self {
-            // push_service,
+            push_request_planner,
             sync_request_builder,
             sync_service,
             dataset_registry,
             dataset_action_authorizer,
-            remote_alias_resolver,
             remote_alias_registry,
         }
     }
@@ -102,54 +97,9 @@ impl PushDatasetUseCaseImpl {
         Ok((authorized_handles, unauthorized_responses))
     }
 
-    async fn collect_push_plan(
-        &self,
-        dataset_handles: &[DatasetHandle],
-        push_target: Option<&DatasetPushTarget>,
-    ) -> (Vec<PushPlanItem>, Vec<PushResponse>) {
-        let mut plan = Vec::new();
-        let mut errors = Vec::new();
-
-        for hdl in dataset_handles {
-            match self.collect_push_plan_item(hdl.clone(), push_target).await {
-                Ok(item) => plan.push(item),
-                Err(err) => errors.push(err),
-            }
-        }
-
-        (plan, errors)
-    }
-
-    async fn collect_push_plan_item(
-        &self,
-        local_handle: DatasetHandle,
-        push_target: Option<&DatasetPushTarget>,
-    ) -> Result<PushPlanItem, PushResponse> {
-        let local_target = self
-            .dataset_registry
-            .get_resolved_dataset_by_handle(&local_handle);
-
-        match self
-            .remote_alias_resolver
-            .resolve_push_target(local_target, push_target.cloned())
-            .await
-        {
-            Ok(remote_target) => Ok(PushPlanItem {
-                local_handle,
-                remote_target,
-                push_target: push_target.cloned(),
-            }),
-            Err(e) => Err(PushResponse {
-                local_handle: Some(local_handle),
-                target: push_target.cloned(),
-                result: Err(e.into()),
-            }),
-        }
-    }
-
     async fn build_sync_requests(
         &self,
-        plan: &[PushPlanItem],
+        plan: &[PushItem],
         sync_options: &SyncOptions,
         push_target: Option<&DatasetPushTarget>,
     ) -> (Vec<SyncRequestNew>, Vec<PushResponse>) {
@@ -203,7 +153,8 @@ impl PushDatasetUseCase for PushDatasetUseCaseImpl {
 
         // Prepare a push plan
         let (plan, errors) = self
-            .collect_push_plan(&authorized_handles, options.remote_target.as_ref())
+            .push_request_planner
+            .collect_plan(&authorized_handles, options.remote_target.as_ref())
             .await;
         if !errors.is_empty() {
             return Ok(errors);
@@ -255,25 +206,6 @@ impl PushDatasetUseCase for PushDatasetUseCaseImpl {
         }
 
         Ok(results)
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug)]
-struct PushPlanItem {
-    local_handle: DatasetHandle,
-    remote_target: RemoteTarget,
-    push_target: Option<DatasetPushTarget>,
-}
-
-impl PushPlanItem {
-    fn as_response(&self, result: Result<SyncResult, SyncError>) -> PushResponse {
-        PushResponse {
-            local_handle: Some(self.local_handle.clone()),
-            target: self.push_target.clone(),
-            result: result.map_err(Into::into),
-        }
     }
 }
 
