@@ -125,3 +125,14 @@ kamu_cli_execute_command_e2e_test!(
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_run_api_server_e2e_test!(
+    storage = postgres,
+    fixture = kamu_cli_e2e_repo_tests::test_smart_push_from_registered_repo,
+    options = Options::default()
+        .with_multi_tenant()
+        .with_today_as_frozen_system_time(),
+    extra_test_groups = "engine, ingest, datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
