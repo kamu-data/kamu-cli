@@ -48,7 +48,7 @@ const CLIENT_ACCOUNT_NAME: &str = "kamu-client";
 pub(crate) struct ClientSideHarness {
     tempdir: TempDir,
     catalog: dill::Catalog,
-    pull_service: Arc<dyn PullService>,
+    pull_dataset_use_case: Arc<dyn PullDatasetUseCase>,
     push_dataset_use_case: Arc<dyn PushDatasetUseCase>,
     access_token_resover: Arc<dyn OdfServerAccessTokenResolver>,
     options: ClientSideHarnessOptions,
@@ -134,7 +134,7 @@ impl ClientSideHarness {
 
         b.add::<CompactionServiceImpl>();
 
-        b.add::<PullServiceImpl>();
+        b.add::<PullRequestPlannerImpl>();
 
         b.add::<PushRequestPlannerImpl>();
 
@@ -146,6 +146,11 @@ impl ClientSideHarness {
         b.add::<CreateDatasetUseCaseImpl>();
         b.add::<PushDatasetUseCaseImpl>();
 
+        b.add_builder(
+            PullDatasetUseCaseImpl::builder().with_in_multi_tenant_mode(options.multi_tenant),
+        )
+        .bind::<dyn PullDatasetUseCase, PullDatasetUseCaseImpl>();
+
         b.add_value(ContainerRuntime::default());
         b.add_value(kamu::utils::ipfs_wrapper::IpfsClient::default());
         b.add_value(IpfsGateway::default());
@@ -154,7 +159,7 @@ impl ClientSideHarness {
 
         let catalog = b.build();
 
-        let pull_service = catalog.get_one::<dyn PullService>().unwrap();
+        let pull_dataset_use_case = catalog.get_one::<dyn PullDatasetUseCase>().unwrap();
         let push_dataset_use_case = catalog.get_one::<dyn PushDatasetUseCase>().unwrap();
         let access_token_resover = catalog
             .get_one::<dyn OdfServerAccessTokenResolver>()
@@ -163,7 +168,7 @@ impl ClientSideHarness {
         Self {
             tempdir,
             catalog,
-            pull_service,
+            pull_dataset_use_case,
             push_dataset_use_case,
             access_token_resover,
             options,
@@ -215,9 +220,11 @@ impl ClientSideHarness {
         dataset_ref: DatasetRefAny,
         force: bool,
     ) -> Vec<PullResponse> {
-        self.pull_service
-            .pull_multi(
-                vec![dataset_ref],
+        self.pull_dataset_use_case
+            .execute_multi(
+                vec![PullRequest::from_any_ref(&dataset_ref, |_| {
+                    !self.options.multi_tenant
+                })],
                 PullMultiOptions {
                     sync_options: SyncOptions {
                         create_if_not_exists: true,
@@ -229,7 +236,6 @@ impl ClientSideHarness {
                 None,
             )
             .await
-            .unwrap()
     }
 
     pub async fn pull_dataset_result(&self, dataset_ref: DatasetRefAny, force: bool) -> PullResult {

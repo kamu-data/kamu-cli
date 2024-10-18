@@ -10,10 +10,13 @@
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
+use internal_error::InternalError;
 use opendatafabric::Multihash;
+use thiserror::Error;
 
-use super::SetWatermarkError;
-use crate::Dataset;
+use super::DatasetNotFoundError;
+use crate::auth::DatasetActionUnauthorizedError;
+use crate::{AccessError, Dataset};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -36,6 +39,47 @@ pub enum SetWatermarkResult {
         old_head: Option<Multihash>,
         new_head: Multihash,
     },
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Error)]
+pub enum SetWatermarkError {
+    #[error(transparent)]
+    NotFound(
+        #[from]
+        #[backtrace]
+        DatasetNotFoundError,
+    ),
+
+    #[error("Attempting to set watermark on a derivative dataset")]
+    IsDerivative,
+
+    #[error("Attempting to set watermark on a remote dataset")]
+    IsRemote,
+
+    #[error(transparent)]
+    Access(
+        #[from]
+        #[backtrace]
+        AccessError,
+    ),
+
+    #[error(transparent)]
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
+}
+
+impl From<DatasetActionUnauthorizedError> for SetWatermarkError {
+    fn from(v: DatasetActionUnauthorizedError) -> Self {
+        match v {
+            DatasetActionUnauthorizedError::Access(e) => Self::Access(e),
+            DatasetActionUnauthorizedError::Internal(e) => Self::Internal(e),
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

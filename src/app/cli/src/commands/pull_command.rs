@@ -26,7 +26,7 @@ use crate::output::OutputConfig;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct PullCommand {
-    pull_svc: Arc<dyn PullService>,
+    pull_dataset_use_case: Arc<dyn PullDatasetUseCase>,
     dataset_registry: Arc<dyn DatasetRegistry>,
     search_svc: Arc<dyn SearchService>,
     output_config: Arc<OutputConfig>,
@@ -44,7 +44,7 @@ pub struct PullCommand {
 
 impl PullCommand {
     pub fn new<I>(
-        pull_svc: Arc<dyn PullService>,
+        pull_dataset_use_case: Arc<dyn PullDatasetUseCase>,
         dataset_registry: Arc<dyn DatasetRegistry>,
         search_svc: Arc<dyn SearchService>,
         output_config: Arc<OutputConfig>,
@@ -63,7 +63,7 @@ impl PullCommand {
         I: IntoIterator<Item = DatasetRefAnyPattern>,
     {
         Self {
-            pull_svc,
+            pull_dataset_use_case,
             dataset_registry,
             search_svc,
             output_config,
@@ -97,8 +97,8 @@ impl PullCommand {
         };
 
         Ok(self
-            .pull_svc
-            .pull_multi_ext(
+            .pull_dataset_use_case
+            .execute_multi(
                 vec![PullRequest {
                     local_ref: Some(local_name.into()),
                     remote_ref: Some(remote_ref),
@@ -109,7 +109,7 @@ impl PullCommand {
                 },
                 listener,
             )
-            .await?)
+            .await)
     }
 
     async fn pull_multi(
@@ -117,7 +117,7 @@ impl PullCommand {
         listener: Option<Arc<dyn PullMultiListener>>,
         current_account_name: &AccountName,
     ) -> Result<Vec<PullResponse>, CLIError> {
-        let dataset_refs: Vec<_> = if !self.all {
+        let dataset_any_refs: Vec<_> = if !self.all {
             filter_datasets_by_any_pattern(
                 self.dataset_registry.as_ref(),
                 self.search_svc.clone(),
@@ -131,10 +131,29 @@ impl PullCommand {
             vec![]
         };
 
+        let requests = dataset_any_refs
+            .into_iter()
+            .map(|r| PullRequest::from_any_ref(&r, |_| !self.in_multi_tenant_mode))
+            .collect();
+
+        let requests: Vec<_> = if !self.all {
+            requests
+        } else {
+            use futures::TryStreamExt;
+            self.dataset_registry
+                .all_dataset_handles_by_owner(current_account_name)
+                .map_ok(|hdl| PullRequest {
+                    local_ref: Some(hdl.into()),
+                    remote_ref: None,
+                })
+                .try_collect()
+                .await?
+        };
+
         Ok(self
-            .pull_svc
-            .pull_multi(
-                dataset_refs,
+            .pull_dataset_use_case
+            .execute_multi(
+                requests,
                 PullMultiOptions {
                     recursive: self.recursive,
                     all: self.all,
@@ -153,7 +172,7 @@ impl PullCommand {
                 },
                 listener,
             )
-            .await?)
+            .await)
     }
 
     async fn pull_with_progress(&self) -> Result<Vec<PullResponse>, CLIError> {
@@ -170,7 +189,7 @@ impl PullCommand {
         let current_account_name = match self.current_account_subject.as_ref() {
             CurrentAccountSubject::Anonymous(_) => {
                 return Err(CLIError::usage_error(
-                    "Anonymous account misused, use multi-tenant alias",
+                    "Anonymous account cannot be used for pulling datasets",
                 ))
             }
             CurrentAccountSubject::Logged(l) => &l.account_name,

@@ -22,7 +22,7 @@ pub struct SetWatermarkCommand {
     all: bool,
     recursive: bool,
     watermark: String,
-    is_multi_tenant_mode: bool,
+    in_multi_tenant_mode: bool,
 }
 
 impl SetWatermarkCommand {
@@ -33,7 +33,7 @@ impl SetWatermarkCommand {
         all: bool,
         recursive: bool,
         watermark: S,
-        is_multi_tenant_mode: bool,
+        in_multi_tenant_mode: bool,
     ) -> Self
     where
         S: Into<String>,
@@ -46,7 +46,7 @@ impl SetWatermarkCommand {
             all,
             recursive,
             watermark: watermark.into(),
-            is_multi_tenant_mode,
+            in_multi_tenant_mode,
         }
     }
 }
@@ -80,7 +80,7 @@ impl Command for SetWatermarkCommand {
         let dataset_ref = self.refs[0]
             .as_dataset_ref_any()
             .unwrap()
-            .as_local_ref(|_| !self.is_multi_tenant_mode)
+            .as_local_ref(|_| !self.in_multi_tenant_mode)
             .map_err(|_| CLIError::usage_error("Expected a local dataset reference"))?;
 
         let dataset_handle = self

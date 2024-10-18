@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::cmp::Ordering;
 use std::sync::Arc;
 
 use ::serde::{Deserialize, Serialize};
@@ -14,7 +15,6 @@ use internal_error::InternalError;
 use opendatafabric::*;
 use thiserror::Error;
 
-use crate::auth::DatasetActionUnauthorizedError;
 use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -22,34 +22,98 @@ use crate::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait PullService: Send + Sync {
-    async fn pull(
+pub trait PullRequestPlanner: Send + Sync {
+    // This function descends down the dependency tree of datasets (starting with
+    // provided references) assigning depth index to every dataset in the
+    // graph(s). Datasets that share the same depth level are independent and
+    // can be pulled in parallel.
+    async fn collect_pull_graph(
         &self,
-        dataset_ref: &DatasetRefAny,
-        options: PullOptions,
-        listener: Option<Arc<dyn PullListener>>,
-    ) -> Result<PullResult, PullError>;
+        requests: &[PullRequest],
+        options: &PullMultiOptions,
+        in_multi_tenant_mode: bool,
+    ) -> (Vec<PullItem>, Vec<PullResponse>);
+}
 
-    async fn pull_ext(
-        &self,
-        request: &PullRequest,
-        options: PullOptions,
-        listener: Option<Arc<dyn PullListener>>,
-    ) -> Result<PullResult, PullError>;
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    async fn pull_multi(
-        &self,
-        dataset_refs: Vec<DatasetRefAny>,
-        options: PullMultiOptions,
-        listener: Option<Arc<dyn PullMultiListener>>,
-    ) -> Result<Vec<PullResponse>, InternalError>;
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PullItem {
+    pub depth: i32,
+    pub local_ref: DatasetRef,
+    pub remote_ref: Option<DatasetRefRemote>,
+    pub original_request: Option<PullRequest>,
+}
 
-    async fn pull_multi_ext(
-        &self,
-        requests: Vec<PullRequest>,
-        options: PullMultiOptions,
-        listener: Option<Arc<dyn PullMultiListener>>,
-    ) -> Result<Vec<PullResponse>, InternalError>;
+impl PullItem {
+    pub fn into_response_ingest(self, r: PollingIngestResponse) -> PullResponse {
+        PullResponse {
+            original_request: self.original_request,
+            local_ref: Some(r.dataset_ref),
+            remote_ref: None,
+            result: match r.result {
+                Ok(r) => Ok(r.into()),
+                Err(e) => Err(e.into()),
+            },
+        }
+    }
+
+    pub fn into_response_sync(self, r: SyncResultMulti) -> PullResponse {
+        PullResponse {
+            original_request: self.original_request,
+            local_ref: r.dst.as_local_ref(|_| true).ok(), // TODO: multi-tenancy
+            remote_ref: r.src.as_remote_ref(|_| true).ok(),
+            result: match r.result {
+                Ok(r) => Ok(r.into()),
+                Err(e) => Err(e.into()),
+            },
+        }
+    }
+
+    pub fn into_response_transform(
+        self,
+        r: (DatasetRef, Result<TransformResult, TransformError>),
+    ) -> PullResponse {
+        PullResponse {
+            original_request: self.original_request,
+            local_ref: Some(r.0),
+            remote_ref: None,
+            result: match r.1 {
+                Ok(r) => Ok(r.into()),
+                Err(e) => Err(e.into()),
+            },
+        }
+    }
+}
+
+impl PartialOrd for PullItem {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for PullItem {
+    fn cmp(&self, other: &Self) -> Ordering {
+        let depth_ord = self.depth.cmp(&other.depth);
+        if depth_ord != Ordering::Equal {
+            return depth_ord;
+        }
+
+        if self.remote_ref.is_some() != other.remote_ref.is_some() {
+            return if self.remote_ref.is_some() {
+                Ordering::Less
+            } else {
+                Ordering::Greater
+            };
+        }
+
+        match (self.local_ref.alias(), other.local_ref.alias()) {
+            (Some(lhs), Some(rhs)) => lhs.cmp(rhs),
+            (Some(_), None) => Ordering::Greater,
+            (None, Some(_)) => Ordering::Less,
+            _ => Ordering::Equal,
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -76,7 +140,16 @@ impl PullRequest {
             },
         }
     }
+
+    pub fn from_handle(hdl: &DatasetHandle) -> Self {
+        Self {
+            local_ref: Some(hdl.as_local_ref()),
+            remote_ref: None,
+        }
+    }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug)]
 pub struct PullResponse {
@@ -90,6 +163,8 @@ pub struct PullResponse {
     /// Result of the push operation
     pub result: Result<PullResult, PullError>,
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone)]
 pub struct PullOptions {
@@ -115,6 +190,8 @@ impl Default for PullOptions {
         }
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone)]
 pub struct PullMultiOptions {
@@ -271,56 +348,6 @@ pub enum PullError {
         #[backtrace]
         InternalError,
     ),
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Error)]
-pub enum SetWatermarkError {
-    #[error(transparent)]
-    NotFound(
-        #[from]
-        #[backtrace]
-        DatasetNotFoundError,
-    ),
-
-    #[error("Attempting to set watermark on a derivative dataset")]
-    IsDerivative,
-
-    #[error("Attempting to set watermark on a remote dataset")]
-    IsRemote,
-
-    #[error(transparent)]
-    Access(
-        #[from]
-        #[backtrace]
-        AccessError,
-    ),
-
-    #[error(transparent)]
-    Internal(
-        #[from]
-        #[backtrace]
-        InternalError,
-    ),
-}
-
-impl From<GetDatasetError> for SetWatermarkError {
-    fn from(v: GetDatasetError) -> Self {
-        match v {
-            GetDatasetError::NotFound(e) => Self::NotFound(e),
-            GetDatasetError::Internal(e) => Self::Internal(e),
-        }
-    }
-}
-
-impl From<DatasetActionUnauthorizedError> for SetWatermarkError {
-    fn from(v: DatasetActionUnauthorizedError) -> Self {
-        match v {
-            DatasetActionUnauthorizedError::Access(e) => Self::Access(e),
-            DatasetActionUnauthorizedError::Internal(e) => Self::Internal(e),
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -442,7 +442,7 @@ pub fn configure_base_catalog(
     b.add::<SyncServiceImpl>();
     b.add::<SyncRequestBuilder>();
 
-    b.add::<PullServiceImpl>();
+    b.add::<PullRequestPlannerImpl>();
 
     b.add::<PushRequestPlannerImpl>();
 
@@ -475,6 +475,11 @@ pub fn configure_base_catalog(
     b.add::<ResetDatasetUseCaseImpl>();
     b.add::<SetWatermarkUseCaseImpl>();
     b.add::<VerifyDatasetUseCaseImpl>();
+
+    b.add_builder(
+        PullDatasetUseCaseImpl::builder().with_in_multi_tenant_mode(multi_tenant_workspace),
+    )
+    .bind::<dyn PullDatasetUseCase, PullDatasetUseCaseImpl>();
 
     b.add::<kamu_accounts_services::LoginPasswordAuthProvider>();
 

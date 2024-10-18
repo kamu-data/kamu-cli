@@ -18,9 +18,10 @@ use kamu_core::{
     CompactionService,
     DatasetRepository,
     PollingIngestOptions,
+    PullDatasetUseCase,
     PullError,
     PullOptions,
-    PullService,
+    PullRequest,
     ResetError,
     ResetService,
     ResolvedDataset,
@@ -70,12 +71,19 @@ impl TaskLogicalPlanRunnerImpl {
             ..Default::default()
         };
 
-        let pull_svc = self.catalog.get_one::<dyn PullService>().int_err()?;
-        let maybe_pull_result = pull_svc
-            .pull(&args.dataset_id.as_any_ref(), pull_options, None)
+        let dataset_repo = self.catalog.get_one::<dyn DatasetRepository>().int_err()?;
+        let hdl = dataset_repo
+            .resolve_dataset_handle_by_ref(&args.dataset_id.as_local_ref())
+            .await
+            .int_err()?;
+        let pull_request = PullRequest::from_handle(&hdl);
+
+        let pull_dataset_use_case = self.catalog.get_one::<dyn PullDatasetUseCase>().int_err()?;
+        let pull_response = pull_dataset_use_case
+            .execute(pull_request, pull_options, None)
             .await;
 
-        match maybe_pull_result {
+        match pull_response.result {
             Ok(pull_result) => Ok(TaskOutcome::Success(TaskResult::UpdateDatasetResult(
                 TaskUpdateDatasetResult { pull_result },
             ))),
