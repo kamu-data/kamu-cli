@@ -51,7 +51,7 @@ impl PullRequestPlannerImpl {
     ) -> Result<i32, PullError> {
         tracing::debug!(?request, "Entering node");
 
-        // Resolve local dataset if it exists
+        // Resolve local dataset handle, if dataset exists
         let maybe_local_handle = self.try_resolve_local_handle(request).await?;
 
         // If dataset is not found, and auto-create is disabled, it's en error
@@ -124,24 +124,29 @@ impl PullRequestPlannerImpl {
         &self,
         request: &PullRequest,
     ) -> Result<Option<DatasetHandle>, PullError> {
-        let maybe_local_handle = if let Some(local_ref) = &request.local_ref {
-            let maybe_local_handle = self
-                .dataset_registry
-                .try_resolve_dataset_handle_by_ref(local_ref)
-                .await?;
-            if maybe_local_handle.is_none() && request.remote_ref.is_none() {
-                // Dataset does not exist locally nor remote ref was provided
-                return Err(PullError::NotFound(DatasetNotFoundError {
-                    dataset_ref: local_ref.clone(),
-                }));
+        let maybe_local_handle = match request {
+            PullRequest::Local(local_ref) => {
+                self.dataset_registry
+                    .try_resolve_dataset_handle_by_ref(local_ref)
+                    .await?
             }
-            maybe_local_handle
-        } else if let Some(remote_ref) = &request.remote_ref {
-            self.try_inverse_lookup_dataset_by_pull_alias(remote_ref)
-                .await?
-        } else {
-            panic!("Pull request must contain either local or remote reference")
+            PullRequest::Remote(remote) => {
+                let maybe_local_handle = if let Some(local_alias) = &remote.maybe_local_alias {
+                    self.dataset_registry
+                        .try_resolve_dataset_handle_by_ref(&local_alias.as_local_ref())
+                        .await?
+                } else {
+                    None
+                };
+                if maybe_local_handle.is_none() {
+                    self.try_inverse_lookup_dataset_by_pull_alias(&remote.remote_ref)
+                        .await?
+                } else {
+                    maybe_local_handle
+                }
+            }
         };
+
         Ok(maybe_local_handle)
     }
 
@@ -206,21 +211,26 @@ impl PullRequestPlannerImpl {
         let local_alias = if let Some(hdl) = maybe_local_handle {
             // Target exists
             hdl.alias.clone()
-        } else if let Some(local_ref) = &request.local_ref {
-            // Target does not exist but was provided
-            if let Some(alias) = local_ref.alias() {
-                alias.clone()
-            } else {
-                return Err(PullError::NotFound(DatasetNotFoundError {
-                    dataset_ref: local_ref.clone(),
-                }));
-            }
-        } else if let Some(remote_ref) = &request.remote_ref {
-            // Infer target name from remote reference
-            // TODO: Inferred name can already exist, should we care?
-            self.infer_alias_from_remote_ref(remote_ref, in_multi_tenant_mode)?
         } else {
-            unreachable!()
+            match request {
+                PullRequest::Local(local_ref) => {
+                    // Target does not exist but was provided
+                    if let Some(alias) = local_ref.alias() {
+                        alias.clone()
+                    } else {
+                        return Err(PullError::NotFound(DatasetNotFoundError {
+                            dataset_ref: local_ref.clone(),
+                        }));
+                    }
+                }
+                PullRequest::Remote(remote) => {
+                    if let Some(local_alias) = &remote.maybe_local_alias {
+                        local_alias.clone()
+                    } else {
+                        self.infer_alias_from_remote_ref(&remote.remote_ref, in_multi_tenant_mode)?
+                    }
+                }
+            }
         };
 
         Ok(local_alias)
@@ -243,12 +253,7 @@ impl PullRequestPlannerImpl {
 
             DatasetRefRemote::Url(url) => DatasetAlias::new(
                 if in_multi_tenant_mode {
-                    match self.current_account_subject.as_ref() {
-                        CurrentAccountSubject::Anonymous(_) => {
-                            panic!("Anonymous account misused, use multi-tenant alias");
-                        }
-                        CurrentAccountSubject::Logged(l) => Some(l.account_name.clone()),
-                    }
+                    Some(self.current_account_subject.account_name().clone())
                 } else {
                     None
                 },
@@ -283,8 +288,8 @@ impl PullRequestPlannerImpl {
         request: &PullRequest,
         maybe_local_handle: Option<&DatasetHandle>,
     ) -> Result<Option<DatasetRefRemote>, PullError> {
-        let remote_ref = if let Some(remote_ref) = &request.remote_ref {
-            Ok(Some(remote_ref.clone()))
+        let remote_ref = if let PullRequest::Remote(remote) = request {
+            Ok(Some(remote.remote_ref.clone()))
         } else if let Some(hdl) = &maybe_local_handle {
             self.resolve_pull_alias(hdl).await
         } else {
@@ -340,10 +345,7 @@ impl PullRequestPlannerImpl {
 
             let depth = self
                 .collect_pull_graph_depth_first(
-                    &PullRequest {
-                        local_ref: Some(dependency_id.as_local_ref()),
-                        remote_ref: None,
-                    },
+                    &PullRequest::local(dependency_id.as_local_ref()),
                     false,
                     options,
                     in_multi_tenant_mode,

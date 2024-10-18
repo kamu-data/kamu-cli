@@ -71,12 +71,7 @@ impl TaskLogicalPlanRunnerImpl {
             ..Default::default()
         };
 
-        let dataset_repo = self.catalog.get_one::<dyn DatasetRepository>().int_err()?;
-        let hdl = dataset_repo
-            .resolve_dataset_handle_by_ref(&args.dataset_id.as_local_ref())
-            .await
-            .int_err()?;
-        let pull_request = PullRequest::from_handle(&hdl);
+        let pull_request = PullRequest::local(args.dataset_id.as_local_ref());
 
         let pull_dataset_use_case = self.catalog.get_one::<dyn PullDatasetUseCase>().int_err()?;
         let pull_response = pull_dataset_use_case

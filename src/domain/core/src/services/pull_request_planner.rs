@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::sync::Arc;
 
@@ -119,32 +120,53 @@ impl Ord for PullItem {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PullRequest {
-    pub local_ref: Option<DatasetRef>,
-    pub remote_ref: Option<DatasetRefRemote>,
+pub enum PullRequest {
+    Local(DatasetRef),
+    Remote(PullRequestRemote),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PullRequestRemote {
+    pub remote_ref: DatasetRefRemote,
+    pub maybe_local_alias: Option<DatasetAlias>,
 }
 
 impl PullRequest {
+    pub fn local(dataset_ref: DatasetRef) -> Self {
+        Self::Local(dataset_ref)
+    }
+
+    pub fn remote(remote_ref: DatasetRefRemote, maybe_local_alias: Option<DatasetAlias>) -> Self {
+        Self::Remote(PullRequestRemote {
+            remote_ref,
+            maybe_local_alias,
+        })
+    }
+
     pub fn from_any_ref(dataset_ref: &DatasetRefAny, is_repo: impl Fn(&RepoName) -> bool) -> Self {
         // Single-tenant workspace => treat all repo-like references as repos.
         // Multi-tenant workspace => treat all repo-like references as accounts, use
         // repo:// for repos
         match dataset_ref.as_local_ref(is_repo) {
-            Ok(local_ref) => Self {
-                local_ref: Some(local_ref),
-                remote_ref: None,
-            },
-            Err(remote_ref) => Self {
-                local_ref: None,
-                remote_ref: Some(remote_ref),
-            },
+            Ok(local_ref) => Self::local(local_ref),
+            Err(remote_ref) => Self::remote(remote_ref, None),
         }
     }
 
-    pub fn from_handle(hdl: &DatasetHandle) -> Self {
-        Self {
-            local_ref: Some(hdl.as_local_ref()),
-            remote_ref: None,
+    pub fn local_ref(&self) -> Option<Cow<DatasetRef>> {
+        match self {
+            PullRequest::Local(local_ref) => Some(Cow::Borrowed(local_ref)),
+            PullRequest::Remote(remote) => remote
+                .maybe_local_alias
+                .as_ref()
+                .map(|alias| Cow::Owned(alias.as_local_ref())),
+        }
+    }
+
+    pub fn remote_ref(&self) -> Option<&DatasetRefRemote> {
+        match self {
+            PullRequest::Local(_) => None,
+            PullRequest::Remote(remote) => Some(&remote.remote_ref),
         }
     }
 }

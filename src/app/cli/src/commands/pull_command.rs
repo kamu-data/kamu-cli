@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -99,10 +100,17 @@ impl PullCommand {
         Ok(self
             .pull_dataset_use_case
             .execute_multi(
-                vec![PullRequest {
-                    local_ref: Some(local_name.into()),
-                    remote_ref: Some(remote_ref),
-                }],
+                vec![PullRequest::remote(
+                    remote_ref,
+                    Some(DatasetAlias::new(
+                        if self.in_multi_tenant_mode {
+                            Some(self.current_account_subject.account_name().clone())
+                        } else {
+                            None
+                        },
+                        local_name.clone(),
+                    )),
+                )],
                 PullMultiOptions {
                     add_aliases: self.add_aliases,
                     ..Default::default()
@@ -142,10 +150,7 @@ impl PullCommand {
             use futures::TryStreamExt;
             self.dataset_registry
                 .all_dataset_handles_by_owner(current_account_name)
-                .map_ok(|hdl| PullRequest {
-                    local_ref: Some(hdl.into()),
-                    remote_ref: None,
-                })
+                .map_ok(|hdl| PullRequest::local(hdl.as_local_ref()))
                 .try_collect()
                 .await?
         };
@@ -186,30 +191,23 @@ impl PullCommand {
         &self,
         listener: Option<Arc<dyn PullMultiListener>>,
     ) -> Result<Vec<PullResponse>, CLIError> {
-        let current_account_name = match self.current_account_subject.as_ref() {
-            CurrentAccountSubject::Anonymous(_) => {
-                return Err(CLIError::usage_error(
-                    "Anonymous account cannot be used for pulling datasets",
-                ))
-            }
-            CurrentAccountSubject::Logged(l) => &l.account_name,
-        };
         if self.as_name.is_some() {
             self.sync_from(listener).await
         } else {
+            let current_account_name = self.current_account_subject.account_name();
             self.pull_multi(listener, current_account_name).await
         }
     }
 
     fn describe_response(&self, pr: &PullResponse) -> String {
-        let local_ref = pr.local_ref.as_ref().or(pr
+        let local_ref = pr.local_ref.as_ref().map(Cow::Borrowed).or(pr
             .original_request
             .as_ref()
-            .and_then(|r| r.local_ref.as_ref()));
-        let remote_ref = pr.remote_ref.as_ref().or(pr
-            .original_request
+            .and_then(PullRequest::local_ref));
+        let remote_ref = pr
+            .remote_ref
             .as_ref()
-            .and_then(|r| r.remote_ref.as_ref()));
+            .or(pr.original_request.as_ref().and_then(|r| r.remote_ref()));
         match (local_ref, remote_ref) {
             (Some(local_ref), Some(remote_ref)) => {
                 format!("sync {local_ref} from {remote_ref}")
