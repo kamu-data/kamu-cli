@@ -52,6 +52,78 @@ impl PullRequestPlannerImpl {
         tracing::debug!(?request, "Entering node");
 
         // Resolve local dataset if it exists
+        let maybe_local_handle = self.try_resolve_local_handle(request).await?;
+
+        // If dataset is not found, and auto-create is disabled, it's en error
+        if maybe_local_handle.is_none() && !options.sync_options.create_if_not_exists {
+            return Err(PullError::InvalidOperation(
+                "Dataset does not exist and auto-create is switched off".to_owned(),
+            ));
+        }
+
+        // Resolve the name of a local dataset if it exists
+        // or a name to create dataset with if syncing from remote and creation is
+        // allowed
+        let local_alias =
+            self.form_local_alias(maybe_local_handle.as_ref(), request, in_multi_tenant_mode)?;
+
+        // Already visited?
+        if let Some(pi) = visited.get_mut(&local_alias) {
+            tracing::debug!("Already visited - continuing");
+            if referenced_explicitly {
+                pi.original_request = Some(request.clone());
+            }
+            return Ok(pi.depth);
+        }
+
+        // Resolve remote alias, if any
+        let maybe_remote_ref = self
+            .resolve_remote_ref(request, maybe_local_handle.as_ref())
+            .await?;
+
+        let mut pull_item = if maybe_remote_ref.is_some() {
+            // Datasets synced from remotes are depth 0
+            PullItem {
+                original_request: None, // May be set below
+                depth: 0,
+                local_ref: maybe_local_handle
+                    .map(Into::into)
+                    .unwrap_or(local_alias.clone().into()),
+                remote_ref: maybe_remote_ref,
+            }
+        } else {
+            // Pulling an existing local root or derivative dataset
+            let local_handle = maybe_local_handle.unwrap();
+
+            // Plan up-stream dependencies first
+            let max_dep_depth = self
+                .plan_upstream_datasets(&local_handle, options, in_multi_tenant_mode, visited)
+                .await?;
+
+            // Plan the current dataset as last
+            PullItem {
+                original_request: None, // May be set below
+                depth: max_dep_depth + 1,
+                local_ref: local_handle.into(),
+                remote_ref: None,
+            }
+        };
+
+        if referenced_explicitly {
+            pull_item.original_request = Some(request.clone());
+        }
+
+        tracing::debug!(?pull_item, "Resolved node");
+
+        let depth = pull_item.depth;
+        visited.insert(local_alias.clone(), pull_item);
+        Ok(depth)
+    }
+
+    async fn try_resolve_local_handle(
+        &self,
+        request: &PullRequest,
+    ) -> Result<Option<DatasetHandle>, PullError> {
         let maybe_local_handle = if let Some(local_ref) = &request.local_ref {
             let maybe_local_handle = self
                 .dataset_registry
@@ -70,134 +142,7 @@ impl PullRequestPlannerImpl {
         } else {
             panic!("Pull request must contain either local or remote reference")
         };
-
-        // Resolve the name of a local dataset if it exists
-        // or a name to create dataset with if syncing from remote and creation is
-        // allowed
-        let local_alias = if let Some(hdl) = &maybe_local_handle {
-            // Target exists
-            hdl.alias.clone()
-        } else if let Some(local_ref) = &request.local_ref {
-            // Target does not exist but was provided
-            if let Some(alias) = local_ref.alias() {
-                alias.clone()
-            } else {
-                return Err(PullError::NotFound(DatasetNotFoundError {
-                    dataset_ref: local_ref.clone(),
-                }));
-            }
-        } else {
-            // Infer target name from remote reference
-            // TODO: Inferred name can already exist, should we care?
-            match &request.remote_ref {
-                Some(DatasetRefRemote::ID(_, _)) => {
-                    unimplemented!("Pulling from remote by ID is not supported")
-                }
-                Some(
-                    DatasetRefRemote::Alias(alias)
-                    | DatasetRefRemote::Handle(DatasetHandleRemote { alias, .. }),
-                ) => DatasetAlias::new(None, alias.dataset_name.clone()),
-                Some(DatasetRefRemote::Url(url)) => DatasetAlias::new(
-                    if in_multi_tenant_mode {
-                        match self.current_account_subject.as_ref() {
-                            CurrentAccountSubject::Anonymous(_) => {
-                                panic!("Anonymous account misused, use multi-tenant alias");
-                            }
-                            CurrentAccountSubject::Logged(l) => Some(l.account_name.clone()),
-                        }
-                    } else {
-                        None
-                    },
-                    self.infer_local_name_from_url(url)?,
-                ),
-                None => unreachable!(),
-            }
-        };
-
-        if maybe_local_handle.is_none() && !options.sync_options.create_if_not_exists {
-            return Err(PullError::InvalidOperation(
-                "Dataset does not exist and auto-create is switched off".to_owned(),
-            ));
-        }
-
-        // Already visited?
-        if let Some(pi) = visited.get_mut(&local_alias) {
-            tracing::debug!("Already visited - continuing");
-            if referenced_explicitly {
-                pi.original_request = Some(request.clone());
-            }
-            return Ok(pi.depth);
-        }
-
-        // Resolve remote alias, if any
-        let remote_ref = if let Some(remote_ref) = &request.remote_ref {
-            Ok(Some(remote_ref.clone()))
-        } else if let Some(hdl) = &maybe_local_handle {
-            self.resolve_pull_alias(hdl).await
-        } else {
-            Ok(None)
-        }?;
-
-        let mut pull_item = if remote_ref.is_some() {
-            // Datasets synced from remotes are depth 0
-            PullItem {
-                original_request: None, // May be set below
-                depth: 0,
-                local_ref: maybe_local_handle
-                    .map(Into::into)
-                    .unwrap_or(local_alias.clone().into()),
-                remote_ref,
-            }
-        } else {
-            // Pulling an existing local root or derivative dataset
-            let local_handle = maybe_local_handle.unwrap();
-
-            let summary = self
-                .dataset_registry
-                .get_dataset_by_handle(&local_handle)
-                .get_summary(GetSummaryOpts::default())
-                .await
-                .int_err()?;
-
-            // TODO: EVO: Should be accounting for historical dependencies, not only current
-            // ones?
-            let mut max_dep_depth = -1;
-
-            for dependency_id in summary.dependencies {
-                tracing::debug!(%dependency_id, "Descending into dependency");
-
-                let depth = self
-                    .collect_pull_graph_depth_first(
-                        &PullRequest {
-                            local_ref: Some(dependency_id.as_local_ref()),
-                            remote_ref: None,
-                        },
-                        false,
-                        options,
-                        in_multi_tenant_mode,
-                        visited,
-                    )
-                    .await?;
-                max_dep_depth = std::cmp::max(max_dep_depth, depth);
-            }
-
-            PullItem {
-                original_request: None, // May be set below
-                depth: max_dep_depth + 1,
-                local_ref: local_handle.into(),
-                remote_ref: None,
-            }
-        };
-
-        if referenced_explicitly {
-            pull_item.original_request = Some(request.clone());
-        }
-
-        tracing::debug!(?pull_item, "Resolved node");
-
-        let depth = pull_item.depth;
-        visited.insert(local_alias.clone(), pull_item);
-        Ok(depth)
+        Ok(maybe_local_handle)
     }
 
     // TODO: avoid traversing all datasets for every alias
@@ -252,6 +197,103 @@ impl PullRequestPlannerImpl {
         Ok(None)
     }
 
+    fn form_local_alias(
+        &self,
+        maybe_local_handle: Option<&DatasetHandle>,
+        request: &PullRequest,
+        in_multi_tenant_mode: bool,
+    ) -> Result<DatasetAlias, PullError> {
+        let local_alias = if let Some(hdl) = maybe_local_handle {
+            // Target exists
+            hdl.alias.clone()
+        } else if let Some(local_ref) = &request.local_ref {
+            // Target does not exist but was provided
+            if let Some(alias) = local_ref.alias() {
+                alias.clone()
+            } else {
+                return Err(PullError::NotFound(DatasetNotFoundError {
+                    dataset_ref: local_ref.clone(),
+                }));
+            }
+        } else if let Some(remote_ref) = &request.remote_ref {
+            // Infer target name from remote reference
+            // TODO: Inferred name can already exist, should we care?
+            self.infer_alias_from_remote_ref(remote_ref, in_multi_tenant_mode)?
+        } else {
+            unreachable!()
+        };
+
+        Ok(local_alias)
+    }
+
+    fn infer_alias_from_remote_ref(
+        &self,
+        remote_ref: &DatasetRefRemote,
+        in_multi_tenant_mode: bool,
+    ) -> Result<DatasetAlias, PullError> {
+        Ok(match &remote_ref {
+            DatasetRefRemote::ID(_, _) => {
+                unimplemented!("Pulling from remote by ID is not supported")
+            }
+
+            DatasetRefRemote::Alias(alias)
+            | DatasetRefRemote::Handle(DatasetHandleRemote { alias, .. }) => {
+                DatasetAlias::new(None, alias.dataset_name.clone())
+            }
+
+            DatasetRefRemote::Url(url) => DatasetAlias::new(
+                if in_multi_tenant_mode {
+                    match self.current_account_subject.as_ref() {
+                        CurrentAccountSubject::Anonymous(_) => {
+                            panic!("Anonymous account misused, use multi-tenant alias");
+                        }
+                        CurrentAccountSubject::Logged(l) => Some(l.account_name.clone()),
+                    }
+                } else {
+                    None
+                },
+                self.infer_local_name_from_url(url)?,
+            ),
+        })
+    }
+
+    fn infer_local_name_from_url(&self, url: &Url) -> Result<DatasetName, PullError> {
+        // Try to use last path segment for a name (ignoring the trailing slash)
+        if let Some(path) = url.path_segments() {
+            if let Some(last_segment) = path.rev().find(|s| !s.is_empty()) {
+                if let Ok(name) = DatasetName::try_from(last_segment) {
+                    return Ok(name);
+                }
+            }
+        }
+        // Fall back to using domain name
+        if let Some(url::Host::Domain(host)) = url.host() {
+            if let Ok(name) = DatasetName::try_from(host) {
+                return Ok(name);
+            }
+        }
+        Err(PullError::InvalidOperation(
+            "Unable to infer local name from remote URL, please specify the destination explicitly"
+                .to_owned(),
+        ))
+    }
+
+    async fn resolve_remote_ref(
+        &self,
+        request: &PullRequest,
+        maybe_local_handle: Option<&DatasetHandle>,
+    ) -> Result<Option<DatasetRefRemote>, PullError> {
+        let remote_ref = if let Some(remote_ref) = &request.remote_ref {
+            Ok(Some(remote_ref.clone()))
+        } else if let Some(hdl) = &maybe_local_handle {
+            self.resolve_pull_alias(hdl).await
+        } else {
+            Ok(None)
+        }?;
+
+        Ok(remote_ref)
+    }
+
     async fn resolve_pull_alias(
         &self,
         hdl: &DatasetHandle,
@@ -274,25 +316,44 @@ impl PullRequestPlannerImpl {
         }
     }
 
-    fn infer_local_name_from_url(&self, url: &Url) -> Result<DatasetName, PullError> {
-        // Try to use last path segment for a name (ignoring the trailing slash)
-        if let Some(path) = url.path_segments() {
-            if let Some(last_segment) = path.rev().find(|s| !s.is_empty()) {
-                if let Ok(name) = DatasetName::try_from(last_segment) {
-                    return Ok(name);
-                }
-            }
+    async fn plan_upstream_datasets(
+        &self,
+        local_handle: &DatasetHandle,
+        options: &PullMultiOptions,
+        in_multi_tenant_mode: bool,
+        visited: &mut HashMap<DatasetAlias, PullItem>,
+    ) -> Result<i32, PullError> {
+        // Read summary to access dependencies
+        let summary = self
+            .dataset_registry
+            .get_dataset_by_handle(local_handle)
+            .get_summary(GetSummaryOpts::default())
+            .await
+            .int_err()?;
+
+        // TODO: EVO: Should be accounting for historical dependencies, not only current
+        // ones?
+        let mut max_dep_depth = -1;
+
+        for dependency_id in summary.dependencies {
+            tracing::debug!(%dependency_id, "Descending into dependency");
+
+            let depth = self
+                .collect_pull_graph_depth_first(
+                    &PullRequest {
+                        local_ref: Some(dependency_id.as_local_ref()),
+                        remote_ref: None,
+                    },
+                    false,
+                    options,
+                    in_multi_tenant_mode,
+                    visited,
+                )
+                .await?;
+            max_dep_depth = std::cmp::max(max_dep_depth, depth);
         }
-        // Fall back to using domain name
-        if let Some(url::Host::Domain(host)) = url.host() {
-            if let Ok(name) = DatasetName::try_from(host) {
-                return Ok(name);
-            }
-        }
-        Err(PullError::InvalidOperation(
-            "Unable to infer local name from remote URL, please specify the destination explicitly"
-                .to_owned(),
-        ))
+
+        Ok(max_dep_depth)
     }
 }
 
