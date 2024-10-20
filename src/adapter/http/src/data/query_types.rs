@@ -16,7 +16,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 
 use http_common::comma_separated::CommaSeparatedSet;
 use http_common::{ApiError, IntoApiError};
@@ -78,24 +78,16 @@ mod tests {
 // Request
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, serde::Deserialize)]
-#[serde(untagged)]
-pub enum RequestBody {
-    V1(RequestBodyV1),
-    V2(RequestBodyV2),
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 // TODO: Sanity limits
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct RequestBodyV2 {
+pub struct QueryRequest {
     /// Query string
     pub query: String,
 
     /// Dialect of the query
-    #[serde(default = "RequestBodyV2::default_query_dialect")]
+    #[schema(value_type = String)]
+    #[serde(default = "QueryRequest::default_query_dialect")]
     pub query_dialect: domain::QueryDialect,
 
     /// How data should be layed out in the response
@@ -103,7 +95,7 @@ pub struct RequestBodyV2 {
     pub data_format: DataFormat,
 
     /// What information to include
-    #[serde(default = "RequestBodyV2::default_include")]
+    #[serde(default = "QueryRequest::default_include")]
     pub include: BTreeSet<Include>,
 
     /// What representation to use for the schema
@@ -120,11 +112,11 @@ pub struct RequestBodyV2 {
     pub skip: u64,
 
     /// Pagination: limits number of records in response to N
-    #[serde(default = "RequestBodyV2::default_limit")]
+    #[serde(default = "QueryRequest::default_limit")]
     pub limit: u64,
 }
 
-impl RequestBodyV2 {
+impl QueryRequest {
     fn default_query_dialect() -> domain::QueryDialect {
         domain::QueryDialect::SqlDataFusion
     }
@@ -186,6 +178,7 @@ impl RequestBodyV2 {
     strum::EnumString,
     serde::Serialize,
     serde::Deserialize,
+    utoipa::ToSchema,
 )]
 #[strum(serialize_all = "PascalCase")]
 #[strum(ascii_case_insensitive)]
@@ -206,69 +199,50 @@ pub enum Include {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, serde::Deserialize)]
+#[derive(Debug, serde::Deserialize, utoipa::IntoParams)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct RequestParams {
+pub struct QueryParams {
+    /// Query to execute (e.g. SQL)
     pub query: String,
 
-    #[serde(default = "RequestBodyV2::default_query_dialect")]
+    /// Dialect of the query
+    #[param(value_type = String)]
+    #[serde(default = "QueryRequest::default_query_dialect")]
     pub query_dialect: domain::QueryDialect,
 
+    /// Number of leading records to skip when returning result (used for
+    /// pagination)
     #[serde(default)]
     pub skip: u64,
 
-    #[serde(default = "RequestBodyV1::default_limit")]
+    /// Maximum number of records to return (used for pagination)
+    #[serde(default = "QueryRequest::default_limit")]
     pub limit: u64,
 
+    /// How the output data should be ecoded
     #[serde(alias = "format")]
     #[serde(default)]
     pub data_format: DataFormat,
 
+    /// How to encode the schema of the result
     pub schema_format: Option<SchemaFormat>,
 
-    // TODO: Remove after V2 transition
-    #[serde(alias = "schema")]
-    #[serde(default = "RequestBodyV1::default_include_schema")]
-    pub include_schema: bool,
-
-    // TODO: Remove after V2 transition
-    #[serde(default = "RequestBodyV1::default_include_state")]
-    pub include_state: bool,
-
-    // TODO: Remove after V2 transition
-    #[serde(default = "RequestBodyV1::default_include_data_hash")]
-    pub include_data_hash: bool,
-
     /// What information to include in the response
+    #[param(value_type = Option<String>)]
     pub include: Option<CommaSeparatedSet<Include>>,
 }
 
-impl From<RequestParams> for RequestBody {
-    fn from(v: RequestParams) -> Self {
-        if let Some(include) = v.include {
-            Self::V2(RequestBodyV2 {
-                query: v.query,
-                query_dialect: v.query_dialect,
-                data_format: v.data_format,
-                include: include.into(),
-                schema_format: v.schema_format,
-                datasets: None,
-                skip: v.skip,
-                limit: v.limit,
-            })
-        } else {
-            Self::V1(RequestBodyV1 {
-                query: v.query,
-                data_format: v.data_format,
-                schema_format: v.schema_format.unwrap_or_default(),
-                include_schema: v.include_schema,
-                include_state: v.include_state,
-                skip: v.skip,
-                limit: v.limit,
-                include_data_hash: v.include_data_hash,
-                aliases: None,
-                as_of_state: None,
-            })
+impl From<QueryParams> for QueryRequest {
+    fn from(v: QueryParams) -> Self {
+        Self {
+            query: v.query,
+            query_dialect: v.query_dialect,
+            data_format: v.data_format,
+            include: v.include.map(Into::into).unwrap_or_default(),
+            schema_format: v.schema_format,
+            datasets: None,
+            skip: v.skip,
+            limit: v.limit,
         }
     }
 }
@@ -277,62 +251,44 @@ impl From<RequestParams> for RequestBody {
 // Response
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, serde::Serialize)]
-#[serde(untagged)]
-pub enum ResponseBody {
-    V1(ResponseBodyV1),
-    V2(ResponseBodyV2),
-    V2Signed(ResponseBodyV2Signed),
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, serde::Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
-pub struct ResponseBodyV2 {
+pub struct QueryResponse {
     /// Inputs that can be used to fully reproduce the query
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub input: Option<RequestBodyV2>,
-
-    /// Query results
-    pub output: Outputs,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, serde::Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ResponseBodyV2Signed {
-    /// Inputs that can be used to fully reproduce the query
-    pub input: RequestBodyV2,
+    pub input: Option<QueryRequest>,
 
     /// Query results
     pub output: Outputs,
 
     /// Information about processing performed by other nodes as part of this
     /// operation
-    pub sub_queries: Vec<SubQuery>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sub_queries: Option<Vec<SubQuery>>,
 
     /// Succinct commitment
-    pub commitment: Commitment,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub commitment: Option<Commitment>,
 
     /// Signature block
-    pub proof: Proof,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub proof: Option<Proof>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Fragments
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Mirrors the structure of [`ResponseBodyV2Signed`] without the `outputs`
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+/// Mirrors the structure of [`ResponseBody`] without the `outputs`
+#[derive(Debug, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct SubQuery {
     /// Inputs that can be used to fully reproduce the query
-    pub input: RequestBodyV2,
+    pub input: QueryRequest,
 
     /// Information about processing performed by other nodes as part of this
     /// operation
+    #[schema(value_type = Object)]
     pub sub_queries: Vec<SubQuery>,
 
     /// Succinct commitment
@@ -344,7 +300,7 @@ pub struct SubQuery {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, serde::Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Outputs {
     /// Resulting data
@@ -362,33 +318,40 @@ pub struct Outputs {
     pub schema_format: Option<SchemaFormat>,
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Commitment {
     /// Hash of the "input" object in the [multihash](https://multiformats.io/multihash/) format
+    #[schema(value_type = String)]
     pub input_hash: Multihash,
 
     /// Hash of the "output" object in the [multihash](https://multiformats.io/multihash/) format
+    #[schema(value_type = String)]
     pub output_hash: Multihash,
 
     /// Hash of the "subQueries" object in the [multihash](https://multiformats.io/multihash/) format
+    #[schema(value_type = String)]
     pub sub_queries_hash: Multihash,
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Proof {
     /// Type of the proof provided
     pub r#type: ProofType,
 
     /// DID (public key) of the node performing the computation
+    #[schema(value_type = String)]
     pub verification_method: odf::DidKey,
 
     /// Signature: `multibase(sign(canonicalize(commitment)))`
+    #[schema(value_type = String)]
     pub proof_value: odf::Signature,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, utoipa::ToSchema,
+)]
 pub enum ProofType {
     Ed25519Signature2020,
 }
@@ -397,10 +360,11 @@ pub enum ProofType {
 // Reproducibility
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct DatasetState {
     /// Globally unique identity of the dataset
+    #[schema(value_type = String)]
     pub id: odf::DatasetID,
 
     /// Alias to be used in the query
@@ -409,6 +373,7 @@ pub struct DatasetState {
     /// Last block hash of the input datasets that was or should be considered
     /// during the query planning
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = String)]
     pub block_hash: Option<odf::Multihash>,
 }
 
@@ -417,7 +382,17 @@ pub struct DatasetState {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[allow(clippy::enum_variant_names)]
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug,
+    Default,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    utoipa::ToSchema,
+)]
 pub enum DataFormat {
     #[default]
     #[serde(alias = "jsonaos")]
@@ -467,7 +442,17 @@ pub(crate) fn serialize_data(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[allow(clippy::enum_variant_names)]
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug,
+    Default,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    utoipa::ToSchema,
+)]
 pub enum SchemaFormat {
     #[default]
     #[serde(alias = "arrowjson")]
@@ -482,8 +467,9 @@ pub enum SchemaFormat {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, utoipa::ToSchema)]
 pub struct Schema {
+    #[schema(value_type = Object)]
     schema: datafusion::arrow::datatypes::SchemaRef,
     format: SchemaFormat,
 }
@@ -530,32 +516,6 @@ impl serde::Serialize for Schema {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// TODO: Remove after V2 transition
-pub(crate) fn serialize_schema(
-    schema: &datafusion::arrow::datatypes::Schema,
-    format: SchemaFormat,
-) -> Result<String, InternalError> {
-    use kamu_data_utils::schema::{convert, format};
-
-    let mut buf = Vec::new();
-    match format {
-        SchemaFormat::ArrowJson => format::write_schema_arrow_json(&mut buf, schema),
-        SchemaFormat::Parquet => format::write_schema_parquet(
-            &mut buf,
-            convert::arrow_schema_to_parquet_schema(schema).as_ref(),
-        ),
-        SchemaFormat::ParquetJson => format::write_schema_parquet_json(
-            &mut buf,
-            convert::arrow_schema_to_parquet_schema(schema).as_ref(),
-        ),
-    }
-    .int_err()?;
-
-    Ok(String::from_utf8(buf).unwrap())
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 pub(crate) fn map_query_error(err: QueryError) -> ApiError {
     match err {
         QueryError::DatasetNotFound(_)
@@ -587,160 +547,6 @@ pub(crate) fn to_canonical_json<T: serde::Serialize>(val: &T) -> Vec<u8> {
     let json = serde_json::to_value(val).unwrap();
     let str = canonical_json::to_string(&json).unwrap();
     str.into_bytes()
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Legacy
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-// TODO: Sanity limits
-#[derive(Debug, serde::Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct RequestBodyV1 {
-    /// SQL query
-    pub query: String,
-
-    /// How data should be layed out in the response
-    #[serde(default)]
-    pub data_format: DataFormat,
-
-    /// What representation to use for the schema
-    #[serde(default)]
-    pub schema_format: SchemaFormat,
-
-    /// Mapping between dataset names used in the query and their stable IDs, to
-    /// make query resistant to datasets being renamed
-    pub aliases: Option<Vec<DatasetAlias>>,
-
-    /// State information used to reproduce query at a specific point in time
-    pub as_of_state: Option<QueryState>,
-
-    /// Whether to include schema info about the response
-    #[serde(default = "RequestBodyV1::default_include_schema")]
-    pub include_schema: bool,
-
-    /// Whether to include dataset state info for query reproducibility
-    #[serde(default = "RequestBodyV1::default_include_state")]
-    pub include_state: bool,
-
-    /// Whether to include a logical hash of the resulting data batch.
-    /// See: <https://docs.kamu.dev/odf/spec/#physical-and-logical-hashes>
-    #[serde(default = "RequestBodyV1::default_include_data_hash")]
-    pub include_data_hash: bool,
-
-    /// Pagination: skips first N records
-    #[serde(default)]
-    pub skip: u64,
-
-    /// Pagination: limits number of records in response to N
-    #[serde(default = "RequestBodyV1::default_limit")]
-    pub limit: u64,
-}
-
-impl RequestBodyV1 {
-    fn default_limit() -> u64 {
-        100
-    }
-
-    fn default_include_schema() -> bool {
-        true
-    }
-
-    fn default_include_state() -> bool {
-        true
-    }
-
-    fn default_include_data_hash() -> bool {
-        true
-    }
-
-    pub fn to_options(&self) -> domain::QueryOptions {
-        let empty_aliases = Vec::new();
-        let aliases = self.aliases.as_ref().unwrap_or(&empty_aliases);
-
-        let empty_hashes = Vec::new();
-        let block_hashes = self
-            .as_of_state
-            .as_ref()
-            .map_or(&empty_hashes, |s| &s.inputs);
-
-        let block_hashes: BTreeMap<_, _> = block_hashes
-            .iter()
-            .map(|s| (s.id.clone(), s.block_hash.clone()))
-            .collect();
-
-        domain::QueryOptions {
-            input_datasets: aliases
-                .iter()
-                .map(|a| {
-                    (
-                        a.id.clone(),
-                        domain::QueryOptionsDataset {
-                            alias: a.alias.clone(),
-                            block_hash: block_hashes.get(&a.id).cloned(),
-                            hints: None,
-                        },
-                    )
-                })
-                .collect(),
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, serde::Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ResponseBodyV1 {
-    pub data: Box<serde_json::value::RawValue>,
-
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub schema: Option<String>,
-
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub state: Option<QueryState>,
-
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub data_hash: Option<odf::Multihash>,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Clone, serde::Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct DatasetAlias {
-    pub id: odf::DatasetID,
-    pub alias: String,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct QueryState {
-    pub inputs: Vec<QueryDatasetState>,
-}
-
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct QueryDatasetState {
-    pub id: odf::DatasetID,
-    pub block_hash: odf::Multihash,
-}
-
-impl From<kamu_core::QueryState> for QueryState {
-    fn from(value: kamu_core::QueryState) -> Self {
-        Self {
-            inputs: value
-                .input_datasets
-                .into_iter()
-                .map(|(id, s)| QueryDatasetState {
-                    id,
-                    block_hash: s.block_hash,
-                })
-                .collect(),
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

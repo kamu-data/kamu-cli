@@ -24,7 +24,7 @@ use kamu_core::DatasetRepository;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, serde::Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct NodeInfoResponse {
     pub is_multi_tenant: bool,
@@ -32,6 +32,17 @@ pub struct NodeInfoResponse {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Get ODF node description
+#[utoipa::path(
+    get,
+    path = "/info",
+    responses((status = OK, body = NodeInfoResponse)),
+    tag = "odf-core",
+    security(
+        (),
+        ("api_key" = [])
+    )
+)]
 pub async fn node_info_handler(
     Extension(catalog): Extension<Catalog>,
 ) -> Result<Json<NodeInfoResponse>, ApiError> {

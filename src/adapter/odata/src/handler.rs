@@ -34,6 +34,17 @@ use crate::context::*;
 // TODO: Replace these variations with middleware
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// OData root service description
+#[utoipa::path(
+    get,
+    path = "/",
+    responses((status = OK, body = String)),
+    tag = "kamu-odata",
+    security(
+        (),
+        ("api_key" = [])
+    )
+)]
 #[transactional_handler]
 pub async fn odata_service_handler_st(
     Extension(catalog): Extension<Catalog>,
@@ -41,6 +52,20 @@ pub async fn odata_service_handler_st(
     odata_service_handler_common(catalog, None).await
 }
 
+/// OData root service description
+#[utoipa::path(
+    get,
+    path = "/{account_name}",
+    params(
+        ("account_name", description = "Account name")
+    ),
+    responses((status = OK, body = String)),
+    tag = "kamu-odata",
+    security(
+        (),
+        ("api_key" = [])
+    )
+)]
 #[transactional_handler]
 pub async fn odata_service_handler_mt(
     Extension(catalog): Extension<Catalog>,
@@ -51,6 +76,17 @@ pub async fn odata_service_handler_mt(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// OData service metadata
+#[utoipa::path(
+    get,
+    path = "/$metadata",
+    responses((status = OK, body = String)),
+    tag = "kamu-odata",
+    security(
+        (),
+        ("api_key" = [])
+    )
+)]
 #[transactional_handler]
 pub async fn odata_metadata_handler_st(
     Extension(catalog): Extension<Catalog>,
@@ -58,6 +94,20 @@ pub async fn odata_metadata_handler_st(
     odata_metadata_handler_common(catalog, None).await
 }
 
+/// OData service metadata
+#[utoipa::path(
+    get,
+    path = "/{account_name}/$metadata",
+    params(
+        ("account_name", description = "Account name")
+    ),
+    responses((status = OK, body = String)),
+    tag = "kamu-odata",
+    security(
+        (),
+        ("api_key" = [])
+    )
+)]
 #[transactional_handler]
 pub async fn odata_metadata_handler_mt(
     Extension(catalog): Extension<Catalog>,
@@ -68,6 +118,20 @@ pub async fn odata_metadata_handler_mt(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// OData collection
+#[utoipa::path(
+    get,
+    path = "/{dataset_name}",
+    params(
+        ("dataset_name", description = "Dataset name")
+    ),
+    responses((status = OK, body = String)),
+    tag = "kamu-odata",
+    security(
+        (),
+        ("api_key" = [])
+    )
+)]
 #[transactional_handler]
 pub async fn odata_collection_handler_st(
     Extension(catalog): Extension<Catalog>,
@@ -78,6 +142,21 @@ pub async fn odata_collection_handler_st(
     odata_collection_handler_common(catalog, None, collection_addr, headers, query).await
 }
 
+/// OData collection
+#[utoipa::path(
+    get,
+    path = "/{account_name}/{dataset_name}",
+    params(
+        ("account_name", description = "Account name"),
+        ("dataset_name", description = "Dataset name"),
+    ),
+    responses((status = OK, body = String)),
+    tag = "kamu-odata",
+    security(
+        (),
+        ("api_key" = [])
+    )
+)]
 #[transactional_handler]
 pub async fn odata_collection_handler_mt(
     Extension(catalog): Extension<Catalog>,

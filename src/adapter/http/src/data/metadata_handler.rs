@@ -58,12 +58,13 @@ pub enum Include {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, serde::Deserialize)]
+#[derive(Debug, serde::Deserialize, utoipa::IntoParams)]
 #[serde_with::serde_as]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct RequestParams {
+pub struct DatasetMetadataParams {
     /// What information to include in response
-    #[serde(default = "RequestParams::default_include")]
+    #[param(value_type = Option<String>)]
+    #[serde(default = "DatasetMetadataParams::default_include")]
     pub include: CommaSeparatedSet<Include>,
 
     /// Format to return the schema in
@@ -71,7 +72,7 @@ pub struct RequestParams {
     pub schema_format: query_types::SchemaFormat,
 }
 
-impl RequestParams {
+impl DatasetMetadataParams {
     fn default_include() -> CommaSeparatedSet<Include> {
         CommaSeparatedSet::from([Include::Seed])
     }
@@ -79,34 +80,40 @@ impl RequestParams {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, serde::Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct ResponseBody {
+pub struct DatasetMetadataResponse {
     pub output: Output,
 }
 
 #[serde_with::serde_as]
 #[serde_with::skip_serializing_none]
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, serde::Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Output {
+    #[schema(value_type = Object)]
     #[serde_as(as = "Option<odf::serde::yaml::SetAttachmentsDef>")]
     pub attachments: Option<odf::SetAttachments>,
 
+    #[schema(value_type = Object)]
     #[serde_as(as = "Option<odf::serde::yaml::SetInfoDef>")]
     pub info: Option<odf::SetInfo>,
 
+    #[schema(value_type = Object)]
     #[serde_as(as = "Option<odf::serde::yaml::SetLicenseDef>")]
     pub license: Option<odf::SetLicense>,
 
+    #[schema(value_type = Option<Vec<String>>)]
     pub refs: Option<Vec<Ref>>,
 
     pub schema: Option<query_types::Schema>,
     pub schema_format: Option<query_types::SchemaFormat>,
 
+    #[schema(value_type = Object)]
     #[serde_as(as = "Option<odf::serde::yaml::SeedDef>")]
     pub seed: Option<odf::Seed>,
 
+    #[schema(value_type = Object)]
     #[serde_as(as = "Option<odf::serde::yaml::DatasetVocabularyDef>")]
     pub vocab: Option<odf::DatasetVocabulary>,
 }
@@ -122,12 +129,24 @@ pub struct Ref {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Access dataset metadata chain
+#[utoipa::path(
+    get,
+    path = "/metadata",
+    params(DatasetMetadataParams),
+    responses((status = OK, body = DatasetMetadataResponse)),
+    tag = "odf-query",
+    security(
+        (),
+        ("api_key" = [])
+    )
+)]
 #[transactional_handler]
 pub async fn dataset_metadata_handler(
     Extension(catalog): Extension<Catalog>,
     Extension(dataset_ref): Extension<odf::DatasetRef>,
-    Query(params): Query<RequestParams>,
-) -> Result<Json<ResponseBody>, ApiError> {
+    Query(params): Query<DatasetMetadataParams>,
+) -> Result<Json<DatasetMetadataResponse>, ApiError> {
     use kamu_core::{metadata_chain_visitors as vis, MetadataChainExt as _};
 
     let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
@@ -217,7 +236,7 @@ pub async fn dataset_metadata_handler(
             })
     };
 
-    Ok(Json(ResponseBody {
+    Ok(Json(DatasetMetadataResponse {
         output: Output {
             attachments,
             info,

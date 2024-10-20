@@ -29,18 +29,26 @@ use crate::axum_utils::ensure_authenticated_account;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, serde::Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct DatasetOwnerInfo {
+    #[schema(value_type = String)]
     pub account_name: AccountName,
+
+    // TODO: This should not be optional. Awaiting dataset repository refactoring.
+    #[schema(value_type = Option<String>)]
     pub account_id: Option<AccountID>,
 }
 
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, serde::Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct DatasetInfoResponse {
+    #[schema(value_type = String)]
     pub id: DatasetID,
+
     pub owner: Option<DatasetOwnerInfo>,
+
+    #[schema(value_type = String)]
     pub dataset_name: DatasetName,
 }
 
@@ -62,6 +70,20 @@ impl DatasetInfoResponse {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Get dataset info by ID
+#[utoipa::path(
+    get,
+    path = "/datasets/{id}",
+    params(
+        ("id", description = "Dataset ID")
+    ),
+    responses((status = OK, body = DatasetInfoResponse)),
+    tag = "kamu",
+    security(
+        (),
+        ("api_key" = [])
+    )
+)]
 #[transactional_handler]
 pub async fn dataset_info_handler(
     Extension(catalog): Extension<Catalog>,
@@ -76,6 +98,8 @@ async fn get_dataset_by_id(
     catalog: &Catalog,
     dataset_id: &DatasetID,
 ) -> Result<Json<DatasetInfoResponse>, ApiError> {
+    // TODO: FIXME: This is incorrect - the endpoint should check permissions to
+    // access dataset and not reject non-authed users
     ensure_authenticated_account(catalog).api_err()?;
 
     let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();

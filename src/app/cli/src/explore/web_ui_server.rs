@@ -31,6 +31,8 @@ use opendatafabric::AccountName;
 use rust_embed::RustEmbed;
 use serde::Serialize;
 use url::Url;
+use utoipa_axum::router::OpenApiRouter;
+use utoipa_axum::routes;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -149,7 +151,7 @@ impl WebUIServer {
             }))
             .build();
 
-        let app = axum::Router::new()
+        let (router, _api) = OpenApiRouter::new()
             .route(
                 "/assets/runtime-config.json",
                 axum::routing::get(runtime_config_handler),
@@ -158,16 +160,14 @@ impl WebUIServer {
                 "/graphql",
                 axum::routing::get(graphql_playground_handler).post(graphql_handler),
             )
-            .nest("/", kamu_adapter_http::data::root_router())
-            .route(
-                "/platform/file/upload/prepare",
-                axum::routing::post(kamu_adapter_http::platform_file_upload_prepare_post_handler),
-            )
-            .route(
-                "/platform/file/upload/:upload_token",
-                axum::routing::post(kamu_adapter_http::platform_file_upload_post_handler)
-                    .get(kamu_adapter_http::platform_file_upload_get_handler),
-            )
+            .merge(kamu_adapter_http::data::root_router())
+            .routes(routes!(
+                kamu_adapter_http::platform_file_upload_prepare_post_handler
+            ))
+            .routes(routes!(
+                kamu_adapter_http::platform_file_upload_post_handler,
+                kamu_adapter_http::platform_file_upload_get_handler
+            ))
             .nest(
                 "/odata",
                 if multi_tenant_workspace {
@@ -183,9 +183,9 @@ impl WebUIServer {
                     "/:dataset_name"
                 },
                 kamu_adapter_http::add_dataset_resolver_layer(
-                    axum::Router::new()
-                        .nest("/", kamu_adapter_http::smart_transfer_protocol_router())
-                        .nest("/", kamu_adapter_http::data::dataset_router()),
+                    OpenApiRouter::new()
+                        .merge(kamu_adapter_http::smart_transfer_protocol_router())
+                        .merge(kamu_adapter_http::data::dataset_router()),
                     multi_tenant_workspace,
                 ),
             )
@@ -210,9 +210,10 @@ impl WebUIServer {
             )
             .layer(axum::extract::Extension(web_ui_catalog))
             .layer(axum::extract::Extension(gql_schema))
-            .layer(axum::extract::Extension(web_ui_config));
+            .layer(axum::extract::Extension(web_ui_config))
+            .split_for_parts();
 
-        let server = axum::serve(listener, app.into_make_service());
+        let server = axum::serve(listener, router.into_make_service());
 
         Ok(Self {
             server,

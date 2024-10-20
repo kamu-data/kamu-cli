@@ -10,6 +10,7 @@
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
 use dill::Catalog;
+use utoipa_axum::router::OpenApiRouter;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -25,7 +26,7 @@ impl TestAPIServer {
         port: Option<u16>,
         multi_tenant: bool,
     ) -> Self {
-        let app = axum::Router::new()
+        let (router, _api) = OpenApiRouter::new()
             .nest(
                 "/odata",
                 if multi_tenant {
@@ -40,7 +41,8 @@ impl TestAPIServer {
                     .allow_methods(vec![http::Method::GET, http::Method::POST])
                     .allow_headers(tower_http::cors::Any),
             )
-            .layer(axum::extract::Extension(catalog));
+            .layer(axum::extract::Extension(catalog))
+            .split_for_parts();
 
         let addr = SocketAddr::from((
             address.unwrap_or(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1))),
@@ -49,7 +51,7 @@ impl TestAPIServer {
 
         let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
         let local_addr = listener.local_addr().unwrap();
-        let server = axum::serve(listener, app.into_make_service());
+        let server = axum::serve(listener, router.into_make_service());
 
         Self { server, local_addr }
     }

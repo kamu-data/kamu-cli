@@ -16,37 +16,27 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use utoipa_axum::router::OpenApiRouter;
+use utoipa_axum::routes;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn root_router() -> axum::Router {
-    axum::Router::new()
-        .route(
-            "/query",
-            axum::routing::get(super::query_handler::query_handler)
-                .post(super::query_handler::query_handler_post),
-        )
-        .route(
-            "/verify",
-            axum::routing::post(super::verify_handler::verify_handler),
-        )
+pub fn root_router() -> OpenApiRouter {
+    OpenApiRouter::new()
+        .routes(routes!(
+            super::query_handler::query_handler,
+            super::query_handler::query_handler_post
+        ))
+        .routes(routes!(super::verify_handler::verify_handler))
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn dataset_router() -> axum::Router {
-    axum::Router::new()
-        .route(
-            "/tail",
-            axum::routing::get(super::tail_handler::dataset_tail_handler),
-        )
-        .route(
-            "/metadata",
-            axum::routing::get(super::metadata_handler::dataset_metadata_handler),
-        )
-        .route(
-            "/ingest",
-            axum::routing::post(super::ingest_handler::dataset_ingest_handler),
-        )
+pub fn dataset_router() -> OpenApiRouter {
+    OpenApiRouter::new()
+        .routes(routes!(super::tail_handler::dataset_tail_handler))
+        .routes(routes!(super::metadata_handler::dataset_metadata_handler))
+        .routes(routes!(super::ingest_handler::dataset_ingest_handler))
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

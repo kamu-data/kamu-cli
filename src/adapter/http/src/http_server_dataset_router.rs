@@ -14,6 +14,8 @@ use http_common::{ApiError, IntoApiError, ResultIntoApiError};
 use opendatafabric as odf;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
+use utoipa_axum::router::OpenApiRouter;
+use utoipa_axum::routes;
 
 use crate::axum_utils::ensure_authenticated_account;
 use crate::simple_protocol::*;
@@ -37,24 +39,17 @@ struct DatasetByAccountAndName {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn smart_transfer_protocol_router() -> axum::Router {
-    axum::Router::new()
-        .route("/refs/:reference", axum::routing::get(dataset_refs_handler))
-        .route(
-            "/blocks/:block_hash",
-            axum::routing::get(dataset_blocks_handler),
-        )
-        .route(
-            "/data/:physical_hash",
-            axum::routing::get(dataset_data_get_handler).put(dataset_data_put_handler),
-        )
-        .route(
-            "/checkpoints/:physical_hash",
-            axum::routing::get(dataset_checkpoints_get_handler)
-                .put(dataset_checkpoints_put_handler),
-        )
-        .route("/pull", axum::routing::get(dataset_pull_ws_upgrade_handler))
-        .route("/push", axum::routing::get(dataset_push_ws_upgrade_handler))
+pub fn smart_transfer_protocol_router() -> OpenApiRouter {
+    OpenApiRouter::new()
+        .routes(routes!(dataset_refs_handler))
+        .routes(routes!(dataset_blocks_handler))
+        .routes(routes!(dataset_data_get_handler, dataset_data_put_handler))
+        .routes(routes!(
+            dataset_checkpoints_get_handler,
+            dataset_checkpoints_put_handler
+        ))
+        .routes(routes!(dataset_pull_ws_upgrade_handler))
+        .routes(routes!(dataset_push_ws_upgrade_handler))
         .layer(DatasetAuthorizationLayer::new(
             get_dataset_action_for_request,
         ))
@@ -63,9 +58,9 @@ pub fn smart_transfer_protocol_router() -> axum::Router {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub fn add_dataset_resolver_layer(
-    dataset_router: axum::Router,
+    dataset_router: OpenApiRouter,
     multi_tenant: bool,
-) -> axum::Router {
+) -> OpenApiRouter {
     use axum::extract::Path;
 
     if multi_tenant {
@@ -85,7 +80,7 @@ pub fn add_dataset_resolver_layer(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct LoginRequestBody {
     pub login_method: String,
@@ -98,6 +93,15 @@ pub struct LoginResponseBody {
     pub access_token: String,
 }
 
+/// Authenticate with the node
+#[utoipa::path(
+    post,
+    path = "/platform/login",
+    request_body = LoginRequestBody,
+    responses((status = OK, body = Object)),
+    tag = "kamu",
+    security(())
+)]
 #[transactional_handler]
 pub async fn platform_login_handler(
     Extension(catalog): Extension<Catalog>,
@@ -133,6 +137,17 @@ pub async fn platform_login_handler(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Validate auth token
+#[utoipa::path(
+    get,
+    path = "/platform/token/validate",
+    responses((status = OK, body = ())),
+    tag = "kamu",
+    security(
+        (),
+        ("api_key" = []),
+    )
+)]
 #[allow(clippy::unused_async)]
 pub async fn platform_token_validate_handler(catalog: Extension<Catalog>) -> Result<(), ApiError> {
     ensure_authenticated_account(&catalog).api_err()?;

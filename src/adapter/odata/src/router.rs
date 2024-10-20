@@ -16,34 +16,21 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use utoipa_axum::router::OpenApiRouter;
+use utoipa_axum::routes;
+
 use crate::handler::*;
 
-pub fn router_single_tenant() -> axum::Router {
-    axum::Router::new()
-        .route("/", axum::routing::get(odata_service_handler_st))
-        .route("/$metadata", axum::routing::get(odata_metadata_handler_st))
-        .route(
-            "/:dataset_name",
-            axum::routing::get(odata_collection_handler_st),
-        )
+pub fn router_single_tenant() -> OpenApiRouter {
+    OpenApiRouter::new()
+        .routes(routes!(odata_service_handler_st))
+        .routes(routes!(odata_metadata_handler_st))
+        .routes(routes!(odata_collection_handler_st))
 }
 
-pub fn router_multi_tenant() -> axum::Router {
-    axum::Router::new()
-        .route(
-            "/:account_name",
-            axum::routing::get(odata_service_handler_mt),
-        )
-        .route(
-            "/:account_name/",
-            axum::routing::get(odata_service_handler_mt),
-        )
-        .route(
-            "/:account_name/$metadata",
-            axum::routing::get(odata_metadata_handler_mt),
-        )
-        .route(
-            "/:account_name/:dataset_name",
-            axum::routing::get(odata_collection_handler_mt),
-        )
+pub fn router_multi_tenant() -> OpenApiRouter {
+    OpenApiRouter::new()
+        .routes(routes!(odata_service_handler_mt))
+        .routes(routes!(odata_metadata_handler_mt))
+        .routes(routes!(odata_collection_handler_mt))
 }

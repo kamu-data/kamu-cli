@@ -67,7 +67,7 @@ pub async fn test_rest_api_request_dataset_tail(kamu_api_server_client: KamuApiS
         .rest_api_call_assert(
             None,
             Method::GET,
-            "player-scores/tail?includeSchema=false",
+            "player-scores/tail",
             None,
             StatusCode::OK,
             Some(ExpectedResponseBody::Json(
@@ -93,7 +93,8 @@ pub async fn test_rest_api_request_dataset_tail(kamu_api_server_client: KamuApiS
                           "score": 80,
                           "system_time": "<SYSTEM_TIME>"
                         }
-                      ]
+                      ],
+                      "dataFormat": "JsonAoS"
                     }
                     "#
                 )

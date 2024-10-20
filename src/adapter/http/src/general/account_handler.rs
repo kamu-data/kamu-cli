@@ -26,10 +26,13 @@ use opendatafabric::{AccountID, AccountName};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, serde::Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct AccountResponse {
+    #[schema(value_type = String)]
     pub id: AccountID,
+
+    #[schema(value_type = String)]
     pub account_name: AccountName,
 }
 
@@ -44,6 +47,17 @@ impl From<Account> for AccountResponse {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Get account information
+#[utoipa::path(
+    get,
+    path = "/accounts/me",
+    responses((status = OK, body = AccountResponse)),
+    tag = "kamu",
+    security(
+        (),
+        ("api_key" = [])
+    )
+)]
 #[transactional_handler]
 pub async fn account_handler(
     Extension(catalog): Extension<Catalog>,

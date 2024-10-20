@@ -188,108 +188,95 @@ async fn test_data_tail_handler() {
         let tail_url = format!("{}/tail", harness.dataset_url);
         let res = cl
             .get(&tail_url)
-            .query(&[("includeSchema", "false")])
+            .query(&[("schemaFormat", "ArrowJson")])
             .send()
             .await
             .unwrap();
 
         assert_eq!(res.status(), http::StatusCode::OK);
-        assert_eq!(
+        pretty_assertions::assert_eq!(
             res.json::<serde_json::Value>().await.unwrap(),
-            json!({"data": [{
-                "city": "A",
-                "event_time": "2050-01-01T12:00:00Z",
-                "offset": 0,
-                "op": 0,
-                "population": 100,
-                "system_time": "2050-01-01T12:00:00Z"
-            }, {
-                "city": "B",
-                "event_time": "2050-01-01T12:00:00Z",
-                "offset": 1,
-                "op": 0,
-                "population": 200,
-                "system_time": "2050-01-01T12:00:00Z"
-            }]})
+            json!({
+                "dataFormat": "JsonAoS",
+                "data": [{
+                    "city": "A",
+                    "event_time": "2050-01-01T12:00:00Z",
+                    "offset": 0,
+                    "op": 0,
+                    "population": 100,
+                    "system_time": "2050-01-01T12:00:00Z"
+                }, {
+                    "city": "B",
+                    "event_time": "2050-01-01T12:00:00Z",
+                    "offset": 1,
+                    "op": 0,
+                    "population": 200,
+                    "system_time": "2050-01-01T12:00:00Z"
+                }],
+                "schemaFormat": "ArrowJson",
+                "schema": {
+                    "fields":  [{
+                        "data_type": "Int64",
+                        "dict_id": 0,
+                        "dict_is_ordered": false,
+                        "metadata": {},
+                        "name": "offset",
+                        "nullable": false,
+                    }, {
+                        "data_type": "Int32",
+                        "dict_id": 0,
+                        "dict_is_ordered": false,
+                        "metadata": {},
+                        "name": "op",
+                        "nullable": false,
+                    }, {
+                        "data_type":  {
+                            "Timestamp":  [
+                                "Millisecond",
+                                "UTC",
+                            ],
+                        },
+                        "dict_id": 0,
+                        "dict_is_ordered": false,
+                        "metadata": {},
+                        "name": "system_time",
+                        "nullable": false,
+                    }, {
+                        "data_type":  {
+                            "Timestamp":  [
+                                "Millisecond",
+                                "UTC",
+                            ],
+                        },
+                        "dict_id": 0,
+                        "dict_is_ordered": false,
+                        "metadata": {},
+                        "name": "event_time",
+                        "nullable": true,
+                    }, {
+                        "data_type": "Utf8",
+                        "dict_id": 0,
+                        "dict_is_ordered": false,
+                        "metadata":  {},
+                        "name": "city",
+                        "nullable": false,
+                    }, {
+                        "data_type": "UInt64",
+                        "dict_id": 0,
+                        "dict_is_ordered": false,
+                        "metadata": {},
+                        "name": "population",
+                        "nullable": false,
+                    }],
+                    "metadata": {},
+                },
+            })
         );
 
         // Limit
         let res = cl
             .get(&tail_url)
-            .query(&[("limit", "1"), ("includeSchema", "false")])
-            .send()
-            .await
-            .unwrap()
-            .error_for_status()
-            .unwrap();
-
-        assert_eq!(
-            res.json::<serde_json::Value>().await.unwrap(),
-            json!({"data": [{
-                "city": "B",
-                "event_time": "2050-01-01T12:00:00Z",
-                "offset": 1,
-                "op": 0,
-                "population": 200,
-                "system_time": "2050-01-01T12:00:00Z"
-            }]})
-        );
-
-        // Skip
-        let res = cl
-            .get(&tail_url)
-            .query(&[("skip", "1"), ("includeSchema", "false")])
-            .send()
-            .await
-            .unwrap()
-            .error_for_status()
-            .unwrap();
-
-        assert_eq!(
-            res.json::<serde_json::Value>().await.unwrap(),
-            json!({"data": [{
-                "city": "A",
-                "event_time": "2050-01-01T12:00:00Z",
-                "offset": 0,
-                "op": 0,
-                "population": 100,
-                "system_time": "2050-01-01T12:00:00Z"
-            }]})
-        );
-    };
-
-    await_client_server_flow!(harness.server_harness.api_server_run(), client);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_group::group(engine, datafusion)]
-#[test_log::test(tokio::test)]
-async fn test_data_query_handler_full() {
-    let harness = Harness::new().await;
-
-    let client = async move {
-        let cl = reqwest::Client::new();
-
-        let head = cl
-            .get(format!("{}/refs/head", harness.dataset_url))
-            .send()
-            .await
-            .unwrap()
-            .error_for_status()
-            .unwrap()
-            .text()
-            .await
-            .unwrap();
-
-        let query = format!(
-            "select offset, city, population from \"{}\" order by offset desc",
-            harness.dataset_handle.alias
-        );
-        let query_url = format!("{}query", harness.root_url);
-        let res = cl
-            .get(&query_url)
-            .query(&[("query", query.as_str())])
+            .query(&[("limit", "1")])
             .send()
             .await
             .unwrap()
@@ -299,23 +286,40 @@ async fn test_data_query_handler_full() {
         pretty_assertions::assert_eq!(
             res.json::<serde_json::Value>().await.unwrap(),
             json!({
+                "dataFormat": "JsonAoS",
                 "data": [{
                     "city": "B",
+                    "event_time": "2050-01-01T12:00:00Z",
                     "offset": 1,
+                    "op": 0,
                     "population": 200,
-                }, {
+                    "system_time": "2050-01-01T12:00:00Z"
+                }]
+            })
+        );
+
+        // Skip
+        let res = cl
+            .get(&tail_url)
+            .query(&[("skip", "1")])
+            .send()
+            .await
+            .unwrap()
+            .error_for_status()
+            .unwrap();
+
+        pretty_assertions::assert_eq!(
+            res.json::<serde_json::Value>().await.unwrap(),
+            json!({
+                "dataFormat": "JsonAoS",
+                "data": [{
                     "city": "A",
+                    "event_time": "2050-01-01T12:00:00Z",
                     "offset": 0,
+                    "op": 0,
                     "population": 100,
-                }],
-                "schema": "{\"fields\":[{\"name\":\"offset\",\"data_type\":\"Int64\",\"nullable\":false,\"dict_id\":0,\"dict_is_ordered\":false,\"metadata\":{}},{\"name\":\"city\",\"data_type\":\"Utf8\",\"nullable\":false,\"dict_id\":0,\"dict_is_ordered\":false,\"metadata\":{}},{\"name\":\"population\",\"data_type\":\"UInt64\",\"nullable\":false,\"dict_id\":0,\"dict_is_ordered\":false,\"metadata\":{}}],\"metadata\":{}}",
-                "dataHash": "f9680c001200b3483eecc3d5c6b50ee6b8cba11b51c08f89ea1f53d3a334c743199f5fe656e",
-                "state": {
-                    "inputs": [{
-                        "id": "did:odf:fed01df230b49615d175307d580c33d6fda61fc7b9aec91df0f5c1a5ebe3b8cbfee02",
-                        "blockHash": head,
-                    }]
-                }
+                    "system_time": "2050-01-01T12:00:00Z"
+                }]
             })
         );
     };
@@ -327,7 +331,7 @@ async fn test_data_query_handler_full() {
 
 #[test_group::group(engine, datafusion)]
 #[test_log::test(tokio::test)]
-async fn test_data_query_handler_v2() {
+async fn test_data_query_handler() {
     let harness = Harness::new().await;
 
     let client = async move {
@@ -969,9 +973,9 @@ async fn test_data_query_handler_dataset_does_not_exist_bad_alias() {
             .post(&query_url)
             .json(&json!({
                 "query": query,
-                "aliases": [{
-                    "alias": harness.dataset_handle.alias,
+                "datasets": [{
                     "id": DatasetID::new_seeded_ed25519(b"does-not-exist"),
+                    "alias": harness.dataset_handle.alias,
                 }]
             }))
             .send()
@@ -1010,51 +1014,49 @@ async fn test_data_query_handler_ranges() {
         // Limit
         let res = cl
             .get(&query_url)
-            .query(&[
-                ("query", query.as_str()),
-                ("limit", "1"),
-                ("includeSchema", "false"),
-                ("includeState", "false"),
-                ("includeDataHash", "false"),
-            ])
+            .query(&[("query", query.as_str()), ("limit", "1")])
             .send()
             .await
             .unwrap()
             .error_for_status()
             .unwrap();
 
-        assert_eq!(
+        pretty_assertions::assert_eq!(
             res.json::<serde_json::Value>().await.unwrap(),
-            json!({"data": [{
-                "city": "B",
-                "offset": 1,
-                "population": 200,
-            }]})
+            json!({
+                "output": {
+                    "dataFormat": "JsonAoS",
+                    "data": [{
+                        "city": "B",
+                        "offset": 1,
+                        "population": 200,
+                    }]
+                }
+            })
         );
 
         // Skip
         let res = cl
             .get(&query_url)
-            .query(&[
-                ("query", query.as_str()),
-                ("skip", "1"),
-                ("includeSchema", "false"),
-                ("includeState", "false"),
-                ("includeDataHash", "false"),
-            ])
+            .query(&[("query", query.as_str()), ("skip", "1")])
             .send()
             .await
             .unwrap()
             .error_for_status()
             .unwrap();
 
-        assert_eq!(
+        pretty_assertions::assert_eq!(
             res.json::<serde_json::Value>().await.unwrap(),
-            json!({"data": [{
-                "city": "A",
-                "offset": 0,
-                "population": 100,
-            }]})
+            json!({
+                "output": {
+                    "dataFormat": "JsonAoS",
+                    "data": [{
+                        "city": "A",
+                        "offset": 0,
+                        "population": 100,
+                    }]
+                }
+            })
         );
     };
 
@@ -1078,77 +1080,74 @@ async fn test_data_query_handler_data_formats() {
         let query_url = format!("{}query", harness.root_url);
         let res = cl
             .get(&query_url)
-            .query(&[
-                ("query", query.as_str()),
-                ("dataFormat", "json-aos"),
-                ("includeSchema", "false"),
-                ("includeState", "false"),
-                ("includeDataHash", "false"),
-            ])
+            .query(&[("query", query.as_str()), ("dataFormat", "json-aos")])
             .send()
             .await
             .unwrap()
             .error_for_status()
             .unwrap();
 
-        assert_eq!(
+        pretty_assertions::assert_eq!(
             res.json::<serde_json::Value>().await.unwrap(),
-            json!({"data": [{
-                "city": "B",
-                "offset": 1,
-                "population": 200,
-            }, {
-                "city": "A",
-                "offset": 0,
-                "population": 100,
-            }]})
+            json!({
+                "output": {
+                    "dataFormat": "JsonAoS",
+                    "data": [{
+                        "city": "B",
+                        "offset": 1,
+                        "population": 200,
+                    }, {
+                        "city": "A",
+                        "offset": 0,
+                        "population": 100,
+                    }]
+                }
+            })
         );
 
         let res = cl
             .get(&query_url)
-            .query(&[
-                ("query", query.as_str()),
-                ("dataFormat", "json-soa"),
-                ("includeSchema", "false"),
-                ("includeState", "false"),
-                ("includeDataHash", "false"),
-            ])
+            .query(&[("query", query.as_str()), ("dataFormat", "json-soa")])
             .send()
             .await
             .unwrap()
             .error_for_status()
             .unwrap();
 
-        assert_eq!(
+        pretty_assertions::assert_eq!(
             res.json::<serde_json::Value>().await.unwrap(),
-            json!({"data": {
-                "offset": [1, 0],
-                "city": ["B", "A"],
-                "population": [200, 100],
-            }})
+            json!({
+                "output": {
+                    "dataFormat": "JsonSoA",
+                    "data": {
+                        "offset": [1, 0],
+                        "city": ["B", "A"],
+                        "population": [200, 100],
+                    }
+                }
+            })
         );
 
         let res = cl
             .get(&query_url)
-            .query(&[
-                ("query", query.as_str()),
-                ("dataFormat", "json-aoa"),
-                ("includeSchema", "false"),
-                ("includeState", "false"),
-                ("includeDataHash", "false"),
-            ])
+            .query(&[("query", query.as_str()), ("dataFormat", "json-aoa")])
             .send()
             .await
             .unwrap()
             .error_for_status()
             .unwrap();
 
-        assert_eq!(
+        pretty_assertions::assert_eq!(
             res.json::<serde_json::Value>().await.unwrap(),
-            json!({"data": [
-                [1, "B", 200],
-                [0, "A", 100],
-            ]})
+            json!({
+                "output": {
+                    "dataFormat": "JsonAoA",
+                    "data": [
+                        [1, "B", 200],
+                        [0, "A", 100],
+                    ]
+                }
+            })
         );
     };
 
@@ -1172,65 +1171,111 @@ async fn test_data_query_handler_schema_formats() {
         let query_url = format!("{}query", harness.root_url);
         let res = cl
             .get(&query_url)
-            .query(&[
-                ("query", query.as_str()),
-                ("schemaFormat", "arrow-json"),
-                ("includeSchema", "true"),
-                ("includeState", "false"),
-                ("includeDataHash", "false"),
-            ])
+            .query(&[("query", query.as_str()), ("schemaFormat", "arrow-json")])
             .send()
             .await
             .unwrap()
             .error_for_status()
             .unwrap();
 
-        assert_eq!(
-            res.json::<serde_json::Value>().await.unwrap()["schema"]
-                .as_str()
-                .unwrap(),
-            r#"{"fields":[{"name":"offset","data_type":"Int64","nullable":false,"dict_id":0,"dict_is_ordered":false,"metadata":{}},{"name":"city","data_type":"Utf8","nullable":false,"dict_id":0,"dict_is_ordered":false,"metadata":{}},{"name":"population","data_type":"UInt64","nullable":false,"dict_id":0,"dict_is_ordered":false,"metadata":{}}],"metadata":{}}"#
+        let resp = res.json::<serde_json::Value>().await.unwrap();
+        let ignore_data = &resp["output"]["data"];
+
+        pretty_assertions::assert_eq!(
+            resp,
+            json!({
+                "output": {
+                    "schemaFormat": "ArrowJson",
+                    "schema": {
+                        "fields":[{
+                            "name": "offset",
+                            "data_type": "Int64",
+                            "nullable": false,
+                            "dict_id":0,
+                            "dict_is_ordered":false,
+                            "metadata":{}
+                        },{
+                            "name":"city",
+                            "data_type":"Utf8",
+                            "nullable":false,
+                            "dict_id":0,
+                            "dict_is_ordered":false,
+                            "metadata":{}
+                        },{
+                            "name":"population",
+                            "data_type":"UInt64",
+                            "nullable":false,
+                            "dict_id":0,
+                            "dict_is_ordered":false,
+                            "metadata":{}
+                        }],
+                        "metadata":{}
+                    },
+                    "data": ignore_data,
+                    "dataFormat": "JsonAoS",
+                }
+            })
         );
 
         let res = cl
             .get(&query_url)
-            .query(&[
-                ("query", query.as_str()),
-                ("schemaFormat", "ArrowJson"),
-                ("includeSchema", "true"),
-                ("includeState", "false"),
-                ("includeDataHash", "false"),
-            ])
+            .query(&[("query", query.as_str()), ("schemaFormat", "ArrowJson")])
             .send()
             .await
             .unwrap()
             .error_for_status()
             .unwrap();
 
-        assert_eq!(
-            res.json::<serde_json::Value>().await.unwrap()["schema"]
-                .as_str()
-                .unwrap(),
-            r#"{"fields":[{"name":"offset","data_type":"Int64","nullable":false,"dict_id":0,"dict_is_ordered":false,"metadata":{}},{"name":"city","data_type":"Utf8","nullable":false,"dict_id":0,"dict_is_ordered":false,"metadata":{}},{"name":"population","data_type":"UInt64","nullable":false,"dict_id":0,"dict_is_ordered":false,"metadata":{}}],"metadata":{}}"#
+        let resp = res.json::<serde_json::Value>().await.unwrap();
+        let ignore_data = &resp["output"]["data"];
+
+        pretty_assertions::assert_eq!(
+            resp,
+            json!({
+                "output": {
+                    "schemaFormat": "ArrowJson",
+                    "schema": {
+                        "fields":[{
+                            "name": "offset",
+                            "data_type": "Int64",
+                            "nullable": false,
+                            "dict_id":0,
+                            "dict_is_ordered":false,
+                            "metadata":{}
+                        },{
+                            "name":"city",
+                            "data_type":"Utf8",
+                            "nullable":false,
+                            "dict_id":0,
+                            "dict_is_ordered":false,
+                            "metadata":{}
+                        },{
+                            "name":"population",
+                            "data_type":"UInt64",
+                            "nullable":false,
+                            "dict_id":0,
+                            "dict_is_ordered":false,
+                            "metadata":{}
+                        }],
+                        "metadata":{}
+                    },
+                    "data": ignore_data,
+                    "dataFormat": "JsonAoS",
+                }
+            })
         );
 
         let res = cl
             .get(&query_url)
-            .query(&[
-                ("query", query.as_str()),
-                ("schemaFormat", "parquet"),
-                ("includeSchema", "true"),
-                ("includeState", "false"),
-                ("includeDataHash", "false"),
-            ])
+            .query(&[("query", query.as_str()), ("schemaFormat", "parquet")])
             .send()
             .await
             .unwrap()
             .error_for_status()
             .unwrap();
 
-        assert_eq!(
-            res.json::<serde_json::Value>().await.unwrap()["schema"]
+        pretty_assertions::assert_eq!(
+            res.json::<serde_json::Value>().await.unwrap()["output"]["schema"]
                 .as_str()
                 .unwrap(),
             indoc::indoc!(
@@ -1245,24 +1290,44 @@ async fn test_data_query_handler_schema_formats() {
 
         let res = cl
             .get(&query_url)
-            .query(&[
-                ("query", query.as_str()),
-                ("schemaFormat", "parquet-json"),
-                ("includeSchema", "true"),
-                ("includeState", "false"),
-                ("includeDataHash", "false"),
-            ])
+            .query(&[("query", query.as_str()), ("schemaFormat", "parquet-json")])
             .send()
             .await
             .unwrap()
             .error_for_status()
             .unwrap();
 
-        assert_eq!(
-            res.json::<serde_json::Value>().await.unwrap()["schema"]
-                .as_str()
-                .unwrap(),
-            r#"{"name": "arrow_schema", "type": "struct", "fields": [{"name": "offset", "repetition": "REQUIRED", "type": "INT64"}, {"name": "city", "repetition": "REQUIRED", "type": "BYTE_ARRAY", "logicalType": "STRING"}, {"name": "population", "repetition": "REQUIRED", "type": "INT64", "logicalType": "INTEGER(64,false)"}]}"#
+        let resp = res.json::<serde_json::Value>().await.unwrap();
+        let ignore_data = &resp["output"]["data"];
+
+        pretty_assertions::assert_eq!(
+            resp,
+            json!({
+                "output": {
+                    "schemaFormat": "ParquetJson",
+                    "schema": {
+                        "name": "arrow_schema",
+                        "type": "struct",
+                        "fields": [{
+                            "name": "offset",
+                            "repetition": "REQUIRED",
+                            "type": "INT64",
+                        }, {
+                            "name": "city",
+                            "repetition": "REQUIRED",
+                            "type": "BYTE_ARRAY",
+                            "logicalType": "STRING",
+                        }, {
+                            "name": "population",
+                            "repetition": "REQUIRED",
+                            "type": "INT64",
+                            "logicalType": "INTEGER(64,false)",
+                        }]
+                    },
+                    "data": ignore_data,
+                    "dataFormat": "JsonAoS",
+                }
+            })
         );
     };
 

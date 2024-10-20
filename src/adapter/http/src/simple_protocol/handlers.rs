@@ -53,6 +53,20 @@ pub struct PhysicalHashFromPath {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Get named block reference
+#[utoipa::path(
+    get,
+    path = "/refs/{reference}",
+    params(
+        ("reference", description = "Name of the reference")
+    ),
+    responses((status = OK, body = String)),
+    tag = "odf-transfer",
+    security(
+        (),
+        ("api_key" = [])
+    )
+)]
 pub async fn dataset_refs_handler(
     axum::extract::Extension(dataset): axum::extract::Extension<Arc<dyn Dataset>>,
     axum::extract::Path(ref_param): axum::extract::Path<RefFromPath>,
@@ -71,6 +85,20 @@ pub async fn dataset_refs_handler(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Get block by hash
+#[utoipa::path(
+    get,
+    path = "/blocks/{block_hash}",
+    params(
+        ("block_hash", description = "Hash of the block")
+    ),
+    responses((status = OK, body = Vec<u8>)),
+    tag = "odf-transfer",
+    security(
+        (),
+        ("api_key" = [])
+    )
+)]
 pub async fn dataset_blocks_handler(
     axum::extract::Extension(dataset): axum::extract::Extension<Arc<dyn Dataset>>,
     axum::extract::Path(hash_param): axum::extract::Path<BlockHashFromPath>,
@@ -95,6 +123,20 @@ pub async fn dataset_blocks_handler(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Get data slice by hash
+#[utoipa::path(
+    get,
+    path = "/data/{physical_hash}",
+    params(
+        ("physical_hash", description = "Physical hash of the data slice")
+    ),
+    responses((status = OK, body = Vec<u8>)),
+    tag = "odf-transfer",
+    security(
+        (),
+        ("api_key" = [])
+    )
+)]
 pub async fn dataset_data_get_handler(
     axum::extract::Extension(dataset): axum::extract::Extension<Arc<dyn Dataset>>,
     axum::extract::Path(hash_param): axum::extract::Path<PhysicalHashFromPath>,
@@ -104,6 +146,20 @@ pub async fn dataset_data_get_handler(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Get checkpoint by hash
+#[utoipa::path(
+    get,
+    path = "/checkpoints/{physical_hash}",
+    params(
+        ("physical_hash", description = "Physical hash of the checkpoint")
+    ),
+    responses((status = OK, body = Vec<u8>)),
+    tag = "odf-transfer",
+    security(
+        (),
+        ("api_key" = [])
+    )
+)]
 pub async fn dataset_checkpoints_get_handler(
     axum::extract::Extension(dataset): axum::extract::Extension<Arc<dyn Dataset>>,
     axum::extract::Path(hash_param): axum::extract::Path<PhysicalHashFromPath>,
@@ -130,6 +186,21 @@ async fn dataset_get_object_common(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Upload data slice
+#[utoipa::path(
+    put,
+    path = "/data/{physical_hash}",
+    params(
+        ("physical_hash", description = "Physical hash of the data slice")
+    ),
+    request_body = Vec<u8>,
+    responses((status = OK, body = ())),
+    tag = "odf-transfer",
+    security(
+        (),
+        ("api_key" = [])
+    )
+)]
 pub async fn dataset_data_put_handler(
     axum::extract::Extension(dataset): axum::extract::Extension<Arc<dyn Dataset>>,
     axum::extract::Path(hash_param): axum::extract::Path<PhysicalHashFromPath>,
@@ -147,6 +218,21 @@ pub async fn dataset_data_put_handler(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Upload checkpoint
+#[utoipa::path(
+    put,
+    path = "/checkpoints/{physical_hash}",
+    params(
+        ("physical_hash", description = "Physical hash of the checkpoint")
+    ),
+    request_body = Vec<u8>,
+    responses((status = OK, body = ())),
+    tag = "odf-transfer",
+    security(
+        (),
+        ("api_key" = [])
+    )
+)]
 pub async fn dataset_checkpoints_put_handler(
     axum::extract::Extension(dataset): axum::extract::Extension<Arc<dyn Dataset>>,
     axum::extract::Path(hash_param): axum::extract::Path<PhysicalHashFromPath>,
@@ -189,6 +275,17 @@ async fn dataset_put_object_common(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Initiate push via Smart Transfer Protocol
+#[utoipa::path(
+    get,
+    path = "/push",
+    responses((status = OK, body = ())),
+    tag = "odf-transfer",
+    security(
+        (),
+        ("api_key" = [])
+    )
+)]
 pub async fn dataset_push_ws_upgrade_handler(
     ws: axum::extract::ws::WebSocketUpgrade,
     axum::extract::Extension(dataset_ref): axum::extract::Extension<DatasetRef>,
@@ -241,6 +338,17 @@ pub async fn dataset_push_ws_upgrade_handler(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Initiate pull via Smart Transfer Protocol
+#[utoipa::path(
+    get,
+    path = "/pull",
+    responses((status = OK, body = ())),
+    tag = "odf-transfer",
+    security(
+        (),
+        ("api_key" = [])
+    )
+)]
 pub async fn dataset_pull_ws_upgrade_handler(
     ws: axum::extract::ws::WebSocketUpgrade,
     axum::extract::Extension(dataset): axum::extract::Extension<Arc<dyn Dataset>>,

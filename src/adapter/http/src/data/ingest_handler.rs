@@ -32,10 +32,12 @@ use crate::{UploadService, UploadTokenBase64Json, UploadTokenIntoStreamError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, serde::Deserialize)]
+#[derive(Debug, serde::Deserialize, utoipa::IntoParams)]
 #[serde(rename_all = "camelCase")]
-pub struct IngestQueryParams {
+pub struct IngestParams {
     source_name: Option<String>,
+
+    #[param(value_type = Option<String>)]
     upload_token: Option<UploadTokenBase64Json>,
 }
 
@@ -53,11 +55,23 @@ struct IngestTaskArguments {
 // until their data was processed. We may still provide a "synchronous" version
 // of push for convenience that waits for passed data to be flushed as part of
 // some block.
+/// Push data ingestion
+#[utoipa::path(
+    post,
+    path = "/ingest",
+    params(IngestParams),
+    request_body = Vec<u8>,
+    responses((status = OK, body = ())),
+    tag = "kamu",
+    security(
+        ("api_key" = []),
+    )
+)]
 #[transactional_handler]
 pub async fn dataset_ingest_handler(
     Extension(catalog): Extension<Catalog>,
     Extension(dataset_ref): Extension<DatasetRef>,
-    Query(params): Query<IngestQueryParams>,
+    Query(params): Query<IngestParams>,
     headers: HeaderMap,
     body: axum::body::Body,
 ) -> Result<(), ApiError> {

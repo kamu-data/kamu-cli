@@ -9,7 +9,7 @@
 
 use std::collections::BTreeSet;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct CommaSeparatedSet<T>(BTreeSet<T>);
 
 impl<T> CommaSeparatedSet<T> {

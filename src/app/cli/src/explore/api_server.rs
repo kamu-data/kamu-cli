@@ -27,6 +27,9 @@ use kamu_task_system_inmem::domain::TaskExecutor;
 use messaging_outbox::OutboxExecutor;
 use tokio::sync::Notify;
 use url::Url;
+use utoipa::OpenApi as _;
+use utoipa_axum::router::OpenApiRouter;
+use utoipa_axum::routes;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -91,7 +94,7 @@ impl APIServer {
             }))
             .build();
 
-        let mut app = axum::Router::new()
+        let mut router = OpenApiRouter::with_openapi(ApiDoc::openapi())
             .route("/", axum::routing::get(root))
             .route(
                 // IMPORTANT: The same name is used inside e2e_middleware_fn().
@@ -99,25 +102,17 @@ impl APIServer {
                 "/graphql",
                 axum::routing::get(graphql_playground_handler).post(graphql_handler),
             )
-            .route(
-                "/platform/login",
-                axum::routing::post(kamu_adapter_http::platform_login_handler),
-            )
-            .route(
-                "/platform/token/validate",
-                axum::routing::get(kamu_adapter_http::platform_token_validate_handler),
-            )
-            .route(
-                "/platform/file/upload/prepare",
-                axum::routing::post(kamu_adapter_http::platform_file_upload_prepare_post_handler),
-            )
-            .route(
-                "/platform/file/upload/:upload_token",
-                axum::routing::post(kamu_adapter_http::platform_file_upload_post_handler)
-                    .get(kamu_adapter_http::platform_file_upload_get_handler),
-            )
-            .nest("/", kamu_adapter_http::data::root_router())
-            .nest("/", kamu_adapter_http::general::root_router())
+            .routes(routes!(kamu_adapter_http::platform_login_handler))
+            .routes(routes!(kamu_adapter_http::platform_token_validate_handler))
+            .routes(routes!(
+                kamu_adapter_http::platform_file_upload_prepare_post_handler
+            ))
+            .routes(routes!(
+                kamu_adapter_http::platform_file_upload_post_handler,
+                kamu_adapter_http::platform_file_upload_get_handler
+            ))
+            .merge(kamu_adapter_http::data::root_router())
+            .merge(kamu_adapter_http::general::root_router())
             .nest(
                 "/odata",
                 if multi_tenant_workspace {
@@ -133,9 +128,9 @@ impl APIServer {
                     "/:dataset_name"
                 },
                 kamu_adapter_http::add_dataset_resolver_layer(
-                    axum::Router::new()
-                        .nest("/", kamu_adapter_http::smart_transfer_protocol_router())
-                        .nest("/", kamu_adapter_http::data::dataset_router()),
+                    OpenApiRouter::new()
+                        .merge(kamu_adapter_http::smart_transfer_protocol_router())
+                        .merge(kamu_adapter_http::data::dataset_router()),
                     multi_tenant_workspace,
                 ),
             );
@@ -143,12 +138,12 @@ impl APIServer {
         let is_e2e_testing = e2e_output_data_path.is_some();
 
         if is_e2e_testing {
-            app = app.layer(middleware::from_fn(
+            router = router.layer(middleware::from_fn(
                 kamu_adapter_http::e2e::e2e_middleware_fn,
             ));
         }
 
-        app = app
+        router = router
             .layer(kamu_adapter_http::AuthenticationLayer::new())
             .layer(
                 tower_http::cors::CorsLayer::new()
@@ -173,14 +168,18 @@ impl APIServer {
         let maybe_shutdown_notify = if is_e2e_testing {
             let shutdown_notify = Arc::new(Notify::new());
 
-            app = app.nest("/e2e", e2e_router(shutdown_notify.clone()));
+            router = router.nest("/e2e", e2e_router(shutdown_notify.clone()).into());
 
             Some(shutdown_notify)
         } else {
             None
         };
 
-        let server = axum::serve(listener, app.into_make_service());
+        let (router, api) = router.split_for_parts();
+        let router =
+            router.merge(utoipa_swagger_ui::SwaggerUi::new("/swagger").url("/openapi.json", api));
+
+        let server = axum::serve(listener, router.into_make_service());
 
         Ok(Self {
             server,
@@ -230,6 +229,7 @@ async fn root() -> impl axum::response::IntoResponse {
         <h1>Kamu HTTP Server</h1>
         <ul>
             <li><a href="/graphql">GraphQL Playground</li>
+            <li><a href="/swagger/">Swagger UI</li>
         </ul>
         "#
     ))
@@ -255,6 +255,43 @@ async fn graphql_playground_handler() -> impl axum::response::IntoResponse {
     axum::response::Html(async_graphql::http::playground_source(
         async_graphql::http::GraphQLPlaygroundConfig::new("/graphql"),
     ))
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// OpenAPI root
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(utoipa::OpenApi)]
+#[openapi(
+    modifiers(&TokenAuthAddon),
+    tags(
+        (name = "odf-core", description = "Core ODF APIs"),
+        (name = "odf-transfer", description = "ODF Data Transfer APIs"),
+        (name = "odf-query", description = "ODF Data Query APIs"),
+        (name = "kamu", description = "General Node APIs"),
+        (name = "kamu-odata", description = "OData Adapter"),
+    )
+)]
+struct ApiDoc;
+
+struct TokenAuthAddon;
+
+impl utoipa::Modify for TokenAuthAddon {
+    fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
+        use utoipa::openapi::security::*;
+
+        if let Some(components) = openapi.components.as_mut() {
+            components.add_security_scheme(
+                "api_key",
+                SecurityScheme::Http(
+                    HttpBuilder::new()
+                        .scheme(HttpAuthScheme::Bearer)
+                        .bearer_format("AccessToken")
+                        .build(),
+                ),
+            );
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

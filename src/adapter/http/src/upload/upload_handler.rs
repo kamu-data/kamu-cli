@@ -21,15 +21,29 @@ use crate::{MakeUploadContextError, SaveUploadError, UploadService};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(serde::Deserialize)]
+#[derive(serde::Deserialize, utoipa::IntoParams)]
 #[serde(rename_all = "camelCase")]
 pub struct PlatformFileUploadQuery {
     file_name: String,
+
     content_length: usize,
+
+    #[param(value_type = Option<String>)]
     #[serde(default, deserialize_with = "empty_string_as_none")]
     content_type: Option<MediaType>,
 }
 
+/// Prepare file upload
+#[utoipa::path(
+    post,
+    path = "/platform/file/upload/prepare",
+    params(PlatformFileUploadQuery),
+    responses((status = OK, body = UploadContext)),
+    tag = "kamu",
+    security(
+        ("api_key" = []),
+    )
+)]
 pub async fn platform_file_upload_prepare_post_handler(
     catalog: axum::extract::Extension<dill::Catalog>,
     axum::extract::Query(query): axum::extract::Query<PlatformFileUploadQuery>,
@@ -61,32 +75,17 @@ pub struct UploadFromPath {
     upload_token: UploadTokenBase64Json,
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[allow(clippy::unused_async)]
-pub async fn platform_file_upload_get_handler(
-    catalog: axum::extract::Extension<dill::Catalog>,
-    axum::extract::Path(upload_param): axum::extract::Path<UploadFromPath>,
-) -> Result<impl axum::response::IntoResponse, ApiError> {
-    let account_id = ensure_authenticated_account(&catalog).api_err()?;
-
-    let upload_local_service = catalog.get_one::<dyn UploadService>().unwrap();
-    let stream = upload_local_service
-        .upload_token_into_stream(&account_id, &upload_param.upload_token.0)
-        .await
-        .map_err(|e| match e {
-            UploadTokenIntoStreamError::ContentNotFound(e) => ApiError::not_found(e),
-            UploadTokenIntoStreamError::ContentLengthMismatch(e) => ApiError::bad_request(e),
-            UploadTokenIntoStreamError::Internal(e) => e.api_err(),
-        })?;
-
-    Ok(axum::body::Body::from_stream(
-        tokio_util::io::ReaderStream::new(stream),
-    ))
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
+/// Upload file to temporary storage
+#[utoipa::path(
+    post,
+    path = "/platform/file/upload/{upload_token}",
+    request_body = Vec<u8>,
+    responses((status = OK, body = UploadContext)),
+    tag = "kamu",
+    security(
+        ("api_key" = []),
+    )
+)]
 #[allow(clippy::unused_async)]
 pub async fn platform_file_upload_post_handler(
     catalog: axum::extract::Extension<dill::Catalog>,
@@ -118,6 +117,40 @@ pub async fn platform_file_upload_post_handler(
             SaveUploadError::NotSupported(e) => Err(ApiError::bad_request(e)),
         },
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Get file from temporary storage
+#[utoipa::path(
+    get,
+    path = "/platform/file/upload/{upload_token}",
+    responses((status = OK, body = Vec<u8>)),
+    tag = "kamu",
+    security(
+        ("api_key" = []),
+    )
+)]
+#[allow(clippy::unused_async)]
+pub async fn platform_file_upload_get_handler(
+    catalog: axum::extract::Extension<dill::Catalog>,
+    axum::extract::Path(upload_param): axum::extract::Path<UploadFromPath>,
+) -> Result<impl axum::response::IntoResponse, ApiError> {
+    let account_id = ensure_authenticated_account(&catalog).api_err()?;
+
+    let upload_local_service = catalog.get_one::<dyn UploadService>().unwrap();
+    let stream = upload_local_service
+        .upload_token_into_stream(&account_id, &upload_param.upload_token.0)
+        .await
+        .map_err(|e| match e {
+            UploadTokenIntoStreamError::ContentNotFound(e) => ApiError::not_found(e),
+            UploadTokenIntoStreamError::ContentLengthMismatch(e) => ApiError::bad_request(e),
+            UploadTokenIntoStreamError::Internal(e) => e.api_err(),
+        })?;
+
+    Ok(axum::body::Body::from_stream(
+        tokio_util::io::ReaderStream::new(stream),
+    ))
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -13,6 +13,10 @@ Recommendation: for ease of reading, use the following order:
 
 ## [Unreleased]
 ### Added
+- Introduced OpenAPI spec generation
+  - `/openapi.json` endpoint now returns the generated spec
+  - `/swagger` endpoint serves an embedded Swagger UI for viewing the spec directly in the running server
+  - OpenAPI schema is available in the repo `resources/openapi.json` beside its multi-tenant version
 - Added (or expanded) E2E tests for:
   - `kamu config` command
   - `kamu init` command
@@ -35,6 +39,9 @@ Recommendation: for ease of reading, use the following order:
   - `kamu pull` command
 - E2E: HTTP middleware is implemented, which improves stability of E2E tests
 - Added endpoint to read a recently uploaded file (`GET /platform/file/upload/{upload_token}`)
+### Changed
+- Removed support for deprecated V1 `/query` endpoint format
+- The `/tail` endpoint was updated to better match V2 `/query` endpoint
 ### Fixed
 - `kamu add`: fixed behavior when using `--stdin` and `--name` arguments
 

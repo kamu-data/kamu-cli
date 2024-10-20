@@ -31,13 +31,16 @@ kamu = { workspace = true, features = ["testing"] }
 # We add a dependency to ensure kamu-cli is up to date before calling tests
 kamu-cli = { workspace = true }
 kamu-cli-e2e-common = { workspace = true }
-kamu-cli-puppet = { workspace = true, default-features = false, features = ["extensions"] }
+kamu-cli-puppet = { workspace = true, default-features = false, features = [
+    "extensions",
+] }
 opendatafabric = { workspace = true }
 
 chrono = { version = "0.4", default-features = false }
 indoc = "2"
 pretty_assertions = { version = "1" }
 reqwest = { version = "0.12", default-features = false, features = [] }
+serde_json = { version = "1", default-features = false }
 tokio = { version = "1", default-features = false, features = [] }
 tokio-retry = "0.3"
 

@@ -20,6 +20,7 @@ use kamu_accounts::CurrentAccountSubject;
 use messaging_outbox::DummyOutboxImpl;
 use opendatafabric::*;
 use time_source::SystemTimeSourceDefault;
+use utoipa_axum::router::OpenApiRouter;
 
 use crate::harness::await_client_server_flow;
 
@@ -92,7 +93,7 @@ where
     Extractor: FromRequestParts<()> + Send + 'static,
     <Extractor as FromRequestParts<()>>::Rejection: std::fmt::Debug,
 {
-    let app = axum::Router::new()
+    let (router, _api) = OpenApiRouter::new()
         .nest(
             path,
             kamu_adapter_http::smart_transfer_protocol_router()
@@ -109,12 +110,13 @@ where
                     .allow_methods(vec![http::Method::GET, http::Method::POST])
                     .allow_headers(tower_http::cors::Any),
             ),
-        );
+        )
+        .split_for_parts();
 
     let addr = SocketAddr::from((IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 0));
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
     let local_addr = listener.local_addr().unwrap();
-    let server = axum::serve(listener, app.into_make_service());
+    let server = axum::serve(listener, router.into_make_service());
     (server.into_future(), local_addr)
 }
 

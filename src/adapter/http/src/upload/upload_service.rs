@@ -81,7 +81,7 @@ pub trait UploadService: Send + Sync {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct UploadContext {
     pub upload_url: String,
@@ -89,6 +89,8 @@ pub struct UploadContext {
     pub use_multipart: bool,
     pub headers: Vec<(String, String)>,
     pub fields: Vec<(String, String)>,
+
+    #[schema(value_type = String)]
     pub upload_token: UploadTokenBase64Json,
 }
 

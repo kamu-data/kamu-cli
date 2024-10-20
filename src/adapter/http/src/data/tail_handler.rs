@@ -25,20 +25,29 @@ use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_core::*;
 use opendatafabric::DatasetRef;
 
-use super::query_types::{DataFormat, SchemaFormat};
+use super::query_types::{DataFormat, Schema, SchemaFormat};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// TODO: This endpoint is temporary to enable some demo integrations
-// it should be properly re-designed in future to allow for different query
-// dialects, returning schema, error handling etc.
+/// Get a sample of latest events
+#[utoipa::path(
+    get,
+    path = "/tail",
+    params(DatasetTailParams),
+    responses((status = OK, body = DatasetTailResponse)),
+    tag = "odf-query",
+    security(
+        (),
+        ("api_key" = [])
+    )
+)]
 #[transactional_handler]
 #[tracing::instrument(level = "info", skip_all, (%dataset_ref))]
 pub async fn dataset_tail_handler(
     Extension(catalog): Extension<Catalog>,
     Extension(dataset_ref): Extension<DatasetRef>,
-    Query(params): Query<TailRequestParams>,
-) -> Result<Json<TailResponseBody>, ApiError> {
+    Query(params): Query<DatasetTailParams>,
+) -> Result<Json<DatasetTailResponse>, ApiError> {
     tracing::debug!(request = ?params, "Tail");
 
     let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
@@ -56,60 +65,70 @@ pub async fn dataset_tail_handler(
             QueryError::Internal(e) => e.api_err(),
         })?;
 
-    let schema = if params.include_schema {
-        Some(
-            super::query_types::serialize_schema(df.schema().as_arrow(), params.schema_format)
-                .api_err()?,
-        )
-    } else {
-        None
-    };
+    let schema = params
+        .schema_format
+        .map(|fmt| Schema::new(df.schema().inner().clone(), fmt));
 
     let record_batches = df.collect().await.int_err().api_err()?;
     let json = super::query_types::serialize_data(&record_batches, params.data_format).api_err()?;
     let data = serde_json::value::RawValue::from_string(json).unwrap();
 
-    Ok(Json(TailResponseBody { data, schema }))
+    Ok(Json(DatasetTailResponse {
+        data,
+        data_format: params.data_format,
+        schema,
+        schema_format: params.schema_format,
+    }))
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // TODO: Sanity limits
-#[derive(Debug, serde::Deserialize)]
+#[derive(Debug, serde::Deserialize, utoipa::IntoParams)]
 #[serde(rename_all = "camelCase")]
-pub struct TailRequestParams {
+pub struct DatasetTailParams {
+    /// Number of leading records to skip when returning result (used for
+    /// pagination)
     #[serde(default)]
-    skip: u64,
-    #[serde(default = "TailRequestParams::default_limit")]
-    limit: u64,
-    #[serde(alias = "format")]
+    pub skip: u64,
+
+    /// Maximum number of records to return (used for pagination)
+    #[serde(default = "DatasetTailParams::default_limit")]
+    pub limit: u64,
+
+    /// How the output data should be ecoded
     #[serde(default)]
-    data_format: DataFormat,
-    #[serde(default)]
-    schema_format: SchemaFormat,
-    #[serde(alias = "schema")]
-    #[serde(default = "TailRequestParams::default_include_schema")]
-    include_schema: bool,
+    pub data_format: DataFormat,
+
+    /// How to encode the schema of the result
+    pub schema_format: Option<SchemaFormat>,
 }
 
-impl TailRequestParams {
+impl DatasetTailParams {
     fn default_limit() -> u64 {
         100
-    }
-
-    fn default_include_schema() -> bool {
-        true
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, serde::Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
-pub struct TailResponseBody {
-    data: Box<serde_json::value::RawValue>,
+pub struct DatasetTailResponse {
+    /// Resulting data
+    #[schema(value_type = Object)]
+    pub data: Box<serde_json::value::RawValue>,
+
+    /// How data is layed out in the response
+    pub data_format: DataFormat,
+
+    /// Schema of the resulting data
     #[serde(skip_serializing_if = "Option::is_none")]
-    schema: Option<String>,
+    pub schema: Option<Schema>,
+
+    /// What representation is used for the schema
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub schema_format: Option<SchemaFormat>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

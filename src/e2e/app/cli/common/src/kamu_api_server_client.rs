@@ -96,15 +96,13 @@ impl KamuApiServerClient {
         node_url.join(format!("{dataset_alias}").as_str()).unwrap()
     }
 
-    pub async fn rest_api_call_assert(
+    pub async fn rest_api_call(
         &self,
         token: Option<String>,
         method: Method,
         endpoint: &str,
         request_body: Option<RequestBody>,
-        expected_status: StatusCode,
-        expected_response_body: Option<ExpectedResponseBody>,
-    ) {
+    ) -> Response {
         let endpoint = self.server_base_url.join(endpoint).unwrap();
         let mut request_builder = match method {
             Method::GET => self.http_client.get(endpoint),
@@ -128,10 +126,24 @@ impl KamuApiServerClient {
             }
         };
 
-        let response = match request_builder.send().await {
+        match request_builder.send().await {
             Ok(response_body) => response_body,
             Err(e) => panic!("Unexpected send error: {e:?}"),
-        };
+        }
+    }
+
+    pub async fn rest_api_call_assert(
+        &self,
+        token: Option<String>,
+        method: Method,
+        endpoint: &str,
+        request_body: Option<RequestBody>,
+        expected_status: StatusCode,
+        expected_response_body: Option<ExpectedResponseBody>,
+    ) {
+        let response = self
+            .rest_api_call(token, method, endpoint, request_body)
+            .await;
 
         pretty_assertions::assert_eq!(expected_status, response.status());
 

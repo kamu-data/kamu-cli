@@ -57,7 +57,9 @@ kamu-data-utils = { workspace = true }
 kamu-adapter-auth-oso = { workspace = true }
 kamu-adapter-flight-sql = { optional = true, workspace = true }
 kamu-adapter-graphql = { workspace = true }
-kamu-adapter-http = { workspace = true, features = ["e2e"], default-features = false }
+kamu-adapter-http = { workspace = true, features = [
+    "e2e",
+], default-features = false }
 kamu-adapter-oauth = { workspace = true }
 kamu-adapter-odata = { workspace = true }
 kamu-datafusion-cli = { workspace = true }
@@ -128,11 +130,18 @@ serde_json = "1"
 tonic = { version = "0.12", default-features = false }
 tower = "0.5"
 tower-http = { version = "0.5", features = ["trace", "cors"] }
+utoipa = { version = "5", default-features = true, features = ["macros"] }
+utoipa-swagger-ui = { version = "8", default-features = true, features = [
+    "axum",
+] }
+utoipa-axum = { version = "0.1", default-features = true, features = [] }
 
 # Web UI
 rust-embed = { optional = true, version = "8", features = [
     "interpolate-folder-path",
-    "compression",
+    # TODO: Re-enable compression when utoipa-swagger-ui supports it
+    # See: https://github.com/juhaku/utoipa/issues/1151
+    # "compression",
 ] }
 mime = "0.3"
 mime_guess = "2"
