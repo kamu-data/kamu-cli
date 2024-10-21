@@ -34,6 +34,8 @@ pub trait PullRequestPlanner: Send + Sync {
         options: &PullMultiOptions,
         in_multi_tenant_mode: bool,
     ) -> (Vec<PullItem>, Vec<PullResponse>);
+
+    fn prepare_pull_execution_steps(&self, plan: Vec<PullItem>) -> Vec<PullExecutionStep>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -115,6 +117,22 @@ impl Ord for PullItem {
             _ => Ordering::Equal,
         }
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug)]
+pub struct PullExecutionStep {
+    pub batch: Vec<PullItem>,
+    pub depth: i32,
+    pub kind: PullExecutionStepKind,
+}
+
+#[derive(Debug)]
+pub enum PullExecutionStepKind {
+    Ingest,
+    Transform,
+    Sync,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -219,8 +237,6 @@ impl Default for PullOptions {
 pub struct PullMultiOptions {
     /// Pull all dataset dependencies recursively in depth-first order
     pub recursive: bool,
-    /// Pull all known datasets
-    pub all: bool,
     /// Whether the datasets pulled from remotes should be permanently
     /// associated with them
     pub add_aliases: bool,
@@ -237,7 +253,6 @@ impl Default for PullMultiOptions {
     fn default() -> Self {
         Self {
             recursive: false,
-            all: false,
             add_aliases: true,
             ingest_options: PollingIngestOptions::default(),
             sync_options: SyncOptions::default(),

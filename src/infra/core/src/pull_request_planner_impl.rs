@@ -357,6 +357,19 @@ impl PullRequestPlannerImpl {
 
         Ok(max_dep_depth)
     }
+
+    fn slice(&self, mut plan: Vec<PullItem>) -> (i32, bool, Vec<PullItem>, Vec<PullItem>) {
+        let first_depth = plan[0].depth;
+        let first_is_remote = plan[0].remote_ref.is_some();
+
+        let count = plan
+            .iter()
+            .take_while(|pi| pi.depth == first_depth && pi.remote_ref.is_some() == first_is_remote)
+            .count();
+
+        let rest = plan.split_off(count);
+        (first_depth, first_is_remote, plan, rest)
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -401,6 +414,28 @@ impl PullRequestPlanner for PullRequestPlannerImpl {
         ordered.extend(visited.into_values());
         ordered.sort();
         (ordered, errors)
+    }
+
+    fn prepare_pull_execution_steps(&self, plan: Vec<PullItem>) -> Vec<PullExecutionStep> {
+        let mut steps = Vec::new();
+
+        let mut rest = plan;
+        while !rest.is_empty() {
+            let (depth, is_remote, batch, tail) = self.slice(rest);
+            rest = tail;
+
+            let kind = if depth == 0 && !is_remote {
+                PullExecutionStepKind::Ingest
+            } else if depth == 0 && is_remote {
+                PullExecutionStepKind::Sync
+            } else {
+                PullExecutionStepKind::Transform
+            };
+
+            steps.push(PullExecutionStep { batch, depth, kind });
+        }
+
+        steps
     }
 }
 

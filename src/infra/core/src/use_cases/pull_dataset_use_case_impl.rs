@@ -19,6 +19,7 @@ use kamu_core::{
     PollingIngestMultiListener,
     PollingIngestService,
     PullDatasetUseCase,
+    PullExecutionStepKind,
     PullItem,
     PullListener,
     PullMultiListener,
@@ -80,25 +81,9 @@ impl PullDatasetUseCaseImpl {
         }
     }
 
-    fn slice<'a>(&self, to_slice: &'a [PullItem]) -> (i32, bool, &'a [PullItem], &'a [PullItem]) {
-        let first = &to_slice[0];
-        let count = to_slice
-            .iter()
-            .take_while(|pi| {
-                pi.depth == first.depth && pi.remote_ref.is_some() == first.remote_ref.is_some()
-            })
-            .count();
-        (
-            first.depth,
-            first.remote_ref.is_some(),
-            &to_slice[..count],
-            &to_slice[count..],
-        )
-    }
-
     async fn ingest_multi(
         &self,
-        batch: &[PullItem], // TODO: Move to avoid cloning
+        batch: &[PullItem],
         options: &PullMultiOptions,
         listener: Option<Arc<dyn PollingIngestMultiListener>>,
     ) -> Result<Vec<PullResponse>, InternalError> {
@@ -245,7 +230,6 @@ impl PullDatasetUseCase for PullDatasetUseCaseImpl {
                 vec![request],
                 PullMultiOptions {
                     recursive: false,
-                    all: false,
                     reset_derivatives_on_diverged_input: options
                         .reset_derivatives_on_diverged_input,
                     add_aliases: options.add_aliases,
@@ -271,10 +255,6 @@ impl PullDatasetUseCase for PullDatasetUseCaseImpl {
         // TODO:
         //  - recursive complex planning may be skipped if there is just 1 dataset, and
         //    no recursive/all flags
-        //  - prepare plan of execution iterations in planner itself, so that whole
-        //    planning can be a separate transaction job .. use case will then execute
-        //    the plain in a for loop, while other clients will call services without
-        //    transaction
         let (mut plan, errors) = self
             .pull_request_planner
             .collect_pull_graph(&requests, &options, self.in_multi_tenant_mode)
@@ -289,53 +269,61 @@ impl PullDatasetUseCase for PullDatasetUseCaseImpl {
             return errors;
         }
 
-        if !(options.recursive || options.all) {
+        if !options.recursive {
             // Leave only datasets explicitly mentioned, preserving the depth order
             plan.retain(|pi| pi.original_request.is_some());
         }
 
         tracing::info!(num_items = plan.len(), ?plan, "Retained pull plan");
-
         let mut results = Vec::with_capacity(plan.len());
 
-        let mut rest = &plan[..];
-        while !rest.is_empty() {
-            let (depth, is_remote, batch, tail) = self.slice(rest);
-            rest = tail;
+        let execution_steps = self.pull_request_planner.prepare_pull_execution_steps(plan);
+        tracing::info!(
+            num_steps = execution_steps.len(),
+            "Prepared pull execution plan"
+        );
 
-            let results_level: Vec<_> = if depth == 0 && !is_remote {
-                tracing::info!(%depth, ?batch, "Running ingest batch");
-                self.ingest_multi(
-                    batch,
-                    &options,
-                    listener
-                        .as_ref()
-                        .and_then(|l| l.clone().get_ingest_listener()),
-                )
-                .await
-                .unwrap() // TODO
-            } else if depth == 0 && is_remote {
-                tracing::info!(%depth, ?batch, "Running sync batch");
-                self.sync_multi(
-                    batch,
-                    &options,
-                    listener
-                        .as_ref()
-                        .and_then(|l| l.clone().get_sync_listener()),
-                )
-                .await
-                .unwrap() // TODO
-            } else {
-                tracing::info!(%depth, ?batch, "Running transform batch");
-                self.transform_multi(
-                    batch,
-                    listener
-                        .as_ref()
-                        .and_then(|l| l.clone().get_transform_listener()),
-                    options.reset_derivatives_on_diverged_input,
-                )
-                .await
-                .unwrap() // TODO
+        for execution_step in execution_steps {
+            let results_level: Vec<_> = match execution_step.kind {
+                // Ingestion
+                PullExecutionStepKind::Ingest => {
+                    tracing::info!(depth = %execution_step.depth, batch = ?execution_step.batch, "Running ingest batch");
+                    self.ingest_multi(
+                        &execution_step.batch,
+                        &options,
+                        listener
+                            .as_ref()
+                            .and_then(|l| l.clone().get_ingest_listener()),
+                    )
+                    .await
+                    .unwrap() // TODO
+                }
+                // Sync
+                PullExecutionStepKind::Sync => {
+                    tracing::info!(depth = %execution_step.depth, batch = ?execution_step.batch, "Running sync batch");
+                    self.sync_multi(
+                        &execution_step.batch,
+                        &options,
+                        listener
+                            .as_ref()
+                            .and_then(|l| l.clone().get_sync_listener()),
+                    )
+                    .await
+                    .unwrap() // TODO
+                }
+                // Transform
+                PullExecutionStepKind::Transform => {
+                    tracing::info!(depth = %execution_step.depth, batch = ?execution_step.batch, "Running transform batch");
+                    self.transform_multi(
+                        &execution_step.batch,
+                        listener
+                            .as_ref()
+                            .and_then(|l| l.clone().get_transform_listener()),
+                        options.reset_derivatives_on_diverged_input,
+                    )
+                    .await
+                    .unwrap() // TODO
+                }
             };
 
             let errors = results_level.iter().any(|r| r.result.is_err());

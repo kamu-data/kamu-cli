@@ -161,7 +161,6 @@ impl PullCommand {
                 requests,
                 PullMultiOptions {
                     recursive: self.recursive,
-                    all: self.all,
                     add_aliases: self.add_aliases,
                     reset_derivatives_on_diverged_input: self.reset_derivatives_on_diverged_input,
                     ingest_options: PollingIngestOptions {
