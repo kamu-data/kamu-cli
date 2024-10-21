@@ -24,7 +24,7 @@ COPY podman/storage-user.conf /root/.config/containers/storage.conf
 # Create empty storage not to get errors when it's not mounted 
 # See: https://www.redhat.com/sysadmin/image-stores-podman
 RUN mkdir -p \
-    /var/lib/containers/shared/overlay-images \ 
+    /var/lib/containers/shared/overlay-images \
     /var/lib/containers/shared/overlay-layers \
     /var/lib/containers/shared/vfs-images \
     /var/lib/containers/shared/vfs-layers && \
