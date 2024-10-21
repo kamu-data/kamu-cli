@@ -5765,6 +5765,7 @@ dependencies = [
  "opendatafabric",
  "pretty_assertions",
  "reqwest",
+ "serde_json",
  "tokio",
  "tokio-retry",
 ]
