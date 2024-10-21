@@ -101,12 +101,27 @@ impl Harness {
         )
     }
 
+    fn upload_retreive_url(&self) -> String {
+        format!("http://{}/platform/file/upload", self.api_server_addr(),)
+    }
+
     async fn read_bucket_file_as_string(bucket_contest: &S3Context, file_key: String) -> String {
         let get_object_output = bucket_contest.get_object(file_key).await.unwrap();
         let mut stream = get_object_output.body.into_async_read();
         let mut data: Vec<u8> = Vec::new();
         stream.read_to_end(&mut data).await.unwrap();
         String::from_utf8(data).expect("Our bytes should be valid utf8")
+    }
+
+    fn make_header_map(upload_context: &UploadContext) -> HeaderMap {
+        let mut header_map = HeaderMap::new();
+        for header in &upload_context.headers {
+            header_map.insert(
+                HeaderName::from_bytes(header.0.as_bytes()).unwrap(),
+                HeaderValue::from_str(&header.1).unwrap(),
+            );
+        }
+        header_map
     }
 
     async fn api_server_run(self) -> Result<(), InternalError> {
@@ -177,18 +192,11 @@ async fn test_attempt_upload_file_authorized() {
             vec![(String::from("x-amz-acl"), String::from("private"))]
         );
 
-        let upload_main_url = upload_context.upload_url;
-
-        let mut header_map = HeaderMap::new();
-        for header in upload_context.headers {
-            header_map.insert(
-                HeaderName::from_bytes(header.0.as_bytes()).unwrap(),
-                HeaderValue::from_str(&header.1).unwrap(),
-            );
-        }
+        let header_map = Harness::make_header_map(&upload_context);
+        let s3_upload_url = upload_context.upload_url;
 
         let s3_upload_response = client
-            .put(upload_main_url.clone())
+            .put(s3_upload_url)
             .headers(header_map)
             .body(FILE_BODY)
             .send()
@@ -255,6 +263,61 @@ async fn test_attempt_upload_file_that_is_too_large() {
         );
 
         // Note: S3/Minio will of course accept up to their limit (5Gb?)
+    };
+
+    await_client_server_flow!(harness.api_server_run(), client);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(containerized)]
+#[test_log::test(tokio::test)]
+async fn test_upload_then_read_file() {
+    const FILE_BODY: &str = "a-test-file-body";
+
+    let harness = Harness::new().await;
+    let upload_prepare_url = harness.upload_prepare_url("test.txt", "text/plain", FILE_BODY.len());
+    let retreive_url = harness.upload_retreive_url();
+    let access_token = harness.access_token.clone();
+
+    let client = async move {
+        let client = reqwest::Client::new();
+        let upload_prepare_response = client
+            .post(upload_prepare_url)
+            .bearer_auth(access_token.clone())
+            .send()
+            .await
+            .unwrap();
+
+        assert_eq!(200, upload_prepare_response.status());
+        let upload_context = upload_prepare_response
+            .json::<UploadContext>()
+            .await
+            .unwrap();
+
+        let header_map = Harness::make_header_map(&upload_context);
+        let s3_upload_url = upload_context.upload_url;
+
+        let s3_upload_response = client
+            .put(s3_upload_url)
+            .headers(header_map)
+            .body(FILE_BODY)
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(200, s3_upload_response.status());
+
+        let upload_retreive_response = client
+            .get(format!("{retreive_url}/{}", upload_context.upload_token))
+            .bearer_auth(access_token)
+            .send()
+            .await
+            .unwrap();
+
+        assert_eq!(200, upload_retreive_response.status());
+
+        let file_body = upload_retreive_response.text().await.unwrap();
+        assert_eq!(FILE_BODY, file_body);
     };
 
     await_client_server_flow!(harness.api_server_run(), client);

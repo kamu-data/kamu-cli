@@ -34,6 +34,7 @@ Recommendation: for ease of reading, use the following order:
   - `kamu push` command
   - `kamu pull` command
 - E2E: HTTP middleware is implemented, which improves stability of E2E tests
+- Added endpoint to read a recently uploaded file (`GET /platform/file/upload/{upload_token}`)
 ### Fixed
 - `kamu add`: fixed behavior when using `--stdin` and `--name` arguments
 

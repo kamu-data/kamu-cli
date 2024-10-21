@@ -359,3 +359,65 @@ async fn test_attempt_upload_file_that_has_different_length_than_declared() {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_upload_then_read_file() {
+    const FILE_BODY: &str = "a-test-file-body";
+
+    let harness = Harness::new().await;
+    let upload_prepare_url = harness.upload_prepare_url("test.txt", "text/plain", FILE_BODY.len());
+    let access_token = harness.access_token.clone();
+
+    let client = async move {
+        let client = reqwest::Client::new();
+
+        let upload_prepare_response = client
+            .post(upload_prepare_url)
+            .bearer_auth(access_token.clone())
+            .send()
+            .await
+            .unwrap();
+
+        assert_eq!(200, upload_prepare_response.status());
+        let upload_context = upload_prepare_response
+            .json::<UploadContext>()
+            .await
+            .unwrap();
+
+        let upload_main_url = upload_context.upload_url;
+
+        let upload_main_response = client
+            .post(upload_main_url.clone())
+            .bearer_auth(access_token.clone())
+            .multipart(
+                reqwest::multipart::Form::new().part(
+                    "file",
+                    reqwest::multipart::Part::text(FILE_BODY)
+                        .file_name("test.txt")
+                        .mime_str("text/plain")
+                        .unwrap(),
+                ),
+            )
+            .send()
+            .await
+            .unwrap();
+
+        assert_eq!(200, upload_main_response.status());
+
+        let upload_retreive_response = client
+            .get(upload_main_url)
+            .bearer_auth(access_token)
+            .send()
+            .await
+            .unwrap();
+
+        assert_eq!(200, upload_retreive_response.status());
+
+        let file_body = upload_retreive_response.text().await.unwrap();
+        assert_eq!(FILE_BODY, file_body);
+    };
+
+    await_client_server_flow!(harness.api_server_run(), client);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

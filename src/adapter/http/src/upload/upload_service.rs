@@ -33,14 +33,14 @@ pub trait UploadService: Send + Sync {
         account_id: &AccountID,
         upload_id: &str,
         file_name: &str,
-    ) -> Result<usize, InternalError>;
+    ) -> Result<usize, UploadTokenIntoStreamError>;
 
     async fn upload_reference_into_stream(
         &self,
         account_id: &AccountID,
         upload_id: &str,
         file_name: &str,
-    ) -> Result<Box<dyn AsyncRead + Send + Unpin>, InternalError>;
+    ) -> Result<Box<dyn AsyncRead + Send + Unpin>, UploadTokenIntoStreamError>;
 
     async fn save_upload(
         &self,
@@ -57,8 +57,7 @@ pub trait UploadService: Send + Sync {
     ) -> Result<Box<dyn AsyncRead + Send + Unpin>, UploadTokenIntoStreamError> {
         let actual_data_size = self
             .upload_reference_size(account_id, &upload_token.upload_id, &upload_token.file_name)
-            .await
-            .map_err(UploadTokenIntoStreamError::Internal)?;
+            .await?;
 
         if actual_data_size != upload_token.content_length {
             let e = ContentLengthMismatchError {
@@ -74,8 +73,7 @@ pub trait UploadService: Send + Sync {
                 &upload_token.upload_id,
                 &upload_token.file_name,
             )
-            .await
-            .map_err(UploadTokenIntoStreamError::Internal)?;
+            .await?;
 
         Ok(stream)
     }
@@ -121,6 +119,8 @@ pub enum UploadTokenIntoStreamError {
     #[error(transparent)]
     ContentLengthMismatch(ContentLengthMismatchError),
     #[error(transparent)]
+    ContentNotFound(ContentNotFoundError),
+    #[error(transparent)]
     Internal(InternalError),
 }
 
@@ -138,6 +138,10 @@ pub struct ContentLengthMismatchError {
 #[derive(Debug, Error)]
 #[error("Direct file uploads are not supported in this environment")]
 pub struct UploadNotSupportedError {}
+
+#[derive(Debug, Error)]
+#[error("Uploaded file not found on the server")]
+pub struct ContentNotFoundError {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

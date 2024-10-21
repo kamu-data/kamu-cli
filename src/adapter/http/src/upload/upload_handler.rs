@@ -15,7 +15,7 @@ use serde::de::IntoDeserializer as _;
 use serde::Deserialize as _;
 use thiserror::Error;
 
-use super::{UploadContext, UploadTokenBase64Json};
+use super::{UploadContext, UploadTokenBase64Json, UploadTokenIntoStreamError};
 use crate::axum_utils::ensure_authenticated_account;
 use crate::{MakeUploadContextError, SaveUploadError, UploadService};
 
@@ -60,6 +60,32 @@ pub async fn platform_file_upload_prepare_post_handler(
 pub struct UploadFromPath {
     upload_token: UploadTokenBase64Json,
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[allow(clippy::unused_async)]
+pub async fn platform_file_upload_get_handler(
+    catalog: axum::extract::Extension<dill::Catalog>,
+    axum::extract::Path(upload_param): axum::extract::Path<UploadFromPath>,
+) -> Result<impl axum::response::IntoResponse, ApiError> {
+    let account_id = ensure_authenticated_account(&catalog).api_err()?;
+
+    let upload_local_service = catalog.get_one::<dyn UploadService>().unwrap();
+    let stream = upload_local_service
+        .upload_token_into_stream(&account_id, &upload_param.upload_token.0)
+        .await
+        .map_err(|e| match e {
+            UploadTokenIntoStreamError::ContentNotFound(e) => ApiError::not_found(e),
+            UploadTokenIntoStreamError::ContentLengthMismatch(e) => ApiError::bad_request(e),
+            UploadTokenIntoStreamError::Internal(e) => e.api_err(),
+        })?;
+
+    Ok(axum::body::Body::from_stream(
+        tokio_util::io::ReaderStream::new(stream),
+    ))
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[allow(clippy::unused_async)]
 pub async fn platform_file_upload_post_handler(

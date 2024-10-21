@@ -9,18 +9,19 @@
 
 use std::sync::Arc;
 
+use aws_sdk_s3::error::SdkError;
 use aws_sdk_s3::presigning::PresigningConfig;
 use aws_sdk_s3::types::ObjectCannedAcl;
 use bytes::Bytes;
 use dill::*;
-use internal_error::{ErrorIntoInternal, InternalError};
+use internal_error::ErrorIntoInternal;
 use kamu::utils::s3_context::S3Context;
 use kamu_core::MediaType;
 use opendatafabric::AccountID;
 use tokio::io::AsyncRead;
 use uuid::Uuid;
 
-use super::{UploadToken, UploadTokenBase64Json};
+use super::{ContentNotFoundError, UploadToken, UploadTokenBase64Json, UploadTokenIntoStreamError};
 use crate::{
     ContentTooLargeError,
     FileUploadLimitConfig,
@@ -110,18 +111,26 @@ impl UploadService for UploadServiceS3 {
         account_id: &AccountID,
         upload_id: &str,
         file_name: &str,
-    ) -> Result<usize, InternalError> {
+    ) -> Result<usize, UploadTokenIntoStreamError> {
         let file_key = self.make_file_key(account_id, upload_id, file_name);
 
         let res = self
             .s3_upload_context
             .head_object(file_key)
             .await
-            .map_err(ErrorIntoInternal::int_err)?;
+            .map_err(|e| {
+                tracing::error!(error = ?e, "S3 head object failed");
+                if let SdkError::ServiceError(_) = e {
+                    UploadTokenIntoStreamError::ContentNotFound(ContentNotFoundError {})
+                } else {
+                    UploadTokenIntoStreamError::Internal(e.int_err())
+                }
+            })?;
 
         let content_length = res
             .content_length
-            .ok_or_else(|| "S3 did not return content length".int_err())?;
+            .ok_or_else(|| "S3 did not return content length".int_err())
+            .map_err(UploadTokenIntoStreamError::Internal)?;
 
         Ok(usize::try_from(content_length).unwrap())
     }
@@ -131,13 +140,21 @@ impl UploadService for UploadServiceS3 {
         account_id: &AccountID,
         upload_id: &str,
         file_name: &str,
-    ) -> Result<Box<dyn AsyncRead + Send + Unpin>, InternalError> {
+    ) -> Result<Box<dyn AsyncRead + Send + Unpin>, UploadTokenIntoStreamError> {
         let file_key = self.make_file_key(account_id, upload_id, file_name);
         let resp = self
             .s3_upload_context
             .get_object(file_key)
             .await
-            .map_err(ErrorIntoInternal::int_err)?;
+            .map_err(|e| {
+                tracing::error!(error = ?e, "S3 get object failed");
+                if let SdkError::ServiceError(_) = e {
+                    UploadTokenIntoStreamError::ContentNotFound(ContentNotFoundError {})
+                } else {
+                    UploadTokenIntoStreamError::Internal(e.int_err())
+                }
+            })?;
+
         let stream = resp.body.into_async_read();
         Ok(Box::new(stream))
     }
