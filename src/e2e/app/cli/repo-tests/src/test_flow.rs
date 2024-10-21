@@ -13,7 +13,7 @@ use tokio_retry::Retry;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_get_dataset_list_flows(kamu_api_server_client: KamuApiServerClient) {
+pub async fn test_web_ui_get_dataset_list_flows(kamu_api_server_client: KamuApiServerClient) {
     let token = kamu_api_server_client.login_as_kamu().await;
 
     let dataset_id = kamu_api_server_client
@@ -84,7 +84,7 @@ pub async fn test_get_dataset_list_flows(kamu_api_server_client: KamuApiServerCl
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_dataset_all_flows_paused(kamu_api_server_client: KamuApiServerClient) {
+pub async fn test_web_ui_dataset_all_flows_paused(kamu_api_server_client: KamuApiServerClient) {
     let token = kamu_api_server_client.login_as_kamu().await;
 
     let dataset_id = kamu_api_server_client
@@ -143,7 +143,7 @@ pub async fn test_dataset_all_flows_paused(kamu_api_server_client: KamuApiServer
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_dataset_flows_initiators(kamu_api_server_client: KamuApiServerClient) {
+pub async fn test_web_ui_dataset_flows_initiators(kamu_api_server_client: KamuApiServerClient) {
     let token = kamu_api_server_client.login_as_kamu().await;
 
     let dataset_id = kamu_api_server_client
@@ -224,7 +224,7 @@ pub async fn test_dataset_flows_initiators(kamu_api_server_client: KamuApiServer
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_dataset_trigger_flow(kamu_api_server_client: KamuApiServerClient) {
+pub async fn test_web_ui_dataset_trigger_flow(kamu_api_server_client: KamuApiServerClient) {
     let token = kamu_api_server_client.login_as_kamu().await;
 
     let _root_dataset_id = kamu_api_server_client
