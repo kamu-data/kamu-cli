@@ -165,7 +165,8 @@ impl WebUIServer {
             )
             .route(
                 "/platform/file/upload/:upload_token",
-                axum::routing::post(kamu_adapter_http::platform_file_upload_post_handler),
+                axum::routing::post(kamu_adapter_http::platform_file_upload_post_handler)
+                    .get(kamu_adapter_http::platform_file_upload_get_handler),
             )
             .nest(
                 "/odata",

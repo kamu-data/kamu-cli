@@ -73,6 +73,7 @@ pub async fn dataset_ingest_handler(
             .await
             .map_err(|e| match e {
                 UploadTokenIntoStreamError::ContentLengthMismatch(e) => ApiError::bad_request(e),
+                UploadTokenIntoStreamError::ContentNotFound(e) => ApiError::not_found(e),
                 UploadTokenIntoStreamError::Internal(e) => e.api_err(),
             })?;
 

@@ -19,7 +19,7 @@ use thiserror::Error;
 use tokio::io::AsyncRead;
 use uuid::Uuid;
 
-use super::{UploadToken, UploadTokenBase64Json};
+use super::{ContentNotFoundError, UploadToken, UploadTokenBase64Json, UploadTokenIntoStreamError};
 use crate::{
     AccessToken,
     ContentLengthMismatchError,
@@ -123,13 +123,17 @@ impl UploadService for UploadServiceLocal {
         account_id: &AccountID,
         upload_id: &str,
         file_name: &str,
-    ) -> Result<usize, InternalError> {
+    ) -> Result<usize, UploadTokenIntoStreamError> {
         let upload_file_path = self
             .make_account_folder_path(account_id)
             .join(upload_id)
             .join(file_name);
 
-        let metadata = tokio::fs::metadata(upload_file_path).await.int_err()?;
+        let metadata = tokio::fs::metadata(upload_file_path).await.map_err(|e| {
+            tracing::error!(error=?e, "Reading upload file failed");
+            UploadTokenIntoStreamError::ContentNotFound(ContentNotFoundError {})
+        })?;
+
         Ok(usize::try_from(metadata.len()).unwrap())
     }
 
@@ -138,13 +142,18 @@ impl UploadService for UploadServiceLocal {
         account_id: &AccountID,
         upload_id: &str,
         file_name: &str,
-    ) -> Result<Box<dyn AsyncRead + Send + Unpin>, InternalError> {
+    ) -> Result<Box<dyn AsyncRead + Send + Unpin>, UploadTokenIntoStreamError> {
         let upload_file_path = self
             .make_account_folder_path(account_id)
             .join(upload_id)
             .join(file_name);
 
-        UploadServiceLocal::file_to_stream(&upload_file_path).await
+        UploadServiceLocal::file_to_stream(&upload_file_path)
+            .await
+            .map_err(|e| {
+                tracing::error!(error=?e, "Reading upload file failed");
+                UploadTokenIntoStreamError::ContentNotFound(ContentNotFoundError {})
+            })
     }
 
     async fn save_upload(

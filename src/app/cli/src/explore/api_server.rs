@@ -113,7 +113,8 @@ impl APIServer {
             )
             .route(
                 "/platform/file/upload/:upload_token",
-                axum::routing::post(kamu_adapter_http::platform_file_upload_post_handler),
+                axum::routing::post(kamu_adapter_http::platform_file_upload_post_handler)
+                    .get(kamu_adapter_http::platform_file_upload_get_handler),
             )
             .nest("/", kamu_adapter_http::data::root_router())
             .nest("/", kamu_adapter_http::general::root_router())
