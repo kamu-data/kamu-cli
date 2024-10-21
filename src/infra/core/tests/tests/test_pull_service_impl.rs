@@ -13,6 +13,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use dill::*;
+use internal_error::InternalError;
 use kamu::domain::*;
 use kamu::testing::*;
 use kamu::*;
@@ -167,25 +168,38 @@ async fn create_graph_remote(
     )
     .unwrap();
 
+    let dataset_factory = Arc::new(DatasetFactoryImpl::new(
+        IpfsGateway::default(),
+        Arc::new(auth::DummyOdfServerAccessTokenResolver::new()),
+    ));
+
     let sync_service = SyncServiceImpl::new(
         reg.clone(),
-        dataset_repo,
-        dataset_repo_writer,
-        Arc::new(DatasetFactoryImpl::new(
-            IpfsGateway::default(),
-            Arc::new(auth::DummyOdfServerAccessTokenResolver::new()),
-        )),
+        dataset_factory.clone(),
         Arc::new(DummySmartTransferProtocolClient::new()),
         Arc::new(kamu::utils::ipfs_wrapper::IpfsClient::default()),
+    );
+
+    let sync_request_builder = SyncRequestBuilder::new(
+        Arc::new(DatasetRegistryRepoBridge::new(dataset_repo)),
+        dataset_factory,
+        dataset_repo_writer,
+        reg.clone(),
     );
 
     for import_alias in to_import {
         sync_service
             .sync(
-                &import_alias
-                    .as_remote_alias(tmp_repo_name.clone())
-                    .into_any_ref(),
-                &import_alias.into_any_ref(),
+                sync_request_builder
+                    .build_sync_request(
+                        import_alias
+                            .as_remote_alias(tmp_repo_name.clone())
+                            .into_any_ref(),
+                        import_alias.into_any_ref(),
+                        true,
+                    )
+                    .await
+                    .unwrap(),
                 SyncOptions::default(),
                 None,
             )
@@ -1026,20 +1040,10 @@ impl TestSyncService {
 impl SyncService for TestSyncService {
     async fn sync(
         &self,
-        _src: &DatasetRefAny,
-        _dst: &DatasetRefAny,
+        _request: SyncRequest,
         _options: SyncOptions,
         _listener: Option<Arc<dyn SyncListener>>,
-    ) -> Result<SyncResult, SyncError> {
-        unimplemented!()
-    }
-
-    async fn sync_new(
-        &self,
-        _request: SyncRequestNew,
-        _options: SyncOptions,
-        _listener: Option<Arc<dyn SyncListener>>,
-    ) -> Result<SyncResult, SyncError> {
+    ) -> Result<SyncResponse, SyncError> {
         unimplemented!()
     }
 
@@ -1052,11 +1056,11 @@ impl SyncService for TestSyncService {
         let mut call = Vec::new();
         let mut results = Vec::new();
         for SyncRequest { src, dst } in requests {
-            call.push((src.clone(), dst.clone()));
+            call.push((src.src_ref.clone(), dst.dst_ref.clone()));
 
-            let local_ref = dst.as_local_single_tenant_ref().unwrap();
+            let local_ref = dst.dst_ref.as_local_single_tenant_ref().unwrap();
 
-            match self
+            let dataset = match self
                 .dataset_repo
                 .try_resolve_dataset_handle_by_ref(&local_ref)
                 .await
@@ -1070,18 +1074,23 @@ impl SyncService for TestSyncService {
                                 .build(),
                         )
                         .await
-                        .unwrap();
+                        .unwrap()
+                        .create_dataset_result
+                        .dataset
                 }
-                Some(_) => (),
-            }
+                Some(dataset_handle) => self.dataset_repo.get_dataset_by_handle(&dataset_handle),
+            };
 
             results.push(SyncResultMulti {
-                src,
-                dst,
-                result: Ok(SyncResult::Updated {
-                    old_head: None,
-                    new_head: Multihash::from_digest_sha3_256(b"boop"),
-                    num_blocks: 1,
+                src: src.src_ref,
+                dst: dst.dst_ref,
+                result: Ok(SyncResponse {
+                    result: SyncResult::Updated {
+                        old_head: None,
+                        new_head: Multihash::from_digest_sha3_256(b"boop"),
+                        num_blocks: 1,
+                    },
+                    local_dataset: dataset,
                 }),
             });
         }
@@ -1089,16 +1098,7 @@ impl SyncService for TestSyncService {
         results
     }
 
-    async fn sync_multi_new(
-        &self,
-        _requests: Vec<SyncRequestNew>,
-        _options: SyncOptions,
-        _listener: Option<Arc<dyn SyncMultiListener>>,
-    ) -> Vec<SyncResultMulti> {
-        unimplemented!()
-    }
-
-    async fn ipfs_add(&self, _src: &DatasetRef) -> Result<String, SyncError> {
+    async fn ipfs_add(&self, _src: Arc<dyn Dataset>) -> Result<String, InternalError> {
         unimplemented!()
     }
 }

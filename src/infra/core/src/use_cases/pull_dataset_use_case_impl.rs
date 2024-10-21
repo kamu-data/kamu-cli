@@ -14,7 +14,6 @@ use internal_error::{InternalError, ResultIntoInternal};
 //use kamu_core::auth::DatasetActionAuthorizer;
 use kamu_core::{
     DatasetRegistry,
-    DatasetRegistryExt,
     PollingIngestListener,
     PollingIngestMultiListener,
     PollingIngestService,
@@ -28,13 +27,14 @@ use kamu_core::{
     PullRequest,
     PullRequestPlanner,
     PullResponse,
-    PullResult,
     RemoteAliasKind,
     RemoteAliasesRegistry,
     ResolvedDataset,
     SyncListener,
     SyncMultiListener,
-    SyncRequest,
+    SyncResponse,
+    SyncResult,
+    SyncResultMulti,
     SyncService,
     TransformListener,
     TransformMultiListener,
@@ -42,6 +42,8 @@ use kamu_core::{
     TransformService,
 };
 use opendatafabric::{DatasetHandle, DatasetRefAny};
+
+use crate::SyncRequestBuilder;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -55,6 +57,7 @@ pub struct PullDatasetUseCaseImpl {
     ingest_svc: Arc<dyn PollingIngestService>,
     transform_svc: Arc<dyn TransformService>,
     sync_svc: Arc<dyn SyncService>,
+    sync_request_builder: Arc<SyncRequestBuilder>,
     in_multi_tenant_mode: bool,
 }
 
@@ -67,6 +70,7 @@ impl PullDatasetUseCaseImpl {
         ingest_svc: Arc<dyn PollingIngestService>,
         transform_svc: Arc<dyn TransformService>,
         sync_svc: Arc<dyn SyncService>,
+        sync_request_builder: Arc<SyncRequestBuilder>,
         in_multi_tenant_mode: bool,
     ) -> Self {
         Self {
@@ -77,18 +81,19 @@ impl PullDatasetUseCaseImpl {
             ingest_svc,
             transform_svc,
             sync_svc,
+            sync_request_builder,
             in_multi_tenant_mode,
         }
     }
 
     async fn ingest_multi(
         &self,
-        batch: &[PullItem],
+        batch: Vec<PullItem>,
         options: &PullMultiOptions,
         listener: Option<Arc<dyn PollingIngestMultiListener>>,
     ) -> Result<Vec<PullResponse>, InternalError> {
         let mut ingest_requests = Vec::new();
-        for item in batch {
+        for item in &batch {
             let dataset_handle = self
                 .dataset_registry
                 .resolve_dataset_handle_by_ref(&item.local_ref)
@@ -111,54 +116,70 @@ impl PullDatasetUseCaseImpl {
         Ok(std::iter::zip(batch, ingest_responses)
             .map(|(pi, res)| {
                 assert_eq!(pi.local_ref, res.dataset_ref);
-                pi.clone().into_response_ingest(res)
+                pi.into_response_ingest(res)
             })
             .collect())
     }
 
     async fn sync_multi(
         &self,
-        batch: &[PullItem], // TODO: Move to avoid cloning
+        batch: Vec<PullItem>,
         options: &PullMultiOptions,
         listener: Option<Arc<dyn SyncMultiListener>>,
     ) -> Result<Vec<PullResponse>, InternalError> {
-        let sync_requests = batch
-            .iter()
-            .map(|pi| SyncRequest {
-                src: pi.remote_ref.as_ref().unwrap().into(),
-                dst: pi.local_ref.as_any_ref(),
-            })
-            .collect();
+        let mut sync_requests = Vec::new();
+        let mut batch_rest = Vec::new();
+        let mut errors = Vec::new();
+
+        for pi in batch {
+            let src_ref: DatasetRefAny = pi.remote_ref.as_ref().unwrap().into();
+            let dst_ref = pi.local_ref.as_any_ref();
+            match self
+                .sync_request_builder
+                .build_sync_request(
+                    src_ref.clone(),
+                    dst_ref.clone(),
+                    options.sync_options.create_if_not_exists,
+                )
+                .await
+            {
+                Ok(request) => {
+                    sync_requests.push(request);
+                    batch_rest.push(pi);
+                }
+                Err(e) => errors.push(pi.into_response_sync(SyncResultMulti {
+                    src: src_ref,
+                    dst: dst_ref,
+                    result: Err(e),
+                })),
+            }
+        }
+
+        if !errors.is_empty() {
+            return Ok(errors);
+        }
 
         let sync_results = self
             .sync_svc
             .sync_multi(sync_requests, options.sync_options.clone(), listener)
             .await;
 
-        assert_eq!(batch.len(), sync_results.len());
+        assert_eq!(batch_rest.len(), sync_results.len());
 
-        let results: Vec<_> = std::iter::zip(batch, sync_results)
-            .map(|(pi, res)| {
-                assert_eq!(pi.local_ref.as_any_ref(), res.dst);
-                pi.clone().into_response_sync(res)
-            })
-            .collect();
+        let mut results = Vec::new();
+        for (pi, res) in std::iter::zip(batch_rest, sync_results) {
+            assert_eq!(pi.local_ref.as_any_ref(), res.dst);
 
-        // Associate newly-synced datasets with remotes
-        // TODO: take Arc<dyn Dataset> from results, they are not yet indexed for
-        // lookup!
-        if options.add_aliases {
-            for res in &results {
-                if let Ok(PullResult::Updated { old_head: None, .. }) = res.result {
-                    if let Some(remote_ref) = &res.remote_ref {
-                        let dataset = self
-                            .dataset_registry
-                            .get_dataset_by_ref(res.local_ref.as_ref().unwrap())
-                            .await
-                            .expect("Must resolve a checked dataset ref");
-
+            // Associate newly-synced datasets with remotes
+            if options.add_aliases {
+                if let Ok(SyncResponse {
+                    result: SyncResult::Updated { old_head: None, .. },
+                    local_dataset,
+                }) = &res.result
+                {
+                    if let Some(remote_ref) = &pi.remote_ref {
                         self.remote_alias_reg
-                            .get_remote_aliases(dataset)
+                            .get_remote_aliases(local_dataset.clone())
                             .await
                             .int_err()?
                             .add(remote_ref, RemoteAliasKind::Pull)
@@ -166,6 +187,8 @@ impl PullDatasetUseCaseImpl {
                     }
                 }
             }
+
+            results.push(pi.into_response_sync(res));
         }
 
         Ok(results)
@@ -173,12 +196,12 @@ impl PullDatasetUseCaseImpl {
 
     async fn transform_multi(
         &self,
-        batch: &[PullItem], // TODO: Move to avoid cloning
+        batch: Vec<PullItem>,
         transform_listener: Option<Arc<dyn TransformMultiListener>>,
         reset_derivatives_on_diverged_input: bool,
     ) -> Result<Vec<PullResponse>, InternalError> {
         let mut transform_requests = Vec::new();
-        for item in batch {
+        for item in &batch {
             let hdl = self
                 .dataset_registry
                 .resolve_dataset_handle_by_ref(&item.local_ref)
@@ -204,7 +227,7 @@ impl PullDatasetUseCaseImpl {
         Ok(std::iter::zip(batch, transform_results)
             .map(|(pi, res)| {
                 assert_eq!(pi.local_ref, res.0);
-                pi.clone().into_response_transform(res)
+                pi.into_response_transform(res)
             })
             .collect())
     }
@@ -289,7 +312,7 @@ impl PullDatasetUseCase for PullDatasetUseCaseImpl {
                 PullExecutionStepKind::Ingest => {
                     tracing::info!(depth = %execution_step.depth, batch = ?execution_step.batch, "Running ingest batch");
                     self.ingest_multi(
-                        &execution_step.batch,
+                        execution_step.batch,
                         &options,
                         listener
                             .as_ref()
@@ -302,7 +325,7 @@ impl PullDatasetUseCase for PullDatasetUseCaseImpl {
                 PullExecutionStepKind::Sync => {
                     tracing::info!(depth = %execution_step.depth, batch = ?execution_step.batch, "Running sync batch");
                     self.sync_multi(
-                        &execution_step.batch,
+                        execution_step.batch,
                         &options,
                         listener
                             .as_ref()
@@ -315,7 +338,7 @@ impl PullDatasetUseCase for PullDatasetUseCaseImpl {
                 PullExecutionStepKind::Transform => {
                     tracing::info!(depth = %execution_step.depth, batch = ?execution_step.batch, "Running transform batch");
                     self.transform_multi(
-                        &execution_step.batch,
+                        execution_step.batch,
                         listener
                             .as_ref()
                             .and_then(|l| l.clone().get_transform_listener()),

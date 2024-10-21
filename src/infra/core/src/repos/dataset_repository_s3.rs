@@ -19,7 +19,6 @@ use kamu_core::*;
 use opendatafabric::*;
 use time_source::SystemTimeSource;
 use tokio::sync::Mutex;
-use url::Url;
 
 use crate::utils::s3_context::S3Context;
 use crate::*;
@@ -89,6 +88,7 @@ impl DatasetRepositoryS3 {
                 ObjectRepositoryS3Sha3::new(s3_context.sub_context("data/")),
                 ObjectRepositoryS3Sha3::new(s3_context.sub_context("checkpoints/")),
                 NamedObjectRepositoryS3::new(s3_context.into_sub_context("info/")),
+                None,
             ))
         } else {
             Arc::new(DatasetImpl::new(
@@ -103,6 +103,7 @@ impl DatasetRepositoryS3 {
                 ObjectRepositoryS3Sha3::new(s3_context.sub_context("data/")),
                 ObjectRepositoryS3Sha3::new(s3_context.sub_context("checkpoints/")),
                 NamedObjectRepositoryS3::new(s3_context.into_sub_context("info/")),
+                None,
             ))
         }
     }
@@ -219,15 +220,6 @@ impl DatasetRepositoryS3 {
         } else {
             DatasetAlias::new(None, alias.dataset_name.clone())
         }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[async_trait]
-impl DatasetUrlResolver for DatasetRepositoryS3 {
-    async fn get_dataset_url(&self, _dataset_ref: &DatasetRef) -> Result<Url, GetDatasetUrlError> {
-        unimplemented!("get_dataset_url not supported by S3 repository")
     }
 }
 

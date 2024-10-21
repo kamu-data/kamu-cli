@@ -9,7 +9,6 @@
 
 pub mod dataset_factory;
 pub mod dataset_repository;
-pub mod dataset_url_resolver;
 pub mod metadata_block_repository;
 pub mod metadata_chain_visitor;
 pub mod metadata_chain_visitors;
@@ -20,7 +19,6 @@ pub mod reference_repository;
 
 pub use dataset_factory::*;
 pub use dataset_repository::*;
-pub use dataset_url_resolver::*;
 pub use metadata_block_repository::*;
 pub use metadata_chain_visitor::*;
 pub use metadata_chain_visitors::*;

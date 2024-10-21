@@ -64,6 +64,7 @@ impl DatasetRepositoryLocalFs {
             ObjectRepositoryLocalFSSha3::new(layout.data_dir),
             ObjectRepositoryLocalFSSha3::new(layout.checkpoints_dir),
             NamedObjectRepositoryLocalFS::new(layout.info_dir),
+            Some(Url::from_directory_path(&layout.root_dir).unwrap()),
         ))
     }
 
@@ -89,17 +90,6 @@ impl DatasetRepositoryLocalFs {
             .to_string();
 
         Ok((canonical_dataset_path, dataset_name_str))
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[async_trait]
-impl DatasetUrlResolver for DatasetRepositoryLocalFs {
-    async fn get_dataset_url(&self, dataset_ref: &DatasetRef) -> Result<Url, GetDatasetUrlError> {
-        let dataset_handle = self.resolve_dataset_handle_by_ref(dataset_ref).await?;
-        let dataset_path = self.storage_strategy.get_dataset_path(&dataset_handle);
-        Ok(Url::from_directory_path(dataset_path).unwrap())
     }
 }
 

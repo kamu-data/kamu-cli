@@ -465,6 +465,7 @@ pub fn get_command(
             cli::SystemSubCommand::Ipfs(sc) => match sc.subcommand {
                 cli::SystemIpfsSubCommand::Add(ssc) => Box::new(SystemIpfsAddCommand::new(
                     cli_catalog.get_one()?,
+                    cli_catalog.get_one()?,
                     ssc.dataset,
                 )),
             },

@@ -38,7 +38,7 @@ pub struct PushItem {
 }
 
 impl PushItem {
-    pub fn as_response(&self, result: Result<SyncResult, SyncError>) -> PushResponse {
+    pub fn as_response(&self, result: Result<SyncResponse, SyncError>) -> PushResponse {
         PushResponse {
             local_handle: Some(self.local_handle.clone()),
             target: self.push_target.clone(),
@@ -49,14 +49,13 @@ impl PushItem {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug)]
 pub struct PushResponse {
     /// Local dataset handle, if resolved
     pub local_handle: Option<DatasetHandle>,
     /// Destination reference, if resolved
     pub target: Option<DatasetPushTarget>,
     /// Result of the push operation
-    pub result: Result<SyncResult, PushError>,
+    pub result: Result<SyncResponse, PushError>,
 }
 
 impl std::fmt::Display for PushResponse {

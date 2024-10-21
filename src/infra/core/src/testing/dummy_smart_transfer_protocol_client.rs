@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use kamu_core::{Dataset, DatasetFactoryFn, SyncError, SyncListener, SyncResult};
+use kamu_core::{Dataset, DatasetFactoryFn, SyncError, SyncListener, SyncResponse};
 use opendatafabric::Multihash;
 use url::Url;
 
@@ -34,7 +34,7 @@ impl SmartTransferProtocolClient for DummySmartTransferProtocolClient {
         _dst_factory: Option<DatasetFactoryFn>,
         _listener: Arc<dyn SyncListener>,
         _transfer_options: TransferOptions,
-    ) -> Result<SyncResult, SyncError> {
+    ) -> Result<SyncResponse, SyncError> {
         unimplemented!("Not supported yet")
     }
 
@@ -45,7 +45,7 @@ impl SmartTransferProtocolClient for DummySmartTransferProtocolClient {
         _dst_head: Option<&Multihash>,
         _listener: Arc<dyn SyncListener>,
         _transfer_options: TransferOptions,
-    ) -> Result<SyncResult, SyncError> {
+    ) -> Result<SyncResponse, SyncError> {
         unimplemented!("Not supported yet")
     }
 }

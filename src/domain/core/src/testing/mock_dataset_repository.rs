@@ -10,26 +10,13 @@
 use std::sync::Arc;
 
 use opendatafabric::{AccountName, DatasetHandle, DatasetRef};
-use url::Url;
 
-use crate::{
-    Dataset,
-    DatasetHandleStream,
-    DatasetRepository,
-    DatasetUrlResolver,
-    GetDatasetError,
-    GetDatasetUrlError,
-};
+use crate::{Dataset, DatasetHandleStream, DatasetRepository, GetDatasetError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 mockall::mock! {
     pub DatasetRepository {}
-
-    #[async_trait::async_trait]
-    impl DatasetUrlResolver for DatasetRepository {
-        async fn get_dataset_url(&self, dataset_ref: &DatasetRef) -> Result<Url, GetDatasetUrlError>;
-    }
 
     #[async_trait::async_trait]
     impl DatasetRepository for DatasetRepository {

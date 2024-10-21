@@ -67,7 +67,7 @@ impl PullItem {
             local_ref: r.dst.as_local_ref(|_| true).ok(), // TODO: multi-tenancy
             remote_ref: r.src.as_remote_ref(|_| true).ok(),
             result: match r.result {
-                Ok(r) => Ok(r.into()),
+                Ok(response) => Ok(response.result.into()),
                 Err(e) => Err(e.into()),
             },
         }

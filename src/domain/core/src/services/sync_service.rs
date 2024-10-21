@@ -25,18 +25,10 @@ use crate::*;
 pub trait SyncService: Send + Sync {
     async fn sync(
         &self,
-        src: &DatasetRefAny,
-        dst: &DatasetRefAny,
+        request: SyncRequest,
         options: SyncOptions,
         listener: Option<Arc<dyn SyncListener>>,
-    ) -> Result<SyncResult, SyncError>;
-
-    async fn sync_new(
-        &self,
-        request: SyncRequestNew,
-        options: SyncOptions,
-        listener: Option<Arc<dyn SyncListener>>,
-    ) -> Result<SyncResult, SyncError>;
+    ) -> Result<SyncResponse, SyncError>;
 
     async fn sync_multi(
         &self,
@@ -45,25 +37,13 @@ pub trait SyncService: Send + Sync {
         listener: Option<Arc<dyn SyncMultiListener>>,
     ) -> Vec<SyncResultMulti>;
 
-    async fn sync_multi_new(
-        &self,
-        requests: Vec<SyncRequestNew>,
-        options: SyncOptions,
-        listener: Option<Arc<dyn SyncMultiListener>>,
-    ) -> Vec<SyncResultMulti>;
-
     /// Adds dataset to IPFS and returns the root CID.
     /// Unlike `sync` it does not do IPNS resolution and publishing.
-    async fn ipfs_add(&self, src: &DatasetRef) -> Result<String, SyncError>;
+    async fn ipfs_add(&self, src: Arc<dyn Dataset>) -> Result<String, InternalError>;
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct SyncRequest {
-    pub src: DatasetRefAny,
-    pub dst: DatasetRefAny,
-}
-
-pub struct SyncRequestNew {
     pub src: SyncRequestSource,
     pub dst: SyncRequestDestination,
 }
@@ -74,11 +54,29 @@ pub struct SyncRequestSource {
     pub sync_ref: SyncRef,
 }
 
+impl std::fmt::Debug for SyncRequestSource {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SyncRequestSource")
+            .field("src_ref", &self.src_ref)
+            .field("sync_ref", &self.sync_ref)
+            .finish_non_exhaustive()
+    }
+}
+
 pub struct SyncRequestDestination {
     pub maybe_dataset: Option<Arc<dyn Dataset>>,
     pub maybe_dataset_factory: Option<DatasetFactoryFn>,
     pub dst_ref: DatasetRefAny,
     pub sync_ref: SyncRef,
+}
+
+impl std::fmt::Debug for SyncRequestDestination {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SyncRequestDestination")
+            .field("dst_ref", &self.dst_ref)
+            .field("sync_ref", &self.sync_ref)
+            .finish_non_exhaustive()
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -119,11 +117,21 @@ pub enum SyncResult {
     },
 }
 
-#[derive(Debug)]
+pub struct SyncResponse {
+    pub result: SyncResult,
+    pub local_dataset: Arc<dyn Dataset>,
+}
+
+impl std::fmt::Debug for SyncResponse {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.result.fmt(f)
+    }
+}
+
 pub struct SyncResultMulti {
     pub src: DatasetRefAny,
     pub dst: DatasetRefAny,
-    pub result: Result<SyncResult, SyncError>,
+    pub result: Result<SyncResponse, SyncError>,
 }
 
 #[derive(Debug, Clone)]

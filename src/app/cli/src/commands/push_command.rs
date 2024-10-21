@@ -170,7 +170,7 @@ impl Command for PushCommand {
 
         for res in &push_results {
             match &res.result {
-                Ok(r) => match r {
+                Ok(response) => match response.result {
                     SyncResult::UpToDate => up_to_date += 1,
                     SyncResult::Updated { .. } => updated += 1,
                 },

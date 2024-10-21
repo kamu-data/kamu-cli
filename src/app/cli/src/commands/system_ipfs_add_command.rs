@@ -19,13 +19,19 @@ use super::{CLIError, Command};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct SystemIpfsAddCommand {
+    dataset_registry: Arc<dyn DatasetRegistry>,
     sync_svc: Arc<dyn SyncService>,
     dataset_ref: DatasetRef,
 }
 
 impl SystemIpfsAddCommand {
-    pub fn new(sync_svc: Arc<dyn SyncService>, dataset_ref: DatasetRef) -> Self {
+    pub fn new(
+        dataset_registry: Arc<dyn DatasetRegistry>,
+        sync_svc: Arc<dyn SyncService>,
+        dataset_ref: DatasetRef,
+    ) -> Self {
         Self {
+            dataset_registry,
             sync_svc,
             dataset_ref,
         }
@@ -35,9 +41,15 @@ impl SystemIpfsAddCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for SystemIpfsAddCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
+        let dataset = self
+            .dataset_registry
+            .get_dataset_by_ref(&self.dataset_ref)
+            .await
+            .map_err(CLIError::failure)?;
+
         let cid = self
             .sync_svc
-            .ipfs_add(&self.dataset_ref)
+            .ipfs_add(dataset)
             .await
             .map_err(CLIError::failure)?;
 

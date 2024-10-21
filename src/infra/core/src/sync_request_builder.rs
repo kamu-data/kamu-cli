@@ -24,8 +24,8 @@ use kamu_core::{
     RemoteRepositoryRegistry,
     SyncError,
     SyncRef,
+    SyncRequest,
     SyncRequestDestination,
-    SyncRequestNew,
     SyncRequestSource,
 };
 use opendatafabric::{DatasetHandleRemote, DatasetRefAny, DatasetRefRemote};
@@ -63,7 +63,7 @@ impl SyncRequestBuilder {
         src_ref: DatasetRefAny,
         dst_ref: DatasetRefAny,
         create_dst_if_not_exists: bool,
-    ) -> Result<SyncRequestNew, SyncError> {
+    ) -> Result<SyncRequest, SyncError> {
         let src_sync_ref = self.resolve_sync_ref(&src_ref)?;
         let src_dataset = self.get_dataset_reader(&src_sync_ref).await?;
 
@@ -72,7 +72,7 @@ impl SyncRequestBuilder {
             .get_dataset_writer(&dst_sync_ref, create_dst_if_not_exists)
             .await?;
 
-        let sync_request = SyncRequestNew {
+        let sync_request = SyncRequest {
             src: SyncRequestSource {
                 src_ref,
                 sync_ref: src_sync_ref,
@@ -92,30 +92,10 @@ impl SyncRequestBuilder {
     fn resolve_sync_ref(&self, any_ref: &DatasetRefAny) -> Result<SyncRef, SyncError> {
         match any_ref.as_local_ref(|repo| self.remote_repo_registry.get_repository(repo).is_ok()) {
             Ok(local_ref) => Ok(SyncRef::Local(local_ref)),
-            Err(remote_ref) => Ok(SyncRef::Remote(Arc::new(
-                self.resolve_remote_dataset_url(&remote_ref)?,
-            ))),
-        }
-    }
-
-    fn resolve_remote_dataset_url(&self, remote_ref: &DatasetRefRemote) -> Result<Url, SyncError> {
-        // TODO: REMOTE ID
-        match remote_ref {
-            DatasetRefRemote::ID(_, _) => Err(SyncError::Internal(
-                "Syncing remote dataset by ID is not yet supported".int_err(),
-            )),
-            DatasetRefRemote::Alias(alias)
-            | DatasetRefRemote::Handle(DatasetHandleRemote { alias, .. }) => {
-                let mut repo = self.remote_repo_registry.get_repository(&alias.repo_name)?;
-
-                repo.url.ensure_trailing_slash();
-                Ok(repo.url.join(&format!("{}/", alias.local_alias())).unwrap())
-            }
-            DatasetRefRemote::Url(url) => {
-                let mut dataset_url = url.as_ref().clone();
-                dataset_url.ensure_trailing_slash();
-                Ok(dataset_url)
-            }
+            Err(remote_ref) => Ok(SyncRef::Remote(Arc::new(resolve_remote_dataset_url(
+                self.remote_repo_registry.as_ref(),
+                &remote_ref,
+            )?))),
         }
     }
 
@@ -205,6 +185,32 @@ impl SyncRequestBuilder {
 
                 Ok((Some(dataset), None))
             }
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) fn resolve_remote_dataset_url(
+    remote_repo_registry: &dyn RemoteRepositoryRegistry,
+    remote_ref: &DatasetRefRemote,
+) -> Result<Url, SyncError> {
+    // TODO: REMOTE ID
+    match remote_ref {
+        DatasetRefRemote::ID(_, _) => Err(SyncError::Internal(
+            "Syncing remote dataset by ID is not yet supported".int_err(),
+        )),
+        DatasetRefRemote::Alias(alias)
+        | DatasetRefRemote::Handle(DatasetHandleRemote { alias, .. }) => {
+            let mut repo = remote_repo_registry.get_repository(&alias.repo_name)?;
+
+            repo.url.ensure_trailing_slash();
+            Ok(repo.url.join(&format!("{}/", alias.local_alias())).unwrap())
+        }
+        DatasetRefRemote::Url(url) => {
+            let mut dataset_url = url.as_ref().clone();
+            dataset_url.ensure_trailing_slash();
+            Ok(dataset_url)
         }
     }
 }

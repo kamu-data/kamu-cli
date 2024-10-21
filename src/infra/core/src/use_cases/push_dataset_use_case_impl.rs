@@ -30,7 +30,7 @@ use kamu_core::{
     SyncError,
     SyncMultiListener,
     SyncOptions,
-    SyncRequestNew,
+    SyncRequest,
     SyncService,
 };
 use opendatafabric::{DatasetHandle, DatasetPushTarget, DatasetRefAny};
@@ -102,7 +102,7 @@ impl PushDatasetUseCaseImpl {
         plan: &[PushItem],
         sync_options: &SyncOptions,
         push_target: Option<&DatasetPushTarget>,
-    ) -> (Vec<SyncRequestNew>, Vec<PushResponse>) {
+    ) -> (Vec<SyncRequest>, Vec<PushResponse>) {
         let mut sync_requests = Vec::new();
         let mut errors = Vec::new();
 
@@ -171,7 +171,7 @@ impl PushDatasetUseCase for PushDatasetUseCaseImpl {
         // Run sync process
         let sync_results = self
             .sync_service
-            .sync_multi_new(sync_requests, options.sync_options, sync_listener)
+            .sync_multi(sync_requests, options.sync_options, sync_listener)
             .await;
 
         // Convert results

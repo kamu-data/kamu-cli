@@ -298,7 +298,7 @@ impl ClientSideHarness {
             .await;
 
         match &(results.first().unwrap().result) {
-            Ok(sync_result) => sync_result.clone(),
+            Ok(sync_response) => sync_response.result.clone(),
             Err(e) => {
                 println!("Error: {e:#?}");
                 panic!("Failure")
