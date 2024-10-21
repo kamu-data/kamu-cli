@@ -78,6 +78,11 @@ impl LoginCommand {
         if !self.skip_add_repo {
             self.add_repository(odf_server_backend_url, odf_server_backend_url)?;
         }
+        eprintln!(
+            "{}: {}",
+            console::style("Login successful").green().bold(),
+            odf_server_backend_url
+        );
 
         Ok(())
     }

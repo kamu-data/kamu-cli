@@ -12,7 +12,7 @@ use std::sync::Arc;
 use datafusion::arrow::array::{RecordBatch, StringArray};
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use futures::TryStreamExt;
-use internal_error::ResultIntoInternal;
+use internal_error::{InternalError, ResultIntoInternal};
 use kamu::domain::*;
 use opendatafabric::*;
 
@@ -41,29 +41,10 @@ impl AliasListCommand {
         }
     }
 
-    fn records_format(&self) -> RecordsFormat {
-        RecordsFormat::new()
-            .with_default_column_format(ColumnFormat::default())
-            .with_column_formats(vec![
-                ColumnFormat::new().with_style_spec("l"),
-                ColumnFormat::new().with_style_spec("c"),
-                ColumnFormat::new().with_style_spec("l"),
-            ])
-    }
-
-    fn schema(&self) -> Arc<Schema> {
-        Arc::new(Schema::new(vec![
-            Field::new("Dataset", DataType::Utf8, false),
-            Field::new("Kind", DataType::Utf8, false),
-            Field::new("Alias", DataType::Utf8, false),
-        ]))
-    }
-
-    async fn records(
+    async fn record_batch(
         &self,
-        schema: Arc<Schema>,
         datasets: &Vec<DatasetHandle>,
-    ) -> Result<RecordBatch, CLIError> {
+    ) -> Result<RecordBatch, InternalError> {
         let mut col_dataset = Vec::new();
         let mut col_kind = Vec::new();
         let mut col_alias = Vec::new();
@@ -72,7 +53,8 @@ impl AliasListCommand {
             let aliases = self
                 .remote_alias_reg
                 .get_remote_aliases(&ds.as_local_ref())
-                .await?;
+                .await
+                .int_err()?;
             let mut pull_aliases: Vec<_> = aliases
                 .get_by_kind(RemoteAliasKind::Pull)
                 .map(ToString::to_string)
@@ -98,19 +80,15 @@ impl AliasListCommand {
             }
         }
 
-        let records = RecordBatch::try_new(
-            schema,
-            vec![
-                Arc::new(StringArray::from(col_dataset)),
-                Arc::new(StringArray::from(col_kind)),
-                Arc::new(StringArray::from(col_alias)),
-            ],
-        )
-        .int_err()?;
-
-        Ok(records)
+        self.records(vec![
+            Arc::new(StringArray::from(col_dataset)),
+            Arc::new(StringArray::from(col_kind)),
+            Arc::new(StringArray::from(col_alias)),
+        ])
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait(?Send)]
 impl Command for AliasListCommand {
@@ -124,16 +102,37 @@ impl Command for AliasListCommand {
 
         datasets.sort_by(|a, b| a.alias.cmp(&b.alias));
 
-        let schema = self.schema();
-        let records = self.records(schema.clone(), &datasets).await?;
-
         let mut writer = self
             .output_config
-            .get_records_writer(&schema, self.records_format());
+            .get_records_writer(&self.schema(), self.records_format());
 
-        writer.write_batch(&records)?;
+        writer.write_batch(&self.record_batch(&datasets).await?)?;
         writer.finish()?;
 
         Ok(())
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl OutputWriter for AliasListCommand {
+    fn records_format(&self) -> RecordsFormat {
+        RecordsFormat::new()
+            .with_default_column_format(ColumnFormat::default())
+            .with_column_formats(vec![
+                ColumnFormat::new().with_style_spec("l"),
+                ColumnFormat::new().with_style_spec("c"),
+                ColumnFormat::new().with_style_spec("l"),
+            ])
+    }
+
+    fn schema(&self) -> Arc<Schema> {
+        Arc::new(Schema::new(vec![
+            Field::new("Dataset", DataType::Utf8, false),
+            Field::new("Kind", DataType::Utf8, false),
+            Field::new("Alias", DataType::Utf8, false),
+        ]))
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

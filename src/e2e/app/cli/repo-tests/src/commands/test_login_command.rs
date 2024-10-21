@@ -12,8 +12,9 @@ use kamu_cli_e2e_common::{
     KamuApiServerClientExt,
     DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
 };
-use kamu_cli_puppet::extensions::KamuCliPuppetExt;
+use kamu_cli_puppet::extensions::{KamuCliPuppetExt, RepoRecord};
 use kamu_cli_puppet::KamuCliPuppet;
+use opendatafabric::RepoName;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -121,6 +122,82 @@ pub async fn test_login_logout_oauth(kamu_node_api_client: KamuApiServerClient) 
         Some([format!("Logged out of {kamu_node_url}").as_str()]),
     )
     .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_login_add_repo(kamu: KamuCliPuppet) {
+    let dummy_access_token = "dummy-access-token";
+    let dummy_url = "http://example.com";
+
+    // Login with skipping adding repo
+    kamu.assert_success_command_execution(
+        [
+            "login",
+            dummy_url,
+            "--access-token",
+            dummy_access_token,
+            "--skip-add-repo",
+        ],
+        None,
+        Some([format!("Login successful: {dummy_url}").as_str()]),
+    )
+    .await;
+
+    let repo_list = kamu.get_list_of_repos().await;
+    assert!(repo_list.is_empty());
+
+    // Login with adding repo with default naming
+    kamu.assert_success_command_execution(
+        ["login", dummy_url, "--access-token", dummy_access_token],
+        None,
+        Some([format!("Login successful: {dummy_url}").as_str()]),
+    )
+    .await;
+
+    let repo_list = kamu.get_list_of_repos().await;
+
+    let expected_repo_list = vec![RepoRecord {
+        name: RepoName::new_unchecked(url::Url::try_from(dummy_url).unwrap().host_str().unwrap()),
+        url: url::Url::try_from(dummy_url).unwrap(),
+    }];
+
+    pretty_assertions::assert_eq!(expected_repo_list, repo_list);
+
+    // Login with adding repo with provided name
+    let new_dummy_url = "http://example-new.com";
+
+    let expected_repo_name = "foo";
+    kamu.assert_success_command_execution(
+        [
+            "login",
+            new_dummy_url,
+            "--access-token",
+            dummy_access_token,
+            "--repo-name",
+            expected_repo_name,
+        ],
+        None,
+        Some([format!("Login successful: {new_dummy_url}").as_str()]),
+    )
+    .await;
+
+    let repo_list = kamu.get_list_of_repos().await;
+
+    let expected_repo_list = vec![
+        RepoRecord {
+            name: RepoName::new_unchecked(
+                url::Url::try_from(dummy_url).unwrap().host_str().unwrap(),
+            ),
+            url: url::Url::try_from(dummy_url).unwrap(),
+        },
+        RepoRecord {
+            name: RepoName::new_unchecked(expected_repo_name),
+            url: url::Url::try_from(new_dummy_url).unwrap(),
+        },
+    ];
+
+    pretty_assertions::assert_eq!(expected_repo_list, repo_list);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
