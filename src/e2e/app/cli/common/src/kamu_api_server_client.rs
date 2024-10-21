@@ -24,7 +24,7 @@ pub enum RequestBody {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub enum ExpectedResponseBody {
-    Json(String),
+    Json(serde_json::Value),
     Plain(String),
 }
 
@@ -193,16 +193,11 @@ impl KamuApiServerClient {
     ) {
         match expected_response_body {
             ExpectedResponseBody::Json(expected_pretty_json_response_body) => {
-                let pretty_actual_response = {
-                    let actual_response_body: serde_json::Value = response.json().await.unwrap();
+                let actual_response_body: serde_json::Value = response.json().await.unwrap();
 
-                    serde_json::to_string_pretty(&actual_response_body).unwrap()
-                };
-
-                // Let's add \n for the sake of convenience of passing the expected result
                 pretty_assertions::assert_eq!(
                     expected_pretty_json_response_body,
-                    format!("{pretty_actual_response}\n"),
+                    actual_response_body
                 );
             }
             ExpectedResponseBody::Plain(expected_plain_response_body) => {

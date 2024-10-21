@@ -16,6 +16,7 @@ use kamu_cli_e2e_common::{
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
 };
 use reqwest::{Method, StatusCode};
+use serde_json::json;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -70,37 +71,29 @@ pub async fn test_rest_api_request_dataset_tail(kamu_api_server_client: KamuApiS
             "player-scores/tail",
             None,
             StatusCode::OK,
-            Some(ExpectedResponseBody::Json(
-                indoc::indoc!(
-                    r#"
+            Some(ExpectedResponseBody::Json(json!({
+                "data": [
                     {
-                      "data": [
-                        {
-                          "match_id": 1,
-                          "match_time": "2000-01-01T00:00:00Z",
-                          "offset": 0,
-                          "op": 0,
-                          "player_id": "Alice",
-                          "score": 100,
-                          "system_time": "<SYSTEM_TIME>"
-                        },
-                        {
-                          "match_id": 1,
-                          "match_time": "2000-01-01T00:00:00Z",
-                          "offset": 1,
-                          "op": 0,
-                          "player_id": "Bob",
-                          "score": 80,
-                          "system_time": "<SYSTEM_TIME>"
-                        }
-                      ],
-                      "dataFormat": "JsonAoS"
+                        "match_id": 1,
+                        "match_time": "2000-01-01T00:00:00Z",
+                        "offset": 0,
+                        "op": 0,
+                        "player_id": "Alice",
+                        "score": 100,
+                        "system_time": today.as_str(),
+                    },
+                    {
+                        "match_id": 1,
+                        "match_time": "2000-01-01T00:00:00Z",
+                        "offset": 1,
+                        "op": 0,
+                        "player_id": "Bob",
+                        "score": 80,
+                        "system_time": today.as_str(),
                     }
-                    "#
-                )
-                .to_string()
-                .replace("<SYSTEM_TIME>", today.as_str()),
-            )),
+                ],
+                "dataFormat": "JsonAoS"
+            }))),
         )
         .await;
 }
