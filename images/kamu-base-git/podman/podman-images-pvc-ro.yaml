@@ -1,0 +1,12 @@
+version: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: podman-images-pvc-ro
+spec:
+  volumeName: podman-images
+  storageClassName: manual
+  accessModes:
+    - ReadOnlyMany
+  resources:
+    requests:
+      storage: 5Gi

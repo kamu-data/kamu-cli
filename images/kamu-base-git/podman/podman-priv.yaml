@@ -1,0 +1,20 @@
+version: v1
+kind: Pod
+metadata:
+  name: podman-priv
+spec:
+  containers:
+    - name: priv
+      image: quay.io/podman/stable
+      args:
+        - sleep
+        - "1000000"
+      securityContext:
+        privileged: true
+      volumeMounts:
+        - mountPath: /var/lib/containers/shared
+          name: podman-images
+  volumes:
+    - name: podman-images
+      persistentVolumeClaim:
+        claimName: podman-images-pvc-rw
