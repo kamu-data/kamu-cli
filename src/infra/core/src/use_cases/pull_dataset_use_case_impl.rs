@@ -268,6 +268,13 @@ impl PullDatasetUseCase for PullDatasetUseCaseImpl {
     ) -> Vec<PullResponse> {
         tracing::info!(?requests, ?options, "Performing pull");
 
+        // TODO:
+        //  - recursive complex planning may be skipped if there is just 1 dataset, and
+        //    no recursive/all flags
+        //  - prepare plan of execution iterations in planner itself, so that whole
+        //    planning can be a separate transaction job .. use case will then execute
+        //    the plain in a for loop, while other clients will call services without
+        //    transaction
         let (mut plan, errors) = self
             .pull_request_planner
             .collect_pull_graph(&requests, &options, self.in_multi_tenant_mode)
