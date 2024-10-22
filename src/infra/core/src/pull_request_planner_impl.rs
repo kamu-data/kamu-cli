@@ -71,7 +71,7 @@ impl PullRequestPlannerImpl {
         if let Some(pi) = visited.get_mut(&local_alias) {
             tracing::debug!("Already visited - continuing");
             if referenced_explicitly {
-                pi.original_request = Some(request.clone());
+                pi.maybe_original_request = Some(request.clone());
             }
             return Ok(pi.depth);
         }
@@ -83,13 +83,16 @@ impl PullRequestPlannerImpl {
 
         let mut pull_item = if maybe_remote_ref.is_some() {
             // Datasets synced from remotes are depth 0
+            let local_target = if let Some(local_handle) = maybe_local_handle {
+                PullItemLocalTarget::existing(local_handle)
+            } else {
+                PullItemLocalTarget::to_create(local_alias.clone())
+            };
             PullItem {
-                original_request: None, // May be set below
+                maybe_original_request: None, // May be set below
                 depth: 0,
-                local_ref: maybe_local_handle
-                    .map(Into::into)
-                    .unwrap_or(local_alias.clone().into()),
-                remote_ref: maybe_remote_ref,
+                local_target,
+                maybe_remote_ref,
             }
         } else {
             // Pulling an existing local root or derivative dataset
@@ -102,15 +105,15 @@ impl PullRequestPlannerImpl {
 
             // Plan the current dataset as last
             PullItem {
-                original_request: None, // May be set below
+                maybe_original_request: None, // May be set below
                 depth: max_dep_depth + 1,
-                local_ref: local_handle.into(),
-                remote_ref: None,
+                local_target: PullItemLocalTarget::existing(local_handle),
+                maybe_remote_ref: None,
             }
         };
 
         if referenced_explicitly {
-            pull_item.original_request = Some(request.clone());
+            pull_item.maybe_original_request = Some(request.clone());
         }
 
         tracing::debug!(?pull_item, "Resolved node");
@@ -360,15 +363,53 @@ impl PullRequestPlannerImpl {
 
     fn slice(&self, mut plan: Vec<PullItem>) -> (i32, bool, Vec<PullItem>, Vec<PullItem>) {
         let first_depth = plan[0].depth;
-        let first_is_remote = plan[0].remote_ref.is_some();
+        let first_is_remote = plan[0].maybe_remote_ref.is_some();
 
         let count = plan
             .iter()
-            .take_while(|pi| pi.depth == first_depth && pi.remote_ref.is_some() == first_is_remote)
+            .take_while(|pi| {
+                pi.depth == first_depth && pi.maybe_remote_ref.is_some() == first_is_remote
+            })
             .count();
 
         let rest = plan.split_off(count);
         (first_depth, first_is_remote, plan, rest)
+    }
+
+    fn build_update_items(&self, pull_items: Vec<PullItem>) -> Vec<PullUpdateItem> {
+        pull_items
+            .into_iter()
+            .map(|pi| {
+                assert!(pi.maybe_remote_ref.is_none());
+
+                PullUpdateItem {
+                    depth: pi.depth,
+                    local_handle: match pi.local_target {
+                        PullItemLocalTarget::Existing(local_handle) => local_handle,
+                        PullItemLocalTarget::ToCreate(_) => unreachable!(
+                            "Ingest/Transform flows expect to work with existing local targets"
+                        ),
+                    },
+                    maybe_original_request: pi.maybe_original_request,
+                }
+            })
+            .collect()
+    }
+
+    fn build_sync_items(&self, pull_items: Vec<PullItem>) -> Vec<PullSyncItem> {
+        pull_items
+            .into_iter()
+            .map(|pi| {
+                assert!(pi.maybe_remote_ref.is_some());
+
+                PullSyncItem {
+                    depth: pi.depth,
+                    local_target: pi.local_target,
+                    remote_ref: pi.maybe_remote_ref.unwrap(),
+                    maybe_original_request: pi.maybe_original_request,
+                }
+            })
+            .collect()
     }
 }
 
@@ -424,15 +465,15 @@ impl PullRequestPlanner for PullRequestPlannerImpl {
             let (depth, is_remote, batch, tail) = self.slice(rest);
             rest = tail;
 
-            let kind = if depth == 0 && !is_remote {
-                PullExecutionStepKind::Ingest
+            let details = if depth == 0 && !is_remote {
+                PullExecutionStepDetails::Ingest(self.build_update_items(batch))
             } else if depth == 0 && is_remote {
-                PullExecutionStepKind::Sync
+                PullExecutionStepDetails::Sync(self.build_sync_items(batch))
             } else {
-                PullExecutionStepKind::Transform
+                PullExecutionStepDetails::Transform(self.build_update_items(batch))
             };
 
-            steps.push(PullExecutionStep { batch, depth, kind });
+            steps.push(PullExecutionStep { depth, details });
         }
 
         steps

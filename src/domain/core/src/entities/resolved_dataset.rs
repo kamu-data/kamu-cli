@@ -35,4 +35,10 @@ impl ResolvedDataset {
     }
 }
 
+impl std::fmt::Debug for ResolvedDataset {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.handle.fmt(f)
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

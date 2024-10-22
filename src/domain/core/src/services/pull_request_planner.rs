@@ -43,50 +43,9 @@ pub trait PullRequestPlanner: Send + Sync {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PullItem {
     pub depth: i32,
-    pub local_ref: DatasetRef,
-    pub remote_ref: Option<DatasetRefRemote>,
-    pub original_request: Option<PullRequest>,
-}
-
-impl PullItem {
-    pub fn into_response_ingest(self, r: PollingIngestResponse) -> PullResponse {
-        PullResponse {
-            original_request: self.original_request,
-            local_ref: Some(r.dataset_ref),
-            remote_ref: None,
-            result: match r.result {
-                Ok(r) => Ok(r.into()),
-                Err(e) => Err(e.into()),
-            },
-        }
-    }
-
-    pub fn into_response_sync(self, r: SyncResultMulti) -> PullResponse {
-        PullResponse {
-            original_request: self.original_request,
-            local_ref: r.dst.as_local_ref(|_| true).ok(), // TODO: multi-tenancy
-            remote_ref: r.src.as_remote_ref(|_| true).ok(),
-            result: match r.result {
-                Ok(response) => Ok(response.result.into()),
-                Err(e) => Err(e.into()),
-            },
-        }
-    }
-
-    pub fn into_response_transform(
-        self,
-        r: (DatasetRef, Result<TransformResult, TransformError>),
-    ) -> PullResponse {
-        PullResponse {
-            original_request: self.original_request,
-            local_ref: Some(r.0),
-            remote_ref: None,
-            result: match r.1 {
-                Ok(r) => Ok(r.into()),
-                Err(e) => Err(e.into()),
-            },
-        }
-    }
+    pub local_target: PullItemLocalTarget,
+    pub maybe_remote_ref: Option<DatasetRefRemote>,
+    pub maybe_original_request: Option<PullRequest>,
 }
 
 impl PartialOrd for PullItem {
@@ -102,19 +61,115 @@ impl Ord for PullItem {
             return depth_ord;
         }
 
-        if self.remote_ref.is_some() != other.remote_ref.is_some() {
-            return if self.remote_ref.is_some() {
+        if self.maybe_remote_ref.is_some() != other.maybe_remote_ref.is_some() {
+            return if self.maybe_remote_ref.is_some() {
                 Ordering::Less
             } else {
                 Ordering::Greater
             };
         }
 
-        match (self.local_ref.alias(), other.local_ref.alias()) {
-            (Some(lhs), Some(rhs)) => lhs.cmp(rhs),
-            (Some(_), None) => Ordering::Greater,
-            (None, Some(_)) => Ordering::Less,
-            _ => Ordering::Equal,
+        self.local_target.alias().cmp(other.local_target.alias())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PullItemLocalTarget {
+    Existing(DatasetHandle),
+    ToCreate(DatasetAlias),
+}
+
+impl PullItemLocalTarget {
+    pub fn existing(hdl: DatasetHandle) -> Self {
+        Self::Existing(hdl)
+    }
+
+    pub fn to_create(alias: DatasetAlias) -> Self {
+        Self::ToCreate(alias)
+    }
+
+    pub fn alias(&self) -> &DatasetAlias {
+        match self {
+            Self::Existing(hdl) => &hdl.alias,
+            Self::ToCreate(alias) => alias,
+        }
+    }
+
+    pub fn as_local_ref(&self) -> DatasetRef {
+        match self {
+            Self::Existing(hdl) => hdl.as_local_ref(),
+            Self::ToCreate(alias) => alias.as_local_ref(),
+        }
+    }
+
+    pub fn as_any_ref(&self) -> DatasetRefAny {
+        match self {
+            Self::Existing(hdl) => hdl.as_any_ref(),
+            Self::ToCreate(alias) => alias.as_any_ref(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PullUpdateItem {
+    pub depth: i32,
+    pub local_handle: DatasetHandle,
+    pub maybe_original_request: Option<PullRequest>,
+}
+
+impl PullUpdateItem {
+    pub fn into_response_ingest(self, r: PollingIngestResponse) -> PullResponse {
+        PullResponse {
+            original_request: self.maybe_original_request,
+            local_ref: Some(r.dataset_ref),
+            remote_ref: None,
+            result: match r.result {
+                Ok(r) => Ok(r.into()),
+                Err(e) => Err(e.into()),
+            },
+        }
+    }
+
+    pub fn into_response_transform(
+        self,
+        r: (DatasetRef, Result<TransformResult, TransformError>),
+    ) -> PullResponse {
+        PullResponse {
+            original_request: self.maybe_original_request,
+            local_ref: Some(r.0),
+            remote_ref: None,
+            result: match r.1 {
+                Ok(r) => Ok(r.into()),
+                Err(e) => Err(e.into()),
+            },
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PullSyncItem {
+    pub depth: i32,
+    pub local_target: PullItemLocalTarget,
+    pub remote_ref: DatasetRefRemote,
+    pub maybe_original_request: Option<PullRequest>,
+}
+
+impl PullSyncItem {
+    pub fn into_response_sync(self, r: SyncResultMulti) -> PullResponse {
+        PullResponse {
+            original_request: self.maybe_original_request,
+            local_ref: r.dst.as_local_ref(|_| true).ok(), // TODO: multi-tenancy
+            remote_ref: r.src.as_remote_ref(|_| true).ok(),
+            result: match r.result {
+                Ok(response) => Ok(response.result.into()),
+                Err(e) => Err(e.into()),
+            },
         }
     }
 }
@@ -123,16 +178,15 @@ impl Ord for PullItem {
 
 #[derive(Debug)]
 pub struct PullExecutionStep {
-    pub batch: Vec<PullItem>,
     pub depth: i32,
-    pub kind: PullExecutionStepKind,
+    pub details: PullExecutionStepDetails,
 }
 
 #[derive(Debug)]
-pub enum PullExecutionStepKind {
-    Ingest,
-    Transform,
-    Sync,
+pub enum PullExecutionStepDetails {
+    Ingest(Vec<PullUpdateItem>),
+    Transform(Vec<PullUpdateItem>),
+    Sync(Vec<PullSyncItem>),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
