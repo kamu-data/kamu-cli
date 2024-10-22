@@ -413,7 +413,14 @@ impl WsSmartTransferProtocolClient {
                                 |e| SyncError::Internal(e.int_err())
                             )?;
                     }
-                _ = &mut export_task => break
+                res = &mut export_task => {
+                    tracing::error!(
+                        "File transfer failed, result is {:?}",
+                        res
+                    );
+                    res.int_err()??;
+                    break;
+                }
             }
         }
 

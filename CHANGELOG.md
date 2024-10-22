@@ -29,6 +29,7 @@ Recommendation: for ease of reading, use the following order:
 - The `/tail` endpoint was updated to better match V2 `/query` endpoint
 ### Fixed
 - `kamu add`: fixed behavior when using `--stdin` and `--name` arguments
+- `kamu push`: show correct error if server failed to store data
 
 ## [0.205.0] - 2024-10-15
 ### Changed
