@@ -86,7 +86,16 @@ impl TaskLogicalPlanRunnerImpl {
                         }),
                     )))
                 }
-                _ => Ok(TaskOutcome::Failed(TaskError::Empty)),
+                err => {
+                    tracing::error!(
+                        args = ?args,
+                        error = ?err,
+                        error_msg = %err,
+                        "Update failed",
+                    );
+
+                    Ok(TaskOutcome::Failed(TaskError::Empty))
+                }
             },
         }
     }
@@ -126,7 +135,16 @@ impl TaskLogicalPlanRunnerImpl {
                 ResetError::BlockNotFound(_) => Ok(TaskOutcome::Failed(
                     TaskError::ResetDatasetError(ResetDatasetTaskError::ResetHeadNotFound),
                 )),
-                _ => Ok(TaskOutcome::Failed(TaskError::Empty)),
+                err => {
+                    tracing::error!(
+                        args = ?args,
+                        error = ?err,
+                        error_msg = %err,
+                        "Reset failed",
+                    );
+
+                    Ok(TaskOutcome::Failed(TaskError::Empty))
+                }
             },
         }
     }
@@ -158,7 +176,16 @@ impl TaskLogicalPlanRunnerImpl {
             Ok(result) => Ok(TaskOutcome::Success(TaskResult::CompactionDatasetResult(
                 result.into(),
             ))),
-            Err(_) => Ok(TaskOutcome::Failed(TaskError::Empty)),
+            Err(err) => {
+                tracing::error!(
+                    args = ?args,
+                    error = ?err,
+                    error_msg = %err,
+                    "Hard compaction failed",
+                );
+
+                Ok(TaskOutcome::Failed(TaskError::Empty))
+            }
         }
     }
 }
