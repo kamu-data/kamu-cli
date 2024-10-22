@@ -59,6 +59,9 @@ fn main() {
     update_crates(&new_version);
 
     update_license(Path::new("LICENSE.txt"), &current_version, &new_version);
+
+    update_openapi_schema(Path::new("resources/openapi.json"), &new_version);
+    update_openapi_schema(Path::new("resources/openapi-mt.json"), &new_version);
 }
 
 fn get_current_version() -> Version {
@@ -99,6 +102,20 @@ fn update_license(license_path: &Path, current_version: &Version, new_version: &
     );
     assert_ne!(text, new_text);
     std::fs::write(license_path, new_text).expect("Failed to write to license file");
+}
+
+fn update_openapi_schema(path: &Path, new_version: &Version) {
+    let text = std::fs::read_to_string(path).expect("Could not read the schema file");
+
+    let re = regex::Regex::new(r#""version": "\d+\.\d+\.\d+""#).unwrap();
+    let new_text = re
+        .replace(&text, |_: &Captures| {
+            format!("\"version\": \"{new_version}\"")
+        })
+        .to_string();
+
+    assert_ne!(text, new_text);
+    std::fs::write(path, new_text).expect("Failed to write to schema file");
 }
 
 fn update_license_text(
