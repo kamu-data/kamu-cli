@@ -11,33 +11,13 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## [Unreleased]
+## [0.206.0] - 2024-10-22
 ### Added
 - Introduced OpenAPI spec generation
   - `/openapi.json` endpoint now returns the generated spec
   - `/swagger` endpoint serves an embedded Swagger UI for viewing the spec directly in the running server
   - OpenAPI schema is available in the repo `resources/openapi.json` beside its multi-tenant version
-- Added (or expanded) E2E tests for:
-  - `kamu config` command
-  - `kamu init` command
-  - `kamu add` command
-  - `kamu rename` command
-  - `kamu ingest` command
-  - `kamu inspect` command
-  - `kamu log` command
-  - `kamu new` command
-  - `kamu reset` command
-  - `kamu search` command
-  - `kamu sql` command
-  - `kamu system gc` command
-  - `kamu system info` command
-  - `kamu system diagnose` command
-  - `kamu tail` command
-  - `kamu login` command
-  - `kamu logout` command
-  - `kamu push` command
-  - `kamu pull` command
-- E2E: HTTP middleware is implemented, which improves stability of E2E tests
+- Added and expanded many E2E tests, improved test stability
 - Added endpoint to read a recently uploaded file (`GET /platform/file/upload/{upload_token}`)
 ### Changed
 - Removed support for deprecated V1 `/query` endpoint format
