@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::assert_matches::assert_matches;
 use std::convert::TryFrom;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
@@ -17,7 +18,7 @@ use internal_error::InternalError;
 use kamu::domain::*;
 use kamu::testing::*;
 use kamu::*;
-use kamu_accounts::CurrentAccountSubject;
+use kamu_accounts::{CurrentAccountSubject, DEFAULT_ACCOUNT_NAME_STR};
 use opendatafabric::*;
 use time_source::SystemTimeSourceDefault;
 
@@ -41,11 +42,11 @@ macro_rules! rl {
     };
 }
 
-/*macro_rules! mrl {
+macro_rules! mrl {
     ($s:expr) => {
         DatasetRef::Alias(DatasetAlias::try_from($s).unwrap())
     };
-}*/
+}
 
 macro_rules! rr {
     ($s:expr) => {
@@ -309,7 +310,7 @@ async fn test_pull_batching_chain_multi_tenant() {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-/*
+
 #[test_log::test(tokio::test)]
 async fn test_pull_batching_complex() {
     let tmp_dir = tempfile::tempdir().unwrap();
@@ -333,14 +334,14 @@ async fn test_pull_batching_complex() {
     .await;
 
     assert_eq!(
-        harness.pull(refs!["e"], PullMultiOptions::default()).await,
+        harness.pull(refs!["e"], PullOptions::default()).await,
         vec![PullBatch::Transform(refs!["e"])]
     );
 
     assert_matches!(
         harness
             .pull_svc
-            .pull_multi(vec![ar!("z")], PullMultiOptions::default(), None)
+            .pull_multi(vec![ar!("z")], PullOptions::default(), None)
             .await
             .unwrap()[0],
         PullResponse {
@@ -353,9 +354,9 @@ async fn test_pull_batching_complex() {
         harness
             .pull(
                 refs!["e"],
-                PullMultiOptions {
+                PullOptions {
                     recursive: true,
-                    ..PullMultiOptions::default()
+                    ..PullOptions::default()
                 }
             )
             .await,
@@ -366,7 +367,6 @@ async fn test_pull_batching_complex() {
         ]
     );
 }
-*/
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -507,7 +507,6 @@ async fn test_pull_batching_complex_with_remote() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/*
 #[tokio::test]
 async fn test_sync_from() {
     let tmp_ws_dir = tempfile::tempdir().unwrap();
@@ -528,7 +527,7 @@ async fn test_sync_from() {
                 local_ref: Some(n!("bar").into()),
                 remote_ref: Some(rr!("myrepo/foo")),
             }],
-            PullMultiOptions::default(),
+            PullOptions::default(),
             None,
         )
         .await
@@ -554,11 +553,9 @@ async fn test_sync_from() {
         vec![DatasetRefRemote::try_from("myrepo/foo").unwrap()]
     );
 }
-*/
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/*
 #[tokio::test]
 async fn test_sync_from_url_and_local_ref() {
     let tmp_ws_dir = tempfile::tempdir().unwrap();
@@ -571,7 +568,7 @@ async fn test_sync_from_url_and_local_ref() {
                 local_ref: Some(n!("bar").into()),
                 remote_ref: Some(rr!("http://example.com/odf/bar")),
             }],
-            PullMultiOptions::default(),
+            PullOptions::default(),
             None,
         )
         .await
@@ -597,11 +594,9 @@ async fn test_sync_from_url_and_local_ref() {
         vec![DatasetRefRemote::try_from("http://example.com/odf/bar").unwrap()]
     );
 }
-*/
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/*
 #[tokio::test]
 async fn test_sync_from_url_and_local_multi_tenant_ref() {
     let tmp_ws_dir = tempfile::tempdir().unwrap();
@@ -614,7 +609,7 @@ async fn test_sync_from_url_and_local_multi_tenant_ref() {
                 local_ref: Some(mn!("x/bar").into()),
                 remote_ref: Some(rr!("http://example.com/odf/bar")),
             }],
-            PullMultiOptions::default(),
+            PullOptions::default(),
             None,
         )
         .await
@@ -640,11 +635,9 @@ async fn test_sync_from_url_and_local_multi_tenant_ref() {
         vec![DatasetRefRemote::try_from("http://example.com/odf/bar").unwrap()]
     );
 }
-*/
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/*
 #[tokio::test]
 async fn test_sync_from_url_only() {
     let tmp_ws_dir = tempfile::tempdir().unwrap();
@@ -657,7 +650,7 @@ async fn test_sync_from_url_only() {
                 local_ref: None,
                 remote_ref: Some(rr!("http://example.com/odf/bar")),
             }],
-            PullMultiOptions::default(),
+            PullOptions::default(),
             None,
         )
         .await
@@ -683,11 +676,9 @@ async fn test_sync_from_url_only() {
         vec![DatasetRefRemote::try_from("http://example.com/odf/bar").unwrap()]
     );
 }
-*/
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/*
 #[tokio::test]
 async fn test_sync_from_url_only_multi_tenant_case() {
     let tmp_ws_dir = tempfile::tempdir().unwrap();
@@ -700,7 +691,7 @@ async fn test_sync_from_url_only_multi_tenant_case() {
                 local_ref: None,
                 remote_ref: Some(rr!("http://example.com/odf/bar")),
             }],
-            PullMultiOptions::default(),
+            PullOptions::default(),
             None,
         )
         .await
@@ -728,7 +719,6 @@ async fn test_sync_from_url_only_multi_tenant_case() {
         vec![DatasetRefRemote::try_from("http://example.com/odf/bar").unwrap()]
     );
 }
-*/
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -737,7 +727,6 @@ struct PullTestHarness {
     dataset_repo: Arc<DatasetRepositoryLocalFs>,
     remote_repo_reg: Arc<RemoteRepositoryRegistryImpl>,
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
-    // pull_svc: Arc<dyn PullRequestPlanner>,
 }
 
 impl PullTestHarness {
@@ -775,7 +764,6 @@ impl PullTestHarness {
             dataset_repo: catalog.get_one().unwrap(),
             remote_repo_reg: catalog.get_one().unwrap(),
             remote_alias_reg: catalog.get_one().unwrap(),
-            // pull_svc: catalog.get_one().unwrap(),
         }
     }
 
@@ -785,12 +773,12 @@ impl PullTestHarness {
         calls
     }
 
-    async fn pull(&self, _refs: Vec<DatasetRefAny>, _options: PullOptions) -> Vec<PullBatch> {
-        /*let results = self.pull_svc.pull_multi(refs, options, None).await.unwrap();
+    async fn pull(&self, refs: Vec<DatasetRefAny>, options: PullOptions) -> Vec<PullBatch> {
+        let results = self.pull_svc.pull_multi(refs, options, None).await.unwrap();
 
         for res in results {
             assert_matches!(res, PullResponse { result: Ok(_), .. });
-        }*/
+        }
 
         tokio::time::sleep(Duration::from_millis(1)).await;
 
@@ -809,94 +797,6 @@ impl PullTestHarness {
             .unwrap()
     }
 }
-
-#[derive(Debug, Clone, Eq)]
-pub enum PullBatch {
-    Ingest(Vec<DatasetRefAny>),
-    Transform(Vec<DatasetRefAny>),
-    Sync(Vec<(DatasetRefAny, DatasetRefAny)>),
-}
-
-impl PullBatch {
-    fn cmp_ref(lhs: &DatasetRefAny, rhs: &DatasetRefAny) -> bool {
-        #[allow(clippy::type_complexity)]
-        fn tuplify(
-            v: &DatasetRefAny,
-        ) -> (
-            Option<&DatasetID>,
-            Option<&url::Url>,
-            Option<&str>,
-            Option<&str>,
-            Option<&DatasetName>,
-        ) {
-            match v {
-                DatasetRefAny::ID(_, id) => (Some(id), None, None, None, None),
-                DatasetRefAny::Url(url) => (None, Some(url), None, None, None),
-                DatasetRefAny::LocalAlias(a, n) => {
-                    (None, None, None, a.as_ref().map(AsRef::as_ref), Some(n))
-                }
-                DatasetRefAny::RemoteAlias(r, a, n) => (
-                    None,
-                    None,
-                    Some(r.as_ref()),
-                    a.as_ref().map(AsRef::as_ref),
-                    Some(n),
-                ),
-                DatasetRefAny::AmbiguousAlias(ra, n) => {
-                    (None, None, Some(ra.as_ref()), None, Some(n))
-                }
-                DatasetRefAny::LocalHandle(h) => (
-                    None,
-                    None,
-                    None,
-                    h.alias.account_name.as_ref().map(AccountName::as_str),
-                    Some(&h.alias.dataset_name),
-                ),
-                DatasetRefAny::RemoteHandle(h) => (
-                    None,
-                    None,
-                    Some(h.alias.repo_name.as_str()),
-                    h.alias.account_name.as_ref().map(AccountName::as_str),
-                    Some(&h.alias.dataset_name),
-                ),
-            }
-        }
-        tuplify(lhs) == tuplify(rhs)
-    }
-}
-
-impl std::cmp::PartialEq for PullBatch {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Self::Ingest(l), Self::Ingest(r)) => {
-                let mut l = l.clone();
-                l.sort();
-                let mut r = r.clone();
-                r.sort();
-                l.len() == r.len() && std::iter::zip(&l, &r).all(|(li, ri)| Self::cmp_ref(li, ri))
-            }
-            (Self::Transform(l), Self::Transform(r)) => {
-                let mut l = l.clone();
-                l.sort();
-                let mut r = r.clone();
-                r.sort();
-                l.len() == r.len() && std::iter::zip(&l, &r).all(|(li, ri)| Self::cmp_ref(li, ri))
-            }
-            (Self::Sync(l), Self::Sync(r)) => {
-                let mut l = l.clone();
-                l.sort();
-                let mut r = r.clone();
-                r.sort();
-                l.len() == r.len()
-                    && std::iter::zip(&l, &r)
-                        .all(|((l1, l2), (r1, r2))| Self::cmp_ref(l1, r1) && Self::cmp_ref(l2, r2))
-            }
-            _ => false,
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct TestIngestService {
     calls: Arc<Mutex<Vec<PullBatch>>>,
@@ -950,62 +850,6 @@ impl PollingIngestService for TestIngestService {
                 .collect(),
         ));
         results
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub struct TestTransformService {
-    calls: Arc<Mutex<Vec<PullBatch>>>,
-}
-
-impl TestTransformService {
-    pub fn new(calls: Arc<Mutex<Vec<PullBatch>>>) -> Self {
-        Self { calls }
-    }
-}
-
-#[async_trait::async_trait]
-impl TransformService for TestTransformService {
-    async fn get_active_transform(
-        &self,
-        _target: ResolvedDataset,
-    ) -> Result<Option<(Multihash, MetadataBlockTyped<SetTransform>)>, GetDatasetError> {
-        unimplemented!()
-    }
-
-    async fn transform(
-        &self,
-        _target: ResolvedDataset,
-        _options: TransformOptions,
-        _maybe_listener: Option<Arc<dyn TransformListener>>,
-    ) -> Result<TransformResult, TransformError> {
-        unimplemented!();
-    }
-
-    async fn transform_multi(
-        &self,
-        targets: Vec<ResolvedDataset>,
-        _options: TransformOptions,
-        _maybe_multi_listener: Option<Arc<dyn TransformMultiListener>>,
-    ) -> Vec<(DatasetRef, Result<TransformResult, TransformError>)> {
-        let results = targets
-            .iter()
-            .map(|r| (r.handle.as_local_ref(), Ok(TransformResult::UpToDate)))
-            .collect();
-        self.calls.lock().unwrap().push(PullBatch::Transform(
-            targets.into_iter().map(|t| t.handle.as_any_ref()).collect(),
-        ));
-        results
-    }
-
-    async fn verify_transform(
-        &self,
-        _target: ResolvedDataset,
-        _block_range: (Option<Multihash>, Option<Multihash>),
-        _listener: Option<Arc<dyn VerificationListener>>,
-    ) -> Result<(), VerificationError> {
-        unimplemented!()
     }
 }
 

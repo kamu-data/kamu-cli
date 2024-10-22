@@ -191,7 +191,8 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
         };
 
         let maybe_server_catalog = if cli_commands::command_needs_server_components(&args) {
-            let server_catalog = configure_server_catalog(&final_base_catalog).build();
+            let server_catalog =
+                configure_server_catalog(&final_base_catalog, is_multi_tenant_workspace).build();
             Some(server_catalog)
         } else {
             None
@@ -547,7 +548,10 @@ pub fn configure_cli_catalog(
 }
 
 // Public only for tests
-pub fn configure_server_catalog(base_catalog: &Catalog) -> CatalogBuilder {
+pub fn configure_server_catalog(
+    base_catalog: &Catalog,
+    is_multi_tenant_workspace: bool,
+) -> CatalogBuilder {
     let mut b = CatalogBuilder::new_chained(base_catalog);
 
     b.add::<DatasetChangesServiceImpl>();
@@ -555,7 +559,7 @@ pub fn configure_server_catalog(base_catalog: &Catalog) -> CatalogBuilder {
     b.add::<DatasetOwnershipServiceInMemory>();
     b.add::<DatasetOwnershipServiceInMemoryStateInitializer>();
 
-    kamu_task_system_services::register_dependencies(&mut b);
+    kamu_task_system_services::register_dependencies(&mut b, is_multi_tenant_workspace);
 
     b.add_value(kamu_flow_system_inmem::domain::FlowExecutorConfig::new(
         Duration::seconds(1),

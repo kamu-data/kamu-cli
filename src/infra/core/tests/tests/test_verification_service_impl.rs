@@ -21,7 +21,7 @@ use kamu_accounts::CurrentAccountSubject;
 use opendatafabric::*;
 use time_source::SystemTimeSourceDefault;
 
-use super::test_pull_service_impl::TestTransformService;
+use crate::utils::dummy_transform_service::DummyTransformService;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -43,8 +43,8 @@ async fn test_verify_data_consistency() {
         )
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
         .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
-        .add_value(TestTransformService::new(Arc::new(Mutex::new(Vec::new()))))
-        .bind::<dyn TransformService, TestTransformService>()
+        .add_value(DummyTransformService::new(Arc::new(Mutex::new(Vec::new()))))
+        .bind::<dyn TransformService, DummyTransformService>()
         .add::<VerificationServiceImpl>()
         .build();
 

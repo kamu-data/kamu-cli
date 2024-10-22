@@ -26,8 +26,8 @@ use kamu_core::auth;
 use opendatafabric::*;
 use time_source::{SystemTimeSource, SystemTimeSourceStub};
 
-use super::test_pull_service_impl::TestTransformService;
 use crate::mock_engine_provisioner;
+use crate::utils::dummy_transform_service::DummyTransformService;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -1080,8 +1080,8 @@ impl CompactTestHarness {
             .add::<ObjectStoreBuilderLocalFs>()
             .add_value(ObjectStoreBuilderS3::new(s3_context.clone(), true))
             .bind::<dyn ObjectStoreBuilder, ObjectStoreBuilderS3>()
-            .add_value(TestTransformService::new(Arc::new(Mutex::new(Vec::new()))))
-            .bind::<dyn TransformService, TestTransformService>()
+            .add_value(DummyTransformService::new(Arc::new(Mutex::new(Vec::new()))))
+            .bind::<dyn TransformService, DummyTransformService>()
             .add::<VerificationServiceImpl>()
             .add::<PushIngestServiceImpl>()
             .add::<DataFormatRegistryImpl>()

@@ -63,10 +63,11 @@ impl PullRequestPlannerImpl {
             match self
                 .collect_pull_graph_depth_first(
                     pr,
-                    true,
                     options,
-                    in_multi_tenant_mode,
                     &mut visited,
+                    true,
+                    true,
+                    in_multi_tenant_mode,
                 )
                 .await
             {
@@ -86,14 +87,48 @@ impl PullRequestPlannerImpl {
         (ordered, errors)
     }
 
+    async fn build_single_node_pull_graph(
+        &self,
+        request: &PullRequest,
+        options: &PullOptions,
+        in_multi_tenant_mode: bool,
+    ) -> (Vec<PullItem>, Vec<PullResponse>) {
+        let mut visited = HashMap::new();
+
+        if let Err(e) = self
+            .collect_pull_graph_depth_first(
+                request,
+                options,
+                &mut visited,
+                true,
+                false,
+                in_multi_tenant_mode,
+            )
+            .await
+        {
+            let error_response = PullResponse {
+                maybe_original_request: Some(request.clone()),
+                maybe_local_ref: None,
+                maybe_remote_ref: None,
+                result: Err(e),
+            };
+            return (vec![], vec![error_response]);
+        }
+
+        assert_eq!(visited.len(), 1);
+        let the_item = visited.into_values().next().unwrap();
+        (vec![the_item], vec![])
+    }
+
     #[async_recursion::async_recursion]
     async fn collect_pull_graph_depth_first(
         &self,
         request: &PullRequest,
-        referenced_explicitly: bool,
         options: &PullOptions,
-        in_multi_tenant_mode: bool,
         visited: &mut HashMap<DatasetAlias, PullItem>,
+        referenced_explicitly: bool,
+        visit_dependencies: bool,
+        in_multi_tenant_mode: bool,
     ) -> Result<i32, PullError> {
         tracing::debug!(?request, "Entering node");
 
@@ -145,9 +180,12 @@ impl PullRequestPlannerImpl {
             let local_handle = maybe_local_handle.unwrap();
 
             // Plan up-stream dependencies first
-            let max_dep_depth = self
-                .plan_upstream_datasets(&local_handle, options, in_multi_tenant_mode, visited)
-                .await?;
+            let max_dep_depth = if visit_dependencies {
+                self.plan_upstream_datasets(&local_handle, options, in_multi_tenant_mode, visited)
+                    .await?
+            } else {
+                0
+            };
 
             // Plan the current dataset as last
             PullItem {
@@ -395,10 +433,11 @@ impl PullRequestPlannerImpl {
             let depth = self
                 .collect_pull_graph_depth_first(
                     &PullRequest::local(dependency_id.as_local_ref()),
-                    false,
                     options,
-                    in_multi_tenant_mode,
                     visited,
+                    false, 
+                    true,
+                    in_multi_tenant_mode,
                 )
                 .await?;
             max_dep_depth = std::cmp::max(max_dep_depth, depth);
@@ -506,12 +545,16 @@ impl PullRequestPlanner for PullRequestPlannerImpl {
         options: &PullOptions,
         in_multi_tenant_mode: bool,
     ) -> (Vec<PullPlanIteration>, Vec<PullResponse>) {
-        // TODO:
-        //  - recursive complex planning may be skipped if there is just 1 dataset, and
-        //    no recursive/all flags
-        let (mut plan, errors) = self
-            .collect_pull_graph(requests, options, in_multi_tenant_mode)
-            .await;
+        // If there is just 1 dataset, and no recursion set, do a simplified procedure.
+        // Otherwise, do a hierarchical scan trying to find relations
+        let (mut plan, errors) = if requests.len() == 1 && !options.recursive {
+            self.build_single_node_pull_graph(&requests[0], options, in_multi_tenant_mode)
+                .await
+        } else {
+            self.collect_pull_graph(requests, options, in_multi_tenant_mode)
+                .await
+        };
+
         tracing::info!(
             num_items = plan.len(),
             num_errors = errors.len(),
