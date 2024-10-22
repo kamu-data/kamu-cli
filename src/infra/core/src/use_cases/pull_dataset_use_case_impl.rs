@@ -16,10 +16,10 @@ use kamu_core::{
     PollingIngestMultiListener,
     PollingIngestService,
     PullDatasetUseCase,
-    PullExecutionStepDetails,
     PullListener,
     PullMultiListener,
     PullOptions,
+    PullPlanIterationJob,
     PullRequest,
     PullRequestPlanner,
     PullResponse,
@@ -196,37 +196,13 @@ impl PullDatasetUseCase for PullDatasetUseCaseImpl {
     ) -> Vec<PullResponse> {
         tracing::info!(?requests, ?options, "Performing pull");
 
-        // TODO:
-        //  - recursive complex planning may be skipped if there is just 1 dataset, and
-        //    no recursive/all flags
-        let (mut plan, errors) = self
+        let (plan, errors) = self
             .pull_request_planner
-            .collect_pull_graph(&requests, &options, self.in_multi_tenant_mode)
+            .collect_plan(&requests, &options, self.in_multi_tenant_mode)
             .await;
+
         tracing::info!(
-            num_items = plan.len(),
-            num_errors = errors.len(),
-            ?plan,
-            "Resolved pull plan"
-        );
-        if !errors.is_empty() {
-            return errors;
-        }
-
-        if !options.recursive {
-            // Leave only datasets explicitly mentioned, preserving the depth order
-            plan.retain(|pi| pi.maybe_original_request.is_some());
-        }
-
-        tracing::info!(num_items = plan.len(), ?plan, "Retained pull plan");
-        let mut results = Vec::with_capacity(plan.len());
-
-        let (execution_steps, errors) = self
-            .pull_request_planner
-            .prepare_pull_execution_steps(plan, &options)
-            .await;
-        tracing::info!(
-            num_steps = execution_steps.len(),
+            num_steps = plan.len(),
             num_errors = errors.len(),
             "Prepared pull execution plan"
         );
@@ -234,13 +210,14 @@ impl PullDatasetUseCase for PullDatasetUseCaseImpl {
             return errors;
         }
 
-        for execution_step in execution_steps {
-            let results_level: Vec<_> = match execution_step.details {
-                // Ingestion
-                PullExecutionStepDetails::Ingest(batch) => {
-                    tracing::info!(depth = %execution_step.depth, batch = ?batch, "Running ingest batch");
+        let mut results = Vec::with_capacity(plan.len());
+
+        for iteration in plan {
+            let iteration_results: Vec<_> = match iteration.job {
+                PullPlanIterationJob::Ingest(ingest_batch) => {
+                    tracing::info!(depth = %iteration.depth, batch = ?ingest_batch, "Running ingest batch");
                     self.ingest_multi(
-                        batch,
+                        ingest_batch,
                         &options,
                         listener
                             .as_ref()
@@ -248,11 +225,11 @@ impl PullDatasetUseCase for PullDatasetUseCaseImpl {
                     )
                     .await
                 }
-                // Sync
-                PullExecutionStepDetails::Sync((batch, sync_requests)) => {
-                    tracing::info!(depth = %execution_step.depth, batch = ?batch, "Running sync batch");
+
+                PullPlanIterationJob::Sync((sync_batch, sync_requests)) => {
+                    tracing::info!(depth = %iteration.depth, batch = ?sync_batch, "Running sync batch");
                     self.sync_multi(
-                        batch,
+                        sync_batch,
                         sync_requests,
                         &options,
                         listener
@@ -261,11 +238,11 @@ impl PullDatasetUseCase for PullDatasetUseCaseImpl {
                     )
                     .await
                 }
-                // Transform
-                PullExecutionStepDetails::Transform(batch) => {
-                    tracing::info!(depth = %execution_step.depth, batch = ?batch, "Running transform batch");
+
+                PullPlanIterationJob::Transform(transform_batch) => {
+                    tracing::info!(depth = %iteration.depth, batch = ?transform_batch, "Running transform batch");
                     self.transform_multi(
-                        batch,
+                        transform_batch,
                         listener
                             .as_ref()
                             .and_then(|l| l.clone().get_transform_listener()),
@@ -275,8 +252,8 @@ impl PullDatasetUseCase for PullDatasetUseCaseImpl {
                 }
             };
 
-            let errors = results_level.iter().any(|r| r.result.is_err());
-            results.extend(results_level);
+            let errors = iteration_results.iter().any(|r| r.result.is_err());
+            results.extend(iteration_results);
             if errors {
                 break;
             }

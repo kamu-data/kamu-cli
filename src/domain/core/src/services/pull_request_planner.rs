@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use std::borrow::Cow;
-use std::cmp::Ordering;
 use std::sync::Arc;
 
 use ::serde::{Deserialize, Serialize};
@@ -28,92 +27,27 @@ pub trait PullRequestPlanner: Send + Sync {
     // provided references) assigning depth index to every dataset in the
     // graph(s). Datasets that share the same depth level are independent and
     // can be pulled in parallel.
-    async fn collect_pull_graph(
+    async fn collect_plan(
         &self,
         requests: &[PullRequest],
         options: &PullOptions,
         in_multi_tenant_mode: bool,
-    ) -> (Vec<PullItem>, Vec<PullResponse>);
-
-    async fn prepare_pull_execution_steps(
-        &self,
-        plan: Vec<PullItem>,
-        options: &PullOptions,
-    ) -> (Vec<PullExecutionStep>, Vec<PullResponse>);
+    ) -> (Vec<PullPlanIteration>, Vec<PullResponse>);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PullItem {
+#[derive(Debug)]
+pub struct PullPlanIteration {
     pub depth: i32,
-    pub local_target: PullItemLocalTarget,
-    pub maybe_remote_ref: Option<DatasetRefRemote>,
-    pub maybe_original_request: Option<PullRequest>,
+    pub job: PullPlanIterationJob,
 }
 
-impl PartialOrd for PullItem {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for PullItem {
-    fn cmp(&self, other: &Self) -> Ordering {
-        let depth_ord = self.depth.cmp(&other.depth);
-        if depth_ord != Ordering::Equal {
-            return depth_ord;
-        }
-
-        if self.maybe_remote_ref.is_some() != other.maybe_remote_ref.is_some() {
-            return if self.maybe_remote_ref.is_some() {
-                Ordering::Less
-            } else {
-                Ordering::Greater
-            };
-        }
-
-        self.local_target.alias().cmp(other.local_target.alias())
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum PullItemLocalTarget {
-    Existing(DatasetHandle),
-    ToCreate(DatasetAlias),
-}
-
-impl PullItemLocalTarget {
-    pub fn existing(hdl: DatasetHandle) -> Self {
-        Self::Existing(hdl)
-    }
-
-    pub fn to_create(alias: DatasetAlias) -> Self {
-        Self::ToCreate(alias)
-    }
-
-    pub fn alias(&self) -> &DatasetAlias {
-        match self {
-            Self::Existing(hdl) => &hdl.alias,
-            Self::ToCreate(alias) => alias,
-        }
-    }
-
-    pub fn as_local_ref(&self) -> DatasetRef {
-        match self {
-            Self::Existing(hdl) => hdl.as_local_ref(),
-            Self::ToCreate(alias) => alias.as_local_ref(),
-        }
-    }
-
-    pub fn as_any_ref(&self) -> DatasetRefAny {
-        match self {
-            Self::Existing(hdl) => hdl.as_any_ref(),
-            Self::ToCreate(alias) => alias.as_any_ref(),
-        }
-    }
+#[derive(Debug)]
+pub enum PullPlanIterationJob {
+    Ingest(Vec<PullUpdateItem>),
+    Transform(Vec<PullUpdateItem>),
+    Sync((Vec<PullSyncItem>, Vec<SyncRequest>)),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -159,7 +93,7 @@ impl PullUpdateItem {
 #[derive(Debug)]
 pub struct PullSyncItem {
     pub depth: i32,
-    pub local_target: PullItemLocalTarget,
+    pub local_target: PullLocalTarget,
     pub remote_ref: DatasetRefRemote,
     pub maybe_original_request: Option<PullRequest>,
 }
@@ -180,17 +114,41 @@ impl PullSyncItem {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug)]
-pub struct PullExecutionStep {
-    pub depth: i32,
-    pub details: PullExecutionStepDetails,
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PullLocalTarget {
+    Existing(DatasetHandle),
+    ToCreate(DatasetAlias),
 }
 
-#[derive(Debug)]
-pub enum PullExecutionStepDetails {
-    Ingest(Vec<PullUpdateItem>),
-    Transform(Vec<PullUpdateItem>),
-    Sync((Vec<PullSyncItem>, Vec<SyncRequest>)),
+impl PullLocalTarget {
+    pub fn existing(hdl: DatasetHandle) -> Self {
+        Self::Existing(hdl)
+    }
+
+    pub fn to_create(alias: DatasetAlias) -> Self {
+        Self::ToCreate(alias)
+    }
+
+    pub fn alias(&self) -> &DatasetAlias {
+        match self {
+            Self::Existing(hdl) => &hdl.alias,
+            Self::ToCreate(alias) => alias,
+        }
+    }
+
+    pub fn as_local_ref(&self) -> DatasetRef {
+        match self {
+            Self::Existing(hdl) => hdl.as_local_ref(),
+            Self::ToCreate(alias) => alias.as_local_ref(),
+        }
+    }
+
+    pub fn as_any_ref(&self) -> DatasetRefAny {
+        match self {
+            Self::Existing(hdl) => hdl.as_any_ref(),
+            Self::ToCreate(alias) => alias.as_any_ref(),
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

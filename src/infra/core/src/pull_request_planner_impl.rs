@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -43,6 +44,46 @@ impl PullRequestPlannerImpl {
             remote_alias_reg,
             current_account_subject,
         }
+    }
+
+    // This function descends down the dependency tree of datasets (starting with
+    // provided references) assigning depth index to every dataset in the
+    // graph(s). Datasets that share the same depth level are independent and
+    // can be pulled in parallel.
+    async fn collect_pull_graph(
+        &self,
+        requests: &[PullRequest],
+        options: &PullOptions,
+        in_multi_tenant_mode: bool,
+    ) -> (Vec<PullItem>, Vec<PullResponse>) {
+        let mut visited = HashMap::new();
+        let mut errors = Vec::new();
+
+        for pr in requests {
+            match self
+                .collect_pull_graph_depth_first(
+                    pr,
+                    true,
+                    options,
+                    in_multi_tenant_mode,
+                    &mut visited,
+                )
+                .await
+            {
+                Ok(_) => {}
+                Err(e) => errors.push(PullResponse {
+                    maybe_original_request: Some(pr.clone()),
+                    maybe_local_ref: None,
+                    maybe_remote_ref: None,
+                    result: Err(e),
+                }),
+            }
+        }
+
+        let mut ordered = Vec::with_capacity(visited.len());
+        ordered.extend(visited.into_values());
+        ordered.sort();
+        (ordered, errors)
     }
 
     #[async_recursion::async_recursion]
@@ -89,9 +130,9 @@ impl PullRequestPlannerImpl {
         let mut pull_item = if maybe_remote_ref.is_some() {
             // Datasets synced from remotes are depth 0
             let local_target = if let Some(local_handle) = maybe_local_handle {
-                PullItemLocalTarget::existing(local_handle)
+                PullLocalTarget::existing(local_handle)
             } else {
-                PullItemLocalTarget::to_create(local_alias.clone())
+                PullLocalTarget::to_create(local_alias.clone())
             };
             PullItem {
                 maybe_original_request: None, // May be set below
@@ -112,7 +153,7 @@ impl PullRequestPlannerImpl {
             PullItem {
                 maybe_original_request: None, // May be set below
                 depth: max_dep_depth + 1,
-                local_target: PullItemLocalTarget::existing(local_handle),
+                local_target: PullLocalTarget::existing(local_handle),
                 maybe_remote_ref: None,
             }
         };
@@ -388,8 +429,8 @@ impl PullRequestPlannerImpl {
                 assert!(pi.maybe_remote_ref.is_none());
 
                 let hdl = match pi.local_target {
-                    PullItemLocalTarget::Existing(local_handle) => local_handle,
-                    PullItemLocalTarget::ToCreate(_) => unreachable!(
+                    PullLocalTarget::Existing(local_handle) => local_handle,
+                    PullLocalTarget::ToCreate(_) => unreachable!(
                         "Ingest/Transform flows expect to work with existing local targets"
                     ),
                 };
@@ -459,53 +500,37 @@ impl PullRequestPlannerImpl {
 
 #[async_trait::async_trait]
 impl PullRequestPlanner for PullRequestPlannerImpl {
-    // This function descends down the dependency tree of datasets (starting with
-    // provided references) assigning depth index to every dataset in the
-    // graph(s). Datasets that share the same depth level are independent and
-    // can be pulled in parallel.
-    async fn collect_pull_graph(
+    async fn collect_plan(
         &self,
         requests: &[PullRequest],
         options: &PullOptions,
         in_multi_tenant_mode: bool,
-    ) -> (Vec<PullItem>, Vec<PullResponse>) {
-        let mut visited = HashMap::new();
-        let mut errors = Vec::new();
-
-        for pr in requests {
-            match self
-                .collect_pull_graph_depth_first(
-                    pr,
-                    true,
-                    options,
-                    in_multi_tenant_mode,
-                    &mut visited,
-                )
-                .await
-            {
-                Ok(_) => {}
-                Err(e) => errors.push(PullResponse {
-                    maybe_original_request: Some(pr.clone()),
-                    maybe_local_ref: None,
-                    maybe_remote_ref: None,
-                    result: Err(e),
-                }),
-            }
+    ) -> (Vec<PullPlanIteration>, Vec<PullResponse>) {
+        // TODO:
+        //  - recursive complex planning may be skipped if there is just 1 dataset, and
+        //    no recursive/all flags
+        let (mut plan, errors) = self
+            .collect_pull_graph(requests, options, in_multi_tenant_mode)
+            .await;
+        tracing::info!(
+            num_items = plan.len(),
+            num_errors = errors.len(),
+            ?plan,
+            "Resolved pull graph"
+        );
+        if !errors.is_empty() {
+            return (vec![], errors);
         }
 
-        let mut ordered = Vec::with_capacity(visited.len());
-        ordered.extend(visited.into_values());
-        ordered.sort();
-        (ordered, errors)
-    }
+        if !options.recursive {
+            // Leave only datasets explicitly mentioned, preserving the depth order
+            plan.retain(|pi| pi.maybe_original_request.is_some());
+        }
 
-    async fn prepare_pull_execution_steps(
-        &self,
-        plan: Vec<PullItem>,
-        options: &PullOptions,
-    ) -> (Vec<PullExecutionStep>, Vec<PullResponse>) {
-        let mut steps = Vec::new();
-        let mut all_errors = Vec::new();
+        tracing::info!(num_items = plan.len(), ?plan, "Retained pull graph");
+
+        let mut iterations = Vec::new();
+        let mut errors = Vec::new();
 
         let mut rest = plan;
         while !rest.is_empty() {
@@ -513,31 +538,66 @@ impl PullRequestPlanner for PullRequestPlannerImpl {
             rest = tail;
 
             if depth == 0 && !is_remote {
-                steps.push(PullExecutionStep {
+                iterations.push(PullPlanIteration {
                     depth,
-                    details: PullExecutionStepDetails::Ingest(self.build_update_items(batch)),
+                    job: PullPlanIterationJob::Ingest(self.build_update_items(batch)),
                 });
             } else if depth == 0 && is_remote {
                 match self.build_sync_items(batch, &options.sync_options).await {
                     Ok(items) => {
-                        steps.push(PullExecutionStep {
+                        iterations.push(PullPlanIteration {
                             depth,
-                            details: PullExecutionStepDetails::Sync(items),
+                            job: PullPlanIterationJob::Sync(items),
                         });
                     }
-                    Err(errors) => {
-                        all_errors.extend(errors);
+                    Err(sync_errors) => {
+                        errors.extend(sync_errors);
                     }
                 }
             } else {
-                steps.push(PullExecutionStep {
+                iterations.push(PullPlanIteration {
                     depth,
-                    details: PullExecutionStepDetails::Transform(self.build_update_items(batch)),
+                    job: PullPlanIterationJob::Transform(self.build_update_items(batch)),
                 });
             };
         }
 
-        (steps, all_errors)
+        (iterations, errors)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct PullItem {
+    depth: i32,
+    local_target: PullLocalTarget,
+    maybe_remote_ref: Option<DatasetRefRemote>,
+    maybe_original_request: Option<PullRequest>,
+}
+
+impl PartialOrd for PullItem {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for PullItem {
+    fn cmp(&self, other: &Self) -> Ordering {
+        let depth_ord = self.depth.cmp(&other.depth);
+        if depth_ord != Ordering::Equal {
+            return depth_ord;
+        }
+
+        if self.maybe_remote_ref.is_some() != other.maybe_remote_ref.is_some() {
+            return if self.maybe_remote_ref.is_some() {
+                Ordering::Less
+            } else {
+                Ordering::Greater
+            };
+        }
+
+        self.local_target.alias().cmp(other.local_target.alias())
     }
 }
 

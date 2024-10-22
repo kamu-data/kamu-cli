@@ -232,9 +232,7 @@ async fn test_pull_batching_chain() {
     );
 
     assert_eq!(
-        harness
-            .pull(refs!["c", "a"], PullOptions::default())
-            .await,
+        harness.pull(refs!["c", "a"], PullOptions::default()).await,
         vec![
             PullBatch::Ingest(refs!["a"]),
             PullBatch::Transform(refs!["c"]),
@@ -278,9 +276,7 @@ async fn test_pull_batching_chain_multi_tenant() {
     .await;
 
     assert_eq!(
-        harness
-            .pull(refs!["z/c"], PullOptions::default())
-            .await,
+        harness.pull(refs!["z/c"], PullOptions::default()).await,
         vec![PullBatch::Transform(refs_local!["z/c"])]
     );
 
