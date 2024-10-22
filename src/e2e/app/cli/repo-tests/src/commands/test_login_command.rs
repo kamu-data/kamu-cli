@@ -145,7 +145,7 @@ pub async fn test_login_add_repo(kamu: KamuCliPuppet) {
     .await;
 
     let repo_list = kamu.get_list_of_repos().await;
-    assert!(repo_list.is_empty());
+    pretty_assertions::assert_eq!(Vec::<RepoRecord>::new(), repo_list);
 
     // Login with adding repo with default naming
     kamu.assert_success_command_execution(
