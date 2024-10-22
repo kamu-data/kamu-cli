@@ -9,12 +9,12 @@ to roll out a build environment and all the tools.
 
 ```shell
 cd ./images/kamu-base-git/
-docker build -t kamu-base:git .
+docker build --no-cache -t kamu-base:git .
 ```
 
 Or, you can also specify the desired branch:
 ```shell
-docker build --build-arg KAMU_BRANCH=<REPLACE_ME> -t kamu-base:git .
+docker build --no-cache --build-arg KAMU_BRANCH=<REPLACE_ME> -t kamu-base:git .
 ```
 
 ### Verification
