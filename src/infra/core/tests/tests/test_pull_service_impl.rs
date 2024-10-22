@@ -227,13 +227,13 @@ async fn test_pull_batching_chain() {
     .await;
 
     assert_eq!(
-        harness.pull(refs!["c"], PullMultiOptions::default()).await,
+        harness.pull(refs!["c"], PullOptions::default()).await,
         vec![PullBatch::Transform(refs!["c"])]
     );
 
     assert_eq!(
         harness
-            .pull(refs!["c", "a"], PullMultiOptions::default())
+            .pull(refs!["c", "a"], PullOptions::default())
             .await,
         vec![
             PullBatch::Ingest(refs!["a"]),
@@ -245,9 +245,9 @@ async fn test_pull_batching_chain() {
         harness
             .pull(
                 refs!["c"],
-                PullMultiOptions {
+                PullOptions {
                     recursive: true,
-                    ..PullMultiOptions::default()
+                    ..PullOptions::default()
                 }
             )
             .await,
@@ -279,14 +279,14 @@ async fn test_pull_batching_chain_multi_tenant() {
 
     assert_eq!(
         harness
-            .pull(refs!["z/c"], PullMultiOptions::default())
+            .pull(refs!["z/c"], PullOptions::default())
             .await,
         vec![PullBatch::Transform(refs_local!["z/c"])]
     );
 
     assert_eq!(
         harness
-            .pull(refs!["z/c", "x/a"], PullMultiOptions::default())
+            .pull(refs!["z/c", "x/a"], PullOptions::default())
             .await,
         vec![
             PullBatch::Ingest(refs_local!["x/a"]),
@@ -298,9 +298,9 @@ async fn test_pull_batching_chain_multi_tenant() {
         harness
             .pull(
                 refs!["z/c"],
-                PullMultiOptions {
+                PullOptions {
                     recursive: true,
-                    ..PullMultiOptions::default()
+                    ..PullOptions::default()
                 }
             )
             .await,
@@ -422,9 +422,9 @@ async fn test_pull_batching_complex_with_remote() {
         harness
             .pull(
                 refs!["e"],
-                PullMultiOptions {
+                PullOptions {
                     recursive: true,
-                    ..PullMultiOptions::default()
+                    ..PullOptions::default()
                 }
             )
             .await,
@@ -439,9 +439,9 @@ async fn test_pull_batching_complex_with_remote() {
         harness
             .pull(
                 refs!["kamu.dev/anonymous/e"],
-                PullMultiOptions {
+                PullOptions {
                     recursive: true,
-                    ..PullMultiOptions::default()
+                    ..PullOptions::default()
                 }
             )
             .await,
@@ -456,9 +456,9 @@ async fn test_pull_batching_complex_with_remote() {
         harness
             .pull(
                 refs!["g"],
-                PullMultiOptions {
+                PullOptions {
                     recursive: true,
-                    ..PullMultiOptions::default()
+                    ..PullOptions::default()
                 }
             )
             .await,
@@ -475,9 +475,9 @@ async fn test_pull_batching_complex_with_remote() {
         harness
             .pull(
                 refs!["g", "e"],
-                PullMultiOptions {
+                PullOptions {
                     recursive: true,
-                    ..PullMultiOptions::default()
+                    ..PullOptions::default()
                 }
             )
             .await,
@@ -494,9 +494,9 @@ async fn test_pull_batching_complex_with_remote() {
         harness
             .pull(
                 refs!["g", "kamu.dev/anonymous/e"],
-                PullMultiOptions {
+                PullOptions {
                     recursive: true,
-                    ..PullMultiOptions::default()
+                    ..PullOptions::default()
                 }
             )
             .await,
@@ -789,7 +789,7 @@ impl PullTestHarness {
         calls
     }
 
-    async fn pull(&self, _refs: Vec<DatasetRefAny>, _options: PullMultiOptions) -> Vec<PullBatch> {
+    async fn pull(&self, _refs: Vec<DatasetRefAny>, _options: PullOptions) -> Vec<PullBatch> {
         /*let results = self.pull_svc.pull_multi(refs, options, None).await.unwrap();
 
         for res in results {

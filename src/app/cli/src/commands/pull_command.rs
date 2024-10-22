@@ -111,7 +111,7 @@ impl PullCommand {
                         local_name.clone(),
                     )),
                 )],
-                PullMultiOptions {
+                PullOptions {
                     add_aliases: self.add_aliases,
                     ..Default::default()
                 },
@@ -159,7 +159,7 @@ impl PullCommand {
             .pull_dataset_use_case
             .execute_multi(
                 requests,
-                PullMultiOptions {
+                PullOptions {
                     recursive: self.recursive,
                     add_aliases: self.add_aliases,
                     reset_derivatives_on_diverged_input: self.reset_derivatives_on_diverged_input,
@@ -199,14 +199,14 @@ impl PullCommand {
     }
 
     fn describe_response(&self, pr: &PullResponse) -> String {
-        let local_ref = pr.local_ref.as_ref().map(Cow::Borrowed).or(pr
-            .original_request
+        let local_ref = pr.maybe_local_ref.as_ref().map(Cow::Borrowed).or(pr
+            .maybe_original_request
             .as_ref()
             .and_then(PullRequest::local_ref));
-        let remote_ref = pr
-            .remote_ref
+        let remote_ref = pr.maybe_remote_ref.as_ref().or(pr
+            .maybe_original_request
             .as_ref()
-            .or(pr.original_request.as_ref().and_then(|r| r.remote_ref()));
+            .and_then(|r| r.remote_ref()));
         match (local_ref, remote_ref) {
             (Some(local_ref), Some(remote_ref)) => {
                 format!("sync {local_ref} from {remote_ref}")

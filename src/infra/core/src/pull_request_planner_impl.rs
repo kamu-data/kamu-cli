@@ -17,10 +17,13 @@ use kamu_core::*;
 use opendatafabric::*;
 use url::Url;
 
+use crate::SyncRequestBuilder;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct PullRequestPlannerImpl {
     dataset_registry: Arc<dyn DatasetRegistry>,
+    sync_request_builder: Arc<SyncRequestBuilder>,
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
     current_account_subject: Arc<CurrentAccountSubject>,
 }
@@ -30,11 +33,13 @@ pub struct PullRequestPlannerImpl {
 impl PullRequestPlannerImpl {
     pub fn new(
         dataset_registry: Arc<dyn DatasetRegistry>,
+        sync_request_builder: Arc<SyncRequestBuilder>,
         remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
         current_account_subject: Arc<CurrentAccountSubject>,
     ) -> Self {
         Self {
             dataset_registry,
+            sync_request_builder,
             remote_alias_reg,
             current_account_subject,
         }
@@ -45,7 +50,7 @@ impl PullRequestPlannerImpl {
         &self,
         request: &PullRequest,
         referenced_explicitly: bool,
-        options: &PullMultiOptions,
+        options: &PullOptions,
         in_multi_tenant_mode: bool,
         visited: &mut HashMap<DatasetAlias, PullItem>,
     ) -> Result<i32, PullError> {
@@ -327,7 +332,7 @@ impl PullRequestPlannerImpl {
     async fn plan_upstream_datasets(
         &self,
         local_handle: &DatasetHandle,
-        options: &PullMultiOptions,
+        options: &PullOptions,
         in_multi_tenant_mode: bool,
         visited: &mut HashMap<DatasetAlias, PullItem>,
     ) -> Result<i32, PullError> {
@@ -382,34 +387,71 @@ impl PullRequestPlannerImpl {
             .map(|pi| {
                 assert!(pi.maybe_remote_ref.is_none());
 
+                let hdl = match pi.local_target {
+                    PullItemLocalTarget::Existing(local_handle) => local_handle,
+                    PullItemLocalTarget::ToCreate(_) => unreachable!(
+                        "Ingest/Transform flows expect to work with existing local targets"
+                    ),
+                };
+
                 PullUpdateItem {
                     depth: pi.depth,
-                    local_handle: match pi.local_target {
-                        PullItemLocalTarget::Existing(local_handle) => local_handle,
-                        PullItemLocalTarget::ToCreate(_) => unreachable!(
-                            "Ingest/Transform flows expect to work with existing local targets"
-                        ),
-                    },
+                    target: self.dataset_registry.get_resolved_dataset_by_handle(&hdl),
                     maybe_original_request: pi.maybe_original_request,
                 }
             })
             .collect()
     }
 
-    fn build_sync_items(&self, pull_items: Vec<PullItem>) -> Vec<PullSyncItem> {
-        pull_items
-            .into_iter()
-            .map(|pi| {
-                assert!(pi.maybe_remote_ref.is_some());
+    async fn build_sync_items(
+        &self,
+        pull_items: Vec<PullItem>,
+        sync_options: &SyncOptions,
+    ) -> Result<(Vec<PullSyncItem>, Vec<SyncRequest>), Vec<PullResponse>> {
+        let mut pull_sync_items = Vec::new();
+        let mut sync_requests = Vec::new();
+        let mut errors = Vec::new();
 
-                PullSyncItem {
-                    depth: pi.depth,
-                    local_target: pi.local_target,
-                    remote_ref: pi.maybe_remote_ref.unwrap(),
-                    maybe_original_request: pi.maybe_original_request,
+        for pi in pull_items {
+            assert!(pi.maybe_remote_ref.is_some());
+
+            let remote_ref = pi.maybe_remote_ref.unwrap();
+
+            match self
+                .sync_request_builder
+                .build_sync_request(
+                    remote_ref.as_any_ref(),
+                    pi.local_target.as_any_ref(),
+                    sync_options.create_if_not_exists,
+                )
+                .await
+            {
+                Ok(sync_request) => {
+                    let psi = PullSyncItem {
+                        depth: pi.depth,
+                        local_target: pi.local_target,
+                        remote_ref,
+                        maybe_original_request: pi.maybe_original_request,
+                    };
+                    pull_sync_items.push(psi);
+                    sync_requests.push(sync_request);
                 }
-            })
-            .collect()
+                Err(e) => {
+                    errors.push(PullResponse {
+                        maybe_original_request: pi.maybe_original_request,
+                        maybe_local_ref: Some(pi.local_target.as_local_ref()),
+                        maybe_remote_ref: Some(remote_ref),
+                        result: Err(PullError::SyncError(e)),
+                    });
+                }
+            };
+        }
+
+        if !errors.is_empty() {
+            Err(errors)
+        } else {
+            Ok((pull_sync_items, sync_requests))
+        }
     }
 }
 
@@ -424,7 +466,7 @@ impl PullRequestPlanner for PullRequestPlannerImpl {
     async fn collect_pull_graph(
         &self,
         requests: &[PullRequest],
-        options: &PullMultiOptions,
+        options: &PullOptions,
         in_multi_tenant_mode: bool,
     ) -> (Vec<PullItem>, Vec<PullResponse>) {
         let mut visited = HashMap::new();
@@ -443,9 +485,9 @@ impl PullRequestPlanner for PullRequestPlannerImpl {
             {
                 Ok(_) => {}
                 Err(e) => errors.push(PullResponse {
-                    original_request: Some(pr.clone()),
-                    local_ref: None,
-                    remote_ref: None,
+                    maybe_original_request: Some(pr.clone()),
+                    maybe_local_ref: None,
+                    maybe_remote_ref: None,
                     result: Err(e),
                 }),
             }
@@ -457,26 +499,45 @@ impl PullRequestPlanner for PullRequestPlannerImpl {
         (ordered, errors)
     }
 
-    fn prepare_pull_execution_steps(&self, plan: Vec<PullItem>) -> Vec<PullExecutionStep> {
+    async fn prepare_pull_execution_steps(
+        &self,
+        plan: Vec<PullItem>,
+        options: &PullOptions,
+    ) -> (Vec<PullExecutionStep>, Vec<PullResponse>) {
         let mut steps = Vec::new();
+        let mut all_errors = Vec::new();
 
         let mut rest = plan;
         while !rest.is_empty() {
             let (depth, is_remote, batch, tail) = self.slice(rest);
             rest = tail;
 
-            let details = if depth == 0 && !is_remote {
-                PullExecutionStepDetails::Ingest(self.build_update_items(batch))
+            if depth == 0 && !is_remote {
+                steps.push(PullExecutionStep {
+                    depth,
+                    details: PullExecutionStepDetails::Ingest(self.build_update_items(batch)),
+                });
             } else if depth == 0 && is_remote {
-                PullExecutionStepDetails::Sync(self.build_sync_items(batch))
+                match self.build_sync_items(batch, &options.sync_options).await {
+                    Ok(items) => {
+                        steps.push(PullExecutionStep {
+                            depth,
+                            details: PullExecutionStepDetails::Sync(items),
+                        });
+                    }
+                    Err(errors) => {
+                        all_errors.extend(errors);
+                    }
+                }
             } else {
-                PullExecutionStepDetails::Transform(self.build_update_items(batch))
+                steps.push(PullExecutionStep {
+                    depth,
+                    details: PullExecutionStepDetails::Transform(self.build_update_items(batch)),
+                });
             };
-
-            steps.push(PullExecutionStep { depth, details });
         }
 
-        steps
+        (steps, all_errors)
     }
 }
 

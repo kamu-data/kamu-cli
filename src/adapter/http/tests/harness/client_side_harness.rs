@@ -225,7 +225,7 @@ impl ClientSideHarness {
                 vec![PullRequest::from_any_ref(&dataset_ref, |_| {
                     !self.options.multi_tenant
                 })],
-                PullMultiOptions {
+                PullOptions {
                     sync_options: SyncOptions {
                         create_if_not_exists: true,
                         force,

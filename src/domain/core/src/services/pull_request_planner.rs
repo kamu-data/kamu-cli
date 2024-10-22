@@ -31,11 +31,15 @@ pub trait PullRequestPlanner: Send + Sync {
     async fn collect_pull_graph(
         &self,
         requests: &[PullRequest],
-        options: &PullMultiOptions,
+        options: &PullOptions,
         in_multi_tenant_mode: bool,
     ) -> (Vec<PullItem>, Vec<PullResponse>);
 
-    fn prepare_pull_execution_steps(&self, plan: Vec<PullItem>) -> Vec<PullExecutionStep>;
+    async fn prepare_pull_execution_steps(
+        &self,
+        plan: Vec<PullItem>,
+        options: &PullOptions,
+    ) -> (Vec<PullExecutionStep>, Vec<PullResponse>);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -114,19 +118,19 @@ impl PullItemLocalTarget {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug)]
 pub struct PullUpdateItem {
     pub depth: i32,
-    pub local_handle: DatasetHandle,
+    pub target: ResolvedDataset,
     pub maybe_original_request: Option<PullRequest>,
 }
 
 impl PullUpdateItem {
     pub fn into_response_ingest(self, r: PollingIngestResponse) -> PullResponse {
         PullResponse {
-            original_request: self.maybe_original_request,
-            local_ref: Some(r.dataset_ref),
-            remote_ref: None,
+            maybe_original_request: self.maybe_original_request,
+            maybe_local_ref: Some(r.dataset_ref),
+            maybe_remote_ref: None,
             result: match r.result {
                 Ok(r) => Ok(r.into()),
                 Err(e) => Err(e.into()),
@@ -139,9 +143,9 @@ impl PullUpdateItem {
         r: (DatasetRef, Result<TransformResult, TransformError>),
     ) -> PullResponse {
         PullResponse {
-            original_request: self.maybe_original_request,
-            local_ref: Some(r.0),
-            remote_ref: None,
+            maybe_original_request: self.maybe_original_request,
+            maybe_local_ref: Some(r.0),
+            maybe_remote_ref: None,
             result: match r.1 {
                 Ok(r) => Ok(r.into()),
                 Err(e) => Err(e.into()),
@@ -152,7 +156,7 @@ impl PullUpdateItem {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug)]
 pub struct PullSyncItem {
     pub depth: i32,
     pub local_target: PullItemLocalTarget,
@@ -163,9 +167,9 @@ pub struct PullSyncItem {
 impl PullSyncItem {
     pub fn into_response_sync(self, r: SyncResultMulti) -> PullResponse {
         PullResponse {
-            original_request: self.maybe_original_request,
-            local_ref: r.dst.as_local_ref(|_| true).ok(), // TODO: multi-tenancy
-            remote_ref: r.src.as_remote_ref(|_| true).ok(),
+            maybe_original_request: self.maybe_original_request,
+            maybe_local_ref: r.dst.as_local_ref(|_| true).ok(), // TODO: multi-tenancy
+            maybe_remote_ref: r.src.as_remote_ref(|_| true).ok(),
             result: match r.result {
                 Ok(response) => Ok(response.result.into()),
                 Err(e) => Err(e.into()),
@@ -186,7 +190,7 @@ pub struct PullExecutionStep {
 pub enum PullExecutionStepDetails {
     Ingest(Vec<PullUpdateItem>),
     Transform(Vec<PullUpdateItem>),
-    Sync(Vec<PullSyncItem>),
+    Sync((Vec<PullSyncItem>, Vec<SyncRequest>)),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -249,11 +253,11 @@ impl PullRequest {
 pub struct PullResponse {
     /// Parameters passed into the call. Empty for datasets that were pulled as
     /// recursive dependencies.
-    pub original_request: Option<PullRequest>,
+    pub maybe_original_request: Option<PullRequest>,
     /// Local dataset handle, if resolved
-    pub local_ref: Option<DatasetRef>,
+    pub maybe_local_ref: Option<DatasetRef>,
     /// Destination reference, if resolved
-    pub remote_ref: Option<DatasetRefRemote>,
+    pub maybe_remote_ref: Option<DatasetRefRemote>,
     /// Result of the push operation
     pub result: Result<PullResult, PullError>,
 }
@@ -262,33 +266,6 @@ pub struct PullResponse {
 
 #[derive(Debug, Clone)]
 pub struct PullOptions {
-    /// Whether the datasets pulled from remotes should be permanently
-    /// associated with them
-    pub add_aliases: bool,
-    /// Ingest-specific options
-    pub ingest_options: PollingIngestOptions,
-    /// Sync-specific options,
-    pub sync_options: SyncOptions,
-    /// Run compaction of derivative dataset without saving data
-    /// if transformation failed due to root dataset compaction
-    pub reset_derivatives_on_diverged_input: bool,
-}
-
-impl Default for PullOptions {
-    fn default() -> Self {
-        Self {
-            add_aliases: true,
-            reset_derivatives_on_diverged_input: false,
-            ingest_options: PollingIngestOptions::default(),
-            sync_options: SyncOptions::default(),
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Clone)]
-pub struct PullMultiOptions {
     /// Pull all dataset dependencies recursively in depth-first order
     pub recursive: bool,
     /// Whether the datasets pulled from remotes should be permanently
@@ -303,7 +280,7 @@ pub struct PullMultiOptions {
     pub reset_derivatives_on_diverged_input: bool,
 }
 
-impl Default for PullMultiOptions {
+impl Default for PullOptions {
     fn default() -> Self {
         Self {
             recursive: false,

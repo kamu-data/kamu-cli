@@ -9,14 +9,7 @@
 
 use std::sync::Arc;
 
-use crate::{
-    PullListener,
-    PullMultiListener,
-    PullMultiOptions,
-    PullOptions,
-    PullRequest,
-    PullResponse,
-};
+use crate::{PullListener, PullMultiListener, PullOptions, PullRequest, PullResponse};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -32,7 +25,7 @@ pub trait PullDatasetUseCase: Send + Sync {
     async fn execute_multi(
         &self,
         requests: Vec<PullRequest>,
-        options: PullMultiOptions,
+        options: PullOptions,
         listener: Option<Arc<dyn PullMultiListener>>,
     ) -> Vec<PullResponse>;
 }
