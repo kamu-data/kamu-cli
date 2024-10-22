@@ -12,6 +12,7 @@ use std::sync::Arc;
 use dill::*;
 //use kamu_core::auth::DatasetActionAuthorizer;
 use kamu_core::{
+    GetAliasesError,
     PollingIngestListener,
     PollingIngestMultiListener,
     PollingIngestService,
@@ -27,6 +28,7 @@ use kamu_core::{
     PullUpdateItem,
     RemoteAliasKind,
     RemoteAliasesRegistry,
+    SyncError,
     SyncListener,
     SyncMultiListener,
     SyncRequest,
@@ -142,23 +144,29 @@ impl PullDatasetUseCaseImpl {
         assert_eq!(batch.len(), sync_results.len());
 
         let mut results = Vec::new();
-        for (psi, res) in std::iter::zip(batch, sync_results) {
+        for (psi, mut res) in std::iter::zip(batch, sync_results) {
             assert_eq!(psi.local_target.as_any_ref(), res.dst);
 
             // Associate newly-synced datasets with remotes
-            if options.add_aliases {
-                if let Ok(SyncResponse {
+            if options.add_aliases
+                && let Ok(SyncResponse {
                     result: SyncResult::Updated { old_head: None, .. },
                     local_dataset,
                 }) = &res.result
+            {
+                let alias_add_result = match self
+                    .remote_alias_reg
+                    .get_remote_aliases(local_dataset.clone())
+                    .await
                 {
-                    self.remote_alias_reg
-                        .get_remote_aliases(local_dataset.clone())
-                        .await
-                        .unwrap() // TODO
-                        .add(&psi.remote_ref, RemoteAliasKind::Pull)
-                        .await
-                        .unwrap(); // TODO
+                    Ok(mut aliases) => aliases.add(&psi.remote_ref, RemoteAliasKind::Pull).await,
+                    Err(e) => match e {
+                        GetAliasesError::Internal(e) => Err(e),
+                    },
+                };
+
+                if let Err(e) = alias_add_result {
+                    res.result = Err(SyncError::Internal(e));
                 }
             }
 
