@@ -435,7 +435,7 @@ impl PullRequestPlannerImpl {
                     &PullRequest::local(dependency_id.as_local_ref()),
                     options,
                     visited,
-                    false, 
+                    false,
                     true,
                     in_multi_tenant_mode,
                 )
