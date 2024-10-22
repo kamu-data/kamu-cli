@@ -236,6 +236,7 @@ impl ClientSideHarness {
                 None,
             )
             .await
+            .unwrap()
     }
 
     pub async fn pull_dataset_result(&self, dataset_ref: DatasetRefAny, force: bool) -> PullResult {

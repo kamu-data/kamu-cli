@@ -9,6 +9,8 @@
 
 use std::sync::Arc;
 
+use internal_error::InternalError;
+
 use crate::{PullListener, PullMultiListener, PullOptions, PullRequest, PullResponse};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -20,14 +22,14 @@ pub trait PullDatasetUseCase: Send + Sync {
         request: PullRequest,
         options: PullOptions,
         listener: Option<Arc<dyn PullListener>>,
-    ) -> PullResponse;
+    ) -> Result<PullResponse, InternalError>;
 
     async fn execute_multi(
         &self,
         requests: Vec<PullRequest>,
         options: PullOptions,
         listener: Option<Arc<dyn PullMultiListener>>,
-    ) -> Vec<PullResponse>;
+    ) -> Result<Vec<PullResponse>, InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

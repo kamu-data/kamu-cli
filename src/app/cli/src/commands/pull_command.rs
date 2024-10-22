@@ -97,8 +97,7 @@ impl PullCommand {
             }
         };
 
-        Ok(self
-            .pull_dataset_use_case
+        self.pull_dataset_use_case
             .execute_multi(
                 vec![PullRequest::remote(
                     remote_ref,
@@ -117,7 +116,8 @@ impl PullCommand {
                 },
                 listener,
             )
-            .await)
+            .await
+            .map_err(CLIError::failure)
     }
 
     async fn pull_multi(
@@ -155,8 +155,7 @@ impl PullCommand {
                 .await?
         };
 
-        Ok(self
-            .pull_dataset_use_case
+        self.pull_dataset_use_case
             .execute_multi(
                 requests,
                 PullOptions {
@@ -176,7 +175,8 @@ impl PullCommand {
                 },
                 listener,
             )
-            .await)
+            .await
+            .map_err(CLIError::failure)
     }
 
     async fn pull_with_progress(&self) -> Result<Vec<PullResponse>, CLIError> {

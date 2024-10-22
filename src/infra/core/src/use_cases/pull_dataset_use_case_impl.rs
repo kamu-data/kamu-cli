@@ -7,16 +7,26 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use dill::*;
-//use kamu_core::auth::DatasetActionAuthorizer;
+use internal_error::InternalError;
+use kamu_core::auth::{
+    ClassifyByAllowanceResponse,
+    DatasetAction,
+    DatasetActionAuthorizer,
+    DatasetActionUnauthorizedError,
+};
 use kamu_core::{
     GetAliasesError,
+    PollingIngestError,
     PollingIngestListener,
     PollingIngestMultiListener,
     PollingIngestService,
     PullDatasetUseCase,
+    PullError,
+    PullItemCommon,
     PullListener,
     PullMultiListener,
     PullOptions,
@@ -35,6 +45,7 @@ use kamu_core::{
     SyncResponse,
     SyncResult,
     SyncService,
+    TransformError,
     TransformListener,
     TransformMultiListener,
     TransformOptions,
@@ -48,8 +59,8 @@ use opendatafabric::{DatasetHandle, DatasetRefAny};
 #[interface(dyn PullDatasetUseCase)]
 pub struct PullDatasetUseCaseImpl {
     pull_request_planner: Arc<dyn PullRequestPlanner>,
-    //dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
-    remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
+    dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
+    remote_alias_registry: Arc<dyn RemoteAliasesRegistry>,
     polling_ingest_svc: Arc<dyn PollingIngestService>,
     transform_svc: Arc<dyn TransformService>,
     sync_svc: Arc<dyn SyncService>,
@@ -58,18 +69,18 @@ pub struct PullDatasetUseCaseImpl {
 
 impl PullDatasetUseCaseImpl {
     pub fn new(
-        pull_plan_builder: Arc<dyn PullRequestPlanner>,
-        //dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
-        remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
+        pull_request_planner: Arc<dyn PullRequestPlanner>,
+        dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
+        remote_alias_registry: Arc<dyn RemoteAliasesRegistry>,
         polling_ingest_svc: Arc<dyn PollingIngestService>,
         transform_svc: Arc<dyn TransformService>,
         sync_svc: Arc<dyn SyncService>,
         in_multi_tenant_mode: bool,
     ) -> Self {
         Self {
-            pull_request_planner: pull_plan_builder,
-            //dataset_action_authorizer,
-            remote_alias_reg,
+            pull_request_planner,
+            dataset_action_authorizer,
+            remote_alias_registry,
             polling_ingest_svc,
             transform_svc,
             sync_svc,
@@ -77,27 +88,101 @@ impl PullDatasetUseCaseImpl {
         }
     }
 
+    async fn make_authorization_checks<TPullItem: PullItemCommon>(
+        &self,
+        batch: Vec<TPullItem>,
+        error_conversion_callback: impl Fn(DatasetActionUnauthorizedError) -> PullError,
+    ) -> Result<(Vec<TPullItem>, Vec<PullResponse>), InternalError> {
+        let (existing_handle_items, other_items): (Vec<_>, Vec<_>) = batch
+            .into_iter()
+            .partition(|item| item.try_get_handle().is_some());
+
+        let dataset_handles = existing_handle_items
+            .iter()
+            .map(|item| item.try_get_handle().expect("handle must exist").clone())
+            .collect();
+
+        let ClassifyByAllowanceResponse {
+            authorized_handles,
+            unauthorized_handles_with_errors,
+        } = self
+            .dataset_action_authorizer
+            .classify_datasets_by_allowance(dataset_handles, DatasetAction::Write)
+            .await?;
+
+        if unauthorized_handles_with_errors.is_empty() {
+            let mut batch = Vec::with_capacity(existing_handle_items.len() + other_items.len());
+            batch.extend(existing_handle_items);
+            batch.extend(other_items);
+            return Ok((batch, vec![]));
+        }
+
+        let mut items_by_handle = HashMap::new();
+        for item in existing_handle_items {
+            items_by_handle.insert(
+                item.try_get_handle().expect("handle must exist").clone(),
+                item,
+            );
+        }
+
+        let unauthorized_responses = unauthorized_handles_with_errors
+            .into_iter()
+            .map(|(hdl, auth_error)| {
+                let item = items_by_handle.remove(&hdl).expect("item must be present");
+                PullResponse {
+                    maybe_local_ref: Some(hdl.as_local_ref()),
+                    maybe_remote_ref: None,
+                    maybe_original_request: item.into_original_pull_request(),
+                    result: Err(error_conversion_callback(auth_error)),
+                }
+            })
+            .collect();
+
+        let mut authorized_items = Vec::with_capacity(authorized_handles.len() + other_items.len());
+        authorized_handles
+            .iter()
+            .map(|hdl| items_by_handle.remove(hdl).expect("item must be present"))
+            .collect_into(&mut authorized_items);
+        authorized_items.extend(other_items);
+
+        Ok((authorized_items, unauthorized_responses))
+    }
+
     async fn ingest_multi(
         &self,
         batch: Vec<PullUpdateItem>,
         options: &PullOptions,
         listener: Option<Arc<dyn PollingIngestMultiListener>>,
-    ) -> Vec<PullResponse> {
-        let ingest_requests = batch.iter().map(|pui| pui.target.clone()).collect();
+    ) -> Result<Vec<PullResponse>, InternalError> {
+        // Authorization checks
+        let (batch, errors) = self
+            .make_authorization_checks(batch, |auth_error| {
+                PullError::PollingIngestError(match auth_error {
+                    DatasetActionUnauthorizedError::Access(e) => PollingIngestError::Access(e),
+                    DatasetActionUnauthorizedError::Internal(e) => PollingIngestError::Internal(e),
+                })
+            })
+            .await?;
+        if !errors.is_empty() {
+            return Ok(errors);
+        }
+
+        // Main ingestion run
+        let ingestion_requests = batch.iter().map(|pui| pui.target.clone()).collect();
 
         let ingest_responses = self
             .polling_ingest_svc
-            .ingest_multi(ingest_requests, options.ingest_options.clone(), listener)
+            .ingest_multi(ingestion_requests, options.ingest_options.clone(), listener)
             .await;
 
+        // Convert ingest results into pull results
         assert_eq!(batch.len(), ingest_responses.len());
-
-        std::iter::zip(batch, ingest_responses)
+        Ok(std::iter::zip(batch, ingest_responses)
             .map(|(pui, res)| {
                 assert_eq!(pui.target.handle.as_local_ref(), res.dataset_ref);
                 pui.into_response_ingest(res)
             })
-            .collect()
+            .collect())
     }
 
     async fn transform_multi(
@@ -105,7 +190,22 @@ impl PullDatasetUseCaseImpl {
         batch: Vec<PullUpdateItem>,
         transform_listener: Option<Arc<dyn TransformMultiListener>>,
         reset_derivatives_on_diverged_input: bool,
-    ) -> Vec<PullResponse> {
+    ) -> Result<Vec<PullResponse>, InternalError> {
+        // Authorization checks
+        // TODO: checked targets for write, but should we check inputs for Read?
+        let (batch, errors) = self
+            .make_authorization_checks(batch, |auth_error| {
+                PullError::TransformError(match auth_error {
+                    DatasetActionUnauthorizedError::Access(e) => TransformError::Access(e),
+                    DatasetActionUnauthorizedError::Internal(e) => TransformError::Internal(e),
+                })
+            })
+            .await?;
+        if !errors.is_empty() {
+            return Ok(errors);
+        }
+
+        // Main transform run
         let transform_requests = batch.iter().map(|pui| pui.target.clone()).collect();
 
         let transform_results = self
@@ -119,14 +219,14 @@ impl PullDatasetUseCaseImpl {
             )
             .await;
 
+        // Convert transform results to pull results
         assert_eq!(batch.len(), transform_results.len());
-
-        std::iter::zip(batch, transform_results)
+        Ok(std::iter::zip(batch, transform_results)
             .map(|(pui, res)| {
                 assert_eq!(pui.target.handle.as_local_ref(), res.0);
                 pui.into_response_transform(res)
             })
-            .collect()
+            .collect())
     }
 
     async fn sync_multi(
@@ -135,7 +235,20 @@ impl PullDatasetUseCaseImpl {
         sync_requests: Vec<SyncRequest>,
         options: &PullOptions,
         listener: Option<Arc<dyn SyncMultiListener>>,
-    ) -> Vec<PullResponse> {
+    ) -> Result<Vec<PullResponse>, InternalError> {
+        // Authorization checks
+        let (batch, errors) = self
+            .make_authorization_checks(batch, |auth_error| {
+                PullError::SyncError(match auth_error {
+                    DatasetActionUnauthorizedError::Access(e) => SyncError::Access(e),
+                    DatasetActionUnauthorizedError::Internal(e) => SyncError::Internal(e),
+                })
+            })
+            .await?;
+        if !errors.is_empty() {
+            return Ok(errors);
+        }
+
         let sync_results = self
             .sync_svc
             .sync_multi(sync_requests, options.sync_options.clone(), listener)
@@ -155,7 +268,7 @@ impl PullDatasetUseCaseImpl {
                 }) = &res.result
             {
                 let alias_add_result = match self
-                    .remote_alias_reg
+                    .remote_alias_registry
                     .get_remote_aliases(local_dataset.clone())
                     .await
                 {
@@ -173,7 +286,7 @@ impl PullDatasetUseCaseImpl {
             results.push(psi.into_response_sync(res));
         }
 
-        results
+        Ok(results)
     }
 }
 
@@ -186,14 +299,14 @@ impl PullDatasetUseCase for PullDatasetUseCaseImpl {
         request: PullRequest,
         options: PullOptions,
         listener: Option<Arc<dyn PullListener>>,
-    ) -> PullResponse {
+    ) -> Result<PullResponse, InternalError> {
         let listener =
             listener.map(|l| Arc::new(ListenerMultiAdapter(l)) as Arc<dyn PullMultiListener>);
 
-        let mut responses = self.execute_multi(vec![request], options, listener).await;
+        let mut responses = self.execute_multi(vec![request], options, listener).await?;
 
         assert_eq!(responses.len(), 1);
-        responses.pop().unwrap()
+        Ok(responses.pop().unwrap())
     }
 
     async fn execute_multi(
@@ -201,7 +314,7 @@ impl PullDatasetUseCase for PullDatasetUseCaseImpl {
         requests: Vec<PullRequest>,
         options: PullOptions,
         listener: Option<Arc<dyn PullMultiListener>>,
-    ) -> Vec<PullResponse> {
+    ) -> Result<Vec<PullResponse>, InternalError> {
         tracing::info!(?requests, ?options, "Performing pull");
 
         let (plan, errors) = self
@@ -215,7 +328,7 @@ impl PullDatasetUseCase for PullDatasetUseCaseImpl {
             "Prepared pull execution plan"
         );
         if !errors.is_empty() {
-            return errors;
+            return Ok(errors);
         }
 
         let mut results = Vec::with_capacity(plan.len());
@@ -231,7 +344,7 @@ impl PullDatasetUseCase for PullDatasetUseCaseImpl {
                             .as_ref()
                             .and_then(|l| l.clone().get_ingest_listener()),
                     )
-                    .await
+                    .await?
                 }
 
                 PullPlanIterationJob::Sync((sync_batch, sync_requests)) => {
@@ -244,7 +357,7 @@ impl PullDatasetUseCase for PullDatasetUseCaseImpl {
                             .as_ref()
                             .and_then(|l| l.clone().get_sync_listener()),
                     )
-                    .await
+                    .await?
                 }
 
                 PullPlanIterationJob::Transform(transform_batch) => {
@@ -256,7 +369,7 @@ impl PullDatasetUseCase for PullDatasetUseCaseImpl {
                             .and_then(|l| l.clone().get_transform_listener()),
                         options.reset_derivatives_on_diverged_input,
                     )
-                    .await
+                    .await?
                 }
             };
 
@@ -267,7 +380,7 @@ impl PullDatasetUseCase for PullDatasetUseCaseImpl {
             }
         }
 
-        results
+        Ok(results)
     }
 }
 

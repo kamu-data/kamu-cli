@@ -207,6 +207,36 @@ impl PullRequest {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub trait PullItemCommon {
+    fn try_get_handle(&self) -> Option<&DatasetHandle>;
+    fn into_original_pull_request(self) -> Option<PullRequest>;
+}
+
+impl PullItemCommon for PullUpdateItem {
+    fn try_get_handle(&self) -> Option<&DatasetHandle> {
+        Some(&self.target.handle)
+    }
+
+    fn into_original_pull_request(self) -> Option<PullRequest> {
+        self.maybe_original_request
+    }
+}
+
+impl PullItemCommon for PullSyncItem {
+    fn try_get_handle(&self) -> Option<&DatasetHandle> {
+        match &self.local_target {
+            PullLocalTarget::Existing(hdl) => Some(hdl),
+            PullLocalTarget::ToCreate(_) => None,
+        }
+    }
+
+    fn into_original_pull_request(self) -> Option<PullRequest> {
+        self.maybe_original_request
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Debug)]
 pub struct PullResponse {
     /// Parameters passed into the call. Empty for datasets that were pulled as
