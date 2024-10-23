@@ -144,6 +144,7 @@ impl PullCommand {
             .map(|r| PullRequest::from_any_ref(&r, |_| !self.in_multi_tenant_mode))
             .collect();
 
+        // TODO: consider moving this logic into pull planner
         let requests: Vec<_> = if !self.all {
             requests
         } else {

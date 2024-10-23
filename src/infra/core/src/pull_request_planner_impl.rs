@@ -602,6 +602,7 @@ impl<'a> PullGraphDepthFirstTraversal<'a> {
         }
     }
 
+    // TODO: consider using data from dependency graph
     async fn traverse_upstream_datasets(
         &mut self,
         local_handle: &DatasetHandle,

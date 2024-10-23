@@ -40,6 +40,10 @@ pub trait PullRequestPlanner: Send + Sync {
 #[derive(Debug)]
 pub struct PullPlanIteration {
     pub depth: i32,
+    // TODO: consider making this a vector of jobs per 1 dataset
+    // This would allow finer grain parallelism within same depth regardless of job kind
+    // In addition, we would simplify the interface for task system runner
+    // Consider removal of *_multi executions in favor of controlling parallelism in use cases
     pub job: PullPlanIterationJob,
 }
 
