@@ -9,11 +9,13 @@
 
 use std::sync::Arc;
 
+use datafusion::arrow::array::{RecordBatch, StringArray};
+use datafusion::arrow::datatypes::{DataType, Field, Schema};
+use internal_error::{InternalError, ResultIntoInternal};
 use kamu::domain::*;
 
 use super::{CLIError, Command};
 use crate::output::*;
-use crate::records_writers::TableWriter;
 
 pub struct RepositoryListCommand {
     remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
@@ -31,68 +33,58 @@ impl RepositoryListCommand {
         }
     }
 
-    // TODO: support multiple format specifiers
-    fn print_machine_readable(&self) -> Result<(), CLIError> {
-        use std::io::Write;
+    fn record_batch(&self) -> Result<RecordBatch, InternalError> {
+        let mut col_name = Vec::new();
+        let mut col_url = Vec::new();
 
         let mut repos: Vec<_> = self.remote_repo_reg.get_all_repositories().collect();
         repos.sort();
-
-        let mut out = std::io::stdout();
-        writeln!(out, "Name,URL")?;
-
-        for name in repos {
-            let repo = self
-                .remote_repo_reg
-                .get_repository(&name)
-                .map_err(CLIError::failure)?;
-            writeln!(out, "{},\"{}\"", name, repo.url)?;
-        }
-        Ok(())
-    }
-
-    fn print_pretty(&self) -> Result<(), CLIError> {
-        use prettytable::*;
-
-        let mut repos: Vec<_> = self.remote_repo_reg.get_all_repositories().collect();
-        repos.sort();
-
-        let mut table = Table::new();
-        table.set_format(TableWriter::<Vec<u8>>::get_table_format());
-
-        table.set_titles(row![bc->"Name", bc->"URL"]);
-
         for name in &repos {
-            let repo = self
-                .remote_repo_reg
-                .get_repository(name)
-                .map_err(CLIError::failure)?;
-            table.add_row(Row::new(vec![
-                Cell::new(name),
-                Cell::new(repo.url.as_ref()),
-            ]));
+            let repo = self.remote_repo_reg.get_repository(name).int_err()?;
+            col_name.push(name.as_str());
+            col_url.push(repo.url.to_string());
         }
 
-        // Header doesn't render when there are no data rows in the table
-        if repos.is_empty() {
-            table.add_row(Row::new(vec![Cell::new(""), Cell::new("")]));
-        }
-
-        table.printstd();
-        Ok(())
+        self.records(vec![
+            Arc::new(StringArray::from(col_name)),
+            Arc::new(StringArray::from(col_url)),
+        ])
     }
 }
 
 #[async_trait::async_trait(?Send)]
 impl Command for RepositoryListCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
-        // TODO: replace with formatters
-        match self.output_config.format {
-            OutputFormat::Table => self.print_pretty()?,
-            OutputFormat::Csv => self.print_machine_readable()?,
-            fmt => unimplemented!("Unsupported format: {fmt:?}"),
-        }
+        let mut writer = self
+            .output_config
+            .get_records_writer(&self.schema(), self.records_format());
+
+        writer.write_batch(&self.record_batch()?)?;
+        writer.finish()?;
 
         Ok(())
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait::async_trait(?Send)]
+impl OutputWriter for RepositoryListCommand {
+    fn records_format(&self) -> RecordsFormat {
+        RecordsFormat::new()
+            .with_default_column_format(ColumnFormat::default())
+            .with_column_formats(vec![
+                ColumnFormat::new().with_style_spec("l"),
+                ColumnFormat::new().with_style_spec("l"),
+            ])
+    }
+
+    fn schema(&self) -> Arc<Schema> {
+        Arc::new(Schema::new(vec![
+            Field::new("Name", DataType::Utf8, false),
+            Field::new("Url", DataType::Utf8, false),
+        ]))
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

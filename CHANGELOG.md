@@ -14,6 +14,7 @@ Recommendation: for ease of reading, use the following order:
 ## [Unreleased]
 ### Changed
 - ObjectRepositoryS3`: can now support external address configuration
+- `kamu repo list`: supports all types of output
 
 ## [0.206.0] - 2024-10-22
 ### Added

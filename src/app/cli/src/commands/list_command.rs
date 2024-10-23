@@ -214,6 +214,7 @@ impl Command for ListCommand {
             false
         };
 
+        // ToDo use Output writer trait
         let records_format = RecordsFormat::new()
             .with_default_column_format(ColumnFormat::default().with_null_value("-"))
             .with_column_formats(self.column_formats(show_owners));

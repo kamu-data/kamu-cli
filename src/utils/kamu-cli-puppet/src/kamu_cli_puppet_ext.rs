@@ -23,6 +23,7 @@ use opendatafabric::{
     DatasetSnapshot,
     MetadataBlock,
     Multihash,
+    RepoName,
 };
 use serde::Deserialize;
 
@@ -82,6 +83,8 @@ pub trait KamuCliPuppetExt {
 
     async fn get_list_of_repo_aliases(&self, dataset_ref: &DatasetRef) -> Vec<RepoAlias>;
 
+    async fn get_list_of_repos(&self) -> Vec<RepoRecord>;
+
     async fn complete<T>(&self, input: T, current: usize) -> Vec<String>
     where
         T: Into<String> + Send;
@@ -138,6 +141,17 @@ impl KamuCliPuppetExt for KamuCliPuppet {
                 "--output-format",
                 "json",
             ])
+            .await
+            .success();
+
+        let stdout = std::str::from_utf8(&assert.get_output().stdout).unwrap();
+
+        serde_json::from_str(stdout).unwrap()
+    }
+
+    async fn get_list_of_repos(&self) -> Vec<RepoRecord> {
+        let assert = self
+            .execute(["repo", "list", "--output-format", "json"])
             .await
             .success();
 
@@ -410,6 +424,13 @@ pub struct RepoAlias {
 pub struct BlockRecord {
     pub block_hash: Multihash,
     pub block: MetadataBlock,
+}
+
+#[derive(Debug, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "PascalCase", deny_unknown_fields)]
+pub struct RepoRecord {
+    pub name: RepoName,
+    pub url: url::Url,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

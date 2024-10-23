@@ -8,8 +8,11 @@
 // by the Apache License, Version 2.0.
 
 use std::path::PathBuf;
+use std::sync::Arc;
 
+use datafusion::arrow::array::{ArrayRef, RecordBatch};
 use datafusion::arrow::datatypes::Schema;
+use internal_error::{InternalError, ResultIntoInternal};
 
 use super::records_writers::*;
 pub use super::records_writers::{ColumnFormat, RecordsFormat};
@@ -95,4 +98,18 @@ pub enum OutputFormat {
     /// A pretty human-readable table
     #[clap(name = "table")]
     Table,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub trait OutputWriter {
+    fn records_format(&self) -> RecordsFormat;
+
+    fn schema(&self) -> Arc<Schema>;
+
+    fn records(&self, records_data: Vec<ArrayRef>) -> Result<RecordBatch, InternalError> {
+        let records = RecordBatch::try_new(self.schema(), records_data).int_err()?;
+
+        Ok(records)
+    }
 }

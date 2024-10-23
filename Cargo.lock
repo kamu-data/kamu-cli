@@ -5732,6 +5732,7 @@ dependencies = [
  "serde_json",
  "tokio",
  "tokio-retry",
+ "url",
 ]
 
 [[package]]
@@ -5764,6 +5765,7 @@ dependencies = [
  "serde_json",
  "tempfile",
  "tokio",
+ "url",
 ]
 
 [[package]]

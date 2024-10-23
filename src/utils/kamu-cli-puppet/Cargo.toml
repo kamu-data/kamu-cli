@@ -55,6 +55,7 @@ serde = { optional = true, version = "1", default-features = false, features = [
     "derive",
 ] }
 serde_json = { optional = true, version = "1" }
+url = { version = "2", features = ["serde"] }
 
 
 [dev-dependencies]
