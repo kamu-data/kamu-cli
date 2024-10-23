@@ -11,6 +11,7 @@ use std::assert_matches::assert_matches;
 
 use kamu::domain::*;
 use opendatafabric::Multihash;
+use url::Url;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -21,27 +22,27 @@ pub async fn test_insert_bytes(repo: &dyn ObjectRepository) {
     assert!(!repo.contains(&hash_foo).await.unwrap());
     assert_matches!(repo.get_bytes(&hash_foo).await, Err(GetError::NotFound(_)),);
 
-    assert_eq!(
-        repo.insert_bytes(b"foo", InsertOpts::default())
-            .await
-            .unwrap(),
+    pretty_assertions::assert_eq!(
         InsertResult {
             hash: hash_foo.clone(),
-        }
-    );
-    assert_eq!(
-        repo.insert_bytes(b"bar", InsertOpts::default())
+        },
+        repo.insert_bytes(b"foo", InsertOpts::default())
             .await
-            .unwrap(),
+            .unwrap()
+    );
+    pretty_assertions::assert_eq!(
         InsertResult {
             hash: hash_bar.clone(),
-        }
+        },
+        repo.insert_bytes(b"bar", InsertOpts::default())
+            .await
+            .unwrap()
     );
 
     assert!(repo.contains(&hash_foo).await.unwrap());
     assert!(repo.contains(&hash_bar).await.unwrap());
-    assert_eq!(&repo.get_bytes(&hash_foo).await.unwrap()[..], b"foo");
-    assert_eq!(&repo.get_bytes(&hash_bar).await.unwrap()[..], b"bar");
+    pretty_assertions::assert_eq!(b"foo", &repo.get_bytes(&hash_foo).await.unwrap()[..]);
+    pretty_assertions::assert_eq!(b"bar", &repo.get_bytes(&hash_bar).await.unwrap()[..]);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -49,27 +50,27 @@ pub async fn test_insert_bytes(repo: &dyn ObjectRepository) {
 pub async fn test_delete(repo: &dyn ObjectRepository) {
     let hash_foo = Multihash::from_digest_sha3_256(b"foo");
 
-    assert_eq!(
-        repo.insert_bytes(b"foo", InsertOpts::default())
-            .await
-            .unwrap(),
+    pretty_assertions::assert_eq!(
         InsertResult {
             hash: hash_foo.clone(),
-        }
-    );
-
-    assert_eq!(&repo.get_bytes(&hash_foo).await.unwrap()[..], b"foo");
-
-    assert_eq!(
+        },
         repo.insert_bytes(b"foo", InsertOpts::default())
             .await
-            .unwrap(),
-        InsertResult {
-            hash: hash_foo.clone(),
-        }
+            .unwrap()
     );
 
-    assert_eq!(&repo.get_bytes(&hash_foo).await.unwrap()[..], b"foo");
+    pretty_assertions::assert_eq!(b"foo", &repo.get_bytes(&hash_foo).await.unwrap()[..]);
+
+    pretty_assertions::assert_eq!(
+        InsertResult {
+            hash: hash_foo.clone(),
+        },
+        repo.insert_bytes(b"foo", InsertOpts::default())
+            .await
+            .unwrap()
+    );
+
+    pretty_assertions::assert_eq!(b"foo", &repo.get_bytes(&hash_foo).await.unwrap()[..]);
 
     repo.delete(&hash_foo).await.unwrap();
 
@@ -85,7 +86,10 @@ pub async fn test_insert_precomputed(repo: &dyn ObjectRepository) {
     let hash_foo = Multihash::from_digest_sha3_256(b"foo");
     let hash_bar = Multihash::from_digest_sha3_256(b"bar");
 
-    assert_eq!(
+    pretty_assertions::assert_eq!(
+        InsertResult {
+            hash: hash_bar.clone(),
+        },
         repo.insert_bytes(
             b"foo",
             InsertOpts {
@@ -94,12 +98,9 @@ pub async fn test_insert_precomputed(repo: &dyn ObjectRepository) {
             },
         )
         .await
-        .unwrap(),
-        InsertResult {
-            hash: hash_bar.clone(),
-        }
+        .unwrap()
     );
-    assert_eq!(&repo.get_bytes(&hash_bar).await.unwrap()[..], b"foo");
+    pretty_assertions::assert_eq!(b"foo", &repo.get_bytes(&hash_bar).await.unwrap()[..]);
     assert_matches!(repo.get_bytes(&hash_foo).await, Err(GetError::NotFound(_)));
 }
 
@@ -109,7 +110,10 @@ pub async fn test_insert_expect(repo: &dyn ObjectRepository) {
     let hash_foo = Multihash::from_digest_sha3_256(b"foo");
     let hash_bar = Multihash::from_digest_sha3_256(b"bar");
 
-    assert_eq!(
+    pretty_assertions::assert_eq!(
+        InsertResult {
+            hash: hash_foo.clone(),
+        },
         repo.insert_bytes(
             b"foo",
             InsertOpts {
@@ -118,12 +122,9 @@ pub async fn test_insert_expect(repo: &dyn ObjectRepository) {
             },
         )
         .await
-        .unwrap(),
-        InsertResult {
-            hash: hash_foo.clone(),
-        }
+        .unwrap()
     );
-    assert_eq!(&repo.get_bytes(&hash_foo).await.unwrap()[..], b"foo");
+    pretty_assertions::assert_eq!(b"foo", &repo.get_bytes(&hash_foo).await.unwrap()[..]);
 
     assert_matches!(
         repo.insert_bytes(
@@ -140,6 +141,55 @@ pub async fn test_insert_expect(repo: &dyn ObjectRepository) {
         })) if expected == hash_foo && actual == hash_bar
     );
     assert_matches!(repo.get_bytes(&hash_bar).await, Err(GetError::NotFound(_)));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct ExternalUrlTestOptions {
+    pub(crate) cut_query_params: bool,
+}
+
+pub async fn test_external_urls(
+    repo: &dyn ObjectRepository,
+    hash: &Multihash,
+    expected_external_download_url: Result<Url, GetExternalUrlError>,
+    expected_external_upload_url_result: Result<Url, GetExternalUrlError>,
+    opts: ExternalUrlTestOptions,
+) {
+    {
+        let actual_external_download_url = repo
+            .get_external_download_url(hash, ExternalTransferOpts { expiration: None })
+            .await
+            .map(|res| {
+                let mut url = res.url;
+                if opts.cut_query_params {
+                    url.set_query(None);
+                }
+                url
+            });
+
+        pretty_assertions::assert_eq!(
+            format!("{expected_external_download_url:?}"),
+            format!("{actual_external_download_url:?}")
+        );
+    }
+    {
+        let actual_external_upload_url = repo
+            .get_external_upload_url(hash, ExternalTransferOpts { expiration: None })
+            .await
+            .map(|res| {
+                let mut url = res.url;
+                if opts.cut_query_params {
+                    url.set_query(None);
+                }
+                url
+            });
+
+        pretty_assertions::assert_eq!(
+            format!("{expected_external_upload_url_result:?}"),
+            format!("{actual_external_upload_url:?}")
+        );
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

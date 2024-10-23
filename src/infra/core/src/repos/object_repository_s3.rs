@@ -25,6 +25,10 @@ use crate::utils::s3_context::S3Context;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+const DEFAULT_EXPIRES_IN: chrono::TimeDelta = chrono::Duration::seconds(3600);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub type ObjectRepositoryS3Sha3 =
     ObjectRepositoryS3<sha3::Sha3_256, { Multicodec::Sha3_256 as u32 }>;
 
@@ -174,7 +178,7 @@ where
         hash: &Multihash,
         opts: ExternalTransferOpts,
     ) -> Result<GetExternalUrlResult, GetExternalUrlError> {
-        let expires_in = opts.expiration.unwrap_or(chrono::Duration::seconds(3600));
+        let expires_in = opts.expiration.unwrap_or(DEFAULT_EXPIRES_IN);
 
         let presigned_conf = PresigningConfig::builder()
             .expires_in(expires_in.to_std().unwrap())
@@ -182,7 +186,7 @@ where
             .expect("Invalid presigning config");
 
         let expires_at = presigned_conf.start_time() + presigned_conf.expires();
-        let res = self
+        let presigned_request = self
             .s3_context
             .client()
             .get_object()
@@ -191,10 +195,11 @@ where
             .presigned(presigned_conf)
             .await
             .int_err()?;
+        let presigned_request_url = Url::parse(presigned_request.uri()).int_err()?;
 
         Ok(GetExternalUrlResult {
-            url: Url::parse(res.uri()).int_err()?,
-            header_map: Self::into_header_map(res.headers()),
+            url: presigned_request_url,
+            header_map: Self::into_header_map(presigned_request.headers()),
             expires_at: Some(expires_at.into()),
         })
     }
@@ -204,7 +209,7 @@ where
         hash: &Multihash,
         opts: ExternalTransferOpts,
     ) -> Result<GetExternalUrlResult, GetExternalUrlError> {
-        let expires_in = opts.expiration.unwrap_or(chrono::Duration::seconds(3600));
+        let expires_in = opts.expiration.unwrap_or(DEFAULT_EXPIRES_IN);
 
         let presigned_conf = PresigningConfig::builder()
             .expires_in(expires_in.to_std().unwrap())
@@ -212,7 +217,7 @@ where
             .expect("Invalid presigning config");
 
         let expires_at = presigned_conf.start_time() + presigned_conf.expires();
-        let res = self
+        let presigned_request = self
             .s3_context
             .client()
             .put_object()
@@ -221,10 +226,11 @@ where
             .presigned(presigned_conf)
             .await
             .int_err()?;
+        let presigned_request_url = Url::parse(presigned_request.uri()).int_err()?;
 
         Ok(GetExternalUrlResult {
-            url: Url::parse(res.uri()).int_err()?,
-            header_map: Self::into_header_map(res.headers()),
+            url: presigned_request_url,
+            header_map: Self::into_header_map(presigned_request.headers()),
             expires_at: Some(expires_at.into()),
         })
     }
