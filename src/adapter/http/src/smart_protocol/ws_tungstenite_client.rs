@@ -415,11 +415,12 @@ impl WsSmartTransferProtocolClient {
                     }
                 res = &mut export_task => {
                     let join_res = res.int_err()?;
-                    if let Err(task_err) = join_res {
+                    if join_res.is_err() {
                         tracing::error!(
                             "File transfer failed, error is {:?}",
-                            task_err
+                            join_res
                         );
+                        join_res?;
                     }
                     break;
                 }
