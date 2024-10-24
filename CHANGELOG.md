@@ -16,6 +16,7 @@ Recommendation: for ease of reading, use the following order:
 - `kamu repo list`: supports all types of output
 - Tests: `sqlx + nextest` combination has been stabilized
 - `DatasetEntryIndexer`: guarantee startup after `OutboxExecutor` for a more predictable initialization
+  - Add `DatasetEntry`'is re-indexing migration
 ### Fixed
 - `kamu push`: show correct error if server failed to store data
 
