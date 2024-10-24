@@ -13,8 +13,8 @@ Recommendation: for ease of reading, use the following order:
 
 ## [Unreleased]
 ### Changed
-- ObjectRepositoryS3`: can now support external address configuration
 - `kamu repo list`: supports all types of output
+- Tests: `sqlx + nextest` combination has been stabilized
 ### Fixed
 - `kamu push`: show correct error if server failed to store data
 
