@@ -433,6 +433,7 @@ pub fn configure_base_catalog(
     b.add::<PushIngestServiceImpl>();
 
     b.add::<TransformServiceImpl>();
+    b.add::<TransformRequestPlannerImpl>();
 
     b.add::<VerificationServiceImpl>();
 
