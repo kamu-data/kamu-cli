@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
@@ -15,15 +16,20 @@ use engine::{TransformRequestExt, TransformRequestInputExt};
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_core::*;
 use opendatafabric::{
+    AsTypedBlock,
     DatasetVocabulary,
     ExecuteTransform,
     ExecuteTransformInput,
     IntoDataStreamBlock,
+    MetadataBlock,
+    MetadataEventTypeFlags,
+    Multihash,
     SetDataSchema,
     TransformInput,
     Watermark,
 };
 use random_names::get_random_name;
+use thiserror::Error;
 use time_source::SystemTimeSource;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -236,6 +242,7 @@ impl TransformRequestPlannerImpl {
             None,
         )
         .await
+        .map_err(Into::into)
     }
 
     async fn get_transform_input_from_query_input(
@@ -243,7 +250,7 @@ impl TransformRequestPlannerImpl {
         query_input: ExecuteTransformInput,
         alias: String,
         vocab_hint: Option<DatasetVocabulary>,
-    ) -> Result<TransformRequestInputExt, TransformPlanError> {
+    ) -> Result<TransformRequestInputExt, GetTransformInputError> {
         let hdl = self
             .dataset_registry
             .resolve_dataset_handle_by_ref(&query_input.dataset_id.as_local_ref())
@@ -277,13 +284,13 @@ impl TransformRequestPlannerImpl {
                 .await
                 .map_err(|chain_err| match chain_err {
                     IterBlocksError::InvalidInterval(err) => {
-                        TransformPlanError::InvalidInputInterval(InvalidInputIntervalError {
+                        GetTransformInputError::InvalidInputInterval(InvalidInputIntervalError {
                             head: err.head,
                             tail: err.tail,
                             input_dataset_id: hdl.id.clone(),
                         })
                     }
-                    _ => TransformPlanError::Internal(chain_err.int_err()),
+                    _ => GetTransformInputError::Internal(chain_err.int_err()),
                 })?
         } else {
             Vec::new()
@@ -366,6 +373,239 @@ impl TransformRequestPlanner for TransformRequestPlannerImpl {
         }
 
         (planned_items, errors)
+    }
+
+    async fn collect_verification_plan(
+        &self,
+        target: ResolvedDataset,
+        block_range: (Option<Multihash>, Option<Multihash>),
+    ) -> Result<Vec<VerificationStep>, VerifyTransformPlanError> {
+        let metadata_chain = target.dataset.as_metadata_chain();
+
+        let head = match block_range.1 {
+            None => metadata_chain.resolve_ref(&BlockRef::Head).await?,
+            Some(hash) => hash,
+        };
+        let tail = block_range.0;
+        let tail_sequence_number = match tail.as_ref() {
+            Some(tail) => {
+                let block = metadata_chain.get_block(tail).await?;
+
+                Some(block.sequence_number)
+            }
+            None => None,
+        };
+
+        let (source, set_vocab, schema, blocks, finished_range) = {
+            // TODO: Support dataset evolution
+            let mut set_transform_visitor = SearchSetTransformVisitor::new();
+            let mut set_vocab_visitor = SearchSetVocabVisitor::new();
+            let mut set_data_schema_visitor = SearchSetDataSchemaVisitor::new();
+
+            type Flag = MetadataEventTypeFlags;
+            type Decision = MetadataVisitorDecision;
+
+            struct ExecuteTransformCollectorVisitor {
+                tail_sequence_number: Option<u64>,
+                blocks: Vec<(Multihash, MetadataBlock)>,
+                finished_range: bool,
+            }
+
+            let mut execute_transform_collector_visitor = GenericCallbackVisitor::new(
+                ExecuteTransformCollectorVisitor {
+                    tail_sequence_number,
+                    blocks: Vec::new(),
+                    finished_range: false,
+                },
+                Decision::NextOfType(Flag::EXECUTE_TRANSFORM),
+                |state, hash, block| {
+                    if Some(block.sequence_number) < state.tail_sequence_number {
+                        state.finished_range = true;
+
+                        return Decision::Stop;
+                    };
+
+                    let block_flag = Flag::from(&block.event);
+
+                    if Flag::EXECUTE_TRANSFORM.contains(block_flag) {
+                        state.blocks.push((hash.clone(), block.clone()));
+                    };
+
+                    if Some(block.sequence_number) == state.tail_sequence_number {
+                        state.finished_range = true;
+
+                        Decision::Stop
+                    } else {
+                        Decision::NextOfType(Flag::EXECUTE_TRANSFORM)
+                    }
+                },
+            );
+
+            metadata_chain
+                .accept(&mut [
+                    &mut set_transform_visitor,
+                    &mut set_vocab_visitor,
+                    &mut set_data_schema_visitor,
+                    &mut execute_transform_collector_visitor,
+                ])
+                .await
+                .int_err()?;
+
+            let ExecuteTransformCollectorVisitor {
+                blocks,
+                finished_range,
+                ..
+            } = execute_transform_collector_visitor.into_state();
+
+            (
+                set_transform_visitor.into_event(),
+                set_vocab_visitor.into_event(),
+                set_data_schema_visitor
+                    .into_event()
+                    .as_ref()
+                    .map(SetDataSchema::schema_as_arrow)
+                    .transpose() // Option<Result<SchemaRef, E>> -> Result<Option<SchemaRef>, E>
+                    .int_err()?,
+                blocks,
+                finished_range,
+            )
+        };
+
+        // Ensure start_block was found if specified
+        if tail.is_some() && !finished_range {
+            return Err(InvalidIntervalError {
+                head,
+                tail: tail.unwrap(),
+            }
+            .into());
+        }
+
+        let source = source.ok_or(
+            "Expected a derivative dataset but SetTransform block was not found".int_err(),
+        )?;
+
+        // TODO: Replace maps with access by index, as ODF guarantees same order of
+        // inputs in ExecuteTransform as in SetTransform
+        use futures::{StreamExt, TryStreamExt};
+        let dataset_vocabs: BTreeMap<_, _> = futures::stream::iter(&source.inputs)
+            .map(|input| {
+                (
+                    input.dataset_ref.id().cloned().unwrap(),
+                    input.dataset_ref.id().unwrap().as_local_ref(),
+                )
+            })
+            .then(|(input_id, input_ref)| async move {
+                use futures::TryFutureExt;
+                let input_dataset = self
+                    .dataset_registry
+                    .get_dataset_by_ref(&input_ref)
+                    .await
+                    .int_err()?;
+                self.get_vocab(input_dataset.as_ref())
+                    .map_ok(|vocab| (input_id, vocab))
+                    .await
+            })
+            .try_collect()
+            .await?;
+
+        let input_aliases: BTreeMap<_, _> = source
+            .inputs
+            .iter()
+            .map(|i| {
+                (
+                    i.dataset_ref.id().cloned().unwrap(),
+                    i.alias.clone().unwrap(),
+                )
+            })
+            .collect();
+
+        let mut plan = Vec::new();
+
+        for (block_hash, block) in blocks.into_iter().rev() {
+            let block_t = block.as_typed::<ExecuteTransform>().unwrap();
+
+            let inputs = futures::stream::iter(&block_t.event.query_inputs)
+                .then(|slice| {
+                    let alias = input_aliases.get(&slice.dataset_id).unwrap();
+
+                    let vocab = dataset_vocabs.get(&slice.dataset_id).cloned().unwrap();
+
+                    self.get_transform_input_from_query_input(
+                        slice.clone(),
+                        alias.clone(),
+                        Some(vocab),
+                    )
+                })
+                .try_collect()
+                .await
+                .map_err(Into::<VerifyTransformPlanError>::into)?;
+
+            let step = VerificationStep {
+                request: TransformRequestExt {
+                    operation_id: get_random_name(None, 10),
+                    dataset_handle: target.handle.clone(),
+                    block_ref: BlockRef::Head,
+                    head: block_t.prev_block_hash.unwrap().clone(),
+                    transform: source.transform.clone(),
+                    system_time: block.system_time,
+                    schema: schema.clone(),
+                    prev_offset: block_t.event.prev_offset,
+                    inputs,
+                    vocab: set_vocab.clone().unwrap_or_default().into(),
+                    prev_checkpoint: block_t.event.prev_checkpoint.clone(),
+                },
+                expected_block: block,
+                expected_hash: block_hash,
+            };
+
+            plan.push(step);
+        }
+
+        Ok(plan)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Error)]
+enum GetTransformInputError {
+    #[error(transparent)]
+    InputSchemaNotDefined(
+        #[from]
+        #[backtrace]
+        InputSchemaNotDefinedError,
+    ),
+    #[error(transparent)]
+    InvalidInputInterval(
+        #[from]
+        #[backtrace]
+        InvalidInputIntervalError,
+    ),
+    #[error(transparent)]
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
+}
+
+impl From<GetTransformInputError> for TransformPlanError {
+    fn from(value: GetTransformInputError) -> Self {
+        match value {
+            GetTransformInputError::InputSchemaNotDefined(e) => Self::InputSchemaNotDefined(e),
+            GetTransformInputError::InvalidInputInterval(e) => Self::InvalidInputInterval(e),
+            GetTransformInputError::Internal(e) => Self::Internal(e),
+        }
+    }
+}
+
+impl From<GetTransformInputError> for VerifyTransformPlanError {
+    fn from(value: GetTransformInputError) -> Self {
+        match value {
+            GetTransformInputError::InputSchemaNotDefined(e) => Self::InputSchemaNotDefined(e),
+            GetTransformInputError::InvalidInputInterval(e) => Self::InvalidInputInterval(e),
+            GetTransformInputError::Internal(e) => Self::Internal(e),
+        }
     }
 }
 
