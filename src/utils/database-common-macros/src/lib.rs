@@ -13,6 +13,7 @@ use syn::parse::{Parse, ParseStream};
 use syn::{
     parse_macro_input,
     parse_str,
+    ExprArray,
     FnArg,
     GenericArgument,
     Ident,
@@ -350,6 +351,16 @@ pub fn transactional_method2(attr: TokenStream, item: TokenStream) -> TokenStrea
 
 #[proc_macro]
 pub fn database_transactional_test(input: TokenStream) -> TokenStream {
+    // Preliminary actions to clean up tables as migrations add rows.
+    let tables_for_cleanup = parse_str::<ExprArray>(
+        r#"
+        [
+            "outbox_message_consumptions",
+        ]
+        "#,
+    )
+    .unwrap();
+
     let DatabaseTransactionalTestInputArgs {
         storage,
         fixture,
@@ -379,6 +390,13 @@ pub fn database_transactional_test(input: TokenStream) -> TokenStream {
             #[test_group::group(database, postgres, #extra_test_groups)]
             #[test_log::test(sqlx::test(migrations = "../../../../migrations/postgres"))]
             async fn #test_function_name (pg_pool: sqlx::PgPool) {
+                for table in #tables_for_cleanup {
+                    sqlx::query(format!("DELETE FROM {table}").as_str())
+                    .execute(&pg_pool)
+                    .await
+                    .unwrap();
+                }
+
                 let harness = #harness ::new(pg_pool);
 
                 database_common::DatabaseTransactionRunner::new(harness.catalog)
@@ -411,6 +429,13 @@ pub fn database_transactional_test(input: TokenStream) -> TokenStream {
             #[test_group::group(database, sqlite, #extra_test_groups)]
             #[test_log::test(sqlx::test(migrations = "../../../../migrations/sqlite"))]
             async fn #test_function_name (sqlite_pool: sqlx::SqlitePool) {
+                for table in #tables_for_cleanup {
+                    sqlx::query(format!("DELETE FROM {table}").as_str())
+                    .execute(&sqlite_pool)
+                    .await
+                    .unwrap();
+                }
+
                 let harness = #harness ::new(sqlite_pool);
 
                 database_common::DatabaseTransactionRunner::new(harness.catalog)

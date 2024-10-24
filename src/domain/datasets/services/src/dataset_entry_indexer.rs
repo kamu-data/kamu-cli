@@ -20,6 +20,7 @@ use kamu_accounts::{
 };
 use kamu_core::DatasetRepository;
 use kamu_datasets::{DatasetEntry, DatasetEntryRepository};
+use messaging_outbox::JOB_MESSAGING_OUTBOX_STARTUP;
 use opendatafabric as odf;
 use opendatafabric::DatasetHandle;
 use time_source::SystemTimeSource;
@@ -39,7 +40,10 @@ pub struct DatasetEntryIndexer {
 #[interface(dyn InitOnStartup)]
 #[meta(InitOnStartupMeta {
     job_name: JOB_KAMU_DATASETS_DATASET_ENTRY_INDEXER,
-    depends_on: &[JOB_KAMU_ACCOUNTS_PREDEFINED_ACCOUNTS_REGISTRATOR],
+    depends_on: &[
+        JOB_MESSAGING_OUTBOX_STARTUP,
+        JOB_KAMU_ACCOUNTS_PREDEFINED_ACCOUNTS_REGISTRATOR,
+    ],
     requires_transaction: true,
 })]
 impl DatasetEntryIndexer {
