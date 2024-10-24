@@ -9278,7 +9278,7 @@ dependencies = [
 [[package]]
 name = "sqlx"
 version = "0.8.2"
-source = "git+https://github.com/kamu-data/sqlx?branch=nextest-race-condition#8379e21f8f2a57448140d786d7b2ceba7370dcf5"
+source = "git+https://github.com/kamu-data/sqlx?branch=nextest-race-condition#c322d7c55d0546dcd723e67e123a61242d2ced19"
 dependencies = [
  "sqlx-core",
  "sqlx-macros",
@@ -9290,7 +9290,7 @@ dependencies = [
 [[package]]
 name = "sqlx-core"
 version = "0.8.2"
-source = "git+https://github.com/kamu-data/sqlx?branch=nextest-race-condition#8379e21f8f2a57448140d786d7b2ceba7370dcf5"
+source = "git+https://github.com/kamu-data/sqlx?branch=nextest-race-condition#c322d7c55d0546dcd723e67e123a61242d2ced19"
 dependencies = [
  "base64 0.22.1",
  "bytes",
@@ -9329,7 +9329,7 @@ dependencies = [
 [[package]]
 name = "sqlx-macros"
 version = "0.8.2"
-source = "git+https://github.com/kamu-data/sqlx?branch=nextest-race-condition#8379e21f8f2a57448140d786d7b2ceba7370dcf5"
+source = "git+https://github.com/kamu-data/sqlx?branch=nextest-race-condition#c322d7c55d0546dcd723e67e123a61242d2ced19"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -9341,7 +9341,7 @@ dependencies = [
 [[package]]
 name = "sqlx-macros-core"
 version = "0.8.2"
-source = "git+https://github.com/kamu-data/sqlx?branch=nextest-race-condition#8379e21f8f2a57448140d786d7b2ceba7370dcf5"
+source = "git+https://github.com/kamu-data/sqlx?branch=nextest-race-condition#c322d7c55d0546dcd723e67e123a61242d2ced19"
 dependencies = [
  "dotenvy",
  "either",
@@ -9366,7 +9366,7 @@ dependencies = [
 [[package]]
 name = "sqlx-mysql"
 version = "0.8.2"
-source = "git+https://github.com/kamu-data/sqlx?branch=nextest-race-condition#8379e21f8f2a57448140d786d7b2ceba7370dcf5"
+source = "git+https://github.com/kamu-data/sqlx?branch=nextest-race-condition#c322d7c55d0546dcd723e67e123a61242d2ced19"
 dependencies = [
  "atoi",
  "base64 0.22.1",
@@ -9410,7 +9410,7 @@ dependencies = [
 [[package]]
 name = "sqlx-postgres"
 version = "0.8.2"
-source = "git+https://github.com/kamu-data/sqlx?branch=nextest-race-condition#8379e21f8f2a57448140d786d7b2ceba7370dcf5"
+source = "git+https://github.com/kamu-data/sqlx?branch=nextest-race-condition#c322d7c55d0546dcd723e67e123a61242d2ced19"
 dependencies = [
  "atoi",
  "base64 0.22.1",
@@ -9448,7 +9448,7 @@ dependencies = [
 [[package]]
 name = "sqlx-sqlite"
 version = "0.8.2"
-source = "git+https://github.com/kamu-data/sqlx?branch=nextest-race-condition#8379e21f8f2a57448140d786d7b2ceba7370dcf5"
+source = "git+https://github.com/kamu-data/sqlx?branch=nextest-race-condition#c322d7c55d0546dcd723e67e123a61242d2ced19"
 dependencies = [
  "atoi",
  "chrono",
