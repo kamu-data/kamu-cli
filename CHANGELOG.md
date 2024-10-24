@@ -11,7 +11,7 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## [Unreleased]
+## [0.206.1] - 2024-10-24
 ### Changed
 - `kamu repo list`: supports all types of output
 - Tests: `sqlx + nextest` combination has been stabilized
