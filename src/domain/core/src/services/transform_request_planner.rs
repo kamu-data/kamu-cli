@@ -18,22 +18,22 @@ use crate::*;
 
 #[async_trait::async_trait]
 pub trait TransformRequestPlanner: Send + Sync {
-    async fn collect_transform_plan(
+    async fn build_transform_plan(
         &self,
-        targets: Vec<ResolvedDataset>,
+        target: ResolvedDataset,
         options: TransformOptions,
-    ) -> (Vec<TransformPlanItem>, Vec<TransformPlanError>);
+    ) -> Result<TransformPlan, TransformPlanError>;
 
-    async fn collect_verification_plan(
+    async fn build_transform_verification_plan(
         &self,
         target: ResolvedDataset,
         block_range: (Option<Multihash>, Option<Multihash>),
-    ) -> Result<Vec<VerificationStep>, VerifyTransformPlanError>;
+    ) -> Result<Vec<VerifyTransformStep>, VerifyTransformPlanError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub enum TransformPlanItem {
+pub enum TransformPlan {
     ReadyToLaunch(TransformRequestExt),
     UpToDate,
     RetryAfterCompacting(InvalidInputIntervalError),
@@ -42,7 +42,7 @@ pub enum TransformPlanItem {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug)]
-pub struct VerificationStep {
+pub struct VerifyTransformStep {
     pub request: TransformRequestExt,
     pub expected_block: MetadataBlock,
     pub expected_hash: Multihash,

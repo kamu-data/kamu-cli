@@ -52,36 +52,6 @@ impl TransformRequestPlannerImpl {
         }
     }
 
-    async fn plan_transform(
-        &self,
-        target: ResolvedDataset,
-        options: &TransformOptions,
-    ) -> Result<TransformPlanItem, TransformPlanError> {
-        // TODO: There might be more operations to do
-        match self
-            .get_next_operation(target.clone(), self.time_source.now())
-            .await
-        {
-            Ok(Some(operation)) => Ok(TransformPlanItem::ReadyToLaunch(operation)),
-            Ok(None) => Ok(TransformPlanItem::UpToDate),
-            // TODO: Trapping the error to preserve old behavior - we should consider
-            // surfacing it and handling on upper layers
-            Err(TransformPlanError::InputSchemaNotDefined(e)) => {
-                tracing::info!(
-                    input = %e.dataset_handle,
-                    "Not processing because one of the inputs was never pulled",
-                );
-                Ok(TransformPlanItem::UpToDate)
-            }
-            Err(TransformPlanError::InvalidInputInterval(e))
-                if options.reset_derivatives_on_diverged_input =>
-            {
-                Ok(TransformPlanItem::RetryAfterCompacting(e))
-            }
-            Err(e) => Err(e),
-        }
-    }
-
     // TODO: PERF: Avoid multiple passes over metadata chain
     #[tracing::instrument(level = "info", skip_all)]
     pub async fn get_next_operation(
@@ -357,29 +327,41 @@ impl TransformRequestPlannerImpl {
 
 #[async_trait::async_trait]
 impl TransformRequestPlanner for TransformRequestPlannerImpl {
-    async fn collect_transform_plan(
+    async fn build_transform_plan(
         &self,
-        targets: Vec<ResolvedDataset>,
+        target: ResolvedDataset,
         options: TransformOptions,
-    ) -> (Vec<TransformPlanItem>, Vec<TransformPlanError>) {
-        let mut planned_items = Vec::new();
-        let mut errors = Vec::new();
-
-        for target in targets {
-            match self.plan_transform(target, &options).await {
-                Ok(plan_item) => planned_items.push(plan_item),
-                Err(e) => errors.push(e),
+    ) -> Result<TransformPlan, TransformPlanError> {
+        // TODO: There might be more operations to do
+        match self
+            .get_next_operation(target, self.time_source.now())
+            .await
+        {
+            Ok(Some(operation)) => Ok(TransformPlan::ReadyToLaunch(operation)),
+            Ok(None) => Ok(TransformPlan::UpToDate),
+            // TODO: Trapping the error to preserve old behavior - we should consider
+            // surfacing it and handling on upper layers
+            Err(TransformPlanError::InputSchemaNotDefined(e)) => {
+                tracing::info!(
+                    input = %e.dataset_handle,
+                    "Not processing because one of the inputs was never pulled",
+                );
+                Ok(TransformPlan::UpToDate)
             }
+            Err(TransformPlanError::InvalidInputInterval(e))
+                if options.reset_derivatives_on_diverged_input =>
+            {
+                Ok(TransformPlan::RetryAfterCompacting(e))
+            }
+            Err(e) => Err(e),
         }
-
-        (planned_items, errors)
     }
 
-    async fn collect_verification_plan(
+    async fn build_transform_verification_plan(
         &self,
         target: ResolvedDataset,
         block_range: (Option<Multihash>, Option<Multihash>),
-    ) -> Result<Vec<VerificationStep>, VerifyTransformPlanError> {
+    ) -> Result<Vec<VerifyTransformStep>, VerifyTransformPlanError> {
         let metadata_chain = target.dataset.as_metadata_chain();
 
         let head = match block_range.1 {
@@ -540,7 +522,7 @@ impl TransformRequestPlanner for TransformRequestPlannerImpl {
                 .await
                 .map_err(Into::<VerifyTransformPlanError>::into)?;
 
-            let step = VerificationStep {
+            let step = VerifyTransformStep {
                 request: TransformRequestExt {
                     operation_id: get_random_name(None, 10),
                     dataset_handle: target.handle.clone(),

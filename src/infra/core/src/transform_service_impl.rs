@@ -479,7 +479,7 @@ impl TransformServiceImpl {
         &self,
         target: ResolvedDataset,
         block_range: (Option<Multihash>, Option<Multihash>),
-    ) -> Result<Vec<VerificationStep>, VerificationError> {
+    ) -> Result<Vec<VerifyTransformStep>, VerificationError> {
         let metadata_chain = target.dataset.as_metadata_chain();
 
         let head = match block_range.1 {
@@ -637,7 +637,7 @@ impl TransformServiceImpl {
                     _ => VerificationError::Internal(e.int_err()),
                 })?;
 
-            let step = VerificationStep {
+            let step = VerifyTransformStep {
                 request: TransformRequestExt {
                     operation_id: get_random_name(None, 10),
                     dataset_handle: target.handle.clone(),
@@ -963,15 +963,6 @@ impl TransformService for TransformServiceImpl {
         listener.end_phase(VerificationPhase::ReplayTransform);
         Ok(())
     }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug)]
-pub struct VerificationStep {
-    pub request: TransformRequestExt,
-    pub expected_block: MetadataBlock,
-    pub expected_hash: Multihash,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
