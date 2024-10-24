@@ -116,7 +116,7 @@ impl Engine for EngineDatafusionInproc {
     async fn execute_transform(
         &self,
         _request: TransformRequestExt,
-        _datasets_by_handle: &HashMap<DatasetHandle, Arc<dyn Dataset>>,
+        _datasets_by_id: &HashMap<DatasetID, Arc<dyn Dataset>>,
     ) -> Result<TransformResponseExt, EngineError> {
         unimplemented!(
             "Derivative transformations must be executed by a versioned out-of-process engine"

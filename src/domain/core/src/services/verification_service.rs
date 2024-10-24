@@ -121,6 +121,7 @@ pub trait VerificationListener: Send + Sync {
     fn begin(&self) {}
     fn success(&self, _result: &VerificationResult) {}
     fn error(&self, _error: &VerificationError) {}
+    fn transform_error(&self, _error: &VerifyTransformExecuteError) {}
 
     fn begin_phase(&self, _phase: VerificationPhase) {}
     fn end_phase(&self, _phase: VerificationPhase) {}

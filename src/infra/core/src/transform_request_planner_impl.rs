@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
@@ -58,7 +58,7 @@ impl TransformRequestPlannerImpl {
         &self,
         target: ResolvedDataset,
         system_time: DateTime<Utc>,
-    ) -> Result<Option<TransformRequestExt>, TransformPlanError> {
+    ) -> Result<Option<TransformOperation>, TransformPlanError> {
         let output_chain = target.dataset.as_metadata_chain();
 
         // TODO: externalize
@@ -140,7 +140,8 @@ impl TransformRequestPlannerImpl {
             return Ok(None);
         }
 
-        Ok(Some(TransformRequestExt {
+        // Build transform request
+        let request = TransformRequestExt {
             operation_id: get_random_name(None, 10),
             dataset_handle: target.handle.clone(),
             block_ref,
@@ -152,6 +153,21 @@ impl TransformRequestPlannerImpl {
             vocab: set_vocab.unwrap_or_default().into(),
             inputs,
             prev_checkpoint: prev_query.and_then(|q| q.new_checkpoint.map(|c| c.physical_hash)),
+        };
+
+        // Pre-fill datasets that is used in the operation
+        let mut datasets_by_id = HashMap::new();
+        datasets_by_id.insert(target.handle.id.clone(), target.dataset.clone());
+        for input in &request.inputs {
+            let input_dataset = self
+                .dataset_registry
+                .get_dataset_by_handle(&input.dataset_handle);
+            datasets_by_id.insert(input.dataset_handle.id.clone(), input_dataset);
+        }
+
+        Ok(Some(TransformOperation {
+            request,
+            datasets_by_id,
         }))
     }
 
@@ -221,13 +237,13 @@ impl TransformRequestPlannerImpl {
         alias: String,
         vocab_hint: Option<DatasetVocabulary>,
     ) -> Result<TransformRequestInputExt, GetTransformInputError> {
-        let hdl = self
+        let dataset_handle = self
             .dataset_registry
             .resolve_dataset_handle_by_ref(&query_input.dataset_id.as_local_ref())
             .await
             .int_err()?;
 
-        let dataset = self.dataset_registry.get_dataset_by_handle(&hdl);
+        let dataset = self.dataset_registry.get_dataset_by_handle(&dataset_handle);
         let input_chain = dataset.as_metadata_chain();
 
         // Find schema
@@ -242,7 +258,7 @@ impl TransformRequestPlannerImpl {
             .transpose()
             .int_err()?
             .ok_or_else(|| InputSchemaNotDefinedError {
-                dataset_handle: hdl.clone(),
+                dataset_handle: dataset_handle.clone(),
             })?;
 
         // Collect unprocessed input blocks
@@ -257,7 +273,7 @@ impl TransformRequestPlannerImpl {
                         GetTransformInputError::InvalidInputInterval(InvalidInputIntervalError {
                             head: err.head,
                             tail: err.tail,
-                            input_dataset_id: hdl.id.clone(),
+                            input_dataset_id: dataset_handle.id.clone(),
                         })
                     }
                     _ => GetTransformInputError::Internal(chain_err.int_err()),
@@ -293,7 +309,7 @@ impl TransformRequestPlannerImpl {
         let is_empty = data_slices.is_empty() && explicit_watermarks.is_empty();
 
         let input = TransformRequestInputExt {
-            dataset_handle: hdl,
+            dataset_handle,
             alias,
             vocab,
             prev_block_hash: query_input.prev_block_hash,
@@ -361,7 +377,7 @@ impl TransformRequestPlanner for TransformRequestPlannerImpl {
         &self,
         target: ResolvedDataset,
         block_range: (Option<Multihash>, Option<Multihash>),
-    ) -> Result<Vec<VerifyTransformStep>, VerifyTransformPlanError> {
+    ) -> Result<VerifyTransformOperation, VerifyTransformPlanError> {
         let metadata_chain = target.dataset.as_metadata_chain();
 
         let head = match block_range.1 {
@@ -501,7 +517,10 @@ impl TransformRequestPlanner for TransformRequestPlannerImpl {
             })
             .collect();
 
-        let mut plan = Vec::new();
+        // Pre-fill datasets that is used in the operation
+        let mut datasets_by_id = HashMap::new();
+
+        let mut steps = Vec::new();
 
         for (block_hash, block) in blocks.into_iter().rev() {
             let block_t = block.as_typed::<ExecuteTransform>().unwrap();
@@ -540,10 +559,29 @@ impl TransformRequestPlanner for TransformRequestPlannerImpl {
                 expected_hash: block_hash,
             };
 
-            plan.push(step);
+            datasets_by_id
+                .entry(step.request.dataset_handle.id.clone())
+                .or_insert_with(|| {
+                    self.dataset_registry
+                        .get_dataset_by_handle(&step.request.dataset_handle)
+                });
+
+            for input in &step.request.inputs {
+                datasets_by_id
+                    .entry(input.dataset_handle.id.clone())
+                    .or_insert_with(|| {
+                        self.dataset_registry
+                            .get_dataset_by_handle(&input.dataset_handle)
+                    });
+            }
+
+            steps.push(step);
         }
 
-        Ok(plan)
+        Ok(VerifyTransformOperation {
+            steps,
+            datasets_by_id,
+        })
     }
 }
 

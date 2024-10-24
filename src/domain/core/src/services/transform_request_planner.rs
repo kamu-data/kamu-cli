@@ -7,8 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashMap;
+use std::sync::Arc;
+
 use internal_error::InternalError;
-use opendatafabric::{MetadataBlock, Multihash};
+use opendatafabric::{DatasetID, MetadataBlock, Multihash};
 use thiserror::Error;
 
 use crate::engine::TransformRequestExt;
@@ -28,15 +31,28 @@ pub trait TransformRequestPlanner: Send + Sync {
         &self,
         target: ResolvedDataset,
         block_range: (Option<Multihash>, Option<Multihash>),
-    ) -> Result<Vec<VerifyTransformStep>, VerifyTransformPlanError>;
+    ) -> Result<VerifyTransformOperation, VerifyTransformPlanError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub enum TransformPlan {
-    ReadyToLaunch(TransformRequestExt),
+    ReadyToLaunch(TransformOperation),
     UpToDate,
     RetryAfterCompacting(InvalidInputIntervalError),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct TransformOperation {
+    pub request: TransformRequestExt,
+    pub datasets_by_id: HashMap<DatasetID, Arc<dyn Dataset>>,
+}
+
+impl std::fmt::Debug for TransformOperation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.request.fmt(f)
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -46,6 +62,19 @@ pub struct VerifyTransformStep {
     pub request: TransformRequestExt,
     pub expected_block: MetadataBlock,
     pub expected_hash: Multihash,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct VerifyTransformOperation {
+    pub steps: Vec<VerifyTransformStep>,
+    pub datasets_by_id: HashMap<DatasetID, Arc<dyn Dataset>>,
+}
+
+impl std::fmt::Debug for VerifyTransformOperation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_list().entries(self.steps.iter()).finish()
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

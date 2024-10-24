@@ -15,7 +15,7 @@ use container_runtime::*;
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_core::engine::*;
 use kamu_core::*;
-use opendatafabric::DatasetHandle;
+use opendatafabric::DatasetID;
 
 use super::engine_odf::*;
 use crate::utils::docker_images;
@@ -302,11 +302,9 @@ impl Engine for EngineHandle {
     async fn execute_transform(
         &self,
         request: TransformRequestExt,
-        datasets_by_handle: &HashMap<DatasetHandle, Arc<dyn Dataset>>,
+        datasets_by_id: &HashMap<DatasetID, Arc<dyn Dataset>>,
     ) -> Result<TransformResponseExt, EngineError> {
-        self.engine
-            .execute_transform(request, datasets_by_handle)
-            .await
+        self.engine.execute_transform(request, datasets_by_id).await
     }
 }
 

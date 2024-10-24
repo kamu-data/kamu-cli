@@ -51,7 +51,7 @@ impl TransformServiceImpl {
     async fn do_transform<CommitFn, Fut>(
         engine_provisioner: Arc<dyn EngineProvisioner>,
         request: TransformRequestExt,
-        datasets_by_handle: &HashMap<DatasetHandle, Arc<dyn Dataset>>,
+        datasets_by_id: &HashMap<DatasetID, Arc<dyn Dataset>>,
         commit_fn: CommitFn,
         listener: Arc<dyn TransformListener>,
     ) -> Result<TransformResult, TransformError>
@@ -66,7 +66,7 @@ impl TransformServiceImpl {
         match Self::do_transform_inner(
             engine_provisioner,
             request,
-            datasets_by_handle,
+            datasets_by_id,
             commit_fn,
             listener.clone(),
         )
@@ -89,7 +89,7 @@ impl TransformServiceImpl {
     async fn do_transform_inner<CommitFn, Fut>(
         engine_provisioner: Arc<dyn EngineProvisioner>,
         request: TransformRequestExt,
-        datasets_by_handle: &HashMap<DatasetHandle, Arc<dyn Dataset>>,
+        datasets_by_id: &HashMap<DatasetID, Arc<dyn Dataset>>,
         commit_fn: CommitFn,
         listener: Arc<dyn TransformListener>,
     ) -> Result<TransformResult, TransformError>
@@ -107,7 +107,7 @@ impl TransformServiceImpl {
             .await?;
 
         let response = engine
-            .execute_transform(request.clone(), datasets_by_handle)
+            .execute_transform(request.clone(), datasets_by_id)
             .await?;
         assert_eq!(
             response.new_offset_interval.is_some(),
@@ -671,8 +671,8 @@ impl TransformServiceImpl {
     ) -> Result<TransformResult, TransformError> {
         let listener = maybe_listener.unwrap_or_else(|| Arc::new(NullTransformListener));
 
-        let mut datasets_by_handle = HashMap::new();
-        datasets_by_handle.insert(target.handle.clone(), target.dataset.clone());
+        let mut datasets_by_id = HashMap::new();
+        datasets_by_id.insert(target.handle.id.clone(), target.dataset.clone());
 
         // TODO: There might be more operations to do
         match self
@@ -684,13 +684,13 @@ impl TransformServiceImpl {
                     let input_dataset = self
                         .dataset_repo
                         .get_dataset_by_handle(&input.dataset_handle);
-                    datasets_by_handle.insert(input.dataset_handle.clone(), input_dataset);
+                    datasets_by_id.insert(input.dataset_handle.id.clone(), input_dataset);
                 }
 
                 Self::do_transform(
                     self.engine_provisioner.clone(),
                     operation,
-                    &datasets_by_handle,
+                    &datasets_by_id,
                     |request, response| async move {
                         Self::commit_execute_transform(target.dataset, request, response).await
                     },
@@ -830,16 +830,16 @@ impl TransformService for TransformServiceImpl {
             .get_verification_plan(target.clone(), block_range)
             .await?;
 
-        let mut datasets_by_handle = HashMap::new();
+        let mut datasets_by_id = HashMap::new();
         for step in &verification_plan {
-            datasets_by_handle.insert(
-                step.request.dataset_handle.clone(),
+            datasets_by_id.insert(
+                step.request.dataset_handle.id.clone(),
                 self.dataset_repo
                     .get_dataset_by_handle(&step.request.dataset_handle),
             );
             for input in &step.request.inputs {
-                datasets_by_handle.insert(
-                    input.dataset_handle.clone(),
+                datasets_by_id.insert(
+                    input.dataset_handle.id.clone(),
                     self.dataset_repo
                         .get_dataset_by_handle(&input.dataset_handle),
                 );
@@ -889,7 +889,7 @@ impl TransformService for TransformServiceImpl {
             Self::do_transform(
                 self.engine_provisioner.clone(),
                 request,
-                &datasets_by_handle,
+                &datasets_by_id,
                 |request, response| async move {
                     let params = ExecuteTransformParams {
                         query_inputs: request.inputs.iter().map(|i| i.clone().into()).collect(),

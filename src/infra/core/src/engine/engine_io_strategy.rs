@@ -27,7 +27,7 @@ pub trait EngineIoStrategy: Send + Sync {
     async fn materialize_request(
         &self,
         request: TransformRequestExt,
-        datasets_by_handle: &HashMap<DatasetHandle, Arc<dyn Dataset>>,
+        datasets_by_id: &HashMap<DatasetID, Arc<dyn Dataset>>,
         operation_dir: &Path,
     ) -> Result<MaterializedEngineRequest, InternalError>;
 }
@@ -88,7 +88,7 @@ impl EngineIoStrategy for EngineIoStrategyLocalVolume {
     async fn materialize_request(
         &self,
         request: TransformRequestExt,
-        datasets_by_handle: &HashMap<DatasetHandle, Arc<dyn Dataset>>,
+        datasets_by_id: &HashMap<DatasetID, Arc<dyn Dataset>>,
         operation_dir: &Path,
     ) -> Result<MaterializedEngineRequest, InternalError> {
         let host_in_dir = operation_dir.join("in");
@@ -105,8 +105,8 @@ impl EngineIoStrategy for EngineIoStrategyLocalVolume {
 
         let mut volumes = vec![(host_out_dir, container_out_dir, VolumeAccess::ReadWrite).into()];
 
-        let target_dataset = datasets_by_handle
-            .get(&request.dataset_handle)
+        let target_dataset = datasets_by_id
+            .get(&request.dataset_handle.id)
             .expect("Target dataset missing in the map");
 
         let prev_checkpoint_path = self
@@ -120,8 +120,8 @@ impl EngineIoStrategy for EngineIoStrategyLocalVolume {
 
         let mut query_inputs = Vec::new();
         for input in request.inputs {
-            let input_dataset = datasets_by_handle
-                .get(&input.dataset_handle)
+            let input_dataset = datasets_by_id
+                .get(&input.dataset_handle.id)
                 .expect("Input dataset missing");
 
             let mut data_paths = Vec::new();
@@ -256,7 +256,7 @@ impl EngineIoStrategy for EngineIoStrategyRemoteProxy {
     async fn materialize_request(
         &self,
         request: TransformRequestExt,
-        datasets_by_handle: &HashMap<DatasetHandle, Arc<dyn Dataset>>,
+        datasets_by_id: &HashMap<DatasetID, Arc<dyn Dataset>>,
         operation_dir: &Path,
     ) -> Result<MaterializedEngineRequest, InternalError> {
         // TODO: PERF: Parallel data transfer
@@ -274,8 +274,8 @@ impl EngineIoStrategy for EngineIoStrategyRemoteProxy {
 
         let mut volumes = vec![(host_out_dir, container_out_dir, VolumeAccess::ReadWrite).into()];
 
-        let target_dataset = datasets_by_handle
-            .get(&request.dataset_handle)
+        let target_dataset = datasets_by_id
+            .get(&request.dataset_handle.id)
             .expect("Target dataset missing in the map");
 
         let prev_checkpoint_path = self
@@ -290,8 +290,8 @@ impl EngineIoStrategy for EngineIoStrategyRemoteProxy {
 
         let mut query_inputs = Vec::new();
         for input in request.inputs {
-            let input_dataset = datasets_by_handle
-                .get(&input.dataset_handle)
+            let input_dataset = datasets_by_id
+                .get(&input.dataset_handle.id)
                 .expect("Input dataset missing");
 
             let mut data_paths = Vec::new();

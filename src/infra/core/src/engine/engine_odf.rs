@@ -19,7 +19,7 @@ use kamu_core::engine::*;
 use kamu_core::*;
 use odf::engine::{EngineGrpcClient, ExecuteRawQueryError, ExecuteTransformError};
 use odf::TransformResponseSuccess;
-use opendatafabric::{self as odf, DatasetHandle};
+use opendatafabric::{self as odf, DatasetID};
 
 use super::engine_container::{EngineContainer, LogsConfig};
 use super::engine_io_strategy::*;
@@ -344,7 +344,7 @@ impl Engine for ODFEngine {
     async fn execute_transform(
         &self,
         request: TransformRequestExt,
-        datasets_by_handle: &HashMap<DatasetHandle, Arc<dyn Dataset>>,
+        datasets_by_id: &HashMap<DatasetID, Arc<dyn Dataset>>,
     ) -> Result<TransformResponseExt, EngineError> {
         let operation_id = request.operation_id.clone();
         let operation_dir = self
@@ -354,13 +354,13 @@ impl Engine for ODFEngine {
         std::fs::create_dir(&operation_dir).int_err()?;
         std::fs::create_dir(&logs_dir).int_err()?;
 
-        let target_dataset = datasets_by_handle
-            .get(&request.dataset_handle)
+        let target_dataset = datasets_by_id
+            .get(&request.dataset_handle.id)
             .expect("Target dataset missing");
         let io_strategy = self.get_io_strategy(target_dataset.as_ref());
 
         let materialized_request = io_strategy
-            .materialize_request(request, datasets_by_handle, &operation_dir)
+            .materialize_request(request, datasets_by_id, &operation_dir)
             .await
             .int_err()?;
 

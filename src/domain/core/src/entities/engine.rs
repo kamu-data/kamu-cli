@@ -36,7 +36,7 @@ pub trait Engine: Send + Sync {
     async fn execute_transform(
         &self,
         request: TransformRequestExt,
-        datasets_by_handle: &HashMap<DatasetHandle, Arc<dyn Dataset>>,
+        datasets_by_id: &HashMap<DatasetID, Arc<dyn Dataset>>,
     ) -> Result<TransformResponseExt, EngineError>;
 }
 
