@@ -380,6 +380,63 @@ async fn test_fetch_url_http_env_interpolation() {
     );
 }
 
+#[test_group::group(containerized)]
+#[test_log::test(tokio::test)]
+async fn test_fetch_url_http_env_interpolation_with_default() {
+    let harness = FetchTestHarness::new();
+
+    let server_dir = harness.temp_dir.path().join("srv");
+    std::fs::create_dir(&server_dir).unwrap();
+
+    let src_path = server_dir.join("data.csv");
+    let target_path = harness.temp_dir.path().join("fetched.bin");
+
+    std::fs::write(&src_path, CSV_BATCH_OUTPUT).unwrap();
+
+    let http_server = crate::utils::HttpServer::new(&server_dir).await;
+
+    let fetch_step = FetchStep::Url(FetchStepUrl {
+        url: format!(
+            "http://localhost:{}/${{{{ env.KAMU_TEST || 'data.csv' }}}}",
+            http_server.host_port
+        ),
+        event_time: None,
+        cache: None,
+        headers: None,
+    });
+
+    let listener = Arc::new(TestListener::new());
+
+    let res = harness
+        .fetch_svc
+        .fetch(
+            &mock_dataset_handle(),
+            &generate_unique_operation_id(),
+            &fetch_step,
+            None,
+            &target_path,
+            &Utc::now(),
+            &HashMap::new(),
+            Some(listener.clone()),
+        )
+        .await
+        .unwrap();
+
+    assert_matches!(res, FetchResult::Updated(_));
+    assert!(target_path.exists());
+    assert_eq!(
+        std::fs::read_to_string(&target_path).unwrap(),
+        CSV_BATCH_OUTPUT
+    );
+    assert_eq!(
+        listener.get_last_progress(),
+        Some(FetchProgress {
+            fetched_bytes: 37,
+            total_bytes: TotalBytes::Exact(37),
+        })
+    );
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // URL: ftp
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

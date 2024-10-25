@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::borrow::Cow;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -21,6 +20,7 @@ use opendatafabric::*;
 use url::Url;
 
 use super::*;
+use crate::ingest::fetch_service::template::template_string;
 use crate::PollingSourceState;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -195,9 +195,7 @@ impl FetchService {
         for htpl in headers_tpl.as_ref().unwrap_or(&empty) {
             let hdr = RequestHeader {
                 name: htpl.name.clone(),
-                value: self
-                    .template_string(&htpl.value, dataset_env_vars)?
-                    .into_owned(),
+                value: self.template_string(&htpl.value, dataset_env_vars)?,
             };
             res.push(hdr);
         }
@@ -208,40 +206,14 @@ impl FetchService {
         &self,
         s: &'a str,
         dataset_env_vars: &'a HashMap<String, DatasetEnvVar>,
-    ) -> Result<Cow<'a, str>, PollingIngestError> {
-        let mut s = Cow::from(s);
-        let re_tpl = regex::Regex::new(r"\$\{\{([^}]*)\}\}").unwrap();
-        let re_env = regex::Regex::new(r"^env\.([a-zA-Z-_]+)$").unwrap();
-
-        loop {
-            if let Some(ctpl) = re_tpl.captures(&s) {
-                let tpl_range = ctpl.get(0).unwrap().range();
-
-                if let Some(cenv) = re_env.captures(ctpl.get(1).unwrap().as_str().trim()) {
-                    let env_name = cenv.get(1).unwrap().as_str();
-
-                    let dataset_env_var_secret_value = self
-                        .dataset_key_value_svc
-                        .find_dataset_env_var_value_by_key(env_name, dataset_env_vars)?;
-
-                    s.to_mut()
-                        .replace_range(tpl_range, dataset_env_var_secret_value.get_exposed_value());
-                } else {
-                    return Err(format!(
-                        "Invalid pattern '{}' encountered in string: {}",
-                        ctpl.get(0).unwrap().as_str(),
-                        s
-                    )
-                    .int_err()
-                    .into());
-                }
-            } else {
-                if let std::borrow::Cow::Owned(_) = &s {
-                    tracing::debug!(%s, "String after template substitution");
-                }
-                return Ok(s);
-            }
-        }
+    ) -> Result<String, PollingIngestError> {
+        let lookup_fn = |env_name: &str| -> Option<String> {
+            self.dataset_key_value_svc
+                .find_dataset_env_var_value_by_key(env_name, dataset_env_vars)
+                .ok()
+                .map(|v| v.get_exposed_value().to_string())
+        };
+        template_string(s, &lookup_fn).map_err(PollingIngestError::TemplateError)
     }
 }
 

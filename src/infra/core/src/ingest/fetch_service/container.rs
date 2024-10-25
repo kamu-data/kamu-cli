@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::borrow::Cow;
 use std::collections::HashMap;
 use std::path::Path;
 use std::process::Stdio;
@@ -44,8 +43,10 @@ impl FetchService {
             .get_pull_image_listener()
             .unwrap_or_else(|| Arc::new(NullPullImageListener));
 
+        let image = self.template_string(&fetch.image, dataset_env_vars)?;
+
         self.container_runtime
-            .ensure_image(&fetch.image, Some(pull_image_listener.as_ref()))
+            .ensure_image(&image, Some(pull_image_listener.as_ref()))
             .await?;
 
         listener.on_progress(&FetchProgress {
@@ -77,7 +78,7 @@ impl FetchService {
 
         let mut container_builder = self
             .container_runtime
-            .run_attached(&fetch.image)
+            .run_attached(&image)
             .container_name(format!("kamu-fetch-{operation_id}"))
             .volume((&out_dir, "/opt/odf/out"))
             .stdout(Stdio::piped())
@@ -106,7 +107,7 @@ impl FetchService {
                         .dataset_key_value_svc
                         .find_dataset_env_var_value_by_key(name, dataset_env_vars)?;
 
-                    Cow::from(value.into_exposed_value())
+                    value.into_exposed_value()
                 };
 
                 if name == ODF_BATCH_SIZE {
@@ -178,7 +179,7 @@ impl FetchService {
             cfg_if::cfg_if! {
                 if #[cfg(unix)] {
                     self.container_runtime
-                        .run_attached(&fetch.image)
+                        .run_attached(&image)
                         .random_container_name_with_prefix("kamu-permissions-")
                         .shell_cmd(format!(
                             "chown -Rf {}:{} {}",
