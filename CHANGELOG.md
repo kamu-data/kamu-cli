@@ -11,6 +11,13 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Unreleased]
+### Changed
+- GraphQL: Removed deprecated `JSON_LD` in favor of `ND_JSON` in `DataBatchFormat`
+- GraphQL: In `DataBatchFormat` introduced `JSON_AOS` format to replace the now deprecated `JSON` in effort to harmonize format names with REST API
+### Fixed
+- GraphQL: Fixed invalid JSON encoding in `PARQUET_JSON` schema format when column names contain special characters (#746)
+
 ## [0.206.1] - 2024-10-24
 ### Changed
 - `kamu repo list`: supports all types of output

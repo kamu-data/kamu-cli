@@ -14,6 +14,38 @@ use datafusion::parquet::schema::types::Type;
 use kamu_data_utils::schema::format::write_schema_parquet_json;
 
 #[test]
+fn test_write_schema_parquet_json_escaping() {
+    let f1 = Type::primitive_type_builder("a \" b", PhysicalType::INT32)
+        .build()
+        .unwrap();
+    let fields = vec![Arc::new(f1)];
+    let message = Type::group_type_builder("schema")
+        .with_fields(fields)
+        .with_id(Some(1))
+        .build()
+        .unwrap();
+
+    let mut buf = Vec::new();
+    write_schema_parquet_json(&mut buf, &message).unwrap();
+
+    println!("{}", std::str::from_utf8(&buf).unwrap());
+
+    let actual: serde_json::Value = serde_json::from_slice(&buf).unwrap();
+
+    let expected = serde_json::json!({
+        "name": "schema",
+        "type": "struct",
+        "fields": [{
+            "name": "a \" b",
+            "repetition": "OPTIONAL",
+            "type": "INT32",
+        }]
+    });
+
+    assert_eq!(actual, expected);
+}
+
+#[test]
 fn test_write_schema_parquet_json_group() {
     let f1 = Type::primitive_type_builder("f1", PhysicalType::INT32)
         .with_repetition(Repetition::REQUIRED)

@@ -116,7 +116,7 @@ mod test {
     use super::*;
 
     #[test_log::test(tokio::test)]
-    async fn test_from_parquet_schema_parquet() {
+    async fn test_data_schema_parquet() {
         let df = get_test_df().await;
 
         let result = DataSchema::from_data_frame_schema(df.schema(), DataSchemaFormat::Parquet);
@@ -140,7 +140,7 @@ mod test {
     }
 
     #[test_log::test(tokio::test)]
-    async fn test_from_parquet_schema_parquet_json() {
+    async fn test_data_schema_parquet_json() {
         let df = get_test_df().await;
 
         let result = DataSchema::from_data_frame_schema(df.schema(), DataSchemaFormat::ParquetJson);
@@ -173,7 +173,47 @@ mod test {
     }
 
     #[test_log::test(tokio::test)]
-    async fn test_from_parquet_schema_parquet_arrow_json() {
+    async fn test_data_schema_parquet_json_escaping() {
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            "a \" b",
+            DataType::Utf8,
+            false,
+        )]));
+
+        let batch =
+            RecordBatch::try_new(schema, vec![Arc::new(StringArray::from(vec!["a"]))]).unwrap();
+
+        let ctx = SessionContext::new();
+        ctx.register_batch("t", batch).unwrap();
+        let df = ctx.table("t").await.unwrap();
+
+        let result = DataSchema::from_data_frame_schema(df.schema(), DataSchemaFormat::ParquetJson);
+
+        let data_schema = result.unwrap();
+
+        assert_eq!(data_schema.format, DataSchemaFormat::ParquetJson);
+
+        let schema_content = data_schema.content;
+
+        let data_schema_json = serde_json::from_str::<Value>(schema_content.as_str()).unwrap();
+
+        assert_eq!(
+            data_schema_json,
+            serde_json::json!({
+                "fields": [{
+                    "logicalType": "STRING",
+                    "name": "a \" b",
+                    "repetition": "REQUIRED",
+                    "type": "BYTE_ARRAY"
+                }],
+                "name": "arrow_schema",
+                "type": "struct"
+            })
+        );
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn test_data_schema_arrow_json() {
         let df = get_test_df().await;
 
         let result = DataSchema::from_data_frame_schema(df.schema(), DataSchemaFormat::ArrowJson);

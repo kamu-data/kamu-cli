@@ -84,8 +84,8 @@ impl<'a> ParquetJsonSchemaWriter<'a> {
             } => {
                 write!(
                     self.output,
-                    r#"{{"name": "{}", "repetition": "{}""#,
-                    basic_info.name(),
+                    r#"{{"name": {}, "repetition": "{}""#,
+                    JsonEscapedString(basic_info.name()),
                     basic_info.repetition()
                 )?;
 
@@ -117,8 +117,8 @@ impl<'a> ParquetJsonSchemaWriter<'a> {
             } => {
                 write!(
                     self.output,
-                    r#"{{"name": "{}", "type": "struct""#,
-                    basic_info.name()
+                    r#"{{"name": {}, "type": "struct""#,
+                    JsonEscapedString(basic_info.name())
                 )?;
 
                 if basic_info.has_repetition() {
@@ -223,6 +223,24 @@ impl<'a> ParquetJsonSchemaWriter<'a> {
             TimeUnit::MICROS(_) => "MICROS",
             TimeUnit::NANOS(_) => "NANOS",
         }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+struct JsonEscapedString<'a>(&'a str);
+
+impl<'a> std::fmt::Display for JsonEscapedString<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use serde::Serializer;
+
+        // TODO: PERF: Find a way to avoid allocation and write directly into
+        // formatter's buffer
+        let mut buf = Vec::new();
+        let mut serializer = serde_json::Serializer::new(&mut buf);
+        serializer.serialize_str(self.0).unwrap();
+        write!(f, "{}", std::str::from_utf8(&buf).unwrap())?;
+        Ok(())
     }
 }
 

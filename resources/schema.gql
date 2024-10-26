@@ -341,7 +341,12 @@ type DataBatch {
 }
 
 enum DataBatchFormat {
+	"""
+	Deprecated: Use `JSON_AOS` instead and expect it to become default in
+	future versions
+	"""
 	JSON
+	JSON_AOS
 	JSON_SOA
 	JSON_AOA
 	ND_JSON

@@ -18,8 +18,11 @@ const MAX_SOA_BUFFER_SIZE: usize = 100_000_000;
 
 #[derive(Enum, Default, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DataBatchFormat {
+    /// Deprecated: Use `JSON_AOS` instead and expect it to become default in
+    /// future versions
     #[default]
     Json,
+    JsonAOS,
     JsonSOA,
     JsonAOA,
     NdJson,
@@ -45,7 +48,9 @@ impl DataBatch {
                 DataBatchFormat::Csv | DataBatchFormat::JsonLD | DataBatchFormat::NdJson => {
                     String::new()
                 }
-                DataBatchFormat::Json | DataBatchFormat::JsonAOA => String::from("[]"),
+                DataBatchFormat::Json | DataBatchFormat::JsonAOS | DataBatchFormat::JsonAOA => {
+                    String::from("[]")
+                }
                 DataBatchFormat::JsonSOA => String::from("{}"),
             },
             num_records: 0,
@@ -77,7 +82,9 @@ impl DataBatch {
                         ..Default::default()
                     },
                 )),
-                DataBatchFormat::Json => Box::new(JsonArrayOfStructsWriter::new(&mut buf)),
+                DataBatchFormat::Json | DataBatchFormat::JsonAOS => {
+                    Box::new(JsonArrayOfStructsWriter::new(&mut buf))
+                }
                 DataBatchFormat::JsonSOA => {
                     Box::new(JsonStructOfArraysWriter::new(&mut buf, MAX_SOA_BUFFER_SIZE))
                 }
