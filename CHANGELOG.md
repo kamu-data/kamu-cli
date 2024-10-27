@@ -11,7 +11,7 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## [Unreleased]
+## [0.206.2] - 2024-10-26
 ### Changed
 - GraphQL: Removed deprecated `JSON_LD` in favor of `ND_JSON` in `DataBatchFormat`
 - GraphQL: In `DataBatchFormat` introduced `JSON_AOS` format to replace the now deprecated `JSON` in effort to harmonize format names with REST API
