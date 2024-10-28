@@ -15,6 +15,7 @@ use init_on_startup::{InitOnStartup, InitOnStartupMeta};
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_accounts::{
     AccountRepository,
+    GetAccountByNameError,
     DEFAULT_ACCOUNT_ID,
     JOB_KAMU_ACCOUNTS_PREDEFINED_ACCOUNTS_REGISTRATOR,
 };
@@ -71,50 +72,44 @@ impl DatasetEntryIndexer {
         Ok(stored_dataset_entries_count > 0)
     }
 
+    #[tracing::instrument(
+        level = "debug",
+        skip_all,
+        name = "DatasetEntryIndexer::index_datasets"
+    )]
     async fn index_datasets(&self) -> Result<(), InternalError> {
         use futures::TryStreamExt;
 
         let dataset_handles: Vec<_> = self.dataset_repo.get_all_datasets().try_collect().await?;
 
-        self.concurrent_dataset_handles_processing(dataset_handles)
-            .await?;
-
-        Ok(())
-    }
-
-    async fn concurrent_dataset_handles_processing(
-        &self,
-        dataset_handles: Vec<DatasetHandle>,
-    ) -> Result<(), InternalError> {
-        let mut join_set = tokio::task::JoinSet::new();
-        let now = self.time_source.now();
         let account_name_id_mapping = self.build_account_name_id_mapping(&dataset_handles).await?;
 
         for dataset_handle in dataset_handles {
-            let task_owner_account_id =
-                account_name_id_mapping[&dataset_handle.alias.account_name].clone();
-            let task_now = now;
-            let task_dataset_entry_repo = self.dataset_entry_repo.clone();
+            let Some(owner_account_id) = account_name_id_mapping
+                .get(&dataset_handle.alias.account_name)
+                .cloned()
+            else {
+                tracing::debug!(dataset_handle=%dataset_handle, "Skipped indexing dataset due to unresolved owner");
+                continue;
+            };
 
-            join_set.spawn(async move {
-                let dataset_entry = DatasetEntry::new(
-                    dataset_handle.id,
-                    task_owner_account_id,
-                    dataset_handle.alias.dataset_name,
-                    task_now,
-                );
+            let dataset_entry = DatasetEntry::new(
+                dataset_handle.id,
+                owner_account_id,
+                dataset_handle.alias.dataset_name,
+                self.time_source.now(),
+            );
 
-                task_dataset_entry_repo
-                    .save_dataset_entry(&dataset_entry)
-                    .await
-                    .int_err()
-            });
-        }
-
-        while let Some(join_result) = join_set.join_next().await {
-            let task_res = join_result.int_err()?;
-
-            task_res?;
+            use tracing::Instrument;
+            self.dataset_entry_repo
+                .save_dataset_entry(&dataset_entry)
+                .instrument(tracing::debug_span!(
+                    "Saving indexed dataset entry",
+                    dataset_entry = ?dataset_entry,
+                    owner_account_name = ?dataset_handle.alias.account_name,
+                ))
+                .await
+                .int_err()?;
         }
 
         Ok(())
@@ -133,9 +128,15 @@ impl DatasetEntryIndexer {
                 continue;
             }
 
-            let owner_account_id = self.get_dataset_owner_id(maybe_owner_name).await?;
-
-            map.insert(maybe_owner_name.clone(), owner_account_id);
+            match self.get_dataset_owner_id(maybe_owner_name).await {
+                Ok(owner_account_id) => {
+                    map.insert(maybe_owner_name.clone(), owner_account_id);
+                }
+                Err(e) => {
+                    // Log error, but don't crash
+                    tracing::error!(error=?e, account_name = ?maybe_owner_name, "Account unresolved by dataset indexing job");
+                }
+            }
         }
 
         Ok(map)
@@ -144,15 +145,15 @@ impl DatasetEntryIndexer {
     async fn get_dataset_owner_id(
         &self,
         maybe_owner_name: &Option<odf::AccountName>,
-    ) -> Result<odf::AccountID, InternalError> {
+    ) -> Result<odf::AccountID, GetAccountByNameError> {
         match &maybe_owner_name {
             Some(account_name) => {
                 let account = self
                     .account_repository
                     .get_account_by_name(account_name)
-                    .await
-                    .int_err()?;
+                    .await?;
 
+                tracing::debug!(account_id=%account.id, account_name=%account_name, "Account resolved by dataset indexing job");
                 Ok(account.id)
             }
             None => Ok(DEFAULT_ACCOUNT_ID.clone()),

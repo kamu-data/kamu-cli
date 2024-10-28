@@ -11,6 +11,11 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [0.206.3] - 2024-10-28
+### Fixed
+- Improved telemetry for dataset entry indexing process
+- Corrected recent migration related to outbox consumptions of old dataset events
+
 ## [0.206.2] - 2024-10-26
 ### Changed
 - GraphQL: Removed deprecated `JSON_LD` in favor of `ND_JSON` in `DataBatchFormat`
