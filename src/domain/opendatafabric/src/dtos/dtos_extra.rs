@@ -287,7 +287,8 @@ impl DataSlice {
 impl SetDataSchema {
     #[cfg(feature = "arrow")]
     pub fn new(schema: &arrow::datatypes::Schema) -> Self {
-        let (mut buf, head) = arrow::ipc::convert::schema_to_fb(schema).collapse();
+        let mut encoder = arrow::ipc::convert::IpcSchemaEncoder::new();
+        let (mut buf, head) = encoder.schema_to_fb(schema).collapse();
         buf.drain(0..head);
         Self { schema: buf }
     }

@@ -97,7 +97,4 @@ ignore = [
     # Unmaintained
     # https://rustsec.org/advisories/RUSTSEC-2024-0370.html
     "RUSTSEC-2024-0370",
-    # Waiting for arrow upgrade
-    # https://rustsec.org/advisories/RUSTSEC-2023-0086
-    "RUSTSEC-2023-0086",
 ]
