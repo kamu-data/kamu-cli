@@ -11,6 +11,10 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [0.206.4] - 2024-10-28
+### Fixed
+- `kamu push` correctly handle `odf+` format repositories
+
 ## [0.206.3] - 2024-10-28
 ### Fixed
 - Improved telemetry for dataset entry indexing process
