@@ -50,7 +50,7 @@ use url::Url;
 use super::{
     create_cli_user_catalog,
     create_web_user_catalog,
-    get_server_account,
+    make_server_account,
     server_authentication_mock,
     ServerSideHarness,
     ServerSideHarnessOptions,
@@ -82,7 +82,7 @@ impl ServerSideS3Harness {
 
         let time_source = SystemTimeSourceStub::new();
 
-        let account = get_server_account();
+        let account = make_server_account();
 
         let (base_catalog, listener) = {
             let addr = SocketAddr::from(([127, 0, 0, 1], 0));

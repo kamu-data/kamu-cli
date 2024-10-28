@@ -9,7 +9,7 @@
 
 use base64::Engine;
 use bytes::Bytes;
-use internal_error::InternalError;
+use internal_error::{InternalError, ResultIntoInternal};
 use kamu_core::MediaType;
 use opendatafabric::AccountID;
 use serde::{Deserialize, Serialize};
@@ -22,7 +22,7 @@ use tokio::io::AsyncRead;
 pub trait UploadService: Send + Sync {
     async fn make_upload_context(
         &self,
-        account_id: &AccountID,
+        owner_account_id: &AccountID,
         file_name: String,
         content_type: Option<MediaType>,
         content_length: usize,
@@ -30,21 +30,20 @@ pub trait UploadService: Send + Sync {
 
     async fn upload_reference_size(
         &self,
-        account_id: &AccountID,
+        owner_account_id: &AccountID,
         upload_id: &str,
         file_name: &str,
     ) -> Result<usize, UploadTokenIntoStreamError>;
 
     async fn upload_reference_into_stream(
         &self,
-        account_id: &AccountID,
+        owner_account_id: &AccountID,
         upload_id: &str,
         file_name: &str,
     ) -> Result<Box<dyn AsyncRead + Send + Unpin>, UploadTokenIntoStreamError>;
 
     async fn save_upload(
         &self,
-        account_id: &AccountID,
         upload_token: &UploadToken,
         content_length: usize,
         file_data: Bytes,
@@ -52,11 +51,17 @@ pub trait UploadService: Send + Sync {
 
     async fn upload_token_into_stream(
         &self,
-        account_id: &AccountID,
         upload_token: &UploadToken,
     ) -> Result<Box<dyn AsyncRead + Send + Unpin>, UploadTokenIntoStreamError> {
+        let owner_account_id =
+            AccountID::from_multibase_string(&upload_token.owner_account_id).int_err()?;
+
         let actual_data_size = self
-            .upload_reference_size(account_id, &upload_token.upload_id, &upload_token.file_name)
+            .upload_reference_size(
+                &owner_account_id,
+                &upload_token.upload_id,
+                &upload_token.file_name,
+            )
             .await?;
 
         if actual_data_size != upload_token.content_length {
@@ -69,7 +74,7 @@ pub trait UploadService: Send + Sync {
 
         let stream = self
             .upload_reference_into_stream(
-                account_id,
+                &owner_account_id,
                 &upload_token.upload_id,
                 &upload_token.file_name,
             )
@@ -101,7 +106,7 @@ pub enum MakeUploadContextError {
     #[error(transparent)]
     TooLarge(ContentTooLargeError),
     #[error(transparent)]
-    Internal(InternalError),
+    Internal(#[from] InternalError),
 }
 
 #[derive(Debug, Error)]
@@ -113,7 +118,7 @@ pub enum SaveUploadError {
     #[error(transparent)]
     ContentLengthMismatch(ContentLengthMismatchError),
     #[error(transparent)]
-    Internal(InternalError),
+    Internal(#[from] InternalError),
 }
 
 #[derive(Debug, Error)]
@@ -123,7 +128,7 @@ pub enum UploadTokenIntoStreamError {
     #[error(transparent)]
     ContentNotFound(ContentNotFoundError),
     #[error(transparent)]
-    Internal(InternalError),
+    Internal(#[from] InternalError),
 }
 
 #[derive(Debug, Error)]
@@ -186,6 +191,7 @@ impl FileUploadLimitConfig {
 pub struct UploadToken {
     pub upload_id: String,
     pub file_name: String,
+    pub owner_account_id: String,
     pub content_length: usize,
     pub content_type: Option<MediaType>,
 }

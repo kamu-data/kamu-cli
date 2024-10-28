@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::net::SocketAddr;
+use std::sync::Arc;
 
 use database_common::NoOpDatabasePlugin;
 use dill::Component;
@@ -25,6 +26,7 @@ use kamu_accounts_services::{
     PredefinedAccountsRegistrator,
 };
 use kamu_adapter_http::{FileUploadLimitConfig, UploadContext, UploadService, UploadServiceS3};
+use opendatafabric::AccountID;
 use time_source::SystemTimeSourceDefault;
 use tokio::io::AsyncReadExt;
 
@@ -35,8 +37,8 @@ use crate::harness::{await_client_server_flow, TestAPIServer};
 struct Harness {
     _s3: LocalS3Server,
     s3_upload_context: S3Context,
-    access_token: String,
     api_server: TestAPIServer,
+    authentication_service: Arc<AuthenticationServiceImpl>,
 }
 
 impl Harness {
@@ -76,22 +78,25 @@ impl Harness {
         init_on_startup::run_startup_jobs(&catalog).await.unwrap();
 
         let authentication_service = catalog.get_one::<AuthenticationServiceImpl>().unwrap();
-        let access_token = authentication_service
-            .make_access_token(&DEFAULT_ACCOUNT_ID, 60)
-            .unwrap();
 
         let api_server = TestAPIServer::new(catalog, listener, true);
 
         Self {
             _s3: s3,
             s3_upload_context,
-            access_token,
             api_server,
+            authentication_service,
         }
     }
 
     fn api_server_addr(&self) -> String {
         self.api_server.local_addr().to_string()
+    }
+
+    fn make_access_token(&self, account_id: &AccountID) -> String {
+        self.authentication_service
+            .make_access_token(account_id, 60)
+            .unwrap()
     }
 
     fn upload_prepare_url(&self, file_name: &str, content_type: &str, file_size: usize) -> String {
@@ -165,7 +170,7 @@ async fn test_attempt_upload_file_authorized() {
     let harness = Harness::new().await;
 
     let upload_prepare_url = harness.upload_prepare_url("test.txt", "text/plain", FILE_BODY.len());
-    let access_token = harness.access_token.clone();
+    let access_token = harness.make_access_token(&DEFAULT_ACCOUNT_ID);
     let upload_bucket_context = harness.s3_upload_context.clone();
 
     let client = async move {
@@ -244,7 +249,7 @@ async fn test_attempt_upload_file_that_is_too_large() {
     let harness = Harness::new().await;
 
     let upload_prepare_url = harness.upload_prepare_url("test.txt", "text/plain", FILE_BODY.len());
-    let access_token = harness.access_token.clone();
+    let access_token = harness.make_access_token(&DEFAULT_ACCOUNT_ID);
 
     let client = async move {
         let client = reqwest::Client::new();
@@ -278,7 +283,8 @@ async fn test_upload_then_read_file() {
     let harness = Harness::new().await;
     let upload_prepare_url = harness.upload_prepare_url("test.txt", "text/plain", FILE_BODY.len());
     let retreive_url = harness.upload_retreive_url();
-    let access_token = harness.access_token.clone();
+    let access_token = harness.make_access_token(&DEFAULT_ACCOUNT_ID);
+    let different_access_token = harness.make_access_token(&(AccountID::new_generated_ed25519().1));
 
     let client = async move {
         let client = reqwest::Client::new();
@@ -307,15 +313,33 @@ async fn test_upload_then_read_file() {
             .unwrap();
         assert_eq!(200, s3_upload_response.status());
 
+        // Read file with the same authorization token
+        let get_url = format!("{retreive_url}/{}", upload_context.upload_token);
         let upload_retreive_response = client
-            .get(format!("{retreive_url}/{}", upload_context.upload_token))
+            .get(get_url.clone())
             .bearer_auth(access_token)
             .send()
             .await
             .unwrap();
-
         assert_eq!(200, upload_retreive_response.status());
+        let file_body = upload_retreive_response.text().await.unwrap();
+        assert_eq!(FILE_BODY, file_body);
 
+        // Read file with different authorization token
+        let get_url = format!("{retreive_url}/{}", upload_context.upload_token);
+        let upload_retreive_response = client
+            .get(get_url.clone())
+            .bearer_auth(different_access_token)
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(200, upload_retreive_response.status());
+        let file_body = upload_retreive_response.text().await.unwrap();
+        assert_eq!(FILE_BODY, file_body);
+
+        // Read file anonymously
+        let upload_retreive_response = client.get(get_url).send().await.unwrap();
+        assert_eq!(200, upload_retreive_response.status());
         let file_body = upload_retreive_response.text().await.unwrap();
         assert_eq!(FILE_BODY, file_body);
     };

@@ -11,6 +11,10 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Unreleased]
+### Changed
+- Allow anonymous access to the content of recently uploaded files
+
 ## [0.206.4] - 2024-10-28
 ### Fixed
 - `kamu push` correctly handle `odf+` format repositories

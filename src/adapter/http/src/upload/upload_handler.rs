@@ -93,6 +93,11 @@ pub async fn platform_file_upload_post_handler(
     mut multipart: axum::extract::Multipart,
 ) -> Result<(), ApiError> {
     let account_id = ensure_authenticated_account(&catalog).api_err()?;
+    if account_id.as_multibase().to_stack_string().as_str()
+        != upload_param.upload_token.0.owner_account_id.as_str()
+    {
+        return Err(ApiError::new_forbidden());
+    }
 
     let file_data = match find_correct_multi_part_field(&mut multipart).await {
         Ok(file_data) => file_data,
@@ -101,12 +106,7 @@ pub async fn platform_file_upload_post_handler(
 
     let upload_local_service = catalog.get_one::<dyn UploadService>().unwrap();
     match upload_local_service
-        .save_upload(
-            &account_id,
-            &upload_param.upload_token.0,
-            file_data.len(),
-            file_data,
-        )
+        .save_upload(&upload_param.upload_token.0, file_data.len(), file_data)
         .await
     {
         Ok(_) => Ok(()),
@@ -128,6 +128,7 @@ pub async fn platform_file_upload_post_handler(
     responses((status = OK, body = Vec<u8>)),
     tag = "kamu",
     security(
+        (),  // Note: anonymous access is fine to read uploaded files
         ("api_key" = []),
     )
 )]
@@ -136,11 +137,9 @@ pub async fn platform_file_upload_get_handler(
     catalog: axum::extract::Extension<dill::Catalog>,
     axum::extract::Path(upload_param): axum::extract::Path<UploadFromPath>,
 ) -> Result<impl axum::response::IntoResponse, ApiError> {
-    let account_id = ensure_authenticated_account(&catalog).api_err()?;
-
     let upload_local_service = catalog.get_one::<dyn UploadService>().unwrap();
     let stream = upload_local_service
-        .upload_token_into_stream(&account_id, &upload_param.upload_token.0)
+        .upload_token_into_stream(&upload_param.upload_token.0)
         .await
         .map_err(|e| match e {
             UploadTokenIntoStreamError::ContentNotFound(e) => ApiError::not_found(e),

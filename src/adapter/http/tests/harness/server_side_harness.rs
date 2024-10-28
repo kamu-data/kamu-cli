@@ -85,7 +85,7 @@ pub(crate) fn server_authentication_mock(account: &Account) -> MockAuthenticatio
     MockAuthenticationService::resolving_token(kamu_accounts::DUMMY_ACCESS_TOKEN, account.clone())
 }
 
-pub(crate) fn get_server_account() -> Account {
+pub(crate) fn make_server_account() -> Account {
     Account {
         id: AccountID::new_seeded_ed25519(SERVER_ACCOUNT_NAME.as_bytes()),
         account_name: AccountName::new_unchecked(SERVER_ACCOUNT_NAME),

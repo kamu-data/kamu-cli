@@ -49,7 +49,7 @@ use url::Url;
 use super::{
     create_cli_user_catalog,
     create_web_user_catalog,
-    get_server_account,
+    make_server_account,
     server_authentication_mock,
     ServerSideHarness,
     ServerSideHarnessOptions,
@@ -82,7 +82,7 @@ impl ServerSideLocalFsHarness {
         let cache_dir = tempdir.path().join("cache");
         std::fs::create_dir(&cache_dir).unwrap();
 
-        let account = get_server_account();
+        let account = make_server_account();
 
         let time_source = SystemTimeSourceStub::new();
         let (base_catalog, listener) = {
@@ -147,6 +147,10 @@ impl ServerSideLocalFsHarness {
 
     pub fn base_catalog(&self) -> &dill::Catalog {
         &self.base_catalog
+    }
+
+    pub fn server_account(&self) -> &Account {
+        &self.account
     }
 }
 
