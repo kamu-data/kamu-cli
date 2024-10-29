@@ -121,7 +121,7 @@ tempfile = "3"
 test-group = { version = "1" }
 test-log = { version = "0.2", features = ["trace"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-tower-http = { version = "0.5", features = ["trace", "cors"] }
+tower-http = { version = "0.6", features = ["trace", "cors"] }
 rand = "0.8"
 sha3 = "0.10"
 mockall = "0.13"
