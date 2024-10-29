@@ -128,7 +128,7 @@ tower-http = { version = "0.5", features = ["fs", "trace"] }
 axum = "0.7"
 
 # Optional dependencies
-alloy = { optional = true, version = "0.3", default-features = false, features = [
+alloy = { optional = true, version = "0.5", default-features = false, features = [
     "std",
     "provider-http",
     "provider-ws",

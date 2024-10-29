@@ -470,14 +470,14 @@ async fn test_data_query_handler() {
                 },
                 "subQueries": [],
                 "commitment": {
-                    "inputHash": "f1620986f955571b81e8f4c3753203fe08a9af520b84ec9079fd1351014d9fd24468a",
+                    "inputHash": "f1620faea05dac703752014a3b3d52869e96493a8c1d2c8154cb616d511c0f01bf644",
                     "outputHash": "f16208d66e08ce876ba35ce00ea56f02faf83dbc086f877c443e3d493427ccad133f1",
                     "subQueriesHash": "f1620ca4510738395af1429224dd785675309c344b2b549632e20275c69b15ed1d210",
                 },
                 "proof": {
                     "type": "Ed25519Signature2020",
                     "verificationMethod": "did:key:z6Mko2nqhQ9wYSTS5Giab2j1aHzGnxHimqwmFeEVY8aNsVnN",
-                    "proofValue": "uU6WTHFxAE2eMY4k0HGN8m-OGG9EkZSvjYa8-I8xWXVJBuMHWiUwtSeGCEjeFrCGn1ErYCs53t-8r0PHWxa2mDg",
+                    "proofValue": "u7IDYkSq0O3QFvq-HRZ-jwaiCbfm7BFVcMKnSCanvC02OBKzfAhA4RPn8--GAmVR9wf54MgkuO4qAXSCXiVRMBw",
                 }
             })
         );
@@ -624,14 +624,14 @@ async fn test_data_verify_handler() {
                 },
                 "subQueries": [],
                 "commitment": {
-                    "inputHash": "f1620deb55f2b02c11c74aba9a8b6c3cc740d7385c2ba3eb1d4b62a3b30ccfe116ec2",
+                    "inputHash": "f162084403bf9b03b0747eabce09977679e97f6b7405430019299137fcccab2912f36",
                     "outputHash": "f1620ff7f5beaf16900218a3ac4aae82cdccf764816986c7c739c716cf7dc03112a2c",
                     "subQueriesHash": "f1620ca4510738395af1429224dd785675309c344b2b549632e20275c69b15ed1d210",
                 },
                 "proof": {
                     "type": "Ed25519Signature2020",
                     "verificationMethod": "did:key:z6Mko2nqhQ9wYSTS5Giab2j1aHzGnxHimqwmFeEVY8aNsVnN",
-                    "proofValue": "u9rZLu4l6qisJUK8YlPNx3DCKy3jHFyOaFg5pheHrVdGt4ThdwCiWIwPjY5vE7GycGKy8axK7r8UEH-iGB2GtAQ",
+                    "proofValue": "u_uOR7GUN2mh4owqvhBefeWlVGX3PiBRqnU1UDL9yoeKhuPUyC5ym9KvMl_uzwllVmaA95en7tEL5t6ux0wTmBQ",
                 }
             })
         );

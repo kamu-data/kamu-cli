@@ -58,14 +58,13 @@ use arrow_flight::{
     FlightInfo,
     HandshakeRequest,
     HandshakeResponse,
-    SchemaAsIpc,
     Ticket,
 };
 use dashmap::DashMap;
 use datafusion::arrow;
 use datafusion::arrow::array::{ArrayRef, BinaryArray, Int32Array, StringArray, UInt8Array};
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
-use datafusion::arrow::ipc::writer::{IpcDataGenerator, IpcWriteOptions};
+use datafusion::arrow::ipc::writer::{DictionaryTracker, IpcDataGenerator, IpcWriteOptions};
 use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::common::DFSchema;
 use datafusion::logical_expr::LogicalPlan;
@@ -503,12 +502,16 @@ impl KamuFlightSqlService {
     }
 
     fn schema_to_arrow(&self, arrow_schema: &Schema) -> Result<Vec<u8>, Status> {
-        let options = IpcWriteOptions::default();
-        let pair = SchemaAsIpc::new(arrow_schema, &options);
+        let mut dictionary_tracker = DictionaryTracker::new(false);
+        let write_options = IpcWriteOptions::default();
         let data_gen = IpcDataGenerator::default();
-        let encoded_data = data_gen.schema_to_bytes(pair.0, pair.1);
+        let encoded_data = data_gen.schema_to_bytes_with_dictionary_tracker(
+            arrow_schema,
+            &mut dictionary_tracker,
+            &write_options,
+        );
         let mut schema_bytes = vec![];
-        arrow::ipc::writer::write_message(&mut schema_bytes, encoded_data, pair.1)
+        arrow::ipc::writer::write_message(&mut schema_bytes, encoded_data, &write_options)
             .map_err(|e| Status::internal(format!("Error encoding schema: {e}")))?;
         Ok(schema_bytes)
     }
