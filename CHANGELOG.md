@@ -11,9 +11,10 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## [Unreleased]
+## [0.206.5] - 2024-10-29
 ### Changed
 - Allow anonymous access to the content of recently uploaded files
+- Updated to `arrow 53.2`, `datafusion 42.1`, `tower 0.6`, `opentelemetry 27` + minor updates
 
 ## [0.206.4] - 2024-10-28
 ### Fixed

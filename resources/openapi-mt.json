@@ -840,7 +840,7 @@
       "name": ""
     },
     "title": "kamu-cli",
-    "version": "0.206.4"
+    "version": "0.206.5"
   },
   "openapi": "3.1.0",
   "paths": {
