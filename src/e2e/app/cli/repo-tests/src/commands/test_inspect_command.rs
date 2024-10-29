@@ -100,23 +100,15 @@ pub async fn test_inspect_query(kamu: KamuCliPuppet) {
                 As Of: 2050-01-02T03:04:05Z
                 Inputs:
                   player_scores  {player_scores_dataset_id}
-                Engine: risingwave (None)
+                Engine: datafusion (None)
                 Query: leaderboard
-                  create materialized view leaderboard as
-                  select
-                    *
-                  from (
-                    select
-                      row_number() over (partition by 1 order by score desc) as place,
-                      match_time,
-                      match_id,
-                      player_id,
-                      score
-                    from player_scores
-                  )
-                  where place <= 2
-                Query: leaderboard
-                  select * from leaderboard
+                  SELECT ROW_NUMBER() OVER (PARTITION BY 1 ORDER BY score DESC) AS place,
+                         match_time,
+                         match_id,
+                         player_id,
+                         score
+                  FROM player_scores
+                  LIMIT 2
                 "#
             )
             .as_str(),

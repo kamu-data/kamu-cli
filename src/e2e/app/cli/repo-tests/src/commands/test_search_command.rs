@@ -11,6 +11,7 @@ use kamu_cli_e2e_common::{
     KamuApiServerClient,
     KamuApiServerClientExt,
     RequestBody,
+    DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR,
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
 };
 use kamu_cli_puppet::extensions::KamuCliPuppetExt;
@@ -88,47 +89,13 @@ pub async fn test_search_multi_user(kamu_node_api_client: KamuApiServerClient) {
     )
     .await;
 
-    // The same as DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT, but contains the word
-    // "player" in the name so that it can be found together with "player-scores"
-    let dataset_derivative_player_leaderboard_snapshot = indoc::indoc!(
-        r#"
-        kind: DatasetSnapshot
-        version: 1
-        content:
-          name: player-leaderboard
-          kind: Derivative
-          metadata:
-            - kind: SetTransform
-              inputs:
-                - datasetRef: player-scores
-                  alias: player_scores
-              transform:
-                kind: Sql
-                engine: risingwave
-                queries:
-                  - alias: leaderboard
-                    query: |
-                      create materialized view leaderboard as
-                      select
-                        *
-                      from (
-                        select
-                          row_number() over (partition by 1 order by score desc) as place,
-                          match_time,
-                          match_id,
-                          player_id,
-                          score
-                        from player_scores
-                      )
-                      where place <= 2
-                  - query: |
-                      select * from leaderboard
-            - kind: SetVocab
-              eventTimeColumn: match_time
-        "#
-    )
-    .escape_default()
-    .to_string();
+    // Updating the name for ease of search so that it can be found
+    // together with "player-scores".
+    let dataset_derivative_player_leaderboard_snapshot =
+        DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR
+            .escape_default()
+            .to_string()
+            .replace("leaderboard", "player-leaderboard");
 
     kamu_node_api_client
         .create_dataset(
