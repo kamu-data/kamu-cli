@@ -22,7 +22,7 @@ kamu_cli_execute_command_e2e_test!(
 kamu_cli_execute_command_e2e_test!(
     storage = sqlite,
     fixture = kamu_cli_e2e_repo_tests::test_verify_recursive,
-    extra_test_groups = "containerized, engine, ingest, datafusion, risingwave"
+    extra_test_groups = "containerized, engine, ingest, datafusion"
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

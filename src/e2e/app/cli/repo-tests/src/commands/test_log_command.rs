@@ -250,36 +250,23 @@ pub async fn test_log(kamu: KamuCliPuppet) {
             );
 
             let expected_transform = Transform::Sql(TransformSql {
-                engine: "risingwave".into(),
+                engine: "datafusion".into(),
                 version: None,
                 query: None,
-                queries: Some(vec![
-                    SqlQueryStep {
-                        alias: Some("leaderboard".into()),
-                        query: indoc::indoc!(
-                            r#"
-                            create materialized view leaderboard as
-                            select
-                              *
-                            from (
-                              select
-                                row_number() over (partition by 1 order by score desc) as place,
-                                match_time,
-                                match_id,
-                                player_id,
-                                score
-                              from player_scores
-                            )
-                            where place <= 2
-                            "#
-                        )
-                        .into(),
-                    },
-                    SqlQueryStep {
-                        alias: None,
-                        query: "select * from leaderboard".into(),
-                    },
-                ]),
+                queries: Some(vec![SqlQueryStep {
+                    alias: None,
+                    query: indoc::indoc!(
+                        r#"
+                        SELECT ROW_NUMBER() OVER (PARTITION BY 1 ORDER BY score DESC) AS place,
+                               match_time,
+                               match_id,
+                               player_id,
+                               score
+                        FROM player_scores
+                        LIMIT 2"#
+                    )
+                    .into(),
+                }]),
                 temporal_tables: None,
             });
 

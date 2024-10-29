@@ -717,7 +717,7 @@ pub async fn test_dataset_trigger_flow(kamu_api_server_client: KamuApiServerClie
                           ],
                           "transform": {
                             "__typename": "TransformSql",
-                            "engine": "risingwave"
+                            "engine": "datafusion"
                           }
                         }
                       },
