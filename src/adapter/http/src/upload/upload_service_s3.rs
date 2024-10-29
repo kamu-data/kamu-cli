@@ -58,7 +58,7 @@ impl UploadServiceS3 {
 impl UploadService for UploadServiceS3 {
     async fn make_upload_context(
         &self,
-        account_id: &AccountID,
+        owner_account_id: &AccountID,
         file_name: String,
         content_type: Option<MediaType>,
         content_length: usize,
@@ -68,7 +68,7 @@ impl UploadService for UploadServiceS3 {
         }
 
         let upload_id = Uuid::new_v4().simple().to_string();
-        let file_key = self.make_file_key(account_id, &upload_id, &file_name);
+        let file_key = self.make_file_key(owner_account_id, &upload_id, &file_name);
 
         let presigned_conf = PresigningConfig::builder()
             .expires_in(chrono::Duration::seconds(3600).to_std().unwrap())
@@ -84,11 +84,14 @@ impl UploadService for UploadServiceS3 {
             .key(file_key.clone())
             .presigned(presigned_conf)
             .await
-            .map_err(|e| MakeUploadContextError::Internal(e.int_err()))?;
+            .map_err(ErrorIntoInternal::int_err)?;
+
+        let owner_account_id_mb = owner_account_id.as_multibase().to_stack_string();
 
         let upload_token = UploadTokenBase64Json(UploadToken {
             upload_id,
             file_name,
+            owner_account_id: owner_account_id_mb.to_string(),
             content_length,
             content_type,
         });
@@ -108,11 +111,11 @@ impl UploadService for UploadServiceS3 {
 
     async fn upload_reference_size(
         &self,
-        account_id: &AccountID,
+        owner_account_id: &AccountID,
         upload_id: &str,
         file_name: &str,
     ) -> Result<usize, UploadTokenIntoStreamError> {
-        let file_key = self.make_file_key(account_id, upload_id, file_name);
+        let file_key = self.make_file_key(owner_account_id, upload_id, file_name);
 
         let res = self
             .s3_upload_context
@@ -129,19 +132,18 @@ impl UploadService for UploadServiceS3 {
 
         let content_length = res
             .content_length
-            .ok_or_else(|| "S3 did not return content length".int_err())
-            .map_err(UploadTokenIntoStreamError::Internal)?;
+            .ok_or_else(|| "S3 did not return content length".int_err())?;
 
         Ok(usize::try_from(content_length).unwrap())
     }
 
     async fn upload_reference_into_stream(
         &self,
-        account_id: &AccountID,
+        owner_account_id: &AccountID,
         upload_id: &str,
         file_name: &str,
     ) -> Result<Box<dyn AsyncRead + Send + Unpin>, UploadTokenIntoStreamError> {
-        let file_key = self.make_file_key(account_id, upload_id, file_name);
+        let file_key = self.make_file_key(owner_account_id, upload_id, file_name);
         let resp = self
             .s3_upload_context
             .get_object(file_key)
@@ -161,7 +163,6 @@ impl UploadService for UploadServiceS3 {
 
     async fn save_upload(
         &self,
-        _: &AccountID,
         _: &UploadToken,
         _: usize,
         _: Bytes,

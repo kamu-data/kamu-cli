@@ -79,11 +79,16 @@ pub async fn dataset_ingest_handler(
 
     let arguments = if let Some(upload_token) = params.upload_token {
         let account_id = ensure_authenticated_account(&catalog).api_err()?;
+        if account_id.as_multibase().to_stack_string().as_str()
+            != upload_token.0.owner_account_id.as_str()
+        {
+            return Err(ApiError::new_forbidden());
+        }
 
         let upload_svc = catalog.get_one::<dyn UploadService>().unwrap();
 
         let data_stream = upload_svc
-            .upload_token_into_stream(&account_id, &upload_token.0)
+            .upload_token_into_stream(&upload_token.0)
             .await
             .map_err(|e| match e {
                 UploadTokenIntoStreamError::ContentLengthMismatch(e) => ApiError::bad_request(e),

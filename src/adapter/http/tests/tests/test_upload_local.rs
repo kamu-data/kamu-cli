@@ -10,11 +10,17 @@
 use std::net::SocketAddr;
 use std::ops::Add;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use database_common::NoOpDatabasePlugin;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu::domain::{CacheDir, ServerUrlConfig};
-use kamu_accounts::{JwtAuthenticationConfig, PredefinedAccountsConfig, DEFAULT_ACCOUNT_ID};
+use kamu_accounts::{
+    AccountConfig,
+    JwtAuthenticationConfig,
+    PredefinedAccountsConfig,
+    DEFAULT_ACCOUNT_ID,
+};
 use kamu_accounts_inmem::{InMemoryAccessTokenRepository, InMemoryAccountRepository};
 use kamu_accounts_services::{
     AccessTokenServiceImpl,
@@ -30,6 +36,7 @@ use kamu_adapter_http::{
     UploadTokenBase64Json,
 };
 use kamu_core::MediaType;
+use opendatafabric::{AccountID, AccountName};
 use time_source::SystemTimeSourceDefault;
 
 use crate::harness::{await_client_server_flow, TestAPIServer};
@@ -39,8 +46,9 @@ use crate::harness::{await_client_server_flow, TestAPIServer};
 struct Harness {
     _tempdir: tempfile::TempDir,
     cache_dir: PathBuf,
-    access_token: String,
     api_server: TestAPIServer,
+    authentication_service: Arc<AuthenticationServiceImpl>,
+    another_account_id: AccountID,
 }
 
 impl Harness {
@@ -53,11 +61,20 @@ impl Harness {
         let tempdir = tempfile::tempdir().unwrap();
         let cache_dir = tempdir.path().join("cache");
 
+        const ANOTHER_ACCOUNT_NAME: &str = "another-account";
+
         let catalog = {
             let mut b = dill::CatalogBuilder::new();
 
+            let mut predefined_account_configs = PredefinedAccountsConfig::single_tenant();
+            predefined_account_configs
+                .predefined
+                .push(AccountConfig::from_name(AccountName::new_unchecked(
+                    ANOTHER_ACCOUNT_NAME,
+                )));
+
             b.add_value(CacheDir::new(cache_dir.clone()))
-                .add_value(PredefinedAccountsConfig::single_tenant())
+                .add_value(predefined_account_configs)
                 .add::<AuthenticationServiceImpl>()
                 .add::<InMemoryAccountRepository>()
                 .add::<AccessTokenServiceImpl>()
@@ -78,17 +95,15 @@ impl Harness {
         init_on_startup::run_startup_jobs(&catalog).await.unwrap();
 
         let authentication_service = catalog.get_one::<AuthenticationServiceImpl>().unwrap();
-        let access_token = authentication_service
-            .make_access_token(&DEFAULT_ACCOUNT_ID, 60)
-            .unwrap();
 
         let api_server = TestAPIServer::new(catalog, listener, true);
 
         Self {
             _tempdir: tempdir,
             cache_dir,
-            access_token,
             api_server,
+            authentication_service,
+            another_account_id: AccountID::new_seeded_ed25519(ANOTHER_ACCOUNT_NAME.as_bytes()),
         }
     }
 
@@ -96,10 +111,17 @@ impl Harness {
         self.api_server.local_addr().to_string()
     }
 
+    fn make_access_token(&self, account_id: &AccountID) -> String {
+        self.authentication_service
+            .make_access_token(account_id, 60)
+            .unwrap()
+    }
+
     fn mock_upload_token(&self) -> UploadTokenBase64Json {
         UploadTokenBase64Json(UploadToken {
             upload_id: "123".to_string(),
             file_name: "someFile.json".to_string(),
+            owner_account_id: DEFAULT_ACCOUNT_ID.as_multibase().to_string(),
             content_length: 123,
             content_type: Some(MediaType::JSON.to_owned()),
         })
@@ -194,7 +216,7 @@ async fn test_attempt_upload_file_authorized() {
 
     let harness = Harness::new().await;
     let upload_prepare_url = harness.upload_prepare_url("test.txt", "text/plain", FILE_BODY.len());
-    let access_token = harness.access_token.clone();
+    let access_token = harness.make_access_token(&DEFAULT_ACCOUNT_ID);
     let cache_dir = harness.cache_dir.clone();
 
     let client = async move {
@@ -248,6 +270,60 @@ async fn test_attempt_upload_file_authorized() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn test_attempt_upload_file_by_different_user() {
+    const FILE_BODY: &str = "a-test-file-body";
+
+    let harness = Harness::new().await;
+    let upload_prepare_url = harness.upload_prepare_url("test.txt", "text/plain", FILE_BODY.len());
+    let access_token = harness.make_access_token(&DEFAULT_ACCOUNT_ID);
+    let different_access_token = harness.make_access_token(&harness.another_account_id);
+
+    let client = async move {
+        let client = reqwest::Client::new();
+
+        let upload_prepare_response = client
+            .post(upload_prepare_url)
+            .bearer_auth(access_token)
+            .send()
+            .await
+            .unwrap();
+
+        assert_eq!(200, upload_prepare_response.status());
+        let upload_context = upload_prepare_response
+            .json::<UploadContext>()
+            .await
+            .unwrap();
+        assert_eq!("POST", upload_context.method);
+        assert!(upload_context.use_multipart);
+        assert!(upload_context.fields.is_empty());
+
+        let upload_main_url = upload_context.upload_url;
+
+        let upload_main_response = client
+            .post(upload_main_url.clone())
+            .bearer_auth(different_access_token)
+            .multipart(
+                reqwest::multipart::Form::new().part(
+                    "file",
+                    reqwest::multipart::Part::text(FILE_BODY)
+                        .file_name("test.txt")
+                        .mime_str("text/plain")
+                        .unwrap(),
+                ),
+            )
+            .send()
+            .await
+            .unwrap();
+
+        assert_eq!(403, upload_main_response.status());
+    };
+
+    await_client_server_flow!(harness.api_server_run(), client);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn test_attempt_upload_file_that_is_too_large() {
     const FILE_BODY: &str =
         "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum \
@@ -261,7 +337,7 @@ async fn test_attempt_upload_file_that_is_too_large() {
     let harness = Harness::new().await;
     let upload_prepare_url = harness.upload_prepare_url("test.txt", "text/plain", FILE_BODY.len());
     let upload_main_url = harness.upload_main_url();
-    let access_token = harness.access_token.clone();
+    let access_token = harness.make_access_token(&DEFAULT_ACCOUNT_ID);
     let upload_token = harness.mock_upload_token();
 
     let client = async move {
@@ -313,7 +389,7 @@ async fn test_attempt_upload_file_that_has_different_length_than_declared() {
 
     let harness = Harness::new().await;
     let upload_prepare_url = harness.upload_prepare_url("test.txt", "text/plain", FILE_BODY.len());
-    let access_token = harness.access_token.clone();
+    let access_token = harness.make_access_token(&DEFAULT_ACCOUNT_ID);
 
     let client = async move {
         let client = reqwest::Client::new();
@@ -366,7 +442,8 @@ async fn test_upload_then_read_file() {
 
     let harness = Harness::new().await;
     let upload_prepare_url = harness.upload_prepare_url("test.txt", "text/plain", FILE_BODY.len());
-    let access_token = harness.access_token.clone();
+    let access_token = harness.make_access_token(&DEFAULT_ACCOUNT_ID);
+    let different_access_token = harness.make_access_token(&harness.another_account_id);
 
     let client = async move {
         let client = reqwest::Client::new();
@@ -404,15 +481,31 @@ async fn test_upload_then_read_file() {
 
         assert_eq!(200, upload_main_response.status());
 
+        // Read file with the same authorization token
         let upload_retreive_response = client
-            .get(upload_main_url)
+            .get(upload_main_url.clone())
             .bearer_auth(access_token)
             .send()
             .await
             .unwrap();
-
         assert_eq!(200, upload_retreive_response.status());
+        let file_body = upload_retreive_response.text().await.unwrap();
+        assert_eq!(FILE_BODY, file_body);
 
+        // Read file with a different authorization token
+        let upload_retreive_response = client
+            .get(upload_main_url.clone())
+            .bearer_auth(different_access_token)
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(200, upload_retreive_response.status());
+        let file_body = upload_retreive_response.text().await.unwrap();
+        assert_eq!(FILE_BODY, file_body);
+
+        // Read file anonymously
+        let upload_retreive_response = client.get(upload_main_url).send().await.unwrap();
+        assert_eq!(200, upload_retreive_response.status());
         let file_body = upload_retreive_response.text().await.unwrap();
         assert_eq!(FILE_BODY, file_body);
     };

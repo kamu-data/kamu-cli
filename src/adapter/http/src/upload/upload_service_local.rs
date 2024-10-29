@@ -38,7 +38,7 @@ use crate::{
 pub struct UploadServiceLocal {
     server_url_config: Arc<ServerUrlConfig>,
     uploads_config: Arc<FileUploadLimitConfig>,
-    access_token: Arc<AccessToken>,
+    maybe_access_token: Option<Arc<AccessToken>>,
     cache_dir: Arc<CacheDir>,
 }
 
@@ -46,21 +46,19 @@ impl UploadServiceLocal {
     pub fn new(
         server_url_config: Arc<ServerUrlConfig>,
         uploads_config: Arc<FileUploadLimitConfig>,
-        access_token: Arc<AccessToken>,
+        maybe_access_token: Option<Arc<AccessToken>>,
         cache_dir: Arc<CacheDir>,
     ) -> Self {
         Self {
             server_url_config,
             uploads_config,
-            access_token,
+            maybe_access_token,
             cache_dir,
         }
     }
 
-    fn make_account_folder_path(&self, account_id: &AccountID) -> PathBuf {
-        self.cache_dir
-            .join("uploads")
-            .join(account_id.as_multibase().to_string())
+    fn make_account_folder_path(&self, account_id_str: &str) -> PathBuf {
+        self.cache_dir.join("uploads").join(account_id_str)
     }
 
     async fn file_to_stream(
@@ -75,26 +73,30 @@ impl UploadServiceLocal {
 impl UploadService for UploadServiceLocal {
     async fn make_upload_context(
         &self,
-        account_id: &AccountID,
+        owner_account_id: &AccountID,
         file_name: String,
         content_type: Option<MediaType>,
         content_length: usize,
     ) -> Result<UploadContext, MakeUploadContextError> {
+        assert!(self.maybe_access_token.is_some());
+
         if content_length > self.uploads_config.max_file_size_in_bytes() {
             return Err(MakeUploadContextError::TooLarge(ContentTooLargeError {}));
         }
 
         let upload_id = Uuid::new_v4().simple().to_string();
 
+        let owner_account_id_mb = owner_account_id.as_multibase().to_stack_string();
+
         let upload_folder_path = self
-            .make_account_folder_path(account_id)
+            .make_account_folder_path(owner_account_id_mb.as_str())
             .join(upload_id.clone());
-        std::fs::create_dir_all(upload_folder_path)
-            .map_err(|e| MakeUploadContextError::Internal(e.int_err()))?;
+        std::fs::create_dir_all(upload_folder_path).map_err(ErrorIntoInternal::int_err)?;
 
         let upload_token = UploadTokenBase64Json(UploadToken {
             upload_id,
             file_name,
+            owner_account_id: owner_account_id_mb.to_string(),
             content_length,
             content_type,
         });
@@ -111,7 +113,13 @@ impl UploadService for UploadServiceLocal {
             use_multipart: true,
             headers: vec![(
                 String::from("Authorization"),
-                format!("Bearer {}", self.access_token.token),
+                format!(
+                    "Bearer {}",
+                    self.maybe_access_token
+                        .as_ref()
+                        .expect("access token must be present")
+                        .token
+                ),
             )],
             fields: vec![],
         };
@@ -120,12 +128,12 @@ impl UploadService for UploadServiceLocal {
 
     async fn upload_reference_size(
         &self,
-        account_id: &AccountID,
+        owner_account_id: &AccountID,
         upload_id: &str,
         file_name: &str,
     ) -> Result<usize, UploadTokenIntoStreamError> {
         let upload_file_path = self
-            .make_account_folder_path(account_id)
+            .make_account_folder_path(owner_account_id.as_multibase().to_stack_string().as_str())
             .join(upload_id)
             .join(file_name);
 
@@ -139,12 +147,12 @@ impl UploadService for UploadServiceLocal {
 
     async fn upload_reference_into_stream(
         &self,
-        account_id: &AccountID,
+        owner_account_id: &AccountID,
         upload_id: &str,
         file_name: &str,
     ) -> Result<Box<dyn AsyncRead + Send + Unpin>, UploadTokenIntoStreamError> {
         let upload_file_path = self
-            .make_account_folder_path(account_id)
+            .make_account_folder_path(owner_account_id.as_multibase().to_stack_string().as_str())
             .join(upload_id)
             .join(file_name);
 
@@ -158,11 +166,12 @@ impl UploadService for UploadServiceLocal {
 
     async fn save_upload(
         &self,
-        account_id: &AccountID,
         upload_token: &UploadToken,
         content_length: usize,
         file_data: Bytes,
     ) -> Result<(), SaveUploadError> {
+        assert!(self.maybe_access_token.is_some());
+
         if content_length > self.uploads_config.max_file_size_in_bytes() {
             return Err(SaveUploadError::TooLarge(ContentTooLargeError {}));
         }
@@ -177,7 +186,7 @@ impl UploadService for UploadServiceLocal {
         }
 
         let upload_folder_path = self
-            .make_account_folder_path(account_id)
+            .make_account_folder_path(&upload_token.owner_account_id)
             .join(upload_token.upload_id.clone());
         if !upload_folder_path.is_dir() {
             return Err(SaveUploadError::Internal(
