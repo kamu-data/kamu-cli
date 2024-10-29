@@ -80,7 +80,7 @@ pub async fn test_search_multi_user(kamu_node_api_client: KamuApiServerClient) {
             ┌──────────────────────────────────┬──────┬─────────────┬────────┬─────────┬──────────┐
             │              Alias               │ Kind │ Description │ Blocks │ Records │   Size   │
             ├──────────────────────────────────┼──────┼─────────────┼────────┼─────────┼──────────┤
-            │ kamu-node/e2e-user/player-scores │ Root │ -           │      5 │       2 │ 1.63 KiB │
+            │ kamu-node/e2e-user/player-scores │ Root │ -           │      5 │       2 │ 1.65 KiB │
             └──────────────────────────────────┴──────┴─────────────┴────────┴─────────┴──────────┘
             "#
         )),
@@ -145,7 +145,7 @@ pub async fn test_search_multi_user(kamu_node_api_client: KamuApiServerClient) {
             │                 Alias                 │    Kind    │ Description │ Blocks │ Records │   Size   │
             ├───────────────────────────────────────┼────────────┼─────────────┼────────┼─────────┼──────────┤
             │ kamu-node/e2e-user/player-leaderboard │ Derivative │ -           │      3 │       - │        - │
-            │ kamu-node/e2e-user/player-scores      │    Root    │ -           │      5 │       2 │ 1.63 KiB │
+            │ kamu-node/e2e-user/player-scores      │    Root    │ -           │      5 │       2 │ 1.65 KiB │
             └───────────────────────────────────────┴────────────┴─────────────┴────────┴─────────┴──────────┘
             "#
         )),
@@ -167,7 +167,7 @@ pub async fn test_search_multi_user(kamu_node_api_client: KamuApiServerClient) {
             │                 Alias                 │    Kind    │ Description │ Blocks │ Records │   Size   │
             ├───────────────────────────────────────┼────────────┼─────────────┼────────┼─────────┼──────────┤
             │ kamu-node/e2e-user/player-leaderboard │ Derivative │ -           │      3 │       - │        - │
-            │ kamu-node/e2e-user/player-scores      │    Root    │ -           │      5 │       2 │ 1.63 KiB │
+            │ kamu-node/e2e-user/player-scores      │    Root    │ -           │      5 │       2 │ 1.65 KiB │
             │ kamu-node/kamu/player-scores          │    Root    │ -           │      3 │       - │        - │
             └───────────────────────────────────────┴────────────┴─────────────┴────────┴─────────┴──────────┘
             "#
