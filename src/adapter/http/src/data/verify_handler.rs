@@ -40,7 +40,7 @@ pub struct VerifyRequest {
     /// original operation
     pub sub_queries: Vec<query::SubQuery>,
 
-    /// Commitment createad by the original operation
+    /// Commitment created by the original operation
     pub commitment: query::Commitment,
 
     /// Signature block
@@ -55,7 +55,7 @@ pub struct VerifyResponse {
     /// Whether validation was successful
     pub ok: bool,
 
-    /// Will contain error details if validation was unsuccessufl
+    /// Will contain error details if validation was unsuccessful
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<ValidationError>,
 }
@@ -319,8 +319,8 @@ impl DatasetBlockNotFound {
             message: "Unable to reproduce the query as one of the input datasets does not contain \
                       a block with specified hash. Under normal circumstances a block can \
                       disappear only when the owner of dataset performs history-altering \
-                      operation such as reset or hard compation. There is also a probability that \
-                      block hash was spoofed in the original request to falsify the results."
+                      operation such as reset or hard compaction. There is also a probability \
+                      that block hash was spoofed in the original request to falsify the results."
                 .to_string(),
             dataset_id,
             block_hash,
@@ -388,3 +388,5 @@ impl axum::response::IntoResponse for VerifyResponse {
         }
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
