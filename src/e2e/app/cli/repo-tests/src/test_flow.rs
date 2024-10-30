@@ -949,6 +949,72 @@ pub async fn test_trigger_flow_ingest(kamu_api_server_client: KamuApiServerClien
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_trigger_flow_ingest_no_polling_source(
+    kamu_api_server_client: KamuApiServerClient,
+) {
+    let root_dataset_snapshot = indoc::indoc!(
+        r#"
+        kind: DatasetSnapshot
+        version: 1
+        content:
+          name: root-dataset
+          kind: Root
+          metadata: []
+        "#
+    )
+    .escape_default()
+    .to_string();
+    let token = kamu_api_server_client.login_as_kamu().await;
+
+    let root_dataset_id = kamu_api_server_client
+        .create_dataset(&root_dataset_snapshot, &token)
+        .await;
+
+    kamu_api_server_client
+        .graphql_api_call_assert_with_token(
+            token.clone(),
+            indoc::indoc!(
+                r#"
+                mutation datasetTriggerFlow() {
+                  datasets {
+                    byId(datasetId: "<dataset_id>") {
+                      flows {
+                        runs {
+                          triggerFlow(datasetFlowType: INGEST) {
+                            message
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+                "#
+            )
+            .replace("<dataset_id>", root_dataset_id.as_str())
+            .as_str(),
+            Ok(indoc::indoc!(
+                r#"
+                {
+                  "datasets": {
+                    "byId": {
+                      "flows": {
+                        "runs": {
+                          "triggerFlow": {
+                            "message": "Flow didn't met preconditions: 'No SetPollingSource event defined'"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+                "#
+            )),
+        )
+        .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Helpers
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
