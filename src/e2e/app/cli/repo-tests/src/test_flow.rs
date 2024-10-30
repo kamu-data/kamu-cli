@@ -1094,6 +1094,72 @@ pub async fn test_trigger_flow_execute_transform(kamu_api_server_client: KamuApi
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_trigger_flow_execute_transform_no_set_transform(
+    kamu_api_server_client: KamuApiServerClient,
+) {
+    let derivative_dataset_snapshot = indoc::indoc!(
+        r#"
+        kind: DatasetSnapshot
+        version: 1
+        content:
+          name: derivative-dataset
+          kind: Derivative
+          metadata: []
+        "#
+    )
+    .escape_default()
+    .to_string();
+    let token = kamu_api_server_client.login_as_kamu().await;
+
+    let derivative_dataset_id = kamu_api_server_client
+        .create_dataset(&derivative_dataset_snapshot, &token)
+        .await;
+
+    kamu_api_server_client
+        .graphql_api_call_assert_with_token(
+            token.clone(),
+            indoc::indoc!(
+                r#"
+                mutation datasetTriggerFlow() {
+                  datasets {
+                    byId(datasetId: "<dataset_id>") {
+                      flows {
+                        runs {
+                          triggerFlow(datasetFlowType: EXECUTE_TRANSFORM) {
+                            message
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+                "#
+            )
+            .replace("<dataset_id>", derivative_dataset_id.as_str())
+            .as_str(),
+            Ok(indoc::indoc!(
+                r#"
+                {
+                  "datasets": {
+                    "byId": {
+                      "flows": {
+                        "runs": {
+                          "triggerFlow": {
+                            "message": "Flow didn't met preconditions: 'No SetTransform event defined'"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+                "#
+            )),
+        )
+        .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Helpers
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
