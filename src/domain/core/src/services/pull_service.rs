@@ -182,7 +182,7 @@ pub enum PullResult {
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum PullResultUpToDate {
-    PollingIngest(PollingInsgestResultUpToDate),
+    PollingIngest(PollingIngestResultUpToDate),
     PushIngest(PushInsgestResultUpToDate),
     Transform,
     Sync,
@@ -190,7 +190,7 @@ pub enum PullResultUpToDate {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-pub struct PollingInsgestResultUpToDate {
+pub struct PollingIngestResultUpToDate {
     pub uncacheable: bool,
 }
 
@@ -203,7 +203,7 @@ impl From<PollingIngestResult> for PullResult {
     fn from(other: PollingIngestResult) -> Self {
         match other {
             PollingIngestResult::UpToDate { uncacheable, .. } => PullResult::UpToDate(
-                PullResultUpToDate::PollingIngest(PollingInsgestResultUpToDate { uncacheable }),
+                PullResultUpToDate::PollingIngest(PollingIngestResultUpToDate { uncacheable }),
             ),
             PollingIngestResult::Updated {
                 old_head, new_head, ..
