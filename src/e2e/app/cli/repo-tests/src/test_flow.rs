@@ -1015,6 +1015,85 @@ pub async fn test_trigger_flow_ingest_no_polling_source(
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_trigger_flow_execute_transform(kamu_api_server_client: KamuApiServerClient) {
+    let token = kamu_api_server_client.login_as_kamu().await;
+
+    kamu_api_server_client
+        .create_player_scores_dataset_with_data(&token, None)
+        .await;
+    let derivative_dataset_id = kamu_api_server_client.create_leaderboard(&token).await;
+
+    pretty_assertions::assert_eq!(
+        "",
+        kamu_api_server_client
+            .tail_data(&derivative_dataset_id, &token)
+            .await
+    );
+
+    kamu_api_server_client
+        .graphql_api_call_assert_with_token(
+            token.clone(),
+            indoc::indoc!(
+                r#"
+                mutation datasetTriggerFlow() {
+                  datasets {
+                    byId(datasetId: "<dataset_id>") {
+                      flows {
+                        runs {
+                          triggerFlow(datasetFlowType: EXECUTE_TRANSFORM) {
+                            message
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+                "#
+            )
+            .replace("<dataset_id>", derivative_dataset_id.as_str())
+            .as_str(),
+            Ok(indoc::indoc!(
+                r#"
+                {
+                  "datasets": {
+                    "byId": {
+                      "flows": {
+                        "runs": {
+                          "triggerFlow": {
+                            "message": "Success"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+                "#
+            )),
+        )
+        .await;
+
+    wait_for_flows_to_finish(
+        &kamu_api_server_client,
+        derivative_dataset_id.as_str(),
+        token.clone(),
+    )
+    .await;
+
+    pretty_assertions::assert_eq!(
+        indoc::indoc!(
+            r#"
+            offset,op,system_time,match_time,place,match_id,player_id,score
+            0,0,2050-01-02T03:04:05Z,2000-01-01T00:00:00Z,1,1,Alice,100
+            1,0,2050-01-02T03:04:05Z,2000-01-01T00:00:00Z,2,1,Bob,80"#
+        ),
+        kamu_api_server_client
+            .tail_data(&derivative_dataset_id, &token)
+            .await
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Helpers
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
