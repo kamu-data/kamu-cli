@@ -149,6 +149,8 @@ pub trait KamuApiServerClientExt {
         data: RequestBody,
         token: &AccessToken,
     );
+
+    async fn tail_data(&self, dataset_id: &DatasetId, token: &AccessToken) -> String;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -280,6 +282,44 @@ impl KamuApiServerClientExt for KamuApiServerClient {
             None,
         )
         .await;
+    }
+
+    async fn tail_data(&self, dataset_id: &DatasetId, token: &AccessToken) -> String {
+        let tail_response = self
+            .graphql_api_call(
+                indoc::indoc!(
+                    r#"
+                    query {
+                      datasets {
+                        byId(
+                          datasetId: "<dataset_id>"
+                        ) {
+                          data {
+                            tail(dataFormat: "CSV") {
+                              ... on DataQueryResultSuccess {
+                                data {
+                                  content
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                    "#,
+                )
+                .replace("<dataset_id>", dataset_id.as_str())
+                .as_str(),
+                Some(token.clone()),
+            )
+            .await;
+
+        let content = tail_response["datasets"]["byId"]["data"]["tail"]["data"]["content"]
+            .as_str()
+            .map(ToOwned::to_owned)
+            .unwrap();
+
+        content
     }
 }
 
