@@ -7,12 +7,16 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use chrono::{DateTime, Utc};
 use internal_error::{InternalError, ResultIntoInternal};
 use opendatafabric::DatasetAlias;
 use reqwest::{Method, Response, StatusCode, Url};
 use serde::Deserialize;
+use serde_json::json;
 use tokio_retry::strategy::FixedInterval;
 use tokio_retry::Retry;
+
+use crate::AccessToken;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -76,6 +80,29 @@ impl KamuApiServerClient {
         Ok(())
     }
 
+    pub async fn set_system_time(&self, t: DateTime<Utc>) {
+        let endpoint = self.server_base_url.join("e2e/system_time").unwrap();
+        // To avoid making a dependency, we just use a json!() macro
+        let request = json!({
+            "newSystemTime": t
+        });
+
+        let response = self
+            .http_client
+            .post(endpoint)
+            .json(&request)
+            .send()
+            .await
+            .unwrap();
+
+        let status = response.status();
+        if status != StatusCode::OK {
+            let response_data = response.text().await.unwrap();
+
+            panic!("Unexpected set system time response status: {status}, {response_data}");
+        }
+    }
+
     pub fn get_base_url(&self) -> &Url {
         &self.server_base_url
     }
@@ -98,7 +125,7 @@ impl KamuApiServerClient {
 
     pub async fn rest_api_call(
         &self,
-        token: Option<String>,
+        maybe_token: Option<AccessToken>,
         method: Method,
         endpoint: &str,
         request_body: Option<RequestBody>,
@@ -113,7 +140,7 @@ impl KamuApiServerClient {
             }
         };
 
-        if let Some(token) = token {
+        if let Some(token) = maybe_token {
             request_builder = request_builder.bearer_auth(token);
         }
 
@@ -156,7 +183,7 @@ impl KamuApiServerClient {
     pub async fn graphql_api_call(
         &self,
         query: &str,
-        maybe_token: Option<String>,
+        maybe_token: Option<AccessToken>,
     ) -> serde_json::Value {
         let response = self.graphql_api_call_impl(query, maybe_token).await;
         let response_body = response.json::<GraphQLResponseBody>().await.unwrap();
@@ -178,7 +205,7 @@ impl KamuApiServerClient {
 
     pub async fn graphql_api_call_assert_with_token(
         &self,
-        token: String,
+        token: AccessToken,
         query: &str,
         expected_response: Result<&str, &str>,
     ) {
@@ -209,7 +236,11 @@ impl KamuApiServerClient {
         };
     }
 
-    async fn graphql_api_call_impl(&self, query: &str, maybe_token: Option<String>) -> Response {
+    async fn graphql_api_call_impl(
+        &self,
+        query: &str,
+        maybe_token: Option<AccessToken>,
+    ) -> Response {
         let endpoint = self.server_base_url.join("graphql").unwrap();
         let request_data = serde_json::json!({
            "query": query
@@ -228,7 +259,7 @@ impl KamuApiServerClient {
         &self,
         query: &str,
         expected_response: Result<&str, &str>,
-        maybe_token: Option<String>,
+        maybe_token: Option<AccessToken>,
     ) {
         let response = self.graphql_api_call_impl(query, maybe_token).await;
 
