@@ -47,7 +47,7 @@ kamu_cli_run_api_server_e2e_test!(
     storage = mysql,
     fixture = kamu_cli_e2e_repo_tests::test_trigger_flow_ingest,
     options = Options::default().with_frozen_system_time(),
-    extra_test_groups = "containerized, engine, transform, datafusion"
+    extra_test_groups = "containerized, engine, datafusion"
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -78,6 +78,15 @@ kamu_cli_run_api_server_e2e_test!(
 kamu_cli_run_api_server_e2e_test!(
     storage = mysql,
     fixture = kamu_cli_e2e_repo_tests::test_trigger_flow_hard_compaction,
+    options = Options::default().with_frozen_system_time(),
+    extra_test_groups = "containerized, engine, datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_run_api_server_e2e_test!(
+    storage = mysql,
+    fixture = kamu_cli_e2e_repo_tests::test_trigger_flow_reset,
     options = Options::default().with_frozen_system_time(),
     extra_test_groups = "containerized, engine, datafusion"
 );

@@ -526,17 +526,17 @@ pub async fn test_web_ui_dataset_trigger_flow(kamu_api_server_client: KamuApiSer
                 }
                 "#
             )
-            .replace(
-                "$accountId",
-                "\"did:odf:fed016b61ed2ab1b63a006b61ed2ab1b63a00b016d65607000000e0821aafbf163e6f\"",
-            )
-            .replace("$datasetFlowType", "\"EXECUTE_TRANSFORM\"")
-            .replace(
-                "$datasetId",
-                format!("\"{derivative_dataset_id}\"").as_str(),
-            )
-            .replace("$flowRunConfiguration", "null")
-            .as_str(),
+                .replace(
+                    "$accountId",
+                    "\"did:odf:fed016b61ed2ab1b63a006b61ed2ab1b63a00b016d65607000000e0821aafbf163e6f\"",
+                )
+                .replace("$datasetFlowType", "\"EXECUTE_TRANSFORM\"")
+                .replace(
+                    "$datasetId",
+                    format!("\"{derivative_dataset_id}\"").as_str(),
+                )
+                .replace("$flowRunConfiguration", "null")
+                .as_str(),
             Ok(indoc::indoc!(
                 r#"
                 {
@@ -1000,8 +1000,8 @@ pub async fn test_trigger_flow_ingest_no_polling_source(
                 }
                 "#
             )
-            .replace("<dataset_id>", root_dataset_id.as_str())
-            .as_str(),
+                .replace("<dataset_id>", root_dataset_id.as_str())
+                .as_str(),
             Ok(indoc::indoc!(
                 r#"
                 {
@@ -1024,8 +1024,6 @@ pub async fn test_trigger_flow_ingest_no_polling_source(
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-// todo add different dataset type
 
 pub async fn test_trigger_flow_execute_transform(kamu_api_server_client: KamuApiServerClient) {
     let token = kamu_api_server_client.login_as_kamu().await;
@@ -1147,8 +1145,8 @@ pub async fn test_trigger_flow_execute_transform_no_set_transform(
                 }
                 "#
             )
-            .replace("<dataset_id>", derivative_dataset_id.as_str())
-            .as_str(),
+                .replace("<dataset_id>", derivative_dataset_id.as_str())
+                .as_str(),
             Ok(indoc::indoc!(
                 r#"
                 {
@@ -1169,6 +1167,7 @@ pub async fn test_trigger_flow_execute_transform_no_set_transform(
         )
         .await;
 }
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_trigger_flow_hard_compaction(kamu_api_server_client: KamuApiServerClient) {
@@ -1372,6 +1371,8 @@ pub async fn test_trigger_flow_hard_compaction(kamu_api_server_client: KamuApiSe
             .await
     );
 
+    // Checking that there is now only one block of data
+
     kamu_api_server_client
         .graphql_api_call_assert_with_token(
             token.clone(),
@@ -1437,6 +1438,191 @@ pub async fn test_trigger_flow_hard_compaction(kamu_api_server_client: KamuApiSe
                                   }
                                 }
                               },
+                              {
+                                "node": {
+                                  "event": {
+                                    "__typename": "Seed"
+                                  }
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+                "#
+            )),
+        )
+        .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_trigger_flow_reset(kamu_api_server_client: KamuApiServerClient) {
+    let token = kamu_api_server_client.login_as_kamu().await;
+
+    let root_dataset_id = kamu_api_server_client
+        .create_player_scores_dataset(&token)
+        .await;
+
+    kamu_api_server_client
+        .graphql_api_call_assert_with_token(
+            token.clone(),
+            indoc::indoc!(
+                r#"
+                query {
+                  datasets {
+                    byId(datasetId: "<dataset_id>") {
+                      metadata {
+                        chain {
+                          blocks {
+                            edges {
+                              node {
+                                event {
+                                  __typename
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+                "#
+            )
+            .replace("<dataset_id>", root_dataset_id.as_str())
+            .as_str(),
+            Ok(indoc::indoc!(
+                r#"
+                {
+                  "datasets": {
+                    "byId": {
+                      "metadata": {
+                        "chain": {
+                          "blocks": {
+                            "edges": [
+                              {
+                                "node": {
+                                  "event": {
+                                    "__typename": "SetVocab"
+                                  }
+                                }
+                              },
+                              {
+                                "node": {
+                                  "event": {
+                                    "__typename": "AddPushSource"
+                                  }
+                                }
+                              },
+                              {
+                                "node": {
+                                  "event": {
+                                    "__typename": "Seed"
+                                  }
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+                "#
+            )),
+        )
+        .await;
+
+    kamu_api_server_client
+        .graphql_api_call_assert_with_token(
+            token.clone(),
+            indoc::indoc!(
+                r#"
+                mutation {
+                  datasets {
+                    byId(datasetId: "<dataset_id>") {
+                      flows {
+                        runs {
+                          triggerFlow(datasetFlowType: RESET) {
+                            message
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+                "#
+            )
+            .replace("<dataset_id>", root_dataset_id.as_str())
+            .as_str(),
+            Ok(indoc::indoc!(
+                r#"
+                {
+                  "datasets": {
+                    "byId": {
+                      "flows": {
+                        "runs": {
+                          "triggerFlow": {
+                            "message": "Success"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+                "#
+            )),
+        )
+        .await;
+
+    wait_for_flows_to_finish(
+        &kamu_api_server_client,
+        root_dataset_id.as_str(),
+        token.clone(),
+    )
+    .await;
+
+    kamu_api_server_client
+        .graphql_api_call_assert_with_token(
+            token.clone(),
+            indoc::indoc!(
+                r#"
+                query {
+                  datasets {
+                    byId(datasetId: "<dataset_id>") {
+                      metadata {
+                        chain {
+                          blocks {
+                            edges {
+                              node {
+                                event {
+                                  __typename
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+                "#
+            )
+            .replace("<dataset_id>", root_dataset_id.as_str())
+            .as_str(),
+            Ok(indoc::indoc!(
+                r#"
+                {
+                  "datasets": {
+                    "byId": {
+                      "metadata": {
+                        "chain": {
+                          "blocks": {
+                            "edges": [
                               {
                                 "node": {
                                   "event": {
