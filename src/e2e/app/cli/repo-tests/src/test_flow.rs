@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use chrono::{TimeZone, Utc};
 use kamu_cli_e2e_common::{AccessToken, KamuApiServerClient, KamuApiServerClientExt};
 use tokio_retry::strategy::FixedInterval;
 use tokio_retry::Retry;
@@ -737,6 +738,217 @@ pub async fn test_web_ui_dataset_trigger_flow(kamu_api_server_client: KamuApiSer
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_trigger_flow_ingest(kamu_api_server_client: KamuApiServerClient) {
+    let temp_dir = tempfile::tempdir().unwrap();
+
+    let root_dataset_snapshot = indoc::formatdoc!(
+        r#"
+        kind: DatasetSnapshot
+        version: 1
+        content:
+          name: root-dataset
+          kind: Root
+          metadata:
+            - kind: SetPollingSource
+              fetch:
+                kind: FilesGlob
+                path: {}
+              read:
+                kind: Csv
+                header: true
+                schema:
+                  - event_time TIMESTAMP
+                  - city STRING
+                  - population BIGINT
+              merge:
+                kind: Ledger
+                primaryKey:
+                  - event_time
+                  - city
+        "#,
+        temp_dir.path().join("chunk-*.csv").display()
+    )
+    .escape_default()
+    .to_string();
+    let token = kamu_api_server_client.login_as_kamu().await;
+
+    let root_dataset_id = kamu_api_server_client
+        .create_dataset(&root_dataset_snapshot, &token)
+        .await;
+
+    // No data before update
+
+    pretty_assertions::assert_eq!(
+        "",
+        kamu_api_server_client
+            .tail_data(&root_dataset_id, &token)
+            .await
+    );
+
+    // Update iteration 1
+
+    std::fs::write(
+        temp_dir.path().join("chunk-1.csv"),
+        indoc::indoc!(
+            r#"
+            event_time,city,population
+            2020-01-01,A,1000
+            2020-01-01,B,2000
+            2020-01-01,C,3000
+            "#
+        ),
+    )
+    .unwrap();
+
+    kamu_api_server_client
+        .graphql_api_call_assert_with_token(
+            token.clone(),
+            indoc::indoc!(
+                r#"
+                mutation datasetTriggerFlow() {
+                  datasets {
+                    byId(datasetId: "<dataset_id>") {
+                      flows {
+                        runs {
+                          triggerFlow(datasetFlowType: INGEST) {
+                            message
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+                "#
+            )
+            .replace("<dataset_id>", root_dataset_id.as_str())
+            .as_str(),
+            Ok(indoc::indoc!(
+                r#"
+                {
+                  "datasets": {
+                    "byId": {
+                      "flows": {
+                        "runs": {
+                          "triggerFlow": {
+                            "message": "Success"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+                "#
+            )),
+        )
+        .await;
+
+    wait_for_flows_to_finish(
+        &kamu_api_server_client,
+        root_dataset_id.as_str(),
+        token.clone(),
+    )
+    .await;
+
+    pretty_assertions::assert_eq!(
+        indoc::indoc!(
+            r#"
+            offset,op,system_time,event_time,city,population
+            0,0,2050-01-02T03:04:05Z,2020-01-01T00:00:00Z,A,1000
+            1,0,2050-01-02T03:04:05Z,2020-01-01T00:00:00Z,B,2000
+            2,0,2050-01-02T03:04:05Z,2020-01-01T00:00:00Z,C,3000"#
+        ),
+        kamu_api_server_client
+            .tail_data(&root_dataset_id, &token)
+            .await
+    );
+
+    // Update iteration 2
+
+    let t = Utc.with_ymd_and_hms(2051, 1, 2, 3, 4, 5).unwrap();
+
+    kamu_api_server_client.set_system_time(t).await;
+
+    std::fs::write(
+        temp_dir.path().join("chunk-2.csv"),
+        indoc::indoc!(
+            r#"
+            event_time,city,population
+            2020-01-02,A,1500
+            2020-01-02,B,2500
+            2020-01-02,C,3500
+            "#
+        ),
+    )
+    .unwrap();
+
+    kamu_api_server_client
+        .graphql_api_call_assert_with_token(
+            token.clone(),
+            indoc::indoc!(
+                r#"
+                mutation datasetTriggerFlow() {
+                  datasets {
+                    byId(datasetId: "<dataset_id>") {
+                      flows {
+                        runs {
+                          triggerFlow(datasetFlowType: INGEST) {
+                            message
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+                "#
+            )
+            .replace("<dataset_id>", root_dataset_id.as_str())
+            .as_str(),
+            Ok(indoc::indoc!(
+                r#"
+                {
+                  "datasets": {
+                    "byId": {
+                      "flows": {
+                        "runs": {
+                          "triggerFlow": {
+                            "message": "Success"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+                "#
+            )),
+        )
+        .await;
+
+    wait_for_flows_to_finish(
+        &kamu_api_server_client,
+        root_dataset_id.as_str(),
+        token.clone(),
+    )
+    .await;
+
+    pretty_assertions::assert_eq!(
+        indoc::indoc!(
+            r#"
+            offset,op,system_time,event_time,city,population
+            0,0,2050-01-02T03:04:05Z,2020-01-01T00:00:00Z,A,1000
+            1,0,2050-01-02T03:04:05Z,2020-01-01T00:00:00Z,B,2000
+            2,0,2050-01-02T03:04:05Z,2020-01-01T00:00:00Z,C,3000
+            3,0,2051-01-02T03:04:05Z,2020-01-02T00:00:00Z,B,2500
+            4,0,2051-01-02T03:04:05Z,2020-01-02T00:00:00Z,C,3500
+            5,0,2051-01-02T03:04:05Z,2020-01-02T00:00:00Z,A,1500"#
+        ),
+        kamu_api_server_client
+            .tail_data(&root_dataset_id, &token)
+            .await
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Helpers
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -1176,15 +1388,12 @@ async fn wait_for_flows_to_finish(
             .graphql_api_call(
                 indoc::indoc!(
                     r#"
-                    query getDatasetListFlows() {
+                    query {
                       datasets {
                         byId(datasetId: "<DATASET_ID>") {
                           flows {
                             runs {
-                              table: listFlows(
-                                page: 0
-                                perPage: 10
-                              ) {
+                              listFlows {
                                 edges {
                                   node {
                                     status
@@ -1204,7 +1413,7 @@ async fn wait_for_flows_to_finish(
             )
             .await;
 
-        let edges = response["datasets"]["byId"]["flows"]["runs"]["table"]["edges"]
+        let edges = response["datasets"]["byId"]["flows"]["runs"]["listFlows"]["edges"]
             .as_array()
             .unwrap();
         let all_finished = edges.iter().all(|edge| {
