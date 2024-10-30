@@ -8,7 +8,16 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{TimeZone, Utc};
-use kamu_cli_e2e_common::{AccessToken, KamuApiServerClient, KamuApiServerClientExt};
+use kamu_cli_e2e_common::{
+    AccessToken,
+    KamuApiServerClient,
+    KamuApiServerClientExt,
+    RequestBody,
+    DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
+    DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_2,
+    DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_3,
+};
+use opendatafabric::{DatasetAlias, DatasetName};
 use tokio_retry::strategy::FixedInterval;
 use tokio_retry::Retry;
 
@@ -806,7 +815,7 @@ pub async fn test_trigger_flow_ingest(kamu_api_server_client: KamuApiServerClien
             token.clone(),
             indoc::indoc!(
                 r#"
-                mutation datasetTriggerFlow() {
+                mutation {
                   datasets {
                     byId(datasetId: "<dataset_id>") {
                       flows {
@@ -887,7 +896,7 @@ pub async fn test_trigger_flow_ingest(kamu_api_server_client: KamuApiServerClien
             token.clone(),
             indoc::indoc!(
                 r#"
-                mutation datasetTriggerFlow() {
+                mutation {
                   datasets {
                     byId(datasetId: "<dataset_id>") {
                       flows {
@@ -976,7 +985,7 @@ pub async fn test_trigger_flow_ingest_no_polling_source(
             token.clone(),
             indoc::indoc!(
                 r#"
-                mutation datasetTriggerFlow() {
+                mutation {
                   datasets {
                     byId(datasetId: "<dataset_id>") {
                       flows {
@@ -1016,6 +1025,8 @@ pub async fn test_trigger_flow_ingest_no_polling_source(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// todo add different dataset type
+
 pub async fn test_trigger_flow_execute_transform(kamu_api_server_client: KamuApiServerClient) {
     let token = kamu_api_server_client.login_as_kamu().await;
 
@@ -1036,7 +1047,7 @@ pub async fn test_trigger_flow_execute_transform(kamu_api_server_client: KamuApi
             token.clone(),
             indoc::indoc!(
                 r#"
-                mutation datasetTriggerFlow() {
+                mutation {
                   datasets {
                     byId(datasetId: "<dataset_id>") {
                       flows {
@@ -1121,7 +1132,7 @@ pub async fn test_trigger_flow_execute_transform_no_set_transform(
             token.clone(),
             indoc::indoc!(
                 r#"
-                mutation datasetTriggerFlow() {
+                mutation {
                   datasets {
                     byId(datasetId: "<dataset_id>") {
                       flows {
@@ -1147,6 +1158,293 @@ pub async fn test_trigger_flow_execute_transform_no_set_transform(
                         "runs": {
                           "triggerFlow": {
                             "message": "Flow didn't met preconditions: 'No SetTransform event defined'"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+                "#
+            )),
+        )
+        .await;
+}
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_trigger_flow_hard_compaction(kamu_api_server_client: KamuApiServerClient) {
+    let token = kamu_api_server_client.login_as_kamu().await;
+
+    let root_dataset_id = kamu_api_server_client
+        .create_player_scores_dataset(&token)
+        .await;
+    let dataset_alias = DatasetAlias::new(None, DatasetName::new_unchecked("player-scores"));
+
+    // Ingesting data in multiple chunks
+
+    for chunk in [
+        DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
+        DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_2,
+        DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_3,
+    ] {
+        kamu_api_server_client
+            .ingest_data(&dataset_alias, RequestBody::NdJson(chunk.into()), &token)
+            .await;
+    }
+
+    pretty_assertions::assert_eq!(
+        indoc::indoc!(
+            r#"
+            offset,op,system_time,match_time,match_id,player_id,score
+            0,0,2050-01-02T03:04:05Z,2000-01-01T00:00:00Z,1,Alice,100
+            1,0,2050-01-02T03:04:05Z,2000-01-01T00:00:00Z,1,Bob,80
+            2,0,2050-01-02T03:04:05Z,2000-01-02T00:00:00Z,2,Charlie,90
+            3,0,2050-01-02T03:04:05Z,2000-01-02T00:00:00Z,2,Alice,70
+            4,0,2050-01-02T03:04:05Z,2000-01-03T00:00:00Z,3,Bob,60
+            5,0,2050-01-02T03:04:05Z,2000-01-03T00:00:00Z,3,Charlie,110"#
+        ),
+        kamu_api_server_client
+            .tail_data(&root_dataset_id, &token)
+            .await
+    );
+
+    // Verify that there are multiple date blocks (3 AddData)
+
+    kamu_api_server_client
+        .graphql_api_call_assert_with_token(
+            token.clone(),
+            indoc::indoc!(
+                r#"
+                query {
+                  datasets {
+                    byId(datasetId: "<dataset_id>") {
+                      metadata {
+                        chain {
+                          blocks {
+                            edges {
+                              node {
+                                event {
+                                  __typename
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+                "#
+            )
+            .replace("<dataset_id>", root_dataset_id.as_str())
+            .as_str(),
+            Ok(indoc::indoc!(
+                r#"
+                {
+                  "datasets": {
+                    "byId": {
+                      "metadata": {
+                        "chain": {
+                          "blocks": {
+                            "edges": [
+                              {
+                                "node": {
+                                  "event": {
+                                    "__typename": "AddData"
+                                  }
+                                }
+                              },
+                              {
+                                "node": {
+                                  "event": {
+                                    "__typename": "AddData"
+                                  }
+                                }
+                              },
+                              {
+                                "node": {
+                                  "event": {
+                                    "__typename": "AddData"
+                                  }
+                                }
+                              },
+                              {
+                                "node": {
+                                  "event": {
+                                    "__typename": "SetDataSchema"
+                                  }
+                                }
+                              },
+                              {
+                                "node": {
+                                  "event": {
+                                    "__typename": "SetVocab"
+                                  }
+                                }
+                              },
+                              {
+                                "node": {
+                                  "event": {
+                                    "__typename": "AddPushSource"
+                                  }
+                                }
+                              },
+                              {
+                                "node": {
+                                  "event": {
+                                    "__typename": "Seed"
+                                  }
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+                "#
+            )),
+        )
+        .await;
+
+    kamu_api_server_client
+        .graphql_api_call_assert_with_token(
+            token.clone(),
+            indoc::indoc!(
+                r#"
+                mutation {
+                  datasets {
+                    byId(datasetId: "<dataset_id>") {
+                      flows {
+                        runs {
+                          triggerFlow(datasetFlowType: HARD_COMPACTION) {
+                            message
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+                "#
+            )
+            .replace("<dataset_id>", root_dataset_id.as_str())
+            .as_str(),
+            Ok(indoc::indoc!(
+                r#"
+                {
+                  "datasets": {
+                    "byId": {
+                      "flows": {
+                        "runs": {
+                          "triggerFlow": {
+                            "message": "Success"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+                "#
+            )),
+        )
+        .await;
+
+    wait_for_flows_to_finish(
+        &kamu_api_server_client,
+        root_dataset_id.as_str(),
+        token.clone(),
+    )
+    .await;
+
+    pretty_assertions::assert_eq!(
+        indoc::indoc!(
+            r#"
+            offset,op,system_time,match_time,match_id,player_id,score
+            0,0,2050-01-02T03:04:05Z,2000-01-01T00:00:00Z,1,Alice,100
+            1,0,2050-01-02T03:04:05Z,2000-01-01T00:00:00Z,1,Bob,80
+            2,0,2050-01-02T03:04:05Z,2000-01-02T00:00:00Z,2,Charlie,90
+            3,0,2050-01-02T03:04:05Z,2000-01-02T00:00:00Z,2,Alice,70
+            4,0,2050-01-02T03:04:05Z,2000-01-03T00:00:00Z,3,Bob,60
+            5,0,2050-01-02T03:04:05Z,2000-01-03T00:00:00Z,3,Charlie,110"#
+        ),
+        kamu_api_server_client
+            .tail_data(&root_dataset_id, &token)
+            .await
+    );
+
+    kamu_api_server_client
+        .graphql_api_call_assert_with_token(
+            token.clone(),
+            indoc::indoc!(
+                r#"
+                query {
+                  datasets {
+                    byId(datasetId: "<dataset_id>") {
+                      metadata {
+                        chain {
+                          blocks {
+                            edges {
+                              node {
+                                event {
+                                  __typename
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+                "#
+            )
+            .replace("<dataset_id>", root_dataset_id.as_str())
+            .as_str(),
+            Ok(indoc::indoc!(
+                r#"
+                {
+                  "datasets": {
+                    "byId": {
+                      "metadata": {
+                        "chain": {
+                          "blocks": {
+                            "edges": [
+                              {
+                                "node": {
+                                  "event": {
+                                    "__typename": "AddData"
+                                  }
+                                }
+                              },
+                              {
+                                "node": {
+                                  "event": {
+                                    "__typename": "SetDataSchema"
+                                  }
+                                }
+                              },
+                              {
+                                "node": {
+                                  "event": {
+                                    "__typename": "SetVocab"
+                                  }
+                                }
+                              },
+                              {
+                                "node": {
+                                  "event": {
+                                    "__typename": "AddPushSource"
+                                  }
+                                }
+                              },
+                              {
+                                "node": {
+                                  "event": {
+                                    "__typename": "Seed"
+                                  }
+                                }
+                              }
+                            ]
                           }
                         }
                       }
@@ -1601,7 +1899,7 @@ async fn wait_for_flows_to_finish(
                     r#"
                     query {
                       datasets {
-                        byId(datasetId: "<DATASET_ID>") {
+                        byId(datasetId: "<dataset_id>") {
                           flows {
                             runs {
                               listFlows {
@@ -1618,7 +1916,7 @@ async fn wait_for_flows_to_finish(
                     }
                     "#
                 )
-                .replace("<DATASET_ID>", dataset_id)
+                .replace("<dataset_id>", dataset_id)
                 .as_str(),
                 Some(token.clone()),
             )
