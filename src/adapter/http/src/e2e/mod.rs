@@ -9,6 +9,7 @@
 
 mod e2e_middleware;
 mod e2e_router;
+mod system_time_handler;
 
 pub use e2e_middleware::*;
 pub use e2e_router::*;

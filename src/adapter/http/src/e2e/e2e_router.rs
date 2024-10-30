@@ -13,6 +13,8 @@ use axum::routing::{get, post};
 use axum::Router;
 use tokio::sync::Notify;
 
+use crate::e2e::system_time_handler::set_system_time_handler;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub fn e2e_router(shutdown_notify: Arc<Notify>) -> Router {
@@ -25,6 +27,7 @@ pub fn e2e_router(shutdown_notify: Arc<Notify>) -> Router {
                 "Shutting down HTTP server..."
             }),
         )
+        .route("/system_time", post(set_system_time_handler))
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

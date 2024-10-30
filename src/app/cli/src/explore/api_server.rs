@@ -161,9 +161,7 @@ impl APIServer {
             .route(
                 "/system/metrics",
                 axum::routing::get(observability::metrics::metrics_handler),
-            )
-            .layer(Extension(gql_schema))
-            .layer(Extension(api_server_catalog));
+            );
 
         let maybe_shutdown_notify = if is_e2e_testing {
             let shutdown_notify = Arc::new(Notify::new());
@@ -174,6 +172,10 @@ impl APIServer {
         } else {
             None
         };
+
+        router = router
+            .layer(Extension(gql_schema))
+            .layer(Extension(api_server_catalog));
 
         let (router, api) = router.split_for_parts();
         let router =
