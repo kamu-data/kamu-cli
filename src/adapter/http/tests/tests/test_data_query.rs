@@ -639,7 +639,6 @@ async fn test_data_verify_handler() {
         // Successful validation
         let mut request = response;
         request.as_object_mut().unwrap().remove("output");
-        println!("{request:#?}");
 
         let res = cl
             .post(&format!("{}verify", harness.root_url))
@@ -729,7 +728,7 @@ async fn test_data_verify_handler() {
         );
 
         // Output mismatch
-        // (dataset stays the same but we fake the output hash and the signature)
+        // (dataset stays the same, but we fake the output hash and the signature)
         let mut invalid_request = request.clone();
         invalid_request["commitment"]["outputHash"] =
             "f1620ff7f5beaf16900218a3ac4aae82cdccf764816986c7c739c716cf7dc03112a2d".into();
@@ -761,7 +760,7 @@ async fn test_data_verify_handler() {
         );
 
         // Cannot reproduce the query: Dataset is missing
-        // (dataset stays the same but we fake the output hash and the signature)
+        // (dataset stays the same, but we fake the output hash and the signature)
         let mut invalid_request = request.clone();
         invalid_request["input"]["datasets"][0]["id"] = DatasetID::new_seeded_ed25519(b"foo")
             .as_did_str()
@@ -803,7 +802,7 @@ async fn test_data_verify_handler() {
         );
 
         // Cannot reproduce the query: Block is missing
-        // (dataset stays the same but we fake the output hash and the signature)
+        // (dataset stays the same, but we fake the output hash and the signature)
         let mut invalid_request = request.clone();
         invalid_request["input"]["datasets"][0]["blockHash"] =
             Multihash::from_digest_sha3_256(b"foo")
@@ -842,7 +841,7 @@ async fn test_data_verify_handler() {
                     "message": "Unable to reproduce the query as one of the input datasets does not contain a \
                                 block with specified hash. Under normal circumstances a block can disappear \
                                 only when the owner of dataset performs history-altering operation such as \
-                                reset or hard compation. There is also a probability that block hash was \
+                                reset or hard compaction. There is also a probability that block hash was \
                                 spoofed in the original request to falsify the results.",
                 }
             }),

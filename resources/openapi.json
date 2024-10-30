@@ -772,7 +772,7 @@
         "properties": {
           "commitment": {
             "$ref": "#/components/schemas/Commitment",
-            "description": "Commitment createad by the original operation"
+            "description": "Commitment created by the original operation"
           },
           "input": {
             "$ref": "#/components/schemas/QueryRequest",
@@ -807,7 +807,7 @@
               },
               {
                 "$ref": "#/components/schemas/ValidationError",
-                "description": "Will contain error details if validation was unsuccessufl"
+                "description": "Will contain error details if validation was unsuccessful"
               }
             ]
           },
