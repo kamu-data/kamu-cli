@@ -9,7 +9,7 @@
 
 use async_trait::async_trait;
 use lazy_static::lazy_static;
-use opendatafabric::{AccountName, DatasetAlias, DatasetName};
+use opendatafabric::{AccountName, DatasetAlias, DatasetKind, DatasetName};
 use reqwest::{Method, StatusCode};
 
 use crate::{KamuApiServerClient, RequestBody};
@@ -129,6 +129,13 @@ pub trait KamuApiServerClientExt {
 
     async fn login_as_e2e_user(&self) -> AccessToken;
 
+    async fn create_empty_dataset(
+        &self,
+        dataset_kind: DatasetKind,
+        dataset_alias: &DatasetAlias,
+        token: &AccessToken,
+    ) -> DatasetId;
+
     // TODO: also return alias, after solving this bug:
     //       https://github.com/kamu-data/kamu-cli/issues/891
     async fn create_dataset(&self, dataset_snapshot_yaml: &str, token: &AccessToken) -> DatasetId;
@@ -193,6 +200,52 @@ impl KamuApiServerClientExt for KamuApiServerClient {
         .await
     }
 
+    async fn create_empty_dataset(
+        &self,
+        dataset_kind: DatasetKind,
+        dataset_alias: &DatasetAlias,
+        token: &AccessToken,
+    ) -> DatasetId {
+        let create_response = self
+            .graphql_api_call(
+                indoc::indoc!(
+                    r#"
+                    mutation {
+                      datasets {
+                        createEmpty(datasetKind: <dataset_kind>, datasetAlias: "<dataset_alias>") {
+                          message
+                          ... on CreateDatasetResultSuccess {
+                            dataset {
+                              id
+                            }
+                          }
+                        }
+                      }
+                    }
+                    "#,
+                )
+                .replace(
+                    "<dataset_kind>",
+                    &format!("{dataset_kind:?}").to_uppercase(),
+                )
+                .replace("<dataset_alias>", &format!("{dataset_alias}"))
+                .as_str(),
+                Some(token.clone()),
+            )
+            .await;
+
+        let create_response_node = &create_response["datasets"]["createEmpty"];
+
+        assert_eq!(create_response_node["message"].as_str(), Some("Success"));
+
+        let dataset_id = create_response_node["dataset"]["id"]
+            .as_str()
+            .map(ToOwned::to_owned)
+            .unwrap();
+
+        dataset_id
+    }
+
     async fn create_dataset(&self, dataset_snapshot_yaml: &str, token: &AccessToken) -> DatasetId {
         let create_response = self
             .graphql_api_call(
@@ -218,12 +271,11 @@ impl KamuApiServerClientExt for KamuApiServerClient {
             )
             .await;
 
-        assert_eq!(
-            create_response["datasets"]["createFromSnapshot"]["message"].as_str(),
-            Some("Success")
-        );
+        let create_response_node = &create_response["datasets"]["createFromSnapshot"];
 
-        let dataset_id = create_response["datasets"]["createFromSnapshot"]["dataset"]["id"]
+        assert_eq!(create_response_node["message"].as_str(), Some("Success"));
+
+        let dataset_id = create_response_node["dataset"]["id"]
             .as_str()
             .map(ToOwned::to_owned)
             .unwrap();
