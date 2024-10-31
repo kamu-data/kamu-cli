@@ -25,8 +25,8 @@ use opendatafabric as odf;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_web_ui_get_dataset_list_flows(kamu_api_server_client: KamuApiServerClient) {
-    let token = kamu_api_server_client.login_as_kamu().await;
+pub async fn test_web_ui_get_dataset_list_flows(mut kamu_api_server_client: KamuApiServerClient) {
+    let token = kamu_api_server_client.auth().login_as_kamu().await;
 
     let CreateDatasetResponse { dataset_id } = kamu_api_server_client
         .create_player_scores_dataset_with_data(&token, None)
@@ -96,8 +96,8 @@ pub async fn test_web_ui_get_dataset_list_flows(kamu_api_server_client: KamuApiS
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_web_ui_dataset_all_flows_paused(kamu_api_server_client: KamuApiServerClient) {
-    let token = kamu_api_server_client.login_as_kamu().await;
+pub async fn test_web_ui_dataset_all_flows_paused(mut kamu_api_server_client: KamuApiServerClient) {
+    let token = kamu_api_server_client.auth().login_as_kamu().await;
 
     let CreateDatasetResponse { dataset_id } = kamu_api_server_client
         .create_player_scores_dataset_with_data(&token, None)
@@ -155,8 +155,8 @@ pub async fn test_web_ui_dataset_all_flows_paused(kamu_api_server_client: KamuAp
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_web_ui_dataset_flows_initiators(kamu_api_server_client: KamuApiServerClient) {
-    let token = kamu_api_server_client.login_as_kamu().await;
+pub async fn test_web_ui_dataset_flows_initiators(mut kamu_api_server_client: KamuApiServerClient) {
+    let token = kamu_api_server_client.auth().login_as_kamu().await;
 
     let CreateDatasetResponse { dataset_id } = kamu_api_server_client
         .create_player_scores_dataset_with_data(&token, None)
@@ -236,8 +236,8 @@ pub async fn test_web_ui_dataset_flows_initiators(kamu_api_server_client: KamuAp
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_web_ui_dataset_trigger_flow(kamu_api_server_client: KamuApiServerClient) {
-    let token = kamu_api_server_client.login_as_kamu().await;
+pub async fn test_web_ui_dataset_trigger_flow(mut kamu_api_server_client: KamuApiServerClient) {
+    let token = kamu_api_server_client.auth().login_as_kamu().await;
 
     kamu_api_server_client
         .create_player_scores_dataset_with_data(&token, None)
@@ -750,7 +750,7 @@ pub async fn test_web_ui_dataset_trigger_flow(kamu_api_server_client: KamuApiSer
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_trigger_flow_ingest(kamu_api_server_client: KamuApiServerClient) {
+pub async fn test_trigger_flow_ingest(mut kamu_api_server_client: KamuApiServerClient) {
     let temp_dir = tempfile::tempdir().unwrap();
 
     let root_dataset_snapshot = indoc::formatdoc!(
@@ -782,7 +782,7 @@ pub async fn test_trigger_flow_ingest(kamu_api_server_client: KamuApiServerClien
     )
     .escape_default()
     .to_string();
-    let token = kamu_api_server_client.login_as_kamu().await;
+    let token = kamu_api_server_client.auth().login_as_kamu().await;
 
     let CreateDatasetResponse {
         dataset_id: root_dataset_id,
@@ -892,7 +892,7 @@ pub async fn test_trigger_flow_ingest(kamu_api_server_client: KamuApiServerClien
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_trigger_flow_ingest_no_polling_source(
-    kamu_api_server_client: KamuApiServerClient,
+    mut kamu_api_server_client: KamuApiServerClient,
 ) {
     let root_dataset_snapshot = indoc::indoc!(
         r#"
@@ -906,7 +906,7 @@ pub async fn test_trigger_flow_ingest_no_polling_source(
     )
     .escape_default()
     .to_string();
-    let token = kamu_api_server_client.login_as_kamu().await;
+    let token = kamu_api_server_client.auth().login_as_kamu().await;
 
     let CreateDatasetResponse {
         dataset_id: root_dataset_id,
@@ -926,8 +926,8 @@ pub async fn test_trigger_flow_ingest_no_polling_source(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_trigger_flow_execute_transform(kamu_api_server_client: KamuApiServerClient) {
-    let token = kamu_api_server_client.login_as_kamu().await;
+pub async fn test_trigger_flow_execute_transform(mut kamu_api_server_client: KamuApiServerClient) {
+    let token = kamu_api_server_client.auth().login_as_kamu().await;
 
     kamu_api_server_client
         .create_player_scores_dataset_with_data(&token, None)
@@ -972,7 +972,7 @@ pub async fn test_trigger_flow_execute_transform(kamu_api_server_client: KamuApi
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_trigger_flow_execute_transform_no_set_transform(
-    kamu_api_server_client: KamuApiServerClient,
+    mut kamu_api_server_client: KamuApiServerClient,
 ) {
     let derivative_dataset_snapshot = indoc::indoc!(
         r#"
@@ -986,7 +986,7 @@ pub async fn test_trigger_flow_execute_transform_no_set_transform(
     )
     .escape_default()
     .to_string();
-    let token = kamu_api_server_client.login_as_kamu().await;
+    let token = kamu_api_server_client.auth().login_as_kamu().await;
 
     let CreateDatasetResponse {
         dataset_id: derivative_dataset_id,
@@ -1006,8 +1006,8 @@ pub async fn test_trigger_flow_execute_transform_no_set_transform(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_trigger_flow_hard_compaction(kamu_api_server_client: KamuApiServerClient) {
-    let token = kamu_api_server_client.login_as_kamu().await;
+pub async fn test_trigger_flow_hard_compaction(mut kamu_api_server_client: KamuApiServerClient) {
+    let token = kamu_api_server_client.auth().login_as_kamu().await;
 
     let CreateDatasetResponse {
         dataset_id: root_dataset_id,
@@ -1119,8 +1119,8 @@ pub async fn test_trigger_flow_hard_compaction(kamu_api_server_client: KamuApiSe
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_trigger_flow_reset(kamu_api_server_client: KamuApiServerClient) {
-    let token = kamu_api_server_client.login_as_kamu().await;
+pub async fn test_trigger_flow_reset(mut kamu_api_server_client: KamuApiServerClient) {
+    let token = kamu_api_server_client.auth().login_as_kamu().await;
 
     let CreateDatasetResponse {
         dataset_id: root_dataset_id,

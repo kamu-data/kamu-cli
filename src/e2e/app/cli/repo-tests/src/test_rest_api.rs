@@ -20,9 +20,9 @@ use serde_json::json;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_rest_api_request_dataset_tail(kamu_api_server_client: KamuApiServerClient) {
+pub async fn test_rest_api_request_dataset_tail(mut kamu_api_server_client: KamuApiServerClient) {
     // 1. Grub a token
-    let token = kamu_api_server_client.login_as_kamu().await;
+    let token = kamu_api_server_client.auth().login_as_kamu().await;
 
     // 2. Create a dataset
     kamu_api_server_client

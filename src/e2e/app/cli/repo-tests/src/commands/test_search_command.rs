@@ -20,7 +20,7 @@ use opendatafabric::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_search_multi_user(kamu_node_api_client: KamuApiServerClient) {
+pub async fn test_search_multi_user(mut kamu_node_api_client: KamuApiServerClient) {
     let kamu = KamuCliPuppet::new_workspace_tmp().await;
 
     add_repo_to_workspace(&kamu_node_api_client, &kamu, "kamu-node").await;
@@ -40,7 +40,7 @@ pub async fn test_search_multi_user(kamu_node_api_client: KamuApiServerClient) {
     )
     .await;
 
-    let e2e_user_token = kamu_node_api_client.login_as_e2e_user().await;
+    let e2e_user_token = kamu_node_api_client.auth().login_as_e2e_user().await;
 
     kamu_node_api_client
         .create_player_scores_dataset(&e2e_user_token)
@@ -120,7 +120,7 @@ pub async fn test_search_multi_user(kamu_node_api_client: KamuApiServerClient) {
     )
     .await;
 
-    let kamu_token = kamu_node_api_client.login_as_kamu().await;
+    let kamu_token = kamu_node_api_client.auth().login_as_kamu().await;
 
     kamu_node_api_client
         .create_player_scores_dataset(&kamu_token)
@@ -146,12 +146,12 @@ pub async fn test_search_multi_user(kamu_node_api_client: KamuApiServerClient) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_search_by_name(kamu_node_api_client: KamuApiServerClient) {
+pub async fn test_search_by_name(mut kamu_node_api_client: KamuApiServerClient) {
     let kamu = KamuCliPuppet::new_workspace_tmp().await;
 
     add_repo_to_workspace(&kamu_node_api_client, &kamu, "kamu-node").await;
 
-    let e2e_user_token = kamu_node_api_client.login_as_e2e_user().await;
+    let e2e_user_token = kamu_node_api_client.auth().login_as_e2e_user().await;
 
     kamu_node_api_client
         .create_player_scores_dataset(&e2e_user_token)
@@ -224,14 +224,14 @@ pub async fn test_search_by_name(kamu_node_api_client: KamuApiServerClient) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_search_by_repo(kamu_node_api_client: KamuApiServerClient) {
+pub async fn test_search_by_repo(mut kamu_node_api_client: KamuApiServerClient) {
     let kamu = KamuCliPuppet::new_workspace_tmp().await;
 
     // As a test, add two repos pointing to the same node
     add_repo_to_workspace(&kamu_node_api_client, &kamu, "kamu-node").await;
     add_repo_to_workspace(&kamu_node_api_client, &kamu, "acme-org-node").await;
 
-    let e2e_user_token = kamu_node_api_client.login_as_e2e_user().await;
+    let e2e_user_token = kamu_node_api_client.auth().login_as_e2e_user().await;
 
     kamu_node_api_client
         .create_player_scores_dataset(&e2e_user_token)

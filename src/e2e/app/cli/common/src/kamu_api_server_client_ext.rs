@@ -17,7 +17,7 @@ use reqwest::{Method, StatusCode};
 use tokio_retry::strategy::FixedInterval;
 use tokio_retry::Retry;
 
-use crate::{KamuApiServerClient, RequestBody};
+use crate::{AccessToken, KamuApiServerClient, RequestBody};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -123,10 +123,6 @@ pub const E2E_USER_ACCOUNT_NAME_STR: &str = "e2e-user";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub type AccessToken = String;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 pub struct CreateDatasetResponse {
     pub dataset_id: odf::DatasetID,
 }
@@ -135,10 +131,6 @@ pub struct CreateDatasetResponse {
 
 #[async_trait]
 pub trait KamuApiServerClientExt {
-    async fn login_as_kamu(&self) -> AccessToken;
-
-    async fn login_as_e2e_user(&self) -> AccessToken;
-
     async fn create_empty_dataset(
         &self,
         dataset_kind: odf::DatasetKind,
@@ -173,6 +165,8 @@ pub trait KamuApiServerClientExt {
 
     async fn tail_data(&self, dataset_id: &odf::DatasetID, token: &AccessToken) -> String;
 
+    fn auth(&mut self) -> AuthApi<'_>;
+
     fn dataset<'a>(&'a self, token: &'a AccessToken) -> DatasetApi<'a>;
 
     fn flow<'a>(&'a self, token: &'a AccessToken) -> FlowApi<'a>;
@@ -182,42 +176,6 @@ pub trait KamuApiServerClientExt {
 
 #[async_trait]
 impl KamuApiServerClientExt for KamuApiServerClient {
-    async fn login_as_kamu(&self) -> AccessToken {
-        login_as_kamu(
-            self,
-            indoc::indoc!(
-                r#"
-                mutation {
-                  auth {
-                    login(loginMethod: "password", loginCredentialsJson: "{\"login\":\"kamu\",\"password\":\"kamu\"}") {
-                      accessToken
-                    }
-                  }
-                }
-                "#,
-            )
-        ).await
-    }
-
-    async fn login_as_e2e_user(&self) -> AccessToken {
-        // We are using DummyOAuthGithub, so the loginCredentialsJson can be arbitrary
-        login_as_kamu(
-            self,
-            indoc::indoc!(
-                r#"
-                mutation {
-                  auth {
-                    login(loginMethod: "oauth_github", loginCredentialsJson: "") {
-                      accessToken
-                    }
-                  }
-                }
-                "#,
-            ),
-        )
-        .await
-    }
-
     async fn create_empty_dataset(
         &self,
         dataset_kind: odf::DatasetKind,
@@ -394,6 +352,10 @@ impl KamuApiServerClientExt for KamuApiServerClient {
         content
     }
 
+    fn auth(&mut self) -> AuthApi<'_> {
+        AuthApi { client: self }
+    }
+
     fn dataset<'a>(&'a self, token: &'a AccessToken) -> DatasetApi<'a> {
         DatasetApi {
             client: self,
@@ -407,6 +369,60 @@ impl KamuApiServerClientExt for KamuApiServerClient {
             client: self,
             token,
         }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// API: Auth
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct AuthApi<'a> {
+    client: &'a mut KamuApiServerClient,
+}
+
+impl AuthApi<'_> {
+    pub async fn login_as_kamu(&mut self) -> AccessToken {
+        self.login(
+            indoc::indoc!(
+                r#"
+                mutation {
+                  auth {
+                    login(loginMethod: "password", loginCredentialsJson: "{\"login\":\"kamu\",\"password\":\"kamu\"}") {
+                      accessToken
+                    }
+                  }
+                }
+                "#,
+            )
+        ).await
+    }
+
+    pub async fn login_as_e2e_user(&mut self) -> AccessToken {
+        // We are using DummyOAuthGithub, so the loginCredentialsJson can be arbitrary
+        self.login(indoc::indoc!(
+            r#"
+                mutation {
+                  auth {
+                    login(loginMethod: "oauth_github", loginCredentialsJson: "") {
+                      accessToken
+                    }
+                  }
+                }
+                "#,
+        ))
+        .await
+    }
+
+    async fn login(&mut self, login_request: &str) -> AccessToken {
+        let login_response = self.client.graphql_api_call(login_request, None).await;
+        let access_token = login_response["auth"]["login"]["accessToken"]
+            .as_str()
+            .map(ToOwned::to_owned)
+            .unwrap();
+
+        self.client.set_token(Some(access_token.clone()));
+
+        access_token
     }
 }
 
@@ -635,25 +651,6 @@ impl FlowApi<'_> {
 pub enum FlowTriggerResponse {
     Success(FlowID),
     Error(String),
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Helper functions
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-async fn login_as_kamu(
-    kamu_api_server_client: &KamuApiServerClient,
-    login_request: &str,
-) -> AccessToken {
-    let login_response = kamu_api_server_client
-        .graphql_api_call(login_request, None)
-        .await;
-    let access_token = login_response["auth"]["login"]["accessToken"]
-        .as_str()
-        .map(ToOwned::to_owned)
-        .unwrap();
-
-    access_token
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

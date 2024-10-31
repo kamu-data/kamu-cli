@@ -16,7 +16,9 @@ use serde_json::json;
 use tokio_retry::strategy::FixedInterval;
 use tokio_retry::Retry;
 
-use crate::AccessToken;
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub type AccessToken = String;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -38,6 +40,7 @@ pub enum ExpectedResponseBody {
 pub struct KamuApiServerClient {
     http_client: reqwest::Client,
     server_base_url: Url,
+    token: Option<AccessToken>,
 }
 
 impl KamuApiServerClient {
@@ -47,7 +50,12 @@ impl KamuApiServerClient {
         Self {
             http_client,
             server_base_url,
+            token: None,
         }
+    }
+
+    pub fn set_token(&mut self, token: Option<AccessToken>) {
+        self.token = token;
     }
 
     pub fn e2e(&self) -> E2EApi {
