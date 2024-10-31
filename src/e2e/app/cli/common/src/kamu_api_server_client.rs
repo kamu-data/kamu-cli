@@ -9,7 +9,6 @@
 
 use chrono::{DateTime, Utc};
 use internal_error::{InternalError, ResultIntoInternal};
-use opendatafabric::DatasetAlias;
 use reqwest::{Method, Response, StatusCode, Url};
 use serde::Deserialize;
 use serde_json::json;
@@ -74,12 +73,6 @@ impl KamuApiServerClient {
         node_url.set_port(base_url.port()).unwrap();
 
         node_url
-    }
-
-    pub fn get_dataset_endpoint(&self, dataset_alias: &DatasetAlias) -> Url {
-        let node_url = self.get_node_url();
-
-        node_url.join(format!("{dataset_alias}").as_str()).unwrap()
     }
 
     pub async fn rest_api_call(
