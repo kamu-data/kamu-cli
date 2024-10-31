@@ -8,12 +8,11 @@
 // by the Apache License, Version 2.0.
 
 use async_trait::async_trait;
+use chrono::{DateTime, Utc};
 use convert_case::{Case, Casing};
 use kamu_flow_system::{DatasetFlowType, FlowID};
 use lazy_static::lazy_static;
 use opendatafabric as odf;
-// TODO: use odf::
-use opendatafabric::{AccountName, DatasetAlias, DatasetKind, DatasetName};
 use reqwest::{Method, StatusCode};
 use tokio_retry::strategy::FixedInterval;
 use tokio_retry::Retry;
@@ -142,8 +141,8 @@ pub trait KamuApiServerClientExt {
 
     async fn create_empty_dataset(
         &self,
-        dataset_kind: DatasetKind,
-        dataset_alias: &DatasetAlias,
+        dataset_kind: odf::DatasetKind,
+        dataset_alias: &odf::DatasetAlias,
         token: &AccessToken,
     ) -> CreateDatasetResponse;
 
@@ -160,19 +159,21 @@ pub trait KamuApiServerClientExt {
     async fn create_player_scores_dataset_with_data(
         &self,
         token: &AccessToken,
-        account_name_maybe: Option<AccountName>,
+        account_name_maybe: Option<odf::AccountName>,
     ) -> CreateDatasetResponse;
 
     async fn create_leaderboard(&self, token: &AccessToken) -> CreateDatasetResponse;
 
     async fn ingest_data(
         &self,
-        dataset_alias: &DatasetAlias,
+        dataset_alias: &odf::DatasetAlias,
         data: RequestBody,
         token: &AccessToken,
     );
 
     async fn tail_data(&self, dataset_id: &odf::DatasetID, token: &AccessToken) -> String;
+
+    fn dataset<'a>(&'a self, token: &'a AccessToken) -> DatasetApi<'a>;
 
     fn flow<'a>(&'a self, token: &'a AccessToken) -> FlowApi<'a>;
 }
@@ -219,8 +220,8 @@ impl KamuApiServerClientExt for KamuApiServerClient {
 
     async fn create_empty_dataset(
         &self,
-        dataset_kind: DatasetKind,
-        dataset_alias: &DatasetAlias,
+        dataset_kind: odf::DatasetKind,
+        dataset_alias: &odf::DatasetAlias,
         token: &AccessToken,
     ) -> CreateDatasetResponse {
         let create_response = self
@@ -310,15 +311,15 @@ impl KamuApiServerClientExt for KamuApiServerClient {
     async fn create_player_scores_dataset_with_data(
         &self,
         token: &AccessToken,
-        account_name_maybe: Option<AccountName>,
+        account_name_maybe: Option<odf::AccountName>,
     ) -> CreateDatasetResponse {
         let dataset_id = self.create_player_scores_dataset(token).await;
 
         // TODO: Use the alias from the reply, after fixing the bug:
         //       https://github.com/kamu-data/kamu-cli/issues/891
-        let dataset_alias = DatasetAlias::new(
+        let dataset_alias = odf::DatasetAlias::new(
             account_name_maybe,
-            DatasetName::new_unchecked("player-scores"),
+            odf::DatasetName::new_unchecked("player-scores"),
         );
 
         self.ingest_data(
@@ -338,7 +339,7 @@ impl KamuApiServerClientExt for KamuApiServerClient {
 
     async fn ingest_data(
         &self,
-        dataset_alias: &DatasetAlias,
+        dataset_alias: &odf::DatasetAlias,
         data: RequestBody,
         token: &AccessToken,
     ) {
@@ -393,6 +394,13 @@ impl KamuApiServerClientExt for KamuApiServerClient {
         content
     }
 
+    fn dataset<'a>(&'a self, token: &'a AccessToken) -> DatasetApi<'a> {
+        DatasetApi {
+            client: self,
+            token,
+        }
+    }
+
     // TODO: hide token better?
     fn flow<'a>(&'a self, token: &'a AccessToken) -> FlowApi<'a> {
         FlowApi {
@@ -400,6 +408,110 @@ impl KamuApiServerClientExt for KamuApiServerClient {
             token,
         }
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// API: Dataset
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct DatasetApi<'a> {
+    client: &'a KamuApiServerClient,
+    token: &'a AccessToken,
+}
+
+impl DatasetApi<'_> {
+    pub async fn blocks(&self, dataset_id: &odf::DatasetID) -> DatasetBlocksResponse {
+        let response = self
+            .client
+            .graphql_api_call(
+                indoc::indoc!(
+                    r#"
+                    query {
+                      datasets {
+                        byId(datasetId: "<dataset_id>") {
+                          metadata {
+                            chain {
+                              blocks {
+                                edges {
+                                  node {
+                                    blockHash
+                                    prevBlockHash
+                                    systemTime
+                                    sequenceNumber
+                                    event {
+                                      __typename
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                    "#
+                )
+                .replace("<dataset_id>", &dataset_id.as_did_str().to_stack_string())
+                .as_str(),
+                Some(self.token.clone()),
+            )
+            .await;
+
+        let blocks = response["datasets"]["byId"]["metadata"]["chain"]["blocks"]["edges"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|edge_node| {
+                let node = &edge_node["node"];
+
+                let block_hash_as_str = node["blockHash"].as_str().unwrap();
+                let maybe_prev_block_hash_as_str = node["prevBlockHash"].as_str();
+                let system_time_as_str = node["systemTime"].as_str().unwrap();
+                let sequence_number = node["sequenceNumber"].as_u64().unwrap();
+                let event = match node["event"]["__typename"].as_str().unwrap() {
+                    "AddData" => odf::MetadataEventTypeFlags::ADD_DATA,
+                    "ExecuteTransform" => odf::MetadataEventTypeFlags::EXECUTE_TRANSFORM,
+                    "Seed" => odf::MetadataEventTypeFlags::SEED,
+                    "SetPollingSource" => odf::MetadataEventTypeFlags::SET_POLLING_SOURCE,
+                    "SetTransform" => odf::MetadataEventTypeFlags::SET_TRANSFORM,
+                    "SetVocab" => odf::MetadataEventTypeFlags::SET_VOCAB,
+                    "SetAttachments" => odf::MetadataEventTypeFlags::SET_ATTACHMENTS,
+                    "SetInfo" => odf::MetadataEventTypeFlags::SET_INFO,
+                    "SetLicense" => odf::MetadataEventTypeFlags::SET_LICENSE,
+                    "SetDataSchema" => odf::MetadataEventTypeFlags::SET_DATA_SCHEMA,
+                    "AddPushSource" => odf::MetadataEventTypeFlags::ADD_PUSH_SOURCE,
+                    "DisablePushSource" => odf::MetadataEventTypeFlags::DISABLE_PUSH_SOURCE,
+                    "DisablePollingSource" => odf::MetadataEventTypeFlags::DISABLE_POLLING_SOURCE,
+                    _ => panic!(),
+                };
+
+                DatasetBlock {
+                    block_hash: odf::Multihash::from_multibase(block_hash_as_str).unwrap(),
+                    prev_block_hash: maybe_prev_block_hash_as_str
+                        .map(|hash| odf::Multihash::from_multibase(hash).unwrap()),
+                    system_time: system_time_as_str.parse().unwrap(),
+                    sequence_number,
+                    event,
+                }
+            })
+            .collect::<Vec<_>>();
+
+        DatasetBlocksResponse { blocks }
+    }
+}
+
+#[derive(Debug)]
+pub struct DatasetBlock {
+    pub block_hash: odf::Multihash,
+    pub prev_block_hash: Option<odf::Multihash>,
+    pub system_time: DateTime<Utc>,
+    pub sequence_number: u64,
+    pub event: odf::MetadataEventTypeFlags,
+}
+
+#[derive(Debug)]
+pub struct DatasetBlocksResponse {
+    pub blocks: Vec<DatasetBlock>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -416,7 +528,7 @@ impl FlowApi<'_> {
         &self,
         dataset_id: &odf::DatasetID,
         dataset_flow_type: DatasetFlowType,
-    ) -> TriggerFlowResponse {
+    ) -> FlowTriggerResponse {
         let response = self
             .client
             .graphql_api_call(
@@ -459,9 +571,9 @@ impl FlowApi<'_> {
             let flow_id_as_str = trigger_node["flow"]["flowId"].as_str().unwrap();
             let flow_id = flow_id_as_str.parse::<u64>().unwrap();
 
-            TriggerFlowResponse::Success(flow_id.into())
+            FlowTriggerResponse::Success(flow_id.into())
         } else {
-            TriggerFlowResponse::Error(message.to_owned())
+            FlowTriggerResponse::Error(message.to_owned())
         }
     }
 
@@ -520,7 +632,7 @@ impl FlowApi<'_> {
 }
 
 #[derive(Debug)]
-pub enum TriggerFlowResponse {
+pub enum FlowTriggerResponse {
     Success(FlowID),
     Error(String),
 }

@@ -12,10 +12,10 @@ use std::assert_matches::assert_matches;
 use chrono::{TimeZone, Utc};
 use kamu_cli_e2e_common::{
     CreateDatasetResponse,
+    FlowTriggerResponse,
     KamuApiServerClient,
     KamuApiServerClientExt,
     RequestBody,
-    TriggerFlowResponse,
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_2,
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_3,
@@ -819,7 +819,7 @@ pub async fn test_trigger_flow_ingest(kamu_api_server_client: KamuApiServerClien
             .flow(&token)
             .trigger(&root_dataset_id, DatasetFlowType::Ingest)
             .await,
-        TriggerFlowResponse::Success(_)
+        FlowTriggerResponse::Success(_)
     );
 
     kamu_api_server_client
@@ -864,7 +864,7 @@ pub async fn test_trigger_flow_ingest(kamu_api_server_client: KamuApiServerClien
             .flow(&token)
             .trigger(&root_dataset_id, DatasetFlowType::Ingest)
             .await,
-        TriggerFlowResponse::Success(_)
+        FlowTriggerResponse::Success(_)
     );
 
     kamu_api_server_client
@@ -919,7 +919,7 @@ pub async fn test_trigger_flow_ingest_no_polling_source(
             .flow(&token)
             .trigger(&root_dataset_id, DatasetFlowType::Ingest)
             .await,
-        TriggerFlowResponse::Error(message)
+        FlowTriggerResponse::Error(message)
             if message == "Flow didn't met preconditions: 'No SetPollingSource event defined'"
     );
 }
@@ -948,7 +948,7 @@ pub async fn test_trigger_flow_execute_transform(kamu_api_server_client: KamuApi
             .flow(&token)
             .trigger(&derivative_dataset_id, DatasetFlowType::ExecuteTransform)
             .await,
-        TriggerFlowResponse::Success(_)
+        FlowTriggerResponse::Success(_)
     );
 
     kamu_api_server_client
@@ -999,7 +999,7 @@ pub async fn test_trigger_flow_execute_transform_no_set_transform(
             .flow(&token)
             .trigger(&derivative_dataset_id, DatasetFlowType::ExecuteTransform)
             .await,
-        TriggerFlowResponse::Error(message)
+        FlowTriggerResponse::Error(message)
             if message == "Flow didn't met preconditions: 'No SetTransform event defined'"
     );
 }
@@ -1047,113 +1047,32 @@ pub async fn test_trigger_flow_hard_compaction(kamu_api_server_client: KamuApiSe
 
     // Verify that there are multiple date blocks (3 AddData)
 
-    kamu_api_server_client
-        .graphql_api_call_assert_with_token(
-            token.clone(),
-            indoc::indoc!(
-                r#"
-                query {
-                  datasets {
-                    byId(datasetId: "<dataset_id>") {
-                      metadata {
-                        chain {
-                          blocks {
-                            edges {
-                              node {
-                                event {
-                                  __typename
-                                }
-                              }
-                            }
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-                "#
-            )
-            .replace(
-                "<dataset_id>",
-                &root_dataset_id.as_did_str().to_stack_string(),
-            )
-            .as_str(),
-            Ok(indoc::indoc!(
-                r#"
-                {
-                  "datasets": {
-                    "byId": {
-                      "metadata": {
-                        "chain": {
-                          "blocks": {
-                            "edges": [
-                              {
-                                "node": {
-                                  "event": {
-                                    "__typename": "AddData"
-                                  }
-                                }
-                              },
-                              {
-                                "node": {
-                                  "event": {
-                                    "__typename": "AddData"
-                                  }
-                                }
-                              },
-                              {
-                                "node": {
-                                  "event": {
-                                    "__typename": "AddData"
-                                  }
-                                }
-                              },
-                              {
-                                "node": {
-                                  "event": {
-                                    "__typename": "SetDataSchema"
-                                  }
-                                }
-                              },
-                              {
-                                "node": {
-                                  "event": {
-                                    "__typename": "SetVocab"
-                                  }
-                                }
-                              },
-                              {
-                                "node": {
-                                  "event": {
-                                    "__typename": "AddPushSource"
-                                  }
-                                }
-                              },
-                              {
-                                "node": {
-                                  "event": {
-                                    "__typename": "Seed"
-                                  }
-                                }
-                              }
-                            ]
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-                "#
-            )),
-        )
-        .await;
+    pretty_assertions::assert_eq!(
+        vec![
+            (6, odf::MetadataEventTypeFlags::ADD_DATA),
+            (5, odf::MetadataEventTypeFlags::ADD_DATA),
+            (4, odf::MetadataEventTypeFlags::ADD_DATA),
+            (3, odf::MetadataEventTypeFlags::SET_DATA_SCHEMA),
+            (2, odf::MetadataEventTypeFlags::SET_VOCAB),
+            (1, odf::MetadataEventTypeFlags::ADD_PUSH_SOURCE),
+            (0, odf::MetadataEventTypeFlags::SEED),
+        ],
+        kamu_api_server_client
+            .dataset(&token)
+            .blocks(&root_dataset_id)
+            .await
+            .blocks
+            .into_iter()
+            .map(|block| (block.sequence_number, block.event))
+            .collect::<Vec<_>>()
+    );
 
     assert_matches!(
         kamu_api_server_client
             .flow(&token)
             .trigger(&root_dataset_id, DatasetFlowType::HardCompaction)
             .await,
-        TriggerFlowResponse::Success(_)
+        FlowTriggerResponse::Success(_)
     );
 
     kamu_api_server_client
@@ -1179,92 +1098,23 @@ pub async fn test_trigger_flow_hard_compaction(kamu_api_server_client: KamuApiSe
 
     // Checking that there is now only one block of data
 
-    kamu_api_server_client
-        .graphql_api_call_assert_with_token(
-            token.clone(),
-            indoc::indoc!(
-                r#"
-                query {
-                  datasets {
-                    byId(datasetId: "<dataset_id>") {
-                      metadata {
-                        chain {
-                          blocks {
-                            edges {
-                              node {
-                                event {
-                                  __typename
-                                }
-                              }
-                            }
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-                "#
-            )
-            .replace(
-                "<dataset_id>",
-                &root_dataset_id.as_did_str().to_stack_string(),
-            )
-            .as_str(),
-            Ok(indoc::indoc!(
-                r#"
-                {
-                  "datasets": {
-                    "byId": {
-                      "metadata": {
-                        "chain": {
-                          "blocks": {
-                            "edges": [
-                              {
-                                "node": {
-                                  "event": {
-                                    "__typename": "AddData"
-                                  }
-                                }
-                              },
-                              {
-                                "node": {
-                                  "event": {
-                                    "__typename": "SetDataSchema"
-                                  }
-                                }
-                              },
-                              {
-                                "node": {
-                                  "event": {
-                                    "__typename": "SetVocab"
-                                  }
-                                }
-                              },
-                              {
-                                "node": {
-                                  "event": {
-                                    "__typename": "AddPushSource"
-                                  }
-                                }
-                              },
-                              {
-                                "node": {
-                                  "event": {
-                                    "__typename": "Seed"
-                                  }
-                                }
-                              }
-                            ]
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-                "#
-            )),
-        )
-        .await;
+    pretty_assertions::assert_eq!(
+        vec![
+            (4, odf::MetadataEventTypeFlags::ADD_DATA),
+            (3, odf::MetadataEventTypeFlags::SET_DATA_SCHEMA),
+            (2, odf::MetadataEventTypeFlags::SET_VOCAB),
+            (1, odf::MetadataEventTypeFlags::ADD_PUSH_SOURCE),
+            (0, odf::MetadataEventTypeFlags::SEED),
+        ],
+        kamu_api_server_client
+            .dataset(&token)
+            .blocks(&root_dataset_id)
+            .await
+            .blocks
+            .into_iter()
+            .map(|block| (block.sequence_number, block.event))
+            .collect::<Vec<_>>()
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1278,85 +1128,28 @@ pub async fn test_trigger_flow_reset(kamu_api_server_client: KamuApiServerClient
         .create_player_scores_dataset(&token)
         .await;
 
-    kamu_api_server_client
-        .graphql_api_call_assert_with_token(
-            token.clone(),
-            indoc::indoc!(
-                r#"
-                query {
-                  datasets {
-                    byId(datasetId: "<dataset_id>") {
-                      metadata {
-                        chain {
-                          blocks {
-                            edges {
-                              node {
-                                event {
-                                  __typename
-                                }
-                              }
-                            }
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-                "#
-            )
-            .replace(
-                "<dataset_id>",
-                &root_dataset_id.as_did_str().to_stack_string(),
-            )
-            .as_str(),
-            Ok(indoc::indoc!(
-                r#"
-                {
-                  "datasets": {
-                    "byId": {
-                      "metadata": {
-                        "chain": {
-                          "blocks": {
-                            "edges": [
-                              {
-                                "node": {
-                                  "event": {
-                                    "__typename": "SetVocab"
-                                  }
-                                }
-                              },
-                              {
-                                "node": {
-                                  "event": {
-                                    "__typename": "AddPushSource"
-                                  }
-                                }
-                              },
-                              {
-                                "node": {
-                                  "event": {
-                                    "__typename": "Seed"
-                                  }
-                                }
-                              }
-                            ]
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-                "#
-            )),
-        )
-        .await;
+    pretty_assertions::assert_eq!(
+        vec![
+            (2, odf::MetadataEventTypeFlags::SET_VOCAB),
+            (1, odf::MetadataEventTypeFlags::ADD_PUSH_SOURCE),
+            (0, odf::MetadataEventTypeFlags::SEED),
+        ],
+        kamu_api_server_client
+            .dataset(&token)
+            .blocks(&root_dataset_id)
+            .await
+            .blocks
+            .into_iter()
+            .map(|block| (block.sequence_number, block.event))
+            .collect::<Vec<_>>()
+    );
 
     assert_matches!(
         kamu_api_server_client
             .flow(&token)
             .trigger(&root_dataset_id, DatasetFlowType::Reset)
             .await,
-        TriggerFlowResponse::Success(_)
+        FlowTriggerResponse::Success(_)
     );
 
     kamu_api_server_client
@@ -1364,64 +1157,17 @@ pub async fn test_trigger_flow_reset(kamu_api_server_client: KamuApiServerClient
         .wait(&root_dataset_id)
         .await;
 
-    kamu_api_server_client
-        .graphql_api_call_assert_with_token(
-            token.clone(),
-            indoc::indoc!(
-                r#"
-                query {
-                  datasets {
-                    byId(datasetId: "<dataset_id>") {
-                      metadata {
-                        chain {
-                          blocks {
-                            edges {
-                              node {
-                                event {
-                                  __typename
-                                }
-                              }
-                            }
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-                "#
-            )
-            .replace(
-                "<dataset_id>",
-                &root_dataset_id.as_did_str().to_stack_string(),
-            )
-            .as_str(),
-            Ok(indoc::indoc!(
-                r#"
-                {
-                  "datasets": {
-                    "byId": {
-                      "metadata": {
-                        "chain": {
-                          "blocks": {
-                            "edges": [
-                              {
-                                "node": {
-                                  "event": {
-                                    "__typename": "Seed"
-                                  }
-                                }
-                              }
-                            ]
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-                "#
-            )),
-        )
-        .await;
+    pretty_assertions::assert_eq!(
+        vec![(0, odf::MetadataEventTypeFlags::SEED),],
+        kamu_api_server_client
+            .dataset(&token)
+            .blocks(&root_dataset_id)
+            .await
+            .blocks
+            .into_iter()
+            .map(|block| (block.sequence_number, block.event))
+            .collect::<Vec<_>>()
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
