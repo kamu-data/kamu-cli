@@ -14,6 +14,7 @@ Recommendation: for ease of reading, use the following order:
 ## [Unreleased]
 ### Added
 - E2E: cover all flow scenarios
+- E2E: `KamuApiServerClientExt`: method grouping
 
 ## [0.206.5] - 2024-10-29
 ### Changed
