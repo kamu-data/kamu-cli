@@ -7,17 +7,29 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_cli_e2e_common::{AccessToken, KamuApiServerClient, KamuApiServerClientExt};
-use tokio_retry::strategy::FixedInterval;
-use tokio_retry::Retry;
+use std::assert_matches::assert_matches;
+
+use kamu_cli_e2e_common::{
+    CreateDatasetResponse,
+    FlowTriggerResponse,
+    KamuApiServerClient,
+    KamuApiServerClientExt,
+    RequestBody,
+    DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
+    DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_2,
+    DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_3,
+};
+use kamu_flow_system::DatasetFlowType;
+use opendatafabric as odf;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_get_dataset_list_flows(kamu_api_server_client: KamuApiServerClient) {
-    let token = kamu_api_server_client.login_as_kamu().await;
+pub async fn test_gql_get_dataset_list_flows(mut kamu_api_server_client: KamuApiServerClient) {
+    kamu_api_server_client.auth().login_as_kamu().await;
 
-    let dataset_id = kamu_api_server_client
-        .create_player_scores_dataset_with_data(&token, None)
+    let CreateDatasetResponse { dataset_id } = kamu_api_server_client
+        .dataset()
+        .create_player_scores_dataset_with_data(None)
         .await;
 
     // The query is almost identical to kamu-web-ui, for ease of later edits.
@@ -27,8 +39,7 @@ pub async fn test_get_dataset_list_flows(kamu_api_server_client: KamuApiServerCl
 
     kamu_api_server_client
         .graphql_api_call_assert_with_token(
-            token,
-            get_dataset_list_flows_query(&dataset_id).as_str(),
+            &get_dataset_list_flows_query(&dataset_id),
             Ok(indoc::indoc!(
                 r#"
                 {
@@ -84,18 +95,18 @@ pub async fn test_get_dataset_list_flows(kamu_api_server_client: KamuApiServerCl
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_dataset_all_flows_paused(kamu_api_server_client: KamuApiServerClient) {
-    let token = kamu_api_server_client.login_as_kamu().await;
+pub async fn test_gql_dataset_all_flows_paused(mut kamu_api_server_client: KamuApiServerClient) {
+    kamu_api_server_client.auth().login_as_kamu().await;
 
-    let dataset_id = kamu_api_server_client
-        .create_player_scores_dataset_with_data(&token, None)
+    let CreateDatasetResponse { dataset_id } = kamu_api_server_client
+        .dataset()
+        .create_player_scores_dataset_with_data(None)
         .await;
 
     // The query is almost identical to kamu-web-ui, for ease of later edits.
 
     kamu_api_server_client
         .graphql_api_call_assert_with_token(
-            token,
             indoc::indoc!(
                 r#"
                 query datasetAllFlowsPaused() {
@@ -116,7 +127,7 @@ pub async fn test_dataset_all_flows_paused(kamu_api_server_client: KamuApiServer
                 }
                 "#
             )
-            .replace("$datasetId", format!("\"{dataset_id}\"").as_str())
+            .replace("$datasetId", &format!("\"{dataset_id}\""))
             .as_str(),
             Ok(indoc::indoc!(
                 r#"
@@ -143,18 +154,18 @@ pub async fn test_dataset_all_flows_paused(kamu_api_server_client: KamuApiServer
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_dataset_flows_initiators(kamu_api_server_client: KamuApiServerClient) {
-    let token = kamu_api_server_client.login_as_kamu().await;
+pub async fn test_gql_dataset_flows_initiators(mut kamu_api_server_client: KamuApiServerClient) {
+    kamu_api_server_client.auth().login_as_kamu().await;
 
-    let dataset_id = kamu_api_server_client
-        .create_player_scores_dataset_with_data(&token, None)
+    let CreateDatasetResponse { dataset_id } = kamu_api_server_client
+        .dataset()
+        .create_player_scores_dataset_with_data(None)
         .await;
 
     // The query is almost identical to kamu-web-ui, for ease of later edits.
 
     kamu_api_server_client
         .graphql_api_call_assert_with_token(
-            token,
             indoc::indoc!(
                 r#"
                 query datasetFlowsInitiators() {
@@ -193,7 +204,7 @@ pub async fn test_dataset_flows_initiators(kamu_api_server_client: KamuApiServer
                 }
                 "#
             )
-            .replace("$datasetId", format!("\"{dataset_id}\"").as_str())
+            .replace("$datasetId", &format!("\"{dataset_id}\""))
             .as_str(),
             Ok(indoc::indoc!(
                 r#"
@@ -224,14 +235,17 @@ pub async fn test_dataset_flows_initiators(kamu_api_server_client: KamuApiServer
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_dataset_trigger_flow(kamu_api_server_client: KamuApiServerClient) {
-    let token = kamu_api_server_client.login_as_kamu().await;
+pub async fn test_gql_dataset_trigger_flow(mut kamu_api_server_client: KamuApiServerClient) {
+    kamu_api_server_client.auth().login_as_kamu().await;
 
-    let _root_dataset_id = kamu_api_server_client
-        .create_player_scores_dataset_with_data(&token, None)
+    kamu_api_server_client
+        .dataset()
+        .create_player_scores_dataset_with_data(None)
         .await;
 
-    let derivative_dataset_id = kamu_api_server_client.create_leaderboard(&token).await;
+    let CreateDatasetResponse {
+        dataset_id: derivative_dataset_id,
+    } = kamu_api_server_client.dataset().create_leaderboard().await;
 
     // The query is almost identical to kamu-web-ui, for ease of later edits.
     // Except for commented dynamic dataset ID fields:
@@ -243,7 +257,6 @@ pub async fn test_dataset_trigger_flow(kamu_api_server_client: KamuApiServerClie
 
     kamu_api_server_client
         .graphql_api_call_assert_with_token(
-            token.clone(),
             indoc::indoc!(
                 r#"
                 mutation datasetTriggerFlow() {
@@ -516,17 +529,17 @@ pub async fn test_dataset_trigger_flow(kamu_api_server_client: KamuApiServerClie
                 }
                 "#
             )
-            .replace(
-                "$accountId",
-                "\"did:odf:fed016b61ed2ab1b63a006b61ed2ab1b63a00b016d65607000000e0821aafbf163e6f\"",
-            )
-            .replace("$datasetFlowType", "\"EXECUTE_TRANSFORM\"")
-            .replace(
-                "$datasetId",
-                format!("\"{derivative_dataset_id}\"").as_str(),
-            )
-            .replace("$flowRunConfiguration", "null")
-            .as_str(),
+                .replace(
+                    "$accountId",
+                    "\"did:odf:fed016b61ed2ab1b63a006b61ed2ab1b63a00b016d65607000000e0821aafbf163e6f\"",
+                )
+                .replace("$datasetFlowType", "\"EXECUTE_TRANSFORM\"")
+                .replace(
+                    "$datasetId",
+                    &format!("\"{derivative_dataset_id}\""),
+                )
+                .replace("$flowRunConfiguration", "null")
+                .as_str(),
             Ok(indoc::indoc!(
                 r#"
                 {
@@ -578,17 +591,14 @@ pub async fn test_dataset_trigger_flow(kamu_api_server_client: KamuApiServerClie
         )
         .await;
 
-    wait_for_flows_to_finish(
-        &kamu_api_server_client,
-        derivative_dataset_id.as_str(),
-        token.clone(),
-    )
-    .await;
+    kamu_api_server_client
+        .flow()
+        .wait(&derivative_dataset_id)
+        .await;
 
     kamu_api_server_client
         .graphql_api_call_assert_with_token(
-            token,
-            get_dataset_list_flows_query(&derivative_dataset_id).as_str(),
+            &get_dataset_list_flows_query(&derivative_dataset_id),
             Ok(indoc::indoc!(
                 r#"
                 {
@@ -737,10 +747,389 @@ pub async fn test_dataset_trigger_flow(kamu_api_server_client: KamuApiServerClie
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_trigger_flow_ingest(mut kamu_api_server_client: KamuApiServerClient) {
+    let temp_dir = tempfile::tempdir().unwrap();
+
+    let root_dataset_snapshot = indoc::formatdoc!(
+        r#"
+        kind: DatasetSnapshot
+        version: 1
+        content:
+          name: root-dataset
+          kind: Root
+          metadata:
+            - kind: SetPollingSource
+              fetch:
+                kind: FilesGlob
+                path: {}
+              read:
+                kind: Csv
+                header: true
+                schema:
+                  - event_time TIMESTAMP
+                  - city STRING
+                  - population BIGINT
+              merge:
+                kind: Ledger
+                primaryKey:
+                  - event_time
+                  - city
+        "#,
+        temp_dir.path().join("chunk-*.csv").display()
+    )
+    .escape_default()
+    .to_string();
+
+    kamu_api_server_client.auth().login_as_kamu().await;
+
+    let CreateDatasetResponse {
+        dataset_id: root_dataset_id,
+    } = kamu_api_server_client
+        .dataset()
+        .create_dataset(&root_dataset_snapshot)
+        .await;
+
+    // No data before update
+
+    pretty_assertions::assert_eq!(
+        "",
+        kamu_api_server_client
+            .dataset()
+            .tail_data(&root_dataset_id)
+            .await
+    );
+
+    std::fs::write(
+        temp_dir.path().join("chunk-1.csv"),
+        indoc::indoc!(
+            r#"
+            event_time,city,population
+            2020-01-01,A,1000
+            2020-01-01,B,2000
+            2020-01-01,C,3000
+            "#
+        ),
+    )
+    .unwrap();
+
+    assert_matches!(
+        kamu_api_server_client
+            .flow()
+            .trigger(&root_dataset_id, DatasetFlowType::Ingest)
+            .await,
+        FlowTriggerResponse::Success(_)
+    );
+
+    kamu_api_server_client.flow().wait(&root_dataset_id).await;
+
+    pretty_assertions::assert_eq!(
+        indoc::indoc!(
+            r#"
+            offset,op,system_time,event_time,city,population
+            0,0,2050-01-02T03:04:05Z,2020-01-01T00:00:00Z,A,1000
+            1,0,2050-01-02T03:04:05Z,2020-01-01T00:00:00Z,B,2000
+            2,0,2050-01-02T03:04:05Z,2020-01-01T00:00:00Z,C,3000"#
+        ),
+        kamu_api_server_client
+            .dataset()
+            .tail_data(&root_dataset_id)
+            .await
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_trigger_flow_ingest_no_polling_source(
+    mut kamu_api_server_client: KamuApiServerClient,
+) {
+    let root_dataset_snapshot = indoc::indoc!(
+        r#"
+        kind: DatasetSnapshot
+        version: 1
+        content:
+          name: root-dataset
+          kind: Root
+          metadata: []
+        "#
+    )
+    .escape_default()
+    .to_string();
+
+    kamu_api_server_client.auth().login_as_kamu().await;
+
+    let CreateDatasetResponse {
+        dataset_id: root_dataset_id,
+    } = kamu_api_server_client
+        .dataset()
+        .create_dataset(&root_dataset_snapshot)
+        .await;
+
+    assert_matches!(
+        kamu_api_server_client
+            .flow()
+            .trigger(&root_dataset_id, DatasetFlowType::Ingest)
+            .await,
+        FlowTriggerResponse::Error(message)
+            if message == "Flow didn't met preconditions: 'No SetPollingSource event defined'"
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_trigger_flow_execute_transform(mut kamu_api_server_client: KamuApiServerClient) {
+    kamu_api_server_client.auth().login_as_kamu().await;
+
+    kamu_api_server_client
+        .dataset()
+        .create_player_scores_dataset_with_data(None)
+        .await;
+    let CreateDatasetResponse {
+        dataset_id: derivative_dataset_id,
+    } = kamu_api_server_client.dataset().create_leaderboard().await;
+
+    pretty_assertions::assert_eq!(
+        "",
+        kamu_api_server_client
+            .dataset()
+            .tail_data(&derivative_dataset_id)
+            .await
+    );
+
+    assert_matches!(
+        kamu_api_server_client
+            .flow()
+            .trigger(&derivative_dataset_id, DatasetFlowType::ExecuteTransform)
+            .await,
+        FlowTriggerResponse::Success(_)
+    );
+
+    kamu_api_server_client
+        .flow()
+        .wait(&derivative_dataset_id)
+        .await;
+
+    pretty_assertions::assert_eq!(
+        indoc::indoc!(
+            r#"
+            offset,op,system_time,match_time,place,match_id,player_id,score
+            0,0,2050-01-02T03:04:05Z,2000-01-01T00:00:00Z,1,1,Alice,100
+            1,0,2050-01-02T03:04:05Z,2000-01-01T00:00:00Z,2,1,Bob,80"#
+        ),
+        kamu_api_server_client
+            .dataset()
+            .tail_data(&derivative_dataset_id)
+            .await
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_trigger_flow_execute_transform_no_set_transform(
+    mut kamu_api_server_client: KamuApiServerClient,
+) {
+    let derivative_dataset_snapshot = indoc::indoc!(
+        r#"
+        kind: DatasetSnapshot
+        version: 1
+        content:
+          name: derivative-dataset
+          kind: Derivative
+          metadata: []
+        "#
+    )
+    .escape_default()
+    .to_string();
+
+    kamu_api_server_client.auth().login_as_kamu().await;
+
+    let CreateDatasetResponse {
+        dataset_id: derivative_dataset_id,
+    } = kamu_api_server_client
+        .dataset()
+        .create_dataset(&derivative_dataset_snapshot)
+        .await;
+
+    assert_matches!(
+        kamu_api_server_client
+            .flow()
+            .trigger(&derivative_dataset_id, DatasetFlowType::ExecuteTransform)
+            .await,
+        FlowTriggerResponse::Error(message)
+            if message == "Flow didn't met preconditions: 'No SetTransform event defined'"
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_trigger_flow_hard_compaction(mut kamu_api_server_client: KamuApiServerClient) {
+    kamu_api_server_client.auth().login_as_kamu().await;
+
+    let CreateDatasetResponse {
+        dataset_id: root_dataset_id,
+    } = kamu_api_server_client
+        .dataset()
+        .create_player_scores_dataset()
+        .await;
+    let dataset_alias =
+        odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("player-scores"));
+
+    // Ingesting data in multiple chunks
+
+    for chunk in [
+        DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
+        DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_2,
+        DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_3,
+    ] {
+        kamu_api_server_client
+            .dataset()
+            .ingest_data(&dataset_alias, RequestBody::NdJson(chunk.into()))
+            .await;
+    }
+
+    pretty_assertions::assert_eq!(
+        indoc::indoc!(
+            r#"
+            offset,op,system_time,match_time,match_id,player_id,score
+            0,0,2050-01-02T03:04:05Z,2000-01-01T00:00:00Z,1,Alice,100
+            1,0,2050-01-02T03:04:05Z,2000-01-01T00:00:00Z,1,Bob,80
+            2,0,2050-01-02T03:04:05Z,2000-01-02T00:00:00Z,2,Charlie,90
+            3,0,2050-01-02T03:04:05Z,2000-01-02T00:00:00Z,2,Alice,70
+            4,0,2050-01-02T03:04:05Z,2000-01-03T00:00:00Z,3,Bob,60
+            5,0,2050-01-02T03:04:05Z,2000-01-03T00:00:00Z,3,Charlie,110"#
+        ),
+        kamu_api_server_client
+            .dataset()
+            .tail_data(&root_dataset_id)
+            .await
+    );
+
+    // Verify that there are multiple date blocks (3 AddData)
+
+    pretty_assertions::assert_eq!(
+        vec![
+            (6, odf::MetadataEventTypeFlags::ADD_DATA),
+            (5, odf::MetadataEventTypeFlags::ADD_DATA),
+            (4, odf::MetadataEventTypeFlags::ADD_DATA),
+            (3, odf::MetadataEventTypeFlags::SET_DATA_SCHEMA),
+            (2, odf::MetadataEventTypeFlags::SET_VOCAB),
+            (1, odf::MetadataEventTypeFlags::ADD_PUSH_SOURCE),
+            (0, odf::MetadataEventTypeFlags::SEED),
+        ],
+        kamu_api_server_client
+            .dataset()
+            .blocks(&root_dataset_id)
+            .await
+            .blocks
+            .into_iter()
+            .map(|block| (block.sequence_number, block.event))
+            .collect::<Vec<_>>()
+    );
+
+    assert_matches!(
+        kamu_api_server_client
+            .flow()
+            .trigger(&root_dataset_id, DatasetFlowType::HardCompaction)
+            .await,
+        FlowTriggerResponse::Success(_)
+    );
+
+    kamu_api_server_client.flow().wait(&root_dataset_id).await;
+
+    pretty_assertions::assert_eq!(
+        indoc::indoc!(
+            r#"
+            offset,op,system_time,match_time,match_id,player_id,score
+            0,0,2050-01-02T03:04:05Z,2000-01-01T00:00:00Z,1,Alice,100
+            1,0,2050-01-02T03:04:05Z,2000-01-01T00:00:00Z,1,Bob,80
+            2,0,2050-01-02T03:04:05Z,2000-01-02T00:00:00Z,2,Charlie,90
+            3,0,2050-01-02T03:04:05Z,2000-01-02T00:00:00Z,2,Alice,70
+            4,0,2050-01-02T03:04:05Z,2000-01-03T00:00:00Z,3,Bob,60
+            5,0,2050-01-02T03:04:05Z,2000-01-03T00:00:00Z,3,Charlie,110"#
+        ),
+        kamu_api_server_client
+            .dataset()
+            .tail_data(&root_dataset_id)
+            .await
+    );
+
+    // Checking that there is now only one block of data
+
+    pretty_assertions::assert_eq!(
+        vec![
+            (4, odf::MetadataEventTypeFlags::ADD_DATA),
+            (3, odf::MetadataEventTypeFlags::SET_DATA_SCHEMA),
+            (2, odf::MetadataEventTypeFlags::SET_VOCAB),
+            (1, odf::MetadataEventTypeFlags::ADD_PUSH_SOURCE),
+            (0, odf::MetadataEventTypeFlags::SEED),
+        ],
+        kamu_api_server_client
+            .dataset()
+            .blocks(&root_dataset_id)
+            .await
+            .blocks
+            .into_iter()
+            .map(|block| (block.sequence_number, block.event))
+            .collect::<Vec<_>>()
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_trigger_flow_reset(mut kamu_api_server_client: KamuApiServerClient) {
+    kamu_api_server_client.auth().login_as_kamu().await;
+
+    let CreateDatasetResponse {
+        dataset_id: root_dataset_id,
+    } = kamu_api_server_client
+        .dataset()
+        .create_player_scores_dataset()
+        .await;
+
+    pretty_assertions::assert_eq!(
+        vec![
+            (2, odf::MetadataEventTypeFlags::SET_VOCAB),
+            (1, odf::MetadataEventTypeFlags::ADD_PUSH_SOURCE),
+            (0, odf::MetadataEventTypeFlags::SEED),
+        ],
+        kamu_api_server_client
+            .dataset()
+            .blocks(&root_dataset_id)
+            .await
+            .blocks
+            .into_iter()
+            .map(|block| (block.sequence_number, block.event))
+            .collect::<Vec<_>>()
+    );
+
+    assert_matches!(
+        kamu_api_server_client
+            .flow()
+            .trigger(&root_dataset_id, DatasetFlowType::Reset)
+            .await,
+        FlowTriggerResponse::Success(_)
+    );
+
+    kamu_api_server_client.flow().wait(&root_dataset_id).await;
+
+    pretty_assertions::assert_eq!(
+        vec![(0, odf::MetadataEventTypeFlags::SEED),],
+        kamu_api_server_client
+            .dataset()
+            .blocks(&root_dataset_id)
+            .await
+            .blocks
+            .into_iter()
+            .map(|block| (block.sequence_number, block.event))
+            .collect::<Vec<_>>()
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Helpers
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn get_dataset_list_flows_query(dataset_id: &str) -> String {
+fn get_dataset_list_flows_query(dataset_id: &odf::DatasetID) -> String {
     // The query is almost identical to kamu-web-ui, for ease of later edits.
     // Except for commented dynamic dataset ID fields:
     // - search FlowDescriptionDatasetHardCompaction (datasetId)
@@ -1157,70 +1546,11 @@ fn get_dataset_list_flows_query(dataset_id: &str) -> String {
         }
         "#
     )
-    .replace("$datasetId", format!("\"{dataset_id}\"").as_str())
+    .replace("$datasetId", &format!("\"{dataset_id}\""))
     .replace("$page", "0")
     .replace("$perPageTable", "15")
     .replace("$perPageTiles", "150")
     .replace("$filters", "{}")
-}
-
-async fn wait_for_flows_to_finish(
-    kamu_api_server_client: &KamuApiServerClient,
-    dataset_id: &str,
-    token: AccessToken,
-) {
-    let retry_strategy = FixedInterval::from_millis(5_000).take(18); // 1m 30s
-
-    Retry::spawn(retry_strategy, || async {
-        let response = kamu_api_server_client
-            .graphql_api_call(
-                indoc::indoc!(
-                    r#"
-                    query getDatasetListFlows() {
-                      datasets {
-                        byId(datasetId: "<DATASET_ID>") {
-                          flows {
-                            runs {
-                              table: listFlows(
-                                page: 0
-                                perPage: 10
-                              ) {
-                                edges {
-                                  node {
-                                    status
-                                  }
-                                }
-                              }
-                            }
-                          }
-                        }
-                      }
-                    }
-                    "#
-                )
-                .replace("<DATASET_ID>", dataset_id)
-                .as_str(),
-                Some(token.clone()),
-            )
-            .await;
-
-        let edges = response["datasets"]["byId"]["flows"]["runs"]["table"]["edges"]
-            .as_array()
-            .unwrap();
-        let all_finished = edges.iter().all(|edge| {
-            let status = edge["node"]["status"].as_str().unwrap();
-
-            status == "FINISHED"
-        });
-
-        if all_finished {
-            Ok(())
-        } else {
-            Err(())
-        }
-    })
-    .await
-    .unwrap();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

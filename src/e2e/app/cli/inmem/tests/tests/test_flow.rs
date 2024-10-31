@@ -13,7 +13,7 @@ use kamu_cli_e2e_common::prelude::*;
 
 kamu_cli_run_api_server_e2e_test!(
     storage = inmem,
-    fixture = kamu_cli_e2e_repo_tests::test_get_dataset_list_flows,
+    fixture = kamu_cli_e2e_repo_tests::test_gql_get_dataset_list_flows,
     extra_test_groups = "containerized, engine, transform, datafusion"
 );
 
@@ -21,7 +21,7 @@ kamu_cli_run_api_server_e2e_test!(
 
 kamu_cli_run_api_server_e2e_test!(
     storage = inmem,
-    fixture = kamu_cli_e2e_repo_tests::test_dataset_all_flows_paused,
+    fixture = kamu_cli_e2e_repo_tests::test_gql_dataset_all_flows_paused,
     extra_test_groups = "containerized, engine, transform, datafusion"
 );
 
@@ -29,7 +29,7 @@ kamu_cli_run_api_server_e2e_test!(
 
 kamu_cli_run_api_server_e2e_test!(
     storage = inmem,
-    fixture = kamu_cli_e2e_repo_tests::test_dataset_flows_initiators,
+    fixture = kamu_cli_e2e_repo_tests::test_gql_dataset_flows_initiators,
     extra_test_groups = "containerized, engine, transform, datafusion"
 );
 
@@ -37,8 +37,58 @@ kamu_cli_run_api_server_e2e_test!(
 
 kamu_cli_run_api_server_e2e_test!(
     storage = inmem,
-    fixture = kamu_cli_e2e_repo_tests::test_dataset_trigger_flow,
+    fixture = kamu_cli_e2e_repo_tests::test_gql_dataset_trigger_flow,
     extra_test_groups = "containerized, engine, transform, datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_run_api_server_e2e_test!(
+    storage = inmem,
+    fixture = kamu_cli_e2e_repo_tests::test_trigger_flow_ingest,
+    options = Options::default().with_frozen_system_time(),
+    extra_test_groups = "containerized, engine, datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_run_api_server_e2e_test!(
+    storage = inmem,
+    fixture = kamu_cli_e2e_repo_tests::test_trigger_flow_ingest_no_polling_source,
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_run_api_server_e2e_test!(
+    storage = inmem,
+    fixture = kamu_cli_e2e_repo_tests::test_trigger_flow_execute_transform,
+    options = Options::default().with_frozen_system_time(),
+    extra_test_groups = "containerized, engine, transform, datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_run_api_server_e2e_test!(
+    storage = inmem,
+    fixture = kamu_cli_e2e_repo_tests::test_trigger_flow_execute_transform_no_set_transform,
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_run_api_server_e2e_test!(
+    storage = inmem,
+    fixture = kamu_cli_e2e_repo_tests::test_trigger_flow_hard_compaction,
+    options = Options::default().with_frozen_system_time(),
+    extra_test_groups = "containerized, engine, datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_run_api_server_e2e_test!(
+    storage = inmem,
+    fixture = kamu_cli_e2e_repo_tests::test_trigger_flow_reset,
+    options = Options::default().with_frozen_system_time(),
+    extra_test_groups = "containerized, engine, datafusion"
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

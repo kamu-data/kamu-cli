@@ -26,16 +26,17 @@ use opendatafabric::{AccountName, DatasetAlias, DatasetName};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_smart_push_pull_sequence(kamu_api_server_client: KamuApiServerClient) {
+pub async fn test_smart_push_pull_sequence(mut kamu_api_server_client: KamuApiServerClient) {
     let dataset_alias = DatasetAlias::new(
         Some(AccountName::new_unchecked("e2e-user")),
         DatasetName::new_unchecked("player-scores"),
     );
-    let kamu_api_server_dataset_endpoint =
-        kamu_api_server_client.get_dataset_endpoint(&dataset_alias);
+    let kamu_api_server_dataset_endpoint = kamu_api_server_client
+        .dataset()
+        .get_endpoint(&dataset_alias);
 
     // 1. Grub a token
-    let token = kamu_api_server_client.login_as_e2e_user().await;
+    let token = kamu_api_server_client.auth().login_as_e2e_user().await;
 
     // 2. Pushing the dataset to the API server
     {
@@ -101,16 +102,17 @@ pub async fn test_smart_push_pull_sequence(kamu_api_server_client: KamuApiServer
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_smart_force_push_pull(kamu_api_server_client: KamuApiServerClient) {
+pub async fn test_smart_force_push_pull(mut kamu_api_server_client: KamuApiServerClient) {
     let dataset_alias = DatasetAlias::new(
         Some(AccountName::new_unchecked("e2e-user")),
         DatasetName::new_unchecked("player-scores"),
     );
-    let kamu_api_server_dataset_endpoint =
-        kamu_api_server_client.get_dataset_endpoint(&dataset_alias);
+    let kamu_api_server_dataset_endpoint = kamu_api_server_client
+        .dataset()
+        .get_endpoint(&dataset_alias);
 
     // 1. Grub a token
-    let token = kamu_api_server_client.login_as_e2e_user().await;
+    let token = kamu_api_server_client.auth().login_as_e2e_user().await;
 
     // 2. Pushing the dataset to the API server
     {
@@ -246,16 +248,17 @@ pub async fn test_smart_force_push_pull(kamu_api_server_client: KamuApiServerCli
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_smart_push_pull_add_alias(kamu_api_server_client: KamuApiServerClient) {
+pub async fn test_smart_push_pull_add_alias(mut kamu_api_server_client: KamuApiServerClient) {
     let dataset_alias = DatasetAlias::new(
         Some(AccountName::new_unchecked("e2e-user")),
         DatasetName::new_unchecked("player-scores"),
     );
-    let kamu_api_server_dataset_endpoint =
-        kamu_api_server_client.get_dataset_endpoint(&dataset_alias);
+    let kamu_api_server_dataset_endpoint = kamu_api_server_client
+        .dataset()
+        .get_endpoint(&dataset_alias);
 
     // 1. Grub a token
-    let token = kamu_api_server_client.login_as_e2e_user().await;
+    let token = kamu_api_server_client.auth().login_as_e2e_user().await;
 
     // 2. Push command
     {
@@ -384,22 +387,23 @@ pub async fn test_smart_push_pull_add_alias(kamu_api_server_client: KamuApiServe
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_smart_pull_as(kamu_api_server_client: KamuApiServerClient) {
+pub async fn test_smart_pull_as(mut kamu_api_server_client: KamuApiServerClient) {
     let dataset_alias = DatasetAlias::new(
         Some(AccountName::new_unchecked("e2e-user")),
         DatasetName::new_unchecked("player-scores"),
     );
-    let kamu_api_server_dataset_endpoint =
-        kamu_api_server_client.get_dataset_endpoint(&dataset_alias);
+    let kamu_api_server_dataset_endpoint = kamu_api_server_client
+        .dataset()
+        .get_endpoint(&dataset_alias);
 
     // 1. Grub a token
-    let token = kamu_api_server_client.login_as_e2e_user().await;
+    kamu_api_server_client.auth().login_as_e2e_user().await;
 
     kamu_api_server_client
-        .create_player_scores_dataset_with_data(
-            &token,
-            Some(AccountName::new_unchecked(E2E_USER_ACCOUNT_NAME_STR)),
-        )
+        .dataset()
+        .create_player_scores_dataset_with_data(Some(AccountName::new_unchecked(
+            E2E_USER_ACCOUNT_NAME_STR,
+        )))
         .await;
 
     {
@@ -432,23 +436,25 @@ pub async fn test_smart_pull_as(kamu_api_server_client: KamuApiServerClient) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_smart_push_pull_all(kamu_api_server_client: KamuApiServerClient) {
+pub async fn test_smart_push_pull_all(mut kamu_api_server_client: KamuApiServerClient) {
     let root_dataset_alias = DatasetAlias::new(
         Some(AccountName::new_unchecked("e2e-user")),
         DatasetName::new_unchecked("player-scores"),
     );
-    let kamu_api_server_root_dataset_endpoint =
-        kamu_api_server_client.get_dataset_endpoint(&root_dataset_alias);
+    let kamu_api_server_root_dataset_endpoint = kamu_api_server_client
+        .dataset()
+        .get_endpoint(&root_dataset_alias);
 
     let derivative_dataset_alias = DatasetAlias::new(
         Some(AccountName::new_unchecked("e2e-user")),
         DatasetName::new_unchecked("leaderboard"),
     );
-    let kamu_api_server_derivative_dataset_endpoint =
-        kamu_api_server_client.get_dataset_endpoint(&derivative_dataset_alias);
+    let kamu_api_server_derivative_dataset_endpoint = kamu_api_server_client
+        .dataset()
+        .get_endpoint(&derivative_dataset_alias);
 
     // 1. Grub a token
-    let token = kamu_api_server_client.login_as_e2e_user().await;
+    let token = kamu_api_server_client.auth().login_as_e2e_user().await;
 
     let mut kamu_in_push_workspace = KamuCliPuppet::new_workspace_tmp().await;
 
@@ -713,13 +719,14 @@ pub async fn test_smart_push_pull_all(kamu_api_server_client: KamuApiServerClien
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_smart_push_pull_recursive(kamu_api_server_client: KamuApiServerClient) {
+pub async fn test_smart_push_pull_recursive(mut kamu_api_server_client: KamuApiServerClient) {
     let root_dataset_alias = DatasetAlias::new(
         Some(AccountName::new_unchecked("e2e-user")),
         DatasetName::new_unchecked("player-scores"),
     );
-    let kamu_api_server_root_dataset_endpoint =
-        kamu_api_server_client.get_dataset_endpoint(&root_dataset_alias);
+    let kamu_api_server_root_dataset_endpoint = kamu_api_server_client
+        .dataset()
+        .get_endpoint(&root_dataset_alias);
 
     let derivative_dataset_alias = DatasetAlias::new(
         Some(AccountName::new_unchecked("e2e-user")),
@@ -727,7 +734,7 @@ pub async fn test_smart_push_pull_recursive(kamu_api_server_client: KamuApiServe
     );
 
     // 1. Grub a token
-    let token = kamu_api_server_client.login_as_e2e_user().await;
+    let token = kamu_api_server_client.auth().login_as_e2e_user().await;
 
     let mut kamu_in_push_workspace = KamuCliPuppet::new_workspace_tmp().await;
 
@@ -1103,16 +1110,17 @@ pub async fn test_smart_pull_reset_derivative(kamu: KamuCliPuppet) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_smart_push_visibility(kamu_api_server_client: KamuApiServerClient) {
+pub async fn test_smart_push_visibility(mut kamu_api_server_client: KamuApiServerClient) {
     let dataset_alias = DatasetAlias::new(
         Some(AccountName::new_unchecked("e2e-user")),
         DatasetName::new_unchecked("player-scores"),
     );
-    let kamu_api_server_dataset_endpoint =
-        kamu_api_server_client.get_dataset_endpoint(&dataset_alias);
+    let kamu_api_server_dataset_endpoint = kamu_api_server_client
+        .dataset()
+        .get_endpoint(&dataset_alias);
 
     // 1. Grub a token
-    let token = kamu_api_server_client.login_as_e2e_user().await;
+    let token = kamu_api_server_client.auth().login_as_e2e_user().await;
 
     // 2. Pushing the dataset to the API server
     {
@@ -1284,16 +1292,17 @@ pub async fn test_smart_pull_derivative(kamu: KamuCliPuppet) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_smart_push_from_registered_repo(kamu_api_server_client: KamuApiServerClient) {
+pub async fn test_smart_push_from_registered_repo(mut kamu_api_server_client: KamuApiServerClient) {
     let dataset_alias = DatasetAlias::new(
         Some(AccountName::new_unchecked("e2e-user")),
         DatasetName::new_unchecked("player-scores"),
     );
-    let kamu_api_server_dataset_endpoint =
-        kamu_api_server_client.get_dataset_endpoint(&dataset_alias);
+    let kamu_api_server_dataset_endpoint = kamu_api_server_client
+        .dataset()
+        .get_endpoint(&dataset_alias);
 
     // 1. Grub a token
-    let token = kamu_api_server_client.login_as_e2e_user().await;
+    let token = kamu_api_server_client.auth().login_as_e2e_user().await;
 
     // 2. Pushing the dataset to the API server
     {

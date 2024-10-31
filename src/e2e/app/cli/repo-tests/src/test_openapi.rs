@@ -16,7 +16,7 @@ use reqwest::Method;
 
 async fn test_openapi(kamu_api_server_client: KamuApiServerClient, schema_path: PathBuf) {
     let response = kamu_api_server_client
-        .rest_api_call(None, Method::GET, "/openapi.json", None)
+        .rest_api_call(Method::GET, "/openapi.json", None)
         .await
         .error_for_status()
         .unwrap();

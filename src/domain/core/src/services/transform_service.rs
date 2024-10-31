@@ -31,14 +31,14 @@ pub trait TransformService: Send + Sync {
     async fn transform(
         &self,
         dataset_ref: &DatasetRef,
-        transfrom_options: TransformOptions,
+        transform_options: TransformOptions,
         listener: Option<Arc<dyn TransformListener>>,
     ) -> Result<TransformResult, TransformError>;
 
     async fn transform_multi(
         &self,
         dataset_refs: Vec<DatasetRef>,
-        transfrom_options: TransformOptions,
+        transform_options: TransformOptions,
         listener: Option<Arc<dyn TransformMultiListener>>,
     ) -> Vec<(DatasetRef, Result<TransformResult, TransformError>)>;
 

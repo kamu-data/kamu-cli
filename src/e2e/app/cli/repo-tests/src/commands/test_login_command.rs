@@ -77,35 +77,41 @@ pub async fn test_login_logout_password(kamu_node_api_client: KamuApiServerClien
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_login_logout_oauth(kamu_node_api_client: KamuApiServerClient) {
-    let kamu_node_url = kamu_node_api_client.get_base_url().as_str();
+pub async fn test_login_logout_oauth(mut kamu_node_api_client: KamuApiServerClient) {
+    let kamu_node_url = kamu_node_api_client.get_base_url().clone();
     let kamu = KamuCliPuppet::new_workspace_tmp().await;
 
     kamu.assert_success_command_execution(
-        ["logout", kamu_node_url],
+        ["logout", kamu_node_url.as_str()],
         None,
         Some([format!("Not logged in to {kamu_node_url}").as_str()]),
     )
     .await;
 
     kamu.assert_failure_command_execution(
-        ["login", kamu_node_url, "--check"],
+        ["login", kamu_node_url.as_str(), "--check"],
         None,
         Some([format!("Error: No access token found for: {kamu_node_url}").as_str()]),
     )
     .await;
 
-    let oauth_token = kamu_node_api_client.login_as_e2e_user().await;
+    let oauth_token = kamu_node_api_client.auth().login_as_e2e_user().await;
 
     kamu.assert_success_command_execution(
-        ["login", "oauth", "github", &oauth_token, kamu_node_url],
+        [
+            "login",
+            "oauth",
+            "github",
+            &oauth_token,
+            kamu_node_url.as_str(),
+        ],
         None,
         Some([format!("Login successful: {kamu_node_url}").as_str()]),
     )
     .await;
 
     kamu.assert_success_command_execution(
-        ["login", kamu_node_url, "--check"],
+        ["login", kamu_node_url.as_str(), "--check"],
         None,
         Some([format!("Access token valid: {kamu_node_url}").as_str()]),
     )
@@ -113,11 +119,12 @@ pub async fn test_login_logout_oauth(kamu_node_api_client: KamuApiServerClient) 
 
     // Token validation, via an API call that requires authorization
     kamu_node_api_client
-        .create_player_scores_dataset(&oauth_token)
+        .dataset()
+        .create_player_scores_dataset()
         .await;
 
     kamu.assert_success_command_execution(
-        ["logout", kamu_node_url],
+        ["logout", kamu_node_url.as_str()],
         None,
         Some([format!("Logged out of {kamu_node_url}").as_str()]),
     )

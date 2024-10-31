@@ -1716,7 +1716,7 @@ impl FlowConfigHarness {
         paused: bool,
         every: u64,
         unit: &str,
-        feach_uncacheable: bool,
+        fetch_uncacheable: bool,
     ) -> String {
         indoc!(
             r#"
@@ -1729,7 +1729,7 @@ impl FlowConfigHarness {
                                     datasetFlowType: "<dataset_flow_type>",
                                     paused: <paused>,
                                     ingest: {
-                                        fetchUncacheable: <feach_uncacheable>,
+                                        fetchUncacheable: <fetch_uncacheable>,
                                         schedule: {
                                             timeDelta: { every: <every>, unit: "<unit>" }
                                         }
@@ -1771,8 +1771,8 @@ impl FlowConfigHarness {
         .replace("<dataset_flow_type>", dataset_flow_type)
         .replace("<paused>", if paused { "true" } else { "false" })
         .replace(
-            "<feach_uncacheable>",
-            if feach_uncacheable { "true" } else { "false" },
+            "<fetch_uncacheable>",
+            if fetch_uncacheable { "true" } else { "false" },
         )
         .replace("<every>", every.to_string().as_str())
         .replace("<unit>", unit)
@@ -1783,7 +1783,7 @@ impl FlowConfigHarness {
         dataset_flow_type: &str,
         paused: bool,
         cron_expression: &str,
-        feach_uncacheable: bool,
+        fetch_uncacheable: bool,
     ) -> String {
         indoc!(
             r#"
@@ -1796,7 +1796,7 @@ impl FlowConfigHarness {
                                     datasetFlowType: "<dataset_flow_type>",
                                     paused: <paused>,
                                     ingest: {
-                                        fetchUncacheable: <feach_uncacheable>,
+                                        fetchUncacheable: <fetch_uncacheable>,
                                         schedule: {
                                             cron5ComponentExpression: "<cron_expression>"
                                         }
@@ -1837,8 +1837,8 @@ impl FlowConfigHarness {
         .replace("<dataset_flow_type>", dataset_flow_type)
         .replace("<paused>", if paused { "true" } else { "false" })
         .replace(
-            "<feach_uncacheable>",
-            if feach_uncacheable { "true" } else { "false" },
+            "<fetch_uncacheable>",
+            if fetch_uncacheable { "true" } else { "false" },
         )
         .replace("<cron_expression>", cron_expression)
     }

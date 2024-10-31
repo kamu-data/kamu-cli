@@ -167,7 +167,7 @@ pub async fn test_login_dummy_github(kamu_api_server_client: KamuApiServerClient
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_kamu_access_token_middleware(kamu_api_server_client: KamuApiServerClient) {
+pub async fn test_kamu_access_token_middleware(mut kamu_api_server_client: KamuApiServerClient) {
     // 1. Grub a JWT
     let login_response = kamu_api_server_client
      .graphql_api_call(indoc::indoc!(
@@ -183,12 +183,15 @@ pub async fn test_kamu_access_token_middleware(kamu_api_server_client: KamuApiSe
             }
         }
         "#,
-         ), None)
+         ))
      .await;
-    let jwt = login_response["auth"]["login"]["accessToken"]
+    let access_token = login_response["auth"]["login"]["accessToken"]
         .as_str()
         .map(ToOwned::to_owned)
         .unwrap();
+
+    kamu_api_server_client.set_token(Some(access_token));
+
     let account_id = login_response["auth"]["login"]["account"]["id"]
         .as_str()
         .map(ToOwned::to_owned)
@@ -218,7 +221,6 @@ pub async fn test_kamu_access_token_middleware(kamu_api_server_client: KamuApiSe
             )
             .replace("<account_id>", account_id.as_str())
             .as_str(),
-            Some(jwt.clone()),
         )
         .await;
     let kamu_token = create_token_response["auth"]["createAccessToken"]["token"]["composed"]
@@ -226,9 +228,12 @@ pub async fn test_kamu_access_token_middleware(kamu_api_server_client: KamuApiSe
         .map(ToOwned::to_owned)
         .unwrap();
 
+    kamu_api_server_client.set_token(Some(kamu_token));
+
     // 3. Create dataset from snapshot with new token
     kamu_api_server_client
-        .create_player_scores_dataset(&kamu_token)
+        .dataset()
+        .create_player_scores_dataset()
         .await;
 }
 

@@ -7,12 +7,17 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use chrono::{DateTime, Utc};
 use internal_error::{InternalError, ResultIntoInternal};
-use opendatafabric::DatasetAlias;
 use reqwest::{Method, Response, StatusCode, Url};
 use serde::Deserialize;
+use serde_json::json;
 use tokio_retry::strategy::FixedInterval;
 use tokio_retry::Retry;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub type AccessToken = String;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -24,7 +29,7 @@ pub enum RequestBody {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub enum ExpectedResponseBody {
-    Json(String),
+    Json(serde_json::Value),
     Plain(String),
 }
 
@@ -34,6 +39,7 @@ pub enum ExpectedResponseBody {
 pub struct KamuApiServerClient {
     http_client: reqwest::Client,
     server_base_url: Url,
+    token: Option<AccessToken>,
 }
 
 impl KamuApiServerClient {
@@ -43,44 +49,23 @@ impl KamuApiServerClient {
         Self {
             http_client,
             server_base_url,
+            token: None,
         }
     }
 
-    pub async fn ready(&self) -> Result<(), InternalError> {
-        let retry_strategy = FixedInterval::from_millis(1_000).take(10);
-        let response = Retry::spawn(retry_strategy, || async {
-            let endpoint = self.server_base_url.join("e2e/health").unwrap();
-            let response = self.http_client.get(endpoint).send().await.int_err()?;
-
-            Ok(response)
-        })
-        .await?;
-
-        let status = response.status();
-        if status != StatusCode::OK {
-            InternalError::bail(format!("Unexpected health response status: {status}",))?;
-        }
-
-        Ok(())
+    pub fn set_token(&mut self, token: Option<AccessToken>) {
+        self.token = token;
     }
 
-    pub async fn shutdown(&self) -> Result<(), InternalError> {
-        let endpoint = self.server_base_url.join("e2e/shutdown").unwrap();
-        let response = self.http_client.post(endpoint).send().await.int_err()?;
-
-        let status = response.status();
-        if status != StatusCode::OK {
-            InternalError::bail(format!("Unexpected shutdown response status: {status}",))?;
-        }
-
-        Ok(())
+    pub fn e2e(&self) -> E2EApi {
+        E2EApi { client: self }
     }
 
     pub fn get_base_url(&self) -> &Url {
         &self.server_base_url
     }
 
-    pub fn get_node_url(&self) -> Url {
+    pub fn get_odf_node_url(&self) -> Url {
         let mut node_url = Url::parse("odf+http://host").unwrap();
         let base_url = self.get_base_url();
 
@@ -90,15 +75,8 @@ impl KamuApiServerClient {
         node_url
     }
 
-    pub fn get_dataset_endpoint(&self, dataset_alias: &DatasetAlias) -> Url {
-        let node_url = self.get_node_url();
-
-        node_url.join(format!("{dataset_alias}").as_str()).unwrap()
-    }
-
     pub async fn rest_api_call(
         &self,
-        token: Option<String>,
         method: Method,
         endpoint: &str,
         request_body: Option<RequestBody>,
@@ -113,7 +91,7 @@ impl KamuApiServerClient {
             }
         };
 
-        if let Some(token) = token {
+        if let Some(token) = &self.token {
             request_builder = request_builder.bearer_auth(token);
         }
 
@@ -134,16 +112,13 @@ impl KamuApiServerClient {
 
     pub async fn rest_api_call_assert(
         &self,
-        token: Option<String>,
         method: Method,
         endpoint: &str,
         request_body: Option<RequestBody>,
         expected_status: StatusCode,
         expected_response_body: Option<ExpectedResponseBody>,
     ) {
-        let response = self
-            .rest_api_call(token, method, endpoint, request_body)
-            .await;
+        let response = self.rest_api_call(method, endpoint, request_body).await;
 
         pretty_assertions::assert_eq!(expected_status, response.status());
 
@@ -153,12 +128,8 @@ impl KamuApiServerClient {
         };
     }
 
-    pub async fn graphql_api_call(
-        &self,
-        query: &str,
-        maybe_token: Option<String>,
-    ) -> serde_json::Value {
-        let response = self.graphql_api_call_impl(query, maybe_token).await;
+    pub async fn graphql_api_call(&self, query: &str) -> serde_json::Value {
+        let response = self.graphql_api_call_impl(query).await;
         let response_body = response.json::<GraphQLResponseBody>().await.unwrap();
 
         match response_body.data {
@@ -172,37 +143,31 @@ impl KamuApiServerClient {
         query: &str,
         expected_response: Result<&str, &str>,
     ) {
-        self.graphql_api_call_assert_impl(query, expected_response, None)
+        self.graphql_api_call_assert_impl(query, expected_response)
             .await;
     }
 
     pub async fn graphql_api_call_assert_with_token(
         &self,
-        token: String,
         query: &str,
         expected_response: Result<&str, &str>,
     ) {
-        self.graphql_api_call_assert_impl(query, expected_response, Some(token))
+        self.graphql_api_call_assert_impl(query, expected_response)
             .await;
     }
 
-    pub async fn rest_api_call_response_body_assert(
+    async fn rest_api_call_response_body_assert(
         &self,
         response: Response,
         expected_response_body: ExpectedResponseBody,
     ) {
         match expected_response_body {
             ExpectedResponseBody::Json(expected_pretty_json_response_body) => {
-                let pretty_actual_response = {
-                    let actual_response_body: serde_json::Value = response.json().await.unwrap();
+                let actual_response_body: serde_json::Value = response.json().await.unwrap();
 
-                    serde_json::to_string_pretty(&actual_response_body).unwrap()
-                };
-
-                // Let's add \n for the sake of convenience of passing the expected result
                 pretty_assertions::assert_eq!(
                     expected_pretty_json_response_body,
-                    format!("{pretty_actual_response}\n"),
+                    actual_response_body
                 );
             }
             ExpectedResponseBody::Plain(expected_plain_response_body) => {
@@ -214,15 +179,15 @@ impl KamuApiServerClient {
         };
     }
 
-    async fn graphql_api_call_impl(&self, query: &str, maybe_token: Option<String>) -> Response {
+    async fn graphql_api_call_impl(&self, query: &str) -> Response {
         let endpoint = self.server_base_url.join("graphql").unwrap();
-        let request_data = serde_json::json!({
+        let request_data = json!({
            "query": query
         });
 
         let mut request_builder = self.http_client.post(endpoint).json(&request_data);
 
-        if let Some(token) = maybe_token {
+        if let Some(token) = &self.token {
             request_builder = request_builder.bearer_auth(token);
         }
 
@@ -233,9 +198,8 @@ impl KamuApiServerClient {
         &self,
         query: &str,
         expected_response: Result<&str, &str>,
-        maybe_token: Option<String>,
     ) {
-        let response = self.graphql_api_call_impl(query, maybe_token).await;
+        let response = self.graphql_api_call_impl(query).await;
 
         pretty_assertions::assert_eq!(StatusCode::OK, response.status());
 
@@ -274,6 +238,82 @@ impl KamuApiServerClient {
                 )
             }
             _ => unreachable!(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// API: E2E
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct E2EApi<'a> {
+    client: &'a KamuApiServerClient,
+}
+
+impl E2EApi<'_> {
+    pub async fn ready(&self) -> Result<(), InternalError> {
+        let retry_strategy = FixedInterval::from_millis(1_000).take(10);
+        let response = Retry::spawn(retry_strategy, || async {
+            let endpoint = self.client.server_base_url.join("e2e/health").unwrap();
+            let response = self
+                .client
+                .http_client
+                .get(endpoint)
+                .send()
+                .await
+                .int_err()?;
+
+            Ok(response)
+        })
+        .await?;
+
+        let status = response.status();
+        if status != StatusCode::OK {
+            InternalError::bail(format!("Unexpected health response status: {status}",))?;
+        }
+
+        Ok(())
+    }
+
+    pub async fn shutdown(&self) -> Result<(), InternalError> {
+        let endpoint = self.client.server_base_url.join("e2e/shutdown").unwrap();
+        let response = self
+            .client
+            .http_client
+            .post(endpoint)
+            .send()
+            .await
+            .int_err()?;
+
+        let status = response.status();
+        if status != StatusCode::OK {
+            InternalError::bail(format!("Unexpected shutdown response status: {status}",))?;
+        }
+
+        Ok(())
+    }
+
+    pub async fn set_system_time(&self, t: DateTime<Utc>) {
+        let endpoint = self.client.server_base_url.join("e2e/system_time").unwrap();
+        // To avoid making a dependency, we just use a json!() macro
+        let request = json!({
+            "newSystemTime": t
+        });
+
+        let response = self
+            .client
+            .http_client
+            .post(endpoint)
+            .json(&request)
+            .send()
+            .await
+            .unwrap();
+
+        let status = response.status();
+        if status != StatusCode::OK {
+            let response_data = response.text().await.unwrap();
+
+            panic!("Unexpected set system time response status: {status}, {response_data}");
         }
     }
 }

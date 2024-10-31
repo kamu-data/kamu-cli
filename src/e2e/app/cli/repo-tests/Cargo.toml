@@ -34,6 +34,7 @@ kamu-cli-e2e-common = { workspace = true }
 kamu-cli-puppet = { workspace = true, default-features = false, features = [
     "extensions",
 ] }
+kamu-flow-system = { workspace = true }
 opendatafabric = { workspace = true }
 
 chrono = { version = "0.4", default-features = false }
@@ -41,8 +42,8 @@ indoc = "2"
 pretty_assertions = { version = "1" }
 reqwest = { version = "0.12", default-features = false, features = [] }
 serde_json = { version = "1", default-features = false }
+tempfile = { version = "3" }
 tokio = { version = "1", default-features = false, features = [] }
-tokio-retry = "0.3"
 url = { version = "2", default-features = false }
 
 

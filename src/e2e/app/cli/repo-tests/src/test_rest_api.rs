@@ -16,22 +16,23 @@ use kamu_cli_e2e_common::{
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
 };
 use reqwest::{Method, StatusCode};
+use serde_json::json;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_rest_api_request_dataset_tail(kamu_api_server_client: KamuApiServerClient) {
+pub async fn test_rest_api_request_dataset_tail(mut kamu_api_server_client: KamuApiServerClient) {
     // 1. Grub a token
-    let token = kamu_api_server_client.login_as_kamu().await;
+    kamu_api_server_client.auth().login_as_kamu().await;
 
     // 2. Create a dataset
     kamu_api_server_client
-        .create_player_scores_dataset(&token)
+        .dataset()
+        .create_player_scores_dataset()
         .await;
 
     // 3. Try to get the dataset tail
     kamu_api_server_client
         .rest_api_call_assert(
-            None,
             Method::GET,
             "player-scores/tail?limit=10",
             None,
@@ -43,7 +44,6 @@ pub async fn test_rest_api_request_dataset_tail(kamu_api_server_client: KamuApiS
     // 4. Ingest data
     kamu_api_server_client
         .rest_api_call_assert(
-            Some(token),
             Method::POST,
             "player-scores/ingest",
             Some(RequestBody::NdJson(
@@ -65,42 +65,33 @@ pub async fn test_rest_api_request_dataset_tail(kamu_api_server_client: KamuApiS
     // 5. Get the dataset tail
     kamu_api_server_client
         .rest_api_call_assert(
-            None,
             Method::GET,
             "player-scores/tail",
             None,
             StatusCode::OK,
-            Some(ExpectedResponseBody::Json(
-                indoc::indoc!(
-                    r#"
+            Some(ExpectedResponseBody::Json(json!({
+                "data": [
                     {
-                      "data": [
-                        {
-                          "match_id": 1,
-                          "match_time": "2000-01-01T00:00:00Z",
-                          "offset": 0,
-                          "op": 0,
-                          "player_id": "Alice",
-                          "score": 100,
-                          "system_time": "<SYSTEM_TIME>"
-                        },
-                        {
-                          "match_id": 1,
-                          "match_time": "2000-01-01T00:00:00Z",
-                          "offset": 1,
-                          "op": 0,
-                          "player_id": "Bob",
-                          "score": 80,
-                          "system_time": "<SYSTEM_TIME>"
-                        }
-                      ],
-                      "dataFormat": "JsonAoS"
+                        "match_id": 1,
+                        "match_time": "2000-01-01T00:00:00Z",
+                        "offset": 0,
+                        "op": 0,
+                        "player_id": "Alice",
+                        "score": 100,
+                        "system_time": today.as_str(),
+                    },
+                    {
+                        "match_id": 1,
+                        "match_time": "2000-01-01T00:00:00Z",
+                        "offset": 1,
+                        "op": 0,
+                        "player_id": "Bob",
+                        "score": 80,
+                        "system_time": today.as_str(),
                     }
-                    "#
-                )
-                .to_string()
-                .replace("<SYSTEM_TIME>", today.as_str()),
-            )),
+                ],
+                "dataFormat": "JsonAoS"
+            }))),
         )
         .await;
 }

@@ -33,10 +33,10 @@ pub async fn test_add_dataset_from_stdin(kamu: KamuCliPuppet) {
         .list_datasets()
         .await
         .into_iter()
-        .map(|dataset| dataset.name)
+        .map(|dataset| dataset.name.to_string())
         .collect::<Vec<_>>();
 
-    assert_eq!(dataset_names, ["player-scores"]);
+    pretty_assertions::assert_eq!(vec!["player-scores"], dataset_names);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -86,10 +86,10 @@ pub async fn test_add_dataset_with_name(kamu: KamuCliPuppet) {
         .list_datasets()
         .await
         .into_iter()
-        .map(|dataset| dataset.name)
+        .map(|dataset| dataset.name.to_string())
         .collect::<Vec<_>>();
 
-    assert_eq!(dataset_names, ["player-scores-1", "player-scores-2"]);
+    pretty_assertions::assert_eq!(vec!["player-scores-1", "player-scores-2"], dataset_names);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -137,10 +137,10 @@ pub async fn test_add_dataset_with_replace(kamu: KamuCliPuppet) {
         .list_datasets()
         .await
         .into_iter()
-        .map(|dataset| dataset.name)
+        .map(|dataset| dataset.name.to_string())
         .collect::<Vec<_>>();
 
-    assert_eq!(dataset_names, ["player-scores"]);
+    pretty_assertions::assert_eq!(vec!["player-scores"], dataset_names);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -213,10 +213,10 @@ pub async fn test_add_recursive(kamu: KamuCliPuppet) {
         .list_datasets()
         .await
         .into_iter()
-        .map(|dataset| dataset.name)
+        .map(|dataset| dataset.name.to_string())
         .collect::<Vec<_>>();
 
-    assert_eq!(dataset_names, ["commented", "plain"]);
+    pretty_assertions::assert_eq!(vec!["commented", "plain"], dataset_names);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
