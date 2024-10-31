@@ -242,7 +242,7 @@ impl KamuApiServerClient {
         maybe_token: Option<AccessToken>,
     ) -> Response {
         let endpoint = self.server_base_url.join("graphql").unwrap();
-        let request_data = serde_json::json!({
+        let request_data = json!({
            "query": query
         });
 

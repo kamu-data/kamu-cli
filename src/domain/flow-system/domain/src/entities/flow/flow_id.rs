@@ -46,6 +46,12 @@ impl std::fmt::Display for FlowID {
     }
 }
 
+impl From<u64> for FlowID {
+    fn from(val: u64) -> Self {
+        Self::new(val)
+    }
+}
+
 impl From<FlowID> for u64 {
     fn from(val: FlowID) -> Self {
         val.0

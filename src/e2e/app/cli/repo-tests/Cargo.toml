@@ -34,6 +34,7 @@ kamu-cli-e2e-common = { workspace = true }
 kamu-cli-puppet = { workspace = true, default-features = false, features = [
     "extensions",
 ] }
+kamu-flow-system = { workspace = true }
 opendatafabric = { workspace = true }
 
 chrono = { version = "0.4", default-features = false }

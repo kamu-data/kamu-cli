@@ -8,7 +8,11 @@
 // by the Apache License, Version 2.0.
 
 use async_trait::async_trait;
+use convert_case::{Case, Casing};
+use kamu_flow_system::{DatasetFlowType, FlowID};
 use lazy_static::lazy_static;
+use opendatafabric as odf;
+// TODO: use odf::
 use opendatafabric::{AccountName, DatasetAlias, DatasetKind, DatasetName};
 use reqwest::{Method, StatusCode};
 
@@ -158,6 +162,8 @@ pub trait KamuApiServerClientExt {
     );
 
     async fn tail_data(&self, dataset_id: &DatasetId, token: &AccessToken) -> String;
+
+    fn flow<'a>(&'a self, token: &'a AccessToken) -> FlowApi<'a>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -373,6 +379,87 @@ impl KamuApiServerClientExt for KamuApiServerClient {
 
         content
     }
+
+    // TODO: hide token better?
+    fn flow<'a>(&'a self, token: &'a AccessToken) -> FlowApi<'a> {
+        FlowApi {
+            client: self,
+            token,
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// API: Flow
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct FlowApi<'a> {
+    client: &'a KamuApiServerClient,
+    token: &'a AccessToken,
+}
+
+impl FlowApi<'_> {
+    pub async fn trigger(
+        &self,
+        dataset_id: &odf::DatasetID,
+        dataset_flow_type: DatasetFlowType,
+    ) -> TriggerFlowResponse {
+        let response = self
+            .client
+            .graphql_api_call(
+                indoc::indoc!(
+                    r#"
+                    mutation {
+                      datasets {
+                        byId(datasetId: "<dataset_id>") {
+                          flows {
+                            runs {
+                              triggerFlow(datasetFlowType: <dataset_flow_type>) {
+                                message
+                                ... on TriggerFlowSuccess {
+                                  flow {
+                                    flowId
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                    "#
+                )
+                .replace(
+                    "<dataset_id>",
+                    dataset_id.as_did_str().to_stack_string().as_str(),
+                )
+                .replace(
+                    "<dataset_flow_type>",
+                    &format!("{dataset_flow_type:?}").to_case(Case::ScreamingSnake),
+                )
+                .as_str(),
+                Some(self.token.clone()),
+            )
+            .await;
+
+        let trigger_node = &response["datasets"]["byId"]["flows"]["runs"]["triggerFlow"];
+        let message = trigger_node["message"].as_str().unwrap();
+
+        if message == "Success" {
+            let flow_id_as_str = trigger_node["flow"]["flowId"].as_str().unwrap();
+            let flow_id = flow_id_as_str.parse::<u64>().unwrap();
+
+            TriggerFlowResponse::Success(flow_id.into())
+        } else {
+            TriggerFlowResponse::Error(message.to_owned())
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum TriggerFlowResponse {
+    Success(FlowID),
+    Error(String),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

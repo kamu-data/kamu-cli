@@ -7,17 +7,21 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::assert_matches::assert_matches;
+
 use chrono::{TimeZone, Utc};
 use kamu_cli_e2e_common::{
     AccessToken,
     KamuApiServerClient,
     KamuApiServerClientExt,
     RequestBody,
+    TriggerFlowResponse,
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_2,
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_3,
 };
-use opendatafabric::{DatasetAlias, DatasetName};
+use kamu_flow_system::DatasetFlowType;
+use opendatafabric as odf;
 use tokio_retry::strategy::FixedInterval;
 use tokio_retry::Retry;
 
@@ -810,47 +814,16 @@ pub async fn test_trigger_flow_ingest(kamu_api_server_client: KamuApiServerClien
     )
     .unwrap();
 
-    kamu_api_server_client
-        .graphql_api_call_assert_with_token(
-            token.clone(),
-            indoc::indoc!(
-                r#"
-                mutation {
-                  datasets {
-                    byId(datasetId: "<dataset_id>") {
-                      flows {
-                        runs {
-                          triggerFlow(datasetFlowType: INGEST) {
-                            message
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-                "#
-            )
-            .replace("<dataset_id>", root_dataset_id.as_str())
-            .as_str(),
-            Ok(indoc::indoc!(
-                r#"
-                {
-                  "datasets": {
-                    "byId": {
-                      "flows": {
-                        "runs": {
-                          "triggerFlow": {
-                            "message": "Success"
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-                "#
-            )),
-        )
-        .await;
+    // TODO: remove variable
+    let root_dataset_id_typed = odf::DatasetID::from_did_str(&root_dataset_id).unwrap();
+
+    assert_matches!(
+        kamu_api_server_client
+            .flow(&token)
+            .trigger(&root_dataset_id_typed, DatasetFlowType::Ingest)
+            .await,
+        TriggerFlowResponse::Success(_)
+    );
 
     wait_for_flows_to_finish(
         &kamu_api_server_client,
@@ -1176,7 +1149,8 @@ pub async fn test_trigger_flow_hard_compaction(kamu_api_server_client: KamuApiSe
     let root_dataset_id = kamu_api_server_client
         .create_player_scores_dataset(&token)
         .await;
-    let dataset_alias = DatasetAlias::new(None, DatasetName::new_unchecked("player-scores"));
+    let dataset_alias =
+        odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("player-scores"));
 
     // Ingesting data in multiple chunks
 
