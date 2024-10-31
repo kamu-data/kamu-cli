@@ -15,6 +15,8 @@ use opendatafabric as odf;
 // TODO: use odf::
 use opendatafabric::{AccountName, DatasetAlias, DatasetKind, DatasetName};
 use reqwest::{Method, StatusCode};
+use tokio_retry::strategy::FixedInterval;
+use tokio_retry::Retry;
 
 use crate::{KamuApiServerClient, RequestBody};
 
@@ -429,10 +431,7 @@ impl FlowApi<'_> {
                     }
                     "#
                 )
-                .replace(
-                    "<dataset_id>",
-                    dataset_id.as_did_str().to_stack_string().as_str(),
-                )
+                .replace("<dataset_id>", &dataset_id.as_did_str().to_stack_string())
                 .replace(
                     "<dataset_flow_type>",
                     &format!("{dataset_flow_type:?}").to_case(Case::ScreamingSnake),
@@ -453,6 +452,59 @@ impl FlowApi<'_> {
         } else {
             TriggerFlowResponse::Error(message.to_owned())
         }
+    }
+
+    pub async fn wait(&self, dataset_id: &odf::DatasetID) {
+        let retry_strategy = FixedInterval::from_millis(5_000).take(18); // 1m 30s
+
+        Retry::spawn(retry_strategy, || async {
+            let response = self
+                .client
+                .graphql_api_call(
+                    indoc::indoc!(
+                        r#"
+                        query {
+                          datasets {
+                            byId(datasetId: "<dataset_id>") {
+                              flows {
+                                runs {
+                                  listFlows {
+                                    edges {
+                                      node {
+                                        status
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                        "#
+                    )
+                    .replace("<dataset_id>", &dataset_id.as_did_str().to_stack_string())
+                    .as_str(),
+                    Some(self.token.clone()),
+                )
+                .await;
+
+            let edges = response["datasets"]["byId"]["flows"]["runs"]["listFlows"]["edges"]
+                .as_array()
+                .unwrap();
+            let all_finished = edges.iter().all(|edge| {
+                let status = edge["node"]["status"].as_str().unwrap();
+
+                status == "FINISHED"
+            });
+
+            if all_finished {
+                Ok(())
+            } else {
+                Err(())
+            }
+        })
+        .await
+        .unwrap();
     }
 }
 

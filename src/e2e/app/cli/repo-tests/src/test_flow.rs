@@ -825,12 +825,10 @@ pub async fn test_trigger_flow_ingest(kamu_api_server_client: KamuApiServerClien
         TriggerFlowResponse::Success(_)
     );
 
-    wait_for_flows_to_finish(
-        &kamu_api_server_client,
-        root_dataset_id.as_str(),
-        token.clone(),
-    )
-    .await;
+    kamu_api_server_client
+        .flow(&token)
+        .wait(&root_dataset_id_typed)
+        .await;
 
     pretty_assertions::assert_eq!(
         indoc::indoc!(
@@ -864,54 +862,18 @@ pub async fn test_trigger_flow_ingest(kamu_api_server_client: KamuApiServerClien
     )
     .unwrap();
 
-    kamu_api_server_client
-        .graphql_api_call_assert_with_token(
-            token.clone(),
-            indoc::indoc!(
-                r#"
-                mutation {
-                  datasets {
-                    byId(datasetId: "<dataset_id>") {
-                      flows {
-                        runs {
-                          triggerFlow(datasetFlowType: INGEST) {
-                            message
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-                "#
-            )
-            .replace("<dataset_id>", root_dataset_id.as_str())
-            .as_str(),
-            Ok(indoc::indoc!(
-                r#"
-                {
-                  "datasets": {
-                    "byId": {
-                      "flows": {
-                        "runs": {
-                          "triggerFlow": {
-                            "message": "Success"
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-                "#
-            )),
-        )
-        .await;
+    assert_matches!(
+        kamu_api_server_client
+            .flow(&token)
+            .trigger(&root_dataset_id_typed, DatasetFlowType::Ingest)
+            .await,
+        TriggerFlowResponse::Success(_)
+    );
 
-    wait_for_flows_to_finish(
-        &kamu_api_server_client,
-        root_dataset_id.as_str(),
-        token.clone(),
-    )
-    .await;
+    kamu_api_server_client
+        .flow(&token)
+        .wait(&root_dataset_id_typed)
+        .await;
 
     pretty_assertions::assert_eq!(
         indoc::indoc!(
