@@ -77,12 +77,12 @@ pub async fn test_delete_dataset_recursive(kamu: KamuCliPuppet) {
             .list_datasets()
             .await
             .into_iter()
-            .map(|dataset| dataset.name)
+            .map(|dataset| dataset.name.to_string())
             .collect::<Vec<_>>();
 
-        assert_eq!(
+        pretty_assertions::assert_eq!(
+            vec!["another-root", "leaderboard", "player-scores"],
             dataset_names,
-            ["another-root", "leaderboard", "player-scores"]
         );
     }
 
@@ -98,10 +98,10 @@ pub async fn test_delete_dataset_recursive(kamu: KamuCliPuppet) {
             .list_datasets()
             .await
             .into_iter()
-            .map(|dataset| dataset.name)
+            .map(|dataset| dataset.name.to_string())
             .collect::<Vec<_>>();
 
-        assert_eq!(dataset_names, ["another-root"]);
+        pretty_assertions::assert_eq!(vec!["another-root"], dataset_names);
     }
 }
 
@@ -134,12 +134,12 @@ pub async fn test_delete_dataset_all(kamu: KamuCliPuppet) {
             .list_datasets()
             .await
             .into_iter()
-            .map(|dataset| dataset.name)
+            .map(|dataset| dataset.name.to_string())
             .collect::<Vec<_>>();
 
-        assert_eq!(
-            dataset_names,
-            ["another-root", "leaderboard", "player-scores"]
+        pretty_assertions::assert_eq!(
+            vec!["another-root", "leaderboard", "player-scores"],
+            dataset_names
         );
     }
 

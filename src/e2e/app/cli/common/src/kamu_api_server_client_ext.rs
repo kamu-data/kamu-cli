@@ -259,7 +259,7 @@ impl DatasetApi<'_> {
 
         let create_response_node = &create_response["datasets"]["createEmpty"];
 
-        assert_eq!(create_response_node["message"].as_str(), Some("Success"));
+        pretty_assertions::assert_eq!(Some("Success"), create_response_node["message"].as_str());
 
         let dataset_id_as_str = create_response_node["dataset"]["id"].as_str().unwrap();
 
@@ -295,7 +295,7 @@ impl DatasetApi<'_> {
 
         let create_response_node = &create_response["datasets"]["createFromSnapshot"];
 
-        assert_eq!(create_response_node["message"].as_str(), Some("Success"));
+        pretty_assertions::assert_eq!(Some("Success"), create_response_node["message"].as_str());
 
         let dataset_id_as_str = create_response_node["dataset"]["id"].as_str().unwrap();
 

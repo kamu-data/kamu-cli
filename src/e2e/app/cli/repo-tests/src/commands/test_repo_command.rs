@@ -64,7 +64,7 @@ pub async fn test_repository_pull_aliases_commands(kamu: KamuCliPuppet) {
     let aliases = kamu
         .get_list_of_repo_aliases(&DatasetRef::from(DatasetName::new_unchecked("foo")))
         .await;
-    assert_eq!(aliases, dataset_aliases);
+    pretty_assertions::assert_eq!(dataset_aliases, aliases);
 
     // Test remove single pull alias
     kamu.execute(["repo", "alias", "rm", "foo", &dataset_aliases[2].alias])
@@ -74,7 +74,7 @@ pub async fn test_repository_pull_aliases_commands(kamu: KamuCliPuppet) {
     let aliases = kamu
         .get_list_of_repo_aliases(&DatasetRef::from(DatasetName::new_unchecked("foo")))
         .await;
-    assert_eq!(aliases, dataset_aliases[..2]);
+    pretty_assertions::assert_eq!(dataset_aliases[..2], aliases);
 
     // Test remove all pull aliases
     kamu.execute(["repo", "alias", "rm", "--all", "foo"])
@@ -140,7 +140,7 @@ pub async fn test_repository_push_aliases_commands(kamu: KamuCliPuppet) {
     let aliases = kamu
         .get_list_of_repo_aliases(&DatasetRef::from(DatasetName::new_unchecked("foo")))
         .await;
-    assert_eq!(aliases, dataset_aliases);
+    pretty_assertions::assert_eq!(dataset_aliases, aliases);
 
     // Test remove single push alias
     kamu.execute(["repo", "alias", "rm", "foo", &dataset_aliases[2].alias])
@@ -150,7 +150,7 @@ pub async fn test_repository_push_aliases_commands(kamu: KamuCliPuppet) {
     let aliases = kamu
         .get_list_of_repo_aliases(&DatasetRef::from(DatasetName::new_unchecked("foo")))
         .await;
-    assert_eq!(aliases, dataset_aliases[..2]);
+    pretty_assertions::assert_eq!(dataset_aliases[..2], aliases);
     // Test remove all push aliases
     kamu.execute(["repo", "alias", "rm", "--all", "foo"])
         .await

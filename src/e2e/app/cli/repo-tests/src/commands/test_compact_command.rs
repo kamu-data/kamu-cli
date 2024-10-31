@@ -54,7 +54,7 @@ pub async fn test_compact_hard(kamu: KamuCliPuppet) {
     .await;
 
     let blocks_after_compacting = kamu.list_blocks(&dataset_name).await;
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         blocks_before_compacting.len() - 1,
         blocks_after_compacting.len()
     );
@@ -101,7 +101,7 @@ pub async fn test_compact_keep_metadata_only(kamu: KamuCliPuppet) {
     .await;
 
     let blocks_after_compacting = kamu.list_blocks(&dataset_name).await;
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         blocks_before_compacting.len() - 2,
         blocks_after_compacting.len()
     );
@@ -151,7 +151,7 @@ pub async fn test_compact_verify(kamu: KamuCliPuppet) {
     .await;
 
     let blocks_after_compacting = kamu.list_blocks(&dataset_name).await;
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         blocks_before_compacting.len() - 1,
         blocks_after_compacting.len()
     );
