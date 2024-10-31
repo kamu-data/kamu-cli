@@ -219,7 +219,7 @@ pub struct DatasetApi<'a> {
 
 impl DatasetApi<'_> {
     pub fn get_endpoint(&self, dataset_alias: &odf::DatasetAlias) -> Url {
-        let node_url = self.client.get_node_url();
+        let node_url = self.client.get_odf_node_url();
 
         node_url.join(format!("{dataset_alias}").as_str()).unwrap()
     }

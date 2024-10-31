@@ -65,7 +65,7 @@ impl KamuApiServerClient {
         &self.server_base_url
     }
 
-    pub fn get_node_url(&self) -> Url {
+    pub fn get_odf_node_url(&self) -> Url {
         let mut node_url = Url::parse("odf+http://host").unwrap();
         let base_url = self.get_base_url();
 
@@ -156,7 +156,7 @@ impl KamuApiServerClient {
             .await;
     }
 
-    pub async fn rest_api_call_response_body_assert(
+    async fn rest_api_call_response_body_assert(
         &self,
         response: Response,
         expected_response_body: ExpectedResponseBody,
