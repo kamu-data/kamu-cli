@@ -844,7 +844,7 @@ pub async fn test_trigger_flow_ingest(kamu_api_server_client: KamuApiServerClien
 
     let t = Utc.with_ymd_and_hms(2051, 1, 2, 3, 4, 5).unwrap();
 
-    kamu_api_server_client.set_system_time(t).await;
+    kamu_api_server_client.e2e().set_system_time(t).await;
 
     std::fs::write(
         temp_dir.path().join("chunk-2.csv"),

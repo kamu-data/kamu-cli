@@ -33,14 +33,14 @@ pub async fn api_server_e2e_test<ServerRunFut, Fixture, FixtureFut>(
         let base_url = get_server_api_base_url(e2e_data_file_path).await?;
         let kamu_api_server_client = KamuApiServerClient::new(base_url);
 
-        kamu_api_server_client.ready().await?;
+        kamu_api_server_client.e2e().ready().await?;
 
         let fixture_res = {
             // tokio::spawn() is used to catch panic, otherwise the test will hang
             tokio::spawn(fixture(kamu_api_server_client.clone())).await
         };
 
-        kamu_api_server_client.shutdown().await?;
+        kamu_api_server_client.e2e().shutdown().await?;
 
         fixture_res.int_err()
     };

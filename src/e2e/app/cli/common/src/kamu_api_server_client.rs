@@ -50,57 +50,8 @@ impl KamuApiServerClient {
         }
     }
 
-    pub async fn ready(&self) -> Result<(), InternalError> {
-        let retry_strategy = FixedInterval::from_millis(1_000).take(10);
-        let response = Retry::spawn(retry_strategy, || async {
-            let endpoint = self.server_base_url.join("e2e/health").unwrap();
-            let response = self.http_client.get(endpoint).send().await.int_err()?;
-
-            Ok(response)
-        })
-        .await?;
-
-        let status = response.status();
-        if status != StatusCode::OK {
-            InternalError::bail(format!("Unexpected health response status: {status}",))?;
-        }
-
-        Ok(())
-    }
-
-    pub async fn shutdown(&self) -> Result<(), InternalError> {
-        let endpoint = self.server_base_url.join("e2e/shutdown").unwrap();
-        let response = self.http_client.post(endpoint).send().await.int_err()?;
-
-        let status = response.status();
-        if status != StatusCode::OK {
-            InternalError::bail(format!("Unexpected shutdown response status: {status}",))?;
-        }
-
-        Ok(())
-    }
-
-    pub async fn set_system_time(&self, t: DateTime<Utc>) {
-        let endpoint = self.server_base_url.join("e2e/system_time").unwrap();
-        // To avoid making a dependency, we just use a json!() macro
-        let request = json!({
-            "newSystemTime": t
-        });
-
-        let response = self
-            .http_client
-            .post(endpoint)
-            .json(&request)
-            .send()
-            .await
-            .unwrap();
-
-        let status = response.status();
-        if status != StatusCode::OK {
-            let response_data = response.text().await.unwrap();
-
-            panic!("Unexpected set system time response status: {status}, {response_data}");
-        }
+    pub fn e2e(&self) -> E2EApi {
+        E2EApi { client: self }
     }
 
     pub fn get_base_url(&self) -> &Url {
@@ -300,6 +251,82 @@ impl KamuApiServerClient {
                 )
             }
             _ => unreachable!(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// API: E2E
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct E2EApi<'a> {
+    client: &'a KamuApiServerClient,
+}
+
+impl E2EApi<'_> {
+    pub async fn ready(&self) -> Result<(), InternalError> {
+        let retry_strategy = FixedInterval::from_millis(1_000).take(10);
+        let response = Retry::spawn(retry_strategy, || async {
+            let endpoint = self.client.server_base_url.join("e2e/health").unwrap();
+            let response = self
+                .client
+                .http_client
+                .get(endpoint)
+                .send()
+                .await
+                .int_err()?;
+
+            Ok(response)
+        })
+        .await?;
+
+        let status = response.status();
+        if status != StatusCode::OK {
+            InternalError::bail(format!("Unexpected health response status: {status}",))?;
+        }
+
+        Ok(())
+    }
+
+    pub async fn shutdown(&self) -> Result<(), InternalError> {
+        let endpoint = self.client.server_base_url.join("e2e/shutdown").unwrap();
+        let response = self
+            .client
+            .http_client
+            .post(endpoint)
+            .send()
+            .await
+            .int_err()?;
+
+        let status = response.status();
+        if status != StatusCode::OK {
+            InternalError::bail(format!("Unexpected shutdown response status: {status}",))?;
+        }
+
+        Ok(())
+    }
+
+    pub async fn set_system_time(&self, t: DateTime<Utc>) {
+        let endpoint = self.client.server_base_url.join("e2e/system_time").unwrap();
+        // To avoid making a dependency, we just use a json!() macro
+        let request = json!({
+            "newSystemTime": t
+        });
+
+        let response = self
+            .client
+            .http_client
+            .post(endpoint)
+            .json(&request)
+            .send()
+            .await
+            .unwrap();
+
+        let status = response.status();
+        if status != StatusCode::OK {
+            let response_data = response.text().await.unwrap();
+
+            panic!("Unexpected set system time response status: {status}, {response_data}");
         }
     }
 }
