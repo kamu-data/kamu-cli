@@ -220,3 +220,68 @@ pub async fn test_add_recursive(kamu: KamuCliPuppet) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_add_with_circular_dependency(kamu: KamuCliPuppet) {
+    // Plain manifest
+    let snapshot = MetadataFactory::dataset_snapshot().name("plain").build();
+    let manifest = odf::serde::yaml::YamlDatasetSnapshotSerializer
+        .write_manifest_str(&snapshot)
+        .unwrap();
+    std::fs::write(kamu.workspace_path().join("plain.yaml"), manifest).unwrap();
+
+    // Manifest with lots of comments
+    let snapshot = MetadataFactory::dataset_snapshot()
+        .name("plain")
+        .kind(opendatafabric::DatasetKind::Derivative)
+        .push_event(
+            MetadataFactory::set_transform()
+                .inputs_from_refs(["plain"])
+                .build(),
+        )
+        .build();
+    let manifest = odf::serde::yaml::YamlDatasetSnapshotSerializer
+        .write_manifest_str(&snapshot)
+        .unwrap();
+    std::fs::write(
+        kamu.workspace_path().join("commented.yaml"),
+        format!(
+            indoc::indoc! {
+                "
+
+                # Some
+
+                # Weird
+                #
+                # Comment
+                {}
+                "
+            },
+            &manifest
+        ),
+    )
+    .unwrap();
+
+    kamu.assert_success_command_execution(
+        ["-v", "add", "plain.yaml", "commented.yaml"],
+        None,
+        Some([indoc::indoc!(
+            r#"
+            Added: plain
+            Skipped: plain: Already exists
+            Added 1 dataset(s)
+            "#
+        )]),
+    )
+    .await;
+
+    let dataset_names = kamu
+        .list_datasets()
+        .await
+        .into_iter()
+        .map(|dataset| dataset.name)
+        .collect::<Vec<_>>();
+
+    assert_eq!(dataset_names, ["plain"]);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

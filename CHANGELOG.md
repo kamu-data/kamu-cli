@@ -15,6 +15,8 @@ Recommendation: for ease of reading, use the following order:
 ### Added
 - E2E: cover all flow scenarios
 - E2E: `KamuApiServerClientExt`: method grouping
+### Fixed
+- `kamu add` correctly handle snapshots with circular dependencies
 
 ## [0.206.5] - 2024-10-29
 ### Changed
