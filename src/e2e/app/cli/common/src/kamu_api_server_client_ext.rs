@@ -125,7 +125,12 @@ pub const E2E_USER_ACCOUNT_NAME_STR: &str = "e2e-user";
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub type AccessToken = String;
-pub type DatasetId = String;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct CreateDatasetResponse {
+    pub dataset_id: odf::DatasetID,
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -140,21 +145,25 @@ pub trait KamuApiServerClientExt {
         dataset_kind: DatasetKind,
         dataset_alias: &DatasetAlias,
         token: &AccessToken,
-    ) -> DatasetId;
+    ) -> CreateDatasetResponse;
 
     // TODO: also return alias, after solving this bug:
     //       https://github.com/kamu-data/kamu-cli/issues/891
-    async fn create_dataset(&self, dataset_snapshot_yaml: &str, token: &AccessToken) -> DatasetId;
+    async fn create_dataset(
+        &self,
+        dataset_snapshot_yaml: &str,
+        token: &AccessToken,
+    ) -> CreateDatasetResponse;
 
-    async fn create_player_scores_dataset(&self, token: &AccessToken) -> DatasetId;
+    async fn create_player_scores_dataset(&self, token: &AccessToken) -> CreateDatasetResponse;
 
     async fn create_player_scores_dataset_with_data(
         &self,
         token: &AccessToken,
         account_name_maybe: Option<AccountName>,
-    ) -> DatasetId;
+    ) -> CreateDatasetResponse;
 
-    async fn create_leaderboard(&self, token: &AccessToken) -> DatasetId;
+    async fn create_leaderboard(&self, token: &AccessToken) -> CreateDatasetResponse;
 
     async fn ingest_data(
         &self,
@@ -163,7 +172,7 @@ pub trait KamuApiServerClientExt {
         token: &AccessToken,
     );
 
-    async fn tail_data(&self, dataset_id: &DatasetId, token: &AccessToken) -> String;
+    async fn tail_data(&self, dataset_id: &odf::DatasetID, token: &AccessToken) -> String;
 
     fn flow<'a>(&'a self, token: &'a AccessToken) -> FlowApi<'a>;
 }
@@ -213,7 +222,7 @@ impl KamuApiServerClientExt for KamuApiServerClient {
         dataset_kind: DatasetKind,
         dataset_alias: &DatasetAlias,
         token: &AccessToken,
-    ) -> DatasetId {
+    ) -> CreateDatasetResponse {
         let create_response = self
             .graphql_api_call(
                 indoc::indoc!(
@@ -246,15 +255,18 @@ impl KamuApiServerClientExt for KamuApiServerClient {
 
         assert_eq!(create_response_node["message"].as_str(), Some("Success"));
 
-        let dataset_id = create_response_node["dataset"]["id"]
-            .as_str()
-            .map(ToOwned::to_owned)
-            .unwrap();
+        let dataset_id_as_str = create_response_node["dataset"]["id"].as_str().unwrap();
 
-        dataset_id
+        CreateDatasetResponse {
+            dataset_id: odf::DatasetID::from_did_str(dataset_id_as_str).unwrap(),
+        }
     }
 
-    async fn create_dataset(&self, dataset_snapshot_yaml: &str, token: &AccessToken) -> DatasetId {
+    async fn create_dataset(
+        &self,
+        dataset_snapshot_yaml: &str,
+        token: &AccessToken,
+    ) -> CreateDatasetResponse {
         let create_response = self
             .graphql_api_call(
                 indoc::indoc!(
@@ -283,15 +295,14 @@ impl KamuApiServerClientExt for KamuApiServerClient {
 
         assert_eq!(create_response_node["message"].as_str(), Some("Success"));
 
-        let dataset_id = create_response_node["dataset"]["id"]
-            .as_str()
-            .map(ToOwned::to_owned)
-            .unwrap();
+        let dataset_id_as_str = create_response_node["dataset"]["id"].as_str().unwrap();
 
-        dataset_id
+        CreateDatasetResponse {
+            dataset_id: odf::DatasetID::from_did_str(dataset_id_as_str).unwrap(),
+        }
     }
 
-    async fn create_player_scores_dataset(&self, token: &AccessToken) -> DatasetId {
+    async fn create_player_scores_dataset(&self, token: &AccessToken) -> CreateDatasetResponse {
         self.create_dataset(&DATASET_ROOT_PLAYER_SCORES_SNAPSHOT, token)
             .await
     }
@@ -300,7 +311,7 @@ impl KamuApiServerClientExt for KamuApiServerClient {
         &self,
         token: &AccessToken,
         account_name_maybe: Option<AccountName>,
-    ) -> DatasetId {
+    ) -> CreateDatasetResponse {
         let dataset_id = self.create_player_scores_dataset(token).await;
 
         // TODO: Use the alias from the reply, after fixing the bug:
@@ -320,7 +331,7 @@ impl KamuApiServerClientExt for KamuApiServerClient {
         dataset_id
     }
 
-    async fn create_leaderboard(&self, token: &AccessToken) -> DatasetId {
+    async fn create_leaderboard(&self, token: &AccessToken) -> CreateDatasetResponse {
         self.create_dataset(&DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT, token)
             .await
     }
@@ -344,7 +355,7 @@ impl KamuApiServerClientExt for KamuApiServerClient {
         .await;
     }
 
-    async fn tail_data(&self, dataset_id: &DatasetId, token: &AccessToken) -> String {
+    async fn tail_data(&self, dataset_id: &odf::DatasetID, token: &AccessToken) -> String {
         let tail_response = self
             .graphql_api_call(
                 indoc::indoc!(
@@ -368,7 +379,7 @@ impl KamuApiServerClientExt for KamuApiServerClient {
                     }
                     "#,
                 )
-                .replace("<dataset_id>", dataset_id.as_str())
+                .replace("<dataset_id>", &dataset_id.as_did_str().to_stack_string())
                 .as_str(),
                 Some(token.clone()),
             )
