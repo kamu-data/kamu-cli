@@ -188,10 +188,11 @@ impl AddCommand {
                 .find_map(|e| e.as_variant::<SetTransform>());
 
             let has_pending_deps = if let Some(transform) = transform {
-                transform
-                    .inputs
-                    .iter()
-                    .any(|input| pending.contains(&input.dataset_ref))
+                transform.inputs.iter().any(|input| {
+                    pending.contains(&input.dataset_ref)
+                        // Check for circular dependency
+                        && snapshot.name.as_local_ref() != input.dataset_ref
+                })
             } else {
                 false
             };
