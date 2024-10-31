@@ -40,10 +40,11 @@ pub async fn test_search_multi_user(mut kamu_node_api_client: KamuApiServerClien
     )
     .await;
 
-    let e2e_user_token = kamu_node_api_client.auth().login_as_e2e_user().await;
+    kamu_node_api_client.auth().login_as_e2e_user().await;
 
     kamu_node_api_client
-        .create_player_scores_dataset(&e2e_user_token)
+        .dataset()
+        .create_player_scores_dataset()
         .await;
 
     kamu.assert_success_command_execution(
@@ -67,10 +68,10 @@ pub async fn test_search_multi_user(mut kamu_node_api_client: KamuApiServerClien
     );
 
     kamu_node_api_client
+        .dataset()
         .ingest_data(
             &player_scores_alias,
             RequestBody::NdJson(DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1.into()),
-            &e2e_user_token,
         )
         .await;
 
@@ -98,10 +99,8 @@ pub async fn test_search_multi_user(mut kamu_node_api_client: KamuApiServerClien
             .replace("leaderboard", "player-leaderboard");
 
     kamu_node_api_client
-        .create_dataset(
-            &dataset_derivative_player_leaderboard_snapshot,
-            &e2e_user_token,
-        )
+        .dataset()
+        .create_dataset(&dataset_derivative_player_leaderboard_snapshot)
         .await;
 
     kamu.assert_success_command_execution(
@@ -120,10 +119,11 @@ pub async fn test_search_multi_user(mut kamu_node_api_client: KamuApiServerClien
     )
     .await;
 
-    let kamu_token = kamu_node_api_client.auth().login_as_kamu().await;
+    kamu_node_api_client.auth().login_as_kamu().await;
 
     kamu_node_api_client
-        .create_player_scores_dataset(&kamu_token)
+        .dataset()
+        .create_player_scores_dataset()
         .await;
 
     kamu.assert_success_command_execution(
@@ -151,15 +151,14 @@ pub async fn test_search_by_name(mut kamu_node_api_client: KamuApiServerClient) 
 
     add_repo_to_workspace(&kamu_node_api_client, &kamu, "kamu-node").await;
 
-    let e2e_user_token = kamu_node_api_client.auth().login_as_e2e_user().await;
+    kamu_node_api_client.auth().login_as_e2e_user().await;
 
     kamu_node_api_client
-        .create_player_scores_dataset(&e2e_user_token)
+        .dataset()
+        .create_player_scores_dataset()
         .await;
 
-    kamu_node_api_client
-        .create_leaderboard(&e2e_user_token)
-        .await;
+    kamu_node_api_client.dataset().create_leaderboard().await;
 
     kamu.assert_success_command_execution(
         ["search", "player", "--output-format", "table"],
@@ -231,15 +230,14 @@ pub async fn test_search_by_repo(mut kamu_node_api_client: KamuApiServerClient) 
     add_repo_to_workspace(&kamu_node_api_client, &kamu, "kamu-node").await;
     add_repo_to_workspace(&kamu_node_api_client, &kamu, "acme-org-node").await;
 
-    let e2e_user_token = kamu_node_api_client.auth().login_as_e2e_user().await;
+    kamu_node_api_client.auth().login_as_e2e_user().await;
 
     kamu_node_api_client
-        .create_player_scores_dataset(&e2e_user_token)
+        .dataset()
+        .create_player_scores_dataset()
         .await;
 
-    kamu_node_api_client
-        .create_leaderboard(&e2e_user_token)
-        .await;
+    kamu_node_api_client.dataset().create_leaderboard().await;
 
     kamu.assert_success_command_execution(
         ["search", "player", "--output-format", "table"],

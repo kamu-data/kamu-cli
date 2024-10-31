@@ -22,17 +22,17 @@ use serde_json::json;
 
 pub async fn test_rest_api_request_dataset_tail(mut kamu_api_server_client: KamuApiServerClient) {
     // 1. Grub a token
-    let token = kamu_api_server_client.auth().login_as_kamu().await;
+    kamu_api_server_client.auth().login_as_kamu().await;
 
     // 2. Create a dataset
     kamu_api_server_client
-        .create_player_scores_dataset(&token)
+        .dataset()
+        .create_player_scores_dataset()
         .await;
 
     // 3. Try to get the dataset tail
     kamu_api_server_client
         .rest_api_call_assert(
-            None,
             Method::GET,
             "player-scores/tail?limit=10",
             None,
@@ -44,7 +44,6 @@ pub async fn test_rest_api_request_dataset_tail(mut kamu_api_server_client: Kamu
     // 4. Ingest data
     kamu_api_server_client
         .rest_api_call_assert(
-            Some(token),
             Method::POST,
             "player-scores/ingest",
             Some(RequestBody::NdJson(
@@ -66,7 +65,6 @@ pub async fn test_rest_api_request_dataset_tail(mut kamu_api_server_client: Kamu
     // 5. Get the dataset tail
     kamu_api_server_client
         .rest_api_call_assert(
-            None,
             Method::GET,
             "player-scores/tail",
             None,

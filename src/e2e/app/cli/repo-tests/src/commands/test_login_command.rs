@@ -119,7 +119,8 @@ pub async fn test_login_logout_oauth(mut kamu_node_api_client: KamuApiServerClie
 
     // Token validation, via an API call that requires authorization
     kamu_node_api_client
-        .create_player_scores_dataset(&oauth_token)
+        .dataset()
+        .create_player_scores_dataset()
         .await;
 
     kamu.assert_success_command_execution(

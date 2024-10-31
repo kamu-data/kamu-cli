@@ -393,13 +393,13 @@ pub async fn test_smart_pull_as(mut kamu_api_server_client: KamuApiServerClient)
         kamu_api_server_client.get_dataset_endpoint(&dataset_alias);
 
     // 1. Grub a token
-    let token = kamu_api_server_client.auth().login_as_e2e_user().await;
+    kamu_api_server_client.auth().login_as_e2e_user().await;
 
     kamu_api_server_client
-        .create_player_scores_dataset_with_data(
-            &token,
-            Some(AccountName::new_unchecked(E2E_USER_ACCOUNT_NAME_STR)),
-        )
+        .dataset()
+        .create_player_scores_dataset_with_data(Some(AccountName::new_unchecked(
+            E2E_USER_ACCOUNT_NAME_STR,
+        )))
         .await;
 
     {

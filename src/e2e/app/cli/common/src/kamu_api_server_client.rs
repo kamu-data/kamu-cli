@@ -84,7 +84,6 @@ impl KamuApiServerClient {
 
     pub async fn rest_api_call(
         &self,
-        maybe_token: Option<AccessToken>,
         method: Method,
         endpoint: &str,
         request_body: Option<RequestBody>,
@@ -99,7 +98,7 @@ impl KamuApiServerClient {
             }
         };
 
-        if let Some(token) = maybe_token {
+        if let Some(token) = &self.token {
             request_builder = request_builder.bearer_auth(token);
         }
 
@@ -120,16 +119,13 @@ impl KamuApiServerClient {
 
     pub async fn rest_api_call_assert(
         &self,
-        token: Option<String>,
         method: Method,
         endpoint: &str,
         request_body: Option<RequestBody>,
         expected_status: StatusCode,
         expected_response_body: Option<ExpectedResponseBody>,
     ) {
-        let response = self
-            .rest_api_call(token, method, endpoint, request_body)
-            .await;
+        let response = self.rest_api_call(method, endpoint, request_body).await;
 
         pretty_assertions::assert_eq!(expected_status, response.status());
 
@@ -139,12 +135,8 @@ impl KamuApiServerClient {
         };
     }
 
-    pub async fn graphql_api_call(
-        &self,
-        query: &str,
-        maybe_token: Option<AccessToken>,
-    ) -> serde_json::Value {
-        let response = self.graphql_api_call_impl(query, maybe_token).await;
+    pub async fn graphql_api_call(&self, query: &str) -> serde_json::Value {
+        let response = self.graphql_api_call_impl(query).await;
         let response_body = response.json::<GraphQLResponseBody>().await.unwrap();
 
         match response_body.data {
@@ -158,17 +150,16 @@ impl KamuApiServerClient {
         query: &str,
         expected_response: Result<&str, &str>,
     ) {
-        self.graphql_api_call_assert_impl(query, expected_response, None)
+        self.graphql_api_call_assert_impl(query, expected_response)
             .await;
     }
 
     pub async fn graphql_api_call_assert_with_token(
         &self,
-        token: AccessToken,
         query: &str,
         expected_response: Result<&str, &str>,
     ) {
-        self.graphql_api_call_assert_impl(query, expected_response, Some(token))
+        self.graphql_api_call_assert_impl(query, expected_response)
             .await;
     }
 
@@ -195,11 +186,7 @@ impl KamuApiServerClient {
         };
     }
 
-    async fn graphql_api_call_impl(
-        &self,
-        query: &str,
-        maybe_token: Option<AccessToken>,
-    ) -> Response {
+    async fn graphql_api_call_impl(&self, query: &str) -> Response {
         let endpoint = self.server_base_url.join("graphql").unwrap();
         let request_data = json!({
            "query": query
@@ -207,7 +194,7 @@ impl KamuApiServerClient {
 
         let mut request_builder = self.http_client.post(endpoint).json(&request_data);
 
-        if let Some(token) = maybe_token {
+        if let Some(token) = &self.token {
             request_builder = request_builder.bearer_auth(token);
         }
 
@@ -218,9 +205,8 @@ impl KamuApiServerClient {
         &self,
         query: &str,
         expected_response: Result<&str, &str>,
-        maybe_token: Option<AccessToken>,
     ) {
-        let response = self.graphql_api_call_impl(query, maybe_token).await;
+        let response = self.graphql_api_call_impl(query).await;
 
         pretty_assertions::assert_eq!(StatusCode::OK, response.status());
 

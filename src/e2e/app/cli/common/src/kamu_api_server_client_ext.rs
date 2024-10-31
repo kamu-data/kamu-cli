@@ -131,244 +131,27 @@ pub struct CreateDatasetResponse {
 
 #[async_trait]
 pub trait KamuApiServerClientExt {
-    async fn create_empty_dataset(
-        &self,
-        dataset_kind: odf::DatasetKind,
-        dataset_alias: &odf::DatasetAlias,
-        token: &AccessToken,
-    ) -> CreateDatasetResponse;
-
-    // TODO: also return alias, after solving this bug:
-    //       https://github.com/kamu-data/kamu-cli/issues/891
-    async fn create_dataset(
-        &self,
-        dataset_snapshot_yaml: &str,
-        token: &AccessToken,
-    ) -> CreateDatasetResponse;
-
-    async fn create_player_scores_dataset(&self, token: &AccessToken) -> CreateDatasetResponse;
-
-    async fn create_player_scores_dataset_with_data(
-        &self,
-        token: &AccessToken,
-        account_name_maybe: Option<odf::AccountName>,
-    ) -> CreateDatasetResponse;
-
-    async fn create_leaderboard(&self, token: &AccessToken) -> CreateDatasetResponse;
-
-    async fn ingest_data(
-        &self,
-        dataset_alias: &odf::DatasetAlias,
-        data: RequestBody,
-        token: &AccessToken,
-    );
-
-    async fn tail_data(&self, dataset_id: &odf::DatasetID, token: &AccessToken) -> String;
-
     fn auth(&mut self) -> AuthApi<'_>;
 
-    fn dataset<'a>(&'a self, token: &'a AccessToken) -> DatasetApi<'a>;
+    fn dataset(&self) -> DatasetApi;
 
-    fn flow<'a>(&'a self, token: &'a AccessToken) -> FlowApi<'a>;
+    fn flow(&self) -> FlowApi;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait]
 impl KamuApiServerClientExt for KamuApiServerClient {
-    async fn create_empty_dataset(
-        &self,
-        dataset_kind: odf::DatasetKind,
-        dataset_alias: &odf::DatasetAlias,
-        token: &AccessToken,
-    ) -> CreateDatasetResponse {
-        let create_response = self
-            .graphql_api_call(
-                indoc::indoc!(
-                    r#"
-                    mutation {
-                      datasets {
-                        createEmpty(datasetKind: <dataset_kind>, datasetAlias: "<dataset_alias>") {
-                          message
-                          ... on CreateDatasetResultSuccess {
-                            dataset {
-                              id
-                            }
-                          }
-                        }
-                      }
-                    }
-                    "#,
-                )
-                .replace(
-                    "<dataset_kind>",
-                    &format!("{dataset_kind:?}").to_uppercase(),
-                )
-                .replace("<dataset_alias>", &format!("{dataset_alias}"))
-                .as_str(),
-                Some(token.clone()),
-            )
-            .await;
-
-        let create_response_node = &create_response["datasets"]["createEmpty"];
-
-        assert_eq!(create_response_node["message"].as_str(), Some("Success"));
-
-        let dataset_id_as_str = create_response_node["dataset"]["id"].as_str().unwrap();
-
-        CreateDatasetResponse {
-            dataset_id: odf::DatasetID::from_did_str(dataset_id_as_str).unwrap(),
-        }
-    }
-
-    async fn create_dataset(
-        &self,
-        dataset_snapshot_yaml: &str,
-        token: &AccessToken,
-    ) -> CreateDatasetResponse {
-        let create_response = self
-            .graphql_api_call(
-                indoc::indoc!(
-                    r#"
-                    mutation {
-                      datasets {
-                        createFromSnapshot(snapshot: "<snapshot>", snapshotFormat: YAML) {
-                          message
-                          ... on CreateDatasetResultSuccess {
-                            dataset {
-                              id
-                            }
-                          }
-                        }
-                      }
-                    }
-                    "#,
-                )
-                .replace("<snapshot>", dataset_snapshot_yaml)
-                .as_str(),
-                Some(token.clone()),
-            )
-            .await;
-
-        let create_response_node = &create_response["datasets"]["createFromSnapshot"];
-
-        assert_eq!(create_response_node["message"].as_str(), Some("Success"));
-
-        let dataset_id_as_str = create_response_node["dataset"]["id"].as_str().unwrap();
-
-        CreateDatasetResponse {
-            dataset_id: odf::DatasetID::from_did_str(dataset_id_as_str).unwrap(),
-        }
-    }
-
-    async fn create_player_scores_dataset(&self, token: &AccessToken) -> CreateDatasetResponse {
-        self.create_dataset(&DATASET_ROOT_PLAYER_SCORES_SNAPSHOT, token)
-            .await
-    }
-
-    async fn create_player_scores_dataset_with_data(
-        &self,
-        token: &AccessToken,
-        account_name_maybe: Option<odf::AccountName>,
-    ) -> CreateDatasetResponse {
-        let dataset_id = self.create_player_scores_dataset(token).await;
-
-        // TODO: Use the alias from the reply, after fixing the bug:
-        //       https://github.com/kamu-data/kamu-cli/issues/891
-        let dataset_alias = odf::DatasetAlias::new(
-            account_name_maybe,
-            odf::DatasetName::new_unchecked("player-scores"),
-        );
-
-        self.ingest_data(
-            &dataset_alias,
-            RequestBody::NdJson(DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1.into()),
-            token,
-        )
-        .await;
-
-        dataset_id
-    }
-
-    async fn create_leaderboard(&self, token: &AccessToken) -> CreateDatasetResponse {
-        self.create_dataset(&DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT, token)
-            .await
-    }
-
-    async fn ingest_data(
-        &self,
-        dataset_alias: &odf::DatasetAlias,
-        data: RequestBody,
-        token: &AccessToken,
-    ) {
-        let endpoint = format!("{dataset_alias}/ingest");
-
-        self.rest_api_call_assert(
-            Some(token.clone()),
-            Method::POST,
-            endpoint.as_str(),
-            Some(data),
-            StatusCode::OK,
-            None,
-        )
-        .await;
-    }
-
-    async fn tail_data(&self, dataset_id: &odf::DatasetID, token: &AccessToken) -> String {
-        let tail_response = self
-            .graphql_api_call(
-                indoc::indoc!(
-                    r#"
-                    query {
-                      datasets {
-                        byId(
-                          datasetId: "<dataset_id>"
-                        ) {
-                          data {
-                            tail(dataFormat: "CSV") {
-                              ... on DataQueryResultSuccess {
-                                data {
-                                  content
-                                }
-                              }
-                            }
-                          }
-                        }
-                      }
-                    }
-                    "#,
-                )
-                .replace("<dataset_id>", &dataset_id.as_did_str().to_stack_string())
-                .as_str(),
-                Some(token.clone()),
-            )
-            .await;
-
-        let content = tail_response["datasets"]["byId"]["data"]["tail"]["data"]["content"]
-            .as_str()
-            .map(ToOwned::to_owned)
-            .unwrap();
-
-        content
-    }
-
     fn auth(&mut self) -> AuthApi<'_> {
         AuthApi { client: self }
     }
 
-    fn dataset<'a>(&'a self, token: &'a AccessToken) -> DatasetApi<'a> {
-        DatasetApi {
-            client: self,
-            token,
-        }
+    fn dataset(&self) -> DatasetApi {
+        DatasetApi { client: self }
     }
 
-    // TODO: hide token better?
-    fn flow<'a>(&'a self, token: &'a AccessToken) -> FlowApi<'a> {
-        FlowApi {
-            client: self,
-            token,
-        }
+    fn flow(&self) -> FlowApi {
+        FlowApi { client: self }
     }
 }
 
@@ -414,7 +197,7 @@ impl AuthApi<'_> {
     }
 
     async fn login(&mut self, login_request: &str) -> AccessToken {
-        let login_response = self.client.graphql_api_call(login_request, None).await;
+        let login_response = self.client.graphql_api_call(login_request).await;
         let access_token = login_response["auth"]["login"]["accessToken"]
             .as_str()
             .map(ToOwned::to_owned)
@@ -432,10 +215,173 @@ impl AuthApi<'_> {
 
 pub struct DatasetApi<'a> {
     client: &'a KamuApiServerClient,
-    token: &'a AccessToken,
 }
 
 impl DatasetApi<'_> {
+    pub async fn create_empty_dataset(
+        &self,
+        dataset_kind: odf::DatasetKind,
+        dataset_alias: &odf::DatasetAlias,
+    ) -> CreateDatasetResponse {
+        let create_response = self
+            .client
+            .graphql_api_call(
+                indoc::indoc!(
+                    r#"
+                    mutation {
+                      datasets {
+                        createEmpty(datasetKind: <dataset_kind>, datasetAlias: "<dataset_alias>") {
+                          message
+                          ... on CreateDatasetResultSuccess {
+                            dataset {
+                              id
+                            }
+                          }
+                        }
+                      }
+                    }
+                    "#,
+                )
+                .replace(
+                    "<dataset_kind>",
+                    &format!("{dataset_kind:?}").to_uppercase(),
+                )
+                .replace("<dataset_alias>", &format!("{dataset_alias}"))
+                .as_str(),
+            )
+            .await;
+
+        let create_response_node = &create_response["datasets"]["createEmpty"];
+
+        assert_eq!(create_response_node["message"].as_str(), Some("Success"));
+
+        let dataset_id_as_str = create_response_node["dataset"]["id"].as_str().unwrap();
+
+        CreateDatasetResponse {
+            dataset_id: odf::DatasetID::from_did_str(dataset_id_as_str).unwrap(),
+        }
+    }
+
+    pub async fn create_dataset(&self, dataset_snapshot_yaml: &str) -> CreateDatasetResponse {
+        let create_response = self
+            .client
+            .graphql_api_call(
+                indoc::indoc!(
+                    r#"
+                    mutation {
+                      datasets {
+                        createFromSnapshot(snapshot: "<snapshot>", snapshotFormat: YAML) {
+                          message
+                          ... on CreateDatasetResultSuccess {
+                            dataset {
+                              id
+                            }
+                          }
+                        }
+                      }
+                    }
+                    "#,
+                )
+                .replace("<snapshot>", dataset_snapshot_yaml)
+                .as_str(),
+            )
+            .await;
+
+        let create_response_node = &create_response["datasets"]["createFromSnapshot"];
+
+        assert_eq!(create_response_node["message"].as_str(), Some("Success"));
+
+        let dataset_id_as_str = create_response_node["dataset"]["id"].as_str().unwrap();
+
+        CreateDatasetResponse {
+            dataset_id: odf::DatasetID::from_did_str(dataset_id_as_str).unwrap(),
+        }
+    }
+
+    pub async fn create_player_scores_dataset(&self) -> CreateDatasetResponse {
+        self.create_dataset(&DATASET_ROOT_PLAYER_SCORES_SNAPSHOT)
+            .await
+    }
+
+    pub async fn create_player_scores_dataset_with_data(
+        &self,
+        account_name_maybe: Option<odf::AccountName>,
+    ) -> CreateDatasetResponse {
+        let dataset_id = self.create_player_scores_dataset().await;
+
+        // TODO: Use the alias from the reply, after fixing the bug:
+        //       https://github.com/kamu-data/kamu-cli/issues/891
+        let dataset_alias = odf::DatasetAlias::new(
+            account_name_maybe,
+            odf::DatasetName::new_unchecked("player-scores"),
+        );
+
+        self.ingest_data(
+            &dataset_alias,
+            RequestBody::NdJson(DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1.into()),
+        )
+        .await;
+
+        dataset_id
+    }
+
+    pub async fn create_leaderboard(&self) -> CreateDatasetResponse {
+        self.create_dataset(&DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT)
+            .await
+    }
+
+    pub async fn ingest_data(&self, dataset_alias: &odf::DatasetAlias, data: RequestBody) {
+        let endpoint = format!("{dataset_alias}/ingest");
+
+        self.client
+            .rest_api_call_assert(
+                Method::POST,
+                endpoint.as_str(),
+                Some(data),
+                StatusCode::OK,
+                None,
+            )
+            .await;
+    }
+
+    pub async fn tail_data(&self, dataset_id: &odf::DatasetID) -> String {
+        let tail_response = self
+            .client
+            .graphql_api_call(
+                indoc::indoc!(
+                    r#"
+                    query {
+                      datasets {
+                        byId(
+                          datasetId: "<dataset_id>"
+                        ) {
+                          data {
+                            tail(dataFormat: "CSV") {
+                              ... on DataQueryResultSuccess {
+                                data {
+                                  content
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                    "#,
+                )
+                .replace("<dataset_id>", &dataset_id.as_did_str().to_stack_string())
+                .as_str(),
+            )
+            .await;
+
+        let content = tail_response["datasets"]["byId"]["data"]["tail"]["data"]["content"]
+            .as_str()
+            .map(ToOwned::to_owned)
+            .unwrap();
+
+        content
+    }
+
     pub async fn blocks(&self, dataset_id: &odf::DatasetID) -> DatasetBlocksResponse {
         let response = self
             .client
@@ -469,7 +415,6 @@ impl DatasetApi<'_> {
                 )
                 .replace("<dataset_id>", &dataset_id.as_did_str().to_stack_string())
                 .as_str(),
-                Some(self.token.clone()),
             )
             .await;
 
@@ -536,7 +481,6 @@ pub struct DatasetBlocksResponse {
 
 pub struct FlowApi<'a> {
     client: &'a KamuApiServerClient,
-    token: &'a AccessToken,
 }
 
 impl FlowApi<'_> {
@@ -576,7 +520,6 @@ impl FlowApi<'_> {
                     &format!("{dataset_flow_type:?}").to_case(Case::ScreamingSnake),
                 )
                 .as_str(),
-                Some(self.token.clone()),
             )
             .await;
 
@@ -623,7 +566,6 @@ impl FlowApi<'_> {
                     )
                     .replace("<dataset_id>", &dataset_id.as_did_str().to_stack_string())
                     .as_str(),
-                    Some(self.token.clone()),
                 )
                 .await;
 
