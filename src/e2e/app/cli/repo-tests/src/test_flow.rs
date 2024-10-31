@@ -11,7 +11,7 @@ use std::assert_matches::assert_matches;
 
 use chrono::{TimeZone, Utc};
 use kamu_cli_e2e_common::{
-    AccessToken,
+    CreateDatasetResponse,
     KamuApiServerClient,
     KamuApiServerClientExt,
     RequestBody,
@@ -22,15 +22,13 @@ use kamu_cli_e2e_common::{
 };
 use kamu_flow_system::DatasetFlowType;
 use opendatafabric as odf;
-use tokio_retry::strategy::FixedInterval;
-use tokio_retry::Retry;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_web_ui_get_dataset_list_flows(kamu_api_server_client: KamuApiServerClient) {
     let token = kamu_api_server_client.login_as_kamu().await;
 
-    let dataset_id = kamu_api_server_client
+    let CreateDatasetResponse { dataset_id } = kamu_api_server_client
         .create_player_scores_dataset_with_data(&token, None)
         .await;
 
@@ -42,7 +40,7 @@ pub async fn test_web_ui_get_dataset_list_flows(kamu_api_server_client: KamuApiS
     kamu_api_server_client
         .graphql_api_call_assert_with_token(
             token,
-            get_dataset_list_flows_query(&dataset_id).as_str(),
+            &get_dataset_list_flows_query(&dataset_id),
             Ok(indoc::indoc!(
                 r#"
                 {
@@ -101,7 +99,7 @@ pub async fn test_web_ui_get_dataset_list_flows(kamu_api_server_client: KamuApiS
 pub async fn test_web_ui_dataset_all_flows_paused(kamu_api_server_client: KamuApiServerClient) {
     let token = kamu_api_server_client.login_as_kamu().await;
 
-    let dataset_id = kamu_api_server_client
+    let CreateDatasetResponse { dataset_id } = kamu_api_server_client
         .create_player_scores_dataset_with_data(&token, None)
         .await;
 
@@ -130,7 +128,7 @@ pub async fn test_web_ui_dataset_all_flows_paused(kamu_api_server_client: KamuAp
                 }
                 "#
             )
-            .replace("$datasetId", format!("\"{dataset_id}\"").as_str())
+            .replace("$datasetId", &format!("\"{dataset_id}\""))
             .as_str(),
             Ok(indoc::indoc!(
                 r#"
@@ -160,7 +158,7 @@ pub async fn test_web_ui_dataset_all_flows_paused(kamu_api_server_client: KamuAp
 pub async fn test_web_ui_dataset_flows_initiators(kamu_api_server_client: KamuApiServerClient) {
     let token = kamu_api_server_client.login_as_kamu().await;
 
-    let dataset_id = kamu_api_server_client
+    let CreateDatasetResponse { dataset_id } = kamu_api_server_client
         .create_player_scores_dataset_with_data(&token, None)
         .await;
 
@@ -207,7 +205,7 @@ pub async fn test_web_ui_dataset_flows_initiators(kamu_api_server_client: KamuAp
                 }
                 "#
             )
-            .replace("$datasetId", format!("\"{dataset_id}\"").as_str())
+            .replace("$datasetId", &format!("\"{dataset_id}\""))
             .as_str(),
             Ok(indoc::indoc!(
                 r#"
@@ -241,11 +239,13 @@ pub async fn test_web_ui_dataset_flows_initiators(kamu_api_server_client: KamuAp
 pub async fn test_web_ui_dataset_trigger_flow(kamu_api_server_client: KamuApiServerClient) {
     let token = kamu_api_server_client.login_as_kamu().await;
 
-    let _root_dataset_id = kamu_api_server_client
+    kamu_api_server_client
         .create_player_scores_dataset_with_data(&token, None)
         .await;
 
-    let derivative_dataset_id = kamu_api_server_client.create_leaderboard(&token).await;
+    let CreateDatasetResponse {
+        dataset_id: derivative_dataset_id,
+    } = kamu_api_server_client.create_leaderboard(&token).await;
 
     // The query is almost identical to kamu-web-ui, for ease of later edits.
     // Except for commented dynamic dataset ID fields:
@@ -537,7 +537,7 @@ pub async fn test_web_ui_dataset_trigger_flow(kamu_api_server_client: KamuApiSer
                 .replace("$datasetFlowType", "\"EXECUTE_TRANSFORM\"")
                 .replace(
                     "$datasetId",
-                    format!("\"{derivative_dataset_id}\"").as_str(),
+                    &format!("\"{derivative_dataset_id}\""),
                 )
                 .replace("$flowRunConfiguration", "null")
                 .as_str(),
@@ -592,17 +592,15 @@ pub async fn test_web_ui_dataset_trigger_flow(kamu_api_server_client: KamuApiSer
         )
         .await;
 
-    wait_for_flows_to_finish(
-        &kamu_api_server_client,
-        derivative_dataset_id.as_str(),
-        token.clone(),
-    )
-    .await;
+    kamu_api_server_client
+        .flow(&token)
+        .wait(&derivative_dataset_id)
+        .await;
 
     kamu_api_server_client
         .graphql_api_call_assert_with_token(
             token,
-            get_dataset_list_flows_query(&derivative_dataset_id).as_str(),
+            &get_dataset_list_flows_query(&derivative_dataset_id),
             Ok(indoc::indoc!(
                 r#"
                 {
@@ -786,7 +784,9 @@ pub async fn test_trigger_flow_ingest(kamu_api_server_client: KamuApiServerClien
     .to_string();
     let token = kamu_api_server_client.login_as_kamu().await;
 
-    let root_dataset_id = kamu_api_server_client
+    let CreateDatasetResponse {
+        dataset_id: root_dataset_id,
+    } = kamu_api_server_client
         .create_dataset(&root_dataset_snapshot, &token)
         .await;
 
@@ -814,20 +814,17 @@ pub async fn test_trigger_flow_ingest(kamu_api_server_client: KamuApiServerClien
     )
     .unwrap();
 
-    // TODO: remove variable
-    let root_dataset_id_typed = odf::DatasetID::from_did_str(&root_dataset_id).unwrap();
-
     assert_matches!(
         kamu_api_server_client
             .flow(&token)
-            .trigger(&root_dataset_id_typed, DatasetFlowType::Ingest)
+            .trigger(&root_dataset_id, DatasetFlowType::Ingest)
             .await,
         TriggerFlowResponse::Success(_)
     );
 
     kamu_api_server_client
         .flow(&token)
-        .wait(&root_dataset_id_typed)
+        .wait(&root_dataset_id)
         .await;
 
     pretty_assertions::assert_eq!(
@@ -865,14 +862,14 @@ pub async fn test_trigger_flow_ingest(kamu_api_server_client: KamuApiServerClien
     assert_matches!(
         kamu_api_server_client
             .flow(&token)
-            .trigger(&root_dataset_id_typed, DatasetFlowType::Ingest)
+            .trigger(&root_dataset_id, DatasetFlowType::Ingest)
             .await,
         TriggerFlowResponse::Success(_)
     );
 
     kamu_api_server_client
         .flow(&token)
-        .wait(&root_dataset_id_typed)
+        .wait(&root_dataset_id)
         .await;
 
     pretty_assertions::assert_eq!(
@@ -911,7 +908,9 @@ pub async fn test_trigger_flow_ingest_no_polling_source(
     .to_string();
     let token = kamu_api_server_client.login_as_kamu().await;
 
-    let root_dataset_id = kamu_api_server_client
+    let CreateDatasetResponse {
+        dataset_id: root_dataset_id,
+    } = kamu_api_server_client
         .create_dataset(&root_dataset_snapshot, &token)
         .await;
 
@@ -935,7 +934,7 @@ pub async fn test_trigger_flow_ingest_no_polling_source(
                 }
                 "#
             )
-                .replace("<dataset_id>", root_dataset_id.as_str())
+                .replace("<dataset_id>", &root_dataset_id.as_did_str().to_stack_string())
                 .as_str(),
             Ok(indoc::indoc!(
                 r#"
@@ -966,7 +965,9 @@ pub async fn test_trigger_flow_execute_transform(kamu_api_server_client: KamuApi
     kamu_api_server_client
         .create_player_scores_dataset_with_data(&token, None)
         .await;
-    let derivative_dataset_id = kamu_api_server_client.create_leaderboard(&token).await;
+    let CreateDatasetResponse {
+        dataset_id: derivative_dataset_id,
+    } = kamu_api_server_client.create_leaderboard(&token).await;
 
     pretty_assertions::assert_eq!(
         "",
@@ -995,7 +996,10 @@ pub async fn test_trigger_flow_execute_transform(kamu_api_server_client: KamuApi
                 }
                 "#
             )
-            .replace("<dataset_id>", derivative_dataset_id.as_str())
+            .replace(
+                "<dataset_id>",
+                &derivative_dataset_id.as_did_str().to_stack_string(),
+            )
             .as_str(),
             Ok(indoc::indoc!(
                 r#"
@@ -1017,12 +1021,10 @@ pub async fn test_trigger_flow_execute_transform(kamu_api_server_client: KamuApi
         )
         .await;
 
-    wait_for_flows_to_finish(
-        &kamu_api_server_client,
-        derivative_dataset_id.as_str(),
-        token.clone(),
-    )
-    .await;
+    kamu_api_server_client
+        .flow(&token)
+        .wait(&derivative_dataset_id)
+        .await;
 
     pretty_assertions::assert_eq!(
         indoc::indoc!(
@@ -1056,7 +1058,9 @@ pub async fn test_trigger_flow_execute_transform_no_set_transform(
     .to_string();
     let token = kamu_api_server_client.login_as_kamu().await;
 
-    let derivative_dataset_id = kamu_api_server_client
+    let CreateDatasetResponse {
+        dataset_id: derivative_dataset_id,
+    } = kamu_api_server_client
         .create_dataset(&derivative_dataset_snapshot, &token)
         .await;
 
@@ -1080,7 +1084,7 @@ pub async fn test_trigger_flow_execute_transform_no_set_transform(
                 }
                 "#
             )
-                .replace("<dataset_id>", derivative_dataset_id.as_str())
+                .replace("<dataset_id>", &derivative_dataset_id.as_did_str().to_stack_string())
                 .as_str(),
             Ok(indoc::indoc!(
                 r#"
@@ -1108,7 +1112,9 @@ pub async fn test_trigger_flow_execute_transform_no_set_transform(
 pub async fn test_trigger_flow_hard_compaction(kamu_api_server_client: KamuApiServerClient) {
     let token = kamu_api_server_client.login_as_kamu().await;
 
-    let root_dataset_id = kamu_api_server_client
+    let CreateDatasetResponse {
+        dataset_id: root_dataset_id,
+    } = kamu_api_server_client
         .create_player_scores_dataset(&token)
         .await;
     let dataset_alias =
@@ -1170,7 +1176,10 @@ pub async fn test_trigger_flow_hard_compaction(kamu_api_server_client: KamuApiSe
                 }
                 "#
             )
-            .replace("<dataset_id>", root_dataset_id.as_str())
+            .replace(
+                "<dataset_id>",
+                &root_dataset_id.as_did_str().to_stack_string(),
+            )
             .as_str(),
             Ok(indoc::indoc!(
                 r#"
@@ -1262,7 +1271,10 @@ pub async fn test_trigger_flow_hard_compaction(kamu_api_server_client: KamuApiSe
                 }
                 "#
             )
-            .replace("<dataset_id>", root_dataset_id.as_str())
+            .replace(
+                "<dataset_id>",
+                &root_dataset_id.as_did_str().to_stack_string(),
+            )
             .as_str(),
             Ok(indoc::indoc!(
                 r#"
@@ -1284,12 +1296,10 @@ pub async fn test_trigger_flow_hard_compaction(kamu_api_server_client: KamuApiSe
         )
         .await;
 
-    wait_for_flows_to_finish(
-        &kamu_api_server_client,
-        root_dataset_id.as_str(),
-        token.clone(),
-    )
-    .await;
+    kamu_api_server_client
+        .flow(&token)
+        .wait(&root_dataset_id)
+        .await;
 
     pretty_assertions::assert_eq!(
         indoc::indoc!(
@@ -1335,7 +1345,10 @@ pub async fn test_trigger_flow_hard_compaction(kamu_api_server_client: KamuApiSe
                 }
                 "#
             )
-            .replace("<dataset_id>", root_dataset_id.as_str())
+            .replace(
+                "<dataset_id>",
+                &root_dataset_id.as_did_str().to_stack_string(),
+            )
             .as_str(),
             Ok(indoc::indoc!(
                 r#"
@@ -1399,7 +1412,9 @@ pub async fn test_trigger_flow_hard_compaction(kamu_api_server_client: KamuApiSe
 pub async fn test_trigger_flow_reset(kamu_api_server_client: KamuApiServerClient) {
     let token = kamu_api_server_client.login_as_kamu().await;
 
-    let root_dataset_id = kamu_api_server_client
+    let CreateDatasetResponse {
+        dataset_id: root_dataset_id,
+    } = kamu_api_server_client
         .create_player_scores_dataset(&token)
         .await;
 
@@ -1429,7 +1444,10 @@ pub async fn test_trigger_flow_reset(kamu_api_server_client: KamuApiServerClient
                 }
                 "#
             )
-            .replace("<dataset_id>", root_dataset_id.as_str())
+            .replace(
+                "<dataset_id>",
+                &root_dataset_id.as_did_str().to_stack_string(),
+            )
             .as_str(),
             Ok(indoc::indoc!(
                 r#"
@@ -1493,7 +1511,10 @@ pub async fn test_trigger_flow_reset(kamu_api_server_client: KamuApiServerClient
                 }
                 "#
             )
-            .replace("<dataset_id>", root_dataset_id.as_str())
+            .replace(
+                "<dataset_id>",
+                &root_dataset_id.as_did_str().to_stack_string(),
+            )
             .as_str(),
             Ok(indoc::indoc!(
                 r#"
@@ -1515,12 +1536,10 @@ pub async fn test_trigger_flow_reset(kamu_api_server_client: KamuApiServerClient
         )
         .await;
 
-    wait_for_flows_to_finish(
-        &kamu_api_server_client,
-        root_dataset_id.as_str(),
-        token.clone(),
-    )
-    .await;
+    kamu_api_server_client
+        .flow(&token)
+        .wait(&root_dataset_id)
+        .await;
 
     kamu_api_server_client
         .graphql_api_call_assert_with_token(
@@ -1548,7 +1567,10 @@ pub async fn test_trigger_flow_reset(kamu_api_server_client: KamuApiServerClient
                 }
                 "#
             )
-            .replace("<dataset_id>", root_dataset_id.as_str())
+            .replace(
+                "<dataset_id>",
+                &root_dataset_id.as_did_str().to_stack_string(),
+            )
             .as_str(),
             Ok(indoc::indoc!(
                 r#"
@@ -1583,7 +1605,7 @@ pub async fn test_trigger_flow_reset(kamu_api_server_client: KamuApiServerClient
 // Helpers
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn get_dataset_list_flows_query(dataset_id: &str) -> String {
+fn get_dataset_list_flows_query(dataset_id: &odf::DatasetID) -> String {
     // The query is almost identical to kamu-web-ui, for ease of later edits.
     // Except for commented dynamic dataset ID fields:
     // - search FlowDescriptionDatasetHardCompaction (datasetId)
@@ -2000,67 +2022,11 @@ fn get_dataset_list_flows_query(dataset_id: &str) -> String {
         }
         "#
     )
-    .replace("$datasetId", format!("\"{dataset_id}\"").as_str())
+    .replace("$datasetId", &format!("\"{dataset_id}\""))
     .replace("$page", "0")
     .replace("$perPageTable", "15")
     .replace("$perPageTiles", "150")
     .replace("$filters", "{}")
-}
-
-async fn wait_for_flows_to_finish(
-    kamu_api_server_client: &KamuApiServerClient,
-    dataset_id: &str,
-    token: AccessToken,
-) {
-    let retry_strategy = FixedInterval::from_millis(5_000).take(18); // 1m 30s
-
-    Retry::spawn(retry_strategy, || async {
-        let response = kamu_api_server_client
-            .graphql_api_call(
-                indoc::indoc!(
-                    r#"
-                    query {
-                      datasets {
-                        byId(datasetId: "<dataset_id>") {
-                          flows {
-                            runs {
-                              listFlows {
-                                edges {
-                                  node {
-                                    status
-                                  }
-                                }
-                              }
-                            }
-                          }
-                        }
-                      }
-                    }
-                    "#
-                )
-                .replace("<dataset_id>", dataset_id)
-                .as_str(),
-                Some(token.clone()),
-            )
-            .await;
-
-        let edges = response["datasets"]["byId"]["flows"]["runs"]["listFlows"]["edges"]
-            .as_array()
-            .unwrap();
-        let all_finished = edges.iter().all(|edge| {
-            let status = edge["node"]["status"].as_str().unwrap();
-
-            status == "FINISHED"
-        });
-
-        if all_finished {
-            Ok(())
-        } else {
-            Err(())
-        }
-    })
-    .await
-    .unwrap();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
