@@ -914,47 +914,14 @@ pub async fn test_trigger_flow_ingest_no_polling_source(
         .create_dataset(&root_dataset_snapshot, &token)
         .await;
 
-    kamu_api_server_client
-        .graphql_api_call_assert_with_token(
-            token.clone(),
-            indoc::indoc!(
-                r#"
-                mutation {
-                  datasets {
-                    byId(datasetId: "<dataset_id>") {
-                      flows {
-                        runs {
-                          triggerFlow(datasetFlowType: INGEST) {
-                            message
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-                "#
-            )
-                .replace("<dataset_id>", &root_dataset_id.as_did_str().to_stack_string())
-                .as_str(),
-            Ok(indoc::indoc!(
-                r#"
-                {
-                  "datasets": {
-                    "byId": {
-                      "flows": {
-                        "runs": {
-                          "triggerFlow": {
-                            "message": "Flow didn't met preconditions: 'No SetPollingSource event defined'"
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-                "#
-            )),
-        )
-        .await;
+    assert_matches!(
+        kamu_api_server_client
+            .flow(&token)
+            .trigger(&root_dataset_id, DatasetFlowType::Ingest)
+            .await,
+        TriggerFlowResponse::Error(message)
+            if message == "Flow didn't met preconditions: 'No SetPollingSource event defined'"
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -976,50 +943,13 @@ pub async fn test_trigger_flow_execute_transform(kamu_api_server_client: KamuApi
             .await
     );
 
-    kamu_api_server_client
-        .graphql_api_call_assert_with_token(
-            token.clone(),
-            indoc::indoc!(
-                r#"
-                mutation {
-                  datasets {
-                    byId(datasetId: "<dataset_id>") {
-                      flows {
-                        runs {
-                          triggerFlow(datasetFlowType: EXECUTE_TRANSFORM) {
-                            message
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-                "#
-            )
-            .replace(
-                "<dataset_id>",
-                &derivative_dataset_id.as_did_str().to_stack_string(),
-            )
-            .as_str(),
-            Ok(indoc::indoc!(
-                r#"
-                {
-                  "datasets": {
-                    "byId": {
-                      "flows": {
-                        "runs": {
-                          "triggerFlow": {
-                            "message": "Success"
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-                "#
-            )),
-        )
-        .await;
+    assert_matches!(
+        kamu_api_server_client
+            .flow(&token)
+            .trigger(&derivative_dataset_id, DatasetFlowType::ExecuteTransform)
+            .await,
+        TriggerFlowResponse::Success(_)
+    );
 
     kamu_api_server_client
         .flow(&token)
@@ -1064,47 +994,14 @@ pub async fn test_trigger_flow_execute_transform_no_set_transform(
         .create_dataset(&derivative_dataset_snapshot, &token)
         .await;
 
-    kamu_api_server_client
-        .graphql_api_call_assert_with_token(
-            token.clone(),
-            indoc::indoc!(
-                r#"
-                mutation {
-                  datasets {
-                    byId(datasetId: "<dataset_id>") {
-                      flows {
-                        runs {
-                          triggerFlow(datasetFlowType: EXECUTE_TRANSFORM) {
-                            message
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-                "#
-            )
-                .replace("<dataset_id>", &derivative_dataset_id.as_did_str().to_stack_string())
-                .as_str(),
-            Ok(indoc::indoc!(
-                r#"
-                {
-                  "datasets": {
-                    "byId": {
-                      "flows": {
-                        "runs": {
-                          "triggerFlow": {
-                            "message": "Flow didn't met preconditions: 'No SetTransform event defined'"
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-                "#
-            )),
-        )
-        .await;
+    assert_matches!(
+        kamu_api_server_client
+            .flow(&token)
+            .trigger(&derivative_dataset_id, DatasetFlowType::ExecuteTransform)
+            .await,
+        TriggerFlowResponse::Error(message)
+            if message == "Flow didn't met preconditions: 'No SetTransform event defined'"
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1251,50 +1148,13 @@ pub async fn test_trigger_flow_hard_compaction(kamu_api_server_client: KamuApiSe
         )
         .await;
 
-    kamu_api_server_client
-        .graphql_api_call_assert_with_token(
-            token.clone(),
-            indoc::indoc!(
-                r#"
-                mutation {
-                  datasets {
-                    byId(datasetId: "<dataset_id>") {
-                      flows {
-                        runs {
-                          triggerFlow(datasetFlowType: HARD_COMPACTION) {
-                            message
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-                "#
-            )
-            .replace(
-                "<dataset_id>",
-                &root_dataset_id.as_did_str().to_stack_string(),
-            )
-            .as_str(),
-            Ok(indoc::indoc!(
-                r#"
-                {
-                  "datasets": {
-                    "byId": {
-                      "flows": {
-                        "runs": {
-                          "triggerFlow": {
-                            "message": "Success"
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-                "#
-            )),
-        )
-        .await;
+    assert_matches!(
+        kamu_api_server_client
+            .flow(&token)
+            .trigger(&root_dataset_id, DatasetFlowType::HardCompaction)
+            .await,
+        TriggerFlowResponse::Success(_)
+    );
 
     kamu_api_server_client
         .flow(&token)
@@ -1491,50 +1351,13 @@ pub async fn test_trigger_flow_reset(kamu_api_server_client: KamuApiServerClient
         )
         .await;
 
-    kamu_api_server_client
-        .graphql_api_call_assert_with_token(
-            token.clone(),
-            indoc::indoc!(
-                r#"
-                mutation {
-                  datasets {
-                    byId(datasetId: "<dataset_id>") {
-                      flows {
-                        runs {
-                          triggerFlow(datasetFlowType: RESET) {
-                            message
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-                "#
-            )
-            .replace(
-                "<dataset_id>",
-                &root_dataset_id.as_did_str().to_stack_string(),
-            )
-            .as_str(),
-            Ok(indoc::indoc!(
-                r#"
-                {
-                  "datasets": {
-                    "byId": {
-                      "flows": {
-                        "runs": {
-                          "triggerFlow": {
-                            "message": "Success"
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-                "#
-            )),
-        )
-        .await;
+    assert_matches!(
+        kamu_api_server_client
+            .flow(&token)
+            .trigger(&root_dataset_id, DatasetFlowType::Reset)
+            .await,
+        TriggerFlowResponse::Success(_)
+    );
 
     kamu_api_server_client
         .flow(&token)
