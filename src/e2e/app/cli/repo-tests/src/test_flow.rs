@@ -25,7 +25,7 @@ use opendatafabric as odf;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_web_ui_get_dataset_list_flows(mut kamu_api_server_client: KamuApiServerClient) {
+pub async fn test_gql_get_dataset_list_flows(mut kamu_api_server_client: KamuApiServerClient) {
     kamu_api_server_client.auth().login_as_kamu().await;
 
     let CreateDatasetResponse { dataset_id } = kamu_api_server_client
@@ -96,7 +96,7 @@ pub async fn test_web_ui_get_dataset_list_flows(mut kamu_api_server_client: Kamu
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_web_ui_dataset_all_flows_paused(mut kamu_api_server_client: KamuApiServerClient) {
+pub async fn test_gql_dataset_all_flows_paused(mut kamu_api_server_client: KamuApiServerClient) {
     kamu_api_server_client.auth().login_as_kamu().await;
 
     let CreateDatasetResponse { dataset_id } = kamu_api_server_client
@@ -155,7 +155,7 @@ pub async fn test_web_ui_dataset_all_flows_paused(mut kamu_api_server_client: Ka
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_web_ui_dataset_flows_initiators(mut kamu_api_server_client: KamuApiServerClient) {
+pub async fn test_gql_dataset_flows_initiators(mut kamu_api_server_client: KamuApiServerClient) {
     kamu_api_server_client.auth().login_as_kamu().await;
 
     let CreateDatasetResponse { dataset_id } = kamu_api_server_client
@@ -236,7 +236,7 @@ pub async fn test_web_ui_dataset_flows_initiators(mut kamu_api_server_client: Ka
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_web_ui_dataset_trigger_flow(mut kamu_api_server_client: KamuApiServerClient) {
+pub async fn test_gql_dataset_trigger_flow(mut kamu_api_server_client: KamuApiServerClient) {
     kamu_api_server_client.auth().login_as_kamu().await;
 
     kamu_api_server_client
