@@ -239,10 +239,15 @@ impl DataApi<'_> {
                           queryDialect: SQL_DATA_FUSION,
                           dataFormat: CSV
                         ) {
+                          __typename
                           ... on DataQueryResultSuccess {
                             data {
                               content
                             }
+                          }
+                          ... on DataQueryResultError {
+                            errorKind
+                            errorMessage
                           }
                         }
                       }
@@ -253,8 +258,23 @@ impl DataApi<'_> {
                 .as_str(),
             )
             .await;
+        let query_node = &response["data"]["query"];
 
-        let content = response["data"]["query"]["data"]["content"]
+        if query_node["__typename"].as_str().unwrap() != "DataQueryResultSuccess" {
+            panic!(
+                "{}",
+                indoc::formatdoc!(
+                    r#"
+                    Query:
+                    {query}
+                    Unexpected response:
+                    {query_node:#}
+                    "#
+                )
+            );
+        }
+
+        let content = query_node["data"]["content"]
             .as_str()
             .map(ToOwned::to_owned)
             .unwrap();

@@ -9,6 +9,7 @@
 
 use std::assert_matches::assert_matches;
 
+use chrono::{TimeZone, Utc};
 use kamu_cli_e2e_common::{
     CreateDatasetResponse,
     FlowTriggerResponse,
@@ -749,6 +750,18 @@ pub async fn test_gql_dataset_trigger_flow(mut kamu_api_server_client: KamuApiSe
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_trigger_flow_ingest(mut kamu_api_server_client: KamuApiServerClient) {
+    const QUERY: &str = indoc::indoc!(
+        r#"
+        SELECT op,
+               system_time,
+               event_time,
+               city,
+               population
+        FROM 'root-dataset'
+        ORDER BY event_time, city, population
+        "#
+    );
+
     let temp_dir = tempfile::tempdir().unwrap();
 
     let root_dataset_snapshot = indoc::formatdoc!(
@@ -800,6 +813,8 @@ pub async fn test_trigger_flow_ingest(mut kamu_api_server_client: KamuApiServerC
             .await
     );
 
+    // Update iteration 1
+
     std::fs::write(
         temp_dir.path().join("chunk-1.csv"),
         indoc::indoc!(
@@ -826,15 +841,55 @@ pub async fn test_trigger_flow_ingest(mut kamu_api_server_client: KamuApiServerC
     pretty_assertions::assert_eq!(
         indoc::indoc!(
             r#"
-            offset,op,system_time,event_time,city,population
-            0,0,2050-01-02T03:04:05Z,2020-01-01T00:00:00Z,A,1000
-            1,0,2050-01-02T03:04:05Z,2020-01-01T00:00:00Z,B,2000
-            2,0,2050-01-02T03:04:05Z,2020-01-01T00:00:00Z,C,3000"#
+            op,system_time,event_time,city,population
+            0,2050-01-02T03:04:05Z,2020-01-01T00:00:00Z,A,1000
+            0,2050-01-02T03:04:05Z,2020-01-01T00:00:00Z,B,2000
+            0,2050-01-02T03:04:05Z,2020-01-01T00:00:00Z,C,3000"#
         ),
+        kamu_api_server_client.data().query(QUERY).await
+    );
+
+    // Update iteration 2
+
+    let t = Utc.with_ymd_and_hms(2051, 1, 2, 3, 4, 5).unwrap();
+
+    kamu_api_server_client.e2e().set_system_time(t).await;
+
+    std::fs::write(
+        temp_dir.path().join("chunk-2.csv"),
+        indoc::indoc!(
+            r#"
+            event_time,city,population
+            2020-01-02,A,1500
+            2020-01-02,B,2500
+            2020-01-02,C,3500
+            "#
+        ),
+    )
+    .unwrap();
+
+    assert_matches!(
         kamu_api_server_client
-            .dataset()
-            .tail_data(&root_dataset_id)
-            .await
+            .flow()
+            .trigger(&root_dataset_id, DatasetFlowType::Ingest)
+            .await,
+        FlowTriggerResponse::Success(_)
+    );
+
+    kamu_api_server_client.flow().wait(&root_dataset_id).await;
+
+    pretty_assertions::assert_eq!(
+        indoc::indoc!(
+            r#"
+            op,system_time,event_time,city,population
+            0,2050-01-02T03:04:05Z,2020-01-01T00:00:00Z,A,1000
+            0,2050-01-02T03:04:05Z,2020-01-01T00:00:00Z,B,2000
+            0,2050-01-02T03:04:05Z,2020-01-01T00:00:00Z,C,3000
+            0,2051-01-02T03:04:05Z,2020-01-02T00:00:00Z,A,1500
+            0,2051-01-02T03:04:05Z,2020-01-02T00:00:00Z,B,2500
+            0,2051-01-02T03:04:05Z,2020-01-02T00:00:00Z,C,3500"#
+        ),
+        kamu_api_server_client.data().query(QUERY).await
     );
 }
 
