@@ -219,7 +219,7 @@ pub struct QueryParams {
     #[serde(default = "QueryRequest::default_limit")]
     pub limit: u64,
 
-    /// How the output data should be ecoded
+    /// How the output data should be encoded
     #[serde(alias = "format")]
     #[serde(default)]
     pub data_format: DataFormat,

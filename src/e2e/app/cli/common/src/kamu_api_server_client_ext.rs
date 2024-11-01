@@ -566,6 +566,19 @@ impl DatasetApi<'_> {
         content
     }
 
+    pub async fn tail_data_via_rest(&self, dataset_alias: &odf::DatasetAlias) -> serde_json::Value {
+        let response = self
+            .client
+            .rest_api_call(Method::GET, &format!("{dataset_alias}/tail"), None)
+            .await;
+
+        match response.status() {
+            StatusCode::OK => response.json().await.unwrap(),
+            StatusCode::NO_CONTENT => serde_json::Value::Null,
+            unexpected_status => panic!("Unexpected status: {unexpected_status}"),
+        }
+    }
+
     pub async fn blocks(&self, dataset_id: &odf::DatasetID) -> DatasetBlocksResponse {
         let response = self
             .client

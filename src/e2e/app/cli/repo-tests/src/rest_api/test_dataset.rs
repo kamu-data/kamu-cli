@@ -9,14 +9,12 @@
 
 use chrono::{NaiveTime, SecondsFormat, Utc};
 use kamu_cli_e2e_common::{
-    ExpectedResponseBody,
     KamuApiServerClient,
     KamuApiServerClientExt,
     RequestBody,
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
 };
 use opendatafabric as odf;
-use reqwest::{Method, StatusCode};
 use serde_json::json;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -32,20 +30,18 @@ pub async fn test_dataset_tail(mut kamu_api_server_client: KamuApiServerClient) 
         .await;
 
     // 3. Try to get the dataset tail
-    kamu_api_server_client
-        .rest_api_call_assert(
-            Method::GET,
-            "player-scores/tail?limit=10",
-            None,
-            StatusCode::NO_CONTENT,
-            None,
-        )
-        .await;
-
-    // 4. Ingest data
     let dataset_alias =
         odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("player-scores"));
 
+    pretty_assertions::assert_eq!(
+        serde_json::Value::Null,
+        kamu_api_server_client
+            .dataset()
+            .tail_data_via_rest(&dataset_alias)
+            .await
+    );
+
+    // 4. Ingest data
     kamu_api_server_client
         .dataset()
         .ingest_data(
@@ -63,37 +59,35 @@ pub async fn test_dataset_tail(mut kamu_api_server_client: KamuApiServerClient) 
     };
 
     // 5. Get the dataset tail
-    kamu_api_server_client
-        .rest_api_call_assert(
-            Method::GET,
-            "player-scores/tail",
-            None,
-            StatusCode::OK,
-            Some(ExpectedResponseBody::Json(json!({
-                "data": [
-                    {
-                        "match_id": 1,
-                        "match_time": "2000-01-01T00:00:00Z",
-                        "offset": 0,
-                        "op": 0,
-                        "player_id": "Alice",
-                        "score": 100,
-                        "system_time": today.as_str(),
-                    },
-                    {
-                        "match_id": 1,
-                        "match_time": "2000-01-01T00:00:00Z",
-                        "offset": 1,
-                        "op": 0,
-                        "player_id": "Bob",
-                        "score": 80,
-                        "system_time": today.as_str(),
-                    }
-                ],
-                "dataFormat": "JsonAoS"
-            }))),
-        )
-        .await;
+    pretty_assertions::assert_eq!(
+        json!({
+            "data": [
+                {
+                    "match_id": 1,
+                    "match_time": "2000-01-01T00:00:00Z",
+                    "offset": 0,
+                    "op": 0,
+                    "player_id": "Alice",
+                    "score": 100,
+                    "system_time": today.as_str(),
+                },
+                {
+                    "match_id": 1,
+                    "match_time": "2000-01-01T00:00:00Z",
+                    "offset": 1,
+                    "op": 0,
+                    "player_id": "Bob",
+                    "score": 80,
+                    "system_time": today.as_str(),
+                }
+            ],
+            "dataFormat": "JsonAoS"
+        }),
+        kamu_api_server_client
+            .dataset()
+            .tail_data_via_rest(&dataset_alias)
+            .await
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
