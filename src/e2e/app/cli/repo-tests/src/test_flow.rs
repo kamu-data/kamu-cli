@@ -990,17 +990,17 @@ pub async fn test_trigger_flow_hard_compaction(mut kamu_api_server_client: KamuA
     pretty_assertions::assert_eq!(
         indoc::indoc!(
             r#"
-            offset,op,system_time,match_time,match_id,player_id,score
-            0,0,2050-01-02T03:04:05Z,2000-01-01T00:00:00Z,1,Alice,100
-            1,0,2050-01-02T03:04:05Z,2000-01-01T00:00:00Z,1,Bob,80
-            2,0,2050-01-02T03:04:05Z,2000-01-02T00:00:00Z,2,Charlie,90
-            3,0,2050-01-02T03:04:05Z,2000-01-02T00:00:00Z,2,Alice,70
-            4,0,2050-01-02T03:04:05Z,2000-01-03T00:00:00Z,3,Bob,60
-            5,0,2050-01-02T03:04:05Z,2000-01-03T00:00:00Z,3,Charlie,110"#
+            op,system_time,match_time,match_id,player_id,score
+            0,2050-01-02T03:04:05Z,2000-01-01T00:00:00Z,1,Bob,80
+            0,2050-01-02T03:04:05Z,2000-01-01T00:00:00Z,1,Alice,100
+            0,2050-01-02T03:04:05Z,2000-01-02T00:00:00Z,2,Alice,70
+            0,2050-01-02T03:04:05Z,2000-01-02T00:00:00Z,2,Charlie,90
+            0,2050-01-02T03:04:05Z,2000-01-03T00:00:00Z,3,Bob,60
+            0,2050-01-02T03:04:05Z,2000-01-03T00:00:00Z,3,Charlie,110"#
         ),
         kamu_api_server_client
-            .dataset()
-            .tail_data(&root_dataset_id)
+            .data()
+            .query_player_scores_dataset()
             .await
     );
 
@@ -1039,17 +1039,17 @@ pub async fn test_trigger_flow_hard_compaction(mut kamu_api_server_client: KamuA
     pretty_assertions::assert_eq!(
         indoc::indoc!(
             r#"
-            offset,op,system_time,match_time,match_id,player_id,score
-            0,0,2050-01-02T03:04:05Z,2000-01-01T00:00:00Z,1,Alice,100
-            1,0,2050-01-02T03:04:05Z,2000-01-01T00:00:00Z,1,Bob,80
-            2,0,2050-01-02T03:04:05Z,2000-01-02T00:00:00Z,2,Charlie,90
-            3,0,2050-01-02T03:04:05Z,2000-01-02T00:00:00Z,2,Alice,70
-            4,0,2050-01-02T03:04:05Z,2000-01-03T00:00:00Z,3,Bob,60
-            5,0,2050-01-02T03:04:05Z,2000-01-03T00:00:00Z,3,Charlie,110"#
+            op,system_time,match_time,match_id,player_id,score
+            0,2050-01-02T03:04:05Z,2000-01-01T00:00:00Z,1,Bob,80
+            0,2050-01-02T03:04:05Z,2000-01-01T00:00:00Z,1,Alice,100
+            0,2050-01-02T03:04:05Z,2000-01-02T00:00:00Z,2,Alice,70
+            0,2050-01-02T03:04:05Z,2000-01-02T00:00:00Z,2,Charlie,90
+            0,2050-01-02T03:04:05Z,2000-01-03T00:00:00Z,3,Bob,60
+            0,2050-01-02T03:04:05Z,2000-01-03T00:00:00Z,3,Charlie,110"#
         ),
         kamu_api_server_client
-            .dataset()
-            .tail_data(&root_dataset_id)
+            .data()
+            .query_player_scores_dataset()
             .await
     );
 
@@ -1113,7 +1113,7 @@ pub async fn test_trigger_flow_reset(mut kamu_api_server_client: KamuApiServerCl
     kamu_api_server_client.flow().wait(&root_dataset_id).await;
 
     pretty_assertions::assert_eq!(
-        vec![(0, odf::MetadataEventTypeFlags::SEED),],
+        vec![(0, odf::MetadataEventTypeFlags::SEED)],
         kamu_api_server_client
             .dataset()
             .blocks(&root_dataset_id)
