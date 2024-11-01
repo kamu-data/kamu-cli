@@ -247,8 +247,7 @@ impl KamuCliPuppetExt for KamuCliPuppet {
                 "--engine",
                 "datafusion",
                 "--command",
-                // Without unstable "offset" column.
-                // For a beautiful output, cut to seconds
+                // Without unstable "offset" column
                 indoc::indoc!(
                     r#"
                     SELECT op,
@@ -257,7 +256,7 @@ impl KamuCliPuppetExt for KamuCliPuppet {
                            match_id,
                            player_id,
                            score
-                    FROM "player-scores"
+                    FROM 'player-scores'
                     ORDER BY match_id, score, player_id;
                     "#
                 ),
