@@ -20,6 +20,7 @@ use kamu_cli_e2e_common::{
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_2,
     DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
+    E2E_USER_ACCOUNT_NAME,
     E2E_USER_ACCOUNT_NAME_STR,
 };
 use kamu_cli_puppet::extensions::{KamuCliPuppetExt, RepoAlias};
@@ -30,7 +31,7 @@ use opendatafabric::{AccountName, DatasetAlias, DatasetName};
 
 pub async fn test_smart_push_pull_sequence(mut kamu_api_server_client: KamuApiServerClient) {
     let dataset_alias = DatasetAlias::new(
-        Some(AccountName::new_unchecked("e2e-user")),
+        Some(E2E_USER_ACCOUNT_NAME.clone()),
         DATASET_ROOT_PLAYER_NAME.clone(),
     );
     let kamu_api_server_dataset_endpoint = kamu_api_server_client
@@ -106,7 +107,7 @@ pub async fn test_smart_push_pull_sequence(mut kamu_api_server_client: KamuApiSe
 
 pub async fn test_smart_force_push_pull(mut kamu_api_server_client: KamuApiServerClient) {
     let dataset_alias = DatasetAlias::new(
-        Some(AccountName::new_unchecked("e2e-user")),
+        Some(E2E_USER_ACCOUNT_NAME.clone()),
         DATASET_ROOT_PLAYER_NAME.clone(),
     );
     let kamu_api_server_dataset_endpoint = kamu_api_server_client
@@ -252,7 +253,7 @@ pub async fn test_smart_force_push_pull(mut kamu_api_server_client: KamuApiServe
 
 pub async fn test_smart_push_pull_add_alias(mut kamu_api_server_client: KamuApiServerClient) {
     let dataset_alias = DatasetAlias::new(
-        Some(AccountName::new_unchecked("e2e-user")),
+        Some(E2E_USER_ACCOUNT_NAME.clone()),
         DATASET_ROOT_PLAYER_NAME.clone(),
     );
     let kamu_api_server_dataset_endpoint = kamu_api_server_client
@@ -391,7 +392,7 @@ pub async fn test_smart_push_pull_add_alias(mut kamu_api_server_client: KamuApiS
 
 pub async fn test_smart_pull_as(mut kamu_api_server_client: KamuApiServerClient) {
     let dataset_alias = DatasetAlias::new(
-        Some(AccountName::new_unchecked("e2e-user")),
+        Some(E2E_USER_ACCOUNT_NAME.clone()),
         DATASET_ROOT_PLAYER_NAME.clone(),
     );
     let kamu_api_server_dataset_endpoint = kamu_api_server_client
@@ -440,7 +441,7 @@ pub async fn test_smart_pull_as(mut kamu_api_server_client: KamuApiServerClient)
 
 pub async fn test_smart_push_pull_all(mut kamu_api_server_client: KamuApiServerClient) {
     let root_dataset_alias = DatasetAlias::new(
-        Some(AccountName::new_unchecked("e2e-user")),
+        Some(E2E_USER_ACCOUNT_NAME.clone()),
         DATASET_ROOT_PLAYER_NAME.clone(),
     );
     let kamu_api_server_root_dataset_endpoint = kamu_api_server_client
@@ -448,7 +449,7 @@ pub async fn test_smart_push_pull_all(mut kamu_api_server_client: KamuApiServerC
         .get_endpoint(&root_dataset_alias);
 
     let derivative_dataset_alias = DatasetAlias::new(
-        Some(AccountName::new_unchecked("e2e-user")),
+        Some(E2E_USER_ACCOUNT_NAME.clone()),
         DATASET_DERIVATIVE_LEADERBOARD_NAME.clone(),
     );
     let kamu_api_server_derivative_dataset_endpoint = kamu_api_server_client
@@ -723,7 +724,7 @@ pub async fn test_smart_push_pull_all(mut kamu_api_server_client: KamuApiServerC
 
 pub async fn test_smart_push_pull_recursive(mut kamu_api_server_client: KamuApiServerClient) {
     let root_dataset_alias = DatasetAlias::new(
-        Some(AccountName::new_unchecked("e2e-user")),
+        Some(E2E_USER_ACCOUNT_NAME.clone()),
         DATASET_ROOT_PLAYER_NAME.clone(),
     );
     let kamu_api_server_root_dataset_endpoint = kamu_api_server_client
@@ -731,7 +732,7 @@ pub async fn test_smart_push_pull_recursive(mut kamu_api_server_client: KamuApiS
         .get_endpoint(&root_dataset_alias);
 
     let derivative_dataset_alias = DatasetAlias::new(
-        Some(AccountName::new_unchecked("e2e-user")),
+        Some(E2E_USER_ACCOUNT_NAME.clone()),
         DATASET_DERIVATIVE_LEADERBOARD_NAME.clone(),
     );
 
@@ -1114,7 +1115,7 @@ pub async fn test_smart_pull_reset_derivative(kamu: KamuCliPuppet) {
 
 pub async fn test_smart_push_visibility(mut kamu_api_server_client: KamuApiServerClient) {
     let dataset_alias = DatasetAlias::new(
-        Some(AccountName::new_unchecked("e2e-user")),
+        Some(E2E_USER_ACCOUNT_NAME.clone()),
         DATASET_ROOT_PLAYER_NAME.clone(),
     );
     let kamu_api_server_dataset_endpoint = kamu_api_server_client
@@ -1296,7 +1297,7 @@ pub async fn test_smart_pull_derivative(kamu: KamuCliPuppet) {
 
 pub async fn test_smart_push_from_registered_repo(mut kamu_api_server_client: KamuApiServerClient) {
     let dataset_alias = DatasetAlias::new(
-        Some(AccountName::new_unchecked("e2e-user")),
+        Some(E2E_USER_ACCOUNT_NAME.clone()),
         DATASET_ROOT_PLAYER_NAME.clone(),
     );
     let kamu_api_server_dataset_endpoint = kamu_api_server_client
