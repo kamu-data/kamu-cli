@@ -10,10 +10,13 @@
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use convert_case::{Case, Casing};
+use internal_error::{ErrorIntoInternal, InternalError};
 use kamu_flow_system::{DatasetFlowType, FlowID};
 use lazy_static::lazy_static;
 use opendatafabric as odf;
 use reqwest::{Method, StatusCode, Url};
+use serde::Deserialize;
+use thiserror::Error;
 use tokio_retry::strategy::FixedInterval;
 use tokio_retry::Retry;
 
@@ -163,6 +166,8 @@ pub struct CreateDatasetResponse {
 
 #[async_trait]
 pub trait KamuApiServerClientExt {
+    fn account(&self) -> AccountApi<'_>;
+
     fn auth(&mut self) -> AuthApi<'_>;
 
     fn data(&self) -> DataApi;
@@ -178,6 +183,10 @@ pub trait KamuApiServerClientExt {
 
 #[async_trait]
 impl KamuApiServerClientExt for KamuApiServerClient {
+    fn account(&self) -> AccountApi<'_> {
+        AccountApi { client: self }
+    }
+
     fn auth(&mut self) -> AuthApi<'_> {
         AuthApi { client: self }
     }
@@ -197,6 +206,46 @@ impl KamuApiServerClientExt for KamuApiServerClient {
     fn swagger(&self) -> SwaggerApi {
         SwaggerApi { client: self }
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// API: Auth
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct AccountApi<'a> {
+    client: &'a KamuApiServerClient,
+}
+
+impl AccountApi<'_> {
+    pub async fn me(&mut self) -> Result<AccountMeResponse, AccountMeError> {
+        let response = self
+            .client
+            .rest_api_call(Method::GET, "/accounts/me", None)
+            .await;
+
+        match response.status() {
+            StatusCode::OK => Ok(response.json().await.unwrap()),
+            StatusCode::UNAUTHORIZED => Err(AccountMeError::Unauthorized),
+            unexpected_status => Err(format!("Unexpected status: {unexpected_status}")
+                .int_err()
+                .into()),
+        }
+    }
+}
+
+#[derive(Error, Debug)]
+pub enum AccountMeError {
+    #[error("Unauthorized")]
+    Unauthorized,
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AccountMeResponse {
+    pub id: odf::AccountID,
+    pub account_name: odf::AccountName,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

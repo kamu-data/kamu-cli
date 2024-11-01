@@ -5696,6 +5696,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sqlx",
+ "thiserror",
  "tokio",
  "tokio-retry",
 ]
@@ -5757,6 +5758,7 @@ dependencies = [
  "indoc 2.0.5",
  "internal-error",
  "kamu",
+ "kamu-accounts",
  "kamu-cli",
  "kamu-cli-e2e-common",
  "kamu-cli-puppet",
