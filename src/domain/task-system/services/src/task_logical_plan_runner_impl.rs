@@ -182,7 +182,6 @@ impl TaskLogicalPlanRunnerImpl {
                     tracing::error!(
                         args = ?args,
                         error = ?e,
-                        error_msg = %e,
                         "Update failed",
                     );
                     Err("Update task planning failed".int_err())
