@@ -15,6 +15,7 @@ use kamu_cli_e2e_common::{
     RequestBody,
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
 };
+use opendatafabric as odf;
 use reqwest::{Method, StatusCode};
 use serde_json::json;
 
@@ -42,15 +43,14 @@ pub async fn test_dataset_tail(mut kamu_api_server_client: KamuApiServerClient) 
         .await;
 
     // 4. Ingest data
+    let dataset_alias =
+        odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("player-scores"));
+
     kamu_api_server_client
-        .rest_api_call_assert(
-            Method::POST,
-            "player-scores/ingest",
-            Some(RequestBody::NdJson(
-                DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1.into(),
-            )),
-            StatusCode::OK,
-            None,
+        .dataset()
+        .ingest_data(
+            &dataset_alias,
+            RequestBody::NdJson(DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1.into()),
         )
         .await;
 
