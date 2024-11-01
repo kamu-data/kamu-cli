@@ -133,6 +133,8 @@ pub struct CreateDatasetResponse {
 pub trait KamuApiServerClientExt {
     fn auth(&mut self) -> AuthApi<'_>;
 
+    fn data(&self) -> DataApi;
+
     fn dataset(&self) -> DatasetApi;
 
     fn flow(&self) -> FlowApi;
@@ -144,6 +146,10 @@ pub trait KamuApiServerClientExt {
 impl KamuApiServerClientExt for KamuApiServerClient {
     fn auth(&mut self) -> AuthApi<'_> {
         AuthApi { client: self }
+    }
+
+    fn data(&self) -> DataApi {
+        DataApi { client: self }
     }
 
     fn dataset(&self) -> DatasetApi {
@@ -184,14 +190,14 @@ impl AuthApi<'_> {
         // We are using DummyOAuthGithub, so the loginCredentialsJson can be arbitrary
         self.login(indoc::indoc!(
             r#"
-                mutation {
-                  auth {
-                    login(loginMethod: "oauth_github", loginCredentialsJson: "") {
-                      accessToken
-                    }
-                  }
+            mutation {
+              auth {
+                login(loginMethod: "oauth_github", loginCredentialsJson: "") {
+                  accessToken
                 }
-                "#,
+              }
+            }
+            "#,
         ))
         .await
     }
@@ -206,6 +212,70 @@ impl AuthApi<'_> {
         self.client.set_token(Some(access_token.clone()));
 
         access_token
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// API: Data
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct DataApi<'a> {
+    client: &'a KamuApiServerClient,
+}
+
+impl DataApi<'_> {
+    pub async fn query(&self, query: &str) -> String {
+        let response = self
+            .client
+            .graphql_api_call(
+                indoc::indoc!(
+                    r#"
+                    query {
+                      data {
+                        query(
+                          query: """
+                          <query>
+                          """,
+                          queryDialect: SQL_DATA_FUSION,
+                          dataFormat: CSV
+                        ) {
+                          ... on DataQueryResultSuccess {
+                            data {
+                              content
+                            }
+                          }
+                        }
+                      }
+                    }
+                    "#,
+                )
+                .replace("<query>", query)
+                .as_str(),
+            )
+            .await;
+
+        let content = response["data"]["query"]["data"]["content"]
+            .as_str()
+            .map(ToOwned::to_owned)
+            .unwrap();
+
+        content
+    }
+
+    pub async fn query_player_scores_dataset(&self) -> String {
+        self.query(indoc::indoc!(
+            r#"
+            SELECT op,
+                   system_time,
+                   match_time,
+                   match_id,
+                   player_id,
+                   score
+            FROM 'player-scores'
+            ORDER BY match_id, score, player_id
+            "#
+        ))
+        .await
     }
 }
 
@@ -313,7 +383,7 @@ impl DatasetApi<'_> {
         &self,
         account_name_maybe: Option<odf::AccountName>,
     ) -> CreateDatasetResponse {
-        let dataset_id = self.create_player_scores_dataset().await;
+        let create_response = self.create_player_scores_dataset().await;
 
         // TODO: Use the alias from the reply, after fixing the bug:
         //       https://github.com/kamu-data/kamu-cli/issues/891
@@ -328,7 +398,7 @@ impl DatasetApi<'_> {
         )
         .await;
 
-        dataset_id
+        create_response
     }
 
     pub async fn create_leaderboard(&self) -> CreateDatasetResponse {
@@ -449,7 +519,7 @@ impl DatasetApi<'_> {
                     "AddPushSource" => odf::MetadataEventTypeFlags::ADD_PUSH_SOURCE,
                     "DisablePushSource" => odf::MetadataEventTypeFlags::DISABLE_PUSH_SOURCE,
                     "DisablePollingSource" => odf::MetadataEventTypeFlags::DISABLE_POLLING_SOURCE,
-                    _ => panic!(),
+                    unexpected_event => panic!("Unexpected event type: {unexpected_event}"),
                 };
 
                 DatasetBlock {
