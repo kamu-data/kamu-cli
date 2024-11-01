@@ -503,10 +503,8 @@ impl DatasetApi<'_> {
 
         // TODO: Use the alias from the reply, after fixing the bug:
         //       https://github.com/kamu-data/kamu-cli/issues/891
-        let dataset_alias = odf::DatasetAlias::new(
-            account_name_maybe,
-            odf::DatasetName::new_unchecked("player-scores"),
-        );
+        let dataset_alias =
+            odf::DatasetAlias::new(account_name_maybe, DATASET_ROOT_PLAYER_NAME.clone());
 
         self.ingest_data(
             &dataset_alias,

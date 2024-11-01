@@ -12,6 +12,7 @@ use std::assert_matches::assert_matches;
 use chrono::{TimeZone, Utc};
 use kamu_cli_e2e_common::{
     DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR,
+    DATASET_ROOT_PLAYER_NAME,
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_2,
     DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
@@ -61,7 +62,7 @@ pub async fn test_log(kamu: KamuCliPuppet) {
 
     {
         let mut metadata_blocks = kamu
-            .list_blocks(&DatasetName::new_unchecked("player-scores"))
+            .list_blocks(&DATASET_ROOT_PLAYER_NAME)
             .await
             .into_iter()
             .map(|br| br.block)

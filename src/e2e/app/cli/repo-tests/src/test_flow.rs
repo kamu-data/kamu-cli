@@ -16,6 +16,7 @@ use kamu_cli_e2e_common::{
     KamuApiServerClient,
     KamuApiServerClientExt,
     RequestBody,
+    DATASET_ROOT_PLAYER_NAME,
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_2,
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_3,
@@ -1026,8 +1027,7 @@ pub async fn test_trigger_flow_hard_compaction(mut kamu_api_server_client: KamuA
         .dataset()
         .create_player_scores_dataset()
         .await;
-    let dataset_alias =
-        odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("player-scores"));
+    let dataset_alias = odf::DatasetAlias::new(None, DATASET_ROOT_PLAYER_NAME.clone());
 
     // Ingesting data in multiple chunks
 

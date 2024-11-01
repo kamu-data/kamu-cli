@@ -9,6 +9,7 @@
 
 use kamu_cli_e2e_common::{
     DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR,
+    DATASET_ROOT_PLAYER_NAME,
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
     DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
 };
@@ -56,7 +57,7 @@ pub async fn test_inspect_query(kamu: KamuCliPuppet) {
         .await
         .into_iter()
         .find_map(|dataset| {
-            if dataset.name == DatasetName::new_unchecked("player-scores") {
+            if dataset.name == *DATASET_ROOT_PLAYER_NAME {
                 Some(dataset.id)
             } else {
                 None
