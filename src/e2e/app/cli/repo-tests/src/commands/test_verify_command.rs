@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use kamu_cli_e2e_common::{
+    DATASET_DERIVATIVE_LEADERBOARD_NAME,
     DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR,
     DATASET_ROOT_PLAYER_NAME,
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
@@ -15,7 +16,6 @@ use kamu_cli_e2e_common::{
 };
 use kamu_cli_puppet::extensions::KamuCliPuppetExt;
 use kamu_cli_puppet::KamuCliPuppet;
-use opendatafabric::DatasetName;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -44,7 +44,7 @@ pub async fn test_verify_regular_dataset(kamu: KamuCliPuppet) {
 
 pub async fn test_verify_recursive(kamu: KamuCliPuppet) {
     let dataset_name = DATASET_ROOT_PLAYER_NAME.clone();
-    let dataset_derivative_name = DatasetName::new_unchecked("leaderboard");
+    let dataset_derivative_name = DATASET_DERIVATIVE_LEADERBOARD_NAME.clone();
 
     kamu.execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
         .await

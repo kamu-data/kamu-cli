@@ -11,6 +11,7 @@ use std::assert_matches::assert_matches;
 
 use chrono::{TimeZone, Utc};
 use kamu_cli_e2e_common::{
+    DATASET_DERIVATIVE_LEADERBOARD_NAME,
     DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR,
     DATASET_ROOT_PLAYER_NAME,
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
@@ -23,7 +24,6 @@ use opendatafabric::{
     AddData,
     AddPushSource,
     DatasetKind,
-    DatasetName,
     EnumWithVariants,
     MergeStrategy,
     MergeStrategyLedger,
@@ -218,7 +218,7 @@ pub async fn test_log(kamu: KamuCliPuppet) {
 
     {
         let mut metadata_blocks = kamu
-            .list_blocks(&DatasetName::new_unchecked("leaderboard"))
+            .list_blocks(&DATASET_DERIVATIVE_LEADERBOARD_NAME)
             .await
             .into_iter()
             .map(|br| br.block)
