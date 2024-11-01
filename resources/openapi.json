@@ -165,7 +165,7 @@
           },
           "dataFormat": {
             "$ref": "#/components/schemas/DataFormat",
-            "description": "How data is layed out in the response"
+            "description": "How data is layered out in the response"
           },
           "schema": {
             "oneOf": [
@@ -1255,7 +1255,7 @@
             }
           },
           {
-            "description": "How the output data should be ecoded",
+            "description": "How the output data should be encoded",
             "in": "path",
             "name": "dataFormat",
             "required": true,
@@ -1846,7 +1846,7 @@
             }
           },
           {
-            "description": "How the output data should be ecoded",
+            "description": "How the output data should be encoded",
             "in": "path",
             "name": "dataFormat",
             "required": true,
