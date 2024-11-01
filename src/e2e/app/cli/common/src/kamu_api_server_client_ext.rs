@@ -170,6 +170,8 @@ pub trait KamuApiServerClientExt {
     fn dataset(&self) -> DatasetApi;
 
     fn flow(&self) -> FlowApi;
+
+    fn swagger(&self) -> SwaggerApi;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -190,6 +192,10 @@ impl KamuApiServerClientExt for KamuApiServerClient {
 
     fn flow(&self) -> FlowApi {
         FlowApi { client: self }
+    }
+
+    fn swagger(&self) -> SwaggerApi {
+        SwaggerApi { client: self }
     }
 }
 
@@ -722,6 +728,38 @@ impl FlowApi<'_> {
 pub enum FlowTriggerResponse {
     Success(FlowID),
     Error(String),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// API: Swagger
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct SwaggerApi<'a> {
+    client: &'a KamuApiServerClient,
+}
+
+impl SwaggerApi<'_> {
+    pub async fn main_page(&self) -> String {
+        let response = self
+            .client
+            .rest_api_call(Method::GET, "/swagger/", None)
+            .await;
+
+        pretty_assertions::assert_eq!(StatusCode::OK, response.status());
+
+        response.text().await.unwrap()
+    }
+
+    pub async fn schema(&self) -> serde_json::Value {
+        let response = self
+            .client
+            .rest_api_call(Method::GET, "/openapi.json", None)
+            .await;
+
+        pretty_assertions::assert_eq!(StatusCode::OK, response.status());
+
+        response.json().await.unwrap()
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

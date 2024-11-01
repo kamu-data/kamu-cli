@@ -9,3 +9,4 @@
 
 mod test_dataset;
 mod test_openapi;
+mod test_swagger;
