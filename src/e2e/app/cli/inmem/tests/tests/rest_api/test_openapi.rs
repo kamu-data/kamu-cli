@@ -13,12 +13,14 @@ use kamu_cli_e2e_common::prelude::*;
 
 kamu_cli_run_api_server_e2e_test!(
     storage = inmem,
-    fixture = kamu_cli_e2e_repo_tests::test_openapi_st,
+    fixture = kamu_cli_e2e_repo_tests::rest_api::test_openapi_st,
 );
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 kamu_cli_run_api_server_e2e_test!(
     storage = inmem,
-    fixture = kamu_cli_e2e_repo_tests::test_openapi_mt,
+    fixture = kamu_cli_e2e_repo_tests::rest_api::test_openapi_mt,
     options = Options::default().with_multi_tenant()
 );
 
