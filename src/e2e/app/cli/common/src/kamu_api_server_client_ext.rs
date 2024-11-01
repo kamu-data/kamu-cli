@@ -113,12 +113,20 @@ lazy_static! {
             .to_string()
     };
 
+    pub static ref DATASET_ROOT_PLAYER_NAME: odf::DatasetName = odf::DatasetName::new_unchecked("player-scores");
+
     /// <https://github.com/kamu-data/kamu-cli/blob/master/examples/leaderboard/leaderboard.yaml>
     pub static ref DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT: String = {
         DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR
             .escape_default()
             .to_string()
     };
+
+    pub static ref DATASET_DERIVATIVE_LEADERBOARD_NAME: odf::DatasetName =
+        odf::DatasetName::new_unchecked("leaderboard");
+
+    pub static ref E2E_USER_ACCOUNT_NAME: odf::AccountName =
+        odf::AccountName::new_unchecked(E2E_USER_ACCOUNT_NAME_STR);
 }
 
 /// <https://raw.githubusercontent.com/kamu-data/kamu-cli/refs/heads/master/examples/leaderboard/data/1.ndjson>

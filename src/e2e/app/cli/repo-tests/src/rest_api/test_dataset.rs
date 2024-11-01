@@ -12,26 +12,46 @@ use kamu_cli_e2e_common::{
     KamuApiServerClient,
     KamuApiServerClientExt,
     RequestBody,
+    DATASET_ROOT_PLAYER_NAME,
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
+    E2E_USER_ACCOUNT_NAME,
 };
 use opendatafabric as odf;
 use serde_json::json;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_dataset_tail(mut kamu_api_server_client: KamuApiServerClient) {
-    // 1. Grub a token
+pub async fn test_dataset_tail_st(mut kamu_api_server_client: KamuApiServerClient) {
     kamu_api_server_client.auth().login_as_kamu().await;
 
-    // 2. Create a dataset
+    test_dataset_tail(kamu_api_server_client, None).await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_dataset_tail_mt(mut kamu_api_server_client: KamuApiServerClient) {
+    kamu_api_server_client.auth().login_as_e2e_user().await;
+
+    test_dataset_tail(kamu_api_server_client, Some(E2E_USER_ACCOUNT_NAME.clone())).await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Implementations
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+async fn test_dataset_tail(
+    kamu_api_server_client: KamuApiServerClient,
+    maybe_account_name: Option<odf::AccountName>,
+) {
+    // Create a dataset
     kamu_api_server_client
         .dataset()
         .create_player_scores_dataset()
         .await;
 
-    // 3. Try to get the dataset tail
+    // Try to get the dataset tail
     let dataset_alias =
-        odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("player-scores"));
+        odf::DatasetAlias::new(maybe_account_name, DATASET_ROOT_PLAYER_NAME.clone());
 
     pretty_assertions::assert_eq!(
         serde_json::Value::Null,
@@ -41,7 +61,7 @@ pub async fn test_dataset_tail(mut kamu_api_server_client: KamuApiServerClient) 
             .await
     );
 
-    // 4. Ingest data
+    // Ingest data
     kamu_api_server_client
         .dataset()
         .ingest_data(
@@ -58,7 +78,7 @@ pub async fn test_dataset_tail(mut kamu_api_server_client: KamuApiServerClient) 
             .to_rfc3339_opts(SecondsFormat::Secs, true)
     };
 
-    // 5. Get the dataset tail
+    // Get the dataset tail
     pretty_assertions::assert_eq!(
         json!({
             "data": [
