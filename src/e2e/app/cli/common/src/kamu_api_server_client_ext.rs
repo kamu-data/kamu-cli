@@ -260,19 +260,19 @@ impl DataApi<'_> {
             .await;
         let query_node = &response["data"]["query"];
 
-        if query_node["__typename"].as_str().unwrap() != "DataQueryResultSuccess" {
-            panic!(
-                "{}",
-                indoc::formatdoc!(
-                    r#"
-                    Query:
-                    {query}
-                    Unexpected response:
-                    {query_node:#}
-                    "#
-                )
-            );
-        }
+        assert_eq!(
+            query_node["__typename"].as_str(),
+            Some("DataQueryResultSuccess"),
+            "{}",
+            indoc::formatdoc!(
+                r#"
+                Query:
+                {query}
+                Unexpected response:
+                {query_node:#}
+                "#
+            )
+        );
 
         let content = query_node["data"]["content"]
             .as_str()
@@ -283,6 +283,7 @@ impl DataApi<'_> {
     }
 
     pub async fn query_player_scores_dataset(&self) -> String {
+        // Without unstable "offset" column
         self.query(indoc::indoc!(
             r#"
             SELECT op,
