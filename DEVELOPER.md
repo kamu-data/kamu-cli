@@ -439,7 +439,7 @@ When using VSCode we recommend following extensions:
     ```
 - `Error Lens` - to display errors inline with code
 - `Even Better TOML` - for editing TOML files
-- `crates` - displays dependency version status in `Cargo.toml`
+- `Dependi` - displays dependency version status in `Cargo.toml`
   - Note: It's better to use `cargo upgrade --dry-run` when upgrading to bump deps across entire workspace
 
 
