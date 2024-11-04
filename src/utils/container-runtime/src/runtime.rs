@@ -83,6 +83,7 @@ impl ContainerRuntime {
             .await
             .map_err(|err| ImagePullError::runtime(image, err))?
         {
+            tracing::warn!(image, runtime=?self.config.runtime, "No image locally");
             self.pull_image(image, maybe_listener).await?;
         }
         Ok(())
