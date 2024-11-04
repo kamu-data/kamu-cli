@@ -17,14 +17,15 @@ use kamu::utils::docker_images;
 async fn test_setup_pull_images() {
     let container_runtime = ContainerRuntime::default();
 
-    container_runtime
+    // Disabled for disk space issue
+    /*container_runtime
         .ensure_image(docker_images::SPARK, None)
         .await
         .unwrap();
     container_runtime
         .ensure_image(docker_images::FLINK, None)
         .await
-        .unwrap();
+        .unwrap();*/
 
     // Disabled for disk space issue
     // See: https://github.com/kamu-data/kamu-cli/issues/599
