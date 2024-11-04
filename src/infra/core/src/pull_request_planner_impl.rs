@@ -459,11 +459,24 @@ impl<'a> PullGraphDepthFirstTraversal<'a> {
             // Pulling an existing local root or derivative dataset
             let local_handle = maybe_local_handle.unwrap();
 
+            // Read summary
+            let summary = self
+                .dataset_registry
+                .get_dataset_by_handle(&local_handle)
+                .get_summary(GetSummaryOpts::default())
+                .await
+                .int_err()?;
+
             // Plan up-stream dependencies first
             let max_dep_depth = if traverse_dependencies {
-                self.traverse_upstream_datasets(&local_handle).await?
+                self.traverse_upstream_datasets(summary).await?
             } else {
-                0
+                // Without scanning upstreams, decide on depth based on Root/Derived kind.
+                // The exact depth is not important, as long as we keep `depth=>0` for derived datasets.
+                match summary.kind {
+                    DatasetKind::Root => -1,
+                    DatasetKind::Derivative => 0,
+                }
             };
 
             // Plan the current dataset as last
@@ -688,16 +701,8 @@ impl<'a> PullGraphDepthFirstTraversal<'a> {
     // TODO: consider using data from dependency graph
     async fn traverse_upstream_datasets(
         &mut self,
-        local_handle: &DatasetHandle,
+        summary: DatasetSummary
     ) -> Result<i32, PullError> {
-        // Read summary to access dependencies
-        let summary = self
-            .dataset_registry
-            .get_dataset_by_handle(local_handle)
-            .get_summary(GetSummaryOpts::default())
-            .await
-            .int_err()?;
-
         // TODO: EVO: Should be accounting for historical dependencies, not only current
         // ones?
         let mut max_dep_depth = -1;
