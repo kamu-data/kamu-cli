@@ -467,7 +467,7 @@ pub enum SchemaFormat {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, utoipa::ToSchema)]
+#[derive(Debug, Clone, serde::Deserialize, utoipa::ToSchema)]
 pub struct Schema {
     #[schema(value_type = Object)]
     schema: datafusion::arrow::datatypes::SchemaRef,

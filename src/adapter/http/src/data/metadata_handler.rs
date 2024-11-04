@@ -73,14 +73,14 @@ pub struct DatasetMetadataParams {
 }
 
 impl DatasetMetadataParams {
-    fn default_include() -> CommaSeparatedSet<Include> {
+    pub fn default_include() -> CommaSeparatedSet<Include> {
         CommaSeparatedSet::from([Include::Seed])
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, serde::Serialize, utoipa::ToSchema)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct DatasetMetadataResponse {
     pub output: Output,
@@ -88,7 +88,7 @@ pub struct DatasetMetadataResponse {
 
 #[serde_with::serde_as]
 #[serde_with::skip_serializing_none]
-#[derive(Debug, serde::Serialize, utoipa::ToSchema)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Output {
     #[schema(value_type = Object)]
@@ -120,7 +120,7 @@ pub struct Output {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Ref {
     pub name: String,

@@ -10,7 +10,13 @@
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use convert_case::{Case, Casing};
-use internal_error::{ErrorIntoInternal, InternalError};
+use http_common::comma_separated::CommaSeparatedSet;
+use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
+use kamu_adapter_http::data::metadata_handler::{
+    DatasetMetadataParams,
+    DatasetMetadataResponse,
+    Include as MetadataInclude,
+};
 use kamu_flow_system::{DatasetFlowType, FlowID};
 use lazy_static::lazy_static;
 use opendatafabric as odf;
@@ -661,6 +667,34 @@ impl DatasetApi<'_> {
             .collect::<Vec<_>>();
 
         DatasetBlocksResponse { blocks }
+    }
+
+    pub async fn metadata(
+        &self,
+        dataset_alias: &odf::DatasetAlias,
+        maybe_include_events: Option<CommaSeparatedSet<MetadataInclude>>,
+    ) -> Result<DatasetMetadataResponse, InternalError> {
+        let include_events =
+            maybe_include_events.unwrap_or_else(DatasetMetadataParams::default_include);
+        let include_events_json = serde_json::to_value(include_events).unwrap();
+        let include_query_param_value = include_events_json.as_str().unwrap().trim_matches('"');
+
+        let response = self
+            .client
+            .rest_api_call(
+                Method::GET,
+                &format!("{dataset_alias}/metadata?include={include_query_param_value}"),
+                None,
+            )
+            .await;
+
+        let status = response.status();
+
+        if status != StatusCode::OK {
+            return Err(format!("Unexpected status: {status}").int_err());
+        }
+
+        response.json::<DatasetMetadataResponse>().await.int_err()
     }
 }
 
