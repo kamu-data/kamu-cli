@@ -23,11 +23,10 @@ mockall::mock! {
             target: ResolvedDataset,
         ) -> Result<Option<(Multihash, MetadataBlockTyped<SetTransform>)>, InternalError>;
 
-        async fn build_transform_plan(
+        async fn build_transform_preliminary_plan(
             &self,
             target: ResolvedDataset,
-            options: &TransformOptions,
-        ) -> Result<TransformPlan, TransformPlanError>;
+        ) -> Result<TransformPreliminaryPlan, TransformPlanError>;
 
         async fn build_transform_verification_plan(
             &self,

@@ -91,7 +91,7 @@ pub struct PullTransformItem {
     pub depth: i32,
     pub target: ResolvedDataset,
     pub maybe_original_request: Option<PullRequest>,
-    pub plan: TransformPlan,
+    pub plan: TransformPreliminaryPlan,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -412,6 +412,12 @@ pub enum PullError {
         #[from]
         #[backtrace]
         TransformPlanError,
+    ),
+    #[error(transparent)]
+    TransformElaborateError(
+        #[from]
+        #[backtrace]
+        TransformElaborateError,
     ),
     #[error(transparent)]
     TransformExecuteError(

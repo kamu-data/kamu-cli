@@ -172,7 +172,6 @@ impl PullRequestPlannerImpl {
     async fn build_transform_items(
         &self,
         pull_items: Vec<PullItem>,
-        transform_options: &TransformOptions,
     ) -> Result<Vec<PullTransformItem>, Vec<PullResponse>> {
         let mut pull_transform_items = Vec::new();
         let mut errors = Vec::new();
@@ -191,7 +190,7 @@ impl PullRequestPlannerImpl {
 
             match self
                 .transform_request_planner
-                .build_transform_plan(target.clone(), transform_options)
+                .build_transform_preliminary_plan(target.clone())
                 .await
             {
                 Ok(plan) => {
@@ -354,10 +353,7 @@ impl PullRequestPlanner for PullRequestPlannerImpl {
                     }
                 }
             } else {
-                match self
-                    .build_transform_items(batch, &options.transform_options)
-                    .await
-                {
+                match self.build_transform_items(batch).await {
                     Ok(items) => {
                         iterations.push(PullPlanIteration {
                             depth,
@@ -472,7 +468,8 @@ impl<'a> PullGraphDepthFirstTraversal<'a> {
                 self.traverse_upstream_datasets(summary).await?
             } else {
                 // Without scanning upstreams, decide on depth based on Root/Derived kind.
-                // The exact depth is not important, as long as we keep `depth=>0` for derived datasets.
+                // The exact depth is not important, as long as we keep `depth=>0` for derived
+                // datasets.
                 match summary.kind {
                     DatasetKind::Root => -1,
                     DatasetKind::Derivative => 0,
@@ -701,7 +698,7 @@ impl<'a> PullGraphDepthFirstTraversal<'a> {
     // TODO: consider using data from dependency graph
     async fn traverse_upstream_datasets(
         &mut self,
-        summary: DatasetSummary
+        summary: DatasetSummary,
     ) -> Result<i32, PullError> {
         // TODO: EVO: Should be accounting for historical dependencies, not only current
         // ones?

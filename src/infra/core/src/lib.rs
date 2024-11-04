@@ -25,6 +25,7 @@ mod query;
 mod repos;
 #[cfg(any(feature = "testing", test))]
 pub mod testing;
+mod transform;
 mod use_cases;
 pub mod utils;
 
@@ -48,8 +49,6 @@ mod resource_loader_impl;
 mod search_service_impl;
 mod sync_request_builder;
 mod sync_service_impl;
-mod transform_execution_service_impl;
-mod transform_request_planner_impl;
 mod transform_service_impl;
 mod verification_service_impl;
 mod watermark_service_impl;
@@ -77,8 +76,7 @@ pub use resource_loader_impl::*;
 pub use search_service_impl::*;
 pub use sync_request_builder::*;
 pub use sync_service_impl::*;
-pub use transform_execution_service_impl::*;
-pub use transform_request_planner_impl::*;
+pub use transform::*;
 pub use transform_service_impl::*;
 pub use use_cases::*;
 pub use verification_service_impl::*;

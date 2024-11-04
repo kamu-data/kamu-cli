@@ -7,8 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use chrono::{DateTime, Utc};
+use datafusion::arrow::datatypes::SchemaRef;
 use internal_error::InternalError;
-use opendatafabric::{MetadataBlock, MetadataBlockTyped, Multihash, SetTransform};
+use opendatafabric::*;
 use thiserror::Error;
 
 use crate::engine::TransformRequestExt;
@@ -24,11 +26,10 @@ pub trait TransformRequestPlanner: Send + Sync {
         target: ResolvedDataset,
     ) -> Result<Option<(Multihash, MetadataBlockTyped<SetTransform>)>, InternalError>;
 
-    async fn build_transform_plan(
+    async fn build_transform_preliminary_plan(
         &self,
         target: ResolvedDataset,
-        options: &TransformOptions,
-    ) -> Result<TransformPlan, TransformPlanError>;
+    ) -> Result<TransformPreliminaryPlan, TransformPlanError>;
 
     async fn build_transform_verification_plan(
         &self,
@@ -39,23 +40,41 @@ pub trait TransformRequestPlanner: Send + Sync {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug)]
-pub enum TransformPlan {
-    ReadyToLaunch(TransformOperation),
-    UpToDate,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub struct TransformOperation {
-    pub request: TransformRequestExt,
+pub struct TransformPreliminaryPlan {
+    pub preliminary_request: TransformPreliminaryRequestExt,
     pub datasets_map: WorkingDatasetsMap,
 }
 
-impl std::fmt::Debug for TransformOperation {
+impl std::fmt::Debug for TransformPreliminaryPlan {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.request.fmt(f)
+        self.preliminary_request.fmt(f)
     }
+}
+
+#[derive(Debug, Clone)]
+pub struct TransformPreliminaryRequestExt {
+    /// Randomly assigned value that identifies this specific engine operation
+    pub operation_id: String,
+    /// Identifies the output dataset
+    pub dataset_handle: DatasetHandle,
+    /// Block reference to advance upon commit
+    pub block_ref: BlockRef,
+    /// Current head (for concurrency control)
+    pub head: Multihash,
+    /// Transformation that will be applied to produce new data
+    pub transform: Transform,
+    /// System time to use for new records
+    pub system_time: DateTime<Utc>,
+    /// Expected data schema (if already defined)
+    pub schema: Option<SchemaRef>,
+    /// Preceding record offset, if any
+    pub prev_offset: Option<u64>,
+    /// State of inputs
+    pub input_states: Vec<(TransformInput, Option<ExecuteTransformInput>)>,
+    /// Output dataset's vocabulary
+    pub vocab: DatasetVocabulary,
+    /// Previous checkpoint, if any
+    pub prev_checkpoint: Option<Multihash>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -89,18 +108,6 @@ pub enum TransformPlanError {
         #[from]
         #[backtrace]
         TransformNotDefinedError,
-    ),
-    #[error(transparent)]
-    InputSchemaNotDefined(
-        #[from]
-        #[backtrace]
-        InputSchemaNotDefinedError,
-    ),
-    #[error(transparent)]
-    InvalidInputInterval(
-        #[from]
-        #[backtrace]
-        InvalidInputIntervalError,
     ),
     #[error(transparent)]
     Internal(

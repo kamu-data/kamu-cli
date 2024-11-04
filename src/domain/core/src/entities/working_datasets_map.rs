@@ -19,6 +19,7 @@ use crate::Dataset;
 #[derive(Default)]
 pub struct WorkingDatasetsMap {
     datasets_by_id: HashMap<DatasetID, Arc<dyn Dataset>>,
+    handles_by_id: HashMap<DatasetID, DatasetHandle>,
 }
 
 impl WorkingDatasetsMap {
@@ -34,9 +35,14 @@ impl WorkingDatasetsMap {
         self.get_by_id(&handle.id)
     }
 
+    pub fn get_handle_by_id(&self, id: &DatasetID) -> &DatasetHandle {
+        self.handles_by_id.get(id).expect("Dataset must be present")
+    }
+
     pub fn register(&mut self, handle: &DatasetHandle, dataset: Arc<dyn Dataset>) {
         if !self.datasets_by_id.contains_key(&handle.id) {
             self.datasets_by_id.insert(handle.id.clone(), dataset);
+            self.handles_by_id.insert(handle.id.clone(), handle.clone());
         }
     }
 
@@ -48,6 +54,7 @@ impl WorkingDatasetsMap {
         if !self.datasets_by_id.contains_key(&handle.id) {
             let dataset = dataset_fn(handle);
             self.datasets_by_id.insert(handle.id.clone(), dataset);
+            self.handles_by_id.insert(handle.id.clone(), handle.clone());
         }
     }
 }

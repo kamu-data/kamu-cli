@@ -144,6 +144,7 @@ impl PullDatasetUseCaseImpl {
             .await;
 
         // Convert ingest results into pull results
+        tracing::debug!(batch=?batch, ingest_responses=?ingest_responses, "Ingest results");
         assert_eq!(batch.len(), ingest_responses.len());
         Ok(std::iter::zip(batch, ingest_responses)
             .map(|(pui, res)| {
@@ -156,6 +157,7 @@ impl PullDatasetUseCaseImpl {
     async fn transform_multi(
         &self,
         batch: Vec<PullTransformItem>,
+        transform_options: &TransformOptions,
         maybe_transform_multi_listener: Option<Arc<dyn TransformMultiListener>>,
     ) -> Result<Vec<PullResponse>, InternalError> {
         // Authorization checks
@@ -182,37 +184,63 @@ impl PullDatasetUseCaseImpl {
             .collect();
 
         // Main transform run
+        async fn run_transform(
+            pti: PullTransformItem,
+            transform_execution_svc: Arc<dyn TransformExecutionService>,
+            transform_options: &TransformOptions,
+            transform_multi_listener: Arc<dyn TransformMultiListener>,
+        ) -> (ResolvedDataset, Result<TransformResult, PullError>) {
+            // Notify listener
+            let maybe_listener = transform_multi_listener.begin_transform(&pti.target.handle);
+
+            // Elaborate phase
+            match transform_execution_svc
+                .elaborate_transform(
+                    pti.target.clone(),
+                    pti.plan,
+                    transform_options,
+                    maybe_listener.clone(),
+                )
+                .await
+            {
+                // Elaborate succeess
+                Ok(TransformElaboration::Elaborated(plan)) => {
+                    // Execute phase
+                    let (target, result) = transform_execution_svc
+                        .execute_transform(pti.target, plan, maybe_listener)
+                        .await;
+                    (target, result.map_err(PullError::TransformExecuteError))
+                }
+                // Already up-to-date
+                Ok(TransformElaboration::UpToDate) => (pti.target, Ok(TransformResult::UpToDate)),
+                // Elab error
+                Err(e) => (pti.target, Err(PullError::TransformElaborateError(e))),
+            }
+        }
+
+        // Run transforms concurrently
         let futures: Vec<_> = batch
             .into_iter()
-            .map(|pti| match pti.plan {
-                TransformPlan::ReadyToLaunch(operation) => {
-                    let maybe_listener =
-                        transform_multi_listener.begin_transform(&pti.target.handle);
-                    self.transform_execution_svc.execute_transform(
-                        pti.target,
-                        operation,
-                        maybe_listener,
-                    )
-                }
-                TransformPlan::UpToDate => Box::pin(std::future::ready((
-                    pti.target,
-                    Ok(TransformResult::UpToDate),
-                ))),
+            .map(|pti| {
+                run_transform(
+                    pti,
+                    self.transform_execution_svc.clone(),
+                    transform_options,
+                    transform_multi_listener.clone(),
+                )
             })
             .collect();
         let transform_results = futures::future::join_all(futures).await;
 
         // Convert transform results to pull results
+        tracing::debug!(original_requests=?original_requests, transform_results=?transform_results, "Transform results");
         assert_eq!(original_requests.len(), transform_results.len());
         Ok(std::iter::zip(original_requests, transform_results)
             .map(|(maybe_original_request, (target, result))| PullResponse {
                 maybe_original_request,
                 maybe_local_ref: Some(target.handle.as_local_ref()),
                 maybe_remote_ref: None,
-                result: match result {
-                    Ok(r) => Ok(r.into()),
-                    Err(e) => Err(e.into()),
-                },
+                result: result.map(Into::into),
             })
             .collect())
     }
@@ -274,6 +302,7 @@ impl PullDatasetUseCaseImpl {
             results.push(psi.into_response_sync(res));
         }
 
+        tracing::debug!(results=?results, "Sync results");
         Ok(results)
     }
 }
@@ -352,6 +381,7 @@ impl PullDatasetUseCase for PullDatasetUseCaseImpl {
                     tracing::info!(depth = %iteration.depth, batch = ?transform_batch, "Running transform batch");
                     self.transform_multi(
                         transform_batch,
+                        &options.transform_options,
                         listener
                             .as_ref()
                             .and_then(|l| l.clone().get_transform_listener()),

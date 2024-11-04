@@ -12,27 +12,37 @@ use std::sync::Arc;
 use internal_error::InternalError;
 use thiserror::Error;
 
-use crate::engine::EngineError;
+use super::{InputSchemaNotDefinedError, InvalidInputIntervalError, TransformOptions};
+use crate::engine::{EngineError, TransformRequestExt};
 use crate::{
     CommitError,
     DataNotReproducible,
     EngineProvisioningError,
     ResolvedDataset,
     TransformListener,
-    TransformOperation,
+    TransformPreliminaryPlan,
     TransformResult,
     VerificationListener,
     VerifyTransformOperation,
+    WorkingDatasetsMap,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 pub trait TransformExecutionService: Send + Sync {
+    async fn elaborate_transform(
+        &self,
+        target: ResolvedDataset,
+        plan: TransformPreliminaryPlan,
+        transform_options: &TransformOptions,
+        maybe_listener: Option<Arc<dyn TransformListener>>,
+    ) -> Result<TransformElaboration, TransformElaborateError>;
+
     async fn execute_transform(
         &self,
         target: ResolvedDataset,
-        operation: TransformOperation,
+        plan: TransformPlan,
         maybe_listener: Option<Arc<dyn TransformListener>>,
     ) -> (
         ResolvedDataset,
@@ -45,6 +55,50 @@ pub trait TransformExecutionService: Send + Sync {
         verification_operation: VerifyTransformOperation,
         maybe_listener: Option<Arc<dyn VerificationListener>>,
     ) -> Result<(), VerifyTransformExecuteError>;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub enum TransformElaboration {
+    Elaborated(TransformPlan),
+    UpToDate,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct TransformPlan {
+    pub request: TransformRequestExt,
+    pub datasets_map: WorkingDatasetsMap,
+}
+
+impl std::fmt::Debug for TransformPlan {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.request.fmt(f)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Error)]
+pub enum TransformElaborateError {
+    #[error(transparent)]
+    InputSchemaNotDefined(
+        #[from]
+        #[backtrace]
+        InputSchemaNotDefinedError,
+    ),
+    #[error(transparent)]
+    InvalidInputInterval(
+        #[from]
+        #[backtrace]
+        InvalidInputIntervalError,
+    ),
+    #[error(transparent)]
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

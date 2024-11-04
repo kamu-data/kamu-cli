@@ -78,6 +78,7 @@ pub trait TransformListener: Send + Sync {
     fn begin(&self) {}
     fn success(&self, _result: &TransformResult) {}
     fn error(&self, _error: &TransformError) {}
+    fn elaborate_error(&self, _error: &TransformElaborateError) {}
     fn execute_error(&self, _error: &TransformExecuteError) {}
 
     fn get_engine_provisioning_listener(

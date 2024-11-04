@@ -52,24 +52,21 @@ impl TaskLogicalPlanRunnerImpl {
         tracing::info!(task_definition = ?task_definition, "Built update task definition");
 
         // Run update task, this does not require a transaction
-        match task_definition {
-            UpdateTaskDefinition::Pull(task) => match task.pull_job {
-                PullPlanIterationJob::Ingest(mut ingest_batch) => {
-                    assert_eq!(ingest_batch.len(), 1);
-                    let ingest_item = ingest_batch.remove(0);
-                    self.run_ingest_update(ingest_item, task.pull_options.ingest_options)
-                        .await
-                }
-                PullPlanIterationJob::Transform(mut transform_batch) => {
-                    assert_eq!(transform_batch.len(), 1);
-                    let transform_item = transform_batch.remove(0);
-                    self.run_transform_update(transform_item).await
-                }
-                PullPlanIterationJob::Sync(_) => {
-                    unreachable!("No Sync jobs possible from update requests");
-                }
-            },
-            UpdateTaskDefinition::Result(outcome) => Ok(outcome),
+        match task_definition.pull_job {
+            PullPlanIterationJob::Ingest(mut ingest_batch) => {
+                assert_eq!(ingest_batch.len(), 1);
+                let ingest_item = ingest_batch.remove(0);
+                self.run_ingest_update(ingest_item, task_definition.pull_options.ingest_options)
+                    .await
+            }
+            PullPlanIterationJob::Transform(mut transform_batch) => {
+                assert_eq!(transform_batch.len(), 1);
+                let transform_item = transform_batch.remove(0);
+                self.run_transform_update(transform_item).await
+            }
+            PullPlanIterationJob::Sync(_) => {
+                unreachable!("No Sync jobs possible from update requests");
+            }
         }
     }
 
@@ -101,10 +98,34 @@ impl TaskLogicalPlanRunnerImpl {
             .get_one::<dyn TransformExecutionService>()
             .unwrap();
 
-        match transform_item.plan {
-            TransformPlan::ReadyToLaunch(operation) => {
+        let transform_elaboration = match transform_execution_service
+            .elaborate_transform(
+                transform_item.target.clone(),
+                transform_item.plan,
+                &TransformOptions::default(),
+                None,
+            )
+            .await
+        {
+            Ok(request) => Ok(request),
+            // Special case: input dataset compacted
+            Err(TransformElaborateError::InvalidInputInterval(e)) => {
+                return Ok(TaskOutcome::Failed(TaskError::UpdateDatasetError(
+                    UpdateDatasetTaskError::InputDatasetCompacted(InputDatasetCompactedError {
+                        dataset_id: e.input_dataset_id,
+                    }),
+                )));
+            }
+            Err(e) => {
+                tracing::error!(error = ?e, "Update failed");
+                Err("Transform request elaboration failed".int_err())
+            }
+        }?;
+
+        match transform_elaboration {
+            TransformElaboration::Elaborated(transform_plan) => {
                 let (_, execution_result) = transform_execution_service
-                    .execute_transform(transform_item.target, operation, None)
+                    .execute_transform(transform_item.target, transform_plan, None)
                     .await;
 
                 match execution_result {
@@ -119,7 +140,7 @@ impl TaskLogicalPlanRunnerImpl {
                     }
                 }
             }
-            TransformPlan::UpToDate => Ok(TaskOutcome::Success(TaskResult::Empty)),
+            TransformElaboration::UpToDate => Ok(TaskOutcome::Success(TaskResult::Empty)),
         }
     }
 
@@ -158,34 +179,18 @@ impl TaskLogicalPlanRunnerImpl {
             .await;
 
         match plan_res {
-            Ok(pull_job) => Ok(UpdateTaskDefinition::Pull(UpdateTaskDefinitionPull {
+            Ok(pull_job) => Ok(UpdateTaskDefinition {
                 pull_options,
                 pull_job,
-            })),
+            }),
             Err(e) => {
                 assert!(e.result.is_err());
-                // Special case: input dataset compacted
-                if let Err(PullError::TransformPlanError(
-                    TransformPlanError::InvalidInputInterval(e),
-                )) = e.result
-                {
-                    Ok(UpdateTaskDefinition::Result(TaskOutcome::Failed(
-                        TaskError::UpdateDatasetError(
-                            UpdateDatasetTaskError::InputDatasetCompacted(
-                                InputDatasetCompactedError {
-                                    dataset_id: e.input_dataset_id,
-                                },
-                            ),
-                        ),
-                    )))
-                } else {
-                    tracing::error!(
-                        args = ?args,
-                        error = ?e,
-                        "Update failed",
-                    );
-                    Err("Update task planning failed".int_err())
-                }
+                tracing::error!(
+                    args = ?args,
+                    error = ?e,
+                    "Update failed",
+                );
+                Err("Update task planning failed".int_err())
             }
         }
     }
@@ -326,13 +331,7 @@ impl TaskLogicalPlanRunner for TaskLogicalPlanRunnerImpl {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug)]
-enum UpdateTaskDefinition {
-    Pull(UpdateTaskDefinitionPull),
-    Result(TaskOutcome),
-}
-
-#[derive(Debug)]
-struct UpdateTaskDefinitionPull {
+struct UpdateTaskDefinition {
     pull_options: PullOptions,
     pull_job: PullPlanIterationJob,
 }
