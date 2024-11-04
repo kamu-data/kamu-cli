@@ -163,10 +163,10 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
 
         let query_str = format!(
             r#"
-            SELECT dataset_id   as "id: _",
-                   owner_id     as "owner_id: _",
+            SELECT dataset_id as id,
+                   owner_id,
                    dataset_name as name,
-                   created_at   as "created_at: _"
+                   created_at
             FROM dataset_entries
             WHERE dataset_id IN ({placeholders})
             "#,
