@@ -15,6 +15,15 @@ Recommendation: for ease of reading, use the following order:
 ### Added
 - E2E: cover all flow scenarios
 - E2E: `KamuApiServerClientExt`: method grouping
+- Dataset definition: added possibility to set defaults in templates:
+  ```yaml
+  fetch:
+    kind: Container
+    image: "ghcr.io/kamu-data/fetch-com.defillama:0.1.5"
+    args:
+      - --request-interval
+      - '${{ env.request_interval || 2 }}'
+  ```
 ### Fixed
 - `kamu add` correctly handle snapshots with circular dependencies
 

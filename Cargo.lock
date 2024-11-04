@@ -5047,6 +5047,7 @@ dependencies = [
  "kamu-datasets",
  "kamu-datasets-services",
  "kamu-ingest-datafusion",
+ "lazy_static",
  "libc",
  "like",
  "messaging-outbox",

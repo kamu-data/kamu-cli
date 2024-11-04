@@ -23,3 +23,4 @@ mod ftp;
 mod http;
 #[cfg(feature = "ingest-mqtt")]
 mod mqtt;
+mod template;

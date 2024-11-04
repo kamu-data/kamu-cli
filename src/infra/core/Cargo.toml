@@ -145,6 +145,7 @@ datafusion-ethers = { optional = true, version = "42" }
 datafusion-functions-json = { optional = true, version = "0.42" }
 rumqttc = { optional = true, version = "0.24" }
 mockall = { optional = true, version = "0.13", default-features = false }
+lazy_static = { version = "1" }
 
 
 [target.'cfg(unix)'.dependencies]

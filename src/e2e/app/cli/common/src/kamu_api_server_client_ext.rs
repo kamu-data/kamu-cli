@@ -79,6 +79,29 @@ pub const DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR: &str = indoc::indoc!(
     "#
 );
 
+pub const DATASET_FETCH_FROM_FILE_STR: &str = indoc::indoc!(
+    r#"
+kind: DatasetSnapshot
+version: 1
+content:
+  name: test.pull-from-file
+  kind: Root
+  metadata:
+    - kind: SetPollingSource
+      fetch:
+        kind: Url
+        url: file://${{ env.data_dir || env.workspace_dir }}${{ env.data_file || 'data.csv' }}
+      read:
+        kind: Csv
+        header: true
+        separator: ','
+      merge:
+        kind: snapshot
+        primaryKey:
+          - city
+    "#
+);
+
 lazy_static! {
     /// <https://github.com/kamu-data/kamu-cli/blob/master/examples/leaderboard/player-scores.yaml>
     pub static ref DATASET_ROOT_PLAYER_SCORES_SNAPSHOT: String = {
@@ -116,6 +139,15 @@ pub const DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_3: &str = indoc::i
     r#"
     {"match_time": "2000-01-03", "match_id": 3, "player_id": "Bob", "score": 60}
     {"match_time": "2000-01-03", "match_id": 3, "player_id": "Charlie", "score": 110}
+    "#
+);
+
+pub const DATASET_FETCH_FROM_FILE_STR_DATA: &str = indoc::indoc!(
+    r#"
+    city,population
+    A,1000
+    B,2000
+    C,3000
     "#
 );
 

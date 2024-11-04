@@ -193,6 +193,43 @@ impl InvalidIngestParameterFormat {
     }
 }
 
+#[derive(Error, Debug)]
+pub enum TemplateError {
+    #[error(transparent)]
+    ValueNotFound(TemplateValueNotFoundError),
+
+    #[error(transparent)]
+    InvalidPattern(TemplateInvalidPatternError),
+}
+
+#[derive(Error, Debug)]
+#[error("Missing values for variable(s): '{template}'")]
+pub struct TemplateValueNotFoundError {
+    pub template: String,
+}
+
+impl TemplateValueNotFoundError {
+    pub fn new(template: impl Into<String>) -> Self {
+        Self {
+            template: template.into(),
+        }
+    }
+}
+
+#[derive(Error, Debug)]
+#[error("Invalid pattern '{pattern}' encountered")]
+pub struct TemplateInvalidPatternError {
+    pub pattern: String,
+}
+
+impl TemplateInvalidPatternError {
+    pub fn new(pattern: impl Into<String>) -> Self {
+        Self {
+            pattern: pattern.into(),
+        }
+    }
+}
+
 // TODO: Revisit error granularity
 #[derive(Debug, Error)]
 pub enum PollingIngestError {
@@ -306,6 +343,13 @@ pub enum PollingIngestError {
         #[from]
         #[backtrace]
         InvalidIngestParameterFormat,
+    ),
+
+    #[error(transparent)]
+    TemplateError(
+        #[from]
+        #[backtrace]
+        TemplateError,
     ),
 
     #[error(transparent)]

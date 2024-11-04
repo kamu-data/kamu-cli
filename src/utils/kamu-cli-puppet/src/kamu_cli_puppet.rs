@@ -97,7 +97,7 @@ impl KamuCliPuppet {
         I: IntoIterator<Item = S>,
         S: AsRef<ffi::OsStr>,
     {
-        self.execute_impl(cmd, None::<Vec<u8>>).await
+        self.execute_impl(cmd, None::<Vec<u8>>, None).await
     }
 
     pub async fn execute_with_input<I, S, T>(&self, cmd: I, input: T) -> ExecuteCommandResult
@@ -106,16 +106,40 @@ impl KamuCliPuppet {
         S: AsRef<ffi::OsStr>,
         T: Into<Vec<u8>>,
     {
-        self.execute_impl(cmd, Some(input)).await
+        self.execute_impl(cmd, Some(input), None).await
     }
 
-    async fn execute_impl<I, S, T>(&self, cmd: I, maybe_input: Option<T>) -> ExecuteCommandResult
+    pub async fn execute_with_env<I, S>(
+        &self,
+        cmd: I,
+        env_vars: Vec<(String, String)>,
+    ) -> ExecuteCommandResult
+    where
+        I: IntoIterator<Item = S>,
+        S: AsRef<ffi::OsStr>,
+    {
+        self.execute_impl(cmd, None::<Vec<u8>>, Some(env_vars))
+            .await
+    }
+
+    async fn execute_impl<I, S, T>(
+        &self,
+        cmd: I,
+        maybe_input: Option<T>,
+        maybe_env: Option<Vec<(String, String)>>,
+    ) -> ExecuteCommandResult
     where
         I: IntoIterator<Item = S>,
         S: AsRef<ffi::OsStr>,
         T: Into<Vec<u8>>,
     {
         let mut command = assert_cmd::Command::cargo_bin("kamu-cli").unwrap();
+
+        if let Some(env_vars) = maybe_env {
+            for (name, value) in env_vars {
+                command.env(name, value);
+            }
+        };
 
         command.env("RUST_LOG", "info,sqlx=debug");
 
