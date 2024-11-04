@@ -53,6 +53,16 @@ pub trait KamuCliPuppetExt {
         S: AsRef<std::ffi::OsStr>,
         T: Into<Vec<u8>> + Send;
 
+    async fn assert_success_command_execution_with_env<I, S>(
+        &self,
+        cmd: I,
+        env_vars: Vec<(String, String)>,
+        maybe_expected_stdout: Option<&str>,
+        maybe_expected_stderr: Option<impl IntoIterator<Item = &str> + Send>,
+    ) where
+        I: IntoIterator<Item = S> + Send,
+        S: AsRef<std::ffi::OsStr>;
+
     async fn assert_failure_command_execution<I, S>(
         &self,
         cmd: I,
@@ -345,6 +355,23 @@ impl KamuCliPuppetExt for KamuCliPuppet {
     {
         assert_execute_command_result(
             &self.execute_with_input(cmd, input).await.success(),
+            maybe_expected_stdout,
+            maybe_expected_stderr,
+        );
+    }
+
+    async fn assert_success_command_execution_with_env<I, S>(
+        &self,
+        cmd: I,
+        env_vars: Vec<(String, String)>,
+        maybe_expected_stdout: Option<&str>,
+        maybe_expected_stderr: Option<impl IntoIterator<Item = &str> + Send>,
+    ) where
+        I: IntoIterator<Item = S> + Send,
+        S: AsRef<std::ffi::OsStr>,
+    {
+        assert_execute_command_result(
+            &self.execute_with_env(cmd, env_vars).await.success(),
             maybe_expected_stdout,
             maybe_expected_stderr,
         );

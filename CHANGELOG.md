@@ -17,6 +17,7 @@ Recommendation: for ease of reading, use the following order:
 - E2E: `KamuApiServerClientExt`: method grouping
 ### Fixed
 - `kamu add` correctly handle snapshots with circular dependencies
+- path issue when pulling data on windows
 
 ## [0.206.5] - 2024-10-29
 ### Changed

@@ -58,7 +58,7 @@ impl WorkspaceService {
     }
 
     pub fn find_workspace() -> WorkspaceLayout {
-        let cwd = Path::new(".").canonicalize().unwrap();
+        let cwd = std::env::current_dir().unwrap();
 
         if let Some(ws) = Self::try_read_workspace_from_env(&cwd) {
             return ws;
