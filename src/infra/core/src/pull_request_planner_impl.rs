@@ -206,7 +206,7 @@ impl PullRequestPlannerImpl {
                         maybe_original_request: pi.maybe_original_request,
                         maybe_local_ref: Some(hdl.as_local_ref()),
                         maybe_remote_ref: None,
-                        result: Err(PullError::TransformPlanError(e)),
+                        result: Err(PullError::TransformError(TransformError::Plan(e))),
                     });
                 }
             }

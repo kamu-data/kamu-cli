@@ -717,14 +717,25 @@ impl TransformListener for PrettyTransformProgress {
             .finish_with_message(Self::spinner_message(&self.dataset_handle, 0, msg));
     }
 
-    fn error(&self, _error: &TransformError) {
+    fn elaborate_error(&self, _error: &TransformElaborateError) {
         self.curr_progress
             .lock()
             .unwrap()
             .finish_with_message(Self::spinner_message(
                 &self.dataset_handle,
                 0,
-                console::style("Failed to update derivative dataset").red(),
+                console::style("Failed to update derivative dataset (elaborate phase)").red(),
+            ));
+    }
+
+    fn execute_error(&self, _error: &TransformExecuteError) {
+        self.curr_progress
+            .lock()
+            .unwrap()
+            .finish_with_message(Self::spinner_message(
+                &self.dataset_handle,
+                0,
+                console::style("Failed to update derivative dataset (execute phase)").red(),
             ));
     }
 

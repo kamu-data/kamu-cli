@@ -49,7 +49,6 @@ mod resource_loader_impl;
 mod search_service_impl;
 mod sync_request_builder;
 mod sync_service_impl;
-mod transform_service_impl;
 mod verification_service_impl;
 mod watermark_service_impl;
 
@@ -77,7 +76,6 @@ pub use search_service_impl::*;
 pub use sync_request_builder::*;
 pub use sync_service_impl::*;
 pub use transform::*;
-pub use transform_service_impl::*;
 pub use use_cases::*;
 pub use verification_service_impl::*;
 pub use watermark_service_impl::*;

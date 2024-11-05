@@ -22,6 +22,10 @@ use kamu_datasets_services::DatasetKeyValueServiceSysEnv;
 use opendatafabric::*;
 use time_source::SystemTimeSourceDefault;
 
+use crate::TransformTestHelper;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 async fn test_engine_io_common<
     TDatasetRepo: DatasetRepository + DatasetRepositoryWriter + 'static,
 >(
@@ -62,15 +66,15 @@ async fn test_engine_io_common<
         time_source.clone(),
     );
 
-    let transform_svc = TransformServiceImpl::new(
-        dataset_repo.clone(),
-        engine_provisioner.clone(),
-        Arc::new(SystemTimeSourceDefault),
+    let transform_helper = TransformTestHelper::build(
+        Arc::new(DatasetRegistryRepoBridge::new(dataset_repo.clone())),
+        time_source.clone(),
         Arc::new(CompactionServiceImpl::new(
             object_store_registry.clone(),
             time_source.clone(),
             run_info_dir.clone(),
         )),
+        engine_provisioner.clone(),
     );
 
     ///////////////////////////////////////////////////////////////////////////
@@ -151,15 +155,7 @@ async fn test_engine_io_common<
         .unwrap()
         .create_dataset_result;
 
-    let block_hash = match transform_svc
-        .transform(
-            ResolvedDataset::from(&deriv_created),
-            &TransformOptions::default(),
-            None,
-        )
-        .await
-        .unwrap()
-    {
+    let block_hash = match transform_helper.transform_dataset(&deriv_created).await {
         TransformResult::Updated { new_head, .. } => new_head,
         v => panic!("Unexpected result: {v:?}"),
     };
@@ -206,15 +202,7 @@ async fn test_engine_io_common<
         .await
         .unwrap();
 
-    let block_hash = match transform_svc
-        .transform(
-            ResolvedDataset::from(&deriv_created),
-            &TransformOptions::default(),
-            None,
-        )
-        .await
-        .unwrap()
-    {
+    let block_hash = match transform_helper.transform_dataset(&deriv_created).await {
         TransformResult::Updated { new_head, .. } => new_head,
         v => panic!("Unexpected result: {v:?}"),
     };
@@ -237,12 +225,11 @@ async fn test_engine_io_common<
     // Verify
     ///////////////////////////////////////////////////////////////////////////
 
-    let verify_result = transform_svc
-        .verify_transform(ResolvedDataset::from(&deriv_created), (None, None), None)
-        .await;
-
+    let verify_result = transform_helper.verify_transform(&deriv_created).await;
     assert_matches!(verify_result, Ok(()));
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(containerized, engine, transform, datafusion)]
 #[test_log::test(tokio::test)]
@@ -284,6 +271,8 @@ async fn test_engine_io_local_file_mount() {
     )
     .await;
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(containerized, engine, transform, datafusion)]
 #[test_log::test(tokio::test)]
@@ -330,3 +319,5 @@ async fn test_engine_io_s3_to_local_file_mount_proxy() {
     )
     .await;
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

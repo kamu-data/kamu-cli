@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::assert_matches::assert_matches;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use datafusion::arrow::array::{Array, Int32Array, StringArray};
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
@@ -20,8 +20,6 @@ use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
 use opendatafabric::*;
 use time_source::SystemTimeSourceDefault;
-
-use crate::utils::dummy_transform_service::DummyTransformService;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -42,9 +40,11 @@ async fn test_verify_data_consistency() {
                 .with_multi_tenant(false),
         )
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+        .add::<DatasetRegistryRepoBridge>()
         .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
-        .add_value(DummyTransformService::new(Arc::new(Mutex::new(Vec::new()))))
-        .bind::<dyn TransformService, DummyTransformService>()
+        .add::<TransformRequestPlannerImpl>()
+        .add::<TransformExecutionServiceImpl>()
+        .add::<EngineProvisionerNull>()
         .add::<VerificationServiceImpl>()
         .build();
 

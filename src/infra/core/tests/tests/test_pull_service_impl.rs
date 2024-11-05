@@ -944,3 +944,93 @@ impl SyncService for TestSyncService {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, Eq)]
+pub enum PullBatch {
+    Ingest(Vec<DatasetRefAny>),
+    Transform(Vec<DatasetRefAny>),
+    Sync(Vec<(DatasetRefAny, DatasetRefAny)>),
+}
+
+impl PullBatch {
+    fn cmp_ref(lhs: &DatasetRefAny, rhs: &DatasetRefAny) -> bool {
+        #[allow(clippy::type_complexity)]
+        fn tuplify(
+            v: &DatasetRefAny,
+        ) -> (
+            Option<&DatasetID>,
+            Option<&url::Url>,
+            Option<&str>,
+            Option<&str>,
+            Option<&DatasetName>,
+        ) {
+            match v {
+                DatasetRefAny::ID(_, id) => (Some(id), None, None, None, None),
+                DatasetRefAny::Url(url) => (None, Some(url), None, None, None),
+                DatasetRefAny::LocalAlias(a, n) => {
+                    (None, None, None, a.as_ref().map(AsRef::as_ref), Some(n))
+                }
+                DatasetRefAny::RemoteAlias(r, a, n) => (
+                    None,
+                    None,
+                    Some(r.as_ref()),
+                    a.as_ref().map(AsRef::as_ref),
+                    Some(n),
+                ),
+                DatasetRefAny::AmbiguousAlias(ra, n) => {
+                    (None, None, Some(ra.as_ref()), None, Some(n))
+                }
+                DatasetRefAny::LocalHandle(h) => (
+                    None,
+                    None,
+                    None,
+                    h.alias.account_name.as_ref().map(AccountName::as_str),
+                    Some(&h.alias.dataset_name),
+                ),
+                DatasetRefAny::RemoteHandle(h) => (
+                    None,
+                    None,
+                    Some(h.alias.repo_name.as_str()),
+                    h.alias.account_name.as_ref().map(AccountName::as_str),
+                    Some(&h.alias.dataset_name),
+                ),
+            }
+        }
+        tuplify(lhs) == tuplify(rhs)
+    }
+}
+
+impl std::cmp::PartialEq for PullBatch {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Ingest(l), Self::Ingest(r)) => {
+                let mut l = l.clone();
+                l.sort();
+                let mut r = r.clone();
+                r.sort();
+                l.len() == r.len() && std::iter::zip(&l, &r).all(|(li, ri)| Self::cmp_ref(li, ri))
+            }
+            (Self::Transform(l), Self::Transform(r)) => {
+                let mut l = l.clone();
+                l.sort();
+                let mut r = r.clone();
+                r.sort();
+                l.len() == r.len() && std::iter::zip(&l, &r).all(|(li, ri)| Self::cmp_ref(li, ri))
+            }
+            (Self::Sync(l), Self::Sync(r)) => {
+                let mut l = l.clone();
+                l.sort();
+                let mut r = r.clone();
+                r.sort();
+                l.len() == r.len()
+                    && std::iter::zip(&l, &r)
+                        .all(|((l1, l2), (r1, r2))| Self::cmp_ref(l1, r1) && Self::cmp_ref(l2, r2))
+            }
+            _ => false,
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -234,6 +234,7 @@ impl TransformRequestPlanner for TransformRequestPlannerImpl {
 
         // Fill table of working datasets
         let mut datasets_map = WorkingDatasetsMap::default();
+        datasets_map.register(&target.handle, target.dataset.clone());
         for input in &source.inputs {
             let hdl = self
                 .dataset_registry
@@ -269,9 +270,6 @@ impl TransformRequestPlanner for TransformRequestPlannerImpl {
                 )
             })
             .collect();
-
-        // Pre-fill datasets that is used in the operation
-        let mut datasets_map = WorkingDatasetsMap::default();
 
         let mut steps = Vec::new();
 
@@ -312,16 +310,6 @@ impl TransformRequestPlanner for TransformRequestPlannerImpl {
                 expected_block: block,
                 expected_hash: block_hash,
             };
-
-            datasets_map.register_with(&step.request.dataset_handle, |handle| {
-                self.dataset_registry.get_dataset_by_handle(handle)
-            });
-
-            for input in &step.request.inputs {
-                datasets_map.register_with(&input.dataset_handle, |handle| {
-                    self.dataset_registry.get_dataset_by_handle(handle)
-                });
-            }
 
             steps.push(step);
         }

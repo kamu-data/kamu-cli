@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::assert_matches::assert_matches;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use chrono::{DateTime, NaiveDate, TimeDelta, TimeZone, Utc};
 use datafusion::execution::config::SessionConfig;
@@ -26,8 +26,7 @@ use kamu_core::auth;
 use opendatafabric::*;
 use time_source::{SystemTimeSource, SystemTimeSourceStub};
 
-use crate::mock_engine_provisioner;
-use crate::utils::dummy_transform_service::DummyTransformService;
+use crate::{mock_engine_provisioner, TransformTestHelper};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -902,14 +901,9 @@ async fn test_dataset_keep_metadata_only_compact() {
     //
     // After: seed <- set_transform
     let res = harness
-        .transform_svc
-        .transform(
-            ResolvedDataset::from(&created_derived),
-            &TransformOptions::default(),
-            None,
-        )
-        .await
-        .unwrap();
+        .transform_helper
+        .transform_dataset(&created_derived)
+        .await;
     assert_matches!(res, TransformResult::Updated { .. });
 
     assert_matches!(
@@ -991,8 +985,8 @@ struct CompactTestHarness {
     dataset_repo_writer: Arc<dyn DatasetRepositoryWriter>,
     compaction_svc: Arc<CompactionServiceImpl>,
     push_ingest_svc: Arc<PushIngestServiceImpl>,
+    transform_helper: TransformTestHelper,
     verification_svc: Arc<dyn VerificationService>,
-    transform_svc: Arc<dyn TransformService>,
     current_date_time: DateTime<Utc>,
     ctx: SessionContext,
 }
@@ -1020,6 +1014,7 @@ impl CompactTestHarness {
             )
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
             .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
+            .add::<DatasetRegistryRepoBridge>()
             .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
             .add_value(SystemTimeSourceStub::new_set(current_date_time))
             .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
@@ -1028,11 +1023,13 @@ impl CompactTestHarness {
             .add::<DataFormatRegistryImpl>()
             .add::<CompactionServiceImpl>()
             .add::<PushIngestServiceImpl>()
+            .add::<TransformRequestPlannerImpl>()
+            .add::<TransformElaborationServiceImpl>()
+            .add::<TransformExecutionServiceImpl>()
             .add_value(
                 mock_engine_provisioner::MockEngineProvisioner::new().stub_provision_engine(),
             )
             .bind::<dyn EngineProvisioner, mock_engine_provisioner::MockEngineProvisioner>()
-            .add::<TransformServiceImpl>()
             .add::<VerificationServiceImpl>()
             .build();
 
@@ -1040,8 +1037,9 @@ impl CompactTestHarness {
         let dataset_repo_writer = catalog.get_one::<dyn DatasetRepositoryWriter>().unwrap();
         let compaction_svc = catalog.get_one::<CompactionServiceImpl>().unwrap();
         let push_ingest_svc = catalog.get_one::<PushIngestServiceImpl>().unwrap();
-        let transform_svc = catalog.get_one::<TransformServiceImpl>().unwrap();
         let verification_svc = catalog.get_one::<dyn VerificationService>().unwrap();
+
+        let transform_helper = TransformTestHelper::from_catalog(&catalog);
 
         Self {
             _temp_dir: temp_dir,
@@ -1049,7 +1047,7 @@ impl CompactTestHarness {
             dataset_repo_writer,
             compaction_svc,
             push_ingest_svc,
-            transform_svc,
+            transform_helper,
             verification_svc,
             current_date_time,
             ctx: SessionContext::new_with_config(SessionConfig::new().with_target_partitions(1)),
@@ -1072,6 +1070,7 @@ impl CompactTestHarness {
             )
             .bind::<dyn DatasetRepository, DatasetRepositoryS3>()
             .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryS3>()
+            .add::<DatasetRegistryRepoBridge>()
             .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
             .add_value(SystemTimeSourceStub::new_set(current_date_time))
             .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
@@ -1080,10 +1079,11 @@ impl CompactTestHarness {
             .add::<ObjectStoreBuilderLocalFs>()
             .add_value(ObjectStoreBuilderS3::new(s3_context.clone(), true))
             .bind::<dyn ObjectStoreBuilder, ObjectStoreBuilderS3>()
-            .add_value(DummyTransformService::new(Arc::new(Mutex::new(Vec::new()))))
-            .bind::<dyn TransformService, DummyTransformService>()
             .add::<VerificationServiceImpl>()
             .add::<PushIngestServiceImpl>()
+            .add::<TransformRequestPlannerImpl>()
+            .add::<TransformElaborationServiceImpl>()
+            .add::<TransformExecutionServiceImpl>()
             .add::<DataFormatRegistryImpl>()
             .add::<CompactionServiceImpl>()
             .add_value(CurrentAccountSubject::new_test())
@@ -1091,14 +1091,16 @@ impl CompactTestHarness {
 
         let ctx = new_session_context(catalog.get_one().unwrap());
 
+        let transform_helper = TransformTestHelper::from_catalog(&catalog);
+
         Self {
             _temp_dir: temp_dir,
             dataset_repo: catalog.get_one().unwrap(),
             dataset_repo_writer: catalog.get_one().unwrap(),
             compaction_svc: catalog.get_one().unwrap(),
             push_ingest_svc: catalog.get_one().unwrap(),
+            transform_helper,
             verification_svc: catalog.get_one().unwrap(),
-            transform_svc: catalog.get_one().unwrap(),
             current_date_time,
             ctx,
         }

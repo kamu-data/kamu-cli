@@ -26,6 +26,8 @@ use kamu_datasets_services::DatasetKeyValueServiceSysEnv;
 use opendatafabric::*;
 use time_source::{SystemTimeSource, SystemTimeSourceStub};
 
+use crate::TransformTestHelper;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct DatasetHelper {
@@ -218,7 +220,7 @@ struct TestHarness {
     dataset_repo: Arc<DatasetRepositoryLocalFs>,
     ingest_svc: Arc<dyn PollingIngestService>,
     push_ingest_svc: Arc<dyn PushIngestService>,
-    transform_svc: Arc<dyn TransformService>,
+    transform_helper: TransformTestHelper,
     time_source: Arc<SystemTimeSourceStub>,
 }
 
@@ -245,6 +247,7 @@ impl TestHarness {
                     .with_multi_tenant(false),
             )
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+            .add::<DatasetRegistryRepoBridge>()
             .add_value(EngineProvisionerLocalConfig::default())
             .add::<EngineProvisionerLocal>()
             .add_value(ObjectStoreRegistryImpl::new(vec![Arc::new(
@@ -255,7 +258,9 @@ impl TestHarness {
             .add::<FetchService>()
             .add::<PollingIngestServiceImpl>()
             .add::<PushIngestServiceImpl>()
-            .add::<TransformServiceImpl>()
+            .add::<TransformRequestPlannerImpl>()
+            .add::<TransformElaborationServiceImpl>()
+            .add::<TransformExecutionServiceImpl>()
             .add::<CompactionServiceImpl>()
             .add::<DatasetKeyValueServiceSysEnv>()
             .add_value(SystemTimeSourceStub::new_set(
@@ -264,13 +269,15 @@ impl TestHarness {
             .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
             .build();
 
+        let transform_helper = TransformTestHelper::from_catalog(&catalog);
+
         Self {
             tempdir,
             dataset_repo: catalog.get_one().unwrap(),
             ingest_svc: catalog.get_one().unwrap(),
             push_ingest_svc: catalog.get_one().unwrap(),
-            transform_svc: catalog.get_one().unwrap(),
             time_source: catalog.get_one().unwrap(),
+            transform_helper,
         }
     }
 }
@@ -372,14 +379,9 @@ async fn test_transform_common(transform: Transform, test_retractions: bool) {
         .set(Utc.with_ymd_and_hms(2050, 1, 2, 12, 0, 0).unwrap());
 
     let res = harness
-        .transform_svc
-        .transform(
-            ResolvedDataset::from(&deriv_created),
-            &TransformOptions::default(),
-            None,
-        )
-        .await
-        .unwrap();
+        .transform_helper
+        .transform_dataset(&deriv_created)
+        .await;
     assert_matches!(res, TransformResult::Updated { .. });
 
     // First transform writes two blocks: SetDataSchema, ExecuteTransform
@@ -454,14 +456,9 @@ async fn test_transform_common(transform: Transform, test_retractions: bool) {
         .set(Utc.with_ymd_and_hms(2050, 1, 3, 12, 0, 0).unwrap());
 
     let res = harness
-        .transform_svc
-        .transform(
-            ResolvedDataset::from(&deriv_created),
-            &TransformOptions::default(),
-            None,
-        )
-        .await
-        .unwrap();
+        .transform_helper
+        .transform_dataset(&deriv_created)
+        .await;
     assert_matches!(res, TransformResult::Updated { .. });
 
     // Only one block written this time
@@ -510,8 +507,8 @@ async fn test_transform_common(transform: Transform, test_retractions: bool) {
         .await;
 
     let verify_result = harness
-        .transform_svc
-        .verify_transform(ResolvedDataset::from(&deriv_created), (None, None), None)
+        .transform_helper
+        .verify_transform(&deriv_created)
         .await;
 
     assert_matches!(verify_result, Ok(()));
@@ -525,13 +522,15 @@ async fn test_transform_common(transform: Transform, test_retractions: bool) {
         .await;
 
     let verify_result = harness
-        .transform_svc
-        .verify_transform(ResolvedDataset::from(&deriv_created), (None, None), None)
+        .transform_helper
+        .verify_transform(&deriv_created)
         .await;
 
     assert_matches!(
         verify_result,
-        Err(VerificationError::DataNotReproducible(_))
+        Err(VerifyTransformError::Execute(
+            VerifyTransformExecuteError::DataNotReproducible(_)
+        ))
     );
 }
 
@@ -731,16 +730,7 @@ async fn test_transform_empty_inputs() {
     // 1: Input doesn't have schema yet - skip update completely
     ///////////////////////////////////////////////////////////////////////////
 
-    let res = harness
-        .transform_svc
-        .transform(
-            ResolvedDataset::from(&deriv),
-            &TransformOptions::default(),
-            None,
-        )
-        .await
-        .unwrap();
-
+    let res = harness.transform_helper.transform_dataset(&deriv).await;
     assert_matches!(res, TransformResult::UpToDate);
 
     ///////////////////////////////////////////////////////////////////////////
@@ -781,16 +771,7 @@ async fn test_transform_empty_inputs() {
 
     assert_matches!(ingest_result, PushIngestResult::Updated { .. });
 
-    let res = harness
-        .transform_svc
-        .transform(
-            ResolvedDataset::from(&deriv),
-            &TransformOptions::default(),
-            None,
-        )
-        .await
-        .unwrap();
-
+    let res = harness.transform_helper.transform_dataset(&deriv).await;
     assert_matches!(res, TransformResult::Updated { .. });
 
     let deriv_helper = DatasetDataHelper::new(deriv.dataset.clone());
@@ -833,16 +814,7 @@ async fn test_transform_empty_inputs() {
 
     assert_matches!(ingest_result, PushIngestResult::Updated { .. });
 
-    let res = harness
-        .transform_svc
-        .transform(
-            ResolvedDataset::from(&deriv),
-            &TransformOptions::default(),
-            None,
-        )
-        .await
-        .unwrap();
-
+    let res = harness.transform_helper.transform_dataset(&deriv).await;
     assert_matches!(res, TransformResult::Updated { .. });
 
     deriv_helper

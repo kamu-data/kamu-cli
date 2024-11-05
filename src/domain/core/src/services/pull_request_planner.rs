@@ -408,24 +408,6 @@ pub enum PullError {
         TransformError,
     ),
     #[error(transparent)]
-    TransformPlanError(
-        #[from]
-        #[backtrace]
-        TransformPlanError,
-    ),
-    #[error(transparent)]
-    TransformElaborateError(
-        #[from]
-        #[backtrace]
-        TransformElaborateError,
-    ),
-    #[error(transparent)]
-    TransformExecuteError(
-        #[from]
-        #[backtrace]
-        TransformExecuteError,
-    ),
-    #[error(transparent)]
     SyncError(
         #[from]
         #[backtrace]

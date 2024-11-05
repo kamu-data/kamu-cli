@@ -19,14 +19,21 @@ use crate::utils::cached_object::CachedObject;
 use crate::*;
 
 pub struct VerificationServiceImpl {
-    transform_service: Arc<dyn TransformService>,
+    transform_request_planner: Arc<dyn TransformRequestPlanner>,
+    transform_execution_svc: Arc<dyn TransformExecutionService>,
 }
 
 #[component(pub)]
 #[interface(dyn VerificationService)]
 impl VerificationServiceImpl {
-    pub fn new(transform_service: Arc<dyn TransformService>) -> Self {
-        Self { transform_service }
+    pub fn new(
+        transform_request_planner: Arc<dyn TransformRequestPlanner>,
+        transform_execution_svc: Arc<dyn TransformExecutionService>,
+    ) -> Self {
+        Self {
+            transform_request_planner,
+            transform_execution_svc,
+        }
     }
 
     #[tracing::instrument(level = "info", skip_all)]
@@ -282,13 +289,23 @@ impl VerificationService for VerificationServiceImpl {
             }
 
             if dataset_kind == DatasetKind::Derivative && request.options.replay_transformations {
-                self.transform_service
-                    .verify_transform(
+                let plan = self
+                    .transform_request_planner
+                    .build_transform_verification_plan(
                         request.target.clone(),
                         request.block_range.clone(),
-                        Some(listener.clone()),
                     )
-                    .await?;
+                    .await
+                    .map_err(|e| {
+                        VerificationError::VerifyTransform(VerifyTransformError::Plan(e))
+                    })?;
+
+                self.transform_execution_svc
+                    .execute_verify_transform(request.target.clone(), plan, Some(listener.clone()))
+                    .await
+                    .map_err(|e| {
+                        VerificationError::VerifyTransform(VerifyTransformError::Execute(e))
+                    })?;
             }
         };
 

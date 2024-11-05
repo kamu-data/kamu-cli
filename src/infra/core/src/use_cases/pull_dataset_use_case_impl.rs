@@ -213,12 +213,18 @@ impl PullDatasetUseCaseImpl {
                     let (target, result) = transform_execution_svc
                         .execute_transform(pti.target, plan, maybe_listener)
                         .await;
-                    (target, result.map_err(PullError::TransformExecuteError))
+                    (
+                        target,
+                        result.map_err(|e| PullError::TransformError(TransformError::Execute(e))),
+                    )
                 }
                 // Already up-to-date
                 Ok(TransformElaboration::UpToDate) => (pti.target, Ok(TransformResult::UpToDate)),
                 // Elab error
-                Err(e) => (pti.target, Err(PullError::TransformElaborateError(e))),
+                Err(e) => (
+                    pti.target,
+                    Err(PullError::TransformError(TransformError::Elaborate(e))),
+                ),
             }
         }
 

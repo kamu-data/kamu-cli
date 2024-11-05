@@ -223,10 +223,10 @@ pub enum VerificationError {
         CheckpointDoesNotMatchMetadata,
     ),
     #[error(transparent)]
-    Transform(
+    VerifyTransform(
         #[from]
         #[backtrace]
-        TransformError,
+        VerifyTransformError,
     ),
     #[error(transparent)]
     Access(
