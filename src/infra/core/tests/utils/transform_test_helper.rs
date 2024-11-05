@@ -49,9 +49,12 @@ impl TransformTestHelper {
         Self {
             transform_request_planner: Arc::new(TransformRequestPlannerImpl::new(
                 dataset_registry,
+                system_time_source.clone(),
+            )),
+            transform_elab_svc: Arc::new(TransformElaborationServiceImpl::new(
+                compaction_svc,
                 system_time_source,
             )),
-            transform_elab_svc: Arc::new(TransformElaborationServiceImpl::new(compaction_svc)),
             transform_exec_svc: Arc::new(TransformExecutionServiceImpl::new(engine_provisioner)),
         }
     }

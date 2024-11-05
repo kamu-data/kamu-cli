@@ -54,7 +54,7 @@ impl TransformRequestPlannerImpl {
 
     // TODO: PERF: Avoid multiple passes over metadata chain
     #[tracing::instrument(level = "info", skip_all)]
-    pub async fn get_next_operation(
+    async fn get_next_operation(
         &self,
         target: ResolvedDataset,
         system_time: DateTime<Utc>,

@@ -14,6 +14,7 @@ use engine::{TransformRequestExt, TransformRequestInputExt};
 use internal_error::ResultIntoInternal;
 use kamu_core::*;
 use opendatafabric::{ExecuteTransformInput, TransformInput};
+use time_source::SystemTimeSource;
 
 use super::get_transform_input_from_query_input;
 use crate::build_preliminary_request_ext;
@@ -22,13 +23,20 @@ use crate::build_preliminary_request_ext;
 
 pub struct TransformElaborationServiceImpl {
     compaction_svc: Arc<dyn CompactionService>,
+    time_source: Arc<dyn SystemTimeSource>,
 }
 
 #[component(pub)]
 #[interface(dyn TransformElaborationService)]
 impl TransformElaborationServiceImpl {
-    pub fn new(compaction_svc: Arc<dyn CompactionService>) -> Self {
-        Self { compaction_svc }
+    pub fn new(
+        compaction_svc: Arc<dyn CompactionService>,
+        time_source: Arc<dyn SystemTimeSource>,
+    ) -> Self {
+        Self {
+            compaction_svc,
+            time_source,
+        }
     }
 
     async fn elaborate_preliminary_request(
@@ -198,7 +206,7 @@ impl TransformElaborationService for TransformElaborationServiceImpl {
                         TransformPreliminaryPlan {
                             preliminary_request: build_preliminary_request_ext(
                                 target,
-                                plan.preliminary_request.system_time,
+                                self.time_source.now(),
                             )
                             .await
                             .int_err()?,
