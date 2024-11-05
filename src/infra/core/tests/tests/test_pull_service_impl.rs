@@ -18,7 +18,7 @@ use internal_error::InternalError;
 use kamu::domain::*;
 use kamu::testing::*;
 use kamu::*;
-use kamu_accounts::{CurrentAccountSubject, DEFAULT_ACCOUNT_NAME_STR};
+use kamu_accounts::CurrentAccountSubject;
 use opendatafabric::*;
 use time_source::SystemTimeSourceDefault;
 
@@ -42,11 +42,13 @@ macro_rules! rl {
     };
 }
 
+/*
 macro_rules! mrl {
     ($s:expr) => {
         DatasetRef::Alias(DatasetAlias::try_from($s).unwrap())
     };
 }
+    */
 
 macro_rules! rr {
     ($s:expr) => {
@@ -144,12 +146,13 @@ async fn create_graph(
 // dir and syncing it into the main workspace. TODO: Add simpler way to import
 // remote dataset
 async fn create_graph_remote(
+    remote_repo_name: &str,
     dataset_repo: Arc<dyn DatasetRepository>,
     dataset_repo_writer: Arc<dyn DatasetRepositoryWriter>,
     reg: Arc<RemoteRepositoryRegistryImpl>,
     datasets: Vec<(DatasetAlias, Vec<DatasetAlias>)>,
     to_import: Vec<DatasetAlias>,
-) {
+) -> tempfile::TempDir {
     let tmp_repo_dir = tempfile::tempdir().unwrap();
 
     let remote_dataset_repo = DatasetRepositoryLocalFs::new(
@@ -161,7 +164,7 @@ async fn create_graph_remote(
 
     create_graph(&remote_dataset_repo, datasets).await;
 
-    let tmp_repo_name = RepoName::new_unchecked("tmp");
+    let tmp_repo_name = RepoName::new_unchecked(remote_repo_name);
 
     reg.add_repository(
         &tmp_repo_name,
@@ -207,6 +210,8 @@ async fn create_graph_remote(
             .await
             .unwrap();
     }
+
+    tmp_repo_dir
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -228,12 +233,18 @@ async fn test_pull_batching_chain() {
     .await;
 
     assert_eq!(
-        harness.pull(refs!["c"], PullOptions::default()).await,
+        harness
+            .pull(refs!["c"], PullOptions::default())
+            .await
+            .unwrap(),
         vec![PullBatch::Transform(refs!["c"])]
     );
 
     assert_eq!(
-        harness.pull(refs!["c", "a"], PullOptions::default()).await,
+        harness
+            .pull(refs!["c", "a"], PullOptions::default())
+            .await
+            .unwrap(),
         vec![
             PullBatch::Ingest(refs!["a"]),
             PullBatch::Transform(refs!["c"]),
@@ -249,7 +260,8 @@ async fn test_pull_batching_chain() {
                     ..PullOptions::default()
                 }
             )
-            .await,
+            .await
+            .unwrap(),
         vec![
             PullBatch::Ingest(refs!["a"]),
             PullBatch::Transform(refs!["b"]),
@@ -277,14 +289,18 @@ async fn test_pull_batching_chain_multi_tenant() {
     .await;
 
     assert_eq!(
-        harness.pull(refs!["z/c"], PullOptions::default()).await,
+        harness
+            .pull(refs!["z/c"], PullOptions::default())
+            .await
+            .unwrap(),
         vec![PullBatch::Transform(refs_local!["z/c"])]
     );
 
     assert_eq!(
         harness
             .pull(refs!["z/c", "x/a"], PullOptions::default())
-            .await,
+            .await
+            .unwrap(),
         vec![
             PullBatch::Ingest(refs_local!["x/a"]),
             PullBatch::Transform(refs_local!["z/c"]),
@@ -300,7 +316,8 @@ async fn test_pull_batching_chain_multi_tenant() {
                     ..PullOptions::default()
                 }
             )
-            .await,
+            .await
+            .unwrap(),
         vec![
             PullBatch::Ingest(refs_local!["x/a"]),
             PullBatch::Transform(refs_local!["y/b"]),
@@ -334,15 +351,18 @@ async fn test_pull_batching_complex() {
     .await;
 
     assert_eq!(
-        harness.pull(refs!["e"], PullOptions::default()).await,
+        harness
+            .pull(refs!["e"], PullOptions::default())
+            .await
+            .unwrap(),
         vec![PullBatch::Transform(refs!["e"])]
     );
 
     assert_matches!(
         harness
-            .pull_svc
-            .pull_multi(vec![ar!("z")], PullOptions::default(), None)
+            .pull(vec![ar!("z")], PullOptions::default())
             .await
+            .err()
             .unwrap()[0],
         PullResponse {
             result: Err(PullError::NotFound(_)),
@@ -359,7 +379,8 @@ async fn test_pull_batching_complex() {
                     ..PullOptions::default()
                 }
             )
-            .await,
+            .await
+            .unwrap(),
         vec![
             PullBatch::Ingest(refs!["a", "b"]),
             PullBatch::Transform(refs!["c", "d"]),
@@ -379,7 +400,8 @@ async fn test_pull_batching_complex_with_remote() {
     // (B) --/    /   /
     // C --------/   /
     // D -----------/
-    create_graph_remote(
+    let _remote_tmp_dir = create_graph_remote(
+        "kamu.dev",
         harness.dataset_repo.clone(),
         harness.dataset_repo.clone(),
         harness.remote_repo_reg.clone(),
@@ -407,7 +429,7 @@ async fn test_pull_batching_complex_with_remote() {
         .get_remote_aliases(&rl!("e"))
         .await
         .add(
-            &DatasetRefRemote::try_from("kamu.dev/anonymous/e").unwrap(),
+            &DatasetRefRemote::try_from("kamu.dev/e").unwrap(),
             RemoteAliasKind::Pull,
         )
         .await
@@ -423,9 +445,10 @@ async fn test_pull_batching_complex_with_remote() {
                     ..PullOptions::default()
                 }
             )
-            .await,
+            .await
+            .unwrap(),
         vec![PullBatch::Sync(vec![(
-            rr!("kamu.dev/anonymous/e").into(),
+            rr!("kamu.dev/e").into(),
             n!("e").into()
         )])],
     );
@@ -434,15 +457,16 @@ async fn test_pull_batching_complex_with_remote() {
     assert_eq!(
         harness
             .pull(
-                refs!["kamu.dev/anonymous/e"],
+                refs!["kamu.dev/e"],
                 PullOptions {
                     recursive: true,
                     ..PullOptions::default()
                 }
             )
-            .await,
+            .await
+            .unwrap(),
         vec![PullBatch::Sync(vec![(
-            rr!("kamu.dev/anonymous/e").into(),
+            rr!("kamu.dev/e").into(),
             n!("e").into()
         )])],
     );
@@ -457,9 +481,10 @@ async fn test_pull_batching_complex_with_remote() {
                     ..PullOptions::default()
                 }
             )
-            .await,
+            .await
+            .unwrap(),
         vec![
-            PullBatch::Sync(vec![(rr!("kamu.dev/anonymous/e").into(), n!("e").into())]),
+            PullBatch::Sync(vec![(rr!("kamu.dev/e").into(), n!("e").into())]),
             PullBatch::Ingest(refs!("c", "d")),
             PullBatch::Transform(refs!("f")),
             PullBatch::Transform(refs!("g")),
@@ -476,9 +501,10 @@ async fn test_pull_batching_complex_with_remote() {
                     ..PullOptions::default()
                 }
             )
-            .await,
+            .await
+            .unwrap(),
         vec![
-            PullBatch::Sync(vec![(rr!("kamu.dev/anonymous/e").into(), n!("e").into())]),
+            PullBatch::Sync(vec![(rr!("kamu.dev/e").into(), n!("e").into())]),
             PullBatch::Ingest(refs!("c", "d")),
             PullBatch::Transform(refs!("f")),
             PullBatch::Transform(refs!("g")),
@@ -489,15 +515,16 @@ async fn test_pull_batching_complex_with_remote() {
     assert_eq!(
         harness
             .pull(
-                refs!["g", "kamu.dev/anonymous/e"],
+                refs!["g", "kamu.dev/e"],
                 PullOptions {
                     recursive: true,
                     ..PullOptions::default()
                 }
             )
-            .await,
+            .await
+            .unwrap(),
         vec![
-            PullBatch::Sync(vec![(rr!("kamu.dev/anonymous/e").into(), n!("e").into())]),
+            PullBatch::Sync(vec![(rr!("kamu.dev/e").into(), n!("e").into())]),
             PullBatch::Ingest(refs!("c", "d")),
             PullBatch::Transform(refs!("f")),
             PullBatch::Transform(refs!("g")),
@@ -512,36 +539,37 @@ async fn test_sync_from() {
     let tmp_ws_dir = tempfile::tempdir().unwrap();
     let harness = PullTestHarness::new(tmp_ws_dir.path(), false);
 
-    harness
-        .remote_repo_reg
-        .add_repository(
-            &RepoName::new_unchecked("myrepo"),
-            url::Url::parse("file:///tmp/nowhere").unwrap(),
-        )
-        .unwrap();
+    let _remote_tmp_dir = create_graph_remote(
+        "kamu.dev",
+        harness.dataset_repo.clone(),
+        harness.dataset_repo.clone(),
+        harness.remote_repo_reg.clone(),
+        vec![(n!("foo"), names![])],
+        names!(),
+    )
+    .await;
 
     let res = harness
-        .pull_svc
-        .pull_multi_ext(
-            vec![PullRequest {
-                local_ref: Some(n!("bar").into()),
-                remote_ref: Some(rr!("myrepo/foo")),
-            }],
+        .pull_with_requests(
+            vec![PullRequest::Remote(PullRequestRemote {
+                maybe_local_alias: Some(n!("bar")),
+                remote_ref: rr!("kamu.dev/foo"),
+            })],
             PullOptions::default(),
-            None,
         )
         .await
         .unwrap();
 
-    assert_eq!(res.len(), 1);
-    assert_matches!(
-        res[0],
-        PullResponse {
-            result: Ok(PullResult::Updated { old_head: None, .. }),
-            ..
-        }
+    assert_eq!(
+        res,
+        vec![PullBatch::Sync(vec![(
+            rr!("kamu.dev/foo").into(),
+            n!("bar").into()
+        )])]
     );
 
+    // Note: we moved pull aliases into use case, so this awaits for refactoring
+    /*
     let aliases = harness.get_remote_aliases(&rl!("bar")).await;
     let pull_aliases: Vec<_> = aliases
         .get_by_kind(RemoteAliasKind::Pull)
@@ -550,8 +578,8 @@ async fn test_sync_from() {
 
     assert_eq!(
         pull_aliases,
-        vec![DatasetRefRemote::try_from("myrepo/foo").unwrap()]
-    );
+        vec![DatasetRefRemote::try_from("kamu.dev/foo").unwrap()]
+    );*/
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -561,29 +589,37 @@ async fn test_sync_from_url_and_local_ref() {
     let tmp_ws_dir = tempfile::tempdir().unwrap();
     let harness = PullTestHarness::new(tmp_ws_dir.path(), false);
 
+    let _remote_tmp_dir = create_graph_remote(
+        "kamu.dev",
+        harness.dataset_repo.clone(),
+        harness.dataset_repo.clone(),
+        harness.remote_repo_reg.clone(),
+        vec![(n!("bar"), names![])],
+        names!(),
+    )
+    .await;
+
     let res = harness
-        .pull_svc
-        .pull_multi_ext(
-            vec![PullRequest {
-                local_ref: Some(n!("bar").into()),
-                remote_ref: Some(rr!("http://example.com/odf/bar")),
-            }],
+        .pull_with_requests(
+            vec![PullRequest::Remote(PullRequestRemote {
+                maybe_local_alias: Some(n!("bar")),
+                remote_ref: rr!("kamu.dev/bar"),
+            })],
             PullOptions::default(),
-            None,
         )
         .await
         .unwrap();
 
-    assert_eq!(res.len(), 1);
-    assert_matches!(
-        res[0],
-        PullResponse {
-            result: Ok(PullResult::Updated { old_head: None, .. }),
-            ..
-        }
+    assert_eq!(
+        res,
+        vec![PullBatch::Sync(vec![(
+            rr!("kamu.dev/bar").into(),
+            n!("bar").into()
+        )])]
     );
 
-    let aliases = harness.get_remote_aliases(&rl!("bar")).await;
+    // Note: we moved pull aliases into use case, so this awaits for refactoring
+    /*let aliases = harness.get_remote_aliases(&rl!("bar")).await;
     let pull_aliases: Vec<_> = aliases
         .get_by_kind(RemoteAliasKind::Pull)
         .cloned()
@@ -591,8 +627,8 @@ async fn test_sync_from_url_and_local_ref() {
 
     assert_eq!(
         pull_aliases,
-        vec![DatasetRefRemote::try_from("http://example.com/odf/bar").unwrap()]
-    );
+        vec![DatasetRefRemote::try_from("kamu.dev/bar").unwrap()]
+    );*/
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -602,28 +638,37 @@ async fn test_sync_from_url_and_local_multi_tenant_ref() {
     let tmp_ws_dir = tempfile::tempdir().unwrap();
     let harness = PullTestHarness::new(tmp_ws_dir.path(), true);
 
+    let _remote_tmp_dir = create_graph_remote(
+        "kamu.dev",
+        harness.dataset_repo.clone(),
+        harness.dataset_repo.clone(),
+        harness.remote_repo_reg.clone(),
+        vec![(n!("bar"), names![])],
+        names!(),
+    )
+    .await;
+
     let res = harness
-        .pull_svc
-        .pull_multi_ext(
-            vec![PullRequest {
-                local_ref: Some(mn!("x/bar").into()),
-                remote_ref: Some(rr!("http://example.com/odf/bar")),
-            }],
+        .pull_with_requests(
+            vec![PullRequest::Remote(PullRequestRemote {
+                maybe_local_alias: Some(mn!("x/bar")),
+                remote_ref: rr!("kamu.dev/bar"),
+            })],
             PullOptions::default(),
-            None,
         )
         .await
         .unwrap();
 
-    assert_eq!(res.len(), 1);
-    assert_matches!(
-        res[0],
-        PullResponse {
-            result: Ok(PullResult::Updated { old_head: None, .. }),
-            ..
-        }
+    assert_eq!(
+        res,
+        vec![PullBatch::Sync(vec![(
+            rr!("kamu.dev/bar").into(),
+            mn!("x/bar").into()
+        )])]
     );
 
+    // Note: we moved pull aliases into use case, so this awaits for refactoring
+    /*
     let aliases = harness.get_remote_aliases(&mrl!("x/bar")).await;
     let pull_aliases: Vec<_> = aliases
         .get_by_kind(RemoteAliasKind::Pull)
@@ -633,7 +678,7 @@ async fn test_sync_from_url_and_local_multi_tenant_ref() {
     assert_eq!(
         pull_aliases,
         vec![DatasetRefRemote::try_from("http://example.com/odf/bar").unwrap()]
-    );
+    );*/
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -643,29 +688,37 @@ async fn test_sync_from_url_only() {
     let tmp_ws_dir = tempfile::tempdir().unwrap();
     let harness = PullTestHarness::new(tmp_ws_dir.path(), false);
 
+    let _remote_tmp_dir = create_graph_remote(
+        "kamu.dev",
+        harness.dataset_repo.clone(),
+        harness.dataset_repo.clone(),
+        harness.remote_repo_reg.clone(),
+        vec![(n!("bar"), names![])],
+        names!(),
+    )
+    .await;
+
     let res = harness
-        .pull_svc
-        .pull_multi_ext(
-            vec![PullRequest {
-                local_ref: None,
-                remote_ref: Some(rr!("http://example.com/odf/bar")),
-            }],
+        .pull_with_requests(
+            vec![PullRequest::Remote(PullRequestRemote {
+                maybe_local_alias: None,
+                remote_ref: rr!("kamu.dev/bar"),
+            })],
             PullOptions::default(),
-            None,
         )
         .await
         .unwrap();
 
-    assert_eq!(res.len(), 1);
-    assert_matches!(
-        res[0],
-        PullResponse {
-            result: Ok(PullResult::Updated { old_head: None, .. }),
-            ..
-        }
+    assert_eq!(
+        res,
+        vec![PullBatch::Sync(vec![(
+            rr!("kamu.dev/bar").into(),
+            n!("bar").into()
+        )])]
     );
 
-    let aliases = harness.get_remote_aliases(&rl!("bar")).await;
+    // Note: we moved pull aliases into use case, so this awaits for refactoring
+    /*let aliases = harness.get_remote_aliases(&rl!("bar")).await;
     let pull_aliases: Vec<_> = aliases
         .get_by_kind(RemoteAliasKind::Pull)
         .cloned()
@@ -674,7 +727,7 @@ async fn test_sync_from_url_only() {
     assert_eq!(
         pull_aliases,
         vec![DatasetRefRemote::try_from("http://example.com/odf/bar").unwrap()]
-    );
+    );*/
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -684,28 +737,37 @@ async fn test_sync_from_url_only_multi_tenant_case() {
     let tmp_ws_dir = tempfile::tempdir().unwrap();
     let harness = PullTestHarness::new(tmp_ws_dir.path(), true);
 
+    let _remote_tmp_dir = create_graph_remote(
+        "kamu.dev",
+        harness.dataset_repo.clone(),
+        harness.dataset_repo.clone(),
+        harness.remote_repo_reg.clone(),
+        vec![(n!("bar"), names![])],
+        names!(),
+    )
+    .await;
+
     let res = harness
-        .pull_svc
-        .pull_multi_ext(
-            vec![PullRequest {
-                local_ref: None,
-                remote_ref: Some(rr!("http://example.com/odf/bar")),
-            }],
+        .pull_with_requests(
+            vec![PullRequest::Remote(PullRequestRemote {
+                maybe_local_alias: None,
+                remote_ref: rr!("kamu.dev/bar"),
+            })],
             PullOptions::default(),
-            None,
         )
         .await
         .unwrap();
 
-    assert_eq!(res.len(), 1);
-    assert_matches!(
-        res[0],
-        PullResponse {
-            result: Ok(PullResult::Updated { old_head: None, .. }),
-            ..
-        }
+    assert_eq!(
+        res,
+        vec![PullBatch::Sync(vec![(
+            rr!("kamu.dev/bar").into(),
+            n!("bar").into()
+        )])]
     );
 
+    // Note: we moved pull aliases into use case, so this awaits for refactoring
+    /*
     let aliases = harness
         .get_remote_aliases(&mrl!(format!("{}/{}", DEFAULT_ACCOUNT_NAME_STR, "bar")))
         .await;
@@ -717,7 +779,7 @@ async fn test_sync_from_url_only_multi_tenant_case() {
     assert_eq!(
         pull_aliases,
         vec![DatasetRefRemote::try_from("http://example.com/odf/bar").unwrap()]
-    );
+    );*/
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -727,6 +789,12 @@ struct PullTestHarness {
     dataset_repo: Arc<DatasetRepositoryLocalFs>,
     remote_repo_reg: Arc<RemoteRepositoryRegistryImpl>,
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
+    pull_request_planner: Arc<dyn PullRequestPlanner>,
+    polling_ingest_svc: Arc<dyn PollingIngestService>,
+    transform_elab_svc: Arc<dyn TransformElaborationService>,
+    transform_exec_svc: Arc<dyn TransformExecutionService>,
+    sync_svc: Arc<dyn SyncService>,
+    in_multi_tenant_mode: bool,
 }
 
 impl PullTestHarness {
@@ -736,7 +804,11 @@ impl PullTestHarness {
         let datasets_dir_path = tmp_path.join("datasets");
         std::fs::create_dir(&datasets_dir_path).unwrap();
 
+        let run_info_dir = tmp_path.join("run");
+        std::fs::create_dir(&run_info_dir).unwrap();
+
         let catalog = dill::CatalogBuilder::new()
+            .add_value(RunInfoDir::new(run_info_dir))
             .add::<SystemTimeSourceDefault>()
             .add_value(CurrentAccountSubject::new_test())
             .add_builder(
@@ -752,11 +824,19 @@ impl PullTestHarness {
             .add::<RemoteAliasesRegistryImpl>()
             .add_value(TestIngestService::new(calls.clone()))
             .bind::<dyn PollingIngestService, TestIngestService>()
-            .add_value(TestTransformService::new(calls.clone()))
-            .bind::<dyn TransformService, TestTransformService>()
             .add_builder(TestSyncService::builder().with_calls(calls.clone()))
             .bind::<dyn SyncService, TestSyncService>()
             .add::<PullRequestPlannerImpl>()
+            .add::<TransformRequestPlannerImpl>()
+            .add::<TransformElaborationServiceImpl>()
+            .add::<TransformExecutionServiceImpl>()
+            .add::<CompactionServiceImpl>()
+            .add::<EngineProvisionerNull>()
+            .add::<ObjectStoreRegistryImpl>()
+            .add::<SyncRequestBuilder>()
+            .add::<DatasetFactoryImpl>()
+            .add::<auth::DummyOdfServerAccessTokenResolver>()
+            .add_value(IpfsGateway::default())
             .build();
 
         Self {
@@ -764,6 +844,12 @@ impl PullTestHarness {
             dataset_repo: catalog.get_one().unwrap(),
             remote_repo_reg: catalog.get_one().unwrap(),
             remote_alias_reg: catalog.get_one().unwrap(),
+            pull_request_planner: catalog.get_one().unwrap(),
+            polling_ingest_svc: catalog.get_one().unwrap(),
+            transform_elab_svc: catalog.get_one().unwrap(),
+            transform_exec_svc: catalog.get_one().unwrap(),
+            sync_svc: catalog.get_one().unwrap(),
+            in_multi_tenant_mode: multi_tenant,
         }
     }
 
@@ -773,16 +859,125 @@ impl PullTestHarness {
         calls
     }
 
-    async fn pull(&self, refs: Vec<DatasetRefAny>, options: PullOptions) -> Vec<PullBatch> {
-        let results = self.pull_svc.pull_multi(refs, options, None).await.unwrap();
+    async fn pull(
+        &self,
+        refs: Vec<DatasetRefAny>,
+        options: PullOptions,
+    ) -> Result<Vec<PullBatch>, Vec<PullResponse>> {
+        let requests: Vec<_> = refs
+            .into_iter()
+            .map(|r| PullRequest::from_any_ref(&r, |_| !self.in_multi_tenant_mode))
+            .collect();
+        self.pull_with_requests(requests, options).await
+    }
 
-        for res in results {
-            assert_matches!(res, PullResponse { result: Ok(_), .. });
+    async fn pull_with_requests(
+        &self,
+        requests: Vec<PullRequest>,
+        options: PullOptions,
+    ) -> Result<Vec<PullBatch>, Vec<PullResponse>> {
+        let (plan_iterations, errors) = self
+            .pull_request_planner
+            .build_pull_multi_plan(&requests, &options, self.in_multi_tenant_mode)
+            .await;
+        if !errors.is_empty() {
+            return Err(errors);
+        }
+
+        for iteration in plan_iterations {
+            let mut errors = Vec::new();
+            match iteration.job {
+                PullPlanIterationJob::Ingest(batch) => {
+                    let ingest_responses = self
+                        .polling_ingest_svc
+                        .ingest_multi(
+                            batch.iter().map(|pii| pii.target.clone()).collect(),
+                            options.ingest_options.clone(),
+                            None,
+                        )
+                        .await;
+
+                    // Convert ingest results into pull results, but only errors
+                    assert_eq!(batch.len(), ingest_responses.len());
+                    std::iter::zip(batch, ingest_responses).for_each(|(pii, res)| {
+                        assert_eq!(pii.target.handle.as_local_ref(), res.dataset_ref);
+                        if res.result.is_err() {
+                            errors.push(pii.into_response_ingest(res));
+                        }
+                    });
+                }
+                PullPlanIterationJob::Transform(batch) => {
+                    self.calls.lock().unwrap().push(PullBatch::Transform(
+                        batch
+                            .iter()
+                            .map(|pti| pti.target.handle.as_any_ref())
+                            .collect(),
+                    ));
+                    for pti in batch {
+                        let elaboration_result = self
+                            .transform_elab_svc
+                            .elaborate_transform(
+                                pti.target.clone(),
+                                pti.plan,
+                                &options.transform_options,
+                                None,
+                            )
+                            .await;
+
+                        match elaboration_result {
+                            Ok(elaboration) => {
+                                if let TransformElaboration::Elaborated(transform_plan) =
+                                    elaboration
+                                {
+                                    let transform_result = self
+                                        .transform_exec_svc
+                                        .execute_transform(pti.target.clone(), transform_plan, None)
+                                        .await
+                                        .1;
+                                    if let Err(e) = transform_result {
+                                        errors.push(PullResponse {
+                                            maybe_original_request: pti.maybe_original_request,
+                                            maybe_local_ref: Some(pti.target.handle.as_local_ref()),
+                                            maybe_remote_ref: None,
+                                            result: Err(PullError::TransformError(
+                                                TransformError::Execute(e),
+                                            )),
+                                        });
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                errors.push(PullResponse {
+                                    maybe_original_request: pti.maybe_original_request,
+                                    maybe_local_ref: Some(pti.target.handle.as_local_ref()),
+                                    maybe_remote_ref: None,
+                                    result: Err(PullError::TransformError(
+                                        TransformError::Elaborate(e),
+                                    )),
+                                });
+                            }
+                        }
+                    }
+                }
+                PullPlanIterationJob::Sync((_, sync_requests)) => {
+                    self.sync_svc
+                        .sync_multi(sync_requests, options.sync_options.clone(), None)
+                        .await
+                        .into_iter()
+                        .for_each(|sync_response| {
+                            assert_matches!(sync_response.result, Ok(_));
+                        });
+                }
+            };
+
+            if !errors.is_empty() {
+                return Err(errors);
+            }
         }
 
         tokio::time::sleep(Duration::from_millis(1)).await;
 
-        self.collect_calls()
+        Ok(self.collect_calls())
     }
 
     async fn get_remote_aliases(&self, dataset_ref: &DatasetRef) -> Box<dyn RemoteAliases> {
@@ -942,8 +1137,6 @@ impl SyncService for TestSyncService {
         unimplemented!()
     }
 }
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

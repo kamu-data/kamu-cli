@@ -502,9 +502,18 @@ impl<'a> PullGraphDepthFirstTraversal<'a> {
     ) -> Result<Option<DatasetHandle>, PullError> {
         let maybe_local_handle = match request {
             PullRequest::Local(local_ref) => {
-                self.dataset_registry
+                match self
+                    .dataset_registry
                     .try_resolve_dataset_handle_by_ref(local_ref)
                     .await?
+                {
+                    Some(hdl) => Some(hdl),
+                    None => {
+                        return Err(PullError::NotFound(DatasetNotFoundError {
+                            dataset_ref: local_ref.clone(),
+                        }))
+                    }
+                }
             }
             PullRequest::Remote(remote) => {
                 let maybe_local_handle = if let Some(local_alias) = &remote.maybe_local_alias {
