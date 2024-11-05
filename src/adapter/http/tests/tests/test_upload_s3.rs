@@ -106,7 +106,7 @@ impl Harness {
         )
     }
 
-    fn upload_retreive_url(&self) -> String {
+    fn upload_retrieve_url(&self) -> String {
         format!("http://{}/platform/file/upload", self.api_server_addr(),)
     }
 
@@ -282,7 +282,7 @@ async fn test_upload_then_read_file() {
 
     let harness = Harness::new().await;
     let upload_prepare_url = harness.upload_prepare_url("test.txt", "text/plain", FILE_BODY.len());
-    let retreive_url = harness.upload_retreive_url();
+    let retrieve_url = harness.upload_retrieve_url();
     let access_token = harness.make_access_token(&DEFAULT_ACCOUNT_ID);
     let different_access_token = harness.make_access_token(&(AccountID::new_generated_ed25519().1));
 
@@ -314,33 +314,33 @@ async fn test_upload_then_read_file() {
         assert_eq!(200, s3_upload_response.status());
 
         // Read file with the same authorization token
-        let get_url = format!("{retreive_url}/{}", upload_context.upload_token);
-        let upload_retreive_response = client
+        let get_url = format!("{retrieve_url}/{}", upload_context.upload_token);
+        let upload_retrieve_response = client
             .get(get_url.clone())
             .bearer_auth(access_token)
             .send()
             .await
             .unwrap();
-        assert_eq!(200, upload_retreive_response.status());
-        let file_body = upload_retreive_response.text().await.unwrap();
+        assert_eq!(200, upload_retrieve_response.status());
+        let file_body = upload_retrieve_response.text().await.unwrap();
         assert_eq!(FILE_BODY, file_body);
 
         // Read file with different authorization token
-        let get_url = format!("{retreive_url}/{}", upload_context.upload_token);
-        let upload_retreive_response = client
+        let get_url = format!("{retrieve_url}/{}", upload_context.upload_token);
+        let upload_retrieve_response = client
             .get(get_url.clone())
             .bearer_auth(different_access_token)
             .send()
             .await
             .unwrap();
-        assert_eq!(200, upload_retreive_response.status());
-        let file_body = upload_retreive_response.text().await.unwrap();
+        assert_eq!(200, upload_retrieve_response.status());
+        let file_body = upload_retrieve_response.text().await.unwrap();
         assert_eq!(FILE_BODY, file_body);
 
         // Read file anonymously
-        let upload_retreive_response = client.get(get_url).send().await.unwrap();
-        assert_eq!(200, upload_retreive_response.status());
-        let file_body = upload_retreive_response.text().await.unwrap();
+        let upload_retrieve_response = client.get(get_url).send().await.unwrap();
+        assert_eq!(200, upload_retrieve_response.status());
+        let file_body = upload_retrieve_response.text().await.unwrap();
         assert_eq!(FILE_BODY, file_body);
     };
 

@@ -482,31 +482,31 @@ async fn test_upload_then_read_file() {
         assert_eq!(200, upload_main_response.status());
 
         // Read file with the same authorization token
-        let upload_retreive_response = client
+        let upload_retrieve_response = client
             .get(upload_main_url.clone())
             .bearer_auth(access_token)
             .send()
             .await
             .unwrap();
-        assert_eq!(200, upload_retreive_response.status());
-        let file_body = upload_retreive_response.text().await.unwrap();
+        assert_eq!(200, upload_retrieve_response.status());
+        let file_body = upload_retrieve_response.text().await.unwrap();
         assert_eq!(FILE_BODY, file_body);
 
         // Read file with a different authorization token
-        let upload_retreive_response = client
+        let upload_retrieve_response = client
             .get(upload_main_url.clone())
             .bearer_auth(different_access_token)
             .send()
             .await
             .unwrap();
-        assert_eq!(200, upload_retreive_response.status());
-        let file_body = upload_retreive_response.text().await.unwrap();
+        assert_eq!(200, upload_retrieve_response.status());
+        let file_body = upload_retrieve_response.text().await.unwrap();
         assert_eq!(FILE_BODY, file_body);
 
         // Read file anonymously
-        let upload_retreive_response = client.get(upload_main_url).send().await.unwrap();
-        assert_eq!(200, upload_retreive_response.status());
-        let file_body = upload_retreive_response.text().await.unwrap();
+        let upload_retrieve_response = client.get(upload_main_url).send().await.unwrap();
+        assert_eq!(200, upload_retrieve_response.status());
+        let file_body = upload_retrieve_response.text().await.unwrap();
         assert_eq!(FILE_BODY, file_body);
     };
 
