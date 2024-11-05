@@ -13,21 +13,21 @@ use kamu_cli_e2e_common::prelude::*;
 
 kamu_cli_run_api_server_e2e_test!(
     storage = postgres,
-    fixture = kamu_cli_e2e_repo_tests::test_login_password_predefined_successful
+    fixture = kamu_cli_e2e_repo_tests::rest_api::test_login_password_predefined_successful
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 kamu_cli_run_api_server_e2e_test!(
     storage = postgres,
-    fixture = kamu_cli_e2e_repo_tests::test_login_enabled_methods
+    fixture = kamu_cli_e2e_repo_tests::rest_api::test_login_enabled_methods
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 kamu_cli_run_api_server_e2e_test!(
     storage = postgres,
-    fixture = kamu_cli_e2e_repo_tests::test_login_dummy_github,
+    fixture = kamu_cli_e2e_repo_tests::rest_api::test_login_dummy_github,
     options = Options::default().with_multi_tenant()
 );
 
@@ -35,7 +35,7 @@ kamu_cli_run_api_server_e2e_test!(
 
 kamu_cli_run_api_server_e2e_test!(
     storage = postgres,
-    fixture = kamu_cli_e2e_repo_tests::test_kamu_access_token_middleware,
+    fixture = kamu_cli_e2e_repo_tests::rest_api::test_kamu_access_token_middleware,
     options = Options::default().with_today_as_frozen_system_time()
 );
 

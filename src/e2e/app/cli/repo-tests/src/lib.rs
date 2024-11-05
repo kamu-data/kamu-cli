@@ -11,13 +11,11 @@
 
 mod commands;
 pub mod rest_api;
-mod test_auth;
 mod test_flow;
 mod test_selftest;
 mod test_smart_transfer_protocol;
 
 pub use commands::*;
-pub use test_auth::*;
 pub use test_flow::*;
 pub use test_selftest::*;
 pub use test_smart_transfer_protocol::*;

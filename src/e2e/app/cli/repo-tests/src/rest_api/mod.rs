@@ -8,11 +8,13 @@
 // by the Apache License, Version 2.0.
 
 mod test_accounts;
+mod test_auth;
 mod test_dataset;
 mod test_openapi;
 mod test_swagger;
 
 pub use test_accounts::*;
+pub use test_auth::*;
 pub use test_dataset::*;
 pub use test_openapi::*;
 pub use test_swagger::*;

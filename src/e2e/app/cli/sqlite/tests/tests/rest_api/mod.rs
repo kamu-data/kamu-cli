@@ -8,4 +8,5 @@
 // by the Apache License, Version 2.0.
 
 mod test_accounts;
+mod test_auth;
 mod test_dataset;
