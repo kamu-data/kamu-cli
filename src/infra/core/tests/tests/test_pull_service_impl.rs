@@ -14,7 +14,6 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use dill::*;
-use internal_error::InternalError;
 use kamu::domain::*;
 use kamu::testing::*;
 use kamu::*;
@@ -790,10 +789,6 @@ struct PullTestHarness {
     remote_repo_reg: Arc<RemoteRepositoryRegistryImpl>,
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
     pull_request_planner: Arc<dyn PullRequestPlanner>,
-    polling_ingest_svc: Arc<dyn PollingIngestService>,
-    transform_elab_svc: Arc<dyn TransformElaborationService>,
-    transform_exec_svc: Arc<dyn TransformExecutionService>,
-    sync_svc: Arc<dyn SyncService>,
     in_multi_tenant_mode: bool,
 }
 
@@ -822,16 +817,8 @@ impl PullTestHarness {
             .add_value(RemoteRepositoryRegistryImpl::create(tmp_path.join("repos")).unwrap())
             .bind::<dyn RemoteRepositoryRegistry, RemoteRepositoryRegistryImpl>()
             .add::<RemoteAliasesRegistryImpl>()
-            .add_value(TestIngestService::new(calls.clone()))
-            .bind::<dyn PollingIngestService, TestIngestService>()
-            .add_builder(TestSyncService::builder().with_calls(calls.clone()))
-            .bind::<dyn SyncService, TestSyncService>()
             .add::<PullRequestPlannerImpl>()
             .add::<TransformRequestPlannerImpl>()
-            .add::<TransformElaborationServiceImpl>()
-            .add::<TransformExecutionServiceImpl>()
-            .add::<CompactionServiceImpl>()
-            .add::<EngineProvisionerNull>()
             .add::<ObjectStoreRegistryImpl>()
             .add::<SyncRequestBuilder>()
             .add::<DatasetFactoryImpl>()
@@ -845,10 +832,6 @@ impl PullTestHarness {
             remote_repo_reg: catalog.get_one().unwrap(),
             remote_alias_reg: catalog.get_one().unwrap(),
             pull_request_planner: catalog.get_one().unwrap(),
-            polling_ingest_svc: catalog.get_one().unwrap(),
-            transform_elab_svc: catalog.get_one().unwrap(),
-            transform_exec_svc: catalog.get_one().unwrap(),
-            sync_svc: catalog.get_one().unwrap(),
             in_multi_tenant_mode: multi_tenant,
         }
     }
@@ -885,26 +868,14 @@ impl PullTestHarness {
         }
 
         for iteration in plan_iterations {
-            let mut errors = Vec::new();
             match iteration.job {
                 PullPlanIterationJob::Ingest(batch) => {
-                    let ingest_responses = self
-                        .polling_ingest_svc
-                        .ingest_multi(
-                            batch.iter().map(|pii| pii.target.clone()).collect(),
-                            options.ingest_options.clone(),
-                            None,
-                        )
-                        .await;
-
-                    // Convert ingest results into pull results, but only errors
-                    assert_eq!(batch.len(), ingest_responses.len());
-                    std::iter::zip(batch, ingest_responses).for_each(|(pii, res)| {
-                        assert_eq!(pii.target.handle.as_local_ref(), res.dataset_ref);
-                        if res.result.is_err() {
-                            errors.push(pii.into_response_ingest(res));
-                        }
-                    });
+                    self.calls.lock().unwrap().push(PullBatch::Ingest(
+                        batch
+                            .into_iter()
+                            .map(|pii| pii.target.handle.as_any_ref())
+                            .collect(),
+                    ));
                 }
                 PullPlanIterationJob::Transform(batch) => {
                     self.calls.lock().unwrap().push(PullBatch::Transform(
@@ -913,66 +884,15 @@ impl PullTestHarness {
                             .map(|pti| pti.target.handle.as_any_ref())
                             .collect(),
                     ));
-                    for pti in batch {
-                        let elaboration_result = self
-                            .transform_elab_svc
-                            .elaborate_transform(
-                                pti.target.clone(),
-                                pti.plan,
-                                &options.transform_options,
-                                None,
-                            )
-                            .await;
-
-                        match elaboration_result {
-                            Ok(elaboration) => {
-                                if let TransformElaboration::Elaborated(transform_plan) =
-                                    elaboration
-                                {
-                                    let transform_result = self
-                                        .transform_exec_svc
-                                        .execute_transform(pti.target.clone(), transform_plan, None)
-                                        .await
-                                        .1;
-                                    if let Err(e) = transform_result {
-                                        errors.push(PullResponse {
-                                            maybe_original_request: pti.maybe_original_request,
-                                            maybe_local_ref: Some(pti.target.handle.as_local_ref()),
-                                            maybe_remote_ref: None,
-                                            result: Err(PullError::TransformError(
-                                                TransformError::Execute(e),
-                                            )),
-                                        });
-                                    }
-                                }
-                            }
-                            Err(e) => {
-                                errors.push(PullResponse {
-                                    maybe_original_request: pti.maybe_original_request,
-                                    maybe_local_ref: Some(pti.target.handle.as_local_ref()),
-                                    maybe_remote_ref: None,
-                                    result: Err(PullError::TransformError(
-                                        TransformError::Elaborate(e),
-                                    )),
-                                });
-                            }
-                        }
-                    }
                 }
                 PullPlanIterationJob::Sync((_, sync_requests)) => {
-                    self.sync_svc
-                        .sync_multi(sync_requests, options.sync_options.clone(), None)
-                        .await
-                        .into_iter()
-                        .for_each(|sync_response| {
-                            assert_matches!(sync_response.result, Ok(_));
-                        });
+                    let mut calls = Vec::new();
+                    for SyncRequest { src, dst } in sync_requests {
+                        calls.push((src.src_ref.clone(), dst.dst_ref.clone()));
+                    }
+                    self.calls.lock().unwrap().push(PullBatch::Sync(calls));
                 }
             };
-
-            if !errors.is_empty() {
-                return Err(errors);
-            }
         }
 
         tokio::time::sleep(Duration::from_millis(1)).await;
@@ -993,155 +913,10 @@ impl PullTestHarness {
     }
 }
 
-struct TestIngestService {
-    calls: Arc<Mutex<Vec<PullBatch>>>,
-}
-
-impl TestIngestService {
-    fn new(calls: Arc<Mutex<Vec<PullBatch>>>) -> Self {
-        Self { calls }
-    }
-}
-
-// TODO: Replace with a mock
-#[async_trait::async_trait]
-impl PollingIngestService for TestIngestService {
-    async fn get_active_polling_source(
-        &self,
-        _target: ResolvedDataset,
-    ) -> Result<Option<(Multihash, MetadataBlockTyped<SetPollingSource>)>, GetDatasetError> {
-        unimplemented!()
-    }
-
-    async fn ingest(
-        &self,
-        _target: ResolvedDataset,
-        _ingest_options: PollingIngestOptions,
-        _maybe_listener: Option<Arc<dyn PollingIngestListener>>,
-    ) -> Result<PollingIngestResult, PollingIngestError> {
-        unimplemented!();
-    }
-
-    async fn ingest_multi(
-        &self,
-        targets: Vec<ResolvedDataset>,
-        _options: PollingIngestOptions,
-        _listener: Option<Arc<dyn PollingIngestMultiListener>>,
-    ) -> Vec<PollingIngestResponse> {
-        let results = targets
-            .iter()
-            .map(|target| PollingIngestResponse {
-                dataset_ref: target.handle.as_local_ref(),
-                result: Ok(PollingIngestResult::UpToDate {
-                    no_source_defined: false,
-                    uncacheable: false,
-                }),
-            })
-            .collect();
-        self.calls.lock().unwrap().push(PullBatch::Ingest(
-            targets
-                .into_iter()
-                .map(|target| target.handle.as_any_ref())
-                .collect(),
-        ));
-        results
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-struct TestSyncService {
-    calls: Arc<Mutex<Vec<PullBatch>>>,
-    dataset_repo: Arc<dyn DatasetRepository>,
-    dataset_repo_writer: Arc<dyn DatasetRepositoryWriter>,
-}
-
-#[dill::component(pub)]
-impl TestSyncService {
-    fn new(
-        calls: Arc<Mutex<Vec<PullBatch>>>,
-        dataset_repo: Arc<dyn DatasetRepository>,
-        dataset_repo_writer: Arc<dyn DatasetRepositoryWriter>,
-    ) -> Self {
-        Self {
-            calls,
-            dataset_repo,
-            dataset_repo_writer,
-        }
-    }
-}
-
-#[async_trait::async_trait]
-impl SyncService for TestSyncService {
-    async fn sync(
-        &self,
-        _request: SyncRequest,
-        _options: SyncOptions,
-        _listener: Option<Arc<dyn SyncListener>>,
-    ) -> Result<SyncResponse, SyncError> {
-        unimplemented!()
-    }
-
-    async fn sync_multi(
-        &self,
-        requests: Vec<SyncRequest>,
-        _options: SyncOptions,
-        _listener: Option<Arc<dyn SyncMultiListener>>,
-    ) -> Vec<SyncResultMulti> {
-        let mut call = Vec::new();
-        let mut results = Vec::new();
-        for SyncRequest { src, dst } in requests {
-            call.push((src.src_ref.clone(), dst.dst_ref.clone()));
-
-            let local_ref = dst.dst_ref.as_local_single_tenant_ref().unwrap();
-
-            let dataset = match self
-                .dataset_repo
-                .try_resolve_dataset_handle_by_ref(&local_ref)
-                .await
-                .unwrap()
-            {
-                None => {
-                    self.dataset_repo_writer
-                        .create_dataset_from_snapshot(
-                            MetadataFactory::dataset_snapshot()
-                                .name(local_ref.alias().unwrap().clone())
-                                .build(),
-                        )
-                        .await
-                        .unwrap()
-                        .create_dataset_result
-                        .dataset
-                }
-                Some(dataset_handle) => self.dataset_repo.get_dataset_by_handle(&dataset_handle),
-            };
-
-            results.push(SyncResultMulti {
-                src: src.src_ref,
-                dst: dst.dst_ref,
-                result: Ok(SyncResponse {
-                    result: SyncResult::Updated {
-                        old_head: None,
-                        new_head: Multihash::from_digest_sha3_256(b"boop"),
-                        num_blocks: 1,
-                    },
-                    local_dataset: dataset,
-                }),
-            });
-        }
-        self.calls.lock().unwrap().push(PullBatch::Sync(call));
-        results
-    }
-
-    async fn ipfs_add(&self, _src: Arc<dyn Dataset>) -> Result<String, InternalError> {
-        unimplemented!()
-    }
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, Eq)]
-pub enum PullBatch {
+enum PullBatch {
     Ingest(Vec<DatasetRefAny>),
     Transform(Vec<DatasetRefAny>),
     Sync(Vec<(DatasetRefAny, DatasetRefAny)>),
