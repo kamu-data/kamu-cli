@@ -17,6 +17,7 @@ use kamu_adapter_http::data::metadata_handler::{
     DatasetMetadataResponse,
     Include as MetadataInclude,
 };
+use kamu_adapter_http::LoginRequestBody;
 use kamu_flow_system::{DatasetFlowType, FlowID};
 use lazy_static::lazy_static;
 use opendatafabric as odf;
@@ -303,6 +304,35 @@ impl AuthApi<'_> {
         .await
     }
 
+    // TODO: remove *_via_rest() postfix
+    pub async fn login_via_rest(
+        &mut self,
+        login_method: impl ToString,
+        login_credentials_json: serde_json::Value,
+    ) -> Result<(), LoginError> {
+        let request_body = LoginRequestBody {
+            login_method: login_method.to_string(),
+            login_credentials_json: serde_json::to_string(&login_credentials_json).unwrap(),
+        };
+        let request_body_json = serde_json::to_value(request_body).unwrap();
+        let response = self
+            .client
+            .rest_api_call(
+                Method::POST,
+                "/platform/login",
+                Some(RequestBody::Json(request_body_json)),
+            )
+            .await;
+
+        match response.status() {
+            StatusCode::OK => Ok(()),
+            StatusCode::UNAUTHORIZED => Err(LoginError::Unauthorized),
+            unexpected_status => Err(format!("Unexpected status: {unexpected_status}")
+                .int_err()
+                .into()),
+        }
+    }
+
     pub async fn token_validate(&self) -> Result<(), TokenValidateError> {
         let response = self
             .client
@@ -329,6 +359,14 @@ impl AuthApi<'_> {
 
         access_token
     }
+}
+
+#[derive(Error, Debug)]
+pub enum LoginError {
+    #[error("Unauthorized")]
+    Unauthorized,
+    #[error(transparent)]
+    Internal(#[from] InternalError),
 }
 
 #[derive(Error, Debug)]

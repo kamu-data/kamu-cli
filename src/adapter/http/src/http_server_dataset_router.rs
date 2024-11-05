@@ -13,7 +13,6 @@ use dill::Catalog;
 use http_common::{ApiError, IntoApiError, ResultIntoApiError};
 use opendatafabric as odf;
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
 
@@ -87,7 +86,7 @@ pub struct LoginRequestBody {
     pub login_credentials_json: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct LoginResponseBody {
     pub access_token: String,
@@ -98,7 +97,11 @@ pub struct LoginResponseBody {
     post,
     path = "/platform/login",
     request_body = LoginRequestBody,
-    responses((status = OK, body = Object)),
+    responses(
+        (status = OK, body = LoginResponseBody),
+        (status = BAD_REQUEST, body = ()),
+        (status = UNAUTHORIZED, body = ()),
+    ),
     tag = "kamu",
     security(())
 )]
@@ -106,7 +109,7 @@ pub struct LoginResponseBody {
 pub async fn platform_login_handler(
     Extension(catalog): Extension<Catalog>,
     Json(payload): Json<LoginRequestBody>,
-) -> Result<Json<Value>, ApiError> {
+) -> Result<Json<LoginResponseBody>, ApiError> {
     let authentication_service = catalog
         .get_one::<dyn kamu_accounts::AuthenticationService>()
         .unwrap();
@@ -123,7 +126,7 @@ pub async fn platform_login_handler(
             let response_body = LoginResponseBody {
                 access_token: login_response.access_token,
             };
-            Ok(Json(json!(response_body)))
+            Ok(Json(response_body))
         }
         Err(e) => Err(match e {
             kamu_accounts::LoginError::UnsupportedMethod(e) => ApiError::bad_request(e),
