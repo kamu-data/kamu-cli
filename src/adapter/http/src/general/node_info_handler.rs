@@ -24,7 +24,7 @@ use kamu_core::DatasetRepository;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, serde::Serialize, utoipa::ToSchema)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct NodeInfoResponse {
     pub is_multi_tenant: bool,

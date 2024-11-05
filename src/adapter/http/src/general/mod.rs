@@ -12,4 +12,5 @@ mod dataset_info_handler;
 mod node_info_handler;
 mod router;
 
+pub use node_info_handler::*;
 pub use router::*;

@@ -17,6 +17,7 @@ use kamu_adapter_http::data::metadata_handler::{
     DatasetMetadataResponse,
     Include as MetadataInclude,
 };
+use kamu_adapter_http::general::NodeInfoResponse;
 use kamu_adapter_http::LoginRequestBody;
 use kamu_flow_system::{DatasetFlowType, FlowID};
 use lazy_static::lazy_static;
@@ -191,6 +192,8 @@ pub trait KamuApiServerClientExt {
 
     fn flow(&self) -> FlowApi;
 
+    fn odf(&self) -> OdfApi;
+
     fn swagger(&self) -> SwaggerApi;
 }
 
@@ -216,6 +219,10 @@ impl KamuApiServerClientExt for KamuApiServerClient {
 
     fn flow(&self) -> FlowApi {
         FlowApi { client: self }
+    }
+
+    fn odf(&self) -> OdfApi {
+        OdfApi { client: self }
     }
 
     fn swagger(&self) -> SwaggerApi {
@@ -891,6 +898,25 @@ impl FlowApi<'_> {
 pub enum FlowTriggerResponse {
     Success(FlowID),
     Error(String),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// API: ODF
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct OdfApi<'a> {
+    client: &'a KamuApiServerClient,
+}
+
+impl OdfApi<'_> {
+    pub async fn info(&self) -> Result<NodeInfoResponse, InternalError> {
+        let response = self.client.rest_api_call(Method::GET, "info", None).await;
+
+        match response.status() {
+            StatusCode::OK => Ok(response.json().await.unwrap()),
+            unexpected_status => panic!("Unexpected status: {unexpected_status}"),
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
