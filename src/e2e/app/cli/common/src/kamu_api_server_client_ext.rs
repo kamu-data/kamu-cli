@@ -303,6 +303,21 @@ impl AuthApi<'_> {
         .await
     }
 
+    pub async fn token_validate(&self) -> Result<(), TokenValidateError> {
+        let response = self
+            .client
+            .rest_api_call(Method::GET, "/platform/token/validate", None)
+            .await;
+
+        match response.status() {
+            StatusCode::OK => Ok(()),
+            StatusCode::UNAUTHORIZED => Err(TokenValidateError::Unauthorized),
+            unexpected_status => Err(format!("Unexpected status: {unexpected_status}")
+                .int_err()
+                .into()),
+        }
+    }
+
     async fn login(&mut self, login_request: &str) -> AccessToken {
         let login_response = self.client.graphql_api_call(login_request).await;
         let access_token = login_response["auth"]["login"]["accessToken"]
@@ -314,6 +329,14 @@ impl AuthApi<'_> {
 
         access_token
     }
+}
+
+#[derive(Error, Debug)]
+pub enum TokenValidateError {
+    #[error("Unauthorized")]
+    Unauthorized,
+    #[error(transparent)]
+    Internal(#[from] InternalError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

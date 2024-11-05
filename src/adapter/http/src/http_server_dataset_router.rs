@@ -141,7 +141,10 @@ pub async fn platform_login_handler(
 #[utoipa::path(
     get,
     path = "/platform/token/validate",
-    responses((status = OK, body = ())),
+    responses(
+        (status = OK, body = ()),
+        (status = UNAUTHORIZED, body = ())
+    ),
     tag = "kamu",
     security(
         (),
