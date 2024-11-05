@@ -17,7 +17,7 @@ use kamu_adapter_http::data::metadata_handler::{
     DatasetMetadataResponse,
     Include as MetadataInclude,
 };
-use kamu_adapter_http::general::NodeInfoResponse;
+use kamu_adapter_http::general::{DatasetInfoResponse, NodeInfoResponse};
 use kamu_adapter_http::LoginRequestBody;
 use kamu_flow_system::{DatasetFlowType, FlowID};
 use lazy_static::lazy_static;
@@ -484,6 +484,25 @@ impl DatasetApi<'_> {
         node_url.join(format!("{dataset_alias}").as_str()).unwrap()
     }
 
+    pub async fn by_id(
+        &self,
+        dataset_id: &odf::DatasetID,
+    ) -> Result<DatasetInfoResponse, DatasetByIdError> {
+        let response = self
+            .client
+            .rest_api_call(Method::GET, &format!("datasets/{dataset_id}"), None)
+            .await;
+
+        match response.status() {
+            StatusCode::OK => Ok(response.json().await.unwrap()),
+            StatusCode::UNAUTHORIZED => Err(DatasetByIdError::Unauthorized),
+            StatusCode::NOT_FOUND => Err(DatasetByIdError::NotFound),
+            unexpected_status => Err(format!("Unexpected status: {unexpected_status}")
+                .int_err()
+                .into()),
+        }
+    }
+
     pub async fn create_empty_dataset(
         &self,
         dataset_kind: odf::DatasetKind,
@@ -764,6 +783,16 @@ impl DatasetApi<'_> {
 
         response.json::<DatasetMetadataResponse>().await.int_err()
     }
+}
+
+#[derive(Error, Debug)]
+pub enum DatasetByIdError {
+    #[error("Unauthorized")]
+    Unauthorized,
+    #[error("Not found")]
+    NotFound,
+    #[error(transparent)]
+    Internal(#[from] InternalError),
 }
 
 #[derive(Debug)]
