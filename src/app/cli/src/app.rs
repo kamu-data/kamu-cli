@@ -434,6 +434,7 @@ pub fn configure_base_catalog(
 
     b.add::<TransformServiceImpl>();
     b.add::<TransformRequestPlannerImpl>();
+    b.add::<TransformElaborationServiceImpl>();
     b.add::<TransformExecutionServiceImpl>();
 
     b.add::<VerificationServiceImpl>();

@@ -7,12 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod transform_elaboration_service_impl;
-mod transform_execution_service_impl;
-mod transform_helpers;
-mod transform_request_planner_impl;
+mod transform_elaboration_service;
+mod transform_execution_service;
+mod transform_request_planner;
 
-pub use transform_elaboration_service_impl::*;
-pub use transform_execution_service_impl::*;
-pub(crate) use transform_helpers::*;
-pub use transform_request_planner_impl::*;
+pub use transform_elaboration_service::*;
+pub use transform_execution_service::*;
+pub use transform_request_planner::*;

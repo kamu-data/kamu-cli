@@ -30,6 +30,7 @@ pub struct PullDatasetUseCaseImpl {
     dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
     remote_alias_registry: Arc<dyn RemoteAliasesRegistry>,
     polling_ingest_svc: Arc<dyn PollingIngestService>,
+    transform_elaboration_svc: Arc<dyn TransformElaborationService>,
     transform_execution_svc: Arc<dyn TransformExecutionService>,
     sync_svc: Arc<dyn SyncService>,
     in_multi_tenant_mode: bool,
@@ -41,6 +42,7 @@ impl PullDatasetUseCaseImpl {
         dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
         remote_alias_registry: Arc<dyn RemoteAliasesRegistry>,
         polling_ingest_svc: Arc<dyn PollingIngestService>,
+        transform_elaboration_svc: Arc<dyn TransformElaborationService>,
         transform_execution_svc: Arc<dyn TransformExecutionService>,
         sync_svc: Arc<dyn SyncService>,
         in_multi_tenant_mode: bool,
@@ -50,6 +52,7 @@ impl PullDatasetUseCaseImpl {
             dataset_action_authorizer,
             remote_alias_registry,
             polling_ingest_svc,
+            transform_elaboration_svc,
             transform_execution_svc,
             sync_svc,
             in_multi_tenant_mode,
@@ -186,6 +189,7 @@ impl PullDatasetUseCaseImpl {
         // Main transform run
         async fn run_transform(
             pti: PullTransformItem,
+            transform_elaboration_svc: Arc<dyn TransformElaborationService>,
             transform_execution_svc: Arc<dyn TransformExecutionService>,
             transform_options: &TransformOptions,
             transform_multi_listener: Arc<dyn TransformMultiListener>,
@@ -194,7 +198,7 @@ impl PullDatasetUseCaseImpl {
             let maybe_listener = transform_multi_listener.begin_transform(&pti.target.handle);
 
             // Elaborate phase
-            match transform_execution_svc
+            match transform_elaboration_svc
                 .elaborate_transform(
                     pti.target.clone(),
                     pti.plan,
@@ -224,6 +228,7 @@ impl PullDatasetUseCaseImpl {
             .map(|pti| {
                 run_transform(
                     pti,
+                    self.transform_elaboration_svc.clone(),
                     self.transform_execution_svc.clone(),
                     transform_options,
                     transform_multi_listener.clone(),

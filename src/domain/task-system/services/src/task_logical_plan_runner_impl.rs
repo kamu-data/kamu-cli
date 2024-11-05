@@ -93,12 +93,16 @@ impl TaskLogicalPlanRunnerImpl {
         &self,
         transform_item: PullTransformItem,
     ) -> Result<TaskOutcome, InternalError> {
+        let transform_elaboration_service = self
+            .catalog
+            .get_one::<dyn TransformElaborationService>()
+            .unwrap();
         let transform_execution_service = self
             .catalog
             .get_one::<dyn TransformExecutionService>()
             .unwrap();
 
-        let transform_elaboration = match transform_execution_service
+        let transform_elaboration = match transform_elaboration_service
             .elaborate_transform(
                 transform_item.target.clone(),
                 transform_item.plan,

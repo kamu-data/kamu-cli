@@ -131,6 +131,7 @@ impl ClientSideHarness {
         b.add::<SyncRequestBuilder>();
 
         b.add::<TransformRequestPlannerImpl>();
+        b.add::<TransformElaborationServiceImpl>();
         b.add::<TransformExecutionServiceImpl>();
 
         b.add::<CompactionServiceImpl>();
