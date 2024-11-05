@@ -17,13 +17,12 @@ use kamu_adapter_http::data::metadata_handler::{
     DatasetMetadataResponse,
     Include as MetadataInclude,
 };
-use kamu_adapter_http::general::{DatasetInfoResponse, NodeInfoResponse};
+use kamu_adapter_http::general::{AccountResponse, DatasetInfoResponse, NodeInfoResponse};
 use kamu_adapter_http::LoginRequestBody;
 use kamu_flow_system::{DatasetFlowType, FlowID};
 use lazy_static::lazy_static;
 use opendatafabric as odf;
 use reqwest::{Method, StatusCode, Url};
-use serde::Deserialize;
 use thiserror::Error;
 use tokio_retry::strategy::FixedInterval;
 use tokio_retry::Retry;
@@ -239,7 +238,7 @@ pub struct AccountApi<'a> {
 }
 
 impl AccountApi<'_> {
-    pub async fn me(&mut self) -> Result<AccountMeResponse, AccountMeError> {
+    pub async fn me(&mut self) -> Result<AccountResponse, AccountMeError> {
         let response = self
             .client
             .rest_api_call(Method::GET, "/accounts/me", None)
@@ -261,13 +260,6 @@ pub enum AccountMeError {
     Unauthorized,
     #[error(transparent)]
     Internal(#[from] InternalError),
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct AccountMeResponse {
-    pub id: odf::AccountID,
-    pub account_name: odf::AccountName,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
