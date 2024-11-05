@@ -16,7 +16,7 @@ mod test_dataset_ownership_service_inmem;
 mod test_datasets_filtering;
 mod test_dependency_graph_inmem;
 mod test_metadata_chain_comparator;
-mod test_pull_service_impl;
+mod test_pull_request_planner_impl;
 mod test_query_service_impl;
 mod test_reset_service_impl;
 mod test_resource_loader_impl;

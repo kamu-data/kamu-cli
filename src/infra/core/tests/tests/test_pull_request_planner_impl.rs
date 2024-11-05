@@ -41,14 +41,6 @@ macro_rules! rl {
     };
 }
 
-/*
-macro_rules! mrl {
-    ($s:expr) => {
-        DatasetRef::Alias(DatasetAlias::try_from($s).unwrap())
-    };
-}
-    */
-
 macro_rules! rr {
     ($s:expr) => {
         DatasetRefRemote::try_from($s).unwrap()
@@ -566,19 +558,6 @@ async fn test_sync_from() {
             n!("bar").into()
         )])]
     );
-
-    // Note: we moved pull aliases into use case, so this awaits for refactoring
-    /*
-    let aliases = harness.get_remote_aliases(&rl!("bar")).await;
-    let pull_aliases: Vec<_> = aliases
-        .get_by_kind(RemoteAliasKind::Pull)
-        .cloned()
-        .collect();
-
-    assert_eq!(
-        pull_aliases,
-        vec![DatasetRefRemote::try_from("kamu.dev/foo").unwrap()]
-    );*/
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -616,18 +595,6 @@ async fn test_sync_from_url_and_local_ref() {
             n!("bar").into()
         )])]
     );
-
-    // Note: we moved pull aliases into use case, so this awaits for refactoring
-    /*let aliases = harness.get_remote_aliases(&rl!("bar")).await;
-    let pull_aliases: Vec<_> = aliases
-        .get_by_kind(RemoteAliasKind::Pull)
-        .cloned()
-        .collect();
-
-    assert_eq!(
-        pull_aliases,
-        vec![DatasetRefRemote::try_from("kamu.dev/bar").unwrap()]
-    );*/
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -665,19 +632,6 @@ async fn test_sync_from_url_and_local_multi_tenant_ref() {
             mn!("x/bar").into()
         )])]
     );
-
-    // Note: we moved pull aliases into use case, so this awaits for refactoring
-    /*
-    let aliases = harness.get_remote_aliases(&mrl!("x/bar")).await;
-    let pull_aliases: Vec<_> = aliases
-        .get_by_kind(RemoteAliasKind::Pull)
-        .cloned()
-        .collect();
-
-    assert_eq!(
-        pull_aliases,
-        vec![DatasetRefRemote::try_from("http://example.com/odf/bar").unwrap()]
-    );*/
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -715,18 +669,6 @@ async fn test_sync_from_url_only() {
             n!("bar").into()
         )])]
     );
-
-    // Note: we moved pull aliases into use case, so this awaits for refactoring
-    /*let aliases = harness.get_remote_aliases(&rl!("bar")).await;
-    let pull_aliases: Vec<_> = aliases
-        .get_by_kind(RemoteAliasKind::Pull)
-        .cloned()
-        .collect();
-
-    assert_eq!(
-        pull_aliases,
-        vec![DatasetRefRemote::try_from("http://example.com/odf/bar").unwrap()]
-    );*/
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -764,21 +706,6 @@ async fn test_sync_from_url_only_multi_tenant_case() {
             n!("bar").into()
         )])]
     );
-
-    // Note: we moved pull aliases into use case, so this awaits for refactoring
-    /*
-    let aliases = harness
-        .get_remote_aliases(&mrl!(format!("{}/{}", DEFAULT_ACCOUNT_NAME_STR, "bar")))
-        .await;
-    let pull_aliases: Vec<_> = aliases
-        .get_by_kind(RemoteAliasKind::Pull)
-        .cloned()
-        .collect();
-
-    assert_eq!(
-        pull_aliases,
-        vec![DatasetRefRemote::try_from("http://example.com/odf/bar").unwrap()]
-    );*/
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
