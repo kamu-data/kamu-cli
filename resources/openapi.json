@@ -319,6 +319,17 @@
         ],
         "type": "object"
       },
+      "LoginResponseBody": {
+        "properties": {
+          "accessToken": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "accessToken"
+        ],
+        "type": "object"
+      },
       "NodeInfoResponse": {
         "properties": {
           "isMultiTenant": {
@@ -857,6 +868,16 @@
               }
             },
             "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "default": null
+                }
+              }
+            },
+            "description": ""
           }
         },
         "security": [
@@ -888,6 +909,26 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/DatasetInfoResponse"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "default": null
+                }
+              }
+            },
+            "description": ""
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "default": null
                 }
               }
             },
@@ -1167,7 +1208,27 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object"
+                  "$ref": "#/components/schemas/LoginResponseBody"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "default": null
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "default": null
                 }
               }
             },
@@ -1188,6 +1249,16 @@
         "operationId": "platform_token_validate_handler",
         "responses": {
           "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "default": null
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
             "content": {
               "application/json": {
                 "schema": {
