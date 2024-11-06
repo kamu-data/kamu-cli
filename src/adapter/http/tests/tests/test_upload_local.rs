@@ -184,7 +184,7 @@ async fn test_attempt_upload_file_unauthorized() {
             upload_prepare_response.text().await.unwrap()
         );
 
-        let upload_main_reponse = client
+        let upload_main_response = client
             .post(format!("{upload_main_url}/{upload_token}"))
             .multipart(
                 reqwest::multipart::Form::new().part(
@@ -198,10 +198,10 @@ async fn test_attempt_upload_file_unauthorized() {
             .send()
             .await
             .unwrap();
-        assert_eq!(401, upload_main_reponse.status());
+        assert_eq!(401, upload_main_response.status());
         assert_eq!(
             "No authentication token provided",
-            upload_main_reponse.text().await.unwrap()
+            upload_main_response.text().await.unwrap()
         );
     };
 
@@ -356,7 +356,7 @@ async fn test_attempt_upload_file_that_is_too_large() {
             upload_prepare_response.text().await.unwrap()
         );
 
-        let upload_main_reponse = client
+        let upload_main_response = client
             .post(format!("{upload_main_url}/{upload_token}"))
             .bearer_auth(access_token.clone())
             .multipart(
@@ -371,10 +371,10 @@ async fn test_attempt_upload_file_that_is_too_large() {
             .send()
             .await
             .unwrap();
-        assert_eq!(400, upload_main_reponse.status());
+        assert_eq!(400, upload_main_response.status());
         assert_eq!(
             "Content too large",
-            upload_main_reponse.text().await.unwrap()
+            upload_main_response.text().await.unwrap()
         );
     };
 
