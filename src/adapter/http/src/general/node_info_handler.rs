@@ -52,6 +52,7 @@ pub async fn node_info_handler(
 }
 
 fn get_node_info(catalog: &Catalog) -> Json<NodeInfoResponse> {
+    // TODO: replace with multi-tenancy marker
     let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
 
     Json(NodeInfoResponse {

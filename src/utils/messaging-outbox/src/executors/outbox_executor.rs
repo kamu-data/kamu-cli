@@ -39,6 +39,7 @@ pub struct OutboxExecutor {
     routes_static_info: Arc<OutboxRoutesStaticInfo>,
     producer_consumption_jobs: Vec<ProducerConsumptionJob>,
     metrics: Arc<OutboxExecutorMetrics>,
+    run_lock: tokio::sync::Mutex<()>,
 }
 
 #[component(pub)]
@@ -80,6 +81,7 @@ impl OutboxExecutor {
             routes_static_info,
             producer_consumption_jobs,
             metrics,
+            run_lock: tokio::sync::Mutex::new(()),
         }
     }
 
@@ -193,6 +195,12 @@ impl OutboxExecutor {
     async fn run_consumption_iteration(
         &self,
     ) -> Result<ProcessedConsumerTasksCount, InternalError> {
+        // We should not allow multiple concurrent entrances into consumption flow.
+        // I.e., there could be concurrently:
+        //  - main scheduled loop iteration
+        //  - flushed iteration (i.e. via e2e middleware)
+        let _guard = self.run_lock.lock().await;
+
         // Read current state of producers and consumptions
         // Prepare consumption tasks for each progressed producer
         let mut consumption_tasks_by_producer = self.prepare_consumption_iteration().await?;

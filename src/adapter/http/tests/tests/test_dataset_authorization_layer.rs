@@ -18,6 +18,7 @@ use kamu::domain::{CreateDatasetUseCase, DatasetRepository};
 use kamu::testing::{MetadataFactory, MockDatasetActionAuthorizer};
 use kamu::{
     CreateDatasetUseCaseImpl,
+    DatasetRegistryRepoBridge,
     DatasetRepositoryLocalFs,
     DatasetRepositoryWriter,
     DependencyGraphServiceInMemory,
@@ -234,6 +235,7 @@ impl ServerHarness {
                 )
                 .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
                 .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
+                .add::<DatasetRegistryRepoBridge>()
                 .add::<CreateDatasetUseCaseImpl>()
                 .add::<DatabaseTransactionRunner>();
 

@@ -149,8 +149,8 @@ pub async fn dataset_metadata_handler(
 ) -> Result<Json<DatasetMetadataResponse>, ApiError> {
     use kamu_core::{metadata_chain_visitors as vis, MetadataChainExt as _};
 
-    let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
-    let dataset = dataset_repo
+    let dataset_registry = catalog.get_one::<dyn DatasetRegistry>().unwrap();
+    let dataset = dataset_registry
         .get_dataset_by_ref(&dataset_ref)
         .await
         .api_err()?;

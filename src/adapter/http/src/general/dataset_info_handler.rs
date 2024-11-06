@@ -22,7 +22,7 @@ use database_common_macros::transactional_handler;
 use dill::Catalog;
 use http_common::*;
 use kamu_accounts::AuthenticationService;
-use kamu_core::{DatasetRepository, GetDatasetError};
+use kamu_core::{DatasetRegistry, GetDatasetError};
 use opendatafabric::{AccountID, AccountName, DatasetHandle, DatasetID, DatasetName};
 
 use crate::axum_utils::ensure_authenticated_account;
@@ -108,8 +108,8 @@ async fn get_dataset_by_id(
     //          to access dataset and not reject non-authed users
     ensure_authenticated_account(catalog).api_err()?;
 
-    let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
-    let dataset_handle = dataset_repo
+    let dataset_registry = catalog.get_one::<dyn DatasetRegistry>().unwrap();
+    let dataset_handle = dataset_registry
         .resolve_dataset_handle_by_ref(&dataset_id.clone().as_local_ref())
         .await
         .map_err(|err| match err {
