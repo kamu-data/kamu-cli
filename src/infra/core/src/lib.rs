@@ -32,7 +32,6 @@ mod dataset_changes_service_impl;
 mod dataset_config;
 mod dataset_layout;
 mod dataset_ownership_service_inmem;
-mod dataset_pushes;
 mod dependency_graph_repository_inmem;
 mod dependency_graph_service_inmem;
 mod provenance_service_impl;

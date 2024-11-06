@@ -1,3 +1,12 @@
+// Copyright Kamu Data, Inc. and contributors. All rights reserved.
+//
+// Use of this software is governed by the Business Source License
+// included in the LICENSE file.
+//
+// As of the Change Date specified in that file, in accordance with
+// the Business Source License, use of this software will be governed
+// by the Apache License, Version 2.0.
+
 use std::collections::HashMap;
 
 use chrono::{DateTime, Utc};
@@ -14,16 +23,8 @@ pub struct DatasetPush {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct DatasetPushes {
     pub pushes: HashMap<DatasetRefRemote, DatasetPush>,
-}
-
-impl DatasetPushes {
-    pub(crate) fn default() -> DatasetPushes {
-        DatasetPushes {
-            pushes: HashMap::new(),
-        }
-    }
 }

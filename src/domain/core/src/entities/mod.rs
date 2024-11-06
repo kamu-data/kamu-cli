@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 pub mod dataset;
+pub mod dataset_pushes;
 pub mod dataset_summary;
 pub mod engine;
 pub mod metadata_chain;

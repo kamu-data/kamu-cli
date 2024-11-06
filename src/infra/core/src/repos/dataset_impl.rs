@@ -10,6 +10,7 @@
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
+use kamu_core::dataset_pushes::{DatasetPush, DatasetPushes};
 use kamu_core::*;
 use opendatafabric::serde::yaml::Manifest;
 use opendatafabric::*;
@@ -599,5 +600,40 @@ where
 
     fn as_info_repo(&self) -> &dyn NamedObjectRepository {
         &self.info_repo
+    }
+
+    async fn read_push_info(&self) -> Result<DatasetPushes, InternalError> {
+        match self.info_repo.get("pushes").await {
+            Ok(bytes) => {
+                let manifest: Manifest<DatasetPushes> =
+                    serde_yaml::from_slice(&bytes[..]).int_err()?;
+                assert_eq!(manifest.kind, "DatasetPushes");
+                Ok(manifest.content)
+            }
+            Err(GetNamedError::Internal(e)) => Err(e),
+            Err(GetNamedError::Access(e)) => Err(e.int_err()),
+            Err(GetNamedError::NotFound(_)) => Ok(DatasetPushes::default()),
+        }
+    }
+
+    async fn update_push_info(&self, push: &DatasetPush) -> Result<(), InternalError> {
+        let prev = self.read_push_info().await?;
+        let mut prev_pushes = prev.pushes.clone();
+        prev_pushes.insert(push.target.clone(), push.clone());
+        let updated = DatasetPushes {
+            pushes: prev_pushes,
+        };
+
+        let manifest = Manifest {
+            kind: "DatasetPushes".to_owned(),
+            version: 1,
+            content: updated,
+        };
+        let manifest_yaml = serde_yaml::to_string(&manifest).int_err()?;
+        self.as_info_repo()
+            .set("pushes", manifest_yaml.as_bytes())
+            .await
+            .int_err()?;
+        Ok(())
     }
 }

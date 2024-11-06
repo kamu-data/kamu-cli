@@ -11,12 +11,9 @@ use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
 use dill::*;
-use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
+use kamu_core::dataset_pushes::DatasetPush;
 use kamu_core::*;
-use opendatafabric::serde::yaml::Manifest;
 use opendatafabric::*;
-
-use crate::dataset_pushes::{DatasetPush, DatasetPushes};
 
 pub struct PushServiceImpl {
     dataset_repo: Arc<dyn DatasetRepository>,
@@ -96,47 +93,6 @@ impl PushServiceImpl {
     }
 }
 
-// TODO: move to a separate entity
-async fn read_pushes_info(dataset: Arc<dyn Dataset>) -> Result<DatasetPushes, InternalError> {
-    match dataset.as_info_repo().get("pushes").await {
-        Ok(bytes) => {
-            let manifest: Manifest<DatasetPushes> = serde_yaml::from_slice(&bytes[..]).int_err()?;
-            assert_eq!(manifest.kind, "DatasetPushes");
-            Ok(manifest.content)
-        }
-        Err(GetNamedError::Internal(e)) => Err(e),
-        Err(GetNamedError::Access(e)) => Err(e.int_err()),
-        Err(GetNamedError::NotFound(_)) => Ok(DatasetPushes::default()),
-    }
-}
-
-// TODO: move to a separate entity
-async fn update_push_info(
-    dataset: Arc<dyn Dataset>,
-    push: &DatasetPush,
-) -> Result<(), InternalError> {
-    let prev = read_pushes_info(dataset.clone()).await?;
-    let mut prev_pushes = prev.pushes.clone();
-    prev_pushes.insert(push.target.clone(), push.clone());
-    let updated = DatasetPushes {
-        pushes: prev_pushes,
-    };
-
-    let manifest = Manifest {
-        kind: "DatasetPushes".to_owned(),
-        version: 1,
-        content: updated,
-    };
-    let manifest_yaml = serde_yaml::to_string(&manifest).int_err()?;
-    dataset
-        .as_info_repo()
-        .set("pushes", manifest_yaml.as_bytes())
-        .await
-        .int_err()?;
-    Ok(())
-}
-// TODO: add remove record function (on repo/alias deletion)
-
 #[async_trait::async_trait]
 impl PushService for PushServiceImpl {
     async fn push_multi(
@@ -207,7 +163,7 @@ impl PushService for PushServiceImpl {
                             pushed_at,
                             head: summary.last_block_hash,
                         };
-                        if let Err(err) = update_push_info(dataset, &push).await {
+                        if let Err(err) = dataset.update_push_info(&push).await {
                             tracing::error!(error = ?err, error_msg = %err, "Failed to record push operation");
                         };
                     }
