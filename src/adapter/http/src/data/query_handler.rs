@@ -180,3 +180,5 @@ pub async fn query_handler(
 #[derive(Debug, thiserror::Error)]
 #[error("Response signing is not enabled by the node operator")]
 struct ResponseSigningNotConfigured;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

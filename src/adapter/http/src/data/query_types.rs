@@ -23,7 +23,7 @@ use http_common::{ApiError, IntoApiError};
 use internal_error::*;
 use kamu::domain;
 use kamu_core::{DataFusionError, QueryError};
-use opendatafabric::{self as odf, Multihash};
+use opendatafabric as odf;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -279,7 +279,7 @@ pub struct QueryResponse {
 // Fragments
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Mirrors the structure of [`ResponseBody`] without the `outputs`
+/// Mirrors the structure of [`QueryRequest`] without the `outputs`
 #[derive(Debug, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct SubQuery {
@@ -323,15 +323,15 @@ pub struct Outputs {
 pub struct Commitment {
     /// Hash of the "input" object in the [multihash](https://multiformats.io/multihash/) format
     #[schema(value_type = String)]
-    pub input_hash: Multihash,
+    pub input_hash: odf::Multihash,
 
     /// Hash of the "output" object in the [multihash](https://multiformats.io/multihash/) format
     #[schema(value_type = String)]
-    pub output_hash: Multihash,
+    pub output_hash: odf::Multihash,
 
     /// Hash of the "subQueries" object in the [multihash](https://multiformats.io/multihash/) format
     #[schema(value_type = String)]
-    pub sub_queries_hash: Multihash,
+    pub sub_queries_hash: odf::Multihash,
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]

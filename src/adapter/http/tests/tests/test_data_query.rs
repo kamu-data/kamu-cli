@@ -358,8 +358,6 @@ async fn test_data_query_handler() {
             .post(&format!("{}query", harness.root_url))
             .json(&json!({
                 "query": query,
-                // TODO: Remove after V2 transition
-                "queryDialect": "SqlDataFusion",
             }))
             .send()
             .await
