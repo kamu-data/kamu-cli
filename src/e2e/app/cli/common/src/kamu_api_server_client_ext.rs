@@ -192,7 +192,7 @@ pub trait KamuApiServerClientExt {
 
     fn flow(&self) -> FlowApi;
 
-    fn odf(&self) -> OdfApi;
+    fn odf_core(&self) -> OdfCoreApi;
 
     fn odf_transfer(&self) -> OdfTransferApi;
 
@@ -223,8 +223,8 @@ impl KamuApiServerClientExt for KamuApiServerClient {
         FlowApi { client: self }
     }
 
-    fn odf(&self) -> OdfApi {
-        OdfApi { client: self }
+    fn odf_core(&self) -> OdfCoreApi {
+        OdfCoreApi { client: self }
     }
 
     fn odf_transfer(&self) -> OdfTransferApi {
@@ -929,14 +929,14 @@ pub enum FlowTriggerResponse {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// API: ODF
+// API: ODF, core
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct OdfApi<'a> {
+pub struct OdfCoreApi<'a> {
     client: &'a KamuApiServerClient,
 }
 
-impl OdfApi<'_> {
+impl OdfCoreApi<'_> {
     pub async fn info(&self) -> Result<NodeInfoResponse, InternalError> {
         let response = self.client.rest_api_call(Method::GET, "info", None).await;
 
@@ -948,7 +948,7 @@ impl OdfApi<'_> {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// API: ODF: Transfer
+// API: ODF, transfer
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct OdfTransferApi<'a> {

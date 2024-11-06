@@ -33,7 +33,7 @@ async fn test_odf_info(
     expected_is_multi_tenant: bool,
 ) {
     assert_matches!(
-        kamu_api_server_client.odf().info().await,
+        kamu_api_server_client.odf_core().info().await,
         Ok(NodeInfoResponse { is_multi_tenant })
             if is_multi_tenant == expected_is_multi_tenant
     );
