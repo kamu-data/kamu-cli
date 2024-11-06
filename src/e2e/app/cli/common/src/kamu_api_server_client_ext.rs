@@ -186,8 +186,6 @@ pub trait KamuApiServerClientExt {
 
     fn auth(&mut self) -> AuthApi<'_>;
 
-    fn data(&self) -> DataApi;
-
     fn dataset(&self) -> DatasetApi;
 
     fn flow(&self) -> FlowApi;
@@ -195,6 +193,8 @@ pub trait KamuApiServerClientExt {
     fn odf_core(&self) -> OdfCoreApi;
 
     fn odf_transfer(&self) -> OdfTransferApi;
+
+    fn odf_query(&self) -> OdfQuery;
 
     fn swagger(&self) -> SwaggerApi;
 }
@@ -211,10 +211,6 @@ impl KamuApiServerClientExt for KamuApiServerClient {
         AuthApi { client: self }
     }
 
-    fn data(&self) -> DataApi {
-        DataApi { client: self }
-    }
-
     fn dataset(&self) -> DatasetApi {
         DatasetApi { client: self }
     }
@@ -229,6 +225,10 @@ impl KamuApiServerClientExt for KamuApiServerClient {
 
     fn odf_transfer(&self) -> OdfTransferApi {
         OdfTransferApi { client: self }
+    }
+
+    fn odf_query(&self) -> OdfQuery {
+        OdfQuery { client: self }
     }
 
     fn swagger(&self) -> SwaggerApi {
@@ -381,91 +381,6 @@ pub enum TokenValidateError {
     Unauthorized,
     #[error(transparent)]
     Internal(#[from] InternalError),
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// API: Data
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub struct DataApi<'a> {
-    client: &'a KamuApiServerClient,
-}
-
-impl DataApi<'_> {
-    pub async fn query(&self, query: &str) -> String {
-        let response = self
-            .client
-            .graphql_api_call(
-                indoc::indoc!(
-                    r#"
-                    query {
-                      data {
-                        query(
-                          query: """
-                          <query>
-                          """,
-                          queryDialect: SQL_DATA_FUSION,
-                          dataFormat: CSV
-                        ) {
-                          __typename
-                          ... on DataQueryResultSuccess {
-                            data {
-                              content
-                            }
-                          }
-                          ... on DataQueryResultError {
-                            errorKind
-                            errorMessage
-                          }
-                        }
-                      }
-                    }
-                    "#,
-                )
-                .replace("<query>", query)
-                .as_str(),
-            )
-            .await;
-        let query_node = &response["data"]["query"];
-
-        assert_eq!(
-            query_node["__typename"].as_str(),
-            Some("DataQueryResultSuccess"),
-            "{}",
-            indoc::formatdoc!(
-                r#"
-                Query:
-                {query}
-                Unexpected response:
-                {query_node:#}
-                "#
-            )
-        );
-
-        let content = query_node["data"]["content"]
-            .as_str()
-            .map(ToOwned::to_owned)
-            .unwrap();
-
-        content
-    }
-
-    pub async fn query_player_scores_dataset(&self) -> String {
-        // Without unstable "offset" column
-        self.query(indoc::indoc!(
-            r#"
-            SELECT op,
-                   system_time,
-                   match_time,
-                   match_id,
-                   player_id,
-                   score
-            FROM 'player-scores'
-            ORDER BY match_id, score, player_id
-            "#
-        ))
-        .await
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -989,6 +904,91 @@ pub enum MetadataBlockHashByRefError {
     NotFound,
     #[error(transparent)]
     Internal(#[from] InternalError),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// API: ODF, query
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct OdfQuery<'a> {
+    client: &'a KamuApiServerClient,
+}
+
+impl OdfQuery<'_> {
+    pub async fn query(&self, query: &str) -> String {
+        let response = self
+            .client
+            .graphql_api_call(
+                indoc::indoc!(
+                    r#"
+                    query {
+                      data {
+                        query(
+                          query: """
+                          <query>
+                          """,
+                          queryDialect: SQL_DATA_FUSION,
+                          dataFormat: CSV
+                        ) {
+                          __typename
+                          ... on DataQueryResultSuccess {
+                            data {
+                              content
+                            }
+                          }
+                          ... on DataQueryResultError {
+                            errorKind
+                            errorMessage
+                          }
+                        }
+                      }
+                    }
+                    "#,
+                )
+                .replace("<query>", query)
+                .as_str(),
+            )
+            .await;
+        let query_node = &response["data"]["query"];
+
+        assert_eq!(
+            query_node["__typename"].as_str(),
+            Some("DataQueryResultSuccess"),
+            "{}",
+            indoc::formatdoc!(
+                r#"
+                Query:
+                {query}
+                Unexpected response:
+                {query_node:#}
+                "#
+            )
+        );
+
+        let content = query_node["data"]["content"]
+            .as_str()
+            .map(ToOwned::to_owned)
+            .unwrap();
+
+        content
+    }
+
+    pub async fn query_player_scores_dataset(&self) -> String {
+        // Without unstable "offset" column
+        self.query(indoc::indoc!(
+            r#"
+            SELECT op,
+                   system_time,
+                   match_time,
+                   match_id,
+                   player_id,
+                   score
+            FROM 'player-scores'
+            ORDER BY match_id, score, player_id
+            "#
+        ))
+        .await
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

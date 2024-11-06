@@ -847,7 +847,7 @@ pub async fn test_trigger_flow_ingest(mut kamu_api_server_client: KamuApiServerC
             0,2050-01-02T03:04:05Z,2020-01-01T00:00:00Z,B,2000
             0,2050-01-02T03:04:05Z,2020-01-01T00:00:00Z,C,3000"#
         ),
-        kamu_api_server_client.data().query(QUERY).await
+        kamu_api_server_client.odf_query().query(QUERY).await
     );
 
     // Update iteration 2
@@ -890,7 +890,7 @@ pub async fn test_trigger_flow_ingest(mut kamu_api_server_client: KamuApiServerC
             0,2051-01-02T03:04:05Z,2020-01-02T00:00:00Z,B,2500
             0,2051-01-02T03:04:05Z,2020-01-02T00:00:00Z,C,3500"#
         ),
-        kamu_api_server_client.data().query(QUERY).await
+        kamu_api_server_client.odf_query().query(QUERY).await
     );
 }
 
@@ -1054,7 +1054,7 @@ pub async fn test_trigger_flow_hard_compaction(mut kamu_api_server_client: KamuA
             0,2050-01-02T03:04:05Z,2000-01-03T00:00:00Z,3,Charlie,110"#
         ),
         kamu_api_server_client
-            .data()
+            .odf_query()
             .query_player_scores_dataset()
             .await
     );
@@ -1103,7 +1103,7 @@ pub async fn test_trigger_flow_hard_compaction(mut kamu_api_server_client: KamuA
             0,2050-01-02T03:04:05Z,2000-01-03T00:00:00Z,3,Charlie,110"#
         ),
         kamu_api_server_client
-            .data()
+            .odf_query()
             .query_player_scores_dataset()
             .await
     );
