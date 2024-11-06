@@ -193,7 +193,9 @@ async fn test_dataset_metadata(
     kamu_api_server_client: KamuApiServerClient,
     maybe_account_name: Option<odf::AccountName>,
 ) {
-    kamu_api_server_client
+    let CreateDatasetResponse {
+        dataset_id: expected_dataset_id,
+    } = kamu_api_server_client
         .dataset()
         .create_player_scores_dataset()
         .await;
@@ -237,7 +239,7 @@ async fn test_dataset_metadata(
                 seed: Some(
                     odf::Seed {
                         dataset_kind: odf::DatasetKind::Root,
-                        ..
+                        dataset_id
                     }
                 ),
                 vocab: Some(vocab),
@@ -248,6 +250,7 @@ async fn test_dataset_metadata(
                 && vocab.system_time_column == "system_time"
                 && vocab.event_time_column == "match_time"
                 && refs == expected_refs
+                && dataset_id == expected_dataset_id
     );
 }
 
