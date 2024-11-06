@@ -106,6 +106,12 @@ impl DatasetEntryServiceImpl {
             ..
         }: &DatasetLifecycleMessageCreated,
     ) -> Result<(), InternalError> {
+        match self.dataset_entry_repo.get_dataset_entry(dataset_id).await {
+            Ok(_) => return Ok(()), // idemponent handling of duplicates
+            Err(GetDatasetEntryError::NotFound(_)) => { /* happy case, create record */ }
+            Err(GetDatasetEntryError::Internal(e)) => return Err(e),
+        }
+
         let entry = DatasetEntry::new(
             dataset_id.clone(),
             owner_account_id.clone(),
@@ -123,10 +129,14 @@ impl DatasetEntryServiceImpl {
         &self,
         DatasetLifecycleMessageDeleted { dataset_id, .. }: &DatasetLifecycleMessageDeleted,
     ) -> Result<(), InternalError> {
-        self.dataset_entry_repo
+        match self
+            .dataset_entry_repo
             .delete_dataset_entry(dataset_id)
             .await
-            .int_err()
+        {
+            Ok(_) | Err(DeleteEntryDatasetError::NotFound(_)) => Ok(()),
+            Err(DeleteEntryDatasetError::Internal(e)) => Err(e),
+        }
     }
 
     async fn handle_dataset_lifecycle_renamed_message(
