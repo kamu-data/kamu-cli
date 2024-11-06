@@ -252,7 +252,7 @@ impl AccountApi<'_> {
             .await;
 
         match response.status() {
-            StatusCode::OK => Ok(response.json().await.unwrap()),
+            StatusCode::OK => Ok(response.json().await.int_err()?),
             StatusCode::UNAUTHORIZED => Err(AccountMeError::Unauthorized),
             unexpected_status => Err(format!("Unexpected status: {unexpected_status}")
                 .int_err()
@@ -318,9 +318,9 @@ impl AuthApi<'_> {
     ) -> Result<(), LoginError> {
         let request_body = LoginRequestBody {
             login_method: login_method.to_string(),
-            login_credentials_json: serde_json::to_string(&login_credentials_json).unwrap(),
+            login_credentials_json: serde_json::to_string(&login_credentials_json).int_err()?,
         };
-        let request_body_json = serde_json::to_value(request_body).unwrap();
+        let request_body_json = serde_json::to_value(request_body).int_err()?;
         let response = self
             .client
             .rest_api_call(
@@ -408,7 +408,7 @@ impl DatasetApi<'_> {
             .await;
 
         match response.status() {
-            StatusCode::OK => Ok(response.json().await.unwrap()),
+            StatusCode::OK => Ok(response.json().await.int_err()?),
             StatusCode::UNAUTHORIZED => Err(DatasetByIdError::Unauthorized),
             StatusCode::NOT_FOUND => Err(DatasetByIdError::NotFound),
             unexpected_status => Err(format!("Unexpected status: {unexpected_status}")
@@ -815,7 +815,7 @@ impl OdfCoreApi<'_> {
         let response = self.client.rest_api_call(Method::GET, "info", None).await;
 
         match response.status() {
-            StatusCode::OK => Ok(response.json().await.unwrap()),
+            StatusCode::OK => response.json().await.int_err(),
             unexpected_status => panic!("Unexpected status: {unexpected_status}"),
         }
     }
@@ -846,8 +846,8 @@ impl OdfTransferApi<'_> {
 
         match response.status() {
             StatusCode::OK => {
-                let raw_response_body = response.text().await.unwrap();
-                Ok(odf::Multihash::from_multibase(&raw_response_body).unwrap())
+                let raw_response_body = response.text().await.int_err()?;
+                Ok(odf::Multihash::from_multibase(&raw_response_body).int_err()?)
             }
             StatusCode::NOT_FOUND => Err(MetadataBlockHashByRefError::NotFound),
             unexpected_status => Err(format!("Unexpected status: {unexpected_status}")
@@ -956,8 +956,11 @@ impl OdfQuery<'_> {
     ) -> Result<DatasetMetadataResponse, InternalError> {
         let include_events =
             maybe_include_events.unwrap_or_else(DatasetMetadataParams::default_include);
-        let include_events_json = serde_json::to_value(include_events).unwrap();
-        let include_query_param_value = include_events_json.as_str().unwrap().trim_matches('"');
+        let include_events_json = serde_json::to_value(include_events).int_err()?;
+        let include_query_param_value = include_events_json
+            .as_str()
+            .ok_or_else(|| "Failed get JSON as string".int_err())?
+            .trim_matches('"');
 
         let response = self
             .client
