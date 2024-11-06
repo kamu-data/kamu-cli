@@ -9,9 +9,14 @@
 
 use std::sync::Arc;
 
+use chrono::{DateTime, Utc};
 use dill::*;
+use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_core::*;
+use opendatafabric::serde::yaml::Manifest;
 use opendatafabric::*;
+
+use crate::dataset_pushes::{DatasetPush, DatasetPushes};
 
 pub struct PushServiceImpl {
     dataset_repo: Arc<dyn DatasetRepository>,
@@ -91,6 +96,47 @@ impl PushServiceImpl {
     }
 }
 
+// TODO: move to a separate entity
+async fn read_pushes_info(dataset: Arc<dyn Dataset>) -> Result<DatasetPushes, InternalError> {
+    match dataset.as_info_repo().get("pushes").await {
+        Ok(bytes) => {
+            let manifest: Manifest<DatasetPushes> = serde_yaml::from_slice(&bytes[..]).int_err()?;
+            assert_eq!(manifest.kind, "DatasetPushes");
+            Ok(manifest.content)
+        }
+        Err(GetNamedError::Internal(e)) => Err(e),
+        Err(GetNamedError::Access(e)) => Err(e.int_err()),
+        Err(GetNamedError::NotFound(_)) => Ok(DatasetPushes::default()),
+    }
+}
+
+// TODO: move to a separate entity
+async fn update_push_info(
+    dataset: Arc<dyn Dataset>,
+    push: &DatasetPush,
+) -> Result<(), InternalError> {
+    let prev = read_pushes_info(dataset.clone()).await?;
+    let mut prev_pushes = prev.pushes.clone();
+    prev_pushes.insert(push.target.clone(), push.clone());
+    let updated = DatasetPushes {
+        pushes: prev_pushes,
+    };
+
+    let manifest = Manifest {
+        kind: "DatasetPushes".to_owned(),
+        version: 1,
+        content: updated,
+    };
+    let manifest_yaml = serde_yaml::to_string(&manifest).int_err()?;
+    dataset
+        .as_info_repo()
+        .set("pushes", manifest_yaml.as_bytes())
+        .await
+        .int_err()?;
+    Ok(())
+}
+// TODO: add remove record function (on repo/alias deletion)
+
 #[async_trait::async_trait]
 impl PushService for PushServiceImpl {
     async fn push_multi(
@@ -140,18 +186,32 @@ impl PushService for PushServiceImpl {
 
         // If no errors - add aliases to initial items
         if options.add_aliases && results.iter().all(|r| r.result.is_ok()) {
+            let pushed_at: DateTime<Utc> = Utc::now();
             for push_item in &plan {
                 // TODO: Improve error handling
+                let remote_target = (&push_item.remote_target.url).into();
+                let dataset_ref = push_item.local_handle.as_local_ref();
                 self.remote_alias_reg
-                    .get_remote_aliases(&(push_item.local_handle.as_local_ref()))
+                    .get_remote_aliases(&dataset_ref)
                     .await
                     .unwrap()
-                    .add(
-                        &((&push_item.remote_target.url).into()),
-                        RemoteAliasKind::Push,
-                    )
+                    .add(&remote_target, RemoteAliasKind::Push)
                     .await
                     .unwrap();
+
+                // Store last block hash of pushed data
+                if let Ok(dataset) = self.dataset_repo.find_dataset_by_ref(&dataset_ref).await {
+                    if let Ok(summary) = dataset.get_summary(GetSummaryOpts::default()).await {
+                        let push = DatasetPush {
+                            target: remote_target,
+                            pushed_at,
+                            head: summary.last_block_hash,
+                        };
+                        if let Err(err) = update_push_info(dataset, &push).await {
+                            tracing::error!(error = ?err, error_msg = %err, "Failed to record push operation");
+                        };
+                    }
+                };
             }
         }
 
