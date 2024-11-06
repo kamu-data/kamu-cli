@@ -447,6 +447,37 @@ impl PullServiceImpl {
             })
             .collect())
     }
+
+    /// Update summary for every updated dataset
+    async fn update_summaries(&self, results: &Vec<PullResponse>) {
+        for res in results {
+            if let Ok(r) = &res.result {
+                if let Some(local) = &res.local_ref {
+                    match r {
+                        PullResult::Updated { .. } => {
+                            match self.dataset_repo.clone().find_dataset_by_ref(local).await {
+                                Ok(ds) => {
+                                    if let Err(e) = ds
+                                        .clone()
+                                        .get_summary(GetSummaryOpts {
+                                            update_if_stale: true,
+                                        })
+                                        .await
+                                    {
+                                        tracing::error!("Failed to update dataset summary: {}", e);
+                                    }
+                                }
+                                Err(e) => {
+                                    tracing::error!("Failed to update dataset summary: {}", e);
+                                }
+                            };
+                        }
+                        PullResult::UpToDate(_) => {}
+                    }
+                };
+            };
+        }
+    }
 }
 
 #[async_trait::async_trait]
@@ -603,6 +634,8 @@ impl PullService for PullServiceImpl {
                 break;
             }
         }
+
+        self.update_summaries(&results).await;
 
         Ok(results)
     }
