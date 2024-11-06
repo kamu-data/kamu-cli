@@ -19,6 +19,7 @@ use kamu_adapter_http::data::metadata_handler::{
 };
 use kamu_adapter_http::general::{AccountResponse, DatasetInfoResponse, NodeInfoResponse};
 use kamu_adapter_http::LoginRequestBody;
+use kamu_core::BlockRef;
 use kamu_flow_system::{DatasetFlowType, FlowID};
 use lazy_static::lazy_static;
 use opendatafabric as odf;
@@ -193,6 +194,8 @@ pub trait KamuApiServerClientExt {
 
     fn odf(&self) -> OdfApi;
 
+    fn odf_transfer(&self) -> OdfTransferApi;
+
     fn swagger(&self) -> SwaggerApi;
 }
 
@@ -222,6 +225,10 @@ impl KamuApiServerClientExt for KamuApiServerClient {
 
     fn odf(&self) -> OdfApi {
         OdfApi { client: self }
+    }
+
+    fn odf_transfer(&self) -> OdfTransferApi {
+        OdfTransferApi { client: self }
     }
 
     fn swagger(&self) -> SwaggerApi {
@@ -938,6 +945,50 @@ impl OdfApi<'_> {
             unexpected_status => panic!("Unexpected status: {unexpected_status}"),
         }
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// API: ODF: Transfer
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct OdfTransferApi<'a> {
+    client: &'a KamuApiServerClient,
+}
+
+impl OdfTransferApi<'_> {
+    pub async fn metadata_block_hash_by_ref(
+        &self,
+        dataset_alias: &odf::DatasetAlias,
+        block_ref: BlockRef,
+    ) -> Result<odf::Multihash, MetadataBlockHashByRefError> {
+        let response = self
+            .client
+            .rest_api_call(
+                Method::GET,
+                &format!("{dataset_alias}/refs/{block_ref}"),
+                None,
+            )
+            .await;
+
+        match response.status() {
+            StatusCode::OK => {
+                let raw_response_body = response.text().await.unwrap();
+                Ok(odf::Multihash::from_multibase(&raw_response_body).unwrap())
+            }
+            StatusCode::NOT_FOUND => Err(MetadataBlockHashByRefError::NotFound),
+            unexpected_status => Err(format!("Unexpected status: {unexpected_status}")
+                .int_err()
+                .into()),
+        }
+    }
+}
+
+#[derive(Error, Debug)]
+pub enum MetadataBlockHashByRefError {
+    #[error("Not found")]
+    NotFound,
+    #[error(transparent)]
+    Internal(#[from] InternalError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

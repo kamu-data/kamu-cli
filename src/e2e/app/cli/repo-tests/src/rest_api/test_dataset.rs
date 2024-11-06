@@ -11,10 +11,12 @@ use std::assert_matches::assert_matches;
 
 use chrono::{NaiveTime, SecondsFormat, Utc};
 use http_common::comma_separated::CommaSeparatedSet;
+use kamu::domain::BlockRef;
 use kamu_adapter_http::data::metadata_handler::{
     DatasetMetadataResponse,
     Include as MetadataInclude,
     Output as MetadataOutput,
+    Ref as MetadataOutputRef,
 };
 use kamu_adapter_http::general::DatasetInfoResponse;
 use kamu_cli_e2e_common::{
@@ -198,6 +200,15 @@ async fn test_dataset_metadata(
 
     let dataset_alias =
         odf::DatasetAlias::new(maybe_account_name, DATASET_ROOT_PLAYER_NAME.clone());
+    let head_hash = kamu_api_server_client
+        .odf_transfer()
+        .metadata_block_hash_by_ref(&dataset_alias, BlockRef::Head)
+        .await
+        .unwrap();
+    let expected_refs = vec![MetadataOutputRef {
+        name: BlockRef::Head.as_str().into(),
+        block_hash: head_hash,
+    }];
 
     assert_matches!(
         kamu_api_server_client
@@ -236,8 +247,7 @@ async fn test_dataset_metadata(
                 && vocab.operation_type_column == "op"
                 && vocab.system_time_column == "system_time"
                 && vocab.event_time_column == "match_time"
-                && refs.len() == 1
-                && refs.iter().any(|r#ref| r#ref.name == "head")
+                && refs == expected_refs
     );
 }
 
