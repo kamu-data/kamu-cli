@@ -90,7 +90,7 @@ pub struct QueryRequest {
     #[serde(default = "QueryRequest::default_query_dialect")]
     pub query_dialect: domain::QueryDialect,
 
-    /// How data should be layed out in the response
+    /// How data should be laid out in the response
     #[serde(default)]
     pub data_format: DataFormat,
 
@@ -306,7 +306,7 @@ pub struct Outputs {
     /// Resulting data
     pub data: serde_json::Value,
 
-    /// How data is layed out in the response
+    /// How data is laid out in the response
     pub data_format: DataFormat,
 
     /// Schema of the resulting data
