@@ -579,19 +579,6 @@ impl DatasetApi<'_> {
         content
     }
 
-    pub async fn tail_data_via_rest(&self, dataset_alias: &odf::DatasetAlias) -> serde_json::Value {
-        let response = self
-            .client
-            .rest_api_call(Method::GET, &format!("{dataset_alias}/tail"), None)
-            .await;
-
-        match response.status() {
-            StatusCode::OK => response.json().await.unwrap(),
-            StatusCode::NO_CONTENT => serde_json::Value::Null,
-            unexpected_status => panic!("Unexpected status: {unexpected_status}"),
-        }
-    }
-
     pub async fn blocks(&self, dataset_id: &odf::DatasetID) -> DatasetBlocksResponse {
         let response = self
             .client
@@ -668,34 +655,6 @@ impl DatasetApi<'_> {
             .collect::<Vec<_>>();
 
         DatasetBlocksResponse { blocks }
-    }
-
-    pub async fn metadata(
-        &self,
-        dataset_alias: &odf::DatasetAlias,
-        maybe_include_events: Option<CommaSeparatedSet<MetadataInclude>>,
-    ) -> Result<DatasetMetadataResponse, InternalError> {
-        let include_events =
-            maybe_include_events.unwrap_or_else(DatasetMetadataParams::default_include);
-        let include_events_json = serde_json::to_value(include_events).unwrap();
-        let include_query_param_value = include_events_json.as_str().unwrap().trim_matches('"');
-
-        let response = self
-            .client
-            .rest_api_call(
-                Method::GET,
-                &format!("{dataset_alias}/metadata?include={include_query_param_value}"),
-                None,
-            )
-            .await;
-
-        let status = response.status();
-
-        if status != StatusCode::OK {
-            return Err(format!("Unexpected status: {status}").int_err());
-        }
-
-        response.json::<DatasetMetadataResponse>().await.int_err()
     }
 }
 
@@ -988,6 +947,47 @@ impl OdfQuery<'_> {
             "#
         ))
         .await
+    }
+
+    pub async fn metadata(
+        &self,
+        dataset_alias: &odf::DatasetAlias,
+        maybe_include_events: Option<CommaSeparatedSet<MetadataInclude>>,
+    ) -> Result<DatasetMetadataResponse, InternalError> {
+        let include_events =
+            maybe_include_events.unwrap_or_else(DatasetMetadataParams::default_include);
+        let include_events_json = serde_json::to_value(include_events).unwrap();
+        let include_query_param_value = include_events_json.as_str().unwrap().trim_matches('"');
+
+        let response = self
+            .client
+            .rest_api_call(
+                Method::GET,
+                &format!("{dataset_alias}/metadata?include={include_query_param_value}"),
+                None,
+            )
+            .await;
+
+        let status = response.status();
+
+        if status != StatusCode::OK {
+            return Err(format!("Unexpected status: {status}").int_err());
+        }
+
+        response.json::<DatasetMetadataResponse>().await.int_err()
+    }
+
+    pub async fn tail(&self, dataset_alias: &odf::DatasetAlias) -> serde_json::Value {
+        let response = self
+            .client
+            .rest_api_call(Method::GET, &format!("{dataset_alias}/tail"), None)
+            .await;
+
+        match response.status() {
+            StatusCode::OK => response.json().await.unwrap(),
+            StatusCode::NO_CONTENT => serde_json::Value::Null,
+            unexpected_status => panic!("Unexpected status: {unexpected_status}"),
+        }
     }
 }
 

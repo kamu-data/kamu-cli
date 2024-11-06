@@ -135,8 +135,8 @@ async fn test_dataset_tail(
     pretty_assertions::assert_eq!(
         serde_json::Value::Null,
         kamu_api_server_client
-            .dataset()
-            .tail_data_via_rest(&dataset_alias)
+            .odf_query()
+            .tail(&dataset_alias)
             .await
     );
 
@@ -183,8 +183,8 @@ async fn test_dataset_tail(
             "dataFormat": "JsonAoS"
         }),
         kamu_api_server_client
-            .dataset()
-            .tail_data_via_rest(&dataset_alias)
+            .odf_query()
+            .tail(&dataset_alias)
             .await
     );
 }
@@ -214,7 +214,7 @@ async fn test_dataset_metadata(
 
     assert_matches!(
         kamu_api_server_client
-            .dataset()
+            .odf_query()
             .metadata(
                 &dataset_alias,
                 Some(CommaSeparatedSet::from([
