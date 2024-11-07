@@ -619,7 +619,7 @@
             },
             "SubQuery": {
                 "additionalProperties": false,
-                "description": "Mirrors the structure of [`ResponseBody`] without the `outputs`",
+                "description": "Mirrors the structure of [`QueryRequest`] without the `outputs`",
                 "properties": {
                     "commitment": {
                         "$ref": "#/components/schemas/Commitment",
