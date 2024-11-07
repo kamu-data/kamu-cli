@@ -602,7 +602,7 @@ where
         &self.info_repo
     }
 
-    async fn read_push_info(&self) -> Result<DatasetPushes, InternalError> {
+    async fn get_push_info(&self) -> Result<DatasetPushes, InternalError> {
         match self.info_repo.get("pushes").await {
             Ok(bytes) => {
                 let manifest: Manifest<DatasetPushes> =
@@ -617,7 +617,7 @@ where
     }
 
     async fn update_push_info(&self, push: &DatasetPush) -> Result<(), InternalError> {
-        let prev = self.read_push_info().await?;
+        let prev = self.get_push_info().await?;
         let mut prev_pushes = prev.pushes.clone();
         prev_pushes.insert(push.target.clone(), push.clone());
         let updated = DatasetPushes {

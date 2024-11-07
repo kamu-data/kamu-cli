@@ -10,8 +10,9 @@
 use std::sync::Arc;
 
 use dill::{component, interface};
-use internal_error::ResultIntoInternal;
+use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer};
+use kamu_core::dataset_pushes::DatasetPush;
 use kamu_core::{
     DanglingReferenceError,
     DatasetLifecycleMessage,
@@ -20,6 +21,7 @@ use kamu_core::{
     DeleteDatasetUseCase,
     DependencyGraphService,
     GetDatasetError,
+    GetSummaryOpts,
     MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
 };
 use messaging_outbox::{Outbox, OutboxExt};
@@ -89,6 +91,42 @@ impl DeleteDatasetUseCaseImpl {
 
         Ok(())
     }
+
+    async fn ensure_no_unsync_remotes(
+        &self,
+        dataset_handle: &DatasetHandle,
+    ) -> Result<(), DeleteDatasetError> {
+        let ds = self.dataset_repo.get_dataset_by_handle(dataset_handle);
+
+        match ds.get_summary(GetSummaryOpts::default()).await {
+            Ok(summary) => {
+                match ds.get_push_info().await {
+                    Ok(ds_pushes) => {
+                        let head = summary.last_block_hash;
+                        let unsync_pushes: Vec<&DatasetPush> = ds_pushes
+                            .pushes
+                            .iter()
+                            .filter(|(_, v)| v.head != head)
+                            .map(|(_, v)| v)
+                            .collect();
+                        //todo
+                        if !unsync_pushes.is_empty() {
+                            for p in &unsync_pushes {
+                                tracing::error!("Out of sync remote: {}", &p.target);
+                            }
+                            let msg =
+                                format!("Out of sync: {}", unsync_pushes.first().unwrap().target);
+                            Err(DeleteDatasetError::Internal(msg.int_err()))
+                        } else {
+                            Ok(())
+                        }
+                    }
+                    Err(e) => Err(DeleteDatasetError::Internal(e.int_err())),
+                }
+            }
+            Err(e) => Err(DeleteDatasetError::Internal(e.int_err())),
+        }
+    }
 }
 
 #[async_trait::async_trait]
@@ -114,6 +152,8 @@ impl DeleteDatasetUseCase for DeleteDatasetUseCaseImpl {
 
         // Validate against dangling ref
         self.ensure_no_dangling_references(dataset_handle).await?;
+
+        self.ensure_no_unsync_remotes(dataset_handle).await?;
 
         // Do actual delete
         self.dataset_repo_writer

@@ -73,7 +73,7 @@ pub trait Dataset: Send + Sync {
     /// Returns a brief summary of the dataset
     async fn get_summary(&self, opts: GetSummaryOpts) -> Result<DatasetSummary, GetSummaryError>;
 
-    async fn read_push_info(&self) -> Result<DatasetPushes, InternalError>;
+    async fn get_push_info(&self) -> Result<DatasetPushes, InternalError>;
 
     async fn update_push_info(&self, push: &DatasetPush) -> Result<(), InternalError>;
     // TODO: add remove record function (on repo/alias deletion)
