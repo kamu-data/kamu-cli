@@ -94,6 +94,7 @@ pub fn get_command(
             cli_catalog.get_one()?,
             c.all,
             c.recursive,
+            c.force,
         )),
         cli::Command::Ingest(c) => Box::new(IngestCommand::new(
             cli_catalog.get_one()?,

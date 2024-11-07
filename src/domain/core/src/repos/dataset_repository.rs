@@ -7,11 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::fmt::Display;
 use std::pin::Pin;
 use std::sync::Arc;
 
 use async_trait::async_trait;
 use internal_error::{ErrorIntoInternal, InternalError};
+use itertools::Itertools;
 use opendatafabric::*;
 use thiserror::Error;
 use tokio_stream::Stream;
@@ -165,7 +167,7 @@ pub struct DanglingReferenceError {
     pub children: Vec<DatasetHandle>,
 }
 
-impl std::fmt::Display for DanglingReferenceError {
+impl Display for DanglingReferenceError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Dataset {} is referenced by: ", self.dataset_handle)?;
         for (i, h) in self.children.iter().enumerate() {
@@ -174,6 +176,23 @@ impl std::fmt::Display for DanglingReferenceError {
             }
             write!(f, "{h}")?;
         }
+        Ok(())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Clone, PartialEq, Eq, Debug)]
+pub struct OutOfSyncError {
+    pub targets: Vec<DatasetRefRemote>,
+}
+
+impl Display for OutOfSyncError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "Following remotes are out of sync:")?;
+        let targets = self.targets.iter().map(|t| format!("  - {t}")).join("\n");
+        writeln!(f, "{targets}")?;
+        writeln!(f, "\nPlease, push all changes and try again.")?;
         Ok(())
     }
 }
@@ -333,6 +352,8 @@ pub enum DeleteDatasetError {
     NotFound(#[from] DatasetNotFoundError),
     #[error(transparent)]
     DanglingReference(#[from] DanglingReferenceError),
+    #[error(transparent)]
+    OutOfSync(#[from] OutOfSyncError),
     #[error(transparent)]
     Access(
         #[from]

@@ -49,6 +49,7 @@ tokio = { version = "1", default-features = false }
 tokio-stream = { version = "0.1", default-features = false }
 tracing = { version = "0.1", default-features = false }
 url = { version = "2", default-features = false, features = ["serde"] }
+itertools = "0.13"
 
 # TODO: Avoid this dependency or depend on sub-crates
 datafusion = { version = "42", default-features = false, features = [

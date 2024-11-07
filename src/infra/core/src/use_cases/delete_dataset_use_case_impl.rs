@@ -22,10 +22,11 @@ use kamu_core::{
     DependencyGraphService,
     GetDatasetError,
     GetSummaryOpts,
+    OutOfSyncError,
     MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
 };
 use messaging_outbox::{Outbox, OutboxExt};
-use opendatafabric::{DatasetHandle, DatasetRef};
+use opendatafabric::{DatasetHandle, DatasetRef, DatasetRefRemote};
 
 use crate::DatasetRepositoryWriter;
 
@@ -92,38 +93,40 @@ impl DeleteDatasetUseCaseImpl {
         Ok(())
     }
 
-    async fn ensure_no_unsync_remotes(
+    async fn ensure_no_out_of_sync_remotes(
         &self,
         dataset_handle: &DatasetHandle,
+        force: bool,
     ) -> Result<(), DeleteDatasetError> {
         let ds = self.dataset_repo.get_dataset_by_handle(dataset_handle);
 
         match ds.get_summary(GetSummaryOpts::default()).await {
-            Ok(summary) => {
-                match ds.get_push_info().await {
-                    Ok(ds_pushes) => {
-                        let head = summary.last_block_hash;
-                        let unsync_pushes: Vec<&DatasetPush> = ds_pushes
-                            .pushes
-                            .iter()
-                            .filter(|(_, v)| v.head != head)
-                            .map(|(_, v)| v)
-                            .collect();
-                        //todo
-                        if !unsync_pushes.is_empty() {
-                            for p in &unsync_pushes {
-                                tracing::error!("Out of sync remote: {}", &p.target);
-                            }
-                            let msg =
-                                format!("Out of sync: {}", unsync_pushes.first().unwrap().target);
-                            Err(DeleteDatasetError::Internal(msg.int_err()))
-                        } else {
+            Ok(summary) => match ds.get_push_info().await {
+                Ok(ds_pushes) => {
+                    // TODO: check only repos from config
+                    let head = summary.last_block_hash;
+                    let pushes: Vec<DatasetPush> = ds_pushes
+                        .pushes
+                        .into_iter()
+                        .filter(|(_, v)| v.head != head)
+                        .map(|(_, v)| v)
+                        .collect();
+                    if !pushes.is_empty() {
+                        let targets: Vec<DatasetRefRemote> =
+                            pushes.into_iter().map(|p| p.target).collect();
+                        let err: DeleteDatasetError = OutOfSyncError { targets }.into();
+                        if force {
+                            eprintln!("{}: {}", console::style("Warning").yellow(), err,);
                             Ok(())
+                        } else {
+                            Err(err)
                         }
+                    } else {
+                        Ok(())
                     }
-                    Err(e) => Err(DeleteDatasetError::Internal(e.int_err())),
                 }
-            }
+                Err(e) => Err(DeleteDatasetError::Internal(e.int_err())),
+            },
             Err(e) => Err(DeleteDatasetError::Internal(e.int_err())),
         }
     }
@@ -131,19 +134,24 @@ impl DeleteDatasetUseCaseImpl {
 
 #[async_trait::async_trait]
 impl DeleteDatasetUseCase for DeleteDatasetUseCaseImpl {
-    async fn execute_via_ref(&self, dataset_ref: &DatasetRef) -> Result<(), DeleteDatasetError> {
+    async fn execute_via_ref(
+        &self,
+        dataset_ref: &DatasetRef,
+        force: bool,
+    ) -> Result<(), DeleteDatasetError> {
         let dataset_handle = match self.dataset_repo.resolve_dataset_ref(dataset_ref).await {
             Ok(h) => Ok(h),
             Err(GetDatasetError::NotFound(e)) => Err(DeleteDatasetError::NotFound(e)),
             Err(GetDatasetError::Internal(e)) => Err(DeleteDatasetError::Internal(e)),
         }?;
 
-        self.execute_via_handle(&dataset_handle).await
+        self.execute_via_handle(&dataset_handle, force).await
     }
 
     async fn execute_via_handle(
         &self,
         dataset_handle: &DatasetHandle,
+        force: bool,
     ) -> Result<(), DeleteDatasetError> {
         // Permission check
         self.dataset_action_authorizer
@@ -153,7 +161,8 @@ impl DeleteDatasetUseCase for DeleteDatasetUseCaseImpl {
         // Validate against dangling ref
         self.ensure_no_dangling_references(dataset_handle).await?;
 
-        self.ensure_no_unsync_remotes(dataset_handle).await?;
+        self.ensure_no_out_of_sync_remotes(dataset_handle, force)
+            .await?;
 
         // Do actual delete
         self.dataset_repo_writer

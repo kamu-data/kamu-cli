@@ -9,8 +9,8 @@
 
 use chrono::{DateTime, Utc};
 use domain::{DeleteDatasetError, RenameDatasetError};
-use kamu_core::{self as domain};
-use opendatafabric as odf;
+use itertools::Itertools;
+use {kamu_core as domain, opendatafabric as odf};
 
 use super::{DatasetEnvVarsMut, DatasetFlowsMut, DatasetMetadataMut};
 use crate::prelude::*;
@@ -91,7 +91,7 @@ impl DatasetMut {
     async fn delete(&self, ctx: &Context<'_>) -> Result<DeleteResult> {
         let delete_dataset = from_catalog::<dyn domain::DeleteDatasetUseCase>(ctx).unwrap();
         match delete_dataset
-            .execute_via_handle(&self.dataset_handle)
+            .execute_via_handle(&self.dataset_handle, false)
             .await
         {
             Ok(_) => Ok(DeleteResult::Success(DeleteResultSuccess {
@@ -105,6 +105,11 @@ impl DatasetMut {
                         .iter()
                         .map(|child_dataset| child_dataset.as_local_ref().into())
                         .collect(),
+                },
+            )),
+            Err(DeleteDatasetError::OutOfSync(e)) => Ok(DeleteResult::OutOfSyncRemotes(
+                DeleteResultOutOfSyncRemotes {
+                    targets: e.targets.into_iter().map(|t| t.to_string()).collect(),
                 },
             )),
             Err(DeleteDatasetError::Access(_)) => Err(GqlError::Gql(
@@ -206,6 +211,7 @@ impl RenameResultNameCollision {
 pub enum DeleteResult {
     Success(DeleteResultSuccess),
     DanglingReference(DeleteResultDanglingReference),
+    OutOfSyncRemotes(DeleteResultOutOfSyncRemotes),
 }
 
 #[derive(SimpleObject, Debug, Clone)]
@@ -236,6 +242,21 @@ impl DeleteResultDanglingReference {
             self.not_deleted_dataset,
             self.dangling_child_refs.len()
         )
+    }
+}
+
+#[derive(SimpleObject, Debug, Clone)]
+#[graphql(complex)]
+pub struct DeleteResultOutOfSyncRemotes {
+    // TODO: change to Vec<DatasetRefRemote>
+    pub targets: Vec<String>,
+}
+
+#[ComplexObject]
+impl DeleteResultOutOfSyncRemotes {
+    async fn message(&self) -> String {
+        let targets = self.targets.iter().map(|t| format!("  - {t}")).join("\n");
+        format!(r"Following remotes are out of sync:\n{targets}")
     }
 }
 

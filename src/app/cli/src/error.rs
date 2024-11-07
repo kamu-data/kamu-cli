@@ -192,6 +192,7 @@ impl From<DeleteDatasetError> for CLIError {
         match v {
             e @ (DeleteDatasetError::NotFound(_)
             | DeleteDatasetError::DanglingReference(_)
+            | DeleteDatasetError::OutOfSync(_)
             | DeleteDatasetError::Access(_)) => Self::failure(e),
             e @ DeleteDatasetError::Internal(_) => Self::critical(e),
         }

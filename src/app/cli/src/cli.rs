@@ -366,6 +366,10 @@ pub struct Delete {
     /// Local dataset reference(s)
     #[arg(value_parser = parsers::dataset_ref_pattern)]
     pub dataset: Vec<odf::DatasetRefPattern>,
+
+    /// Force delete
+    #[arg(long, short = 'f')]
+    pub force: bool,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

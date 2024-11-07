@@ -121,6 +121,7 @@ tokio-util = { version = "0.7", default-features = false, features = [
 tracing = "0.1"
 url = { version = "2", features = ["serde"] }
 walkdir = "2"
+console = "0.15.8"
 
 # Http file server
 tower = "0.5"

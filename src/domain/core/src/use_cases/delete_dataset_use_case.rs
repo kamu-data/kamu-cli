@@ -15,11 +15,16 @@ use crate::DeleteDatasetError;
 
 #[async_trait::async_trait]
 pub trait DeleteDatasetUseCase: Send + Sync {
-    async fn execute_via_ref(&self, dataset_ref: &DatasetRef) -> Result<(), DeleteDatasetError>;
+    async fn execute_via_ref(
+        &self,
+        dataset_ref: &DatasetRef,
+        force: bool,
+    ) -> Result<(), DeleteDatasetError>;
 
     async fn execute_via_handle(
         &self,
         dataset_handle: &DatasetHandle,
+        force: bool,
     ) -> Result<(), DeleteDatasetError>;
 }
 

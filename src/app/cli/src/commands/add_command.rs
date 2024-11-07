@@ -293,7 +293,7 @@ impl Command for AddCommand {
                 // TODO: Private Datasets: delete permissions should be checked in multi-tenant
                 //                         scenario
                 for hdl in already_exist {
-                    self.delete_dataset.execute_via_handle(&hdl).await?;
+                    self.delete_dataset.execute_via_handle(&hdl, false).await?;
                 }
             }
         };

@@ -28,6 +28,7 @@ pub struct DeleteCommand {
     dependency_graph_service: Arc<dyn DependencyGraphService>,
     all: bool,
     recursive: bool,
+    force: bool,
 }
 
 impl DeleteCommand {
@@ -39,6 +40,7 @@ impl DeleteCommand {
         dependency_graph_service: Arc<dyn DependencyGraphService>,
         all: bool,
         recursive: bool,
+        force: bool,
     ) -> Self
     where
         I: IntoIterator<Item = DatasetRefPattern>,
@@ -51,6 +53,7 @@ impl DeleteCommand {
             dependency_graph_service,
             all,
             recursive,
+            force,
         }
     }
 }
@@ -119,7 +122,7 @@ impl Command for DeleteCommand {
         for id in &dataset_ids {
             match self
                 .delete_dataset
-                .execute_via_ref(&id.as_local_ref())
+                .execute_via_ref(&id.as_local_ref(), self.force)
                 .await
             {
                 Ok(_) => Ok(()),
