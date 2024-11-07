@@ -43,6 +43,7 @@ use kamu::{
 };
 use kamu_accounts::testing::MockAuthenticationService;
 use kamu_accounts::{Account, AuthenticationService};
+use kamu_core::TenancyConfig;
 use messaging_outbox::DummyOutboxImpl;
 use opendatafabric::{AccountName, DatasetAlias, DatasetHandle};
 use time_source::{SystemTimeSource, SystemTimeSourceStub};
@@ -97,11 +98,8 @@ impl ServerSideS3Harness {
                 .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
                 .add::<DummyOutboxImpl>()
                 .add::<DependencyGraphServiceInMemory>()
-                .add_builder(
-                    DatasetRepositoryS3::builder()
-                        .with_s3_context(s3_context.clone())
-                        .with_multi_tenant(options.multi_tenant),
-                )
+                .add_value(options.tenancy_config)
+                .add_builder(DatasetRepositoryS3::builder().with_s3_context(s3_context.clone()))
                 .bind::<dyn DatasetRepository, DatasetRepositoryS3>()
                 .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryS3>()
                 .add::<DatasetRegistryRepoBridge>()
@@ -126,7 +124,7 @@ impl ServerSideS3Harness {
         let api_server = TestAPIServer::new(
             create_web_user_catalog(&base_catalog, &options),
             listener,
-            options.multi_tenant,
+            options.tenancy_config,
         );
 
         Self {
@@ -148,10 +146,9 @@ impl ServerSideS3Harness {
 #[async_trait::async_trait]
 impl ServerSideHarness for ServerSideS3Harness {
     fn operating_account_name(&self) -> Option<AccountName> {
-        if self.options.multi_tenant {
-            Some(AccountName::new_unchecked(SERVER_ACCOUNT_NAME))
-        } else {
-            None
+        match self.options.tenancy_config {
+            TenancyConfig::MultiTenant => Some(AccountName::new_unchecked(SERVER_ACCOUNT_NAME)),
+            TenancyConfig::SingleTenant => None,
         }
     }
 
@@ -189,19 +186,18 @@ impl ServerSideHarness for ServerSideS3Harness {
     fn dataset_url_with_scheme(&self, dataset_alias: &DatasetAlias, scheme: &str) -> Url {
         let api_server_address = self.api_server_addr();
         Url::from_str(
-            if self.options.multi_tenant {
-                format!(
+            match self.options.tenancy_config {
+                TenancyConfig::MultiTenant => format!(
                     "{}://{}/{}/{}",
                     scheme,
                     api_server_address,
                     dataset_alias.account_name.as_ref().unwrap(),
                     dataset_alias.dataset_name
-                )
-            } else {
-                format!(
+                ),
+                TenancyConfig::SingleTenant => format!(
                     "{}://{}/{}",
                     scheme, api_server_address, dataset_alias.dataset_name
-                )
+                ),
             }
             .as_str(),
         )

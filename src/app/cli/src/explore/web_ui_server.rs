@@ -83,7 +83,7 @@ pub struct WebUIServer {
 impl WebUIServer {
     pub async fn new(
         server_catalog: Catalog,
-        multi_tenant_workspace: bool,
+        tenancy_config: TenancyConfig,
         current_account_name: AccountName,
         predefined_accounts_config: Arc<PredefinedAccountsConfig>,
         file_upload_limit_config: Arc<FileUploadLimitConfig>,
@@ -170,23 +170,21 @@ impl WebUIServer {
             ))
             .nest(
                 "/odata",
-                if multi_tenant_workspace {
-                    kamu_adapter_odata::router_multi_tenant()
-                } else {
-                    kamu_adapter_odata::router_single_tenant()
+                match tenancy_config {
+                    TenancyConfig::MultiTenant => kamu_adapter_odata::router_multi_tenant(),
+                    TenancyConfig::SingleTenant => kamu_adapter_odata::router_single_tenant(),
                 },
             )
             .nest(
-                if multi_tenant_workspace {
-                    "/:account_name/:dataset_name"
-                } else {
-                    "/:dataset_name"
+                match tenancy_config {
+                    TenancyConfig::MultiTenant => "/:account_name/:dataset_name",
+                    TenancyConfig::SingleTenant => "/:dataset_name",
                 },
                 kamu_adapter_http::add_dataset_resolver_layer(
                     OpenApiRouter::new()
                         .merge(kamu_adapter_http::smart_transfer_protocol_router())
                         .merge(kamu_adapter_http::data::dataset_router()),
-                    multi_tenant_workspace,
+                    tenancy_config,
                 ),
             )
             .fallback(app_handler)

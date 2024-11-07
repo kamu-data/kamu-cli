@@ -10,7 +10,7 @@
 use std::assert_matches::assert_matches;
 
 use kamu::domain::{AccessError, PushError, SyncError};
-use kamu_core::DatasetVisibility;
+use kamu_core::{DatasetVisibility, TenancyConfig};
 use opendatafabric::{AccountName, DatasetAlias, DatasetRefRemote};
 
 use crate::harness::{
@@ -29,11 +29,11 @@ use crate::tests::tests_push::scenarios::*;
 async fn test_smart_push_new_dataset_unauthenticated() {
     let scenario = SmartPushNewDatasetScenario::prepare(
         ClientSideHarness::new(ClientSideHarnessOptions {
-            multi_tenant: false,
+            tenancy_config: TenancyConfig::SingleTenant,
             authenticated_remotely: false,
         }),
         ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
-            multi_tenant: true,
+            tenancy_config: TenancyConfig::MultiTenant,
             authorized_writes: true,
             base_catalog: None,
         })
@@ -75,11 +75,11 @@ async fn test_smart_push_new_dataset_unauthenticated() {
 async fn test_smart_push_new_dataset_wrong_user() {
     let scenario = SmartPushNewDatasetScenario::prepare(
         ClientSideHarness::new(ClientSideHarnessOptions {
-            multi_tenant: false,
+            tenancy_config: TenancyConfig::SingleTenant,
             authenticated_remotely: true,
         }),
         ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
-            multi_tenant: true,
+            tenancy_config: TenancyConfig::MultiTenant,
             authorized_writes: true,
             base_catalog: None,
         })
@@ -126,11 +126,11 @@ async fn test_smart_push_new_dataset_wrong_user() {
 async fn test_smart_push_existing_dataset_unauthenticated() {
     let scenario = SmartPushExistingEvolvedDatasetScenario::prepare(
         ClientSideHarness::new(ClientSideHarnessOptions {
-            multi_tenant: false,
+            tenancy_config: TenancyConfig::SingleTenant,
             authenticated_remotely: false,
         }),
         ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
-            multi_tenant: true,
+            tenancy_config: TenancyConfig::MultiTenant,
             authorized_writes: false,
             base_catalog: None,
         })
@@ -170,11 +170,11 @@ async fn test_smart_push_existing_dataset_unauthenticated() {
 async fn test_smart_push_existing_dataset_unauthorized() {
     let scenario = SmartPushExistingEvolvedDatasetScenario::prepare(
         ClientSideHarness::new(ClientSideHarnessOptions {
-            multi_tenant: false,
+            tenancy_config: TenancyConfig::SingleTenant,
             authenticated_remotely: true,
         }),
         ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
-            multi_tenant: true,
+            tenancy_config: TenancyConfig::MultiTenant,
             authorized_writes: false,
             base_catalog: None,
         })
@@ -214,11 +214,11 @@ async fn test_smart_push_existing_dataset_unauthorized() {
 async fn test_smart_push_existing_ref_collision() {
     let scenario = SmartPushExistingRefCollisionScenarion::prepare(
         ClientSideHarness::new(ClientSideHarnessOptions {
-            multi_tenant: true,
+            tenancy_config: TenancyConfig::MultiTenant,
             authenticated_remotely: true,
         }),
         ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
-            multi_tenant: true,
+            tenancy_config: TenancyConfig::MultiTenant,
             authorized_writes: true,
             base_catalog: None,
         })
@@ -256,11 +256,11 @@ async fn test_smart_push_existing_ref_collision() {
 async fn test_smart_push_incompatible_version_err() {
     let scenario = SmartPushExistingRefCollisionScenarion::prepare(
         ClientSideHarness::new(ClientSideHarnessOptions {
-            multi_tenant: true,
+            tenancy_config: TenancyConfig::MultiTenant,
             authenticated_remotely: true,
         }),
         ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
-            multi_tenant: true,
+            tenancy_config: TenancyConfig::MultiTenant,
             authorized_writes: true,
             base_catalog: None,
         })

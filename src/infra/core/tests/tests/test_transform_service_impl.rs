@@ -51,11 +51,8 @@ impl TransformTestHarness {
         let catalog = dill::CatalogBuilder::new()
             .add_value(RunInfoDir::new(run_info_dir))
             .add_value(CurrentAccountSubject::new_test())
-            .add_builder(
-                DatasetRepositoryLocalFs::builder()
-                    .with_root(datasets_dir)
-                    .with_multi_tenant(false),
-            )
+            .add_value(TenancyConfig::SingleTenant)
+            .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
             .add::<DatasetRegistryRepoBridge>()
             .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()

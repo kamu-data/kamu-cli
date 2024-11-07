@@ -17,6 +17,7 @@ use std::sync::Arc;
 use console::style as s;
 use dill::Catalog;
 use internal_error::ResultIntoInternal;
+use kamu::domain::TenancyConfig;
 use kamu_accounts::PredefinedAccountsConfig;
 use kamu_adapter_http::FileUploadLimitConfig;
 use kamu_datasets::DatasetEnvVarsConfig;
@@ -29,7 +30,7 @@ use crate::OutputConfig;
 
 pub struct UICommand {
     server_catalog: Catalog,
-    multi_tenant_workspace: bool,
+    tenancy_config: TenancyConfig,
     current_account_name: AccountName,
     predefined_accounts_config: Arc<PredefinedAccountsConfig>,
     file_upload_limit_config: Arc<FileUploadLimitConfig>,
@@ -43,7 +44,7 @@ pub struct UICommand {
 impl UICommand {
     pub fn new(
         server_catalog: Catalog,
-        multi_tenant_workspace: bool,
+        tenancy_config: TenancyConfig,
         current_account_name: AccountName,
         predefined_accounts_config: Arc<PredefinedAccountsConfig>,
         file_upload_limit_config: Arc<FileUploadLimitConfig>,
@@ -55,7 +56,7 @@ impl UICommand {
     ) -> Self {
         Self {
             server_catalog,
-            multi_tenant_workspace,
+            tenancy_config,
             current_account_name,
             predefined_accounts_config,
             file_upload_limit_config,
@@ -74,7 +75,7 @@ impl Command for UICommand {
     async fn run(&mut self) -> Result<(), CLIError> {
         let web_server = crate::explore::WebUIServer::new(
             self.server_catalog.clone(),
-            self.multi_tenant_workspace,
+            self.tenancy_config,
             self.current_account_name.clone(),
             self.predefined_accounts_config.clone(),
             self.file_upload_limit_config.clone(),

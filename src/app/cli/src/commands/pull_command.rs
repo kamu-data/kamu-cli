@@ -31,6 +31,7 @@ pub struct PullCommand {
     dataset_registry: Arc<dyn DatasetRegistry>,
     search_svc: Arc<dyn SearchService>,
     output_config: Arc<OutputConfig>,
+    tenancy_config: TenancyConfig,
     refs: Vec<DatasetRefAnyPattern>,
     current_account_subject: Arc<CurrentAccountSubject>,
     all: bool,
@@ -40,7 +41,6 @@ pub struct PullCommand {
     add_aliases: bool,
     force: bool,
     reset_derivatives_on_diverged_input: bool,
-    in_multi_tenant_mode: bool,
 }
 
 impl PullCommand {
@@ -49,6 +49,7 @@ impl PullCommand {
         dataset_registry: Arc<dyn DatasetRegistry>,
         search_svc: Arc<dyn SearchService>,
         output_config: Arc<OutputConfig>,
+        tenancy_config: TenancyConfig,
         refs: I,
         current_account_subject: Arc<CurrentAccountSubject>,
         all: bool,
@@ -58,7 +59,6 @@ impl PullCommand {
         add_aliases: bool,
         force: bool,
         reset_derivatives_on_diverged_input: bool,
-        in_multi_tenant_mode: bool,
     ) -> Self
     where
         I: IntoIterator<Item = DatasetRefAnyPattern>,
@@ -68,6 +68,7 @@ impl PullCommand {
             dataset_registry,
             search_svc,
             output_config,
+            tenancy_config,
             refs: refs.into_iter().collect(),
             current_account_subject,
             all,
@@ -77,7 +78,6 @@ impl PullCommand {
             add_aliases,
             force,
             reset_derivatives_on_diverged_input,
-            in_multi_tenant_mode,
         }
     }
 
@@ -102,10 +102,11 @@ impl PullCommand {
                 vec![PullRequest::remote(
                     remote_ref,
                     Some(DatasetAlias::new(
-                        if self.in_multi_tenant_mode {
-                            Some(self.current_account_subject.account_name().clone())
-                        } else {
-                            None
+                        match self.tenancy_config {
+                            TenancyConfig::MultiTenant => {
+                                Some(self.current_account_subject.account_name().clone())
+                            }
+                            TenancyConfig::SingleTenant => None,
                         },
                         local_name.clone(),
                     )),
@@ -131,7 +132,7 @@ impl PullCommand {
                 self.search_svc.clone(),
                 self.refs.clone(),
                 current_account_name,
-                self.in_multi_tenant_mode,
+                self.tenancy_config,
             )
             .try_collect()
             .await?
@@ -141,7 +142,11 @@ impl PullCommand {
 
         let requests = dataset_any_refs
             .into_iter()
-            .map(|r| PullRequest::from_any_ref(&r, |_| !self.in_multi_tenant_mode))
+            .map(|r| {
+                PullRequest::from_any_ref(&r, |_| {
+                    self.tenancy_config == TenancyConfig::SingleTenant
+                })
+            })
             .collect();
 
         // TODO: consider moving this logic into pull planner
@@ -184,8 +189,7 @@ impl PullCommand {
     }
 
     async fn pull_with_progress(&self) -> Result<Vec<PullResponse>, CLIError> {
-        let pull_progress =
-            PrettyPullProgress::new(self.fetch_uncacheable, self.in_multi_tenant_mode);
+        let pull_progress = PrettyPullProgress::new(self.fetch_uncacheable, self.tenancy_config);
         let listener = Arc::new(pull_progress.clone());
         self.pull(Some(listener)).await
     }
@@ -302,15 +306,15 @@ impl Command for PullCommand {
 struct PrettyPullProgress {
     multi_progress: Arc<indicatif::MultiProgress>,
     fetch_uncacheable: bool,
-    multi_tenant_workspace: bool,
+    tenancy_config: TenancyConfig,
 }
 
 impl PrettyPullProgress {
-    fn new(fetch_uncacheable: bool, multi_tenant_workspace: bool) -> Self {
+    fn new(fetch_uncacheable: bool, tenancy_config: TenancyConfig) -> Self {
         Self {
             multi_progress: Arc::new(indicatif::MultiProgress::new()),
             fetch_uncacheable,
-            multi_tenant_workspace,
+            tenancy_config,
         }
     }
 }
@@ -361,7 +365,7 @@ impl SyncMultiListener for PrettyPullProgress {
         dst: &DatasetRefAny,
     ) -> Option<Arc<dyn SyncListener>> {
         Some(Arc::new(PrettySyncProgress::new(
-            dst.as_local_ref(|_| !self.multi_tenant_workspace)
+            dst.as_local_ref(|_| self.tenancy_config == TenancyConfig::SingleTenant)
                 .expect("Expected local ref"),
             src.as_remote_ref(|_| true).expect("Expected remote ref"),
             self.multi_progress.clone(),

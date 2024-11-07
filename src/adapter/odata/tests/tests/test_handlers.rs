@@ -346,11 +346,8 @@ impl TestHarness {
                 .add_value(CurrentAccountSubject::new_test())
                 .add_value(dataset_action_authorizer)
                 .bind::<dyn auth::DatasetActionAuthorizer, TDatasetAuthorizer>()
-                .add_builder(
-                    DatasetRepositoryLocalFs::builder()
-                        .with_root(datasets_dir)
-                        .with_multi_tenant(false),
-                )
+                .add_value(TenancyConfig::SingleTenant)
+                .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
                 .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
                 .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
                 .add::<DatasetRegistryRepoBridge>()
@@ -371,7 +368,8 @@ impl TestHarness {
 
         let push_ingest_svc = catalog.get_one::<dyn PushIngestService>().unwrap();
 
-        let api_server = TestAPIServer::new(catalog.clone(), None, None, false).await;
+        let api_server =
+            TestAPIServer::new(catalog.clone(), None, None, TenancyConfig::SingleTenant).await;
 
         Self {
             temp_dir,

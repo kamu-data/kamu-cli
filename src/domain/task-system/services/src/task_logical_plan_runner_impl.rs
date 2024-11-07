@@ -21,7 +21,7 @@ use kamu_task_system::*;
 
 pub struct TaskLogicalPlanRunnerImpl {
     catalog: Catalog,
-    in_multi_tenant_mode: bool,
+    tenancy_config: Arc<TenancyConfig>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -29,10 +29,10 @@ pub struct TaskLogicalPlanRunnerImpl {
 #[component(pub)]
 #[interface(dyn TaskLogicalPlanRunner)]
 impl TaskLogicalPlanRunnerImpl {
-    pub fn new(catalog: Catalog, in_multi_tenant_mode: bool) -> Self {
+    pub fn new(catalog: Catalog, tenancy_config: Arc<TenancyConfig>) -> Self {
         Self {
             catalog,
-            in_multi_tenant_mode,
+            tenancy_config,
         }
     }
 
@@ -178,7 +178,7 @@ impl TaskLogicalPlanRunnerImpl {
             .build_pull_plan(
                 PullRequest::local(args.dataset_id.as_local_ref()),
                 &pull_options,
-                self.in_multi_tenant_mode,
+                *self.tenancy_config,
             )
             .await;
 

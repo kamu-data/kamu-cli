@@ -18,6 +18,7 @@ use kamu_accounts::DUMMY_ACCESS_TOKEN;
 use kamu_adapter_http::smart_protocol::messages::{self, SMART_TRANSFER_PROTOCOL_VERSION};
 use kamu_adapter_http::smart_protocol::protocol_dataset_helper::*;
 use kamu_adapter_http::{BearerHeader, OdfSmtpVersion};
+use kamu_core::TenancyConfig;
 use opendatafabric::{DatasetID, DatasetKind, Multihash};
 use url::Url;
 
@@ -35,7 +36,7 @@ use crate::harness::{
 #[test_log::test(tokio::test)]
 async fn test_object_url_local_fs() {
     let server_harness = ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
-        multi_tenant: false,
+        tenancy_config: TenancyConfig::SingleTenant,
         authorized_writes: true,
         base_catalog: None,
     })
@@ -254,7 +255,7 @@ async fn test_object_url_local_fs() {
 #[test_log::test(tokio::test)]
 async fn test_pull_object_url_s3() {
     let server_harness = ServerSideS3Harness::new(ServerSideHarnessOptions {
-        multi_tenant: false,
+        tenancy_config: TenancyConfig::SingleTenant,
         authorized_writes: true,
         base_catalog: None,
     })

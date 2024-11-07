@@ -61,10 +61,9 @@ async fn setup_dataset(
         .add_value(ipfs_gateway)
         .add_value(ipfs_client)
         .add_value(CurrentAccountSubject::new_test())
+        .add_value(TenancyConfig::SingleTenant)
         .add_builder(
-            DatasetRepositoryLocalFs::builder()
-                .with_root(tmp_workspace_dir.join("datasets"))
-                .with_multi_tenant(false),
+            DatasetRepositoryLocalFs::builder().with_root(tmp_workspace_dir.join("datasets")),
         )
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
         .add::<DatasetRegistryRepoBridge>()

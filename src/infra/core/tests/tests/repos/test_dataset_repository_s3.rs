@@ -19,7 +19,7 @@ use kamu::{
     S3RegistryCache,
 };
 use kamu_accounts::{CurrentAccountSubject, DEFAULT_ACCOUNT_NAME};
-use kamu_core::{CreateDatasetFromSnapshotUseCase, DatasetRepository};
+use kamu_core::{CreateDatasetFromSnapshotUseCase, DatasetRepository, TenancyConfig};
 use messaging_outbox::{Outbox, OutboxImmediateImpl};
 use time_source::SystemTimeSourceDefault;
 
@@ -34,7 +34,11 @@ struct S3RepoHarness {
 }
 
 impl S3RepoHarness {
-    pub async fn create(s3: &LocalS3Server, multi_tenant: bool, registry_caching: bool) -> Self {
+    pub async fn create(
+        s3: &LocalS3Server,
+        tenancy_config: TenancyConfig,
+        registry_caching: bool,
+    ) -> Self {
         let s3_context = S3Context::from_url(&s3.url).await;
 
         let mut b = dill::CatalogBuilder::new();
@@ -46,11 +50,8 @@ impl S3RepoHarness {
             )
             .bind::<dyn Outbox, OutboxImmediateImpl>()
             .add_value(CurrentAccountSubject::new_test())
-            .add_builder(
-                DatasetRepositoryS3::builder()
-                    .with_s3_context(s3_context)
-                    .with_multi_tenant(multi_tenant),
-            )
+            .add_value(tenancy_config)
+            .add_builder(DatasetRepositoryS3::builder().with_s3_context(s3_context))
             .bind::<dyn DatasetRepository, DatasetRepositoryS3>()
             .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryS3>()
             .add::<CreateDatasetFromSnapshotUseCaseImpl>();
@@ -79,7 +80,7 @@ impl S3RepoHarness {
 #[tokio::test]
 async fn test_create_dataset() {
     let s3 = LocalS3Server::new().await;
-    let harness = S3RepoHarness::create(&s3, false, false).await;
+    let harness = S3RepoHarness::create(&s3, TenancyConfig::SingleTenant, false).await;
 
     test_dataset_repository_shared::test_create_dataset(harness.dataset_repo.as_ref(), None).await;
 }
@@ -90,7 +91,7 @@ async fn test_create_dataset() {
 #[tokio::test]
 async fn test_create_dataset_multi_tenant() {
     let s3 = LocalS3Server::new().await;
-    let harness = S3RepoHarness::create(&s3, true, false).await;
+    let harness = S3RepoHarness::create(&s3, TenancyConfig::MultiTenant, false).await;
 
     test_dataset_repository_shared::test_create_dataset(
         harness.dataset_repo.as_ref(),
@@ -105,7 +106,7 @@ async fn test_create_dataset_multi_tenant() {
 #[tokio::test]
 async fn test_create_dataset_multi_tenant_with_caching() {
     let s3 = LocalS3Server::new().await;
-    let harness = S3RepoHarness::create(&s3, true, true).await;
+    let harness = S3RepoHarness::create(&s3, TenancyConfig::MultiTenant, true).await;
 
     test_dataset_repository_shared::test_create_dataset(
         harness.dataset_repo.as_ref(),
@@ -120,7 +121,7 @@ async fn test_create_dataset_multi_tenant_with_caching() {
 #[tokio::test]
 async fn test_create_dataset_same_name_multiple_tenants() {
     let s3 = LocalS3Server::new().await;
-    let harness = S3RepoHarness::create(&s3, true, false).await;
+    let harness = S3RepoHarness::create(&s3, TenancyConfig::MultiTenant, false).await;
 
     test_dataset_repository_shared::test_create_dataset_same_name_multiple_tenants(
         harness.dataset_repo.as_ref(),
@@ -135,7 +136,7 @@ async fn test_create_dataset_same_name_multiple_tenants() {
 #[tokio::test]
 async fn test_create_dataset_from_snapshot() {
     let s3 = LocalS3Server::new().await;
-    let harness = S3RepoHarness::create(&s3, false, false).await;
+    let harness = S3RepoHarness::create(&s3, TenancyConfig::SingleTenant, false).await;
 
     test_dataset_repository_shared::test_create_dataset_from_snapshot(
         harness.dataset_repo.as_ref(),
@@ -150,7 +151,7 @@ async fn test_create_dataset_from_snapshot() {
 #[tokio::test]
 async fn test_create_dataset_from_snapshot_multi_tenant() {
     let s3 = LocalS3Server::new().await;
-    let harness = S3RepoHarness::create(&s3, true, false).await;
+    let harness = S3RepoHarness::create(&s3, TenancyConfig::MultiTenant, false).await;
 
     test_dataset_repository_shared::test_create_dataset_from_snapshot(
         harness.dataset_repo.as_ref(),
@@ -165,7 +166,7 @@ async fn test_create_dataset_from_snapshot_multi_tenant() {
 #[tokio::test]
 async fn test_rename_dataset() {
     let s3 = LocalS3Server::new().await;
-    let harness = S3RepoHarness::create(&s3, false, false).await;
+    let harness = S3RepoHarness::create(&s3, TenancyConfig::SingleTenant, false).await;
 
     test_dataset_repository_shared::test_rename_dataset(harness.dataset_repo.as_ref(), None).await;
 }
@@ -176,7 +177,7 @@ async fn test_rename_dataset() {
 #[tokio::test]
 async fn test_rename_dataset_multi_tenant() {
     let s3 = LocalS3Server::new().await;
-    let harness = S3RepoHarness::create(&s3, true, false).await;
+    let harness = S3RepoHarness::create(&s3, TenancyConfig::MultiTenant, false).await;
 
     test_dataset_repository_shared::test_rename_dataset(
         harness.dataset_repo.as_ref(),
@@ -191,7 +192,7 @@ async fn test_rename_dataset_multi_tenant() {
 #[tokio::test]
 async fn test_rename_dataset_multi_tenant_with_caching() {
     let s3 = LocalS3Server::new().await;
-    let harness = S3RepoHarness::create(&s3, true, true).await;
+    let harness = S3RepoHarness::create(&s3, TenancyConfig::MultiTenant, true).await;
 
     test_dataset_repository_shared::test_rename_dataset(
         harness.dataset_repo.as_ref(),
@@ -206,7 +207,7 @@ async fn test_rename_dataset_multi_tenant_with_caching() {
 #[tokio::test]
 async fn test_rename_dataset_same_name_multiple_tenants() {
     let s3 = LocalS3Server::new().await;
-    let harness = S3RepoHarness::create(&s3, true, false).await;
+    let harness = S3RepoHarness::create(&s3, TenancyConfig::MultiTenant, false).await;
 
     test_dataset_repository_shared::test_rename_dataset_same_name_multiple_tenants(
         harness.dataset_repo.as_ref(),
@@ -220,7 +221,7 @@ async fn test_rename_dataset_same_name_multiple_tenants() {
 #[tokio::test]
 async fn test_delete_dataset() {
     let s3 = LocalS3Server::new().await;
-    let harness = S3RepoHarness::create(&s3, false, false).await;
+    let harness = S3RepoHarness::create(&s3, TenancyConfig::SingleTenant, false).await;
 
     test_dataset_repository_shared::test_delete_dataset(
         harness.dataset_repo.as_ref(),
@@ -236,7 +237,7 @@ async fn test_delete_dataset() {
 #[tokio::test]
 async fn test_delete_dataset_multi_tenant() {
     let s3 = LocalS3Server::new().await;
-    let harness = S3RepoHarness::create(&s3, true, false).await;
+    let harness = S3RepoHarness::create(&s3, TenancyConfig::MultiTenant, false).await;
 
     test_dataset_repository_shared::test_delete_dataset(
         harness.dataset_repo.as_ref(),
@@ -252,7 +253,7 @@ async fn test_delete_dataset_multi_tenant() {
 #[tokio::test]
 async fn test_iterate_datasets() {
     let s3 = LocalS3Server::new().await;
-    let harness = S3RepoHarness::create(&s3, false, false).await;
+    let harness = S3RepoHarness::create(&s3, TenancyConfig::SingleTenant, false).await;
 
     test_dataset_repository_shared::test_iterate_datasets(harness.dataset_repo.as_ref()).await;
 }
@@ -263,7 +264,7 @@ async fn test_iterate_datasets() {
 #[tokio::test]
 async fn test_iterate_datasets_multi_tenant() {
     let s3 = LocalS3Server::new().await;
-    let harness = S3RepoHarness::create(&s3, true, false).await;
+    let harness = S3RepoHarness::create(&s3, TenancyConfig::MultiTenant, false).await;
 
     test_dataset_repository_shared::test_iterate_datasets_multi_tenant(
         harness.dataset_repo.as_ref(),
@@ -277,7 +278,7 @@ async fn test_iterate_datasets_multi_tenant() {
 #[tokio::test]
 async fn test_create_and_get_case_insensetive_dataset() {
     let s3 = LocalS3Server::new().await;
-    let harness = S3RepoHarness::create(&s3, false, false).await;
+    let harness = S3RepoHarness::create(&s3, TenancyConfig::SingleTenant, false).await;
 
     test_dataset_repository_shared::test_create_and_get_case_insensetive_dataset(
         harness.dataset_repo.as_ref(),
@@ -292,7 +293,7 @@ async fn test_create_and_get_case_insensetive_dataset() {
 #[tokio::test]
 async fn test_create_and_get_case_insensetive_dataset_multi_tenant() {
     let s3 = LocalS3Server::new().await;
-    let harness = S3RepoHarness::create(&s3, true, false).await;
+    let harness = S3RepoHarness::create(&s3, TenancyConfig::MultiTenant, false).await;
 
     test_dataset_repository_shared::test_create_and_get_case_insensetive_dataset(
         harness.dataset_repo.as_ref(),

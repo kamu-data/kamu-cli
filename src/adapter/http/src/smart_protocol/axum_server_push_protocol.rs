@@ -237,7 +237,11 @@ impl AxumServerPushProtocolInstance {
                     ))
                     .await;
                 match create_result {
-                    Ok(create_result) => self.maybe_dataset = Some(create_result.dataset),
+                    Ok(create_result) => {
+                        self.maybe_dataset = Some(create_result.dataset);
+                        // TODO: workaround for outbox flush
+                        tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+                    }
                     Err(ref _e @ CreateDatasetError::RefCollision(ref err)) => {
                         return Err(PushServerError::RefCollision(RefCollisionError {
                             id: err.id.clone(),

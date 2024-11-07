@@ -10,6 +10,7 @@
 use chrono::Utc;
 use kamu::testing::MetadataFactory;
 use kamu_accounts::DUMMY_ACCESS_TOKEN;
+use kamu_core::TenancyConfig;
 use opendatafabric::{DatasetAlias, DatasetID, DatasetKind, DatasetName};
 use serde_json::json;
 
@@ -19,7 +20,7 @@ use crate::harness::*;
 
 #[test_log::test(tokio::test)]
 async fn test_get_dataset_info_by_id() {
-    let harness = DatasetInfoHarness::new(false).await;
+    let harness = DatasetInfoHarness::new(TenancyConfig::SingleTenant).await;
 
     let dataset_alias = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
     let create_result = harness
@@ -67,7 +68,7 @@ async fn test_get_dataset_info_by_id() {
 
 #[test_log::test(tokio::test)]
 async fn test_get_dataset_info_by_id_not_found_err() {
-    let harness = DatasetInfoHarness::new(false).await;
+    let harness = DatasetInfoHarness::new(TenancyConfig::SingleTenant).await;
 
     let client = async move {
         let cl = reqwest::Client::new();
@@ -100,9 +101,9 @@ struct DatasetInfoHarness {
 }
 
 impl DatasetInfoHarness {
-    async fn new(is_multi_tenant: bool) -> Self {
+    async fn new(tenancy_config: TenancyConfig) -> Self {
         let server_harness = ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
-            multi_tenant: is_multi_tenant,
+            tenancy_config,
             authorized_writes: true,
             base_catalog: None,
         })

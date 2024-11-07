@@ -18,22 +18,22 @@ use super::{CLIError, Command};
 pub struct SetWatermarkCommand {
     dataset_registry: Arc<dyn DatasetRegistry>,
     set_watermark_use_case: Arc<dyn SetWatermarkUseCase>,
+    tenancy_config: TenancyConfig,
     refs: Vec<DatasetRefAnyPattern>,
     all: bool,
     recursive: bool,
     watermark: String,
-    in_multi_tenant_mode: bool,
 }
 
 impl SetWatermarkCommand {
     pub fn new<I, S>(
         dataset_registry: Arc<dyn DatasetRegistry>,
         set_watermark_use_case: Arc<dyn SetWatermarkUseCase>,
+        tenancy_config: TenancyConfig,
         refs: I,
         all: bool,
         recursive: bool,
         watermark: S,
-        in_multi_tenant_mode: bool,
     ) -> Self
     where
         S: Into<String>,
@@ -42,11 +42,11 @@ impl SetWatermarkCommand {
         Self {
             dataset_registry,
             set_watermark_use_case,
+            tenancy_config,
             refs: refs.into_iter().collect(),
             all,
             recursive,
             watermark: watermark.into(),
-            in_multi_tenant_mode,
         }
     }
 }
@@ -80,7 +80,7 @@ impl Command for SetWatermarkCommand {
         let dataset_ref = self.refs[0]
             .as_dataset_ref_any()
             .unwrap()
-            .as_local_ref(|_| !self.in_multi_tenant_mode)
+            .as_local_ref(|_| self.tenancy_config == TenancyConfig::SingleTenant)
             .map_err(|_| CLIError::usage_error("Expected a local dataset reference"))?;
 
         let dataset_handle = self

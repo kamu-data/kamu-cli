@@ -35,7 +35,7 @@ use kamu_accounts_services::{
     LoginPasswordAuthProvider,
     PredefinedAccountsRegistrator,
 };
-use kamu_core::{DatasetOwnershipService, DatasetRepository};
+use kamu_core::{DatasetOwnershipService, DatasetRepository, TenancyConfig};
 use opendatafabric::{AccountID, AccountName, DatasetAlias, DatasetID, DatasetKind, DatasetName};
 use tempfile::TempDir;
 use time_source::SystemTimeSourceDefault;
@@ -44,7 +44,7 @@ use time_source::SystemTimeSourceDefault;
 
 #[test_log::test(tokio::test)]
 async fn test_multi_tenant_dataset_owners() {
-    let mut harness = DatasetOwnershipHarness::new(true).await;
+    let mut harness = DatasetOwnershipHarness::new(TenancyConfig::MultiTenant).await;
 
     harness.create_multi_tenant_datasets().await;
     harness.eager_initialization().await;
@@ -95,7 +95,7 @@ struct DatasetOwnershipHarness {
 }
 
 impl DatasetOwnershipHarness {
-    async fn new(multi_tenant: bool) -> Self {
+    async fn new(tenancy_config: TenancyConfig) -> Self {
         let workdir = tempfile::tempdir().unwrap();
         let datasets_dir = workdir.path().join("datasets");
         std::fs::create_dir(&datasets_dir).unwrap();
@@ -115,11 +115,8 @@ impl DatasetOwnershipHarness {
             let mut b = dill::CatalogBuilder::new();
 
             b.add::<SystemTimeSourceDefault>()
-                .add_builder(
-                    DatasetRepositoryLocalFs::builder()
-                        .with_root(datasets_dir)
-                        .with_multi_tenant(multi_tenant),
-                )
+                .add_value(tenancy_config)
+                .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
                 .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
                 .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
                 .add::<DatasetRegistryRepoBridge>()

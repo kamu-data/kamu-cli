@@ -33,7 +33,7 @@ pub struct PullDatasetUseCaseImpl {
     transform_elaboration_svc: Arc<dyn TransformElaborationService>,
     transform_execution_svc: Arc<dyn TransformExecutionService>,
     sync_svc: Arc<dyn SyncService>,
-    in_multi_tenant_mode: bool,
+    tenancy_config: Arc<TenancyConfig>,
 }
 
 impl PullDatasetUseCaseImpl {
@@ -45,7 +45,7 @@ impl PullDatasetUseCaseImpl {
         transform_elaboration_svc: Arc<dyn TransformElaborationService>,
         transform_execution_svc: Arc<dyn TransformExecutionService>,
         sync_svc: Arc<dyn SyncService>,
-        in_multi_tenant_mode: bool,
+        tenancy_config: Arc<TenancyConfig>,
     ) -> Self {
         Self {
             pull_request_planner,
@@ -55,7 +55,7 @@ impl PullDatasetUseCaseImpl {
             transform_elaboration_svc,
             transform_execution_svc,
             sync_svc,
-            in_multi_tenant_mode,
+            tenancy_config,
         }
     }
 
@@ -347,7 +347,7 @@ impl PullDatasetUseCase for PullDatasetUseCaseImpl {
 
         let (plan, errors) = self
             .pull_request_planner
-            .build_pull_multi_plan(&requests, &options, self.in_multi_tenant_mode)
+            .build_pull_multi_plan(&requests, &options, *self.tenancy_config)
             .await;
 
         tracing::info!(

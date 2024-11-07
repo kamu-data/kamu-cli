@@ -34,11 +34,8 @@ async fn test_verify_data_consistency() {
     let catalog = dill::CatalogBuilder::new()
         .add::<SystemTimeSourceDefault>()
         .add_value(CurrentAccountSubject::new_test())
-        .add_builder(
-            DatasetRepositoryLocalFs::builder()
-                .with_root(datasets_dir)
-                .with_multi_tenant(false),
-        )
+        .add_value(TenancyConfig::SingleTenant)
+        .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
         .add::<DatasetRegistryRepoBridge>()
         .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()

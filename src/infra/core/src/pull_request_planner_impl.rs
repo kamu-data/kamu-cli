@@ -57,7 +57,7 @@ impl PullRequestPlannerImpl {
         &self,
         requests: &[PullRequest],
         options: &PullOptions,
-        in_multi_tenant_mode: bool,
+        tenancy_config: TenancyConfig,
     ) -> (Vec<PullItem>, Vec<PullResponse>) {
         let mut errors = Vec::new();
 
@@ -66,7 +66,7 @@ impl PullRequestPlannerImpl {
             self.remote_alias_registry.clone(),
             self.current_account_subject.clone(),
             options,
-            in_multi_tenant_mode,
+            tenancy_config,
         );
 
         for pr in requests {
@@ -99,14 +99,14 @@ impl PullRequestPlannerImpl {
         &self,
         request: &PullRequest,
         options: &PullOptions,
-        in_multi_tenant_mode: bool,
+        tenancy_config: TenancyConfig,
     ) -> (Vec<PullItem>, Vec<PullResponse>) {
         let mut depth_first_traversal = PullGraphDepthFirstTraversal::new(
             self.dataset_registry.clone(),
             self.remote_alias_registry.clone(),
             self.current_account_subject.clone(),
             options,
-            in_multi_tenant_mode,
+            tenancy_config,
         );
 
         if let Err(e) = depth_first_traversal
@@ -279,10 +279,10 @@ impl PullRequestPlanner for PullRequestPlannerImpl {
         &self,
         request: PullRequest,
         options: &PullOptions,
-        in_multi_tenant_mode: bool,
+        tenancy_config: TenancyConfig,
     ) -> Result<PullPlanIterationJob, PullResponse> {
         let (mut plan, mut errors) = self
-            .build_pull_multi_plan(&[request], options, in_multi_tenant_mode)
+            .build_pull_multi_plan(&[request], options, tenancy_config)
             .await;
         assert!(plan.len() == 1 && errors.is_empty() || plan.is_empty() && errors.len() == 1);
         if plan.is_empty() {
@@ -298,15 +298,15 @@ impl PullRequestPlanner for PullRequestPlannerImpl {
         &self,
         requests: &[PullRequest],
         options: &PullOptions,
-        in_multi_tenant_mode: bool,
+        tenancy_config: TenancyConfig,
     ) -> (Vec<PullPlanIteration>, Vec<PullResponse>) {
         // If there is just 1 dataset, and no recursion set, do a simplified procedure.
         // Otherwise, do a hierarchical scan trying to find relations
         let (mut plan, errors) = if requests.len() == 1 && !options.recursive {
-            self.build_single_node_pull_graph(&requests[0], options, in_multi_tenant_mode)
+            self.build_single_node_pull_graph(&requests[0], options, tenancy_config)
                 .await
         } else {
-            self.collect_pull_graph(requests, options, in_multi_tenant_mode)
+            self.collect_pull_graph(requests, options, tenancy_config)
                 .await
         };
 
@@ -378,7 +378,7 @@ struct PullGraphDepthFirstTraversal<'a> {
     remote_alias_registry: Arc<dyn RemoteAliasesRegistry>,
     current_account_subject: Arc<CurrentAccountSubject>,
     options: &'a PullOptions,
-    in_multi_tenant_mode: bool,
+    tenancy_config: TenancyConfig,
     visited: HashMap<DatasetAlias, PullItem>,
 }
 
@@ -388,14 +388,14 @@ impl<'a> PullGraphDepthFirstTraversal<'a> {
         remote_alias_registry: Arc<dyn RemoteAliasesRegistry>,
         current_account_subject: Arc<CurrentAccountSubject>,
         options: &'a PullOptions,
-        in_multi_tenant_mode: bool,
+        tenancy_config: TenancyConfig,
     ) -> Self {
         Self {
             dataset_registry,
             remote_alias_registry,
             current_account_subject,
             options,
-            in_multi_tenant_mode,
+            tenancy_config,
             visited: HashMap::new(),
         }
     }
@@ -635,7 +635,7 @@ impl<'a> PullGraphDepthFirstTraversal<'a> {
             }
 
             DatasetRefRemote::Url(url) => DatasetAlias::new(
-                if self.in_multi_tenant_mode {
+                if self.tenancy_config == TenancyConfig::MultiTenant {
                     Some(self.current_account_subject.account_name().clone())
                 } else {
                     None

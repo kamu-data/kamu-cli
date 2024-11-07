@@ -55,7 +55,7 @@ pub(crate) struct ClientSideHarness {
 }
 
 pub(crate) struct ClientSideHarnessOptions {
-    pub multi_tenant: bool,
+    pub tenancy_config: TenancyConfig,
     pub authenticated_remotely: bool,
 }
 
@@ -98,14 +98,12 @@ impl ClientSideHarness {
 
         b.add::<SystemTimeSourceDefault>();
 
-        b.add_builder(
-            DatasetRepositoryLocalFs::builder()
-                .with_root(datasets_dir)
-                .with_multi_tenant(options.multi_tenant),
-        )
-        .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-        .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
-        .add::<DatasetRegistryRepoBridge>();
+        b.add_value(options.tenancy_config);
+
+        b.add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
+            .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+            .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
+            .add::<DatasetRegistryRepoBridge>();
 
         b.add::<RemoteRepositoryRegistryImpl>();
 
@@ -146,12 +144,8 @@ impl ClientSideHarness {
         b.add::<CreateDatasetFromSnapshotUseCaseImpl>();
         b.add::<CommitDatasetEventUseCaseImpl>();
         b.add::<CreateDatasetUseCaseImpl>();
+        b.add::<PullDatasetUseCaseImpl>();
         b.add::<PushDatasetUseCaseImpl>();
-
-        b.add_builder(
-            PullDatasetUseCaseImpl::builder().with_in_multi_tenant_mode(options.multi_tenant),
-        )
-        .bind::<dyn PullDatasetUseCase, PullDatasetUseCaseImpl>();
 
         b.add_value(ContainerRuntime::default());
         b.add_value(kamu::utils::ipfs_wrapper::IpfsClient::default());
@@ -178,7 +172,9 @@ impl ClientSideHarness {
     }
 
     pub fn operating_account_name(&self) -> Option<AccountName> {
-        if self.options.multi_tenant && self.options.authenticated_remotely {
+        if self.options.tenancy_config == TenancyConfig::MultiTenant
+            && self.options.authenticated_remotely
+        {
             Some(AccountName::new_unchecked(CLIENT_ACCOUNT_NAME))
         } else {
             None
@@ -207,12 +203,12 @@ impl ClientSideHarness {
 
     // TODO: accept alias or handle
     pub fn dataset_layout(&self, dataset_id: &DatasetID, dataset_name: &str) -> DatasetLayout {
-        let root_path = if self.options.multi_tenant {
-            self.internal_datasets_folder_path()
+        let root_path = match self.options.tenancy_config {
+            TenancyConfig::MultiTenant => self
+                .internal_datasets_folder_path()
                 .join(CLIENT_ACCOUNT_NAME)
-                .join(dataset_id.as_multibase().to_stack_string())
-        } else {
-            self.internal_datasets_folder_path().join(dataset_name)
+                .join(dataset_id.as_multibase().to_stack_string()),
+            TenancyConfig::SingleTenant => self.internal_datasets_folder_path().join(dataset_name),
         };
         DatasetLayout::new(root_path.as_path())
     }
@@ -225,7 +221,7 @@ impl ClientSideHarness {
         self.pull_dataset_use_case
             .execute_multi(
                 vec![PullRequest::from_any_ref(&dataset_ref, |_| {
-                    !self.options.multi_tenant
+                    self.options.tenancy_config == TenancyConfig::SingleTenant
                 })],
                 PullOptions {
                     sync_options: SyncOptions {

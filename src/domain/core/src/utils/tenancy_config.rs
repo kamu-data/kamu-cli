@@ -7,16 +7,18 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use dill::CatalogBuilder;
-
-use crate::*;
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn register_dependencies(catalog_builder: &mut CatalogBuilder) {
-    catalog_builder.add::<TaskExecutorImpl>();
-    catalog_builder.add::<TaskSchedulerImpl>();
-    catalog_builder.add::<TaskLogicalPlanRunnerImpl>();
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub enum TenancyConfig {
+    SingleTenant,
+    MultiTenant,
+}
+
+impl Default for TenancyConfig {
+    fn default() -> Self {
+        Self::SingleTenant
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

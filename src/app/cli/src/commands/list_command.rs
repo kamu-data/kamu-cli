@@ -27,8 +27,8 @@ pub struct ListCommand {
     current_account: accounts::CurrentAccountIndication,
     related_account: accounts::RelatedAccountIndication,
     output_config: Arc<OutputConfig>,
+    tenancy_config: TenancyConfig,
     detail_level: u8,
-    in_multi_tenant_mode: bool,
 }
 
 impl ListCommand {
@@ -38,8 +38,8 @@ impl ListCommand {
         current_account: accounts::CurrentAccountIndication,
         related_account: accounts::RelatedAccountIndication,
         output_config: Arc<OutputConfig>,
+        tenancy_config: TenancyConfig,
         detail_level: u8,
-        in_multi_tenant_mode: bool,
     ) -> Self {
         Self {
             dataset_registry,
@@ -47,8 +47,8 @@ impl ListCommand {
             current_account,
             related_account,
             output_config,
+            tenancy_config,
             detail_level,
-            in_multi_tenant_mode,
         }
     }
 
@@ -180,8 +180,8 @@ impl ListCommand {
     }
 
     fn stream_datasets(&self) -> DatasetHandleStream {
-        if self.in_multi_tenant_mode {
-            match &self.related_account.target_account {
+        match self.tenancy_config {
+            TenancyConfig::MultiTenant => match &self.related_account.target_account {
                 accounts::TargetAccountSelection::Current => self
                     .dataset_registry
                     .all_dataset_handles_by_owner(&self.current_account.account_name),
@@ -193,9 +193,8 @@ impl ListCommand {
                 accounts::TargetAccountSelection::AllUsers => {
                     self.dataset_registry.all_dataset_handles()
                 }
-            }
-        } else {
-            self.dataset_registry.all_dataset_handles()
+            },
+            TenancyConfig::SingleTenant => self.dataset_registry.all_dataset_handles(),
         }
     }
 }
@@ -212,7 +211,7 @@ impl Command for ListCommand {
         use datafusion::arrow::datatypes::Schema;
         use datafusion::arrow::record_batch::RecordBatch;
 
-        let show_owners = if self.in_multi_tenant_mode {
+        let show_owners = if self.tenancy_config == TenancyConfig::MultiTenant {
             self.current_account.is_explicit() || self.related_account.is_explicit()
         } else if self.related_account.is_explicit() {
             return Err(CLIError::usage_error_from(NotInMultiTenantWorkspace));

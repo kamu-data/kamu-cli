@@ -2017,7 +2017,7 @@ async fn test_manual_trigger_keep_metadata_only_compaction_multiple_accounts() {
     let petya_account_name = AccountName::new_unchecked("petya");
 
     let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
-        is_multi_tenant: true,
+        tenancy_config: TenancyConfig::MultiTenant,
         custom_account_names: vec![wasya_account_name.clone(), petya_account_name.clone()],
         ..Default::default()
     })
@@ -5340,7 +5340,7 @@ async fn test_list_all_flow_initiators() {
 
     let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
         custom_account_names: vec![foo_account_name.clone(), bar_account_name.clone()],
-        is_multi_tenant: true,
+        tenancy_config: TenancyConfig::MultiTenant,
         ..Default::default()
     })
     .await;
@@ -5490,7 +5490,7 @@ async fn test_list_all_datasets_with_flow() {
 
     let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
         custom_account_names: vec![foo_account_name.clone(), bar_account_name.clone()],
-        is_multi_tenant: true,
+        tenancy_config: TenancyConfig::MultiTenant,
         ..Default::default()
     })
     .await;

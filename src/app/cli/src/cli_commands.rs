@@ -9,6 +9,7 @@
 
 use clap::CommandFactory as _;
 use dill::Catalog;
+use kamu::domain::TenancyConfig;
 use kamu_accounts::CurrentAccountSubject;
 use opendatafabric::*;
 
@@ -23,6 +24,11 @@ pub fn get_command(
     args: cli::Cli,
 ) -> Result<Box<dyn Command>, CLIError> {
     let workspace_svc = cli_catalog.get_one::<WorkspaceService>()?;
+    let tenancy_config = if workspace_svc.is_multi_tenant_workspace() {
+        TenancyConfig::MultiTenant
+    } else {
+        TenancyConfig::SingleTenant
+    };
 
     let command: Box<dyn Command> = match args.command {
         cli::Command::Add(c) => Box::new(AddCommand::new(
@@ -38,7 +44,7 @@ pub fn get_command(
             c.stdin,
             c.visibility.into(),
             cli_catalog.get_one()?,
-            workspace_svc.is_multi_tenant_workspace(),
+            tenancy_config,
         )),
         cli::Command::Complete(c) => {
             let in_workspace =
@@ -124,7 +130,7 @@ pub fn get_command(
                     cli_catalog.get_one()?,
                     cli_catalog.get_one()?,
                     c.exists_ok,
-                    c.multi_tenant,
+                    tenancy_config,
                 ))
             }
         }
@@ -159,7 +165,7 @@ pub fn get_command(
                 cli_catalog.get_one()?,
                 accounts::AccountService::current_account_indication(
                     args.account,
-                    workspace_svc.is_multi_tenant_workspace(),
+                    tenancy_config,
                     user_config.as_ref(),
                 ),
                 accounts::AccountService::related_account_indication(
@@ -167,8 +173,8 @@ pub fn get_command(
                     c.all_accounts,
                 ),
                 cli_catalog.get_one()?,
+                tenancy_config,
                 c.wide,
-                workspace_svc.is_multi_tenant_workspace(),
             ))
         }
         cli::Command::Log(c) => Box::new(LogCommand::new(
@@ -256,11 +262,11 @@ pub fn get_command(
                 Box::new(SetWatermarkCommand::new(
                     cli_catalog.get_one()?,
                     cli_catalog.get_one()?,
+                    tenancy_config,
                     c.dataset.unwrap_or_default(),
                     c.all,
                     c.recursive,
                     set_watermark,
-                    workspace_svc.is_multi_tenant_workspace(),
                 ))
             } else {
                 Box::new(PullCommand::new(
@@ -268,6 +274,7 @@ pub fn get_command(
                     cli_catalog.get_one()?,
                     cli_catalog.get_one()?,
                     cli_catalog.get_one()?,
+                    tenancy_config,
                     c.dataset.unwrap_or_default(),
                     cli_catalog.get_one()?,
                     c.all,
@@ -277,7 +284,6 @@ pub fn get_command(
                     !c.no_alias,
                     c.force,
                     c.reset_derivatives_on_diverged_input,
-                    workspace_svc.is_multi_tenant_workspace(),
                 ))
             }
         }
@@ -292,7 +298,7 @@ pub fn get_command(
             c.to,
             c.visibility.into(),
             cli_catalog.get_one()?,
-            workspace_svc.is_multi_tenant_workspace(),
+            tenancy_config,
         )),
         cli::Command::Rename(c) => Box::new(RenameCommand::new(
             cli_catalog.get_one()?,
@@ -405,7 +411,7 @@ pub fn get_command(
                 None => Box::new(APIServerRunCommand::new(
                     base_catalog.clone(),
                     cli_catalog.clone(),
-                    workspace_svc.is_multi_tenant_workspace(),
+                    tenancy_config,
                     cli_catalog.get_one()?,
                     sc.address,
                     sc.http_port,
@@ -492,7 +498,7 @@ pub fn get_command(
 
             Box::new(UICommand::new(
                 base_catalog.clone(),
-                workspace_svc.is_multi_tenant_workspace(),
+                tenancy_config,
                 current_account_name,
                 cli_catalog.get_one()?,
                 cli_catalog.get_one()?,

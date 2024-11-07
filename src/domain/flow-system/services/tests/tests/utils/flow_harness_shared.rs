@@ -76,7 +76,7 @@ pub(crate) struct FlowHarnessOverrides {
     pub mandatory_throttling_period: Option<Duration>,
     pub mock_dataset_changes: Option<MockDatasetChangesService>,
     pub custom_account_names: Vec<AccountName>,
-    pub is_multi_tenant: bool,
+    pub tenancy_config: TenancyConfig,
 }
 
 impl FlowHarness {
@@ -150,11 +150,8 @@ impl FlowHarness {
             .add::<InMemoryFlowConfigurationEventStore>()
             .add_value(fake_system_time_source.clone())
             .bind::<dyn SystemTimeSource, FakeSystemTimeSource>()
-            .add_builder(
-                DatasetRepositoryLocalFs::builder()
-                    .with_root(datasets_dir)
-                    .with_multi_tenant(overrides.is_multi_tenant),
-            )
+            .add_value(overrides.tenancy_config)
+            .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
             .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
             .add::<DatasetRegistryRepoBridge>()

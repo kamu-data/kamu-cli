@@ -247,11 +247,8 @@ async fn test_engine_io_local_file_mount() {
         .add::<kamu_core::auth::AlwaysHappyDatasetActionAuthorizer>()
         .add::<DatasetKeyValueServiceSysEnv>()
         .add_value(CurrentAccountSubject::new_test())
-        .add_builder(
-            DatasetRepositoryLocalFs::builder()
-                .with_root(datasets_dir)
-                .with_multi_tenant(false),
-        )
+        .add_value(TenancyConfig::SingleTenant)
+        .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
         .build();
 
@@ -290,11 +287,8 @@ async fn test_engine_io_s3_to_local_file_mount_proxy() {
         .add::<SystemTimeSourceDefault>()
         .add::<kamu_core::auth::AlwaysHappyDatasetActionAuthorizer>()
         .add_value(CurrentAccountSubject::new_test())
-        .add_builder(
-            DatasetRepositoryS3::builder()
-                .with_s3_context(s3_context.clone())
-                .with_multi_tenant(false),
-        )
+        .add_value(TenancyConfig::SingleTenant)
+        .add_builder(DatasetRepositoryS3::builder().with_s3_context(s3_context.clone()))
         .bind::<dyn DatasetRepository, DatasetRepositoryS3>()
         .build();
 

@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use kamu_core::TenancyConfig;
 use serde_json::json;
 
 use crate::harness::*;
@@ -15,7 +16,7 @@ use crate::harness::*;
 
 #[test_log::test(tokio::test)]
 async fn test_node_info_single_tenant() {
-    let harness = NodeInfoHarness::new(false).await;
+    let harness = NodeInfoHarness::new(TenancyConfig::SingleTenant).await;
 
     let client = async move {
         let cl = reqwest::Client::new();
@@ -41,7 +42,7 @@ async fn test_node_info_single_tenant() {
 
 #[test_log::test(tokio::test)]
 async fn test_node_info_multi_tenant() {
-    let harness = NodeInfoHarness::new(true).await;
+    let harness = NodeInfoHarness::new(TenancyConfig::MultiTenant).await;
 
     let client = async move {
         let cl = reqwest::Client::new();
@@ -73,9 +74,9 @@ struct NodeInfoHarness {
 }
 
 impl NodeInfoHarness {
-    async fn new(is_multi_tenant: bool) -> Self {
+    async fn new(tenancy_config: TenancyConfig) -> Self {
         let server_harness = ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
-            multi_tenant: is_multi_tenant,
+            tenancy_config,
             authorized_writes: true,
             base_catalog: None,
         })

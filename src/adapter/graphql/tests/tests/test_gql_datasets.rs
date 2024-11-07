@@ -29,7 +29,7 @@ use crate::utils::{authentication_catalogs, expect_anonymous_access_error};
 
 #[test_log::test(tokio::test)]
 async fn dataset_by_id_does_not_exist() {
-    let harness = GraphQLDatasetsHarness::new(false).await;
+    let harness = GraphQLDatasetsHarness::new(TenancyConfig::SingleTenant).await;
     let res = harness.execute_anonymous_query(indoc!(
             r#"
             {
@@ -57,7 +57,7 @@ async fn dataset_by_id_does_not_exist() {
 
 #[test_log::test(tokio::test)]
 async fn dataset_by_id() {
-    let harness = GraphQLDatasetsHarness::new(false).await;
+    let harness = GraphQLDatasetsHarness::new(TenancyConfig::SingleTenant).await;
 
     let foo_result = harness
         .create_root_dataset(None, DatasetName::new_unchecked("foo"))
@@ -107,8 +107,11 @@ async fn dataset_by_account_and_name_case_insensitive() {
         .with(eq(account_name.clone()))
         .returning(|_| Ok(Some(Account::dummy())));
 
-    let harness =
-        GraphQLDatasetsHarness::new_custom_authentication(mock_authentication_service, true).await;
+    let harness = GraphQLDatasetsHarness::new_custom_authentication(
+        mock_authentication_service,
+        TenancyConfig::MultiTenant,
+    )
+    .await;
 
     harness
         .create_root_dataset(
@@ -160,8 +163,11 @@ async fn dataset_by_account_id() {
         .with(eq(DEFAULT_ACCOUNT_ID.clone()))
         .returning(|_| Ok(Some(DEFAULT_ACCOUNT_NAME.clone())));
 
-    let harness =
-        GraphQLDatasetsHarness::new_custom_authentication(mock_authentication_service, false).await;
+    let harness = GraphQLDatasetsHarness::new_custom_authentication(
+        mock_authentication_service,
+        TenancyConfig::SingleTenant,
+    )
+    .await;
     harness
         .create_root_dataset(None, DatasetName::new_unchecked("Foo"))
         .await;
@@ -210,7 +216,7 @@ async fn dataset_by_account_id() {
 
 #[test_log::test(tokio::test)]
 async fn dataset_create_empty() {
-    let harness = GraphQLDatasetsHarness::new(false).await;
+    let harness = GraphQLDatasetsHarness::new(TenancyConfig::SingleTenant).await;
 
     let request_code = indoc::indoc!(
         r#"
@@ -252,7 +258,7 @@ async fn dataset_create_empty() {
 
 #[test_log::test(tokio::test)]
 async fn dataset_create_from_snapshot() {
-    let harness = GraphQLDatasetsHarness::new(true).await;
+    let harness = GraphQLDatasetsHarness::new(TenancyConfig::MultiTenant).await;
 
     let snapshot = MetadataFactory::dataset_snapshot()
         .name("foo")
@@ -308,7 +314,7 @@ async fn dataset_create_from_snapshot() {
 
 #[test_log::test(tokio::test)]
 async fn dataset_create_from_snapshot_malformed() {
-    let harness = GraphQLDatasetsHarness::new(false).await;
+    let harness = GraphQLDatasetsHarness::new(TenancyConfig::SingleTenant).await;
 
     let res = harness
         .execute_authorized_query(indoc!(
@@ -342,7 +348,7 @@ async fn dataset_create_from_snapshot_malformed() {
 
 #[test_log::test(tokio::test)]
 async fn dataset_rename_success() {
-    let harness = GraphQLDatasetsHarness::new(false).await;
+    let harness = GraphQLDatasetsHarness::new(TenancyConfig::SingleTenant).await;
 
     let foo_result = harness
         .create_root_dataset(None, DatasetName::new_unchecked("foo"))
@@ -394,7 +400,7 @@ async fn dataset_rename_success() {
 
 #[test_log::test(tokio::test)]
 async fn dataset_rename_no_changes() {
-    let harness = GraphQLDatasetsHarness::new(false).await;
+    let harness = GraphQLDatasetsHarness::new(TenancyConfig::SingleTenant).await;
 
     let foo_result = harness
         .create_root_dataset(None, DatasetName::new_unchecked("foo"))
@@ -444,7 +450,7 @@ async fn dataset_rename_no_changes() {
 
 #[test_log::test(tokio::test)]
 async fn dataset_rename_name_collision() {
-    let harness = GraphQLDatasetsHarness::new(false).await;
+    let harness = GraphQLDatasetsHarness::new(TenancyConfig::SingleTenant).await;
 
     let foo_result = harness
         .create_root_dataset(None, DatasetName::new_unchecked("foo"))
@@ -497,7 +503,7 @@ async fn dataset_rename_name_collision() {
 
 #[test_log::test(tokio::test)]
 async fn dataset_delete_success() {
-    let harness = GraphQLDatasetsHarness::new(false).await;
+    let harness = GraphQLDatasetsHarness::new(TenancyConfig::SingleTenant).await;
     harness.init_dependencies_graph().await;
 
     let foo_result = harness
@@ -547,7 +553,7 @@ async fn dataset_delete_success() {
 
 #[test_log::test(tokio::test)]
 async fn dataset_delete_dangling_ref() {
-    let harness = GraphQLDatasetsHarness::new(false).await;
+    let harness = GraphQLDatasetsHarness::new(TenancyConfig::SingleTenant).await;
     harness.init_dependencies_graph().await;
 
     let foo_result = harness
@@ -605,7 +611,7 @@ async fn dataset_delete_dangling_ref() {
 
 #[test_log::test(tokio::test)]
 async fn dataset_view_permissions() {
-    let harness = GraphQLDatasetsHarness::new(false).await;
+    let harness = GraphQLDatasetsHarness::new(TenancyConfig::SingleTenant).await;
 
     let foo_result = harness
         .create_root_dataset(None, DatasetName::new_unchecked("foo"))
@@ -660,14 +666,13 @@ struct GraphQLDatasetsHarness {
 }
 
 impl GraphQLDatasetsHarness {
-    pub async fn new(is_multi_tenant: bool) -> Self {
-        Self::new_custom_authentication(MockAuthenticationService::built_in(), is_multi_tenant)
-            .await
+    pub async fn new(tenancy_config: TenancyConfig) -> Self {
+        Self::new_custom_authentication(MockAuthenticationService::built_in(), tenancy_config).await
     }
 
     pub async fn new_custom_authentication(
         mock_authentication_service: MockAuthenticationService,
-        is_multi_tenant: bool,
+        tenancy_config: TenancyConfig,
     ) -> Self {
         let tempdir = tempfile::tempdir().unwrap();
         let datasets_dir = tempdir.path().join("datasets");
@@ -686,11 +691,8 @@ impl GraphQLDatasetsHarness {
                 .add::<RenameDatasetUseCaseImpl>()
                 .add::<DeleteDatasetUseCaseImpl>()
                 .add::<DependencyGraphServiceInMemory>()
-                .add_builder(
-                    DatasetRepositoryLocalFs::builder()
-                        .with_root(datasets_dir)
-                        .with_multi_tenant(is_multi_tenant),
-                )
+                .add_value(tenancy_config)
+                .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
                 .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
                 .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
                 .add::<DatasetRegistryRepoBridge>()

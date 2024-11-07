@@ -125,11 +125,8 @@ fn create_catalog_with_local_workspace(
 
     dill::CatalogBuilder::new()
         .add::<SystemTimeSourceDefault>()
-        .add_builder(
-            DatasetRepositoryLocalFs::builder()
-                .with_root(datasets_dir)
-                .with_multi_tenant(false),
-        )
+        .add_value(TenancyConfig::SingleTenant)
+        .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
         .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
         .add::<DatasetRegistryRepoBridge>()
@@ -153,11 +150,8 @@ async fn create_catalog_with_s3_workspace(
 
     dill::CatalogBuilder::new()
         .add::<SystemTimeSourceDefault>()
-        .add_builder(
-            DatasetRepositoryS3::builder()
-                .with_s3_context(s3_context.clone())
-                .with_multi_tenant(false),
-        )
+        .add_value(TenancyConfig::SingleTenant)
+        .add_builder(DatasetRepositoryS3::builder().with_s3_context(s3_context.clone()))
         .bind::<dyn DatasetRepository, DatasetRepositoryS3>()
         .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryS3>()
         .add::<DatasetRegistryRepoBridge>()

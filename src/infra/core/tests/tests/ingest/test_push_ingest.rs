@@ -818,11 +818,8 @@ impl IngestTestHarness {
             .add_value(CacheDir::new(cache_dir))
             .add_value(CurrentAccountSubject::new_test())
             .add::<kamu_core::auth::AlwaysHappyDatasetActionAuthorizer>()
-            .add_builder(
-                DatasetRepositoryLocalFs::builder()
-                    .with_root(datasets_dir)
-                    .with_multi_tenant(false),
-            )
+            .add_value(TenancyConfig::SingleTenant)
+            .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
             .add_value(SystemTimeSourceStub::new_set(
                 Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap(),

@@ -29,6 +29,7 @@ use kamu_core::{
     GetDatasetError,
     RenameDatasetError,
     RenameDatasetUseCase,
+    TenancyConfig,
     MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
 };
 use messaging_outbox::{MockOutbox, Outbox};
@@ -136,11 +137,8 @@ impl RenameUseCaseHarness {
 
         let catalog = dill::CatalogBuilder::new()
             .add::<RenameDatasetUseCaseImpl>()
-            .add_builder(
-                DatasetRepositoryLocalFs::builder()
-                    .with_root(datasets_dir)
-                    .with_multi_tenant(false),
-            )
+            .add_value(TenancyConfig::SingleTenant)
+            .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
             .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
             .add::<DatasetRegistryRepoBridge>()

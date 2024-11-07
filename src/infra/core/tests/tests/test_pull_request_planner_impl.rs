@@ -149,7 +149,7 @@ async fn create_graph_remote(
     let remote_dataset_repo = DatasetRepositoryLocalFs::new(
         tmp_repo_dir.path().to_owned(),
         Arc::new(CurrentAccountSubject::new_test()),
-        false,
+        Arc::new(TenancyConfig::SingleTenant),
         Arc::new(SystemTimeSourceDefault),
     );
 
@@ -210,7 +210,7 @@ async fn create_graph_remote(
 #[test_log::test(tokio::test)]
 async fn test_pull_batching_chain() {
     let tmp_dir = tempfile::tempdir().unwrap();
-    let harness = PullTestHarness::new(tmp_dir.path(), false);
+    let harness = PullTestHarness::new(tmp_dir.path(), TenancyConfig::SingleTenant);
 
     // A - B - C
     create_graph(
@@ -266,7 +266,7 @@ async fn test_pull_batching_chain() {
 #[test_log::test(tokio::test)]
 async fn test_pull_batching_chain_multi_tenant() {
     let tmp_dir = tempfile::tempdir().unwrap();
-    let harness = PullTestHarness::new(tmp_dir.path(), true);
+    let harness = PullTestHarness::new(tmp_dir.path(), TenancyConfig::MultiTenant);
 
     // XA - YB - ZC
     create_graph(
@@ -322,7 +322,7 @@ async fn test_pull_batching_chain_multi_tenant() {
 #[test_log::test(tokio::test)]
 async fn test_pull_batching_complex() {
     let tmp_dir = tempfile::tempdir().unwrap();
-    let harness = PullTestHarness::new(tmp_dir.path(), false);
+    let harness = PullTestHarness::new(tmp_dir.path(), TenancyConfig::SingleTenant);
 
     //    / C \
     // A <     > > E
@@ -385,7 +385,7 @@ async fn test_pull_batching_complex() {
 #[test_log::test(tokio::test)]
 async fn test_pull_batching_complex_with_remote() {
     let tmp_dir = tempfile::tempdir().unwrap();
-    let harness = PullTestHarness::new(tmp_dir.path(), false);
+    let harness = PullTestHarness::new(tmp_dir.path(), TenancyConfig::SingleTenant);
 
     // (A) - (E) - F - G
     // (B) --/    /   /
@@ -528,7 +528,7 @@ async fn test_pull_batching_complex_with_remote() {
 #[tokio::test]
 async fn test_sync_from() {
     let tmp_ws_dir = tempfile::tempdir().unwrap();
-    let harness = PullTestHarness::new(tmp_ws_dir.path(), false);
+    let harness = PullTestHarness::new(tmp_ws_dir.path(), TenancyConfig::SingleTenant);
 
     let _remote_tmp_dir = create_graph_remote(
         "kamu.dev",
@@ -565,7 +565,7 @@ async fn test_sync_from() {
 #[tokio::test]
 async fn test_sync_from_url_and_local_ref() {
     let tmp_ws_dir = tempfile::tempdir().unwrap();
-    let harness = PullTestHarness::new(tmp_ws_dir.path(), false);
+    let harness = PullTestHarness::new(tmp_ws_dir.path(), TenancyConfig::SingleTenant);
 
     let _remote_tmp_dir = create_graph_remote(
         "kamu.dev",
@@ -602,7 +602,7 @@ async fn test_sync_from_url_and_local_ref() {
 #[tokio::test]
 async fn test_sync_from_url_and_local_multi_tenant_ref() {
     let tmp_ws_dir = tempfile::tempdir().unwrap();
-    let harness = PullTestHarness::new(tmp_ws_dir.path(), true);
+    let harness = PullTestHarness::new(tmp_ws_dir.path(), TenancyConfig::MultiTenant);
 
     let _remote_tmp_dir = create_graph_remote(
         "kamu.dev",
@@ -639,7 +639,7 @@ async fn test_sync_from_url_and_local_multi_tenant_ref() {
 #[tokio::test]
 async fn test_sync_from_url_only() {
     let tmp_ws_dir = tempfile::tempdir().unwrap();
-    let harness = PullTestHarness::new(tmp_ws_dir.path(), false);
+    let harness = PullTestHarness::new(tmp_ws_dir.path(), TenancyConfig::SingleTenant);
 
     let _remote_tmp_dir = create_graph_remote(
         "kamu.dev",
@@ -676,7 +676,7 @@ async fn test_sync_from_url_only() {
 #[tokio::test]
 async fn test_sync_from_url_only_multi_tenant_case() {
     let tmp_ws_dir = tempfile::tempdir().unwrap();
-    let harness = PullTestHarness::new(tmp_ws_dir.path(), true);
+    let harness = PullTestHarness::new(tmp_ws_dir.path(), TenancyConfig::MultiTenant);
 
     let _remote_tmp_dir = create_graph_remote(
         "kamu.dev",
@@ -716,11 +716,11 @@ struct PullTestHarness {
     remote_repo_reg: Arc<RemoteRepositoryRegistryImpl>,
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
     pull_request_planner: Arc<dyn PullRequestPlanner>,
-    in_multi_tenant_mode: bool,
+    tenancy_config: TenancyConfig,
 }
 
 impl PullTestHarness {
-    fn new(tmp_path: &Path, multi_tenant: bool) -> Self {
+    fn new(tmp_path: &Path, tenancy_config: TenancyConfig) -> Self {
         let calls = Arc::new(Mutex::new(Vec::new()));
 
         let datasets_dir_path = tmp_path.join("datasets");
@@ -731,13 +731,10 @@ impl PullTestHarness {
 
         let catalog = dill::CatalogBuilder::new()
             .add_value(RunInfoDir::new(run_info_dir))
+            .add_value(tenancy_config)
             .add::<SystemTimeSourceDefault>()
             .add_value(CurrentAccountSubject::new_test())
-            .add_builder(
-                DatasetRepositoryLocalFs::builder()
-                    .with_root(datasets_dir_path)
-                    .with_multi_tenant(multi_tenant),
-            )
+            .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir_path))
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
             .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
             .add::<DatasetRegistryRepoBridge>()
@@ -759,7 +756,7 @@ impl PullTestHarness {
             remote_repo_reg: catalog.get_one().unwrap(),
             remote_alias_reg: catalog.get_one().unwrap(),
             pull_request_planner: catalog.get_one().unwrap(),
-            in_multi_tenant_mode: multi_tenant,
+            tenancy_config,
         }
     }
 
@@ -776,7 +773,11 @@ impl PullTestHarness {
     ) -> Result<Vec<PullBatch>, Vec<PullResponse>> {
         let requests: Vec<_> = refs
             .into_iter()
-            .map(|r| PullRequest::from_any_ref(&r, |_| !self.in_multi_tenant_mode))
+            .map(|r| {
+                PullRequest::from_any_ref(&r, |_| {
+                    self.tenancy_config == TenancyConfig::SingleTenant
+                })
+            })
             .collect();
         self.pull_with_requests(requests, options).await
     }
@@ -788,7 +789,7 @@ impl PullTestHarness {
     ) -> Result<Vec<PullBatch>, Vec<PullResponse>> {
         let (plan_iterations, errors) = self
             .pull_request_planner
-            .build_pull_multi_plan(&requests, &options, self.in_multi_tenant_mode)
+            .build_pull_multi_plan(&requests, &options, self.tenancy_config)
             .await;
         if !errors.is_empty() {
             return Err(errors);

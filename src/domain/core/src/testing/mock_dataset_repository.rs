@@ -20,8 +20,6 @@ mockall::mock! {
 
     #[async_trait::async_trait]
     impl DatasetRepository for DatasetRepository {
-        fn is_multi_tenant(&self) -> bool;
-
         async fn resolve_dataset_handle_by_ref(
             &self,
             dataset_ref: &DatasetRef,

@@ -48,8 +48,6 @@ pub struct CreateDatasetFromSnapshotResult {
 
 #[async_trait]
 pub trait DatasetRepository: Sync + Send {
-    fn is_multi_tenant(&self) -> bool;
-
     async fn resolve_dataset_handle_by_ref(
         &self,
         dataset_ref: &DatasetRef,

@@ -51,6 +51,7 @@ use kamu_core::{
     DependencyGraphRepository,
     PollingIngestService,
     PullResult,
+    TenancyConfig,
     TransformRequestPlanner,
     MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
 };
@@ -3179,11 +3180,8 @@ impl FlowRunsHarness {
                     .with_consumer_filter(messaging_outbox::ConsumerFilter::AllConsumers),
             )
             .bind::<dyn Outbox, OutboxImmediateImpl>()
-            .add_builder(
-                DatasetRepositoryLocalFs::builder()
-                    .with_root(datasets_dir)
-                    .with_multi_tenant(false),
-            )
+            .add_value(TenancyConfig::SingleTenant)
+            .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
             .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
             .add::<DatasetRegistryRepoBridge>()

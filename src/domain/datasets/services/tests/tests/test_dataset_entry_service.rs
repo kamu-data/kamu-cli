@@ -20,6 +20,7 @@ use kamu_core::{
     DatasetLifecycleMessage,
     DatasetRepository,
     DatasetVisibility,
+    TenancyConfig,
     MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
 };
 use kamu_datasets::{
@@ -236,6 +237,8 @@ impl DatasetEntryServiceHarness {
             b.bind::<dyn Outbox, OutboxImmediateImpl>();
 
             b.add_value(CurrentAccountSubject::new_test());
+
+            b.add_value(TenancyConfig::SingleTenant);
 
             register_message_dispatcher::<DatasetLifecycleMessage>(
                 &mut b,

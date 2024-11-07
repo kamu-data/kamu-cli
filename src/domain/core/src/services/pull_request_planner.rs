@@ -27,7 +27,7 @@ pub trait PullRequestPlanner: Send + Sync {
         &self,
         request: PullRequest,
         options: &PullOptions,
-        in_multi_tenant_mode: bool,
+        tenancy_config: TenancyConfig,
     ) -> Result<PullPlanIterationJob, PullResponse>;
 
     // This function descends down the dependency tree of datasets (starting with
@@ -38,7 +38,7 @@ pub trait PullRequestPlanner: Send + Sync {
         &self,
         requests: &[PullRequest],
         options: &PullOptions,
-        in_multi_tenant_mode: bool,
+        tenancy_config: TenancyConfig,
     ) -> (Vec<PullPlanIteration>, Vec<PullResponse>);
 }
 

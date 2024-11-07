@@ -27,6 +27,7 @@ use kamu_core::{
     DatasetRepository,
     GetDatasetError,
     GetMultipleDatasetsError,
+    TenancyConfig,
     MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
 };
 use kamu_datasets::*;
@@ -56,6 +57,7 @@ pub struct DatasetEntryServiceImpl {
     dataset_entry_repo: Arc<dyn DatasetEntryRepository>,
     dataset_repo: Arc<dyn DatasetRepository>,
     account_repo: Arc<dyn AccountRepository>,
+    tenancy_config: Arc<TenancyConfig>,
     accounts_cache: Arc<Mutex<AccountsCache>>,
 }
 
@@ -87,12 +89,14 @@ impl DatasetEntryServiceImpl {
         dataset_entry_repo: Arc<dyn DatasetEntryRepository>,
         dataset_repo: Arc<dyn DatasetRepository>,
         account_repo: Arc<dyn AccountRepository>,
+        tenancy_config: Arc<TenancyConfig>,
     ) -> Self {
         Self {
             time_source,
             dataset_entry_repo,
             dataset_repo,
             account_repo,
+            tenancy_config,
             accounts_cache: Default::default(),
         }
     }
@@ -321,10 +325,9 @@ impl DatasetEntryServiceImpl {
     }
 
     fn make_alias(&self, owner_name: AccountName, dataset_name: DatasetName) -> DatasetAlias {
-        if self.dataset_repo.is_multi_tenant() {
-            DatasetAlias::new(Some(owner_name), dataset_name)
-        } else {
-            DatasetAlias::new(None, dataset_name)
+        match *self.tenancy_config {
+            TenancyConfig::MultiTenant => DatasetAlias::new(Some(owner_name), dataset_name),
+            TenancyConfig::SingleTenant => DatasetAlias::new(None, dataset_name),
         }
     }
 }

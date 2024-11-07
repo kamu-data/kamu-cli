@@ -32,6 +32,7 @@ use kamu_core::{
     DeleteDatasetUseCase,
     DependencyGraphService,
     GetDatasetError,
+    TenancyConfig,
     MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
 };
 use messaging_outbox::{consume_deserialized_message, ConsumerFilter, Message, MockOutbox, Outbox};
@@ -224,11 +225,8 @@ impl DeleteUseCaseHarness {
 
         let catalog = dill::CatalogBuilder::new()
             .add::<DeleteDatasetUseCaseImpl>()
-            .add_builder(
-                DatasetRepositoryLocalFs::builder()
-                    .with_root(datasets_dir)
-                    .with_multi_tenant(false),
-            )
+            .add_value(TenancyConfig::SingleTenant)
+            .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
             .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
             .add::<DatasetRegistryRepoBridge>()

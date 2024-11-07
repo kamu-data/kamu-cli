@@ -34,7 +34,7 @@ pub struct PushCommand {
     to: Option<DatasetPushTarget>,
     dataset_visibility: DatasetVisibility,
     output_config: Arc<OutputConfig>,
-    in_multi_tenant_mode: bool,
+    tenancy_config: TenancyConfig,
 }
 
 impl PushCommand {
@@ -49,7 +49,7 @@ impl PushCommand {
         to: Option<DatasetPushTarget>,
         dataset_visibility: DatasetVisibility,
         output_config: Arc<OutputConfig>,
-        in_multi_tenant_mode: bool,
+        tenancy_config: TenancyConfig,
     ) -> Self
     where
         I: IntoIterator<Item = DatasetRefPattern>,
@@ -65,7 +65,7 @@ impl PushCommand {
             to,
             dataset_visibility,
             output_config,
-            in_multi_tenant_mode,
+            tenancy_config,
         }
     }
 
@@ -132,7 +132,7 @@ impl PushCommand {
     }
 
     async fn push_with_progress(&self) -> Result<Vec<PushResponse>, CLIError> {
-        let progress = PrettyPushProgress::new(self.in_multi_tenant_mode);
+        let progress = PrettyPushProgress::new(self.tenancy_config);
         let listener = Arc::new(progress.clone());
         self.do_push(Some(listener.clone())).await
     }
@@ -227,14 +227,14 @@ impl Command for PushCommand {
 #[derive(Clone)]
 struct PrettyPushProgress {
     pub multi_progress: Arc<indicatif::MultiProgress>,
-    pub multi_tenant_workspace: bool,
+    pub tenancy_config: TenancyConfig,
 }
 
 impl PrettyPushProgress {
-    fn new(multi_tenant_workspace: bool) -> Self {
+    fn new(tenancy_config: TenancyConfig) -> Self {
         Self {
             multi_progress: Arc::new(indicatif::MultiProgress::new()),
-            multi_tenant_workspace,
+            tenancy_config,
         }
     }
 }
@@ -246,7 +246,7 @@ impl SyncMultiListener for PrettyPushProgress {
         dst: &DatasetRefAny,
     ) -> Option<Arc<dyn SyncListener>> {
         Some(Arc::new(PrettySyncProgress::new(
-            src.as_local_ref(|_| !self.multi_tenant_workspace)
+            src.as_local_ref(|_| self.tenancy_config == TenancyConfig::SingleTenant)
                 .expect("Expected local ref"),
             dst.as_remote_ref(|_| true).expect("Expected remote ref"),
             self.multi_progress.clone(),

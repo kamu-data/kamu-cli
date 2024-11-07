@@ -1007,11 +1007,8 @@ impl CompactTestHarness {
         let catalog = dill::CatalogBuilder::new()
             .add_value(RunInfoDir::new(run_info_dir))
             .add_value(CurrentAccountSubject::new_test())
-            .add_builder(
-                DatasetRepositoryLocalFs::builder()
-                    .with_root(datasets_dir)
-                    .with_multi_tenant(false),
-            )
+            .add_value(TenancyConfig::SingleTenant)
+            .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
             .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
             .add::<DatasetRegistryRepoBridge>()
@@ -1063,11 +1060,8 @@ impl CompactTestHarness {
 
         let catalog = dill::CatalogBuilder::new()
             .add_builder(run_info_dir.clone())
-            .add_builder(
-                DatasetRepositoryS3::builder()
-                    .with_s3_context(s3_context.clone())
-                    .with_multi_tenant(false),
-            )
+            .add_value(TenancyConfig::SingleTenant)
+            .add_builder(DatasetRepositoryS3::builder().with_s3_context(s3_context.clone()))
             .bind::<dyn DatasetRepository, DatasetRepositoryS3>()
             .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryS3>()
             .add::<DatasetRegistryRepoBridge>()

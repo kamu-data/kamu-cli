@@ -31,7 +31,7 @@ pub struct AddCommand {
     stdin: bool,
     dataset_visibility: DatasetVisibility,
     output_config: Arc<OutputConfig>,
-    in_multi_tenant_mode: bool,
+    tenancy_config: TenancyConfig,
 }
 
 impl AddCommand {
@@ -48,7 +48,7 @@ impl AddCommand {
         stdin: bool,
         dataset_visibility: DatasetVisibility,
         output_config: Arc<OutputConfig>,
-        in_multi_tenant_mode: bool,
+        tenancy_config: TenancyConfig,
     ) -> Self
     where
         I: IntoIterator<Item = S>,
@@ -67,7 +67,7 @@ impl AddCommand {
             stdin,
             dataset_visibility,
             output_config,
-            in_multi_tenant_mode,
+            tenancy_config,
         }
     }
 
@@ -232,7 +232,9 @@ impl Command for AddCommand {
                 "Name override can be used only when adding a single manifest",
             ));
         }
-        if !self.in_multi_tenant_mode && !self.dataset_visibility.is_private() {
+        if self.tenancy_config == TenancyConfig::SingleTenant
+            && !self.dataset_visibility.is_private()
+        {
             return Err(CLIError::usage_error(
                 "Only multi-tenant workspaces support non-private dataset visibility",
             ));

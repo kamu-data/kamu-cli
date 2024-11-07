@@ -28,7 +28,7 @@ use crate::*;
 pub struct DatasetRepositoryS3 {
     s3_context: S3Context,
     current_account_subject: Arc<CurrentAccountSubject>,
-    multi_tenant: bool,
+    tenancy_config: Arc<TenancyConfig>,
     registry_cache: Option<Arc<S3RegistryCache>>,
     metadata_cache_local_fs_path: Option<Arc<PathBuf>>,
     system_time_source: Arc<dyn SystemTimeSource>,
@@ -50,7 +50,7 @@ impl DatasetRepositoryS3 {
     pub fn new(
         s3_context: S3Context,
         current_account_subject: Arc<CurrentAccountSubject>,
-        multi_tenant: bool,
+        tenancy_config: Arc<TenancyConfig>,
         registry_cache: Option<Arc<S3RegistryCache>>,
         metadata_cache_local_fs_path: Option<Arc<PathBuf>>,
         system_time_source: Arc<dyn SystemTimeSource>,
@@ -58,7 +58,7 @@ impl DatasetRepositoryS3 {
         Self {
             s3_context,
             current_account_subject,
-            multi_tenant,
+            tenancy_config,
             registry_cache,
             metadata_cache_local_fs_path,
             system_time_source,
@@ -208,7 +208,7 @@ impl DatasetRepositoryS3 {
     fn normalize_alias(&self, alias: &DatasetAlias) -> DatasetAlias {
         if alias.is_multi_tenant() {
             alias.clone()
-        } else if self.is_multi_tenant() {
+        } else if *self.tenancy_config == TenancyConfig::MultiTenant {
             match self.current_account_subject.as_ref() {
                 CurrentAccountSubject::Anonymous(_) => {
                     panic!("Anonymous account misused, use multi-tenant alias");
@@ -227,10 +227,6 @@ impl DatasetRepositoryS3 {
 
 #[async_trait]
 impl DatasetRepository for DatasetRepositoryS3 {
-    fn is_multi_tenant(&self) -> bool {
-        self.multi_tenant
-    }
-
     async fn resolve_dataset_handle_by_ref(
         &self,
         dataset_ref: &DatasetRef,
@@ -278,7 +274,9 @@ impl DatasetRepository for DatasetRepositoryS3 {
     }
 
     fn all_dataset_handles_by_owner(&self, account_name: &AccountName) -> DatasetHandleStream<'_> {
-        if !self.is_multi_tenant() && *account_name != DEFAULT_ACCOUNT_NAME_STR {
+        if *self.tenancy_config == TenancyConfig::SingleTenant
+            && *account_name != DEFAULT_ACCOUNT_NAME_STR
+        {
             return Box::pin(futures::stream::empty());
         }
 

@@ -12,7 +12,14 @@ use std::sync::Arc;
 
 use futures::{future, StreamExt, TryStreamExt};
 use internal_error::InternalError;
-use kamu_core::{DatasetRegistry, GetDatasetError, SearchError, SearchOptions, SearchService};
+use kamu_core::{
+    DatasetRegistry,
+    GetDatasetError,
+    SearchError,
+    SearchOptions,
+    SearchService,
+    TenancyConfig,
+};
 use opendatafabric::{
     AccountName,
     DatasetAliasRemote,
@@ -71,19 +78,23 @@ pub fn filter_datasets_by_any_pattern<'a>(
     search_svc: Arc<dyn SearchService>,
     dataset_ref_any_patterns: Vec<DatasetRefAnyPattern>,
     current_account_name: &AccountName,
-    is_multitenant_mode: bool,
+    tenancy_config: TenancyConfig,
 ) -> FilteredDatasetRefAnyStream<'a> {
     let (all_ref_patterns, static_refs): (Vec<_>, Vec<_>) = dataset_ref_any_patterns
         .into_iter()
         .partition(DatasetRefAnyPattern::is_pattern);
 
-    let (remote_ref_patterns, local_ref_patterns): (Vec<_>, Vec<_>) = all_ref_patterns
-        .into_iter()
-        .partition(|pattern| pattern.is_remote_pattern(is_multitenant_mode));
+    let (remote_ref_patterns, local_ref_patterns): (Vec<_>, Vec<_>) =
+        all_ref_patterns.into_iter().partition(|pattern| {
+            pattern.is_remote_pattern(tenancy_config == TenancyConfig::MultiTenant)
+        });
 
     let static_datasets_stream = get_static_datasets_stream(static_refs);
-    let remote_patterns_stream =
-        get_remote_datasets_stream(search_svc, remote_ref_patterns, is_multitenant_mode);
+    let remote_patterns_stream = get_remote_datasets_stream(
+        search_svc,
+        remote_ref_patterns,
+        tenancy_config == TenancyConfig::MultiTenant,
+    );
     let local_patterns_stream =
         get_local_datasets_stream(dataset_registry, local_ref_patterns, current_account_name);
 

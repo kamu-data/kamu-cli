@@ -27,6 +27,7 @@ use kamu_core::{
     DatasetLifecycleMessage,
     DatasetRegistry,
     DatasetRepository,
+    TenancyConfig,
     MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
 };
 use messaging_outbox::{MockOutbox, Outbox};
@@ -155,11 +156,8 @@ impl AppendDatasetMetadataBatchUseCaseHarness {
 
         let catalog = dill::CatalogBuilder::new()
             .add::<AppendDatasetMetadataBatchUseCaseImpl>()
-            .add_builder(
-                DatasetRepositoryLocalFs::builder()
-                    .with_root(datasets_dir)
-                    .with_multi_tenant(false),
-            )
+            .add_value(TenancyConfig::SingleTenant)
+            .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
             .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
             .add::<DatasetRegistryRepoBridge>()

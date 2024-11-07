@@ -73,11 +73,8 @@ async fn do_test_sync(
         .add_value(ipfs_gateway.clone())
         .add_value(ipfs_client.clone())
         .add_value(CurrentAccountSubject::new_test())
-        .add_builder(
-            DatasetRepositoryLocalFs::builder()
-                .with_root(datasets_dir_foo)
-                .with_multi_tenant(false),
-        )
+        .add_value(TenancyConfig::SingleTenant)
+        .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir_foo))
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
         .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
         .add::<DatasetRegistryRepoBridge>()
@@ -97,11 +94,8 @@ async fn do_test_sync(
         .add_value(ipfs_gateway.clone())
         .add_value(ipfs_client.clone())
         .add_value(CurrentAccountSubject::new_test())
-        .add_builder(
-            DatasetRepositoryLocalFs::builder()
-                .with_root(datasets_dir_bar)
-                .with_multi_tenant(false),
-        )
+        .add_value(TenancyConfig::SingleTenant)
+        .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir_bar))
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
         .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
         .add::<DatasetRegistryRepoBridge>()

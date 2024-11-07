@@ -32,11 +32,8 @@ async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
     let catalog = dill::CatalogBuilder::new()
         .add::<SystemTimeSourceDefault>()
         .add_value(CurrentAccountSubject::new_test())
-        .add_builder(
-            DatasetRepositoryLocalFs::builder()
-                .with_root(datasets_dir)
-                .with_multi_tenant(false),
-        )
+        .add_value(TenancyConfig::SingleTenant)
+        .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
         .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
         .add::<DatasetRegistryRepoBridge>()

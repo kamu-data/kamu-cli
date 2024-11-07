@@ -28,6 +28,7 @@ use kamu_core::{
     MetadataChainExt,
     SetWatermarkError,
     SetWatermarkResult,
+    TenancyConfig,
     WatermarkService,
 };
 use opendatafabric::{DatasetAlias, DatasetKind, DatasetName};
@@ -38,7 +39,7 @@ use time_source::SystemTimeSourceDefault;
 #[tokio::test]
 async fn test_set_watermark() {
     let tmp_dir = tempfile::tempdir().unwrap();
-    let harness = WatermarkTestHarness::new(tmp_dir.path(), false);
+    let harness = WatermarkTestHarness::new(tmp_dir.path(), TenancyConfig::SingleTenant);
 
     let dataset_alias = DatasetAlias::new(None, DatasetName::try_from("foo").unwrap());
     let create_result = harness.create_dataset(&dataset_alias).await;
@@ -99,7 +100,7 @@ async fn test_set_watermark() {
 #[tokio::test]
 async fn test_set_watermark_rejects_on_derivative() {
     let tmp_dir = tempfile::tempdir().unwrap();
-    let harness = WatermarkTestHarness::new(tmp_dir.path(), true);
+    let harness = WatermarkTestHarness::new(tmp_dir.path(), TenancyConfig::MultiTenant);
 
     let dataset_alias = DatasetAlias::new(None, DatasetName::try_from("foo").unwrap());
 
@@ -135,18 +136,15 @@ struct WatermarkTestHarness {
 }
 
 impl WatermarkTestHarness {
-    fn new(tmp_path: &Path, multi_tenant: bool) -> Self {
+    fn new(tmp_path: &Path, tenancy_config: TenancyConfig) -> Self {
         let datasets_dir_path = tmp_path.join("datasets");
         std::fs::create_dir(&datasets_dir_path).unwrap();
 
         let catalog = dill::CatalogBuilder::new()
             .add::<SystemTimeSourceDefault>()
             .add_value(CurrentAccountSubject::new_test())
-            .add_builder(
-                DatasetRepositoryLocalFs::builder()
-                    .with_root(datasets_dir_path)
-                    .with_multi_tenant(multi_tenant),
-            )
+            .add_value(tenancy_config)
+            .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir_path))
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
             .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
             .add::<RemoteAliasesRegistryImpl>()

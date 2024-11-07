@@ -26,7 +26,7 @@ use time_source::SystemTimeSourceDefault;
 
 #[test_log::test(tokio::test)]
 async fn test_single_tenant_repository() {
-    let harness = DependencyGraphHarness::new(false);
+    let harness = DependencyGraphHarness::new(TenancyConfig::SingleTenant);
 
     let all_dependencies: Vec<_> = harness.list_all_dependencies().await;
     assert_eq!(
@@ -55,7 +55,7 @@ async fn test_single_tenant_repository() {
 
 #[test_log::test(tokio::test)]
 async fn test_multi_tenant_repository() {
-    let harness = DependencyGraphHarness::new(true);
+    let harness = DependencyGraphHarness::new(TenancyConfig::MultiTenant);
 
     let all_dependencies: Vec<_> = harness.list_all_dependencies().await;
     assert_eq!(
@@ -84,7 +84,7 @@ async fn test_multi_tenant_repository() {
 
 #[test_log::test(tokio::test)]
 async fn test_service_queries() {
-    let harness = DependencyGraphHarness::new(false);
+    let harness = DependencyGraphHarness::new(TenancyConfig::SingleTenant);
     harness.create_single_tenant_graph().await;
     harness.eager_initialization().await;
 
@@ -123,7 +123,7 @@ async fn test_service_queries() {
 
 #[test_log::test(tokio::test)]
 async fn test_service_new_datasets() {
-    let harness = DependencyGraphHarness::new(false);
+    let harness = DependencyGraphHarness::new(TenancyConfig::SingleTenant);
     harness.create_single_tenant_graph().await;
     harness.eager_initialization().await;
 
@@ -167,7 +167,7 @@ async fn test_service_new_datasets() {
 
 #[test_log::test(tokio::test)]
 async fn test_service_derived_dataset_modifies_links() {
-    let harness = DependencyGraphHarness::new(false);
+    let harness = DependencyGraphHarness::new(TenancyConfig::SingleTenant);
     harness.create_single_tenant_graph().await;
     harness.eager_initialization().await;
 
@@ -259,7 +259,7 @@ async fn test_service_derived_dataset_modifies_links() {
 
 #[test_log::test(tokio::test)]
 async fn test_service_dataset_deleted() {
-    let harness = DependencyGraphHarness::new(false);
+    let harness = DependencyGraphHarness::new(TenancyConfig::SingleTenant);
     harness.create_single_tenant_graph().await;
     harness.eager_initialization().await;
 
@@ -613,7 +613,7 @@ struct DependencyGraphHarness {
 }
 
 impl DependencyGraphHarness {
-    fn new(multi_tenant: bool) -> Self {
+    fn new(tenancy_config: TenancyConfig) -> Self {
         let workdir = tempfile::tempdir().unwrap();
         let datasets_dir = workdir.path().join("datasets");
         std::fs::create_dir(&datasets_dir).unwrap();
@@ -625,11 +625,8 @@ impl DependencyGraphHarness {
                     .with_consumer_filter(messaging_outbox::ConsumerFilter::AllConsumers),
             )
             .bind::<dyn Outbox, OutboxImmediateImpl>()
-            .add_builder(
-                DatasetRepositoryLocalFs::builder()
-                    .with_root(datasets_dir)
-                    .with_multi_tenant(multi_tenant),
-            )
+            .add_value(tenancy_config)
+            .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
             .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
             .add::<DatasetRegistryRepoBridge>()
@@ -1037,7 +1034,7 @@ impl DependencyGraphHarness {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 async fn create_large_dataset_graph() -> DependencyGraphHarness {
-    let dependency_harness = DependencyGraphHarness::new(false);
+    let dependency_harness = DependencyGraphHarness::new(TenancyConfig::SingleTenant);
     dependency_harness.create_single_tenant_graph().await;
     dependency_harness.eager_initialization().await;
 

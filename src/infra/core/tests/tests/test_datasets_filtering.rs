@@ -20,7 +20,7 @@ use kamu::utils::datasets_filtering::{
 };
 use kamu::{DatasetRegistryRepoBridge, DatasetRepositoryLocalFs, DatasetRepositoryWriter};
 use kamu_accounts::{CurrentAccountSubject, DEFAULT_ACCOUNT_NAME};
-use kamu_core::{DatasetRegistry, DatasetRepository};
+use kamu_core::{DatasetRegistry, DatasetRepository, TenancyConfig};
 use opendatafabric::{
     AccountName,
     DatasetAlias,
@@ -154,7 +154,7 @@ fn test_matches_remote_ref_pattern() {
 
 #[test_log::test(tokio::test)]
 async fn test_get_local_datasets_stream_single_tenant() {
-    let dataset_filtering_harness = DatasetFilteringHarness::new(false);
+    let dataset_filtering_harness = DatasetFilteringHarness::new(TenancyConfig::SingleTenant);
     let foo_handle = dataset_filtering_harness
         .create_root_dataset(None, "foo")
         .await;
@@ -207,7 +207,7 @@ async fn test_get_local_datasets_stream_single_tenant() {
 
 #[test_log::test(tokio::test)]
 async fn test_get_local_datasets_stream_multi_tenant() {
-    let dataset_filtering_harness = DatasetFilteringHarness::new(true);
+    let dataset_filtering_harness = DatasetFilteringHarness::new(TenancyConfig::MultiTenant);
     let account_1 = AccountName::new_unchecked("account1");
     let account_2 = AccountName::new_unchecked("account2");
 
@@ -268,18 +268,15 @@ struct DatasetFilteringHarness {
 }
 
 impl DatasetFilteringHarness {
-    fn new(is_multi_tenant: bool) -> Self {
+    fn new(tenancy_config: TenancyConfig) -> Self {
         let workdir = tempfile::tempdir().unwrap();
         let datasets_dir = workdir.path().join("datasets");
         std::fs::create_dir(&datasets_dir).unwrap();
 
         let catalog = dill::CatalogBuilder::new()
             .add::<SystemTimeSourceDefault>()
-            .add_builder(
-                DatasetRepositoryLocalFs::builder()
-                    .with_root(datasets_dir)
-                    .with_multi_tenant(is_multi_tenant),
-            )
+            .add_value(tenancy_config)
+            .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
             .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
             .add::<DatasetRegistryRepoBridge>()

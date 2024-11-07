@@ -19,7 +19,13 @@ use kamu::{
     DatasetRepositoryWriter,
     DependencyGraphServiceInMemory,
 };
-use kamu_core::{auth, CreateDatasetFromSnapshotUseCase, CreateDatasetResult, DatasetRepository};
+use kamu_core::{
+    auth,
+    CreateDatasetFromSnapshotUseCase,
+    CreateDatasetResult,
+    DatasetRepository,
+    TenancyConfig,
+};
 use kamu_datasets::DatasetEnvVarsConfig;
 use kamu_datasets_inmem::InMemoryDatasetEnvVarRepository;
 use kamu_datasets_services::DatasetEnvVarServiceImpl;
@@ -346,11 +352,8 @@ impl DatasetEnvVarsHarness {
 
             b.add::<DummyOutboxImpl>()
                 .add_value(DatasetEnvVarsConfig::sample())
-                .add_builder(
-                    DatasetRepositoryLocalFs::builder()
-                        .with_root(datasets_dir)
-                        .with_multi_tenant(false),
-                )
+                .add_value(TenancyConfig::SingleTenant)
+                .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
                 .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
                 .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
                 .add::<DatasetRegistryRepoBridge>()

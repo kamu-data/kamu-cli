@@ -29,6 +29,7 @@ use kamu::testing::MockDatasetActionAuthorizer;
 use kamu::DatasetLayout;
 use kamu_accounts::testing::MockAuthenticationService;
 use kamu_accounts::{Account, AccountType, CurrentAccountSubject, PROVIDER_PASSWORD};
+use kamu_core::TenancyConfig;
 use opendatafabric::{AccountID, AccountName, DatasetAlias, DatasetHandle};
 use reqwest::Url;
 use time_source::SystemTimeSourceStub;
@@ -74,7 +75,7 @@ pub(crate) trait ServerSideHarness {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) struct ServerSideHarnessOptions {
-    pub multi_tenant: bool,
+    pub tenancy_config: TenancyConfig,
     pub authorized_writes: bool,
     pub base_catalog: Option<dill::Catalog>,
 }

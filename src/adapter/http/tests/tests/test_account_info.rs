@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use kamu_accounts::DUMMY_ACCESS_TOKEN;
-use kamu_core::RunInfoDir;
+use kamu_core::{RunInfoDir, TenancyConfig};
 use serde_json::json;
 
 use crate::harness::*;
@@ -17,7 +17,7 @@ use crate::harness::*;
 
 #[test_log::test(tokio::test)]
 async fn test_get_account_info_with_wrong_token() {
-    let harness = AccountInfoHarness::new(false).await;
+    let harness = AccountInfoHarness::new(TenancyConfig::SingleTenant).await;
 
     let client = async move {
         let cl = reqwest::Client::new();
@@ -42,7 +42,7 @@ async fn test_get_account_info_with_wrong_token() {
 
 #[test_log::test(tokio::test)]
 async fn test_get_account_info() {
-    let harness = AccountInfoHarness::new(false).await;
+    let harness = AccountInfoHarness::new(TenancyConfig::SingleTenant).await;
     let expected_account = harness.server_harness.api_server_account();
 
     let client = async move {
@@ -77,7 +77,7 @@ struct AccountInfoHarness {
 }
 
 impl AccountInfoHarness {
-    async fn new(is_multi_tenant: bool) -> Self {
+    async fn new(tenancy_config: TenancyConfig) -> Self {
         let run_info_dir = tempfile::tempdir().unwrap();
 
         let catalog = dill::CatalogBuilder::new()
@@ -85,7 +85,7 @@ impl AccountInfoHarness {
             .build();
 
         let server_harness = ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
-            multi_tenant: is_multi_tenant,
+            tenancy_config,
             authorized_writes: true,
             base_catalog: Some(catalog),
         })

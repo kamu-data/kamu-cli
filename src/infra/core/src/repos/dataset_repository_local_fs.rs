@@ -33,20 +33,22 @@ pub struct DatasetRepositoryLocalFs {
 
 #[component(pub)]
 impl DatasetRepositoryLocalFs {
+    #[allow(clippy::needless_pass_by_value)]
     pub fn new(
         root: PathBuf,
         current_account_subject: Arc<CurrentAccountSubject>,
-        multi_tenant: bool,
+        tenancy_config: Arc<TenancyConfig>,
         system_time_source: Arc<dyn SystemTimeSource>,
     ) -> Self {
         Self {
-            storage_strategy: if multi_tenant {
-                Box::new(DatasetMultiTenantStorageStrategy::new(
+            storage_strategy: match *tenancy_config {
+                TenancyConfig::MultiTenant => Box::new(DatasetMultiTenantStorageStrategy::new(
                     root,
                     current_account_subject,
-                ))
-            } else {
-                Box::new(DatasetSingleTenantStorageStrategy::new(root))
+                )),
+                TenancyConfig::SingleTenant => {
+                    Box::new(DatasetSingleTenantStorageStrategy::new(root))
+                }
             },
             thrash_lock: tokio::sync::Mutex::new(()),
             system_time_source,
@@ -97,10 +99,6 @@ impl DatasetRepositoryLocalFs {
 
 #[async_trait]
 impl DatasetRepository for DatasetRepositoryLocalFs {
-    fn is_multi_tenant(&self) -> bool {
-        self.storage_strategy.is_multi_tenant()
-    }
-
     // TODO: PERF: Cache data and speed up lookups by ID
     //
     // TODO: CONCURRENCY: Since resolving ID to Name currently requires accessing
@@ -338,8 +336,6 @@ impl DatasetRepositoryWriter for DatasetRepositoryLocalFs {
 
 #[async_trait]
 trait DatasetStorageStrategy: Sync + Send {
-    fn is_multi_tenant(&self) -> bool;
-
     fn get_dataset_path(&self, dataset_handle: &DatasetHandle) -> PathBuf;
 
     fn get_all_datasets(&self) -> DatasetHandleStream<'_>;
@@ -459,10 +455,6 @@ impl DatasetSingleTenantStorageStrategy {
 
 #[async_trait]
 impl DatasetStorageStrategy for DatasetSingleTenantStorageStrategy {
-    fn is_multi_tenant(&self) -> bool {
-        false
-    }
-
     fn get_dataset_path(&self, dataset_handle: &DatasetHandle) -> PathBuf {
         self.dataset_path_impl(&dataset_handle.alias)
     }
@@ -743,10 +735,6 @@ impl DatasetMultiTenantStorageStrategy {
 
 #[async_trait]
 impl DatasetStorageStrategy for DatasetMultiTenantStorageStrategy {
-    fn is_multi_tenant(&self) -> bool {
-        true
-    }
-
     fn get_dataset_path(&self, dataset_handle: &DatasetHandle) -> PathBuf {
         let account_name = self.effective_account_name(&dataset_handle.alias);
 
