@@ -13,3 +13,4 @@ mod test_dataset;
 mod test_odf_core;
 mod test_openapi;
 mod test_swagger;
+mod test_upload;

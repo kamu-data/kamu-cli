@@ -13,6 +13,7 @@ mod test_dataset;
 mod test_odf_core;
 mod test_openapi;
 mod test_swagger;
+mod test_upload;
 
 pub use test_accounts::*;
 pub use test_auth::*;
@@ -20,3 +21,4 @@ pub use test_dataset::*;
 pub use test_odf_core::*;
 pub use test_openapi::*;
 pub use test_swagger::*;
+pub use test_upload::*;

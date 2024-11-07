@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::str::FromStr;
+
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use convert_case::{Case, Casing};
@@ -18,7 +20,7 @@ use kamu_adapter_http::data::metadata_handler::{
     Include as MetadataInclude,
 };
 use kamu_adapter_http::general::{AccountResponse, DatasetInfoResponse, NodeInfoResponse};
-use kamu_adapter_http::LoginRequestBody;
+use kamu_adapter_http::{LoginRequestBody, PlatformFileUploadQuery, UploadContext};
 use kamu_core::BlockRef;
 use kamu_flow_system::{DatasetFlowType, FlowID};
 use lazy_static::lazy_static;
@@ -197,6 +199,8 @@ pub trait KamuApiServerClientExt {
     fn odf_query(&self) -> OdfQuery;
 
     fn swagger(&self) -> SwaggerApi;
+
+    fn upload(&self) -> UploadApi;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -233,6 +237,10 @@ impl KamuApiServerClientExt for KamuApiServerClient {
 
     fn swagger(&self) -> SwaggerApi {
         SwaggerApi { client: self }
+    }
+
+    fn upload(&self) -> UploadApi {
+        UploadApi { client: self }
     }
 }
 
@@ -1024,6 +1032,131 @@ impl SwaggerApi<'_> {
 
         response.json().await.unwrap()
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// API: Upload
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct UploadApi<'a> {
+    client: &'a KamuApiServerClient,
+}
+
+impl UploadApi<'_> {
+    pub async fn prepare(
+        &self,
+        options: PlatformFileUploadQuery,
+    ) -> Result<UploadContext, UploadPrepareError> {
+        let query_params = serde_urlencoded::to_string(options).int_err()?;
+
+        let response = self
+            .client
+            .rest_api_call(
+                Method::POST,
+                &format!("/platform/file/upload/prepare?{query_params}"),
+                None,
+            )
+            .await;
+
+        match response.status() {
+            StatusCode::OK => Ok(response.json().await.int_err()?),
+            StatusCode::UNAUTHORIZED => Err(UploadPrepareError::Unauthorized),
+            unexpected_status => Err(format!("Unexpected status: {unexpected_status}")
+                .int_err()
+                .into()),
+        }
+    }
+
+    pub async fn upload_file(
+        &self,
+        upload_context: &UploadContext,
+        file_name: &str,
+        file_data: &str,
+    ) -> Result<(), UploadFileError> {
+        pretty_assertions::assert_eq!(true, upload_context.use_multipart);
+
+        use reqwest::multipart::{Form, Part};
+
+        let headers = convert_headers(&upload_context.headers);
+        let form = Form::new().part(
+            "file",
+            Part::text(file_data.to_string())
+                .file_name(file_name.to_string())
+                .mime_str("text/plain")
+                .int_err()?,
+        );
+
+        let response = reqwest::Client::new()
+            .post(upload_context.upload_url.clone())
+            .headers(headers)
+            .multipart(form)
+            .send()
+            .await
+            .int_err()?;
+
+        match response.status() {
+            StatusCode::OK => Ok(()),
+            StatusCode::UNAUTHORIZED => Err(UploadFileError::Unauthorized),
+            unexpected_status => Err(format!("Unexpected status: {unexpected_status}")
+                .int_err()
+                .into()),
+        }
+    }
+
+    pub async fn get_file_content(
+        &self,
+        upload_context: &UploadContext,
+    ) -> Result<String, UploadFileError> {
+        let headers = convert_headers(&upload_context.headers);
+        let response = reqwest::Client::new()
+            .get(upload_context.upload_url.clone())
+            .headers(headers)
+            .send()
+            .await
+            .int_err()?;
+
+        match response.status() {
+            StatusCode::OK => Ok(response.text().await.int_err()?),
+            StatusCode::UNAUTHORIZED => Err(UploadFileError::Unauthorized),
+            unexpected_status => Err(format!("Unexpected status: {unexpected_status}")
+                .int_err()
+                .into()),
+        }
+    }
+}
+
+#[derive(Error, Debug)]
+pub enum UploadPrepareError {
+    #[error("Unauthorized")]
+    Unauthorized,
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+}
+
+#[derive(Error, Debug)]
+pub enum UploadFileError {
+    #[error("Unauthorized")]
+    Unauthorized,
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Helpers
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn convert_headers(headers: &[(String, String)]) -> reqwest::header::HeaderMap {
+    use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
+
+    headers
+        .iter()
+        .fold(HeaderMap::new(), |mut acc, (header, value)| {
+            acc.insert(
+                HeaderName::from_str(header).unwrap(),
+                HeaderValue::from_str(value).unwrap(),
+            );
+            acc
+        })
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
