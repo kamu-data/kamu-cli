@@ -42,12 +42,13 @@ impl OutboxMessageRepository for SqliteOutboxMessageRepository {
 
         sqlx::query!(
             r#"
-                INSERT INTO outbox_messages (producer_name, content_json, occurred_on)
-                    VALUES ($1, $2, $3)
+                INSERT INTO outbox_messages (producer_name, content_json, occurred_on, version)
+                    VALUES ($1, $2, $3, $4)
             "#,
             message.producer_name,
             message_content_json,
-            message.occurred_on
+            message.occurred_on,
+            message.version,
         )
         .execute(connection_mut)
         .await
@@ -93,6 +94,7 @@ impl OutboxMessageRepository for SqliteOutboxMessageRepository {
                     occurred_on
                 FROM outbox_messages
                 WHERE {producer_filters}
+                and version = {OUTBOX_MESSAGE_VERSION}
                 ORDER BY message_id
                 LIMIT $1
                 "#,
@@ -108,12 +110,13 @@ impl OutboxMessageRepository for SqliteOutboxMessageRepository {
 
             use sqlx::Row;
             let mut query_stream = query.try_map(|event_row: SqliteRow| {
-                Ok(OutboxMessage {
-                    message_id: OutboxMessageID::new(event_row.get(0)),
-                    producer_name: event_row.get(1),
-                    content_json: event_row.get(2),
-                    occurred_on: event_row.get(3),
-                })
+                println!("event_row");
+                Ok(OutboxMessage::new(
+                    OutboxMessageID::new(event_row.get(0)),
+                    event_row.get(1),
+                    event_row.get(2),
+                    event_row.get(3),
+                ))
             })
             .fetch(connection_mut)
             .map_err(ErrorIntoInternal::int_err);

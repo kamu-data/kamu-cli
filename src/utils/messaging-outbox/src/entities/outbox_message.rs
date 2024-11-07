@@ -13,12 +13,36 @@ use crate::OutboxMessageID;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// Version of outbox message which will be bumped only if the structure contains
+// breaking changes in the message structure
+pub const OUTBOX_MESSAGE_VERSION: i32 = 1;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Debug, Clone)]
 pub struct OutboxMessage {
     pub message_id: OutboxMessageID,
     pub producer_name: String,
     pub content_json: serde_json::Value,
     pub occurred_on: DateTime<Utc>,
+    pub version: i32,
+}
+
+impl OutboxMessage {
+    pub fn new(
+        message_id: OutboxMessageID,
+        producer_name: String,
+        content_json: serde_json::Value,
+        occurred_on: DateTime<Utc>,
+    ) -> Self {
+        Self {
+            message_id,
+            producer_name,
+            content_json,
+            occurred_on,
+            version: OUTBOX_MESSAGE_VERSION,
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -28,6 +52,22 @@ pub struct NewOutboxMessage {
     pub producer_name: String,
     pub content_json: serde_json::Value,
     pub occurred_on: DateTime<Utc>,
+    pub version: i32,
+}
+
+impl NewOutboxMessage {
+    pub fn new(
+        producer_name: String,
+        content_json: serde_json::Value,
+        occurred_on: DateTime<Utc>,
+    ) -> Self {
+        Self {
+            producer_name,
+            content_json,
+            occurred_on,
+            version: OUTBOX_MESSAGE_VERSION,
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

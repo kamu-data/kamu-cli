@@ -71,12 +71,12 @@ impl OutboxMessageRepository for InMemoryOutboxMessageRepository {
 
         guard.messages.insert(
             message_id,
-            OutboxMessage {
+            OutboxMessage::new(
                 message_id,
-                producer_name: new_message.producer_name,
-                content_json: new_message.content_json,
-                occurred_on: new_message.occurred_on,
-            },
+                new_message.producer_name,
+                new_message.content_json,
+                new_message.occurred_on,
+            ),
         );
         Ok(())
     }

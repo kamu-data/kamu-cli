@@ -45,11 +45,11 @@ impl Outbox for OutboxTransactionalImpl {
     ) -> Result<(), InternalError> {
         tracing::debug!(content_json = %content_json, "Saving outbox message into database");
 
-        let new_outbox_message = NewOutboxMessage {
-            content_json: content_json.clone(),
-            producer_name: producer_name.to_string(),
-            occurred_on: self.time_source.now(),
-        };
+        let new_outbox_message = NewOutboxMessage::new(
+            producer_name.to_string(),
+            content_json.clone(),
+            self.time_source.now(),
+        );
 
         self.outbox_message_repository
             .push_message(new_outbox_message)
