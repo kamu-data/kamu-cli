@@ -116,6 +116,21 @@ pub struct QueryRequest {
     pub limit: u64,
 }
 
+impl Default for QueryRequest {
+    fn default() -> Self {
+        Self {
+            query: String::new(),
+            query_dialect: QueryRequest::default_query_dialect(),
+            data_format: Default::default(),
+            include: QueryRequest::default_include(),
+            schema_format: None,
+            datasets: None,
+            skip: 0,
+            limit: QueryRequest::default_limit(),
+        }
+    }
+}
+
 impl QueryRequest {
     fn default_query_dialect() -> domain::QueryDialect {
         domain::QueryDialect::SqlDataFusion
@@ -251,7 +266,7 @@ impl From<QueryParams> for QueryRequest {
 // Response
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, serde::Serialize, utoipa::ToSchema)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct QueryResponse {
     /// Inputs that can be used to fully reproduce the query
@@ -300,7 +315,7 @@ pub struct SubQuery {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, serde::Serialize, utoipa::ToSchema)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Outputs {
     /// Resulting data

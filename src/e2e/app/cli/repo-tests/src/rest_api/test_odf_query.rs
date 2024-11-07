@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::assert_matches::assert_matches;
+use std::collections::BTreeSet;
 
 use chrono::{NaiveTime, SecondsFormat, Utc};
 use http_common::comma_separated::CommaSeparatedSet;
@@ -18,6 +19,8 @@ use kamu_adapter_http::data::metadata_handler::{
     Output as MetadataOutput,
     Ref as MetadataOutputRef,
 };
+use kamu_adapter_http::data::query_types::{Include as QueryInclude, QueryRequest};
+use kamu_adapter_http::data::verify_types::{VerifyRequest, VerifyResponse};
 use kamu_cli_e2e_common::{
     CreateDatasetResponse,
     KamuApiServerClient,
@@ -60,6 +63,54 @@ pub async fn test_dataset_metadata_mt(mut kamu_api_server_client: KamuApiServerC
     kamu_api_server_client.auth().login_as_e2e_user().await;
 
     test_dataset_metadata(kamu_api_server_client, Some(E2E_USER_ACCOUNT_NAME.clone())).await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_verify(mut kamu_api_server_client: KamuApiServerClient) {
+    const QUERY: &str = indoc::indoc!(
+        r#"
+        SELECT player_id,
+               score
+        FROM 'player-scores'
+        ORDER BY match_id, score, player_id
+        "#
+    );
+
+    kamu_api_server_client.auth().login_as_kamu().await;
+
+    kamu_api_server_client
+        .dataset()
+        .create_player_scores_dataset_with_data(None)
+        .await;
+
+    let query_request = QueryRequest {
+        query: QUERY.into(),
+        include: BTreeSet::from([QueryInclude::Proof]),
+        ..Default::default()
+    };
+    let query_result = kamu_api_server_client
+        .odf_query()
+        .query_via_rest(&query_request)
+        .await;
+
+    let query_response = query_result.unwrap();
+
+    assert_matches!(
+        kamu_api_server_client
+            .odf_query()
+            .verify(VerifyRequest {
+                input: query_response.input.unwrap(),
+                sub_queries: query_response.sub_queries.unwrap(),
+                commitment: query_response.commitment.unwrap(),
+                proof: query_response.proof.unwrap(),
+            })
+            .await,
+        Ok(VerifyResponse {
+            ok: true,
+            error: None
+        })
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

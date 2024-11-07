@@ -19,6 +19,8 @@ use kamu_adapter_http::data::metadata_handler::{
     DatasetMetadataResponse,
     Include as MetadataInclude,
 };
+use kamu_adapter_http::data::query_types::{QueryRequest, QueryResponse};
+use kamu_adapter_http::data::verify_types::{VerifyRequest, VerifyResponse};
 use kamu_adapter_http::general::{AccountResponse, DatasetInfoResponse, NodeInfoResponse};
 use kamu_adapter_http::{LoginRequestBody, PlatformFileUploadQuery, UploadContext};
 use kamu_core::BlockRef;
@@ -957,6 +959,53 @@ impl OdfQuery<'_> {
         .await
     }
 
+    pub async fn query_via_rest(
+        &self,
+        options: &QueryRequest,
+    ) -> Result<QueryResponse, InternalError> {
+        let request_body_json = serde_json::to_value(options).int_err()?;
+
+        let response = self
+            .client
+            .rest_api_call(
+                Method::POST,
+                "/query",
+                Some(RequestBody::Json(request_body_json)),
+            )
+            .await;
+
+        match response.status() {
+            StatusCode::OK => Ok(response.json().await.int_err()?),
+            unexpected_status => {
+                let message = response.text().await.int_err()?;
+
+                Err(format!("Unexpected status: {unexpected_status}, message: {message}").int_err())
+            }
+        }
+    }
+
+    pub async fn verify(&self, options: VerifyRequest) -> Result<VerifyResponse, InternalError> {
+        let request_body_json = serde_json::to_value(&options).int_err()?;
+
+        let response = self
+            .client
+            .rest_api_call(
+                Method::POST,
+                "/verify",
+                Some(RequestBody::Json(request_body_json)),
+            )
+            .await;
+
+        match response.status() {
+            StatusCode::OK => Ok(response.json().await.int_err()?),
+            unexpected_status => {
+                let message = response.text().await.int_err()?;
+
+                Err(format!("Unexpected status: {unexpected_status}, message: {message}").int_err())
+            }
+        }
+    }
+
     pub async fn metadata(
         &self,
         dataset_alias: &odf::DatasetAlias,
@@ -1000,6 +1049,14 @@ impl OdfQuery<'_> {
             unexpected_status => panic!("Unexpected status: {unexpected_status}"),
         }
     }
+}
+
+#[derive(Error, Debug)]
+pub enum QueryError {
+    #[error("Unauthorized")]
+    Unauthorized,
+    #[error(transparent)]
+    Internal(#[from] InternalError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

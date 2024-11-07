@@ -53,3 +53,19 @@ kamu_cli_run_api_server_e2e_test!(
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_run_api_server_e2e_test!(
+    storage = sqlite,
+    fixture = kamu_cli_e2e_repo_tests::rest_api::test_verify,
+    options = Options::default().with_kamu_config(indoc::indoc!(
+        r#"
+        kind: CLIConfig
+        version: 1
+        content:
+          identity:
+            privateKey: f0000000000000000000000000000000000000000000000000000000000000000
+        "#
+    )),
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

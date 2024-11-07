@@ -16,6 +16,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::borrow::Cow;
+
 use axum::response::Json;
 use opendatafabric as odf;
 
@@ -23,7 +25,7 @@ use super::query_types as query;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, serde::Deserialize, utoipa::ToSchema)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct VerifyRequest {
     /// Inputs that will be used to reproduce the query
@@ -42,7 +44,7 @@ pub struct VerifyRequest {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, serde::Serialize, utoipa::ToSchema)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct VerifyResponse {
     /// Whether validation was successful
@@ -55,7 +57,7 @@ pub struct VerifyResponse {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, thiserror::Error, serde::Serialize, utoipa::ToSchema)]
+#[derive(Debug, thiserror::Error, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
 #[serde(untagged)]
 pub enum ValidationError {
     #[error(transparent)]
@@ -64,7 +66,7 @@ pub enum ValidationError {
     VerificationFailed(VerificationFailed),
 }
 
-#[derive(Debug, thiserror::Error, serde::Serialize, utoipa::ToSchema)]
+#[derive(Debug, thiserror::Error, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
 #[serde(tag = "kind")]
 pub enum InvalidRequest {
     #[serde(rename = "InvalidRequest::InputHash")]
@@ -80,37 +82,41 @@ pub enum InvalidRequest {
     BadSignature(#[from] InvalidRequestBadSignature),
 }
 
-#[derive(Debug, thiserror::Error, serde::Serialize, utoipa::ToSchema)]
+#[derive(Debug, thiserror::Error, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
 #[error("{message}")]
 pub struct InvalidRequestInputHash {
-    pub message: &'static str,
+    pub message: Cow<'static, str>,
 }
 
 impl InvalidRequestInputHash {
     pub fn new() -> Self {
         Self {
-            message: "The commitment is invalid and cannot be disputed: commitment.inputHash \
-                      doesn't match the hash of input object",
+            message: Cow::from(
+                "The commitment is invalid and cannot be disputed: commitment.inputHash doesn't \
+                 match the hash of input object",
+            ),
         }
     }
 }
 
-#[derive(Debug, thiserror::Error, serde::Serialize, utoipa::ToSchema)]
+#[derive(Debug, thiserror::Error, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
 #[error("{message}")]
 pub struct InvalidRequestSubQueriesHash {
-    pub message: &'static str,
+    pub message: Cow<'static, str>,
 }
 
 impl InvalidRequestSubQueriesHash {
     pub fn new() -> Self {
         Self {
-            message: "The commitment is invalid and cannot be disputed: commitment.subQueriesHash \
-                      doesn't match the hash of subQueries object",
+            message: Cow::from(
+                "The commitment is invalid and cannot be disputed: commitment.subQueriesHash \
+                 doesn't match the hash of subQueries object",
+            ),
         }
     }
 }
 
-#[derive(Debug, thiserror::Error, serde::Serialize, utoipa::ToSchema)]
+#[derive(Debug, thiserror::Error, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
 #[error("{message}")]
 pub struct InvalidRequestBadSignature {
     pub message: String,
@@ -126,7 +132,7 @@ impl InvalidRequestBadSignature {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, thiserror::Error, serde::Serialize, utoipa::ToSchema)]
+#[derive(Debug, thiserror::Error, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
 #[serde(tag = "kind")]
 pub enum VerificationFailed {
     #[serde(rename = "VerificationFailed::OutputMismatch")]
@@ -142,7 +148,7 @@ pub enum VerificationFailed {
     DatasetBlockNotFound(#[from] DatasetBlockNotFound),
 }
 
-#[derive(Debug, thiserror::Error, serde::Serialize, utoipa::ToSchema)]
+#[derive(Debug, thiserror::Error, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
 #[error("{message}")]
 pub struct OutputMismatch {
     pub message: String,
@@ -169,7 +175,7 @@ impl OutputMismatch {
     }
 }
 
-#[derive(Debug, thiserror::Error, serde::Serialize, utoipa::ToSchema)]
+#[derive(Debug, thiserror::Error, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
 #[error("{message}")]
 pub struct DatasetNotFound {
     pub message: String,
@@ -190,7 +196,7 @@ impl DatasetNotFound {
     }
 }
 
-#[derive(Debug, thiserror::Error, serde::Serialize, utoipa::ToSchema)]
+#[derive(Debug, thiserror::Error, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
 #[error("{message}")]
 pub struct DatasetBlockNotFound {
     pub message: String,
