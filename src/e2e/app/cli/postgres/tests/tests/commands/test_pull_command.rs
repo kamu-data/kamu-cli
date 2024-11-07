@@ -12,19 +12,7 @@ use kamu_cli_e2e_common::prelude::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 kamu_cli_execute_command_e2e_test!(
-    storage = inmem,
-    fixture = kamu_cli_e2e_repo_tests::test_pull_from_file_success,
-);
-
-kamu_cli_execute_command_e2e_test!(
-    storage = inmem,
-    fixture = kamu_cli_e2e_repo_tests::test_pull_from_file_failure,
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-kamu_cli_execute_command_e2e_test!(
-    storage = inmem,
+    storage = postgres,
     fixture = kamu_cli_e2e_repo_tests::test_pull_set_watermark,
     options = Options::default().with_frozen_system_time(),
 );
@@ -32,7 +20,7 @@ kamu_cli_execute_command_e2e_test!(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 kamu_cli_execute_command_e2e_test!(
-    storage = inmem,
+    storage = postgres,
     fixture = kamu_cli_e2e_repo_tests::test_pull_reset_derivative,
     options = Options::default().with_frozen_system_time(),
     extra_test_groups = "containerized, engine, ingest, transform, datafusion"
@@ -41,7 +29,7 @@ kamu_cli_execute_command_e2e_test!(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 kamu_cli_execute_command_e2e_test!(
-    storage = inmem,
+    storage = postgres,
     fixture = kamu_cli_e2e_repo_tests::test_pull_derivative,
     options = Options::default().with_frozen_system_time(),
     extra_test_groups = "containerized, engine, ingest, transform, datafusion"
@@ -50,7 +38,7 @@ kamu_cli_execute_command_e2e_test!(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 kamu_cli_execute_command_e2e_test!(
-    storage = inmem,
+    storage = postgres,
     fixture = kamu_cli_e2e_repo_tests::test_push_pull_s3,
     options = Options::default().with_frozen_system_time(),
     extra_test_groups = "containerized, engine, ingest, datafusion"

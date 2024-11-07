@@ -16,6 +16,7 @@ mod test_inspect_command;
 mod test_log_command;
 mod test_login_command;
 mod test_new_command;
+mod test_pull_command;
 mod test_rename_command;
 mod test_repo_command;
 mod test_reset_command;
