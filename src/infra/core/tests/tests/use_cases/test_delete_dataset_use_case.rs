@@ -55,7 +55,7 @@ async fn test_delete_dataset_success_via_ref() {
 
     harness
         .use_case
-        .execute_via_ref(&alias_foo.as_local_ref())
+        .execute_via_ref(&alias_foo.as_local_ref(), true)
         .await
         .unwrap();
 
@@ -84,7 +84,7 @@ async fn test_delete_dataset_success_via_handle() {
 
     harness
         .use_case
-        .execute_via_handle(&create_result_foo.dataset_handle)
+        .execute_via_handle(&create_result_foo.dataset_handle, true)
         .await
         .unwrap();
 
@@ -104,7 +104,7 @@ async fn test_delete_dataset_not_found() {
     assert_matches!(
         harness
             .use_case
-            .execute_via_ref(&alias_foo.as_local_ref())
+            .execute_via_ref(&alias_foo.as_local_ref(), true)
             .await,
         Err(DeleteDatasetError::NotFound(_))
     );
@@ -127,7 +127,7 @@ async fn test_delete_unauthorized() {
     assert_matches!(
         harness
             .use_case
-            .execute_via_handle(&create_result_foo.dataset_handle)
+            .execute_via_handle(&create_result_foo.dataset_handle, true)
             .await,
         Err(DeleteDatasetError::Access(_))
     );
@@ -154,7 +154,7 @@ async fn test_delete_dataset_respects_dangling_refs() {
     harness.dependencies_eager_initialization().await;
 
     assert_matches!(
-        harness.use_case.execute_via_handle(&create_result_root.dataset_handle).await,
+        harness.use_case.execute_via_handle(&create_result_root.dataset_handle, true).await,
         Err(DeleteDatasetError::DanglingReference(e)) if e.children == vec![create_result_derived.dataset_handle.clone()]
     );
 
@@ -163,7 +163,7 @@ async fn test_delete_dataset_respects_dangling_refs() {
 
     harness
         .use_case
-        .execute_via_handle(&create_result_derived.dataset_handle)
+        .execute_via_handle(&create_result_derived.dataset_handle, true)
         .await
         .unwrap();
 
@@ -181,7 +181,7 @@ async fn test_delete_dataset_respects_dangling_refs() {
 
     harness
         .use_case
-        .execute_via_handle(&create_result_root.dataset_handle)
+        .execute_via_handle(&create_result_root.dataset_handle, true)
         .await
         .unwrap();
 

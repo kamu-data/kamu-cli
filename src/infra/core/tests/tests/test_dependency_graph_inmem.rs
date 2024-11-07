@@ -283,6 +283,7 @@ async fn test_service_dataset_deleted() {
     delete_dataset
         .execute_via_ref(
             &DatasetAlias::new(None, DatasetName::new_unchecked("foo-bar-foo-baz")).as_local_ref(),
+            true,
         )
         .await
         .unwrap();
