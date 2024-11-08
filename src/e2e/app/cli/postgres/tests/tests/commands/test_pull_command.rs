@@ -13,6 +13,20 @@ use kamu_cli_e2e_common::prelude::*;
 
 kamu_cli_execute_command_e2e_test!(
     storage = postgres,
+    fixture = kamu_cli_e2e_repo_tests::test_pull_env_var_template_default_value,
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_execute_command_e2e_test!(
+    storage = postgres,
+    fixture = kamu_cli_e2e_repo_tests::test_pull_env_var_template_default_value_missing_values,
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_execute_command_e2e_test!(
+    storage = postgres,
     fixture = kamu_cli_e2e_repo_tests::test_pull_set_watermark,
     options = Options::default().with_frozen_system_time(),
 );
