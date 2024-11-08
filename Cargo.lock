@@ -5699,6 +5699,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_urlencoded",
+ "serde_yaml",
  "sqlx",
  "thiserror",
  "tokio",

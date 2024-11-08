@@ -190,15 +190,14 @@ impl KamuCliApiServerHarness {
         mut options: KamuCliApiServerHarnessOptions,
         generated_kamu_config: Option<String>,
     ) -> Self {
-        assert!(
-            !(options.kamu_config.is_some() && generated_kamu_config.is_some()),
-            "There can be only one configuration file: either preset from the test options or \
-             generated based on the storage type"
-        );
+        let target_config =
+            generated_kamu_config.map(|target| serde_yaml::from_str(&target).unwrap());
+        let source_config = options
+            .kamu_config
+            .map(|source| serde_yaml::from_str(&source).unwrap());
 
-        if options.kamu_config.is_none() {
-            options.kamu_config = generated_kamu_config;
-        }
+        options.kamu_config = merge_yaml(target_config, source_config)
+            .map(|yaml| serde_yaml::to_string(&yaml).unwrap());
 
         Self { options }
     }
@@ -251,6 +250,28 @@ impl KamuCliApiServerHarness {
         kamu.set_system_time(frozen_system_time);
 
         kamu
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn merge_yaml(
+    target: Option<serde_yaml::Value>,
+    source: Option<serde_yaml::Value>,
+) -> Option<serde_yaml::Value> {
+    match (target, source) {
+        (Some(mut target), Some(source)) => {
+            let target_mapping = target.as_mapping_mut().unwrap();
+            let serde_yaml::Value::Mapping(source_mapping) = source else {
+                panic!("source is not a mapping: {source:?}")
+            };
+
+            target_mapping.extend(source_mapping);
+
+            Some(target)
+        }
+        (target, None) => target,
+        (None, generated_kamu_config) => generated_kamu_config,
     }
 }
 
