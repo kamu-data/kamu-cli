@@ -98,23 +98,21 @@ impl KamuCliApiServerHarness {
 
     pub fn postgres(pg_pool: &PgPool, options: KamuCliApiServerHarnessOptions) -> Self {
         let db = pg_pool.connect_options();
-        let kamu_config = format!(
-            indoc::indoc!(
-                r#"
-                kind: CLIConfig
-                version: 1
-                content:
-                    database:
-                        provider: postgres
-                        host: {host}
-                        credentialsPolicy:
-                            source:
-                                kind: rawPassword
-                                userName: {user}
-                                rawPassword: {password}
-                        databaseName: {database}
-                "#
-            ),
+        let kamu_config = indoc::formatdoc!(
+            r#"
+            kind: CLIConfig
+            version: 1
+            content:
+                database:
+                    provider: postgres
+                    host: {host}
+                    credentialsPolicy:
+                        source:
+                            kind: rawPassword
+                            userName: {user}
+                            rawPassword: {password}
+                    databaseName: {database}
+            "#,
             host = db.get_host(),
             user = db.get_username(),
             password = db.get_username(), // It's intended: password is same as user for tests
@@ -126,23 +124,21 @@ impl KamuCliApiServerHarness {
 
     pub fn mysql(mysql_pool: &MySqlPool, options: KamuCliApiServerHarnessOptions) -> Self {
         let db = mysql_pool.connect_options();
-        let kamu_config = format!(
-            indoc::indoc!(
-                r#"
-                kind: CLIConfig
-                version: 1
-                content:
-                    database:
-                        provider: mySql
-                        host: {host}
-                        credentialsPolicy:
-                            source:
-                                kind: rawPassword
-                                userName: {user}
-                                rawPassword: {password}
-                        databaseName: {database}
-                "#
-            ),
+        let kamu_config = indoc::formatdoc!(
+            r#"
+            kind: CLIConfig
+            version: 1
+            content:
+                database:
+                    provider: mySql
+                    host: {host}
+                    credentialsPolicy:
+                        source:
+                            kind: rawPassword
+                            userName: {user}
+                            rawPassword: {password}
+                    databaseName: {database}
+                "#,
             host = db.get_host(),
             user = db.get_username(),
             password = db.get_username(), // It's intended: password is same as user for tests
@@ -169,17 +165,15 @@ impl KamuCliApiServerHarness {
                 .to_string()
         };
 
-        let kamu_config = format!(
-            indoc::indoc!(
-                r#"
-                kind: CLIConfig
-                version: 1
-                content:
-                    database:
-                        provider: sqlite
-                        databasePath: {path}
-                "#
-            ),
+        let kamu_config = indoc::formatdoc!(
+            r#"
+            kind: CLIConfig
+            version: 1
+            content:
+                database:
+                    provider: sqlite
+                    databasePath: {path}
+            "#,
             path = database_path
         );
 
