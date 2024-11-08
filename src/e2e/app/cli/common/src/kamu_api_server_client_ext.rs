@@ -32,7 +32,7 @@ use thiserror::Error;
 use tokio_retry::strategy::FixedInterval;
 use tokio_retry::Retry;
 
-use crate::{AccessToken, KamuApiServerClient, RequestBody, TransferProtocol};
+use crate::{AccessToken, KamuApiServerClient, RequestBody};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -402,12 +402,8 @@ pub struct DatasetApi<'a> {
 }
 
 impl DatasetApi<'_> {
-    pub fn get_endpoint(
-        &self,
-        dataset_alias: &odf::DatasetAlias,
-        protocol: TransferProtocol,
-    ) -> Url {
-        let node_url = self.client.get_node_url(protocol);
+    pub fn get_endpoint(&self, dataset_alias: &odf::DatasetAlias) -> Url {
+        let node_url = self.client.get_odf_node_url();
 
         node_url.join(format!("{dataset_alias}").as_str()).unwrap()
     }

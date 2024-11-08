@@ -11,4 +11,4 @@ mod commands;
 mod rest_api;
 mod test_flow;
 mod test_selftest;
-mod transfer_protocol;
+mod test_smart_transfer_protocol;

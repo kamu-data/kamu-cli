@@ -316,7 +316,7 @@ async fn add_repo_to_workspace(
             "repo",
             "add",
             repo_name,
-            kamu_node_api_client.get_base_url().as_str(),
+            kamu_node_api_client.get_odf_node_url().as_str(),
         ],
         None,
         Some([format!("Added: {repo_name}").as_str()]),
