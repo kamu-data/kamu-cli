@@ -320,7 +320,6 @@ impl AuthApi<'_> {
         .await
     }
 
-    // TODO: remove *_via_rest() postfix
     pub async fn login_via_rest(
         &mut self,
         login_method: impl ToString,

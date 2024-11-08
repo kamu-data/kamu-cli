@@ -260,7 +260,6 @@ pub async fn test_token_validate(mut kamu_api_server_client: KamuApiServerClient
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// TODO: remove *_via_rest() postfix
 pub async fn test_login_via_rest_password(mut kamu_api_server_client: KamuApiServerClient) {
     let login_credentials_json = json!({
         "login": "kamu",
@@ -278,7 +277,6 @@ pub async fn test_login_via_rest_password(mut kamu_api_server_client: KamuApiSer
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// TODO: remove *_via_rest() postfix
 pub async fn test_login_via_rest_dummy_github(mut kamu_api_server_client: KamuApiServerClient) {
     let login_credentials_json = serde_json::Value::Null;
 
@@ -293,7 +291,6 @@ pub async fn test_login_via_rest_dummy_github(mut kamu_api_server_client: KamuAp
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// TODO: remove *_via_rest() postfix
 pub async fn test_login_via_rest_unauthorized(mut kamu_api_server_client: KamuApiServerClient) {
     let login_credentials_json = json!({
         "login": "kamu",
