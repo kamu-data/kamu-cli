@@ -1219,7 +1219,7 @@ pub struct Sql {
     pub url: Option<String>,
 
     /// SQL command to run
-    #[arg(long, value_name = "CMD")]
+    #[arg(long, short = 'c', value_name = "CMD")]
     pub command: Option<String>,
 
     /// SQL script file to execute
