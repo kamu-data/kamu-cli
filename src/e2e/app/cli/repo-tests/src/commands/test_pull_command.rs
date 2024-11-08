@@ -13,8 +13,6 @@ use kamu::testing::LocalS3Server;
 use kamu_cli_e2e_common::{
     DATASET_DERIVATIVE_LEADERBOARD_NAME,
     DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR,
-    DATASET_FETCH_FROM_FILE_STR,
-    DATASET_FETCH_FROM_FILE_STR_DATA,
     DATASET_ROOT_PLAYER_NAME,
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_2,
@@ -25,10 +23,44 @@ use kamu_cli_puppet::KamuCliPuppet;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+const DATASET_SNAPSHOT_STR: &str = indoc::indoc!(
+    r#"
+    kind: DatasetSnapshot
+    version: 1
+    content:
+      name: test.pull-from-file
+      kind: Root
+      metadata:
+        - kind: SetPollingSource
+          fetch:
+            kind: Url
+            url: file://${{ env.data_dir || env.workspace_dir }}${{ env.data_file || 'data.csv' }}
+          read:
+            kind: Csv
+            header: true
+            separator: ','
+          merge:
+            kind: snapshot
+            primaryKey:
+              - city
+    "#
+);
+
+const DATASET_INGEST_DATA: &str = indoc::indoc!(
+    r#"
+    city,population
+    A,1000
+    B,2000
+    C,3000
+    "#
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub async fn test_pull_from_file_success(kamu: KamuCliPuppet) {
     kamu.assert_success_command_execution_with_input(
         ["add", "--stdin"],
-        DATASET_FETCH_FROM_FILE_STR,
+        DATASET_SNAPSHOT_STR,
         None,
         Some([indoc::indoc!(
             r#"
@@ -40,7 +72,7 @@ pub async fn test_pull_from_file_success(kamu: KamuCliPuppet) {
     .await;
 
     let data_path = kamu.workspace_path().join("data.csv");
-    std::fs::write(&data_path, DATASET_FETCH_FROM_FILE_STR_DATA).unwrap();
+    std::fs::write(&data_path, DATASET_INGEST_DATA).unwrap();
 
     let mut workspace_dir = PathBuf::from(kamu.workspace_path());
     workspace_dir.push(""); // ensure trailing separator
@@ -64,7 +96,7 @@ pub async fn test_pull_from_file_success(kamu: KamuCliPuppet) {
 pub async fn test_pull_from_file_failure(kamu: KamuCliPuppet) {
     kamu.assert_success_command_execution_with_input(
         ["add", "--stdin"],
-        DATASET_FETCH_FROM_FILE_STR,
+        DATASET_SNAPSHOT_STR,
         None,
         Some([indoc::indoc!(
             r#"
@@ -76,7 +108,7 @@ pub async fn test_pull_from_file_failure(kamu: KamuCliPuppet) {
     .await;
 
     let data_path = kamu.workspace_path().join("data.csv");
-    std::fs::write(&data_path, DATASET_FETCH_FROM_FILE_STR_DATA).unwrap();
+    std::fs::write(&data_path, DATASET_INGEST_DATA).unwrap();
 
     kamu.assert_failure_command_execution(
         ["pull", "test.pull-from-file"],
