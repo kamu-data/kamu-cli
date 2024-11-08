@@ -1063,7 +1063,7 @@ Executes an SQL query or drops you into an SQL shell
   Possible values: `datafusion`, `spark`
 
 * `--url <URL>` — URL of a running JDBC server (e.g. jdbc:hive2://example.com:10000)
-* `--command <CMD>` — SQL command to run
+* `-c`, `--command <CMD>` — SQL command to run
 * `--script <FILE>` — SQL script file to execute
 
 SQL shell allows you to explore data of all dataset in your workspace using one of the supported data processing engines. This can be a great way to prepare and test a query that you cal later turn into derivative dataset.
