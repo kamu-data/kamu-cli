@@ -9,9 +9,21 @@
 
 use std::path::PathBuf;
 
-use kamu_cli_e2e_common::{DATASET_FETCH_FROM_FILE_STR, DATASET_FETCH_FROM_FILE_STR_DATA};
+use kamu::testing::LocalS3Server;
+use kamu_cli_e2e_common::{
+    DATASET_DERIVATIVE_LEADERBOARD_NAME,
+    DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR,
+    DATASET_FETCH_FROM_FILE_STR,
+    DATASET_FETCH_FROM_FILE_STR_DATA,
+    DATASET_ROOT_PLAYER_NAME,
+    DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
+    DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_2,
+    DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
+};
 use kamu_cli_puppet::extensions::KamuCliPuppetExt;
 use kamu_cli_puppet::KamuCliPuppet;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_pull_from_file_success(kamu: KamuCliPuppet) {
     kamu.assert_success_command_execution_with_input(
@@ -47,6 +59,8 @@ pub async fn test_pull_from_file_success(kamu: KamuCliPuppet) {
     .await;
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub async fn test_pull_from_file_failure(kamu: KamuCliPuppet) {
     kamu.assert_success_command_execution_with_input(
         ["add", "--stdin"],
@@ -75,27 +89,6 @@ pub async fn test_pull_from_file_failure(kamu: KamuCliPuppet) {
     )
         .await;
 }
-
-// Copyright Kamu Data, Inc. and contributors. All rights reserved.
-//
-// Use of this software is governed by the Business Source License
-// included in the LICENSE file.
-//
-// As of the Change Date specified in that file, in accordance with
-// the Business Source License, use of this software will be governed
-// by the Apache License, Version 2.0.
-
-use kamu::testing::LocalS3Server;
-use kamu_cli_e2e_common::{
-    DATASET_DERIVATIVE_LEADERBOARD_NAME,
-    DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR,
-    DATASET_ROOT_PLAYER_NAME,
-    DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
-    DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_2,
-    DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
-};
-use kamu_cli_puppet::extensions::KamuCliPuppetExt;
-use kamu_cli_puppet::KamuCliPuppet;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -357,4 +350,3 @@ pub async fn test_push_pull_s3(kamu: KamuCliPuppet) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
