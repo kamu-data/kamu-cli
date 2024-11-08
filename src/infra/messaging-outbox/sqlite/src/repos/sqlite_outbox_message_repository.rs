@@ -69,7 +69,7 @@ impl OutboxMessageRepository for SqliteOutboxMessageRepository {
                 .iter()
                 .enumerate()
                 .map(|(i, _)| {
-                    format!(
+                    indoc::formatdoc!(
                         "producer_name = ${} AND message_id > ${}",
                         i * 2 + 2, // $2, $4, $6, ...
                         i * 2 + 3, // $3, $5, $7, ...
@@ -85,7 +85,7 @@ impl OutboxMessageRepository for SqliteOutboxMessageRepository {
                 .connection_mut()
                 .await?;
 
-            let query_str = format!(
+            let query_str = indoc::formatdoc!(
                 r#"
                 SELECT
                     message_id,
@@ -110,7 +110,6 @@ impl OutboxMessageRepository for SqliteOutboxMessageRepository {
 
             use sqlx::Row;
             let mut query_stream = query.try_map(|event_row: SqliteRow| {
-                println!("event_row");
                 Ok(OutboxMessage::new(
                     OutboxMessageID::new(event_row.get(0)),
                     event_row.get(1),
