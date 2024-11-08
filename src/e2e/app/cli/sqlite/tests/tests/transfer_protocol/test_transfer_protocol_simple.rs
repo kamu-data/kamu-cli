@@ -12,8 +12,8 @@ use kamu_cli_e2e_common::prelude::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 kamu_cli_run_api_server_e2e_test!(
-    storage = inmem,
-    fixture = kamu_cli_e2e_repo_tests::test_smart_push_pull_sequence,
+    storage = sqlite,
+    fixture = kamu_cli_e2e_repo_tests::test_push_pull_sequence_simple,
     // We need synthetic time for the tests, but the third-party JWT code
     // uses the current time. Assuming that the token lifetime is 24 hours, we will
     // use the projected date (the current day) as a workaround.
@@ -26,8 +26,8 @@ kamu_cli_run_api_server_e2e_test!(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 kamu_cli_run_api_server_e2e_test!(
-    storage = inmem,
-    fixture = kamu_cli_e2e_repo_tests::test_smart_force_push_pull,
+    storage = sqlite,
+    fixture = kamu_cli_e2e_repo_tests::test_force_push_pull_simple,
     options = Options::default()
         .with_multi_tenant()
         .with_today_as_frozen_system_time(),
@@ -37,8 +37,8 @@ kamu_cli_run_api_server_e2e_test!(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 kamu_cli_run_api_server_e2e_test!(
-    storage = inmem,
-    fixture = kamu_cli_e2e_repo_tests::test_smart_push_pull_add_alias,
+    storage = sqlite,
+    fixture = kamu_cli_e2e_repo_tests::test_push_pull_add_alias_simple,
     options = Options::default()
         .with_multi_tenant()
         .with_today_as_frozen_system_time(),
@@ -48,8 +48,8 @@ kamu_cli_run_api_server_e2e_test!(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 kamu_cli_run_api_server_e2e_test!(
-    storage = inmem,
-    fixture = kamu_cli_e2e_repo_tests::test_smart_pull_as,
+    storage = sqlite,
+    fixture = kamu_cli_e2e_repo_tests::test_pull_as_simple,
     options = Options::default()
         .with_multi_tenant()
         .with_today_as_frozen_system_time(),
@@ -59,8 +59,8 @@ kamu_cli_run_api_server_e2e_test!(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 kamu_cli_run_api_server_e2e_test!(
-    storage = inmem,
-    fixture = kamu_cli_e2e_repo_tests::test_smart_push_pull_all,
+    storage = sqlite,
+    fixture = kamu_cli_e2e_repo_tests::test_push_pull_all_simple,
     options = Options::default()
         .with_multi_tenant()
         .with_today_as_frozen_system_time(),
@@ -70,8 +70,8 @@ kamu_cli_run_api_server_e2e_test!(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 kamu_cli_run_api_server_e2e_test!(
-    storage = inmem,
-    fixture = kamu_cli_e2e_repo_tests::test_smart_push_pull_recursive,
+    storage = sqlite,
+    fixture = kamu_cli_e2e_repo_tests::test_push_pull_recursive_simple,
     options = Options::default()
         .with_multi_tenant()
         .with_today_as_frozen_system_time(),
@@ -80,26 +80,9 @@ kamu_cli_run_api_server_e2e_test!(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-kamu_cli_execute_command_e2e_test!(
-    storage = inmem,
-    fixture = kamu_cli_e2e_repo_tests::test_smart_pull_set_watermark,
-    options = Options::default().with_frozen_system_time(),
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-kamu_cli_execute_command_e2e_test!(
-    storage = inmem,
-    fixture = kamu_cli_e2e_repo_tests::test_smart_pull_reset_derivative,
-    options = Options::default().with_frozen_system_time(),
-    extra_test_groups = "containerized, engine, ingest, transform, datafusion"
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 kamu_cli_run_api_server_e2e_test!(
-    storage = inmem,
-    fixture = kamu_cli_e2e_repo_tests::test_smart_push_visibility,
+    storage = sqlite,
+    fixture = kamu_cli_e2e_repo_tests::test_push_visibility_simple,
     options = Options::default()
         .with_multi_tenant()
         .with_today_as_frozen_system_time(),
@@ -108,27 +91,9 @@ kamu_cli_run_api_server_e2e_test!(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-kamu_cli_execute_command_e2e_test!(
-    storage = inmem,
-    fixture = kamu_cli_e2e_repo_tests::test_smart_push_pull_s3,
-    options = Options::default().with_frozen_system_time(),
-    extra_test_groups = "containerized, engine, ingest, datafusion"
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-kamu_cli_execute_command_e2e_test!(
-    storage = inmem,
-    fixture = kamu_cli_e2e_repo_tests::test_smart_pull_derivative,
-    options = Options::default().with_frozen_system_time(),
-    extra_test_groups = "containerized, engine, ingest, transform, datafusion"
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 kamu_cli_run_api_server_e2e_test!(
-    storage = inmem,
-    fixture = kamu_cli_e2e_repo_tests::test_smart_push_from_registered_repo,
+    storage = sqlite,
+    fixture = kamu_cli_e2e_repo_tests::test_push_from_registered_repo_simple,
     options = Options::default()
         .with_multi_tenant()
         .with_today_as_frozen_system_time(),

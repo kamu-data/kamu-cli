@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::borrow::Cow;
+
 use chrono::{DateTime, Utc};
 use internal_error::{InternalError, ResultIntoInternal};
 use reqwest::{Method, Response, StatusCode, Url};
@@ -31,6 +33,14 @@ pub enum RequestBody {
 pub enum ExpectedResponseBody {
     Json(serde_json::Value),
     Plain(String),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Copy, Clone)]
+pub enum TransferProtocol {
+    Simple,
+    Smart,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -65,14 +75,19 @@ impl KamuApiServerClient {
         &self.server_base_url
     }
 
-    pub fn get_odf_node_url(&self) -> Url {
-        let mut node_url = Url::parse("odf+http://host").unwrap();
-        let base_url = self.get_base_url();
+    pub fn get_node_url(&self, protocol: TransferProtocol) -> Cow<Url> {
+        match protocol {
+            TransferProtocol::Simple => Cow::Borrowed(&self.server_base_url),
+            TransferProtocol::Smart => {
+                let mut node_url = Url::parse("odf+http://host").unwrap();
+                let base_url = self.get_base_url();
 
-        node_url.set_host(base_url.host_str()).unwrap();
-        node_url.set_port(base_url.port()).unwrap();
+                node_url.set_host(base_url.host_str()).unwrap();
+                node_url.set_port(base_url.port()).unwrap();
 
-        node_url
+                Cow::Owned(node_url)
+            }
+        }
     }
 
     pub async fn rest_api_call(
