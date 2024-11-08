@@ -57,7 +57,7 @@ const DATASET_INGEST_DATA: &str = indoc::indoc!(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_pull_from_file_success(kamu: KamuCliPuppet) {
+pub async fn test_pull_env_var_template_default_value(kamu: KamuCliPuppet) {
     kamu.assert_success_command_execution_with_input(
         ["add", "--stdin"],
         DATASET_SNAPSHOT_STR,
@@ -93,7 +93,7 @@ pub async fn test_pull_from_file_success(kamu: KamuCliPuppet) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_pull_from_file_failure(kamu: KamuCliPuppet) {
+pub async fn test_pull_env_var_template_default_value_missing_values(kamu: KamuCliPuppet) {
     kamu.assert_success_command_execution_with_input(
         ["add", "--stdin"],
         DATASET_SNAPSHOT_STR,
