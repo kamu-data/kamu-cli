@@ -13,8 +13,12 @@ Recommendation: for ease of reading, use the following order:
 
 ## [Unreleased]
 ### Added
-- E2E: cover all flow scenarios
-- E2E: `KamuApiServerClientExt`: method grouping
+- E2E: reinforce test coverage
+  - Covered all flow scenarios
+  - Covered hot REST API endpoints
+  - Reconfiguring test groups for a small speedup (10%)
+  - Directory structure grooming
+  - `KamuApiServerClientExt`: method grouping
 - Dataset definition: added possibility to set defaults in templates:
   ```yaml
   fetch:
