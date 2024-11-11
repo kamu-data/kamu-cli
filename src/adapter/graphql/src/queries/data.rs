@@ -49,24 +49,26 @@ impl DataQueries {
 
         let query_svc = from_catalog::<dyn domain::QueryService>(ctx).unwrap();
 
-        let df = match query_dialect {
+        let query_result = match query_dialect {
             QueryDialect::SqlDataFusion => {
                 let sql_result = query_svc
                     .sql_statement(&query, domain::QueryOptions::default())
                     .await;
                 match sql_result {
-                    Ok(r) => r.df,
+                    Ok(r) => r,
                     Err(e) => return Ok(e.into()),
                 }
             }
             _ => unimplemented!(),
-        }
-        // TODO: Sanity limits
-        .limit(
-            usize::try_from(skip.unwrap_or(0)).unwrap(),
-            Some(usize::try_from(limit).unwrap()),
-        )
-        .int_err()?;
+        };
+        let df = query_result
+            .df
+            // TODO: Sanity limits
+            .limit(
+                usize::try_from(skip.unwrap_or(0)).unwrap(),
+                Some(usize::try_from(limit).unwrap()),
+            )
+            .int_err()?;
 
         let schema = DataSchema::from_data_frame_schema(df.schema(), schema_format)?;
         let record_batches = match df.collect().await {
@@ -74,8 +76,14 @@ impl DataQueries {
             Err(e) => return Ok(e.into()),
         };
         let data = DataBatch::from_records(&record_batches, data_format)?;
+        let datasets = DatasetState::from_query_state(query_result.state);
 
-        Ok(DataQueryResult::success(Some(schema), data, limit))
+        Ok(DataQueryResult::success(
+            Some(schema),
+            data,
+            Some(datasets),
+            limit,
+        ))
     }
 
     /// Lists engines known to the system and recommended for use
@@ -89,3 +97,5 @@ impl DataQueries {
             .collect())
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
