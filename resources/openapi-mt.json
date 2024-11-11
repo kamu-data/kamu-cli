@@ -16,6 +16,17 @@
         ],
         "type": "object"
       },
+      "ApiErrorResponse": {
+        "properties": {
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "message"
+        ],
+        "type": "object"
+      },
       "Commitment": {
         "additionalProperties": false,
         "properties": {
@@ -873,7 +884,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "default": null
+                  "$ref": "#/components/schemas/ApiErrorResponse"
                 }
               }
             },
@@ -881,7 +892,6 @@
           }
         },
         "security": [
-          {},
           {
             "api_key": []
           }
@@ -918,7 +928,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "default": null
+                  "$ref": "#/components/schemas/ApiErrorResponse"
                 }
               }
             },
@@ -928,7 +938,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "default": null
+                  "$ref": "#/components/schemas/ApiErrorResponse"
                 }
               }
             },
@@ -936,7 +946,6 @@
           }
         },
         "security": [
-          {},
           {
             "api_key": []
           }
@@ -1240,7 +1249,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "default": null
+                  "$ref": "#/components/schemas/ApiErrorResponse"
                 }
               }
             },
@@ -1250,7 +1259,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "default": null
+                  "$ref": "#/components/schemas/ApiErrorResponse"
                 }
               }
             },
@@ -1284,7 +1293,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "default": null
+                  "$ref": "#/components/schemas/ApiErrorResponse"
                 }
               }
             },
@@ -1292,7 +1301,6 @@
           }
         },
         "security": [
-          {},
           {
             "api_key": []
           }
@@ -1473,7 +1481,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/VerifyResponse"
+                  "$ref": "#/components/schemas/ApiErrorResponse"
                 }
               }
             },

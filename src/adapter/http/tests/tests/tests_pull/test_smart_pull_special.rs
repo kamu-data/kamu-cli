@@ -61,7 +61,7 @@ async fn test_smart_pull_unauthenticated() {
             .pull_dataset_result(DatasetRefAny::from(scenario.server_dataset_ref), false)
             .await;
 
-        assert_eq!(
+        pretty_assertions::assert_eq!(
             PullResult::Updated {
                 old_head: None,
                 new_head: scenario.server_commit_result.new_head,
@@ -99,14 +99,16 @@ async fn test_smart_pull_incompatible_version_err() {
     let api_server_handle = scenario.server_harness.api_server_run();
 
     let client_handle = async {
-        let connet_result = scenario
+        let connect_result = scenario
             .client_harness
             .try_connect_to_websocket(scenario.server_dataset_ref.url().unwrap(), "pull")
             .await;
 
-        assert_matches!(connet_result, Err(msg) if {
-            msg == "Incompatible client version"
-        });
+        assert_matches!(
+            connect_result,
+            Err(msg)
+                if msg == r#"{"message":"Incompatible client version"}"#
+        );
     };
 
     await_client_server_flow!(api_server_handle, client_handle);

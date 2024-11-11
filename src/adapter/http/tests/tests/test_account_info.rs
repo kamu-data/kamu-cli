@@ -27,8 +27,14 @@ async fn test_get_account_info_with_wrong_token() {
             .send()
             .await
             .unwrap();
-        assert_eq!(401, res.status());
-        assert_eq!("Unauthorized", res.text().await.unwrap());
+
+        pretty_assertions::assert_eq!(401, res.status());
+        pretty_assertions::assert_eq!(
+            json!({
+                "message": "Unauthorized"
+            }),
+            res.json::<serde_json::Value>().await.unwrap()
+        );
     };
 
     await_client_server_flow!(harness.server_harness.api_server_run(), client);

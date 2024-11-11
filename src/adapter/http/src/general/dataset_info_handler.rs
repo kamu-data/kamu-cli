@@ -79,12 +79,11 @@ impl DatasetInfoResponse {
     ),
     responses(
         (status = OK, body = DatasetInfoResponse),
-        (status = UNAUTHORIZED, body = ()),
-        (status = NOT_FOUND, body = ()),
+        (status = UNAUTHORIZED, body = ApiErrorResponse),
+        (status = NOT_FOUND, body = ApiErrorResponse),
     ),
     tag = "kamu",
     security(
-        (),
         ("api_key" = [])
     )
 )]

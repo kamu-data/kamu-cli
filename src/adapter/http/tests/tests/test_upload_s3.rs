@@ -27,6 +27,7 @@ use kamu_accounts_services::{
 };
 use kamu_adapter_http::{FileUploadLimitConfig, UploadContext, UploadService, UploadServiceS3};
 use opendatafabric::AccountID;
+use serde_json::json;
 use time_source::SystemTimeSourceDefault;
 use tokio::io::AsyncReadExt;
 
@@ -150,10 +151,19 @@ async fn test_attempt_upload_file_unauthorized() {
             .send()
             .await
             .unwrap();
-        assert_eq!(401, upload_prepare_response.status());
-        assert_eq!(
-            "No authentication token provided",
-            upload_prepare_response.text().await.unwrap()
+
+        pretty_assertions::assert_eq!(
+            http::StatusCode::UNAUTHORIZED,
+            upload_prepare_response.status()
+        );
+        pretty_assertions::assert_eq!(
+            json!({
+                "message": "No authentication token provided"
+            }),
+            upload_prepare_response
+                .json::<serde_json::Value>()
+                .await
+                .unwrap()
         );
     };
 
@@ -183,18 +193,18 @@ async fn test_attempt_upload_file_authorized() {
             .await
             .unwrap();
 
-        assert_eq!(200, upload_prepare_response.status());
+        pretty_assertions::assert_eq!(http::StatusCode::OK, upload_prepare_response.status());
         let upload_context = upload_prepare_response
             .json::<UploadContext>()
             .await
             .unwrap();
-        assert_eq!("PUT", upload_context.method);
+        pretty_assertions::assert_eq!(http::method::Method::PUT.as_str(), upload_context.method);
         assert!(!upload_context.use_multipart);
         assert!(upload_context.fields.is_empty());
 
-        assert_eq!(
+        pretty_assertions::assert_eq!(
+            vec![(String::from("x-amz-acl"), String::from("private"))],
             upload_context.headers,
-            vec![(String::from("x-amz-acl"), String::from("private"))]
         );
 
         let header_map = Harness::make_header_map(&upload_context);
@@ -208,7 +218,7 @@ async fn test_attempt_upload_file_authorized() {
             .await
             .unwrap();
 
-        assert_eq!(200, s3_upload_response.status());
+        pretty_assertions::assert_eq!(http::StatusCode::OK, s3_upload_response.status());
 
         let upload_token = upload_context.upload_token.0;
 
@@ -226,7 +236,7 @@ async fn test_attempt_upload_file_authorized() {
 
         let actual_file_body =
             Harness::read_bucket_file_as_string(&upload_bucket_context, expected_key).await;
-        assert_eq!(actual_file_body, FILE_BODY);
+        pretty_assertions::assert_eq!(FILE_BODY, actual_file_body);
     };
 
     await_client_server_flow!(harness.api_server_run(), client);
@@ -261,10 +271,18 @@ async fn test_attempt_upload_file_that_is_too_large() {
             .await
             .unwrap();
 
-        assert_eq!(400, upload_prepare_response.status());
-        assert_eq!(
-            "Content too large",
-            upload_prepare_response.text().await.unwrap()
+        pretty_assertions::assert_eq!(
+            http::StatusCode::BAD_REQUEST,
+            upload_prepare_response.status()
+        );
+        pretty_assertions::assert_eq!(
+            json!({
+                "message": "Content too large"
+            }),
+            upload_prepare_response
+                .json::<serde_json::Value>()
+                .await
+                .unwrap()
         );
 
         // Note: S3/Minio will of course accept up to their limit (5Gb?)
@@ -295,7 +313,7 @@ async fn test_upload_then_read_file() {
             .await
             .unwrap();
 
-        assert_eq!(200, upload_prepare_response.status());
+        pretty_assertions::assert_eq!(http::StatusCode::OK, upload_prepare_response.status());
         let upload_context = upload_prepare_response
             .json::<UploadContext>()
             .await
@@ -311,7 +329,7 @@ async fn test_upload_then_read_file() {
             .send()
             .await
             .unwrap();
-        assert_eq!(200, s3_upload_response.status());
+        pretty_assertions::assert_eq!(http::StatusCode::OK, s3_upload_response.status());
 
         // Read file with the same authorization token
         let get_url = format!("{retrieve_url}/{}", upload_context.upload_token);
@@ -321,9 +339,9 @@ async fn test_upload_then_read_file() {
             .send()
             .await
             .unwrap();
-        assert_eq!(200, upload_retrieve_response.status());
+        pretty_assertions::assert_eq!(http::StatusCode::OK, upload_retrieve_response.status());
         let file_body = upload_retrieve_response.text().await.unwrap();
-        assert_eq!(FILE_BODY, file_body);
+        pretty_assertions::assert_eq!(FILE_BODY, file_body);
 
         // Read file with different authorization token
         let get_url = format!("{retrieve_url}/{}", upload_context.upload_token);
@@ -333,15 +351,15 @@ async fn test_upload_then_read_file() {
             .send()
             .await
             .unwrap();
-        assert_eq!(200, upload_retrieve_response.status());
+        pretty_assertions::assert_eq!(http::StatusCode::OK, upload_retrieve_response.status());
         let file_body = upload_retrieve_response.text().await.unwrap();
-        assert_eq!(FILE_BODY, file_body);
+        pretty_assertions::assert_eq!(FILE_BODY, file_body);
 
         // Read file anonymously
         let upload_retrieve_response = client.get(get_url).send().await.unwrap();
-        assert_eq!(200, upload_retrieve_response.status());
+        pretty_assertions::assert_eq!(http::StatusCode::OK, upload_retrieve_response.status());
         let file_body = upload_retrieve_response.text().await.unwrap();
-        assert_eq!(FILE_BODY, file_body);
+        pretty_assertions::assert_eq!(FILE_BODY, file_body);
     };
 
     await_client_server_flow!(harness.api_server_run(), client);

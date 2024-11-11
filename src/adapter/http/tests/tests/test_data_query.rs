@@ -193,9 +193,8 @@ async fn test_data_tail_handler() {
             .await
             .unwrap();
 
-        assert_eq!(res.status(), http::StatusCode::OK);
+        pretty_assertions::assert_eq!(http::StatusCode::OK, res.status());
         pretty_assertions::assert_eq!(
-            res.json::<serde_json::Value>().await.unwrap(),
             json!({
                 "dataFormat": "JsonAoS",
                 "data": [{
@@ -270,7 +269,8 @@ async fn test_data_tail_handler() {
                     }],
                     "metadata": {},
                 },
-            })
+            }),
+            res.json::<serde_json::Value>().await.unwrap()
         );
 
         // Limit
@@ -284,7 +284,6 @@ async fn test_data_tail_handler() {
             .unwrap();
 
         pretty_assertions::assert_eq!(
-            res.json::<serde_json::Value>().await.unwrap(),
             json!({
                 "dataFormat": "JsonAoS",
                 "data": [{
@@ -295,7 +294,8 @@ async fn test_data_tail_handler() {
                     "population": 200,
                     "system_time": "2050-01-01T12:00:00Z"
                 }]
-            })
+            }),
+            res.json::<serde_json::Value>().await.unwrap()
         );
 
         // Skip
@@ -309,7 +309,6 @@ async fn test_data_tail_handler() {
             .unwrap();
 
         pretty_assertions::assert_eq!(
-            res.json::<serde_json::Value>().await.unwrap(),
             json!({
                 "dataFormat": "JsonAoS",
                 "data": [{
@@ -320,7 +319,8 @@ async fn test_data_tail_handler() {
                     "population": 100,
                     "system_time": "2050-01-01T12:00:00Z"
                 }]
-            })
+            }),
+            res.json::<serde_json::Value>().await.unwrap()
         );
     };
 
@@ -366,7 +366,6 @@ async fn test_data_query_handler() {
             .unwrap();
 
         pretty_assertions::assert_eq!(
-            res.json::<serde_json::Value>().await.unwrap(),
             json!({
                 "output": {
                     "data": [
@@ -375,7 +374,8 @@ async fn test_data_query_handler() {
                     ],
                     "dataFormat": "JsonAoS",
                 }
-            })
+            }),
+            res.json::<serde_json::Value>().await.unwrap()
         );
 
         // 2: Input and schema
@@ -395,7 +395,6 @@ async fn test_data_query_handler() {
         let ignore_schema = &response["output"]["schema"];
 
         pretty_assertions::assert_eq!(
-            response,
             json!({
                 "input": {
                     "include": ["Input", "Schema"],
@@ -420,7 +419,8 @@ async fn test_data_query_handler() {
                     "schema": ignore_schema,
                     "schemaFormat": "ArrowJson",
                 }
-            })
+            }),
+            response
         );
 
         // 3: Full with proof
@@ -440,7 +440,6 @@ async fn test_data_query_handler() {
         let ignore_schema = &response["output"]["schema"];
 
         pretty_assertions::assert_eq!(
-            response,
             json!({
                 "input": {
                     // Note: Proof automatically adds Input
@@ -477,11 +476,12 @@ async fn test_data_query_handler() {
                     "verificationMethod": "did:key:z6Mko2nqhQ9wYSTS5Giab2j1aHzGnxHimqwmFeEVY8aNsVnN",
                     "proofValue": "u7IDYkSq0O3QFvq-HRZ-jwaiCbfm7BFVcMKnSCanvC02OBKzfAhA4RPn8--GAmVR9wf54MgkuO4qAXSCXiVRMBw",
                 }
-            })
+            }),
+            response
         );
 
         // Verify the commitment
-        assert_eq!(
+        pretty_assertions::assert_eq!(
             response["commitment"]["inputHash"].as_str().unwrap(),
             Multihash::from_digest_sha3_256(
                 canonical_json::to_string(&response["input"])
@@ -490,7 +490,7 @@ async fn test_data_query_handler() {
             )
             .to_string()
         );
-        assert_eq!(
+        pretty_assertions::assert_eq!(
             response["commitment"]["outputHash"].as_str().unwrap(),
             Multihash::from_digest_sha3_256(
                 canonical_json::to_string(&response["output"])
@@ -499,7 +499,7 @@ async fn test_data_query_handler() {
             )
             .to_string()
         );
-        assert_eq!(
+        pretty_assertions::assert_eq!(
             response["commitment"]["subQueriesHash"].as_str().unwrap(),
             Multihash::from_digest_sha3_256(
                 canonical_json::to_string(&response["subQueries"])
@@ -533,7 +533,7 @@ async fn test_data_query_handler() {
             .await
             .unwrap();
 
-        assert_eq!(res.status(), http::StatusCode::NOT_FOUND);
+        pretty_assertions::assert_eq!(http::StatusCode::NOT_FOUND, res.status());
 
         // Error: Block does not exist
         let res = cl
@@ -550,7 +550,7 @@ async fn test_data_query_handler() {
             .await
             .unwrap();
 
-        assert_eq!(res.status(), http::StatusCode::NOT_FOUND);
+        pretty_assertions::assert_eq!(http::StatusCode::NOT_FOUND, res.status());
     };
 
     await_client_server_flow!(harness.server_harness.api_server_run(), client);
@@ -598,7 +598,6 @@ async fn test_data_verify_handler() {
         let response = res.json::<serde_json::Value>().await.unwrap();
 
         pretty_assertions::assert_eq!(
-            response,
             json!({
                 "input": {
                     "include": ["Input", "Proof"],
@@ -631,7 +630,8 @@ async fn test_data_verify_handler() {
                     "verificationMethod": "did:key:z6Mko2nqhQ9wYSTS5Giab2j1aHzGnxHimqwmFeEVY8aNsVnN",
                     "proofValue": "u_uOR7GUN2mh4owqvhBefeWlVGX3PiBRqnU1UDL9yoeKhuPUyC5ym9KvMl_uzwllVmaA95en7tEL5t6ux0wTmBQ",
                 }
-            })
+            }),
+            response
         );
 
         // Successful validation
@@ -648,7 +648,7 @@ async fn test_data_verify_handler() {
             .unwrap();
 
         let response = res.json::<serde_json::Value>().await.unwrap();
-        pretty_assertions::assert_eq!(response, json!({"ok": true}));
+        pretty_assertions::assert_eq!(json!({"ok": true}), response);
 
         // Invalid request: input hash
         let mut invalid_request = request.clone();
@@ -662,9 +662,8 @@ async fn test_data_verify_handler() {
             .await
             .unwrap();
 
-        assert_eq!(res.status(), http::StatusCode::BAD_REQUEST);
+        pretty_assertions::assert_eq!(http::StatusCode::BAD_REQUEST, res.status());
         pretty_assertions::assert_eq!(
-            res.json::<serde_json::Value>().await.unwrap(),
             json!({
                 "ok": false,
                 "error": {
@@ -673,6 +672,7 @@ async fn test_data_verify_handler() {
                                 commitment.inputHash doesn't match the hash of input object",
                 }
             }),
+            res.json::<serde_json::Value>().await.unwrap()
         );
 
         // Invalid request: subQueries hash
@@ -687,9 +687,8 @@ async fn test_data_verify_handler() {
             .await
             .unwrap();
 
-        assert_eq!(res.status(), http::StatusCode::BAD_REQUEST);
+        pretty_assertions::assert_eq!(http::StatusCode::BAD_REQUEST, res.status());
         pretty_assertions::assert_eq!(
-            res.json::<serde_json::Value>().await.unwrap(),
             json!({
                 "ok": false,
                 "error": {
@@ -698,6 +697,7 @@ async fn test_data_verify_handler() {
                                 commitment.subQueriesHash doesn't match the hash of subQueries object",
                 }
             }),
+            res.json::<serde_json::Value>().await.unwrap()
         );
 
         // Invalid request: bad signature
@@ -712,9 +712,8 @@ async fn test_data_verify_handler() {
             .await
             .unwrap();
 
-        assert_eq!(res.status(), http::StatusCode::BAD_REQUEST);
+        pretty_assertions::assert_eq!(http::StatusCode::BAD_REQUEST, res.status());
         pretty_assertions::assert_eq!(
-            res.json::<serde_json::Value>().await.unwrap(),
             json!({
                 "ok": false,
                 "error": {
@@ -723,6 +722,7 @@ async fn test_data_verify_handler() {
                                 Verification equation was not satisfied",
                 }
             }),
+            res.json::<serde_json::Value>().await.unwrap()
         );
 
         // Output mismatch
@@ -741,7 +741,7 @@ async fn test_data_verify_handler() {
             .await
             .unwrap();
 
-        assert_eq!(res.status(), http::StatusCode::BAD_REQUEST);
+        pretty_assertions::assert_eq!(http::StatusCode::BAD_REQUEST, res.status());
         pretty_assertions::assert_eq!(
             res.json::<serde_json::Value>().await.unwrap(),
             json!({
@@ -784,7 +784,7 @@ async fn test_data_verify_handler() {
             .await
             .unwrap();
 
-        assert_eq!(res.status(), http::StatusCode::BAD_REQUEST);
+        pretty_assertions::assert_eq!(http::StatusCode::BAD_REQUEST, res.status());
         pretty_assertions::assert_eq!(
             res.json::<serde_json::Value>().await.unwrap(),
             json!({
@@ -827,7 +827,7 @@ async fn test_data_verify_handler() {
             .await
             .unwrap();
 
-        assert_eq!(res.status(), http::StatusCode::BAD_REQUEST);
+        pretty_assertions::assert_eq!(http::StatusCode::BAD_REQUEST, res.status());
         pretty_assertions::assert_eq!(
             res.json::<serde_json::Value>().await.unwrap(),
             json!({
@@ -870,11 +870,18 @@ async fn test_data_query_handler_error_sql_unparsable() {
             .unwrap();
 
         let status = res.status();
-        let body = res.text().await.unwrap();
-        assert_eq!(status, 400, "Unexpected response: {status} {body}");
-        assert_eq!(
-            body,
-            "sql parser error: Expected end of statement, found: ?"
+        let body = res.json::<serde_json::Value>().await.unwrap();
+
+        pretty_assertions::assert_eq!(
+            http::StatusCode::BAD_REQUEST,
+            status,
+            "Unexpected response: {status} {body}"
+        );
+        pretty_assertions::assert_eq!(
+            json!({
+                "message": "sql parser error: Expected end of statement, found: ?"
+            }),
+            body
         );
     };
 
@@ -907,11 +914,18 @@ async fn test_data_query_handler_error_sql_missing_function() {
             .unwrap();
 
         let status = res.status();
-        let body = res.text().await.unwrap();
-        assert_eq!(status, 400, "Unexpected response: {status} {body}");
-        assert_eq!(
-            body,
-            "Error during planning: Invalid function 'foobar'.\nDid you mean 'floor'?"
+        let body = res.json::<serde_json::Value>().await.unwrap();
+
+        pretty_assertions::assert_eq!(
+            http::StatusCode::BAD_REQUEST,
+            status,
+            "Unexpected response: {status} {body}"
+        );
+        pretty_assertions::assert_eq!(
+            json!({
+                "message": "Error during planning: Invalid function 'foobar'.\nDid you mean 'floor'?"
+            }),
+            body
         );
     };
 
@@ -939,11 +953,18 @@ async fn test_data_query_handler_dataset_does_not_exist() {
             .unwrap();
 
         let status = res.status();
-        let body = res.text().await.unwrap();
-        assert_eq!(status, 400, "Unexpected response: {status} {body}");
-        assert_eq!(
-            body,
-            "Error during planning: table 'kamu.kamu.does_not_exist' not found"
+        let body = res.json::<serde_json::Value>().await.unwrap();
+
+        pretty_assertions::assert_eq!(
+            http::StatusCode::BAD_REQUEST,
+            status,
+            "Unexpected response: {status} {body}"
+        );
+        pretty_assertions::assert_eq!(
+            json!({
+                "message": "Error during planning: table 'kamu.kamu.does_not_exist' not found"
+            }),
+            body
         );
     };
 
@@ -980,12 +1001,19 @@ async fn test_data_query_handler_dataset_does_not_exist_bad_alias() {
             .unwrap();
 
         let status = res.status();
-        let body = res.text().await.unwrap();
-        assert_eq!(status, 404, "Unexpected response: {status} {body}");
-        assert_eq!(
-            body,
-            "Dataset not found: \
-             did:odf:fed011ba79f25e520298ba6945dd6197083a366364bef178d5899b100c434748d88e5"
+        let body = res.json::<serde_json::Value>().await.unwrap();
+
+        pretty_assertions::assert_eq!(
+            http::StatusCode::NOT_FOUND,
+            status,
+            "Unexpected response: {status} {body}"
+        );
+        pretty_assertions::assert_eq!(
+            json!({
+                "message": "Dataset not found: \
+                            did:odf:fed011ba79f25e520298ba6945dd6197083a366364bef178d5899b100c434748d88e5"
+            }),
+            body
         );
     };
 
@@ -1019,7 +1047,6 @@ async fn test_data_query_handler_ranges() {
             .unwrap();
 
         pretty_assertions::assert_eq!(
-            res.json::<serde_json::Value>().await.unwrap(),
             json!({
                 "output": {
                     "dataFormat": "JsonAoS",
@@ -1029,7 +1056,8 @@ async fn test_data_query_handler_ranges() {
                         "population": 200,
                     }]
                 }
-            })
+            }),
+            res.json::<serde_json::Value>().await.unwrap()
         );
 
         // Skip
@@ -1043,7 +1071,6 @@ async fn test_data_query_handler_ranges() {
             .unwrap();
 
         pretty_assertions::assert_eq!(
-            res.json::<serde_json::Value>().await.unwrap(),
             json!({
                 "output": {
                     "dataFormat": "JsonAoS",
@@ -1053,7 +1080,8 @@ async fn test_data_query_handler_ranges() {
                         "population": 100,
                     }]
                 }
-            })
+            }),
+            res.json::<serde_json::Value>().await.unwrap()
         );
     };
 
@@ -1085,7 +1113,6 @@ async fn test_data_query_handler_data_formats() {
             .unwrap();
 
         pretty_assertions::assert_eq!(
-            res.json::<serde_json::Value>().await.unwrap(),
             json!({
                 "output": {
                     "dataFormat": "JsonAoS",
@@ -1099,7 +1126,8 @@ async fn test_data_query_handler_data_formats() {
                         "population": 100,
                     }]
                 }
-            })
+            }),
+            res.json::<serde_json::Value>().await.unwrap()
         );
 
         let res = cl
@@ -1112,7 +1140,6 @@ async fn test_data_query_handler_data_formats() {
             .unwrap();
 
         pretty_assertions::assert_eq!(
-            res.json::<serde_json::Value>().await.unwrap(),
             json!({
                 "output": {
                     "dataFormat": "JsonSoA",
@@ -1122,7 +1149,8 @@ async fn test_data_query_handler_data_formats() {
                         "population": [200, 100],
                     }
                 }
-            })
+            }),
+            res.json::<serde_json::Value>().await.unwrap()
         );
 
         let res = cl
@@ -1135,7 +1163,6 @@ async fn test_data_query_handler_data_formats() {
             .unwrap();
 
         pretty_assertions::assert_eq!(
-            res.json::<serde_json::Value>().await.unwrap(),
             json!({
                 "output": {
                     "dataFormat": "JsonAoA",
@@ -1144,7 +1171,8 @@ async fn test_data_query_handler_data_formats() {
                         [0, "A", 100],
                     ]
                 }
-            })
+            }),
+            res.json::<serde_json::Value>().await.unwrap()
         );
     };
 
@@ -1179,7 +1207,6 @@ async fn test_data_query_handler_schema_formats() {
         let ignore_data = &resp["output"]["data"];
 
         pretty_assertions::assert_eq!(
-            resp,
             json!({
                 "output": {
                     "schemaFormat": "ArrowJson",
@@ -1211,7 +1238,8 @@ async fn test_data_query_handler_schema_formats() {
                     "data": ignore_data,
                     "dataFormat": "JsonAoS",
                 }
-            })
+            }),
+            resp
         );
 
         let res = cl
@@ -1227,7 +1255,6 @@ async fn test_data_query_handler_schema_formats() {
         let ignore_data = &resp["output"]["data"];
 
         pretty_assertions::assert_eq!(
-            resp,
             json!({
                 "output": {
                     "schemaFormat": "ArrowJson",
@@ -1259,7 +1286,8 @@ async fn test_data_query_handler_schema_formats() {
                     "data": ignore_data,
                     "dataFormat": "JsonAoS",
                 }
-            })
+            }),
+            resp
         );
 
         let res = cl
@@ -1272,9 +1300,6 @@ async fn test_data_query_handler_schema_formats() {
             .unwrap();
 
         pretty_assertions::assert_eq!(
-            res.json::<serde_json::Value>().await.unwrap()["output"]["schema"]
-                .as_str()
-                .unwrap(),
             indoc::indoc!(
                 r#"message arrow_schema {
                   REQUIRED INT64 offset;
@@ -1282,7 +1307,10 @@ async fn test_data_query_handler_schema_formats() {
                   REQUIRED INT64 population (INTEGER(64,false));
                 }
                 "#
-            )
+            ),
+            res.json::<serde_json::Value>().await.unwrap()["output"]["schema"]
+                .as_str()
+                .unwrap(),
         );
 
         let res = cl
@@ -1298,7 +1326,6 @@ async fn test_data_query_handler_schema_formats() {
         let ignore_data = &resp["output"]["data"];
 
         pretty_assertions::assert_eq!(
-            resp,
             json!({
                 "output": {
                     "schemaFormat": "ParquetJson",
@@ -1324,7 +1351,8 @@ async fn test_data_query_handler_schema_formats() {
                     "data": ignore_data,
                     "dataFormat": "JsonAoS",
                 }
-            })
+            }),
+            resp
         );
     };
 
@@ -1364,7 +1392,6 @@ async fn test_metadata_handler_aspects() {
             .unwrap();
 
         pretty_assertions::assert_eq!(
-            res.json::<serde_json::Value>().await.unwrap(),
             json!({
                 "output": {
                     "seed": {
@@ -1372,7 +1399,8 @@ async fn test_metadata_handler_aspects() {
                         "datasetKind": "Root",
                     }
                 }
-            })
+            }),
+            res.json::<serde_json::Value>().await.unwrap()
         );
 
         // Full
@@ -1389,7 +1417,6 @@ async fn test_metadata_handler_aspects() {
         let res = res.json::<serde_json::Value>().await.unwrap();
         let ignore_schema = &res["output"]["schema"];
         pretty_assertions::assert_eq!(
-            res,
             json!({
                 "output": {
                     "attachments": {
@@ -1427,7 +1454,8 @@ async fn test_metadata_handler_aspects() {
                         "systemTimeColumn": "system_time",
                     }
                 }
-            })
+            }),
+            res
         );
     };
 
@@ -1455,7 +1483,6 @@ async fn test_metadata_handler_schema_formats() {
             .unwrap();
 
         pretty_assertions::assert_eq!(
-            res.json::<serde_json::Value>().await.unwrap(),
             json!({
                 "output": {
                     "schemaFormat": "ArrowJson",
@@ -1523,7 +1550,8 @@ async fn test_metadata_handler_schema_formats() {
                         "metadata": {}
                     },
                 }
-            })
+            }),
+            res.json::<serde_json::Value>().await.unwrap()
         );
 
         let query_url = format!("{}/metadata", harness.dataset_url);
@@ -1537,7 +1565,6 @@ async fn test_metadata_handler_schema_formats() {
             .unwrap();
 
         pretty_assertions::assert_eq!(
-            res.json::<serde_json::Value>().await.unwrap(),
             json!({
                 "output": {
                     "schemaFormat": "ParquetJson",
@@ -1582,7 +1609,8 @@ async fn test_metadata_handler_schema_formats() {
                         ],
                     },
                 }
-            })
+            }),
+            res.json::<serde_json::Value>().await.unwrap()
         );
 
         let query_url = format!("{}/metadata", harness.dataset_url);
@@ -1596,13 +1624,13 @@ async fn test_metadata_handler_schema_formats() {
             .unwrap();
 
         pretty_assertions::assert_eq!(
-            res.json::<serde_json::Value>().await.unwrap(),
             json!({
                 "output": {
                     "schemaFormat": "Parquet",
                     "schema": "message arrow_schema {\n  REQUIRED INT64 offset;\n  REQUIRED INT32 op;\n  REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));\n  OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));\n  REQUIRED BYTE_ARRAY city (STRING);\n  REQUIRED INT64 population (INTEGER(64,false));\n}\n",
                 }
-            })
+            }),
+            res.json::<serde_json::Value>().await.unwrap()
         );
     };
 

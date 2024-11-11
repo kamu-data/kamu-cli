@@ -49,7 +49,7 @@ use crate::data::verify_types::{
     request_body = VerifyRequest,
     responses(
         (status = OK, body = VerifyResponse),
-        (status = BAD_REQUEST, body = VerifyResponse),
+        (status = BAD_REQUEST, body = ApiErrorResponse),
     ),
     tag = "odf-query",
     security(

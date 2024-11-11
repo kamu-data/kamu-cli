@@ -10,7 +10,7 @@
 use axum::{Extension, Json};
 use database_common_macros::transactional_handler;
 use dill::Catalog;
-use http_common::{ApiError, IntoApiError, ResultIntoApiError};
+use http_common::{ApiError, ApiErrorResponse, IntoApiError, ResultIntoApiError};
 use opendatafabric as odf;
 use serde::{Deserialize, Serialize};
 use utoipa_axum::router::OpenApiRouter;
@@ -99,8 +99,8 @@ pub struct LoginResponseBody {
     request_body = LoginRequestBody,
     responses(
         (status = OK, body = LoginResponseBody),
-        (status = BAD_REQUEST, body = ()),
-        (status = UNAUTHORIZED, body = ()),
+        (status = BAD_REQUEST, body = ApiErrorResponse),
+        (status = UNAUTHORIZED, body = ApiErrorResponse),
     ),
     tag = "kamu",
     security(())
@@ -146,11 +146,10 @@ pub async fn platform_login_handler(
     path = "/platform/token/validate",
     responses(
         (status = OK, body = ()),
-        (status = UNAUTHORIZED, body = ())
+        (status = UNAUTHORIZED, body = ApiErrorResponse)
     ),
     tag = "kamu",
     security(
-        (),
         ("api_key" = []),
     )
 )]

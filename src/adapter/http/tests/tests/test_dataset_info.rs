@@ -63,6 +63,8 @@ async fn test_get_dataset_info_by_id() {
     await_client_server_flow!(harness.server_harness.api_server_run(), client);
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[test_log::test(tokio::test)]
 async fn test_get_dataset_info_by_id_not_found_err() {
     let harness = DatasetInfoHarness::new(false).await;
@@ -78,10 +80,12 @@ async fn test_get_dataset_info_by_id_not_found_err() {
             .await
             .unwrap();
 
-        assert_eq!(404, res.status());
-        assert_eq!(
-            format!("Dataset not found: {dataset_id}"),
-            res.text().await.unwrap()
+        pretty_assertions::assert_eq!(http::StatusCode::NOT_FOUND, res.status());
+        pretty_assertions::assert_eq!(
+            json!({
+                "message": format!("Dataset not found: {dataset_id}")
+            }),
+            res.json::<serde_json::Value>().await.unwrap()
         );
     };
 
@@ -115,3 +119,5 @@ impl DatasetInfoHarness {
         }
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

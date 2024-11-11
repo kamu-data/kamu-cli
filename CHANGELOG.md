@@ -28,6 +28,11 @@ Recommendation: for ease of reading, use the following order:
       - --request-interval
       - '${{ env.request_interval || 2 }}'
   ```
+### Changed
+- HTTP API errors will now come in JSON format instead of plain text, for example:
+  ```json
+  { "message": "Incompatible client version" }
+  ```
 ### Fixed
 - `kamu add` correctly handle snapshots with circular dependencies
 - `kamu push` show human readable error when trying to push to non existing repository

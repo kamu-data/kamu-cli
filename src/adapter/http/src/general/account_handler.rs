@@ -53,11 +53,10 @@ impl From<Account> for AccountResponse {
     path = "/accounts/me",
     responses(
         (status = OK, body = AccountResponse),
-        (status = UNAUTHORIZED, body = ()),
+        (status = UNAUTHORIZED, body = ApiErrorResponse),
     ),
     tag = "kamu",
     security(
-        (),
         ("api_key" = [])
     )
 )]

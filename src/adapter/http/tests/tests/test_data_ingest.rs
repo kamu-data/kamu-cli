@@ -66,7 +66,7 @@ async fn test_data_push_ingest_handler() {
             )
             .await
             .unwrap();
-        assert_eq!(res.status(), http::StatusCode::OK);
+        pretty_assertions::assert_eq!(http::StatusCode::OK, res.status());
 
         dataset_helper
             .assert_last_data_eq(
@@ -156,7 +156,7 @@ async fn test_data_push_ingest_handler() {
             )
             .await
             .unwrap();
-        assert_eq!(res.status(), http::StatusCode::BAD_REQUEST);
+        pretty_assertions::assert_eq!(http::StatusCode::BAD_REQUEST, res.status());
 
         // OK - uses named source
         let res = cl
@@ -177,7 +177,7 @@ async fn test_data_push_ingest_handler() {
             )
             .await
             .unwrap();
-        assert_eq!(res.status(), http::StatusCode::OK);
+        pretty_assertions::assert_eq!(http::StatusCode::OK, res.status());
 
         dataset_helper
             .assert_last_data_eq(
@@ -224,7 +224,7 @@ async fn test_data_push_ingest_handler() {
             )
             .await
             .unwrap();
-        assert_eq!(res.status(), http::StatusCode::BAD_REQUEST);
+        pretty_assertions::assert_eq!(http::StatusCode::BAD_REQUEST, res.status());
 
         // OK - transcoding from CSV
         let res = cl
@@ -238,7 +238,7 @@ async fn test_data_push_ingest_handler() {
             )
             .await
             .unwrap();
-        assert_eq!(res.status(), http::StatusCode::OK);
+        pretty_assertions::assert_eq!(http::StatusCode::OK, res.status());
 
         dataset_helper
             .assert_last_data_eq(
@@ -323,7 +323,7 @@ async fn test_data_push_ingest_upload_token_no_initial_source() {
             )
             .await
             .unwrap();
-        assert_eq!(res.status(), http::StatusCode::OK);
+        pretty_assertions::assert_eq!(http::StatusCode::OK, res.status());
 
         dataset_helper
             .assert_last_data_eq(
@@ -411,7 +411,7 @@ async fn test_data_push_ingest_upload_token_with_initial_source() {
             )
             .await
             .unwrap();
-        assert_eq!(res.status(), http::StatusCode::OK);
+        pretty_assertions::assert_eq!(http::StatusCode::OK, res.status());
 
         dataset_helper
             .assert_last_data_eq(
@@ -578,10 +578,13 @@ async fn test_data_push_ingest_upload_token_actual_file_different_size() {
             )
             .await
             .unwrap();
-        assert_eq!(res.status(), http::StatusCode::BAD_REQUEST);
-        assert_eq!(
-            "Actual content length 318 does not match the initially declared length 301",
-            res.text().await.unwrap()
+
+        pretty_assertions::assert_eq!(http::StatusCode::BAD_REQUEST, res.status());
+        pretty_assertions::assert_eq!(
+            json!({
+                "message": "Actual content length 318 does not match the initially declared length 301"
+            }),
+            res.json::<serde_json::Value>().await.unwrap()
         );
     };
 

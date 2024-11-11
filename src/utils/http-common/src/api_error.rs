@@ -18,6 +18,7 @@
 
 use internal_error::InternalError;
 use kamu_core::*;
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -135,6 +136,11 @@ impl From<InternalError> for ApiError {
     }
 }
 
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, utoipa::ToSchema)]
+pub struct ApiErrorResponse {
+    pub message: String,
+}
+
 impl axum::response::IntoResponse for ApiError {
     fn into_response(self) -> axum::response::Response {
         // TODO: Logging as a side effect of conversion is not great - we should move
@@ -154,7 +160,12 @@ impl axum::response::IntoResponse for ApiError {
                 status_code = %self.status_code,
                 "API error",
             );
-            (self.status_code, self.source.to_string()).into_response()
+
+            let response_body = axum::response::Json(ApiErrorResponse {
+                message: self.source.to_string(),
+            });
+
+            (self.status_code, response_body).into_response()
         }
     }
 }

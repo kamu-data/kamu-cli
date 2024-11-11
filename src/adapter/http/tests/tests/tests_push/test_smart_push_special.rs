@@ -271,14 +271,16 @@ async fn test_smart_push_incompatible_version_err() {
     let api_server_handle = scenario.server_harness.api_server_run();
 
     let client_handle = async {
-        let connet_result = scenario
+        let connect_result = scenario
             .client_harness
             .try_connect_to_websocket(scenario.server_dataset_ref.url().unwrap(), "push")
             .await;
 
-        assert_matches!(connet_result, Err(msg) if {
-            msg == "Incompatible client version"
-        });
+        assert_matches!(
+            connect_result,
+            Err(msg)
+                if msg == r#"{"message":"Incompatible client version"}"#
+        );
     };
 
     await_client_server_flow!(api_server_handle, client_handle);
