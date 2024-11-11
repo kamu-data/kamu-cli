@@ -226,17 +226,10 @@ impl PullDatasetUseCaseImpl {
         pii: PullIngestItem,
         ingest_options: PollingIngestOptions,
         polling_ingest_svc: Arc<dyn PollingIngestService>,
-        maybe_multi_listener: Option<Arc<dyn PollingIngestMultiListener>>,
+        maybe_listener: Option<Arc<dyn PollingIngestListener>>,
     ) -> Result<PullResponse, InternalError> {
-        let multi_listener =
-            maybe_multi_listener.unwrap_or_else(|| Arc::new(NullPollingIngestMultiListener));
-
         let ingest_response = polling_ingest_svc
-            .ingest(
-                pii.target.clone(),
-                ingest_options,
-                multi_listener.begin_ingest(&pii.target.handle),
-            )
+            .ingest(pii.target.clone(), ingest_options, maybe_listener)
             .await;
 
         Ok(PullResponse {
@@ -255,11 +248,8 @@ impl PullDatasetUseCaseImpl {
         transform_options: TransformOptions,
         transform_elaboration_svc: Arc<dyn TransformElaborationService>,
         transform_execution_svc: Arc<dyn TransformExecutionService>,
-        maybe_transform_multi_listener: Option<Arc<dyn TransformMultiListener>>,
+        maybe_listener: Option<Arc<dyn TransformListener>>,
     ) -> Result<PullResponse, InternalError> {
-        let transform_multi_listener =
-            maybe_transform_multi_listener.unwrap_or_else(|| Arc::new(NullTransformMultiListener));
-
         // Remember original request
         let maybe_original_request = pti.maybe_original_request.clone();
 
@@ -269,11 +259,8 @@ impl PullDatasetUseCaseImpl {
             transform_elaboration_svc: Arc<dyn TransformElaborationService>,
             transform_execution_svc: Arc<dyn TransformExecutionService>,
             transform_options: TransformOptions,
-            transform_multi_listener: Arc<dyn TransformMultiListener>,
+            maybe_listener: Option<Arc<dyn TransformListener>>,
         ) -> (ResolvedDataset, Result<TransformResult, PullError>) {
-            // Notify listener
-            let maybe_listener = transform_multi_listener.begin_transform(&pti.target.handle);
-
             // Elaborate phase
             match transform_elaboration_svc
                 .elaborate_transform(
@@ -310,10 +297,11 @@ impl PullDatasetUseCaseImpl {
             transform_elaboration_svc,
             transform_execution_svc,
             transform_options,
-            transform_multi_listener.clone(),
+            maybe_listener,
         )
         .await;
 
+        // Prepare response
         Ok(PullResponse {
             maybe_original_request,
             maybe_local_ref: Some(transform_result.0.handle.as_local_ref()),
@@ -327,12 +315,9 @@ impl PullDatasetUseCaseImpl {
         options: PullOptions,
         sync_svc: Arc<dyn SyncService>,
         remote_alias_registry: Arc<dyn RemoteAliasesRegistry>,
-        listener: Option<Arc<dyn SyncMultiListener>>,
+        listener: Option<Arc<dyn SyncListener>>,
     ) -> Result<PullResponse, InternalError> {
-        let listener = listener.as_ref().and_then(|l| {
-            l.begin_sync(&psi.sync_request.src.src_ref, &psi.sync_request.dst.dst_ref)
-        });
-
+        // Run sync action
         let mut sync_result = sync_svc
             .sync(*psi.sync_request, options.sync_options, listener)
             .await;
@@ -356,6 +341,7 @@ impl PullDatasetUseCaseImpl {
             }
         }
 
+        // Prepare response
         Ok(PullResponse {
             maybe_original_request: psi.maybe_original_request,
             maybe_local_ref: Some(psi.local_target.as_local_ref()), // TODO: multi-tenancy
@@ -411,6 +397,19 @@ impl PullDatasetUseCase for PullDatasetUseCaseImpl {
 
         let mut results = Vec::new();
 
+        // Prepare multi-listeners
+        let maybe_ingest_multi_listener = listener
+            .as_ref()
+            .and_then(|l| l.clone().get_ingest_listener());
+
+        let maybe_transform_multi_listener = listener
+            .as_ref()
+            .and_then(|l| l.clone().get_transform_listener());
+
+        let maybe_sync_multi_listener = listener
+            .as_ref()
+            .and_then(|l| l.clone().get_sync_listener());
+
         // Execute each iteration
         for iteration in plan {
             tracing::info!(depth = %iteration.depth, jobs = ?iteration.jobs, "Running pull iteration");
@@ -428,32 +427,45 @@ impl PullDatasetUseCase for PullDatasetUseCaseImpl {
             let mut tasks = tokio::task::JoinSet::new();
             for job in iteration.jobs {
                 match job {
-                    PullPlanIterationJob::Ingest(pii) => tasks.spawn(Self::ingest(
-                        pii,
-                        options.ingest_options.clone(),
-                        self.polling_ingest_svc.clone(),
-                        listener
+                    PullPlanIterationJob::Ingest(pii) => {
+                        let maybe_listener = maybe_ingest_multi_listener
                             .as_ref()
-                            .and_then(|l| l.clone().get_ingest_listener()),
-                    )),
-                    PullPlanIterationJob::Transform(pti) => tasks.spawn(Self::transform(
-                        pti,
-                        options.transform_options,
-                        self.transform_elaboration_svc.clone(),
-                        self.transform_execution_svc.clone(),
-                        listener
+                            .and_then(|l| l.begin_ingest(&pii.target.handle));
+                        tasks.spawn(Self::ingest(
+                            pii,
+                            options.ingest_options.clone(),
+                            self.polling_ingest_svc.clone(),
+                            maybe_listener,
+                        ))
+                    }
+                    PullPlanIterationJob::Transform(pti) => {
+                        let maybe_listener = maybe_transform_multi_listener
                             .as_ref()
-                            .and_then(|l| l.clone().get_transform_listener()),
-                    )),
-                    PullPlanIterationJob::Sync(psi) => tasks.spawn(Self::sync(
-                        psi,
-                        options.clone(),
-                        self.sync_svc.clone(),
-                        self.remote_alias_registry.clone(),
-                        listener
-                            .as_ref()
-                            .and_then(|l| l.clone().get_sync_listener()),
-                    )),
+                            .and_then(|l| l.begin_transform(&pti.target.handle));
+                        tasks.spawn(Self::transform(
+                            pti,
+                            options.transform_options,
+                            self.transform_elaboration_svc.clone(),
+                            self.transform_execution_svc.clone(),
+                            maybe_listener,
+                        ))
+                    }
+                    PullPlanIterationJob::Sync(psi) => {
+                        let maybe_listener = maybe_sync_multi_listener.as_ref().and_then(|l| {
+                            l.begin_sync(
+                                &psi.sync_request.src.src_ref,
+                                &psi.sync_request.dst.dst_ref,
+                            )
+                        });
+
+                        tasks.spawn(Self::sync(
+                            psi,
+                            options.clone(),
+                            self.sync_svc.clone(),
+                            self.remote_alias_registry.clone(),
+                            maybe_listener,
+                        ))
+                    }
                 };
             }
             let iteration_results = tasks.join_all().await;

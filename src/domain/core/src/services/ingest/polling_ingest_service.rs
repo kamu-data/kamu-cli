@@ -40,7 +40,7 @@ pub trait PollingIngestService: Send + Sync {
         &self,
         target: ResolvedDataset,
         options: PollingIngestOptions,
-        listener: Option<Arc<dyn PollingIngestListener>>,
+        maybe_listener: Option<Arc<dyn PollingIngestListener>>,
     ) -> Result<PollingIngestResult, PollingIngestError>;
 }
 
