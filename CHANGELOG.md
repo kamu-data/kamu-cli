@@ -26,6 +26,8 @@ Recommendation: for ease of reading, use the following order:
   ```
 ### Fixed
 - `kamu add` correctly handle snapshots with circular dependencies
+- `kamu push` show human readable error when trying to push to non existing repository
+- Jupyter repository block documentation misleading
 
 ## [0.206.5] - 2024-10-29
 ### Changed

@@ -14,6 +14,7 @@ use opendatafabric::*;
 use thiserror::Error;
 
 use super::sync_service::*;
+use super::RepositoryNotFoundError;
 use crate::{DatasetNotFoundError, GetDatasetError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -91,6 +92,12 @@ pub enum PushError {
     ),
     #[error("Destination is not specified and there is no associated push alias")]
     NoTarget,
+    #[error(transparent)]
+    DestinationNotFound(
+        #[from]
+        #[backtrace]
+        RepositoryNotFoundError,
+    ),
     #[error("Cannot choose between multiple push aliases")]
     AmbiguousTarget,
     #[error(transparent)]
