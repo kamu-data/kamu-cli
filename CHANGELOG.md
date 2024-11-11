@@ -11,7 +11,7 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## [Unreleased]
+## [0.207.0] - 2024-11-11
 ### Added
 - E2E: reinforce test coverage
   - Covered all flow scenarios
@@ -36,10 +36,10 @@ Recommendation: for ease of reading, use the following order:
 - GQL: The `DataQueryResultSuccess` type is extended to the optional `datasets` field, 
    which contains information about the datasets participating in the query. Affected API:
   - `GQL DataQueries`: the field will be filled
-  - `GQL DatasetData`: field will be empty, because we already know which dataset is involved
+  - `GQL DatasetData`: field will be empty because we already know which dataset is involved
 ### Fixed
-- `kamu add` correctly handle snapshots with circular dependencies
-- `kamu push` show human-readable error when trying to push to non-existing repository
+- `kamu add` correctly handles snapshots with circular dependencies
+- `kamu push` shows a human-readable error when trying to push to the non-existing repository
 - Jupyter repository block documentation misleading
 
 ## [0.206.5] - 2024-10-29
