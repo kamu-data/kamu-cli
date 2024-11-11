@@ -11,6 +11,7 @@ use std::borrow::Cow;
 use std::sync::Arc;
 
 use ::serde::{Deserialize, Serialize};
+use auth::DatasetActionUnauthorizedError;
 use internal_error::InternalError;
 use opendatafabric::*;
 use thiserror::Error;
@@ -55,6 +56,41 @@ pub enum PullPlanIterationJob {
     Ingest(PullIngestItem),
     Transform(PullTransformItem),
     Sync(PullSyncItem),
+}
+
+impl PullPlanIterationJob {
+    pub fn as_common_item(&self) -> &dyn PullItemCommon {
+        match self {
+            Self::Ingest(pii) => pii,
+            Self::Transform(pti) => pti,
+            Self::Sync(psi) => psi,
+        }
+    }
+
+    pub fn into_original_pull_request(self) -> Option<PullRequest> {
+        match self {
+            Self::Ingest(pii) => pii.maybe_original_request,
+            Self::Transform(pti) => pti.maybe_original_request,
+            Self::Sync(psi) => psi.maybe_original_request,
+        }
+    }
+
+    pub fn auth_error(&self, auth_error: DatasetActionUnauthorizedError) -> PullError {
+        match self {
+            PullPlanIterationJob::Ingest(_) => PullError::PollingIngestError(match auth_error {
+                DatasetActionUnauthorizedError::Access(e) => PollingIngestError::Access(e),
+                DatasetActionUnauthorizedError::Internal(e) => PollingIngestError::Internal(e),
+            }),
+            PullPlanIterationJob::Transform(_) => PullError::TransformError(match auth_error {
+                DatasetActionUnauthorizedError::Access(e) => TransformError::Access(e),
+                DatasetActionUnauthorizedError::Internal(e) => TransformError::Internal(e),
+            }),
+            PullPlanIterationJob::Sync(_) => PullError::SyncError(match auth_error {
+                DatasetActionUnauthorizedError::Access(e) => SyncError::Access(e),
+                DatasetActionUnauthorizedError::Internal(e) => SyncError::Internal(e),
+            }),
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -183,40 +219,46 @@ impl PullRequest {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub trait PullItemCommon {
-    fn try_get_handle(&self) -> Option<&DatasetHandle>;
-    fn into_original_pull_request(self) -> Option<PullRequest>;
+    fn try_get_written_handle(&self) -> Option<&DatasetHandle>;
+    fn get_read_handles(&self) -> Vec<&DatasetHandle>;
 }
 
 impl PullItemCommon for PullIngestItem {
-    fn try_get_handle(&self) -> Option<&DatasetHandle> {
+    fn try_get_written_handle(&self) -> Option<&DatasetHandle> {
         Some(&self.target.handle)
     }
 
-    fn into_original_pull_request(self) -> Option<PullRequest> {
-        self.maybe_original_request
+    fn get_read_handles(&self) -> Vec<&DatasetHandle> {
+        vec![]
     }
 }
 
 impl PullItemCommon for PullTransformItem {
-    fn try_get_handle(&self) -> Option<&DatasetHandle> {
+    fn try_get_written_handle(&self) -> Option<&DatasetHandle> {
         Some(&self.target.handle)
     }
 
-    fn into_original_pull_request(self) -> Option<PullRequest> {
-        self.maybe_original_request
+    fn get_read_handles(&self) -> Vec<&DatasetHandle> {
+        let mut read_handles = Vec::new();
+        for hdl in self.plan.datasets_map.iterate_all_handles() {
+            if hdl != &self.target.handle {
+                read_handles.push(hdl);
+            }
+        }
+        read_handles
     }
 }
 
 impl PullItemCommon for PullSyncItem {
-    fn try_get_handle(&self) -> Option<&DatasetHandle> {
+    fn try_get_written_handle(&self) -> Option<&DatasetHandle> {
         match &self.local_target {
             PullLocalTarget::Existing(hdl) => Some(hdl),
             PullLocalTarget::ToCreate(_) => None,
         }
     }
 
-    fn into_original_pull_request(self) -> Option<PullRequest> {
-        self.maybe_original_request
+    fn get_read_handles(&self) -> Vec<&DatasetHandle> {
+        vec![]
     }
 }
 

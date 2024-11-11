@@ -39,6 +39,10 @@ impl WorkingDatasetsMap {
         self.handles_by_id.get(id).expect("Dataset must be present")
     }
 
+    pub fn iterate_all_handles(&self) -> impl Iterator<Item = &DatasetHandle> {
+        self.handles_by_id.values()
+    }
+
     pub fn register(&mut self, handle: &DatasetHandle, dataset: Arc<dyn Dataset>) {
         if !self.datasets_by_id.contains_key(&handle.id) {
             self.datasets_by_id.insert(handle.id.clone(), dataset);

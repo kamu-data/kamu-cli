@@ -59,89 +59,175 @@ impl PullDatasetUseCaseImpl {
         }
     }
 
-    async fn make_authorization_checks<TPullItem: PullItemCommon>(
-        batch: Vec<TPullItem>,
-        dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
-        error_conversion_callback: impl Fn(DatasetActionUnauthorizedError) -> PullError,
-    ) -> Result<(Vec<TPullItem>, Vec<PullResponse>), InternalError> {
-        let (existing_handle_items, other_items): (Vec<_>, Vec<_>) = batch
-            .into_iter()
-            .partition(|item| item.try_get_handle().is_some());
-
-        let dataset_handles = existing_handle_items
-            .iter()
-            .map(|item| item.try_get_handle().expect("handle must exist").clone())
-            .collect();
+    async fn make_authorization_write_checks(
+        &self,
+        iteration: PullPlanIteration,
+    ) -> Result<(PullPlanIteration, Vec<PullResponse>), InternalError> {
+        let mut written_datasets = Vec::new();
+        let mut written_jobs_by_handle = HashMap::new();
+        let mut other_jobs = Vec::new();
+        for job in iteration.jobs {
+            if let Some(written_handle) = job.as_common_item().try_get_written_handle() {
+                written_datasets.push(written_handle.clone());
+                written_jobs_by_handle.insert(written_handle.clone(), job);
+            } else {
+                other_jobs.push(job);
+            }
+        }
 
         let ClassifyByAllowanceResponse {
             authorized_handles,
             unauthorized_handles_with_errors,
-        } = dataset_action_authorizer
-            .classify_datasets_by_allowance(dataset_handles, DatasetAction::Write)
+        } = self
+            .dataset_action_authorizer
+            .classify_datasets_by_allowance(written_datasets, DatasetAction::Write)
             .await?;
 
-        if unauthorized_handles_with_errors.is_empty() {
-            let mut batch = Vec::with_capacity(existing_handle_items.len() + other_items.len());
-            batch.extend(existing_handle_items);
-            batch.extend(other_items);
-            return Ok((batch, vec![]));
+        let mut okay_jobs = Vec::new();
+        for authorized_hdl in authorized_handles {
+            let job = written_jobs_by_handle
+                .remove(&authorized_hdl)
+                .expect("item must be present");
+            okay_jobs.push(job);
         }
+        okay_jobs.extend(other_jobs);
 
-        let mut items_by_handle = HashMap::new();
-        for item in existing_handle_items {
-            items_by_handle.insert(
-                item.try_get_handle().expect("handle must exist").clone(),
-                item,
-            );
-        }
-
-        let unauthorized_responses = unauthorized_handles_with_errors
+        let unauthorized_responses: Vec<_> = unauthorized_handles_with_errors
             .into_iter()
             .map(|(hdl, auth_error)| {
-                let item = items_by_handle.remove(&hdl).expect("item must be present");
+                let job = written_jobs_by_handle
+                    .remove(&hdl)
+                    .expect("item must be present");
+                let error = match &job {
+                    PullPlanIterationJob::Ingest(_) => {
+                        PullError::PollingIngestError(match auth_error {
+                            DatasetActionUnauthorizedError::Access(e) => {
+                                PollingIngestError::Access(e)
+                            }
+                            DatasetActionUnauthorizedError::Internal(e) => {
+                                PollingIngestError::Internal(e)
+                            }
+                        })
+                    }
+                    PullPlanIterationJob::Transform(_) => {
+                        PullError::TransformError(match auth_error {
+                            DatasetActionUnauthorizedError::Access(e) => TransformError::Access(e),
+                            DatasetActionUnauthorizedError::Internal(e) => {
+                                TransformError::Internal(e)
+                            }
+                        })
+                    }
+                    PullPlanIterationJob::Sync(_) => PullError::SyncError(match auth_error {
+                        DatasetActionUnauthorizedError::Access(e) => SyncError::Access(e),
+                        DatasetActionUnauthorizedError::Internal(e) => SyncError::Internal(e),
+                    }),
+                };
                 PullResponse {
                     maybe_local_ref: Some(hdl.as_local_ref()),
                     maybe_remote_ref: None,
-                    maybe_original_request: item.into_original_pull_request(),
-                    result: Err(error_conversion_callback(auth_error)),
+                    maybe_original_request: job.into_original_pull_request(),
+                    result: Err(error),
                 }
             })
             .collect();
 
-        let mut authorized_items = Vec::with_capacity(authorized_handles.len() + other_items.len());
-        authorized_handles
-            .iter()
-            .map(|hdl| items_by_handle.remove(hdl).expect("item must be present"))
-            .collect_into(&mut authorized_items);
-        authorized_items.extend(other_items);
+        Ok((
+            PullPlanIteration {
+                depth: iteration.depth,
+                jobs: okay_jobs,
+            },
+            unauthorized_responses,
+        ))
+    }
 
-        Ok((authorized_items, unauthorized_responses))
+    async fn make_authorization_read_checks(
+        &self,
+        iteration: PullPlanIteration,
+    ) -> Result<(PullPlanIteration, Vec<PullResponse>), InternalError> {
+        let mut read_datasets = Vec::new();
+        let mut reading_jobs = Vec::new();
+        let mut other_jobs = Vec::new();
+        for job in iteration.jobs {
+            let read_handles = job.as_common_item().get_read_handles();
+            if read_handles.is_empty() {
+                other_jobs.push(job);
+            } else {
+                read_datasets.extend(read_handles.into_iter().cloned());
+                reading_jobs.push(job);
+            }
+        }
+
+        let ClassifyByAllowanceResponse {
+            authorized_handles: _,
+            unauthorized_handles_with_errors,
+        } = self
+            .dataset_action_authorizer
+            .classify_datasets_by_allowance(read_datasets, DatasetAction::Read)
+            .await?;
+
+        if unauthorized_handles_with_errors.is_empty() {
+            let mut all_jobs = Vec::with_capacity(reading_jobs.len() + other_jobs.len());
+            all_jobs.extend(reading_jobs);
+            all_jobs.extend(other_jobs);
+            return Ok((
+                PullPlanIteration {
+                    jobs: all_jobs,
+                    depth: iteration.depth,
+                },
+                vec![],
+            ));
+        }
+
+        let mut unauthorized_handles_to_errors: HashMap<
+            DatasetHandle,
+            DatasetActionUnauthorizedError,
+        > = unauthorized_handles_with_errors.into_iter().collect();
+
+        let mut unauthorized_responses = Vec::new();
+
+        let mut okay_jobs = Vec::new();
+        okay_jobs.extend(other_jobs);
+
+        for reading_job in reading_jobs {
+            let read_handles = reading_job.as_common_item().get_read_handles();
+            let mut maybe_error = None;
+            for read_hdl in read_handles {
+                if let Some(auth_error) = unauthorized_handles_to_errors.remove(read_hdl) {
+                    maybe_error = Some(reading_job.auth_error(auth_error));
+                    break;
+                }
+            }
+
+            if let Some(error) = maybe_error {
+                unauthorized_responses.push(PullResponse {
+                    maybe_local_ref: reading_job
+                        .as_common_item()
+                        .try_get_written_handle()
+                        .map(DatasetHandle::as_local_ref),
+                    maybe_remote_ref: None,
+                    maybe_original_request: reading_job.into_original_pull_request(),
+                    result: Err(error),
+                });
+            } else {
+                okay_jobs.push(reading_job);
+            }
+        }
+
+        Ok((
+            PullPlanIteration {
+                depth: iteration.depth,
+                jobs: okay_jobs,
+            },
+            unauthorized_responses,
+        ))
     }
 
     async fn ingest(
         pii: PullIngestItem,
         ingest_options: PollingIngestOptions,
-        dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
         polling_ingest_svc: Arc<dyn PollingIngestService>,
         maybe_multi_listener: Option<Arc<dyn PollingIngestMultiListener>>,
     ) -> Result<PullResponse, InternalError> {
-        // Authorization checks
-        let (mut batch, mut errors) =
-            Self::make_authorization_checks(vec![pii], dataset_action_authorizer, |auth_error| {
-                PullError::PollingIngestError(match auth_error {
-                    DatasetActionUnauthorizedError::Access(e) => PollingIngestError::Access(e),
-                    DatasetActionUnauthorizedError::Internal(e) => PollingIngestError::Internal(e),
-                })
-            })
-            .await?;
-        if !errors.is_empty() {
-            assert_eq!(errors.len(), 1);
-            return Ok(errors.remove(0));
-        }
-
-        assert_eq!(batch.len(), 1);
-        let pii = batch.remove(0);
-
         let multi_listener =
             maybe_multi_listener.unwrap_or_else(|| Arc::new(NullPollingIngestMultiListener));
 
@@ -167,29 +253,10 @@ impl PullDatasetUseCaseImpl {
     async fn transform(
         pti: PullTransformItem,
         transform_options: TransformOptions,
-        dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
         transform_elaboration_svc: Arc<dyn TransformElaborationService>,
         transform_execution_svc: Arc<dyn TransformExecutionService>,
         maybe_transform_multi_listener: Option<Arc<dyn TransformMultiListener>>,
     ) -> Result<PullResponse, InternalError> {
-        // Authorization checks
-        // TODO: checked targets for write, but should we check inputs for Read?
-        let (mut batch, mut errors) =
-            Self::make_authorization_checks(vec![pti], dataset_action_authorizer, |auth_error| {
-                PullError::TransformError(match auth_error {
-                    DatasetActionUnauthorizedError::Access(e) => TransformError::Access(e),
-                    DatasetActionUnauthorizedError::Internal(e) => TransformError::Internal(e),
-                })
-            })
-            .await?;
-        if !errors.is_empty() {
-            assert_eq!(errors.len(), 1);
-            return Ok(errors.remove(0));
-        }
-
-        assert_eq!(batch.len(), 1);
-        let pti = batch.remove(0);
-
         let transform_multi_listener =
             maybe_transform_multi_listener.unwrap_or_else(|| Arc::new(NullTransformMultiListener));
 
@@ -258,28 +325,10 @@ impl PullDatasetUseCaseImpl {
     async fn sync(
         psi: PullSyncItem,
         options: PullOptions,
-        dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
         sync_svc: Arc<dyn SyncService>,
         remote_alias_registry: Arc<dyn RemoteAliasesRegistry>,
         listener: Option<Arc<dyn SyncMultiListener>>,
     ) -> Result<PullResponse, InternalError> {
-        // Authorization checks
-        let (mut batch, mut errors) =
-            Self::make_authorization_checks(vec![psi], dataset_action_authorizer, |auth_error| {
-                PullError::SyncError(match auth_error {
-                    DatasetActionUnauthorizedError::Access(e) => SyncError::Access(e),
-                    DatasetActionUnauthorizedError::Internal(e) => SyncError::Internal(e),
-                })
-            })
-            .await?;
-        if !errors.is_empty() {
-            assert_eq!(errors.len(), 1);
-            return Ok(errors.remove(0));
-        }
-
-        assert_eq!(batch.len(), 1);
-        let psi = batch.remove(0);
-
         let listener = listener.as_ref().and_then(|l| {
             l.begin_sync(&psi.sync_request.src.src_ref, &psi.sync_request.dst.dst_ref)
         });
@@ -360,18 +409,28 @@ impl PullDatasetUseCase for PullDatasetUseCaseImpl {
             return Ok(errors);
         }
 
-        let mut results = Vec::with_capacity(plan.len());
+        let mut results = Vec::new();
 
+        // Execute each iteration
         for iteration in plan {
             tracing::info!(depth = %iteration.depth, jobs = ?iteration.jobs, "Running pull iteration");
 
+            // Authorization checks for this iteration
+            let (iteration, write_errors) = self.make_authorization_write_checks(iteration).await?;
+            let (iteration, read_errors) = self.make_authorization_read_checks(iteration).await?;
+            if !write_errors.is_empty() || !read_errors.is_empty() {
+                results.extend(write_errors);
+                results.extend(read_errors);
+                break;
+            }
+
+            // Run iteration jobs concurrently
             let mut tasks = tokio::task::JoinSet::new();
             for job in iteration.jobs {
                 match job {
                     PullPlanIterationJob::Ingest(pii) => tasks.spawn(Self::ingest(
                         pii,
                         options.ingest_options.clone(),
-                        self.dataset_action_authorizer.clone(),
                         self.polling_ingest_svc.clone(),
                         listener
                             .as_ref()
@@ -380,7 +439,6 @@ impl PullDatasetUseCase for PullDatasetUseCaseImpl {
                     PullPlanIterationJob::Transform(pti) => tasks.spawn(Self::transform(
                         pti,
                         options.transform_options,
-                        self.dataset_action_authorizer.clone(),
                         self.transform_elaboration_svc.clone(),
                         self.transform_execution_svc.clone(),
                         listener
@@ -390,7 +448,6 @@ impl PullDatasetUseCase for PullDatasetUseCaseImpl {
                     PullPlanIterationJob::Sync(psi) => tasks.spawn(Self::sync(
                         psi,
                         options.clone(),
-                        self.dataset_action_authorizer.clone(),
                         self.sync_svc.clone(),
                         self.remote_alias_registry.clone(),
                         listener
@@ -399,10 +456,10 @@ impl PullDatasetUseCase for PullDatasetUseCaseImpl {
                     )),
                 };
             }
-
             let iteration_results = tasks.join_all().await;
             tracing::debug!(iteration_result=?iteration_results, "Pull iteration finished");
 
+            // Deal with results
             let mut has_errors = false;
             for result in iteration_results {
                 let result = result?;
