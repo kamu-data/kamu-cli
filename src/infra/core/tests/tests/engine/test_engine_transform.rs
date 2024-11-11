@@ -344,6 +344,7 @@ async fn test_transform_common(transform: Transform, test_retractions: bool) {
             None,
         )
         .await
+        .result
         .unwrap();
 
     ///////////////////////////////////////////////////////////////////////////
@@ -446,6 +447,7 @@ async fn test_transform_common(transform: Transform, test_retractions: bool) {
             None,
         )
         .await
+        .result
         .unwrap();
 
     harness

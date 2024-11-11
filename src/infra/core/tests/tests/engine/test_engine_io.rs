@@ -132,6 +132,7 @@ async fn test_engine_io_common<
             None,
         )
         .await
+        .result
         .unwrap();
 
     ///////////////////////////////////////////////////////////////////////////
@@ -200,6 +201,7 @@ async fn test_engine_io_common<
             None,
         )
         .await
+        .result
         .unwrap();
 
     let block_hash = match transform_helper.transform_dataset(&deriv_created).await {

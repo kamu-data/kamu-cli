@@ -616,38 +616,13 @@ impl PollingIngestService for PollingIngestServiceImpl {
         target: ResolvedDataset,
         options: PollingIngestOptions,
         maybe_listener: Option<Arc<dyn PollingIngestListener>>,
-    ) -> Result<PollingIngestResult, PollingIngestError> {
-        self.do_ingest(target, options, |_| maybe_listener).await
-    }
-
-    #[tracing::instrument(level = "info", skip_all)]
-    async fn ingest_multi(
-        &self,
-        targets: Vec<ResolvedDataset>,
-        options: PollingIngestOptions,
-        maybe_multi_listener: Option<Arc<dyn PollingIngestMultiListener>>,
-    ) -> Vec<PollingIngestResponse> {
-        let multi_listener =
-            maybe_multi_listener.unwrap_or_else(|| Arc::new(NullPollingIngestMultiListener));
-
-        let futures: Vec<_> = targets
-            .iter()
-            .map(|target| {
-                self.do_ingest(target.clone(), options.clone(), |hdl| {
-                    multi_listener.begin_ingest(hdl)
-                })
-            })
-            .collect();
-
-        let results = futures::future::join_all(futures).await;
-        targets
-            .into_iter()
-            .zip(results)
-            .map(|(target, result)| PollingIngestResponse {
-                dataset_ref: target.handle.into_local_ref(),
-                result,
-            })
-            .collect()
+    ) -> PollingIngestResponse {
+        let dataset_ref = target.handle.as_local_ref();
+        let result = self.do_ingest(target, options, |_| maybe_listener).await;
+        PollingIngestResponse {
+            dataset_ref,
+            result,
+        }
     }
 }
 

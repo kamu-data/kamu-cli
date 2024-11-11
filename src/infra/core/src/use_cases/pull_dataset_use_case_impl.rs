@@ -123,7 +123,7 @@ impl PullDatasetUseCaseImpl {
         &self,
         batch: Vec<PullIngestItem>,
         options: &PullOptions,
-        listener: Option<Arc<dyn PollingIngestMultiListener>>,
+        maybe_multi_listener: Option<Arc<dyn PollingIngestMultiListener>>,
     ) -> Result<Vec<PullResponse>, InternalError> {
         // Authorization checks
         let (batch, errors) = self
@@ -138,21 +138,29 @@ impl PullDatasetUseCaseImpl {
             return Ok(errors);
         }
 
-        // Main ingestion run
-        let ingestion_requests = batch.iter().map(|pui| pui.target.clone()).collect();
+        let multi_listener =
+            maybe_multi_listener.unwrap_or_else(|| Arc::new(NullPollingIngestMultiListener));
 
-        let ingest_responses = self
-            .polling_ingest_svc
-            .ingest_multi(ingestion_requests, options.ingest_options.clone(), listener)
-            .await;
+        // Run ingests concurrently
+        let futures: Vec<_> = batch
+            .iter()
+            .map(|pii| {
+                self.polling_ingest_svc.ingest(
+                    pii.target.clone(),
+                    options.ingest_options.clone(),
+                    multi_listener.begin_ingest(&pii.target.handle),
+                )
+            })
+            .collect();
+        let ingest_responses = futures::future::join_all(futures).await;
 
         // Convert ingest results into pull results
         tracing::debug!(batch=?batch, ingest_responses=?ingest_responses, "Ingest results");
         assert_eq!(batch.len(), ingest_responses.len());
         Ok(std::iter::zip(batch, ingest_responses)
-            .map(|(pui, res)| {
-                assert_eq!(pui.target.handle.as_local_ref(), res.dataset_ref);
-                pui.into_response_ingest(res)
+            .map(|(pii, res)| {
+                assert_eq!(pii.target.handle.as_local_ref(), res.dataset_ref);
+                pii.into_response_ingest(res)
             })
             .collect())
     }

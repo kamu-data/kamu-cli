@@ -41,15 +41,7 @@ pub trait PollingIngestService: Send + Sync {
         target: ResolvedDataset,
         options: PollingIngestOptions,
         listener: Option<Arc<dyn PollingIngestListener>>,
-    ) -> Result<PollingIngestResult, PollingIngestError>;
-
-    /// A batch version of [PollingIngestService::ingest]
-    async fn ingest_multi(
-        &self,
-        targets: Vec<ResolvedDataset>,
-        options: PollingIngestOptions,
-        listener: Option<Arc<dyn PollingIngestMultiListener>>,
-    ) -> Vec<PollingIngestResponse>;
+    ) -> PollingIngestResponse;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

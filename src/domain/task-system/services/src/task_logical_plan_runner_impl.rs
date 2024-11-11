@@ -76,10 +76,10 @@ impl TaskLogicalPlanRunnerImpl {
         ingest_options: PollingIngestOptions,
     ) -> Result<TaskOutcome, InternalError> {
         let polling_ingest_service = self.catalog.get_one::<dyn PollingIngestService>().unwrap();
-        match polling_ingest_service
+        let ingest_response = polling_ingest_service
             .ingest(ingest_item.target, ingest_options, None)
-            .await
-        {
+            .await;
+        match ingest_response.result {
             Ok(ingest_result) => Ok(TaskOutcome::Success(TaskResult::UpdateDatasetResult(
                 TaskUpdateDatasetResult {
                     pull_result: ingest_result.into(),

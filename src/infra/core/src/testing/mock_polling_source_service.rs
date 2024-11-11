@@ -12,12 +12,9 @@ use std::sync::Arc;
 use chrono::Utc;
 use kamu_core::{
     GetDatasetError,
-    PollingIngestError,
     PollingIngestListener,
-    PollingIngestMultiListener,
     PollingIngestOptions,
     PollingIngestResponse,
-    PollingIngestResult,
     PollingIngestService,
     ResolvedDataset,
 };
@@ -39,24 +36,17 @@ mockall::mock! {
     pub PollingIngestService {}
     #[async_trait::async_trait]
     impl PollingIngestService for PollingIngestService {
-      async fn get_active_polling_source(
-          &self,
-          target: ResolvedDataset,
-      ) -> Result<Option<(Multihash, MetadataBlockTyped<SetPollingSource>)>, GetDatasetError>;
+        async fn get_active_polling_source(
+            &self,
+            target: ResolvedDataset,
+        ) -> Result<Option<(Multihash, MetadataBlockTyped<SetPollingSource>)>, GetDatasetError>;
 
-    async fn ingest(
-        &self,
-        target: ResolvedDataset,
-        options: PollingIngestOptions,
-        listener: Option<Arc<dyn PollingIngestListener>>,
-    ) -> Result<PollingIngestResult, PollingIngestError>;
-
-    async fn ingest_multi(
-        &self,
-        targets: Vec<ResolvedDataset>,
-        options: PollingIngestOptions,
-        listener: Option<Arc<dyn PollingIngestMultiListener>>,
-    ) -> Vec<PollingIngestResponse>;
+        async fn ingest(
+            &self,
+            target: ResolvedDataset,
+            options: PollingIngestOptions,
+            listener: Option<Arc<dyn PollingIngestListener>>,
+        ) -> PollingIngestResponse;
     }
 }
 
