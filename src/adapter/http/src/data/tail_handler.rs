@@ -119,7 +119,7 @@ pub struct DatasetTailResponse {
     #[schema(value_type = Object)]
     pub data: Box<serde_json::value::RawValue>,
 
-    /// How data is layered out in the response
+    /// How data is laid out in the response
     pub data_format: DataFormat,
 
     /// Schema of the resulting data
