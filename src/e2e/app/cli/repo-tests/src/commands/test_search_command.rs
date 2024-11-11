@@ -12,7 +12,9 @@ use kamu_cli_e2e_common::{
     KamuApiServerClientExt,
     RequestBody,
     DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR,
+    DATASET_ROOT_PLAYER_NAME,
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
+    E2E_USER_ACCOUNT_NAME,
 };
 use kamu_cli_puppet::extensions::KamuCliPuppetExt;
 use kamu_cli_puppet::KamuCliPuppet;
@@ -63,8 +65,8 @@ pub async fn test_search_multi_user(mut kamu_node_api_client: KamuApiServerClien
     .await;
 
     let player_scores_alias = DatasetAlias::new(
-        Some(AccountName::new_unchecked("e2e-user")),
-        DatasetName::new_unchecked("player-scores"),
+        Some(E2E_USER_ACCOUNT_NAME.clone()),
+        DATASET_ROOT_PLAYER_NAME.clone(),
     );
 
     kamu_node_api_client

@@ -96,7 +96,7 @@ pub struct DatasetTailParams {
     #[serde(default = "DatasetTailParams::default_limit")]
     pub limit: u64,
 
-    /// How the output data should be ecoded
+    /// How the output data should be encoded
     #[serde(default)]
     pub data_format: DataFormat,
 
@@ -119,7 +119,7 @@ pub struct DatasetTailResponse {
     #[schema(value_type = Object)]
     pub data: Box<serde_json::value::RawValue>,
 
-    /// How data is layed out in the response
+    /// How data is laid out in the response
     pub data_format: DataFormat,
 
     /// Schema of the resulting data

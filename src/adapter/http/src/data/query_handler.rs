@@ -125,7 +125,7 @@ pub async fn query_handler_post(
 
         // TODO: PERF: There is a large avenue for improvements to avoid
         // re-serialization. We could potentially always serialize signed
-        // responses in canonical JSON format to avoid trascoding.
+        // responses in canonical JSON format to avoid transcoding.
         let commitment = Commitment {
             input_hash: odf::Multihash::from_digest_sha3_256(&to_canonical_json(&input)),
             output_hash: odf::Multihash::from_digest_sha3_256(&to_canonical_json(&output)),
@@ -180,3 +180,5 @@ pub async fn query_handler(
 #[derive(Debug, thiserror::Error)]
 #[error("Response signing is not enabled by the node operator")]
 struct ResponseSigningNotConfigured;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

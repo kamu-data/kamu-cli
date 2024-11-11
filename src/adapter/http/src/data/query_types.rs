@@ -23,7 +23,7 @@ use http_common::{ApiError, IntoApiError};
 use internal_error::*;
 use kamu::domain;
 use kamu_core::{DataFusionError, QueryError};
-use opendatafabric::{self as odf, Multihash};
+use opendatafabric as odf;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -90,7 +90,7 @@ pub struct QueryRequest {
     #[serde(default = "QueryRequest::default_query_dialect")]
     pub query_dialect: domain::QueryDialect,
 
-    /// How data should be layed out in the response
+    /// How data should be laid out in the response
     #[serde(default)]
     pub data_format: DataFormat,
 
@@ -114,6 +114,21 @@ pub struct QueryRequest {
     /// Pagination: limits number of records in response to N
     #[serde(default = "QueryRequest::default_limit")]
     pub limit: u64,
+}
+
+impl Default for QueryRequest {
+    fn default() -> Self {
+        Self {
+            query: String::new(),
+            query_dialect: QueryRequest::default_query_dialect(),
+            data_format: Default::default(),
+            include: QueryRequest::default_include(),
+            schema_format: None,
+            datasets: None,
+            skip: 0,
+            limit: QueryRequest::default_limit(),
+        }
+    }
 }
 
 impl QueryRequest {
@@ -219,7 +234,7 @@ pub struct QueryParams {
     #[serde(default = "QueryRequest::default_limit")]
     pub limit: u64,
 
-    /// How the output data should be ecoded
+    /// How the output data should be encoded
     #[serde(alias = "format")]
     #[serde(default)]
     pub data_format: DataFormat,
@@ -251,7 +266,7 @@ impl From<QueryParams> for QueryRequest {
 // Response
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, serde::Serialize, utoipa::ToSchema)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct QueryResponse {
     /// Inputs that can be used to fully reproduce the query
@@ -279,7 +294,7 @@ pub struct QueryResponse {
 // Fragments
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Mirrors the structure of [`ResponseBody`] without the `outputs`
+/// Mirrors the structure of [`QueryRequest`] without the `outputs`
 #[derive(Debug, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct SubQuery {
@@ -300,13 +315,13 @@ pub struct SubQuery {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, serde::Serialize, utoipa::ToSchema)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Outputs {
     /// Resulting data
     pub data: serde_json::Value,
 
-    /// How data is layed out in the response
+    /// How data is laid out in the response
     pub data_format: DataFormat,
 
     /// Schema of the resulting data
@@ -323,15 +338,15 @@ pub struct Outputs {
 pub struct Commitment {
     /// Hash of the "input" object in the [multihash](https://multiformats.io/multihash/) format
     #[schema(value_type = String)]
-    pub input_hash: Multihash,
+    pub input_hash: odf::Multihash,
 
     /// Hash of the "output" object in the [multihash](https://multiformats.io/multihash/) format
     #[schema(value_type = String)]
-    pub output_hash: Multihash,
+    pub output_hash: odf::Multihash,
 
     /// Hash of the "subQueries" object in the [multihash](https://multiformats.io/multihash/) format
     #[schema(value_type = String)]
-    pub sub_queries_hash: Multihash,
+    pub sub_queries_hash: odf::Multihash,
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
@@ -467,7 +482,7 @@ pub enum SchemaFormat {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, utoipa::ToSchema)]
+#[derive(Debug, Clone, serde::Deserialize, utoipa::ToSchema)]
 pub struct Schema {
     #[schema(value_type = Object)]
     schema: datafusion::arrow::datatypes::SchemaRef,

@@ -12,31 +12,23 @@ use kamu_cli_e2e_common::prelude::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 kamu_cli_run_api_server_e2e_test!(
-    storage = postgres,
-    fixture = kamu_cli_e2e_repo_tests::test_login_password_predefined_successful
+    storage = inmem,
+    fixture = kamu_cli_e2e_repo_tests::rest_api::test_accounts_me_kamu_user,
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 kamu_cli_run_api_server_e2e_test!(
-    storage = postgres,
-    fixture = kamu_cli_e2e_repo_tests::test_login_enabled_methods
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-kamu_cli_run_api_server_e2e_test!(
-    storage = postgres,
-    fixture = kamu_cli_e2e_repo_tests::test_login_dummy_github,
+    storage = inmem,
+    fixture = kamu_cli_e2e_repo_tests::rest_api::test_accounts_me_e2e_user,
     options = Options::default().with_multi_tenant()
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 kamu_cli_run_api_server_e2e_test!(
-    storage = postgres,
-    fixture = kamu_cli_e2e_repo_tests::test_kamu_access_token_middleware,
-    options = Options::default().with_today_as_frozen_system_time()
+    storage = inmem,
+    fixture = kamu_cli_e2e_repo_tests::rest_api::test_accounts_me_unauthorized,
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

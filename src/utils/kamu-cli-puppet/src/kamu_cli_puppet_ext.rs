@@ -56,7 +56,7 @@ pub trait KamuCliPuppetExt {
     async fn assert_success_command_execution_with_env<I, S>(
         &self,
         cmd: I,
-        env_vars: Vec<(String, String)>,
+        env_vars: Vec<(&std::ffi::OsStr, &std::ffi::OsStr)>,
         maybe_expected_stdout: Option<&str>,
         maybe_expected_stderr: Option<impl IntoIterator<Item = &str> + Send>,
     ) where
@@ -363,7 +363,7 @@ impl KamuCliPuppetExt for KamuCliPuppet {
     async fn assert_success_command_execution_with_env<I, S>(
         &self,
         cmd: I,
-        env_vars: Vec<(String, String)>,
+        env_vars: Vec<(&std::ffi::OsStr, &std::ffi::OsStr)>,
         maybe_expected_stdout: Option<&str>,
         maybe_expected_stderr: Option<impl IntoIterator<Item = &str> + Send>,
     ) where

@@ -7,13 +7,28 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::str::FromStr;
+
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use convert_case::{Case, Casing};
+use http_common::comma_separated::CommaSeparatedSet;
+use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
+use kamu_adapter_http::data::metadata_handler::{
+    DatasetMetadataParams,
+    DatasetMetadataResponse,
+    Include as MetadataInclude,
+};
+use kamu_adapter_http::data::query_types::{QueryRequest, QueryResponse};
+use kamu_adapter_http::data::verify_types::{VerifyRequest, VerifyResponse};
+use kamu_adapter_http::general::{AccountResponse, DatasetInfoResponse, NodeInfoResponse};
+use kamu_adapter_http::{LoginRequestBody, PlatformFileUploadQuery, UploadContext};
+use kamu_core::BlockRef;
 use kamu_flow_system::{DatasetFlowType, FlowID};
 use lazy_static::lazy_static;
 use opendatafabric as odf;
 use reqwest::{Method, StatusCode, Url};
+use thiserror::Error;
 use tokio_retry::strategy::FixedInterval;
 use tokio_retry::Retry;
 
@@ -79,29 +94,6 @@ pub const DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR: &str = indoc::indoc!(
     "#
 );
 
-pub const DATASET_FETCH_FROM_FILE_STR: &str = indoc::indoc!(
-    r#"
-kind: DatasetSnapshot
-version: 1
-content:
-  name: test.pull-from-file
-  kind: Root
-  metadata:
-    - kind: SetPollingSource
-      fetch:
-        kind: Url
-        url: file://${{ env.data_dir || env.workspace_dir }}${{ env.data_file || 'data.csv' }}
-      read:
-        kind: Csv
-        header: true
-        separator: ','
-      merge:
-        kind: snapshot
-        primaryKey:
-          - city
-    "#
-);
-
 lazy_static! {
     /// <https://github.com/kamu-data/kamu-cli/blob/master/examples/leaderboard/player-scores.yaml>
     pub static ref DATASET_ROOT_PLAYER_SCORES_SNAPSHOT: String = {
@@ -110,12 +102,20 @@ lazy_static! {
             .to_string()
     };
 
+    pub static ref DATASET_ROOT_PLAYER_NAME: odf::DatasetName = odf::DatasetName::new_unchecked("player-scores");
+
     /// <https://github.com/kamu-data/kamu-cli/blob/master/examples/leaderboard/leaderboard.yaml>
     pub static ref DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT: String = {
         DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR
             .escape_default()
             .to_string()
     };
+
+    pub static ref DATASET_DERIVATIVE_LEADERBOARD_NAME: odf::DatasetName =
+        odf::DatasetName::new_unchecked("leaderboard");
+
+    pub static ref E2E_USER_ACCOUNT_NAME: odf::AccountName =
+        odf::AccountName::new_unchecked(E2E_USER_ACCOUNT_NAME_STR);
 }
 
 /// <https://raw.githubusercontent.com/kamu-data/kamu-cli/refs/heads/master/examples/leaderboard/data/1.ndjson>
@@ -142,15 +142,6 @@ pub const DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_3: &str = indoc::i
     "#
 );
 
-pub const DATASET_FETCH_FROM_FILE_STR_DATA: &str = indoc::indoc!(
-    r#"
-    city,population
-    A,1000
-    B,2000
-    C,3000
-    "#
-);
-
 pub const E2E_USER_ACCOUNT_NAME_STR: &str = "e2e-user";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -163,25 +154,35 @@ pub struct CreateDatasetResponse {
 
 #[async_trait]
 pub trait KamuApiServerClientExt {
-    fn auth(&mut self) -> AuthApi<'_>;
+    fn account(&self) -> AccountApi<'_>;
 
-    fn data(&self) -> DataApi;
+    fn auth(&mut self) -> AuthApi<'_>;
 
     fn dataset(&self) -> DatasetApi;
 
     fn flow(&self) -> FlowApi;
+
+    fn odf_core(&self) -> OdfCoreApi;
+
+    fn odf_transfer(&self) -> OdfTransferApi;
+
+    fn odf_query(&self) -> OdfQuery;
+
+    fn swagger(&self) -> SwaggerApi;
+
+    fn upload(&self) -> UploadApi;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait]
 impl KamuApiServerClientExt for KamuApiServerClient {
-    fn auth(&mut self) -> AuthApi<'_> {
-        AuthApi { client: self }
+    fn account(&self) -> AccountApi<'_> {
+        AccountApi { client: self }
     }
 
-    fn data(&self) -> DataApi {
-        DataApi { client: self }
+    fn auth(&mut self) -> AuthApi<'_> {
+        AuthApi { client: self }
     }
 
     fn dataset(&self) -> DatasetApi {
@@ -191,6 +192,59 @@ impl KamuApiServerClientExt for KamuApiServerClient {
     fn flow(&self) -> FlowApi {
         FlowApi { client: self }
     }
+
+    fn odf_core(&self) -> OdfCoreApi {
+        OdfCoreApi { client: self }
+    }
+
+    fn odf_transfer(&self) -> OdfTransferApi {
+        OdfTransferApi { client: self }
+    }
+
+    fn odf_query(&self) -> OdfQuery {
+        OdfQuery { client: self }
+    }
+
+    fn swagger(&self) -> SwaggerApi {
+        SwaggerApi { client: self }
+    }
+
+    fn upload(&self) -> UploadApi {
+        UploadApi { client: self }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// API: Auth
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct AccountApi<'a> {
+    client: &'a KamuApiServerClient,
+}
+
+impl AccountApi<'_> {
+    pub async fn me(&mut self) -> Result<AccountResponse, AccountMeError> {
+        let response = self
+            .client
+            .rest_api_call(Method::GET, "/accounts/me", None)
+            .await;
+
+        match response.status() {
+            StatusCode::OK => Ok(response.json().await.int_err()?),
+            StatusCode::UNAUTHORIZED => Err(AccountMeError::Unauthorized),
+            unexpected_status => Err(format!("Unexpected status: {unexpected_status}")
+                .int_err()
+                .into()),
+        }
+    }
+}
+
+#[derive(Error, Debug)]
+pub enum AccountMeError {
+    #[error("Unauthorized")]
+    Unauthorized,
+    #[error(transparent)]
+    Internal(#[from] InternalError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -234,6 +288,49 @@ impl AuthApi<'_> {
         .await
     }
 
+    pub async fn login_via_rest(
+        &mut self,
+        login_method: impl ToString,
+        login_credentials_json: serde_json::Value,
+    ) -> Result<(), LoginError> {
+        let request_body = LoginRequestBody {
+            login_method: login_method.to_string(),
+            login_credentials_json: serde_json::to_string(&login_credentials_json).int_err()?,
+        };
+        let request_body_json = serde_json::to_value(request_body).int_err()?;
+        let response = self
+            .client
+            .rest_api_call(
+                Method::POST,
+                "/platform/login",
+                Some(RequestBody::Json(request_body_json)),
+            )
+            .await;
+
+        match response.status() {
+            StatusCode::OK => Ok(()),
+            StatusCode::UNAUTHORIZED => Err(LoginError::Unauthorized),
+            unexpected_status => Err(format!("Unexpected status: {unexpected_status}")
+                .int_err()
+                .into()),
+        }
+    }
+
+    pub async fn token_validate(&self) -> Result<(), TokenValidateError> {
+        let response = self
+            .client
+            .rest_api_call(Method::GET, "/platform/token/validate", None)
+            .await;
+
+        match response.status() {
+            StatusCode::OK => Ok(()),
+            StatusCode::UNAUTHORIZED => Err(TokenValidateError::Unauthorized),
+            unexpected_status => Err(format!("Unexpected status: {unexpected_status}")
+                .int_err()
+                .into()),
+        }
+    }
+
     async fn login(&mut self, login_request: &str) -> AccessToken {
         let login_response = self.client.graphql_api_call(login_request).await;
         let access_token = login_response["auth"]["login"]["accessToken"]
@@ -247,89 +344,20 @@ impl AuthApi<'_> {
     }
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// API: Data
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub struct DataApi<'a> {
-    client: &'a KamuApiServerClient,
+#[derive(Error, Debug)]
+pub enum LoginError {
+    #[error("Unauthorized")]
+    Unauthorized,
+    #[error(transparent)]
+    Internal(#[from] InternalError),
 }
 
-impl DataApi<'_> {
-    pub async fn query(&self, query: &str) -> String {
-        let response = self
-            .client
-            .graphql_api_call(
-                indoc::indoc!(
-                    r#"
-                    query {
-                      data {
-                        query(
-                          query: """
-                          <query>
-                          """,
-                          queryDialect: SQL_DATA_FUSION,
-                          dataFormat: CSV
-                        ) {
-                          __typename
-                          ... on DataQueryResultSuccess {
-                            data {
-                              content
-                            }
-                          }
-                          ... on DataQueryResultError {
-                            errorKind
-                            errorMessage
-                          }
-                        }
-                      }
-                    }
-                    "#,
-                )
-                .replace("<query>", query)
-                .as_str(),
-            )
-            .await;
-        let query_node = &response["data"]["query"];
-
-        assert_eq!(
-            query_node["__typename"].as_str(),
-            Some("DataQueryResultSuccess"),
-            "{}",
-            indoc::formatdoc!(
-                r#"
-                Query:
-                {query}
-                Unexpected response:
-                {query_node:#}
-                "#
-            )
-        );
-
-        let content = query_node["data"]["content"]
-            .as_str()
-            .map(ToOwned::to_owned)
-            .unwrap();
-
-        content
-    }
-
-    pub async fn query_player_scores_dataset(&self) -> String {
-        // Without unstable "offset" column
-        self.query(indoc::indoc!(
-            r#"
-            SELECT op,
-                   system_time,
-                   match_time,
-                   match_id,
-                   player_id,
-                   score
-            FROM 'player-scores'
-            ORDER BY match_id, score, player_id
-            "#
-        ))
-        .await
-    }
+#[derive(Error, Debug)]
+pub enum TokenValidateError {
+    #[error("Unauthorized")]
+    Unauthorized,
+    #[error(transparent)]
+    Internal(#[from] InternalError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -345,6 +373,25 @@ impl DatasetApi<'_> {
         let node_url = self.client.get_odf_node_url();
 
         node_url.join(format!("{dataset_alias}").as_str()).unwrap()
+    }
+
+    pub async fn by_id(
+        &self,
+        dataset_id: &odf::DatasetID,
+    ) -> Result<DatasetInfoResponse, DatasetByIdError> {
+        let response = self
+            .client
+            .rest_api_call(Method::GET, &format!("datasets/{dataset_id}"), None)
+            .await;
+
+        match response.status() {
+            StatusCode::OK => Ok(response.json().await.int_err()?),
+            StatusCode::UNAUTHORIZED => Err(DatasetByIdError::Unauthorized),
+            StatusCode::NOT_FOUND => Err(DatasetByIdError::NotFound),
+            unexpected_status => Err(format!("Unexpected status: {unexpected_status}")
+                .int_err()
+                .into()),
+        }
     }
 
     pub async fn create_empty_dataset(
@@ -440,10 +487,8 @@ impl DatasetApi<'_> {
 
         // TODO: Use the alias from the reply, after fixing the bug:
         //       https://github.com/kamu-data/kamu-cli/issues/891
-        let dataset_alias = odf::DatasetAlias::new(
-            account_name_maybe,
-            odf::DatasetName::new_unchecked("player-scores"),
-        );
+        let dataset_alias =
+            odf::DatasetAlias::new(account_name_maybe, DATASET_ROOT_PLAYER_NAME.clone());
 
         self.ingest_data(
             &dataset_alias,
@@ -590,6 +635,16 @@ impl DatasetApi<'_> {
     }
 }
 
+#[derive(Error, Debug)]
+pub enum DatasetByIdError {
+    #[error("Unauthorized")]
+    Unauthorized,
+    #[error("Not found")]
+    NotFound,
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+}
+
 #[derive(Debug)]
 pub struct DatasetBlock {
     pub block_hash: odf::Multihash,
@@ -722,6 +777,410 @@ impl FlowApi<'_> {
 pub enum FlowTriggerResponse {
     Success(FlowID),
     Error(String),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// API: ODF, core
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct OdfCoreApi<'a> {
+    client: &'a KamuApiServerClient,
+}
+
+impl OdfCoreApi<'_> {
+    pub async fn info(&self) -> Result<NodeInfoResponse, InternalError> {
+        let response = self.client.rest_api_call(Method::GET, "info", None).await;
+
+        match response.status() {
+            StatusCode::OK => response.json().await.int_err(),
+            unexpected_status => panic!("Unexpected status: {unexpected_status}"),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// API: ODF, transfer
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct OdfTransferApi<'a> {
+    client: &'a KamuApiServerClient,
+}
+
+impl OdfTransferApi<'_> {
+    pub async fn metadata_block_hash_by_ref(
+        &self,
+        dataset_alias: &odf::DatasetAlias,
+        block_ref: BlockRef,
+    ) -> Result<odf::Multihash, MetadataBlockHashByRefError> {
+        let response = self
+            .client
+            .rest_api_call(
+                Method::GET,
+                &format!("{dataset_alias}/refs/{block_ref}"),
+                None,
+            )
+            .await;
+
+        match response.status() {
+            StatusCode::OK => {
+                let raw_response_body = response.text().await.int_err()?;
+                Ok(odf::Multihash::from_multibase(&raw_response_body).int_err()?)
+            }
+            StatusCode::NOT_FOUND => Err(MetadataBlockHashByRefError::NotFound),
+            unexpected_status => Err(format!("Unexpected status: {unexpected_status}")
+                .int_err()
+                .into()),
+        }
+    }
+}
+
+#[derive(Error, Debug)]
+pub enum MetadataBlockHashByRefError {
+    #[error("Not found")]
+    NotFound,
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// API: ODF, query
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct OdfQuery<'a> {
+    client: &'a KamuApiServerClient,
+}
+
+impl OdfQuery<'_> {
+    pub async fn query(&self, query: &str) -> String {
+        let response = self
+            .client
+            .graphql_api_call(
+                indoc::indoc!(
+                    r#"
+                    query {
+                      data {
+                        query(
+                          query: """
+                          <query>
+                          """,
+                          queryDialect: SQL_DATA_FUSION,
+                          dataFormat: CSV
+                        ) {
+                          __typename
+                          ... on DataQueryResultSuccess {
+                            data {
+                              content
+                            }
+                          }
+                          ... on DataQueryResultError {
+                            errorKind
+                            errorMessage
+                          }
+                        }
+                      }
+                    }
+                    "#,
+                )
+                .replace("<query>", query)
+                .as_str(),
+            )
+            .await;
+        let query_node = &response["data"]["query"];
+
+        assert_eq!(
+            query_node["__typename"].as_str(),
+            Some("DataQueryResultSuccess"),
+            "{}",
+            indoc::formatdoc!(
+                r#"
+                Query:
+                {query}
+                Unexpected response:
+                {query_node:#}
+                "#
+            )
+        );
+
+        let content = query_node["data"]["content"]
+            .as_str()
+            .map(ToOwned::to_owned)
+            .unwrap();
+
+        content
+    }
+
+    pub async fn query_player_scores_dataset(&self) -> String {
+        // Without unstable "offset" column
+        self.query(indoc::indoc!(
+            r#"
+            SELECT op,
+                   system_time,
+                   match_time,
+                   match_id,
+                   player_id,
+                   score
+            FROM 'player-scores'
+            ORDER BY match_id, score, player_id
+            "#
+        ))
+        .await
+    }
+
+    pub async fn query_via_rest(
+        &self,
+        options: &QueryRequest,
+    ) -> Result<QueryResponse, InternalError> {
+        let request_body_json = serde_json::to_value(options).int_err()?;
+
+        let response = self
+            .client
+            .rest_api_call(
+                Method::POST,
+                "/query",
+                Some(RequestBody::Json(request_body_json)),
+            )
+            .await;
+
+        match response.status() {
+            StatusCode::OK => Ok(response.json().await.int_err()?),
+            unexpected_status => {
+                let message = response.text().await.int_err()?;
+
+                Err(format!("Unexpected status: {unexpected_status}, message: {message}").int_err())
+            }
+        }
+    }
+
+    pub async fn verify(&self, options: VerifyRequest) -> Result<VerifyResponse, InternalError> {
+        let request_body_json = serde_json::to_value(&options).int_err()?;
+
+        let response = self
+            .client
+            .rest_api_call(
+                Method::POST,
+                "/verify",
+                Some(RequestBody::Json(request_body_json)),
+            )
+            .await;
+
+        match response.status() {
+            StatusCode::OK => Ok(response.json().await.int_err()?),
+            unexpected_status => {
+                let message = response.text().await.int_err()?;
+
+                Err(format!("Unexpected status: {unexpected_status}, message: {message}").int_err())
+            }
+        }
+    }
+
+    pub async fn metadata(
+        &self,
+        dataset_alias: &odf::DatasetAlias,
+        maybe_include_events: Option<CommaSeparatedSet<MetadataInclude>>,
+    ) -> Result<DatasetMetadataResponse, InternalError> {
+        let include_events =
+            maybe_include_events.unwrap_or_else(DatasetMetadataParams::default_include);
+        let include_events_json = serde_json::to_value(include_events).int_err()?;
+        let include_query_param_value = include_events_json
+            .as_str()
+            .ok_or_else(|| "Failed get JSON as string".int_err())?
+            .trim_matches('"');
+
+        let response = self
+            .client
+            .rest_api_call(
+                Method::GET,
+                &format!("{dataset_alias}/metadata?include={include_query_param_value}"),
+                None,
+            )
+            .await;
+
+        let status = response.status();
+
+        if status != StatusCode::OK {
+            return Err(format!("Unexpected status: {status}").int_err());
+        }
+
+        response.json::<DatasetMetadataResponse>().await.int_err()
+    }
+
+    pub async fn tail(&self, dataset_alias: &odf::DatasetAlias) -> serde_json::Value {
+        let response = self
+            .client
+            .rest_api_call(Method::GET, &format!("{dataset_alias}/tail"), None)
+            .await;
+
+        match response.status() {
+            StatusCode::OK => response.json().await.unwrap(),
+            StatusCode::NO_CONTENT => serde_json::Value::Null,
+            unexpected_status => panic!("Unexpected status: {unexpected_status}"),
+        }
+    }
+}
+
+#[derive(Error, Debug)]
+pub enum QueryError {
+    #[error("Unauthorized")]
+    Unauthorized,
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// API: Swagger
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct SwaggerApi<'a> {
+    client: &'a KamuApiServerClient,
+}
+
+impl SwaggerApi<'_> {
+    pub async fn main_page(&self) -> String {
+        let response = self
+            .client
+            .rest_api_call(Method::GET, "/swagger/", None)
+            .await;
+
+        pretty_assertions::assert_eq!(StatusCode::OK, response.status());
+
+        response.text().await.unwrap()
+    }
+
+    pub async fn schema(&self) -> serde_json::Value {
+        let response = self
+            .client
+            .rest_api_call(Method::GET, "/openapi.json", None)
+            .await;
+
+        pretty_assertions::assert_eq!(StatusCode::OK, response.status());
+
+        response.json().await.unwrap()
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// API: Upload
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct UploadApi<'a> {
+    client: &'a KamuApiServerClient,
+}
+
+impl UploadApi<'_> {
+    pub async fn prepare(
+        &self,
+        options: PlatformFileUploadQuery,
+    ) -> Result<UploadContext, UploadPrepareError> {
+        let query_params = serde_urlencoded::to_string(options).int_err()?;
+
+        let response = self
+            .client
+            .rest_api_call(
+                Method::POST,
+                &format!("/platform/file/upload/prepare?{query_params}"),
+                None,
+            )
+            .await;
+
+        match response.status() {
+            StatusCode::OK => Ok(response.json().await.int_err()?),
+            StatusCode::UNAUTHORIZED => Err(UploadPrepareError::Unauthorized),
+            unexpected_status => Err(format!("Unexpected status: {unexpected_status}")
+                .int_err()
+                .into()),
+        }
+    }
+
+    pub async fn upload_file(
+        &self,
+        upload_context: &UploadContext,
+        file_name: &str,
+        file_data: &str,
+    ) -> Result<(), UploadFileError> {
+        pretty_assertions::assert_eq!(true, upload_context.use_multipart);
+
+        use reqwest::multipart::{Form, Part};
+
+        let headers = convert_headers(&upload_context.headers);
+        let form = Form::new().part(
+            "file",
+            Part::text(file_data.to_string())
+                .file_name(file_name.to_string())
+                .mime_str("text/plain")
+                .int_err()?,
+        );
+
+        let response = reqwest::Client::new()
+            .post(upload_context.upload_url.clone())
+            .headers(headers)
+            .multipart(form)
+            .send()
+            .await
+            .int_err()?;
+
+        match response.status() {
+            StatusCode::OK => Ok(()),
+            StatusCode::UNAUTHORIZED => Err(UploadFileError::Unauthorized),
+            unexpected_status => Err(format!("Unexpected status: {unexpected_status}")
+                .int_err()
+                .into()),
+        }
+    }
+
+    pub async fn get_file_content(
+        &self,
+        upload_context: &UploadContext,
+    ) -> Result<String, UploadFileError> {
+        let headers = convert_headers(&upload_context.headers);
+        let response = reqwest::Client::new()
+            .get(upload_context.upload_url.clone())
+            .headers(headers)
+            .send()
+            .await
+            .int_err()?;
+
+        match response.status() {
+            StatusCode::OK => Ok(response.text().await.int_err()?),
+            StatusCode::UNAUTHORIZED => Err(UploadFileError::Unauthorized),
+            unexpected_status => Err(format!("Unexpected status: {unexpected_status}")
+                .int_err()
+                .into()),
+        }
+    }
+}
+
+#[derive(Error, Debug)]
+pub enum UploadPrepareError {
+    #[error("Unauthorized")]
+    Unauthorized,
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+}
+
+#[derive(Error, Debug)]
+pub enum UploadFileError {
+    #[error("Unauthorized")]
+    Unauthorized,
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Helpers
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn convert_headers(headers: &[(String, String)]) -> reqwest::header::HeaderMap {
+    use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
+
+    headers
+        .iter()
+        .fold(HeaderMap::new(), |mut acc, (header, value)| {
+            acc.insert(
+                HeaderName::from_str(header).unwrap(),
+                HeaderValue::from_str(value).unwrap(),
+            );
+            acc
+        })
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

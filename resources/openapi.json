@@ -16,6 +16,17 @@
         ],
         "type": "object"
       },
+      "ApiErrorResponse": {
+        "properties": {
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "message"
+        ],
+        "type": "object"
+      },
       "Commitment": {
         "additionalProperties": false,
         "properties": {
@@ -165,7 +176,7 @@
           },
           "dataFormat": {
             "$ref": "#/components/schemas/DataFormat",
-            "description": "How data is layed out in the response"
+            "description": "How data is laid out in the response"
           },
           "schema": {
             "oneOf": [
@@ -319,6 +330,17 @@
         ],
         "type": "object"
       },
+      "LoginResponseBody": {
+        "properties": {
+          "accessToken": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "accessToken"
+        ],
+        "type": "object"
+      },
       "NodeInfoResponse": {
         "properties": {
           "isMultiTenant": {
@@ -406,7 +428,7 @@
           },
           "dataFormat": {
             "$ref": "#/components/schemas/DataFormat",
-            "description": "How data is layed out in the response"
+            "description": "How data is laid out in the response"
           },
           "schema": {
             "oneOf": [
@@ -471,7 +493,7 @@
         "properties": {
           "dataFormat": {
             "$ref": "#/components/schemas/DataFormat",
-            "description": "How data should be layed out in the response"
+            "description": "How data should be laid out in the response"
           },
           "datasets": {
             "description": "Optional information used to affix an alias to the specific\n[`odf::DatasetID`] and reproduce the query at a specific state in time",
@@ -608,7 +630,7 @@
       },
       "SubQuery": {
         "additionalProperties": false,
-        "description": "Mirrors the structure of [`ResponseBody`] without the `outputs`",
+        "description": "Mirrors the structure of [`QueryRequest`] without the `outputs`",
         "properties": {
           "commitment": {
             "$ref": "#/components/schemas/Commitment",
@@ -857,10 +879,19 @@
               }
             },
             "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": ""
           }
         },
         "security": [
-          {},
           {
             "api_key": []
           }
@@ -892,10 +923,29 @@
               }
             },
             "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": ""
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": ""
           }
         },
         "security": [
-          {},
           {
             "api_key": []
           }
@@ -1167,7 +1217,27 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object"
+                  "$ref": "#/components/schemas/LoginResponseBody"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
                 }
               }
             },
@@ -1196,10 +1266,19 @@
               }
             },
             "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": ""
           }
         },
         "security": [
-          {},
           {
             "api_key": []
           }
@@ -1255,7 +1334,7 @@
             }
           },
           {
-            "description": "How the output data should be ecoded",
+            "description": "How the output data should be encoded",
             "in": "path",
             "name": "dataFormat",
             "required": true,
@@ -1380,7 +1459,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/VerifyResponse"
+                  "$ref": "#/components/schemas/ApiErrorResponse"
                 }
               }
             },
@@ -1846,7 +1925,7 @@
             }
           },
           {
-            "description": "How the output data should be ecoded",
+            "description": "How the output data should be encoded",
             "in": "path",
             "name": "dataFormat",
             "required": true,

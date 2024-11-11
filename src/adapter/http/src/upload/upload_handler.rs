@@ -21,16 +21,16 @@ use crate::{MakeUploadContextError, SaveUploadError, UploadService};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(serde::Deserialize, utoipa::IntoParams)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::IntoParams)]
 #[serde(rename_all = "camelCase")]
 pub struct PlatformFileUploadQuery {
-    file_name: String,
+    pub file_name: String,
 
-    content_length: usize,
+    pub content_length: usize,
 
     #[param(value_type = Option<String>)]
     #[serde(default, deserialize_with = "empty_string_as_none")]
-    content_type: Option<MediaType>,
+    pub content_type: Option<MediaType>,
 }
 
 /// Prepare file upload
@@ -202,3 +202,5 @@ where
         Some(s) => T::deserialize(s.into_deserializer()).map(Some),
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

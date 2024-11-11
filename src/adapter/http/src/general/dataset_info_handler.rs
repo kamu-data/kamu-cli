@@ -29,7 +29,7 @@ use crate::axum_utils::ensure_authenticated_account;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, serde::Serialize, utoipa::ToSchema)]
+#[derive(Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct DatasetOwnerInfo {
     #[schema(value_type = String)]
@@ -40,7 +40,7 @@ pub struct DatasetOwnerInfo {
     pub account_id: Option<AccountID>,
 }
 
-#[derive(Debug, serde::Serialize, utoipa::ToSchema)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct DatasetInfoResponse {
     #[schema(value_type = String)]
@@ -77,10 +77,13 @@ impl DatasetInfoResponse {
     params(
         ("id", description = "Dataset ID")
     ),
-    responses((status = OK, body = DatasetInfoResponse)),
+    responses(
+        (status = OK, body = DatasetInfoResponse),
+        (status = UNAUTHORIZED, body = ApiErrorResponse),
+        (status = NOT_FOUND, body = ApiErrorResponse),
+    ),
     tag = "kamu",
     security(
-        (),
         ("api_key" = [])
     )
 )]
@@ -98,8 +101,11 @@ async fn get_dataset_by_id(
     catalog: &Catalog,
     dataset_id: &DatasetID,
 ) -> Result<Json<DatasetInfoResponse>, ApiError> {
-    // TODO: FIXME: This is incorrect - the endpoint should check permissions to
-    // access dataset and not reject non-authed users
+    // TODO: Private Datasets: Revision of access permission checks: add missing
+    //       https://github.com/kamu-data/kamu-cli/issues/730
+    //
+    // Context: This is incorrect - the endpoint should check permissions
+    //          to access dataset and not reject non-authed users
     ensure_authenticated_account(catalog).api_err()?;
 
     let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
@@ -111,6 +117,8 @@ async fn get_dataset_by_id(
             GetDatasetError::Internal(e) => e.api_err(),
         })?;
 
+    // TODO: Private Datasets: Use the real owner_id, not the alias name
+    //       Context: In the case of single-tenant, we have None
     let account_id = if let Some(account_name) = dataset_handle.alias.account_name.as_ref() {
         let auth_service = catalog.get_one::<dyn AuthenticationService>().unwrap();
         auth_service

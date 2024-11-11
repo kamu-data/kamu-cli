@@ -10,18 +10,19 @@
 use std::assert_matches::assert_matches;
 
 use kamu_cli_e2e_common::{
+    DATASET_ROOT_PLAYER_NAME,
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_2,
     DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
 };
 use kamu_cli_puppet::extensions::KamuCliPuppetExt;
 use kamu_cli_puppet::KamuCliPuppet;
-use opendatafabric::{DatasetName, MetadataEvent};
+use opendatafabric as odf;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_compact_hard(kamu: KamuCliPuppet) {
-    let dataset_name = DatasetName::new_unchecked("player-scores");
+    let dataset_name = DATASET_ROOT_PLAYER_NAME.clone();
 
     kamu.execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
         .await
@@ -60,14 +61,14 @@ pub async fn test_compact_hard(kamu: KamuCliPuppet) {
     );
     assert_matches!(
         blocks_after_compacting.first().unwrap().block.event,
-        MetadataEvent::AddData(_)
+        odf::MetadataEvent::AddData(_)
     );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_compact_keep_metadata_only(kamu: KamuCliPuppet) {
-    let dataset_name = DatasetName::new_unchecked("player-scores");
+    let dataset_name = DATASET_ROOT_PLAYER_NAME.clone();
 
     kamu.execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
         .await
@@ -107,14 +108,14 @@ pub async fn test_compact_keep_metadata_only(kamu: KamuCliPuppet) {
     );
     assert_matches!(
         blocks_after_compacting.first().unwrap().block.event,
-        MetadataEvent::SetDataSchema(_)
+        odf::MetadataEvent::SetDataSchema(_)
     );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_compact_verify(kamu: KamuCliPuppet) {
-    let dataset_name = DatasetName::new_unchecked("player-scores");
+    let dataset_name = DATASET_ROOT_PLAYER_NAME.clone();
 
     kamu.execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
         .await
@@ -157,7 +158,7 @@ pub async fn test_compact_verify(kamu: KamuCliPuppet) {
     );
     assert_matches!(
         blocks_after_compacting.first().unwrap().block.event,
-        MetadataEvent::AddData(_)
+        odf::MetadataEvent::AddData(_)
     );
 }
 

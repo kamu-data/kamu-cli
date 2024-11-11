@@ -37,6 +37,7 @@ use kamu_adapter_http::{
 };
 use kamu_core::MediaType;
 use opendatafabric::{AccountID, AccountName};
+use serde_json::json;
 use time_source::SystemTimeSourceDefault;
 
 use crate::harness::{await_client_server_flow, TestAPIServer};
@@ -178,13 +179,22 @@ async fn test_attempt_upload_file_unauthorized() {
             .send()
             .await
             .unwrap();
-        assert_eq!(401, upload_prepare_response.status());
-        assert_eq!(
-            "No authentication token provided",
-            upload_prepare_response.text().await.unwrap()
+
+        pretty_assertions::assert_eq!(
+            http::StatusCode::UNAUTHORIZED,
+            upload_prepare_response.status()
+        );
+        pretty_assertions::assert_eq!(
+            json!({
+                "message": "No authentication token provided"
+            }),
+            upload_prepare_response
+                .json::<serde_json::Value>()
+                .await
+                .unwrap()
         );
 
-        let upload_main_reponse = client
+        let upload_main_response = client
             .post(format!("{upload_main_url}/{upload_token}"))
             .multipart(
                 reqwest::multipart::Form::new().part(
@@ -198,10 +208,19 @@ async fn test_attempt_upload_file_unauthorized() {
             .send()
             .await
             .unwrap();
-        assert_eq!(401, upload_main_reponse.status());
-        assert_eq!(
-            "No authentication token provided",
-            upload_main_reponse.text().await.unwrap()
+
+        pretty_assertions::assert_eq!(
+            http::StatusCode::UNAUTHORIZED,
+            upload_main_response.status()
+        );
+        pretty_assertions::assert_eq!(
+            json!({
+                "message": "No authentication token provided"
+            }),
+            upload_main_response
+                .json::<serde_json::Value>()
+                .await
+                .unwrap()
         );
     };
 
@@ -229,12 +248,12 @@ async fn test_attempt_upload_file_authorized() {
             .await
             .unwrap();
 
-        assert_eq!(200, upload_prepare_response.status());
+        pretty_assertions::assert_eq!(http::StatusCode::OK, upload_prepare_response.status());
         let upload_context = upload_prepare_response
             .json::<UploadContext>()
             .await
             .unwrap();
-        assert_eq!("POST", upload_context.method);
+        pretty_assertions::assert_eq!(http::method::Method::POST.as_str(), upload_context.method);
         assert!(upload_context.use_multipart);
         assert!(upload_context.fields.is_empty());
 
@@ -256,12 +275,12 @@ async fn test_attempt_upload_file_authorized() {
             .await
             .unwrap();
 
-        assert_eq!(200, upload_main_response.status());
+        pretty_assertions::assert_eq!(http::StatusCode::OK, upload_main_response.status());
 
         let expected_upload_path =
             Harness::target_path_from_upload_url(&cache_dir, &upload_main_url);
         let file_body = std::fs::read_to_string(expected_upload_path).unwrap();
-        assert_eq!(FILE_BODY, file_body);
+        pretty_assertions::assert_eq!(FILE_BODY, file_body);
     };
 
     await_client_server_flow!(harness.api_server_run(), client);
@@ -288,12 +307,12 @@ async fn test_attempt_upload_file_by_different_user() {
             .await
             .unwrap();
 
-        assert_eq!(200, upload_prepare_response.status());
+        pretty_assertions::assert_eq!(http::StatusCode::OK, upload_prepare_response.status());
         let upload_context = upload_prepare_response
             .json::<UploadContext>()
             .await
             .unwrap();
-        assert_eq!("POST", upload_context.method);
+        pretty_assertions::assert_eq!(http::method::Method::POST.as_str(), upload_context.method);
         assert!(upload_context.use_multipart);
         assert!(upload_context.fields.is_empty());
 
@@ -315,7 +334,7 @@ async fn test_attempt_upload_file_by_different_user() {
             .await
             .unwrap();
 
-        assert_eq!(403, upload_main_response.status());
+        pretty_assertions::assert_eq!(http::StatusCode::FORBIDDEN, upload_main_response.status());
     };
 
     await_client_server_flow!(harness.api_server_run(), client);
@@ -350,13 +369,21 @@ async fn test_attempt_upload_file_that_is_too_large() {
             .await
             .unwrap();
 
-        assert_eq!(400, upload_prepare_response.status());
-        assert_eq!(
-            "Content too large",
-            upload_prepare_response.text().await.unwrap()
+        pretty_assertions::assert_eq!(
+            http::StatusCode::BAD_REQUEST,
+            upload_prepare_response.status()
+        );
+        pretty_assertions::assert_eq!(
+            json!({
+                "message": "Content too large"
+            }),
+            upload_prepare_response
+                .json::<serde_json::Value>()
+                .await
+                .unwrap()
         );
 
-        let upload_main_reponse = client
+        let upload_main_response = client
             .post(format!("{upload_main_url}/{upload_token}"))
             .bearer_auth(access_token.clone())
             .multipart(
@@ -371,10 +398,16 @@ async fn test_attempt_upload_file_that_is_too_large() {
             .send()
             .await
             .unwrap();
-        assert_eq!(400, upload_main_reponse.status());
-        assert_eq!(
-            "Content too large",
-            upload_main_reponse.text().await.unwrap()
+
+        pretty_assertions::assert_eq!(http::StatusCode::BAD_REQUEST, upload_main_response.status());
+        pretty_assertions::assert_eq!(
+            json!({
+                "message": "Content too large"
+            }),
+            upload_main_response
+                .json::<serde_json::Value>()
+                .await
+                .unwrap()
         );
     };
 
@@ -401,7 +434,7 @@ async fn test_attempt_upload_file_that_has_different_length_than_declared() {
             .await
             .unwrap();
 
-        assert_eq!(200, upload_prepare_response.status());
+        pretty_assertions::assert_eq!(http::StatusCode::OK, upload_prepare_response.status());
         let upload_context = upload_prepare_response
             .json::<UploadContext>()
             .await
@@ -424,10 +457,16 @@ async fn test_attempt_upload_file_that_has_different_length_than_declared() {
             .send()
             .await
             .unwrap();
-        assert_eq!(400, upload_main_response.status());
-        assert_eq!(
-            "Actual content length 27 does not match the initially declared length 9",
-            upload_main_response.text().await.unwrap()
+
+        pretty_assertions::assert_eq!(http::StatusCode::BAD_REQUEST, upload_main_response.status());
+        pretty_assertions::assert_eq!(
+            json!({
+                "message": "Actual content length 27 does not match the initially declared length 9"
+            }),
+            upload_main_response
+                .json::<serde_json::Value>()
+                .await
+                .unwrap()
         );
     };
 
@@ -455,7 +494,7 @@ async fn test_upload_then_read_file() {
             .await
             .unwrap();
 
-        assert_eq!(200, upload_prepare_response.status());
+        pretty_assertions::assert_eq!(http::StatusCode::OK, upload_prepare_response.status());
         let upload_context = upload_prepare_response
             .json::<UploadContext>()
             .await
@@ -479,35 +518,36 @@ async fn test_upload_then_read_file() {
             .await
             .unwrap();
 
-        assert_eq!(200, upload_main_response.status());
+        pretty_assertions::assert_eq!(http::StatusCode::OK, upload_main_response.status());
 
         // Read file with the same authorization token
-        let upload_retreive_response = client
+        let upload_retrieve_response = client
             .get(upload_main_url.clone())
             .bearer_auth(access_token)
             .send()
             .await
             .unwrap();
-        assert_eq!(200, upload_retreive_response.status());
-        let file_body = upload_retreive_response.text().await.unwrap();
-        assert_eq!(FILE_BODY, file_body);
+
+        pretty_assertions::assert_eq!(http::StatusCode::OK, upload_retrieve_response.status());
+        let file_body = upload_retrieve_response.text().await.unwrap();
+        pretty_assertions::assert_eq!(FILE_BODY, file_body);
 
         // Read file with a different authorization token
-        let upload_retreive_response = client
+        let upload_retrieve_response = client
             .get(upload_main_url.clone())
             .bearer_auth(different_access_token)
             .send()
             .await
             .unwrap();
-        assert_eq!(200, upload_retreive_response.status());
-        let file_body = upload_retreive_response.text().await.unwrap();
-        assert_eq!(FILE_BODY, file_body);
+        pretty_assertions::assert_eq!(http::StatusCode::OK, upload_retrieve_response.status());
+        let file_body = upload_retrieve_response.text().await.unwrap();
+        pretty_assertions::assert_eq!(FILE_BODY, file_body);
 
         // Read file anonymously
-        let upload_retreive_response = client.get(upload_main_url).send().await.unwrap();
-        assert_eq!(200, upload_retreive_response.status());
-        let file_body = upload_retreive_response.text().await.unwrap();
-        assert_eq!(FILE_BODY, file_body);
+        let upload_retrieve_response = client.get(upload_main_url).send().await.unwrap();
+        pretty_assertions::assert_eq!(http::StatusCode::OK, upload_retrieve_response.status());
+        let file_body = upload_retrieve_response.text().await.unwrap();
+        pretty_assertions::assert_eq!(FILE_BODY, file_body);
     };
 
     await_client_server_flow!(harness.api_server_run(), client);

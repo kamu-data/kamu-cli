@@ -9,6 +9,8 @@
 
 use std::collections::BTreeSet;
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct CommaSeparatedSet<T>(BTreeSet<T>);
 
@@ -77,6 +79,8 @@ where
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[cfg(test)]
 mod tests {
     use serde_json::json;
@@ -106,7 +110,7 @@ mod tests {
                 "b".to_string()
             ]))
             .unwrap(),
-            serde_json::json!("a,b,c"),
+            json!("a,b,c"),
         );
 
         assert_eq!(
@@ -129,7 +133,7 @@ mod tests {
 
         assert_eq!(
             serde_json::to_value(CommaSeparatedSet::from([X::Foo, X::Bar, X::Foo])).unwrap(),
-            serde_json::json!("Foo,Bar"),
+            json!("Foo,Bar"),
         );
 
         assert_eq!(
@@ -138,3 +142,5 @@ mod tests {
         );
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

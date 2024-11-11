@@ -276,7 +276,7 @@ where
                 InsertBlockError::Internal(e) => AppendError::Internal(e),
             })?;
 
-        tracing::debug!(?block, "Sucessfully appended block");
+        tracing::debug!(?block, "Successfully appended block");
 
         if let Some(r) = opts.update_ref {
             tracing::debug!(?r, new_hash = %res.hash, "Updating reference");

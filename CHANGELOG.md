@@ -13,8 +13,12 @@ Recommendation: for ease of reading, use the following order:
 
 ## [Unreleased]
 ### Added
-- E2E: cover all flow scenarios
-- E2E: `KamuApiServerClientExt`: method grouping
+- E2E: reinforce test coverage
+  - Covered all flow scenarios
+  - Covered hot REST API endpoints
+  - Reconfiguring test groups for a small speedup (10%)
+  - Directory structure grooming
+  - `KamuApiServerClientExt`: method grouping
 - Dataset definition: added possibility to set defaults in templates:
   ```yaml
   fetch:
@@ -23,6 +27,11 @@ Recommendation: for ease of reading, use the following order:
     args:
       - --request-interval
       - '${{ env.request_interval || 2 }}'
+  ```
+### Changed
+- HTTP API errors will now come in JSON format instead of plain text, for example:
+  ```json
+  { "message": "Incompatible client version" }
   ```
 ### Fixed
 - `kamu add` correctly handle snapshots with circular dependencies

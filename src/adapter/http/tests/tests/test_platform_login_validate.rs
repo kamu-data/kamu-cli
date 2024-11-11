@@ -138,7 +138,7 @@ async fn test_login_with_password_method_success() {
             .send()
             .await
             .unwrap();
-        assert_eq!(200, login_response.status());
+        pretty_assertions::assert_eq!(http::StatusCode::OK, login_response.status());
 
         let login_response_body = login_response.json::<LoginResponseBody>().await.unwrap();
 
@@ -148,7 +148,7 @@ async fn test_login_with_password_method_success() {
             .send()
             .await
             .unwrap();
-        assert_eq!(200, validate_response.status());
+        pretty_assertions::assert_eq!(http::StatusCode::OK, validate_response.status());
     };
 
     await_client_server_flow!(harness.api_server_run(), client);
@@ -180,12 +180,13 @@ async fn test_login_with_password_method_invalid_credentials() {
             .send()
             .await
             .unwrap();
-        assert_eq!(401, login_response.status());
 
-        let login_response_error = login_response.text().await.unwrap();
-        assert_eq!(
-            login_response_error,
-            "Rejected credentials: invalid login or password"
+        pretty_assertions::assert_eq!(http::StatusCode::UNAUTHORIZED, login_response.status());
+        pretty_assertions::assert_eq!(
+            json!({
+                "message": "Rejected credentials: invalid login or password"
+            }),
+            login_response.json::<serde_json::Value>().await.unwrap()
         );
     };
 
@@ -223,7 +224,8 @@ async fn test_login_with_password_method_expired_credentials() {
             .send()
             .await
             .unwrap();
-        assert_eq!(200, login_response.status());
+
+        pretty_assertions::assert_eq!(http::StatusCode::OK, login_response.status());
 
         let login_response_body = login_response.json::<LoginResponseBody>().await.unwrap();
 
@@ -233,10 +235,14 @@ async fn test_login_with_password_method_expired_credentials() {
             .send()
             .await
             .unwrap();
-        assert_eq!(401, validate_response.status());
 
-        let validate_response_error = validate_response.text().await.unwrap();
-        assert_eq!(validate_response_error, "Authentication token expired");
+        pretty_assertions::assert_eq!(http::StatusCode::UNAUTHORIZED, validate_response.status());
+        pretty_assertions::assert_eq!(
+            json!({
+                "message": "Authentication token expired"
+            }),
+            validate_response.json::<serde_json::Value>().await.unwrap()
+        );
     };
 
     await_client_server_flow!(harness.api_server_run(), client);
@@ -258,10 +264,14 @@ async fn test_validate_invalid_token_fails() {
             .send()
             .await
             .unwrap();
-        assert_eq!(401, validate_response.status());
 
-        let validate_response_error = validate_response.text().await.unwrap();
-        assert_eq!(validate_response_error, "Authentication token invalid");
+        pretty_assertions::assert_eq!(http::StatusCode::UNAUTHORIZED, validate_response.status());
+        pretty_assertions::assert_eq!(
+            json!({
+                "message": "Authentication token invalid"
+            }),
+            validate_response.json::<serde_json::Value>().await.unwrap()
+        );
     };
 
     await_client_server_flow!(harness.api_server_run(), client);
@@ -278,10 +288,14 @@ async fn test_validate_without_token_fails() {
         let client = reqwest::Client::new();
 
         let validate_response = client.get(validate_url).send().await.unwrap();
-        assert_eq!(401, validate_response.status());
 
-        let validate_response_error = validate_response.text().await.unwrap();
-        assert_eq!(validate_response_error, "No authentication token provided");
+        pretty_assertions::assert_eq!(http::StatusCode::UNAUTHORIZED, validate_response.status());
+        pretty_assertions::assert_eq!(
+            json!({
+                "message": "No authentication token provided"
+            }),
+            validate_response.json::<serde_json::Value>().await.unwrap()
+        );
     };
 
     await_client_server_flow!(harness.api_server_run(), client);

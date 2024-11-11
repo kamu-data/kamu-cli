@@ -8,13 +8,16 @@
 // by the Apache License, Version 2.0.
 
 use kamu_cli_e2e_common::{
+    DATASET_DERIVATIVE_LEADERBOARD_NAME,
     DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR,
+    DATASET_ROOT_PLAYER_NAME,
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
     DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
 };
 use kamu_cli_puppet::extensions::KamuCliPuppetExt;
 use kamu_cli_puppet::KamuCliPuppet;
-use opendatafabric::{DatasetName, EnumWithVariants, SetTransform};
+use odf::EnumWithVariants;
+use opendatafabric as odf;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -56,7 +59,7 @@ pub async fn test_inspect_query(kamu: KamuCliPuppet) {
         .await
         .into_iter()
         .find_map(|dataset| {
-            if dataset.name == DatasetName::new_unchecked("player-scores") {
+            if dataset.name == *DATASET_ROOT_PLAYER_NAME {
                 Some(dataset.id)
             } else {
                 None
@@ -72,11 +75,16 @@ pub async fn test_inspect_query(kamu: KamuCliPuppet) {
     .success();
 
     let leaderboard_transform_block_hash = kamu
-        .list_blocks(&DatasetName::new_unchecked("leaderboard"))
+        .list_blocks(&DATASET_DERIVATIVE_LEADERBOARD_NAME)
         .await
         .into_iter()
         .find_map(|block| {
-            if block.block.event.as_variant::<SetTransform>().is_some() {
+            if block
+                .block
+                .event
+                .as_variant::<odf::SetTransform>()
+                .is_some()
+            {
                 Some(block.block_hash)
             } else {
                 None

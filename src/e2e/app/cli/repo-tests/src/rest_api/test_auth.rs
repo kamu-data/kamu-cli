@@ -7,7 +7,15 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_cli_e2e_common::{KamuApiServerClient, KamuApiServerClientExt};
+use std::assert_matches::assert_matches;
+
+use kamu_cli_e2e_common::{
+    KamuApiServerClient,
+    KamuApiServerClientExt,
+    LoginError,
+    TokenValidateError,
+};
+use serde_json::json;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -235,6 +243,67 @@ pub async fn test_kamu_access_token_middleware(mut kamu_api_server_client: KamuA
         .dataset()
         .create_player_scores_dataset()
         .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_token_validate(mut kamu_api_server_client: KamuApiServerClient) {
+    assert_matches!(
+        kamu_api_server_client.auth().token_validate().await,
+        Err(TokenValidateError::Unauthorized)
+    );
+
+    kamu_api_server_client.auth().login_as_kamu().await;
+
+    assert_matches!(kamu_api_server_client.auth().token_validate().await, Ok(_));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_login_via_rest_password(mut kamu_api_server_client: KamuApiServerClient) {
+    let login_credentials_json = json!({
+        "login": "kamu",
+        "password": "kamu"
+    });
+
+    assert_matches!(
+        kamu_api_server_client
+            .auth()
+            .login_via_rest("password", login_credentials_json)
+            .await,
+        Ok(_)
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_login_via_rest_dummy_github(mut kamu_api_server_client: KamuApiServerClient) {
+    let login_credentials_json = serde_json::Value::Null;
+
+    assert_matches!(
+        kamu_api_server_client
+            .auth()
+            .login_via_rest("oauth_github", login_credentials_json)
+            .await,
+        Ok(_)
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_login_via_rest_unauthorized(mut kamu_api_server_client: KamuApiServerClient) {
+    let login_credentials_json = json!({
+        "login": "kamu",
+        "password": "wrong-password"
+    });
+
+    assert_matches!(
+        kamu_api_server_client
+            .auth()
+            .login_via_rest("password", login_credentials_json)
+            .await,
+        Err(LoginError::Unauthorized)
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

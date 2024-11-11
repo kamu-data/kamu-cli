@@ -8,8 +8,7 @@
 // by the Apache License, Version 2.0.
 
 mod commands;
-mod test_auth;
+mod rest_api;
 mod test_flow;
-mod test_rest_api;
 mod test_selftest;
 mod test_smart_transfer_protocol;

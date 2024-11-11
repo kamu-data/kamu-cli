@@ -16,6 +16,7 @@ use kamu_cli_e2e_common::{
     KamuApiServerClient,
     KamuApiServerClientExt,
     RequestBody,
+    DATASET_ROOT_PLAYER_NAME,
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_2,
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_3,
@@ -846,7 +847,7 @@ pub async fn test_trigger_flow_ingest(mut kamu_api_server_client: KamuApiServerC
             0,2050-01-02T03:04:05Z,2020-01-01T00:00:00Z,B,2000
             0,2050-01-02T03:04:05Z,2020-01-01T00:00:00Z,C,3000"#
         ),
-        kamu_api_server_client.data().query(QUERY).await
+        kamu_api_server_client.odf_query().query(QUERY).await
     );
 
     // Update iteration 2
@@ -889,7 +890,7 @@ pub async fn test_trigger_flow_ingest(mut kamu_api_server_client: KamuApiServerC
             0,2051-01-02T03:04:05Z,2020-01-02T00:00:00Z,B,2500
             0,2051-01-02T03:04:05Z,2020-01-02T00:00:00Z,C,3500"#
         ),
-        kamu_api_server_client.data().query(QUERY).await
+        kamu_api_server_client.odf_query().query(QUERY).await
     );
 }
 
@@ -1026,8 +1027,7 @@ pub async fn test_trigger_flow_hard_compaction(mut kamu_api_server_client: KamuA
         .dataset()
         .create_player_scores_dataset()
         .await;
-    let dataset_alias =
-        odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("player-scores"));
+    let dataset_alias = odf::DatasetAlias::new(None, DATASET_ROOT_PLAYER_NAME.clone());
 
     // Ingesting data in multiple chunks
 
@@ -1054,7 +1054,7 @@ pub async fn test_trigger_flow_hard_compaction(mut kamu_api_server_client: KamuA
             0,2050-01-02T03:04:05Z,2000-01-03T00:00:00Z,3,Charlie,110"#
         ),
         kamu_api_server_client
-            .data()
+            .odf_query()
             .query_player_scores_dataset()
             .await
     );
@@ -1103,7 +1103,7 @@ pub async fn test_trigger_flow_hard_compaction(mut kamu_api_server_client: KamuA
             0,2050-01-02T03:04:05Z,2000-01-03T00:00:00Z,3,Charlie,110"#
         ),
         kamu_api_server_client
-            .data()
+            .odf_query()
             .query_player_scores_dataset()
             .await
     );

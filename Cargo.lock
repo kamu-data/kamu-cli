@@ -4545,6 +4545,7 @@ dependencies = [
  "strum",
  "thiserror",
  "tracing",
+ "utoipa",
 ]
 
 [[package]]
@@ -5683,10 +5684,13 @@ dependencies = [
  "async-trait",
  "chrono",
  "convert_case",
+ "http-common",
  "indoc 2.0.5",
  "internal-error",
+ "kamu-adapter-http",
  "kamu-cli-e2e-common-macros",
  "kamu-cli-puppet",
+ "kamu-core",
  "kamu-flow-system",
  "lazy_static",
  "opendatafabric",
@@ -5695,7 +5699,10 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
+ "serde_urlencoded",
+ "serde_yaml",
  "sqlx",
+ "thiserror",
  "tokio",
  "tokio-retry",
 ]
@@ -5754,9 +5761,12 @@ name = "kamu-cli-e2e-repo-tests"
 version = "0.206.5"
 dependencies = [
  "chrono",
+ "http-common",
  "indoc 2.0.5",
  "internal-error",
  "kamu",
+ "kamu-accounts",
+ "kamu-adapter-http",
  "kamu-cli",
  "kamu-cli-e2e-common",
  "kamu-cli-puppet",
