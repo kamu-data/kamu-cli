@@ -5323,6 +5323,7 @@ dependencies = [
  "messaging-outbox",
  "mockall",
  "opendatafabric",
+ "pretty_assertions",
  "secrecy",
  "serde",
  "serde_json",

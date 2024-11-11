@@ -28,6 +28,7 @@ use kamu_accounts_services::{
 use kamu_core::*;
 use messaging_outbox::DummyOutboxImpl;
 use opendatafabric::*;
+use serde_json::json;
 use time_source::SystemTimeSourceDefault;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -189,14 +190,14 @@ async fn test_dataset_tail_schema() {
         )
         .await;
     assert!(res.is_ok(), "{res:?}");
-    let json = serde_json::to_string(&res.data).unwrap();
-    let json = serde_json::from_str::<serde_json::Value>(&json).unwrap();
-    let data_schema = &json["datasets"]["byOwnerAndName"]["data"]["tail"]["schema"]["content"];
+
+    let json = serde_json::to_value(&res.data).unwrap();
+    let schema_content = &json["datasets"]["byOwnerAndName"]["data"]["tail"]["schema"]["content"];
     let data_schema =
-        serde_json::from_str::<serde_json::Value>(data_schema.as_str().unwrap()).unwrap();
-    assert_eq!(
-        data_schema,
-        serde_json::json!({
+        serde_json::from_str::<serde_json::Value>(schema_content.as_str().unwrap()).unwrap();
+
+    pretty_assertions::assert_eq!(
+        json!({
             "name": "arrow_schema",
             "type": "struct",
             "fields": [{
@@ -210,7 +211,8 @@ async fn test_dataset_tail_schema() {
                 "type": "BYTE_ARRAY",
                 "logicalType": "STRING"
             }]
-        })
+        }),
+        data_schema,
     );
 }
 
@@ -248,11 +250,13 @@ async fn test_dataset_tail_some() {
         )
         .await;
     assert!(res.is_ok(), "{res:?}");
-    let json = serde_json::to_string(&res.data).unwrap();
-    let json = serde_json::from_str::<serde_json::Value>(&json).unwrap();
-    let data = &json["datasets"]["byOwnerAndName"]["data"]["tail"]["data"]["content"];
-    let data = serde_json::from_str::<serde_json::Value>(data.as_str().unwrap()).unwrap();
-    assert_eq!(data, serde_json::json!([{"blah": "c", "offset": 2}]));
+
+    let json = serde_json::to_value(&res.data).unwrap();
+    let data_content = &json["datasets"]["byOwnerAndName"]["data"]["tail"]["data"]["content"];
+    let data_content_json =
+        serde_json::from_str::<serde_json::Value>(data_content.as_str().unwrap()).unwrap();
+
+    pretty_assertions::assert_eq!(json!([{"blah": "c", "offset": 2}]), data_content_json);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -289,11 +293,13 @@ async fn test_dataset_tail_empty() {
         )
         .await;
     assert!(res.is_ok(), "{res:?}");
-    let json = serde_json::to_string(&res.data).unwrap();
-    let json = serde_json::from_str::<serde_json::Value>(&json).unwrap();
-    let data = &json["datasets"]["byOwnerAndName"]["data"]["tail"]["data"]["content"];
-    let data = serde_json::from_str::<serde_json::Value>(data.as_str().unwrap()).unwrap();
-    assert_eq!(data, serde_json::json!([]));
+
+    let json = serde_json::to_value(&res.data).unwrap();
+    let data_content = &json["datasets"]["byOwnerAndName"]["data"]["tail"]["data"]["content"];
+    let data_content_json =
+        serde_json::from_str::<serde_json::Value>(data_content.as_str().unwrap()).unwrap();
+
+    pretty_assertions::assert_eq!(json!([]), data_content_json);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -313,18 +319,25 @@ async fn test_data_query_some() {
             async_graphql::Request::new(indoc::indoc!(
                 r#"
                 {
-                    data {
-                        query(
-                            query: "select * from \"kamu/foo\" order by offset",
-                            queryDialect: SQL_DATA_FUSION,
-                            schemaFormat: ARROW_JSON,
-                            dataFormat: JSON,
-                        ) {
-                            ... on DataQueryResultSuccess {
-                                data { content }
-                            }
+                  data {
+                    query(
+                      query: "select * from \"kamu/foo\" order by offset"
+                      queryDialect: SQL_DATA_FUSION
+                      schemaFormat: ARROW_JSON
+                      dataFormat: JSON
+                    ) {
+                      ... on DataQueryResultSuccess {
+                        data {
+                          content
                         }
+                        datasets {
+                          id
+                          alias
+                          # blockHash
+                        }
+                      }
                     }
+                  }
                 }
                 "#
             ))
@@ -332,18 +345,29 @@ async fn test_data_query_some() {
         )
         .await;
     assert!(res.is_ok(), "{res:?}");
-    let json = serde_json::to_string(&res.data).unwrap();
-    let json = serde_json::from_str::<serde_json::Value>(&json).unwrap();
-    let data = &json["data"]["query"]["data"]["content"];
-    let data = serde_json::from_str::<serde_json::Value>(data.as_str().unwrap()).unwrap();
-    assert_eq!(
-        data,
-        serde_json::json!([
+
+    let json = serde_json::to_value(&res.data).unwrap();
+    let data_content = &json["data"]["query"]["data"]["content"];
+    let data_content_json =
+        serde_json::from_str::<serde_json::Value>(data_content.as_str().unwrap()).unwrap();
+
+    pretty_assertions::assert_eq!(
+        json!([
             {"offset": 0, "blah": "a"},
             {"offset": 1, "blah": "b"},
             {"offset": 2, "blah": "c"},
             {"offset": 3, "blah": "d"},
-        ])
+        ]),
+        data_content_json
+    );
+    pretty_assertions::assert_eq!(
+        json!([
+            {
+                "alias": "kamu/foo",
+                "id": "did:odf:fed01df230b49615d175307d580c33d6fda61fc7b9aec91df0f5c1a5ebe3b8cbfee02"
+            }
+        ]),
+        json["data"]["query"]["datasets"]
     );
 }
 
@@ -381,16 +405,15 @@ async fn test_data_query_error_sql_unparsable() {
         )
         .await;
     assert!(res.is_ok(), "{res:?}");
-    let json = serde_json::to_string(&res.data).unwrap();
-    tracing::debug!(?json, "Response data");
-    let json = serde_json::from_str::<serde_json::Value>(&json).unwrap();
-    let data = &json["data"]["query"];
-    assert_eq!(
-        *data,
-        serde_json::json!({
+
+    let json = serde_json::to_value(&res.data).unwrap();
+
+    pretty_assertions::assert_eq!(
+        json!({
             "errorMessage": "sql parser error: Expected end of statement, found: ?",
             "errorKind": "INVALID_SQL",
-        })
+        }),
+        json["data"]["query"],
     );
 }
 
@@ -428,16 +451,15 @@ async fn test_data_query_error_sql_missing_function() {
         )
         .await;
     assert!(res.is_ok(), "{res:?}");
-    let json = serde_json::to_string(&res.data).unwrap();
-    tracing::debug!(?json, "Response data");
-    let json = serde_json::from_str::<serde_json::Value>(&json).unwrap();
-    let data = &json["data"]["query"];
-    assert_eq!(
-        *data,
-        serde_json::json!({
+
+    let json = serde_json::to_value(&res.data).unwrap();
+
+    pretty_assertions::assert_eq!(
+        json!({
             "errorMessage": "Invalid function 'foobar'.\nDid you mean 'floor'?",
             "errorKind": "INVALID_SQL",
-        })
+        }),
+        json["data"]["query"],
     );
 }
 
