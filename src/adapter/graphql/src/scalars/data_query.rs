@@ -20,6 +20,7 @@ use crate::prelude::*;
 pub struct DataQueryResultSuccess {
     pub schema: Option<DataSchema>,
     pub data: DataBatch,
+    pub datasets: Option<Vec<DatasetState>>,
     pub limit: u64,
 }
 
@@ -43,10 +44,16 @@ pub enum DataQueryResult {
 }
 
 impl DataQueryResult {
-    pub fn success(schema: Option<DataSchema>, data: DataBatch, limit: u64) -> DataQueryResult {
+    pub fn success(
+        schema: Option<DataSchema>,
+        data: DataBatch,
+        datasets: Option<Vec<DatasetState>>,
+        limit: u64,
+    ) -> DataQueryResult {
         DataQueryResult::Success(DataQueryResultSuccess {
             schema,
             data,
+            datasets,
             limit,
         })
     }
@@ -55,6 +62,7 @@ impl DataQueryResult {
         DataQueryResult::Success(DataQueryResultSuccess {
             schema: None,
             data: DataBatch::empty(format),
+            datasets: None,
             limit,
         })
     }
@@ -103,3 +111,5 @@ impl From<DataFusionError> for DataQueryResult {
         }
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

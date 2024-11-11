@@ -384,6 +384,7 @@ enum DataQueryResultErrorKind {
 type DataQueryResultSuccess {
 	schema: DataSchema
 	data: DataBatch!
+	datasets: [DatasetState!]
 	limit: Int!
 }
 
@@ -705,6 +706,22 @@ type DatasetPermissions {
 }
 
 scalar DatasetRef
+
+type DatasetState {
+	"""
+	Globally unique identity of the dataset
+	"""
+	id: DatasetID!
+	"""
+	Alias to be used in the query
+	"""
+	alias: String!
+	"""
+	Last block hash of the input datasets that was or should be considered
+	during the query planning
+	"""
+	blockHash: Multihash
+}
 
 enum DatasetVisibility {
 	PRIVATE

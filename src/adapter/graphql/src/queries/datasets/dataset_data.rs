@@ -12,6 +12,8 @@ use opendatafabric as odf;
 
 use crate::prelude::*;
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub struct DatasetData {
     dataset_handle: odf::DatasetHandle,
 }
@@ -107,6 +109,8 @@ impl DatasetData {
         };
         let data = DataBatch::from_records(&record_batches, data_format)?;
 
-        Ok(DataQueryResult::success(Some(schema), data, limit))
+        Ok(DataQueryResult::success(Some(schema), data, None, limit))
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
