@@ -89,18 +89,6 @@ macro_rules! refs {
     };
 }
 
-macro_rules! refs_local {
-    [] => {
-        vec![]
-    };
-    [$x:expr] => {
-        vec![mn!($x).as_any_ref()]
-    };
-    [$x:expr, $($y:expr),+] => {
-        vec![mn!($x).as_any_ref(), $(mn!($y).as_any_ref()),+]
-    };
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 async fn create_graph(
@@ -228,7 +216,7 @@ async fn test_pull_batching_chain() {
             .pull(refs!["c"], PullOptions::default())
             .await
             .unwrap(),
-        vec![PullBatch::Transform(refs!["c"])]
+        vec![vec![PullJob::Transform(ar!["c"])]]
     );
 
     assert_eq!(
@@ -237,8 +225,8 @@ async fn test_pull_batching_chain() {
             .await
             .unwrap(),
         vec![
-            PullBatch::Ingest(refs!["a"]),
-            PullBatch::Transform(refs!["c"]),
+            vec![PullJob::Ingest(ar!["a"])],
+            vec![PullJob::Transform(ar!["c"])]
         ],
     );
 
@@ -254,9 +242,9 @@ async fn test_pull_batching_chain() {
             .await
             .unwrap(),
         vec![
-            PullBatch::Ingest(refs!["a"]),
-            PullBatch::Transform(refs!["b"]),
-            PullBatch::Transform(refs!["c"]),
+            vec![PullJob::Ingest(ar!["a"])],
+            vec![PullJob::Transform(ar!["b"])],
+            vec![PullJob::Transform(ar!["c"])],
         ]
     );
 }
@@ -284,7 +272,7 @@ async fn test_pull_batching_chain_multi_tenant() {
             .pull(refs!["z/c"], PullOptions::default())
             .await
             .unwrap(),
-        vec![PullBatch::Transform(refs_local!["z/c"])]
+        vec![vec![PullJob::Transform(mn!["z/c"].as_any_ref())]]
     );
 
     assert_eq!(
@@ -293,8 +281,8 @@ async fn test_pull_batching_chain_multi_tenant() {
             .await
             .unwrap(),
         vec![
-            PullBatch::Ingest(refs_local!["x/a"]),
-            PullBatch::Transform(refs_local!["z/c"]),
+            vec![PullJob::Ingest(mn!["x/a"].as_any_ref())],
+            vec![PullJob::Transform(mn!["z/c"].as_any_ref())],
         ],
     );
 
@@ -310,9 +298,9 @@ async fn test_pull_batching_chain_multi_tenant() {
             .await
             .unwrap(),
         vec![
-            PullBatch::Ingest(refs_local!["x/a"]),
-            PullBatch::Transform(refs_local!["y/b"]),
-            PullBatch::Transform(refs_local!["z/c"]),
+            vec![PullJob::Ingest(mn!["x/a"].as_any_ref())],
+            vec![PullJob::Transform(mn!["y/b"].as_any_ref())],
+            vec![PullJob::Transform(mn!["z/c"].as_any_ref())],
         ]
     );
 }
@@ -346,7 +334,7 @@ async fn test_pull_batching_complex() {
             .pull(refs!["e"], PullOptions::default())
             .await
             .unwrap(),
-        vec![PullBatch::Transform(refs!["e"])]
+        vec![vec![PullJob::Transform(ar!["e"])]]
     );
 
     assert_matches!(
@@ -373,9 +361,9 @@ async fn test_pull_batching_complex() {
             .await
             .unwrap(),
         vec![
-            PullBatch::Ingest(refs!["a", "b"]),
-            PullBatch::Transform(refs!["c", "d"]),
-            PullBatch::Transform(refs!["e"]),
+            vec![PullJob::Ingest(ar!["a"]), PullJob::Ingest(ar!["b"])],
+            vec![PullJob::Transform(ar!["c"]), PullJob::Transform(ar!["d"])],
+            vec![PullJob::Transform(ar!["e"])],
         ]
     );
 }
@@ -438,10 +426,10 @@ async fn test_pull_batching_complex_with_remote() {
             )
             .await
             .unwrap(),
-        vec![PullBatch::Sync(vec![(
+        vec![vec![PullJob::Sync((
             rr!("kamu.dev/e").into(),
             n!("e").into()
-        )])],
+        ))]],
     );
 
     // Explicit remote reference associates with E
@@ -456,10 +444,10 @@ async fn test_pull_batching_complex_with_remote() {
             )
             .await
             .unwrap(),
-        vec![PullBatch::Sync(vec![(
+        vec![vec![PullJob::Sync((
             rr!("kamu.dev/e").into(),
             n!("e").into()
-        )])],
+        ))]],
     );
 
     // Remote is recursed onto
@@ -475,10 +463,13 @@ async fn test_pull_batching_complex_with_remote() {
             .await
             .unwrap(),
         vec![
-            PullBatch::Sync(vec![(rr!("kamu.dev/e").into(), n!("e").into())]),
-            PullBatch::Ingest(refs!("c", "d")),
-            PullBatch::Transform(refs!("f")),
-            PullBatch::Transform(refs!("g")),
+            vec![
+                PullJob::Sync((rr!("kamu.dev/e").into(), n!("e").into())),
+                PullJob::Ingest(ar!("c")),
+                PullJob::Ingest(ar!("d")),
+            ],
+            vec![PullJob::Transform(ar!("f"))],
+            vec![PullJob::Transform(ar!("g"))],
         ],
     );
 
@@ -495,10 +486,13 @@ async fn test_pull_batching_complex_with_remote() {
             .await
             .unwrap(),
         vec![
-            PullBatch::Sync(vec![(rr!("kamu.dev/e").into(), n!("e").into())]),
-            PullBatch::Ingest(refs!("c", "d")),
-            PullBatch::Transform(refs!("f")),
-            PullBatch::Transform(refs!("g")),
+            vec![
+                PullJob::Sync((rr!("kamu.dev/e").into(), n!("e").into())),
+                PullJob::Ingest(ar!("c")),
+                PullJob::Ingest(ar!("d"))
+            ],
+            vec![PullJob::Transform(ar!("f"))],
+            vec![PullJob::Transform(ar!("g"))],
         ],
     );
 
@@ -515,10 +509,13 @@ async fn test_pull_batching_complex_with_remote() {
             .await
             .unwrap(),
         vec![
-            PullBatch::Sync(vec![(rr!("kamu.dev/e").into(), n!("e").into())]),
-            PullBatch::Ingest(refs!("c", "d")),
-            PullBatch::Transform(refs!("f")),
-            PullBatch::Transform(refs!("g")),
+            vec![
+                PullJob::Sync((rr!("kamu.dev/e").into(), n!("e").into())),
+                PullJob::Ingest(ar!("c")),
+                PullJob::Ingest(ar!("d"))
+            ],
+            vec![PullJob::Transform(ar!("f"))],
+            vec![PullJob::Transform(ar!("g"))],
         ],
     );
 }
@@ -553,10 +550,10 @@ async fn test_sync_from() {
 
     assert_eq!(
         res,
-        vec![PullBatch::Sync(vec![(
+        vec![vec![PullJob::Sync((
             rr!("kamu.dev/foo").into(),
             n!("bar").into()
-        )])]
+        ))]]
     );
 }
 
@@ -590,10 +587,10 @@ async fn test_sync_from_url_and_local_ref() {
 
     assert_eq!(
         res,
-        vec![PullBatch::Sync(vec![(
+        vec![vec![PullJob::Sync((
             rr!("kamu.dev/bar").into(),
             n!("bar").into()
-        )])]
+        ))]]
     );
 }
 
@@ -627,10 +624,10 @@ async fn test_sync_from_url_and_local_multi_tenant_ref() {
 
     assert_eq!(
         res,
-        vec![PullBatch::Sync(vec![(
+        vec![vec![PullJob::Sync((
             rr!("kamu.dev/bar").into(),
             mn!("x/bar").into()
-        )])]
+        ))]]
     );
 }
 
@@ -664,10 +661,10 @@ async fn test_sync_from_url_only() {
 
     assert_eq!(
         res,
-        vec![PullBatch::Sync(vec![(
+        vec![vec![PullJob::Sync((
             rr!("kamu.dev/bar").into(),
             n!("bar").into()
-        )])]
+        ))]]
     );
 }
 
@@ -701,17 +698,17 @@ async fn test_sync_from_url_only_multi_tenant_case() {
 
     assert_eq!(
         res,
-        vec![PullBatch::Sync(vec![(
+        vec![vec![PullJob::Sync((
             rr!("kamu.dev/bar").into(),
             n!("bar").into()
-        )])]
+        ))]]
     );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct PullTestHarness {
-    calls: Arc<Mutex<Vec<PullBatch>>>,
+    calls: Arc<Mutex<Vec<Vec<PullJob>>>>,
     dataset_repo: Arc<DatasetRepositoryLocalFs>,
     remote_repo_reg: Arc<RemoteRepositoryRegistryImpl>,
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
@@ -760,7 +757,7 @@ impl PullTestHarness {
         }
     }
 
-    fn collect_calls(&self) -> Vec<PullBatch> {
+    fn collect_calls(&self) -> Vec<Vec<PullJob>> {
         let mut calls = Vec::new();
         std::mem::swap(self.calls.lock().unwrap().as_mut(), &mut calls);
         calls
@@ -770,7 +767,7 @@ impl PullTestHarness {
         &self,
         refs: Vec<DatasetRefAny>,
         options: PullOptions,
-    ) -> Result<Vec<PullBatch>, Vec<PullResponse>> {
+    ) -> Result<Vec<Vec<PullJob>>, Vec<PullResponse>> {
         let requests: Vec<_> = refs
             .into_iter()
             .map(|r| {
@@ -786,7 +783,7 @@ impl PullTestHarness {
         &self,
         requests: Vec<PullRequest>,
         options: PullOptions,
-    ) -> Result<Vec<PullBatch>, Vec<PullResponse>> {
+    ) -> Result<Vec<Vec<PullJob>>, Vec<PullResponse>> {
         let (plan_iterations, errors) = self
             .pull_request_planner
             .build_pull_multi_plan(&requests, &options, self.tenancy_config)
@@ -796,31 +793,25 @@ impl PullTestHarness {
         }
 
         for iteration in plan_iterations {
-            match iteration.job {
-                PullPlanIterationJob::Ingest(batch) => {
-                    self.calls.lock().unwrap().push(PullBatch::Ingest(
-                        batch
-                            .into_iter()
-                            .map(|pii| pii.target.handle.as_any_ref())
-                            .collect(),
-                    ));
-                }
-                PullPlanIterationJob::Transform(batch) => {
-                    self.calls.lock().unwrap().push(PullBatch::Transform(
-                        batch
-                            .iter()
-                            .map(|pti| pti.target.handle.as_any_ref())
-                            .collect(),
-                    ));
-                }
-                PullPlanIterationJob::Sync((_, sync_requests)) => {
-                    let mut calls = Vec::new();
-                    for SyncRequest { src, dst } in sync_requests {
-                        calls.push((src.src_ref.clone(), dst.dst_ref.clone()));
+            let mut jobs = Vec::new();
+            for job in iteration.jobs {
+                match job {
+                    PullPlanIterationJob::Ingest(pii) => {
+                        jobs.push(PullJob::Ingest(pii.target.handle.as_any_ref()));
                     }
-                    self.calls.lock().unwrap().push(PullBatch::Sync(calls));
-                }
-            };
+                    PullPlanIterationJob::Transform(pti) => {
+                        jobs.push(PullJob::Transform(pti.target.handle.as_any_ref()));
+                    }
+                    PullPlanIterationJob::Sync(psi) => {
+                        jobs.push(PullJob::Sync((
+                            psi.sync_request.src.src_ref.clone(),
+                            psi.sync_request.dst.dst_ref.clone(),
+                        )));
+                    }
+                };
+            }
+
+            self.calls.lock().unwrap().push(jobs);
         }
 
         tokio::time::sleep(Duration::from_millis(1)).await;
@@ -844,13 +835,13 @@ impl PullTestHarness {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, Eq)]
-enum PullBatch {
-    Ingest(Vec<DatasetRefAny>),
-    Transform(Vec<DatasetRefAny>),
-    Sync(Vec<(DatasetRefAny, DatasetRefAny)>),
+enum PullJob {
+    Ingest(DatasetRefAny),
+    Transform(DatasetRefAny),
+    Sync((DatasetRefAny, DatasetRefAny)),
 }
 
-impl PullBatch {
+impl PullJob {
     fn cmp_ref(lhs: &DatasetRefAny, rhs: &DatasetRefAny) -> bool {
         #[allow(clippy::type_complexity)]
         fn tuplify(
@@ -898,31 +889,14 @@ impl PullBatch {
     }
 }
 
-impl std::cmp::PartialEq for PullBatch {
+impl std::cmp::PartialEq for PullJob {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (Self::Ingest(l), Self::Ingest(r)) => {
-                let mut l = l.clone();
-                l.sort();
-                let mut r = r.clone();
-                r.sort();
-                l.len() == r.len() && std::iter::zip(&l, &r).all(|(li, ri)| Self::cmp_ref(li, ri))
-            }
-            (Self::Transform(l), Self::Transform(r)) => {
-                let mut l = l.clone();
-                l.sort();
-                let mut r = r.clone();
-                r.sort();
-                l.len() == r.len() && std::iter::zip(&l, &r).all(|(li, ri)| Self::cmp_ref(li, ri))
+            (Self::Transform(l), Self::Transform(r)) | (Self::Ingest(l), Self::Ingest(r)) => {
+                Self::cmp_ref(l, r)
             }
             (Self::Sync(l), Self::Sync(r)) => {
-                let mut l = l.clone();
-                l.sort();
-                let mut r = r.clone();
-                r.sort();
-                l.len() == r.len()
-                    && std::iter::zip(&l, &r)
-                        .all(|((l1, l2), (r1, r2))| Self::cmp_ref(l1, r1) && Self::cmp_ref(l2, r2))
+                Self::cmp_ref(&l.0, &r.0) && Self::cmp_ref(&l.1, &r.1)
             }
             _ => false,
         }

@@ -81,7 +81,7 @@ impl TransformTestHelper {
             .elaborate_transform(
                 deriv_target.clone(),
                 plan,
-                &TransformOptions::default(),
+                TransformOptions::default(),
                 None,
             )
             .await

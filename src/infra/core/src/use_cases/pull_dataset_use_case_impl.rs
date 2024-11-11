@@ -60,8 +60,8 @@ impl PullDatasetUseCaseImpl {
     }
 
     async fn make_authorization_checks<TPullItem: PullItemCommon>(
-        &self,
         batch: Vec<TPullItem>,
+        dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
         error_conversion_callback: impl Fn(DatasetActionUnauthorizedError) -> PullError,
     ) -> Result<(Vec<TPullItem>, Vec<PullResponse>), InternalError> {
         let (existing_handle_items, other_items): (Vec<_>, Vec<_>) = batch
@@ -76,8 +76,7 @@ impl PullDatasetUseCaseImpl {
         let ClassifyByAllowanceResponse {
             authorized_handles,
             unauthorized_handles_with_errors,
-        } = self
-            .dataset_action_authorizer
+        } = dataset_action_authorizer
             .classify_datasets_by_allowance(dataset_handles, DatasetAction::Write)
             .await?;
 
@@ -119,15 +118,16 @@ impl PullDatasetUseCaseImpl {
         Ok((authorized_items, unauthorized_responses))
     }
 
-    async fn ingest_multi(
-        &self,
-        batch: Vec<PullIngestItem>,
-        options: &PullOptions,
+    async fn ingest(
+        pii: PullIngestItem,
+        ingest_options: PollingIngestOptions,
+        dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
+        polling_ingest_svc: Arc<dyn PollingIngestService>,
         maybe_multi_listener: Option<Arc<dyn PollingIngestMultiListener>>,
-    ) -> Result<Vec<PullResponse>, InternalError> {
+    ) -> Result<PullResponse, InternalError> {
         // Authorization checks
-        let (batch, errors) = self
-            .make_authorization_checks(batch, |auth_error| {
+        let (mut batch, mut errors) =
+            Self::make_authorization_checks(vec![pii], dataset_action_authorizer, |auth_error| {
                 PullError::PollingIngestError(match auth_error {
                     DatasetActionUnauthorizedError::Access(e) => PollingIngestError::Access(e),
                     DatasetActionUnauthorizedError::Internal(e) => PollingIngestError::Internal(e),
@@ -135,51 +135,47 @@ impl PullDatasetUseCaseImpl {
             })
             .await?;
         if !errors.is_empty() {
-            return Ok(errors);
+            assert_eq!(errors.len(), 1);
+            return Ok(errors.remove(0));
         }
+
+        assert_eq!(batch.len(), 1);
+        let pii = batch.remove(0);
 
         let multi_listener =
             maybe_multi_listener.unwrap_or_else(|| Arc::new(NullPollingIngestMultiListener));
 
-        // Run ingests concurrently
-        let futures: Vec<_> = batch
-            .iter()
-            .map(|pii| {
-                self.polling_ingest_svc.ingest(
-                    pii.target.clone(),
-                    options.ingest_options.clone(),
-                    multi_listener.begin_ingest(&pii.target.handle),
-                )
-            })
-            .collect();
-        let ingest_responses = futures::future::join_all(futures).await;
+        let ingest_response = polling_ingest_svc
+            .ingest(
+                pii.target.clone(),
+                ingest_options,
+                multi_listener.begin_ingest(&pii.target.handle),
+            )
+            .await;
 
-        // Convert ingest results into pull results
-        tracing::debug!(batch=?batch, ingest_responses=?ingest_responses, "Ingest results");
-        assert_eq!(batch.len(), ingest_responses.len());
-        Ok(std::iter::zip(batch, ingest_responses)
-            .map(|(pii, res)| PullResponse {
-                maybe_original_request: pii.maybe_original_request,
-                maybe_local_ref: Some(pii.target.handle.as_local_ref()),
-                maybe_remote_ref: None,
-                result: match res {
-                    Ok(r) => Ok(r.into()),
-                    Err(e) => Err(e.into()),
-                },
-            })
-            .collect())
+        Ok(PullResponse {
+            maybe_original_request: pii.maybe_original_request,
+            maybe_local_ref: Some(pii.target.handle.as_local_ref()),
+            maybe_remote_ref: None,
+            result: match ingest_response {
+                Ok(r) => Ok(r.into()),
+                Err(e) => Err(e.into()),
+            },
+        })
     }
 
-    async fn transform_multi(
-        &self,
-        batch: Vec<PullTransformItem>,
-        transform_options: &TransformOptions,
+    async fn transform(
+        pti: PullTransformItem,
+        transform_options: TransformOptions,
+        dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
+        transform_elaboration_svc: Arc<dyn TransformElaborationService>,
+        transform_execution_svc: Arc<dyn TransformExecutionService>,
         maybe_transform_multi_listener: Option<Arc<dyn TransformMultiListener>>,
-    ) -> Result<Vec<PullResponse>, InternalError> {
+    ) -> Result<PullResponse, InternalError> {
         // Authorization checks
         // TODO: checked targets for write, but should we check inputs for Read?
-        let (batch, errors) = self
-            .make_authorization_checks(batch, |auth_error| {
+        let (mut batch, mut errors) =
+            Self::make_authorization_checks(vec![pti], dataset_action_authorizer, |auth_error| {
                 PullError::TransformError(match auth_error {
                     DatasetActionUnauthorizedError::Access(e) => TransformError::Access(e),
                     DatasetActionUnauthorizedError::Internal(e) => TransformError::Internal(e),
@@ -187,24 +183,25 @@ impl PullDatasetUseCaseImpl {
             })
             .await?;
         if !errors.is_empty() {
-            return Ok(errors);
+            assert_eq!(errors.len(), 1);
+            return Ok(errors.remove(0));
         }
+
+        assert_eq!(batch.len(), 1);
+        let pti = batch.remove(0);
 
         let transform_multi_listener =
             maybe_transform_multi_listener.unwrap_or_else(|| Arc::new(NullTransformMultiListener));
 
-        // Remember original requests
-        let original_requests: Vec<_> = batch
-            .iter()
-            .map(|pti| pti.maybe_original_request.clone())
-            .collect();
+        // Remember original request
+        let maybe_original_request = pti.maybe_original_request.clone();
 
         // Main transform run
         async fn run_transform(
             pti: PullTransformItem,
             transform_elaboration_svc: Arc<dyn TransformElaborationService>,
             transform_execution_svc: Arc<dyn TransformExecutionService>,
-            transform_options: &TransformOptions,
+            transform_options: TransformOptions,
             transform_multi_listener: Arc<dyn TransformMultiListener>,
         ) -> (ResolvedDataset, Result<TransformResult, PullError>) {
             // Notify listener
@@ -241,44 +238,34 @@ impl PullDatasetUseCaseImpl {
             }
         }
 
-        // Run transforms concurrently
-        let futures: Vec<_> = batch
-            .into_iter()
-            .map(|pti| {
-                run_transform(
-                    pti,
-                    self.transform_elaboration_svc.clone(),
-                    self.transform_execution_svc.clone(),
-                    transform_options,
-                    transform_multi_listener.clone(),
-                )
-            })
-            .collect();
-        let transform_results = futures::future::join_all(futures).await;
+        let transform_result = run_transform(
+            pti,
+            transform_elaboration_svc,
+            transform_execution_svc,
+            transform_options,
+            transform_multi_listener.clone(),
+        )
+        .await;
 
-        // Convert transform results to pull results
-        tracing::debug!(original_requests=?original_requests, transform_results=?transform_results, "Transform results");
-        assert_eq!(original_requests.len(), transform_results.len());
-        Ok(std::iter::zip(original_requests, transform_results)
-            .map(|(maybe_original_request, (target, result))| PullResponse {
-                maybe_original_request,
-                maybe_local_ref: Some(target.handle.as_local_ref()),
-                maybe_remote_ref: None,
-                result: result.map(Into::into),
-            })
-            .collect())
+        Ok(PullResponse {
+            maybe_original_request,
+            maybe_local_ref: Some(transform_result.0.handle.as_local_ref()),
+            maybe_remote_ref: None,
+            result: transform_result.1.map(Into::into),
+        })
     }
 
-    async fn sync_multi(
-        &self,
-        batch: Vec<PullSyncItem>,
-        sync_requests: Vec<SyncRequest>,
-        options: &PullOptions,
+    async fn sync(
+        psi: PullSyncItem,
+        options: PullOptions,
+        dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
+        sync_svc: Arc<dyn SyncService>,
+        remote_alias_registry: Arc<dyn RemoteAliasesRegistry>,
         listener: Option<Arc<dyn SyncMultiListener>>,
-    ) -> Result<Vec<PullResponse>, InternalError> {
+    ) -> Result<PullResponse, InternalError> {
         // Authorization checks
-        let (batch, errors) = self
-            .make_authorization_checks(batch, |auth_error| {
+        let (mut batch, mut errors) =
+            Self::make_authorization_checks(vec![psi], dataset_action_authorizer, |auth_error| {
                 PullError::SyncError(match auth_error {
                     DatasetActionUnauthorizedError::Access(e) => SyncError::Access(e),
                     DatasetActionUnauthorizedError::Internal(e) => SyncError::Internal(e),
@@ -286,60 +273,49 @@ impl PullDatasetUseCaseImpl {
             })
             .await?;
         if !errors.is_empty() {
-            return Ok(errors);
+            assert_eq!(errors.len(), 1);
+            return Ok(errors.remove(0));
         }
 
-        let futures: Vec<_> = sync_requests
-            .into_iter()
-            .map(|sync_request| {
-                let listener = listener.as_ref().and_then(|l| {
-                    l.begin_sync(&sync_request.src.src_ref, &sync_request.dst.dst_ref)
-                });
-                self.sync_svc
-                    .sync(sync_request, options.sync_options.clone(), listener)
-            })
-            .collect();
-        let sync_results = futures::future::join_all(futures).await;
+        assert_eq!(batch.len(), 1);
+        let psi = batch.remove(0);
 
-        assert_eq!(batch.len(), sync_results.len());
+        let listener = listener.as_ref().and_then(|l| {
+            l.begin_sync(&psi.sync_request.src.src_ref, &psi.sync_request.dst.dst_ref)
+        });
 
-        let mut results = Vec::new();
-        for (psi, mut res) in std::iter::zip(batch, sync_results) {
-            //assert_eq!(psi.local_target.as_any_ref(), res.dst);
+        let mut sync_result = sync_svc
+            .sync(*psi.sync_request, options.sync_options, listener)
+            .await;
 
-            // Associate newly-synced datasets with remotes
-            if options.add_aliases
-                && let Ok((SyncResult::Updated { old_head: None, .. }, local_dataset)) = &res
+        // Associate newly-synced datasets with remotes
+        if options.add_aliases
+            && let Ok((SyncResult::Updated { old_head: None, .. }, local_dataset)) = &sync_result
+        {
+            let alias_add_result = match remote_alias_registry
+                .get_remote_aliases(local_dataset.clone())
+                .await
             {
-                let alias_add_result = match self
-                    .remote_alias_registry
-                    .get_remote_aliases(local_dataset.clone())
-                    .await
-                {
-                    Ok(mut aliases) => aliases.add(&psi.remote_ref, RemoteAliasKind::Pull).await,
-                    Err(e) => match e {
-                        GetAliasesError::Internal(e) => Err(e),
-                    },
-                };
-
-                if let Err(e) = alias_add_result {
-                    res = Err(SyncError::Internal(e));
-                }
-            }
-
-            results.push(PullResponse {
-                maybe_original_request: psi.maybe_original_request,
-                maybe_local_ref: Some(psi.local_target.as_local_ref()), // TODO: multi-tenancy
-                maybe_remote_ref: Some(psi.remote_ref),
-                result: match res {
-                    Ok(response) => Ok(response.0.into()),
-                    Err(e) => Err(e.into()),
+                Ok(mut aliases) => aliases.add(&psi.remote_ref, RemoteAliasKind::Pull).await,
+                Err(e) => match e {
+                    GetAliasesError::Internal(e) => Err(e),
                 },
-            });
+            };
+
+            if let Err(e) = alias_add_result {
+                sync_result = Err(SyncError::Internal(e));
+            }
         }
 
-        tracing::debug!(results=?results, "Sync results");
-        Ok(results)
+        Ok(PullResponse {
+            maybe_original_request: psi.maybe_original_request,
+            maybe_local_ref: Some(psi.local_target.as_local_ref()), // TODO: multi-tenancy
+            maybe_remote_ref: Some(psi.remote_ref),
+            result: match sync_result {
+                Ok(response) => Ok(response.0.into()),
+                Err(e) => Err(e.into()),
+            },
+        })
     }
 }
 
@@ -387,48 +363,55 @@ impl PullDatasetUseCase for PullDatasetUseCaseImpl {
         let mut results = Vec::with_capacity(plan.len());
 
         for iteration in plan {
-            let iteration_results: Vec<_> = match iteration.job {
-                PullPlanIterationJob::Ingest(ingest_batch) => {
-                    tracing::info!(depth = %iteration.depth, batch = ?ingest_batch, "Running ingest batch");
-                    self.ingest_multi(
-                        ingest_batch,
-                        &options,
+            tracing::info!(depth = %iteration.depth, jobs = ?iteration.jobs, "Running pull iteration");
+
+            let mut tasks = tokio::task::JoinSet::new();
+            for job in iteration.jobs {
+                match job {
+                    PullPlanIterationJob::Ingest(pii) => tasks.spawn(Self::ingest(
+                        pii,
+                        options.ingest_options.clone(),
+                        self.dataset_action_authorizer.clone(),
+                        self.polling_ingest_svc.clone(),
                         listener
                             .as_ref()
                             .and_then(|l| l.clone().get_ingest_listener()),
-                    )
-                    .await?
-                }
-
-                PullPlanIterationJob::Sync((sync_batch, sync_requests)) => {
-                    tracing::info!(depth = %iteration.depth, batch = ?sync_batch, "Running sync batch");
-                    self.sync_multi(
-                        sync_batch,
-                        sync_requests,
-                        &options,
-                        listener
-                            .as_ref()
-                            .and_then(|l| l.clone().get_sync_listener()),
-                    )
-                    .await?
-                }
-
-                PullPlanIterationJob::Transform(transform_batch) => {
-                    tracing::info!(depth = %iteration.depth, batch = ?transform_batch, "Running transform batch");
-                    self.transform_multi(
-                        transform_batch,
-                        &options.transform_options,
+                    )),
+                    PullPlanIterationJob::Transform(pti) => tasks.spawn(Self::transform(
+                        pti,
+                        options.transform_options,
+                        self.dataset_action_authorizer.clone(),
+                        self.transform_elaboration_svc.clone(),
+                        self.transform_execution_svc.clone(),
                         listener
                             .as_ref()
                             .and_then(|l| l.clone().get_transform_listener()),
-                    )
-                    .await?
-                }
-            };
+                    )),
+                    PullPlanIterationJob::Sync(psi) => tasks.spawn(Self::sync(
+                        psi,
+                        options.clone(),
+                        self.dataset_action_authorizer.clone(),
+                        self.sync_svc.clone(),
+                        self.remote_alias_registry.clone(),
+                        listener
+                            .as_ref()
+                            .and_then(|l| l.clone().get_sync_listener()),
+                    )),
+                };
+            }
 
-            let errors = iteration_results.iter().any(|r| r.result.is_err());
-            results.extend(iteration_results);
-            if errors {
+            let iteration_results = tasks.join_all().await;
+            tracing::debug!(iteration_result=?iteration_results, "Pull iteration finished");
+
+            let mut has_errors = false;
+            for result in iteration_results {
+                let result = result?;
+                if result.result.is_err() {
+                    has_errors = true;
+                }
+                results.push(result);
+            }
+            if has_errors {
                 break;
             }
         }

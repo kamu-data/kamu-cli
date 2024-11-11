@@ -152,7 +152,7 @@ impl TransformElaborationService for TransformElaborationServiceImpl {
         &self,
         target: ResolvedDataset,
         plan: TransformPreliminaryPlan,
-        options: &TransformOptions,
+        options: TransformOptions,
         maybe_listener: Option<Arc<dyn TransformListener>>,
     ) -> Result<TransformElaboration, TransformElaborateError> {
         tracing::info!(target=%target.handle, options=?options, "Elaborating transform");
@@ -212,7 +212,7 @@ impl TransformElaborationService for TransformElaborationServiceImpl {
                             .int_err()?,
                             datasets_map: plan.datasets_map,
                         },
-                        &TransformOptions {
+                        TransformOptions {
                             reset_derivatives_on_diverged_input: false,
                         },
                         Some(listener),

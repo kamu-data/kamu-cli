@@ -201,7 +201,7 @@ impl TransformTestHarness {
     async fn elaborate_transform(
         &self,
         deriv_dataset: &CreateDatasetResult,
-        options: &TransformOptions,
+        options: TransformOptions,
     ) -> Result<TransformElaboration, TransformElaborateError> {
         let target = ResolvedDataset::from(deriv_dataset);
         self.transform_elab_svc
@@ -220,7 +220,7 @@ impl TransformTestHarness {
     async fn transform(
         &self,
         deriv_dataset: &CreateDatasetResult,
-        options: &TransformOptions,
+        options: TransformOptions,
     ) -> Result<TransformResult, TransformError> {
         let target = ResolvedDataset::from(deriv_dataset);
         let elaboration = self
@@ -250,7 +250,7 @@ async fn test_get_next_operation() {
 
     // No data - no work
     let elaboration = harness
-        .elaborate_transform(&bar, &TransformOptions::default())
+        .elaborate_transform(&bar, TransformOptions::default())
         .await
         .unwrap();
     assert_matches!(elaboration, TransformElaboration::UpToDate);
@@ -259,7 +259,7 @@ async fn test_get_next_operation() {
     let foo_slice = foo_block.event.new_data.as_ref().unwrap();
 
     let elaboration = harness
-        .elaborate_transform(&bar, &TransformOptions::default())
+        .elaborate_transform(&bar, TransformOptions::default())
         .await
         .unwrap();
     assert!(matches!(
@@ -409,7 +409,7 @@ async fn test_get_verification_plan_one_to_one() {
     // T2: Transform [SEED; T1]
     let t2 = Utc.with_ymd_and_hms(2020, 1, 2, 12, 0, 0).unwrap();
     let deriv_req_t2 = match harness
-        .elaborate_transform(&deriv_create_result, &TransformOptions::default())
+        .elaborate_transform(&deriv_create_result, TransformOptions::default())
         .await
         .unwrap()
     {
@@ -487,7 +487,7 @@ async fn test_get_verification_plan_one_to_one() {
     // T4: Transform (T1; T3]
     let t4 = Utc.with_ymd_and_hms(2020, 1, 4, 12, 0, 0).unwrap();
     let deriv_req_t4 = match harness
-        .elaborate_transform(&deriv_create_result, &TransformOptions::default())
+        .elaborate_transform(&deriv_create_result, TransformOptions::default())
         .await
         .unwrap()
     {
@@ -550,7 +550,7 @@ async fn test_get_verification_plan_one_to_one() {
     // T6: Transform (T3; T5]
     let t6 = Utc.with_ymd_and_hms(2020, 1, 6, 12, 0, 0).unwrap();
     let deriv_req_t6 = match harness
-        .elaborate_transform(&deriv_create_result, &TransformOptions::default())
+        .elaborate_transform(&deriv_create_result, TransformOptions::default())
         .await
         .unwrap()
     {
@@ -696,7 +696,7 @@ async fn test_transform_with_compaction_retry() {
         .new_deriv("bar", &[foo_created_result.dataset_handle.alias.clone()])
         .await;
 
-    let transform_result = harness.transform(&bar, &TransformOptions::default()).await;
+    let transform_result = harness.transform(&bar, TransformOptions::default()).await;
     assert_matches!(transform_result, Ok(TransformResult::Updated { .. }));
 
     let foo_dataset = harness
@@ -713,7 +713,7 @@ async fn test_transform_with_compaction_retry() {
         .await
         .unwrap();
 
-    let transform_result = harness.transform(&bar, &TransformOptions::default()).await;
+    let transform_result = harness.transform(&bar, TransformOptions::default()).await;
 
     assert_matches!(
         transform_result,
@@ -725,7 +725,7 @@ async fn test_transform_with_compaction_retry() {
     let transform_result = harness
         .transform(
             &bar,
-            &TransformOptions {
+            TransformOptions {
                 reset_derivatives_on_diverged_input: true,
             },
         )

@@ -53,15 +53,11 @@ impl TaskLogicalPlanRunnerImpl {
 
         // Run update task, this does not require a transaction
         match task_definition.pull_job {
-            PullPlanIterationJob::Ingest(mut ingest_batch) => {
-                assert_eq!(ingest_batch.len(), 1);
-                let ingest_item = ingest_batch.remove(0);
+            PullPlanIterationJob::Ingest(ingest_item) => {
                 self.run_ingest_update(ingest_item, task_definition.pull_options.ingest_options)
                     .await
             }
-            PullPlanIterationJob::Transform(mut transform_batch) => {
-                assert_eq!(transform_batch.len(), 1);
-                let transform_item = transform_batch.remove(0);
+            PullPlanIterationJob::Transform(transform_item) => {
                 self.run_transform_update(transform_item).await
             }
             PullPlanIterationJob::Sync(_) => {
@@ -106,7 +102,7 @@ impl TaskLogicalPlanRunnerImpl {
             .elaborate_transform(
                 transform_item.target.clone(),
                 transform_item.plan,
-                &TransformOptions::default(),
+                TransformOptions::default(),
                 None,
             )
             .await

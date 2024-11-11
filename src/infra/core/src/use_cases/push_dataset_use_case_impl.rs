@@ -100,7 +100,7 @@ impl PushDatasetUseCaseImpl {
     async fn build_sync_requests(
         &self,
         plan: &[PushItem],
-        sync_options: &SyncOptions,
+        sync_options: SyncOptions,
         push_target: Option<&DatasetPushTarget>,
     ) -> (Vec<SyncRequest>, Vec<PushResponse>) {
         let mut sync_requests = Vec::new();
@@ -162,7 +162,7 @@ impl PushDatasetUseCase for PushDatasetUseCaseImpl {
 
         // Create sync requests
         let (sync_requests, errors) = self
-            .build_sync_requests(&plan, &options.sync_options, options.remote_target.as_ref())
+            .build_sync_requests(&plan, options.sync_options, options.remote_target.as_ref())
             .await;
         if !errors.is_empty() {
             return Ok(errors);
@@ -176,7 +176,7 @@ impl PushDatasetUseCase for PushDatasetUseCaseImpl {
                     l.begin_sync(&sync_request.src.src_ref, &sync_request.dst.dst_ref)
                 });
                 self.sync_service
-                    .sync(sync_request, options.sync_options.clone(), listener)
+                    .sync(sync_request, options.sync_options, listener)
             })
             .collect();
         let sync_results = futures::future::join_all(futures).await;

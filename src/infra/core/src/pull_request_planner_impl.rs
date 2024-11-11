@@ -132,141 +132,93 @@ impl PullRequestPlannerImpl {
         (vec![the_item], vec![])
     }
 
-    fn slice(&self, mut plan: Vec<PullItem>) -> (i32, bool, Vec<PullItem>, Vec<PullItem>) {
+    fn slice_by_depth(&self, mut plan: Vec<PullItem>) -> (i32, Vec<PullItem>, Vec<PullItem>) {
         let first_depth = plan[0].depth;
-        let first_is_remote = plan[0].maybe_remote_ref.is_some();
-
-        let count = plan
-            .iter()
-            .take_while(|pi| {
-                pi.depth == first_depth && pi.maybe_remote_ref.is_some() == first_is_remote
-            })
-            .count();
-
+        let count = plan.iter().take_while(|pi| pi.depth == first_depth).count();
         let rest = plan.split_off(count);
-        (first_depth, first_is_remote, plan, rest)
+        (first_depth, plan, rest)
     }
 
-    fn build_ingest_items(&self, pull_items: Vec<PullItem>) -> Vec<PullIngestItem> {
-        pull_items
-            .into_iter()
-            .map(|pi| {
-                assert!(pi.maybe_remote_ref.is_none());
+    fn build_ingest_item(&self, pi: PullItem) -> PullIngestItem {
+        assert!(pi.maybe_remote_ref.is_none());
 
-                let hdl = match pi.local_target {
-                    PullLocalTarget::Existing(local_handle) => local_handle,
-                    PullLocalTarget::ToCreate(_) => {
-                        unreachable!("Ingest flows expect to work with existing local targets")
-                    }
-                };
-
-                PullIngestItem {
-                    depth: pi.depth,
-                    target: self.dataset_registry.get_resolved_dataset_by_handle(&hdl),
-                    maybe_original_request: pi.maybe_original_request,
-                }
-            })
-            .collect()
-    }
-
-    async fn build_transform_items(
-        &self,
-        pull_items: Vec<PullItem>,
-    ) -> Result<Vec<PullTransformItem>, Vec<PullResponse>> {
-        let mut pull_transform_items = Vec::new();
-        let mut errors = Vec::new();
-
-        for pi in pull_items {
-            assert!(pi.maybe_remote_ref.is_none());
-
-            let hdl = match pi.local_target {
-                PullLocalTarget::Existing(local_handle) => local_handle,
-                PullLocalTarget::ToCreate(_) => {
-                    unreachable!("Transform flows expect to work with existing local targets")
-                }
-            };
-
-            let target = self.dataset_registry.get_resolved_dataset_by_handle(&hdl);
-
-            match self
-                .transform_request_planner
-                .build_transform_preliminary_plan(target.clone())
-                .await
-            {
-                Ok(plan) => {
-                    pull_transform_items.push(PullTransformItem {
-                        depth: pi.depth,
-                        target,
-                        maybe_original_request: pi.maybe_original_request,
-                        plan,
-                    });
-                }
-                Err(e) => {
-                    errors.push(PullResponse {
-                        maybe_original_request: pi.maybe_original_request,
-                        maybe_local_ref: Some(hdl.as_local_ref()),
-                        maybe_remote_ref: None,
-                        result: Err(PullError::TransformError(TransformError::Plan(e))),
-                    });
-                }
+        let hdl = match pi.local_target {
+            PullLocalTarget::Existing(local_handle) => local_handle,
+            PullLocalTarget::ToCreate(_) => {
+                unreachable!("Ingest flows expect to work with existing local targets")
             }
-        }
+        };
 
-        if !errors.is_empty() {
-            Err(errors)
-        } else {
-            Ok(pull_transform_items)
+        PullIngestItem {
+            depth: pi.depth,
+            target: self.dataset_registry.get_resolved_dataset_by_handle(&hdl),
+            maybe_original_request: pi.maybe_original_request,
         }
     }
 
-    async fn build_sync_items(
-        &self,
-        pull_items: Vec<PullItem>,
-        sync_options: &SyncOptions,
-    ) -> Result<(Vec<PullSyncItem>, Vec<SyncRequest>), Vec<PullResponse>> {
-        let mut pull_sync_items = Vec::new();
-        let mut sync_requests = Vec::new();
-        let mut errors = Vec::new();
+    async fn build_transform_item(&self, pi: PullItem) -> Result<PullTransformItem, PullResponse> {
+        assert!(pi.maybe_remote_ref.is_none());
 
-        for pi in pull_items {
-            assert!(pi.maybe_remote_ref.is_some());
+        let hdl = match pi.local_target {
+            PullLocalTarget::Existing(local_handle) => local_handle,
+            PullLocalTarget::ToCreate(_) => {
+                unreachable!("Transform flows expect to work with existing local targets")
+            }
+        };
 
-            let remote_ref = pi.maybe_remote_ref.unwrap();
+        let target = self.dataset_registry.get_resolved_dataset_by_handle(&hdl);
 
-            match self
-                .sync_request_builder
-                .build_sync_request(
-                    remote_ref.as_any_ref(),
-                    pi.local_target.as_any_ref(),
-                    sync_options.create_if_not_exists,
-                )
-                .await
-            {
-                Ok(sync_request) => {
-                    let psi = PullSyncItem {
-                        depth: pi.depth,
-                        local_target: pi.local_target,
-                        remote_ref,
-                        maybe_original_request: pi.maybe_original_request,
-                    };
-                    pull_sync_items.push(psi);
-                    sync_requests.push(sync_request);
-                }
-                Err(e) => {
-                    errors.push(PullResponse {
-                        maybe_original_request: pi.maybe_original_request,
-                        maybe_local_ref: Some(pi.local_target.as_local_ref()),
-                        maybe_remote_ref: Some(remote_ref),
-                        result: Err(PullError::SyncError(e)),
-                    });
-                }
-            };
+        match self
+            .transform_request_planner
+            .build_transform_preliminary_plan(target.clone())
+            .await
+        {
+            Ok(plan) => Ok(PullTransformItem {
+                depth: pi.depth,
+                target,
+                maybe_original_request: pi.maybe_original_request,
+                plan,
+            }),
+            Err(e) => Err(PullResponse {
+                maybe_original_request: pi.maybe_original_request,
+                maybe_local_ref: Some(hdl.as_local_ref()),
+                maybe_remote_ref: None,
+                result: Err(PullError::TransformError(TransformError::Plan(e))),
+            }),
         }
+    }
 
-        if !errors.is_empty() {
-            Err(errors)
-        } else {
-            Ok((pull_sync_items, sync_requests))
+    async fn build_sync_item(
+        &self,
+        pi: PullItem,
+        sync_options: SyncOptions,
+    ) -> Result<PullSyncItem, PullResponse> {
+        assert!(pi.maybe_remote_ref.is_some());
+
+        let remote_ref = pi.maybe_remote_ref.unwrap();
+
+        match self
+            .sync_request_builder
+            .build_sync_request(
+                remote_ref.as_any_ref(),
+                pi.local_target.as_any_ref(),
+                sync_options.create_if_not_exists,
+            )
+            .await
+        {
+            Ok(sync_request) => Ok(PullSyncItem {
+                depth: pi.depth,
+                local_target: pi.local_target,
+                remote_ref,
+                maybe_original_request: pi.maybe_original_request,
+                sync_request: Box::new(sync_request),
+            }),
+            Err(e) => Err(PullResponse {
+                maybe_original_request: pi.maybe_original_request,
+                maybe_local_ref: Some(pi.local_target.as_local_ref()),
+                maybe_remote_ref: Some(remote_ref),
+                result: Err(PullError::SyncError(e)),
+            }),
         }
     }
 }
@@ -289,7 +241,9 @@ impl PullRequestPlanner for PullRequestPlannerImpl {
             let the_error = errors.remove(0);
             Err(the_error)
         } else {
-            let the_job = plan.remove(0).job;
+            let mut the_iteration = plan.remove(0).jobs;
+            assert_eq!(the_iteration.len(), 1);
+            let the_job = the_iteration.remove(0);
             Ok(the_job)
         }
     }
@@ -332,39 +286,36 @@ impl PullRequestPlanner for PullRequestPlannerImpl {
 
         let mut rest = plan;
         while !rest.is_empty() {
-            let (depth, is_remote, batch, tail) = self.slice(rest);
+            let (depth, batch, tail) = self.slice_by_depth(rest);
             rest = tail;
 
-            if depth == 0 && !is_remote {
-                iterations.push(PullPlanIteration {
-                    depth,
-                    job: PullPlanIterationJob::Ingest(self.build_ingest_items(batch)),
-                });
-            } else if depth == 0 && is_remote {
-                match self.build_sync_items(batch, &options.sync_options).await {
-                    Ok(items) => {
-                        iterations.push(PullPlanIteration {
-                            depth,
-                            job: PullPlanIterationJob::Sync(items),
-                        });
+            let mut jobs = Vec::new();
+            for item in batch {
+                if depth == 0 && item.maybe_remote_ref.is_none() {
+                    jobs.push(PullPlanIterationJob::Ingest(self.build_ingest_item(item)));
+                } else if depth == 0 && item.maybe_remote_ref.is_some() {
+                    match self.build_sync_item(item, options.sync_options).await {
+                        Ok(psi) => {
+                            jobs.push(PullPlanIterationJob::Sync(psi));
+                        }
+                        Err(sync_error) => {
+                            errors.push(sync_error);
+                        }
                     }
-                    Err(sync_errors) => {
-                        errors.extend(sync_errors);
-                    }
-                }
-            } else {
-                match self.build_transform_items(batch).await {
-                    Ok(items) => {
-                        iterations.push(PullPlanIteration {
-                            depth,
-                            job: PullPlanIterationJob::Transform(items),
-                        });
-                    }
-                    Err(transform_errors) => {
-                        errors.extend(transform_errors);
+                } else {
+                    match self.build_transform_item(item).await {
+                        Ok(pti) => {
+                            jobs.push(PullPlanIterationJob::Transform(pti));
+                        }
+                        Err(transform_error) => {
+                            errors.push(transform_error);
+                        }
                     }
                 }
-            };
+            }
+
+            assert!(!jobs.is_empty());
+            iterations.push(PullPlanIteration { depth, jobs });
         }
 
         (iterations, errors)

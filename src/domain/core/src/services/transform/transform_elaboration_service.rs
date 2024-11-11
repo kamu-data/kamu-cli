@@ -31,7 +31,7 @@ pub trait TransformElaborationService: Send + Sync {
         &self,
         target: ResolvedDataset,
         plan: TransformPreliminaryPlan,
-        transform_options: &TransformOptions,
+        transform_options: TransformOptions,
         maybe_listener: Option<Arc<dyn TransformListener>>,
     ) -> Result<TransformElaboration, TransformElaborateError>;
 }

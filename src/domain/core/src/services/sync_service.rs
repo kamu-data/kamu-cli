@@ -72,7 +72,7 @@ impl std::fmt::Debug for SyncRequestDestination {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct SyncOptions {
     /// Whether the source of data can be assumed non-malicious to skip hash sum
     /// and other expensive checks. Defaults to `true` when the source is
