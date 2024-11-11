@@ -14,6 +14,7 @@ use kamu_cli_e2e_common::prelude::*;
 kamu_cli_execute_command_e2e_test!(
     storage = sqlite,
     fixture = kamu_cli_e2e_repo_tests::test_pull_env_var_template_default_value,
+    extra_test_groups = "containerized, engine, ingest, datafusion"
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -21,6 +22,7 @@ kamu_cli_execute_command_e2e_test!(
 kamu_cli_execute_command_e2e_test!(
     storage = sqlite,
     fixture = kamu_cli_e2e_repo_tests::test_pull_env_var_template_default_value_missing_values,
+    extra_test_groups = "containerized, engine, ingest, datafusion"
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
