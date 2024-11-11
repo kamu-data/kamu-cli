@@ -517,7 +517,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
         dst_factory: Option<DatasetFactoryFn>,
         listener: Arc<dyn SyncListener>,
         transfer_options: TransferOptions,
-    ) -> Result<SyncResponse, SyncError> {
+    ) -> Result<(SyncResult, Arc<dyn Dataset>), SyncError> {
         listener.begin();
 
         let maybe_access_token = self
@@ -706,19 +706,19 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
                 .await
                 .int_err()?;
 
-            SyncResponse {
-                result: SyncResult::Updated {
+            (
+                SyncResult::Updated {
                     old_head: dst_head,
                     new_head: new_dst_head,
                     num_blocks: u64::from(dataset_pull_result.transfer_plan.num_blocks),
                 },
-                local_dataset: dst,
-            }
+                dst,
+            )
         } else {
-            SyncResponse {
-                result: SyncResult::UpToDate,
-                local_dataset: dst.expect("Destination must exist in up-to-date scenario"),
-            }
+            (
+                SyncResult::UpToDate,
+                dst.expect("Destination must exist in up-to-date scenario"),
+            )
         };
 
         use tokio_tungstenite::tungstenite::protocol::frame::coding::CloseCode;
@@ -741,7 +741,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
         dst_head: Option<&Multihash>,
         listener: Arc<dyn SyncListener>,
         transfer_options: TransferOptions,
-    ) -> Result<SyncResponse, SyncError> {
+    ) -> Result<(SyncResult, Arc<dyn Dataset>), SyncError> {
         listener.begin();
 
         let src_head = src
@@ -761,10 +761,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
 
         let num_blocks = transfer_plan.num_blocks;
         if num_blocks == 0 {
-            return Ok(SyncResponse {
-                result: SyncResult::UpToDate,
-                local_dataset: src,
-            });
+            return Ok((SyncResult::UpToDate, src));
         }
 
         let maybe_access_token = self
@@ -912,14 +909,14 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
             .await
             .int_err()?;
 
-        Ok(SyncResponse {
-            result: SyncResult::Updated {
+        Ok((
+            SyncResult::Updated {
                 old_head: dst_head.cloned(),
                 new_head: src_head,
                 num_blocks: u64::from(num_blocks),
             },
-            local_dataset: src,
-        })
+            src,
+        ))
     }
 }
 

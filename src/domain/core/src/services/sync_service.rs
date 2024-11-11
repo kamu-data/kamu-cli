@@ -28,14 +28,7 @@ pub trait SyncService: Send + Sync {
         request: SyncRequest,
         options: SyncOptions,
         listener: Option<Arc<dyn SyncListener>>,
-    ) -> Result<SyncResponse, SyncError>;
-
-    async fn sync_multi(
-        &self,
-        requests: Vec<SyncRequest>,
-        options: SyncOptions,
-        listener: Option<Arc<dyn SyncMultiListener>>,
-    ) -> Vec<SyncResultMulti>;
+    ) -> SyncResponse;
 
     /// Adds dataset to IPFS and returns the root CID.
     /// Unlike `sync` it does not do IPNS resolution and publishing.
@@ -118,20 +111,9 @@ pub enum SyncResult {
 }
 
 pub struct SyncResponse {
-    pub result: SyncResult,
-    pub local_dataset: Arc<dyn Dataset>,
-}
-
-impl std::fmt::Debug for SyncResponse {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.result.fmt(f)
-    }
-}
-
-pub struct SyncResultMulti {
     pub src: DatasetRefAny,
     pub dst: DatasetRefAny,
-    pub result: Result<SyncResponse, SyncError>,
+    pub result: Result<(SyncResult, Arc<dyn Dataset>), SyncError>,
 }
 
 #[derive(Debug, Clone)]

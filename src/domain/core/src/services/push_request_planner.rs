@@ -7,13 +7,15 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::sync::Arc;
+
 use internal_error::InternalError;
 use opendatafabric::*;
 use thiserror::Error;
 
 use super::sync_service::*;
 use super::{RemoteTarget, RepositoryNotFoundError};
-use crate::{DatasetNotFoundError, GetDatasetError};
+use crate::{Dataset, DatasetNotFoundError, GetDatasetError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Service
@@ -38,7 +40,10 @@ pub struct PushItem {
 }
 
 impl PushItem {
-    pub fn as_response(&self, result: Result<SyncResponse, SyncError>) -> PushResponse {
+    pub fn as_response(
+        &self,
+        result: Result<(SyncResult, Arc<dyn Dataset>), SyncError>,
+    ) -> PushResponse {
         PushResponse {
             local_handle: Some(self.local_handle.clone()),
             target: self.push_target.clone(),
@@ -55,7 +60,7 @@ pub struct PushResponse {
     /// Destination reference, if resolved
     pub target: Option<DatasetPushTarget>,
     /// Result of the push operation
-    pub result: Result<SyncResponse, PushError>,
+    pub result: Result<(SyncResult, Arc<dyn Dataset>), PushError>,
 }
 
 impl std::fmt::Display for PushResponse {

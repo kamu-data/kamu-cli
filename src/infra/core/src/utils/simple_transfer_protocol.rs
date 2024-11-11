@@ -65,7 +65,7 @@ impl SimpleTransferProtocol {
         trust_source_hashes: bool,
         force: bool,
         listener: Arc<dyn SyncListener + 'static>,
-    ) -> Result<SyncResponse, SyncError> {
+    ) -> Result<(SyncResult, Arc<dyn Dataset>), SyncError> {
         listener.begin();
 
         let empty_chain = MetadataChainImpl::new(
@@ -99,11 +99,10 @@ impl SimpleTransferProtocol {
 
         match chains_comparison {
             CompareChainsResult::Equal => {
-                return Ok(SyncResponse {
-                    result: SyncResult::UpToDate,
-                    local_dataset: maybe_dst
-                        .expect("Destination must exist in up-to-date scenario"),
-                })
+                return Ok((
+                    SyncResult::UpToDate,
+                    maybe_dst.expect("Destination must exist in up-to-date scenario"),
+                ))
             }
             CompareChainsResult::LhsAhead { .. } => { /* Skip */ }
             CompareChainsResult::LhsBehind {
@@ -181,14 +180,14 @@ impl SimpleTransferProtocol {
         )
         .await?;
 
-        Ok(SyncResponse {
-            result: SyncResult::Updated {
+        Ok((
+            SyncResult::Updated {
                 old_head,
                 new_head: src_head,
                 num_blocks: num_blocks as u64,
             },
-            local_dataset: dst,
-        })
+            dst,
+        ))
     }
 
     async fn get_src_head(

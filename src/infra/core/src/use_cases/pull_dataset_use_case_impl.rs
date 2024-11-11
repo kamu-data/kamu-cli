@@ -284,10 +284,17 @@ impl PullDatasetUseCaseImpl {
             return Ok(errors);
         }
 
-        let sync_results = self
-            .sync_svc
-            .sync_multi(sync_requests, options.sync_options.clone(), listener)
-            .await;
+        let futures: Vec<_> = sync_requests
+            .into_iter()
+            .map(|sync_request| {
+                let listener = listener.as_ref().and_then(|l| {
+                    l.begin_sync(&sync_request.src.src_ref, &sync_request.dst.dst_ref)
+                });
+                self.sync_svc
+                    .sync(sync_request, options.sync_options.clone(), listener)
+            })
+            .collect();
+        let sync_results = futures::future::join_all(futures).await;
 
         assert_eq!(batch.len(), sync_results.len());
 
@@ -297,10 +304,7 @@ impl PullDatasetUseCaseImpl {
 
             // Associate newly-synced datasets with remotes
             if options.add_aliases
-                && let Ok(SyncResponse {
-                    result: SyncResult::Updated { old_head: None, .. },
-                    local_dataset,
-                }) = &res.result
+                && let Ok((SyncResult::Updated { old_head: None, .. }, local_dataset)) = &res.result
             {
                 let alias_add_result = match self
                     .remote_alias_registry

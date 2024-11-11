@@ -58,7 +58,7 @@ impl SyncServiceImpl {
         dst: SyncRequestDestination,
         opts: SyncOptions,
         listener: Arc<dyn SyncListener>,
-    ) -> Result<SyncResponse, SyncError> {
+    ) -> Result<(SyncResult, Arc<dyn Dataset>), SyncError> {
         let src_is_local = src.sync_ref.is_local();
 
         let validation = if opts.trust_source.unwrap_or(src_is_local) {
@@ -91,7 +91,7 @@ impl SyncServiceImpl {
         dst: SyncRequestDestination,
         opts: SyncOptions,
         listener: Arc<dyn SyncListener>,
-    ) -> Result<SyncResponse, SyncError> {
+    ) -> Result<(SyncResult, Arc<dyn Dataset>), SyncError> {
         let http_src_url = src_url.odf_to_transport_protocol()?;
 
         tracing::info!("Starting sync using Smart Transfer Protocol (Pull flow)");
@@ -116,7 +116,7 @@ impl SyncServiceImpl {
         dst_url: &Url,
         opts: SyncOptions,
         listener: Arc<dyn SyncListener>,
-    ) -> Result<SyncResponse, SyncError> {
+    ) -> Result<(SyncResult, Arc<dyn Dataset>), SyncError> {
         let http_dst_url = dst_url.odf_to_transport_protocol()?;
 
         // TODO: move head check into the protocol
@@ -155,7 +155,7 @@ impl SyncServiceImpl {
         src_dataset: Arc<dyn Dataset>,
         dst_url: &Url,
         opts: SyncOptions,
-    ) -> Result<SyncResponse, SyncError> {
+    ) -> Result<(SyncResult, Arc<dyn Dataset>), SyncError> {
         // Resolve key
         let key_id = match (dst_url.host_str(), dst_url.path()) {
             (Some(h), "" | "/") => Ok(h),
@@ -248,10 +248,7 @@ impl SyncServiceImpl {
                     )
                     .await?;
 
-                return Ok(SyncResponse {
-                    result: SyncResult::UpToDate,
-                    local_dataset: src_dataset,
-                });
+                return Ok((SyncResult::UpToDate, src_dataset));
             }
             Some(CompareChainsResult::LhsAhead { .. }) | None => { /* Skip */ }
             Some(CompareChainsResult::LhsBehind {
@@ -342,14 +339,14 @@ impl SyncServiceImpl {
             )
             .await?;
 
-        Ok(SyncResponse {
-            result: SyncResult::Updated {
+        Ok((
+            SyncResult::Updated {
                 old_head: dst_head,
                 new_head: src_head,
                 num_blocks: num_blocks as u64,
             },
-            local_dataset: src_dataset,
-        })
+            src_dataset,
+        ))
     }
 
     async fn add_to_ipfs(&self, src_dataset: &dyn Dataset) -> Result<String, InternalError> {
@@ -378,7 +375,7 @@ impl SyncServiceImpl {
         dst: SyncRequestDestination,
         opts: SyncOptions,
         listener: Arc<dyn SyncListener>,
-    ) -> Result<SyncResponse, SyncError> {
+    ) -> Result<(SyncResult, Arc<dyn Dataset>), SyncError> {
         match (&src.sync_ref, &dst.sync_ref) {
             // * -> ipfs
             (_, SyncRef::Remote(dst_url)) if dst_url.scheme() == "ipfs" => {
@@ -470,51 +467,34 @@ impl SyncService for SyncServiceImpl {
         request: SyncRequest,
         options: SyncOptions,
         listener: Option<Arc<dyn SyncListener>>,
-    ) -> Result<SyncResponse, SyncError> {
+    ) -> SyncResponse {
         let listener = listener.unwrap_or(Arc::new(NullSyncListener));
         listener.begin();
+
+        let src_ref = request.src.src_ref.clone();
+        let dst_ref = request.dst.dst_ref.clone();
 
         match self
             .sync_impl(request.src, request.dst, options, listener.clone())
             .await
         {
-            Ok(response) => {
-                listener.success(&response.result);
-                Ok(response)
+            Ok((result, dataset)) => {
+                listener.success(&result);
+                SyncResponse {
+                    src: src_ref,
+                    dst: dst_ref,
+                    result: Ok((result, dataset)),
+                }
             }
             Err(err) => {
                 listener.error(&err);
-                Err(err)
+                SyncResponse {
+                    src: src_ref,
+                    dst: dst_ref,
+                    result: Err(err),
+                }
             }
         }
-    }
-
-    // TODO: Parallelism
-    async fn sync_multi(
-        &self,
-        requests: Vec<SyncRequest>,
-        options: SyncOptions,
-        listener: Option<Arc<dyn SyncMultiListener>>,
-    ) -> Vec<SyncResultMulti> {
-        let mut results = Vec::new();
-
-        for request in requests {
-            let listener = listener
-                .as_ref()
-                .and_then(|l| l.begin_sync(&request.src.src_ref, &request.dst.dst_ref));
-
-            let src_ref = request.src.src_ref.clone();
-            let dst_ref = request.dst.dst_ref.clone();
-            let result = self.sync(request, options.clone(), listener).await;
-
-            results.push(SyncResultMulti {
-                src: src_ref,
-                dst: dst_ref,
-                result,
-            });
-        }
-
-        results
     }
 
     async fn ipfs_add(&self, src: Arc<dyn Dataset>) -> Result<String, InternalError> {

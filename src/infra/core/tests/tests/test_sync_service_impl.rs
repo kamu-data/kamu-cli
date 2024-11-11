@@ -155,38 +155,50 @@ async fn do_test_sync(
         Err(SyncError::DatasetNotFound(e)) if e.dataset_ref == push_ref.as_any_ref()
     );
 
-    assert_matches!(
-        sync_svc_foo.sync(
+    let sync_result = sync_svc_foo
+        .sync(
             sync_request_builder_foo
                 .build_sync_request(dataset_alias_foo.as_any_ref(), push_ref.as_any_ref(), true)
                 .await
                 .unwrap(),
             SyncOptions::default(),
-            None
-        ).await,
-        Ok(SyncResponse { result: SyncResult::Updated {
+            None,
+        )
+        .await
+        .result
+        .unwrap()
+        .0;
+    assert_matches!(
+        sync_result,
+        SyncResult::Updated {
             old_head: None,
             new_head,
             num_blocks: 2,
             ..
-        }, ..}) if new_head == b1
+        } if new_head == b1
     );
 
-    assert_matches!(
-        sync_svc_bar.sync(
+    let sync_result = sync_svc_bar
+        .sync(
             sync_request_builder_bar
                 .build_sync_request(pull_ref.as_any_ref(), dataset_alias_bar.as_any_ref(), true)
                 .await
                 .unwrap(),
             SyncOptions::default(),
-            None
-        ).await,
-        Ok(SyncResponse { result: SyncResult::Updated {
+            None,
+        )
+        .await
+        .result
+        .unwrap()
+        .0;
+    assert_matches!(
+        sync_result,
+        SyncResult::Updated {
             old_head: None,
             new_head,
             num_blocks: 2,
             ..
-        }, ..}) if new_head == b1
+        } if new_head == b1
     );
 
     assert_in_sync(
@@ -212,50 +224,72 @@ async fn do_test_sync(
     )
     .await;
 
-    assert_matches!(
-        sync_svc_foo.sync(
-            sync_request_builder_foo.build_sync_request(pull_ref.as_any_ref(), dataset_alias_foo.as_any_ref(), false)
+    let sync_err = sync_svc_foo
+        .sync(
+            sync_request_builder_foo
+                .build_sync_request(pull_ref.as_any_ref(), dataset_alias_foo.as_any_ref(), false)
                 .await
                 .unwrap(),
             SyncOptions::default(),
-            None
-        ).await,
-        Err(SyncError::DestinationAhead(DestinationAheadError {
+            None,
+        )
+        .await
+        .result
+        .err()
+        .unwrap();
+    assert_matches!(
+        sync_err,
+        SyncError::DestinationAhead(DestinationAheadError {
             src_head,
-            dst_head, dst_ahead_size: 2 }))
+            dst_head, dst_ahead_size: 2 }
+        )
         if src_head == b1 && dst_head == b3
     );
 
-    assert_matches!(
-        sync_svc_foo.sync(
-            sync_request_builder_foo.build_sync_request(dataset_alias_foo.as_any_ref(), push_ref.as_any_ref(), false)
+    let sync_result = sync_svc_foo
+        .sync(
+            sync_request_builder_foo
+                .build_sync_request(dataset_alias_foo.as_any_ref(), push_ref.as_any_ref(), false)
                 .await
                 .unwrap(),
             SyncOptions::default(),
-            None
-        ).await,
-        Ok(SyncResponse { result: SyncResult::Updated {
+            None,
+        )
+        .await
+        .result
+        .unwrap()
+        .0;
+    assert_matches!(
+        sync_result,
+        SyncResult::Updated {
             old_head,
             new_head,
             num_blocks: 2,
             ..
-        }, ..}) if old_head.as_ref() == Some(&b1) && new_head == b3
+        } if old_head.as_ref() == Some(&b1) && new_head == b3
     );
 
-    assert_matches!(
-        sync_svc_bar.sync(
-            sync_request_builder_bar.build_sync_request(pull_ref.as_any_ref(), dataset_alias_bar.as_any_ref(), false)
+    let sync_result = sync_svc_bar
+        .sync(
+            sync_request_builder_bar
+                .build_sync_request(pull_ref.as_any_ref(), dataset_alias_bar.as_any_ref(), false)
                 .await
                 .unwrap(),
             SyncOptions::default(),
-            None
-        ).await,
-        Ok(SyncResponse { result: SyncResult::Updated {
+            None,
+        )
+        .await
+        .result
+        .unwrap()
+        .0;
+    assert_matches!(
+        sync_result,
+        SyncResult::Updated {
             old_head,
             new_head,
             num_blocks: 2,
             ..
-        }, ..}) if old_head.as_ref() == Some(&b1) && new_head == b3
+        } if old_head.as_ref() == Some(&b1) && new_head == b3
     );
 
     assert_in_sync(
@@ -267,47 +301,35 @@ async fn do_test_sync(
     .await;
 
     // Up to date /////////////////////////////////////////////////////////////
-    assert_matches!(
-        sync_svc_foo
-            .sync(
-                sync_request_builder_foo
-                    .build_sync_request(
-                        dataset_alias_foo.as_any_ref(),
-                        push_ref.as_any_ref(),
-                        false
-                    )
-                    .await
-                    .unwrap(),
-                SyncOptions::default(),
-                None
-            )
-            .await,
-        Ok(SyncResponse {
-            result: SyncResult::UpToDate,
-            ..
-        })
-    );
+    let sync_result = sync_svc_foo
+        .sync(
+            sync_request_builder_foo
+                .build_sync_request(dataset_alias_foo.as_any_ref(), push_ref.as_any_ref(), false)
+                .await
+                .unwrap(),
+            SyncOptions::default(),
+            None,
+        )
+        .await
+        .result
+        .unwrap()
+        .0;
+    assert_matches!(sync_result, SyncResult::UpToDate,);
 
-    assert_matches!(
-        sync_svc_bar
-            .sync(
-                sync_request_builder_bar
-                    .build_sync_request(
-                        pull_ref.as_any_ref(),
-                        dataset_alias_bar.as_any_ref(),
-                        false
-                    )
-                    .await
-                    .unwrap(),
-                SyncOptions::default(),
-                None
-            )
-            .await,
-        Ok(SyncResponse {
-            result: SyncResult::UpToDate,
-            ..
-        })
-    );
+    let sync_result = sync_svc_bar
+        .sync(
+            sync_request_builder_bar
+                .build_sync_request(pull_ref.as_any_ref(), dataset_alias_bar.as_any_ref(), false)
+                .await
+                .unwrap(),
+            SyncOptions::default(),
+            None,
+        )
+        .await
+        .result
+        .unwrap()
+        .0;
+    assert_matches!(sync_result, SyncResult::UpToDate);
 
     assert_in_sync(
         &dataset_repo_foo,
@@ -327,105 +349,125 @@ async fn do_test_sync(
     )
     .await;
 
-    assert_matches!(
-        sync_svc_bar.sync(
-            sync_request_builder_bar.build_sync_request(dataset_alias_bar.as_any_ref(), push_ref.as_any_ref(), false)
+    let sync_result = sync_svc_bar
+        .sync(
+            sync_request_builder_bar
+                .build_sync_request(dataset_alias_bar.as_any_ref(), push_ref.as_any_ref(), false)
                 .await
                 .unwrap(),
             SyncOptions::default(),
-            None
-        ).await,
-        Ok(SyncResponse { result: SyncResult::Updated {
+            None,
+        )
+        .await
+        .result
+        .unwrap()
+        .0;
+    assert_matches!(
+        sync_result,
+        SyncResult::Updated {
             old_head,
             new_head,
             num_blocks: 1,
             ..
-        }, ..}) if old_head == Some(b3.clone()) && new_head == exta_head
+        } if old_head == Some(b3.clone()) && new_head == exta_head
     );
 
     // Try push from dataset_foo
+    let sync_err = sync_svc_foo
+        .sync(
+            sync_request_builder_foo
+                .build_sync_request(dataset_alias_foo.as_any_ref(), push_ref.as_any_ref(), false)
+                .await
+                .unwrap(),
+            SyncOptions::default(),
+            None,
+        )
+        .await
+        .result
+        .err()
+        .unwrap();
     assert_matches!(
-        sync_svc_foo
-            .sync(
-                sync_request_builder_foo
-                    .build_sync_request(
-                        dataset_alias_foo.as_any_ref(),
-                        push_ref.as_any_ref(),
-                        false
-                    )
-                    .await
-                    .unwrap(),
-                SyncOptions::default(),
-                None
-            )
-            .await,
-        Err(SyncError::DestinationAhead(DestinationAheadError {
+        sync_err,
+        SyncError::DestinationAhead(DestinationAheadError {
             src_head, dst_head, dst_ahead_size: 1
-        })) if src_head == b3 && dst_head == exta_head
+        }) if src_head == b3 && dst_head == exta_head
     );
 
     // Try push from dataset_1 with --force: it should abandon the diverged_head
     // block
+    let sync_result = sync_svc_foo
+        .sync(
+            sync_request_builder_foo
+                .build_sync_request(dataset_alias_foo.as_any_ref(), push_ref.as_any_ref(), false)
+                .await
+                .unwrap(),
+            SyncOptions {
+                force: true,
+                ..SyncOptions::default()
+            },
+            None,
+        )
+        .await
+        .result
+        .unwrap()
+        .0;
     assert_matches!(
-        sync_svc_foo
-            .sync(
-                sync_request_builder_foo
-                    .build_sync_request(
-                        dataset_alias_foo.as_any_ref(),
-                        push_ref.as_any_ref(),
-                        false
-                    )
-                    .await
-                    .unwrap(),
-                SyncOptions {
-                    force: true,
-                    ..SyncOptions::default()
-                },
-                None
-            )
-            .await,
-        Ok(SyncResponse { result: SyncResult::Updated {
+        sync_result,
+        SyncResult::Updated {
             old_head,
             new_head,
             num_blocks: 4, // full resynchronization: seed, b1, b2, b3
             ..
-        }, ..}) if old_head == Some(exta_head.clone()) && new_head == b3
+        } if old_head == Some(exta_head.clone()) && new_head == b3
     );
 
     // Try pulling dataset_bar: should fail, destination is ahead
-    assert_matches!(
-        sync_svc_bar.sync(
-            sync_request_builder_bar.build_sync_request(pull_ref.as_any_ref(), dataset_alias_bar.as_any_ref(), false)
+    let sync_err = sync_svc_bar
+        .sync(
+            sync_request_builder_bar
+                .build_sync_request(pull_ref.as_any_ref(), dataset_alias_bar.as_any_ref(), false)
                 .await
                 .unwrap(),
             SyncOptions::default(),
-            None
-        ).await,
-        Err(SyncError::DestinationAhead(DestinationAheadError {
+            None,
+        )
+        .await
+        .result
+        .err()
+        .unwrap();
+    assert_matches!(
+        sync_err,
+        SyncError::DestinationAhead(DestinationAheadError {
             src_head,
             dst_head, dst_ahead_size: 1
-        })) if src_head == b3 && dst_head == exta_head
+        }) if src_head == b3 && dst_head == exta_head
     );
 
     // Try pulling dataset_bar with --force: should abandon diverged_head
-    assert_matches!(
-        sync_svc_bar.sync(
-            sync_request_builder_bar.build_sync_request(pull_ref.as_any_ref(), dataset_alias_bar.as_any_ref(), false)
+    let sync_result = sync_svc_bar
+        .sync(
+            sync_request_builder_bar
+                .build_sync_request(pull_ref.as_any_ref(), dataset_alias_bar.as_any_ref(), false)
                 .await
                 .unwrap(),
-                SyncOptions {
-                    force: true,
-                    .. SyncOptions::default()
-                },
-                None
-            )
-            .await,
-        Ok(SyncResponse { result: SyncResult::Updated {
+            SyncOptions {
+                force: true,
+                ..SyncOptions::default()
+            },
+            None,
+        )
+        .await
+        .result
+        .unwrap()
+        .0;
+    assert_matches!(
+        sync_result,
+        SyncResult::Updated {
             old_head,
             new_head,
             num_blocks: 4, // full resynchronization: seed, b1, b2, b3
             ..
-        }, ..}) if old_head == Some(exta_head.clone()) && new_head == b3
+        } if old_head == Some(exta_head.clone()) && new_head == b3
     );
 
     // Datasets complex divergence //////////////////////////////////////////////
@@ -451,45 +493,52 @@ async fn do_test_sync(
     )
     .await;
 
+    let sync_result = sync_svc_foo
+        .sync(
+            sync_request_builder_foo
+                .build_sync_request(dataset_alias_foo.as_any_ref(), push_ref.as_any_ref(), false)
+                .await
+                .unwrap(),
+            SyncOptions::default(),
+            None,
+        )
+        .await
+        .result
+        .unwrap()
+        .0;
     assert_matches!(
-        sync_svc_foo
-            .sync(
-                sync_request_builder_foo
-                    .build_sync_request(
-                        dataset_alias_foo.as_any_ref(),
-                        push_ref.as_any_ref(),
-                        false
-                    )
-                    .await
-                    .unwrap(),
-                SyncOptions::default(),
-                None
-            )
-            .await,
-        Ok(SyncResponse { result: SyncResult::Updated {
+        sync_result,
+        SyncResult::Updated {
             old_head,
             new_head,
             num_blocks: 2,
             ..
-        }, ..}) if old_head.as_ref() == Some(&b3) && new_head == b5
+        } if old_head.as_ref() == Some(&b3) && new_head == b5
     );
 
-    assert_matches!(
-        sync_svc_bar.sync(
-            sync_request_builder_bar.build_sync_request(dataset_alias_bar.as_any_ref(), push_ref.as_any_ref(), false)
+    let sync_err = sync_svc_bar
+        .sync(
+            sync_request_builder_bar
+                .build_sync_request(dataset_alias_bar.as_any_ref(), push_ref.as_any_ref(), false)
                 .await
                 .unwrap(),
-            SyncOptions::default(), 
-            None
-        ).await,
-        Err(SyncError::DatasetsDiverged(DatasetsDivergedError {
+            SyncOptions::default(),
+            None,
+        )
+        .await
+        .result
+        .err()
+        .unwrap();
+    assert_matches!(
+        sync_err,
+        SyncError::DatasetsDiverged(DatasetsDivergedError {
             src_head,
             dst_head,
             detail: Some(DatasetsDivergedErrorDetail {
                 uncommon_blocks_in_src,
                 uncommon_blocks_in_dst
             })
-        }))
+        })
         if src_head == b4_alt && dst_head == b5 && uncommon_blocks_in_src ==
     1 && uncommon_blocks_in_dst == 2 );
 
@@ -517,25 +566,29 @@ async fn do_test_sync(
             .await;
         }
 
-        assert_matches!(
-            sync_svc_foo
+        let sync_err = sync_svc_foo
             .sync(
                 sync_request_builder_foo
                     .build_sync_request(
                         dataset_alias_foo.as_any_ref(),
                         push_ref.as_any_ref(),
-                        false
+                        false,
                     )
                     .await
                     .unwrap(),
                 SyncOptions::default(),
-                None
+                None,
             )
-            .await,
-            Err(SyncError::Corrupted(CorruptedSourceError {
+            .await
+            .result
+            .err()
+            .unwrap();
+        assert_matches!(
+            sync_err,
+            SyncError::Corrupted(CorruptedSourceError {
                 message,
                 ..
-            })) if message == *"Source checkpoint file is missing"
+            }) if message == *"Source checkpoint file is missing"
         );
     }
 }

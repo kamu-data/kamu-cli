@@ -169,10 +169,17 @@ impl PushDatasetUseCase for PushDatasetUseCaseImpl {
         }
 
         // Run sync process
-        let sync_results = self
-            .sync_service
-            .sync_multi(sync_requests, options.sync_options, sync_listener)
-            .await;
+        let futures: Vec<_> = sync_requests
+            .into_iter()
+            .map(|sync_request| {
+                let listener = sync_listener.as_ref().and_then(|l| {
+                    l.begin_sync(&sync_request.src.src_ref, &sync_request.dst.dst_ref)
+                });
+                self.sync_service
+                    .sync(sync_request, options.sync_options.clone(), listener)
+            })
+            .collect();
+        let sync_results = futures::future::join_all(futures).await;
 
         // Convert results
         assert_eq!(plan.len(), sync_results.len());

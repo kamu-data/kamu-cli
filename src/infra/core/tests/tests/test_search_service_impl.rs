@@ -88,8 +88,7 @@ async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
             SyncOptions::default(),
             None,
         )
-        .await
-        .unwrap();
+        .await;
 
     // Search!
     assert_eq!(

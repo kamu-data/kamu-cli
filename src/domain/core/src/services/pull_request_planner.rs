@@ -105,13 +105,13 @@ pub struct PullSyncItem {
 }
 
 impl PullSyncItem {
-    pub fn into_response_sync(self, r: SyncResultMulti) -> PullResponse {
+    pub fn into_response_sync(self, r: SyncResponse) -> PullResponse {
         PullResponse {
             maybe_original_request: self.maybe_original_request,
             maybe_local_ref: r.dst.as_local_ref(|_| true).ok(), // TODO: multi-tenancy
             maybe_remote_ref: r.src.as_remote_ref(|_| true).ok(),
             result: match r.result {
-                Ok(response) => Ok(response.result.into()),
+                Ok(response) => Ok(response.0.into()),
                 Err(e) => Err(e.into()),
             },
         }
