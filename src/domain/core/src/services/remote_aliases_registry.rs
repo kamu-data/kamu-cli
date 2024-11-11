@@ -124,9 +124,8 @@ impl From<ResolveAliasError> for PushError {
             ResolveAliasError::AmbiguousAlias | ResolveAliasError::AmbiguousRepository => {
                 Self::AmbiguousTarget
             }
-            ResolveAliasError::EmptyRepositoryList | ResolveAliasError::RepositoryNotFound(_) => {
-                Self::NoTarget
-            }
+            ResolveAliasError::EmptyRepositoryList => Self::NoTarget,
+            ResolveAliasError::RepositoryNotFound(e) => Self::DestinationNotFound(e),
             ResolveAliasError::Internal(e) => Self::Internal(e),
         }
     }
