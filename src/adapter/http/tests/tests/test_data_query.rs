@@ -467,14 +467,14 @@ async fn test_data_query_handler() {
                 },
                 "subQueries": [],
                 "commitment": {
-                    "inputHash": "f1620faea05dac703752014a3b3d52869e96493a8c1d2c8154cb616d511c0f01bf644",
+                    "inputHash": "f16206ab5788a997a0d05c236c207ea66434f2d4ae933ad62556583979f47d2f522ed",
                     "outputHash": "f16208d66e08ce876ba35ce00ea56f02faf83dbc086f877c443e3d493427ccad133f1",
                     "subQueriesHash": "f1620ca4510738395af1429224dd785675309c344b2b549632e20275c69b15ed1d210",
                 },
                 "proof": {
                     "type": "Ed25519Signature2020",
                     "verificationMethod": "did:key:z6Mko2nqhQ9wYSTS5Giab2j1aHzGnxHimqwmFeEVY8aNsVnN",
-                    "proofValue": "u7IDYkSq0O3QFvq-HRZ-jwaiCbfm7BFVcMKnSCanvC02OBKzfAhA4RPn8--GAmVR9wf54MgkuO4qAXSCXiVRMBw",
+                    "proofValue": "uadIt9gTyeqRUwCIHiq4ILzK79h0jnZwOSVX86NeSJrmoMAV1keK9CJl7yyH9wiJCw1AjAb84nxeqB7kPzHyaDQ",
                 }
             }),
             response
@@ -621,14 +621,14 @@ async fn test_data_verify_handler() {
                 },
                 "subQueries": [],
                 "commitment": {
-                    "inputHash": "f162084403bf9b03b0747eabce09977679e97f6b7405430019299137fcccab2912f36",
+                    "inputHash": "f16205ad9518f5dd9fe6bbc082afc92841dff1cb2ebe85f82d12fbb3567399aa879c1",
                     "outputHash": "f1620ff7f5beaf16900218a3ac4aae82cdccf764816986c7c739c716cf7dc03112a2c",
                     "subQueriesHash": "f1620ca4510738395af1429224dd785675309c344b2b549632e20275c69b15ed1d210",
                 },
                 "proof": {
                     "type": "Ed25519Signature2020",
                     "verificationMethod": "did:key:z6Mko2nqhQ9wYSTS5Giab2j1aHzGnxHimqwmFeEVY8aNsVnN",
-                    "proofValue": "u_uOR7GUN2mh4owqvhBefeWlVGX3PiBRqnU1UDL9yoeKhuPUyC5ym9KvMl_uzwllVmaA95en7tEL5t6ux0wTmBQ",
+                    "proofValue": "uox4Jm0WJgSV-5K7Lp2jLvvRXnVTqu_N-DdGBt4NETRVN-cvZQINUDCcmBFrtmORsJV4PrjDtCNumvsEYeSLZAQ",
                 }
             }),
             response
