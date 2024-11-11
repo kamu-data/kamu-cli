@@ -70,20 +70,6 @@ pub struct PullIngestItem {
     pub maybe_original_request: Option<PullRequest>,
 }
 
-impl PullIngestItem {
-    pub fn into_response_ingest(self, r: PollingIngestResponse) -> PullResponse {
-        PullResponse {
-            maybe_original_request: self.maybe_original_request,
-            maybe_local_ref: Some(r.dataset_ref),
-            maybe_remote_ref: None,
-            result: match r.result {
-                Ok(r) => Ok(r.into()),
-                Err(e) => Err(e.into()),
-            },
-        }
-    }
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug)]
@@ -102,20 +88,6 @@ pub struct PullSyncItem {
     pub local_target: PullLocalTarget,
     pub remote_ref: DatasetRefRemote,
     pub maybe_original_request: Option<PullRequest>,
-}
-
-impl PullSyncItem {
-    pub fn into_response_sync(self, r: SyncResponse) -> PullResponse {
-        PullResponse {
-            maybe_original_request: self.maybe_original_request,
-            maybe_local_ref: r.dst.as_local_ref(|_| true).ok(), // TODO: multi-tenancy
-            maybe_remote_ref: r.src.as_remote_ref(|_| true).ok(),
-            result: match r.result {
-                Ok(response) => Ok(response.0.into()),
-                Err(e) => Err(e.into()),
-            },
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

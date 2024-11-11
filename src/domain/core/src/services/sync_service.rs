@@ -28,7 +28,7 @@ pub trait SyncService: Send + Sync {
         request: SyncRequest,
         options: SyncOptions,
         listener: Option<Arc<dyn SyncListener>>,
-    ) -> SyncResponse;
+    ) -> Result<(SyncResult, Arc<dyn Dataset>), SyncError>;
 
     /// Adds dataset to IPFS and returns the root CID.
     /// Unlike `sync` it does not do IPNS resolution and publishing.
@@ -108,12 +108,6 @@ pub enum SyncResult {
         new_head: Multihash,
         num_blocks: u64,
     },
-}
-
-pub struct SyncResponse {
-    pub src: DatasetRefAny,
-    pub dst: DatasetRefAny,
-    pub result: Result<(SyncResult, Arc<dyn Dataset>), SyncError>,
 }
 
 #[derive(Debug, Clone)]

@@ -467,32 +467,20 @@ impl SyncService for SyncServiceImpl {
         request: SyncRequest,
         options: SyncOptions,
         listener: Option<Arc<dyn SyncListener>>,
-    ) -> SyncResponse {
+    ) -> Result<(SyncResult, Arc<dyn Dataset>), SyncError> {
         let listener = listener.unwrap_or(Arc::new(NullSyncListener));
         listener.begin();
-
-        let src_ref = request.src.src_ref.clone();
-        let dst_ref = request.dst.dst_ref.clone();
-
         match self
             .sync_impl(request.src, request.dst, options, listener.clone())
             .await
         {
             Ok((result, dataset)) => {
                 listener.success(&result);
-                SyncResponse {
-                    src: src_ref,
-                    dst: dst_ref,
-                    result: Ok((result, dataset)),
-                }
+                Ok((result, dataset))
             }
             Err(err) => {
                 listener.error(&err);
-                SyncResponse {
-                    src: src_ref,
-                    dst: dst_ref,
-                    result: Err(err),
-                }
+                Err(err)
             }
         }
     }

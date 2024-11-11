@@ -1272,7 +1272,6 @@ impl IngestTestHarness {
                 None,
             )
             .await
-            .result
     }
 
     async fn dataset_data_helper(&self, dataset_alias: &DatasetAlias) -> DatasetDataHelper {

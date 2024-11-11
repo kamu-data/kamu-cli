@@ -41,7 +41,7 @@ pub trait PollingIngestService: Send + Sync {
         target: ResolvedDataset,
         options: PollingIngestOptions,
         listener: Option<Arc<dyn PollingIngestListener>>,
-    ) -> PollingIngestResponse;
+    ) -> Result<PollingIngestResult, PollingIngestError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -81,12 +81,6 @@ impl Default for SchemaInferenceOpts {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug)]
-pub struct PollingIngestResponse {
-    pub dataset_ref: DatasetRef,
-    pub result: Result<PollingIngestResult, PollingIngestError>,
-}
 
 #[derive(Debug)]
 pub enum PollingIngestResult {

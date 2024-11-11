@@ -79,7 +79,7 @@ impl TaskLogicalPlanRunnerImpl {
         let ingest_response = polling_ingest_service
             .ingest(ingest_item.target, ingest_options, None)
             .await;
-        match ingest_response.result {
+        match ingest_response {
             Ok(ingest_result) => Ok(TaskOutcome::Success(TaskResult::UpdateDatasetResult(
                 TaskUpdateDatasetResult {
                     pull_result: ingest_result.into(),

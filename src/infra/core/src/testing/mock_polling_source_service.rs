@@ -12,9 +12,10 @@ use std::sync::Arc;
 use chrono::Utc;
 use kamu_core::{
     GetDatasetError,
+    PollingIngestError,
     PollingIngestListener,
     PollingIngestOptions,
-    PollingIngestResponse,
+    PollingIngestResult,
     PollingIngestService,
     ResolvedDataset,
 };
@@ -46,7 +47,7 @@ mockall::mock! {
             target: ResolvedDataset,
             options: PollingIngestOptions,
             listener: Option<Arc<dyn PollingIngestListener>>,
-        ) -> PollingIngestResponse;
+        ) -> Result<PollingIngestResult, PollingIngestError>;
     }
 }
 

@@ -158,9 +158,14 @@ impl PullDatasetUseCaseImpl {
         tracing::debug!(batch=?batch, ingest_responses=?ingest_responses, "Ingest results");
         assert_eq!(batch.len(), ingest_responses.len());
         Ok(std::iter::zip(batch, ingest_responses)
-            .map(|(pii, res)| {
-                assert_eq!(pii.target.handle.as_local_ref(), res.dataset_ref);
-                pii.into_response_ingest(res)
+            .map(|(pii, res)| PullResponse {
+                maybe_original_request: pii.maybe_original_request,
+                maybe_local_ref: Some(pii.target.handle.as_local_ref()),
+                maybe_remote_ref: None,
+                result: match res {
+                    Ok(r) => Ok(r.into()),
+                    Err(e) => Err(e.into()),
+                },
             })
             .collect())
     }
@@ -300,11 +305,11 @@ impl PullDatasetUseCaseImpl {
 
         let mut results = Vec::new();
         for (psi, mut res) in std::iter::zip(batch, sync_results) {
-            assert_eq!(psi.local_target.as_any_ref(), res.dst);
+            //assert_eq!(psi.local_target.as_any_ref(), res.dst);
 
             // Associate newly-synced datasets with remotes
             if options.add_aliases
-                && let Ok((SyncResult::Updated { old_head: None, .. }, local_dataset)) = &res.result
+                && let Ok((SyncResult::Updated { old_head: None, .. }, local_dataset)) = &res
             {
                 let alias_add_result = match self
                     .remote_alias_registry
@@ -318,11 +323,19 @@ impl PullDatasetUseCaseImpl {
                 };
 
                 if let Err(e) = alias_add_result {
-                    res.result = Err(SyncError::Internal(e));
+                    res = Err(SyncError::Internal(e));
                 }
             }
 
-            results.push(psi.into_response_sync(res));
+            results.push(PullResponse {
+                maybe_original_request: psi.maybe_original_request,
+                maybe_local_ref: Some(psi.local_target.as_local_ref()), // TODO: multi-tenancy
+                maybe_remote_ref: Some(psi.remote_ref),
+                result: match res {
+                    Ok(response) => Ok(response.0.into()),
+                    Err(e) => Err(e.into()),
+                },
+            });
         }
 
         tracing::debug!(results=?results, "Sync results");

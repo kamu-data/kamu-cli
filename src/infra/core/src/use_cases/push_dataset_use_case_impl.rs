@@ -33,7 +33,7 @@ use kamu_core::{
     SyncRequest,
     SyncService,
 };
-use opendatafabric::{DatasetHandle, DatasetPushTarget, DatasetRefAny};
+use opendatafabric::{DatasetHandle, DatasetPushTarget};
 
 use crate::SyncRequestBuilder;
 
@@ -184,12 +184,7 @@ impl PushDatasetUseCase for PushDatasetUseCaseImpl {
         // Convert results
         assert_eq!(plan.len(), sync_results.len());
         let results: Vec<_> = std::iter::zip(&plan, sync_results)
-            .map(|(pi, res)| {
-                let remote_ref: DatasetRefAny = (&pi.remote_target.url).into();
-                assert_eq!(pi.local_handle.as_any_ref(), res.src);
-                assert_eq!(remote_ref, res.dst);
-                pi.as_response(res.result)
-            })
+            .map(|(pi, res)| pi.as_response(res))
             .collect();
 
         // If no errors - add aliases to initial items

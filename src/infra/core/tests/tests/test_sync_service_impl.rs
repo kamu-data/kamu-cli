@@ -165,7 +165,6 @@ async fn do_test_sync(
             None,
         )
         .await
-        .result
         .unwrap()
         .0;
     assert_matches!(
@@ -188,7 +187,6 @@ async fn do_test_sync(
             None,
         )
         .await
-        .result
         .unwrap()
         .0;
     assert_matches!(
@@ -234,7 +232,6 @@ async fn do_test_sync(
             None,
         )
         .await
-        .result
         .err()
         .unwrap();
     assert_matches!(
@@ -256,7 +253,6 @@ async fn do_test_sync(
             None,
         )
         .await
-        .result
         .unwrap()
         .0;
     assert_matches!(
@@ -279,7 +275,6 @@ async fn do_test_sync(
             None,
         )
         .await
-        .result
         .unwrap()
         .0;
     assert_matches!(
@@ -311,7 +306,6 @@ async fn do_test_sync(
             None,
         )
         .await
-        .result
         .unwrap()
         .0;
     assert_matches!(sync_result, SyncResult::UpToDate,);
@@ -326,7 +320,6 @@ async fn do_test_sync(
             None,
         )
         .await
-        .result
         .unwrap()
         .0;
     assert_matches!(sync_result, SyncResult::UpToDate);
@@ -359,7 +352,6 @@ async fn do_test_sync(
             None,
         )
         .await
-        .result
         .unwrap()
         .0;
     assert_matches!(
@@ -383,7 +375,6 @@ async fn do_test_sync(
             None,
         )
         .await
-        .result
         .err()
         .unwrap();
     assert_matches!(
@@ -408,7 +399,6 @@ async fn do_test_sync(
             None,
         )
         .await
-        .result
         .unwrap()
         .0;
     assert_matches!(
@@ -432,7 +422,6 @@ async fn do_test_sync(
             None,
         )
         .await
-        .result
         .err()
         .unwrap();
     assert_matches!(
@@ -457,7 +446,6 @@ async fn do_test_sync(
             None,
         )
         .await
-        .result
         .unwrap()
         .0;
     assert_matches!(
@@ -503,7 +491,6 @@ async fn do_test_sync(
             None,
         )
         .await
-        .result
         .unwrap()
         .0;
     assert_matches!(
@@ -526,7 +513,6 @@ async fn do_test_sync(
             None,
         )
         .await
-        .result
         .err()
         .unwrap();
     assert_matches!(
@@ -580,7 +566,6 @@ async fn do_test_sync(
                 None,
             )
             .await
-            .result
             .err()
             .unwrap();
         assert_matches!(

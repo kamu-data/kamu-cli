@@ -198,7 +198,8 @@ async fn create_graph_remote(
                 SyncOptions::default(),
                 None,
             )
-            .await;
+            .await
+            .unwrap();
     }
 
     tmp_repo_dir

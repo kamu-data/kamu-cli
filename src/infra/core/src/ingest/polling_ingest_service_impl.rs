@@ -616,13 +616,8 @@ impl PollingIngestService for PollingIngestServiceImpl {
         target: ResolvedDataset,
         options: PollingIngestOptions,
         maybe_listener: Option<Arc<dyn PollingIngestListener>>,
-    ) -> PollingIngestResponse {
-        let dataset_ref = target.handle.as_local_ref();
-        let result = self.do_ingest(target, options, |_| maybe_listener).await;
-        PollingIngestResponse {
-            dataset_ref,
-            result,
-        }
+    ) -> Result<PollingIngestResult, PollingIngestError> {
+        self.do_ingest(target, options, |_| maybe_listener).await
     }
 }
 
