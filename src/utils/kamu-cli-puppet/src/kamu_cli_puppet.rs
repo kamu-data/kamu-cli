@@ -112,7 +112,7 @@ impl KamuCliPuppet {
     pub async fn execute_with_env<I, S>(
         &self,
         cmd: I,
-        env_vars: Vec<(String, String)>,
+        env_vars: Vec<(&ffi::OsStr, &ffi::OsStr)>,
     ) -> ExecuteCommandResult
     where
         I: IntoIterator<Item = S>,
@@ -126,7 +126,7 @@ impl KamuCliPuppet {
         &self,
         cmd: I,
         maybe_input: Option<T>,
-        maybe_env: Option<Vec<(String, String)>>,
+        maybe_env: Option<Vec<(&ffi::OsStr, &ffi::OsStr)>>,
     ) -> ExecuteCommandResult
     where
         I: IntoIterator<Item = S>,

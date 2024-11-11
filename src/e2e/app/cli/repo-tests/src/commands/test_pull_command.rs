@@ -7,8 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::path::PathBuf;
-
 use kamu::testing::LocalS3Server;
 use kamu_cli_e2e_common::{
     DATASET_DERIVATIVE_LEADERBOARD_NAME,
@@ -34,7 +32,7 @@ const DATASET_SNAPSHOT_STR: &str = indoc::indoc!(
         - kind: SetPollingSource
           fetch:
             kind: Url
-            url: file://${{ env.data_dir || env.workspace_dir }}${{ env.data_file || 'data.csv' }}
+            url: file://${{ env.data_dir || env.workspace_dir }}/${{ env.data_file || 'data.csv' }}
           read:
             kind: Csv
             header: true
@@ -74,13 +72,9 @@ pub async fn test_pull_env_var_template_default_value(kamu: KamuCliPuppet) {
     let data_path = kamu.workspace_path().join("data.csv");
     std::fs::write(&data_path, DATASET_INGEST_DATA).unwrap();
 
-    let mut workspace_dir = PathBuf::from(kamu.workspace_path());
-    workspace_dir.push(""); // ensure trailing separator
-    let workspace_dir = workspace_dir.as_os_str().to_str().unwrap().to_string();
-
     kamu.assert_success_command_execution_with_env(
         ["pull", "test.pull-from-file"],
-        vec![("workspace_dir".to_string(), workspace_dir)],
+        vec![("workspace_dir".as_ref(), kamu.workspace_path().as_os_str())],
         None,
         Some([indoc::indoc!(
             r#"
