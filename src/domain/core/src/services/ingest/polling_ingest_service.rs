@@ -219,13 +219,6 @@ impl TemplateInvalidPatternError {
 // TODO: Revisit error granularity
 #[derive(Debug, Error)]
 pub enum PollingIngestError {
-    #[error(transparent)]
-    DatasetNotFound(
-        #[from]
-        #[backtrace]
-        DatasetNotFoundError,
-    ),
-
     #[error("Source is unreachable at {path}")]
     Unreachable {
         path: String,
@@ -318,13 +311,6 @@ pub enum PollingIngestError {
     ),
 
     #[error(transparent)]
-    Access(
-        #[from]
-        #[backtrace]
-        AccessError,
-    ),
-
-    #[error(transparent)]
     InvalidParameterFormat(
         #[from]
         #[backtrace]
@@ -344,24 +330,6 @@ pub enum PollingIngestError {
         #[backtrace]
         InternalError,
     ),
-}
-
-impl From<GetDatasetError> for PollingIngestError {
-    fn from(v: GetDatasetError) -> Self {
-        match v {
-            GetDatasetError::NotFound(e) => Self::DatasetNotFound(e),
-            GetDatasetError::Internal(e) => Self::Internal(e),
-        }
-    }
-}
-
-impl From<auth::DatasetActionUnauthorizedError> for PollingIngestError {
-    fn from(v: auth::DatasetActionUnauthorizedError) -> Self {
-        match v {
-            auth::DatasetActionUnauthorizedError::Access(e) => Self::Access(e),
-            auth::DatasetActionUnauthorizedError::Internal(e) => Self::Internal(e),
-        }
-    }
 }
 
 impl From<FindDatasetEnvVarError> for PollingIngestError {

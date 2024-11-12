@@ -11,7 +11,6 @@ use std::borrow::Cow;
 use std::sync::Arc;
 
 use ::serde::{Deserialize, Serialize};
-use auth::DatasetActionUnauthorizedError;
 use internal_error::InternalError;
 use opendatafabric::*;
 use thiserror::Error;
@@ -78,23 +77,6 @@ impl PullPlanIterationJob {
             Self::Ingest(pii) => pii.maybe_original_request,
             Self::Transform(pti) => pti.maybe_original_request,
             Self::Sync(psi) => psi.maybe_original_request,
-        }
-    }
-
-    pub fn auth_error(&self, auth_error: DatasetActionUnauthorizedError) -> PullError {
-        match self {
-            PullPlanIterationJob::Ingest(_) => PullError::PollingIngestError(match auth_error {
-                DatasetActionUnauthorizedError::Access(e) => PollingIngestError::Access(e),
-                DatasetActionUnauthorizedError::Internal(e) => PollingIngestError::Internal(e),
-            }),
-            PullPlanIterationJob::Transform(_) => PullError::TransformError(match auth_error {
-                DatasetActionUnauthorizedError::Access(e) => TransformError::Access(e),
-                DatasetActionUnauthorizedError::Internal(e) => TransformError::Internal(e),
-            }),
-            PullPlanIterationJob::Sync(_) => PullError::SyncError(match auth_error {
-                DatasetActionUnauthorizedError::Access(e) => SyncError::Access(e),
-                DatasetActionUnauthorizedError::Internal(e) => SyncError::Internal(e),
-            }),
         }
     }
 }
@@ -406,8 +388,6 @@ pub enum PullError {
         #[backtrace]
         DatasetNotFoundError,
     ),
-    #[error("Source is not specified and there is no associated pull alias")]
-    NoSource,
     #[error("Cannot choose between multiple pull aliases")]
     AmbiguousSource,
     #[error("{0}")]
@@ -429,6 +409,12 @@ pub enum PullError {
         #[from]
         #[backtrace]
         SyncError,
+    ),
+    #[error(transparent)]
+    Access(
+        #[from]
+        #[backtrace]
+        AccessError,
     ),
     #[error(transparent)]
     Internal(

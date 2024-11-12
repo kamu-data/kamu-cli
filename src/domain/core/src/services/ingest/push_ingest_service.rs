@@ -123,13 +123,6 @@ impl PushIngestListener for NullPushIngestListener {}
 #[derive(Debug, Error)]
 pub enum PushIngestError {
     #[error(transparent)]
-    DatasetNotFound(
-        #[from]
-        #[backtrace]
-        DatasetNotFoundError,
-    ),
-
-    #[error(transparent)]
     SourceNotFound(
         #[from]
         #[backtrace]
@@ -198,24 +191,6 @@ pub enum PushIngestError {
         #[backtrace]
         InternalError,
     ),
-}
-
-impl From<GetDatasetError> for PushIngestError {
-    fn from(v: GetDatasetError) -> Self {
-        match v {
-            GetDatasetError::NotFound(e) => Self::DatasetNotFound(e),
-            GetDatasetError::Internal(e) => Self::Internal(e),
-        }
-    }
-}
-
-impl From<auth::DatasetActionUnauthorizedError> for PushIngestError {
-    fn from(v: auth::DatasetActionUnauthorizedError) -> Self {
-        match v {
-            auth::DatasetActionUnauthorizedError::Access(e) => Self::Access(e),
-            auth::DatasetActionUnauthorizedError::Internal(e) => Self::Internal(e),
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

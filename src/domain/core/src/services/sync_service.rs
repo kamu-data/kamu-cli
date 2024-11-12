@@ -336,15 +336,6 @@ impl From<GetDatasetError> for SyncError {
     }
 }
 
-impl From<auth::DatasetActionUnauthorizedError> for SyncError {
-    fn from(v: auth::DatasetActionUnauthorizedError) -> Self {
-        match v {
-            auth::DatasetActionUnauthorizedError::Access(e) => Self::Access(e),
-            auth::DatasetActionUnauthorizedError::Internal(e) => Self::Internal(e),
-        }
-    }
-}
-
 impl From<GetRepoError> for SyncError {
     fn from(v: GetRepoError) -> Self {
         match v {

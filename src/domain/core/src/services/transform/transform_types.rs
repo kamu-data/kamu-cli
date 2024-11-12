@@ -18,7 +18,6 @@ use super::{
     VerifyTransformExecuteError,
     VerifyTransformPlanError,
 };
-use crate::AccessError;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // DTOs
@@ -63,12 +62,6 @@ pub enum TransformError {
         #[from]
         #[backtrace]
         TransformExecuteError,
-    ),
-    #[error(transparent)]
-    Access(
-        #[from]
-        #[backtrace]
-        AccessError,
     ),
     #[error(transparent)]
     Internal(

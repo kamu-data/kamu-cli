@@ -198,35 +198,14 @@ impl PullDatasetUseCaseImpl {
                 let job = written_jobs_by_handle
                     .remove(&hdl)
                     .expect("item must be present");
-                let error = match &job {
-                    PullPlanIterationJob::Ingest(_) => {
-                        PullError::PollingIngestError(match auth_error {
-                            DatasetActionUnauthorizedError::Access(e) => {
-                                PollingIngestError::Access(e)
-                            }
-                            DatasetActionUnauthorizedError::Internal(e) => {
-                                PollingIngestError::Internal(e)
-                            }
-                        })
-                    }
-                    PullPlanIterationJob::Transform(_) => {
-                        PullError::TransformError(match auth_error {
-                            DatasetActionUnauthorizedError::Access(e) => TransformError::Access(e),
-                            DatasetActionUnauthorizedError::Internal(e) => {
-                                TransformError::Internal(e)
-                            }
-                        })
-                    }
-                    PullPlanIterationJob::Sync(_) => PullError::SyncError(match auth_error {
-                        DatasetActionUnauthorizedError::Access(e) => SyncError::Access(e),
-                        DatasetActionUnauthorizedError::Internal(e) => SyncError::Internal(e),
-                    }),
-                };
                 PullResponse {
                     maybe_local_ref: Some(hdl.as_local_ref()),
                     maybe_remote_ref: None,
                     maybe_original_request: job.into_original_pull_request(),
-                    result: Err(error),
+                    result: Err(match auth_error {
+                        DatasetActionUnauthorizedError::Access(e) => PullError::Access(e),
+                        DatasetActionUnauthorizedError::Internal(e) => PullError::Internal(e),
+                    }),
                 }
             })
             .collect();
@@ -294,7 +273,10 @@ impl PullDatasetUseCaseImpl {
             let mut maybe_error = None;
             for read_hdl in read_handles {
                 if let Some(auth_error) = unauthorized_handles_to_errors.remove(read_hdl) {
-                    maybe_error = Some(reading_job.auth_error(auth_error));
+                    maybe_error = Some(match auth_error {
+                        DatasetActionUnauthorizedError::Access(e) => PullError::Access(e),
+                        DatasetActionUnauthorizedError::Internal(e) => PullError::Internal(e),
+                    });
                     break;
                 }
             }
