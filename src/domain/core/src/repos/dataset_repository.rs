@@ -66,54 +66,6 @@ pub type DatasetHandleStream<'a> =
     Pin<Box<dyn Stream<Item = Result<DatasetHandle, InternalError>> + Send + 'a>>;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Extensions
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[async_trait]
-pub trait DatasetRepositoryExt: DatasetRepository {
-    async fn try_resolve_dataset_handle_by_ref(
-        &self,
-        dataset_ref: &DatasetRef,
-    ) -> Result<Option<DatasetHandle>, InternalError>;
-
-    async fn get_dataset_by_ref(
-        &self,
-        dataset_ref: &DatasetRef,
-    ) -> Result<Arc<dyn Dataset>, GetDatasetError>;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[async_trait]
-impl<T> DatasetRepositoryExt for T
-where
-    T: DatasetRepository,
-    T: ?Sized,
-{
-    async fn try_resolve_dataset_handle_by_ref(
-        &self,
-        dataset_ref: &DatasetRef,
-    ) -> Result<Option<DatasetHandle>, InternalError> {
-        match self.resolve_dataset_handle_by_ref(dataset_ref).await {
-            Ok(hdl) => Ok(Some(hdl)),
-            Err(GetDatasetError::NotFound(_)) => Ok(None),
-            Err(GetDatasetError::Internal(e)) => Err(e),
-        }
-    }
-
-    async fn get_dataset_by_ref(
-        &self,
-        dataset_ref: &DatasetRef,
-    ) -> Result<Arc<dyn Dataset>, GetDatasetError> {
-        let dataset_handle = self.resolve_dataset_handle_by_ref(dataset_ref).await?;
-        let dataset = self.get_dataset_by_handle(&dataset_handle);
-        Ok(dataset)
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Errors
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

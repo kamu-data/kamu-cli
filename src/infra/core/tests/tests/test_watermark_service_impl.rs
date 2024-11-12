@@ -15,6 +15,7 @@ use chrono::{TimeZone, Utc};
 use dill::Component;
 use kamu::testing::MetadataFactory;
 use kamu::{
+    DatasetRegistryRepoBridge,
     DatasetRepositoryLocalFs,
     DatasetRepositoryWriter,
     RemoteAliasesRegistryImpl,
@@ -23,8 +24,9 @@ use kamu::{
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::{
     CreateDatasetResult,
+    DatasetRegistry,
+    DatasetRegistryExt,
     DatasetRepository,
-    DatasetRepositoryExt,
     MetadataChainExt,
     SetWatermarkError,
     SetWatermarkResult,
@@ -105,7 +107,7 @@ async fn test_set_watermark_rejects_on_derivative() {
     let dataset_alias = DatasetAlias::new(None, DatasetName::try_from("foo").unwrap());
 
     let create_result = harness
-        .dataset_repo
+        .dataset_repo_writer
         .create_dataset(
             &dataset_alias,
             MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Derivative).build())
@@ -131,7 +133,8 @@ async fn test_set_watermark_rejects_on_derivative() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct WatermarkTestHarness {
-    dataset_repo: Arc<DatasetRepositoryLocalFs>,
+    dataset_registry: Arc<dyn DatasetRegistry>,
+    dataset_repo_writer: Arc<dyn DatasetRepositoryWriter>,
     watermark_svc: Arc<dyn WatermarkService>,
 }
 
@@ -147,18 +150,20 @@ impl WatermarkTestHarness {
             .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir_path))
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
             .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
+            .add::<DatasetRegistryRepoBridge>()
             .add::<RemoteAliasesRegistryImpl>()
             .add::<WatermarkServiceImpl>()
             .build();
 
         Self {
-            dataset_repo: catalog.get_one().unwrap(),
+            dataset_registry: catalog.get_one().unwrap(),
+            dataset_repo_writer: catalog.get_one().unwrap(),
             watermark_svc: catalog.get_one().unwrap(),
         }
     }
 
     async fn create_dataset(&self, dataset_alias: &DatasetAlias) -> CreateDatasetResult {
-        self.dataset_repo
+        self.dataset_repo_writer
             .create_dataset_from_snapshot(
                 MetadataFactory::dataset_snapshot()
                     .name(DatasetAlias::new(None, dataset_alias.dataset_name.clone()))
@@ -171,7 +176,7 @@ impl WatermarkTestHarness {
 
     async fn num_blocks(&self, dataset_alias: &DatasetAlias) -> usize {
         let ds = self
-            .dataset_repo
+            .dataset_registry
             .get_dataset_by_ref(&dataset_alias.as_local_ref())
             .await
             .unwrap();

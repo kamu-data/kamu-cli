@@ -81,13 +81,13 @@ impl DatasetTestHelper {
     }
 
     pub async fn append_random_data(
-        dataset_repo: &dyn DatasetRepository,
+        dataset_registry: &dyn DatasetRegistry,
         dataset_ref: impl Into<DatasetRef>,
         data_size: usize,
     ) -> Multihash {
         let tmp_dir = tempfile::tempdir().unwrap();
 
-        let ds = dataset_repo
+        let ds = dataset_registry
             .get_dataset_by_ref(&dataset_ref.into())
             .await
             .unwrap();

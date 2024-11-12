@@ -798,7 +798,8 @@ async fn test_ingest_sql_case_sensitivity() {
 
 struct IngestTestHarness {
     temp_dir: TempDir,
-    dataset_repo: Arc<DatasetRepositoryLocalFs>,
+    dataset_registry: Arc<dyn DatasetRegistry>,
+    dataset_repo_writer: Arc<dyn DatasetRepositoryWriter>,
     push_ingest_svc: Arc<dyn PushIngestService>,
     ctx: SessionContext,
 }
@@ -821,6 +822,8 @@ impl IngestTestHarness {
             .add_value(TenancyConfig::SingleTenant)
             .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+            .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
+            .add::<DatasetRegistryRepoBridge>()
             .add_value(SystemTimeSourceStub::new_set(
                 Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap(),
             ))
@@ -834,14 +837,15 @@ impl IngestTestHarness {
 
         Self {
             temp_dir,
-            dataset_repo: catalog.get_one().unwrap(),
+            dataset_registry: catalog.get_one().unwrap(),
+            dataset_repo_writer: catalog.get_one().unwrap(),
             push_ingest_svc: catalog.get_one().unwrap(),
             ctx: SessionContext::new_with_config(SessionConfig::new().with_target_partitions(1)),
         }
     }
 
     async fn create_dataset(&self, dataset_snapshot: DatasetSnapshot) -> CreateDatasetResult {
-        self.dataset_repo
+        self.dataset_repo_writer
             .create_dataset_from_snapshot(dataset_snapshot)
             .await
             .unwrap()
@@ -850,7 +854,7 @@ impl IngestTestHarness {
 
     async fn dataset_data_helper(&self, dataset_alias: &DatasetAlias) -> DatasetDataHelper {
         let dataset = self
-            .dataset_repo
+            .dataset_registry
             .get_dataset_by_ref(&dataset_alias.as_local_ref())
             .await
             .unwrap();

@@ -1201,7 +1201,8 @@ async fn test_ingest_polling_preprocess_with_flink() {
 
 struct IngestTestHarness {
     temp_dir: TempDir,
-    dataset_repo: Arc<DatasetRepositoryLocalFs>,
+    dataset_registry: Arc<dyn DatasetRegistry>,
+    dataset_repo_writer: Arc<dyn DatasetRepositoryWriter>,
     ingest_svc: Arc<dyn PollingIngestService>,
     time_source: Arc<SystemTimeSourceStub>,
     ctx: SessionContext,
@@ -1228,6 +1229,8 @@ impl IngestTestHarness {
             .add_value(TenancyConfig::SingleTenant)
             .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+            .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
+            .add::<DatasetRegistryRepoBridge>()
             .add_value(EngineProvisionerLocalConfig::default())
             .add::<EngineProvisionerLocal>()
             .add_value(SystemTimeSourceStub::new_set(
@@ -1240,13 +1243,15 @@ impl IngestTestHarness {
             .add::<DatasetKeyValueServiceSysEnv>()
             .build();
 
-        let dataset_repo = catalog.get_one::<DatasetRepositoryLocalFs>().unwrap();
+        let dataset_registry = catalog.get_one::<dyn DatasetRegistry>().unwrap();
+        let dataset_repo_writer = catalog.get_one::<dyn DatasetRepositoryWriter>().unwrap();
         let ingest_svc = catalog.get_one::<dyn PollingIngestService>().unwrap();
         let time_source = catalog.get_one::<SystemTimeSourceStub>().unwrap();
 
         Self {
             temp_dir,
-            dataset_repo,
+            dataset_registry,
+            dataset_repo_writer,
             ingest_svc,
             time_source,
             ctx: SessionContext::new_with_config(SessionConfig::new().with_target_partitions(1)),
@@ -1254,7 +1259,7 @@ impl IngestTestHarness {
     }
 
     async fn create_dataset(&self, dataset_snapshot: DatasetSnapshot) -> CreateDatasetResult {
-        self.dataset_repo
+        self.dataset_repo_writer
             .create_dataset_from_snapshot(dataset_snapshot)
             .await
             .unwrap()
@@ -1276,7 +1281,7 @@ impl IngestTestHarness {
 
     async fn dataset_data_helper(&self, dataset_alias: &DatasetAlias) -> DatasetDataHelper {
         let dataset = self
-            .dataset_repo
+            .dataset_registry
             .get_dataset_by_ref(&dataset_alias.as_local_ref())
             .await
             .unwrap();

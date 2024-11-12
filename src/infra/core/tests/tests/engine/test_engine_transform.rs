@@ -217,7 +217,7 @@ impl DatasetHelper {
 
 struct TestHarness {
     tempdir: tempfile::TempDir,
-    dataset_repo: Arc<DatasetRepositoryLocalFs>,
+    dataset_repo_writer: Arc<dyn DatasetRepositoryWriter>,
     ingest_svc: Arc<dyn PollingIngestService>,
     push_ingest_svc: Arc<dyn PushIngestService>,
     transform_helper: TransformTestHelper,
@@ -244,6 +244,7 @@ impl TestHarness {
             .add_value(TenancyConfig::SingleTenant)
             .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+            .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
             .add::<DatasetRegistryRepoBridge>()
             .add_value(EngineProvisionerLocalConfig::default())
             .add::<EngineProvisionerLocal>()
@@ -270,7 +271,7 @@ impl TestHarness {
 
         Self {
             tempdir,
-            dataset_repo: catalog.get_one().unwrap(),
+            dataset_repo_writer: catalog.get_one().unwrap(),
             ingest_svc: catalog.get_one().unwrap(),
             push_ingest_svc: catalog.get_one().unwrap(),
             time_source: catalog.get_one().unwrap(),
@@ -330,7 +331,7 @@ async fn test_transform_common(transform: Transform, test_retractions: bool) {
     let root_alias = root_snapshot.name.clone();
 
     let root_created = harness
-        .dataset_repo
+        .dataset_repo_writer
         .create_dataset_from_snapshot(root_snapshot)
         .await
         .unwrap()
@@ -362,7 +363,7 @@ async fn test_transform_common(transform: Transform, test_retractions: bool) {
         .build();
 
     let deriv_created = harness
-        .dataset_repo
+        .dataset_repo_writer
         .create_dataset_from_snapshot(deriv_snapshot)
         .await
         .unwrap()
@@ -681,7 +682,7 @@ async fn test_transform_empty_inputs() {
     ///////////////////////////////////////////////////////////////////////////
 
     let root = harness
-        .dataset_repo
+        .dataset_repo_writer
         .create_dataset_from_snapshot(
             MetadataFactory::dataset_snapshot()
                 .name("root")
@@ -713,7 +714,7 @@ async fn test_transform_empty_inputs() {
         .build();
 
     let deriv = harness
-        .dataset_repo
+        .dataset_repo_writer
         .create_dataset_from_snapshot(deriv_snapshot)
         .await
         .unwrap()

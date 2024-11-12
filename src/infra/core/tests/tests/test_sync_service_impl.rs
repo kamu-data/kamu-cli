@@ -113,10 +113,12 @@ async fn do_test_sync(
     let sync_svc_foo = catalog_foo.get_one::<dyn SyncService>().unwrap();
     let sync_request_builder_foo = catalog_foo.get_one::<SyncRequestBuilder>().unwrap();
     let dataset_repo_foo = catalog_foo.get_one::<DatasetRepositoryLocalFs>().unwrap();
+    let dataset_registry_foo = catalog_foo.get_one::<dyn DatasetRegistry>().unwrap();
 
     let sync_svc_bar = catalog_bar.get_one::<dyn SyncService>().unwrap();
     let sync_request_builder_bar = catalog_bar.get_one::<SyncRequestBuilder>().unwrap();
     let dataset_repo_bar = catalog_bar.get_one::<DatasetRepositoryLocalFs>().unwrap();
+    let dataset_registry_bar = catalog_bar.get_one::<dyn DatasetRegistry>().unwrap();
 
     // Dataset does not exist locally / remotely
     assert_matches!(
@@ -209,14 +211,14 @@ async fn do_test_sync(
 
     // Subsequent sync ////////////////////////////////////////////////////////
     let _b2 = DatasetTestHelper::append_random_data(
-        dataset_repo_foo.as_ref(),
+        dataset_registry_foo.as_ref(),
         &dataset_alias_foo,
         FILE_DATA_ARRAY_SIZE,
     )
     .await;
 
     let b3 = DatasetTestHelper::append_random_data(
-        dataset_repo_foo.as_ref(),
+        dataset_registry_foo.as_ref(),
         &dataset_alias_foo,
         FILE_DATA_ARRAY_SIZE,
     )
@@ -336,7 +338,7 @@ async fn do_test_sync(
 
     // Push a new block into dataset_bar (which we were pulling into before)
     let exta_head = DatasetTestHelper::append_random_data(
-        dataset_repo_bar.as_ref(),
+        dataset_registry_bar.as_ref(),
         &dataset_alias_bar,
         FILE_DATA_ARRAY_SIZE,
     )
@@ -461,21 +463,21 @@ async fn do_test_sync(
     // Datasets complex divergence //////////////////////////////////////////////
 
     let _b4 = DatasetTestHelper::append_random_data(
-        dataset_repo_foo.as_ref(),
+        dataset_registry_foo.as_ref(),
         &dataset_alias_foo,
         FILE_DATA_ARRAY_SIZE,
     )
     .await;
 
     let b5 = DatasetTestHelper::append_random_data(
-        dataset_repo_foo.as_ref(),
+        dataset_registry_foo.as_ref(),
         &dataset_alias_foo,
         FILE_DATA_ARRAY_SIZE,
     )
     .await;
 
     let b4_alt = DatasetTestHelper::append_random_data(
-        dataset_repo_bar.as_ref(),
+        dataset_registry_bar.as_ref(),
         &dataset_alias_bar,
         FILE_DATA_ARRAY_SIZE,
     )
@@ -531,7 +533,7 @@ async fn do_test_sync(
     // Datasets corrupted transfer flow /////////////////////////////////////////
     if is_ipfs {
         let _b6 = DatasetTestHelper::append_random_data(
-            dataset_repo_foo.as_ref(),
+            dataset_registry_foo.as_ref(),
             &dataset_alias_foo,
             FILE_DATA_ARRAY_SIZE,
         )
@@ -545,7 +547,7 @@ async fn do_test_sync(
 
         for _i in 0..15 {
             DatasetTestHelper::append_random_data(
-                dataset_repo_foo.as_ref(),
+                dataset_registry_foo.as_ref(),
                 &dataset_alias_foo,
                 FILE_DATA_ARRAY_SIZE,
             )

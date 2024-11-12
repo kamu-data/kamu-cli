@@ -25,7 +25,7 @@ pub fn get_staging_name() -> String {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) async fn create_dataset_from_snapshot_impl<
-    TRepository: DatasetRepositoryExt + DatasetRepositoryWriter,
+    TRepository: DatasetRepository + DatasetRepositoryWriter,
 >(
     dataset_repo: &TRepository,
     mut snapshot: DatasetSnapshot,

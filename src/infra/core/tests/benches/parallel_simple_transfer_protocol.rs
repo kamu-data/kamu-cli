@@ -52,7 +52,7 @@ async fn setup_dataset(
 ) -> (
     Arc<dyn SyncService>,
     Arc<SyncRequestBuilder>,
-    Arc<DatasetRepositoryLocalFs>,
+    Arc<dyn DatasetRegistry>,
 ) {
     let (ipfs_gateway, ipfs_client) = ipfs.unwrap_or_default();
 
@@ -79,7 +79,8 @@ async fn setup_dataset(
 
     let sync_svc = catalog.get_one::<dyn SyncService>().unwrap();
     let sync_request_builder = catalog.get_one::<SyncRequestBuilder>().unwrap();
-    let dataset_repo = catalog.get_one::<DatasetRepositoryLocalFs>().unwrap();
+    let dataset_registry = catalog.get_one::<dyn DatasetRegistry>().unwrap();
+    let dataset_repo_writer = catalog.get_one::<dyn DatasetRepositoryWriter>().unwrap();
 
     // Add dataset
     let snapshot = MetadataFactory::dataset_snapshot()
@@ -88,7 +89,7 @@ async fn setup_dataset(
         .push_event(MetadataFactory::set_data_schema().build())
         .build();
 
-    let _ = dataset_repo
+    let _ = dataset_repo_writer
         .create_dataset_from_snapshot(snapshot)
         .await
         .unwrap()
@@ -97,23 +98,26 @@ async fn setup_dataset(
 
     append_data_to_dataset(
         AMOUNT_OF_BLOCKS_TO_APPEND,
-        dataset_repo.as_ref(),
+        dataset_registry.as_ref(),
         dataset_alias,
     )
     .await;
 
-    (sync_svc, sync_request_builder, dataset_repo)
+    (sync_svc, sync_request_builder, dataset_registry)
 }
 
 async fn append_data_to_dataset(
     block_amount: usize,
-    dataset_repo: &dyn DatasetRepository,
+    dataset_registry: &dyn DatasetRegistry,
     dataset_ref: &DatasetAlias,
 ) {
     for _ in 1..block_amount {
-        let _ =
-            DatasetTestHelper::append_random_data(dataset_repo, dataset_ref, FILE_DATA_ARRAY_SIZE)
-                .await;
+        let _ = DatasetTestHelper::append_random_data(
+            dataset_registry,
+            dataset_ref,
+            FILE_DATA_ARRAY_SIZE,
+        )
+        .await;
     }
 }
 
@@ -123,7 +127,7 @@ async fn do_test_sync(
     dataset_alias: &DatasetAlias,
     pull_repo_url: &DatasetRefRemote,
     push_repo_url: &DatasetRefRemote,
-    dataset_repo: Arc<DatasetRepositoryLocalFs>,
+    dataset_registry: Arc<dyn DatasetRegistry>,
 ) {
     let _push_res = sync_svc
         .sync(
@@ -151,7 +155,7 @@ async fn do_test_sync(
     // the same as previous
     append_data_to_dataset(
         AMOUNT_OF_BLOCKS_TO_APPEND,
-        dataset_repo.as_ref(),
+        dataset_registry.as_ref(),
         dataset_alias,
     )
     .await;
@@ -183,7 +187,7 @@ fn bench_with_1_parallel(c: &mut Criterion) {
 
     let (dataset_alias, pull_repo_url, push_repo_url) = rt.block_on(build_temp_dirs(&rt));
 
-    let (sync_service_impl, sync_request_builder, dataset_repo) = rt.block_on(setup_dataset(
+    let (sync_service_impl, sync_request_builder, dataset_registry) = rt.block_on(setup_dataset(
         tmp_workspace_dir.path(),
         &dataset_alias,
         None,
@@ -200,7 +204,7 @@ fn bench_with_1_parallel(c: &mut Criterion) {
                 &dataset_alias,
                 &DatasetRefRemote::from(&pull_repo_url),
                 &DatasetRefRemote::from(&push_repo_url),
-                dataset_repo.clone(),
+                dataset_registry.clone(),
             ));
         });
     });
