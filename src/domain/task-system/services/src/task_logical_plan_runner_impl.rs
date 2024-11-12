@@ -36,6 +36,7 @@ impl TaskLogicalPlanRunnerImpl {
         }
     }
 
+    #[tracing::instrument(level = "debug", skip_all, fields(?probe_plan))]
     async fn run_probe(&self, probe_plan: &Probe) -> Result<TaskOutcome, InternalError> {
         if let Some(busy_time) = &probe_plan.busy_time {
             tokio::time::sleep(*busy_time).await;
@@ -46,6 +47,7 @@ impl TaskLogicalPlanRunnerImpl {
             .unwrap_or(TaskOutcome::Success(TaskResult::Empty)))
     }
 
+    #[tracing::instrument(level = "debug", skip_all, fields(?args))]
     async fn run_update(&self, args: &UpdateDataset) -> Result<TaskOutcome, InternalError> {
         // Prepare task definition: requires a transaction
         let task_definition = self.prepare_update_task_definition(args).await?;
@@ -195,6 +197,7 @@ impl TaskLogicalPlanRunnerImpl {
         }
     }
 
+    #[tracing::instrument(level = "debug", skip_all, fields(?args))]
     async fn run_reset(&self, args: &ResetDataset) -> Result<TaskOutcome, InternalError> {
         // Prepare task definition: requires a transaction
         let task_definition = self.prepare_reset_task_definition(args).await?;
@@ -246,6 +249,7 @@ impl TaskLogicalPlanRunnerImpl {
         Ok(ResetTaskDefinition { target })
     }
 
+    #[tracing::instrument(level = "debug", skip_all, fields(?args))]
     async fn run_hard_compaction(
         &self,
         args: &HardCompactionDataset,

@@ -93,6 +93,12 @@ impl DeleteDatasetUseCaseImpl {
 
 #[async_trait::async_trait]
 impl DeleteDatasetUseCase for DeleteDatasetUseCaseImpl {
+    #[tracing::instrument(
+        level = "info",
+        name = "DeleteDatasetUseCase::execute_via_ref",
+        skip_all,
+        fields(dataset_ref)
+    )]
     async fn execute_via_ref(&self, dataset_ref: &DatasetRef) -> Result<(), DeleteDatasetError> {
         let dataset_handle = match self
             .dataset_registry
@@ -107,6 +113,12 @@ impl DeleteDatasetUseCase for DeleteDatasetUseCaseImpl {
         self.execute_via_handle(&dataset_handle).await
     }
 
+    #[tracing::instrument(
+        level = "info",
+        name = "DeleteDatasetUseCase::execute_via_handle",
+        skip_all,
+        fields(dataset_handle)
+    )]
     async fn execute_via_handle(
         &self,
         dataset_handle: &DatasetHandle,

@@ -40,6 +40,12 @@ impl ResetDatasetUseCaseImpl {
 
 #[async_trait::async_trait]
 impl ResetDatasetUseCase for ResetDatasetUseCaseImpl {
+    #[tracing::instrument(
+        level = "info",
+        name = "ResetDatasetUseCase::execute",
+        skip_all,
+        fields(dataset_handle, ?maybe_new_head, ?maybe_old_head)
+    )]
     async fn execute(
         &self,
         dataset_handle: &DatasetHandle,

@@ -58,6 +58,7 @@ impl WatermarkServiceImpl {
 #[async_trait::async_trait]
 impl WatermarkService for WatermarkServiceImpl {
     /// Manually advances the watermark of a root dataset
+    #[tracing::instrument(level = "info", skip_all, fields(%new_watermark))]
     async fn set_watermark(
         &self,
         dataset: Arc<dyn Dataset>,

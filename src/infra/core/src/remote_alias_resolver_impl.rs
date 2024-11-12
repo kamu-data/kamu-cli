@@ -111,6 +111,7 @@ impl RemoteAliasResolverImpl {
 
 #[async_trait::async_trait]
 impl RemoteAliasResolver for RemoteAliasResolverImpl {
+    #[tracing::instrument(level = "debug", skip_all, fields(local_target = ?local_target.handle, ?dataset_push_target_maybe))]
     async fn resolve_push_target(
         &self,
         local_target: ResolvedDataset,

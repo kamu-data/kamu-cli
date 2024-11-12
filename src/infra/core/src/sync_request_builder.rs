@@ -58,6 +58,7 @@ impl SyncRequestBuilder {
         }
     }
 
+    #[tracing::instrument(level = "debug", skip_all, fields(?src_ref, ?dst_ref, %create_dst_if_not_exists))]
     pub async fn build_sync_request(
         &self,
         src_ref: DatasetRefAny,

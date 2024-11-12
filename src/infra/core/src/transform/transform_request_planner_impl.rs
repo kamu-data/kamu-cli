@@ -100,6 +100,8 @@ impl TransformRequestPlannerImpl {
 #[async_trait::async_trait]
 impl TransformRequestPlanner for TransformRequestPlannerImpl {
     /// Returns an active transform, if any
+    #[tracing::instrument(level = "debug", skip_all, fields(target=%target.handle))]
+    ///
     async fn get_active_transform(
         &self,
         target: ResolvedDataset,
@@ -114,6 +116,7 @@ impl TransformRequestPlanner for TransformRequestPlannerImpl {
             .into_hashed_block())
     }
 
+    #[tracing::instrument(level = "info", skip_all, fields(target=%target.handle))]
     async fn build_transform_preliminary_plan(
         &self,
         target: ResolvedDataset,
@@ -123,6 +126,7 @@ impl TransformRequestPlanner for TransformRequestPlannerImpl {
             .await
     }
 
+    #[tracing::instrument(level = "info", skip_all, fields(target=%target.handle, ?block_range))]
     async fn build_transform_verification_plan(
         &self,
         target: ResolvedDataset,

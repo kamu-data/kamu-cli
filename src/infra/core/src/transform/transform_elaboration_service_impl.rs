@@ -148,6 +148,7 @@ impl TransformElaborationServiceImpl {
 
 #[async_trait::async_trait]
 impl TransformElaborationService for TransformElaborationServiceImpl {
+    #[tracing::instrument(level = "info", skip_all, fields(target=%target.handle, ?plan, ?options))]
     async fn elaborate_transform(
         &self,
         target: ResolvedDataset,
@@ -155,7 +156,6 @@ impl TransformElaborationService for TransformElaborationServiceImpl {
         options: TransformOptions,
         maybe_listener: Option<Arc<dyn TransformListener>>,
     ) -> Result<TransformElaboration, TransformElaborateError> {
-        tracing::info!(target=%target.handle, options=?options, "Elaborating transform");
         let listener = maybe_listener.unwrap_or_else(|| Arc::new(NullTransformListener));
 
         match self

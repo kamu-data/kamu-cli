@@ -387,7 +387,7 @@ impl CompactionServiceImpl {
         Ok((old_data_slices, current_head, new_num_blocks))
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
+    #[tracing::instrument(level = "debug", skip_all)]
     async fn compact_dataset_impl(
         &self,
         dataset: Arc<dyn Dataset>,
@@ -456,7 +456,7 @@ impl CompactionServiceImpl {
 
 #[async_trait::async_trait]
 impl CompactionService for CompactionServiceImpl {
-    #[tracing::instrument(level = "info", skip_all)]
+    #[tracing::instrument(level = "info", skip_all, fields(target=?target.handle, ?options))]
     async fn compact_dataset(
         &self,
         target: ResolvedDataset,

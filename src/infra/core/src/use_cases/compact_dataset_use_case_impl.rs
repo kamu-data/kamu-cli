@@ -52,6 +52,12 @@ impl CompactDatasetUseCaseImpl {
 
 #[async_trait::async_trait]
 impl CompactDatasetUseCase for CompactDatasetUseCaseImpl {
+    #[tracing::instrument(
+        level = "info",
+        name = "CompactDatasetUseCase::execute",
+        skip_all,
+        fields(dataset_handle, ?options)
+    )]
     async fn execute(
         &self,
         dataset_handle: &DatasetHandle,
@@ -74,6 +80,12 @@ impl CompactDatasetUseCase for CompactDatasetUseCaseImpl {
             .await
     }
 
+    #[tracing::instrument(
+        level = "info",
+        name = "CompactDatasetUseCase::execute_multi",
+        skip_all,
+        fields(?dataset_handles, ?options)
+    )]
     async fn execute_multi(
         &self,
         dataset_handles: Vec<DatasetHandle>,

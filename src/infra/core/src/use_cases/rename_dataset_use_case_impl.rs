@@ -57,6 +57,12 @@ impl RenameDatasetUseCaseImpl {
 
 #[async_trait::async_trait]
 impl RenameDatasetUseCase for RenameDatasetUseCaseImpl {
+    #[tracing::instrument(
+        level = "info",
+        name = "RenameDatasetUseCase::execute",
+        skip_all,
+        fields(dataset_ref, new_name)
+    )]
     async fn execute(
         &self,
         dataset_ref: &DatasetRef,

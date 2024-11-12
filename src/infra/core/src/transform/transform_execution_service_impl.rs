@@ -185,6 +185,7 @@ impl TransformExecutionServiceImpl {
 
 #[async_trait::async_trait]
 impl TransformExecutionService for TransformExecutionServiceImpl {
+    #[tracing::instrument(level = "info", skip_all, fields(target=%target.handle, ?plan))]
     async fn execute_transform(
         &self,
         target: ResolvedDataset,
@@ -194,8 +195,6 @@ impl TransformExecutionService for TransformExecutionServiceImpl {
         ResolvedDataset,
         Result<TransformResult, TransformExecuteError>,
     ) {
-        tracing::info!(target=%target.handle, "Executing transform");
-
         let listener = maybe_listener.unwrap_or_else(|| Arc::new(NullTransformListener));
 
         (
@@ -213,6 +212,7 @@ impl TransformExecutionService for TransformExecutionServiceImpl {
         )
     }
 
+    #[tracing::instrument(level = "info", skip_all, fields(target=%target.handle, ?verification_operation))]
     async fn execute_verify_transform(
         &self,
         target: ResolvedDataset,

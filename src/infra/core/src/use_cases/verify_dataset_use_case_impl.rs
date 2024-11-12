@@ -49,6 +49,12 @@ impl VerifyDatasetUseCaseImpl {
 
 #[async_trait::async_trait]
 impl VerifyDatasetUseCase for VerifyDatasetUseCaseImpl {
+    #[tracing::instrument(
+        level = "info",
+        name = "VerifyDatasetUseCase::execute",
+        skip_all,
+        fields(?request)
+    )]
     async fn execute(
         &self,
         request: VerificationRequest<DatasetHandle>,
@@ -82,6 +88,12 @@ impl VerifyDatasetUseCase for VerifyDatasetUseCaseImpl {
             .await
     }
 
+    #[tracing::instrument(
+        level = "info",
+        name = "VerifyDatasetUseCase::execute_multi",
+        skip_all,
+        fields(?requests)
+    )]
     async fn execute_multi(
         &self,
         requests: Vec<VerificationRequest<DatasetHandle>>,

@@ -49,6 +49,12 @@ impl CommitDatasetEventUseCaseImpl {
 
 #[async_trait::async_trait]
 impl CommitDatasetEventUseCase for CommitDatasetEventUseCaseImpl {
+    #[tracing::instrument(
+        level = "info",
+        name = "CommitDatasetEventUseCase::execute",
+        skip_all,
+        fields(dataset_handle, ?event, ?opts)
+    )]
     async fn execute(
         &self,
         dataset_handle: &DatasetHandle,

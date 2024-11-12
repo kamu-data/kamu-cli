@@ -53,6 +53,7 @@ impl PullRequestPlannerImpl {
     // provided references) assigning depth index to every dataset in the
     // graph(s). Datasets that share the same depth level are independent and
     // can be pulled in parallel.
+    #[tracing::instrument(level = "debug", skip_all, fields(?requests, ?options))]
     async fn collect_pull_graph(
         &self,
         requests: &[PullRequest],
@@ -95,6 +96,7 @@ impl PullRequestPlannerImpl {
         (ordered, errors)
     }
 
+    #[tracing::instrument(level = "debug", skip_all, fields(?request, ?options))]
     async fn build_single_node_pull_graph(
         &self,
         request: &PullRequest,
@@ -139,6 +141,7 @@ impl PullRequestPlannerImpl {
         (first_depth, plan, rest)
     }
 
+    #[tracing::instrument(level = "debug", skip_all, fields(?pi))]
     fn build_ingest_item(&self, pi: PullItem) -> PullIngestItem {
         assert!(pi.maybe_remote_ref.is_none());
 
@@ -156,6 +159,7 @@ impl PullRequestPlannerImpl {
         }
     }
 
+    #[tracing::instrument(level = "debug", skip_all, fields(?pi))]
     async fn build_transform_item(&self, pi: PullItem) -> Result<PullTransformItem, PullResponse> {
         assert!(pi.maybe_remote_ref.is_none());
 
@@ -188,6 +192,7 @@ impl PullRequestPlannerImpl {
         }
     }
 
+    #[tracing::instrument(level = "debug", skip_all, fields(?pi, ?sync_options))]
     async fn build_sync_item(
         &self,
         pi: PullItem,
@@ -227,6 +232,7 @@ impl PullRequestPlannerImpl {
 
 #[async_trait::async_trait]
 impl PullRequestPlanner for PullRequestPlannerImpl {
+    #[tracing::instrument(level = "debug", skip_all, fields(?request, ?options))]
     async fn build_pull_plan(
         &self,
         request: PullRequest,
@@ -250,6 +256,7 @@ impl PullRequestPlanner for PullRequestPlannerImpl {
         }
     }
 
+    #[tracing::instrument(level = "debug", skip_all, fields(?requests, ?options))]
     async fn build_pull_multi_plan(
         &self,
         requests: &[PullRequest],
@@ -267,7 +274,7 @@ impl PullRequestPlanner for PullRequestPlannerImpl {
         };
 
         tracing::info!(
-            num_items = plan.len(),
+            num_iterations = plan.len(),
             num_errors = errors.len(),
             ?plan,
             "Resolved pull graph"
@@ -291,22 +298,38 @@ impl PullRequestPlanner for PullRequestPlannerImpl {
             let (depth, batch, tail) = self.slice_by_depth(rest);
             rest = tail;
 
+            tracing::debug!(
+                depth,
+                num_items = batch.len(),
+                ?batch,
+                "Detailing pull graph iteration"
+            );
+
             let mut jobs = Vec::new();
             for item in batch {
+                // Ingest?
                 if depth == 0 && item.maybe_remote_ref.is_none() {
-                    jobs.push(PullPlanIterationJob::Ingest(self.build_ingest_item(item)));
+                    let pii = self.build_ingest_item(item);
+                    tracing::debug!(depth, ?pii, "Added ingest item to pull plan");
+                    jobs.push(PullPlanIterationJob::Ingest(pii));
+
+                // Sync?
                 } else if depth == 0 && item.maybe_remote_ref.is_some() {
                     match self.build_sync_item(item, options.sync_options).await {
                         Ok(psi) => {
+                            tracing::debug!(depth, ?psi, "Added sync item to pull plan");
                             jobs.push(PullPlanIterationJob::Sync(psi));
                         }
                         Err(sync_error) => {
                             errors.push(sync_error);
                         }
                     }
-                } else {
+                }
+                // Transform otherwise
+                else {
                     match self.build_transform_item(item).await {
                         Ok(pti) => {
+                            tracing::debug!(depth, ?pti, "Added transform item to pull plan");
                             jobs.push(PullPlanIterationJob::Transform(pti));
                         }
                         Err(transform_error) => {
@@ -323,6 +346,7 @@ impl PullRequestPlanner for PullRequestPlannerImpl {
         (iterations, errors)
     }
 
+    #[tracing::instrument(level = "debug", skip_all, fields(?options))]
     async fn build_pull_plan_all_owner_datasets(
         &self,
         options: &PullOptions,
@@ -378,7 +402,7 @@ impl<'a> PullGraphDepthFirstTraversal<'a> {
         referenced_explicitly: bool,
         traverse_dependencies: bool,
     ) -> Result<i32, PullError> {
-        tracing::debug!(?request, "Entering node");
+        tracing::debug!(?request, %referenced_explicitly, %traverse_dependencies, "Entering pull graph node");
 
         // Resolve local dataset handle, if dataset exists
         let maybe_local_handle = self.try_resolve_local_handle(request).await?;
@@ -460,7 +484,7 @@ impl<'a> PullGraphDepthFirstTraversal<'a> {
             pull_item.maybe_original_request = Some(request.clone());
         }
 
-        tracing::debug!(?pull_item, "Resolved node");
+        tracing::debug!(?pull_item, "Resolved pull graph node");
 
         let depth = pull_item.depth;
         self.visited.insert(local_alias.clone(), pull_item);

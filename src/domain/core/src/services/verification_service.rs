@@ -39,7 +39,7 @@ pub trait VerificationService: Send + Sync {
 // DTOs
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct VerificationRequest<TTarget> {
     pub target: TTarget,
     pub block_range: (Option<Multihash>, Option<Multihash>),

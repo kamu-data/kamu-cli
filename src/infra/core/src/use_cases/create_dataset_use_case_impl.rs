@@ -50,6 +50,7 @@ impl CreateDatasetUseCaseImpl {
 
 #[async_trait::async_trait]
 impl CreateDatasetUseCase for CreateDatasetUseCaseImpl {
+    #[tracing::instrument(level = "info", skip_all, fields(dataset_alias, ?seed_block, ?options))]
     async fn execute(
         &self,
         dataset_alias: &DatasetAlias,

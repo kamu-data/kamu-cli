@@ -42,6 +42,8 @@ impl PushRequestPlannerImpl {
             .dataset_registry
             .get_resolved_dataset_by_handle(&local_handle);
 
+        tracing::debug!(local_target = ? local_target.handle, "Resolved push plan local target");
+
         match self
             .remote_alias_resolver
             .resolve_push_target(local_target, push_target.cloned())
@@ -63,6 +65,7 @@ impl PushRequestPlannerImpl {
 
 #[async_trait::async_trait]
 impl PushRequestPlanner for PushRequestPlannerImpl {
+    #[tracing::instrument(level = "debug", skip_all, fields(?dataset_handles, ?push_target))]
     async fn collect_plan(
         &self,
         dataset_handles: &[DatasetHandle],

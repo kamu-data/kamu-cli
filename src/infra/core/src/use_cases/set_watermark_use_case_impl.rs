@@ -47,6 +47,12 @@ impl SetWatermarkUseCaseImpl {
 
 #[async_trait::async_trait]
 impl SetWatermarkUseCase for SetWatermarkUseCaseImpl {
+    #[tracing::instrument(
+        level = "info",
+        name = "SetWatermarkUseCase::execute",
+        skip_all,
+        fields(dataset_handle, new_watermark)
+    )]
     async fn execute(
         &self,
         dataset_handle: &DatasetHandle,

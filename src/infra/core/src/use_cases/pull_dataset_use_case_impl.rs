@@ -59,6 +59,7 @@ impl PullDatasetUseCaseImpl {
         }
     }
 
+    #[tracing::instrument(level = "info", skip_all)]
     async fn pull_by_plan(
         &self,
         plan: Vec<PullPlanIteration>,
@@ -139,7 +140,7 @@ impl PullDatasetUseCaseImpl {
                 };
             }
             let iteration_results = tasks.join_all().await;
-            tracing::debug!(iteration_result=?iteration_results, "Pull iteration finished");
+            tracing::info!(iteration_result=?iteration_results, "Pull iteration finished");
 
             // Deal with results
             let mut has_errors = false;
@@ -158,6 +159,7 @@ impl PullDatasetUseCaseImpl {
         Ok(results)
     }
 
+    #[tracing::instrument(level = "debug", name = "PullDatasetUsecase::write_authorizations", skip_all, fields(?iteration))]
     async fn make_authorization_write_checks(
         &self,
         iteration: PullPlanIteration,
@@ -219,6 +221,7 @@ impl PullDatasetUseCaseImpl {
         ))
     }
 
+    #[tracing::instrument(level = "debug", name = "PullDatasetUsecase::read_authoirzations", skip_all, fields(?iteration))]
     async fn make_authorization_read_checks(
         &self,
         iteration: PullPlanIteration,
@@ -441,6 +444,12 @@ impl PullDatasetUseCaseImpl {
 
 #[async_trait::async_trait]
 impl PullDatasetUseCase for PullDatasetUseCaseImpl {
+    #[tracing::instrument(
+        level = "info",
+        name = "PullDatasetUseCase::execute",
+        skip_all,
+        fields(?request, ?options)
+    )]
     async fn execute(
         &self,
         request: PullRequest,
@@ -456,6 +465,12 @@ impl PullDatasetUseCase for PullDatasetUseCaseImpl {
         Ok(responses.pop().unwrap())
     }
 
+    #[tracing::instrument(
+        level = "info",
+        name = "PullDatasetUseCase::execute_multi",
+        skip_all,
+        fields(?requests, ?options)
+    )]
     async fn execute_multi(
         &self,
         requests: Vec<PullRequest>,
@@ -481,6 +496,12 @@ impl PullDatasetUseCase for PullDatasetUseCaseImpl {
         self.pull_by_plan(plan, options, listener).await
     }
 
+    #[tracing::instrument(
+        level = "info",
+        name = "PullDatasetUseCase::execute_all_owned",
+        skip_all,
+        fields(?options)
+    )]
     async fn execute_all_owned(
         &self,
         options: PullOptions,

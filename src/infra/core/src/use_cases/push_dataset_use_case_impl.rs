@@ -69,6 +69,7 @@ impl PushDatasetUseCaseImpl {
         }
     }
 
+    #[tracing::instrument(level = "debug", name = "PushDatasetUseCase::authorizations", skip_all, fields(?dataset_handles, ?push_target))]
     async fn make_authorization_checks(
         &self,
         dataset_handles: Vec<DatasetHandle>,
@@ -97,6 +98,12 @@ impl PushDatasetUseCaseImpl {
         Ok((authorized_handles, unauthorized_responses))
     }
 
+    #[tracing::instrument(
+        level = "debug",
+        name = "PushDatasetUseCase::build_sync_requests",
+        skip_all,
+        fields(?plan, ?sync_options, ?push_target)
+    )]
     async fn build_sync_requests(
         &self,
         plan: &[PushItem],
@@ -129,6 +136,12 @@ impl PushDatasetUseCaseImpl {
 
 #[async_trait::async_trait]
 impl PushDatasetUseCase for PushDatasetUseCaseImpl {
+    #[tracing::instrument(
+        level = "info",
+        name = "PushDatasetUseCase::execute_multi",
+        skip_all,
+        fields(?dataset_handles, ?options)
+    )]
     async fn execute_multi(
         &self,
         dataset_handles: Vec<DatasetHandle>,
@@ -159,6 +172,8 @@ impl PushDatasetUseCase for PushDatasetUseCaseImpl {
         if !errors.is_empty() {
             return Ok(errors);
         }
+
+        tracing::debug!(?plan, "Obtained push plan");
 
         // Create sync requests
         let (sync_requests, errors) = self

@@ -22,6 +22,7 @@ pub struct ResetServiceImpl {}
 
 #[async_trait::async_trait]
 impl ResetService for ResetServiceImpl {
+    #[tracing::instrument(level = "info", skip_all, fields(new_head = ?new_head_maybe, old_head = ?old_head_maybe))]
     async fn reset_dataset(
         &self,
         dataset: Arc<dyn Dataset>,

@@ -52,6 +52,7 @@ impl SyncServiceImpl {
         }
     }
 
+    #[tracing::instrument(level = "debug", skip_all, fields(?src, ?dst, ?opts))]
     async fn sync_generic(
         &self,
         src: SyncRequestSource,
@@ -85,6 +86,7 @@ impl SyncServiceImpl {
             .await
     }
 
+    #[tracing::instrument(level = "debug", skip_all, fields(%src_url, ?dst, ?opts))]
     async fn sync_smart_pull_transfer_protocol(
         &self,
         src_url: &Url,
@@ -110,6 +112,7 @@ impl SyncServiceImpl {
             .await
     }
 
+    #[tracing::instrument(level = "debug", skip_all, fields(?src, %dst_url, ?opts))]
     async fn sync_smart_push_transfer_protocol<'a>(
         &'a self,
         src: SyncRequestSource,
@@ -150,6 +153,7 @@ impl SyncServiceImpl {
             .await
     }
 
+    #[tracing::instrument(level = "debug", skip_all, fields(%dst_url, ?opts))]
     async fn sync_to_ipfs(
         &self,
         src_dataset: Arc<dyn Dataset>,
@@ -462,6 +466,7 @@ impl SyncServiceImpl {
 
 #[async_trait::async_trait]
 impl SyncService for SyncServiceImpl {
+    #[tracing::instrument(level = "debug", skip_all, fields(?request, ?options))]
     async fn sync(
         &self,
         request: SyncRequest,
@@ -485,6 +490,7 @@ impl SyncService for SyncServiceImpl {
         }
     }
 
+    #[tracing::instrument(level = "debug", skip_all)]
     async fn ipfs_add(&self, src: Arc<dyn Dataset>) -> Result<String, InternalError> {
         self.add_to_ipfs(src.as_ref()).await
     }

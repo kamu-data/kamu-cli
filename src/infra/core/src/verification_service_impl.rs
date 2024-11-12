@@ -18,6 +18,8 @@ use opendatafabric::*;
 use crate::utils::cached_object::CachedObject;
 use crate::*;
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub struct VerificationServiceImpl {
     transform_request_planner: Arc<dyn TransformRequestPlanner>,
     transform_execution_svc: Arc<dyn TransformExecutionService>,
@@ -241,6 +243,8 @@ impl VerificationServiceImpl {
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[async_trait::async_trait]
 impl VerificationService for VerificationServiceImpl {
     #[tracing::instrument(
@@ -314,6 +318,8 @@ impl VerificationService for VerificationServiceImpl {
             outcome,
         };
 
+        tracing::debug!(result = ?result, "Dataset verification finished");
+
         match &result.outcome {
             Ok(_) => listener.success(&result),
             Err(error) => listener.error(error),
@@ -322,6 +328,7 @@ impl VerificationService for VerificationServiceImpl {
         result
     }
 
+    #[tracing::instrument(level = "info", skip_all)]
     async fn verify_multi(
         &self,
         requests: Vec<VerificationRequest<ResolvedDataset>>,
@@ -342,3 +349,5 @@ impl VerificationService for VerificationServiceImpl {
         results
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
