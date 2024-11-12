@@ -151,7 +151,7 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
         dataset_handles: Vec<DatasetHandle>,
         action: DatasetAction,
     ) -> Result<ClassifyByAllowanceResponse, InternalError> {
-        let mut matched_dataset_handles = Vec::new();
+        let mut matched_dataset_handles = Vec::with_capacity(dataset_handles.len());
         let mut unmatched_results = Vec::new();
 
         for hdl in dataset_handles {

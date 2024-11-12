@@ -162,9 +162,10 @@ impl PullDatasetUseCaseImpl {
         &self,
         iteration: PullPlanIteration,
     ) -> Result<(PullPlanIteration, Vec<PullResponse>), InternalError> {
-        let mut written_datasets = Vec::new();
-        let mut written_jobs_by_handle = HashMap::new();
+        let mut written_datasets = Vec::with_capacity(iteration.jobs.len());
+        let mut written_jobs_by_handle = HashMap::with_capacity(iteration.jobs.len());
         let mut other_jobs = Vec::new();
+
         for job in iteration.jobs {
             if let Some(written_handle) = job.as_common_item().try_get_written_handle() {
                 written_datasets.push(written_handle.clone());
@@ -182,7 +183,7 @@ impl PullDatasetUseCaseImpl {
             .classify_datasets_by_allowance(written_datasets, DatasetAction::Write)
             .await?;
 
-        let mut okay_jobs = Vec::new();
+        let mut okay_jobs = Vec::with_capacity(authorized_handles.len() + other_jobs.len());
         for authorized_hdl in authorized_handles {
             let job = written_jobs_by_handle
                 .remove(&authorized_hdl)
@@ -244,8 +245,9 @@ impl PullDatasetUseCaseImpl {
         iteration: PullPlanIteration,
     ) -> Result<(PullPlanIteration, Vec<PullResponse>), InternalError> {
         let mut read_datasets = Vec::new();
-        let mut reading_jobs = Vec::new();
-        let mut other_jobs = Vec::new();
+        let mut reading_jobs = Vec::with_capacity(iteration.jobs.len());
+        let mut other_jobs = Vec::with_capacity(iteration.jobs.len());
+
         for job in iteration.jobs {
             let read_handles = job.as_common_item().get_read_handles();
             if read_handles.is_empty() {
@@ -284,7 +286,7 @@ impl PullDatasetUseCaseImpl {
 
         let mut unauthorized_responses = Vec::new();
 
-        let mut okay_jobs = Vec::new();
+        let mut okay_jobs = Vec::with_capacity(reading_jobs.len() + other_jobs.len());
         okay_jobs.extend(other_jobs);
 
         for reading_job in reading_jobs {
