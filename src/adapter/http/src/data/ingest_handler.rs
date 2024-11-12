@@ -7,15 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-// Copyright Kamu Data, Inc. and contributors. All rights reserved.
-//
-// Use of this software is governed by the Business Source License
-// included in the LICENSE file.
-//
-// As of the Change Date specified in that file, in accordance with
-// the Business Source License, use of this software will be governed
-// by the Apache License, Version 2.0.
-
+use auth::{DatasetActionAuthorizer, DatasetActionUnauthorizedError};
 use axum::extract::{Extension, Query};
 use chrono::{DateTime, Utc};
 use database_common_macros::transactional_handler;
@@ -134,7 +126,15 @@ pub async fn dataset_ingest_handler(
         .await
         .map_err(ApiError::not_found)?;
 
-    // TODO: authorization!
+    // Authorization check
+    let authorizer = catalog.get_one::<dyn DatasetActionAuthorizer>().unwrap();
+    authorizer
+        .check_action_allowed(&resolved_dataset.handle, auth::DatasetAction::Write)
+        .await
+        .map_err(|e| match e {
+            DatasetActionUnauthorizedError::Access(_) => ApiError::new_forbidden(),
+            DatasetActionUnauthorizedError::Internal(e) => e.api_err(),
+        })?;
 
     // Run ingestion
     let ingest_svc = catalog.get_one::<dyn PushIngestService>().unwrap();
