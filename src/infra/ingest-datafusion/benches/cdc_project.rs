@@ -23,7 +23,9 @@ async fn setup(tempdir: &Path, num_rows: usize) -> String {
 
     let ctx = SessionContext::new();
 
-    let path = tempdir.join("data").to_str().unwrap().to_string();
+    let data_path = tempdir.join("data");
+    std::fs::create_dir(&data_path).unwrap();
+    let path = data_path.to_str().unwrap().to_string();
 
     let mut offset = array::PrimitiveBuilder::<UInt64Type>::with_capacity(num_rows);
     let mut op = array::PrimitiveBuilder::<UInt8Type>::new();

@@ -31,8 +31,13 @@ async fn setup(
 
     let ctx = SessionContext::new();
 
-    let prev = tempdir.join("prev").to_str().unwrap().to_string();
-    let new = tempdir.join("new").to_str().unwrap().to_string();
+    let prev_path = tempdir.join("prev");
+    let new_path = tempdir.join("new");
+    std::fs::create_dir(&prev_path).unwrap();
+    std::fs::create_dir(&new_path).unwrap();
+
+    let prev = prev_path.to_str().unwrap().to_string();
+    let new = new_path.to_str().unwrap().to_string();
 
     let mut offset = array::PrimitiveBuilder::<UInt64Type>::with_capacity(orig_rows);
     let mut op = array::PrimitiveBuilder::<UInt8Type>::new();

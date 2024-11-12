@@ -36,6 +36,7 @@ use kamu::{
 };
 use kamu_accounts::CurrentAccountSubject;
 use opendatafabric::*;
+use time_source::SystemTimeSourceDefault;
 use url::Url;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -56,26 +57,34 @@ async fn setup_dataset(
 ) {
     let (ipfs_gateway, ipfs_client) = ipfs.unwrap_or_default();
 
+    let datasets_dir = tmp_workspace_dir.join("datasets");
+    std::fs::create_dir(&datasets_dir).unwrap();
+
+    let repos_dir = tmp_workspace_dir.join("repos");
+    std::fs::create_dir(&repos_dir).unwrap();
+
     let catalog = dill::CatalogBuilder::new()
         .add::<DependencyGraphServiceInMemory>()
         .add_value(ipfs_gateway)
         .add_value(ipfs_client)
         .add_value(CurrentAccountSubject::new_test())
         .add_value(TenancyConfig::SingleTenant)
-        .add_builder(
-            DatasetRepositoryLocalFs::builder().with_root(tmp_workspace_dir.join("datasets")),
-        )
+        .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+        .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
         .add::<DatasetRegistryRepoBridge>()
-        .add_value(RemoteReposDir::new(tmp_workspace_dir.join("repos")))
+        .add_value(RemoteReposDir::new(repos_dir))
         .add::<RemoteRepositoryRegistryImpl>()
         .add::<auth::DummyOdfServerAccessTokenResolver>()
         .add::<DatasetFactoryImpl>()
         .add::<SyncServiceImpl>()
         .add::<SyncRequestBuilder>()
+        .add::<SystemTimeSourceDefault>()
         .add::<DummySmartTransferProtocolClient>()
         .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
         .build();
+
+    init_on_startup::run_startup_jobs(&catalog).await.unwrap();
 
     let sync_svc = catalog.get_one::<dyn SyncService>().unwrap();
     let sync_request_builder = catalog.get_one::<SyncRequestBuilder>().unwrap();
