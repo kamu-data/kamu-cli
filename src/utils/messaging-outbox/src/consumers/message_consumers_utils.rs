@@ -18,7 +18,7 @@ use super::{
     ConsumerFilter,
     MessageConsumer,
     MessageConsumerMeta,
-    MessageConsumptionDurability,
+    MessageDeliveryMechanism,
     MessageDispatcher,
 };
 use crate::{Message, MessageConsumerT, MessageSubscription};
@@ -36,7 +36,7 @@ pub async fn consume_deserialized_message<'a, TMessage: Message + 'static>(
 
     let consumers = match consumer_filter {
         ConsumerFilter::AllConsumers => all_consumers_for::<TMessage>(catalog),
-        ConsumerFilter::BestEffortConsumers => best_effort_consumers_for::<TMessage>(catalog),
+        ConsumerFilter::ImmediateConsumers => immediate_consumers_for::<TMessage>(catalog),
         ConsumerFilter::SelectedConsumer(consumer_name) => {
             particular_consumers_for::<TMessage>(catalog, consumer_name)
         }
@@ -67,15 +67,13 @@ fn all_consumers_for<TMessage: Message + 'static>(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn best_effort_consumers_for<TMessage: Message + 'static>(
+fn immediate_consumers_for<TMessage: Message + 'static>(
     catalog: &Catalog,
 ) -> Vec<Arc<dyn MessageConsumerT<TMessage>>> {
     consumers_from_builders(
         catalog,
         catalog.builders_for_with_meta::<dyn MessageConsumerT<TMessage>, _>(
-            |meta: &MessageConsumerMeta| {
-                meta.durability == MessageConsumptionDurability::BestEffort
-            },
+            |meta: &MessageConsumerMeta| meta.delivery == MessageDeliveryMechanism::Immediate,
         ),
     )
 }
@@ -131,7 +129,7 @@ pub(crate) fn group_message_dispatchers_by_producer(
 
 pub(crate) fn enumerate_messaging_routes(
     catalog: &Catalog,
-    durability: MessageConsumptionDurability,
+    durability: MessageDeliveryMechanism,
 ) -> Vec<MessageSubscription> {
     let mut res = Vec::new();
 
@@ -144,7 +142,7 @@ pub(crate) fn enumerate_messaging_routes(
             consumer_builder.instance_type_name()
         );
         for metadata in all_metadata {
-            if metadata.durability == durability {
+            if metadata.delivery == durability {
                 for producer_name in metadata.feeding_producers {
                     res.push(MessageSubscription::new(
                         producer_name,

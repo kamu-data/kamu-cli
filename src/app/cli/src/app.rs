@@ -509,7 +509,7 @@ pub fn configure_base_catalog(
 
     b.add_builder(
         messaging_outbox::OutboxImmediateImpl::builder()
-            .with_consumer_filter(messaging_outbox::ConsumerFilter::BestEffortConsumers),
+            .with_consumer_filter(messaging_outbox::ConsumerFilter::ImmediateConsumers),
     );
     b.add::<messaging_outbox::OutboxTransactionalImpl>();
     b.add::<messaging_outbox::OutboxDispatchingImpl>();

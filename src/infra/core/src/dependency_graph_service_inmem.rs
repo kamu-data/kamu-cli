@@ -17,7 +17,7 @@ use messaging_outbox::{
     MessageConsumer,
     MessageConsumerMeta,
     MessageConsumerT,
-    MessageConsumptionDurability,
+    MessageDeliveryMechanism,
 };
 use opendatafabric::DatasetID;
 use petgraph::stable_graph::{NodeIndex, StableDiGraph};
@@ -75,7 +75,7 @@ impl State {
 #[meta(MessageConsumerMeta {
     consumer_name: MESSAGE_CONSUMER_KAMU_CORE_DEPENDENCY_GRAPH_SERVICE,
     feeding_producers: &[MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE],
-    durability: MessageConsumptionDurability::BestEffort,
+    delivery: MessageDeliveryMechanism::Immediate,
  })]
 #[scope(Singleton)]
 impl DependencyGraphServiceInMemory {

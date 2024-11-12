@@ -35,7 +35,7 @@ use messaging_outbox::{
     MessageConsumer,
     MessageConsumerMeta,
     MessageConsumerT,
-    MessageConsumptionDurability,
+    MessageDeliveryMechanism,
 };
 use opendatafabric::{
     AccountID,
@@ -81,7 +81,7 @@ struct AccountsCache {
     feeding_producers: &[
         MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
     ],
-    durability: MessageConsumptionDurability::Durable,
+    delivery: MessageDeliveryMechanism::Immediate,
 })]
 impl DatasetEntryServiceImpl {
     pub fn new(

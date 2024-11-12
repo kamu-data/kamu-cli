@@ -91,7 +91,7 @@ impl OutboxExecutor {
         message_dispatchers: Vec<Arc<dyn MessageDispatcher>>,
     ) -> OutboxRoutesStaticInfo {
         let all_durable_messaging_routes =
-            enumerate_messaging_routes(catalog, MessageConsumptionDurability::Durable);
+            enumerate_messaging_routes(catalog, MessageDeliveryMechanism::Transactional);
         let consumers_by_producers = group_consumers_by_producers(&all_durable_messaging_routes);
         let message_dispatchers_by_producers =
             group_message_dispatchers_by_producer(&message_dispatchers);

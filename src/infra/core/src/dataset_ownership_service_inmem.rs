@@ -19,7 +19,7 @@ use messaging_outbox::{
     MessageConsumer,
     MessageConsumerMeta,
     MessageConsumerT,
-    MessageConsumptionDurability,
+    MessageDeliveryMechanism,
 };
 use opendatafabric::{AccountID, AccountName, DatasetID};
 
@@ -45,7 +45,7 @@ struct State {
 #[meta(MessageConsumerMeta {
     consumer_name: MESSAGE_CONSUMER_KAMU_CORE_DATASET_OWNERSHIP_SERVICE,
     feeding_producers: &[MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE],
-    durability: MessageConsumptionDurability::BestEffort,
+    delivery: MessageDeliveryMechanism::Immediate,
 })]
 #[scope(Singleton)]
 impl DatasetOwnershipServiceInMemory {

@@ -27,7 +27,7 @@ macro_rules! test_message_type {
 }
 
 macro_rules! test_message_consumer {
-    ($message_type_suffix: ident, $message_consumer_suffix: ident, $producer_name: ident, $durability: ident) => {
+    ($message_type_suffix: ident, $message_consumer_suffix: ident, $producer_name: ident, $delivery: ident) => {
         paste::paste! {
             struct [<"TestMessageConsumer" $message_consumer_suffix>] {
                 state: Arc<Mutex<[<"State" $message_consumer_suffix>]>>,
@@ -52,7 +52,7 @@ macro_rules! test_message_consumer {
             #[meta(MessageConsumerMeta {
                 consumer_name: concat!("TestMessageConsumer", stringify!($message_consumer_suffix)),
                 feeding_producers: &[$producer_name],
-                durability: MessageConsumptionDurability::$durability,
+                delivery: MessageDeliveryMechanism::$delivery,
             })]
             impl [<"TestMessageConsumer" $message_consumer_suffix>] {
                 fn new() -> Self {

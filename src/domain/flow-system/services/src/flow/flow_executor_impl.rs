@@ -25,7 +25,7 @@ use messaging_outbox::{
     MessageConsumer,
     MessageConsumerMeta,
     MessageConsumerT,
-    MessageConsumptionDurability,
+    MessageDeliveryMechanism,
     Outbox,
     OutboxExt,
 };
@@ -65,7 +65,7 @@ pub struct FlowExecutorImpl {
         MESSAGE_PRODUCER_KAMU_TASK_EXECUTOR,
         MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE
     ],
-    durability: MessageConsumptionDurability::Durable,
+    delivery: MessageDeliveryMechanism::Transactional,
 })]
 #[interface(dyn InitOnStartup)]
 #[meta(InitOnStartupMeta {
