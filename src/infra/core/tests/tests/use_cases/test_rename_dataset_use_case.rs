@@ -24,7 +24,7 @@ use kamu_core::{
     RenameDatasetUseCase,
     MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
 };
-use messaging_outbox::{MockOutbox, Outbox};
+use messaging_outbox::{MockOutbox, Outbox, OUTBOX_MESSAGE_VERSION};
 use mockall::predicate::{eq, function};
 use opendatafabric::{DatasetAlias, DatasetKind, DatasetName};
 use time_source::SystemTimeSourceDefault;
@@ -192,9 +192,10 @@ impl RenameUseCaseHarness {
                         Ok(DatasetLifecycleMessage::Renamed(_))
                     )
                 }),
+                eq(OUTBOX_MESSAGE_VERSION),
             )
             .times(times)
-            .returning(|_, _| Ok(()));
+            .returning(|_, _, _| Ok(()));
     }
 }
 

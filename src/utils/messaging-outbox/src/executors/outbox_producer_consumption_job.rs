@@ -229,6 +229,7 @@ impl ConsumeMessageTransaction {
                 &transaction_catalog,
                 ConsumerFilter::SelectedConsumer(&self.consumer_name),
                 &content_json,
+                self.message.version,
             )
             .await?;
 

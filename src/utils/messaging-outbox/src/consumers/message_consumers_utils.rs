@@ -29,10 +29,20 @@ pub async fn consume_deserialized_message<'a, TMessage: Message + 'static>(
     catalog: &Catalog,
     consumer_filter: ConsumerFilter<'a>,
     content_json: &str,
+    version: u32,
 ) -> Result<(), InternalError> {
     tracing::debug!(content_json = %content_json, "Consuming outbox message");
 
     let message = serde_json::from_str::<TMessage>(content_json).int_err()?;
+    if message.version() > version {
+        tracing::error!(
+            content_json = %content_json,
+            message_version = %message.version(),
+            expected_version = %version,
+            "Cannot consume outbox message due to version mismatch"
+        );
+        return Ok(());
+    }
 
     let consumers = match consumer_filter {
         ConsumerFilter::AllConsumers => all_consumers_for::<TMessage>(catalog),

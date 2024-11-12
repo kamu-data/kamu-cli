@@ -35,6 +35,7 @@ pub trait MessageDispatcher: Send + Sync {
         catalog: &Catalog,
         consumer_filter: ConsumerFilter<'a>,
         content_json: &str,
+        version: u32,
     ) -> Result<(), InternalError>;
 }
 
@@ -76,8 +77,10 @@ impl<TMessage: Message + 'static> MessageDispatcher for MessageDispatcherT<TMess
         catalog: &Catalog,
         consumer_filter: ConsumerFilter<'a>,
         content_json: &str,
+        version: u32,
     ) -> Result<(), InternalError> {
-        consume_deserialized_message::<TMessage>(catalog, consumer_filter, content_json).await
+        consume_deserialized_message::<TMessage>(catalog, consumer_filter, content_json, version)
+            .await
     }
 }
 

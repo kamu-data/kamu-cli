@@ -56,6 +56,7 @@ Recommendation: for ease of reading, use the following order:
    which contains information about the datasets participating in the query. Affected API:
   - `GQL DataQueries`: the field will be filled
   - `GQL DatasetData`: field will be empty because we already know which dataset is involved
+### Fixed
 - `kamu add` correctly handles snapshots with circular dependencies
 - `kamu push` shows a human-readable error when trying to push to the non-existing repository
 - Jupyter repository block documentation misleading

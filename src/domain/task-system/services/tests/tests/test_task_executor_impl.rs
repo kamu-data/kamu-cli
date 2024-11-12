@@ -15,7 +15,7 @@ use dill::{Catalog, CatalogBuilder};
 use kamu_task_system::*;
 use kamu_task_system_inmem::InMemoryTaskEventStore;
 use kamu_task_system_services::*;
-use messaging_outbox::{MockOutbox, Outbox};
+use messaging_outbox::{MockOutbox, Outbox, OUTBOX_MESSAGE_VERSION};
 use mockall::predicate::{eq, function};
 use time_source::SystemTimeSourceDefault;
 
@@ -196,9 +196,10 @@ impl TaskExecutorHarness {
                         })) if task_id == a_task_id
                     )
                 }),
+                eq(OUTBOX_MESSAGE_VERSION),
             )
             .times(1)
-            .returning(|_, _| Ok(()));
+            .returning(|_, _, _| Ok(()));
 
         mock_outbox
             .expect_post_message_as_json()
@@ -213,9 +214,10 @@ impl TaskExecutorHarness {
                         })) if task_id == a_task_id
                     )
                 }),
+                eq(OUTBOX_MESSAGE_VERSION),
             )
             .times(1)
-            .returning(|_, _| Ok(()));
+            .returning(|_, _, _| Ok(()));
     }
 
     fn add_run_probe_plan_expectations(

@@ -27,7 +27,7 @@ use kamu_core::{
     DatasetRepository,
     MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
 };
-use messaging_outbox::{MockOutbox, Outbox};
+use messaging_outbox::{MockOutbox, Outbox, OUTBOX_MESSAGE_VERSION};
 use mockall::predicate::{eq, function};
 use opendatafabric::serde::flatbuffers::FlatbuffersMetadataBlockSerializer;
 use opendatafabric::serde::MetadataBlockSerializer;
@@ -221,9 +221,10 @@ impl AppendDatasetMetadataBatchUseCaseHarness {
                         Ok(DatasetLifecycleMessage::DependenciesUpdated(_))
                     )
                 }),
+                eq(OUTBOX_MESSAGE_VERSION),
             )
             .times(times)
-            .returning(|_, _| Ok(()));
+            .returning(|_, _, _| Ok(()));
     }
 }
 

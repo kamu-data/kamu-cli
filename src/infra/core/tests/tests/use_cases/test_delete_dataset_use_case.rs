@@ -31,7 +31,14 @@ use kamu_core::{
     GetDatasetError,
     MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
 };
-use messaging_outbox::{consume_deserialized_message, ConsumerFilter, Message, MockOutbox, Outbox};
+use messaging_outbox::{
+    consume_deserialized_message,
+    ConsumerFilter,
+    Message,
+    MockOutbox,
+    Outbox,
+    OUTBOX_MESSAGE_VERSION,
+};
 use mockall::predicate::{eq, function};
 use opendatafabric::{DatasetAlias, DatasetKind, DatasetName, DatasetRef};
 use time_source::SystemTimeSourceDefault;
@@ -320,6 +327,7 @@ impl DeleteUseCaseHarness {
             &self.catalog,
             ConsumerFilter::AllConsumers,
             &content_json,
+            message.version(),
         )
         .await
         .unwrap();
@@ -336,9 +344,10 @@ impl DeleteUseCaseHarness {
                         Ok(DatasetLifecycleMessage::Deleted(_))
                     )
                 }),
+                eq(OUTBOX_MESSAGE_VERSION),
             )
             .times(times)
-            .returning(|_, _| Ok(()));
+            .returning(|_, _, _| Ok(()));
     }
 }
 

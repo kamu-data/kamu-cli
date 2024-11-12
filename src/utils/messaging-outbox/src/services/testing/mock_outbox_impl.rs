@@ -22,6 +22,7 @@ mockall::mock! {
             &self,
             producer_name: &str,
             content_json: &serde_json::Value,
+            version: u32,
         ) -> Result<(), InternalError>;
     }
 }

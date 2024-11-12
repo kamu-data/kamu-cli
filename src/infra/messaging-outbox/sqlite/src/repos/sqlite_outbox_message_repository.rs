@@ -39,6 +39,10 @@ impl OutboxMessageRepository for SqliteOutboxMessageRepository {
         let connection_mut = tr.connection_mut().await?;
 
         let message_content_json = message.content_json;
+        let message_version: i32 = message
+            .version
+            .try_into()
+            .expect("Version out of range for i32");
 
         sqlx::query!(
             r#"
@@ -48,7 +52,7 @@ impl OutboxMessageRepository for SqliteOutboxMessageRepository {
             message.producer_name,
             message_content_json,
             message.occurred_on,
-            message.version,
+            message_version,
         )
         .execute(connection_mut)
         .await
@@ -91,10 +95,13 @@ impl OutboxMessageRepository for SqliteOutboxMessageRepository {
                     message_id,
                     producer_name,
                     content_json,
-                    occurred_on
+                    occurred_on,
+                    version
                 FROM outbox_messages
                 WHERE {producer_filters}
-                and version = {OUTBOX_MESSAGE_VERSION}
+                and version = (
+                    SELECT MAX(version) FROM outbox_messages
+                )
                 ORDER BY message_id
                 LIMIT $1
                 "#,
@@ -110,12 +117,13 @@ impl OutboxMessageRepository for SqliteOutboxMessageRepository {
 
             use sqlx::Row;
             let mut query_stream = query.try_map(|event_row: SqliteRow| {
-                Ok(OutboxMessage::new(
-                    OutboxMessageID::new(event_row.get(0)),
-                    event_row.get(1),
-                    event_row.get(2),
-                    event_row.get(3),
-                ))
+                Ok(OutboxMessage{
+                    message_id: OutboxMessageID::new(event_row.get(0)),
+                    producer_name: event_row.get(1),
+                    content_json: event_row.get(2),
+                    occurred_on: event_row.get(3),
+                    version: event_row.get(4),
+                })
             })
             .fetch(connection_mut)
             .map_err(ErrorIntoInternal::int_err);
