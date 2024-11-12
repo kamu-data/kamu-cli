@@ -59,6 +59,105 @@ impl PullDatasetUseCaseImpl {
         }
     }
 
+    async fn pull_by_plan(
+        &self,
+        plan: Vec<PullPlanIteration>,
+        options: PullOptions,
+        listener: Option<Arc<dyn PullMultiListener>>,
+    ) -> Result<Vec<PullResponse>, InternalError> {
+        let mut results = Vec::new();
+
+        // Prepare multi-listeners
+        let maybe_ingest_multi_listener = listener
+            .as_ref()
+            .and_then(|l| l.clone().get_ingest_listener());
+
+        let maybe_transform_multi_listener = listener
+            .as_ref()
+            .and_then(|l| l.clone().get_transform_listener());
+
+        let maybe_sync_multi_listener = listener
+            .as_ref()
+            .and_then(|l| l.clone().get_sync_listener());
+
+        // Execute each iteration
+        for iteration in plan {
+            tracing::info!(depth = %iteration.depth, jobs = ?iteration.jobs, "Running pull iteration");
+
+            // Authorization checks for this iteration
+            let (iteration, write_errors) = self.make_authorization_write_checks(iteration).await?;
+            let (iteration, read_errors) = self.make_authorization_read_checks(iteration).await?;
+            if !write_errors.is_empty() || !read_errors.is_empty() {
+                results.extend(write_errors);
+                results.extend(read_errors);
+                break;
+            }
+
+            // Run iteration jobs concurrently
+            let mut tasks = tokio::task::JoinSet::new();
+            for job in iteration.jobs {
+                match job {
+                    PullPlanIterationJob::Ingest(pii) => {
+                        let maybe_listener = maybe_ingest_multi_listener
+                            .as_ref()
+                            .and_then(|l| l.begin_ingest(&pii.target.handle));
+                        tasks.spawn(Self::ingest(
+                            pii,
+                            options.ingest_options.clone(),
+                            self.polling_ingest_svc.clone(),
+                            maybe_listener,
+                        ))
+                    }
+                    PullPlanIterationJob::Transform(pti) => {
+                        let maybe_listener = maybe_transform_multi_listener
+                            .as_ref()
+                            .and_then(|l| l.begin_transform(&pti.target.handle));
+                        tasks.spawn(Self::transform(
+                            pti,
+                            options.transform_options,
+                            self.transform_elaboration_svc.clone(),
+                            self.transform_execution_svc.clone(),
+                            maybe_listener,
+                        ))
+                    }
+                    PullPlanIterationJob::Sync(psi) => {
+                        let maybe_listener = maybe_sync_multi_listener.as_ref().and_then(|l| {
+                            l.begin_sync(
+                                &psi.sync_request.src.src_ref,
+                                &psi.sync_request.dst.dst_ref,
+                            )
+                        });
+
+                        tasks.spawn(Self::sync(
+                            psi,
+                            options.clone(),
+                            self.sync_svc.clone(),
+                            self.remote_alias_registry.clone(),
+                            maybe_listener,
+                        ))
+                    }
+                };
+            }
+            let iteration_results = tasks.join_all().await;
+            tracing::debug!(iteration_result=?iteration_results, "Pull iteration finished");
+
+            // Deal with results
+            let mut has_errors = false;
+            for result in iteration_results {
+                let result = result?;
+                if result.result.is_err() {
+                    has_errors = true;
+                }
+                results.push(result);
+            }
+            if has_errors {
+                break;
+            }
+        }
+
+        Ok(results)
+    }
+
     async fn make_authorization_write_checks(
         &self,
         iteration: PullPlanIteration,
@@ -395,97 +494,31 @@ impl PullDatasetUseCase for PullDatasetUseCaseImpl {
             return Ok(errors);
         }
 
-        let mut results = Vec::new();
+        self.pull_by_plan(plan, options, listener).await
+    }
 
-        // Prepare multi-listeners
-        let maybe_ingest_multi_listener = listener
-            .as_ref()
-            .and_then(|l| l.clone().get_ingest_listener());
+    async fn execute_all_owned(
+        &self,
+        options: PullOptions,
+        listener: Option<Arc<dyn PullMultiListener>>,
+    ) -> Result<Vec<PullResponse>, InternalError> {
+        tracing::info!(?options, "Performing pull (all owned)");
 
-        let maybe_transform_multi_listener = listener
-            .as_ref()
-            .and_then(|l| l.clone().get_transform_listener());
+        let (plan, errors) = self
+            .pull_request_planner
+            .build_pull_plan_all_owner_datasets(&options, *self.tenancy_config)
+            .await?;
 
-        let maybe_sync_multi_listener = listener
-            .as_ref()
-            .and_then(|l| l.clone().get_sync_listener());
-
-        // Execute each iteration
-        for iteration in plan {
-            tracing::info!(depth = %iteration.depth, jobs = ?iteration.jobs, "Running pull iteration");
-
-            // Authorization checks for this iteration
-            let (iteration, write_errors) = self.make_authorization_write_checks(iteration).await?;
-            let (iteration, read_errors) = self.make_authorization_read_checks(iteration).await?;
-            if !write_errors.is_empty() || !read_errors.is_empty() {
-                results.extend(write_errors);
-                results.extend(read_errors);
-                break;
-            }
-
-            // Run iteration jobs concurrently
-            let mut tasks = tokio::task::JoinSet::new();
-            for job in iteration.jobs {
-                match job {
-                    PullPlanIterationJob::Ingest(pii) => {
-                        let maybe_listener = maybe_ingest_multi_listener
-                            .as_ref()
-                            .and_then(|l| l.begin_ingest(&pii.target.handle));
-                        tasks.spawn(Self::ingest(
-                            pii,
-                            options.ingest_options.clone(),
-                            self.polling_ingest_svc.clone(),
-                            maybe_listener,
-                        ))
-                    }
-                    PullPlanIterationJob::Transform(pti) => {
-                        let maybe_listener = maybe_transform_multi_listener
-                            .as_ref()
-                            .and_then(|l| l.begin_transform(&pti.target.handle));
-                        tasks.spawn(Self::transform(
-                            pti,
-                            options.transform_options,
-                            self.transform_elaboration_svc.clone(),
-                            self.transform_execution_svc.clone(),
-                            maybe_listener,
-                        ))
-                    }
-                    PullPlanIterationJob::Sync(psi) => {
-                        let maybe_listener = maybe_sync_multi_listener.as_ref().and_then(|l| {
-                            l.begin_sync(
-                                &psi.sync_request.src.src_ref,
-                                &psi.sync_request.dst.dst_ref,
-                            )
-                        });
-
-                        tasks.spawn(Self::sync(
-                            psi,
-                            options.clone(),
-                            self.sync_svc.clone(),
-                            self.remote_alias_registry.clone(),
-                            maybe_listener,
-                        ))
-                    }
-                };
-            }
-            let iteration_results = tasks.join_all().await;
-            tracing::debug!(iteration_result=?iteration_results, "Pull iteration finished");
-
-            // Deal with results
-            let mut has_errors = false;
-            for result in iteration_results {
-                let result = result?;
-                if result.result.is_err() {
-                    has_errors = true;
-                }
-                results.push(result);
-            }
-            if has_errors {
-                break;
-            }
+        tracing::info!(
+            num_steps = plan.len(),
+            num_errors = errors.len(),
+            "Prepared pull execution plan (all owned)"
+        );
+        if !errors.is_empty() {
+            return Ok(errors);
         }
 
-        Ok(results)
+        self.pull_by_plan(plan, options, listener).await
     }
 }
 

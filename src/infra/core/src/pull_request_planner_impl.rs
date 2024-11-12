@@ -233,6 +233,8 @@ impl PullRequestPlanner for PullRequestPlannerImpl {
         options: &PullOptions,
         tenancy_config: TenancyConfig,
     ) -> Result<PullPlanIterationJob, PullResponse> {
+        assert!(!options.recursive);
+
         let (mut plan, mut errors) = self
             .build_pull_multi_plan(&[request], options, tenancy_config)
             .await;
@@ -319,6 +321,24 @@ impl PullRequestPlanner for PullRequestPlannerImpl {
         }
 
         (iterations, errors)
+    }
+
+    async fn build_pull_plan_all_owner_datasets(
+        &self,
+        options: &PullOptions,
+        tenancy_config: TenancyConfig,
+    ) -> Result<(Vec<PullPlanIteration>, Vec<PullResponse>), InternalError> {
+        use futures::TryStreamExt;
+        let requests: Vec<_> = self
+            .dataset_registry
+            .all_dataset_handles_by_owner(self.current_account_subject.account_name())
+            .map_ok(|hdl| PullRequest::local(hdl.as_local_ref()))
+            .try_collect()
+            .await?;
+
+        Ok(self
+            .build_pull_multi_plan(&requests, options, tenancy_config)
+            .await)
     }
 }
 

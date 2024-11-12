@@ -140,52 +140,44 @@ impl PullCommand {
             vec![]
         };
 
-        let requests = dataset_any_refs
-            .into_iter()
-            .map(|r| {
-                PullRequest::from_any_ref(&r, |_| {
-                    self.tenancy_config == TenancyConfig::SingleTenant
-                })
-            })
-            .collect();
-
-        // TODO: consider moving this logic into pull planner
-        let requests: Vec<_> = if !self.all {
-            requests
-        } else {
-            use futures::TryStreamExt;
-            self.dataset_registry
-                .all_dataset_handles_by_owner(current_account_name)
-                .map_ok(|hdl| PullRequest::local(hdl.as_local_ref()))
-                .try_collect()
-                .await?
+        let options = PullOptions {
+            recursive: self.recursive,
+            add_aliases: self.add_aliases,
+            ingest_options: PollingIngestOptions {
+                fetch_uncacheable: self.fetch_uncacheable,
+                exhaust_sources: true,
+                dataset_env_vars: HashMap::new(),
+                schema_inference: SchemaInferenceOpts::default(),
+            },
+            transform_options: TransformOptions {
+                reset_derivatives_on_diverged_input: self.reset_derivatives_on_diverged_input,
+            },
+            sync_options: SyncOptions {
+                force: self.force,
+                ..SyncOptions::default()
+            },
         };
 
-        self.pull_dataset_use_case
-            .execute_multi(
-                requests,
-                PullOptions {
-                    recursive: self.recursive,
-                    add_aliases: self.add_aliases,
-                    ingest_options: PollingIngestOptions {
-                        fetch_uncacheable: self.fetch_uncacheable,
-                        exhaust_sources: true,
-                        dataset_env_vars: HashMap::new(),
-                        schema_inference: SchemaInferenceOpts::default(),
-                    },
-                    transform_options: TransformOptions {
-                        reset_derivatives_on_diverged_input: self
-                            .reset_derivatives_on_diverged_input,
-                    },
-                    sync_options: SyncOptions {
-                        force: self.force,
-                        ..SyncOptions::default()
-                    },
-                },
-                listener,
-            )
-            .await
-            .map_err(CLIError::failure)
+        if self.all {
+            self.pull_dataset_use_case
+                .execute_all_owned(options, listener)
+                .await
+                .map_err(CLIError::failure)
+        } else {
+            let requests = dataset_any_refs
+                .into_iter()
+                .map(|r| {
+                    PullRequest::from_any_ref(&r, |_| {
+                        self.tenancy_config == TenancyConfig::SingleTenant
+                    })
+                })
+                .collect();
+
+            self.pull_dataset_use_case
+                .execute_multi(requests, options, listener)
+                .await
+                .map_err(CLIError::failure)
+        }
     }
 
     async fn pull_with_progress(&self) -> Result<Vec<PullResponse>, CLIError> {

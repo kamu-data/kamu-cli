@@ -18,7 +18,7 @@ use database_common_macros::transactional_handler;
 use dill::{Catalog, CatalogBuilder};
 use http_common::ApiError;
 use internal_error::*;
-use kamu::domain::{Protocols, ServerUrlConfig};
+use kamu::domain::{Protocols, ServerUrlConfig, TenancyConfig};
 use kamu_accounts::{
     AccountConfig,
     AuthenticationService,
@@ -115,10 +115,10 @@ impl WebUIServer {
             login_credentials_json: serde_json::to_string(&login_credentials).unwrap(),
         };
 
-        let web_ui_url = format!("http://{}", local_addr);
+        let web_ui_url = format!("http://{local_addr}");
 
         let web_ui_config = WebUIConfig {
-            api_server_gql_url: format!("http://{}/graphql", local_addr),
+            api_server_gql_url: format!("http://{local_addr}/graphql"),
             api_server_http_url: web_ui_url.clone(),
             login_instructions: Some(login_instructions.clone()),
             ingest_upload_file_limit_mb: file_upload_limit_config.max_file_size_in_mb(),

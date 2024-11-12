@@ -30,6 +30,12 @@ pub trait PullDatasetUseCase: Send + Sync {
         options: PullOptions,
         listener: Option<Arc<dyn PullMultiListener>>,
     ) -> Result<Vec<PullResponse>, InternalError>;
+
+    async fn execute_all_owned(
+        &self,
+        options: PullOptions,
+        listener: Option<Arc<dyn PullMultiListener>>,
+    ) -> Result<Vec<PullResponse>, InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -41,6 +41,12 @@ pub trait PullRequestPlanner: Send + Sync {
         options: &PullOptions,
         tenancy_config: TenancyConfig,
     ) -> (Vec<PullPlanIteration>, Vec<PullResponse>);
+
+    async fn build_pull_plan_all_owner_datasets(
+        &self,
+        options: &PullOptions,
+        tenancy_config: TenancyConfig,
+    ) -> Result<(Vec<PullPlanIteration>, Vec<PullResponse>), InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
