@@ -23,13 +23,12 @@ use kamu::domain::{
     CompactionService,
     CreateDatasetFromSnapshotUseCase,
     CreateDatasetUseCase,
-    DatasetRepository,
 };
 use kamu::testing::MockDatasetActionAuthorizer;
 use kamu::DatasetLayout;
 use kamu_accounts::testing::MockAuthenticationService;
 use kamu_accounts::{Account, AccountType, CurrentAccountSubject, PROVIDER_PASSWORD};
-use kamu_core::TenancyConfig;
+use kamu_core::{DatasetRegistry, TenancyConfig};
 use opendatafabric::{AccountID, AccountName, DatasetAlias, DatasetHandle};
 use reqwest::Url;
 use time_source::SystemTimeSourceStub;
@@ -43,7 +42,8 @@ pub(crate) const SERVER_ACCOUNT_NAME: &str = "kamu-server";
 #[async_trait::async_trait]
 pub(crate) trait ServerSideHarness {
     fn operating_account_name(&self) -> Option<AccountName>;
-    fn cli_dataset_repository(&self) -> Arc<dyn DatasetRepository>;
+
+    fn cli_dataset_registry(&self) -> Arc<dyn DatasetRegistry>;
 
     fn cli_create_dataset_use_case(&self) -> Arc<dyn CreateDatasetUseCase>;
 

@@ -24,6 +24,7 @@ use kamu_core::{
     CreateDatasetResult,
     DatasetChangesService,
     DatasetIntervalIncrement,
+    DatasetRegistry,
     DatasetRepository,
     TenancyConfig,
 };
@@ -111,7 +112,7 @@ async fn test_add_data_differences() {
     let foo_result = harness.create_root_dataset("foo").await;
 
     let dataset = harness
-        .dataset_repo
+        .dataset_registry
         .get_dataset_by_handle(&foo_result.dataset_handle);
 
     // Commit SetDataSchema and 2 data nodes
@@ -298,7 +299,7 @@ async fn test_execute_transform_differences() {
     let bar_result = harness.create_derived_dataset("bar", vec!["foo"]).await;
 
     let bar_dataset = harness
-        .dataset_repo
+        .dataset_registry
         .get_dataset_by_handle(&bar_result.dataset_handle);
 
     // Commit SetDataSchema and 2 trasnform data nodes
@@ -484,7 +485,7 @@ async fn test_multiple_watermarks_within_interval() {
     let foo_result = harness.create_root_dataset("foo").await;
 
     let dataset = harness
-        .dataset_repo
+        .dataset_registry
         .get_dataset_by_handle(&foo_result.dataset_handle);
 
     // Commit SetDataSchema and 2 data nodes each having a watermark
@@ -625,7 +626,7 @@ async fn test_older_watermark_before_interval() {
     let foo_result = harness.create_root_dataset("foo").await;
 
     let dataset = harness
-        .dataset_repo
+        .dataset_registry
         .get_dataset_by_handle(&foo_result.dataset_handle);
 
     // Commit SetDataSchema and 3 data nodes, with #1,3 containing watermark
@@ -795,7 +796,7 @@ async fn test_older_watermark_before_interval() {
 struct DatasetChangesHarness {
     _workdir: TempDir,
     _catalog: dill::Catalog,
-    dataset_repo: Arc<dyn DatasetRepository>,
+    dataset_registry: Arc<dyn DatasetRegistry>,
     dataset_repo_writer: Arc<dyn DatasetRepositoryWriter>,
     dataset_changes_service: Arc<dyn DatasetChangesService>,
 }
@@ -817,7 +818,7 @@ impl DatasetChangesHarness {
             .add::<DatasetChangesServiceImpl>()
             .build();
 
-        let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
+        let dataset_registry = catalog.get_one::<dyn DatasetRegistry>().unwrap();
         let dataset_repo_writer = catalog.get_one::<dyn DatasetRepositoryWriter>().unwrap();
 
         let dataset_changes_service = catalog.get_one::<dyn DatasetChangesService>().unwrap();
@@ -825,7 +826,7 @@ impl DatasetChangesHarness {
         Self {
             _workdir: workdir,
             _catalog: catalog,
-            dataset_repo,
+            dataset_registry,
             dataset_repo_writer,
             dataset_changes_service,
         }

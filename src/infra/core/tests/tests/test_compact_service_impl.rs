@@ -981,7 +981,7 @@ async fn test_dataset_keep_metadata_only_compact() {
 
 struct CompactTestHarness {
     _temp_dir: tempfile::TempDir,
-    dataset_repo: Arc<dyn DatasetRepository>,
+    dataset_registry: Arc<dyn DatasetRegistry>,
     dataset_repo_writer: Arc<dyn DatasetRepositoryWriter>,
     compaction_svc: Arc<CompactionServiceImpl>,
     push_ingest_svc: Arc<PushIngestServiceImpl>,
@@ -1030,7 +1030,7 @@ impl CompactTestHarness {
             .add::<VerificationServiceImpl>()
             .build();
 
-        let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
+        let dataset_registry = catalog.get_one::<dyn DatasetRegistry>().unwrap();
         let dataset_repo_writer = catalog.get_one::<dyn DatasetRepositoryWriter>().unwrap();
         let compaction_svc = catalog.get_one::<CompactionServiceImpl>().unwrap();
         let push_ingest_svc = catalog.get_one::<PushIngestServiceImpl>().unwrap();
@@ -1040,7 +1040,7 @@ impl CompactTestHarness {
 
         Self {
             _temp_dir: temp_dir,
-            dataset_repo,
+            dataset_registry,
             dataset_repo_writer,
             compaction_svc,
             push_ingest_svc,
@@ -1089,7 +1089,7 @@ impl CompactTestHarness {
 
         Self {
             _temp_dir: temp_dir,
-            dataset_repo: catalog.get_one().unwrap(),
+            dataset_registry: catalog.get_one().unwrap(),
             dataset_repo_writer: catalog.get_one().unwrap(),
             compaction_svc: catalog.get_one().unwrap(),
             push_ingest_svc: catalog.get_one().unwrap(),
@@ -1102,7 +1102,7 @@ impl CompactTestHarness {
 
     async fn get_dataset_head(&self, dataset_ref: &DatasetRef) -> Multihash {
         let dataset = self
-            .dataset_repo
+            .dataset_registry
             .get_dataset_by_ref(dataset_ref)
             .await
             .unwrap();
@@ -1116,7 +1116,7 @@ impl CompactTestHarness {
 
     async fn get_dataset_blocks(&self, dataset_ref: &DatasetRef) -> Vec<MetadataBlock> {
         let dataset = self
-            .dataset_repo
+            .dataset_registry
             .get_dataset_by_ref(dataset_ref)
             .await
             .unwrap();
@@ -1200,7 +1200,7 @@ impl CompactTestHarness {
 
     async fn dataset_data_helper(&self, dataset_ref: &DatasetRef) -> DatasetDataHelper {
         let dataset = self
-            .dataset_repo
+            .dataset_registry
             .get_dataset_by_ref(dataset_ref)
             .await
             .unwrap();
@@ -1245,7 +1245,7 @@ impl CompactTestHarness {
 
     async fn commit_set_licence_block(&self, dataset_ref: &DatasetRef, head: &Multihash) {
         let dataset = self
-            .dataset_repo
+            .dataset_registry
             .get_dataset_by_ref(dataset_ref)
             .await
             .unwrap();

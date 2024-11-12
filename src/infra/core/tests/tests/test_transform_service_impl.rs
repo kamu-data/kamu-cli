@@ -29,7 +29,7 @@ use crate::mock_engine_provisioner;
 
 struct TransformTestHarness {
     _tempdir: TempDir,
-    dataset_repo: Arc<dyn DatasetRepository>,
+    dataset_registry: Arc<dyn DatasetRegistry>,
     dataset_repo_writer: Arc<dyn DatasetRepositoryWriter>,
     transform_request_planner: Arc<dyn TransformRequestPlanner>,
     transform_elab_svc: Arc<dyn TransformElaborationService>,
@@ -73,7 +73,7 @@ impl TransformTestHarness {
 
         Self {
             _tempdir: tempdir,
-            dataset_repo: catalog.get_one().unwrap(),
+            dataset_registry: catalog.get_one().unwrap(),
             dataset_repo_writer: catalog.get_one().unwrap(),
             compaction_service: catalog.get_one().unwrap(),
             push_ingest_svc: catalog.get_one().unwrap(),
@@ -133,7 +133,7 @@ impl TransformTestHarness {
         block: MetadataBlock,
     ) -> Multihash {
         let ds = self
-            .dataset_repo
+            .dataset_registry
             .get_dataset_by_ref(&dataset_ref.into())
             .await
             .unwrap();
@@ -150,7 +150,7 @@ impl TransformTestHarness {
         records: u64,
     ) -> (Multihash, MetadataBlockTyped<AddData>) {
         let ds = self
-            .dataset_repo
+            .dataset_registry
             .get_dataset_by_ref(&alias.as_local_ref())
             .await
             .unwrap();
@@ -700,7 +700,7 @@ async fn test_transform_with_compaction_retry() {
     assert_matches!(transform_result, Ok(TransformResult::Updated { .. }));
 
     let foo_dataset = harness
-        .dataset_repo
+        .dataset_registry
         .get_dataset_by_handle(&foo_created_result.dataset_handle);
 
     harness

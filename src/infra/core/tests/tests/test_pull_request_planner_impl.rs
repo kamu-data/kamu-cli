@@ -92,30 +92,31 @@ macro_rules! refs {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 async fn create_graph(
-    repo: &DatasetRepositoryLocalFs,
+    dataset_repo_writer: &dyn DatasetRepositoryWriter,
     datasets: Vec<(DatasetAlias, Vec<DatasetAlias>)>,
 ) {
     for (dataset_alias, deps) in datasets {
-        repo.create_dataset_from_snapshot(
-            MetadataFactory::dataset_snapshot()
-                .name(dataset_alias)
-                .kind(if deps.is_empty() {
-                    DatasetKind::Root
-                } else {
-                    DatasetKind::Derivative
-                })
-                .push_event::<MetadataEvent>(if deps.is_empty() {
-                    MetadataFactory::set_polling_source().build().into()
-                } else {
-                    MetadataFactory::set_transform()
-                        .inputs_from_refs(deps)
-                        .build()
-                        .into()
-                })
-                .build(),
-        )
-        .await
-        .unwrap();
+        dataset_repo_writer
+            .create_dataset_from_snapshot(
+                MetadataFactory::dataset_snapshot()
+                    .name(dataset_alias)
+                    .kind(if deps.is_empty() {
+                        DatasetKind::Root
+                    } else {
+                        DatasetKind::Derivative
+                    })
+                    .push_event::<MetadataEvent>(if deps.is_empty() {
+                        MetadataFactory::set_polling_source().build().into()
+                    } else {
+                        MetadataFactory::set_transform()
+                            .inputs_from_refs(deps)
+                            .build()
+                            .into()
+                    })
+                    .build(),
+            )
+            .await
+            .unwrap();
     }
 }
 
@@ -126,7 +127,7 @@ async fn create_graph(
 // remote dataset
 async fn create_graph_remote(
     remote_repo_name: &str,
-    dataset_repo: Arc<dyn DatasetRepository>,
+    dataset_registry: Arc<dyn DatasetRegistry>,
     dataset_repo_writer: Arc<dyn DatasetRepositoryWriter>,
     reg: Arc<RemoteRepositoryRegistryImpl>,
     datasets: Vec<(DatasetAlias, Vec<DatasetAlias>)>,
@@ -164,7 +165,7 @@ async fn create_graph_remote(
     );
 
     let sync_request_builder = SyncRequestBuilder::new(
-        Arc::new(DatasetRegistryRepoBridge::new(dataset_repo)),
+        dataset_registry,
         dataset_factory,
         dataset_repo_writer,
         reg.clone(),
@@ -202,7 +203,7 @@ async fn test_pull_batching_chain() {
 
     // A - B - C
     create_graph(
-        harness.dataset_repo.as_ref(),
+        harness.dataset_repo_writer.as_ref(),
         vec![
             (n!("a"), names![]),
             (n!("b"), names!["a"]),
@@ -258,7 +259,7 @@ async fn test_pull_batching_chain_multi_tenant() {
 
     // XA - YB - ZC
     create_graph(
-        harness.dataset_repo.as_ref(),
+        harness.dataset_repo_writer.as_ref(),
         vec![
             (mn!("x/a"), mnames![]),
             (mn!("y/b"), mnames!["x/a"]),
@@ -318,7 +319,7 @@ async fn test_pull_batching_complex() {
     //         /
     // B - - -/
     create_graph(
-        harness.dataset_repo.as_ref(),
+        harness.dataset_repo_writer.as_ref(),
         vec![
             (n!("a"), names![]),
             (n!("b"), names![]),
@@ -381,8 +382,8 @@ async fn test_pull_batching_complex_with_remote() {
     // D -----------/
     let _remote_tmp_dir = create_graph_remote(
         "kamu.dev",
-        harness.dataset_repo.clone(),
-        harness.dataset_repo.clone(),
+        harness.dataset_registry.clone(),
+        harness.dataset_repo_writer.clone(),
         harness.remote_repo_reg.clone(),
         vec![
             (n!("a"), names![]),
@@ -393,7 +394,7 @@ async fn test_pull_batching_complex_with_remote() {
     )
     .await;
     create_graph(
-        harness.dataset_repo.as_ref(),
+        harness.dataset_repo_writer.as_ref(),
         vec![
             (n!("c"), names![]),
             (n!("d"), names![]),
@@ -529,8 +530,8 @@ async fn test_sync_from() {
 
     let _remote_tmp_dir = create_graph_remote(
         "kamu.dev",
-        harness.dataset_repo.clone(),
-        harness.dataset_repo.clone(),
+        harness.dataset_registry.clone(),
+        harness.dataset_repo_writer.clone(),
         harness.remote_repo_reg.clone(),
         vec![(n!("foo"), names![])],
         names!(),
@@ -566,8 +567,8 @@ async fn test_sync_from_url_and_local_ref() {
 
     let _remote_tmp_dir = create_graph_remote(
         "kamu.dev",
-        harness.dataset_repo.clone(),
-        harness.dataset_repo.clone(),
+        harness.dataset_registry.clone(),
+        harness.dataset_repo_writer.clone(),
         harness.remote_repo_reg.clone(),
         vec![(n!("bar"), names![])],
         names!(),
@@ -603,8 +604,8 @@ async fn test_sync_from_url_and_local_multi_tenant_ref() {
 
     let _remote_tmp_dir = create_graph_remote(
         "kamu.dev",
-        harness.dataset_repo.clone(),
-        harness.dataset_repo.clone(),
+        harness.dataset_registry.clone(),
+        harness.dataset_repo_writer.clone(),
         harness.remote_repo_reg.clone(),
         vec![(n!("bar"), names![])],
         names!(),
@@ -640,8 +641,8 @@ async fn test_sync_from_url_only() {
 
     let _remote_tmp_dir = create_graph_remote(
         "kamu.dev",
-        harness.dataset_repo.clone(),
-        harness.dataset_repo.clone(),
+        harness.dataset_registry.clone(),
+        harness.dataset_repo_writer.clone(),
         harness.remote_repo_reg.clone(),
         vec![(n!("bar"), names![])],
         names!(),
@@ -677,8 +678,8 @@ async fn test_sync_from_url_only_multi_tenant_case() {
 
     let _remote_tmp_dir = create_graph_remote(
         "kamu.dev",
-        harness.dataset_repo.clone(),
-        harness.dataset_repo.clone(),
+        harness.dataset_registry.clone(),
+        harness.dataset_repo_writer.clone(),
         harness.remote_repo_reg.clone(),
         vec![(n!("bar"), names![])],
         names!(),
@@ -709,7 +710,8 @@ async fn test_sync_from_url_only_multi_tenant_case() {
 
 struct PullTestHarness {
     calls: Arc<Mutex<Vec<Vec<PullJob>>>>,
-    dataset_repo: Arc<DatasetRepositoryLocalFs>,
+    dataset_registry: Arc<dyn DatasetRegistry>,
+    dataset_repo_writer: Arc<dyn DatasetRepositoryWriter>,
     remote_repo_reg: Arc<RemoteRepositoryRegistryImpl>,
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
     pull_request_planner: Arc<dyn PullRequestPlanner>,
@@ -749,7 +751,8 @@ impl PullTestHarness {
 
         Self {
             calls,
-            dataset_repo: catalog.get_one().unwrap(),
+            dataset_registry: catalog.get_one().unwrap(),
+            dataset_repo_writer: catalog.get_one().unwrap(),
             remote_repo_reg: catalog.get_one().unwrap(),
             remote_alias_reg: catalog.get_one().unwrap(),
             pull_request_planner: catalog.get_one().unwrap(),
@@ -821,7 +824,7 @@ impl PullTestHarness {
 
     async fn get_remote_aliases(&self, dataset_ref: &DatasetRef) -> Box<dyn RemoteAliases> {
         let dataset = self
-            .dataset_repo
+            .dataset_registry
             .get_dataset_by_ref(dataset_ref)
             .await
             .unwrap();

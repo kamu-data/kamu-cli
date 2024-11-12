@@ -491,7 +491,7 @@ async fn create_test_case(server_harness: &dyn ServerSideHarness) -> TestCase {
         .unwrap();
 
     let commit_result = commit_add_data_event(
-        server_harness.cli_dataset_repository().as_ref(),
+        server_harness.cli_dataset_registry().as_ref(),
         &make_dataset_ref(&None, "foo"),
         &server_harness.dataset_layout(&create_result.dataset_handle),
         None,

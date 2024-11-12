@@ -154,12 +154,15 @@ async fn create_random_parquet_file(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) async fn commit_add_data_event(
-    dataset_repo: &dyn DatasetRepository,
+    dataset_registry: &dyn DatasetRegistry,
     dataset_ref: &DatasetRef,
     dataset_layout: &DatasetLayout,
     prev_data_block_hash: Option<Multihash>,
 ) -> CommitResult {
-    let dataset = dataset_repo.get_dataset_by_ref(dataset_ref).await.unwrap();
+    let dataset = dataset_registry
+        .get_dataset_by_ref(dataset_ref)
+        .await
+        .unwrap();
 
     let (prev_offset, prev_checkpoint) = if let Some(prev_data_block_hash) = prev_data_block_hash {
         let prev_data_block = dataset

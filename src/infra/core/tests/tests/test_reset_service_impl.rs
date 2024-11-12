@@ -156,7 +156,7 @@ impl ChainWith2BlocksTestCase {
 
 struct ResetTestHarness {
     _temp_dir: TempDir,
-    dataset_repo: Arc<dyn DatasetRepository>,
+    dataset_registry: Arc<dyn DatasetRegistry>,
     dataset_repo_writer: Arc<dyn DatasetRepositoryWriter>,
     reset_svc: Arc<dyn ResetService>,
 }
@@ -174,16 +174,17 @@ impl ResetTestHarness {
             .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
             .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
+            .add::<DatasetRegistryRepoBridge>()
             .add::<ResetServiceImpl>()
             .build();
 
-        let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
+        let dataset_registry = catalog.get_one::<dyn DatasetRegistry>().unwrap();
         let dataset_repo_writer = catalog.get_one::<dyn DatasetRepositoryWriter>().unwrap();
         let reset_svc = catalog.get_one::<dyn ResetService>().unwrap();
 
         Self {
             _temp_dir: tempdir,
-            dataset_repo,
+            dataset_registry,
             dataset_repo_writer,
             reset_svc,
         }
@@ -250,7 +251,7 @@ impl ResetTestHarness {
     }
 
     fn resolve_dataset(&self, dataset_handle: &DatasetHandle) -> Arc<dyn Dataset> {
-        self.dataset_repo.get_dataset_by_handle(dataset_handle)
+        self.dataset_registry.get_dataset_by_handle(dataset_handle)
     }
 }
 

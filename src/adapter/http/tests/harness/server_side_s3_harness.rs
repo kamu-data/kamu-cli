@@ -43,7 +43,7 @@ use kamu::{
 };
 use kamu_accounts::testing::MockAuthenticationService;
 use kamu_accounts::{Account, AuthenticationService};
-use kamu_core::TenancyConfig;
+use kamu_core::{DatasetRegistry, TenancyConfig};
 use messaging_outbox::DummyOutboxImpl;
 use opendatafabric::{AccountName, DatasetAlias, DatasetHandle};
 use time_source::{SystemTimeSource, SystemTimeSourceStub};
@@ -152,9 +152,9 @@ impl ServerSideHarness for ServerSideS3Harness {
         }
     }
 
-    fn cli_dataset_repository(&self) -> Arc<dyn DatasetRepository> {
+    fn cli_dataset_registry(&self) -> Arc<dyn DatasetRegistry> {
         let cli_catalog = create_cli_user_catalog(&self.base_catalog);
-        cli_catalog.get_one::<dyn DatasetRepository>().unwrap()
+        cli_catalog.get_one::<dyn DatasetRegistry>().unwrap()
     }
 
     fn cli_create_dataset_use_case(&self) -> Arc<dyn CreateDatasetUseCase> {

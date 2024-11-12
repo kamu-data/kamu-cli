@@ -46,7 +46,7 @@ async fn test_verify_data_consistency() {
         .build();
 
     let verification_svc = catalog.get_one::<dyn VerificationService>().unwrap();
-    let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
+    let dataset_registry = catalog.get_one::<dyn DatasetRegistry>().unwrap();
     let dataset_repo_writer = catalog.get_one::<dyn DatasetRepositoryWriter>().unwrap();
 
     dataset_repo_writer
@@ -78,7 +78,7 @@ async fn test_verify_data_consistency() {
         .unwrap()
         .create_dataset_result;
 
-    let dataset = dataset_repo.get_dataset_by_handle(&create_result.dataset_handle);
+    let dataset = dataset_registry.get_dataset_by_handle(&create_result.dataset_handle);
 
     assert_matches!(
         verification_svc

@@ -181,8 +181,8 @@ impl ClientSideHarness {
         }
     }
 
-    pub fn dataset_repository(&self) -> Arc<dyn DatasetRepository> {
-        self.catalog.get_one::<dyn DatasetRepository>().unwrap()
+    pub fn dataset_registry(&self) -> Arc<dyn DatasetRegistry> {
+        self.catalog.get_one::<dyn DatasetRegistry>().unwrap()
     }
 
     pub fn create_dataset_from_snapshot(&self) -> Arc<dyn CreateDatasetFromSnapshotUseCase> {
@@ -256,7 +256,7 @@ impl ClientSideHarness {
         dataset_visibility: DatasetVisibility,
     ) -> Vec<PushResponse> {
         let dataset_handle = self
-            .dataset_repository()
+            .dataset_registry()
             .resolve_dataset_handle_by_ref(&dataset_local_ref)
             .await
             .unwrap();
