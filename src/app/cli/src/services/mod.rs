@@ -15,4 +15,8 @@ pub use workspace::*;
 
 pub mod accounts;
 pub mod config;
+
+mod confirm_delete_service;
+pub use confirm_delete_service::*;
+
 pub mod odf_server;

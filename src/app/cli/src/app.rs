@@ -53,6 +53,7 @@ use crate::{
     odf_server,
     spawn_password_refreshing_job,
     try_build_db_connection_settings,
+    ConfirmDeleteService,
     GcService,
     WorkspaceLayout,
     WorkspaceService,
@@ -159,6 +160,7 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
         let output_config = configure_output_format(&args, &workspace_svc);
         base_catalog_builder.add_value(output_config.clone());
         base_catalog_builder.add_value(Interact::new(args.yes, output_config.is_tty));
+        base_catalog_builder.add::<ConfirmDeleteService>(); // Should be added after Interact
 
         let guards = configure_logging(&output_config, &workspace_layout, args.no_color);
 
@@ -445,6 +447,8 @@ pub fn configure_base_catalog(
     b.add::<PushRequestPlannerImpl>();
 
     b.add::<WatermarkServiceImpl>();
+
+    b.add::<RemoteStatusServiceImpl>();
 
     b.add::<ResetServiceImpl>();
 

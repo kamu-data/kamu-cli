@@ -8,5 +8,7 @@
 // by the Apache License, Version 2.0.
 
 mod mock_dataset_repository;
+mod mock_remote_aliases_registry;
 
 pub use mock_dataset_repository::*;
+pub use mock_remote_aliases_registry::*;

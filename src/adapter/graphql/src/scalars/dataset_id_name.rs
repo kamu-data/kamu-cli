@@ -277,3 +277,38 @@ impl ScalarType for DatasetAlias {
         Value::String(self.0.to_string())
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// DatasetRefRemote
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct DatasetRefRemote(odf::DatasetRefRemote);
+
+impl From<odf::DatasetRefRemote> for DatasetRefRemote {
+    fn from(value: odf::DatasetRefRemote) -> Self {
+        DatasetRefRemote(value)
+    }
+}
+
+impl std::fmt::Display for DatasetRefRemote {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+#[Scalar]
+impl ScalarType for DatasetRefRemote {
+    fn parse(value: Value) -> InputValueResult<Self> {
+        if let Value::String(value) = &value {
+            let val = odf::DatasetRefRemote::try_from(value.as_str())?;
+            Ok(val.into())
+        } else {
+            Err(InputValueError::expected_type(value))
+        }
+    }
+
+    fn to_value(&self) -> Value {
+        Value::String(self.0.to_string())
+    }
+}
