@@ -77,6 +77,7 @@ pub async fn dataset_tail_handler(
 // TODO: Sanity limits
 #[derive(Debug, serde::Deserialize, utoipa::IntoParams)]
 #[serde(rename_all = "camelCase")]
+#[into_params(parameter_in = Query)]
 pub struct DatasetTailParams {
     /// Number of leading records to skip when returning result (used for
     /// pagination)

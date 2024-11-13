@@ -3,3 +3,5 @@ rules:
   # We use camelCase
   ibm-property-casing-convention: off
   ibm-enum-casing-convention: off
+  ibm-parameter-casing-convention: off
+  

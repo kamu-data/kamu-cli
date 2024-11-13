@@ -22,6 +22,7 @@ use crate::{MakeUploadContextError, SaveUploadError, UploadService};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::IntoParams)]
+#[into_params(parameter_in = Query)]
 #[serde(rename_all = "camelCase")]
 pub struct PlatformFileUploadQuery {
     pub file_name: String,
@@ -70,8 +71,10 @@ pub async fn platform_file_upload_prepare_post_handler(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(serde::Deserialize)]
+#[derive(serde::Deserialize, utoipa::IntoParams)]
+#[into_params(parameter_in = Path)]
 pub struct UploadFromPath {
+    #[param(value_type = String)]
     upload_token: UploadTokenBase64Json,
 }
 
@@ -79,6 +82,7 @@ pub struct UploadFromPath {
 #[utoipa::path(
     post,
     path = "/platform/file/upload/{upload_token}",
+    params(UploadFromPath),
     request_body = Vec<u8>,
     responses((status = OK, body = UploadContext)),
     tag = "kamu",
@@ -125,6 +129,7 @@ pub async fn platform_file_upload_post_handler(
 #[utoipa::path(
     get,
     path = "/platform/file/upload/{upload_token}",
+    params(UploadFromPath),
     responses((status = OK, body = Vec<u8>)),
     tag = "kamu",
     security(

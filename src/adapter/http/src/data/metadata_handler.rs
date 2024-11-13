@@ -52,6 +52,7 @@ pub enum Include {
 #[derive(Debug, serde::Deserialize, utoipa::IntoParams)]
 #[serde_with::serde_as]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[into_params(parameter_in = Query)]
 pub struct DatasetMetadataParams {
     /// What information to include in response
     #[param(value_type = Option<String>)]

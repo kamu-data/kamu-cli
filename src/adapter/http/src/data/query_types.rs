@@ -207,6 +207,7 @@ pub enum Include {
 
 #[derive(Debug, serde::Deserialize, utoipa::IntoParams)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[into_params(parameter_in = Query)]
 pub struct QueryParams {
     /// Query to execute (e.g. SQL)
     pub query: String,

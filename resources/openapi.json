@@ -1077,7 +1077,7 @@
         "operationId": "platform_file_upload_prepare_post_handler",
         "parameters": [
           {
-            "in": "path",
+            "in": "query",
             "name": "fileName",
             "required": true,
             "schema": {
@@ -1085,7 +1085,7 @@
             }
           },
           {
-            "in": "path",
+            "in": "query",
             "name": "contentLength",
             "required": true,
             "schema": {
@@ -1094,9 +1094,9 @@
             }
           },
           {
-            "in": "path",
+            "in": "query",
             "name": "contentType",
-            "required": true,
+            "required": false,
             "schema": {
               "type": [
                 "string",
@@ -1131,6 +1131,16 @@
     "/platform/file/upload/{upload_token}": {
       "get": {
         "operationId": "platform_file_upload_get_handler",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "upload_token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -1161,6 +1171,16 @@
       },
       "post": {
         "operationId": "platform_file_upload_post_handler",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "upload_token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/octet-stream": {
@@ -1295,7 +1315,7 @@
         "parameters": [
           {
             "description": "Query to execute (e.g. SQL)",
-            "in": "path",
+            "in": "query",
             "name": "query",
             "required": true,
             "schema": {
@@ -1304,18 +1324,18 @@
           },
           {
             "description": "Dialect of the query",
-            "in": "path",
+            "in": "query",
             "name": "queryDialect",
-            "required": true,
+            "required": false,
             "schema": {
               "type": "string"
             }
           },
           {
             "description": "Number of leading records to skip when returning result (used for\npagination)",
-            "in": "path",
+            "in": "query",
             "name": "skip",
-            "required": true,
+            "required": false,
             "schema": {
               "format": "int64",
               "minimum": 0,
@@ -1324,9 +1344,9 @@
           },
           {
             "description": "Maximum number of records to return (used for pagination)",
-            "in": "path",
+            "in": "query",
             "name": "limit",
-            "required": true,
+            "required": false,
             "schema": {
               "format": "int64",
               "minimum": 0,
@@ -1335,18 +1355,18 @@
           },
           {
             "description": "How the output data should be encoded",
-            "in": "path",
+            "in": "query",
             "name": "dataFormat",
-            "required": true,
+            "required": false,
             "schema": {
               "$ref": "#/components/schemas/DataFormat"
             }
           },
           {
             "description": "How to encode the schema of the result",
-            "in": "path",
+            "in": "query",
             "name": "schemaFormat",
-            "required": true,
+            "required": false,
             "schema": {
               "oneOf": [
                 {
@@ -1360,9 +1380,9 @@
           },
           {
             "description": "What information to include in the response",
-            "in": "path",
+            "in": "query",
             "name": "include",
-            "required": true,
+            "required": false,
             "schema": {
               "type": [
                 "string",
@@ -1486,7 +1506,10 @@
             "description": "Hash of the block",
             "in": "path",
             "name": "block_hash",
-            "required": true
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -1523,10 +1546,13 @@
         "operationId": "dataset_checkpoints_get_handler",
         "parameters": [
           {
-            "description": "Physical hash of the checkpoint",
+            "description": "Physical hash of the block",
             "in": "path",
             "name": "physical_hash",
-            "required": true
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -1561,10 +1587,13 @@
         "operationId": "dataset_checkpoints_put_handler",
         "parameters": [
           {
-            "description": "Physical hash of the checkpoint",
+            "description": "Physical hash of the block",
             "in": "path",
             "name": "physical_hash",
-            "required": true
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -1611,10 +1640,13 @@
         "operationId": "dataset_data_get_handler",
         "parameters": [
           {
-            "description": "Physical hash of the data slice",
+            "description": "Physical hash of the block",
             "in": "path",
             "name": "physical_hash",
-            "required": true
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -1649,10 +1681,13 @@
         "operationId": "dataset_data_put_handler",
         "parameters": [
           {
-            "description": "Physical hash of the data slice",
+            "description": "Physical hash of the block",
             "in": "path",
             "name": "physical_hash",
-            "required": true
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -1699,9 +1734,9 @@
         "operationId": "dataset_ingest_handler",
         "parameters": [
           {
-            "in": "path",
+            "in": "query",
             "name": "sourceName",
-            "required": true,
+            "required": false,
             "schema": {
               "type": [
                 "string",
@@ -1710,9 +1745,9 @@
             }
           },
           {
-            "in": "path",
+            "in": "query",
             "name": "uploadToken",
-            "required": true,
+            "required": false,
             "schema": {
               "type": [
                 "string",
@@ -1765,9 +1800,9 @@
         "parameters": [
           {
             "description": "What information to include in response",
-            "in": "path",
+            "in": "query",
             "name": "include",
-            "required": true,
+            "required": false,
             "schema": {
               "type": [
                 "string",
@@ -1777,9 +1812,9 @@
           },
           {
             "description": "Format to return the schema in",
-            "in": "path",
+            "in": "query",
             "name": "schemaFormat",
-            "required": true,
+            "required": false,
             "schema": {
               "$ref": "#/components/schemas/SchemaFormat"
             }
@@ -1871,7 +1906,10 @@
             "description": "Name of the reference",
             "in": "path",
             "name": "reference",
-            "required": true
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -1904,9 +1942,9 @@
         "parameters": [
           {
             "description": "Number of leading records to skip when returning result (used for\npagination)",
-            "in": "path",
+            "in": "query",
             "name": "skip",
-            "required": true,
+            "required": false,
             "schema": {
               "format": "int64",
               "minimum": 0,
@@ -1915,9 +1953,9 @@
           },
           {
             "description": "Maximum number of records to return (used for pagination)",
-            "in": "path",
+            "in": "query",
             "name": "limit",
-            "required": true,
+            "required": false,
             "schema": {
               "format": "int64",
               "minimum": 0,
@@ -1926,18 +1964,18 @@
           },
           {
             "description": "How the output data should be encoded",
-            "in": "path",
+            "in": "query",
             "name": "dataFormat",
-            "required": true,
+            "required": false,
             "schema": {
               "$ref": "#/components/schemas/DataFormat"
             }
           },
           {
             "description": "How to encode the schema of the result",
-            "in": "path",
+            "in": "query",
             "name": "schemaFormat",
-            "required": true,
+            "required": false,
             "schema": {
               "oneOf": [
                 {

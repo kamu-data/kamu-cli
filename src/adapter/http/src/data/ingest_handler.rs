@@ -26,6 +26,7 @@ use crate::{UploadService, UploadTokenBase64Json, UploadTokenIntoStreamError};
 
 #[derive(Debug, serde::Deserialize, utoipa::IntoParams)]
 #[serde(rename_all = "camelCase")]
+#[into_params(parameter_in = Query)]
 pub struct IngestParams {
     source_name: Option<String>,
 

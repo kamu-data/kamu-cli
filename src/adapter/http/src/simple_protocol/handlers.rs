@@ -28,18 +28,26 @@ use crate::{BearerHeader, OdfSmtpVersion, OdfSmtpVersionTyped};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(serde::Deserialize)]
+#[derive(serde::Deserialize, utoipa::IntoParams)]
+#[into_params(parameter_in = Path)]
 pub struct RefFromPath {
+    /// Name of the reference
     reference: String,
 }
 
-#[derive(serde::Deserialize)]
+#[derive(serde::Deserialize, utoipa::IntoParams)]
+#[into_params(parameter_in = Path)]
 pub struct BlockHashFromPath {
+    /// Hash of the block
+    #[param(value_type = String)]
     block_hash: Multihash,
 }
 
-#[derive(serde::Deserialize)]
+#[derive(serde::Deserialize, utoipa::IntoParams)]
+#[into_params(parameter_in = Path)]
 pub struct PhysicalHashFromPath {
+    /// Physical hash of the block
+    #[param(value_type = String)]
     physical_hash: Multihash,
 }
 
@@ -49,9 +57,7 @@ pub struct PhysicalHashFromPath {
 #[utoipa::path(
     get,
     path = "/refs/{reference}",
-    params(
-        ("reference", description = "Name of the reference")
-    ),
+    params(RefFromPath),
     responses((status = OK, body = String)),
     tag = "odf-transfer",
     security(
@@ -81,9 +87,7 @@ pub async fn dataset_refs_handler(
 #[utoipa::path(
     get,
     path = "/blocks/{block_hash}",
-    params(
-        ("block_hash", description = "Hash of the block")
-    ),
+    params(BlockHashFromPath),
     responses((status = OK, body = Vec<u8>)),
     tag = "odf-transfer",
     security(
@@ -119,9 +123,7 @@ pub async fn dataset_blocks_handler(
 #[utoipa::path(
     get,
     path = "/data/{physical_hash}",
-    params(
-        ("physical_hash", description = "Physical hash of the data slice")
-    ),
+    params(PhysicalHashFromPath),
     responses((status = OK, body = Vec<u8>)),
     tag = "odf-transfer",
     security(
@@ -142,9 +144,7 @@ pub async fn dataset_data_get_handler(
 #[utoipa::path(
     get,
     path = "/checkpoints/{physical_hash}",
-    params(
-        ("physical_hash", description = "Physical hash of the checkpoint")
-    ),
+    params(PhysicalHashFromPath),
     responses((status = OK, body = Vec<u8>)),
     tag = "odf-transfer",
     security(
@@ -182,9 +182,7 @@ async fn dataset_get_object_common(
 #[utoipa::path(
     put,
     path = "/data/{physical_hash}",
-    params(
-        ("physical_hash", description = "Physical hash of the data slice")
-    ),
+    params(PhysicalHashFromPath),
     request_body = Vec<u8>,
     responses((status = OK, body = ())),
     tag = "odf-transfer",
@@ -214,9 +212,7 @@ pub async fn dataset_data_put_handler(
 #[utoipa::path(
     put,
     path = "/checkpoints/{physical_hash}",
-    params(
-        ("physical_hash", description = "Physical hash of the checkpoint")
-    ),
+    params(PhysicalHashFromPath),
     request_body = Vec<u8>,
     responses((status = OK, body = ())),
     tag = "odf-transfer",
