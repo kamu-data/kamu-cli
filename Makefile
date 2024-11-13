@@ -17,18 +17,47 @@ MIGRATION_DIRS := ./migrations/mysql ./migrations/postgres ./migrations/sqlite
 ###############################################################################
 
 .PHONY: lint
-lint:
+lint: lint-rustfmt lint-repo lint-deps clippy lint-sqlx
+
+
+.PHONY: lint-rustfmt
+lint-rustfmt:
 	cargo fmt --check
+
+
+.PHONY: lint-repo
+lint-repo:
 	cargo test -p kamu-repo-tools
+
+
+.PHONY: lint-deps
+lint-deps:
 	cargo deny check --hide-inclusion-graph
-	# cargo udeps --all-targets
-	cargo clippy --workspace --all-targets -- -D warnings
+
+
+.PHONY: lint-sqlx
+lint-sqlx:
 	$(foreach crate,$(ALL_DATABASE_CRATES),(cd $(crate) && cargo sqlx prepare --check);)
 
 
 .PHONY: clippy
 clippy:
 	cargo clippy --workspace --all-targets -- -D warnings
+
+
+.PHONY: lint-openapi
+lint-openapi:
+	docker run --rm -t \
+		-v "${PWD}:/data:ro" \
+  		ibmdevxsdk/openapi-validator:latest \
+		--config src/adapter/http/resources/openapi-validator/config.yaml \
+		--ruleset src/adapter/http/resources/openapi-validator/ruleset.yaml \
+    	resources/openapi-mt.json
+
+
+.PHONY: lint-udeps
+lint-udeps:
+	cargo udeps --all-targets
 
 ###############################################################################
 # Lint (with fixes)

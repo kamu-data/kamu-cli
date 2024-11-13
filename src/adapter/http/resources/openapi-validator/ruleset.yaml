@@ -1,0 +1,5 @@
+extends: '@ibm-cloud/openapi-ruleset'
+rules:
+  # We use camelCase
+  ibm-property-casing-convention: off
+  ibm-enum-casing-convention: off
