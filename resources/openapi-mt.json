@@ -86,14 +86,7 @@
             "type": "string"
           },
           "owner": {
-            "oneOf": [
-              {
-                "type": "null"
-              },
-              {
-                "$ref": "#/components/schemas/DatasetOwnerInfo"
-              }
-            ]
+            "$ref": "#/components/schemas/DatasetOwnerInfo"
           }
         },
         "required": [
@@ -132,10 +125,7 @@
       "DatasetOwnerInfo": {
         "properties": {
           "accountId": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "string"
           },
           "accountName": {
             "type": "string"
@@ -179,26 +169,12 @@
             "description": "How data is laid out in the response"
           },
           "schema": {
-            "oneOf": [
-              {
-                "type": "null"
-              },
-              {
-                "$ref": "#/components/schemas/Schema",
-                "description": "Schema of the resulting data"
-              }
-            ]
+            "$ref": "#/components/schemas/Schema",
+            "description": "Schema of the resulting data"
           },
           "schemaFormat": {
-            "oneOf": [
-              {
-                "type": "null"
-              },
-              {
-                "$ref": "#/components/schemas/SchemaFormat",
-                "description": "What representation is used for the schema"
-              }
-            ]
+            "$ref": "#/components/schemas/SchemaFormat",
+            "description": "What representation is used for the schema"
           }
         },
         "required": [
@@ -374,24 +350,10 @@
             ]
           },
           "schema": {
-            "oneOf": [
-              {
-                "type": "null"
-              },
-              {
-                "$ref": "#/components/schemas/Schema"
-              }
-            ]
+            "$ref": "#/components/schemas/Schema"
           },
           "schemaFormat": {
-            "oneOf": [
-              {
-                "type": "null"
-              },
-              {
-                "$ref": "#/components/schemas/SchemaFormat"
-              }
-            ]
+            "$ref": "#/components/schemas/SchemaFormat"
           },
           "seed": {
             "type": "object"
@@ -431,26 +393,12 @@
             "description": "How data is laid out in the response"
           },
           "schema": {
-            "oneOf": [
-              {
-                "type": "null"
-              },
-              {
-                "$ref": "#/components/schemas/Schema",
-                "description": "Schema of the resulting data"
-              }
-            ]
+            "$ref": "#/components/schemas/Schema",
+            "description": "Schema of the resulting data"
           },
           "schemaFormat": {
-            "oneOf": [
-              {
-                "type": "null"
-              },
-              {
-                "$ref": "#/components/schemas/SchemaFormat",
-                "description": "What representation is used for the schema"
-              }
-            ]
+            "$ref": "#/components/schemas/SchemaFormat",
+            "description": "What representation is used for the schema"
           }
         },
         "required": [
@@ -516,6 +464,7 @@
           "limit": {
             "description": "Pagination: limits number of records in response to N",
             "format": "int64",
+            "maximum": 100000000,
             "minimum": 0,
             "type": "integer"
           },
@@ -528,19 +477,13 @@
             "type": "string"
           },
           "schemaFormat": {
-            "oneOf": [
-              {
-                "type": "null"
-              },
-              {
-                "$ref": "#/components/schemas/SchemaFormat",
-                "description": "What representation to use for the schema"
-              }
-            ]
+            "$ref": "#/components/schemas/SchemaFormat",
+            "description": "What representation to use for the schema"
           },
           "skip": {
             "description": "Pagination: skips first N records",
             "format": "int64",
+            "maximum": 100000000,
             "minimum": 0,
             "type": "integer"
           }
@@ -553,41 +496,20 @@
       "QueryResponse": {
         "properties": {
           "commitment": {
-            "oneOf": [
-              {
-                "type": "null"
-              },
-              {
-                "$ref": "#/components/schemas/Commitment",
-                "description": "Succinct commitment"
-              }
-            ]
+            "$ref": "#/components/schemas/Commitment",
+            "description": "Succinct commitment"
           },
           "input": {
-            "oneOf": [
-              {
-                "type": "null"
-              },
-              {
-                "$ref": "#/components/schemas/QueryRequest",
-                "description": "Inputs that can be used to fully reproduce the query"
-              }
-            ]
+            "$ref": "#/components/schemas/QueryRequest",
+            "description": "Inputs that can be used to fully reproduce the query"
           },
           "output": {
             "$ref": "#/components/schemas/Outputs",
             "description": "Query results"
           },
           "proof": {
-            "oneOf": [
-              {
-                "type": "null"
-              },
-              {
-                "$ref": "#/components/schemas/Proof",
-                "description": "Signature block"
-              }
-            ]
+            "$ref": "#/components/schemas/Proof",
+            "description": "Signature block"
           },
           "subQueries": {
             "description": "Information about processing performed by other nodes as part of this\noperation",
@@ -823,15 +745,8 @@
       "VerifyResponse": {
         "properties": {
           "error": {
-            "oneOf": [
-              {
-                "type": "null"
-              },
-              {
-                "$ref": "#/components/schemas/ValidationError",
-                "description": "Will contain error details if validation was unsuccessful"
-              }
-            ]
+            "$ref": "#/components/schemas/ValidationError",
+            "description": "Will contain error details if validation was unsuccessful"
           },
           "ok": {
             "description": "Whether validation was successful",
@@ -910,7 +825,10 @@
             "description": "Dataset ID",
             "in": "path",
             "name": "id",
-            "required": true
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -991,7 +909,10 @@
             "description": "Account name",
             "in": "path",
             "name": "account_name",
-            "required": true
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -1026,7 +947,10 @@
             "description": "Account name",
             "in": "path",
             "name": "account_name",
-            "required": true
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -1061,13 +985,19 @@
             "description": "Account name",
             "in": "path",
             "name": "account_name",
-            "required": true
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
           },
           {
             "description": "Dataset name",
             "in": "path",
             "name": "dataset_name",
-            "required": true
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -1111,6 +1041,7 @@
             "name": "contentLength",
             "required": true,
             "schema": {
+              "maximum": 100000000,
               "minimum": 0,
               "type": "integer"
             }
@@ -1360,6 +1291,7 @@
             "required": false,
             "schema": {
               "format": "int64",
+              "maximum": 100000000,
               "minimum": 0,
               "type": "integer"
             }
@@ -1371,6 +1303,7 @@
             "required": false,
             "schema": {
               "format": "int64",
+              "maximum": 100000000,
               "minimum": 0,
               "type": "integer"
             }
@@ -1388,16 +1321,9 @@
             "description": "How to encode the schema of the result",
             "in": "query",
             "name": "schemaFormat",
-            "required": false,
+            "required": true,
             "schema": {
-              "oneOf": [
-                {
-                  "type": "null"
-                },
-                {
-                  "$ref": "#/components/schemas/SchemaFormat"
-                }
-              ]
+              "$ref": "#/components/schemas/SchemaFormat"
             }
           },
           {
@@ -1969,6 +1895,7 @@
             "required": false,
             "schema": {
               "format": "int64",
+              "maximum": 100000000,
               "minimum": 0,
               "type": "integer"
             }
@@ -1980,6 +1907,7 @@
             "required": false,
             "schema": {
               "format": "int64",
+              "maximum": 100000000,
               "minimum": 0,
               "type": "integer"
             }
@@ -1997,16 +1925,9 @@
             "description": "How to encode the schema of the result",
             "in": "query",
             "name": "schemaFormat",
-            "required": false,
+            "required": true,
             "schema": {
-              "oneOf": [
-                {
-                  "type": "null"
-                },
-                {
-                  "$ref": "#/components/schemas/SchemaFormat"
-                }
-              ]
+              "$ref": "#/components/schemas/SchemaFormat"
             }
           }
         ],

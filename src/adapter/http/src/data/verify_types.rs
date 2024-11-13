@@ -43,6 +43,7 @@ pub struct VerifyResponse {
 
     /// Will contain error details if validation was unsuccessful
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = ValidationError)]
     pub error: Option<ValidationError>,
 }
 

@@ -81,10 +81,12 @@ pub async fn dataset_tail_handler(
 pub struct DatasetTailParams {
     /// Number of leading records to skip when returning result (used for
     /// pagination)
+    #[param(maximum = 100_000_000)]
     #[serde(default)]
     pub skip: u64,
 
     /// Maximum number of records to return (used for pagination)
+    #[param(maximum = 100_000_000)]
     #[serde(default = "DatasetTailParams::default_limit")]
     pub limit: u64,
 
@@ -93,6 +95,7 @@ pub struct DatasetTailParams {
     pub data_format: DataFormat,
 
     /// How to encode the schema of the result
+    #[param(value_type = SchemaFormat)]
     pub schema_format: Option<SchemaFormat>,
 }
 
@@ -116,10 +119,12 @@ pub struct DatasetTailResponse {
 
     /// Schema of the resulting data
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Schema)]
     pub schema: Option<Schema>,
 
     /// What representation is used for the schema
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = SchemaFormat)]
     pub schema_format: Option<SchemaFormat>,
 }
 

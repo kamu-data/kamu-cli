@@ -27,7 +27,7 @@ pub struct DatasetOwnerInfo {
     pub account_name: AccountName,
 
     // TODO: This should not be optional. Awaiting dataset repository refactoring.
-    #[schema(value_type = Option<String>)]
+    #[schema(value_type = String, required = false)]
     pub account_id: Option<AccountID>,
 }
 
@@ -37,6 +37,8 @@ pub struct DatasetInfoResponse {
     #[schema(value_type = String)]
     pub id: DatasetID,
 
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = DatasetOwnerInfo, required = false)]
     pub owner: Option<DatasetOwnerInfo>,
 
     #[schema(value_type = String)]
@@ -66,7 +68,7 @@ impl DatasetInfoResponse {
     get,
     path = "/datasets/{id}",
     params(
-        ("id", description = "Dataset ID")
+        ("id" = String, Path, description = "Dataset ID")
     ),
     responses(
         (status = OK, body = DatasetInfoResponse),

@@ -90,6 +90,7 @@ pub struct QueryRequest {
     pub include: BTreeSet<Include>,
 
     /// What representation to use for the schema
+    #[schema(value_type = SchemaFormat)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub schema_format: Option<SchemaFormat>,
 
@@ -100,10 +101,12 @@ pub struct QueryRequest {
 
     /// Pagination: skips first N records
     #[serde(default)]
+    #[schema(maximum = 100_000_000)]
     pub skip: u64,
 
     /// Pagination: limits number of records in response to N
     #[serde(default = "QueryRequest::default_limit")]
+    #[schema(maximum = 100_000_000)]
     pub limit: u64,
 }
 
@@ -219,10 +222,12 @@ pub struct QueryParams {
 
     /// Number of leading records to skip when returning result (used for
     /// pagination)
+    #[param(maximum = 100_000_000)]
     #[serde(default)]
     pub skip: u64,
 
     /// Maximum number of records to return (used for pagination)
+    #[param(maximum = 100_000_000)]
     #[serde(default = "QueryRequest::default_limit")]
     pub limit: u64,
 
@@ -232,6 +237,7 @@ pub struct QueryParams {
     pub data_format: DataFormat,
 
     /// How to encode the schema of the result
+    #[param(value_type = SchemaFormat)]
     pub schema_format: Option<SchemaFormat>,
 
     /// What information to include in the response
@@ -263,6 +269,7 @@ impl From<QueryParams> for QueryRequest {
 pub struct QueryResponse {
     /// Inputs that can be used to fully reproduce the query
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = QueryRequest)]
     pub input: Option<QueryRequest>,
 
     /// Query results
@@ -275,10 +282,12 @@ pub struct QueryResponse {
 
     /// Succinct commitment
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Commitment)]
     pub commitment: Option<Commitment>,
 
     /// Signature block
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Proof)]
     pub proof: Option<Proof>,
 }
 
@@ -318,10 +327,12 @@ pub struct Outputs {
 
     /// Schema of the resulting data
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Schema)]
     pub schema: Option<Schema>,
 
     /// What representation is used for the schema
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = SchemaFormat)]
     pub schema_format: Option<SchemaFormat>,
 }
 

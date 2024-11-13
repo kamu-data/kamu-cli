@@ -83,30 +83,41 @@ pub struct DatasetMetadataResponse {
 #[derive(Debug, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Output {
-    #[schema(value_type = Object)]
     #[serde_as(as = "Option<odf::serde::yaml::SetAttachmentsDef>")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Object)]
     pub attachments: Option<odf::SetAttachments>,
 
-    #[schema(value_type = Object)]
     #[serde_as(as = "Option<odf::serde::yaml::SetInfoDef>")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Object)]
     pub info: Option<odf::SetInfo>,
 
-    #[schema(value_type = Object)]
     #[serde_as(as = "Option<odf::serde::yaml::SetLicenseDef>")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Object)]
     pub license: Option<odf::SetLicense>,
 
+    #[serde(skip_serializing_if = "Option::is_none")]
     #[schema(value_type = Option<Vec<String>>)]
     pub refs: Option<Vec<Ref>>,
 
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = query_types::Schema)]
     pub schema: Option<query_types::Schema>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = query_types::SchemaFormat)]
     pub schema_format: Option<query_types::SchemaFormat>,
 
-    #[schema(value_type = Object)]
     #[serde_as(as = "Option<odf::serde::yaml::SeedDef>")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Object)]
     pub seed: Option<odf::Seed>,
 
-    #[schema(value_type = Object)]
     #[serde_as(as = "Option<odf::serde::yaml::DatasetVocabularyDef>")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Object)]
     pub vocab: Option<odf::DatasetVocabulary>,
 }
 

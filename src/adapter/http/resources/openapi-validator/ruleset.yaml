@@ -4,4 +4,9 @@ rules:
   ibm-property-casing-convention: off
   ibm-enum-casing-convention: off
   ibm-parameter-casing-convention: off
-  
+  ibm-path-segment-casing-convention: off
+  # Debatable rules
+  ibm-required-enum-properties-in-response: off
+  ibm-required-array-properties-in-response: off  # almost agree
+  no-$ref-siblings: off
+

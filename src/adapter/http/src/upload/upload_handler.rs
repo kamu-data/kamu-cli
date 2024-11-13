@@ -27,6 +27,7 @@ use crate::{MakeUploadContextError, SaveUploadError, UploadService};
 pub struct PlatformFileUploadQuery {
     pub file_name: String,
 
+    #[param(maximum = 100_000_000)]
     pub content_length: usize,
 
     #[param(value_type = Option<String>)]
