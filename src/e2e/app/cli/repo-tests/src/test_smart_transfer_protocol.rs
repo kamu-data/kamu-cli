@@ -132,62 +132,17 @@ pub async fn test_s3_push_smart_pull_mt_mt(kamu: KamuCliPuppet) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Others
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_smart_pull_derivative(kamu: KamuCliPuppet) {
-    let dataset_name = DATASET_ROOT_PLAYER_NAME.clone();
-    let dataset_derivative_name = DATASET_DERIVATIVE_LEADERBOARD_NAME.clone();
-
-    kamu.execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
-        .await
-        .success();
-
-    kamu.execute_with_input(
-        ["add", "--stdin"],
-        DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR,
-    )
-    .await
-    .success();
-
-    kamu.ingest_data(
-        &dataset_name,
-        DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
-    )
-    .await;
-
-    kamu.assert_failure_command_execution(
-        [
-            "tail",
-            dataset_derivative_name.as_str(),
-            "--output-format",
-            "table",
-        ],
-        None,
-        Some(["Error: Dataset schema is not yet available: leaderboard"]),
-    )
-    .await;
-
-    kamu.assert_success_command_execution(
-        ["pull", dataset_derivative_name.as_str()],
-        None,
-        Some(["1 dataset(s) updated"]),
-    )
-    .await;
-
-    kamu.assert_player_scores_dataset_data(indoc::indoc!(
-        r#"
-        ┌────┬──────────────────────┬──────────────────────┬──────────┬───────────┬───────┐
-        │ op │     system_time      │      match_time      │ match_id │ player_id │ score │
-        ├────┼──────────────────────┼──────────────────────┼──────────┼───────────┼───────┤
-        │  0 │ 2050-01-02T03:04:05Z │ 2000-01-01T00:00:00Z │        1 │       Bob │    80 │
-        │  0 │ 2050-01-02T03:04:05Z │ 2000-01-01T00:00:00Z │        1 │     Alice │   100 │
-        └────┴──────────────────────┴──────────────────────┴──────────┴───────────┴───────┘
-        "#
-    ))
-    .await;
+pub async fn test_pull_derivative_st(kamu: KamuCliPuppet) {
+    test_pull_derivative(kamu).await;
 }
 
+pub async fn test_pull_derivative_mt(kamu: KamuCliPuppet) {
+    test_pull_derivative(kamu).await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Others
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_smart_push_from_registered_repo(mut kamu_api_server_client: KamuApiServerClient) {
@@ -1710,6 +1665,61 @@ async fn test_s3_push_smart_pull(kamu: KamuCliPuppet, is_pull_workspace_multi_te
         kamu.assert_last_data_slice(&dataset_alias, expected_schema, expected_data)
             .await;
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+async fn test_pull_derivative(kamu: KamuCliPuppet) {
+    let dataset_name = DATASET_ROOT_PLAYER_NAME.clone();
+    let dataset_derivative_name = DATASET_DERIVATIVE_LEADERBOARD_NAME.clone();
+
+    kamu.execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
+        .await
+        .success();
+
+    kamu.execute_with_input(
+        ["add", "--stdin"],
+        DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR,
+    )
+    .await
+    .success();
+
+    kamu.ingest_data(
+        &dataset_name,
+        DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
+    )
+    .await;
+
+    kamu.assert_failure_command_execution(
+        [
+            "tail",
+            dataset_derivative_name.as_str(),
+            "--output-format",
+            "table",
+        ],
+        None,
+        Some(["Error: Dataset schema is not yet available: leaderboard"]),
+    )
+    .await;
+
+    kamu.assert_success_command_execution(
+        ["pull", dataset_derivative_name.as_str()],
+        None,
+        Some(["1 dataset(s) updated"]),
+    )
+    .await;
+
+    kamu.assert_player_scores_dataset_data(indoc::indoc!(
+        r#"
+        ┌────┬──────────────────────┬──────────────────────┬──────────┬───────────┬───────┐
+        │ op │     system_time      │      match_time      │ match_id │ player_id │ score │
+        ├────┼──────────────────────┼──────────────────────┼──────────┼───────────┼───────┤
+        │  0 │ 2050-01-02T03:04:05Z │ 2000-01-01T00:00:00Z │        1 │       Bob │    80 │
+        │  0 │ 2050-01-02T03:04:05Z │ 2000-01-01T00:00:00Z │        1 │     Alice │   100 │
+        └────┴──────────────────────┴──────────────────────┴──────────┴───────────┴───────┘
+        "#
+    ))
+    .await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
