@@ -16,7 +16,9 @@ use kamu_accounts::CurrentAccountSubject;
 use kamu_core::{
     CreateDatasetResult,
     DatasetRegistry,
+    DatasetRegistryExt,
     DatasetRepository,
+    GetDatasetError,
     MetadataChainExt,
     TenancyConfig,
 };
@@ -66,6 +68,13 @@ impl BaseRepoHarness {
 
     pub fn dataset_registry(&self) -> &dyn DatasetRegistry {
         self.dataset_registry.as_ref()
+    }
+
+    pub async fn check_dataset_exists(&self, alias: &DatasetAlias) -> Result<(), GetDatasetError> {
+        self.dataset_registry
+            .get_dataset_by_ref(&alias.as_local_ref())
+            .await?;
+        Ok(())
     }
 
     pub async fn create_root_dataset(&self, alias: &DatasetAlias) -> CreateDatasetResult {
