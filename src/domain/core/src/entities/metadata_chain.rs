@@ -558,6 +558,7 @@ impl From<GetBlockError> for IterBlocksError {
 pub enum AcceptVisitorError<E> {
     #[error(transparent)]
     Traversal(IterBlocksError),
+
     #[error(transparent)]
     Visitor(E),
 }

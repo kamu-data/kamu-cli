@@ -15,13 +15,17 @@ use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_core::{
     AppendError,
     AppendValidationError,
+    BlockRef,
     CommitError,
     DataWriter,
     Dataset,
     GetAliasesError,
     GetSummaryOpts,
+    GetWatermarkError,
+    MetadataChainExt,
     RemoteAliasKind,
     RemoteAliasesRegistry,
+    SearchAddDataVisitor,
     SetWatermarkError,
     SetWatermarkResult,
     WatermarkService,
@@ -57,6 +61,31 @@ impl WatermarkServiceImpl {
 
 #[async_trait::async_trait]
 impl WatermarkService for WatermarkServiceImpl {
+    /// Attempt reading watermark that is currently associated with a dataset
+    #[tracing::instrument(level = "info", skip_all)]
+    async fn try_get_current_watermark(
+        &self,
+        dataset: Arc<dyn Dataset>,
+    ) -> Result<Option<DateTime<Utc>>, GetWatermarkError> {
+        let head = dataset
+            .as_metadata_chain()
+            .resolve_ref(&BlockRef::Head)
+            .await
+            .int_err()?;
+
+        let mut add_data_visitor = SearchAddDataVisitor::new();
+
+        dataset
+            .as_metadata_chain()
+            .accept_by_hash(&mut [&mut add_data_visitor], &head)
+            .await
+            .int_err()?;
+
+        let current_watermark = add_data_visitor.into_event().and_then(|e| e.new_watermark);
+
+        Ok(current_watermark)
+    }
+
     /// Manually advances the watermark of a root dataset
     #[tracing::instrument(level = "info", skip_all, fields(%new_watermark))]
     async fn set_watermark(

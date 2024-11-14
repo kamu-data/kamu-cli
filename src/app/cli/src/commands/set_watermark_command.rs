@@ -112,7 +112,6 @@ impl Command for SetWatermarkCommand {
             Err(
                 e @ (SetWatermarkError::IsDerivative
                 | SetWatermarkError::IsRemote
-                | SetWatermarkError::NotFound(_)
                 | SetWatermarkError::Access(_)),
             ) => Err(CLIError::failure(e)),
             Err(e @ SetWatermarkError::Internal(_)) => Err(CLIError::critical(e)),

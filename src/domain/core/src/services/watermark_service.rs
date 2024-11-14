@@ -14,7 +14,6 @@ use internal_error::InternalError;
 use opendatafabric::Multihash;
 use thiserror::Error;
 
-use super::DatasetNotFoundError;
 use crate::auth::DatasetActionUnauthorizedError;
 use crate::{AccessError, Dataset};
 
@@ -22,6 +21,12 @@ use crate::{AccessError, Dataset};
 
 #[async_trait::async_trait]
 pub trait WatermarkService: Send + Sync {
+    /// Attempt reading watermark that is currently associated with a dataset
+    async fn try_get_current_watermark(
+        &self,
+        dataset: Arc<dyn Dataset>,
+    ) -> Result<Option<DateTime<Utc>>, GetWatermarkError>;
+
     /// Manually advances the watermark of a root dataset
     async fn set_watermark(
         &self,
@@ -44,14 +49,19 @@ pub enum SetWatermarkResult {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Error)]
-pub enum SetWatermarkError {
+pub enum GetWatermarkError {
     #[error(transparent)]
-    NotFound(
+    Internal(
         #[from]
         #[backtrace]
-        DatasetNotFoundError,
+        InternalError,
     ),
+}
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Error)]
+pub enum SetWatermarkError {
     #[error("Attempting to set watermark on a derivative dataset")]
     IsDerivative,
 
@@ -72,6 +82,8 @@ pub enum SetWatermarkError {
         InternalError,
     ),
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl From<DatasetActionUnauthorizedError> for SetWatermarkError {
     fn from(v: DatasetActionUnauthorizedError) -> Self {
