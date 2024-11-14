@@ -392,12 +392,12 @@ kamu_cli_execute_command_e2e_test!(
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Others
+// test_smart_push_to_registered_repo_smart_pull
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 kamu_cli_run_api_server_e2e_test!(
     storage = inmem,
-    fixture = kamu_cli_e2e_repo_tests::test_smart_push_from_registered_repo,
+    fixture = kamu_cli_e2e_repo_tests::test_smart_push_to_registered_repo_smart_pull_st_st,
     options = Options::default()
         .with_multi_tenant()
         .with_today_as_frozen_system_time(),
@@ -408,11 +408,33 @@ kamu_cli_run_api_server_e2e_test!(
 
 kamu_cli_run_api_server_e2e_test!(
     storage = inmem,
-    fixture = kamu_cli_e2e_repo_tests::test_pull_mt,
+    fixture = kamu_cli_e2e_repo_tests::test_smart_push_to_registered_repo_smart_pull_st_mt,
     options = Options::default()
         .with_multi_tenant()
-        .with_frozen_system_time(),
-    extra_test_groups = "containerized, engine, ingest, datafusion"
+        .with_today_as_frozen_system_time(),
+    extra_test_groups = "engine, ingest, datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_run_api_server_e2e_test!(
+    storage = inmem,
+    fixture = kamu_cli_e2e_repo_tests::test_smart_push_to_registered_repo_smart_pull_mt_st,
+    options = Options::default()
+        .with_multi_tenant()
+        .with_today_as_frozen_system_time(),
+    extra_test_groups = "engine, ingest, datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_run_api_server_e2e_test!(
+    storage = inmem,
+    fixture = kamu_cli_e2e_repo_tests::test_smart_push_to_registered_repo_smart_pull_mt_mt,
+    options = Options::default()
+        .with_multi_tenant()
+        .with_today_as_frozen_system_time(),
+    extra_test_groups = "engine, ingest, datafusion"
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
