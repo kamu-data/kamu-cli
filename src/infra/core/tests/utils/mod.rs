@@ -25,3 +25,6 @@ pub use mqtt_broker::*;
 
 mod transform_test_helper;
 pub use transform_test_helper::*;
+
+mod base_repo_harness;
+pub use base_repo_harness::*;

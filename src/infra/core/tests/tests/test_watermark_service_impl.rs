@@ -8,124 +8,92 @@
 // by the Apache License, Version 2.0.
 
 use std::assert_matches::assert_matches;
-use std::path::Path;
 use std::sync::Arc;
 
 use chrono::{DateTime, TimeZone, Utc};
-use dill::Component;
-use kamu::testing::MetadataFactory;
-use kamu::{
-    DatasetRegistryRepoBridge,
-    DatasetRepositoryLocalFs,
-    DatasetRepositoryWriter,
-    RemoteAliasesRegistryImpl,
-    WatermarkServiceImpl,
-};
-use kamu_accounts::CurrentAccountSubject;
+use kamu::{RemoteAliasesRegistryImpl, WatermarkServiceImpl};
 use kamu_core::{
     CreateDatasetResult,
-    DatasetRegistry,
-    DatasetRegistryExt,
-    DatasetRepository,
-    MetadataChainExt,
     SetWatermarkError,
     SetWatermarkResult,
     TenancyConfig,
     WatermarkService,
 };
-use opendatafabric::{DatasetAlias, DatasetHandle, DatasetKind, DatasetName};
-use time_source::SystemTimeSourceDefault;
+use opendatafabric::{DatasetAlias, DatasetName, DatasetRef};
+
+use crate::BaseRepoHarness;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
 async fn test_no_watermark_initially() {
-    let tmp_dir = tempfile::tempdir().unwrap();
-    let harness = WatermarkTestHarness::new(tmp_dir.path(), TenancyConfig::SingleTenant);
+    let harness = WatermarkTestHarness::new(TenancyConfig::SingleTenant);
 
-    let dataset_alias = DatasetAlias::new(None, DatasetName::try_from("foo").unwrap());
-    let create_result = harness.create_dataset(&dataset_alias).await;
+    let foo_created = harness
+        .create_root_dataset(&DatasetAlias::new(
+            None,
+            DatasetName::try_from("foo").unwrap(),
+        ))
+        .await;
 
-    assert_eq!(
-        harness
-            .current_watermark(&create_result.dataset_handle)
-            .await,
-        None,
-    );
+    assert_eq!(harness.current_watermark(&foo_created).await, None,);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
 async fn test_set_watermark() {
-    let tmp_dir = tempfile::tempdir().unwrap();
-    let harness = WatermarkTestHarness::new(tmp_dir.path(), TenancyConfig::SingleTenant);
+    let harness = WatermarkTestHarness::new(TenancyConfig::SingleTenant);
 
-    let dataset_alias = DatasetAlias::new(None, DatasetName::try_from("foo").unwrap());
-    let create_result = harness.create_dataset(&dataset_alias).await;
+    let foo_created = harness
+        .create_root_dataset(&DatasetAlias::new(
+            None,
+            DatasetName::try_from("foo").unwrap(),
+        ))
+        .await;
 
-    assert_eq!(harness.num_blocks(&dataset_alias).await, 1);
+    assert_eq!(harness.num_blocks(&foo_created).await, 2);
 
     let watermark_1 = Utc.with_ymd_and_hms(2000, 1, 2, 0, 0, 0).unwrap();
     assert_matches!(
-        harness
-            .watermark_svc
-            .set_watermark(create_result.dataset.clone(), watermark_1)
-            .await,
+        harness.set_watermark(&foo_created, watermark_1).await,
         Ok(SetWatermarkResult::Updated { .. })
     );
-    assert_eq!(harness.num_blocks(&dataset_alias).await, 2);
+    assert_eq!(harness.num_blocks(&foo_created).await, 3);
     assert_eq!(
-        harness
-            .current_watermark(&create_result.dataset_handle)
-            .await,
+        harness.current_watermark(&foo_created).await,
         Some(watermark_1),
     );
 
     let watermark_2 = Utc.with_ymd_and_hms(2000, 1, 3, 0, 0, 0).unwrap();
     assert_matches!(
-        harness
-            .watermark_svc
-            .set_watermark(create_result.dataset.clone(), watermark_2)
-            .await,
+        harness.set_watermark(&foo_created, watermark_2).await,
         Ok(SetWatermarkResult::Updated { .. })
     );
-    assert_eq!(harness.num_blocks(&dataset_alias).await, 3);
+    assert_eq!(harness.num_blocks(&foo_created).await, 4);
     assert_eq!(
-        harness
-            .current_watermark(&create_result.dataset_handle)
-            .await,
+        harness.current_watermark(&foo_created).await,
         Some(watermark_2),
     );
 
     assert_matches!(
-        harness
-            .watermark_svc
-            .set_watermark(create_result.dataset.clone(), watermark_2)
-            .await,
+        harness.set_watermark(&foo_created, watermark_2).await,
         Ok(SetWatermarkResult::UpToDate)
     );
-    assert_eq!(harness.num_blocks(&dataset_alias).await, 3);
+    assert_eq!(harness.num_blocks(&foo_created).await, 4);
     assert_eq!(
-        harness
-            .current_watermark(&create_result.dataset_handle)
-            .await,
+        harness.current_watermark(&foo_created).await,
         Some(watermark_2),
     );
 
     let watermark_3 = Utc.with_ymd_and_hms(2000, 1, 2, 0, 0, 0).unwrap();
     assert_matches!(
-        harness
-            .watermark_svc
-            .set_watermark(create_result.dataset, watermark_3)
-            .await,
+        harness.set_watermark(&foo_created, watermark_3).await,
         Ok(SetWatermarkResult::UpToDate)
     );
-    assert_eq!(harness.num_blocks(&dataset_alias).await, 3);
+    assert_eq!(harness.num_blocks(&foo_created).await, 4);
     assert_eq!(
-        harness
-            .current_watermark(&create_result.dataset_handle)
-            .await,
+        harness.current_watermark(&foo_created).await,
         Some(watermark_2),
     );
 }
@@ -134,101 +102,95 @@ async fn test_set_watermark() {
 
 #[tokio::test]
 async fn test_set_watermark_rejects_on_derivative() {
-    let tmp_dir = tempfile::tempdir().unwrap();
-    let harness = WatermarkTestHarness::new(tmp_dir.path(), TenancyConfig::MultiTenant);
+    let harness = WatermarkTestHarness::new(TenancyConfig::MultiTenant);
 
-    let dataset_alias = DatasetAlias::new(None, DatasetName::try_from("foo").unwrap());
+    let created_root = harness
+        .create_root_dataset(&DatasetAlias::new(
+            None,
+            DatasetName::try_from("foo").unwrap(),
+        ))
+        .await;
 
-    let create_result = harness
-        .dataset_repo_writer
-        .create_dataset(
-            &dataset_alias,
-            MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Derivative).build())
-                .build_typed(),
+    let created_derived = harness
+        .create_derived_dataset(
+            &DatasetAlias::new(None, DatasetName::try_from("bar").unwrap()),
+            vec![created_root.dataset_handle.as_local_ref()],
         )
-        .await
-        .unwrap();
+        .await;
 
     assert_matches!(
         harness
-            .watermark_svc
             .set_watermark(
-                create_result.dataset,
+                &created_derived,
                 Utc.with_ymd_and_hms(2000, 1, 2, 0, 0, 0).unwrap()
             )
             .await,
         Err(SetWatermarkError::IsDerivative)
     );
 
-    assert_eq!(harness.num_blocks(&dataset_alias).await, 1);
-    assert_eq!(
-        harness
-            .current_watermark(&create_result.dataset_handle)
-            .await,
-        None,
-    );
+    assert_eq!(harness.num_blocks(&created_derived).await, 2);
+    assert_eq!(harness.current_watermark(&created_derived).await, None,);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct WatermarkTestHarness {
-    dataset_registry: Arc<dyn DatasetRegistry>,
-    dataset_repo_writer: Arc<dyn DatasetRepositoryWriter>,
+    base_repo_harness: BaseRepoHarness,
     watermark_svc: Arc<dyn WatermarkService>,
 }
 
 impl WatermarkTestHarness {
-    fn new(tmp_path: &Path, tenancy_config: TenancyConfig) -> Self {
-        let datasets_dir_path = tmp_path.join("datasets");
-        std::fs::create_dir(&datasets_dir_path).unwrap();
+    fn new(tenancy_config: TenancyConfig) -> Self {
+        let base_repo_harness = BaseRepoHarness::new(tenancy_config);
 
-        let catalog = dill::CatalogBuilder::new()
-            .add::<SystemTimeSourceDefault>()
-            .add_value(CurrentAccountSubject::new_test())
-            .add_value(tenancy_config)
-            .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir_path))
-            .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-            .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
-            .add::<DatasetRegistryRepoBridge>()
+        let catalog = dill::CatalogBuilder::new_chained(base_repo_harness.catalog())
             .add::<RemoteAliasesRegistryImpl>()
             .add::<WatermarkServiceImpl>()
             .build();
 
         Self {
-            dataset_registry: catalog.get_one().unwrap(),
-            dataset_repo_writer: catalog.get_one().unwrap(),
+            base_repo_harness,
             watermark_svc: catalog.get_one().unwrap(),
         }
     }
 
-    async fn create_dataset(&self, dataset_alias: &DatasetAlias) -> CreateDatasetResult {
-        self.dataset_repo_writer
-            .create_dataset_from_snapshot(
-                MetadataFactory::dataset_snapshot()
-                    .name(DatasetAlias::new(None, dataset_alias.dataset_name.clone()))
-                    .build(),
-            )
-            .await
-            .unwrap()
-            .create_dataset_result
+    #[inline]
+    async fn create_root_dataset(&self, alias: &DatasetAlias) -> CreateDatasetResult {
+        self.base_repo_harness.create_root_dataset(alias).await
     }
 
-    async fn num_blocks(&self, dataset_alias: &DatasetAlias) -> usize {
-        let ds = self
-            .dataset_registry
-            .get_dataset_by_ref(&dataset_alias.as_local_ref())
+    #[inline]
+    async fn create_derived_dataset(
+        &self,
+        alias: &DatasetAlias,
+        input_dataset_refs: Vec<DatasetRef>,
+    ) -> CreateDatasetResult {
+        self.base_repo_harness
+            .create_derived_dataset(alias, input_dataset_refs)
             .await
-            .unwrap();
-
-        use futures::StreamExt;
-        ds.as_metadata_chain().iter_blocks().count().await
     }
 
-    async fn current_watermark(&self, hdl: &DatasetHandle) -> Option<DateTime<Utc>> {
-        let dataset = self.dataset_registry.get_dataset_by_handle(hdl);
+    #[inline]
+    async fn num_blocks(&self, create_result: &CreateDatasetResult) -> usize {
+        self.base_repo_harness.num_blocks(create_result).await
+    }
 
+    async fn set_watermark(
+        &self,
+        create_result: &CreateDatasetResult,
+        new_watermark: DateTime<Utc>,
+    ) -> Result<SetWatermarkResult, SetWatermarkError> {
         self.watermark_svc
-            .try_get_current_watermark(dataset)
+            .set_watermark(create_result.dataset.clone(), new_watermark)
+            .await
+    }
+
+    async fn current_watermark(
+        &self,
+        create_result: &CreateDatasetResult,
+    ) -> Option<DateTime<Utc>> {
+        self.watermark_svc
+            .try_get_current_watermark(create_result.dataset.clone())
             .await
             .unwrap()
     }
