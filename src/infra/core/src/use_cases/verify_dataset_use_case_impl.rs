@@ -61,6 +61,7 @@ impl VerifyDatasetUseCase for VerifyDatasetUseCaseImpl {
         maybe_listener: Option<Arc<dyn VerificationListener>>,
     ) -> VerificationResult {
         // Permission check
+        // TODO: verification of derived datasets requires read permission for inputs
         match self
             .dataset_action_authorizer
             .check_action_allowed(&request.target, DatasetAction::Read)

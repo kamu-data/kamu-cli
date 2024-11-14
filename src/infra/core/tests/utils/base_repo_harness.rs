@@ -89,6 +89,10 @@ impl BaseRepoHarness {
         self.dataset_registry.as_ref()
     }
 
+    pub fn dataset_repo_writer(&self) -> &dyn DatasetRepositoryWriter {
+        self.dataset_repo_writer.as_ref()
+    }
+
     pub async fn check_dataset_exists(&self, alias: &DatasetAlias) -> Result<(), GetDatasetError> {
         self.dataset_registry
             .get_dataset_by_ref(&alias.as_local_ref())

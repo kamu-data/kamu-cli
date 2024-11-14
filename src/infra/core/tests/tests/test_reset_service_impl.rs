@@ -10,14 +10,12 @@
 use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
-use dill::Component;
 use kamu::domain::*;
 use kamu::testing::*;
 use kamu::*;
-use kamu_accounts::CurrentAccountSubject;
 use opendatafabric::*;
-use tempfile::TempDir;
-use time_source::SystemTimeSourceDefault;
+
+use crate::BaseRepoHarness;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -154,38 +152,24 @@ impl ChainWith2BlocksTestCase {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[oop::extend(BaseRepoHarness, base_repo_harness)]
 struct ResetTestHarness {
-    _temp_dir: TempDir,
-    dataset_registry: Arc<dyn DatasetRegistry>,
-    dataset_repo_writer: Arc<dyn DatasetRepositoryWriter>,
+    base_repo_harness: BaseRepoHarness,
     reset_svc: Arc<dyn ResetService>,
 }
 
 impl ResetTestHarness {
     fn new() -> Self {
-        let tempdir = tempfile::tempdir().unwrap();
-        let datasets_dir = tempdir.path().join("datasets");
-        std::fs::create_dir(&datasets_dir).unwrap();
+        let base_repo_harness = BaseRepoHarness::new(TenancyConfig::SingleTenant);
 
-        let catalog = dill::CatalogBuilder::new()
-            .add::<SystemTimeSourceDefault>()
-            .add_value(CurrentAccountSubject::new_test())
-            .add_value(TenancyConfig::SingleTenant)
-            .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
-            .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-            .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
-            .add::<DatasetRegistryRepoBridge>()
+        let catalog = dill::CatalogBuilder::new_chained(base_repo_harness.catalog())
             .add::<ResetServiceImpl>()
             .build();
 
-        let dataset_registry = catalog.get_one::<dyn DatasetRegistry>().unwrap();
-        let dataset_repo_writer = catalog.get_one::<dyn DatasetRepositoryWriter>().unwrap();
         let reset_svc = catalog.get_one::<dyn ResetService>().unwrap();
 
         Self {
-            _temp_dir: tempdir,
-            dataset_registry,
-            dataset_repo_writer,
+            base_repo_harness,
             reset_svc,
         }
     }
@@ -201,7 +185,7 @@ impl ResetTestHarness {
         .build_typed();
 
         let create_result = self
-            .dataset_repo_writer
+            .dataset_repo_writer()
             .create_dataset(&DatasetAlias::new(None, dataset_name.clone()), seed_block)
             .await
             .unwrap();
@@ -251,7 +235,8 @@ impl ResetTestHarness {
     }
 
     fn resolve_dataset(&self, dataset_handle: &DatasetHandle) -> Arc<dyn Dataset> {
-        self.dataset_registry.get_dataset_by_handle(dataset_handle)
+        self.dataset_registry()
+            .get_dataset_by_handle(dataset_handle)
     }
 }
 

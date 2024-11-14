@@ -16,6 +16,7 @@ mod test_delete_dataset_use_case;
 mod test_rename_dataset_use_case;
 mod test_reset_dataset_use_case;
 mod test_set_watermark_use_case;
+mod test_verify_dataset_use_case;
 
 mod base_use_case_harness;
 mod outbox_expectation_helpers;
