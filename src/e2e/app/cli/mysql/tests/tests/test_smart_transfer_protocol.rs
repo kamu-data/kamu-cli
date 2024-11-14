@@ -102,18 +102,53 @@ kamu_cli_run_api_server_e2e_test!(
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Others
+// test_smart_push_no_alias_pull_no_alias
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 kamu_cli_run_api_server_e2e_test!(
     storage = mysql,
-    fixture = kamu_cli_e2e_repo_tests::test_smart_push_pull_add_alias,
+    fixture = kamu_cli_e2e_repo_tests::test_smart_push_no_alias_pull_no_alias_st_st,
     options = Options::default()
         .with_multi_tenant()
         .with_today_as_frozen_system_time(),
     extra_test_groups = "engine, ingest, datafusion"
 );
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_run_api_server_e2e_test!(
+    storage = mysql,
+    fixture = kamu_cli_e2e_repo_tests::test_smart_push_no_alias_pull_no_alias_st_mt,
+    options = Options::default()
+        .with_multi_tenant()
+        .with_today_as_frozen_system_time(),
+    extra_test_groups = "engine, ingest, datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_run_api_server_e2e_test!(
+    storage = mysql,
+    fixture = kamu_cli_e2e_repo_tests::test_smart_push_no_alias_pull_no_alias_mt_st,
+    options = Options::default()
+        .with_multi_tenant()
+        .with_today_as_frozen_system_time(),
+    extra_test_groups = "engine, ingest, datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_run_api_server_e2e_test!(
+    storage = mysql,
+    fixture = kamu_cli_e2e_repo_tests::test_smart_push_no_alias_pull_no_alias_mt_mt,
+    options = Options::default()
+        .with_multi_tenant()
+        .with_today_as_frozen_system_time(),
+    extra_test_groups = "engine, ingest, datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Others
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 kamu_cli_run_api_server_e2e_test!(

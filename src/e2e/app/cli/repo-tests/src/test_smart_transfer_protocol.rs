@@ -62,146 +62,11 @@ test_smart_transfer_protocol_permutations!(test_smart_push_pull_sequence);
 test_smart_transfer_protocol_permutations!(test_smart_push_force_pull_force);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Others
+
+test_smart_transfer_protocol_permutations!(test_smart_push_no_alias_pull_no_alias);
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub async fn test_smart_push_pull_add_alias(mut kamu_api_server_client: KamuApiServerClient) {
-    let dataset_alias = DatasetAlias::new(
-        Some(E2E_USER_ACCOUNT_NAME.clone()),
-        DATASET_ROOT_PLAYER_NAME.clone(),
-    );
-    let kamu_api_server_dataset_endpoint = kamu_api_server_client
-        .dataset()
-        .get_endpoint(&dataset_alias);
-
-    // 1. Grub a token
-    let token = kamu_api_server_client.auth().login_as_e2e_user().await;
-
-    // 2. Push command
-    {
-        let kamu_in_push_workspace = KamuCliPuppet::new_workspace_tmp().await;
-
-        // Add the dataset
-        kamu_in_push_workspace
-            .execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
-            .await
-            .success();
-
-        // Ingest data to the dataset
-        kamu_in_push_workspace
-            .ingest_data(
-                &dataset_alias.dataset_name,
-                DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
-            )
-            .await;
-
-        // Login to the API server
-        kamu_in_push_workspace
-            .execute([
-                "login",
-                kamu_api_server_client.get_base_url().as_str(),
-                "--access-token",
-                token.as_str(),
-            ])
-            .await
-            .success();
-
-        // Dataset push without storing alias
-        kamu_in_push_workspace
-            .assert_success_command_execution(
-                [
-                    "push",
-                    dataset_alias.dataset_name.as_str(),
-                    "--to",
-                    kamu_api_server_dataset_endpoint.as_str(),
-                    "--no-alias",
-                ],
-                None,
-                Some(["1 dataset(s) pushed"]),
-            )
-            .await;
-
-        // Check alias should be empty
-        let aliases = kamu_in_push_workspace
-            .get_list_of_repo_aliases(&dataset_alias.dataset_name.clone().into())
-            .await;
-        assert!(aliases.is_empty());
-
-        // Dataset push with storing alias
-        kamu_in_push_workspace
-            .assert_success_command_execution(
-                [
-                    "push",
-                    dataset_alias.dataset_name.as_str(),
-                    "--to",
-                    kamu_api_server_dataset_endpoint.as_str(),
-                ],
-                None,
-                Some(["1 dataset(s) up-to-date"]),
-            )
-            .await;
-
-        let aliases = kamu_in_push_workspace
-            .get_list_of_repo_aliases(&dataset_alias.dataset_name.clone().into())
-            .await;
-        let expected_aliases = vec![RepoAlias {
-            dataset: dataset_alias.dataset_name.clone(),
-            kind: "Push".to_string(),
-            alias: kamu_api_server_dataset_endpoint.to_string(),
-        }];
-        pretty_assertions::assert_eq!(aliases, expected_aliases);
-    }
-
-    // 3. Pull command
-    {
-        let kamu_in_pull_workspace = KamuCliPuppet::new_workspace_tmp().await;
-
-        // Dataset pull without storing alias
-        kamu_in_pull_workspace
-            .assert_success_command_execution(
-                [
-                    "pull",
-                    kamu_api_server_dataset_endpoint.as_str(),
-                    "--no-alias",
-                ],
-                None,
-                Some(["1 dataset(s) updated"]),
-            )
-            .await;
-
-        // Check alias should be empty
-        let aliases = kamu_in_pull_workspace
-            .get_list_of_repo_aliases(&dataset_alias.dataset_name.clone().into())
-            .await;
-        assert!(aliases.is_empty());
-
-        // Delete local dataset
-        kamu_in_pull_workspace
-            .execute(["--yes", "delete", dataset_alias.dataset_name.as_str()])
-            .await
-            .success();
-
-        // Dataset pull with storing alias
-        kamu_in_pull_workspace
-            .assert_success_command_execution(
-                ["pull", kamu_api_server_dataset_endpoint.as_str()],
-                None,
-                Some(["1 dataset(s) updated"]),
-            )
-            .await;
-
-        let aliases = kamu_in_pull_workspace
-            .get_list_of_repo_aliases(&dataset_alias.dataset_name.clone().into())
-            .await;
-        let expected_aliases = vec![RepoAlias {
-            dataset: dataset_alias.dataset_name.clone(),
-            kind: "Pull".to_string(),
-            alias: kamu_api_server_dataset_endpoint.to_string(),
-        }];
-        pretty_assertions::assert_eq!(aliases, expected_aliases);
-    }
-}
-
+// Others
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_smart_pull_as(mut kamu_api_server_client: KamuApiServerClient) {
@@ -1463,7 +1328,7 @@ async fn test_smart_push_pull_sequence(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_smart_push_force_pull_force(
+async fn test_smart_push_force_pull_force(
     mut kamu_api_server_client: KamuApiServerClient,
     is_push_workspace_multi_tenant: bool,
     is_pull_workspace_multi_tenant: bool,
@@ -1610,6 +1475,153 @@ pub async fn test_smart_push_force_pull_force(
                 Some(["1 dataset(s) updated"]),
             )
             .await;
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+async fn test_smart_push_no_alias_pull_no_alias(
+    mut kamu_api_server_client: KamuApiServerClient,
+    is_push_workspace_multi_tenant: bool,
+    is_pull_workspace_multi_tenant: bool,
+) {
+    let dataset_alias = DatasetAlias::new(
+        Some(E2E_USER_ACCOUNT_NAME.clone()),
+        DATASET_ROOT_PLAYER_NAME.clone(),
+    );
+    let kamu_api_server_dataset_endpoint = kamu_api_server_client
+        .dataset()
+        .get_endpoint(&dataset_alias);
+
+    // 1. Grub a token
+    let token = kamu_api_server_client.auth().login_as_e2e_user().await;
+
+    // 2. Push command
+    {
+        let kamu_in_push_workspace =
+            KamuCliPuppet::new_workspace_tmp(is_push_workspace_multi_tenant).await;
+
+        // Add the dataset
+        kamu_in_push_workspace
+            .execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
+            .await
+            .success();
+
+        // Ingest data to the dataset
+        kamu_in_push_workspace
+            .ingest_data(
+                &dataset_alias.dataset_name,
+                DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
+            )
+            .await;
+
+        // Login to the API server
+        kamu_in_push_workspace
+            .execute([
+                "login",
+                kamu_api_server_client.get_base_url().as_str(),
+                "--access-token",
+                token.as_str(),
+            ])
+            .await
+            .success();
+
+        // Dataset push without storing alias
+        kamu_in_push_workspace
+            .assert_success_command_execution(
+                [
+                    "push",
+                    dataset_alias.dataset_name.as_str(),
+                    "--to",
+                    kamu_api_server_dataset_endpoint.as_str(),
+                    "--no-alias",
+                ],
+                None,
+                Some(["1 dataset(s) pushed"]),
+            )
+            .await;
+
+        // Check alias should be empty
+        let aliases = kamu_in_push_workspace
+            .get_list_of_repo_aliases(&dataset_alias.dataset_name.clone().into())
+            .await;
+        assert!(aliases.is_empty());
+
+        // Dataset push with storing alias
+        kamu_in_push_workspace
+            .assert_success_command_execution(
+                [
+                    "push",
+                    dataset_alias.dataset_name.as_str(),
+                    "--to",
+                    kamu_api_server_dataset_endpoint.as_str(),
+                ],
+                None,
+                Some(["1 dataset(s) up-to-date"]),
+            )
+            .await;
+
+        let aliases = kamu_in_push_workspace
+            .get_list_of_repo_aliases(&dataset_alias.dataset_name.clone().into())
+            .await;
+        let expected_aliases = vec![RepoAlias {
+            dataset: dataset_alias.dataset_name.clone(),
+            kind: "Push".to_string(),
+            alias: kamu_api_server_dataset_endpoint.to_string(),
+        }];
+
+        pretty_assertions::assert_eq!(aliases, expected_aliases);
+    }
+
+    // 3. Pull command
+    {
+        let kamu_in_pull_workspace =
+            KamuCliPuppet::new_workspace_tmp(is_pull_workspace_multi_tenant).await;
+
+        // Dataset pull without storing alias
+        kamu_in_pull_workspace
+            .assert_success_command_execution(
+                [
+                    "pull",
+                    kamu_api_server_dataset_endpoint.as_str(),
+                    "--no-alias",
+                ],
+                None,
+                Some(["1 dataset(s) updated"]),
+            )
+            .await;
+
+        // Check alias should be empty
+        let aliases = kamu_in_pull_workspace
+            .get_list_of_repo_aliases(&dataset_alias.dataset_name.clone().into())
+            .await;
+        assert!(aliases.is_empty());
+
+        // Delete local dataset
+        kamu_in_pull_workspace
+            .execute(["--yes", "delete", dataset_alias.dataset_name.as_str()])
+            .await
+            .success();
+
+        // Dataset pull with storing alias
+        kamu_in_pull_workspace
+            .assert_success_command_execution(
+                ["pull", kamu_api_server_dataset_endpoint.as_str()],
+                None,
+                Some(["1 dataset(s) updated"]),
+            )
+            .await;
+
+        let aliases = kamu_in_pull_workspace
+            .get_list_of_repo_aliases(&dataset_alias.dataset_name.clone().into())
+            .await;
+        let expected_aliases = vec![RepoAlias {
+            dataset: dataset_alias.dataset_name.clone(),
+            kind: "Pull".to_string(),
+            alias: kamu_api_server_dataset_endpoint.to_string(),
+        }];
+
+        pretty_assertions::assert_eq!(aliases, expected_aliases);
     }
 }
 
