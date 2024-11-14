@@ -72,7 +72,7 @@ pub async fn test_push_ingest_from_file_ledger(kamu: KamuCliPuppet) {
     .success();
 
     kamu.assert_last_data_slice(
-        &DatasetName::new_unchecked("population"),
+        &DatasetAlias::new(None, DatasetName::new_unchecked("population")),
         indoc!(
             r#"
             message arrow_schema {
@@ -154,7 +154,7 @@ pub async fn test_push_ingest_from_file_snapshot_with_event_time(kamu: KamuCliPu
     .success();
 
     kamu.assert_last_data_slice(
-        &DatasetName::new_unchecked("population"),
+        &DatasetAlias::new(None, DatasetName::new_unchecked("population")),
         indoc!(
             r#"
             message arrow_schema {

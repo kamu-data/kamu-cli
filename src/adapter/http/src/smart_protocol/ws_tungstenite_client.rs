@@ -693,6 +693,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
             }
 
             let dst_dataset = dst.clone();
+
             DatabaseTransactionRunner::new(self.catalog.clone())
                 .transactional_with(
                     |append_dataset_metadata_batch: Arc<
@@ -707,7 +708,8 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
                             .await
                     },
                 )
-                .instrument(tracing::debug_span!("SmartTransferProtocolClient::append_dataset_metadata_batch",))
+                .instrument(tracing::debug_span!("
+            SmartTransferProtocolClient::append_dataset_metadata_batch",))
                 .await
                 .int_err()?;
 
