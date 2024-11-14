@@ -10,15 +10,13 @@
 use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
-use dill::Catalog;
 use kamu::testing::MetadataFactory;
 use kamu::CreateDatasetUseCaseImpl;
-use kamu_core::{CreateDatasetUseCase, GetDatasetError, TenancyConfig};
-use messaging_outbox::{MockOutbox, Outbox};
+use kamu_core::CreateDatasetUseCase;
+use messaging_outbox::MockOutbox;
 use opendatafabric::{DatasetAlias, DatasetKind, DatasetName};
 
 use crate::tests::use_cases::*;
-use crate::BaseRepoHarness;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -47,34 +45,27 @@ async fn test_create_root_dataset() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[oop::extend(BaseUseCaseHarness, base_harness)]
 struct CreateUseCaseHarness {
-    base_repo_harness: BaseRepoHarness,
-    _catalog: Catalog,
+    base_harness: BaseUseCaseHarness,
     use_case: Arc<dyn CreateDatasetUseCase>,
 }
 
 impl CreateUseCaseHarness {
     fn new(mock_outbox: MockOutbox) -> Self {
-        let base_repo_harness = BaseRepoHarness::new(TenancyConfig::SingleTenant);
+        let base_harness =
+            BaseUseCaseHarness::new(BaseUseCaseHarnessOptions::new().with_outbox(mock_outbox));
 
-        let catalog = dill::CatalogBuilder::new_chained(base_repo_harness.catalog())
+        let catalog = dill::CatalogBuilder::new_chained(base_harness.catalog())
             .add::<CreateDatasetUseCaseImpl>()
-            .add_value(mock_outbox)
-            .bind::<dyn Outbox, MockOutbox>()
             .build();
 
         let use_case = catalog.get_one::<dyn CreateDatasetUseCase>().unwrap();
 
         Self {
-            base_repo_harness,
-            _catalog: catalog,
+            base_harness,
             use_case,
         }
-    }
-
-    #[inline]
-    async fn check_dataset_exists(&self, alias: &DatasetAlias) -> Result<(), GetDatasetError> {
-        self.base_repo_harness.check_dataset_exists(alias).await
     }
 }
 

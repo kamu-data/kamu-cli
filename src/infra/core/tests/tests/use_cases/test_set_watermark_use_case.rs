@@ -11,14 +11,12 @@ use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
 use chrono::{DateTime, TimeDelta, Utc};
-use dill::Catalog;
 use kamu::testing::MockDatasetActionAuthorizer;
 use kamu::*;
-use kamu_core::auth::DatasetActionAuthorizer;
 use kamu_core::*;
 use opendatafabric::*;
 
-use crate::BaseRepoHarness;
+use super::{BaseUseCaseHarness, BaseUseCaseHarnessOptions};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -70,39 +68,33 @@ async fn test_set_watermark_unauthorized() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[oop::extend(BaseUseCaseHarness, base_harness)]
 struct SetWatermarkUseCaseHarness {
-    base_repo_harness: BaseRepoHarness,
-    _catalog: Catalog,
+    base_harness: BaseUseCaseHarness,
     use_case: Arc<dyn SetWatermarkUseCase>,
     watermark_svc: Arc<dyn WatermarkService>,
 }
 
 impl SetWatermarkUseCaseHarness {
     fn new(mock_dataset_action_authorizer: MockDatasetActionAuthorizer) -> Self {
-        let base_repo_harness = BaseRepoHarness::new(TenancyConfig::SingleTenant);
+        let base_harness = BaseUseCaseHarness::new(
+            BaseUseCaseHarnessOptions::new().with_authorizer(mock_dataset_action_authorizer),
+        );
 
-        let catalog = dill::CatalogBuilder::new_chained(base_repo_harness.catalog())
+        let catalog = dill::CatalogBuilder::new_chained(base_harness.catalog())
             .add::<SetWatermarkUseCaseImpl>()
             .add::<WatermarkServiceImpl>()
             .add::<RemoteAliasesRegistryImpl>()
-            .add_value(mock_dataset_action_authorizer)
-            .bind::<dyn DatasetActionAuthorizer, MockDatasetActionAuthorizer>()
             .build();
 
         let use_case = catalog.get_one().unwrap();
         let watermark_svc = catalog.get_one().unwrap();
 
         Self {
-            base_repo_harness,
-            _catalog: catalog,
+            base_harness,
             use_case,
             watermark_svc,
         }
-    }
-
-    #[inline]
-    async fn create_root_dataset(&self, alias: &DatasetAlias) -> CreateDatasetResult {
-        self.base_repo_harness.create_root_dataset(alias).await
     }
 
     async fn current_watermark(

@@ -17,22 +17,18 @@ use kamu::{
     DependencyGraphRepositoryInMemory,
     DependencyGraphServiceInMemory,
 };
-use kamu_core::auth::DatasetActionAuthorizer;
 use kamu_core::{
-    CreateDatasetResult,
     DatasetLifecycleMessage,
     DatasetRepository,
     DeleteDatasetError,
     DeleteDatasetUseCase,
     DependencyGraphService,
     GetDatasetError,
-    TenancyConfig,
 };
-use messaging_outbox::{consume_deserialized_message, ConsumerFilter, Message, MockOutbox, Outbox};
-use opendatafabric::{DatasetAlias, DatasetName, DatasetRef};
+use messaging_outbox::{consume_deserialized_message, ConsumerFilter, Message, MockOutbox};
+use opendatafabric::{DatasetAlias, DatasetName};
 
 use crate::tests::use_cases::*;
-use crate::BaseRepoHarness;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -201,9 +197,12 @@ async fn test_delete_dataset_respects_dangling_refs() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[oop::extend(BaseUseCaseHarness, base_harness)]
 struct DeleteUseCaseHarness {
-    base_repo_harness: BaseRepoHarness,
+    base_harness: BaseUseCaseHarness,
     catalog: Catalog,
+    dependency_graph_service: Arc<dyn DependencyGraphService>,
+    dataset_repo: Arc<dyn DatasetRepository>,
     use_case: Arc<dyn DeleteDatasetUseCase>,
 }
 
@@ -212,56 +211,35 @@ impl DeleteUseCaseHarness {
         mock_dataset_action_authorizer: MockDatasetActionAuthorizer,
         mock_outbox: MockOutbox,
     ) -> Self {
-        let base_repo_harness = BaseRepoHarness::new(TenancyConfig::SingleTenant);
+        let base_harness = BaseUseCaseHarness::new(
+            BaseUseCaseHarnessOptions::new()
+                .with_authorizer(mock_dataset_action_authorizer)
+                .with_outbox(mock_outbox),
+        );
 
-        let catalog = dill::CatalogBuilder::new_chained(base_repo_harness.catalog())
+        let catalog = dill::CatalogBuilder::new_chained(base_harness.catalog())
             .add::<DeleteDatasetUseCaseImpl>()
             .add::<DependencyGraphServiceInMemory>()
-            .add_value(mock_dataset_action_authorizer)
-            .bind::<dyn DatasetActionAuthorizer, MockDatasetActionAuthorizer>()
-            .add_value(mock_outbox)
-            .bind::<dyn Outbox, MockOutbox>()
             .build();
 
-        let use_case = catalog.get_one::<dyn DeleteDatasetUseCase>().unwrap();
+        let dependency_graph_service = catalog.get_one().unwrap();
+        let use_case = catalog.get_one().unwrap();
+        let dataset_repo = catalog.get_one().unwrap();
 
         Self {
-            base_repo_harness,
+            base_harness,
             catalog,
+            dependency_graph_service,
+            dataset_repo,
             use_case,
         }
     }
 
-    #[inline]
-    async fn create_root_dataset(&self, alias: &DatasetAlias) -> CreateDatasetResult {
-        self.base_repo_harness.create_root_dataset(alias).await
-    }
-
-    #[inline]
-    async fn create_derived_dataset(
-        &self,
-        alias: &DatasetAlias,
-        input_dataset_refs: Vec<DatasetRef>,
-    ) -> CreateDatasetResult {
-        self.base_repo_harness
-            .create_derived_dataset(alias, input_dataset_refs)
-            .await
-    }
-
-    #[inline]
-    async fn check_dataset_exists(&self, alias: &DatasetAlias) -> Result<(), GetDatasetError> {
-        self.base_repo_harness.check_dataset_exists(alias).await
-    }
-
     async fn dependencies_eager_initialization(&self) {
-        let dependency_graph_service = self
-            .catalog
-            .get_one::<dyn DependencyGraphService>()
-            .unwrap();
-        let dataset_repo = self.catalog.get_one::<dyn DatasetRepository>().unwrap();
-
-        dependency_graph_service
-            .eager_initialization(&DependencyGraphRepositoryInMemory::new(dataset_repo))
+        self.dependency_graph_service
+            .eager_initialization(&DependencyGraphRepositoryInMemory::new(
+                self.dataset_repo.clone(),
+            ))
             .await
             .unwrap();
     }

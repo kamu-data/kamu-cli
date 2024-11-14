@@ -10,22 +10,13 @@
 use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
-use dill::Catalog;
 use kamu::testing::{MetadataFactory, MockDatasetActionAuthorizer};
 use kamu::CommitDatasetEventUseCaseImpl;
-use kamu_core::auth::DatasetActionAuthorizer;
-use kamu_core::{
-    CommitDatasetEventUseCase,
-    CommitError,
-    CommitOpts,
-    CreateDatasetResult,
-    TenancyConfig,
-};
-use messaging_outbox::{MockOutbox, Outbox};
-use opendatafabric::{DatasetAlias, DatasetName, DatasetRef, MetadataEvent};
+use kamu_core::{CommitDatasetEventUseCase, CommitError, CommitOpts};
+use messaging_outbox::MockOutbox;
+use opendatafabric::{DatasetAlias, DatasetName, MetadataEvent};
 
 use crate::tests::use_cases::*;
-use crate::BaseRepoHarness;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -116,9 +107,9 @@ async fn test_commit_event_with_new_dependencies() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[oop::extend(BaseUseCaseHarness, base_harness)]
 struct CommitDatasetEventUseCaseHarness {
-    base_repo_harness: BaseRepoHarness,
-    _catalog: Catalog,
+    base_harness: BaseUseCaseHarness,
     use_case: Arc<dyn CommitDatasetEventUseCase>,
 }
 
@@ -127,39 +118,22 @@ impl CommitDatasetEventUseCaseHarness {
         mock_dataset_action_authorizer: MockDatasetActionAuthorizer,
         mock_outbox: MockOutbox,
     ) -> Self {
-        let base_repo_harness = BaseRepoHarness::new(TenancyConfig::SingleTenant);
+        let base_harness = BaseUseCaseHarness::new(
+            BaseUseCaseHarnessOptions::new()
+                .with_authorizer(mock_dataset_action_authorizer)
+                .with_outbox(mock_outbox),
+        );
 
-        let catalog = dill::CatalogBuilder::new_chained(base_repo_harness.catalog())
+        let catalog = dill::CatalogBuilder::new_chained(base_harness.catalog())
             .add::<CommitDatasetEventUseCaseImpl>()
-            .add_value(mock_dataset_action_authorizer)
-            .bind::<dyn DatasetActionAuthorizer, MockDatasetActionAuthorizer>()
-            .add_value(mock_outbox)
-            .bind::<dyn Outbox, MockOutbox>()
             .build();
 
         let use_case = catalog.get_one::<dyn CommitDatasetEventUseCase>().unwrap();
 
         Self {
-            base_repo_harness,
-            _catalog: catalog,
+            base_harness,
             use_case,
         }
-    }
-
-    #[inline]
-    async fn create_root_dataset(&self, alias: &DatasetAlias) -> CreateDatasetResult {
-        self.base_repo_harness.create_root_dataset(alias).await
-    }
-
-    #[inline]
-    async fn create_derived_dataset(
-        &self,
-        alias: &DatasetAlias,
-        input_dataset_refs: Vec<DatasetRef>,
-    ) -> CreateDatasetResult {
-        self.base_repo_harness
-            .create_derived_dataset(alias, input_dataset_refs)
-            .await
     }
 }
 

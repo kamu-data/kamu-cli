@@ -12,25 +12,15 @@ use std::collections::VecDeque;
 use std::sync::Arc;
 
 use chrono::Utc;
-use dill::Catalog;
 use kamu::testing::MetadataFactory;
 use kamu::AppendDatasetMetadataBatchUseCaseImpl;
-use kamu_core::{AppendDatasetMetadataBatchUseCase, CreateDatasetResult, TenancyConfig};
-use messaging_outbox::{MockOutbox, Outbox};
+use kamu_core::AppendDatasetMetadataBatchUseCase;
+use messaging_outbox::MockOutbox;
 use opendatafabric::serde::flatbuffers::FlatbuffersMetadataBlockSerializer;
 use opendatafabric::serde::MetadataBlockSerializer;
-use opendatafabric::{
-    DatasetAlias,
-    DatasetName,
-    DatasetRef,
-    MetadataBlock,
-    MetadataEvent,
-    Multicodec,
-    Multihash,
-};
+use opendatafabric::*;
 
 use crate::tests::use_cases::*;
-use crate::BaseRepoHarness;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -116,20 +106,19 @@ async fn test_append_dataset_metadata_batch_with_new_dependencies() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[oop::extend(BaseUseCaseHarness, base_harness)]
 struct AppendDatasetMetadataBatchUseCaseHarness {
-    base_repo_harness: BaseRepoHarness,
-    _catalog: Catalog,
+    base_harness: BaseUseCaseHarness,
     use_case: Arc<dyn AppendDatasetMetadataBatchUseCase>,
 }
 
 impl AppendDatasetMetadataBatchUseCaseHarness {
     fn new(mock_outbox: MockOutbox) -> Self {
-        let base_repo_harness = BaseRepoHarness::new(TenancyConfig::SingleTenant);
+        let base_harness =
+            BaseUseCaseHarness::new(BaseUseCaseHarnessOptions::new().with_outbox(mock_outbox));
 
-        let catalog = dill::CatalogBuilder::new()
+        let catalog = dill::CatalogBuilder::new_chained(base_harness.catalog())
             .add::<AppendDatasetMetadataBatchUseCaseImpl>()
-            .add_value(mock_outbox)
-            .bind::<dyn Outbox, MockOutbox>()
             .build();
 
         let use_case = catalog
@@ -137,26 +126,9 @@ impl AppendDatasetMetadataBatchUseCaseHarness {
             .unwrap();
 
         Self {
-            base_repo_harness,
-            _catalog: catalog,
+            base_harness,
             use_case,
         }
-    }
-
-    #[inline]
-    async fn create_root_dataset(&self, alias: &DatasetAlias) -> CreateDatasetResult {
-        self.base_repo_harness.create_root_dataset(alias).await
-    }
-
-    #[inline]
-    async fn create_derived_dataset(
-        &self,
-        alias: &DatasetAlias,
-        input_dataset_refs: Vec<DatasetRef>,
-    ) -> CreateDatasetResult {
-        self.base_repo_harness
-            .create_derived_dataset(alias, input_dataset_refs)
-            .await
     }
 
     fn hash_from_block(block: &MetadataBlock) -> Multihash {

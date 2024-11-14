@@ -10,22 +10,13 @@
 use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
-use dill::Catalog;
 use kamu::testing::MockDatasetActionAuthorizer;
 use kamu::RenameDatasetUseCaseImpl;
-use kamu_core::auth::DatasetActionAuthorizer;
-use kamu_core::{
-    CreateDatasetResult,
-    GetDatasetError,
-    RenameDatasetError,
-    RenameDatasetUseCase,
-    TenancyConfig,
-};
-use messaging_outbox::{MockOutbox, Outbox};
+use kamu_core::{GetDatasetError, RenameDatasetError, RenameDatasetUseCase};
+use messaging_outbox::MockOutbox;
 use opendatafabric::{DatasetAlias, DatasetName};
 
 use crate::tests::use_cases::*;
-use crate::BaseRepoHarness;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -109,9 +100,9 @@ async fn test_rename_dataset_unauthorized() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[oop::extend(BaseUseCaseHarness, base_harness)]
 struct RenameUseCaseHarness {
-    base_repo_harness: BaseRepoHarness,
-    _catalog: Catalog,
+    base_harness: BaseUseCaseHarness,
     use_case: Arc<dyn RenameDatasetUseCase>,
 }
 
@@ -120,33 +111,22 @@ impl RenameUseCaseHarness {
         mock_dataset_action_authorizer: MockDatasetActionAuthorizer,
         mock_outbox: MockOutbox,
     ) -> Self {
-        let base_repo_harness = BaseRepoHarness::new(TenancyConfig::SingleTenant);
+        let base_harness = BaseUseCaseHarness::new(
+            BaseUseCaseHarnessOptions::new()
+                .with_authorizer(mock_dataset_action_authorizer)
+                .with_outbox(mock_outbox),
+        );
 
-        let catalog = dill::CatalogBuilder::new_chained(base_repo_harness.catalog())
+        let catalog = dill::CatalogBuilder::new_chained(base_harness.catalog())
             .add::<RenameDatasetUseCaseImpl>()
-            .add_value(mock_dataset_action_authorizer)
-            .bind::<dyn DatasetActionAuthorizer, MockDatasetActionAuthorizer>()
-            .add_value(mock_outbox)
-            .bind::<dyn Outbox, MockOutbox>()
             .build();
 
         let use_case = catalog.get_one::<dyn RenameDatasetUseCase>().unwrap();
 
         Self {
-            base_repo_harness,
-            _catalog: catalog,
+            base_harness,
             use_case,
         }
-    }
-
-    #[inline]
-    async fn create_root_dataset(&self, alias: &DatasetAlias) -> CreateDatasetResult {
-        self.base_repo_harness.create_root_dataset(alias).await
-    }
-
-    #[inline]
-    async fn check_dataset_exists(&self, alias: &DatasetAlias) -> Result<(), GetDatasetError> {
-        self.base_repo_harness.check_dataset_exists(alias).await
     }
 }
 

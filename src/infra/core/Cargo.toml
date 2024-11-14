@@ -168,6 +168,7 @@ filetime = "0.2"
 indoc = "2"
 mockall = { version = "0.13", default-features = false }
 nanoid = "0.4.0"
+oop = "0.0.2"
 pretty_assertions = { version = "1" }
 test-group = { version = "1" }
 test-log = { version = "0.2", features = ["trace"] }

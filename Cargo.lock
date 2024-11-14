@@ -5185,6 +5185,7 @@ dependencies = [
  "mockall",
  "nanoid",
  "object_store",
+ "oop",
  "opendatafabric",
  "parking_lot",
  "petgraph",
@@ -7482,6 +7483,26 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1261fe7e33c73b354eab43b1273a57c8f967d0391e80353e51f764ac02cf6775"
 dependencies = [
  "parking_lot_core",
+]
+
+[[package]]
+name = "oop"
+version = "0.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7a3014baf68cf315fbfc3c3d69efd1f79fea3c3ac44d9cd9e10b7cf8fd8e4920"
+dependencies = [
+ "oop-macro",
+]
+
+[[package]]
+name = "oop-macro"
+version = "0.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e493043dcf88be852a9716f7b065640867a72cab403f360003534e8cbf11bf84"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.87",
 ]
 
 [[package]]
