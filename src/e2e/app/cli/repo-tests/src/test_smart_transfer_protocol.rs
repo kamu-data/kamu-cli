@@ -104,69 +104,17 @@ pub async fn test_smart_pull_reset_derivative_mt(kamu: KamuCliPuppet) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Others
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_smart_push_visibility(mut kamu_api_server_client: KamuApiServerClient) {
-    let dataset_alias = DatasetAlias::new(
-        Some(E2E_USER_ACCOUNT_NAME.clone()),
-        DATASET_ROOT_PLAYER_NAME.clone(),
-    );
-    let kamu_api_server_dataset_endpoint = kamu_api_server_client
-        .dataset()
-        .get_endpoint(&dataset_alias);
-
-    // 1. Grub a token
-    let token = kamu_api_server_client.auth().login_as_e2e_user().await;
-
-    // 2. Pushing the dataset to the API server
-    {
-        let kamu_in_push_workspace = KamuCliPuppet::new_workspace_tmp().await;
-
-        // 2.1. Add the dataset
-        kamu_in_push_workspace
-            .execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
-            .await
-            .success();
-
-        // 2.1. Ingest data to the dataset
-        kamu_in_push_workspace
-            .ingest_data(
-                &dataset_alias.dataset_name,
-                DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
-            )
-            .await;
-
-        // 2.2. Login to the API server
-        kamu_in_push_workspace
-            .execute([
-                "login",
-                kamu_api_server_client.get_base_url().as_str(),
-                "--access-token",
-                token.as_str(),
-            ])
-            .await
-            .success();
-
-        kamu_in_push_workspace
-            .assert_success_command_execution(
-                [
-                    "push",
-                    dataset_alias.dataset_name.as_str(),
-                    "--to",
-                    kamu_api_server_dataset_endpoint.as_str(),
-                    "--visibility",
-                    "private",
-                ],
-                None,
-                Some(["1 dataset(s) pushed"]),
-            )
-            .await;
-
-        // ToDo add visibility check
-    }
+pub async fn test_smart_push_visibility_st(kamu_api_server_client: KamuApiServerClient) {
+    test_smart_push_visibility(kamu_api_server_client, false).await;
 }
 
+pub async fn test_smart_push_visibility_mt(kamu_api_server_client: KamuApiServerClient) {
+    test_smart_push_visibility(kamu_api_server_client, true).await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Others
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_smart_push_pull_s3(kamu: KamuCliPuppet) {
@@ -1677,6 +1625,72 @@ async fn test_smart_pull_reset_derivative(kamu: KamuCliPuppet) {
         expected_derivative_data,
     )
     .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+async fn test_smart_push_visibility(
+    mut kamu_api_server_client: KamuApiServerClient,
+    is_push_workspace_multi_tenant: bool,
+) {
+    let dataset_alias = DatasetAlias::new(
+        Some(E2E_USER_ACCOUNT_NAME.clone()),
+        DATASET_ROOT_PLAYER_NAME.clone(),
+    );
+    let kamu_api_server_dataset_endpoint = kamu_api_server_client
+        .dataset()
+        .get_endpoint(&dataset_alias);
+
+    // 1. Grub a token
+    let token = kamu_api_server_client.auth().login_as_e2e_user().await;
+
+    // 2. Pushing the dataset to the API server
+    {
+        let kamu_in_push_workspace =
+            KamuCliPuppet::new_workspace_tmp(is_push_workspace_multi_tenant).await;
+
+        // 2.1. Add the dataset
+        kamu_in_push_workspace
+            .execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
+            .await
+            .success();
+
+        // 2.1. Ingest data to the dataset
+        kamu_in_push_workspace
+            .ingest_data(
+                &dataset_alias.dataset_name,
+                DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
+            )
+            .await;
+
+        // 2.2. Login to the API server
+        kamu_in_push_workspace
+            .execute([
+                "login",
+                kamu_api_server_client.get_base_url().as_str(),
+                "--access-token",
+                token.as_str(),
+            ])
+            .await
+            .success();
+
+        kamu_in_push_workspace
+            .assert_success_command_execution(
+                [
+                    "push",
+                    dataset_alias.dataset_name.as_str(),
+                    "--to",
+                    kamu_api_server_dataset_endpoint.as_str(),
+                    "--visibility",
+                    "private",
+                ],
+                None,
+                Some(["1 dataset(s) pushed"]),
+            )
+            .await;
+
+        // TODO: Private Datasets: add visibility check
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
