@@ -10,21 +10,12 @@
 use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
-use dill::{Catalog, Component};
+use dill::Catalog;
 use kamu::testing::MetadataFactory;
-use kamu::{
-    CreateDatasetFromSnapshotUseCaseImpl,
-    DatasetRegistryRepoBridge,
-    DatasetRepositoryLocalFs,
-    DatasetRepositoryWriter,
-};
-use kamu_accounts::CurrentAccountSubject;
+use kamu::CreateDatasetFromSnapshotUseCaseImpl;
 use kamu_core::{
     CreateDatasetFromSnapshotUseCase,
     DatasetLifecycleMessage,
-    DatasetRegistry,
-    DatasetRegistryExt,
-    DatasetRepository,
     GetDatasetError,
     TenancyConfig,
     MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
@@ -32,7 +23,8 @@ use kamu_core::{
 use messaging_outbox::{MockOutbox, Outbox};
 use mockall::predicate::{eq, function};
 use opendatafabric::{DatasetAlias, DatasetKind, DatasetName};
-use time_source::SystemTimeSourceDefault;
+
+use crate::BaseRepoHarness;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -113,46 +105,34 @@ async fn test_create_derived_dataset_from_snapshot() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct CreateFromSnapshotUseCaseHarness {
-    _temp_dir: tempfile::TempDir,
-    catalog: Catalog,
+    base_repo_harness: BaseRepoHarness,
+    _catalog: Catalog,
     use_case: Arc<dyn CreateDatasetFromSnapshotUseCase>,
 }
 
 impl CreateFromSnapshotUseCaseHarness {
     fn new(mock_outbox: MockOutbox) -> Self {
-        let tempdir = tempfile::tempdir().unwrap();
+        let base_repo_harness = BaseRepoHarness::new(TenancyConfig::SingleTenant);
 
-        let datasets_dir = tempdir.path().join("datasets");
-        std::fs::create_dir(&datasets_dir).unwrap();
-
-        let mut b = dill::CatalogBuilder::new();
+        let mut b = dill::CatalogBuilder::new_chained(base_repo_harness.catalog());
 
         b.add::<CreateDatasetFromSnapshotUseCaseImpl>()
-            .add_value(TenancyConfig::SingleTenant)
-            .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
-            .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-            .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
-            .add::<DatasetRegistryRepoBridge>()
-            .add_value(CurrentAccountSubject::new_test())
             .add_value(mock_outbox)
-            .bind::<dyn Outbox, MockOutbox>()
-            .add::<SystemTimeSourceDefault>();
+            .bind::<dyn Outbox, MockOutbox>();
 
         let catalog = b.build();
+        let use_case = catalog.get_one().unwrap();
 
         Self {
-            _temp_dir: tempdir,
-            use_case: catalog.get_one().unwrap(),
-            catalog,
+            base_repo_harness,
+            _catalog: catalog,
+            use_case,
         }
     }
 
+    #[inline]
     async fn check_dataset_exists(&self, alias: &DatasetAlias) -> Result<(), GetDatasetError> {
-        let dataset_registry = self.catalog.get_one::<dyn DatasetRegistry>().unwrap();
-        dataset_registry
-            .get_dataset_by_ref(&alias.as_local_ref())
-            .await?;
-        Ok(())
+        self.base_repo_harness.check_dataset_exists(alias).await
     }
 
     fn add_outbox_dataset_created_expectation(mock_outbox: &mut MockOutbox, times: usize) {

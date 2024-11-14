@@ -12,21 +12,13 @@ use std::collections::VecDeque;
 use std::sync::Arc;
 
 use chrono::Utc;
-use dill::{Catalog, Component};
+use dill::Catalog;
 use kamu::testing::MetadataFactory;
-use kamu::{
-    AppendDatasetMetadataBatchUseCaseImpl,
-    DatasetRegistryRepoBridge,
-    DatasetRepositoryLocalFs,
-    DatasetRepositoryWriter,
-};
-use kamu_accounts::CurrentAccountSubject;
+use kamu::AppendDatasetMetadataBatchUseCaseImpl;
 use kamu_core::{
     AppendDatasetMetadataBatchUseCase,
     CreateDatasetResult,
     DatasetLifecycleMessage,
-    DatasetRegistry,
-    DatasetRepository,
     TenancyConfig,
     MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
 };
@@ -36,14 +28,15 @@ use opendatafabric::serde::flatbuffers::FlatbuffersMetadataBlockSerializer;
 use opendatafabric::serde::MetadataBlockSerializer;
 use opendatafabric::{
     DatasetAlias,
-    DatasetKind,
     DatasetName,
+    DatasetRef,
     MetadataBlock,
     MetadataEvent,
     Multicodec,
     Multihash,
 };
-use time_source::SystemTimeSourceDefault;
+
+use crate::BaseRepoHarness;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -54,16 +47,12 @@ async fn test_append_dataset_metadata_batch() {
     let mock_outbox = MockOutbox::new();
 
     let harness = AppendDatasetMetadataBatchUseCaseHarness::new(mock_outbox);
-    let create_result_foo = harness.create_dataset(&alias_foo, DatasetKind::Root).await;
-
-    let foo_dataset = harness
-        .dataset_registry
-        .get_dataset_by_handle(&create_result_foo.dataset_handle);
+    let created_foo = harness.create_root_dataset(&alias_foo).await;
 
     let set_info_block = MetadataBlock {
         system_time: Utc::now(),
-        prev_block_hash: Some(create_result_foo.head.clone()),
-        sequence_number: 1,
+        prev_block_hash: Some(created_foo.head.clone()),
+        sequence_number: 2,
         event: MetadataEvent::SetInfo(MetadataFactory::set_info().description("test").build()),
     };
     let hash_set_info_block =
@@ -72,7 +61,7 @@ async fn test_append_dataset_metadata_batch() {
     let set_license_block = MetadataBlock {
         system_time: Utc::now(),
         prev_block_hash: Some(hash_set_info_block.clone()),
-        sequence_number: 2,
+        sequence_number: 3,
         event: MetadataEvent::SetLicense(MetadataFactory::set_license().build()),
     };
     let hash_set_license_block =
@@ -85,7 +74,7 @@ async fn test_append_dataset_metadata_batch() {
 
     let res = harness
         .use_case
-        .execute(foo_dataset.as_ref(), new_blocks, false)
+        .execute(created_foo.dataset.as_ref(), new_blocks, false)
         .await;
     assert_matches!(res, Ok(_));
 }
@@ -104,23 +93,19 @@ async fn test_append_dataset_metadata_batch_with_new_dependencies() {
     );
 
     let harness = AppendDatasetMetadataBatchUseCaseHarness::new(mock_outbox);
-    let create_result_foo = harness.create_dataset(&alias_foo, DatasetKind::Root).await;
-    let create_result_bar = harness
-        .create_dataset(&alias_bar, DatasetKind::Derivative)
+    let foo_created = harness.create_root_dataset(&alias_foo).await;
+    let bar_created = harness
+        .create_derived_dataset(&alias_bar, vec![foo_created.dataset_handle.as_local_ref()])
         .await;
-
-    let bar_dataset = harness
-        .dataset_registry
-        .get_dataset_by_handle(&create_result_bar.dataset_handle);
 
     let set_transform_block = MetadataBlock {
         system_time: Utc::now(),
-        prev_block_hash: Some(create_result_bar.head.clone()),
-        sequence_number: 1,
+        prev_block_hash: Some(bar_created.head.clone()),
+        sequence_number: 2,
         event: MetadataEvent::SetTransform(
             MetadataFactory::set_transform()
                 .inputs_from_refs_and_aliases(vec![(
-                    create_result_foo.dataset_handle.id,
+                    foo_created.dataset_handle.id,
                     alias_foo.to_string(),
                 )])
                 .build(),
@@ -133,7 +118,7 @@ async fn test_append_dataset_metadata_batch_with_new_dependencies() {
 
     let res = harness
         .use_case
-        .execute(bar_dataset.as_ref(), new_blocks, false)
+        .execute(bar_created.dataset.as_ref(), new_blocks, false)
         .await;
     assert_matches!(res, Ok(_));
 }
@@ -141,28 +126,17 @@ async fn test_append_dataset_metadata_batch_with_new_dependencies() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct AppendDatasetMetadataBatchUseCaseHarness {
-    _temp_dir: tempfile::TempDir,
-    catalog: Catalog,
-    dataset_registry: Arc<dyn DatasetRegistry>,
+    base_repo_harness: BaseRepoHarness,
+    _catalog: Catalog,
     use_case: Arc<dyn AppendDatasetMetadataBatchUseCase>,
 }
 
 impl AppendDatasetMetadataBatchUseCaseHarness {
     fn new(mock_outbox: MockOutbox) -> Self {
-        let tempdir = tempfile::tempdir().unwrap();
-
-        let datasets_dir = tempdir.path().join("datasets");
-        std::fs::create_dir(&datasets_dir).unwrap();
+        let base_repo_harness = BaseRepoHarness::new(TenancyConfig::SingleTenant);
 
         let catalog = dill::CatalogBuilder::new()
             .add::<AppendDatasetMetadataBatchUseCaseImpl>()
-            .add_value(TenancyConfig::SingleTenant)
-            .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
-            .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-            .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
-            .add::<DatasetRegistryRepoBridge>()
-            .add_value(CurrentAccountSubject::new_test())
-            .add::<SystemTimeSourceDefault>()
             .add_value(mock_outbox)
             .bind::<dyn Outbox, MockOutbox>()
             .build();
@@ -171,33 +145,27 @@ impl AppendDatasetMetadataBatchUseCaseHarness {
             .get_one::<dyn AppendDatasetMetadataBatchUseCase>()
             .unwrap();
 
-        let dataset_registry = catalog.get_one::<dyn DatasetRegistry>().unwrap();
-
         Self {
-            _temp_dir: tempdir,
-            catalog,
+            base_repo_harness,
+            _catalog: catalog,
             use_case,
-            dataset_registry,
         }
     }
 
-    async fn create_dataset(&self, alias: &DatasetAlias, kind: DatasetKind) -> CreateDatasetResult {
-        let snapshot = MetadataFactory::dataset_snapshot()
-            .name(alias.clone())
-            .kind(kind)
-            .build();
+    #[inline]
+    async fn create_root_dataset(&self, alias: &DatasetAlias) -> CreateDatasetResult {
+        self.base_repo_harness.create_root_dataset(alias).await
+    }
 
-        let dataset_repo_writer = self
-            .catalog
-            .get_one::<dyn DatasetRepositoryWriter>()
-            .unwrap();
-
-        let result = dataset_repo_writer
-            .create_dataset_from_snapshot(snapshot)
+    #[inline]
+    async fn create_derived_dataset(
+        &self,
+        alias: &DatasetAlias,
+        input_dataset_refs: Vec<DatasetRef>,
+    ) -> CreateDatasetResult {
+        self.base_repo_harness
+            .create_derived_dataset(alias, input_dataset_refs)
             .await
-            .unwrap();
-
-        result.create_dataset_result
     }
 
     fn hash_from_block(block: &MetadataBlock) -> Multihash {

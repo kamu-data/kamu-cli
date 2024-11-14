@@ -10,23 +10,17 @@
 use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
-use dill::{Catalog, Component};
-use kamu::testing::{MetadataFactory, MockDatasetActionAuthorizer};
+use dill::Catalog;
+use kamu::testing::MockDatasetActionAuthorizer;
 use kamu::{
-    DatasetRegistryRepoBridge,
-    DatasetRepositoryLocalFs,
-    DatasetRepositoryWriter,
     DeleteDatasetUseCaseImpl,
     DependencyGraphRepositoryInMemory,
     DependencyGraphServiceInMemory,
 };
-use kamu_accounts::CurrentAccountSubject;
 use kamu_core::auth::DatasetActionAuthorizer;
 use kamu_core::{
     CreateDatasetResult,
     DatasetLifecycleMessage,
-    DatasetRegistry,
-    DatasetRegistryExt,
     DatasetRepository,
     DeleteDatasetError,
     DeleteDatasetUseCase,
@@ -37,8 +31,9 @@ use kamu_core::{
 };
 use messaging_outbox::{consume_deserialized_message, ConsumerFilter, Message, MockOutbox, Outbox};
 use mockall::predicate::{eq, function};
-use opendatafabric::{DatasetAlias, DatasetKind, DatasetName, DatasetRef};
-use time_source::SystemTimeSourceDefault;
+use opendatafabric::{DatasetAlias, DatasetName, DatasetRef};
+
+use crate::BaseRepoHarness;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -208,7 +203,7 @@ async fn test_delete_dataset_respects_dangling_refs() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct DeleteUseCaseHarness {
-    _temp_dir: tempfile::TempDir,
+    base_repo_harness: BaseRepoHarness,
     catalog: Catalog,
     use_case: Arc<dyn DeleteDatasetUseCase>,
 }
@@ -218,23 +213,13 @@ impl DeleteUseCaseHarness {
         mock_dataset_action_authorizer: MockDatasetActionAuthorizer,
         mock_outbox: MockOutbox,
     ) -> Self {
-        let tempdir = tempfile::tempdir().unwrap();
+        let base_repo_harness = BaseRepoHarness::new(TenancyConfig::SingleTenant);
 
-        let datasets_dir = tempdir.path().join("datasets");
-        std::fs::create_dir(&datasets_dir).unwrap();
-
-        let catalog = dill::CatalogBuilder::new()
+        let catalog = dill::CatalogBuilder::new_chained(base_repo_harness.catalog())
             .add::<DeleteDatasetUseCaseImpl>()
-            .add_value(TenancyConfig::SingleTenant)
-            .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
-            .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-            .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
-            .add::<DatasetRegistryRepoBridge>()
-            .add_value(CurrentAccountSubject::new_test())
             .add::<DependencyGraphServiceInMemory>()
             .add_value(mock_dataset_action_authorizer)
             .bind::<dyn DatasetActionAuthorizer, MockDatasetActionAuthorizer>()
-            .add::<SystemTimeSourceDefault>()
             .add_value(mock_outbox)
             .bind::<dyn Outbox, MockOutbox>()
             .build();
@@ -242,65 +227,31 @@ impl DeleteUseCaseHarness {
         let use_case = catalog.get_one::<dyn DeleteDatasetUseCase>().unwrap();
 
         Self {
-            _temp_dir: tempdir,
+            base_repo_harness,
             catalog,
             use_case,
         }
     }
 
+    #[inline]
     async fn create_root_dataset(&self, alias: &DatasetAlias) -> CreateDatasetResult {
-        let snapshot = MetadataFactory::dataset_snapshot()
-            .name(alias.clone())
-            .kind(DatasetKind::Root)
-            .push_event(MetadataFactory::set_polling_source().build())
-            .build();
-
-        let dataset_repo_writer = self
-            .catalog
-            .get_one::<dyn DatasetRepositoryWriter>()
-            .unwrap();
-
-        let result = dataset_repo_writer
-            .create_dataset_from_snapshot(snapshot)
-            .await
-            .unwrap();
-
-        result.create_dataset_result
+        self.base_repo_harness.create_root_dataset(alias).await
     }
 
+    #[inline]
     async fn create_derived_dataset(
         &self,
         alias: &DatasetAlias,
         input_dataset_refs: Vec<DatasetRef>,
     ) -> CreateDatasetResult {
-        let dataset_repo_writer = self
-            .catalog
-            .get_one::<dyn DatasetRepositoryWriter>()
-            .unwrap();
-
-        dataset_repo_writer
-            .create_dataset_from_snapshot(
-                MetadataFactory::dataset_snapshot()
-                    .name(alias.clone())
-                    .kind(DatasetKind::Derivative)
-                    .push_event(
-                        MetadataFactory::set_transform()
-                            .inputs_from_refs(input_dataset_refs)
-                            .build(),
-                    )
-                    .build(),
-            )
+        self.base_repo_harness
+            .create_derived_dataset(alias, input_dataset_refs)
             .await
-            .unwrap()
-            .create_dataset_result
     }
 
+    #[inline]
     async fn check_dataset_exists(&self, alias: &DatasetAlias) -> Result<(), GetDatasetError> {
-        let dataset_registry = self.catalog.get_one::<dyn DatasetRegistry>().unwrap();
-        dataset_registry
-            .get_dataset_by_ref(&alias.as_local_ref())
-            .await?;
-        Ok(())
+        self.base_repo_harness.check_dataset_exists(alias).await
     }
 
     async fn dependencies_eager_initialization(&self) {

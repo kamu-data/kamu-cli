@@ -10,15 +10,9 @@
 use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
-use dill::{Catalog, Component};
+use dill::Catalog;
 use kamu::testing::{MetadataFactory, MockDatasetActionAuthorizer};
-use kamu::{
-    CommitDatasetEventUseCaseImpl,
-    DatasetRegistryRepoBridge,
-    DatasetRepositoryLocalFs,
-    DatasetRepositoryWriter,
-};
-use kamu_accounts::CurrentAccountSubject;
+use kamu::CommitDatasetEventUseCaseImpl;
 use kamu_core::auth::DatasetActionAuthorizer;
 use kamu_core::{
     CommitDatasetEventUseCase,
@@ -26,14 +20,14 @@ use kamu_core::{
     CommitOpts,
     CreateDatasetResult,
     DatasetLifecycleMessage,
-    DatasetRepository,
     TenancyConfig,
     MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
 };
 use messaging_outbox::{MockOutbox, Outbox};
 use mockall::predicate::{eq, function};
-use opendatafabric::{DatasetAlias, DatasetKind, DatasetName, MetadataEvent};
-use time_source::SystemTimeSourceDefault;
+use opendatafabric::{DatasetAlias, DatasetName, DatasetRef, MetadataEvent};
+
+use crate::BaseRepoHarness;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -47,12 +41,12 @@ async fn test_commit_dataset_event() {
     let mock_outbox = MockOutbox::new();
 
     let harness = CommitDatasetEventUseCaseHarness::new(mock_authorizer, mock_outbox);
-    let create_result_foo = harness.create_dataset(&alias_foo, DatasetKind::Root).await;
+    let created_foo = harness.create_root_dataset(&alias_foo).await;
 
     let res = harness
         .use_case
         .execute(
-            &create_result_foo.dataset_handle,
+            &created_foo.dataset_handle,
             MetadataEvent::SetInfo(MetadataFactory::set_info().description("test").build()),
             CommitOpts::default(),
         )
@@ -72,12 +66,12 @@ async fn test_commit_event_unauthorized() {
     let mock_outbox = MockOutbox::new();
 
     let harness = CommitDatasetEventUseCaseHarness::new(mock_authorizer, mock_outbox);
-    let create_result_foo = harness.create_dataset(&alias_foo, DatasetKind::Root).await;
+    let created_foo = harness.create_root_dataset(&alias_foo).await;
 
     let res = harness
         .use_case
         .execute(
-            &create_result_foo.dataset_handle,
+            &created_foo.dataset_handle,
             MetadataEvent::SetInfo(MetadataFactory::set_info().description("test").build()),
             CommitOpts::default(),
         )
@@ -102,19 +96,19 @@ async fn test_commit_event_with_new_dependencies() {
     );
 
     let harness = CommitDatasetEventUseCaseHarness::new(mock_authorizer, mock_outbox);
-    let create_result_foo = harness.create_dataset(&alias_foo, DatasetKind::Root).await;
-    let create_result_bar = harness
-        .create_dataset(&alias_bar, DatasetKind::Derivative)
+    let created_foo = harness.create_root_dataset(&alias_foo).await;
+    let created_bar = harness
+        .create_derived_dataset(&alias_bar, vec![created_foo.dataset_handle.as_local_ref()])
         .await;
 
     let res = harness
         .use_case
         .execute(
-            &create_result_bar.dataset_handle,
+            &created_bar.dataset_handle,
             MetadataEvent::SetTransform(
                 MetadataFactory::set_transform()
                     .inputs_from_refs_and_aliases(vec![(
-                        create_result_foo.dataset_handle.id,
+                        created_foo.dataset_handle.id,
                         alias_foo.to_string(),
                     )])
                     .build(),
@@ -128,8 +122,8 @@ async fn test_commit_event_with_new_dependencies() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct CommitDatasetEventUseCaseHarness {
-    _temp_dir: tempfile::TempDir,
-    catalog: Catalog,
+    base_repo_harness: BaseRepoHarness,
+    _catalog: Catalog,
     use_case: Arc<dyn CommitDatasetEventUseCase>,
 }
 
@@ -138,22 +132,12 @@ impl CommitDatasetEventUseCaseHarness {
         mock_dataset_action_authorizer: MockDatasetActionAuthorizer,
         mock_outbox: MockOutbox,
     ) -> Self {
-        let tempdir = tempfile::tempdir().unwrap();
+        let base_repo_harness = BaseRepoHarness::new(TenancyConfig::SingleTenant);
 
-        let datasets_dir = tempdir.path().join("datasets");
-        std::fs::create_dir(&datasets_dir).unwrap();
-
-        let catalog = dill::CatalogBuilder::new()
+        let catalog = dill::CatalogBuilder::new_chained(base_repo_harness.catalog())
             .add::<CommitDatasetEventUseCaseImpl>()
-            .add_value(TenancyConfig::SingleTenant)
-            .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
-            .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-            .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
-            .add::<DatasetRegistryRepoBridge>()
-            .add_value(CurrentAccountSubject::new_test())
             .add_value(mock_dataset_action_authorizer)
             .bind::<dyn DatasetActionAuthorizer, MockDatasetActionAuthorizer>()
-            .add::<SystemTimeSourceDefault>()
             .add_value(mock_outbox)
             .bind::<dyn Outbox, MockOutbox>()
             .build();
@@ -161,29 +145,26 @@ impl CommitDatasetEventUseCaseHarness {
         let use_case = catalog.get_one::<dyn CommitDatasetEventUseCase>().unwrap();
 
         Self {
-            _temp_dir: tempdir,
-            catalog,
+            base_repo_harness,
+            _catalog: catalog,
             use_case,
         }
     }
 
-    async fn create_dataset(&self, alias: &DatasetAlias, kind: DatasetKind) -> CreateDatasetResult {
-        let snapshot = MetadataFactory::dataset_snapshot()
-            .name(alias.clone())
-            .kind(kind)
-            .build();
+    #[inline]
+    async fn create_root_dataset(&self, alias: &DatasetAlias) -> CreateDatasetResult {
+        self.base_repo_harness.create_root_dataset(alias).await
+    }
 
-        let dataset_repo_writer = self
-            .catalog
-            .get_one::<dyn DatasetRepositoryWriter>()
-            .unwrap();
-
-        let result = dataset_repo_writer
-            .create_dataset_from_snapshot(snapshot)
+    #[inline]
+    async fn create_derived_dataset(
+        &self,
+        alias: &DatasetAlias,
+        input_dataset_refs: Vec<DatasetRef>,
+    ) -> CreateDatasetResult {
+        self.base_repo_harness
+            .create_derived_dataset(alias, input_dataset_refs)
             .await
-            .unwrap();
-
-        result.create_dataset_result
     }
 
     fn add_outbox_dataset_dependencies_updated_expectation(
