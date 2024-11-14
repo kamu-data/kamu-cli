@@ -80,259 +80,11 @@ pub async fn test_smart_pull_as_mt(kamu_api_server_client: KamuApiServerClient) 
 test_smart_transfer_protocol_permutations!(test_smart_push_all_pull_all);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Others
+
+test_smart_transfer_protocol_permutations!(test_smart_push_recursive_pull_recursive);
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub async fn test_smart_push_pull_recursive(mut kamu_api_server_client: KamuApiServerClient) {
-    let root_dataset_alias = DatasetAlias::new(
-        Some(E2E_USER_ACCOUNT_NAME.clone()),
-        DATASET_ROOT_PLAYER_NAME.clone(),
-    );
-    let kamu_api_server_root_dataset_endpoint = kamu_api_server_client
-        .dataset()
-        .get_endpoint(&root_dataset_alias);
-
-    let derivative_dataset_alias = DatasetAlias::new(
-        Some(E2E_USER_ACCOUNT_NAME.clone()),
-        DATASET_DERIVATIVE_LEADERBOARD_NAME.clone(),
-    );
-
-    // 1. Grub a token
-    let token = kamu_api_server_client.auth().login_as_e2e_user().await;
-
-    let mut kamu_in_push_workspace = KamuCliPuppet::new_workspace_tmp().await;
-
-    // 2. Pushing datasets to the API server
-    {
-        kamu_in_push_workspace
-            .set_system_time(Some(DateTime::from_str("2050-01-02T03:04:05Z").unwrap()));
-
-        // 2.1. Add datasets
-        {
-            kamu_in_push_workspace
-                .execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
-                .await
-                .success();
-        }
-
-        // 2.1. Ingest data to the dataset
-        {
-            kamu_in_push_workspace
-                .ingest_data(
-                    &root_dataset_alias.dataset_name,
-                    DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
-                )
-                .await;
-        }
-
-        // 2.2. Login to the API server
-        kamu_in_push_workspace
-            .execute([
-                "login",
-                kamu_api_server_client.get_base_url().as_str(),
-                "--access-token",
-                token.as_str(),
-            ])
-            .await
-            .success();
-
-        // Push all datasets should fail
-        kamu_in_push_workspace
-            .assert_failure_command_execution(
-                [
-                    "push",
-                    root_dataset_alias.dataset_name.as_str(),
-                    "--recursive",
-                ],
-                None,
-                Some(["Recursive push is not yet supported"]),
-            )
-            .await;
-
-        // Push dataset
-        kamu_in_push_workspace
-            .assert_success_command_execution(
-                [
-                    "push",
-                    root_dataset_alias.dataset_name.as_str(),
-                    "--to",
-                    kamu_api_server_root_dataset_endpoint.as_str(),
-                ],
-                None,
-                Some(["1 dataset(s) pushed"]),
-            )
-            .await;
-    }
-
-    // 3. Pulling datasets from the API server
-    {
-        let mut kamu_in_pull_workspace = KamuCliPuppet::new_workspace_tmp().await;
-
-        kamu_in_pull_workspace
-            .set_system_time(Some(DateTime::from_str("2050-01-02T03:04:05Z").unwrap()));
-
-        // Pull datasets one by one and check data
-        kamu_in_pull_workspace
-            .assert_success_command_execution(
-                ["pull", kamu_api_server_root_dataset_endpoint.as_str()],
-                None,
-                Some(["1 dataset(s) updated"]),
-            )
-            .await;
-
-        kamu_in_pull_workspace
-            .execute_with_input(
-                ["add", "--stdin"],
-                DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR,
-            )
-            .await
-            .success();
-
-        kamu_in_pull_workspace
-            .assert_success_command_execution(
-                ["pull", derivative_dataset_alias.dataset_name.as_str()],
-                None,
-                Some(["1 dataset(s) updated"]),
-            )
-            .await;
-
-        let expected_schema = indoc::indoc!(
-            r#"
-            message arrow_schema {
-              REQUIRED INT64 offset;
-              REQUIRED INT32 op;
-              REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
-              OPTIONAL INT64 match_time (TIMESTAMP(MILLIS,true));
-              OPTIONAL INT64 match_id;
-              OPTIONAL BYTE_ARRAY player_id (STRING);
-              OPTIONAL INT64 score;
-            }
-            "#
-        );
-        let expected_data = indoc::indoc!(
-            r#"
-            +--------+----+----------------------+----------------------+----------+-----------+-------+
-            | offset | op | system_time          | match_time           | match_id | player_id | score |
-            +--------+----+----------------------+----------------------+----------+-----------+-------+
-            | 0      | 0  | 2050-01-02T03:04:05Z | 2000-01-01T00:00:00Z | 1        | Alice     | 100   |
-            | 1      | 0  | 2050-01-02T03:04:05Z | 2000-01-01T00:00:00Z | 1        | Bob       | 80    |
-            +--------+----+----------------------+----------------------+----------+-----------+-------+
-            "#
-        );
-        let expected_derivative_schema = indoc::indoc!(
-            r#"
-            message arrow_schema {
-              OPTIONAL INT64 offset;
-              REQUIRED INT32 op;
-              REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
-              OPTIONAL INT64 match_time (TIMESTAMP(MILLIS,true));
-              OPTIONAL INT64 place (INTEGER(64,false));
-              OPTIONAL INT64 match_id;
-              OPTIONAL BYTE_ARRAY player_id (STRING);
-              OPTIONAL INT64 score;
-            }
-            "#
-        );
-        let expected_derivative_data = indoc::indoc!(
-            r#"
-            +--------+----+----------------------+----------------------+-------+----------+-----------+-------+
-            | offset | op | system_time          | match_time           | place | match_id | player_id | score |
-            +--------+----+----------------------+----------------------+-------+----------+-----------+-------+
-            | 0      | 0  | 2050-01-02T03:04:05Z | 2000-01-01T00:00:00Z | 1     | 1        | Alice     | 100   |
-            | 1      | 0  | 2050-01-02T03:04:05Z | 2000-01-01T00:00:00Z | 2     | 1        | Bob       | 80    |
-            +--------+----+----------------------+----------------------+-------+----------+-----------+-------+
-            "#
-        );
-
-        kamu_in_pull_workspace
-            .assert_last_data_slice(
-                &DatasetAlias::new(None, root_dataset_alias.dataset_name.clone()),
-                expected_schema,
-                expected_data,
-            )
-            .await;
-        kamu_in_pull_workspace
-            .assert_last_data_slice(
-                &DatasetAlias::new(None, derivative_dataset_alias.dataset_name.clone()),
-                expected_derivative_schema,
-                expected_derivative_data,
-            )
-            .await;
-
-        // Update remote datasets
-
-        kamu_in_push_workspace
-            .ingest_data(
-                &root_dataset_alias.dataset_name,
-                DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_2,
-            )
-            .await;
-
-        kamu_in_push_workspace
-            .assert_success_command_execution(
-                [
-                    "push",
-                    root_dataset_alias.dataset_name.as_str(),
-                    "--to",
-                    kamu_api_server_root_dataset_endpoint.as_str(),
-                ],
-                None,
-                Some(["1 dataset(s) pushed"]),
-            )
-            .await;
-
-        // Pull all datasets
-        kamu_in_pull_workspace
-            .assert_success_command_execution(
-                [
-                    "pull",
-                    derivative_dataset_alias.dataset_name.as_str(),
-                    "--recursive",
-                ],
-                None,
-                Some(["2 dataset(s) updated"]),
-            )
-            .await;
-
-        // Perform dataslices checks
-        let expected_data = indoc::indoc!(
-            r#"
-            +--------+----+----------------------+----------------------+----------+-----------+-------+
-            | offset | op | system_time          | match_time           | match_id | player_id | score |
-            +--------+----+----------------------+----------------------+----------+-----------+-------+
-            | 2      | 0  | 2050-01-02T03:04:05Z | 2000-01-02T00:00:00Z | 2        | Charlie   | 90    |
-            | 3      | 0  | 2050-01-02T03:04:05Z | 2000-01-02T00:00:00Z | 2        | Alice     | 70    |
-            +--------+----+----------------------+----------------------+----------+-----------+-------+
-            "#
-        );
-        let expected_derivative_data = indoc::indoc!(
-            r#"
-            +--------+----+----------------------+----------------------+-------+----------+-----------+-------+
-            | offset | op | system_time          | match_time           | place | match_id | player_id | score |
-            +--------+----+----------------------+----------------------+-------+----------+-----------+-------+
-            | 2      | 0  | 2050-01-02T03:04:05Z | 2000-01-02T00:00:00Z | 1     | 2        | Charlie   | 90    |
-            | 3      | 0  | 2050-01-02T03:04:05Z | 2000-01-02T00:00:00Z | 2     | 2        | Alice     | 70    |
-            +--------+----+----------------------+----------------------+-------+----------+-----------+-------+
-            "#
-        );
-
-        kamu_in_pull_workspace
-            .assert_last_data_slice(
-                &DatasetAlias::new(None, root_dataset_alias.dataset_name),
-                expected_schema,
-                expected_data,
-            )
-            .await;
-        kamu_in_pull_workspace
-            .assert_last_data_slice(
-                &DatasetAlias::new(None, derivative_dataset_alias.dataset_name),
-                expected_derivative_schema,
-                expected_derivative_data,
-            )
-            .await;
-    }
-}
-
+// Others
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_smart_pull_set_watermark(kamu: KamuCliPuppet) {
@@ -1605,6 +1357,264 @@ async fn test_smart_push_all_pull_all(
         kamu_in_pull_workspace
             .assert_success_command_execution(
                 ["pull", "--all"],
+                None,
+                Some(["2 dataset(s) updated"]),
+            )
+            .await;
+
+        // Perform dataslices checks
+        let expected_data = indoc::indoc!(
+            r#"
+            +--------+----+----------------------+----------------------+----------+-----------+-------+
+            | offset | op | system_time          | match_time           | match_id | player_id | score |
+            +--------+----+----------------------+----------------------+----------+-----------+-------+
+            | 2      | 0  | 2050-01-02T03:04:05Z | 2000-01-02T00:00:00Z | 2        | Charlie   | 90    |
+            | 3      | 0  | 2050-01-02T03:04:05Z | 2000-01-02T00:00:00Z | 2        | Alice     | 70    |
+            +--------+----+----------------------+----------------------+----------+-----------+-------+
+            "#
+        );
+        let expected_derivative_data = indoc::indoc!(
+            r#"
+            +--------+----+----------------------+----------------------+-------+----------+-----------+-------+
+            | offset | op | system_time          | match_time           | place | match_id | player_id | score |
+            +--------+----+----------------------+----------------------+-------+----------+-----------+-------+
+            | 2      | 0  | 2050-01-02T03:04:05Z | 2000-01-02T00:00:00Z | 1     | 2        | Charlie   | 90    |
+            | 3      | 0  | 2050-01-02T03:04:05Z | 2000-01-02T00:00:00Z | 2     | 2        | Alice     | 70    |
+            +--------+----+----------------------+----------------------+-------+----------+-----------+-------+
+            "#
+        );
+
+        kamu_in_pull_workspace
+            .assert_last_data_slice(
+                &DatasetAlias::new(None, root_dataset_alias.dataset_name),
+                expected_schema,
+                expected_data,
+            )
+            .await;
+        kamu_in_pull_workspace
+            .assert_last_data_slice(
+                &DatasetAlias::new(None, derivative_dataset_alias.dataset_name),
+                expected_derivative_schema,
+                expected_derivative_data,
+            )
+            .await;
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+async fn test_smart_push_recursive_pull_recursive(
+    mut kamu_api_server_client: KamuApiServerClient,
+    is_push_workspace_multi_tenant: bool,
+    is_pull_workspace_multi_tenant: bool,
+) {
+    let root_dataset_alias = DatasetAlias::new(
+        Some(E2E_USER_ACCOUNT_NAME.clone()),
+        DATASET_ROOT_PLAYER_NAME.clone(),
+    );
+    let kamu_api_server_root_dataset_endpoint = kamu_api_server_client
+        .dataset()
+        .get_endpoint(&root_dataset_alias);
+
+    let derivative_dataset_alias = DatasetAlias::new(
+        Some(E2E_USER_ACCOUNT_NAME.clone()),
+        DATASET_DERIVATIVE_LEADERBOARD_NAME.clone(),
+    );
+
+    // 1. Grub a token
+    let token = kamu_api_server_client.auth().login_as_e2e_user().await;
+
+    let mut kamu_in_push_workspace =
+        KamuCliPuppet::new_workspace_tmp(is_push_workspace_multi_tenant).await;
+
+    // 2. Pushing datasets to the API server
+    {
+        kamu_in_push_workspace
+            .set_system_time(Some(DateTime::from_str("2050-01-02T03:04:05Z").unwrap()));
+
+        // 2.1. Add datasets
+        {
+            kamu_in_push_workspace
+                .execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
+                .await
+                .success();
+        }
+
+        // 2.1. Ingest data to the dataset
+        {
+            kamu_in_push_workspace
+                .ingest_data(
+                    &root_dataset_alias.dataset_name,
+                    DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
+                )
+                .await;
+        }
+
+        // 2.2. Login to the API server
+        kamu_in_push_workspace
+            .execute([
+                "login",
+                kamu_api_server_client.get_base_url().as_str(),
+                "--access-token",
+                token.as_str(),
+            ])
+            .await
+            .success();
+
+        // Push all datasets should fail
+        kamu_in_push_workspace
+            .assert_failure_command_execution(
+                [
+                    "push",
+                    root_dataset_alias.dataset_name.as_str(),
+                    "--recursive",
+                ],
+                None,
+                Some(["Recursive push is not yet supported"]),
+            )
+            .await;
+
+        // Push dataset
+        kamu_in_push_workspace
+            .assert_success_command_execution(
+                [
+                    "push",
+                    root_dataset_alias.dataset_name.as_str(),
+                    "--to",
+                    kamu_api_server_root_dataset_endpoint.as_str(),
+                ],
+                None,
+                Some(["1 dataset(s) pushed"]),
+            )
+            .await;
+    }
+
+    // 3. Pulling datasets from the API server
+    {
+        let mut kamu_in_pull_workspace =
+            KamuCliPuppet::new_workspace_tmp(is_pull_workspace_multi_tenant).await;
+
+        kamu_in_pull_workspace
+            .set_system_time(Some(DateTime::from_str("2050-01-02T03:04:05Z").unwrap()));
+
+        // Pull datasets one by one and check data
+        kamu_in_pull_workspace
+            .assert_success_command_execution(
+                ["pull", kamu_api_server_root_dataset_endpoint.as_str()],
+                None,
+                Some(["1 dataset(s) updated"]),
+            )
+            .await;
+
+        kamu_in_pull_workspace
+            .execute_with_input(
+                ["add", "--stdin"],
+                DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR,
+            )
+            .await
+            .success();
+
+        kamu_in_pull_workspace
+            .assert_success_command_execution(
+                ["pull", derivative_dataset_alias.dataset_name.as_str()],
+                None,
+                Some(["1 dataset(s) updated"]),
+            )
+            .await;
+
+        let expected_schema = indoc::indoc!(
+            r#"
+            message arrow_schema {
+              REQUIRED INT64 offset;
+              REQUIRED INT32 op;
+              REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
+              OPTIONAL INT64 match_time (TIMESTAMP(MILLIS,true));
+              OPTIONAL INT64 match_id;
+              OPTIONAL BYTE_ARRAY player_id (STRING);
+              OPTIONAL INT64 score;
+            }
+            "#
+        );
+        let expected_data = indoc::indoc!(
+            r#"
+            +--------+----+----------------------+----------------------+----------+-----------+-------+
+            | offset | op | system_time          | match_time           | match_id | player_id | score |
+            +--------+----+----------------------+----------------------+----------+-----------+-------+
+            | 0      | 0  | 2050-01-02T03:04:05Z | 2000-01-01T00:00:00Z | 1        | Alice     | 100   |
+            | 1      | 0  | 2050-01-02T03:04:05Z | 2000-01-01T00:00:00Z | 1        | Bob       | 80    |
+            +--------+----+----------------------+----------------------+----------+-----------+-------+
+            "#
+        );
+        let expected_derivative_schema = indoc::indoc!(
+            r#"
+            message arrow_schema {
+              OPTIONAL INT64 offset;
+              REQUIRED INT32 op;
+              REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
+              OPTIONAL INT64 match_time (TIMESTAMP(MILLIS,true));
+              OPTIONAL INT64 place (INTEGER(64,false));
+              OPTIONAL INT64 match_id;
+              OPTIONAL BYTE_ARRAY player_id (STRING);
+              OPTIONAL INT64 score;
+            }
+            "#
+        );
+        let expected_derivative_data = indoc::indoc!(
+            r#"
+            +--------+----+----------------------+----------------------+-------+----------+-----------+-------+
+            | offset | op | system_time          | match_time           | place | match_id | player_id | score |
+            +--------+----+----------------------+----------------------+-------+----------+-----------+-------+
+            | 0      | 0  | 2050-01-02T03:04:05Z | 2000-01-01T00:00:00Z | 1     | 1        | Alice     | 100   |
+            | 1      | 0  | 2050-01-02T03:04:05Z | 2000-01-01T00:00:00Z | 2     | 1        | Bob       | 80    |
+            +--------+----+----------------------+----------------------+-------+----------+-----------+-------+
+            "#
+        );
+
+        kamu_in_pull_workspace
+            .assert_last_data_slice(
+                &DatasetAlias::new(None, root_dataset_alias.dataset_name.clone()),
+                expected_schema,
+                expected_data,
+            )
+            .await;
+        kamu_in_pull_workspace
+            .assert_last_data_slice(
+                &DatasetAlias::new(None, derivative_dataset_alias.dataset_name.clone()),
+                expected_derivative_schema,
+                expected_derivative_data,
+            )
+            .await;
+
+        // Update remote datasets
+
+        kamu_in_push_workspace
+            .ingest_data(
+                &root_dataset_alias.dataset_name,
+                DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_2,
+            )
+            .await;
+
+        kamu_in_push_workspace
+            .assert_success_command_execution(
+                [
+                    "push",
+                    root_dataset_alias.dataset_name.as_str(),
+                    "--to",
+                    kamu_api_server_root_dataset_endpoint.as_str(),
+                ],
+                None,
+                Some(["1 dataset(s) pushed"]),
+            )
+            .await;
+
+        // Pull all datasets
+        kamu_in_pull_workspace
+            .assert_success_command_execution(
+                [
+                    "pull",
+                    derivative_dataset_alias.dataset_name.as_str(),
+                    "--recursive",
+                ],
                 None,
                 Some(["2 dataset(s) updated"]),
             )

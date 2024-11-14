@@ -218,18 +218,53 @@ kamu_cli_run_api_server_e2e_test!(
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Others
+// test_smart_push_recursive_pull_recursive
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 kamu_cli_run_api_server_e2e_test!(
     storage = postgres,
-    fixture = kamu_cli_e2e_repo_tests::test_smart_push_pull_recursive,
+    fixture = kamu_cli_e2e_repo_tests::test_smart_push_recursive_pull_recursive_st_st,
     options = Options::default()
         .with_multi_tenant()
         .with_today_as_frozen_system_time(),
     extra_test_groups = "containerized, engine, ingest, transform, datafusion"
 );
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_run_api_server_e2e_test!(
+    storage = postgres,
+    fixture = kamu_cli_e2e_repo_tests::test_smart_push_recursive_pull_recursive_st_mt,
+    options = Options::default()
+        .with_multi_tenant()
+        .with_today_as_frozen_system_time(),
+    extra_test_groups = "containerized, engine, ingest, transform, datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_run_api_server_e2e_test!(
+    storage = postgres,
+    fixture = kamu_cli_e2e_repo_tests::test_smart_push_recursive_pull_recursive_mt_st,
+    options = Options::default()
+        .with_multi_tenant()
+        .with_today_as_frozen_system_time(),
+    extra_test_groups = "containerized, engine, ingest, transform, datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_run_api_server_e2e_test!(
+    storage = postgres,
+    fixture = kamu_cli_e2e_repo_tests::test_smart_push_recursive_pull_recursive_mt_mt,
+    options = Options::default()
+        .with_multi_tenant()
+        .with_today_as_frozen_system_time(),
+    extra_test_groups = "containerized, engine, ingest, transform, datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Others
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 kamu_cli_execute_command_e2e_test!(
