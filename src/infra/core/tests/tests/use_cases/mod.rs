@@ -14,3 +14,6 @@ mod test_create_dataset_use_case;
 mod test_delete_dataset_use_case;
 mod test_rename_dataset_use_case;
 mod test_set_watermark_use_case;
+
+mod outbox_expectation_helpers;
+pub(crate) use outbox_expectation_helpers::*;

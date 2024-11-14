@@ -16,17 +16,15 @@ use kamu::RenameDatasetUseCaseImpl;
 use kamu_core::auth::DatasetActionAuthorizer;
 use kamu_core::{
     CreateDatasetResult,
-    DatasetLifecycleMessage,
     GetDatasetError,
     RenameDatasetError,
     RenameDatasetUseCase,
     TenancyConfig,
-    MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
 };
 use messaging_outbox::{MockOutbox, Outbox};
-use mockall::predicate::{eq, function};
 use opendatafabric::{DatasetAlias, DatasetName};
 
+use crate::tests::use_cases::*;
 use crate::BaseRepoHarness;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -39,7 +37,7 @@ async fn test_rename_dataset_success_via_ref() {
     let mock_authorizer =
         MockDatasetActionAuthorizer::new().expect_check_write_dataset(&alias_foo, 1, true);
     let mut mock_outbox = MockOutbox::new();
-    RenameUseCaseHarness::add_outbox_dataset_renamed_expectation(&mut mock_outbox, 1);
+    expect_outbox_dataset_renamed(&mut mock_outbox, 1);
 
     let harness = RenameUseCaseHarness::new(mock_authorizer, mock_outbox);
     harness.create_root_dataset(&alias_foo).await;
@@ -149,22 +147,6 @@ impl RenameUseCaseHarness {
     #[inline]
     async fn check_dataset_exists(&self, alias: &DatasetAlias) -> Result<(), GetDatasetError> {
         self.base_repo_harness.check_dataset_exists(alias).await
-    }
-
-    fn add_outbox_dataset_renamed_expectation(mock_outbox: &mut MockOutbox, times: usize) {
-        mock_outbox
-            .expect_post_message_as_json()
-            .with(
-                eq(MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE),
-                function(|message_as_json: &serde_json::Value| {
-                    matches!(
-                        serde_json::from_value::<DatasetLifecycleMessage>(message_as_json.clone()),
-                        Ok(DatasetLifecycleMessage::Renamed(_))
-                    )
-                }),
-            )
-            .times(times)
-            .returning(|_, _| Ok(()));
     }
 }
 

@@ -27,12 +27,11 @@ use kamu_core::{
     DependencyGraphService,
     GetDatasetError,
     TenancyConfig,
-    MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
 };
 use messaging_outbox::{consume_deserialized_message, ConsumerFilter, Message, MockOutbox, Outbox};
-use mockall::predicate::{eq, function};
 use opendatafabric::{DatasetAlias, DatasetName, DatasetRef};
 
+use crate::tests::use_cases::*;
 use crate::BaseRepoHarness;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -42,7 +41,7 @@ async fn test_delete_dataset_success_via_ref() {
     let alias_foo = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
 
     let mut mock_outbox = MockOutbox::new();
-    DeleteUseCaseHarness::add_outbox_dataset_deleted_expectation(&mut mock_outbox, 1);
+    expect_outbox_dataset_deleted(&mut mock_outbox, 1);
 
     let mock_authorizer =
         MockDatasetActionAuthorizer::new().expect_check_write_dataset(&alias_foo, 1, true);
@@ -71,7 +70,7 @@ async fn test_delete_dataset_success_via_handle() {
     let alias_foo = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
 
     let mut mock_outbox = MockOutbox::new();
-    DeleteUseCaseHarness::add_outbox_dataset_deleted_expectation(&mut mock_outbox, 1);
+    expect_outbox_dataset_deleted(&mut mock_outbox, 1);
 
     let mock_authorizer =
         MockDatasetActionAuthorizer::new().expect_check_write_dataset(&alias_foo, 1, true);
@@ -142,7 +141,7 @@ async fn test_delete_dataset_respects_dangling_refs() {
     let alias_bar = DatasetAlias::new(None, DatasetName::new_unchecked("bar"));
 
     let mut mock_outbox = MockOutbox::new();
-    DeleteUseCaseHarness::add_outbox_dataset_deleted_expectation(&mut mock_outbox, 2);
+    expect_outbox_dataset_deleted(&mut mock_outbox, 2);
 
     let harness = DeleteUseCaseHarness::new(MockDatasetActionAuthorizer::allowing(), mock_outbox);
 
@@ -276,22 +275,6 @@ impl DeleteUseCaseHarness {
         )
         .await
         .unwrap();
-    }
-
-    fn add_outbox_dataset_deleted_expectation(mock_outbox: &mut MockOutbox, times: usize) {
-        mock_outbox
-            .expect_post_message_as_json()
-            .with(
-                eq(MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE),
-                function(|message_as_json: &serde_json::Value| {
-                    matches!(
-                        serde_json::from_value::<DatasetLifecycleMessage>(message_as_json.clone()),
-                        Ok(DatasetLifecycleMessage::Deleted(_))
-                    )
-                }),
-            )
-            .times(times)
-            .returning(|_, _| Ok(()));
     }
 }
 

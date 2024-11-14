@@ -19,14 +19,12 @@ use kamu_core::{
     CommitError,
     CommitOpts,
     CreateDatasetResult,
-    DatasetLifecycleMessage,
     TenancyConfig,
-    MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
 };
 use messaging_outbox::{MockOutbox, Outbox};
-use mockall::predicate::{eq, function};
 use opendatafabric::{DatasetAlias, DatasetName, DatasetRef, MetadataEvent};
 
+use crate::tests::use_cases::*;
 use crate::BaseRepoHarness;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -90,10 +88,7 @@ async fn test_commit_event_with_new_dependencies() {
         MockDatasetActionAuthorizer::new().expect_check_write_dataset(&alias_bar, 1, true);
 
     let mut mock_outbox = MockOutbox::new();
-    CommitDatasetEventUseCaseHarness::add_outbox_dataset_dependencies_updated_expectation(
-        &mut mock_outbox,
-        1,
-    );
+    expect_outbox_dataset_dependencies_updated(&mut mock_outbox, 1);
 
     let harness = CommitDatasetEventUseCaseHarness::new(mock_authorizer, mock_outbox);
     let created_foo = harness.create_root_dataset(&alias_foo).await;
@@ -165,25 +160,6 @@ impl CommitDatasetEventUseCaseHarness {
         self.base_repo_harness
             .create_derived_dataset(alias, input_dataset_refs)
             .await
-    }
-
-    fn add_outbox_dataset_dependencies_updated_expectation(
-        mock_outbox: &mut MockOutbox,
-        times: usize,
-    ) {
-        mock_outbox
-            .expect_post_message_as_json()
-            .with(
-                eq(MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE),
-                function(|message_as_json: &serde_json::Value| {
-                    matches!(
-                        serde_json::from_value::<DatasetLifecycleMessage>(message_as_json.clone()),
-                        Ok(DatasetLifecycleMessage::DependenciesUpdated(_))
-                    )
-                }),
-            )
-            .times(times)
-            .returning(|_, _| Ok(()));
     }
 }
 

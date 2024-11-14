@@ -15,15 +15,8 @@ use chrono::Utc;
 use dill::Catalog;
 use kamu::testing::MetadataFactory;
 use kamu::AppendDatasetMetadataBatchUseCaseImpl;
-use kamu_core::{
-    AppendDatasetMetadataBatchUseCase,
-    CreateDatasetResult,
-    DatasetLifecycleMessage,
-    TenancyConfig,
-    MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
-};
+use kamu_core::{AppendDatasetMetadataBatchUseCase, CreateDatasetResult, TenancyConfig};
 use messaging_outbox::{MockOutbox, Outbox};
-use mockall::predicate::{eq, function};
 use opendatafabric::serde::flatbuffers::FlatbuffersMetadataBlockSerializer;
 use opendatafabric::serde::MetadataBlockSerializer;
 use opendatafabric::{
@@ -36,6 +29,7 @@ use opendatafabric::{
     Multihash,
 };
 
+use crate::tests::use_cases::*;
 use crate::BaseRepoHarness;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -87,10 +81,7 @@ async fn test_append_dataset_metadata_batch_with_new_dependencies() {
     let alias_bar = DatasetAlias::new(None, DatasetName::new_unchecked("bar"));
 
     let mut mock_outbox = MockOutbox::new();
-    AppendDatasetMetadataBatchUseCaseHarness::add_outbox_dataset_dependencies_updated_expectation(
-        &mut mock_outbox,
-        1,
-    );
+    expect_outbox_dataset_dependencies_updated(&mut mock_outbox, 1);
 
     let harness = AppendDatasetMetadataBatchUseCaseHarness::new(mock_outbox);
     let foo_created = harness.create_root_dataset(&alias_foo).await;
@@ -174,25 +165,6 @@ impl AppendDatasetMetadataBatchUseCaseHarness {
             .unwrap();
 
         Multihash::from_digest::<sha3::Sha3_256>(Multicodec::Sha3_256, &block_data)
-    }
-
-    fn add_outbox_dataset_dependencies_updated_expectation(
-        mock_outbox: &mut MockOutbox,
-        times: usize,
-    ) {
-        mock_outbox
-            .expect_post_message_as_json()
-            .with(
-                eq(MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE),
-                function(|message_as_json: &serde_json::Value| {
-                    matches!(
-                        serde_json::from_value::<DatasetLifecycleMessage>(message_as_json.clone()),
-                        Ok(DatasetLifecycleMessage::DependenciesUpdated(_))
-                    )
-                }),
-            )
-            .times(times)
-            .returning(|_, _| Ok(()));
     }
 }
 

@@ -13,17 +13,11 @@ use std::sync::Arc;
 use dill::Catalog;
 use kamu::testing::MetadataFactory;
 use kamu::CreateDatasetUseCaseImpl;
-use kamu_core::{
-    CreateDatasetUseCase,
-    DatasetLifecycleMessage,
-    GetDatasetError,
-    TenancyConfig,
-    MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
-};
+use kamu_core::{CreateDatasetUseCase, GetDatasetError, TenancyConfig};
 use messaging_outbox::{MockOutbox, Outbox};
-use mockall::predicate::{eq, function};
 use opendatafabric::{DatasetAlias, DatasetKind, DatasetName};
 
+use crate::tests::use_cases::*;
 use crate::BaseRepoHarness;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -33,7 +27,7 @@ async fn test_create_root_dataset() {
     let alias_foo = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
 
     let mut mock_outbox = MockOutbox::new();
-    CreateUseCaseHarness::add_outbox_dataset_created_expectation(&mut mock_outbox, 1);
+    expect_outbox_dataset_created(&mut mock_outbox, 1);
 
     let harness = CreateUseCaseHarness::new(mock_outbox);
 
@@ -81,22 +75,6 @@ impl CreateUseCaseHarness {
     #[inline]
     async fn check_dataset_exists(&self, alias: &DatasetAlias) -> Result<(), GetDatasetError> {
         self.base_repo_harness.check_dataset_exists(alias).await
-    }
-
-    fn add_outbox_dataset_created_expectation(mock_outbox: &mut MockOutbox, times: usize) {
-        mock_outbox
-            .expect_post_message_as_json()
-            .with(
-                eq(MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE),
-                function(|message_as_json: &serde_json::Value| {
-                    matches!(
-                        serde_json::from_value::<DatasetLifecycleMessage>(message_as_json.clone()),
-                        Ok(DatasetLifecycleMessage::Created(_))
-                    )
-                }),
-            )
-            .times(times)
-            .returning(|_, _| Ok(()));
     }
 }
 
