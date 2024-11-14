@@ -16,11 +16,10 @@ use kamu::testing::MetadataFactory;
 use kamu::AppendDatasetMetadataBatchUseCaseImpl;
 use kamu_core::AppendDatasetMetadataBatchUseCase;
 use messaging_outbox::MockOutbox;
-use opendatafabric::serde::flatbuffers::FlatbuffersMetadataBlockSerializer;
-use opendatafabric::serde::MetadataBlockSerializer;
 use opendatafabric::*;
 
 use crate::tests::use_cases::*;
+use crate::BaseRepoHarness;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -39,8 +38,7 @@ async fn test_append_dataset_metadata_batch() {
         sequence_number: 2,
         event: MetadataEvent::SetInfo(MetadataFactory::set_info().description("test").build()),
     };
-    let hash_set_info_block =
-        AppendDatasetMetadataBatchUseCaseHarness::hash_from_block(&set_info_block);
+    let hash_set_info_block = BaseRepoHarness::hash_from_block(&set_info_block);
 
     let set_license_block = MetadataBlock {
         system_time: Utc::now(),
@@ -48,8 +46,7 @@ async fn test_append_dataset_metadata_batch() {
         sequence_number: 3,
         event: MetadataEvent::SetLicense(MetadataFactory::set_license().build()),
     };
-    let hash_set_license_block =
-        AppendDatasetMetadataBatchUseCaseHarness::hash_from_block(&set_license_block);
+    let hash_set_license_block = BaseRepoHarness::hash_from_block(&set_license_block);
 
     let new_blocks = VecDeque::from([
         (hash_set_info_block, set_info_block),
@@ -92,8 +89,7 @@ async fn test_append_dataset_metadata_batch_with_new_dependencies() {
                 .build(),
         ),
     };
-    let hash_set_transform_block =
-        AppendDatasetMetadataBatchUseCaseHarness::hash_from_block(&set_transform_block);
+    let hash_set_transform_block = BaseRepoHarness::hash_from_block(&set_transform_block);
 
     let new_blocks = VecDeque::from([(hash_set_transform_block, set_transform_block)]);
 
@@ -129,14 +125,6 @@ impl AppendDatasetMetadataBatchUseCaseHarness {
             base_harness,
             use_case,
         }
-    }
-
-    fn hash_from_block(block: &MetadataBlock) -> Multihash {
-        let block_data = FlatbuffersMetadataBlockSerializer
-            .write_manifest(block)
-            .unwrap();
-
-        Multihash::from_digest::<sha3::Sha3_256>(Multicodec::Sha3_256, &block_data)
     }
 }
 
