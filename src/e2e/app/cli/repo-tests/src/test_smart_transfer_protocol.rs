@@ -25,9 +25,7 @@ use kamu_cli_e2e_common::{
 };
 use kamu_cli_puppet::extensions::{KamuCliPuppetExt, RepoAlias};
 use kamu_cli_puppet::KamuCliPuppet;
-// use opendatafabric as odf;
-// todo temp
-use opendatafabric::{AccountName, DatasetAlias, DatasetName};
+use opendatafabric as odf;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -154,7 +152,7 @@ async fn test_smart_push_pull_sequence(
     is_push_workspace_multi_tenant: bool,
     is_pull_workspace_multi_tenant: bool,
 ) {
-    let dataset_alias = DatasetAlias::new(
+    let dataset_alias = odf::DatasetAlias::new(
         Some(E2E_USER_ACCOUNT_NAME.clone()),
         DATASET_ROOT_PLAYER_NAME.clone(),
     );
@@ -306,7 +304,7 @@ async fn test_smart_push_force_pull_force(
     is_push_workspace_multi_tenant: bool,
     is_pull_workspace_multi_tenant: bool,
 ) {
-    let dataset_alias = DatasetAlias::new(
+    let dataset_alias = odf::DatasetAlias::new(
         Some(E2E_USER_ACCOUNT_NAME.clone()),
         DATASET_ROOT_PLAYER_NAME.clone(),
     );
@@ -458,7 +456,7 @@ async fn test_smart_push_no_alias_pull_no_alias(
     is_push_workspace_multi_tenant: bool,
     is_pull_workspace_multi_tenant: bool,
 ) {
-    let dataset_alias = DatasetAlias::new(
+    let dataset_alias = odf::DatasetAlias::new(
         Some(E2E_USER_ACCOUNT_NAME.clone()),
         DATASET_ROOT_PLAYER_NAME.clone(),
     );
@@ -626,7 +624,7 @@ async fn test_smart_pull_as(
     mut kamu_api_server_client: KamuApiServerClient,
     is_pull_workspace_multi_tenant: bool,
 ) {
-    let dataset_alias = DatasetAlias::new(
+    let dataset_alias = odf::DatasetAlias::new(
         Some(E2E_USER_ACCOUNT_NAME.clone()),
         DATASET_ROOT_PLAYER_NAME.clone(),
     );
@@ -639,7 +637,7 @@ async fn test_smart_pull_as(
 
     kamu_api_server_client
         .dataset()
-        .create_player_scores_dataset_with_data(Some(AccountName::new_unchecked(
+        .create_player_scores_dataset_with_data(Some(odf::AccountName::new_unchecked(
             E2E_USER_ACCOUNT_NAME_STR,
         )))
         .await;
@@ -647,7 +645,7 @@ async fn test_smart_pull_as(
     {
         let kamu_in_pull_workspace =
             KamuCliPuppet::new_workspace_tmp(is_pull_workspace_multi_tenant).await;
-        let new_dataset_name = DatasetName::new_unchecked("foo");
+        let new_dataset_name = odf::DatasetName::new_unchecked("foo");
 
         kamu_in_pull_workspace
             .assert_success_command_execution(
@@ -680,7 +678,7 @@ async fn test_smart_push_all_pull_all(
     is_push_workspace_multi_tenant: bool,
     is_pull_workspace_multi_tenant: bool,
 ) {
-    let root_dataset_alias = DatasetAlias::new(
+    let root_dataset_alias = odf::DatasetAlias::new(
         Some(E2E_USER_ACCOUNT_NAME.clone()),
         DATASET_ROOT_PLAYER_NAME.clone(),
     );
@@ -688,7 +686,7 @@ async fn test_smart_push_all_pull_all(
         .dataset()
         .get_endpoint(&root_dataset_alias);
 
-    let derivative_dataset_alias = DatasetAlias::new(
+    let derivative_dataset_alias = odf::DatasetAlias::new(
         Some(E2E_USER_ACCOUNT_NAME.clone()),
         DATASET_DERIVATIVE_LEADERBOARD_NAME.clone(),
     );
@@ -858,14 +856,14 @@ async fn test_smart_push_all_pull_all(
 
         kamu_in_pull_workspace
             .assert_last_data_slice(
-                &DatasetAlias::new(None, root_dataset_alias.dataset_name.clone()),
+                &odf::DatasetAlias::new(None, root_dataset_alias.dataset_name.clone()),
                 expected_schema,
                 expected_data,
             )
             .await;
         kamu_in_pull_workspace
             .assert_last_data_slice(
-                &DatasetAlias::new(None, derivative_dataset_alias.dataset_name.clone()),
+                &odf::DatasetAlias::new(None, derivative_dataset_alias.dataset_name.clone()),
                 expected_derivative_schema,
                 expected_derivative_data,
             )
@@ -947,14 +945,14 @@ async fn test_smart_push_all_pull_all(
 
         kamu_in_pull_workspace
             .assert_last_data_slice(
-                &DatasetAlias::new(None, root_dataset_alias.dataset_name),
+                &odf::DatasetAlias::new(None, root_dataset_alias.dataset_name),
                 expected_schema,
                 expected_data,
             )
             .await;
         kamu_in_pull_workspace
             .assert_last_data_slice(
-                &DatasetAlias::new(None, derivative_dataset_alias.dataset_name),
+                &odf::DatasetAlias::new(None, derivative_dataset_alias.dataset_name),
                 expected_derivative_schema,
                 expected_derivative_data,
             )
@@ -969,7 +967,7 @@ async fn test_smart_push_recursive_pull_recursive(
     is_push_workspace_multi_tenant: bool,
     is_pull_workspace_multi_tenant: bool,
 ) {
-    let root_dataset_alias = DatasetAlias::new(
+    let root_dataset_alias = odf::DatasetAlias::new(
         Some(E2E_USER_ACCOUNT_NAME.clone()),
         DATASET_ROOT_PLAYER_NAME.clone(),
     );
@@ -977,7 +975,7 @@ async fn test_smart_push_recursive_pull_recursive(
         .dataset()
         .get_endpoint(&root_dataset_alias);
 
-    let derivative_dataset_alias = DatasetAlias::new(
+    let derivative_dataset_alias = odf::DatasetAlias::new(
         Some(E2E_USER_ACCOUNT_NAME.clone()),
         DATASET_DERIVATIVE_LEADERBOARD_NAME.clone(),
     );
@@ -1133,14 +1131,14 @@ async fn test_smart_push_recursive_pull_recursive(
 
         kamu_in_pull_workspace
             .assert_last_data_slice(
-                &DatasetAlias::new(None, root_dataset_alias.dataset_name.clone()),
+                &odf::DatasetAlias::new(None, root_dataset_alias.dataset_name.clone()),
                 expected_schema,
                 expected_data,
             )
             .await;
         kamu_in_pull_workspace
             .assert_last_data_slice(
-                &DatasetAlias::new(None, derivative_dataset_alias.dataset_name.clone()),
+                &odf::DatasetAlias::new(None, derivative_dataset_alias.dataset_name.clone()),
                 expected_derivative_schema,
                 expected_derivative_data,
             )
@@ -1205,14 +1203,14 @@ async fn test_smart_push_recursive_pull_recursive(
 
         kamu_in_pull_workspace
             .assert_last_data_slice(
-                &DatasetAlias::new(None, root_dataset_alias.dataset_name),
+                &odf::DatasetAlias::new(None, root_dataset_alias.dataset_name),
                 expected_schema,
                 expected_data,
             )
             .await;
         kamu_in_pull_workspace
             .assert_last_data_slice(
-                &DatasetAlias::new(None, derivative_dataset_alias.dataset_name),
+                &odf::DatasetAlias::new(None, derivative_dataset_alias.dataset_name),
                 expected_derivative_schema,
                 expected_derivative_data,
             )
@@ -1245,9 +1243,9 @@ async fn test_smart_pull_set_watermark(kamu: KamuCliPuppet) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 async fn test_smart_pull_reset_derivative(kamu: KamuCliPuppet) {
-    let dataset_alias = DatasetAlias::new(None, DATASET_ROOT_PLAYER_NAME.clone());
+    let dataset_alias = odf::DatasetAlias::new(None, DATASET_ROOT_PLAYER_NAME.clone());
     let dataset_derivative_alias =
-        DatasetAlias::new(None, DATASET_DERIVATIVE_LEADERBOARD_NAME.clone());
+        odf::DatasetAlias::new(None, DATASET_DERIVATIVE_LEADERBOARD_NAME.clone());
 
     kamu.execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
         .await
@@ -1366,7 +1364,7 @@ async fn test_smart_push_visibility(
     mut kamu_api_server_client: KamuApiServerClient,
     is_push_workspace_multi_tenant: bool,
 ) {
-    let dataset_alias = DatasetAlias::new(
+    let dataset_alias = odf::DatasetAlias::new(
         Some(E2E_USER_ACCOUNT_NAME.clone()),
         DATASET_ROOT_PLAYER_NAME.clone(),
     );
@@ -1429,7 +1427,7 @@ async fn test_smart_push_visibility(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 async fn test_s3_push_smart_pull(kamu: KamuCliPuppet, is_pull_workspace_multi_tenant: bool) {
-    let dataset_alias = DatasetAlias::new(None, DATASET_ROOT_PLAYER_NAME.clone());
+    let dataset_alias = odf::DatasetAlias::new(None, DATASET_ROOT_PLAYER_NAME.clone());
 
     kamu.execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
         .await
@@ -1559,7 +1557,7 @@ async fn test_smart_push_to_registered_repo_smart_pull(
     is_push_workspace_multi_tenant: bool,
     is_pull_workspace_multi_tenant: bool,
 ) {
-    let dataset_alias = DatasetAlias::new(
+    let dataset_alias = odf::DatasetAlias::new(
         Some(E2E_USER_ACCOUNT_NAME.clone()),
         DATASET_ROOT_PLAYER_NAME.clone(),
     );
