@@ -84,29 +84,17 @@ test_smart_transfer_protocol_permutations!(test_smart_push_all_pull_all);
 test_smart_transfer_protocol_permutations!(test_smart_push_recursive_pull_recursive);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Others
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_smart_pull_set_watermark(kamu: KamuCliPuppet) {
-    let dataset_name = DATASET_ROOT_PLAYER_NAME.clone();
-
-    kamu.execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
-        .await
-        .success();
-
-    kamu.assert_success_command_execution(
-        [
-            "pull",
-            dataset_name.as_str(),
-            "--set-watermark",
-            "2051-01-02T03:04:05Z",
-        ],
-        None,
-        Some(["Committed new block"]),
-    )
-    .await;
+pub async fn test_smart_pull_set_watermark_st(kamu: KamuCliPuppet) {
+    test_smart_pull_set_watermark(kamu).await;
 }
 
+pub async fn test_smart_pull_set_watermark_mt(kamu: KamuCliPuppet) {
+    test_smart_pull_set_watermark(kamu).await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Others
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_smart_pull_reset_derivative(kamu: KamuCliPuppet) {
@@ -1657,6 +1645,28 @@ async fn test_smart_push_recursive_pull_recursive(
             )
             .await;
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+async fn test_smart_pull_set_watermark(kamu: KamuCliPuppet) {
+    let dataset_name = DATASET_ROOT_PLAYER_NAME.clone();
+
+    kamu.execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
+        .await
+        .success();
+
+    kamu.assert_success_command_execution(
+        [
+            "pull",
+            dataset_name.as_str(),
+            "--set-watermark",
+            "2051-01-02T03:04:05Z",
+        ],
+        None,
+        Some(["Committed new block"]),
+    )
+    .await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
