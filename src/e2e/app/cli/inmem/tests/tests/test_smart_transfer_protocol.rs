@@ -10,19 +10,53 @@
 use kamu_cli_e2e_common::prelude::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// test_smart_push_pull_sequence
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 kamu_cli_run_api_server_e2e_test!(
     storage = inmem,
-    fixture = kamu_cli_e2e_repo_tests::test_smart_push_pull_sequence,
-    // We need synthetic time for the tests, but the third-party JWT code
-    // uses the current time. Assuming that the token lifetime is 24 hours, we will
-    // use the projected date (the current day) as a workaround.
+    fixture = kamu_cli_e2e_repo_tests::test_smart_push_pull_sequence_st_st,
     options = Options::default()
         .with_multi_tenant()
         .with_today_as_frozen_system_time(),
     extra_test_groups = "engine, ingest, datafusion"
 );
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_run_api_server_e2e_test!(
+    storage = inmem,
+    fixture = kamu_cli_e2e_repo_tests::test_smart_push_pull_sequence_st_mt,
+    options = Options::default()
+        .with_multi_tenant()
+        .with_today_as_frozen_system_time(),
+    extra_test_groups = "engine, ingest, datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_run_api_server_e2e_test!(
+    storage = inmem,
+    fixture = kamu_cli_e2e_repo_tests::test_smart_push_pull_sequence_mt_st,
+    options = Options::default()
+        .with_multi_tenant()
+        .with_today_as_frozen_system_time(),
+    extra_test_groups = "engine, ingest, datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_run_api_server_e2e_test!(
+    storage = inmem,
+    fixture = kamu_cli_e2e_repo_tests::test_smart_push_pull_sequence_mt_mt,
+    options = Options::default()
+        .with_multi_tenant()
+        .with_today_as_frozen_system_time(),
+    extra_test_groups = "engine, ingest, datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Others
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 kamu_cli_run_api_server_e2e_test!(

@@ -5902,6 +5902,7 @@ dependencies = [
  "kamu-cli-puppet",
  "kamu-flow-system",
  "opendatafabric",
+ "paste",
  "pretty_assertions",
  "reqwest",
  "serde_json",

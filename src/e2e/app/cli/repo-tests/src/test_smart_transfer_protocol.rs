@@ -25,83 +25,37 @@ use kamu_cli_e2e_common::{
 };
 use kamu_cli_puppet::extensions::{KamuCliPuppetExt, RepoAlias};
 use kamu_cli_puppet::{KamuCliPuppet, NewWorkspaceOptions};
+use opendatafabric as odf;
+// todo temp
 use opendatafabric::{AccountName, DatasetAlias, DatasetName};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_smart_push_pull_sequence(mut kamu_api_server_client: KamuApiServerClient) {
-    let dataset_alias = DatasetAlias::new(
-        Some(E2E_USER_ACCOUNT_NAME.clone()),
-        DATASET_ROOT_PLAYER_NAME.clone(),
-    );
-    let kamu_api_server_dataset_endpoint = kamu_api_server_client
-        .dataset()
-        .get_endpoint(&dataset_alias);
+macro_rules! test_smart_transfer_protocol_permutations {
+    ($test_name: expr) => {
+        paste::paste! {
+            pub async fn [<$test_name "_st_st">](kamu_api_server_client: KamuApiServerClient) {
+                $test_name(kamu_api_server_client, false, false).await;
+            }
 
-    // 1. Grub a token
-    let token = kamu_api_server_client.auth().login_as_e2e_user().await;
+            pub async fn [<$test_name "_st_mt">](kamu_api_server_client: KamuApiServerClient) {
+                $test_name(kamu_api_server_client, false, true).await;
+            }
 
-    // 2. Pushing the dataset to the API server
-    {
-        let kamu_in_push_workspace = KamuCliPuppet::new_workspace_tmp().await;
+            pub async fn [<$test_name "_mt_st">](kamu_api_server_client: KamuApiServerClient) {
+                $test_name(kamu_api_server_client, true, false).await;
+            }
 
-        // 2.1. Add the dataset
-        {
-            kamu_in_push_workspace
-                .execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
-                .await
-                .success();
+            pub async fn [<$test_name "_mt_mt">](kamu_api_server_client: KamuApiServerClient) {
+                $test_name(kamu_api_server_client, true, true).await;
+            }
         }
-
-        // 2.1. Ingest data to the dataset
-        {
-            kamu_in_push_workspace
-                .ingest_data(
-                    &dataset_alias.dataset_name,
-                    DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
-                )
-                .await;
-        }
-
-        // 2.2. Login to the API server
-        kamu_in_push_workspace
-            .execute([
-                "login",
-                kamu_api_server_client.get_base_url().as_str(),
-                "--access-token",
-                token.as_str(),
-            ])
-            .await
-            .success();
-
-        // 2.3. Push the dataset to the API server
-        kamu_in_push_workspace
-            .assert_success_command_execution(
-                [
-                    "push",
-                    dataset_alias.dataset_name.as_str(),
-                    "--to",
-                    kamu_api_server_dataset_endpoint.as_str(),
-                ],
-                None,
-                Some(["1 dataset(s) pushed"]),
-            )
-            .await;
-    }
-
-    // 3. Pulling the dataset from the API server
-    {
-        let kamu_in_pull_workspace = KamuCliPuppet::new_workspace_tmp().await;
-
-        kamu_in_pull_workspace
-            .assert_success_command_execution(
-                ["pull", kamu_api_server_dataset_endpoint.as_str()],
-                None,
-                Some(["1 dataset(s) updated"]),
-            )
-            .await;
-    }
+    };
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+test_smart_transfer_protocol_permutations!(test_smart_push_pull_sequence);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -1488,6 +1442,160 @@ pub async fn test_pull_mt(mut kamu_api_server_client: KamuApiServerClient) {
                 ),
                 expected_schema,
                 expected_data,
+            )
+            .await;
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Implementations
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+async fn test_smart_push_pull_sequence(
+    mut kamu_api_server_client: KamuApiServerClient,
+    is_push_workspace_multi_tenant: bool,
+    is_pull_workspace_multi_tenant: bool,
+) {
+    let dataset_alias = DatasetAlias::new(
+        Some(E2E_USER_ACCOUNT_NAME.clone()),
+        DATASET_ROOT_PLAYER_NAME.clone(),
+    );
+    let kamu_api_server_dataset_endpoint = kamu_api_server_client
+        .dataset()
+        .get_endpoint(&dataset_alias);
+
+    // 1. Grub a token
+    let token = kamu_api_server_client.auth().login_as_e2e_user().await;
+
+    // 2. Pushing the dataset to the API server
+    {
+        let kamu_in_push_workspace =
+            KamuCliPuppet::new_workspace_tmp(is_push_workspace_multi_tenant).await;
+
+        // 2.1. Add the dataset
+        kamu_in_push_workspace
+            .execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
+            .await
+            .success();
+
+        // 2.1. Ingest data to the dataset
+        kamu_in_push_workspace
+            .ingest_data(
+                &dataset_alias.dataset_name,
+                DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
+            )
+            .await;
+
+        // 2.2. Login to the API server
+        kamu_in_push_workspace
+            .execute([
+                "login",
+                kamu_api_server_client.get_base_url().as_str(),
+                "--access-token",
+                token.as_str(),
+            ])
+            .await
+            .success();
+
+        // Initial dataset push
+        kamu_in_push_workspace
+            .assert_success_command_execution(
+                [
+                    "push",
+                    dataset_alias.dataset_name.as_str(),
+                    "--to",
+                    kamu_api_server_dataset_endpoint.as_str(),
+                ],
+                None,
+                Some(["1 dataset(s) pushed"]),
+            )
+            .await;
+
+        // Hard compact dataset
+        kamu_in_push_workspace
+            .execute([
+                "--yes",
+                "system",
+                "compact",
+                dataset_alias.dataset_name.as_str(),
+                "--hard",
+                "--keep-metadata-only",
+            ])
+            .await
+            .success();
+
+        // Should fail without force flag
+        kamu_in_push_workspace
+            .assert_failure_command_execution(
+                [
+                    "push",
+                    dataset_alias.dataset_name.as_str(),
+                    "--to",
+                    kamu_api_server_dataset_endpoint.as_str(),
+                ],
+                None,
+                Some(["Failed to push 1 dataset(s)"]),
+            )
+            .await;
+
+        // Should successfully push with force flag
+        kamu_in_push_workspace
+            .assert_success_command_execution(
+                [
+                    "push",
+                    dataset_alias.dataset_name.as_str(),
+                    "--to",
+                    kamu_api_server_dataset_endpoint.as_str(),
+                    "--force",
+                ],
+                None,
+                Some(["1 dataset(s) pushed"]),
+            )
+            .await;
+    }
+
+    // 3. Pulling the dataset from the API server
+    {
+        let kamu_in_pull_workspace =
+            KamuCliPuppet::new_workspace_tmp(is_pull_workspace_multi_tenant).await;
+
+        // Call with no-alias flag to avoid remote ingest checking in next step
+        kamu_in_pull_workspace
+            .assert_success_command_execution(
+                [
+                    "pull",
+                    kamu_api_server_dataset_endpoint.as_str(),
+                    "--no-alias",
+                ],
+                None,
+                Some(["1 dataset(s) updated"]),
+            )
+            .await;
+
+        // Ingest data in pulled dataset
+
+        kamu_in_pull_workspace
+            .ingest_data(
+                &dataset_alias.dataset_name,
+                DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_2,
+            )
+            .await;
+
+        // Should fail without force flag
+        kamu_in_pull_workspace
+            .assert_failure_command_execution(
+                ["pull", kamu_api_server_dataset_endpoint.as_str()],
+                None,
+                Some(["Failed to update 1 dataset(s)"]),
+            )
+            .await;
+
+        // Should successfully pull with force flag
+        kamu_in_pull_workspace
+            .assert_success_command_execution(
+                ["pull", kamu_api_server_dataset_endpoint.as_str(), "--force"],
+                None,
+                Some(["1 dataset(s) updated"]),
             )
             .await;
     }

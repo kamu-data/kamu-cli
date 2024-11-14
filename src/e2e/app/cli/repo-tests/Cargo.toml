@@ -42,6 +42,7 @@ opendatafabric = { workspace = true }
 
 chrono = { version = "0.4", default-features = false }
 indoc = "2"
+paste = { version = "1", default-features = false }
 pretty_assertions = { version = "1" }
 reqwest = { version = "0.12", default-features = false, features = [] }
 serde_json = { version = "1", default-features = false }
