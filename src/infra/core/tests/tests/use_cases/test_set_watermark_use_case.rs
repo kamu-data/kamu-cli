@@ -28,20 +28,17 @@ async fn test_set_watermark_success() {
         MockDatasetActionAuthorizer::new().expect_check_write_dataset(&alias_foo, 1, true),
     );
 
-    let create_result_foo = harness.create_root_dataset(&alias_foo).await;
+    let foo = harness.create_root_dataset(&alias_foo).await;
 
     let watermark = Utc::now() - TimeDelta::minutes(5);
     let result = harness
         .use_case
-        .execute(&create_result_foo.dataset_handle, watermark)
+        .execute(&foo.dataset_handle, watermark)
         .await
         .unwrap();
 
     assert_matches!(result, SetWatermarkResult::Updated { .. });
-    assert_eq!(
-        harness.current_watermark(&create_result_foo).await,
-        Some(watermark)
-    );
+    assert_eq!(harness.current_watermark(&foo).await, Some(watermark));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -54,16 +51,16 @@ async fn test_set_watermark_unauthorized() {
         MockDatasetActionAuthorizer::new().expect_check_write_dataset(&alias_foo, 1, false),
     );
 
-    let create_result_foo = harness.create_root_dataset(&alias_foo).await;
+    let foo = harness.create_root_dataset(&alias_foo).await;
 
     assert_matches!(
         harness
             .use_case
-            .execute(&create_result_foo.dataset_handle, Utc::now())
+            .execute(&foo.dataset_handle, Utc::now())
             .await,
         Err(SetWatermarkError::Access(_))
     );
-    assert_eq!(harness.current_watermark(&create_result_foo).await, None,);
+    assert_eq!(harness.current_watermark(&foo).await, None,);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

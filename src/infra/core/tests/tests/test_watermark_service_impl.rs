@@ -13,13 +13,13 @@ use std::sync::Arc;
 use chrono::{DateTime, TimeZone, Utc};
 use kamu::{RemoteAliasesRegistryImpl, WatermarkServiceImpl};
 use kamu_core::{
-    CreateDatasetResult,
+    ResolvedDataset,
     SetWatermarkError,
     SetWatermarkResult,
     TenancyConfig,
     WatermarkService,
 };
-use opendatafabric::{DatasetAlias, DatasetName, DatasetRef};
+use opendatafabric::{DatasetAlias, DatasetName};
 
 use crate::BaseRepoHarness;
 
@@ -29,14 +29,17 @@ use crate::BaseRepoHarness;
 async fn test_no_watermark_initially() {
     let harness = WatermarkTestHarness::new(TenancyConfig::SingleTenant);
 
-    let foo_created = harness
+    let foo = harness
         .create_root_dataset(&DatasetAlias::new(
             None,
             DatasetName::try_from("foo").unwrap(),
         ))
         .await;
 
-    assert_eq!(harness.current_watermark(&foo_created).await, None,);
+    assert_eq!(
+        harness.current_watermark(ResolvedDataset::from(&foo)).await,
+        None,
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -45,55 +48,63 @@ async fn test_no_watermark_initially() {
 async fn test_set_watermark() {
     let harness = WatermarkTestHarness::new(TenancyConfig::SingleTenant);
 
-    let foo_created = harness
+    let foo = harness
         .create_root_dataset(&DatasetAlias::new(
             None,
             DatasetName::try_from("foo").unwrap(),
         ))
         .await;
 
-    assert_eq!(harness.num_blocks(&foo_created).await, 2);
+    assert_eq!(harness.num_blocks(ResolvedDataset::from(&foo)).await, 2);
 
     let watermark_1 = Utc.with_ymd_and_hms(2000, 1, 2, 0, 0, 0).unwrap();
     assert_matches!(
-        harness.set_watermark(&foo_created, watermark_1).await,
+        harness
+            .set_watermark(ResolvedDataset::from(&foo), watermark_1)
+            .await,
         Ok(SetWatermarkResult::Updated { .. })
     );
-    assert_eq!(harness.num_blocks(&foo_created).await, 3);
+    assert_eq!(harness.num_blocks(ResolvedDataset::from(&foo)).await, 3);
     assert_eq!(
-        harness.current_watermark(&foo_created).await,
+        harness.current_watermark(ResolvedDataset::from(&foo)).await,
         Some(watermark_1),
     );
 
     let watermark_2 = Utc.with_ymd_and_hms(2000, 1, 3, 0, 0, 0).unwrap();
     assert_matches!(
-        harness.set_watermark(&foo_created, watermark_2).await,
+        harness
+            .set_watermark(ResolvedDataset::from(&foo), watermark_2)
+            .await,
         Ok(SetWatermarkResult::Updated { .. })
     );
-    assert_eq!(harness.num_blocks(&foo_created).await, 4);
+    assert_eq!(harness.num_blocks(ResolvedDataset::from(&foo)).await, 4);
     assert_eq!(
-        harness.current_watermark(&foo_created).await,
+        harness.current_watermark(ResolvedDataset::from(&foo)).await,
         Some(watermark_2),
     );
 
     assert_matches!(
-        harness.set_watermark(&foo_created, watermark_2).await,
+        harness
+            .set_watermark(ResolvedDataset::from(&foo), watermark_2)
+            .await,
         Ok(SetWatermarkResult::UpToDate)
     );
-    assert_eq!(harness.num_blocks(&foo_created).await, 4);
+    assert_eq!(harness.num_blocks(ResolvedDataset::from(&foo)).await, 4);
     assert_eq!(
-        harness.current_watermark(&foo_created).await,
+        harness.current_watermark(ResolvedDataset::from(&foo)).await,
         Some(watermark_2),
     );
 
     let watermark_3 = Utc.with_ymd_and_hms(2000, 1, 2, 0, 0, 0).unwrap();
     assert_matches!(
-        harness.set_watermark(&foo_created, watermark_3).await,
+        harness
+            .set_watermark(ResolvedDataset::from(&foo), watermark_3)
+            .await,
         Ok(SetWatermarkResult::UpToDate)
     );
-    assert_eq!(harness.num_blocks(&foo_created).await, 4);
+    assert_eq!(harness.num_blocks(ResolvedDataset::from(&foo)).await, 4);
     assert_eq!(
-        harness.current_watermark(&foo_created).await,
+        harness.current_watermark(ResolvedDataset::from(&foo)).await,
         Some(watermark_2),
     );
 }
@@ -104,36 +115,42 @@ async fn test_set_watermark() {
 async fn test_set_watermark_rejects_on_derivative() {
     let harness = WatermarkTestHarness::new(TenancyConfig::MultiTenant);
 
-    let created_root = harness
+    let root = harness
         .create_root_dataset(&DatasetAlias::new(
             None,
             DatasetName::try_from("foo").unwrap(),
         ))
         .await;
 
-    let created_derived = harness
+    let derived = harness
         .create_derived_dataset(
             &DatasetAlias::new(None, DatasetName::try_from("bar").unwrap()),
-            vec![created_root.dataset_handle.as_local_ref()],
+            vec![root.dataset_handle.as_local_ref()],
         )
         .await;
 
     assert_matches!(
         harness
             .set_watermark(
-                &created_derived,
+                ResolvedDataset::from(&derived),
                 Utc.with_ymd_and_hms(2000, 1, 2, 0, 0, 0).unwrap()
             )
             .await,
         Err(SetWatermarkError::IsDerivative)
     );
 
-    assert_eq!(harness.num_blocks(&created_derived).await, 2);
-    assert_eq!(harness.current_watermark(&created_derived).await, None,);
+    assert_eq!(harness.num_blocks(ResolvedDataset::from(&derived)).await, 2);
+    assert_eq!(
+        harness
+            .current_watermark(ResolvedDataset::from(&derived))
+            .await,
+        None,
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[oop::extend(BaseRepoHarness, base_repo_harness)]
 struct WatermarkTestHarness {
     base_repo_harness: BaseRepoHarness,
     watermark_svc: Arc<dyn WatermarkService>,
@@ -154,43 +171,19 @@ impl WatermarkTestHarness {
         }
     }
 
-    #[inline]
-    async fn create_root_dataset(&self, alias: &DatasetAlias) -> CreateDatasetResult {
-        self.base_repo_harness.create_root_dataset(alias).await
-    }
-
-    #[inline]
-    async fn create_derived_dataset(
-        &self,
-        alias: &DatasetAlias,
-        input_dataset_refs: Vec<DatasetRef>,
-    ) -> CreateDatasetResult {
-        self.base_repo_harness
-            .create_derived_dataset(alias, input_dataset_refs)
-            .await
-    }
-
-    #[inline]
-    async fn num_blocks(&self, create_result: &CreateDatasetResult) -> usize {
-        self.base_repo_harness.num_blocks(create_result).await
-    }
-
     async fn set_watermark(
         &self,
-        create_result: &CreateDatasetResult,
+        target: ResolvedDataset,
         new_watermark: DateTime<Utc>,
     ) -> Result<SetWatermarkResult, SetWatermarkError> {
         self.watermark_svc
-            .set_watermark(create_result.dataset.clone(), new_watermark)
+            .set_watermark(target.dataset, new_watermark)
             .await
     }
 
-    async fn current_watermark(
-        &self,
-        create_result: &CreateDatasetResult,
-    ) -> Option<DateTime<Utc>> {
+    async fn current_watermark(&self, target: ResolvedDataset) -> Option<DateTime<Utc>> {
         self.watermark_svc
-            .try_get_current_watermark(create_result.dataset.clone())
+            .try_get_current_watermark(target.dataset)
             .await
             .unwrap()
     }

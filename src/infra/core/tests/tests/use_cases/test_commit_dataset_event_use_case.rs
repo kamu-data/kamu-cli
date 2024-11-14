@@ -30,12 +30,12 @@ async fn test_commit_dataset_event() {
     let mock_outbox = MockOutbox::new();
 
     let harness = CommitDatasetEventUseCaseHarness::new(mock_authorizer, mock_outbox);
-    let created_foo = harness.create_root_dataset(&alias_foo).await;
+    let foo = harness.create_root_dataset(&alias_foo).await;
 
     let res = harness
         .use_case
         .execute(
-            &created_foo.dataset_handle,
+            &foo.dataset_handle,
             MetadataEvent::SetInfo(MetadataFactory::set_info().description("test").build()),
             CommitOpts::default(),
         )
@@ -55,12 +55,12 @@ async fn test_commit_event_unauthorized() {
     let mock_outbox = MockOutbox::new();
 
     let harness = CommitDatasetEventUseCaseHarness::new(mock_authorizer, mock_outbox);
-    let created_foo = harness.create_root_dataset(&alias_foo).await;
+    let foo = harness.create_root_dataset(&alias_foo).await;
 
     let res = harness
         .use_case
         .execute(
-            &created_foo.dataset_handle,
+            &foo.dataset_handle,
             MetadataEvent::SetInfo(MetadataFactory::set_info().description("test").build()),
             CommitOpts::default(),
         )
@@ -82,19 +82,19 @@ async fn test_commit_event_with_new_dependencies() {
     expect_outbox_dataset_dependencies_updated(&mut mock_outbox, 1);
 
     let harness = CommitDatasetEventUseCaseHarness::new(mock_authorizer, mock_outbox);
-    let created_foo = harness.create_root_dataset(&alias_foo).await;
-    let created_bar = harness
-        .create_derived_dataset(&alias_bar, vec![created_foo.dataset_handle.as_local_ref()])
+    let foo = harness.create_root_dataset(&alias_foo).await;
+    let bar = harness
+        .create_derived_dataset(&alias_bar, vec![foo.dataset_handle.as_local_ref()])
         .await;
 
     let res = harness
         .use_case
         .execute(
-            &created_bar.dataset_handle,
+            &bar.dataset_handle,
             MetadataEvent::SetTransform(
                 MetadataFactory::set_transform()
                     .inputs_from_refs_and_aliases(vec![(
-                        created_foo.dataset_handle.id,
+                        foo.dataset_handle.id,
                         alias_foo.to_string(),
                     )])
                     .build(),

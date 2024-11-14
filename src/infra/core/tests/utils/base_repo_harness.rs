@@ -23,6 +23,8 @@ use kamu_core::{
     DatasetRepository,
     GetDatasetError,
     MetadataChainExt,
+    ResolvedDataset,
+    RunInfoDir,
     TenancyConfig,
 };
 use opendatafabric::serde::flatbuffers::FlatbuffersMetadataBlockSerializer;
@@ -54,7 +56,11 @@ impl BaseRepoHarness {
         let datasets_dir = tempdir.path().join("datasets");
         std::fs::create_dir(&datasets_dir).unwrap();
 
+        let run_info_dir = tempdir.path().join("run");
+        std::fs::create_dir(&run_info_dir).unwrap();
+
         let catalog = dill::CatalogBuilder::new()
+            .add_value(RunInfoDir::new(run_info_dir))
             .add_value(tenancy_config)
             .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
@@ -128,9 +134,9 @@ impl BaseRepoHarness {
             .create_dataset_result
     }
 
-    pub async fn num_blocks(&self, create_result: &CreateDatasetResult) -> usize {
+    pub async fn num_blocks(&self, target: ResolvedDataset) -> usize {
         use futures::StreamExt;
-        create_result
+        target
             .dataset
             .as_metadata_chain()
             .iter_blocks()
@@ -148,11 +154,11 @@ impl BaseRepoHarness {
 
     pub async fn commit_event(
         &self,
-        create_result: &CreateDatasetResult,
+        target: ResolvedDataset,
         event: MetadataEvent,
         options: CommitOpts<'_>,
     ) -> Result<CommitResult, CommitError> {
-        create_result.dataset.commit_event(event, options).await
+        target.dataset.commit_event(event, options).await
     }
 }
 

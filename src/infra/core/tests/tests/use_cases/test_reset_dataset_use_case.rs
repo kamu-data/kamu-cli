@@ -31,13 +31,13 @@ async fn test_reset_success() {
 
     harness
         .commit_event(
-            &foo,
+            ResolvedDataset::from(&foo),
             MetadataEvent::SetInfo(MetadataFactory::set_info().description("test").build()),
             CommitOpts::default(),
         )
         .await
         .unwrap();
-    assert_eq!(harness.num_blocks(&foo).await, 3);
+    assert_eq!(harness.num_blocks(ResolvedDataset::from(&foo)).await, 3);
 
     let new_head = harness
         .use_case
@@ -46,7 +46,7 @@ async fn test_reset_success() {
         .unwrap();
 
     assert_eq!(new_head, foo.head);
-    assert_eq!(harness.num_blocks(&foo).await, 2);
+    assert_eq!(harness.num_blocks(ResolvedDataset::from(&foo)).await, 2);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

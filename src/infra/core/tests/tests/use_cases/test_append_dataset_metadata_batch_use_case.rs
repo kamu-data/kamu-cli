@@ -30,11 +30,11 @@ async fn test_append_dataset_metadata_batch() {
     let mock_outbox = MockOutbox::new();
 
     let harness = AppendDatasetMetadataBatchUseCaseHarness::new(mock_outbox);
-    let created_foo = harness.create_root_dataset(&alias_foo).await;
+    let foo = harness.create_root_dataset(&alias_foo).await;
 
     let set_info_block = MetadataBlock {
         system_time: Utc::now(),
-        prev_block_hash: Some(created_foo.head.clone()),
+        prev_block_hash: Some(foo.head.clone()),
         sequence_number: 2,
         event: MetadataEvent::SetInfo(MetadataFactory::set_info().description("test").build()),
     };
@@ -55,7 +55,7 @@ async fn test_append_dataset_metadata_batch() {
 
     let res = harness
         .use_case
-        .execute(created_foo.dataset.as_ref(), new_blocks, false)
+        .execute(foo.dataset.as_ref(), new_blocks, false)
         .await;
     assert_matches!(res, Ok(_));
 }
@@ -71,21 +71,18 @@ async fn test_append_dataset_metadata_batch_with_new_dependencies() {
     expect_outbox_dataset_dependencies_updated(&mut mock_outbox, 1);
 
     let harness = AppendDatasetMetadataBatchUseCaseHarness::new(mock_outbox);
-    let foo_created = harness.create_root_dataset(&alias_foo).await;
-    let bar_created = harness
-        .create_derived_dataset(&alias_bar, vec![foo_created.dataset_handle.as_local_ref()])
+    let foo = harness.create_root_dataset(&alias_foo).await;
+    let bar = harness
+        .create_derived_dataset(&alias_bar, vec![foo.dataset_handle.as_local_ref()])
         .await;
 
     let set_transform_block = MetadataBlock {
         system_time: Utc::now(),
-        prev_block_hash: Some(bar_created.head.clone()),
+        prev_block_hash: Some(bar.head.clone()),
         sequence_number: 2,
         event: MetadataEvent::SetTransform(
             MetadataFactory::set_transform()
-                .inputs_from_refs_and_aliases(vec![(
-                    foo_created.dataset_handle.id,
-                    alias_foo.to_string(),
-                )])
+                .inputs_from_refs_and_aliases(vec![(foo.dataset_handle.id, alias_foo.to_string())])
                 .build(),
         ),
     };
@@ -95,7 +92,7 @@ async fn test_append_dataset_metadata_batch_with_new_dependencies() {
 
     let res = harness
         .use_case
-        .execute(bar_created.dataset.as_ref(), new_blocks, false)
+        .execute(bar.dataset.as_ref(), new_blocks, false)
         .await;
     assert_matches!(res, Ok(_));
 }

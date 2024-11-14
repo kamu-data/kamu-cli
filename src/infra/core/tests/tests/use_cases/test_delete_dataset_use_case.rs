@@ -73,12 +73,12 @@ async fn test_delete_dataset_success_via_handle() {
 
     let harness = DeleteUseCaseHarness::new(mock_authorizer, mock_outbox);
 
-    let create_result_foo = harness.create_root_dataset(&alias_foo).await;
+    let foo = harness.create_root_dataset(&alias_foo).await;
     harness.dependencies_eager_initialization().await;
 
     harness
         .use_case
-        .execute_via_handle(&create_result_foo.dataset_handle)
+        .execute_via_handle(&foo.dataset_handle)
         .await
         .unwrap();
 
@@ -115,13 +115,13 @@ async fn test_delete_unauthorized() {
         MockOutbox::new(),
     );
 
-    let create_result_foo = harness.create_root_dataset(&alias_foo).await;
+    let foo = harness.create_root_dataset(&alias_foo).await;
     harness.dependencies_eager_initialization().await;
 
     assert_matches!(
         harness
             .use_case
-            .execute_via_handle(&create_result_foo.dataset_handle)
+            .execute_via_handle(&foo.dataset_handle)
             .await,
         Err(DeleteDatasetError::Access(_))
     );
@@ -141,15 +141,15 @@ async fn test_delete_dataset_respects_dangling_refs() {
 
     let harness = DeleteUseCaseHarness::new(MockDatasetActionAuthorizer::allowing(), mock_outbox);
 
-    let create_result_root = harness.create_root_dataset(&alias_foo).await;
-    let create_result_derived = harness
+    let root = harness.create_root_dataset(&alias_foo).await;
+    let derived = harness
         .create_derived_dataset(&alias_bar, vec![alias_foo.as_local_ref()])
         .await;
     harness.dependencies_eager_initialization().await;
 
     assert_matches!(
-        harness.use_case.execute_via_handle(&create_result_root.dataset_handle).await,
-        Err(DeleteDatasetError::DanglingReference(e)) if e.children == vec![create_result_derived.dataset_handle.clone()]
+        harness.use_case.execute_via_handle(&root.dataset_handle).await,
+        Err(DeleteDatasetError::DanglingReference(e)) if e.children == vec![derived.dataset_handle.clone()]
     );
 
     assert_matches!(harness.check_dataset_exists(&alias_foo).await, Ok(_));
@@ -157,14 +157,12 @@ async fn test_delete_dataset_respects_dangling_refs() {
 
     harness
         .use_case
-        .execute_via_handle(&create_result_derived.dataset_handle)
+        .execute_via_handle(&derived.dataset_handle)
         .await
         .unwrap();
 
     harness
-        .consume_message(DatasetLifecycleMessage::deleted(
-            create_result_derived.dataset_handle.id,
-        ))
+        .consume_message(DatasetLifecycleMessage::deleted(derived.dataset_handle.id))
         .await;
 
     assert_matches!(harness.check_dataset_exists(&alias_foo).await, Ok(_));
@@ -175,14 +173,12 @@ async fn test_delete_dataset_respects_dangling_refs() {
 
     harness
         .use_case
-        .execute_via_handle(&create_result_root.dataset_handle)
+        .execute_via_handle(&root.dataset_handle)
         .await
         .unwrap();
 
     harness
-        .consume_message(DatasetLifecycleMessage::deleted(
-            create_result_root.dataset_handle.id,
-        ))
+        .consume_message(DatasetLifecycleMessage::deleted(root.dataset_handle.id))
         .await;
 
     assert_matches!(
