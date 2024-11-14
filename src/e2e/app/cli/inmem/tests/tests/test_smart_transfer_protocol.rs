@@ -155,7 +155,7 @@ kamu_cli_run_api_server_e2e_test!(
     storage = inmem,
     fixture = kamu_cli_e2e_repo_tests::test_smart_pull_as_st,
     options = Options::default()
-        .with_multi_tenant()
+        // .with_multi_tenant()
         .with_today_as_frozen_system_time(),
     extra_test_groups = "engine, ingest, datafusion"
 );
@@ -328,16 +328,49 @@ kamu_cli_run_api_server_e2e_test!(
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Others
+// test_s3_push_smart_pull
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 kamu_cli_execute_command_e2e_test!(
     storage = inmem,
-    fixture = kamu_cli_e2e_repo_tests::test_smart_push_pull_s3,
+    fixture = kamu_cli_e2e_repo_tests::test_s3_push_smart_pull_st_st,
     options = Options::default().with_frozen_system_time(),
     extra_test_groups = "containerized, engine, ingest, datafusion"
 );
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_execute_command_e2e_test!(
+    storage = inmem,
+    fixture = kamu_cli_e2e_repo_tests::test_s3_push_smart_pull_st_mt,
+    options = Options::default().with_frozen_system_time(),
+    extra_test_groups = "containerized, engine, ingest, datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_execute_command_e2e_test!(
+    storage = inmem,
+    fixture = kamu_cli_e2e_repo_tests::test_s3_push_smart_pull_mt_st,
+    options = Options::default()
+        .with_multi_tenant()
+        .with_frozen_system_time(),
+    extra_test_groups = "containerized, engine, ingest, datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_execute_command_e2e_test!(
+    storage = inmem,
+    fixture = kamu_cli_e2e_repo_tests::test_s3_push_smart_pull_mt_mt,
+    options = Options::default()
+        .with_multi_tenant()
+        .with_frozen_system_time(),
+    extra_test_groups = "containerized, engine, ingest, datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Others
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 kamu_cli_execute_command_e2e_test!(

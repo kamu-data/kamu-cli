@@ -114,77 +114,25 @@ pub async fn test_smart_push_visibility_mt(kamu_api_server_client: KamuApiServer
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Others
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_smart_push_pull_s3(kamu: KamuCliPuppet) {
-    let dataset_alias = DatasetAlias::new(None, DATASET_ROOT_PLAYER_NAME.clone());
-
-    kamu.execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
-        .await
-        .success();
-
-    kamu.ingest_data(
-        &dataset_alias.dataset_name,
-        DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
-    )
-    .await;
-
-    let s3_server = LocalS3Server::new().await;
-    let dataset_url = format!("{}/e2e-user/{}", s3_server.url, dataset_alias.dataset_name);
-
-    // Push dataset
-    kamu.assert_success_command_execution(
-        [
-            "push",
-            dataset_alias.dataset_name.as_str(),
-            "--to",
-            dataset_url.as_str(),
-        ],
-        None,
-        Some(["1 dataset(s) pushed"]),
-    )
-    .await;
-
-    {
-        let kamu_in_pull_workspace = KamuCliPuppet::new_workspace_tmp().await;
-
-        kamu_in_pull_workspace
-            .assert_success_command_execution(
-                ["pull", dataset_url.as_str()],
-                None,
-                Some(["1 dataset(s) updated"]),
-            )
-            .await;
-
-        let expected_schema = indoc::indoc!(
-            r#"
-            message arrow_schema {
-              REQUIRED INT64 offset;
-              REQUIRED INT32 op;
-              REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
-              OPTIONAL INT64 match_time (TIMESTAMP(MILLIS,true));
-              OPTIONAL INT64 match_id;
-              OPTIONAL BYTE_ARRAY player_id (STRING);
-              OPTIONAL INT64 score;
-            }
-            "#
-        );
-        let expected_data = indoc::indoc!(
-            r#"
-            +--------+----+----------------------+----------------------+----------+-----------+-------+
-            | offset | op | system_time          | match_time           | match_id | player_id | score |
-            +--------+----+----------------------+----------------------+----------+-----------+-------+
-            | 0      | 0  | 2050-01-02T03:04:05Z | 2000-01-01T00:00:00Z | 1        | Alice     | 100   |
-            | 1      | 0  | 2050-01-02T03:04:05Z | 2000-01-01T00:00:00Z | 1        | Bob       | 80    |
-            +--------+----+----------------------+----------------------+----------+-----------+-------+
-            "#
-        );
-        kamu.assert_last_data_slice(&dataset_alias, expected_schema, expected_data)
-            .await;
-    }
+pub async fn test_s3_push_smart_pull_st_st(kamu: KamuCliPuppet) {
+    test_s3_push_smart_pull(kamu, false).await;
 }
 
+pub async fn test_s3_push_smart_pull_st_mt(kamu: KamuCliPuppet) {
+    test_s3_push_smart_pull(kamu, true).await;
+}
+
+pub async fn test_s3_push_smart_pull_mt_st(kamu: KamuCliPuppet) {
+    test_s3_push_smart_pull(kamu, false).await;
+}
+
+pub async fn test_s3_push_smart_pull_mt_mt(kamu: KamuCliPuppet) {
+    test_s3_push_smart_pull(kamu, true).await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Others
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_smart_pull_derivative(kamu: KamuCliPuppet) {
@@ -1690,6 +1638,77 @@ async fn test_smart_push_visibility(
             .await;
 
         // TODO: Private Datasets: add visibility check
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+async fn test_s3_push_smart_pull(kamu: KamuCliPuppet, is_pull_workspace_multi_tenant: bool) {
+    let dataset_alias = DatasetAlias::new(None, DATASET_ROOT_PLAYER_NAME.clone());
+
+    kamu.execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
+        .await
+        .success();
+
+    kamu.ingest_data(
+        &dataset_alias.dataset_name,
+        DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
+    )
+    .await;
+
+    let s3_server = LocalS3Server::new().await;
+    let dataset_url = format!("{}/e2e-user/{}", s3_server.url, dataset_alias.dataset_name);
+
+    // Push dataset
+    kamu.assert_success_command_execution(
+        [
+            "push",
+            dataset_alias.dataset_name.as_str(),
+            "--to",
+            dataset_url.as_str(),
+        ],
+        None,
+        Some(["1 dataset(s) pushed"]),
+    )
+    .await;
+
+    {
+        let kamu_in_pull_workspace =
+            KamuCliPuppet::new_workspace_tmp(is_pull_workspace_multi_tenant).await;
+
+        kamu_in_pull_workspace
+            .assert_success_command_execution(
+                ["pull", dataset_url.as_str()],
+                None,
+                Some(["1 dataset(s) updated"]),
+            )
+            .await;
+
+        let expected_schema = indoc::indoc!(
+            r#"
+            message arrow_schema {
+              REQUIRED INT64 offset;
+              REQUIRED INT32 op;
+              REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
+              OPTIONAL INT64 match_time (TIMESTAMP(MILLIS,true));
+              OPTIONAL INT64 match_id;
+              OPTIONAL BYTE_ARRAY player_id (STRING);
+              OPTIONAL INT64 score;
+            }
+            "#
+        );
+        let expected_data = indoc::indoc!(
+            r#"
+            +--------+----+----------------------+----------------------+----------+-----------+-------+
+            | offset | op | system_time          | match_time           | match_id | player_id | score |
+            +--------+----+----------------------+----------------------+----------+-----------+-------+
+            | 0      | 0  | 2050-01-02T03:04:05Z | 2000-01-01T00:00:00Z | 1        | Alice     | 100   |
+            | 1      | 0  | 2050-01-02T03:04:05Z | 2000-01-01T00:00:00Z | 1        | Bob       | 80    |
+            +--------+----+----------------------+----------------------+----------+-----------+-------+
+            "#
+        );
+        kamu.assert_last_data_slice(&dataset_alias, expected_schema, expected_data)
+            .await;
     }
 }
 
