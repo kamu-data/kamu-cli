@@ -11,6 +11,10 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [0.207.1] - 2024-11-14
+### Fixed
+- `kamu pull`: crash in multi-tenant mode
+
 ## [0.207.0] - 2024-11-11
 ### Added
 - E2E: reinforce test coverage

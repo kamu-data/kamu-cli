@@ -17,6 +17,7 @@ use datafusion::prelude::{ParquetReadOptions, SessionContext};
 use opendatafabric::serde::yaml::{YamlDatasetSnapshotSerializer, YamlMetadataBlockDeserializer};
 use opendatafabric::serde::{DatasetSnapshotSerializer, MetadataBlockDeserializer};
 use opendatafabric::{
+    DatasetAlias,
     DatasetID,
     DatasetName,
     DatasetRef,
@@ -105,7 +106,7 @@ pub trait KamuCliPuppetExt {
 
     async fn assert_last_data_slice(
         &self,
-        dataset_name: &DatasetName,
+        dataset_alias: &DatasetAlias,
         expected_schema: &str,
         expected_data: &str,
     );
@@ -281,7 +282,7 @@ impl KamuCliPuppetExt for KamuCliPuppet {
 
     async fn assert_last_data_slice(
         &self,
-        dataset_name: &DatasetName,
+        dataset_alias: &DatasetAlias,
         expected_schema: &str,
         expected_data: &str,
     ) {
@@ -292,7 +293,7 @@ impl KamuCliPuppetExt for KamuCliPuppet {
                 "--action",
                 "get-last-data-block-path",
                 "--dataset",
-                dataset_name.as_str(),
+                &dataset_alias.to_string(),
             ])
             .await
             .success();

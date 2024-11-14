@@ -18,6 +18,7 @@ use kamu_cli_e2e_common::{
 };
 use kamu_cli_puppet::extensions::KamuCliPuppetExt;
 use kamu_cli_puppet::KamuCliPuppet;
+use opendatafabric::DatasetAlias;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -193,7 +194,7 @@ pub async fn test_pull_reset_derivative(kamu: KamuCliPuppet) {
         "#
     );
     kamu.assert_last_data_slice(
-        &dataset_derivative_name,
+        &DatasetAlias::new(None, dataset_derivative_name.clone()),
         expected_derivative_schema,
         expected_derivative_data,
     )
@@ -248,7 +249,7 @@ pub async fn test_pull_reset_derivative(kamu: KamuCliPuppet) {
         "#
     );
     kamu.assert_last_data_slice(
-        &dataset_derivative_name,
+        &DatasetAlias::new(None, dataset_derivative_name),
         expected_derivative_schema,
         expected_derivative_data,
     )
@@ -370,8 +371,12 @@ pub async fn test_push_pull_s3(kamu: KamuCliPuppet) {
             +--------+----+----------------------+----------------------+----------+-----------+-------+
             "#
         );
-        kamu.assert_last_data_slice(&dataset_name, expected_schema, expected_data)
-            .await;
+        kamu.assert_last_data_slice(
+            &DatasetAlias::new(None, dataset_name),
+            expected_schema,
+            expected_data,
+        )
+        .await;
     }
 }
 
