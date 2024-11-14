@@ -46,6 +46,12 @@ impl RepositoryDeleteCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for RepositoryDeleteCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
+        if self.names.is_empty() && !self.all {
+            return Err(CLIError::usage_error(
+                "Specify a repository or use --all flag",
+            ));
+        }
+
         let repo_names: Vec<_> = if self.all {
             self.remote_repo_reg.get_all_repositories().collect()
         } else {
@@ -58,9 +64,11 @@ impl Command for RepositoryDeleteCommand {
         };
 
         if repo_names.is_empty() {
-            return Err(CLIError::usage_error(
-                "Specify a repository or use --all flag",
-            ));
+            eprintln!(
+                "{}",
+                console::style("There are no repositories to delete").yellow()
+            );
+            return Ok(());
         }
 
         self.interact.require_confirmation(format!(
