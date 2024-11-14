@@ -10,7 +10,6 @@
 use std::sync::atomic::{AtomicI32, Ordering};
 use std::sync::Arc;
 
-use database_common::DatabaseTransactionRunner;
 use dill::*;
 use futures::SinkExt;
 use headers::Header;
@@ -28,7 +27,6 @@ use tokio::net::TcpStream;
 use tokio_tungstenite::tungstenite::protocol::frame::coding::CloseCode;
 use tokio_tungstenite::tungstenite::{Error as TungsteniteError, Message};
 use tokio_tungstenite::{connect_async, MaybeTlsStream, WebSocketStream};
-use tracing::Instrument;
 use url::Url;
 
 use crate::smart_protocol::errors::*;
@@ -693,23 +691,16 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
             }
 
             let dst_dataset = dst.clone();
-
-            DatabaseTransactionRunner::new(self.catalog.clone())
-                .transactional_with(
-                    |append_dataset_metadata_batch: Arc<
-                        dyn AppendDatasetMetadataBatchUseCase,
-                    >| async move {
-                        append_dataset_metadata_batch
-                            .execute(
-                                dst_dataset.as_ref(),
-                                new_blocks,
-                                transfer_options.force_update_if_diverged,
-                            )
-                            .await
-                    },
+            let append_event = self
+                .catalog
+                .get_one::<dyn AppendDatasetMetadataBatchUseCase>()
+                .unwrap();
+            append_event
+                .execute(
+                    dst_dataset.as_ref(),
+                    new_blocks,
+                    transfer_options.force_update_if_diverged,
                 )
-                .instrument(tracing::debug_span!("
-            SmartTransferProtocolClient::append_dataset_metadata_batch",))
                 .await
                 .int_err()?;
 
