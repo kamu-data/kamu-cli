@@ -11,7 +11,7 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## [Unreleased]
+## [0.207.1] - 2024-11-14
 ### Fixed
 - `kamu pull`: crash in multi-tenant mode
 
