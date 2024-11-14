@@ -534,16 +534,27 @@ async fn test_smart_push_no_alias_pull_no_alias(
             )
             .await;
 
-        let aliases = kamu_in_push_workspace
+        let actual_aliases = kamu_in_push_workspace
             .get_list_of_repo_aliases(&dataset_alias.dataset_name.clone().into())
-            .await;
-        let expected_aliases = vec![RepoAlias {
-            dataset: dataset_alias.dataset_name.clone(),
-            kind: "Push".to_string(),
-            alias: kamu_api_server_dataset_endpoint.to_string(),
-        }];
+            .await
+            .into_iter()
+            .map(|repo_alias: RepoAlias| {
+                (
+                    repo_alias.dataset.dataset_name,
+                    repo_alias.kind,
+                    repo_alias.alias,
+                )
+            })
+            .collect::<Vec<_>>();
 
-        pretty_assertions::assert_eq!(aliases, expected_aliases);
+        pretty_assertions::assert_eq!(
+            vec![(
+                dataset_alias.dataset_name.clone(),
+                "Push".to_string(),
+                kamu_api_server_dataset_endpoint.to_string()
+            )],
+            actual_aliases
+        );
     }
 
     // 3. Pull command
@@ -585,16 +596,27 @@ async fn test_smart_push_no_alias_pull_no_alias(
             )
             .await;
 
-        let aliases = kamu_in_pull_workspace
+        let actual_aliases = kamu_in_pull_workspace
             .get_list_of_repo_aliases(&dataset_alias.dataset_name.clone().into())
-            .await;
-        let expected_aliases = vec![RepoAlias {
-            dataset: dataset_alias.dataset_name.clone(),
-            kind: "Pull".to_string(),
-            alias: kamu_api_server_dataset_endpoint.to_string(),
-        }];
+            .await
+            .into_iter()
+            .map(|repo_alias: RepoAlias| {
+                (
+                    repo_alias.dataset.dataset_name,
+                    repo_alias.kind,
+                    repo_alias.alias,
+                )
+            })
+            .collect::<Vec<_>>();
 
-        pretty_assertions::assert_eq!(aliases, expected_aliases);
+        pretty_assertions::assert_eq!(
+            vec![(
+                dataset_alias.dataset_name.clone(),
+                "Pull".to_string(),
+                kamu_api_server_dataset_endpoint.to_string()
+            )],
+            actual_aliases
+        );
     }
 }
 

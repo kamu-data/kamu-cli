@@ -442,7 +442,7 @@ pub struct DatasetRecord {
 #[derive(Debug, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "PascalCase", deny_unknown_fields)]
 pub struct RepoAlias {
-    pub dataset: DatasetName,
+    pub dataset: DatasetAlias,
     pub kind: String,
     pub alias: String,
 }
