@@ -66,56 +66,17 @@ test_smart_transfer_protocol_permutations!(test_smart_push_force_pull_force);
 test_smart_transfer_protocol_permutations!(test_smart_push_no_alias_pull_no_alias);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Others
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_smart_pull_as(mut kamu_api_server_client: KamuApiServerClient) {
-    let dataset_alias = DatasetAlias::new(
-        Some(E2E_USER_ACCOUNT_NAME.clone()),
-        DATASET_ROOT_PLAYER_NAME.clone(),
-    );
-    let kamu_api_server_dataset_endpoint = kamu_api_server_client
-        .dataset()
-        .get_endpoint(&dataset_alias);
-
-    // 1. Grub a token
-    kamu_api_server_client.auth().login_as_e2e_user().await;
-
-    kamu_api_server_client
-        .dataset()
-        .create_player_scores_dataset_with_data(Some(AccountName::new_unchecked(
-            E2E_USER_ACCOUNT_NAME_STR,
-        )))
-        .await;
-
-    {
-        let kamu_in_pull_workspace = KamuCliPuppet::new_workspace_tmp().await;
-        let new_dataset_name = DatasetName::new_unchecked("foo");
-
-        kamu_in_pull_workspace
-            .assert_success_command_execution(
-                [
-                    "pull",
-                    kamu_api_server_dataset_endpoint.as_str(),
-                    "--as",
-                    new_dataset_name.as_str(),
-                ],
-                None,
-                Some(["1 dataset(s) updated"]),
-            )
-            .await;
-
-        let expected_dataset_list = kamu_in_pull_workspace
-            .list_datasets()
-            .await
-            .into_iter()
-            .map(|dataset| dataset.name)
-            .collect::<Vec<_>>();
-
-        pretty_assertions::assert_eq!(vec![new_dataset_name], expected_dataset_list);
-    }
+pub async fn test_smart_pull_as_st(kamu_api_server_client: KamuApiServerClient) {
+    test_smart_pull_as(kamu_api_server_client, false).await;
 }
 
+pub async fn test_smart_pull_as_mt(kamu_api_server_client: KamuApiServerClient) {
+    test_smart_pull_as(kamu_api_server_client, true).await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Others
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_smart_push_pull_all(mut kamu_api_server_client: KamuApiServerClient) {
@@ -1622,6 +1583,59 @@ async fn test_smart_push_no_alias_pull_no_alias(
         }];
 
         pretty_assertions::assert_eq!(aliases, expected_aliases);
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+async fn test_smart_pull_as(
+    mut kamu_api_server_client: KamuApiServerClient,
+    is_pull_workspace_multi_tenant: bool,
+) {
+    let dataset_alias = DatasetAlias::new(
+        Some(E2E_USER_ACCOUNT_NAME.clone()),
+        DATASET_ROOT_PLAYER_NAME.clone(),
+    );
+    let kamu_api_server_dataset_endpoint = kamu_api_server_client
+        .dataset()
+        .get_endpoint(&dataset_alias);
+
+    // 1. Grub a token
+    kamu_api_server_client.auth().login_as_e2e_user().await;
+
+    kamu_api_server_client
+        .dataset()
+        .create_player_scores_dataset_with_data(Some(AccountName::new_unchecked(
+            E2E_USER_ACCOUNT_NAME_STR,
+        )))
+        .await;
+
+    {
+        let kamu_in_pull_workspace =
+            KamuCliPuppet::new_workspace_tmp(is_pull_workspace_multi_tenant).await;
+        let new_dataset_name = DatasetName::new_unchecked("foo");
+
+        kamu_in_pull_workspace
+            .assert_success_command_execution(
+                [
+                    "pull",
+                    kamu_api_server_dataset_endpoint.as_str(),
+                    "--as",
+                    new_dataset_name.as_str(),
+                ],
+                None,
+                Some(["1 dataset(s) updated"]),
+            )
+            .await;
+
+        let expected_dataset_list = kamu_in_pull_workspace
+            .list_datasets()
+            .await
+            .into_iter()
+            .map(|dataset| dataset.name)
+            .collect::<Vec<_>>();
+
+        pretty_assertions::assert_eq!(vec![new_dataset_name], expected_dataset_list);
     }
 }
 
