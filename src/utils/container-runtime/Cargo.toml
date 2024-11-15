@@ -30,8 +30,13 @@ dill = "0.9"
 libc = "0.2"
 regex = "1"
 serde = { version = "1", features = ["derive"] }
-thiserror = { version = "1", default-features = false }
-tokio = { version = "1", default-features = false, features = ["time", "sync", "process", "parking_lot"] }
+thiserror = { version = "2", default-features = false, features = ["std"] }
+tokio = { version = "1", default-features = false, features = [
+    "time",
+    "sync",
+    "process",
+    "parking_lot",
+] }
 tracing = "0.1"
 url = "2"
 

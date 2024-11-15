@@ -39,7 +39,7 @@ dill = { version = "0.9" }
 lazy_static = { version = "1" }
 sqlx = { version = "0.8", default-features = false, features = ["macros"] }
 strum = { version = "0.26", features = ["derive"] }
-thiserror = { version = "1", default-features = false }
+thiserror = { version = "2", default-features = false, features = ["std"] }
 tokio-stream = { version = "0.1", default-features = false }
 tracing = { version = "0.1", default-features = false }
 url = { version = "2", default-features = false }
@@ -51,4 +51,4 @@ serde_with = { version = "3", default-features = false, features = [
 ] }
 
 [dev-dependencies]
-datafusion = { version = "42", default-features = false }
+datafusion = { version = "43", default-features = false }

@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use arrow::datatypes::Schema;
 use datafusion::common::DFSchema;
 use datafusion::prelude::*;
 use pretty_assertions::assert_eq;
@@ -17,6 +18,12 @@ pub fn assert_schema_eq(schema: &DFSchema, expected: &str) {
     let parquet_schema = crate::schema::convert::dataframe_schema_to_parquet_schema(schema);
     let actual = crate::schema::format::format_schema_parquet(&parquet_schema);
     assert_eq!(expected.trim(), actual.trim());
+}
+
+#[allow(clippy::needless_pass_by_value)]
+pub fn assert_arrow_schema_eq(schema: &Schema, expected: serde_json::Value) {
+    let actual = serde_json::to_value(schema).unwrap();
+    assert_eq!(expected, actual);
 }
 
 pub async fn assert_data_eq(df: DataFrame, expected: &str) {

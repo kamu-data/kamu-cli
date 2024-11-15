@@ -70,7 +70,7 @@ secrecy = "0.10"
 zip = "2"
 
 # Data
-datafusion = { version = "42", default-features = false }
+datafusion = { version = "43", default-features = false }
 digest = "0.10"
 object_store = { version = "0.11", features = ["aws"] }
 parking_lot = { version = "0.12" }
@@ -104,7 +104,7 @@ pin-project = "1"
 rand = "0.8"
 regex = "1"
 tempfile = "3"
-thiserror = { version = "1", default-features = false }
+thiserror = { version = "2", default-features = false, features = ["std"] }
 tokio = { version = "1", default-features = false, features = [
     "fs",
     "process",
@@ -125,7 +125,7 @@ tower-http = { version = "0.6", features = ["fs", "trace"] }
 axum = "0.7"
 
 # Optional dependencies
-alloy = { optional = true, version = "0.5", default-features = false, features = [
+alloy = { optional = true, version = "0.6", default-features = false, features = [
     "std",
     "provider-http",
     "provider-ws",
@@ -138,8 +138,8 @@ curl = { optional = true, version = "0.4", features = [
     "static-ssl",
 ] }
 curl-sys = { optional = true, version = "0.4" }
-datafusion-ethers = { optional = true, version = "42" }
-datafusion-functions-json = { optional = true, version = "0.42" }
+datafusion-ethers = { optional = true, version = "43" }
+datafusion-functions-json = { optional = true, version = "0.43" }
 rumqttc = { optional = true, version = "0.24" }
 mockall = { optional = true, version = "0.13", default-features = false }
 lazy_static = { version = "1" }
@@ -159,7 +159,7 @@ kamu-datasets-services = { workspace = true }
 kamu-datasets-inmem = { workspace = true }
 
 criterion = { version = "0.5", features = ["async_tokio"] }
-datafusion = { version = "42", default-features = false, features = [
+datafusion = { version = "43", default-features = false, features = [
     "parquet",
 ] }
 filetime = "0.2"

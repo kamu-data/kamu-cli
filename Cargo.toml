@@ -264,7 +264,7 @@ debug = "line-tables-only"
 # Use this section to test or apply emergency overrides to dependencies
 # See: https://doc.rust-lang.org/cargo/reference/overriding-dependencies.html
 [patch.crates-io]
-# datafusion = { git = 'https://github.com/apache/datafusion.git', tag = '42.0.0-rc1' }
+# datafusion = { git = 'https://github.com/apache/datafusion.git', branch = 'main' }
 # datafusion-common = { git = 'https://github.com/apache/datafusion.git', tag = '42.0.0-rc1' }
 # datafusion-execution = { git = 'https://github.com/apache/datafusion.git', tag = '42.0.0-rc1' }
 # datafusion-expr = { git = 'https://github.com/apache/datafusion.git', tag = '42.0.0-rc1' }

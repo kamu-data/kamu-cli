@@ -279,8 +279,11 @@ impl CompactionServiceImpl {
                     .sort(vec![col(Column::from_name(offset_column)).sort(true, false)])
                     .int_err()?;
 
+                // FIXME: The .parquet extension is currently necessary for DataFusion to
+                // respect the single-file output
+                // See: https://github.com/apache/datafusion/issues/13323
                 let new_file_path =
-                    compaction_dir_path.join(format!("merge-slice-{index}").as_str());
+                    compaction_dir_path.join(format!("merge-slice-{index}.parquet").as_str());
 
                 data_frame
                     .write_parquet(

@@ -12,7 +12,6 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use chrono::{DateTime, TimeZone, Utc};
-use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::prelude::*;
 use dill::Component;
 use indoc::indoc;
@@ -20,10 +19,11 @@ use kamu::testing::MetadataFactory;
 use kamu::{DatasetRepositoryLocalFs, DatasetRepositoryWriter};
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::*;
-use kamu_data_utils::testing::{assert_data_eq, assert_schema_eq};
+use kamu_data_utils::testing::{assert_arrow_schema_eq, assert_data_eq, assert_schema_eq};
 use kamu_ingest_datafusion::*;
 use odf::{AsTypedBlock, DatasetAlias};
 use opendatafabric as odf;
+use serde_json::json;
 use time_source::SystemTimeSourceDefault;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -63,20 +63,65 @@ async fn test_data_writer_happy_path() {
 
     let df = harness.get_last_data().await;
 
-    assert_schema_eq(
-        df.schema(),
-        indoc!(
-            r#"
-            message arrow_schema {
-              REQUIRED INT64 offset;
-              REQUIRED INT32 op;
-              REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
-              OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));
-              OPTIONAL BYTE_ARRAY city (STRING);
-              OPTIONAL INT64 population;
-            }
-            "#
-        ),
+    // Check schema of the data
+    assert_arrow_schema_eq(
+        df.schema().as_arrow(),
+        json!({
+            "fields": [{
+                "name": "offset",
+                "data_type": "Int64",
+                "dict_id": 0,
+                "dict_is_ordered": false,
+                "metadata": {},
+                "nullable": false,
+            }, {
+                "name": "op",
+                "data_type": "Int32",
+                "dict_id": 0,
+                "dict_is_ordered": false,
+                "metadata": {},
+                "nullable": false,
+            }, {
+                "name": "system_time",
+                "data_type": {
+                    "Timestamp": [
+                        "Millisecond",
+                        "UTC",
+                    ],
+                },
+                "dict_id": 0,
+                "dict_is_ordered": false,
+                "metadata": {},
+                "nullable": false,
+            }, {
+                "name": "event_time",
+                "data_type": {
+                    "Timestamp": [
+                        "Millisecond",
+                        "UTC",
+                    ],
+                },
+                "dict_id": 0,
+                "dict_is_ordered": false,
+                "metadata": {},
+                "nullable": true,
+            }, {
+                "name": "city",
+                "data_type": "Utf8View",
+                "dict_id": 0,
+                "dict_is_ordered": false,
+                "metadata": {},
+                "nullable": true,
+            }, {
+                "name": "population",
+                "data_type": "Int64",
+                "dict_id": 0,
+                "dict_is_ordered": false,
+                "metadata": {},
+                "nullable": true,
+            }],
+            "metadata": {},
+        }),
     );
 
     assert_data_eq(
@@ -100,11 +145,68 @@ async fn test_data_writer_happy_path() {
         Some(&harness.source_event_time)
     );
 
-    // Compare schemas in block and in data
+    // Check schema in block SetDataSchema block
     let (schema_block_hash, schema_block) = harness.get_last_schema_block().await;
-    let schema_in_block = schema_block.event.schema_as_arrow().unwrap();
-    let schema_in_data = SchemaRef::new(df.schema().into());
-    assert_eq!(schema_in_block, schema_in_data);
+    assert_arrow_schema_eq(
+        &schema_block.event.schema_as_arrow().unwrap(),
+        json!({
+            "fields": [{
+                "name": "offset",
+                "data_type": "Int64",
+                "dict_id": 0,
+                "dict_is_ordered": false,
+                "metadata": {},
+                "nullable": false,
+            }, {
+                "name": "op",
+                "data_type": "Int32",
+                "dict_id": 0,
+                "dict_is_ordered": false,
+                "metadata": {},
+                "nullable": false,
+            }, {
+                "name": "system_time",
+                "data_type": {
+                    "Timestamp": [
+                        "Millisecond",
+                        "UTC",
+                    ],
+                },
+                "dict_id": 0,
+                "dict_is_ordered": false,
+                "metadata": {},
+                "nullable": false,
+            }, {
+                "name": "event_time",
+                "data_type": {
+                    "Timestamp": [
+                        "Millisecond",
+                        "UTC",
+                    ],
+                },
+                "dict_id": 0,
+                "dict_is_ordered": false,
+                "metadata": {},
+                "nullable": true,
+            }, {
+                "name": "city",
+                // NOTE: The difference between Utf8 and Utf8View is expected
+                "data_type": "Utf8",
+                "dict_id": 0,
+                "dict_is_ordered": false,
+                "metadata": {},
+                "nullable": true,
+            }, {
+                "name": "population",
+                "data_type": "Int64",
+                "dict_id": 0,
+                "dict_is_ordered": false,
+                "metadata": {},
+                "nullable": true,
+            }],
+            "metadata": {},
+        }),
+    );
 
     // Round 2
     harness.set_system_time(Utc.with_ymd_and_hms(2010, 1, 2, 12, 0, 0).unwrap());
@@ -1056,7 +1158,7 @@ impl Harness {
                     source_event_time: self.source_event_time,
                     new_watermark: None,
                     new_source_state,
-                    data_staging_path: self.temp_dir.path().join("write.tmp"),
+                    data_staging_path: self.temp_dir.path().join("data.parquet"),
                 },
             )
             .await

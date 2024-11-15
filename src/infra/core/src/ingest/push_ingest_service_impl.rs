@@ -237,7 +237,7 @@ impl PushIngestServiceImpl {
         };
 
         let out_dir = args.operation_dir.join("out");
-        let data_staging_path = out_dir.join("data");
+        let data_staging_path = out_dir.join("data.parquet");
         std::fs::create_dir(&out_dir).int_err()?;
 
         let stage_result = args

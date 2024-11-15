@@ -149,7 +149,7 @@ impl Harness {
                     source_event_time: system_time,
                     new_watermark: None,
                     new_source_state: None,
-                    data_staging_path: run_info_dir.path().join(".temp-data"),
+                    data_staging_path: run_info_dir.path().join(".temp-data.parquet"),
                 },
             )
             .await
@@ -467,14 +467,14 @@ async fn test_data_query_handler() {
                 },
                 "subQueries": [],
                 "commitment": {
-                    "inputHash": "f16206ab5788a997a0d05c236c207ea66434f2d4ae933ad62556583979f47d2f522ed",
+                    "inputHash": "f1620c01c8a5746b5c70f76a42cae96b97639737f597f87a74fa3f6e4c4799a130891",
                     "outputHash": "f16208d66e08ce876ba35ce00ea56f02faf83dbc086f877c443e3d493427ccad133f1",
                     "subQueriesHash": "f1620ca4510738395af1429224dd785675309c344b2b549632e20275c69b15ed1d210",
                 },
                 "proof": {
                     "type": "Ed25519Signature2020",
                     "verificationMethod": "did:key:z6Mko2nqhQ9wYSTS5Giab2j1aHzGnxHimqwmFeEVY8aNsVnN",
-                    "proofValue": "uadIt9gTyeqRUwCIHiq4ILzK79h0jnZwOSVX86NeSJrmoMAV1keK9CJl7yyH9wiJCw1AjAb84nxeqB7kPzHyaDQ",
+                    "proofValue": "ulm5TqOk7Qkut08caRv0_vxzA8zTpScKPHvZKM0e9rO1irRylf1K_9FykhB1oWqgm51eppwFxwm5mrrv7J8BiDQ",
                 }
             }),
             response
@@ -621,14 +621,14 @@ async fn test_data_verify_handler() {
                 },
                 "subQueries": [],
                 "commitment": {
-                    "inputHash": "f16205ad9518f5dd9fe6bbc082afc92841dff1cb2ebe85f82d12fbb3567399aa879c1",
+                    "inputHash": "f162043b05d93c527d8573645d2529dd6678e6375f308cdfa21028c34593e1455edf4",
                     "outputHash": "f1620ff7f5beaf16900218a3ac4aae82cdccf764816986c7c739c716cf7dc03112a2c",
                     "subQueriesHash": "f1620ca4510738395af1429224dd785675309c344b2b549632e20275c69b15ed1d210",
                 },
                 "proof": {
                     "type": "Ed25519Signature2020",
                     "verificationMethod": "did:key:z6Mko2nqhQ9wYSTS5Giab2j1aHzGnxHimqwmFeEVY8aNsVnN",
-                    "proofValue": "uox4Jm0WJgSV-5K7Lp2jLvvRXnVTqu_N-DdGBt4NETRVN-cvZQINUDCcmBFrtmORsJV4PrjDtCNumvsEYeSLZAQ",
+                    "proofValue": "uyK1zM9v3MlkC2-2TyCuwN5hfbsUV15GSegzGuwgaWYKsTtQj1xxUrPsTbPZs0aBSmR569ozZ8ZtAUYVAjoy3Bg",
                 }
             }),
             response

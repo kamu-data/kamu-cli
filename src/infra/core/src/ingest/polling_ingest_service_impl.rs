@@ -268,7 +268,7 @@ impl PollingIngestServiceImpl {
         let new_source_state = savepoint.source_state.map(|ss| ss.to_source_state());
 
         let out_dir = args.operation_dir.join("out");
-        let data_staging_path = out_dir.join("data");
+        let data_staging_path = out_dir.join("data.parquet");
         std::fs::create_dir(&out_dir).int_err()?;
 
         let stage_result = args
@@ -284,6 +284,8 @@ impl PollingIngestServiceImpl {
                 },
             )
             .await;
+
+        tracing::info!(?stage_result, "Stage result");
 
         // Clean up intermediate files
         // Note that we are leaving the fetch data and savepoint intact

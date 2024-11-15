@@ -30,7 +30,7 @@ chrono = { version = "0.4", default-features = false }
 dill = "0.9"
 tokio = { version = "1", default-features = false }
 tokio-stream = "0.1"
-thiserror = { version = "1", default-features = false }
+thiserror = { version = "2", default-features = false, features = ["std"] }
 tracing = { version = "0.1", default-features = false }
 
 
