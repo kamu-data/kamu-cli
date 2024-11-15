@@ -13,14 +13,14 @@ use kamu_cli_e2e_common::prelude::*;
 
 kamu_cli_execute_command_e2e_test!(
     storage = inmem,
-    fixture = kamu_cli_e2e_repo_tests::test_repository_pull_aliases_commands
+    fixture = kamu_cli_e2e_repo_tests::commands::test_repository_pull_aliases_commands
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 kamu_cli_execute_command_e2e_test!(
     storage = inmem,
-    fixture = kamu_cli_e2e_repo_tests::test_repository_push_aliases_commands
+    fixture = kamu_cli_e2e_repo_tests::commands::test_repository_push_aliases_commands
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

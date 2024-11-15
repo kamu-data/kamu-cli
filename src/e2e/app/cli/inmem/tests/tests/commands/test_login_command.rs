@@ -15,14 +15,14 @@ use kamu_cli_e2e_common::prelude::*;
 
 kamu_cli_run_api_server_e2e_test!(
     storage = inmem,
-    fixture = kamu_cli_e2e_repo_tests::test_login_logout_password_st,
+    fixture = kamu_cli_e2e_repo_tests::commands::test_login_logout_password_st,
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 kamu_cli_run_api_server_e2e_test!(
     storage = inmem,
-    fixture = kamu_cli_e2e_repo_tests::test_login_logout_password_mt,
+    fixture = kamu_cli_e2e_repo_tests::commands::test_login_logout_password_mt,
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -31,7 +31,7 @@ kamu_cli_run_api_server_e2e_test!(
 
 kamu_cli_run_api_server_e2e_test!(
     storage = inmem,
-    fixture = kamu_cli_e2e_repo_tests::test_login_logout_oauth_st,
+    fixture = kamu_cli_e2e_repo_tests::commands::test_login_logout_oauth_st,
     options = Options::default().with_multi_tenant()
 );
 
@@ -39,7 +39,7 @@ kamu_cli_run_api_server_e2e_test!(
 
 kamu_cli_run_api_server_e2e_test!(
     storage = inmem,
-    fixture = kamu_cli_e2e_repo_tests::test_login_logout_oauth_mt,
+    fixture = kamu_cli_e2e_repo_tests::commands::test_login_logout_oauth_mt,
     options = Options::default().with_multi_tenant()
 );
 
@@ -49,14 +49,14 @@ kamu_cli_run_api_server_e2e_test!(
 
 kamu_cli_execute_command_e2e_test!(
     storage = inmem,
-    fixture = kamu_cli_e2e_repo_tests::test_login_add_repo_st,
+    fixture = kamu_cli_e2e_repo_tests::commands::test_login_add_repo_st,
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 kamu_cli_execute_command_e2e_test!(
     storage = inmem,
-    fixture = kamu_cli_e2e_repo_tests::test_login_add_repo_mt,
+    fixture = kamu_cli_e2e_repo_tests::commands::test_login_add_repo_mt,
     options = Options::default().with_multi_tenant()
 );
 

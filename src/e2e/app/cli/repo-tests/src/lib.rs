@@ -9,13 +9,12 @@
 
 #![feature(assert_matches)]
 
-mod commands;
+pub mod commands;
 pub mod rest_api;
 mod test_flow;
 mod test_selftest;
 mod test_smart_transfer_protocol;
 
-pub use commands::*;
 pub use test_flow::*;
 pub use test_selftest::*;
 pub use test_smart_transfer_protocol::*;

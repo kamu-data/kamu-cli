@@ -15,7 +15,7 @@ use kamu_cli_e2e_common::prelude::*;
 
 kamu_cli_run_api_server_e2e_test!(
     storage = inmem,
-    fixture = kamu_cli_e2e_repo_tests::test_search_multi_user_st
+    fixture = kamu_cli_e2e_repo_tests::commands::test_search_multi_user_st
     // We need synthetic time for the tests, but the third-party JWT code
     // uses the current time. Assuming that the token lifetime is 24 hours, we will
     // use the projected date (the current day) as a workaround.
@@ -41,7 +41,7 @@ kamu_cli_run_api_server_e2e_test!(
 
 kamu_cli_run_api_server_e2e_test!(
     storage = inmem,
-    fixture = kamu_cli_e2e_repo_tests::test_search_multi_user_mt
+    fixture = kamu_cli_e2e_repo_tests::commands::test_search_multi_user_mt
     // We need synthetic time for the tests, but the third-party JWT code
     // uses the current time. Assuming that the token lifetime is 24 hours, we will
     // use the projected date (the current day) as a workaround.
@@ -69,7 +69,7 @@ kamu_cli_run_api_server_e2e_test!(
 
 kamu_cli_run_api_server_e2e_test!(
     storage = inmem,
-    fixture = kamu_cli_e2e_repo_tests::test_search_by_name_st
+    fixture = kamu_cli_e2e_repo_tests::commands::test_search_by_name_st
     // We need synthetic time for the tests, but the third-party JWT code
     // uses the current time. Assuming that the token lifetime is 24 hours, we will
     // use the projected date (the current day) as a workaround.
@@ -83,7 +83,7 @@ kamu_cli_run_api_server_e2e_test!(
 
 kamu_cli_run_api_server_e2e_test!(
     storage = inmem,
-    fixture = kamu_cli_e2e_repo_tests::test_search_by_name_mt
+    fixture = kamu_cli_e2e_repo_tests::commands::test_search_by_name_mt
     // We need synthetic time for the tests, but the third-party JWT code
     // uses the current time. Assuming that the token lifetime is 24 hours, we will
     // use the projected date (the current day) as a workaround.
@@ -99,7 +99,7 @@ kamu_cli_run_api_server_e2e_test!(
 
 kamu_cli_run_api_server_e2e_test!(
     storage = inmem,
-    fixture = kamu_cli_e2e_repo_tests::test_search_by_repo_st
+    fixture = kamu_cli_e2e_repo_tests::commands::test_search_by_repo_st
     // We need synthetic time for the tests, but the third-party JWT code
     // uses the current time. Assuming that the token lifetime is 24 hours, we will
     // use the projected date (the current day) as a workaround.
@@ -113,7 +113,7 @@ kamu_cli_run_api_server_e2e_test!(
 
 kamu_cli_run_api_server_e2e_test!(
     storage = inmem,
-    fixture = kamu_cli_e2e_repo_tests::test_search_by_repo_mt
+    fixture = kamu_cli_e2e_repo_tests::commands::test_search_by_repo_mt
     // We need synthetic time for the tests, but the third-party JWT code
     // uses the current time. Assuming that the token lifetime is 24 hours, we will
     // use the projected date (the current day) as a workaround.
