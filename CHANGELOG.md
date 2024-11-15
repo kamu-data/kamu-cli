@@ -11,9 +11,26 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Unreleased]
+### Fixed
+- E2E: revision of st/mt tests:
+  - In cases where temporary workspaces are created, 
+     test variants for both single-tenant and multi-tenant have been added
+  - New combinations activated
+  - Certain duplicate tests have been removed
+  - Some of the tests related to `kamu pull` only have been moved to the appropriate module
+  - Activated missing tests for databases
+- `kamu pull`: crash in multi-tenant mode, vol. 2
+  - The ingest flow was affected 
+  - Returned transaction from the pull smart transport protocol
+  - Disabled global transaction for the command
+- `kamu push`: crash in multi-tenant mode
+  - Disabled global transaction for the command
+
 ## [0.207.1] - 2024-11-14
 ### Fixed
 - `kamu pull`: crash in multi-tenant mode
+  - Removed transaction from the pull smart transport protocol
 
 ## [0.207.0] - 2024-11-11
 ### Added
