@@ -10,6 +10,7 @@
 use std::sync::atomic::{AtomicI32, Ordering};
 use std::sync::Arc;
 
+use database_common::DatabaseTransactionRunner;
 use dill::*;
 use futures::SinkExt;
 use headers::Header;
@@ -27,6 +28,7 @@ use tokio::net::TcpStream;
 use tokio_tungstenite::tungstenite::protocol::frame::coding::CloseCode;
 use tokio_tungstenite::tungstenite::{Error as TungsteniteError, Message};
 use tokio_tungstenite::{connect_async, MaybeTlsStream, WebSocketStream};
+use tracing::Instrument;
 use url::Url;
 
 use crate::smart_protocol::errors::*;
@@ -39,8 +41,8 @@ use crate::OdfSmtpVersion;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct WsSmartTransferProtocolClient {
+    catalog: Catalog,
     dataset_credential_resolver: Arc<dyn auth::OdfServerAccessTokenResolver>,
-    append_dataset_metadata_batch_use_case: Arc<dyn AppendDatasetMetadataBatchUseCase>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -49,12 +51,12 @@ pub struct WsSmartTransferProtocolClient {
 #[interface(dyn SmartTransferProtocolClient)]
 impl WsSmartTransferProtocolClient {
     pub fn new(
+        catalog: Catalog,
         dataset_credential_resolver: Arc<dyn auth::OdfServerAccessTokenResolver>,
-        append_dataset_metadata_batch_use_case: Arc<dyn AppendDatasetMetadataBatchUseCase>,
     ) -> Self {
         Self {
+            catalog,
             dataset_credential_resolver,
-            append_dataset_metadata_batch_use_case,
         }
     }
 
@@ -690,12 +692,22 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
                     .await?;
             }
 
-            self.append_dataset_metadata_batch_use_case
-                .execute(
-                    dst.as_ref(),
-                    new_blocks,
-                    transfer_options.force_update_if_diverged,
+            let dst_dataset = dst.clone();
+            DatabaseTransactionRunner::new(self.catalog.clone())
+                .transactional_with(
+                    |append_dataset_metadata_batch: Arc<
+                        dyn AppendDatasetMetadataBatchUseCase,
+                    >| async move {
+                        append_dataset_metadata_batch
+                            .execute(
+                                dst_dataset.as_ref(),
+                                new_blocks,
+                                transfer_options.force_update_if_diverged,
+                            )
+                            .await
+                    },
                 )
+                .instrument(tracing::debug_span!("SmartTransferProtocolClient::append_dataset_metadata_batch",))
                 .await
                 .int_err()?;
 
