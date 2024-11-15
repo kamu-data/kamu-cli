@@ -10,17 +10,69 @@
 use kamu_cli_e2e_common::{
     KamuApiServerClient,
     KamuApiServerClientExt,
+    DATASET_ROOT_PLAYER_NAME,
     DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
 };
 use kamu_cli_puppet::extensions::{KamuCliPuppetExt, RepoRecord};
 use kamu_cli_puppet::KamuCliPuppet;
-use opendatafabric::RepoName;
+use opendatafabric as odf;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// test_login_logout_password
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_login_logout_password_st(kamu_node_api_client: KamuApiServerClient) {
+    test_login_logout_password(kamu_node_api_client, false).await;
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_login_logout_password(kamu_node_api_client: KamuApiServerClient) {
+pub async fn test_login_logout_password_mt(kamu_node_api_client: KamuApiServerClient) {
+    test_login_logout_password(kamu_node_api_client, true).await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// test_login_logout_oauth
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_login_logout_oauth_st(kamu_node_api_client: KamuApiServerClient) {
+    test_login_logout_oauth(kamu_node_api_client, false).await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_login_logout_oauth_mt(kamu_node_api_client: KamuApiServerClient) {
+    test_login_logout_oauth(kamu_node_api_client, true).await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// test_login_add_repo
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_login_add_repo_st(kamu: KamuCliPuppet) {
+    test_login_add_repo(kamu).await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_login_add_repo_mt(kamu: KamuCliPuppet) {
+    test_login_add_repo(kamu).await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Implementations
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+async fn test_login_logout_password(
+    kamu_node_api_client: KamuApiServerClient,
+    is_workspace_multi_tenant: bool,
+) {
     let kamu_node_url = kamu_node_api_client.get_base_url().as_str();
-    let kamu = KamuCliPuppet::new_workspace_tmp().await;
+    let dataset_alias = odf::DatasetAlias::new(None, DATASET_ROOT_PLAYER_NAME.clone());
+    let kamu_api_server_dataset_endpoint =
+        kamu_node_api_client.dataset().get_endpoint(&dataset_alias);
+
+    let kamu = KamuCliPuppet::new_workspace_tmp(is_workspace_multi_tenant).await;
 
     kamu.assert_success_command_execution(
         ["logout", kamu_node_url],
@@ -60,7 +112,7 @@ pub async fn test_login_logout_password(kamu_node_api_client: KamuApiServerClien
             "push",
             "player-scores",
             "--to",
-            &format!("odf+{kamu_node_url}player-scores"),
+            kamu_api_server_dataset_endpoint.as_str(),
         ],
         None,
         Some(["1 dataset(s) pushed"]),
@@ -77,9 +129,12 @@ pub async fn test_login_logout_password(kamu_node_api_client: KamuApiServerClien
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_login_logout_oauth(mut kamu_node_api_client: KamuApiServerClient) {
+async fn test_login_logout_oauth(
+    mut kamu_node_api_client: KamuApiServerClient,
+    is_workspace_multi_tenant: bool,
+) {
     let kamu_node_url = kamu_node_api_client.get_base_url().clone();
-    let kamu = KamuCliPuppet::new_workspace_tmp().await;
+    let kamu = KamuCliPuppet::new_workspace_tmp(is_workspace_multi_tenant).await;
 
     kamu.assert_success_command_execution(
         ["logout", kamu_node_url.as_str()],
@@ -133,7 +188,7 @@ pub async fn test_login_logout_oauth(mut kamu_node_api_client: KamuApiServerClie
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_login_add_repo(kamu: KamuCliPuppet) {
+async fn test_login_add_repo(kamu: KamuCliPuppet) {
     let dummy_access_token = "dummy-access-token";
     let dummy_url = "http://example.com";
 
@@ -165,7 +220,9 @@ pub async fn test_login_add_repo(kamu: KamuCliPuppet) {
     let repo_list = kamu.get_list_of_repos().await;
 
     let expected_repo_list = vec![RepoRecord {
-        name: RepoName::new_unchecked(url::Url::try_from(dummy_url).unwrap().host_str().unwrap()),
+        name: odf::RepoName::new_unchecked(
+            url::Url::try_from(dummy_url).unwrap().host_str().unwrap(),
+        ),
         url: url::Url::try_from(dummy_url).unwrap(),
     }];
 
@@ -193,13 +250,13 @@ pub async fn test_login_add_repo(kamu: KamuCliPuppet) {
 
     let expected_repo_list = vec![
         RepoRecord {
-            name: RepoName::new_unchecked(
+            name: odf::RepoName::new_unchecked(
                 url::Url::try_from(dummy_url).unwrap().host_str().unwrap(),
             ),
             url: url::Url::try_from(dummy_url).unwrap(),
         },
         RepoRecord {
-            name: RepoName::new_unchecked(expected_repo_name),
+            name: odf::RepoName::new_unchecked(expected_repo_name),
             url: url::Url::try_from(new_dummy_url).unwrap(),
         },
     ];
