@@ -11,7 +11,7 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## [Unreleased]
+## [0.207.2] - 2024-11-15
 ### Fixed
 - E2E: revision of st/mt tests:
   - In cases where temporary workspaces are created, 
