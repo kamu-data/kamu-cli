@@ -531,6 +531,7 @@ pub fn command_needs_transaction(args: &cli::Cli) -> bool {
         cli::Command::Add(_)
         | cli::Command::Delete(_)
         | cli::Command::Rename(_)
+        | cli::Command::Push(_)
         | cli::Command::Pull(_) => true,
         _ => false,
     }
