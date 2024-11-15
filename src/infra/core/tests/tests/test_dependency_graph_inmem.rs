@@ -15,12 +15,11 @@ use futures::{future, StreamExt, TryStreamExt};
 use internal_error::ResultIntoInternal;
 use kamu::testing::MetadataFactory;
 use kamu::*;
-use kamu_accounts::CurrentAccountSubject;
 use kamu_core::*;
 use messaging_outbox::{register_message_dispatcher, Outbox, OutboxImmediateImpl};
 use opendatafabric::*;
-use tempfile::TempDir;
-use time_source::SystemTimeSourceDefault;
+
+use crate::BaseRepoHarness;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -604,38 +603,29 @@ async fn test_in_dependency_order() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[oop::extend(BaseRepoHarness, base_repo_harness)]
 struct DependencyGraphHarness {
-    _workdir: TempDir,
+    base_repo_harness: BaseRepoHarness,
     catalog: dill::Catalog,
-    dataset_registry: Arc<dyn DatasetRegistry>,
     dependency_graph_service: Arc<dyn DependencyGraphService>,
     dependency_graph_repository: Arc<dyn DependencyGraphRepository>,
 }
 
 impl DependencyGraphHarness {
     fn new(tenancy_config: TenancyConfig) -> Self {
-        let workdir = tempfile::tempdir().unwrap();
-        let datasets_dir = workdir.path().join("datasets");
-        std::fs::create_dir(&datasets_dir).unwrap();
+        let base_repo_harness = BaseRepoHarness::new(tenancy_config);
 
-        let mut b = dill::CatalogBuilder::new();
-        b.add::<SystemTimeSourceDefault>()
-            .add_builder(
-                messaging_outbox::OutboxImmediateImpl::builder()
-                    .with_consumer_filter(messaging_outbox::ConsumerFilter::AllConsumers),
-            )
-            .bind::<dyn Outbox, OutboxImmediateImpl>()
-            .add_value(tenancy_config)
-            .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
-            .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-            .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
-            .add::<DatasetRegistryRepoBridge>()
-            .add_value(CurrentAccountSubject::new_test())
-            .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
-            .add::<DependencyGraphServiceInMemory>()
-            .add::<CreateDatasetFromSnapshotUseCaseImpl>()
-            .add::<CommitDatasetEventUseCaseImpl>()
-            .add::<DeleteDatasetUseCaseImpl>();
+        let mut b = dill::CatalogBuilder::new_chained(base_repo_harness.catalog());
+        b.add_builder(
+            messaging_outbox::OutboxImmediateImpl::builder()
+                .with_consumer_filter(messaging_outbox::ConsumerFilter::AllConsumers),
+        )
+        .bind::<dyn Outbox, OutboxImmediateImpl>()
+        .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
+        .add::<DependencyGraphServiceInMemory>()
+        .add::<CreateDatasetFromSnapshotUseCaseImpl>()
+        .add::<CommitDatasetEventUseCaseImpl>()
+        .add::<DeleteDatasetUseCaseImpl>();
 
         register_message_dispatcher::<DatasetLifecycleMessage>(
             &mut b,
@@ -645,7 +635,6 @@ impl DependencyGraphHarness {
         let catalog = b.build();
 
         let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
-        let dataset_registry = catalog.get_one::<dyn DatasetRegistry>().unwrap();
 
         let dependency_graph_service = catalog.get_one::<dyn DependencyGraphService>().unwrap();
 
@@ -654,9 +643,8 @@ impl DependencyGraphHarness {
             Arc::new(DependencyGraphRepositoryInMemory::new(dataset_repo.clone()));
 
         Self {
-            _workdir: workdir,
+            base_repo_harness,
             catalog,
-            dataset_registry,
             dependency_graph_service,
             dependency_graph_repository,
         }
@@ -678,14 +666,14 @@ impl DependencyGraphHarness {
             } = dataset_dependencies;
 
             let downstream_hdl = self
-                .dataset_registry
+                .dataset_registry()
                 .resolve_dataset_handle_by_ref(&downstream_dataset_id.as_local_ref())
                 .await
                 .unwrap();
 
             for upstream_dataset_id in upstream_dataset_ids {
                 let upstream_hdl = self
-                    .dataset_registry
+                    .dataset_registry()
                     .resolve_dataset_handle_by_ref(&upstream_dataset_id.as_local_ref())
                     .await
                     .unwrap();
@@ -855,7 +843,7 @@ impl DependencyGraphHarness {
     async fn dataset_id_by_name(&self, dataset_name: &str) -> DatasetID {
         let dataset_alias = DatasetAlias::try_from(dataset_name).unwrap();
         let dataset_hdl = self
-            .dataset_registry
+            .dataset_registry()
             .resolve_dataset_handle_by_ref(&dataset_alias.as_local_ref())
             .await
             .unwrap();
@@ -865,7 +853,7 @@ impl DependencyGraphHarness {
     async fn dataset_alias_by_id(&self, dataset_id: &DatasetID) -> DatasetAlias {
         let dataset_ref = dataset_id.as_local_ref();
         let dataset_hdl = self
-            .dataset_registry
+            .dataset_registry()
             .resolve_dataset_handle_by_ref(&dataset_ref)
             .await
             .unwrap();
@@ -998,7 +986,7 @@ impl DependencyGraphHarness {
             DatasetAlias::new(account_name, DatasetName::new_unchecked(dataset_name));
 
         let dataset_handle = self
-            .dataset_registry
+            .dataset_registry()
             .resolve_dataset_handle_by_ref(&dataset_alias.as_local_ref())
             .await
             .unwrap();

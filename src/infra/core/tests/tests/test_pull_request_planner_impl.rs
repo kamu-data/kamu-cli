@@ -9,17 +9,18 @@
 
 use std::assert_matches::assert_matches;
 use std::convert::TryFrom;
-use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use dill::*;
 use kamu::domain::*;
 use kamu::testing::*;
+use kamu::utils::ipfs_wrapper::IpfsClient;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
 use opendatafabric::*;
 use time_source::SystemTimeSourceDefault;
+
+use crate::BaseRepoHarness;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -127,9 +128,7 @@ async fn create_graph(
 // remote dataset
 async fn create_graph_remote(
     remote_repo_name: &str,
-    dataset_registry: Arc<dyn DatasetRegistry>,
-    dataset_repo_writer: Arc<dyn DatasetRepositoryWriter>,
-    reg: Arc<RemoteRepositoryRegistryImpl>,
+    harness: &PullTestHarness,
     datasets: Vec<(DatasetAlias, Vec<DatasetAlias>)>,
     to_import: Vec<DatasetAlias>,
 ) -> tempfile::TempDir {
@@ -146,35 +145,20 @@ async fn create_graph_remote(
 
     let tmp_repo_name = RepoName::new_unchecked(remote_repo_name);
 
-    reg.add_repository(
-        &tmp_repo_name,
-        url::Url::from_file_path(tmp_repo_dir.path()).unwrap(),
-    )
-    .unwrap();
-
-    let dataset_factory = Arc::new(DatasetFactoryImpl::new(
-        IpfsGateway::default(),
-        Arc::new(auth::DummyOdfServerAccessTokenResolver::new()),
-    ));
-
-    let sync_service = SyncServiceImpl::new(
-        reg.clone(),
-        dataset_factory.clone(),
-        Arc::new(DummySmartTransferProtocolClient::new()),
-        Arc::new(kamu::utils::ipfs_wrapper::IpfsClient::default()),
-    );
-
-    let sync_request_builder = SyncRequestBuilder::new(
-        dataset_registry,
-        dataset_factory,
-        dataset_repo_writer,
-        reg.clone(),
-    );
+    harness
+        .remote_repo_reg
+        .add_repository(
+            &tmp_repo_name,
+            url::Url::from_file_path(tmp_repo_dir.path()).unwrap(),
+        )
+        .unwrap();
 
     for import_alias in to_import {
-        sync_service
+        harness
+            .sync_service
             .sync(
-                sync_request_builder
+                harness
+                    .sync_request_builder
                     .build_sync_request(
                         import_alias
                             .as_remote_alias(tmp_repo_name.clone())
@@ -198,12 +182,11 @@ async fn create_graph_remote(
 
 #[test_log::test(tokio::test)]
 async fn test_pull_batching_chain() {
-    let tmp_dir = tempfile::tempdir().unwrap();
-    let harness = PullTestHarness::new(tmp_dir.path(), TenancyConfig::SingleTenant);
+    let harness = PullTestHarness::new(TenancyConfig::SingleTenant);
 
     // A - B - C
     create_graph(
-        harness.dataset_repo_writer.as_ref(),
+        harness.dataset_repo_writer(),
         vec![
             (n!("a"), names![]),
             (n!("b"), names!["a"]),
@@ -254,12 +237,11 @@ async fn test_pull_batching_chain() {
 
 #[test_log::test(tokio::test)]
 async fn test_pull_batching_chain_multi_tenant() {
-    let tmp_dir = tempfile::tempdir().unwrap();
-    let harness = PullTestHarness::new(tmp_dir.path(), TenancyConfig::MultiTenant);
+    let harness = PullTestHarness::new(TenancyConfig::MultiTenant);
 
     // XA - YB - ZC
     create_graph(
-        harness.dataset_repo_writer.as_ref(),
+        harness.dataset_repo_writer(),
         vec![
             (mn!("x/a"), mnames![]),
             (mn!("y/b"), mnames!["x/a"]),
@@ -310,8 +292,7 @@ async fn test_pull_batching_chain_multi_tenant() {
 
 #[test_log::test(tokio::test)]
 async fn test_pull_batching_complex() {
-    let tmp_dir = tempfile::tempdir().unwrap();
-    let harness = PullTestHarness::new(tmp_dir.path(), TenancyConfig::SingleTenant);
+    let harness = PullTestHarness::new(TenancyConfig::SingleTenant);
 
     //    / C \
     // A <     > > E
@@ -319,7 +300,7 @@ async fn test_pull_batching_complex() {
     //         /
     // B - - -/
     create_graph(
-        harness.dataset_repo_writer.as_ref(),
+        harness.dataset_repo_writer(),
         vec![
             (n!("a"), names![]),
             (n!("b"), names![]),
@@ -373,8 +354,7 @@ async fn test_pull_batching_complex() {
 
 #[test_log::test(tokio::test)]
 async fn test_pull_batching_complex_with_remote() {
-    let tmp_dir = tempfile::tempdir().unwrap();
-    let harness = PullTestHarness::new(tmp_dir.path(), TenancyConfig::SingleTenant);
+    let harness = PullTestHarness::new(TenancyConfig::SingleTenant);
 
     // (A) - (E) - F - G
     // (B) --/    /   /
@@ -382,9 +362,7 @@ async fn test_pull_batching_complex_with_remote() {
     // D -----------/
     let _remote_tmp_dir = create_graph_remote(
         "kamu.dev",
-        harness.dataset_registry.clone(),
-        harness.dataset_repo_writer.clone(),
-        harness.remote_repo_reg.clone(),
+        &harness,
         vec![
             (n!("a"), names![]),
             (n!("b"), names![]),
@@ -394,7 +372,7 @@ async fn test_pull_batching_complex_with_remote() {
     )
     .await;
     create_graph(
-        harness.dataset_repo_writer.as_ref(),
+        harness.dataset_repo_writer(),
         vec![
             (n!("c"), names![]),
             (n!("d"), names![]),
@@ -525,18 +503,10 @@ async fn test_pull_batching_complex_with_remote() {
 
 #[tokio::test]
 async fn test_sync_from() {
-    let tmp_ws_dir = tempfile::tempdir().unwrap();
-    let harness = PullTestHarness::new(tmp_ws_dir.path(), TenancyConfig::SingleTenant);
+    let harness = PullTestHarness::new(TenancyConfig::SingleTenant);
 
-    let _remote_tmp_dir = create_graph_remote(
-        "kamu.dev",
-        harness.dataset_registry.clone(),
-        harness.dataset_repo_writer.clone(),
-        harness.remote_repo_reg.clone(),
-        vec![(n!("foo"), names![])],
-        names!(),
-    )
-    .await;
+    let _remote_tmp_dir =
+        create_graph_remote("kamu.dev", &harness, vec![(n!("foo"), names![])], names!()).await;
 
     let res = harness
         .pull_with_requests(
@@ -562,18 +532,10 @@ async fn test_sync_from() {
 
 #[tokio::test]
 async fn test_sync_from_url_and_local_ref() {
-    let tmp_ws_dir = tempfile::tempdir().unwrap();
-    let harness = PullTestHarness::new(tmp_ws_dir.path(), TenancyConfig::SingleTenant);
+    let harness = PullTestHarness::new(TenancyConfig::SingleTenant);
 
-    let _remote_tmp_dir = create_graph_remote(
-        "kamu.dev",
-        harness.dataset_registry.clone(),
-        harness.dataset_repo_writer.clone(),
-        harness.remote_repo_reg.clone(),
-        vec![(n!("bar"), names![])],
-        names!(),
-    )
-    .await;
+    let _remote_tmp_dir =
+        create_graph_remote("kamu.dev", &harness, vec![(n!("bar"), names![])], names!()).await;
 
     let res = harness
         .pull_with_requests(
@@ -599,18 +561,10 @@ async fn test_sync_from_url_and_local_ref() {
 
 #[tokio::test]
 async fn test_sync_from_url_and_local_multi_tenant_ref() {
-    let tmp_ws_dir = tempfile::tempdir().unwrap();
-    let harness = PullTestHarness::new(tmp_ws_dir.path(), TenancyConfig::MultiTenant);
+    let harness = PullTestHarness::new(TenancyConfig::MultiTenant);
 
-    let _remote_tmp_dir = create_graph_remote(
-        "kamu.dev",
-        harness.dataset_registry.clone(),
-        harness.dataset_repo_writer.clone(),
-        harness.remote_repo_reg.clone(),
-        vec![(n!("bar"), names![])],
-        names!(),
-    )
-    .await;
+    let _remote_tmp_dir =
+        create_graph_remote("kamu.dev", &harness, vec![(n!("bar"), names![])], names!()).await;
 
     let res = harness
         .pull_with_requests(
@@ -636,18 +590,10 @@ async fn test_sync_from_url_and_local_multi_tenant_ref() {
 
 #[tokio::test]
 async fn test_sync_from_url_only() {
-    let tmp_ws_dir = tempfile::tempdir().unwrap();
-    let harness = PullTestHarness::new(tmp_ws_dir.path(), TenancyConfig::SingleTenant);
+    let harness = PullTestHarness::new(TenancyConfig::SingleTenant);
 
-    let _remote_tmp_dir = create_graph_remote(
-        "kamu.dev",
-        harness.dataset_registry.clone(),
-        harness.dataset_repo_writer.clone(),
-        harness.remote_repo_reg.clone(),
-        vec![(n!("bar"), names![])],
-        names!(),
-    )
-    .await;
+    let _remote_tmp_dir =
+        create_graph_remote("kamu.dev", &harness, vec![(n!("bar"), names![])], names!()).await;
 
     let res = harness
         .pull_with_requests(
@@ -673,18 +619,10 @@ async fn test_sync_from_url_only() {
 
 #[tokio::test]
 async fn test_sync_from_url_only_multi_tenant_case() {
-    let tmp_ws_dir = tempfile::tempdir().unwrap();
-    let harness = PullTestHarness::new(tmp_ws_dir.path(), TenancyConfig::MultiTenant);
+    let harness = PullTestHarness::new(TenancyConfig::MultiTenant);
 
-    let _remote_tmp_dir = create_graph_remote(
-        "kamu.dev",
-        harness.dataset_registry.clone(),
-        harness.dataset_repo_writer.clone(),
-        harness.remote_repo_reg.clone(),
-        vec![(n!("bar"), names![])],
-        names!(),
-    )
-    .await;
+    let _remote_tmp_dir =
+        create_graph_remote("kamu.dev", &harness, vec![(n!("bar"), names![])], names!()).await;
 
     let res = harness
         .pull_with_requests(
@@ -708,10 +646,12 @@ async fn test_sync_from_url_only_multi_tenant_case() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[oop::extend(BaseRepoHarness, base_repo_harness)]
 struct PullTestHarness {
+    base_repo_harness: BaseRepoHarness,
     calls: Arc<Mutex<Vec<Vec<PullJob>>>>,
-    dataset_registry: Arc<dyn DatasetRegistry>,
-    dataset_repo_writer: Arc<dyn DatasetRepositoryWriter>,
+    sync_service: Arc<dyn SyncService>,
+    sync_request_builder: Arc<SyncRequestBuilder>,
     remote_repo_reg: Arc<RemoteRepositoryRegistryImpl>,
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
     pull_request_planner: Arc<dyn PullRequestPlanner>,
@@ -719,40 +659,35 @@ struct PullTestHarness {
 }
 
 impl PullTestHarness {
-    fn new(tmp_path: &Path, tenancy_config: TenancyConfig) -> Self {
+    fn new(tenancy_config: TenancyConfig) -> Self {
+        let base_repo_harness = BaseRepoHarness::new(tenancy_config);
+
         let calls = Arc::new(Mutex::new(Vec::new()));
 
-        let datasets_dir_path = tmp_path.join("datasets");
-        std::fs::create_dir(&datasets_dir_path).unwrap();
+        let repos_dir = base_repo_harness.temp_dir_path().join("repos");
+        std::fs::create_dir(&repos_dir).unwrap();
 
-        let run_info_dir = tmp_path.join("run");
-        std::fs::create_dir(&run_info_dir).unwrap();
-
-        let catalog = dill::CatalogBuilder::new()
-            .add_value(RunInfoDir::new(run_info_dir))
-            .add_value(tenancy_config)
-            .add::<SystemTimeSourceDefault>()
-            .add_value(CurrentAccountSubject::new_test())
-            .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir_path))
-            .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-            .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
-            .add::<DatasetRegistryRepoBridge>()
-            .add_value(RemoteRepositoryRegistryImpl::create(tmp_path.join("repos")).unwrap())
+        let catalog = dill::CatalogBuilder::new_chained(base_repo_harness.catalog())
+            .add_value(RemoteRepositoryRegistryImpl::create(repos_dir).unwrap())
             .bind::<dyn RemoteRepositoryRegistry, RemoteRepositoryRegistryImpl>()
             .add::<RemoteAliasesRegistryImpl>()
             .add::<PullRequestPlannerImpl>()
             .add::<TransformRequestPlannerImpl>()
             .add::<ObjectStoreRegistryImpl>()
+            .add::<SyncServiceImpl>()
             .add::<SyncRequestBuilder>()
             .add::<DatasetFactoryImpl>()
             .add::<auth::DummyOdfServerAccessTokenResolver>()
+            .add::<DummySmartTransferProtocolClient>()
+            .add_value(IpfsClient::default())
             .add_value(IpfsGateway::default())
             .build();
 
         Self {
+            base_repo_harness,
             calls,
-            dataset_registry: catalog.get_one().unwrap(),
-            dataset_repo_writer: catalog.get_one().unwrap(),
+            sync_service: catalog.get_one().unwrap(),
+            sync_request_builder: catalog.get_one().unwrap(),
             remote_repo_reg: catalog.get_one().unwrap(),
             remote_alias_reg: catalog.get_one().unwrap(),
             pull_request_planner: catalog.get_one().unwrap(),
@@ -824,7 +759,7 @@ impl PullTestHarness {
 
     async fn get_remote_aliases(&self, dataset_ref: &DatasetRef) -> Box<dyn RemoteAliases> {
         let dataset = self
-            .dataset_registry
+            .dataset_registry()
             .get_dataset_by_ref(dataset_ref)
             .await
             .unwrap();

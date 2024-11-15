@@ -11,19 +11,10 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
-use dill::Component;
-use kamu::testing::MetadataFactory;
-use kamu::{
-    DatasetOwnershipServiceInMemory,
-    DatasetOwnershipServiceInMemoryStateInitializer,
-    DatasetRegistryRepoBridge,
-    DatasetRepositoryLocalFs,
-    DatasetRepositoryWriter,
-};
+use kamu::{DatasetOwnershipServiceInMemory, DatasetOwnershipServiceInMemoryStateInitializer};
 use kamu_accounts::{
     AccountConfig,
     AuthenticationService,
-    CurrentAccountSubject,
     JwtAuthenticationConfig,
     PredefinedAccountsConfig,
     DEFAULT_ACCOUNT_ID,
@@ -35,10 +26,10 @@ use kamu_accounts_services::{
     LoginPasswordAuthProvider,
     PredefinedAccountsRegistrator,
 };
-use kamu_core::{DatasetOwnershipService, DatasetRepository, TenancyConfig};
-use opendatafabric::{AccountID, AccountName, DatasetAlias, DatasetID, DatasetKind, DatasetName};
-use tempfile::TempDir;
-use time_source::SystemTimeSourceDefault;
+use kamu_core::{DatasetOwnershipService, TenancyConfig};
+use opendatafabric::{AccountID, AccountName, DatasetAlias, DatasetID, DatasetName};
+
+use crate::BaseRepoHarness;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -85,10 +76,12 @@ async fn test_multi_tenant_dataset_owners() {
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[oop::extend(BaseRepoHarness, base_repo_harness)]
 struct DatasetOwnershipHarness {
-    _workdir: TempDir,
+    base_repo_harness: BaseRepoHarness,
     catalog: dill::Catalog,
-    dataset_repo_writer: Arc<dyn DatasetRepositoryWriter>,
     dataset_ownership_service: Arc<dyn DatasetOwnershipService>,
     auth_svc: Arc<dyn AuthenticationService>,
     account_datasets: HashMap<AccountID, Vec<DatasetID>>,
@@ -96,9 +89,8 @@ struct DatasetOwnershipHarness {
 
 impl DatasetOwnershipHarness {
     async fn new(tenancy_config: TenancyConfig) -> Self {
-        let workdir = tempfile::tempdir().unwrap();
-        let datasets_dir = workdir.path().join("datasets");
-        std::fs::create_dir(&datasets_dir).unwrap();
+        let base_repo_harness = BaseRepoHarness::new(tenancy_config);
+
         let predefined_accounts = [
             AccountName::new_unchecked("alice"),
             AccountName::new_unchecked("bob"),
@@ -112,16 +104,9 @@ impl DatasetOwnershipHarness {
         }
 
         let base_catalog = {
-            let mut b = dill::CatalogBuilder::new();
+            let mut b = dill::CatalogBuilder::new_chained(base_repo_harness.catalog());
 
-            b.add::<SystemTimeSourceDefault>()
-                .add_value(tenancy_config)
-                .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
-                .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-                .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
-                .add::<DatasetRegistryRepoBridge>()
-                .add_value(CurrentAccountSubject::new_test())
-                .add::<AccessTokenServiceImpl>()
+            b.add::<AccessTokenServiceImpl>()
                 .add::<AuthenticationServiceImpl>()
                 .add_value(predefined_accounts_config.clone())
                 .add_value(JwtAuthenticationConfig::default())
@@ -149,15 +134,12 @@ impl DatasetOwnershipHarness {
             b.build()
         };
 
-        let dataset_repo_writer = catalog.get_one::<dyn DatasetRepositoryWriter>().unwrap();
-
         let dataset_ownership_service = catalog.get_one::<dyn DatasetOwnershipService>().unwrap();
         let auth_svc = catalog.get_one::<dyn AuthenticationService>().unwrap();
 
         Self {
-            _workdir: workdir,
+            base_repo_harness,
             catalog,
-            dataset_repo_writer,
             dataset_ownership_service,
             auth_svc,
             account_datasets: HashMap::new(),
@@ -241,20 +223,12 @@ impl DatasetOwnershipHarness {
             .unwrap();
 
         let created_dataset = self
-            .dataset_repo_writer
-            .create_dataset_from_snapshot(
-                MetadataFactory::dataset_snapshot()
-                    .name(DatasetAlias::new(
-                        account_name,
-                        DatasetName::new_unchecked(dataset_name),
-                    ))
-                    .kind(DatasetKind::Root)
-                    .push_event(MetadataFactory::set_polling_source().build())
-                    .build(),
-            )
-            .await
-            .unwrap()
-            .create_dataset_result;
+            ._super()
+            .create_root_dataset(&DatasetAlias::new(
+                account_name,
+                DatasetName::new_unchecked(dataset_name),
+            ))
+            .await;
 
         self.account_datasets
             .entry(account_id.clone())
@@ -278,24 +252,15 @@ impl DatasetOwnershipHarness {
             .unwrap();
 
         let created_dataset = self
-            .dataset_repo_writer
-            .create_dataset_from_snapshot(
-                MetadataFactory::dataset_snapshot()
-                    .name(DatasetAlias::new(
-                        account_name,
-                        DatasetName::new_unchecked(dataset_name),
-                    ))
-                    .kind(DatasetKind::Derivative)
-                    .push_event(
-                        MetadataFactory::set_transform()
-                            .inputs_from_refs(input_aliases)
-                            .build(),
-                    )
-                    .build(),
+            ._super()
+            .create_derived_dataset(
+                &DatasetAlias::new(account_name, DatasetName::new_unchecked(dataset_name)),
+                input_aliases
+                    .iter()
+                    .map(DatasetAlias::as_local_ref)
+                    .collect(),
             )
-            .await
-            .unwrap()
-            .create_dataset_result;
+            .await;
 
         self.account_datasets
             .entry(account_id.clone())

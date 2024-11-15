@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::path::Path;
 use std::sync::Arc;
 
 use dill::{Catalog, Component};
@@ -43,7 +44,7 @@ use time_source::SystemTimeSourceDefault;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct BaseRepoHarness {
-    _temp_dir: tempfile::TempDir,
+    temp_dir: tempfile::TempDir,
     catalog: Catalog,
     dataset_registry: Arc<dyn DatasetRegistry>,
     dataset_repo_writer: Arc<dyn DatasetRepositoryWriter>,
@@ -51,12 +52,12 @@ pub struct BaseRepoHarness {
 
 impl BaseRepoHarness {
     pub fn new(tenancy_config: TenancyConfig) -> Self {
-        let tempdir = tempfile::tempdir().unwrap();
+        let temp_dir = tempfile::tempdir().unwrap();
 
-        let datasets_dir = tempdir.path().join("datasets");
+        let datasets_dir = temp_dir.path().join("datasets");
         std::fs::create_dir(&datasets_dir).unwrap();
 
-        let run_info_dir = tempdir.path().join("run");
+        let run_info_dir = temp_dir.path().join("run");
         std::fs::create_dir(&run_info_dir).unwrap();
 
         let catalog = dill::CatalogBuilder::new()
@@ -74,7 +75,7 @@ impl BaseRepoHarness {
         let dataset_repo_writer = catalog.get_one().unwrap();
 
         Self {
-            _temp_dir: tempdir,
+            temp_dir,
             catalog,
             dataset_registry,
             dataset_repo_writer,
@@ -83,6 +84,10 @@ impl BaseRepoHarness {
 
     pub fn catalog(&self) -> &Catalog {
         &self.catalog
+    }
+
+    pub fn temp_dir_path(&self) -> &Path {
+        self.temp_dir.path()
     }
 
     pub fn dataset_registry(&self) -> &dyn DatasetRegistry {

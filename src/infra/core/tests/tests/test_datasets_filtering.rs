@@ -8,33 +8,18 @@
 // by the Apache License, Version 2.0.
 
 use std::str::FromStr;
-use std::sync::Arc;
 
-use dill::Component;
 use futures::TryStreamExt;
-use kamu::testing::MetadataFactory;
 use kamu::utils::datasets_filtering::{
     get_local_datasets_stream,
     matches_local_ref_pattern,
     matches_remote_ref_pattern,
 };
-use kamu::{DatasetRegistryRepoBridge, DatasetRepositoryLocalFs, DatasetRepositoryWriter};
-use kamu_accounts::{CurrentAccountSubject, DEFAULT_ACCOUNT_NAME};
-use kamu_core::{DatasetRegistry, DatasetRepository, TenancyConfig};
-use opendatafabric::{
-    AccountName,
-    DatasetAlias,
-    DatasetAliasRemote,
-    DatasetHandle,
-    DatasetID,
-    DatasetKind,
-    DatasetName,
-    DatasetRefAny,
-    DatasetRefAnyPattern,
-    RepoName,
-};
-use tempfile::TempDir;
-use time_source::SystemTimeSourceDefault;
+use kamu_accounts::DEFAULT_ACCOUNT_NAME;
+use kamu_core::TenancyConfig;
+use opendatafabric::*;
+
+use crate::BaseRepoHarness;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -154,20 +139,19 @@ fn test_matches_remote_ref_pattern() {
 
 #[test_log::test(tokio::test)]
 async fn test_get_local_datasets_stream_single_tenant() {
-    let dataset_filtering_harness = DatasetFilteringHarness::new(TenancyConfig::SingleTenant);
-    let foo_handle = dataset_filtering_harness
-        .create_root_dataset(None, "foo")
-        .await;
-    let bar_handle = dataset_filtering_harness
-        .create_root_dataset(None, "bar")
-        .await;
-    let baz_handle = dataset_filtering_harness
-        .create_root_dataset(None, "baz")
-        .await;
+    let harness = DatasetFilteringHarness::new(TenancyConfig::SingleTenant);
+
+    let alias_foo = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
+    let alias_bar = DatasetAlias::new(None, DatasetName::new_unchecked("bar"));
+    let alias_baz = DatasetAlias::new(None, DatasetName::new_unchecked("baz"));
+
+    let foo = harness.create_root_dataset(&alias_foo).await;
+    let bar = harness.create_root_dataset(&alias_bar).await;
+    let baz = harness.create_root_dataset(&alias_baz).await;
 
     let pattern = DatasetRefAnyPattern::from_str("f%").unwrap();
     let res: Vec<_> = get_local_datasets_stream(
-        dataset_filtering_harness.dataset_registry.as_ref(),
+        harness.dataset_registry(),
         vec![pattern],
         &DEFAULT_ACCOUNT_NAME,
     )
@@ -175,11 +159,11 @@ async fn test_get_local_datasets_stream_single_tenant() {
     .await
     .unwrap();
 
-    assert_eq!(res, vec![foo_handle.as_any_ref()]);
+    assert_eq!(res, vec![foo.dataset_handle.as_any_ref()]);
 
     let pattern = DatasetRefAnyPattern::from_str("b%").unwrap();
     let mut res: Vec<_> = get_local_datasets_stream(
-        dataset_filtering_harness.dataset_registry.as_ref(),
+        harness.dataset_registry(),
         vec![pattern],
         &DEFAULT_ACCOUNT_NAME,
     )
@@ -188,11 +172,17 @@ async fn test_get_local_datasets_stream_single_tenant() {
     .unwrap();
     DatasetFilteringHarness::sort_datasets_by_dataset_name(&mut res);
 
-    assert_eq!(res, vec![bar_handle.as_any_ref(), baz_handle.as_any_ref()]);
+    assert_eq!(
+        res,
+        vec![
+            bar.dataset_handle.as_any_ref(),
+            baz.dataset_handle.as_any_ref()
+        ]
+    );
 
     let pattern = DatasetRefAnyPattern::from_str("s%").unwrap();
     let res: Vec<_> = get_local_datasets_stream(
-        dataset_filtering_harness.dataset_registry.as_ref(),
+        harness.dataset_registry(),
         vec![pattern.clone()],
         &DEFAULT_ACCOUNT_NAME,
     )
@@ -207,113 +197,58 @@ async fn test_get_local_datasets_stream_single_tenant() {
 
 #[test_log::test(tokio::test)]
 async fn test_get_local_datasets_stream_multi_tenant() {
-    let dataset_filtering_harness = DatasetFilteringHarness::new(TenancyConfig::MultiTenant);
+    let harness = DatasetFilteringHarness::new(TenancyConfig::MultiTenant);
+
     let account_1 = AccountName::new_unchecked("account1");
     let account_2 = AccountName::new_unchecked("account2");
 
-    let foo_handle = dataset_filtering_harness
-        .create_root_dataset(Some(account_1.clone()), "foo")
-        .await;
-    let bar_handle = dataset_filtering_harness
-        .create_root_dataset(Some(account_2.clone()), "bar")
-        .await;
-    let baz_handle = dataset_filtering_harness
-        .create_root_dataset(Some(account_1.clone()), "baz")
-        .await;
+    let alias_foo = DatasetAlias::new(Some(account_1.clone()), DatasetName::new_unchecked("foo"));
+    let alias_bar = DatasetAlias::new(Some(account_2.clone()), DatasetName::new_unchecked("bar"));
+    let alias_baz = DatasetAlias::new(Some(account_1.clone()), DatasetName::new_unchecked("baz"));
+
+    let foo = harness.create_root_dataset(&alias_foo).await;
+    let bar = harness.create_root_dataset(&alias_bar).await;
+    let baz = harness.create_root_dataset(&alias_baz).await;
 
     let pattern = DatasetRefAnyPattern::from_str("account1/f%").unwrap();
-    let res: Vec<_> = get_local_datasets_stream(
-        dataset_filtering_harness.dataset_registry.as_ref(),
-        vec![pattern],
-        &account_1,
-    )
-    .try_collect()
-    .await
-    .unwrap();
+    let res: Vec<_> =
+        get_local_datasets_stream(harness.dataset_registry(), vec![pattern], &account_1)
+            .try_collect()
+            .await
+            .unwrap();
 
-    assert_eq!(res, vec![foo_handle.as_any_ref()]);
+    assert_eq!(res, vec![foo.dataset_handle.as_any_ref()]);
 
     let pattern = DatasetRefAnyPattern::from_str("account2/b%").unwrap();
-    let res: Vec<_> = get_local_datasets_stream(
-        dataset_filtering_harness.dataset_registry.as_ref(),
-        vec![pattern],
-        &account_2,
-    )
-    .try_collect()
-    .await
-    .unwrap();
+    let res: Vec<_> =
+        get_local_datasets_stream(harness.dataset_registry(), vec![pattern], &account_2)
+            .try_collect()
+            .await
+            .unwrap();
 
-    assert_eq!(res, vec![bar_handle.as_any_ref()]);
+    assert_eq!(res, vec![bar.dataset_handle.as_any_ref()]);
 
     let pattern = DatasetRefAnyPattern::from_str("account1/b%").unwrap();
-    let res: Vec<_> = get_local_datasets_stream(
-        dataset_filtering_harness.dataset_registry.as_ref(),
-        vec![pattern],
-        &account_1,
-    )
-    .try_collect()
-    .await
-    .unwrap();
+    let res: Vec<_> =
+        get_local_datasets_stream(harness.dataset_registry(), vec![pattern], &account_1)
+            .try_collect()
+            .await
+            .unwrap();
 
-    assert_eq!(res, vec![baz_handle.as_any_ref()]);
+    assert_eq!(res, vec![baz.dataset_handle.as_any_ref()]);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[oop::extend(BaseRepoHarness, base_repo_harness)]
 struct DatasetFilteringHarness {
-    _workdir: TempDir,
-    _catalog: dill::Catalog,
-    dataset_registry: Arc<dyn DatasetRegistry>,
-    dataset_repo_writer: Arc<dyn DatasetRepositoryWriter>,
+    base_repo_harness: BaseRepoHarness,
 }
 
 impl DatasetFilteringHarness {
     fn new(tenancy_config: TenancyConfig) -> Self {
-        let workdir = tempfile::tempdir().unwrap();
-        let datasets_dir = workdir.path().join("datasets");
-        std::fs::create_dir(&datasets_dir).unwrap();
-
-        let catalog = dill::CatalogBuilder::new()
-            .add::<SystemTimeSourceDefault>()
-            .add_value(tenancy_config)
-            .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
-            .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-            .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
-            .add::<DatasetRegistryRepoBridge>()
-            .add_value(CurrentAccountSubject::new_test())
-            .build();
-
-        let dataset_registry = catalog.get_one::<dyn DatasetRegistry>().unwrap();
-        let dataset_repo_writer = catalog.get_one::<dyn DatasetRepositoryWriter>().unwrap();
-
-        Self {
-            _workdir: workdir,
-            _catalog: catalog,
-            dataset_registry,
-            dataset_repo_writer,
-        }
-    }
-
-    async fn create_root_dataset(
-        &self,
-        account_name: Option<AccountName>,
-        dataset_name: &str,
-    ) -> DatasetHandle {
-        self.dataset_repo_writer
-            .create_dataset_from_snapshot(
-                MetadataFactory::dataset_snapshot()
-                    .name(DatasetAlias::new(
-                        account_name,
-                        DatasetName::new_unchecked(dataset_name),
-                    ))
-                    .kind(DatasetKind::Root)
-                    .push_event(MetadataFactory::set_polling_source().build())
-                    .build(),
-            )
-            .await
-            .unwrap()
-            .create_dataset_result
-            .dataset_handle
+        let base_repo_harness = BaseRepoHarness::new(tenancy_config);
+        Self { base_repo_harness }
     }
 
     fn sort_datasets_by_dataset_name(datasets: &mut [DatasetRefAny]) {
@@ -333,3 +268,5 @@ impl DatasetFilteringHarness {
         });
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
