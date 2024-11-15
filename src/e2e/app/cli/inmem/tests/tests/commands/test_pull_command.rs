@@ -10,10 +10,12 @@
 use kamu_cli_e2e_common::prelude::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// test_pull_env_var_template_default_value
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 kamu_cli_execute_command_e2e_test!(
     storage = inmem,
-    fixture = kamu_cli_e2e_repo_tests::test_pull_env_var_template_default_value,
+    fixture = kamu_cli_e2e_repo_tests::test_pull_env_var_template_default_value_st,
     extra_test_groups = "containerized, engine, ingest, datafusion"
 );
 
@@ -21,7 +23,25 @@ kamu_cli_execute_command_e2e_test!(
 
 kamu_cli_execute_command_e2e_test!(
     storage = inmem,
-    fixture = kamu_cli_e2e_repo_tests::test_pull_env_var_template_default_value_missing_values,
+    fixture = kamu_cli_e2e_repo_tests::test_pull_env_var_template_default_value_mt,
+    extra_test_groups = "containerized, engine, ingest, datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// test_pull_env_var_template_default_value_missing_values
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_execute_command_e2e_test!(
+    storage = inmem,
+    fixture = kamu_cli_e2e_repo_tests::test_pull_env_var_template_default_value_missing_values_st,
+    extra_test_groups = "containerized, engine, ingest, datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_execute_command_e2e_test!(
+    storage = inmem,
+    fixture = kamu_cli_e2e_repo_tests::test_pull_env_var_template_default_value_missing_values_mt,
     extra_test_groups = "containerized, engine, ingest, datafusion"
 );
 

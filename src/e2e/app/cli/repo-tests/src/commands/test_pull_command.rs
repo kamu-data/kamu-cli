@@ -54,66 +54,31 @@ const DATASET_INGEST_DATA: &str = indoc::indoc!(
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// test_pull_env_var_template_default_value
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_pull_env_var_template_default_value(kamu: KamuCliPuppet) {
-    kamu.assert_success_command_execution_with_input(
-        ["add", "--stdin"],
-        DATASET_SNAPSHOT_STR,
-        None,
-        Some([indoc::indoc!(
-            r#"
-            Added: test.pull-from-file
-            Added 1 dataset(s)
-            "#
-        )]),
-    )
-    .await;
-
-    let data_path = kamu.workspace_path().join("data.csv");
-    std::fs::write(&data_path, DATASET_INGEST_DATA).unwrap();
-
-    kamu.assert_success_command_execution_with_env(
-        ["pull", "test.pull-from-file"],
-        vec![("workspace_dir".as_ref(), kamu.workspace_path().as_os_str())],
-        None,
-        Some([indoc::indoc!(
-            r#"
-                1 dataset(s) updated
-            "#
-        )]),
-    )
-    .await;
+pub async fn test_pull_env_var_template_default_value_st(kamu: KamuCliPuppet) {
+    test_pull_env_var_template_default_value(kamu).await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_pull_env_var_template_default_value_missing_values(kamu: KamuCliPuppet) {
-    kamu.assert_success_command_execution_with_input(
-        ["add", "--stdin"],
-        DATASET_SNAPSHOT_STR,
-        None,
-        Some([indoc::indoc!(
-            r#"
-            Added: test.pull-from-file
-            Added 1 dataset(s)
-            "#
-        )]),
-    )
-    .await;
+pub async fn test_pull_env_var_template_default_value_mt(kamu: KamuCliPuppet) {
+    test_pull_env_var_template_default_value(kamu).await;
+}
 
-    let data_path = kamu.workspace_path().join("data.csv");
-    std::fs::write(&data_path, DATASET_INGEST_DATA).unwrap();
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// test_pull_env_var_template_default_value_missing_values
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    kamu.assert_failure_command_execution(
-        ["pull", "test.pull-from-file"],
-        None,
-        Some([indoc::indoc!(
-            r#"
-                Failed to pull test.pull-from-file: Missing values for variable(s): 'env.data_dir || env.workspace_dir'
-            "#
-        )]),
-    )
-        .await;
+pub async fn test_pull_env_var_template_default_value_missing_values_st(kamu: KamuCliPuppet) {
+    test_pull_env_var_template_default_value_missing_values(kamu).await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_pull_env_var_template_default_value_missing_values_mt(kamu: KamuCliPuppet) {
+    test_pull_env_var_template_default_value_missing_values(kamu).await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -160,6 +125,69 @@ pub async fn test_pull_derivative_mt(kamu: KamuCliPuppet) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Implementations
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+async fn test_pull_env_var_template_default_value(kamu: KamuCliPuppet) {
+    kamu.assert_success_command_execution_with_input(
+        ["add", "--stdin"],
+        DATASET_SNAPSHOT_STR,
+        None,
+        Some([indoc::indoc!(
+            r#"
+            Added: test.pull-from-file
+            Added 1 dataset(s)
+            "#
+        )]),
+    )
+    .await;
+
+    let data_path = kamu.workspace_path().join("data.csv");
+    std::fs::write(&data_path, DATASET_INGEST_DATA).unwrap();
+
+    kamu.assert_success_command_execution_with_env(
+        ["pull", "test.pull-from-file"],
+        vec![("workspace_dir".as_ref(), kamu.workspace_path().as_os_str())],
+        None,
+        Some([indoc::indoc!(
+            r#"
+                1 dataset(s) updated
+            "#
+        )]),
+    )
+    .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+async fn test_pull_env_var_template_default_value_missing_values(kamu: KamuCliPuppet) {
+    kamu.assert_success_command_execution_with_input(
+        ["add", "--stdin"],
+        DATASET_SNAPSHOT_STR,
+        None,
+        Some([indoc::indoc!(
+            r#"
+            Added: test.pull-from-file
+            Added 1 dataset(s)
+            "#
+        )]),
+    )
+    .await;
+
+    let data_path = kamu.workspace_path().join("data.csv");
+    std::fs::write(&data_path, DATASET_INGEST_DATA).unwrap();
+
+    kamu.assert_failure_command_execution(
+        ["pull", "test.pull-from-file"],
+        None,
+        Some([indoc::indoc!(
+            r#"
+                Failed to pull test.pull-from-file: Missing values for variable(s): 'env.data_dir || env.workspace_dir'
+            "#
+        )]),
+    )
+        .await;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 async fn test_pull_reset_derivative(kamu: KamuCliPuppet) {
