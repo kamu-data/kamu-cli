@@ -74,6 +74,20 @@ impl std::fmt::Display for PushResponse {
     }
 }
 
+impl std::fmt::Debug for PushResponse {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "PushResponse(local_handle={:?}, target={:?}, result=",
+            self.local_handle, self.target
+        )?;
+        match &self.result {
+            Ok((sync_res, _)) => write!(f, "Ok({sync_res:?})"),
+            Err(e) => write!(f, "Err({e:?})"),
+        }
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone)]

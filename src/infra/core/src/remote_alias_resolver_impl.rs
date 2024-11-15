@@ -75,13 +75,11 @@ impl RemoteAliasResolverImpl {
     ) -> Result<Url, InternalError> {
         let mut res_url = repo_url.clone().as_odf_protocol().int_err()?;
 
-        {
-            let mut path_segments = res_url.path_segments_mut().unwrap();
-            if let Some(account_name) = account_name_maybe {
-                path_segments.push(account_name);
-            }
-            path_segments.push(dataset_name);
+        if let Some(account_name) = account_name_maybe {
+            res_url = res_url.join(format!("{account_name}/").as_str()).unwrap();
         }
+        res_url = res_url.join(dataset_name).unwrap();
+
         Ok(res_url)
     }
 

@@ -13,6 +13,7 @@ mod test_compact_dataset_use_case;
 mod test_create_dataset_from_snapshot_use_case;
 mod test_create_dataset_use_case;
 mod test_delete_dataset_use_case;
+mod test_push_dataset_use_case;
 mod test_rename_dataset_use_case;
 mod test_reset_dataset_use_case;
 mod test_set_watermark_use_case;

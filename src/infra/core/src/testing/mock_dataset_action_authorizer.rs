@@ -148,6 +148,37 @@ impl MockDatasetActionAuthorizer {
 
         self
     }
+
+    pub fn make_expect_classify_datasets_by_allowance(
+        mut self,
+        action: auth::DatasetAction,
+        times: usize,
+        authorized: HashSet<DatasetAlias>,
+    ) -> Self {
+        self.expect_classify_datasets_by_allowance()
+            .with(always(), eq(action))
+            .times(times)
+            .returning(move |handles, action| {
+                let mut good = Vec::new();
+                let mut bad = Vec::new();
+
+                for handle in handles {
+                    if authorized.contains(&handle.alias) {
+                        good.push(handle);
+                    } else {
+                        let error = Self::denying_error(&handle, action);
+                        bad.push((handle, error));
+                    }
+                }
+
+                Ok(ClassifyByAllowanceResponse {
+                    authorized_handles: good,
+                    unauthorized_handles_with_errors: bad,
+                })
+            });
+
+        self
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
