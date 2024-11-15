@@ -15,9 +15,6 @@ use kamu::testing::MetadataFactory;
 use kamu::{DatasetRegistryRepoBridge, DatasetRepositoryLocalFs, DatasetRepositoryWriter};
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::{
-    CommitError,
-    CommitOpts,
-    CommitResult,
     CreateDatasetResult,
     DatasetRegistry,
     DatasetRegistryExt,
@@ -30,15 +27,7 @@ use kamu_core::{
 };
 use opendatafabric::serde::flatbuffers::FlatbuffersMetadataBlockSerializer;
 use opendatafabric::serde::MetadataBlockSerializer;
-use opendatafabric::{
-    DatasetAlias,
-    DatasetKind,
-    DatasetRef,
-    MetadataBlock,
-    MetadataEvent,
-    Multicodec,
-    Multihash,
-};
+use opendatafabric::{DatasetAlias, DatasetKind, DatasetRef, MetadataBlock, Multicodec, Multihash};
 use time_source::SystemTimeSourceDefault;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -159,15 +148,6 @@ impl BaseRepoHarness {
             .unwrap();
 
         Multihash::from_digest::<sha3::Sha3_256>(Multicodec::Sha3_256, &block_data)
-    }
-
-    pub async fn commit_event(
-        &self,
-        target: ResolvedDataset,
-        event: MetadataEvent,
-        options: CommitOpts<'_>,
-    ) -> Result<CommitResult, CommitError> {
-        target.dataset.commit_event(event, options).await
     }
 }
 

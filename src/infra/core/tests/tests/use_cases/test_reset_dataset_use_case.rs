@@ -28,15 +28,14 @@ async fn test_reset_success() {
     );
 
     let foo = harness.create_root_dataset(&alias_foo).await;
-
-    harness
+    foo.dataset
         .commit_event(
-            ResolvedDataset::from(&foo),
             MetadataEvent::SetInfo(MetadataFactory::set_info().description("test").build()),
             CommitOpts::default(),
         )
         .await
         .unwrap();
+
     assert_eq!(harness.num_blocks(ResolvedDataset::from(&foo)).await, 3);
 
     let new_head = harness
