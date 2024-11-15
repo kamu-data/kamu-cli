@@ -39,8 +39,8 @@ use crate::OdfSmtpVersion;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct WsSmartTransferProtocolClient {
-    catalog: Catalog,
     dataset_credential_resolver: Arc<dyn auth::OdfServerAccessTokenResolver>,
+    append_dataset_metadata_batch_use_case: Arc<dyn AppendDatasetMetadataBatchUseCase>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -49,12 +49,12 @@ pub struct WsSmartTransferProtocolClient {
 #[interface(dyn SmartTransferProtocolClient)]
 impl WsSmartTransferProtocolClient {
     pub fn new(
-        catalog: Catalog,
         dataset_credential_resolver: Arc<dyn auth::OdfServerAccessTokenResolver>,
+        append_dataset_metadata_batch_use_case: Arc<dyn AppendDatasetMetadataBatchUseCase>,
     ) -> Self {
         Self {
-            catalog,
             dataset_credential_resolver,
+            append_dataset_metadata_batch_use_case,
         }
     }
 
@@ -690,14 +690,9 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
                     .await?;
             }
 
-            let dst_dataset = dst.clone();
-            let append_event = self
-                .catalog
-                .get_one::<dyn AppendDatasetMetadataBatchUseCase>()
-                .unwrap();
-            append_event
+            self.append_dataset_metadata_batch_use_case
                 .execute(
-                    dst_dataset.as_ref(),
+                    dst.as_ref(),
                     new_blocks,
                     transfer_options.force_update_if_diverged,
                 )
