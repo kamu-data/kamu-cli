@@ -13,7 +13,7 @@ use kamu_cli_e2e_common::prelude::*;
 
 kamu_cli_execute_command_e2e_test!(
     storage = sqlite,
-    fixture = kamu_cli_e2e_repo_tests::test_init_multi_tenant_creates_sqlite_database,
+    fixture = kamu_cli_e2e_repo_tests::commands::test_init_exist_ok_st,
     options = Options::default().with_no_workspace()
 );
 
@@ -21,8 +21,7 @@ kamu_cli_execute_command_e2e_test!(
 
 kamu_cli_execute_command_e2e_test!(
     storage = sqlite,
-    fixture =
-        kamu_cli_e2e_repo_tests::test_init_multi_tenant_with_exists_ok_flag_creates_sqlite_database,
+    fixture = kamu_cli_e2e_repo_tests::commands::test_init_exist_ok_mt,
     options = Options::default().with_no_workspace()
 );
 
@@ -30,23 +29,7 @@ kamu_cli_execute_command_e2e_test!(
 
 kamu_cli_execute_command_e2e_test!(
     storage = sqlite,
-    fixture = kamu_cli_e2e_repo_tests::test_init_exist_ok_st,
-    options = Options::default().with_no_workspace()
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-kamu_cli_execute_command_e2e_test!(
-    storage = sqlite,
-    fixture = kamu_cli_e2e_repo_tests::test_init_exist_ok_mt,
-    options = Options::default().with_no_workspace()
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-kamu_cli_execute_command_e2e_test!(
-    storage = sqlite,
-    fixture = kamu_cli_e2e_repo_tests::test_init_in_an_existing_workspace,
+    fixture = kamu_cli_e2e_repo_tests::commands::test_init_in_an_existing_workspace,
     options = Options::default().with_no_workspace()
 );
 
