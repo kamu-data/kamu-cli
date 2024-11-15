@@ -23,7 +23,7 @@ use opendatafabric::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_search_multi_user(mut kamu_node_api_client: KamuApiServerClient) {
-    let kamu = KamuCliPuppet::new_workspace_tmp().await;
+    let kamu = KamuCliPuppet::new_workspace_tmp(false).await;
 
     add_repo_to_workspace(&kamu_node_api_client, &kamu, "kamu-node").await;
 
@@ -149,7 +149,7 @@ pub async fn test_search_multi_user(mut kamu_node_api_client: KamuApiServerClien
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_search_by_name(mut kamu_node_api_client: KamuApiServerClient) {
-    let kamu = KamuCliPuppet::new_workspace_tmp().await;
+    let kamu = KamuCliPuppet::new_workspace_tmp(false).await;
 
     add_repo_to_workspace(&kamu_node_api_client, &kamu, "kamu-node").await;
 
@@ -226,7 +226,7 @@ pub async fn test_search_by_name(mut kamu_node_api_client: KamuApiServerClient) 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_search_by_repo(mut kamu_node_api_client: KamuApiServerClient) {
-    let kamu = KamuCliPuppet::new_workspace_tmp().await;
+    let kamu = KamuCliPuppet::new_workspace_tmp(false).await;
 
     // As a test, add two repos pointing to the same node
     add_repo_to_workspace(&kamu_node_api_client, &kamu, "kamu-node").await;
