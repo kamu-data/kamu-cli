@@ -53,15 +53,15 @@ macro_rules! test_smart_transfer_protocol_permutations {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-test_smart_transfer_protocol_permutations!(test_smart_push_pull_sequence);
+test_smart_transfer_protocol_permutations!(test_smart_push_smart_pull_sequence);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-test_smart_transfer_protocol_permutations!(test_smart_push_force_pull_force);
+test_smart_transfer_protocol_permutations!(test_smart_push_force_smart_pull_force);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-test_smart_transfer_protocol_permutations!(test_smart_push_no_alias_pull_no_alias);
+test_smart_transfer_protocol_permutations!(test_smart_push_no_alias_smart_pull_no_alias);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -75,11 +75,11 @@ pub async fn test_smart_pull_as_mt(kamu_api_server_client: KamuApiServerClient) 
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-test_smart_transfer_protocol_permutations!(test_smart_push_all_pull_all);
+test_smart_transfer_protocol_permutations!(test_smart_push_all_smart_pull_all);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-test_smart_transfer_protocol_permutations!(test_smart_push_recursive_pull_recursive);
+test_smart_transfer_protocol_permutations!(test_smart_push_recursive_smart_pull_recursive);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -117,7 +117,7 @@ test_smart_transfer_protocol_permutations!(test_smart_push_to_registered_repo_sm
 // Implementations
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-async fn test_smart_push_pull_sequence(
+async fn test_smart_push_smart_pull_sequence(
     mut kamu_api_server_client: KamuApiServerClient,
     is_push_workspace_multi_tenant: bool,
     is_pull_workspace_multi_tenant: bool,
@@ -269,7 +269,7 @@ async fn test_smart_push_pull_sequence(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-async fn test_smart_push_force_pull_force(
+async fn test_smart_push_force_smart_pull_force(
     mut kamu_api_server_client: KamuApiServerClient,
     is_push_workspace_multi_tenant: bool,
     is_pull_workspace_multi_tenant: bool,
@@ -421,7 +421,7 @@ async fn test_smart_push_force_pull_force(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-async fn test_smart_push_no_alias_pull_no_alias(
+async fn test_smart_push_no_alias_smart_pull_no_alias(
     mut kamu_api_server_client: KamuApiServerClient,
     is_push_workspace_multi_tenant: bool,
     is_pull_workspace_multi_tenant: bool,
@@ -643,7 +643,7 @@ async fn test_smart_pull_as(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-async fn test_smart_push_all_pull_all(
+async fn test_smart_push_all_smart_pull_all(
     mut kamu_api_server_client: KamuApiServerClient,
     is_push_workspace_multi_tenant: bool,
     is_pull_workspace_multi_tenant: bool,
@@ -932,7 +932,7 @@ async fn test_smart_push_all_pull_all(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-async fn test_smart_push_recursive_pull_recursive(
+async fn test_smart_push_recursive_smart_pull_recursive(
     mut kamu_api_server_client: KamuApiServerClient,
     is_push_workspace_multi_tenant: bool,
     is_pull_workspace_multi_tenant: bool,
