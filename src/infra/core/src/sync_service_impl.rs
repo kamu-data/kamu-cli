@@ -21,8 +21,11 @@ use url::Url;
 use super::utils::smart_transfer_protocol::SmartTransferProtocolClient;
 use crate::resolve_remote_dataset_url;
 use crate::utils::ipfs_wrapper::*;
-use crate::utils::simple_transfer_protocol::SimpleTransferProtocol;
-use crate::utils::smart_transfer_protocol::TransferOptions;
+use crate::utils::simple_transfer_protocol::{
+    SimpleProtocolTransferOptions,
+    SimpleTransferProtocol,
+};
+use crate::utils::smart_transfer_protocol::TransferOptions as SmartTransferOptions;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -30,6 +33,7 @@ pub struct SyncServiceImpl {
     remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
     dataset_factory: Arc<dyn DatasetFactory>,
     smart_transfer_protocol: Arc<dyn SmartTransferProtocolClient>,
+    simple_transfer_protocol: Arc<SimpleTransferProtocol>,
     ipfs_client: Arc<IpfsClient>,
 }
 
@@ -42,12 +46,14 @@ impl SyncServiceImpl {
         remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
         dataset_factory: Arc<dyn DatasetFactory>,
         smart_transfer_protocol: Arc<dyn SmartTransferProtocolClient>,
+        simple_transfer_protocol: Arc<SimpleTransferProtocol>,
         ipfs_client: Arc<IpfsClient>,
     ) -> Self {
         Self {
             remote_repo_reg,
             dataset_factory,
             smart_transfer_protocol,
+            simple_transfer_protocol,
             ipfs_client,
         }
     }
@@ -69,18 +75,23 @@ impl SyncServiceImpl {
         };
 
         let trust_source_hashes = opts.trust_source.unwrap_or(src_is_local);
+        let maybe_dst_alias = match &dst.sync_ref {
+            SyncRef::Local(l) => l.alias(),
+            SyncRef::Remote(_) => None,
+        };
 
         tracing::info!("Starting sync using Simple Transfer Protocol");
 
-        SimpleTransferProtocol
+        self.simple_transfer_protocol
             .sync(
                 &src.src_ref,
                 src.dataset,
                 dst.maybe_dataset,
-                dst.maybe_dataset_factory,
+                maybe_dst_alias,
                 validation,
                 trust_source_hashes,
                 opts.force,
+                SimpleProtocolTransferOptions::default(),
                 listener,
             )
             .await
@@ -98,7 +109,7 @@ impl SyncServiceImpl {
 
         tracing::info!("Starting sync using Smart Transfer Protocol (Pull flow)");
 
-        let maybe_dataset_alias = match &dst.sync_ref {
+        let maybe_dst_alias = match &dst.sync_ref {
             SyncRef::Local(l) => l.alias(),
             SyncRef::Remote(_) => None,
         };
@@ -107,9 +118,9 @@ impl SyncServiceImpl {
             .pull_protocol_client_flow(
                 &http_src_url,
                 dst.maybe_dataset,
-                maybe_dataset_alias,
+                maybe_dst_alias,
                 listener,
-                TransferOptions {
+                SmartTransferOptions {
                     force_update_if_diverged: opts.force,
                     visibility_for_created_dataset: opts.dataset_visibility,
                     ..Default::default()
@@ -150,7 +161,7 @@ impl SyncServiceImpl {
                 &http_dst_url,
                 maybe_dst_head.as_ref(),
                 listener,
-                TransferOptions {
+                SmartTransferOptions {
                     force_update_if_diverged: opts.force,
                     visibility_for_created_dataset: opts.dataset_visibility,
                     ..Default::default()

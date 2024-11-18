@@ -10,12 +10,14 @@
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 
+use dill::{component, Catalog};
 use futures::{stream, Future, StreamExt, TryStreamExt};
-use internal_error::ErrorIntoInternal;
+use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_core::sync_service::DatasetNotFoundError;
 use kamu_core::utils::metadata_chain_comparator::*;
 use kamu_core::*;
-use opendatafabric::*;
+use odf::{AsTypedBlock, IntoDataStreamBlock};
+use opendatafabric as odf;
 
 use crate::*;
 
@@ -30,6 +32,7 @@ const DEFAULT_SIMPLE_PROTOCOL_MAX_PARALLEL_TRANSFERS: usize = 10;
 #[derive(Debug, Eq, PartialEq)]
 pub struct SimpleProtocolTransferOptions {
     pub max_parallel_transfers: usize,
+    pub visibility_for_created_dataset: DatasetVisibility,
 }
 
 impl Default for SimpleProtocolTransferOptions {
@@ -43,6 +46,7 @@ impl Default for SimpleProtocolTransferOptions {
             };
         Self {
             max_parallel_transfers,
+            visibility_for_created_dataset: DatasetVisibility::Private,
         }
     }
 }
@@ -50,20 +54,28 @@ impl Default for SimpleProtocolTransferOptions {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Implements "Simple Transfer Protocol" as described in ODF spec
-pub struct SimpleTransferProtocol;
+pub struct SimpleTransferProtocol {
+    catalog: Catalog,
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[component(pub)]
 impl SimpleTransferProtocol {
+    pub fn new(catalog: Catalog) -> Self {
+        Self { catalog }
+    }
+
     pub async fn sync(
         &self,
-        src_ref: &DatasetRefAny,
+        src_ref: &odf::DatasetRefAny,
         src: Arc<dyn Dataset>,
         maybe_dst: Option<Arc<dyn Dataset>>,
-        dst_factory: Option<DatasetFactoryFn>,
+        dst_alias: Option<&odf::DatasetAlias>,
         validation: AppendValidation,
         trust_source_hashes: bool,
         force: bool,
+        transfer_options: SimpleProtocolTransferOptions,
         listener: Arc<dyn SyncListener + 'static>,
     ) -> Result<(SyncResult, Arc<dyn Dataset>), SyncError> {
         listener.begin();
@@ -156,14 +168,29 @@ impl SimpleTransferProtocol {
         let (dst, dst_head) = if let Some(dst) = maybe_dst {
             (dst, dst_head)
         } else {
-            let (_, first_block) = blocks.pop().unwrap();
+            let (first_hash, first_block) = blocks.pop().unwrap();
             let seed_block = first_block
                 .into_typed()
                 .ok_or_else(|| CorruptedSourceError {
                     message: "First metadata block is not Seed".to_owned(),
                     source: None,
                 })?;
-            let create_result = dst_factory.unwrap()(seed_block).await?;
+
+            let create_dataset_use_case =
+                self.catalog.get_one::<dyn CreateDatasetUseCase>().unwrap();
+            let alias =
+                dst_alias.ok_or_else(|| "Destination dataset alias is unknown".int_err())?;
+            let create_result = create_dataset_use_case
+                .execute(
+                    alias,
+                    seed_block,
+                    CreateDatasetUseCaseOptions {
+                        dataset_visibility: transfer_options.visibility_for_created_dataset,
+                    },
+                )
+                .await
+                .int_err()?;
+            assert_eq!(first_hash, create_result.head);
             (create_result.dataset, Some(create_result.head))
         };
 
@@ -176,6 +203,7 @@ impl SimpleTransferProtocol {
             validation,
             trust_source_hashes,
             listener,
+            transfer_options,
             listener_adapter.into_status(),
         )
         .await?;
@@ -192,9 +220,9 @@ impl SimpleTransferProtocol {
 
     async fn get_src_head(
         &self,
-        src_ref: &DatasetRefAny,
+        src_ref: &odf::DatasetRefAny,
         src_chain: &dyn MetadataChain,
-    ) -> Result<Multihash, SyncError> {
+    ) -> Result<odf::Multihash, SyncError> {
         match src_chain.resolve_ref(&BlockRef::Head).await {
             Ok(head) => Ok(head),
             Err(GetRefError::NotFound(_)) => Err(DatasetNotFoundError {
@@ -209,7 +237,7 @@ impl SimpleTransferProtocol {
     async fn get_dest_head(
         &self,
         dst_chain: &dyn MetadataChain,
-    ) -> Result<Option<Multihash>, SyncError> {
+    ) -> Result<Option<odf::Multihash>, SyncError> {
         match dst_chain.resolve_ref(&BlockRef::Head).await {
             Ok(h) => Ok(Some(h)),
             Err(GetRefError::NotFound(_)) => Ok(None),
@@ -246,7 +274,7 @@ impl SimpleTransferProtocol {
         &'a self,
         src: &'a dyn Dataset,
         dst: &'a dyn Dataset,
-        data_slice: &DataSlice,
+        data_slice: &odf::DataSlice,
         trust_source_hashes: bool,
         listener: Arc<dyn SyncListener>,
         arc_stats: Arc<Mutex<SyncStats>>,
@@ -317,7 +345,7 @@ impl SimpleTransferProtocol {
         &'a self,
         src: &'a dyn Dataset,
         dst: &'a dyn Dataset,
-        checkpoint: &Checkpoint,
+        checkpoint: &odf::Checkpoint,
         trust_source_hashes: bool,
         listener: Arc<dyn SyncListener>,
         arc_stats: Arc<Mutex<SyncStats>>,
@@ -390,11 +418,12 @@ impl SimpleTransferProtocol {
         blocks: Vec<HashedMetadataBlock>,
         src: &'a dyn Dataset,
         dst: &'a dyn Dataset,
-        src_head: &'a Multihash,
-        dst_head: Option<&'a Multihash>,
+        src_head: &'a odf::Multihash,
+        dst_head: Option<&'a odf::Multihash>,
         validation: AppendValidation,
         trust_source_hashes: bool,
         listener: Arc<dyn SyncListener>,
+        transfer_options: SimpleProtocolTransferOptions,
         mut stats: SyncStats,
     ) -> Result<(), SyncError> {
         // Update stats estimates based on metadata
@@ -455,10 +484,7 @@ impl SimpleTransferProtocol {
 
         stream::iter(block_download_tasks)
             .map(Ok)
-            .try_for_each_concurrent(
-                SimpleProtocolTransferOptions::default().max_parallel_transfers,
-                |future| future,
-            )
+            .try_for_each_concurrent(transfer_options.max_parallel_transfers, |future| future)
             .await?;
 
         // Commit blocks

@@ -639,7 +639,8 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
 
                 let create_dataset_use_case =
                     self.catalog.get_one::<dyn CreateDatasetUseCase>().unwrap();
-                let alias = dst_alias.ok_or_else(|| "Dataset alias is unknown".int_err())?;
+                let alias =
+                    dst_alias.ok_or_else(|| "Destination dataset alias is unknown".int_err())?;
                 let create_result = create_dataset_use_case
                     .execute(
                         alias,
