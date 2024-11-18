@@ -79,7 +79,7 @@ kamu_cli_execute_command_e2e_test!(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 kamu_cli_execute_command_e2e_test!(
-    storage = inmem,
+    storage = sqlite,
     fixture = kamu_cli_e2e_repo_tests::commands::test_pull_reset_derivative_mt,
     options = Options::default()
         .with_multi_tenant()
@@ -92,7 +92,7 @@ kamu_cli_execute_command_e2e_test!(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 kamu_cli_execute_command_e2e_test!(
-    storage = inmem,
+    storage = sqlite,
     fixture = kamu_cli_e2e_repo_tests::commands::test_pull_derivative_st,
     options = Options::default().with_frozen_system_time(),
     extra_test_groups = "containerized, engine, ingest, transform, datafusion"
@@ -101,7 +101,7 @@ kamu_cli_execute_command_e2e_test!(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 kamu_cli_execute_command_e2e_test!(
-    storage = inmem,
+    storage = sqlite,
     fixture = kamu_cli_e2e_repo_tests::commands::test_pull_derivative_st,
     options = Options::default()
         .with_multi_tenant()
