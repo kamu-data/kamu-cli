@@ -13,6 +13,7 @@ use std::sync::Arc;
 
 use kamu::testing::{DummySmartTransferProtocolClient, MockDatasetActionAuthorizer};
 use kamu::utils::ipfs_wrapper::IpfsClient;
+use kamu::utils::simple_transfer_protocol::SimpleTransferProtocol;
 use kamu::*;
 use kamu_core::auth::{DatasetAction, DummyOdfServerAccessTokenResolver};
 use kamu_core::*;
@@ -362,6 +363,7 @@ impl PushUseCaseHarness {
             .bind::<dyn RemoteRepositoryRegistry, RemoteRepositoryRegistryImpl>()
             .add::<DummyOdfServerAccessTokenResolver>()
             .add::<DummySmartTransferProtocolClient>()
+            .add::<SimpleTransferProtocol>()
             .add_value(IpfsClient::default())
             .add_value(IpfsGateway::default())
             .build();

@@ -12,6 +12,7 @@ use std::path::Path;
 use dill::Component;
 use kamu::domain::*;
 use kamu::testing::*;
+use kamu::utils::simple_transfer_protocol::SimpleTransferProtocol;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
 use messaging_outbox::DummyOutboxImpl;
@@ -47,6 +48,7 @@ async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
         .add::<SyncServiceImpl>()
         .add::<SyncRequestBuilder>()
         .add::<DummySmartTransferProtocolClient>()
+        .add::<SimpleTransferProtocol>()
         .add::<SearchServiceImpl>()
         .add::<CreateDatasetUseCaseImpl>()
         .add::<DummyOutboxImpl>()

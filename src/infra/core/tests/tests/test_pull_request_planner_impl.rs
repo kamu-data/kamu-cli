@@ -15,8 +15,10 @@ use std::time::Duration;
 use kamu::domain::*;
 use kamu::testing::*;
 use kamu::utils::ipfs_wrapper::IpfsClient;
+use kamu::utils::simple_transfer_protocol::SimpleTransferProtocol;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
+use messaging_outbox::DummyOutboxImpl;
 use opendatafabric::*;
 use time_source::SystemTimeSourceDefault;
 
@@ -679,6 +681,9 @@ impl PullTestHarness {
             .add::<DatasetFactoryImpl>()
             .add::<auth::DummyOdfServerAccessTokenResolver>()
             .add::<DummySmartTransferProtocolClient>()
+            .add::<SimpleTransferProtocol>()
+            .add::<CreateDatasetUseCaseImpl>()
+            .add::<DummyOutboxImpl>()
             .add_value(IpfsClient::default())
             .add_value(IpfsGateway::default())
             .build();

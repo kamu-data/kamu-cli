@@ -15,6 +15,7 @@ use dill::Component;
 use kamu::domain::*;
 use kamu::testing::*;
 use kamu::utils::ipfs_wrapper::IpfsClient;
+use kamu::utils::simple_transfer_protocol::SimpleTransferProtocol;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
 use messaging_outbox::DummyOutboxImpl;
@@ -85,6 +86,7 @@ async fn do_test_sync(
         .add::<SyncServiceImpl>()
         .add::<SyncRequestBuilder>()
         .add::<DummySmartTransferProtocolClient>()
+        .add::<SimpleTransferProtocol>()
         .add::<CreateDatasetUseCaseImpl>()
         .add::<DummyOutboxImpl>()
         .build();
@@ -106,6 +108,7 @@ async fn do_test_sync(
         .add::<SyncServiceImpl>()
         .add::<SyncRequestBuilder>()
         .add::<DummySmartTransferProtocolClient>()
+        .add::<SimpleTransferProtocol>()
         .add::<CreateDatasetUseCaseImpl>()
         .add::<DummyOutboxImpl>()
         .build();

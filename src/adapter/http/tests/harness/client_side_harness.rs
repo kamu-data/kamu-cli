@@ -18,6 +18,7 @@ use dill::Component;
 use headers::Header;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu::domain::*;
+use kamu::utils::simple_transfer_protocol::SimpleTransferProtocol;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_adapter_http::{OdfSmtpVersion, SmartTransferProtocolClientWs};
@@ -124,6 +125,7 @@ impl ClientSideHarness {
         b.add::<DatasetFactoryImpl>();
 
         b.add::<SmartTransferProtocolClientWs>();
+        b.add::<SimpleTransferProtocol>();
 
         b.add::<SyncServiceImpl>();
         b.add::<SyncRequestBuilder>();
