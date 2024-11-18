@@ -13,7 +13,7 @@ use kamu_cli_e2e_common::prelude::*;
 
 kamu_cli_execute_command_e2e_test!(
     storage = postgres,
-    fixture = kamu_cli_e2e_repo_tests::test_compact_hard
+    fixture = kamu_cli_e2e_repo_tests::commands::test_compact_hard
     extra_test_groups = "engine, ingest, datafusion"
 );
 
@@ -21,7 +21,7 @@ kamu_cli_execute_command_e2e_test!(
 
 kamu_cli_execute_command_e2e_test!(
     storage = postgres,
-    fixture = kamu_cli_e2e_repo_tests::test_compact_keep_metadata_only
+    fixture = kamu_cli_e2e_repo_tests::commands::test_compact_keep_metadata_only
     extra_test_groups = "engine, ingest, datafusion"
 );
 
@@ -29,7 +29,7 @@ kamu_cli_execute_command_e2e_test!(
 
 kamu_cli_execute_command_e2e_test!(
     storage = postgres,
-    fixture = kamu_cli_e2e_repo_tests::test_compact_verify
+    fixture = kamu_cli_e2e_repo_tests::commands::test_compact_verify
     extra_test_groups = "engine, ingest, datafusion"
 );
 

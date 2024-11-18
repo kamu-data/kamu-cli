@@ -21,9 +21,56 @@ use kamu_cli_puppet::KamuCliPuppet;
 use opendatafabric::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// test_search_multi_user
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_search_multi_user(mut kamu_node_api_client: KamuApiServerClient) {
-    let kamu = KamuCliPuppet::new_workspace_tmp().await;
+pub async fn test_search_multi_user_st(kamu_node_api_client: KamuApiServerClient) {
+    test_search_multi_user(kamu_node_api_client, false).await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_search_multi_user_mt(kamu_node_api_client: KamuApiServerClient) {
+    test_search_multi_user(kamu_node_api_client, true).await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// test_search_by_name
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_search_by_name_st(kamu_node_api_client: KamuApiServerClient) {
+    test_search_by_name(kamu_node_api_client, false).await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_search_by_name_mt(kamu_node_api_client: KamuApiServerClient) {
+    test_search_by_name(kamu_node_api_client, true).await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// test_search_by_repo
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_search_by_repo_st(kamu_node_api_client: KamuApiServerClient) {
+    test_search_by_repo(kamu_node_api_client, false).await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_search_by_repo_mt(kamu_node_api_client: KamuApiServerClient) {
+    test_search_by_repo(kamu_node_api_client, true).await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Implementations
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+async fn test_search_multi_user(
+    mut kamu_node_api_client: KamuApiServerClient,
+    is_workspace_multi_tenant: bool,
+) {
+    let kamu = KamuCliPuppet::new_workspace_tmp(is_workspace_multi_tenant).await;
 
     add_repo_to_workspace(&kamu_node_api_client, &kamu, "kamu-node").await;
 
@@ -148,8 +195,11 @@ pub async fn test_search_multi_user(mut kamu_node_api_client: KamuApiServerClien
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_search_by_name(mut kamu_node_api_client: KamuApiServerClient) {
-    let kamu = KamuCliPuppet::new_workspace_tmp().await;
+async fn test_search_by_name(
+    mut kamu_node_api_client: KamuApiServerClient,
+    is_workspace_multi_tenant: bool,
+) {
+    let kamu = KamuCliPuppet::new_workspace_tmp(is_workspace_multi_tenant).await;
 
     add_repo_to_workspace(&kamu_node_api_client, &kamu, "kamu-node").await;
 
@@ -225,8 +275,11 @@ pub async fn test_search_by_name(mut kamu_node_api_client: KamuApiServerClient) 
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_search_by_repo(mut kamu_node_api_client: KamuApiServerClient) {
-    let kamu = KamuCliPuppet::new_workspace_tmp().await;
+async fn test_search_by_repo(
+    mut kamu_node_api_client: KamuApiServerClient,
+    is_workspace_multi_tenant: bool,
+) {
+    let kamu = KamuCliPuppet::new_workspace_tmp(is_workspace_multi_tenant).await;
 
     // As a test, add two repos pointing to the same node
     add_repo_to_workspace(&kamu_node_api_client, &kamu, "kamu-node").await;

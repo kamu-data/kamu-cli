@@ -13,35 +13,35 @@ use kamu_cli_e2e_common::prelude::*;
 
 kamu_cli_execute_command_e2e_test!(
     storage = postgres,
-    fixture = kamu_cli_e2e_repo_tests::test_add_dataset_from_stdin
+    fixture = kamu_cli_e2e_repo_tests::commands::test_add_dataset_from_stdin
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 kamu_cli_execute_command_e2e_test!(
     storage = postgres,
-    fixture = kamu_cli_e2e_repo_tests::test_add_dataset_with_name
+    fixture = kamu_cli_e2e_repo_tests::commands::test_add_dataset_with_name
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 kamu_cli_execute_command_e2e_test!(
     storage = postgres,
-    fixture = kamu_cli_e2e_repo_tests::test_add_dataset_with_replace
+    fixture = kamu_cli_e2e_repo_tests::commands::test_add_dataset_with_replace
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 kamu_cli_execute_command_e2e_test!(
     storage = postgres,
-    fixture = kamu_cli_e2e_repo_tests::test_add_recursive
+    fixture = kamu_cli_e2e_repo_tests::commands::test_add_recursive
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 kamu_cli_execute_command_e2e_test!(
     storage = postgres,
-    fixture = kamu_cli_e2e_repo_tests::test_add_with_circular_dependency
+    fixture = kamu_cli_e2e_repo_tests::commands::test_add_with_circular_dependency
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

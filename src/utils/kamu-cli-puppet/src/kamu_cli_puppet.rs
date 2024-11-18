@@ -35,8 +35,12 @@ impl KamuCliPuppet {
         }
     }
 
-    pub async fn new_workspace_tmp() -> Self {
-        Self::new_workspace_tmp_inner(NewWorkspaceOptions::default()).await
+    pub async fn new_workspace_tmp(is_multi_tenant: bool) -> Self {
+        Self::new_workspace_tmp_inner(NewWorkspaceOptions {
+            is_multi_tenant,
+            ..Default::default()
+        })
+        .await
     }
 
     pub async fn new_workspace_tmp_with(options: NewWorkspaceOptions) -> Self {

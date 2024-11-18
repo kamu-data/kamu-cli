@@ -13,7 +13,7 @@ use kamu_cli_e2e_common::prelude::*;
 
 kamu_cli_execute_command_e2e_test!(
     storage = postgres,
-    fixture = kamu_cli_e2e_repo_tests::test_push_ingest_from_file_ledger,
+    fixture = kamu_cli_e2e_repo_tests::commands::test_push_ingest_from_file_ledger,
     options = Options::default().with_frozen_system_time(),
     extra_test_groups = "engine, ingest, datafusion"
 );
@@ -22,7 +22,8 @@ kamu_cli_execute_command_e2e_test!(
 
 kamu_cli_execute_command_e2e_test!(
     storage = postgres,
-    fixture = kamu_cli_e2e_repo_tests::test_push_ingest_from_file_snapshot_with_event_time,
+    fixture =
+        kamu_cli_e2e_repo_tests::commands::test_push_ingest_from_file_snapshot_with_event_time,
     options = Options::default().with_frozen_system_time(),
     extra_test_groups = "engine, ingest, datafusion"
 );
@@ -31,7 +32,7 @@ kamu_cli_execute_command_e2e_test!(
 
 kamu_cli_execute_command_e2e_test!(
     storage = postgres,
-    fixture = kamu_cli_e2e_repo_tests::test_ingest_from_stdin,
+    fixture = kamu_cli_e2e_repo_tests::commands::test_ingest_from_stdin,
     options = Options::default().with_frozen_system_time(),
     extra_test_groups = "engine, ingest, datafusion"
 );
@@ -40,7 +41,7 @@ kamu_cli_execute_command_e2e_test!(
 
 kamu_cli_execute_command_e2e_test!(
     storage = postgres,
-    fixture = kamu_cli_e2e_repo_tests::test_ingest_recursive,
+    fixture = kamu_cli_e2e_repo_tests::commands::test_ingest_recursive,
     options = Options::default().with_frozen_system_time(),
     extra_test_groups = "engine, ingest, datafusion"
 );
@@ -49,7 +50,7 @@ kamu_cli_execute_command_e2e_test!(
 
 kamu_cli_execute_command_e2e_test!(
     storage = postgres,
-    fixture = kamu_cli_e2e_repo_tests::test_ingest_with_source_name,
+    fixture = kamu_cli_e2e_repo_tests::commands::test_ingest_with_source_name,
     options = Options::default().with_frozen_system_time(),
     extra_test_groups = "engine, ingest, datafusion"
 );

@@ -13,21 +13,21 @@ use kamu_cli_e2e_common::prelude::*;
 
 kamu_cli_execute_command_e2e_test!(
     storage = sqlite,
-    fixture = kamu_cli_e2e_repo_tests::test_delete_dataset
+    fixture = kamu_cli_e2e_repo_tests::commands::test_delete_dataset
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 kamu_cli_execute_command_e2e_test!(
     storage = sqlite,
-    fixture = kamu_cli_e2e_repo_tests::test_delete_dataset_recursive
+    fixture = kamu_cli_e2e_repo_tests::commands::test_delete_dataset_recursive
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 kamu_cli_execute_command_e2e_test!(
     storage = sqlite,
-    fixture = kamu_cli_e2e_repo_tests::test_delete_dataset_all
+    fixture = kamu_cli_e2e_repo_tests::commands::test_delete_dataset_all
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -10,13 +10,12 @@
 use kamu_cli_e2e_common::prelude::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// test_smart_push_smart_pull_sequence
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 kamu_cli_run_api_server_e2e_test!(
     storage = sqlite,
-    fixture = kamu_cli_e2e_repo_tests::test_smart_push_pull_sequence,
-    // We need synthetic time for the tests, but the third-party JWT code
-    // uses the current time. Assuming that the token lifetime is 24 hours, we will
-    // use the projected date (the current day) as a workaround.
+    fixture = kamu_cli_e2e_repo_tests::test_smart_push_smart_pull_sequence_st_st,
     options = Options::default()
         .with_multi_tenant()
         .with_today_as_frozen_system_time(),
@@ -27,7 +26,7 @@ kamu_cli_run_api_server_e2e_test!(
 
 kamu_cli_run_api_server_e2e_test!(
     storage = sqlite,
-    fixture = kamu_cli_e2e_repo_tests::test_smart_force_push_pull,
+    fixture = kamu_cli_e2e_repo_tests::test_smart_push_smart_pull_sequence_st_mt,
     options = Options::default()
         .with_multi_tenant()
         .with_today_as_frozen_system_time(),
@@ -38,7 +37,7 @@ kamu_cli_run_api_server_e2e_test!(
 
 kamu_cli_run_api_server_e2e_test!(
     storage = sqlite,
-    fixture = kamu_cli_e2e_repo_tests::test_smart_push_pull_add_alias,
+    fixture = kamu_cli_e2e_repo_tests::test_smart_push_smart_pull_sequence_mt_st,
     options = Options::default()
         .with_multi_tenant()
         .with_today_as_frozen_system_time(),
@@ -49,7 +48,20 @@ kamu_cli_run_api_server_e2e_test!(
 
 kamu_cli_run_api_server_e2e_test!(
     storage = sqlite,
-    fixture = kamu_cli_e2e_repo_tests::test_smart_pull_as,
+    fixture = kamu_cli_e2e_repo_tests::test_smart_push_smart_pull_sequence_mt_mt,
+    options = Options::default()
+        .with_multi_tenant()
+        .with_today_as_frozen_system_time(),
+    extra_test_groups = "engine, ingest, datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// test_smart_push_force_smart_pull_force
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_run_api_server_e2e_test!(
+    storage = sqlite,
+    fixture = kamu_cli_e2e_repo_tests::test_smart_push_force_smart_pull_force_st_st,
     options = Options::default()
         .with_multi_tenant()
         .with_today_as_frozen_system_time(),
@@ -60,7 +72,112 @@ kamu_cli_run_api_server_e2e_test!(
 
 kamu_cli_run_api_server_e2e_test!(
     storage = sqlite,
-    fixture = kamu_cli_e2e_repo_tests::test_smart_push_pull_all,
+    fixture = kamu_cli_e2e_repo_tests::test_smart_push_force_smart_pull_force_st_mt,
+    options = Options::default()
+        .with_multi_tenant()
+        .with_today_as_frozen_system_time(),
+    extra_test_groups = "engine, ingest, datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_run_api_server_e2e_test!(
+    storage = sqlite,
+    fixture = kamu_cli_e2e_repo_tests::test_smart_push_force_smart_pull_force_mt_st,
+    options = Options::default()
+        .with_multi_tenant()
+        .with_today_as_frozen_system_time(),
+    extra_test_groups = "engine, ingest, datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_run_api_server_e2e_test!(
+    storage = sqlite,
+    fixture = kamu_cli_e2e_repo_tests::test_smart_push_force_smart_pull_force_mt_mt,
+    options = Options::default()
+        .with_multi_tenant()
+        .with_today_as_frozen_system_time(),
+    extra_test_groups = "engine, ingest, datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// test_smart_push_no_alias_smart_pull_no_alias
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_run_api_server_e2e_test!(
+    storage = sqlite,
+    fixture = kamu_cli_e2e_repo_tests::test_smart_push_no_alias_smart_pull_no_alias_st_st,
+    options = Options::default()
+        .with_multi_tenant()
+        .with_today_as_frozen_system_time(),
+    extra_test_groups = "engine, ingest, datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_run_api_server_e2e_test!(
+    storage = sqlite,
+    fixture = kamu_cli_e2e_repo_tests::test_smart_push_no_alias_smart_pull_no_alias_st_mt,
+    options = Options::default()
+        .with_multi_tenant()
+        .with_today_as_frozen_system_time(),
+    extra_test_groups = "engine, ingest, datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_run_api_server_e2e_test!(
+    storage = sqlite,
+    fixture = kamu_cli_e2e_repo_tests::test_smart_push_no_alias_smart_pull_no_alias_mt_st,
+    options = Options::default()
+        .with_multi_tenant()
+        .with_today_as_frozen_system_time(),
+    extra_test_groups = "engine, ingest, datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_run_api_server_e2e_test!(
+    storage = sqlite,
+    fixture = kamu_cli_e2e_repo_tests::test_smart_push_no_alias_smart_pull_no_alias_mt_mt,
+    options = Options::default()
+        .with_multi_tenant()
+        .with_today_as_frozen_system_time(),
+    extra_test_groups = "engine, ingest, datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// test_smart_pull_as
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_run_api_server_e2e_test!(
+    storage = sqlite,
+    fixture = kamu_cli_e2e_repo_tests::test_smart_pull_as_st,
+    options = Options::default()
+        .with_multi_tenant()
+        .with_today_as_frozen_system_time(),
+    extra_test_groups = "engine, ingest, datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_run_api_server_e2e_test!(
+    storage = sqlite,
+    fixture = kamu_cli_e2e_repo_tests::test_smart_pull_as_mt,
+    options = Options::default()
+        .with_multi_tenant()
+        .with_today_as_frozen_system_time(),
+    extra_test_groups = "engine, ingest, datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// test_smart_push_all_smart_pull_all
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_run_api_server_e2e_test!(
+    storage = sqlite,
+    fixture = kamu_cli_e2e_repo_tests::test_smart_push_all_smart_pull_all_st_st,
     options = Options::default()
         .with_multi_tenant()
         .with_today_as_frozen_system_time(),
@@ -71,7 +188,7 @@ kamu_cli_run_api_server_e2e_test!(
 
 kamu_cli_run_api_server_e2e_test!(
     storage = sqlite,
-    fixture = kamu_cli_e2e_repo_tests::test_smart_push_pull_recursive,
+    fixture = kamu_cli_e2e_repo_tests::test_smart_push_all_smart_pull_all_st_mt,
     options = Options::default()
         .with_multi_tenant()
         .with_today_as_frozen_system_time(),
@@ -80,18 +197,12 @@ kamu_cli_run_api_server_e2e_test!(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-kamu_cli_execute_command_e2e_test!(
+kamu_cli_run_api_server_e2e_test!(
     storage = sqlite,
-    fixture = kamu_cli_e2e_repo_tests::test_smart_pull_set_watermark,
-    options = Options::default().with_frozen_system_time(),
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-kamu_cli_execute_command_e2e_test!(
-    storage = sqlite,
-    fixture = kamu_cli_e2e_repo_tests::test_smart_pull_reset_derivative,
-    options = Options::default().with_frozen_system_time(),
+    fixture = kamu_cli_e2e_repo_tests::test_smart_push_all_smart_pull_all_mt_st,
+    options = Options::default()
+        .with_multi_tenant()
+        .with_today_as_frozen_system_time(),
     extra_test_groups = "containerized, engine, ingest, transform, datafusion"
 );
 
@@ -99,7 +210,66 @@ kamu_cli_execute_command_e2e_test!(
 
 kamu_cli_run_api_server_e2e_test!(
     storage = sqlite,
-    fixture = kamu_cli_e2e_repo_tests::test_smart_push_visibility,
+    fixture = kamu_cli_e2e_repo_tests::test_smart_push_all_smart_pull_all_mt_mt,
+    options = Options::default()
+        .with_multi_tenant()
+        .with_today_as_frozen_system_time(),
+    extra_test_groups = "containerized, engine, ingest, transform, datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// test_smart_push_recursive_smart_pull_recursive
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_run_api_server_e2e_test!(
+    storage = sqlite,
+    fixture = kamu_cli_e2e_repo_tests::test_smart_push_recursive_smart_pull_recursive_st_st,
+    options = Options::default()
+        .with_multi_tenant()
+        .with_today_as_frozen_system_time(),
+    extra_test_groups = "containerized, engine, ingest, transform, datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_run_api_server_e2e_test!(
+    storage = sqlite,
+    fixture = kamu_cli_e2e_repo_tests::test_smart_push_recursive_smart_pull_recursive_st_mt,
+    options = Options::default()
+        .with_multi_tenant()
+        .with_today_as_frozen_system_time(),
+    extra_test_groups = "containerized, engine, ingest, transform, datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_run_api_server_e2e_test!(
+    storage = sqlite,
+    fixture = kamu_cli_e2e_repo_tests::test_smart_push_recursive_smart_pull_recursive_mt_st,
+    options = Options::default()
+        .with_multi_tenant()
+        .with_today_as_frozen_system_time(),
+    extra_test_groups = "containerized, engine, ingest, transform, datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_run_api_server_e2e_test!(
+    storage = sqlite,
+    fixture = kamu_cli_e2e_repo_tests::test_smart_push_recursive_smart_pull_recursive_mt_mt,
+    options = Options::default()
+        .with_multi_tenant()
+        .with_today_as_frozen_system_time(),
+    extra_test_groups = "containerized, engine, ingest, transform, datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// test_smart_push_visibility
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_run_api_server_e2e_test!(
+    storage = sqlite,
+    fixture = kamu_cli_e2e_repo_tests::test_smart_push_visibility_st,
     options = Options::default()
         .with_multi_tenant()
         .with_today_as_frozen_system_time(),
@@ -108,9 +278,22 @@ kamu_cli_run_api_server_e2e_test!(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+kamu_cli_run_api_server_e2e_test!(
+    storage = sqlite,
+    fixture = kamu_cli_e2e_repo_tests::test_smart_push_visibility_mt,
+    options = Options::default()
+        .with_multi_tenant()
+        .with_today_as_frozen_system_time(),
+    extra_test_groups = "engine, ingest, datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// test_simple_push_to_s3_smart_pull
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 kamu_cli_execute_command_e2e_test!(
     storage = sqlite,
-    fixture = kamu_cli_e2e_repo_tests::test_smart_push_pull_s3,
+    fixture = kamu_cli_e2e_repo_tests::test_simple_push_to_s3_smart_pull_st_st,
     options = Options::default().with_frozen_system_time(),
     extra_test_groups = "containerized, engine, ingest, datafusion"
 );
@@ -119,31 +302,77 @@ kamu_cli_execute_command_e2e_test!(
 
 kamu_cli_execute_command_e2e_test!(
     storage = sqlite,
-    fixture = kamu_cli_e2e_repo_tests::test_smart_pull_derivative,
+    fixture = kamu_cli_e2e_repo_tests::test_simple_push_to_s3_smart_pull_st_mt,
     options = Options::default().with_frozen_system_time(),
-    extra_test_groups = "containerized, engine, ingest, transform, datafusion"
+    extra_test_groups = "containerized, engine, ingest, datafusion"
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-kamu_cli_run_api_server_e2e_test!(
+kamu_cli_execute_command_e2e_test!(
     storage = sqlite,
-    fixture = kamu_cli_e2e_repo_tests::test_smart_push_from_registered_repo,
-    options = Options::default()
-        .with_multi_tenant()
-        .with_today_as_frozen_system_time(),
-    extra_test_groups = "engine, ingest, datafusion"
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-kamu_cli_run_api_server_e2e_test!(
-    storage = sqlite,
-    fixture = kamu_cli_e2e_repo_tests::test_pull_mt,
+    fixture = kamu_cli_e2e_repo_tests::test_simple_push_to_s3_smart_pull_mt_st,
     options = Options::default()
         .with_multi_tenant()
         .with_frozen_system_time(),
     extra_test_groups = "containerized, engine, ingest, datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_execute_command_e2e_test!(
+    storage = sqlite,
+    fixture = kamu_cli_e2e_repo_tests::test_simple_push_to_s3_smart_pull_mt_mt,
+    options = Options::default()
+        .with_multi_tenant()
+        .with_frozen_system_time(),
+    extra_test_groups = "containerized, engine, ingest, datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// test_smart_push_to_registered_repo_smart_pull
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_run_api_server_e2e_test!(
+    storage = sqlite,
+    fixture = kamu_cli_e2e_repo_tests::test_smart_push_to_registered_repo_smart_pull_st_st,
+    options = Options::default()
+        .with_multi_tenant()
+        .with_today_as_frozen_system_time(),
+    extra_test_groups = "engine, ingest, datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_run_api_server_e2e_test!(
+    storage = sqlite,
+    fixture = kamu_cli_e2e_repo_tests::test_smart_push_to_registered_repo_smart_pull_st_mt,
+    options = Options::default()
+        .with_multi_tenant()
+        .with_today_as_frozen_system_time(),
+    extra_test_groups = "engine, ingest, datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_run_api_server_e2e_test!(
+    storage = sqlite,
+    fixture = kamu_cli_e2e_repo_tests::test_smart_push_to_registered_repo_smart_pull_mt_st,
+    options = Options::default()
+        .with_multi_tenant()
+        .with_today_as_frozen_system_time(),
+    extra_test_groups = "engine, ingest, datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_run_api_server_e2e_test!(
+    storage = sqlite,
+    fixture = kamu_cli_e2e_repo_tests::test_smart_push_to_registered_repo_smart_pull_mt_mt,
+    options = Options::default()
+        .with_multi_tenant()
+        .with_today_as_frozen_system_time(),
+    extra_test_groups = "engine, ingest, datafusion"
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

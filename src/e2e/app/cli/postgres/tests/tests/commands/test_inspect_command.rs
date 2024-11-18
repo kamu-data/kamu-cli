@@ -13,14 +13,14 @@ use kamu_cli_e2e_common::prelude::*;
 
 kamu_cli_execute_command_e2e_test!(
     storage = postgres,
-    fixture = kamu_cli_e2e_repo_tests::test_inspect_lineage,
+    fixture = kamu_cli_e2e_repo_tests::commands::test_inspect_lineage,
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 kamu_cli_execute_command_e2e_test!(
     storage = postgres,
-    fixture = kamu_cli_e2e_repo_tests::test_inspect_query,
+    fixture = kamu_cli_e2e_repo_tests::commands::test_inspect_query,
     options = Options::default().with_frozen_system_time()
 );
 
@@ -28,7 +28,7 @@ kamu_cli_execute_command_e2e_test!(
 
 kamu_cli_execute_command_e2e_test!(
     storage = postgres,
-    fixture = kamu_cli_e2e_repo_tests::test_inspect_schema,
+    fixture = kamu_cli_e2e_repo_tests::commands::test_inspect_schema,
     extra_test_groups = "engine, ingest, datafusion"
 );
 

@@ -14,18 +14,9 @@ use std::path::PathBuf;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use datafusion::prelude::{ParquetReadOptions, SessionContext};
+use opendatafabric as odf;
 use opendatafabric::serde::yaml::{YamlDatasetSnapshotSerializer, YamlMetadataBlockDeserializer};
 use opendatafabric::serde::{DatasetSnapshotSerializer, MetadataBlockDeserializer};
-use opendatafabric::{
-    DatasetAlias,
-    DatasetID,
-    DatasetName,
-    DatasetRef,
-    DatasetSnapshot,
-    MetadataBlock,
-    Multihash,
-    RepoName,
-};
 use serde::Deserialize;
 
 use crate::{ExecuteCommandResult, KamuCliPuppet};
@@ -86,13 +77,13 @@ pub trait KamuCliPuppetExt {
 
     async fn list_datasets(&self) -> Vec<DatasetRecord>;
 
-    async fn add_dataset(&self, dataset_snapshot: DatasetSnapshot);
+    async fn add_dataset(&self, dataset_snapshot: odf::DatasetSnapshot);
 
-    async fn list_blocks(&self, dataset_name: &DatasetName) -> Vec<BlockRecord>;
+    async fn list_blocks(&self, dataset_name: &odf::DatasetName) -> Vec<BlockRecord>;
 
-    async fn ingest_data(&self, dataset_name: &DatasetName, data: &str);
+    async fn ingest_data(&self, dataset_name: &odf::DatasetName, data: &str);
 
-    async fn get_list_of_repo_aliases(&self, dataset_ref: &DatasetRef) -> Vec<RepoAlias>;
+    async fn get_list_of_repo_aliases(&self, dataset_ref: &odf::DatasetRef) -> Vec<RepoAlias>;
 
     async fn get_list_of_repos(&self) -> Vec<RepoRecord>;
 
@@ -106,7 +97,7 @@ pub trait KamuCliPuppetExt {
 
     async fn assert_last_data_slice(
         &self,
-        dataset_alias: &DatasetAlias,
+        dataset_alias: &odf::DatasetAlias,
         expected_schema: &str,
         expected_data: &str,
     );
@@ -127,7 +118,7 @@ impl KamuCliPuppetExt for KamuCliPuppet {
         serde_json::from_str(stdout).unwrap()
     }
 
-    async fn add_dataset(&self, dataset_snapshot: DatasetSnapshot) {
+    async fn add_dataset(&self, dataset_snapshot: odf::DatasetSnapshot) {
         let content = YamlDatasetSnapshotSerializer
             .write_manifest(&dataset_snapshot)
             .unwrap();
@@ -142,7 +133,7 @@ impl KamuCliPuppetExt for KamuCliPuppet {
             .success();
     }
 
-    async fn get_list_of_repo_aliases(&self, dataset_ref: &DatasetRef) -> Vec<RepoAlias> {
+    async fn get_list_of_repo_aliases(&self, dataset_ref: &odf::DatasetRef) -> Vec<RepoAlias> {
         let assert = self
             .execute([
                 "repo",
@@ -189,7 +180,7 @@ impl KamuCliPuppetExt for KamuCliPuppet {
         stdout.lines().map(ToString::to_string).collect()
     }
 
-    async fn list_blocks(&self, dataset_name: &DatasetName) -> Vec<BlockRecord> {
+    async fn list_blocks(&self, dataset_name: &odf::DatasetName) -> Vec<BlockRecord> {
         let assert = self
             .execute(["log", dataset_name.as_str(), "--output-format", "yaml"])
             .await
@@ -219,7 +210,7 @@ impl KamuCliPuppetExt for KamuCliPuppet {
                     .unwrap();
 
                 BlockRecord {
-                    block_hash: Multihash::from_multibase(block_hash).unwrap(),
+                    block_hash: odf::Multihash::from_multibase(block_hash).unwrap(),
                     block,
                 }
             })
@@ -282,7 +273,7 @@ impl KamuCliPuppetExt for KamuCliPuppet {
 
     async fn assert_last_data_slice(
         &self,
-        dataset_alias: &DatasetAlias,
+        dataset_alias: &odf::DatasetAlias,
         expected_schema: &str,
         expected_data: &str,
     ) {
@@ -321,7 +312,7 @@ impl KamuCliPuppetExt for KamuCliPuppet {
         kamu_data_utils::testing::assert_schema_eq(df.schema(), expected_schema);
     }
 
-    async fn ingest_data(&self, dataset_name: &DatasetName, data: &str) {
+    async fn ingest_data(&self, dataset_name: &odf::DatasetName, data: &str) {
         self.execute_with_input(["ingest", dataset_name, "--stdin"], data)
             .await
             .success();
@@ -426,12 +417,12 @@ pub struct ServerOutput {
 #[serde(rename_all = "PascalCase", deny_unknown_fields)]
 pub struct DatasetRecord {
     #[serde(rename = "ID")]
-    pub id: DatasetID,
-    pub name: DatasetName,
+    pub id: odf::DatasetID,
+    pub name: odf::DatasetName,
     // CLI returns regular ENUM DatasetKind(Root/Derivative) for local datasets
     // but for remote it is Remote(DatasetKind) type
     pub kind: String,
-    pub head: Multihash,
+    pub head: odf::Multihash,
     pub pulled: Option<DateTime<Utc>>,
     pub records: usize,
     pub blocks: usize,
@@ -442,21 +433,21 @@ pub struct DatasetRecord {
 #[derive(Debug, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "PascalCase", deny_unknown_fields)]
 pub struct RepoAlias {
-    pub dataset: DatasetName,
+    pub dataset: odf::DatasetAlias,
     pub kind: String,
     pub alias: String,
 }
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct BlockRecord {
-    pub block_hash: Multihash,
-    pub block: MetadataBlock,
+    pub block_hash: odf::Multihash,
+    pub block: odf::MetadataBlock,
 }
 
 #[derive(Debug, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "PascalCase", deny_unknown_fields)]
 pub struct RepoRecord {
-    pub name: RepoName,
+    pub name: odf::RepoName,
     pub url: url::Url,
 }
 
