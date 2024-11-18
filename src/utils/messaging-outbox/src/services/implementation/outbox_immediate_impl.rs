@@ -64,7 +64,7 @@ impl Outbox for OutboxImmediateImpl {
                     error_msg = %e,
                     producer_name,
                     ?content_json,
-                    "Immediate outbox message dispatching faioed"
+                    "Immediate outbox message dispatching failed"
                 );
             }
         }

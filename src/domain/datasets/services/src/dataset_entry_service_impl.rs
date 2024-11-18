@@ -114,7 +114,7 @@ impl DatasetEntryServiceImpl {
         }: &DatasetLifecycleMessageCreated,
     ) -> Result<(), InternalError> {
         match self.dataset_entry_repo.get_dataset_entry(dataset_id).await {
-            Ok(_) => return Ok(()), // idemponent handling of duplicates
+            Ok(_) => return Ok(()), // idempotent handling of duplicates
             Err(GetDatasetEntryError::NotFound(_)) => { /* happy case, create record */ }
             Err(GetDatasetEntryError::Internal(e)) => return Err(e),
         }

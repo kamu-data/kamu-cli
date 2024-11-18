@@ -16,7 +16,8 @@ use headers::Header;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu::utils::smart_transfer_protocol::{SmartTransferProtocolClient, TransferOptions};
 use kamu_core::*;
-use opendatafabric::{AsTypedBlock, Multihash};
+use odf::AsTypedBlock;
+use opendatafabric as odf;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use tokio::net::TcpStream;
@@ -57,7 +58,7 @@ impl WsSmartTransferProtocolClient {
     async fn pull_send_request(
         &self,
         socket: &mut TungsteniteStream,
-        dst_head: Option<Multihash>,
+        dst_head: Option<odf::Multihash>,
         force_update_if_diverged: bool,
     ) -> Result<DatasetPullSuccessResponse, PullClientError> {
         let pull_request_message = DatasetPullRequest {
@@ -194,7 +195,7 @@ impl WsSmartTransferProtocolClient {
         &self,
         socket: &mut TungsteniteStream,
         transfer_plan: TransferPlan,
-        dst_head: Option<&Multihash>,
+        dst_head: Option<&odf::Multihash>,
         force_update_if_diverged: bool,
         visibility_for_created_dataset: DatasetVisibility,
     ) -> Result<DatasetPushRequestAccepted, PushClientError> {
@@ -246,8 +247,8 @@ impl WsSmartTransferProtocolClient {
         &self,
         socket: &mut TungsteniteStream,
         src_dataset: &dyn Dataset,
-        src_head: &Multihash,
-        dst_head: Option<&Multihash>,
+        src_head: &odf::Multihash,
+        dst_head: Option<&odf::Multihash>,
         force_update_if_diverged: bool,
     ) -> Result<DatasetPushMetadataAccepted, PushClientError> {
         tracing::debug!("Sending push metadata request");
@@ -514,7 +515,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
         &self,
         http_src_url: &Url,
         dst: Option<Arc<dyn Dataset>>,
-        dst_factory: Option<DatasetFactoryFn>,
+        dst_alias: Option<&odf::DatasetAlias>,
         listener: Arc<dyn SyncListener>,
         transfer_options: TransferOptions,
     ) -> Result<(SyncResult, Arc<dyn Dataset>), SyncError> {
@@ -635,7 +636,20 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
                         message: "First metadata block is not Seed".to_owned(),
                         source: None,
                     })?;
-                let create_result = dst_factory.unwrap()(seed_block).await.int_err()?;
+
+                let create_dataset_use_case =
+                    self.catalog.get_one::<dyn CreateDatasetUseCase>().unwrap();
+                let alias = dst_alias.ok_or_else(|| "Dataset alias is unknown".int_err())?;
+                let create_result = create_dataset_use_case
+                    .execute(
+                        alias,
+                        seed_block,
+                        CreateDatasetUseCaseOptions {
+                            dataset_visibility: transfer_options.visibility_for_created_dataset,
+                        },
+                    )
+                    .await
+                    .int_err()?;
                 assert_eq!(first_hash, create_result.head);
                 create_result.dataset
             };
@@ -738,7 +752,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
         &self,
         src: Arc<dyn Dataset>,
         http_dst_url: &Url,
-        dst_head: Option<&Multihash>,
+        dst_head: Option<&odf::Multihash>,
         listener: Arc<dyn SyncListener>,
         transfer_options: TransferOptions,
     ) -> Result<(SyncResult, Arc<dyn Dataset>), SyncError> {

@@ -17,7 +17,7 @@ use kamu_core::{
     SyncListener,
     SyncResult,
 };
-use opendatafabric::Multihash;
+use opendatafabric as odf;
 use url::Url;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -54,7 +54,7 @@ pub trait SmartTransferProtocolClient: Sync + Send {
         &self,
         http_src_url: &Url,
         dst: Option<Arc<dyn Dataset>>,
-        dst_factory: Option<DatasetFactoryFn>,
+        dst_alias: Option<&odf::DatasetAlias>,
         listener: Arc<dyn SyncListener>,
         transfer_options: TransferOptions,
     ) -> Result<(SyncResult, Arc<dyn Dataset>), SyncError>;
@@ -63,7 +63,7 @@ pub trait SmartTransferProtocolClient: Sync + Send {
         &self,
         src: Arc<dyn Dataset>,
         http_dst_url: &Url,
-        dst_head: Option<&Multihash>,
+        dst_head: Option<&odf::Multihash>,
         listener: Arc<dyn SyncListener>,
         transfer_options: TransferOptions,
     ) -> Result<(SyncResult, Arc<dyn Dataset>), SyncError>;

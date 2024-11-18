@@ -159,7 +159,7 @@ impl PullDatasetUseCaseImpl {
         Ok(results)
     }
 
-    #[tracing::instrument(level = "debug", name = "PullDatasetUsecase::write_authorizations", skip_all, fields(?iteration))]
+    #[tracing::instrument(level = "debug", name = "PullDatasetUseCase::write_authorizations", skip_all, fields(?iteration))]
     async fn make_authorization_write_checks(
         &self,
         iteration: PullPlanIteration,
@@ -221,7 +221,7 @@ impl PullDatasetUseCaseImpl {
         ))
     }
 
-    #[tracing::instrument(level = "debug", name = "PullDatasetUsecase::read_authoirzations", skip_all, fields(?iteration))]
+    #[tracing::instrument(level = "debug", name = "PullDatasetUseCase::read_authoirzations", skip_all, fields(?iteration))]
     async fn make_authorization_read_checks(
         &self,
         iteration: PullPlanIteration,
@@ -357,7 +357,7 @@ impl PullDatasetUseCaseImpl {
                 )
                 .await
             {
-                // Elaborate succeess
+                // Elaborate success
                 Ok(TransformElaboration::Elaborated(plan)) => {
                     // Execute phase
                     let (target, result) = transform_execution_svc
@@ -370,7 +370,7 @@ impl PullDatasetUseCaseImpl {
                 }
                 // Already up-to-date
                 Ok(TransformElaboration::UpToDate) => (pti.target, Ok(TransformResult::UpToDate)),
-                // Elab error
+                // Elaborate error
                 Err(e) => (
                     pti.target,
                     Err(PullError::TransformError(TransformError::Elaborate(e))),

@@ -98,14 +98,20 @@ impl SyncServiceImpl {
 
         tracing::info!("Starting sync using Smart Transfer Protocol (Pull flow)");
 
+        let maybe_dataset_alias = match &dst.sync_ref {
+            SyncRef::Local(l) => l.alias(),
+            SyncRef::Remote(_) => None,
+        };
+
         self.smart_transfer_protocol
             .pull_protocol_client_flow(
                 &http_src_url,
                 dst.maybe_dataset,
-                dst.maybe_dataset_factory,
+                maybe_dataset_alias,
                 listener,
                 TransferOptions {
                     force_update_if_diverged: opts.force,
+                    visibility_for_created_dataset: opts.dataset_visibility,
                     ..Default::default()
                 },
             )
