@@ -13,7 +13,7 @@ use std::sync::Arc;
 
 use dill::*;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
-use kamu_accounts::{CurrentAccountSubject, DEFAULT_ACCOUNT_NAME_STR};
+use kamu_accounts::CurrentAccountSubject;
 use kamu_core::auth::*;
 use kamu_core::AccessError;
 use opendatafabric::DatasetHandle;
@@ -57,10 +57,14 @@ impl OsoDatasetAuthorizer {
 
     fn dataset_resource(&self, dataset_handle: &DatasetHandle) -> DatasetResource {
         let dataset_alias = &dataset_handle.alias;
-        let creator = dataset_alias
-            .account_name
-            .as_ref()
-            .map_or(DEFAULT_ACCOUNT_NAME_STR, |a| a.as_str());
+        let creator = dataset_alias.account_name.as_ref().map_or_else(
+            || {
+                self.current_account_subject
+                    .account_name_or_default()
+                    .as_str()
+            },
+            |a| a.as_str(),
+        );
 
         // TODO: for now let's treat all datasets as public
         // TODO: explicit read/write permissions

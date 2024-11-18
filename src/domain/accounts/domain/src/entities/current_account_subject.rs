@@ -64,6 +64,13 @@ impl CurrentAccountSubject {
             CurrentAccountSubject::Logged(l) => &l.account_name,
         }
     }
+
+    pub fn account_name_or_default(&self) -> &AccountName {
+        match self {
+            CurrentAccountSubject::Logged(l) => &l.account_name,
+            CurrentAccountSubject::Anonymous(_) => &DEFAULT_ACCOUNT_NAME,
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

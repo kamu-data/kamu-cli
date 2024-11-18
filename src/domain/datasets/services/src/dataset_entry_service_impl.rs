@@ -13,7 +13,7 @@ use std::sync::{Arc, Mutex};
 use database_common::PaginationOpts;
 use dill::{component, interface, meta, Catalog};
 use internal_error::{InternalError, ResultIntoInternal};
-use kamu_accounts::{AccountRepository, DEFAULT_ACCOUNT_NAME};
+use kamu_accounts::{AccountRepository, CurrentAccountSubject};
 use kamu_core::{
     Dataset,
     DatasetHandleStream,
@@ -57,6 +57,7 @@ pub struct DatasetEntryServiceImpl {
     dataset_entry_repo: Arc<dyn DatasetEntryRepository>,
     dataset_repo: Arc<dyn DatasetRepository>,
     account_repo: Arc<dyn AccountRepository>,
+    current_account_subject: Arc<CurrentAccountSubject>,
     tenancy_config: Arc<TenancyConfig>,
     accounts_cache: Arc<Mutex<AccountsCache>>,
 }
@@ -89,6 +90,7 @@ impl DatasetEntryServiceImpl {
         dataset_entry_repo: Arc<dyn DatasetEntryRepository>,
         dataset_repo: Arc<dyn DatasetRepository>,
         account_repo: Arc<dyn AccountRepository>,
+        current_account_subject: Arc<CurrentAccountSubject>,
         tenancy_config: Arc<TenancyConfig>,
     ) -> Self {
         Self {
@@ -96,6 +98,7 @@ impl DatasetEntryServiceImpl {
             dataset_entry_repo,
             dataset_repo,
             account_repo,
+            current_account_subject,
             tenancy_config,
             accounts_cache: Default::default(),
         }
@@ -248,7 +251,8 @@ impl DatasetEntryServiceImpl {
         &self,
         maybe_account_name: Option<&AccountName>,
     ) -> Result<AccountID, InternalError> {
-        let account_name = maybe_account_name.unwrap_or(&DEFAULT_ACCOUNT_NAME);
+        let account_name = maybe_account_name
+            .unwrap_or_else(|| self.current_account_subject.account_name_or_default());
 
         let maybe_cached_id = {
             let accounts_cache = self.accounts_cache.lock().unwrap();
