@@ -58,7 +58,6 @@ impl std::fmt::Debug for SyncRequestSource {
 
 pub struct SyncRequestDestination {
     pub maybe_dataset: Option<Arc<dyn Dataset>>,
-    pub maybe_dataset_factory: Option<DatasetFactoryFn>,
     pub dst_ref: DatasetRefAny,
     pub sync_ref: SyncRef,
 }

@@ -9,14 +9,7 @@
 
 use std::sync::Arc;
 
-use kamu_core::{
-    Dataset,
-    DatasetFactoryFn,
-    DatasetVisibility,
-    SyncError,
-    SyncListener,
-    SyncResult,
-};
+use kamu_core::{Dataset, DatasetVisibility, SyncError, SyncListener, SyncResult};
 use opendatafabric as odf;
 use url::Url;
 

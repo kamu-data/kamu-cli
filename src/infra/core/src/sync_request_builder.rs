@@ -16,7 +16,6 @@ use kamu_core::{
     BlockRef,
     Dataset,
     DatasetFactory,
-    DatasetFactoryFn,
     DatasetRegistry,
     DatasetRegistryExt,
     GetDatasetError,
@@ -31,7 +30,7 @@ use kamu_core::{
 use opendatafabric::{DatasetHandleRemote, DatasetRefAny, DatasetRefRemote};
 use url::Url;
 
-use crate::{DatasetRepositoryWriter, UrlExt};
+use crate::UrlExt;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -39,7 +38,6 @@ use crate::{DatasetRepositoryWriter, UrlExt};
 pub struct SyncRequestBuilder {
     dataset_registry: Arc<dyn DatasetRegistry>,
     dataset_factory: Arc<dyn DatasetFactory>,
-    dataset_repo_writer: Arc<dyn DatasetRepositoryWriter>,
     remote_repo_registry: Arc<dyn RemoteRepositoryRegistry>,
 }
 
@@ -47,13 +45,11 @@ impl SyncRequestBuilder {
     pub fn new(
         dataset_registry: Arc<dyn DatasetRegistry>,
         dataset_factory: Arc<dyn DatasetFactory>,
-        dataset_repo_writer: Arc<dyn DatasetRepositoryWriter>,
         remote_repo_registry: Arc<dyn RemoteRepositoryRegistry>,
     ) -> Self {
         Self {
             dataset_registry,
             dataset_factory,
-            dataset_repo_writer,
             remote_repo_registry,
         }
     }
@@ -69,7 +65,7 @@ impl SyncRequestBuilder {
         let src_dataset = self.get_dataset_reader(&src_sync_ref).await?;
 
         let dst_sync_ref = self.resolve_sync_ref(&dst_ref)?;
-        let (maybe_dst_dataset, maybe_dst_dataset_factory) = self
+        let maybe_dst_dataset = self
             .get_dataset_writer(&dst_sync_ref, create_dst_if_not_exists)
             .await?;
 
@@ -83,7 +79,6 @@ impl SyncRequestBuilder {
                 sync_ref: dst_sync_ref,
                 dst_ref,
                 maybe_dataset: maybe_dst_dataset,
-                maybe_dataset_factory: maybe_dst_dataset_factory,
             },
         };
 
@@ -134,30 +129,12 @@ impl SyncRequestBuilder {
         &self,
         dataset_ref: &SyncRef,
         create_if_not_exists: bool,
-    ) -> Result<(Option<Arc<dyn Dataset>>, Option<DatasetFactoryFn>), SyncError> {
+    ) -> Result<Option<Arc<dyn Dataset>>, SyncError> {
         match dataset_ref {
             SyncRef::Local(local_ref) => {
                 match self.dataset_registry.get_dataset_by_ref(local_ref).await {
-                    Ok(dataset) => Ok((Some(dataset), None)),
-                    Err(GetDatasetError::NotFound(_)) if create_if_not_exists => {
-                        let alias = local_ref.alias().unwrap().clone();
-                        let repo_writer = self.dataset_repo_writer.clone();
-
-                        Ok((
-                            None,
-                            Some(Box::new(move |seed_block| {
-                                Box::pin(async move {
-                                    // After retrieving the dataset externally, we default to
-                                    // private visibility.
-                                    /*let create_options = CreateDatasetUseCaseOptions {
-                                        dataset_visibility: DatasetVisibility::Private,
-                                    };*/
-
-                                    repo_writer.create_dataset(&alias, seed_block).await
-                                })
-                            })),
-                        ))
-                    }
+                    Ok(dataset) => Ok(Some(dataset)),
+                    Err(GetDatasetError::NotFound(_)) if create_if_not_exists => Ok(None),
                     Err(err) => Err(err.into()),
                 }
             }
@@ -184,7 +161,7 @@ impl SyncRequestBuilder {
                     }?;
                 }
 
-                Ok((Some(dataset), None))
+                Ok(Some(dataset))
             }
         }
     }
