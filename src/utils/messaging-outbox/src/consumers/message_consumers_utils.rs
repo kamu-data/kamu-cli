@@ -34,7 +34,7 @@ pub async fn consume_deserialized_message<'a, TMessage: Message + 'static>(
     tracing::debug!(content_json = %content_json, "Consuming outbox message");
 
     let message = serde_json::from_str::<TMessage>(content_json).int_err()?;
-    if message.version() > version {
+    if message.version() != version {
         tracing::error!(
             content_json = %content_json,
             message_version = %message.version(),

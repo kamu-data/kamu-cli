@@ -163,8 +163,37 @@ async fn test_immediate_outbox_messages_two_handlers_for_same() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_log::test(tokio::test)]
+async fn test_different_version_message_decode() {
+    let harness = ImmediateOutboxHarness::new();
+    let filter = ConsumerFilter::AllConsumers;
+
+    let message = TestMessageA {
+        body: "foo".to_string(),
+    };
+    let message_json = serde_json::to_string(&message).unwrap();
+
+    assert_matches!(
+        consume_deserialized_message::<TestMessageA>(&harness.catalog, filter, &message_json, 0)
+            .await,
+        Ok(())
+    );
+    assert_matches!(
+        consume_deserialized_message::<TestMessageA>(
+            &harness.catalog,
+            filter,
+            &message_json,
+            message.version()
+        )
+        .await,
+        Ok(())
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 struct ImmediateOutboxHarness {
-    _catalog: Catalog,
+    catalog: Catalog,
     outbox: Arc<dyn Outbox>,
     test_message_consumer_a: Arc<TestMessageConsumerA>,
     test_message_consumer_b: Arc<TestMessageConsumerB>,
@@ -197,7 +226,7 @@ impl ImmediateOutboxHarness {
         let test_message_consumer_d2 = catalog.get_one::<TestMessageConsumerD2>().unwrap();
 
         Self {
-            _catalog: catalog,
+            catalog,
             outbox,
             test_message_consumer_a,
             test_message_consumer_b,
