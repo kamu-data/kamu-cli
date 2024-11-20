@@ -49,7 +49,11 @@ impl TaskProgressMessage {
     }
 }
 
-impl Message for TaskProgressMessage {}
+impl Message for TaskProgressMessage {
+    fn version(&self) -> u32 {
+        1
+    }
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

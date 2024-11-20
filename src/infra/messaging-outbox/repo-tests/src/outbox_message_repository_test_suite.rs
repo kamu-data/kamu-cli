@@ -16,9 +16,10 @@ use messaging_outbox::{
     OutboxMessage,
     OutboxMessageID,
     OutboxMessageRepository,
-    OUTBOX_MESSAGE_VERSION,
 };
 use serde::{Deserialize, Serialize};
+
+const OUTBOX_MESSAGE_VERSION: u32 = 1;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -410,7 +411,11 @@ struct MessageA {
     y: u64,
 }
 
-impl Message for MessageA {}
+impl Message for MessageA {
+    fn version(&self) -> u32 {
+        OUTBOX_MESSAGE_VERSION
+    }
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct MessageB {
@@ -418,6 +423,10 @@ struct MessageB {
     b: Vec<String>,
 }
 
-impl Message for MessageB {}
+impl Message for MessageB {
+    fn version(&self) -> u32 {
+        OUTBOX_MESSAGE_VERSION
+    }
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

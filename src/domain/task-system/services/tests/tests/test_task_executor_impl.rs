@@ -15,7 +15,7 @@ use dill::{Catalog, CatalogBuilder};
 use kamu_task_system::*;
 use kamu_task_system_inmem::InMemoryTaskEventStore;
 use kamu_task_system_services::*;
-use messaging_outbox::{MockOutbox, Outbox, OUTBOX_MESSAGE_VERSION};
+use messaging_outbox::{MockOutbox, Outbox};
 use mockall::predicate::{eq, function};
 use time_source::SystemTimeSourceDefault;
 
@@ -196,7 +196,7 @@ impl TaskExecutorHarness {
                         })) if task_id == a_task_id
                     )
                 }),
-                eq(OUTBOX_MESSAGE_VERSION),
+                eq(1),
             )
             .times(1)
             .returning(|_, _, _| Ok(()));
@@ -214,7 +214,7 @@ impl TaskExecutorHarness {
                         })) if task_id == a_task_id
                     )
                 }),
-                eq(OUTBOX_MESSAGE_VERSION),
+                eq(1),
             )
             .times(1)
             .returning(|_, _, _| Ok(()));

@@ -31,14 +31,7 @@ use kamu_core::{
     GetDatasetError,
     MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
 };
-use messaging_outbox::{
-    consume_deserialized_message,
-    ConsumerFilter,
-    Message,
-    MockOutbox,
-    Outbox,
-    OUTBOX_MESSAGE_VERSION,
-};
+use messaging_outbox::{consume_deserialized_message, ConsumerFilter, Message, MockOutbox, Outbox};
 use mockall::predicate::{eq, function};
 use opendatafabric::{DatasetAlias, DatasetKind, DatasetName, DatasetRef};
 use time_source::SystemTimeSourceDefault;
@@ -344,7 +337,7 @@ impl DeleteUseCaseHarness {
                         Ok(DatasetLifecycleMessage::Deleted(_))
                     )
                 }),
-                eq(OUTBOX_MESSAGE_VERSION),
+                eq(1),
             )
             .times(times)
             .returning(|_, _, _| Ok(()));

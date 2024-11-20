@@ -21,7 +21,11 @@ macro_rules! test_message_type {
                 pub(crate) body: String,
             }
 
-            impl Message for [<TestMessage $message_type_suffix>] {}
+            impl Message for [<TestMessage $message_type_suffix>] {
+                fn version(&self) -> u32 {
+                    1
+                }
+            }
         }
     };
 }

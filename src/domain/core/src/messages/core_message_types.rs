@@ -64,7 +64,11 @@ impl DatasetLifecycleMessage {
     }
 }
 
-impl Message for DatasetLifecycleMessage {}
+impl Message for DatasetLifecycleMessage {
+    fn version(&self) -> u32 {
+        1
+    }
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

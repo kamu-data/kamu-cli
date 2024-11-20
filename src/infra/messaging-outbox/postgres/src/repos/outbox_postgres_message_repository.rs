@@ -97,9 +97,6 @@ impl OutboxMessageRepository for PostgresOutboxMessageRepository {
                     version
                 FROM outbox_messages
                 WHERE {producer_filters}
-                and version = (
-                    SELECT MAX(version) FROM outbox_messages
-                )
                 ORDER BY message_id
                 LIMIT $1
                 "#,

@@ -10,16 +10,10 @@
 use serde::{Deserialize, Serialize};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-// Version of outbox message which will be bumped only if the structure contains
-// breaking changes in the message structure
-pub const OUTBOX_MESSAGE_VERSION: u32 = 1;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 pub trait Message: Clone + Serialize + for<'a> Deserialize<'a> + Send + Sync {
-    fn version(&self) -> u32 {
-        OUTBOX_MESSAGE_VERSION
-    }
+    // Version of outbox message which will be bumped only if the structure contains
+    // breaking changes in the message structure
+    fn version(&self) -> u32;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

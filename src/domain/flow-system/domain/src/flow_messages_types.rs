@@ -23,7 +23,11 @@ pub struct FlowConfigurationUpdatedMessage {
     pub rule: FlowConfigurationRule,
 }
 
-impl Message for FlowConfigurationUpdatedMessage {}
+impl Message for FlowConfigurationUpdatedMessage {
+    fn version(&self) -> u32 {
+        1
+    }
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -33,7 +37,11 @@ pub struct FlowExecutorUpdatedMessage {
     pub update_details: FlowExecutorUpdateDetails,
 }
 
-impl Message for FlowExecutorUpdatedMessage {}
+impl Message for FlowExecutorUpdatedMessage {
+    fn version(&self) -> u32 {
+        1
+    }
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -53,7 +61,11 @@ pub enum FlowProgressMessage {
     Cancelled(FlowProgressMessageCancelled),
 }
 
-impl Message for FlowProgressMessage {}
+impl Message for FlowProgressMessage {
+    fn version(&self) -> u32 {
+        1
+    }
+}
 
 impl FlowProgressMessage {
     pub fn scheduled(

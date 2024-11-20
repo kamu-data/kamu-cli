@@ -25,7 +25,7 @@ use kamu_core::{
     GetDatasetError,
     MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
 };
-use messaging_outbox::{MockOutbox, Outbox, OUTBOX_MESSAGE_VERSION};
+use messaging_outbox::{MockOutbox, Outbox};
 use mockall::predicate::{eq, function};
 use opendatafabric::{DatasetAlias, DatasetKind, DatasetName};
 use time_source::SystemTimeSourceDefault;
@@ -164,7 +164,7 @@ impl CreateFromSnapshotUseCaseHarness {
                         Ok(DatasetLifecycleMessage::Created(_))
                     )
                 }),
-                eq(OUTBOX_MESSAGE_VERSION),
+                eq(1),
             )
             .times(times)
             .returning(|_, _, _| Ok(()));
@@ -184,7 +184,7 @@ impl CreateFromSnapshotUseCaseHarness {
                         Ok(DatasetLifecycleMessage::DependenciesUpdated(_))
                     )
                 }),
-                eq(OUTBOX_MESSAGE_VERSION),
+                eq(1),
             )
             .times(times)
             .returning(|_, _, _| Ok(()));
