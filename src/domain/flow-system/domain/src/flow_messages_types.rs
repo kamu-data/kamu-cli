@@ -15,6 +15,12 @@ use crate::{FlowConfigurationRule, FlowID, FlowKey, FlowOutcome};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+const FLOW_EXECUTOR_UPDATE_OUTBOX_VERSION: u32 = 1;
+const FLOW_CONFIGURATION_UPDATE_OUTBOX_VERSION: u32 = 1;
+const FLOW_PROGRESS_OUTBOX_VERSION: u32 = 1;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FlowConfigurationUpdatedMessage {
     pub event_time: DateTime<Utc>,
@@ -23,7 +29,11 @@ pub struct FlowConfigurationUpdatedMessage {
     pub rule: FlowConfigurationRule,
 }
 
-impl Message for FlowConfigurationUpdatedMessage {}
+impl Message for FlowConfigurationUpdatedMessage {
+    fn version() -> u32 {
+        FLOW_CONFIGURATION_UPDATE_OUTBOX_VERSION
+    }
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -33,7 +43,11 @@ pub struct FlowExecutorUpdatedMessage {
     pub update_details: FlowExecutorUpdateDetails,
 }
 
-impl Message for FlowExecutorUpdatedMessage {}
+impl Message for FlowExecutorUpdatedMessage {
+    fn version() -> u32 {
+        FLOW_EXECUTOR_UPDATE_OUTBOX_VERSION
+    }
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -53,7 +67,11 @@ pub enum FlowProgressMessage {
     Cancelled(FlowProgressMessageCancelled),
 }
 
-impl Message for FlowProgressMessage {}
+impl Message for FlowProgressMessage {
+    fn version() -> u32 {
+        FLOW_PROGRESS_OUTBOX_VERSION
+    }
+}
 
 impl FlowProgressMessage {
     pub fn scheduled(

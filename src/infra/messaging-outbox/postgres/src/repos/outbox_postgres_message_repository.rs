@@ -37,15 +37,20 @@ impl OutboxMessageRepository for PostgresOutboxMessageRepository {
         let mut tr = self.transaction.lock().await;
 
         let connection_mut = tr.connection_mut().await?;
+        let message_version: i32 = message
+            .version
+            .try_into()
+            .expect("Version out of range for i32");
 
         sqlx::query!(
             r#"
-                INSERT INTO outbox_messages (producer_name, content_json, occurred_on)
-                    VALUES ($1, $2, $3)
+                INSERT INTO outbox_messages (producer_name, content_json, occurred_on, version)
+                    VALUES ($1, $2, $3, $4)
             "#,
             message.producer_name,
             &message.content_json,
-            message.occurred_on
+            message.occurred_on,
+            message_version,
         )
         .execute(connection_mut)
         .await
@@ -88,7 +93,8 @@ impl OutboxMessageRepository for PostgresOutboxMessageRepository {
                     message_id,
                     producer_name,
                     content_json,
-                    occurred_on
+                    occurred_on,
+                    version
                 FROM outbox_messages
                 WHERE {producer_filters}
                 ORDER BY message_id
@@ -106,11 +112,13 @@ impl OutboxMessageRepository for PostgresOutboxMessageRepository {
 
             use sqlx::Row;
             let mut query_stream = query.map(|event_row: PgRow| {
-                OutboxMessage {
+                let version: i32 = event_row.get(4);
+                OutboxMessage{
                     message_id: OutboxMessageID::new(event_row.get(0)),
                     producer_name: event_row.get(1),
                     content_json: event_row.get(2),
                     occurred_on: event_row.get(3),
+                    version: version.try_into().unwrap(),
                 }
             })
             .fetch(connection_mut)

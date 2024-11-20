@@ -24,6 +24,7 @@ impl Outbox for DummyOutboxImpl {
         &self,
         _producer_name: &str,
         _content_json: &serde_json::Value,
+        _version: u32,
     ) -> Result<(), InternalError> {
         // We are happy
         Ok(())

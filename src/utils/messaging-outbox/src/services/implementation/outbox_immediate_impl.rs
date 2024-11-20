@@ -48,6 +48,7 @@ impl Outbox for OutboxImmediateImpl {
         &self,
         producer_name: &str,
         content_json: &serde_json::Value,
+        version: u32,
     ) -> Result<(), InternalError> {
         tracing::debug!(content_json = %content_json, "Dispatching outbox message immediately");
 
@@ -56,7 +57,7 @@ impl Outbox for OutboxImmediateImpl {
             let content_json = content_json.to_string();
 
             let dispatch_result = dispatcher
-                .dispatch_message(&self.catalog, self.consumer_filter, &content_json)
+                .dispatch_message(&self.catalog, self.consumer_filter, &content_json, version)
                 .await;
             if let Err(e) = dispatch_result {
                 tracing::error!(
@@ -64,7 +65,7 @@ impl Outbox for OutboxImmediateImpl {
                     error_msg = %e,
                     producer_name,
                     ?content_json,
-                    "Immediate outbox message dispatching faioed"
+                    "Immediate outbox message dispatching failed"
                 );
             }
         }

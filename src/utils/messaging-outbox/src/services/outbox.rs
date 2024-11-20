@@ -19,6 +19,7 @@ pub trait Outbox: Send + Sync {
         &self,
         producer_name: &str,
         content_json: &serde_json::Value,
+        version: u32,
     ) -> Result<(), InternalError>;
 }
 
@@ -42,7 +43,7 @@ impl<T: Outbox + ?Sized> OutboxExt for T {
         message: M,
     ) -> Result<(), InternalError> {
         let message_as_json = serde_json::to_value(&message).unwrap();
-        self.post_message_as_json(producer_name, &message_as_json)
+        self.post_message_as_json(producer_name, &message_as_json, M::version())
             .await
     }
 }

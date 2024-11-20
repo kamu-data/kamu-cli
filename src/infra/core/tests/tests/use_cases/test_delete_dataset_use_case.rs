@@ -320,6 +320,7 @@ impl DeleteUseCaseHarness {
             &self.catalog,
             ConsumerFilter::AllConsumers,
             &content_json,
+            TMessage::version(),
         )
         .await
         .unwrap();
@@ -336,9 +337,10 @@ impl DeleteUseCaseHarness {
                         Ok(DatasetLifecycleMessage::Deleted(_))
                     )
                 }),
+                eq(1),
             )
             .times(times)
-            .returning(|_, _| Ok(()));
+            .returning(|_, _, _| Ok(()));
     }
 }
 

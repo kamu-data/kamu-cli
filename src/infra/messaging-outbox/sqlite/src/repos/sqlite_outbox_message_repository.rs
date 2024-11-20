@@ -39,15 +39,20 @@ impl OutboxMessageRepository for SqliteOutboxMessageRepository {
         let connection_mut = tr.connection_mut().await?;
 
         let message_content_json = message.content_json;
+        let message_version: i32 = message
+            .version
+            .try_into()
+            .expect("Version out of range for i32");
 
         sqlx::query!(
             r#"
-                INSERT INTO outbox_messages (producer_name, content_json, occurred_on)
-                    VALUES ($1, $2, $3)
+                INSERT INTO outbox_messages (producer_name, content_json, occurred_on, version)
+                    VALUES ($1, $2, $3, $4)
             "#,
             message.producer_name,
             message_content_json,
-            message.occurred_on
+            message.occurred_on,
+            message_version,
         )
         .execute(connection_mut)
         .await
@@ -68,7 +73,7 @@ impl OutboxMessageRepository for SqliteOutboxMessageRepository {
                 .iter()
                 .enumerate()
                 .map(|(i, _)| {
-                    format!(
+                    indoc::formatdoc!(
                         "producer_name = ${} AND message_id > ${}",
                         i * 2 + 2, // $2, $4, $6, ...
                         i * 2 + 3, // $3, $5, $7, ...
@@ -84,13 +89,14 @@ impl OutboxMessageRepository for SqliteOutboxMessageRepository {
                 .connection_mut()
                 .await?;
 
-            let query_str = format!(
+            let query_str = indoc::formatdoc!(
                 r#"
                 SELECT
                     message_id,
                     producer_name,
                     content_json,
-                    occurred_on
+                    occurred_on,
+                    version
                 FROM outbox_messages
                 WHERE {producer_filters}
                 ORDER BY message_id
@@ -108,11 +114,12 @@ impl OutboxMessageRepository for SqliteOutboxMessageRepository {
 
             use sqlx::Row;
             let mut query_stream = query.try_map(|event_row: SqliteRow| {
-                Ok(OutboxMessage {
+                Ok(OutboxMessage{
                     message_id: OutboxMessageID::new(event_row.get(0)),
                     producer_name: event_row.get(1),
                     content_json: event_row.get(2),
                     occurred_on: event_row.get(3),
+                    version: event_row.get(4),
                 })
             })
             .fetch(connection_mut)

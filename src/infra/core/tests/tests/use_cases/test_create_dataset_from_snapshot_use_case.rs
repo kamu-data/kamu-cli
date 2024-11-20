@@ -164,9 +164,10 @@ impl CreateFromSnapshotUseCaseHarness {
                         Ok(DatasetLifecycleMessage::Created(_))
                     )
                 }),
+                eq(1),
             )
             .times(times)
-            .returning(|_, _| Ok(()));
+            .returning(|_, _, _| Ok(()));
     }
 
     fn add_outbox_dataset_dependencies_updated_expectation(
@@ -183,9 +184,10 @@ impl CreateFromSnapshotUseCaseHarness {
                         Ok(DatasetLifecycleMessage::DependenciesUpdated(_))
                     )
                 }),
+                eq(1),
             )
             .times(times)
-            .returning(|_, _| Ok(()));
+            .returning(|_, _, _| Ok(()));
     }
 }
 

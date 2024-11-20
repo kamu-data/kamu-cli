@@ -19,6 +19,7 @@ pub struct OutboxMessage {
     pub producer_name: String,
     pub content_json: serde_json::Value,
     pub occurred_on: DateTime<Utc>,
+    pub version: u32,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -28,6 +29,19 @@ pub struct NewOutboxMessage {
     pub producer_name: String,
     pub content_json: serde_json::Value,
     pub occurred_on: DateTime<Utc>,
+    pub version: u32,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl NewOutboxMessage {
+    pub fn as_outbox_message(&self, message_id: OutboxMessageID) -> OutboxMessage {
+        OutboxMessage {
+            message_id,
+            producer_name: self.producer_name.clone(),
+            content_json: self.content_json.clone(),
+            occurred_on: self.occurred_on,
+            version: self.version,
+        }
+    }
+}

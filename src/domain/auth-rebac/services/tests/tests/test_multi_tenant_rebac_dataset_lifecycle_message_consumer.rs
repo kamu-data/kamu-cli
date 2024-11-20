@@ -196,6 +196,7 @@ impl MultiTenantRebacDatasetLifecycleMessageConsumerHarness {
             &self.catalog,
             ConsumerFilter::AllConsumers,
             &content_json,
+            TMessage::version(),
         )
         .await
         .unwrap();

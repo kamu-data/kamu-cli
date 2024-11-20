@@ -69,15 +69,9 @@ impl OutboxMessageRepository for InMemoryOutboxMessageRepository {
             .latest_message_id_by_producer
             .insert(new_message.producer_name.clone(), message_id);
 
-        guard.messages.insert(
-            message_id,
-            OutboxMessage {
-                message_id,
-                producer_name: new_message.producer_name,
-                content_json: new_message.content_json,
-                occurred_on: new_message.occurred_on,
-            },
-        );
+        guard
+            .messages
+            .insert(message_id, new_message.as_outbox_message(message_id));
         Ok(())
     }
 

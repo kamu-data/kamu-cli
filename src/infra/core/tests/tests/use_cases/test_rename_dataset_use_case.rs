@@ -192,9 +192,10 @@ impl RenameUseCaseHarness {
                         Ok(DatasetLifecycleMessage::Renamed(_))
                     )
                 }),
+                eq(1),
             )
             .times(times)
-            .returning(|_, _| Ok(()));
+            .returning(|_, _, _| Ok(()));
     }
 }
 

@@ -6427,6 +6427,7 @@ dependencies = [
  "database-common-macros",
  "dill",
  "futures",
+ "indoc 2.0.5",
  "internal-error",
  "kamu-messaging-outbox-repo-tests",
  "messaging-outbox",
