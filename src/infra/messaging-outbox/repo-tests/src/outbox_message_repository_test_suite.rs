@@ -148,17 +148,16 @@ pub async fn test_try_reading_above_max(catalog: &Catalog) {
     let outbox_message_repo = catalog.get_one::<dyn OutboxMessageRepository>().unwrap();
 
     for i in 1..=5 {
-        let message_body = MessageA {
-            x: i,
-            y: u64::try_from(i * 2).unwrap(),
-        };
-
         outbox_message_repo
             .push_message(NewOutboxMessage {
                 producer_name: "A".to_string(),
-                content_json: serde_json::to_value(&message_body).unwrap(),
+                content_json: serde_json::to_value(&MessageA {
+                    x: i,
+                    y: u64::try_from(i * 2).unwrap(),
+                })
+                .unwrap(),
                 occurred_on: Utc::now(),
-                version: message_body.version(),
+                version: MessageA::version(),
             })
             .await
             .unwrap();
@@ -208,30 +207,30 @@ pub async fn test_reading_messages_above_max_with_multiple_producers(catalog: &C
 
     // Push a mix of messages for A and B producers (10 A, 5 B)
     for i in 1..=10 {
-        let message_body = MessageA {
-            x: i * 2,
-            y: u64::try_from(256 + i).unwrap(),
-        };
         outbox_message_repo
             .push_message(NewOutboxMessage {
                 producer_name: "A".to_string(),
-                content_json: serde_json::to_value(&message_body).unwrap(),
+                content_json: serde_json::to_value(&MessageA {
+                    x: i * 2,
+                    y: u64::try_from(256 + i).unwrap(),
+                })
+                .unwrap(),
                 occurred_on: Utc::now(),
-                version: message_body.version(),
+                version: MessageA::version(),
             })
             .await
             .unwrap();
         if i % 2 == 0 {
-            let message_body = MessageB {
-                a: format!("test_{i}"),
-                b: vec![format!("foo_{i}"), format!("bar_{i}")],
-            };
             outbox_message_repo
                 .push_message(NewOutboxMessage {
                     producer_name: "B".to_string(),
-                    content_json: serde_json::to_value(&message_body).unwrap(),
+                    content_json: serde_json::to_value(&MessageB {
+                        a: format!("test_{i}"),
+                        b: vec![format!("foo_{i}"), format!("bar_{i}")],
+                    })
+                    .unwrap(),
                     occurred_on: Utc::now(),
-                    version: message_body.version(),
+                    version: MessageB::version(),
                 })
                 .await
                 .unwrap();
@@ -385,7 +384,7 @@ pub async fn test_outbox_messages_version(catalog: &Catalog) {
         producer_name: "A".to_string(),
         content_json: serde_json::to_value(&actual_message_body).unwrap(),
         occurred_on: Utc::now(),
-        version: actual_message_body.version(),
+        version: MessageA::version(),
     };
 
     outbox_message_repo
@@ -400,7 +399,7 @@ pub async fn test_outbox_messages_version(catalog: &Catalog) {
         .unwrap();
 
     assert_eq!(1, messages.len());
-    assert_eq!(actual_message_body.version(), messages[0].version);
+    assert_eq!(MessageA::version(), messages[0].version);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -412,7 +411,7 @@ struct MessageA {
 }
 
 impl Message for MessageA {
-    fn version(&self) -> u32 {
+    fn version() -> u32 {
         OUTBOX_MESSAGE_VERSION
     }
 }
@@ -424,7 +423,7 @@ struct MessageB {
 }
 
 impl Message for MessageB {
-    fn version(&self) -> u32 {
+    fn version() -> u32 {
         OUTBOX_MESSAGE_VERSION
     }
 }

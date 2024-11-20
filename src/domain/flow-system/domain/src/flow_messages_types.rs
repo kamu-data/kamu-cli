@@ -15,6 +15,12 @@ use crate::{FlowConfigurationRule, FlowID, FlowKey, FlowOutcome};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+const FLOW_EXECUTOR_UPDATE_OUTBOX_VERSION: u32 = 1;
+const FLOW_CONFIGURATION_UPDATE_OUTBOX_VERSION: u32 = 1;
+const FLOW_PROGRESS_OUTBOX_VERSION: u32 = 1;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FlowConfigurationUpdatedMessage {
     pub event_time: DateTime<Utc>,
@@ -24,8 +30,8 @@ pub struct FlowConfigurationUpdatedMessage {
 }
 
 impl Message for FlowConfigurationUpdatedMessage {
-    fn version(&self) -> u32 {
-        1
+    fn version() -> u32 {
+        FLOW_CONFIGURATION_UPDATE_OUTBOX_VERSION
     }
 }
 
@@ -38,8 +44,8 @@ pub struct FlowExecutorUpdatedMessage {
 }
 
 impl Message for FlowExecutorUpdatedMessage {
-    fn version(&self) -> u32 {
-        1
+    fn version() -> u32 {
+        FLOW_EXECUTOR_UPDATE_OUTBOX_VERSION
     }
 }
 
@@ -62,8 +68,8 @@ pub enum FlowProgressMessage {
 }
 
 impl Message for FlowProgressMessage {
-    fn version(&self) -> u32 {
-        1
+    fn version() -> u32 {
+        FLOW_PROGRESS_OUTBOX_VERSION
     }
 }
 

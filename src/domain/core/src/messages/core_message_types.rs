@@ -15,6 +15,10 @@ use crate::DatasetVisibility;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+const DATASET_LIFECYCLE_OUTBOX_VERSION: u32 = 1;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum DatasetLifecycleMessage {
     Created(DatasetLifecycleMessageCreated),
@@ -65,8 +69,8 @@ impl DatasetLifecycleMessage {
 }
 
 impl Message for DatasetLifecycleMessage {
-    fn version(&self) -> u32 {
-        1
+    fn version() -> u32 {
+        DATASET_LIFECYCLE_OUTBOX_VERSION
     }
 }
 

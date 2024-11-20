@@ -183,7 +183,7 @@ async fn test_different_version_message_decode() {
             &harness.catalog,
             filter,
             &message_json,
-            message.version()
+            TestMessageA::version()
         )
         .await,
         Ok(())

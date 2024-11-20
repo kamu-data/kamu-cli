@@ -15,6 +15,10 @@ use crate::{TaskID, TaskMetadata, TaskOutcome};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+const TASK_PROGRESS_OUTBOX_VERSION: u32 = 1;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum TaskProgressMessage {
     Running(TaskProgressMessageRunning),
@@ -50,8 +54,8 @@ impl TaskProgressMessage {
 }
 
 impl Message for TaskProgressMessage {
-    fn version(&self) -> u32 {
-        1
+    fn version() -> u32 {
+        TASK_PROGRESS_OUTBOX_VERSION
     }
 }
 

@@ -22,7 +22,7 @@ macro_rules! test_message_type {
             }
 
             impl Message for [<TestMessage $message_type_suffix>] {
-                fn version(&self) -> u32 {
+                fn version() -> u32 {
                     1
                 }
             }

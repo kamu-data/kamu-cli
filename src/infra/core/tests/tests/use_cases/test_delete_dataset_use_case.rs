@@ -320,7 +320,7 @@ impl DeleteUseCaseHarness {
             &self.catalog,
             ConsumerFilter::AllConsumers,
             &content_json,
-            message.version(),
+            TMessage::version(),
         )
         .await
         .unwrap();
