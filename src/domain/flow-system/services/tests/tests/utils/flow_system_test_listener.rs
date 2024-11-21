@@ -23,7 +23,7 @@ use messaging_outbox::{
     MessageConsumer,
     MessageConsumerMeta,
     MessageConsumerT,
-    MessageConsumptionDurability,
+    MessageDeliveryMechanism,
 };
 use opendatafabric::DatasetID;
 use time_source::FakeSystemTimeSource;
@@ -52,7 +52,7 @@ struct FlowSystemTestListenerState {
 #[meta(MessageConsumerMeta {
     consumer_name: "FlowSystemTestListener",
     feeding_producers: &[MESSAGE_PRODUCER_KAMU_FLOW_EXECUTOR, MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE],
-    durability: MessageConsumptionDurability::BestEffort,
+    delivery: MessageDeliveryMechanism::Immediate,
 })]
 impl FlowSystemTestListener {
     pub(crate) fn new(

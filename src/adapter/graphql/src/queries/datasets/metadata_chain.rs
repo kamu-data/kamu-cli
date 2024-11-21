@@ -42,18 +42,18 @@ impl MetadataChain {
     }
 
     #[graphql(skip)]
-    fn get_dataset(&self, ctx: &Context<'_>) -> std::sync::Arc<dyn domain::Dataset> {
-        let dataset_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
-        dataset_repo.get_dataset_by_handle(&self.dataset_handle)
+    fn get_dataset(&self, ctx: &Context<'_>) -> domain::ResolvedDataset {
+        let dataset_registry = from_catalog::<dyn domain::DatasetRegistry>(ctx).unwrap();
+        dataset_registry.get_dataset_by_handle(&self.dataset_handle)
     }
 
     /// Returns all named metadata block references
     #[tracing::instrument(level = "info", skip_all)]
     async fn refs(&self, ctx: &Context<'_>) -> Result<Vec<BlockRef>> {
-        let dataset = self.get_dataset(ctx);
+        let resolved_dataset = self.get_dataset(ctx);
         Ok(vec![BlockRef {
             name: "head".to_owned(),
-            block_hash: dataset
+            block_hash: resolved_dataset
                 .as_metadata_chain()
                 .resolve_ref(&domain::BlockRef::Head)
                 .await
@@ -69,8 +69,11 @@ impl MetadataChain {
         ctx: &Context<'_>,
         hash: Multihash,
     ) -> Result<Option<MetadataBlockExtended>> {
-        let dataset = self.get_dataset(ctx);
-        let block = dataset.as_metadata_chain().try_get_block(&hash).await?;
+        let resolved_dataset = self.get_dataset(ctx);
+        let block = resolved_dataset
+            .as_metadata_chain()
+            .try_get_block(&hash)
+            .await?;
         let account = Account::from_dataset_alias(ctx, &self.dataset_handle.alias)
             .await?
             .expect("Account must exist");
@@ -88,8 +91,12 @@ impl MetadataChain {
     ) -> Result<Option<String>> {
         use odf::serde::MetadataBlockSerializer;
 
-        let dataset = self.get_dataset(ctx);
-        match dataset.as_metadata_chain().try_get_block(&hash).await? {
+        let resolved_dataset = self.get_dataset(ctx);
+        match resolved_dataset
+            .as_metadata_chain()
+            .try_get_block(&hash)
+            .await?
+        {
             None => Ok(None),
             Some(block) => match format {
                 MetadataManifestFormat::Yaml => {
@@ -115,8 +122,8 @@ impl MetadataChain {
         let page = page.unwrap_or(0);
         let per_page = per_page.unwrap_or(Self::DEFAULT_BLOCKS_PER_PAGE);
 
-        let dataset = self.get_dataset(ctx);
-        let chain = dataset.as_metadata_chain();
+        let resolved_dataset = self.get_dataset(ctx);
+        let chain = resolved_dataset.as_metadata_chain();
 
         let head = chain.resolve_ref(&domain::BlockRef::Head).await.int_err()?;
         let total_count =

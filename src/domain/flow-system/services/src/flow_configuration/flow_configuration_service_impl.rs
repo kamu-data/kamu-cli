@@ -18,7 +18,7 @@ use messaging_outbox::{
     MessageConsumer,
     MessageConsumerMeta,
     MessageConsumerT,
-    MessageConsumptionDurability,
+    MessageDeliveryMechanism,
     Outbox,
     OutboxExt,
 };
@@ -47,7 +47,7 @@ pub struct FlowConfigurationServiceImpl {
 #[meta(MessageConsumerMeta {
     consumer_name: MESSAGE_CONSUMER_KAMU_FLOW_CONFIGURATION_SERVICE,
     feeding_producers: &[MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE],
-    durability: MessageConsumptionDurability::Durable,
+    delivery: MessageDeliveryMechanism::Transactional,
 })]
 impl FlowConfigurationServiceImpl {
     pub fn new(

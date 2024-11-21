@@ -27,7 +27,7 @@ pub async fn test_create_dataset<
     let dataset_alias = DatasetAlias::new(account_name, DatasetName::new_unchecked("foo"));
 
     assert_matches!(
-        repo.find_dataset_by_ref(&dataset_alias.as_local_ref())
+        repo.resolve_dataset_handle_by_ref(&dataset_alias.as_local_ref())
             .await
             .err()
             .unwrap(),
@@ -47,7 +47,7 @@ pub async fn test_create_dataset<
 
     // We should see the dataset
     assert!(repo
-        .find_dataset_by_ref(&dataset_alias.as_local_ref())
+        .resolve_dataset_handle_by_ref(&dataset_alias.as_local_ref())
         .await
         .is_ok());
 
@@ -78,7 +78,7 @@ pub async fn test_create_and_get_case_insensetive_dataset<
         DatasetAlias::new(account_name.clone(), DatasetName::new_unchecked("Foo"));
 
     assert_matches!(
-        repo.find_dataset_by_ref(&dataset_alias_to_create.as_local_ref())
+        repo.resolve_dataset_handle_by_ref(&dataset_alias_to_create.as_local_ref())
             .await
             .err()
             .unwrap(),
@@ -105,7 +105,7 @@ pub async fn test_create_and_get_case_insensetive_dataset<
 
     // We should see the dataset
     assert!(repo
-        .find_dataset_by_ref(&dataset_alias_in_another_registry.as_local_ref())
+        .resolve_dataset_handle_by_ref(&dataset_alias_in_another_registry.as_local_ref())
         .await
         .is_ok());
 
@@ -172,7 +172,7 @@ pub async fn test_create_dataset_same_name_multiple_tenants<
     );
 
     assert_matches!(
-        repo.find_dataset_by_ref(&dataset_alias_my.as_local_ref())
+        repo.resolve_dataset_handle_by_ref(&dataset_alias_my.as_local_ref())
             .await
             .err()
             .unwrap(),
@@ -180,7 +180,7 @@ pub async fn test_create_dataset_same_name_multiple_tenants<
     );
 
     assert_matches!(
-        repo.find_dataset_by_ref(&dataset_alias_her.as_local_ref())
+        repo.resolve_dataset_handle_by_ref(&dataset_alias_her.as_local_ref())
             .await
             .err()
             .unwrap(),
@@ -217,12 +217,12 @@ pub async fn test_create_dataset_same_name_multiple_tenants<
     // We should see the datasets
 
     assert!(repo
-        .find_dataset_by_ref(&dataset_alias_my.as_local_ref())
+        .resolve_dataset_handle_by_ref(&dataset_alias_my.as_local_ref())
         .await
         .is_ok());
 
     assert!(repo
-        .find_dataset_by_ref(&dataset_alias_her.as_local_ref())
+        .resolve_dataset_handle_by_ref(&dataset_alias_her.as_local_ref())
         .await
         .is_ok());
 
@@ -265,7 +265,7 @@ pub async fn test_create_dataset_from_snapshot<
     let dataset_alias = DatasetAlias::new(account_name.clone(), DatasetName::new_unchecked("foo"));
 
     assert_matches!(
-        repo.find_dataset_by_ref(&dataset_alias.as_local_ref())
+        repo.resolve_dataset_handle_by_ref(&dataset_alias.as_local_ref())
             .await
             .err()
             .unwrap(),
@@ -284,10 +284,11 @@ pub async fn test_create_dataset_from_snapshot<
         .unwrap()
         .create_dataset_result;
 
-    let dataset = repo
-        .find_dataset_by_ref(&create_result.dataset_handle.into())
+    let hdl = repo
+        .resolve_dataset_handle_by_ref(&create_result.dataset_handle.into())
         .await
         .unwrap();
+    let dataset = repo.get_dataset_by_handle(&hdl);
 
     let actual_head = dataset
         .as_metadata_chain()
@@ -355,10 +356,11 @@ pub async fn test_rename_dataset<
     .await
     .unwrap();
 
-    let baz = repo
-        .find_dataset_by_ref(&alias_baz.as_local_ref())
+    let baz_hdl = repo
+        .resolve_dataset_handle_by_ref(&alias_baz.as_local_ref())
         .await
         .unwrap();
+    let baz = repo.get_dataset_by_handle(&baz_hdl);
 
     use futures::StreamExt;
     assert_eq!(baz.as_metadata_chain().iter_blocks().count().await, 2);
@@ -423,15 +425,17 @@ pub async fn test_rename_dataset_same_name_multiple_tenants<
     .await
     .unwrap();
 
-    let my_bar = repo
-        .find_dataset_by_ref(&DatasetRef::try_from("my/bar").unwrap())
+    let my_bar_hdl = repo
+        .resolve_dataset_handle_by_ref(&DatasetRef::try_from("my/bar").unwrap())
         .await
         .unwrap();
+    let my_bar = repo.get_dataset_by_handle(&my_bar_hdl);
 
-    let her_bar = repo
-        .find_dataset_by_ref(&DatasetRef::try_from("her/bar").unwrap())
+    let her_bar_hdl = repo
+        .resolve_dataset_handle_by_ref(&DatasetRef::try_from("her/bar").unwrap())
         .await
         .unwrap();
+    let her_bar = repo.get_dataset_by_handle(&her_bar_hdl);
 
     assert_eq!(
         my_bar
@@ -483,7 +487,7 @@ pub async fn test_delete_dataset<
         .unwrap();
 
     assert!(repo
-        .find_dataset_by_ref(&alias_foo.as_local_ref())
+        .resolve_dataset_handle_by_ref(&alias_foo.as_local_ref())
         .await
         .is_ok());
 
@@ -492,7 +496,7 @@ pub async fn test_delete_dataset<
         .unwrap();
 
     assert_matches!(
-        repo.find_dataset_by_ref(&alias_foo.as_local_ref())
+        repo.resolve_dataset_handle_by_ref(&alias_foo.as_local_ref())
             .await
             .err()
             .unwrap(),
@@ -536,21 +540,21 @@ pub async fn test_iterate_datasets<
     // All
     check_expected_datasets(
         vec![alias_bar.clone(), alias_foo.clone()],
-        repo.get_all_datasets(),
+        repo.all_dataset_handles(),
     )
     .await;
 
     // Default account
     check_expected_datasets(
         vec![alias_bar, alias_foo],
-        repo.get_datasets_by_owner(&DEFAULT_ACCOUNT_NAME),
+        repo.all_dataset_handles_by_owner(&DEFAULT_ACCOUNT_NAME),
     )
     .await;
 
     // Random account
     check_expected_datasets(
         vec![],
-        repo.get_datasets_by_owner(&AccountName::new_unchecked("unknown-account")),
+        repo.all_dataset_handles_by_owner(&AccountName::new_unchecked("unknown-account")),
     )
     .await;
 }
@@ -625,26 +629,26 @@ pub async fn test_iterate_datasets_multi_tenant<
             alias_my_baz.clone(),
             alias_my_foo.clone(),
         ],
-        repo.get_all_datasets(),
+        repo.all_dataset_handles(),
     )
     .await;
 
     check_expected_datasets(
         vec![alias_my_baz, alias_my_foo],
-        repo.get_datasets_by_owner(&account_my),
+        repo.all_dataset_handles_by_owner(&account_my),
     )
     .await;
 
     check_expected_datasets(
         vec![alias_her_bar, alias_her_foo],
-        repo.get_datasets_by_owner(&account_her),
+        repo.all_dataset_handles_by_owner(&account_her),
     )
     .await;
 
     // Random account
     check_expected_datasets(
         vec![],
-        repo.get_datasets_by_owner(&AccountName::new_unchecked("unknown-account")),
+        repo.all_dataset_handles_by_owner(&AccountName::new_unchecked("unknown-account")),
     )
     .await;
 }
@@ -679,7 +683,7 @@ pub async fn test_create_multiple_datasets_with_same_id<
     let dataset_alias = DatasetAlias::new(account_name.clone(), DatasetName::new_unchecked("foo"));
 
     assert_matches!(
-        repo.find_dataset_by_ref(&dataset_alias.as_local_ref())
+        repo.resolve_dataset_handle_by_ref(&dataset_alias.as_local_ref())
             .await
             .err()
             .unwrap(),
@@ -698,7 +702,7 @@ pub async fn test_create_multiple_datasets_with_same_id<
 
     // We should see the dataset
     assert!(repo
-        .find_dataset_by_ref(&dataset_alias.as_local_ref())
+        .resolve_dataset_handle_by_ref(&dataset_alias.as_local_ref())
         .await
         .is_ok());
 

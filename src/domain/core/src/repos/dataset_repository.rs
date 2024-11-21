@@ -46,23 +46,17 @@ pub struct CreateDatasetFromSnapshotResult {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Abstraction of datasets storage repository
 #[async_trait]
-pub trait DatasetRepository: DatasetRegistry + Sync + Send {
-    fn is_multi_tenant(&self) -> bool;
-
-    async fn resolve_dataset_ref(
+pub trait DatasetRepository: Sync + Send {
+    async fn resolve_dataset_handle_by_ref(
         &self,
         dataset_ref: &DatasetRef,
     ) -> Result<DatasetHandle, GetDatasetError>;
 
-    fn get_all_datasets(&self) -> DatasetHandleStream<'_>;
+    fn all_dataset_handles(&self) -> DatasetHandleStream<'_>;
 
-    fn get_datasets_by_owner(&self, account_name: &AccountName) -> DatasetHandleStream<'_>;
-
-    async fn find_dataset_by_ref(
-        &self,
-        dataset_ref: &DatasetRef,
-    ) -> Result<Arc<dyn Dataset>, GetDatasetError>;
+    fn all_dataset_handles_by_owner(&self, account_name: &AccountName) -> DatasetHandleStream<'_>;
 
     fn get_dataset_by_handle(&self, dataset_handle: &DatasetHandle) -> Arc<dyn Dataset>;
 }
@@ -71,56 +65,6 @@ pub trait DatasetRepository: DatasetRegistry + Sync + Send {
 
 pub type DatasetHandleStream<'a> =
     Pin<Box<dyn Stream<Item = Result<DatasetHandle, InternalError>> + Send + 'a>>;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Extensions
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[async_trait]
-pub trait DatasetRepositoryExt: DatasetRepository {
-    async fn try_resolve_dataset_ref(
-        &self,
-        dataset_ref: &DatasetRef,
-    ) -> Result<Option<DatasetHandle>, InternalError>;
-
-    async fn try_get_dataset(
-        &self,
-        dataset_ref: &DatasetRef,
-    ) -> Result<Option<Arc<dyn Dataset>>, InternalError>;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[async_trait]
-impl<T> DatasetRepositoryExt for T
-where
-    T: DatasetRepository,
-    T: ?Sized,
-{
-    async fn try_resolve_dataset_ref(
-        &self,
-        dataset_ref: &DatasetRef,
-    ) -> Result<Option<DatasetHandle>, InternalError> {
-        match self.resolve_dataset_ref(dataset_ref).await {
-            Ok(hdl) => Ok(Some(hdl)),
-            Err(GetDatasetError::NotFound(_)) => Ok(None),
-            Err(GetDatasetError::Internal(e)) => Err(e),
-        }
-    }
-
-    async fn try_get_dataset(
-        &self,
-        dataset_ref: &DatasetRef,
-    ) -> Result<Option<Arc<dyn Dataset>>, InternalError> {
-        match self.find_dataset_by_ref(dataset_ref).await {
-            Ok(ds) => Ok(Some(ds)),
-            Err(GetDatasetError::NotFound(_)) => Ok(None),
-            Err(GetDatasetError::Internal(e)) => Err(e),
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Errors

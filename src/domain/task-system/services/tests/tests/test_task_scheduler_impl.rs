@@ -10,7 +10,14 @@
 use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
-use kamu_task_system::{LogicalPlan, Probe, TaskMetadata, TaskScheduler, TaskState, TaskStatus};
+use kamu_task_system::{
+    LogicalPlan,
+    LogicalPlanProbe,
+    TaskMetadata,
+    TaskScheduler,
+    TaskState,
+    TaskStatus,
+};
 use kamu_task_system_inmem::InMemoryTaskEventStore;
 use kamu_task_system_services::TaskSchedulerImpl;
 use time_source::SystemTimeSourceStub;
@@ -21,7 +28,10 @@ use time_source::SystemTimeSourceStub;
 async fn test_creates_task() {
     let task_sched = create_task_scheduler();
 
-    let logical_plan_expected: LogicalPlan = Probe { ..Probe::default() }.into();
+    let logical_plan_expected: LogicalPlan = LogicalPlanProbe {
+        ..LogicalPlanProbe::default()
+    }
+    .into();
 
     let metadata_expected = TaskMetadata::from(vec![("foo", "x"), ("bar", "y")]);
 
@@ -55,13 +65,25 @@ async fn test_queues_tasks() {
     assert!(maybe_task_0.is_none());
 
     let task_id_1 = task_sched
-        .create_task(Probe { ..Probe::default() }.into(), None)
+        .create_task(
+            LogicalPlanProbe {
+                ..LogicalPlanProbe::default()
+            }
+            .into(),
+            None,
+        )
         .await
         .unwrap()
         .task_id;
 
     let task_id_2 = task_sched
-        .create_task(Probe { ..Probe::default() }.into(), None)
+        .create_task(
+            LogicalPlanProbe {
+                ..LogicalPlanProbe::default()
+            }
+            .into(),
+            None,
+        )
         .await
         .unwrap()
         .task_id;
@@ -83,13 +105,25 @@ async fn test_task_taken_task_is_running() {
     let task_sched = create_task_scheduler();
 
     let task_id_1 = task_sched
-        .create_task(Probe { ..Probe::default() }.into(), None)
+        .create_task(
+            LogicalPlanProbe {
+                ..LogicalPlanProbe::default()
+            }
+            .into(),
+            None,
+        )
         .await
         .unwrap()
         .task_id;
 
     let task_id_2 = task_sched
-        .create_task(Probe { ..Probe::default() }.into(), None)
+        .create_task(
+            LogicalPlanProbe {
+                ..LogicalPlanProbe::default()
+            }
+            .into(),
+            None,
+        )
         .await
         .unwrap()
         .task_id;
@@ -114,13 +148,25 @@ async fn test_task_cancellation() {
     let task_sched = create_task_scheduler();
 
     let task_id_1 = task_sched
-        .create_task(Probe { ..Probe::default() }.into(), None)
+        .create_task(
+            LogicalPlanProbe {
+                ..LogicalPlanProbe::default()
+            }
+            .into(),
+            None,
+        )
         .await
         .unwrap()
         .task_id;
 
     let task_id_2 = task_sched
-        .create_task(Probe { ..Probe::default() }.into(), None)
+        .create_task(
+            LogicalPlanProbe {
+                ..LogicalPlanProbe::default()
+            }
+            .into(),
+            None,
+        )
         .await
         .unwrap()
         .task_id;

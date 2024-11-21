@@ -60,7 +60,7 @@ impl<TServerHarness: ServerSideHarness> SmartPullExistingUpToDateDatasetScenario
             server_harness.dataset_layout(&server_create_result.dataset_handle);
 
         commit_add_data_event(
-            server_harness.cli_dataset_repository().as_ref(),
+            server_harness.cli_dataset_registry().as_ref(),
             &make_dataset_ref(&server_account_name, "foo"),
             &server_dataset_layout,
             None,

@@ -25,7 +25,7 @@ use messaging_outbox::{
     MessageConsumer,
     MessageConsumerMeta,
     MessageConsumerT,
-    MessageConsumptionDurability,
+    MessageDeliveryMechanism,
     Outbox,
     OutboxExt,
 };
@@ -65,7 +65,7 @@ pub struct FlowExecutorImpl {
         MESSAGE_PRODUCER_KAMU_TASK_EXECUTOR,
         MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE
     ],
-    durability: MessageConsumptionDurability::Durable,
+    delivery: MessageDeliveryMechanism::Transactional,
 })]
 #[interface(dyn InitOnStartup)]
 #[meta(InitOnStartupMeta {
@@ -376,7 +376,7 @@ impl FlowExecutorImpl {
                     {
                         fetch_uncacheable = ingest_rule.fetch_uncacheable;
                     }
-                    Ok(LogicalPlan::UpdateDataset(UpdateDataset {
+                    Ok(LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
                         dataset_id: flow_key.dataset_id.clone(),
                         fetch_uncacheable,
                     }))
@@ -396,18 +396,20 @@ impl FlowExecutorImpl {
                             matches!(compaction_rule, CompactionRule::MetadataOnly(_));
                     };
 
-                    Ok(LogicalPlan::HardCompactionDataset(HardCompactionDataset {
-                        dataset_id: flow_key.dataset_id.clone(),
-                        max_slice_size,
-                        max_slice_records,
-                        keep_metadata_only,
-                    }))
+                    Ok(LogicalPlan::HardCompactDataset(
+                        LogicalPlanHardCompactDataset {
+                            dataset_id: flow_key.dataset_id.clone(),
+                            max_slice_size,
+                            max_slice_records,
+                            keep_metadata_only,
+                        },
+                    ))
                 }
                 DatasetFlowType::Reset => {
                     if let Some(config_rule) = maybe_config_snapshot
                         && let FlowConfigurationSnapshot::Reset(reset_rule) = config_rule
                     {
-                        return Ok(LogicalPlan::Reset(ResetDataset {
+                        return Ok(LogicalPlan::ResetDataset(LogicalPlanResetDataset {
                             dataset_id: flow_key.dataset_id.clone(),
                             new_head_hash: reset_rule.new_head_hash.clone(),
                             old_head_hash: reset_rule.old_head_hash.clone(),
@@ -420,7 +422,7 @@ impl FlowExecutorImpl {
             FlowKey::System(flow_key) => {
                 match flow_key.flow_type {
                     // TODO: replace on correct logical plan
-                    SystemFlowType::GC => Ok(LogicalPlan::Probe(Probe {
+                    SystemFlowType::GC => Ok(LogicalPlan::Probe(LogicalPlanProbe {
                         dataset_id: None,
                         busy_time: Some(std::time::Duration::from_secs(20)),
                         end_with_outcome: Some(TaskOutcome::Success(TaskResult::Empty)),

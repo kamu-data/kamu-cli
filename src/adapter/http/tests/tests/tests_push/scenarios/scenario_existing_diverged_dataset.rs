@@ -69,7 +69,7 @@ impl<TServerHarness: ServerSideHarness> SmartPushExistingDivergedDatasetScenario
         for _ in 0..3 {
             commit_result = Some(
                 commit_add_data_event(
-                    client_harness.dataset_repository().as_ref(),
+                    client_harness.dataset_registry().as_ref(),
                     &client_dataset_ref,
                     &client_dataset_layout,
                     commit_result.map(|r| r.new_head),
@@ -93,14 +93,14 @@ impl<TServerHarness: ServerSideHarness> SmartPushExistingDivergedDatasetScenario
         )
         .await;
 
+        let client_dataset = client_harness
+            .dataset_registry()
+            .get_dataset_by_handle(&client_create_result.dataset_handle);
+
         // Compact at client side
         let compaction_service = client_harness.compaction_service();
         let client_compaction_result = compaction_service
-            .compact_dataset(
-                &client_create_result.dataset_handle,
-                CompactionOptions::default(),
-                None,
-            )
+            .compact_dataset(client_dataset, CompactionOptions::default(), None)
             .await
             .unwrap();
 

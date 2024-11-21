@@ -12,9 +12,11 @@ use std::task::{Context, Poll};
 
 use axum::body::Body;
 use axum::response::Response;
+use database_common::DatabaseTransactionRunner;
 use futures::Future;
+use internal_error::InternalError;
 use kamu_accounts::CurrentAccountSubject;
-use kamu_core::GetDatasetError;
+use kamu_core::{DatasetRegistry, GetDatasetError};
 use opendatafabric::DatasetRef;
 use tower::{Layer, Service};
 
@@ -101,14 +103,6 @@ where
                 .get::<dill::Catalog>()
                 .expect("Catalog not found in http server extensions");
 
-            let dataset_action_authorizer = catalog
-                .get_one::<dyn kamu_core::auth::DatasetActionAuthorizer>()
-                .unwrap();
-
-            let dataset_repo = catalog
-                .get_one::<dyn kamu_core::DatasetRepository>()
-                .unwrap();
-
             let dataset_ref = request
                 .extensions()
                 .get::<DatasetRef>()
@@ -116,35 +110,68 @@ where
 
             let action = dataset_action_query(&request);
 
-            match dataset_repo.resolve_dataset_ref(dataset_ref).await {
-                Ok(dataset_handle) => {
-                    if let Err(err) = dataset_action_authorizer
-                        .check_action_allowed(&dataset_handle, action)
-                        .await
-                    {
-                        if let Err(err_result) = Self::check_logged_in(catalog) {
-                            tracing::error!(
-                                "Dataset '{}' {} access denied: user not logged in",
-                                dataset_ref,
-                                action
-                            );
-                            return Ok(err_result);
-                        }
-
-                        tracing::error!(
-                            "Dataset '{}' {} access denied: {:?}",
-                            dataset_ref,
-                            action,
-                            err
-                        );
-                        return Ok(forbidden_access_response());
-                    }
-                }
-                Err(GetDatasetError::NotFound(_)) => {}
-                Err(GetDatasetError::Internal(_)) => return Ok(internal_server_error_response()),
+            enum CheckResult {
+                Proceed,
+                ErrorResponse(Response<Body>),
             }
 
-            inner.call(request).await
+            let check_result: Result<CheckResult, InternalError> =
+                DatabaseTransactionRunner::new(catalog.clone())
+                    .transactional(|transaction_catalog| async move {
+                        let dataset_registry = transaction_catalog
+                            .get_one::<dyn DatasetRegistry>()
+                            .unwrap();
+                        let dataset_action_authorizer = transaction_catalog
+                            .get_one::<dyn kamu_core::auth::DatasetActionAuthorizer>()
+                            .unwrap();
+
+                        match dataset_registry
+                            .resolve_dataset_handle_by_ref(dataset_ref)
+                            .await
+                        {
+                            Ok(dataset_handle) => {
+                                if let Err(err) = dataset_action_authorizer
+                                    .check_action_allowed(&dataset_handle, action)
+                                    .await
+                                {
+                                    if let Err(err_result) = Self::check_logged_in(catalog) {
+                                        tracing::error!(
+                                            "Dataset '{}' {} access denied: user not logged in",
+                                            dataset_ref,
+                                            action
+                                        );
+                                        return Ok(CheckResult::ErrorResponse(err_result));
+                                    }
+
+                                    tracing::error!(
+                                        "Dataset '{}' {} access denied: {:?}",
+                                        dataset_ref,
+                                        action,
+                                        err
+                                    );
+                                    return Ok(CheckResult::ErrorResponse(
+                                        forbidden_access_response(),
+                                    ));
+                                }
+
+                                Ok(CheckResult::Proceed)
+                            }
+                            Err(GetDatasetError::NotFound(_)) => Ok(CheckResult::Proceed),
+                            Err(GetDatasetError::Internal(_)) => {
+                                Ok(CheckResult::ErrorResponse(internal_server_error_response()))
+                            }
+                        }
+                    })
+                    .await;
+
+            match check_result {
+                Ok(CheckResult::Proceed) => inner.call(request).await,
+                Ok(CheckResult::ErrorResponse(r)) => Ok(r),
+                Err(err) => {
+                    tracing::error!(error=?err, error_msg=%err, "DatasetAuthorizationLayer failed");
+                    Ok(internal_server_error_response())
+                }
+            }
         })
     }
 }

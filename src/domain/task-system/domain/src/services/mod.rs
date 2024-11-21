@@ -7,10 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod task_definition_planner;
 mod task_executor;
-mod task_logical_plan_runner;
+mod task_runner;
 mod task_scheduler;
 
+pub use task_definition_planner::*;
 pub use task_executor::*;
-pub use task_logical_plan_runner::*;
+pub use task_runner::*;
 pub use task_scheduler::*;

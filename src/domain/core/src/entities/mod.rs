@@ -12,8 +12,12 @@ pub mod dataset_summary;
 pub mod engine;
 pub mod metadata_chain;
 pub mod metadata_stream;
+pub mod resolved_dataset;
+pub mod resolved_datasets_map;
 
 pub use dataset::*;
 pub use dataset_summary::*;
 pub use metadata_chain::*;
 pub use metadata_stream::*;
+pub use resolved_dataset::*;
+pub use resolved_datasets_map::*;

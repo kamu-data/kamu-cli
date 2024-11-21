@@ -14,7 +14,7 @@ use kamu_accounts::CurrentAccountSubject;
 use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer};
 use kamu_core::{
     DatasetLifecycleMessage,
-    DatasetRepository,
+    DatasetRegistry,
     GetDatasetError,
     RenameDatasetError,
     RenameDatasetUseCase,
@@ -28,7 +28,7 @@ use crate::DatasetRepositoryWriter;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct RenameDatasetUseCaseImpl {
-    dataset_repo: Arc<dyn DatasetRepository>,
+    dataset_registry: Arc<dyn DatasetRegistry>,
     dataset_repo_writer: Arc<dyn DatasetRepositoryWriter>,
     dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
     outbox: Arc<dyn Outbox>,
@@ -39,14 +39,14 @@ pub struct RenameDatasetUseCaseImpl {
 #[interface(dyn RenameDatasetUseCase)]
 impl RenameDatasetUseCaseImpl {
     pub fn new(
-        dataset_repo: Arc<dyn DatasetRepository>,
+        dataset_registry: Arc<dyn DatasetRegistry>,
         dataset_repo_writer: Arc<dyn DatasetRepositoryWriter>,
         dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
         outbox: Arc<dyn Outbox>,
         current_account_subject: Arc<CurrentAccountSubject>,
     ) -> Self {
         Self {
-            dataset_repo,
+            dataset_registry,
             dataset_repo_writer,
             dataset_action_authorizer,
             outbox,
@@ -57,6 +57,12 @@ impl RenameDatasetUseCaseImpl {
 
 #[async_trait::async_trait]
 impl RenameDatasetUseCase for RenameDatasetUseCaseImpl {
+    #[tracing::instrument(
+        level = "info",
+        name = "RenameDatasetUseCase::execute",
+        skip_all,
+        fields(dataset_ref, new_name)
+    )]
     async fn execute(
         &self,
         dataset_ref: &DatasetRef,
@@ -68,7 +74,11 @@ impl RenameDatasetUseCase for RenameDatasetUseCaseImpl {
             }
             CurrentAccountSubject::Logged(l) => l.account_id.clone(),
         };
-        let dataset_handle = match self.dataset_repo.resolve_dataset_ref(dataset_ref).await {
+        let dataset_handle = match self
+            .dataset_registry
+            .resolve_dataset_handle_by_ref(dataset_ref)
+            .await
+        {
             Ok(h) => Ok(h),
             Err(GetDatasetError::NotFound(e)) => Err(RenameDatasetError::NotFound(e)),
             Err(GetDatasetError::Internal(e)) => Err(RenameDatasetError::Internal(e)),

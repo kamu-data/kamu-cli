@@ -13,7 +13,7 @@ use async_graphql::{Context, ErrorExtensions};
 use internal_error::*;
 use kamu_accounts::{CurrentAccountSubject, GetAccessTokenError, LoggedAccount};
 use kamu_core::auth::DatasetActionUnauthorizedError;
-use kamu_core::{Dataset, DatasetRepository};
+use kamu_core::{DatasetRegistry, ResolvedDataset};
 use kamu_datasets::DatasetEnvVarsConfig;
 use kamu_task_system as ts;
 use opendatafabric::{AccountName as OdfAccountName, DatasetHandle};
@@ -33,9 +33,9 @@ where
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn get_dataset(ctx: &Context<'_>, dataset_handle: &DatasetHandle) -> Arc<dyn Dataset> {
-    let dataset_repo = from_catalog::<dyn DatasetRepository>(ctx).unwrap();
-    dataset_repo.get_dataset_by_handle(dataset_handle)
+pub(crate) fn get_dataset(ctx: &Context<'_>, dataset_handle: &DatasetHandle) -> ResolvedDataset {
+    let dataset_registry = from_catalog::<dyn DatasetRegistry>(ctx).unwrap();
+    dataset_registry.get_dataset_by_handle(dataset_handle)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

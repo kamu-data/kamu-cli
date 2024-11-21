@@ -13,6 +13,7 @@ use kamu_core::{DatasetDependenciesIDStream, DependencyGraphRepository};
 
 mockall::mock! {
     pub DependencyGraphRepository {}
+
     #[async_trait::async_trait]
     impl DependencyGraphRepository for DependencyGraphRepository {
         fn list_dependencies_of_all_datasets(&self) -> DatasetDependenciesIDStream<'_>;

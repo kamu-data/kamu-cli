@@ -25,7 +25,7 @@ pub fn get_staging_name() -> String {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) async fn create_dataset_from_snapshot_impl<
-    TRepository: DatasetRepositoryExt + DatasetRepositoryWriter,
+    TRepository: DatasetRepository + DatasetRepositoryWriter,
 >(
     dataset_repo: &TRepository,
     mut snapshot: DatasetSnapshot,
@@ -237,7 +237,7 @@ async fn resolve_transform_inputs(
     let mut missing_inputs = Vec::new();
 
     for input in inputs.iter_mut() {
-        let hdl = match repo.resolve_dataset_ref(&input.dataset_ref).await {
+        let hdl = match repo.resolve_dataset_handle_by_ref(&input.dataset_ref).await {
             Ok(hdl) => Ok(hdl),
             Err(GetDatasetError::NotFound(_)) => {
                 // Accumulate errors to report as one

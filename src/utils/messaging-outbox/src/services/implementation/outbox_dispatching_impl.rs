@@ -14,15 +14,15 @@ use dill::*;
 use internal_error::InternalError;
 
 use super::{OutboxImmediateImpl, OutboxTransactionalImpl};
-use crate::{MessageConsumer, MessageConsumerMeta, MessageConsumptionDurability, Outbox};
+use crate::{MessageConsumer, MessageConsumerMeta, MessageDeliveryMechanism, Outbox};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct OutboxDispatchingImpl {
     immediate_outbox: Arc<OutboxImmediateImpl>,
     transactional_outbox: Arc<OutboxTransactionalImpl>,
-    durable_producers: HashSet<String>,
-    best_effort_producers: HashSet<String>,
+    transactional_producers: HashSet<String>,
+    immediate_producers: HashSet<String>,
 }
 
 #[component(pub)]
@@ -33,19 +33,20 @@ impl OutboxDispatchingImpl {
         immediate_outbox: Arc<OutboxImmediateImpl>,
         transactional_outbox: Arc<OutboxTransactionalImpl>,
     ) -> Self {
-        let (durable_producers, best_effort_producers) = Self::classify_message_routes(&catalog);
+        let (transactional_producers, immediate_producers) =
+            Self::classify_message_routes(&catalog);
 
         Self {
             immediate_outbox,
             transactional_outbox,
-            durable_producers,
-            best_effort_producers,
+            transactional_producers,
+            immediate_producers,
         }
     }
 
     fn classify_message_routes(catalog: &Catalog) -> (HashSet<String>, HashSet<String>) {
-        let mut durable_producers = HashSet::new();
-        let mut best_effort_producers = HashSet::new();
+        let mut transactional_producers = HashSet::new();
+        let mut immediate_producers = HashSet::new();
 
         let all_consumer_builders = catalog.builders_for::<dyn MessageConsumer>();
         for consumer_builder in all_consumer_builders {
@@ -57,19 +58,19 @@ impl OutboxDispatchingImpl {
             );
             for metadata in all_metadata {
                 for producer_name in metadata.feeding_producers {
-                    match metadata.durability {
-                        MessageConsumptionDurability::Durable => {
-                            durable_producers.insert((*producer_name).to_string());
+                    match metadata.delivery {
+                        MessageDeliveryMechanism::Transactional => {
+                            transactional_producers.insert((*producer_name).to_string());
                         }
-                        MessageConsumptionDurability::BestEffort => {
-                            best_effort_producers.insert((*producer_name).to_string());
+                        MessageDeliveryMechanism::Immediate => {
+                            immediate_producers.insert((*producer_name).to_string());
                         }
                     }
                 }
             }
         }
 
-        (durable_producers, best_effort_producers)
+        (transactional_producers, immediate_producers)
     }
 }
 
@@ -86,13 +87,13 @@ impl Outbox for OutboxDispatchingImpl {
     ) -> Result<(), InternalError> {
         tracing::debug!(content_json = %content_json, "Dispatching outbox message");
 
-        if self.durable_producers.contains(producer_name) {
+        if self.transactional_producers.contains(producer_name) {
             self.transactional_outbox
                 .post_message_as_json(producer_name, content_json, version)
                 .await?;
         }
 
-        if self.best_effort_producers.contains(producer_name) {
+        if self.immediate_producers.contains(producer_name) {
             self.immediate_outbox
                 .post_message_as_json(producer_name, content_json, version)
                 .await?;

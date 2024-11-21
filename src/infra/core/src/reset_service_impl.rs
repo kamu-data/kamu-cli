@@ -7,8 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::sync::Arc;
-
 use dill::*;
 use internal_error::ResultIntoInternal;
 use kamu_core::*;
@@ -16,43 +14,23 @@ use opendatafabric::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct ResetServiceImpl {
-    dataset_repo: Arc<dyn DatasetRepository>,
-    dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
-}
-
 #[component(pub)]
 #[interface(dyn ResetService)]
-impl ResetServiceImpl {
-    pub fn new(
-        dataset_repo: Arc<dyn DatasetRepository>,
-        dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
-    ) -> Self {
-        Self {
-            dataset_repo,
-            dataset_action_authorizer,
-        }
-    }
-}
+pub struct ResetServiceImpl {}
 
 #[async_trait::async_trait]
 impl ResetService for ResetServiceImpl {
+    #[tracing::instrument(level = "info", skip_all, fields(new_head = ?new_head_maybe, old_head = ?old_head_maybe))]
     async fn reset_dataset(
         &self,
-        dataset_handle: &DatasetHandle,
+        target: ResolvedDataset,
         new_head_maybe: Option<&Multihash>,
         old_head_maybe: Option<&Multihash>,
     ) -> Result<Multihash, ResetError> {
-        self.dataset_action_authorizer
-            .check_action_allowed(dataset_handle, auth::DatasetAction::Write)
-            .await?;
-
-        let dataset = self.dataset_repo.get_dataset_by_handle(dataset_handle);
-
         let new_head = if let Some(new_head) = new_head_maybe {
             new_head
         } else {
-            &dataset
+            &target
                 .as_metadata_chain()
                 .accept_one(SearchSeedVisitor::new())
                 .await
@@ -62,7 +40,7 @@ impl ResetService for ResetServiceImpl {
                 .0
         };
         if let Some(old_head) = old_head_maybe
-            && let Some(current_head) = dataset
+            && let Some(current_head) = target
                 .as_metadata_chain()
                 .try_get_ref(&BlockRef::Head)
                 .await?
@@ -74,7 +52,7 @@ impl ResetService for ResetServiceImpl {
             }));
         }
 
-        dataset
+        target
             .as_metadata_chain()
             .set_ref(
                 &BlockRef::Head,

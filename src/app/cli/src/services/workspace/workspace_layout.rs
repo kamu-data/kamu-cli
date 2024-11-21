@@ -10,6 +10,7 @@
 use std::path::{Path, PathBuf};
 
 use internal_error::{InternalError, ResultIntoInternal};
+use kamu::domain::TenancyConfig;
 use opendatafabric::serde::yaml::Manifest;
 use serde::{Deserialize, Serialize};
 
@@ -53,7 +54,10 @@ impl WorkspaceLayout {
         }
     }
 
-    pub fn create(root: impl Into<PathBuf>, multi_tenant: bool) -> Result<Self, InternalError> {
+    pub fn create(
+        root: impl Into<PathBuf>,
+        tenancy_config: TenancyConfig,
+    ) -> Result<Self, InternalError> {
         let ws = Self::new(root);
         if !ws.root_dir.exists() || ws.root_dir.read_dir().int_err()?.next().is_some() {
             std::fs::create_dir(&ws.root_dir).int_err()?;
@@ -65,7 +69,7 @@ impl WorkspaceLayout {
         std::fs::write(&ws.version_path, WorkspaceVersion::LATEST.to_string()).int_err()?;
 
         // Only save the workspace configuration if it is different from default
-        let ws_config = WorkspaceConfig::new(multi_tenant);
+        let ws_config = WorkspaceConfig::new(tenancy_config == TenancyConfig::MultiTenant);
         if ws_config != WorkspaceConfig::default() {
             ws_config.save_to(&ws.config_path).int_err()?;
         }

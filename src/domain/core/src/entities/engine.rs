@@ -17,7 +17,7 @@ use internal_error::*;
 use opendatafabric::*;
 use thiserror::Error;
 
-use crate::{BlockRef, OwnedFile};
+use crate::{BlockRef, OwnedFile, ResolvedDatasetsMap};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Engine
@@ -33,6 +33,7 @@ pub trait Engine: Send + Sync {
     async fn execute_transform(
         &self,
         request: TransformRequestExt,
+        datasets_map: &ResolvedDatasetsMap,
     ) -> Result<TransformResponseExt, EngineError>;
 }
 

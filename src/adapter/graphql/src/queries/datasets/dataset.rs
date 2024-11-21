@@ -33,12 +33,12 @@ impl Dataset {
 
     #[graphql(skip)]
     pub async fn from_ref(ctx: &Context<'_>, dataset_ref: &odf::DatasetRef) -> Result<Dataset> {
-        let dataset_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
+        let dataset_registry = from_catalog::<dyn domain::DatasetRegistry>(ctx).unwrap();
 
         // TODO: Should we resolve reference at this point or allow unresolved and fail
         // later?
-        let hdl = dataset_repo
-            .resolve_dataset_ref(dataset_ref)
+        let hdl = dataset_registry
+            .resolve_dataset_handle_by_ref(dataset_ref)
             .await
             .int_err()?;
         let account = Account::from_dataset_alias(ctx, &hdl.alias)
@@ -48,9 +48,9 @@ impl Dataset {
     }
 
     #[graphql(skip)]
-    fn get_dataset(&self, ctx: &Context<'_>) -> std::sync::Arc<dyn domain::Dataset> {
-        let dataset_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
-        dataset_repo.get_dataset_by_handle(&self.dataset_handle)
+    fn get_dataset(&self, ctx: &Context<'_>) -> domain::ResolvedDataset {
+        let dataset_registry = from_catalog::<dyn domain::DatasetRegistry>(ctx).unwrap();
+        dataset_registry.get_dataset_by_handle(&self.dataset_handle)
     }
 
     /// Unique identifier of the dataset
@@ -77,8 +77,8 @@ impl Dataset {
 
     /// Returns the kind of dataset (Root or Derivative)
     async fn kind(&self, ctx: &Context<'_>) -> Result<DatasetKind> {
-        let dataset = self.get_dataset(ctx);
-        let summary = dataset
+        let resolved_dataset = self.get_dataset(ctx);
+        let summary = resolved_dataset
             .get_summary(domain::GetSummaryOpts::default())
             .await
             .int_err()?;
@@ -111,9 +111,9 @@ impl Dataset {
     // TODO: PERF: Avoid traversing the entire chain
     /// Creation time of the first metadata block in the chain
     async fn created_at(&self, ctx: &Context<'_>) -> Result<DateTime<Utc>> {
-        let dataset = self.get_dataset(ctx);
+        let resolved_dataset = self.get_dataset(ctx);
 
-        Ok(dataset
+        Ok(resolved_dataset
             .as_metadata_chain()
             .accept_one(SearchSeedVisitor::new())
             .await
@@ -125,9 +125,9 @@ impl Dataset {
 
     /// Creation time of the most recent metadata block in the chain
     async fn last_updated_at(&self, ctx: &Context<'_>) -> Result<DateTime<Utc>> {
-        let dataset = self.get_dataset(ctx);
+        let resolved_dataset = self.get_dataset(ctx);
 
-        Ok(dataset
+        Ok(resolved_dataset
             .as_metadata_chain()
             .get_block_by_ref(&domain::BlockRef::Head)
             .await?

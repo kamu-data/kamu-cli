@@ -27,7 +27,7 @@ use crate::utils::{authentication_catalogs, expect_anonymous_access_error};
 
 #[test_log::test(tokio::test)]
 async fn test_metadata_chain_events() {
-    let harness = GraphQLMetadataChainHarness::new(false).await;
+    let harness = GraphQLMetadataChainHarness::new(TenancyConfig::SingleTenant).await;
 
     let create_dataset = harness
         .catalog_authorized
@@ -174,7 +174,7 @@ async fn test_metadata_chain_events() {
 
 #[test_log::test(tokio::test)]
 async fn metadata_chain_append_event() {
-    let harness = GraphQLMetadataChainHarness::new(false).await;
+    let harness = GraphQLMetadataChainHarness::new(TenancyConfig::SingleTenant).await;
 
     let create_dataset = harness
         .catalog_authorized
@@ -259,7 +259,7 @@ async fn metadata_chain_append_event() {
 
 #[test_log::test(tokio::test)]
 async fn metadata_update_readme_new() {
-    let harness = GraphQLMetadataChainHarness::new(false).await;
+    let harness = GraphQLMetadataChainHarness::new(TenancyConfig::SingleTenant).await;
 
     let create_dataset = harness
         .catalog_authorized
@@ -518,7 +518,7 @@ struct GraphQLMetadataChainHarness {
 }
 
 impl GraphQLMetadataChainHarness {
-    async fn new(is_multi_tenant: bool) -> Self {
+    async fn new(tenancy_config: TenancyConfig) -> Self {
         let tempdir = tempfile::tempdir().unwrap();
         let datasets_dir = tempdir.path().join("datasets");
         std::fs::create_dir(&datasets_dir).unwrap();
@@ -532,13 +532,11 @@ impl GraphQLMetadataChainHarness {
                 .add::<CreateDatasetFromSnapshotUseCaseImpl>()
                 .add::<CommitDatasetEventUseCaseImpl>()
                 .add::<DependencyGraphServiceInMemory>()
-                .add_builder(
-                    DatasetRepositoryLocalFs::builder()
-                        .with_root(datasets_dir)
-                        .with_multi_tenant(is_multi_tenant),
-                )
+                .add_value(tenancy_config)
+                .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
                 .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
                 .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
+                .add::<DatasetRegistryRepoBridge>()
                 .add::<auth::AlwaysHappyDatasetActionAuthorizer>();
 
             database_common::NoOpDatabasePlugin::init_database_components(&mut b);

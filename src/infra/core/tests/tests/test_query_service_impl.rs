@@ -125,13 +125,11 @@ fn create_catalog_with_local_workspace(
 
     dill::CatalogBuilder::new()
         .add::<SystemTimeSourceDefault>()
-        .add_builder(
-            DatasetRepositoryLocalFs::builder()
-                .with_root(datasets_dir)
-                .with_multi_tenant(false),
-        )
+        .add_value(TenancyConfig::SingleTenant)
+        .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
         .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
+        .add::<DatasetRegistryRepoBridge>()
         .add::<QueryServiceImpl>()
         .add::<ObjectStoreRegistryImpl>()
         .add::<ObjectStoreBuilderLocalFs>()
@@ -152,13 +150,11 @@ async fn create_catalog_with_s3_workspace(
 
     dill::CatalogBuilder::new()
         .add::<SystemTimeSourceDefault>()
-        .add_builder(
-            DatasetRepositoryS3::builder()
-                .with_s3_context(s3_context.clone())
-                .with_multi_tenant(false),
-        )
+        .add_value(TenancyConfig::SingleTenant)
+        .add_builder(DatasetRepositoryS3::builder().with_s3_context(s3_context.clone()))
         .bind::<dyn DatasetRepository, DatasetRepositoryS3>()
         .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryS3>()
+        .add::<DatasetRegistryRepoBridge>()
         .add::<QueryServiceImpl>()
         .add::<ObjectStoreRegistryImpl>()
         .add::<ObjectStoreBuilderLocalFs>()
@@ -255,50 +251,53 @@ async fn test_dataset_arrow_schema(catalog: &Catalog, tempdir: &TempDir) {
     );
 }
 
-fn prepare_test_catalog() -> (TempDir, Catalog) {
+fn prepare_schema_test_catalog() -> (TempDir, Catalog) {
+    let mut authorizer = MockDatasetActionAuthorizer::new().expect_check_read_a_dataset(1, true);
+    authorizer
+        .expect_filter_datasets_allowing()
+        .returning(|_, _| Ok(vec![]));
+
     let tempdir = tempfile::tempdir().unwrap();
-    let catalog = create_catalog_with_local_workspace(
-        tempdir.path(),
-        MockDatasetActionAuthorizer::new().expect_check_read_a_dataset(1, true),
-    );
+    let catalog = create_catalog_with_local_workspace(tempdir.path(), authorizer);
     (tempdir, catalog)
 }
 
-async fn prepare_test_s3_catalog() -> (LocalS3Server, Catalog) {
+async fn prepare_schema_test_s3_catalog() -> (LocalS3Server, Catalog) {
+    let mut authorizer = MockDatasetActionAuthorizer::new().expect_check_read_a_dataset(1, true);
+    authorizer
+        .expect_filter_datasets_allowing()
+        .returning(|_, _| Ok(vec![]));
+
     let s3 = LocalS3Server::new().await;
-    let catalog = create_catalog_with_s3_workspace(
-        &s3,
-        MockDatasetActionAuthorizer::new().expect_check_read_a_dataset(1, true),
-    )
-    .await;
+    let catalog = create_catalog_with_s3_workspace(&s3, authorizer).await;
     (s3, catalog)
 }
 
 #[test_group::group(engine, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_dataset_parquet_schema_local_fs() {
-    let (tempdir, catalog) = prepare_test_catalog();
+    let (tempdir, catalog) = prepare_schema_test_catalog();
     test_dataset_parquet_schema(&catalog, &tempdir).await;
 }
 
 #[test_group::group(engine, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_dataset_arrow_schema_local_fs() {
-    let (tempdir, catalog) = prepare_test_catalog();
+    let (tempdir, catalog) = prepare_schema_test_catalog();
     test_dataset_arrow_schema(&catalog, &tempdir).await;
 }
 
 #[test_group::group(containerized, engine, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_dataset_parquet_schema_s3() {
-    let (s3, catalog) = prepare_test_s3_catalog().await;
+    let (s3, catalog) = prepare_schema_test_s3_catalog().await;
     test_dataset_parquet_schema(&catalog, &s3.tmp_dir).await;
 }
 
 #[test_group::group(containerized, engine, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_dataset_arrow_schema_s3() {
-    let (s3, catalog) = prepare_test_s3_catalog().await;
+    let (s3, catalog) = prepare_schema_test_s3_catalog().await;
     test_dataset_arrow_schema(&catalog, &s3.tmp_dir).await;
 }
 
@@ -562,11 +561,16 @@ async fn test_dataset_sql_unauthorized_s3() {
 #[test_group::group(engine, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_sql_statement_not_found() {
+    let mut mock_authorizer = MockDatasetActionAuthorizer::new();
+    mock_authorizer
+        .expect_check_action_allowed()
+        .returning(|_, _| Ok(()));
+    mock_authorizer
+        .expect_filter_datasets_allowing()
+        .returning(|_, _| Ok(vec![]));
+
     let tempdir = tempfile::tempdir().unwrap();
-    let catalog = create_catalog_with_local_workspace(
-        tempdir.path(),
-        MockDatasetActionAuthorizer::allowing(),
-    );
+    let catalog = create_catalog_with_local_workspace(tempdir.path(), mock_authorizer);
 
     let _ = create_test_dataset(&catalog, tempdir.path()).await;
 

@@ -12,8 +12,8 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 use dill::*;
-use internal_error::ErrorIntoInternal;
-use kamu_accounts::{CurrentAccountSubject, DEFAULT_ACCOUNT_NAME_STR};
+use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
+use kamu_accounts::CurrentAccountSubject;
 use kamu_core::auth::*;
 use kamu_core::AccessError;
 use opendatafabric::DatasetHandle;
@@ -57,10 +57,14 @@ impl OsoDatasetAuthorizer {
 
     fn dataset_resource(&self, dataset_handle: &DatasetHandle) -> DatasetResource {
         let dataset_alias = &dataset_handle.alias;
-        let creator = dataset_alias
-            .account_name
-            .as_ref()
-            .map_or(DEFAULT_ACCOUNT_NAME_STR, |a| a.as_str());
+        let creator = dataset_alias.account_name.as_ref().map_or_else(
+            || {
+                self.current_account_subject
+                    .account_name_or_default()
+                    .as_str()
+            },
+            |a| a.as_str(),
+        );
 
         // TODO: for now let's treat all datasets as public
         // TODO: explicit read/write permissions
@@ -121,6 +125,71 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
         }
 
         allowed_actions
+    }
+
+    #[tracing::instrument(level = "debug", skip_all, fields(dataset_handles=?dataset_handles, action=%action))]
+    async fn filter_datasets_allowing(
+        &self,
+        dataset_handles: Vec<DatasetHandle>,
+        action: DatasetAction,
+    ) -> Result<Vec<DatasetHandle>, InternalError> {
+        let mut matched_dataset_handles = Vec::new();
+        for hdl in dataset_handles {
+            let is_allowed = self
+                .oso
+                .is_allowed(
+                    self.actor(),
+                    action.to_string(),
+                    self.dataset_resource(&hdl),
+                )
+                .int_err()?;
+            if is_allowed {
+                matched_dataset_handles.push(hdl);
+            }
+        }
+
+        Ok(matched_dataset_handles)
+    }
+
+    #[tracing::instrument(level = "debug", skip_all, fields(dataset_handles=?dataset_handles, action=%action))]
+    async fn classify_datasets_by_allowance(
+        &self,
+        dataset_handles: Vec<DatasetHandle>,
+        action: DatasetAction,
+    ) -> Result<ClassifyByAllowanceResponse, InternalError> {
+        let mut matched_dataset_handles = Vec::with_capacity(dataset_handles.len());
+        let mut unmatched_results = Vec::new();
+
+        for hdl in dataset_handles {
+            let is_allowed = self
+                .oso
+                .is_allowed(
+                    self.actor(),
+                    action.to_string(),
+                    self.dataset_resource(&hdl),
+                )
+                .int_err()?;
+            if is_allowed {
+                matched_dataset_handles.push(hdl);
+            } else {
+                let dataset_ref = hdl.as_local_ref();
+                unmatched_results.push((
+                    hdl,
+                    DatasetActionUnauthorizedError::Access(AccessError::Forbidden(
+                        DatasetActionNotEnoughPermissionsError {
+                            action,
+                            dataset_ref,
+                        }
+                        .into(),
+                    )),
+                ));
+            }
+        }
+
+        Ok(ClassifyByAllowanceResponse {
+            authorized_handles: matched_dataset_handles,
+            unauthorized_handles_with_errors: unmatched_results,
+        })
     }
 }
 

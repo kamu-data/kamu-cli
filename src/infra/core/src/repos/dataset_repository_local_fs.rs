@@ -33,20 +33,22 @@ pub struct DatasetRepositoryLocalFs {
 
 #[component(pub)]
 impl DatasetRepositoryLocalFs {
+    #[allow(clippy::needless_pass_by_value)]
     pub fn new(
         root: PathBuf,
         current_account_subject: Arc<CurrentAccountSubject>,
-        multi_tenant: bool,
+        tenancy_config: Arc<TenancyConfig>,
         system_time_source: Arc<dyn SystemTimeSource>,
     ) -> Self {
         Self {
-            storage_strategy: if multi_tenant {
-                Box::new(DatasetMultiTenantStorageStrategy::new(
+            storage_strategy: match *tenancy_config {
+                TenancyConfig::MultiTenant => Box::new(DatasetMultiTenantStorageStrategy::new(
                     root,
                     current_account_subject,
-                ))
-            } else {
-                Box::new(DatasetSingleTenantStorageStrategy::new(root))
+                )),
+                TenancyConfig::SingleTenant => {
+                    Box::new(DatasetSingleTenantStorageStrategy::new(root))
+                }
             },
             thrash_lock: tokio::sync::Mutex::new(()),
             system_time_source,
@@ -64,6 +66,7 @@ impl DatasetRepositoryLocalFs {
             ObjectRepositoryLocalFSSha3::new(layout.data_dir),
             ObjectRepositoryLocalFSSha3::new(layout.checkpoints_dir),
             NamedObjectRepositoryLocalFS::new(layout.info_dir),
+            Url::from_directory_path(&layout.root_dir).unwrap(),
         ))
     }
 
@@ -73,7 +76,7 @@ impl DatasetRepositoryLocalFs {
         &self,
         dataset_ref: &DatasetRef,
     ) -> Result<DatasetLayout, GetDatasetError> {
-        let dataset_handle = self.resolve_dataset_ref(dataset_ref).await?;
+        let dataset_handle = self.resolve_dataset_handle_by_ref(dataset_ref).await?;
         Ok(DatasetLayout::new(
             self.storage_strategy.get_dataset_path(&dataset_handle),
         ))
@@ -95,22 +98,7 @@ impl DatasetRepositoryLocalFs {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait]
-impl DatasetRegistry for DatasetRepositoryLocalFs {
-    async fn get_dataset_url(&self, dataset_ref: &DatasetRef) -> Result<Url, GetDatasetUrlError> {
-        let dataset_handle = self.resolve_dataset_ref(dataset_ref).await?;
-        let dataset_path = self.storage_strategy.get_dataset_path(&dataset_handle);
-        Ok(Url::from_directory_path(dataset_path).unwrap())
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[async_trait]
 impl DatasetRepository for DatasetRepositoryLocalFs {
-    fn is_multi_tenant(&self) -> bool {
-        self.storage_strategy.is_multi_tenant()
-    }
-
     // TODO: PERF: Cache data and speed up lookups by ID
     //
     // TODO: CONCURRENCY: Since resolving ID to Name currently requires accessing
@@ -120,7 +108,7 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
     //
     // Note that this lock does not prevent concurrent updates to summaries, only
     // reduces the chances of it.
-    async fn resolve_dataset_ref(
+    async fn resolve_dataset_handle_by_ref(
         &self,
         dataset_ref: &DatasetRef,
     ) -> Result<DatasetHandle, GetDatasetError> {
@@ -149,21 +137,12 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
     }
 
     // TODO: PERF: Resolving handles currently involves reading summary files
-    fn get_all_datasets(&self) -> DatasetHandleStream<'_> {
+    fn all_dataset_handles(&self) -> DatasetHandleStream<'_> {
         self.storage_strategy.get_all_datasets()
     }
 
-    fn get_datasets_by_owner(&self, account_name: &AccountName) -> DatasetHandleStream<'_> {
+    fn all_dataset_handles_by_owner(&self, account_name: &AccountName) -> DatasetHandleStream<'_> {
         self.storage_strategy.get_datasets_by_owner(account_name)
-    }
-
-    async fn find_dataset_by_ref(
-        &self,
-        dataset_ref: &DatasetRef,
-    ) -> Result<Arc<dyn Dataset>, GetDatasetError> {
-        let dataset_handle = self.resolve_dataset_ref(dataset_ref).await?;
-        let dataset = self.get_dataset_by_handle(&dataset_handle);
-        Ok(dataset)
     }
 
     fn get_dataset_by_handle(&self, dataset_handle: &DatasetHandle) -> Arc<dyn Dataset> {
@@ -171,6 +150,8 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
         Self::build_dataset(layout)
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait]
 impl DatasetRepositoryWriter for DatasetRepositoryLocalFs {
@@ -181,14 +162,14 @@ impl DatasetRepositoryWriter for DatasetRepositoryLocalFs {
     ) -> Result<CreateDatasetResult, CreateDatasetError> {
         // Check if a dataset with the same alias can be resolved successfully
         let maybe_existing_dataset_handle = match self
-            .resolve_dataset_ref(&dataset_alias.as_local_ref())
+            .resolve_dataset_handle_by_ref(&dataset_alias.as_local_ref())
             .await
         {
             Ok(existing_handle) => Ok(Some(existing_handle)),
             // ToDo temporary fix, remove it on favor of
             // https://github.com/kamu-data/kamu-cli/issues/342
             Err(GetDatasetError::NotFound(_)) => match self
-                .resolve_dataset_ref(&(seed_block.event.dataset_id.clone().into()))
+                .resolve_dataset_handle_by_ref(&(seed_block.event.dataset_id.clone().into()))
                 .await
             {
                 Ok(existing_handle) => Ok(Some(existing_handle)),
@@ -355,8 +336,6 @@ impl DatasetRepositoryWriter for DatasetRepositoryLocalFs {
 
 #[async_trait]
 trait DatasetStorageStrategy: Sync + Send {
-    fn is_multi_tenant(&self) -> bool;
-
     fn get_dataset_path(&self, dataset_handle: &DatasetHandle) -> PathBuf;
 
     fn get_all_datasets(&self) -> DatasetHandleStream<'_>;
@@ -476,10 +455,6 @@ impl DatasetSingleTenantStorageStrategy {
 
 #[async_trait]
 impl DatasetStorageStrategy for DatasetSingleTenantStorageStrategy {
-    fn is_multi_tenant(&self) -> bool {
-        false
-    }
-
     fn get_dataset_path(&self, dataset_handle: &DatasetHandle) -> PathBuf {
         self.dataset_path_impl(&dataset_handle.alias)
     }
@@ -760,10 +735,6 @@ impl DatasetMultiTenantStorageStrategy {
 
 #[async_trait]
 impl DatasetStorageStrategy for DatasetMultiTenantStorageStrategy {
-    fn is_multi_tenant(&self) -> bool {
-        true
-    }
-
     fn get_dataset_path(&self, dataset_handle: &DatasetHandle) -> PathBuf {
         let account_name = self.effective_account_name(&dataset_handle.alias);
 

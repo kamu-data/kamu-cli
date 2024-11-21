@@ -18,12 +18,14 @@ use kamu::domain::{CreateDatasetUseCase, DatasetRepository};
 use kamu::testing::{MetadataFactory, MockDatasetActionAuthorizer};
 use kamu::{
     CreateDatasetUseCaseImpl,
+    DatasetRegistryRepoBridge,
     DatasetRepositoryLocalFs,
     DatasetRepositoryWriter,
     DependencyGraphServiceInMemory,
 };
 use kamu_accounts::testing::MockAuthenticationService;
 use kamu_accounts::*;
+use kamu_core::TenancyConfig;
 use messaging_outbox::DummyOutboxImpl;
 use mockall::predicate::{eq, function};
 use opendatafabric::{DatasetAlias, DatasetHandle, DatasetKind, DatasetName, DatasetRef};
@@ -227,13 +229,14 @@ impl ServerHarness {
                 .bind::<dyn AuthenticationService, MockAuthenticationService>()
                 .add_value(dataset_action_authorizer)
                 .bind::<dyn kamu::domain::auth::DatasetActionAuthorizer, MockDatasetActionAuthorizer>()
+                .add_value(TenancyConfig::SingleTenant)
                 .add_builder(
                     DatasetRepositoryLocalFs::builder()
-                        .with_multi_tenant(false)
                         .with_root(datasets_dir),
                 )
                 .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
                 .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
+                .add::<DatasetRegistryRepoBridge>()
                 .add::<CreateDatasetUseCaseImpl>()
                 .add::<DatabaseTransactionRunner>();
 

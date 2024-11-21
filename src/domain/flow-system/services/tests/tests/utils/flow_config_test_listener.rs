@@ -17,7 +17,7 @@ use messaging_outbox::{
     MessageConsumer,
     MessageConsumerMeta,
     MessageConsumerT,
-    MessageConsumptionDurability,
+    MessageDeliveryMechanism,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -33,7 +33,7 @@ pub(crate) struct FlowConfigTestListener {
 #[meta(MessageConsumerMeta {
     consumer_name: "FlowConfigTestListener",
     feeding_producers: &[MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE],
-    durability: MessageConsumptionDurability::BestEffort,
+    delivery: MessageDeliveryMechanism::Immediate,
 })]
 impl FlowConfigTestListener {
     pub fn new() -> Self {

@@ -49,7 +49,7 @@ pub struct AxumServerPushProtocolInstance {
     socket: axum::extract::ws::WebSocket,
     catalog: Catalog,
     dataset_ref: DatasetRef,
-    dataset: Option<Arc<dyn Dataset>>,
+    maybe_dataset: Option<Arc<dyn Dataset>>,
     dataset_url: Url,
     maybe_bearer_header: Option<BearerHeader>,
 }
@@ -59,7 +59,7 @@ impl AxumServerPushProtocolInstance {
         socket: axum::extract::ws::WebSocket,
         catalog: Catalog,
         dataset_ref: DatasetRef,
-        dataset: Option<Arc<dyn Dataset>>,
+        maybe_dataset: Option<Arc<dyn Dataset>>,
         dataset_url: Url,
         maybe_bearer_header: Option<BearerHeader>,
     ) -> Self {
@@ -67,7 +67,7 @@ impl AxumServerPushProtocolInstance {
             socket,
             catalog,
             dataset_ref,
-            dataset,
+            maybe_dataset,
             dataset_url,
             maybe_bearer_header,
         }
@@ -196,7 +196,7 @@ impl AxumServerPushProtocolInstance {
 
         let mut new_blocks = self.try_handle_push_metadata_request(push_request).await?;
         if !new_blocks.is_empty() {
-            if self.dataset.is_none() {
+            if self.maybe_dataset.is_none() {
                 tracing::info!("Dataset does not exist, trying to create from Seed block");
 
                 let dataset_alias = self
@@ -237,7 +237,9 @@ impl AxumServerPushProtocolInstance {
                     ))
                     .await;
                 match create_result {
-                    Ok(create_result) => self.dataset = Some(create_result.dataset),
+                    Ok(create_result) => {
+                        self.maybe_dataset = Some(create_result.dataset);
+                    }
                     Err(ref _e @ CreateDatasetError::RefCollision(ref err)) => {
                         return Err(PushServerError::RefCollision(RefCollisionError {
                             id: err.id.clone(),
@@ -248,7 +250,7 @@ impl AxumServerPushProtocolInstance {
                     }
                     Err(e) => {
                         return Err(PushServerError::Internal(PhaseInternalError {
-                            phase: TransferPhase::Push(PushPhase::ObjectsUploadProgress),
+                            phase: TransferPhase::Push(PushPhase::EnsuringTargetExists),
                             error: e.int_err(),
                         }));
                     }
@@ -257,7 +259,7 @@ impl AxumServerPushProtocolInstance {
 
             loop {
                 let should_continue = self
-                    .try_handle_push_objects_request(self.dataset.as_ref().unwrap().clone())
+                    .try_handle_push_objects_request(self.maybe_dataset.as_ref().unwrap().clone())
                     .await?;
 
                 if !should_continue {
@@ -293,7 +295,7 @@ impl AxumServerPushProtocolInstance {
 
         // TODO: consider size estimate and maybe cancel too large pushes
 
-        let actual_head = if let Some(dataset) = self.dataset.as_ref() {
+        let actual_head = if let Some(dataset) = self.maybe_dataset.as_ref() {
             match dataset
                 .as_metadata_chain()
                 .resolve_ref(&BlockRef::Head)
@@ -469,7 +471,7 @@ impl AxumServerPushProtocolInstance {
 
         tracing::debug!("Push client sent a complete request. Committing the dataset");
 
-        let dataset = self.dataset.clone().unwrap();
+        let dataset = self.maybe_dataset.clone().unwrap();
         DatabaseTransactionRunner::new(self.catalog.clone())
             .transactional_with(
                 |append_dataset_metadata_batch: Arc<dyn AppendDatasetMetadataBatchUseCase>| async move {

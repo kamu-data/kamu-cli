@@ -10,25 +10,13 @@
 use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
-use dill::{Catalog, Component};
 use kamu::testing::MetadataFactory;
-use kamu::{
-    CreateDatasetFromSnapshotUseCaseImpl,
-    DatasetRepositoryLocalFs,
-    DatasetRepositoryWriter,
-};
-use kamu_accounts::CurrentAccountSubject;
-use kamu_core::{
-    CreateDatasetFromSnapshotUseCase,
-    DatasetLifecycleMessage,
-    DatasetRepository,
-    GetDatasetError,
-    MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
-};
-use messaging_outbox::{MockOutbox, Outbox};
-use mockall::predicate::{eq, function};
+use kamu::CreateDatasetFromSnapshotUseCaseImpl;
+use kamu_core::CreateDatasetFromSnapshotUseCase;
+use messaging_outbox::MockOutbox;
 use opendatafabric::{DatasetAlias, DatasetKind, DatasetName};
-use time_source::SystemTimeSourceDefault;
+
+use crate::tests::use_cases::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -38,7 +26,7 @@ async fn test_create_root_dataset_from_snapshot() {
 
     // Expect only DatasetCreated message for "foo"
     let mut mock_outbox = MockOutbox::new();
-    CreateFromSnapshotUseCaseHarness::add_outbox_dataset_created_expectation(&mut mock_outbox, 1);
+    expect_outbox_dataset_created(&mut mock_outbox, 1);
 
     let harness = CreateFromSnapshotUseCaseHarness::new(mock_outbox);
 
@@ -65,11 +53,8 @@ async fn test_create_derived_dataset_from_snapshot() {
     // Expect DatasetCreated messages for "foo" and "bar"
     // Expect DatasetDependenciesUpdated message for "bar"
     let mut mock_outbox = MockOutbox::new();
-    CreateFromSnapshotUseCaseHarness::add_outbox_dataset_created_expectation(&mut mock_outbox, 2);
-    CreateFromSnapshotUseCaseHarness::add_outbox_dataset_dependencies_updated_expectation(
-        &mut mock_outbox,
-        1,
-    );
+    expect_outbox_dataset_created(&mut mock_outbox, 2);
+    expect_outbox_dataset_dependencies_updated(&mut mock_outbox, 1);
 
     let harness = CreateFromSnapshotUseCaseHarness::new(mock_outbox);
 
@@ -108,86 +93,27 @@ async fn test_create_derived_dataset_from_snapshot() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[oop::extend(BaseUseCaseHarness, base_harness)]
 struct CreateFromSnapshotUseCaseHarness {
-    _temp_dir: tempfile::TempDir,
-    catalog: Catalog,
+    base_harness: BaseUseCaseHarness,
     use_case: Arc<dyn CreateDatasetFromSnapshotUseCase>,
 }
 
 impl CreateFromSnapshotUseCaseHarness {
     fn new(mock_outbox: MockOutbox) -> Self {
-        let tempdir = tempfile::tempdir().unwrap();
+        let base_harness =
+            BaseUseCaseHarness::new(BaseUseCaseHarnessOptions::new().with_outbox(mock_outbox));
 
-        let datasets_dir = tempdir.path().join("datasets");
-        std::fs::create_dir(&datasets_dir).unwrap();
+        let catalog = dill::CatalogBuilder::new_chained(base_harness.catalog())
+            .add::<CreateDatasetFromSnapshotUseCaseImpl>()
+            .build();
 
-        let mut b = dill::CatalogBuilder::new();
-
-        b.add::<CreateDatasetFromSnapshotUseCaseImpl>()
-            .add_builder(
-                DatasetRepositoryLocalFs::builder()
-                    .with_root(datasets_dir)
-                    .with_multi_tenant(false),
-            )
-            .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-            .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
-            .add_value(CurrentAccountSubject::new_test())
-            .add_value(mock_outbox)
-            .bind::<dyn Outbox, MockOutbox>()
-            .add::<SystemTimeSourceDefault>();
-
-        let catalog = b.build();
+        let use_case = catalog.get_one().unwrap();
 
         Self {
-            _temp_dir: tempdir,
-            use_case: catalog.get_one().unwrap(),
-            catalog,
+            base_harness,
+            use_case,
         }
-    }
-
-    async fn check_dataset_exists(&self, alias: &DatasetAlias) -> Result<(), GetDatasetError> {
-        let dataset_repo = self.catalog.get_one::<dyn DatasetRepository>().unwrap();
-        dataset_repo
-            .find_dataset_by_ref(&alias.as_local_ref())
-            .await?;
-        Ok(())
-    }
-
-    fn add_outbox_dataset_created_expectation(mock_outbox: &mut MockOutbox, times: usize) {
-        mock_outbox
-            .expect_post_message_as_json()
-            .with(
-                eq(MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE),
-                function(|message_as_json: &serde_json::Value| {
-                    matches!(
-                        serde_json::from_value::<DatasetLifecycleMessage>(message_as_json.clone()),
-                        Ok(DatasetLifecycleMessage::Created(_))
-                    )
-                }),
-                eq(1),
-            )
-            .times(times)
-            .returning(|_, _, _| Ok(()));
-    }
-
-    fn add_outbox_dataset_dependencies_updated_expectation(
-        mock_outbox: &mut MockOutbox,
-        times: usize,
-    ) {
-        mock_outbox
-            .expect_post_message_as_json()
-            .with(
-                eq(MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE),
-                function(|message_as_json: &serde_json::Value| {
-                    matches!(
-                        serde_json::from_value::<DatasetLifecycleMessage>(message_as_json.clone()),
-                        Ok(DatasetLifecycleMessage::DependenciesUpdated(_))
-                    )
-                }),
-                eq(1),
-            )
-            .times(times)
-            .returning(|_, _, _| Ok(()));
     }
 }
 

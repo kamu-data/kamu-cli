@@ -82,11 +82,11 @@ impl<TServerHarness: ServerSideHarness>
 
         // Extend server-side dataset with new nodes
 
-        let server_repo = server_harness.cli_dataset_repository();
+        let server_repo = server_harness.cli_dataset_registry();
 
         let server_dataset_ref = make_dataset_ref(&server_account_name, "foo");
         let server_dataset_handle = server_repo
-            .resolve_dataset_ref(&server_dataset_ref)
+            .resolve_dataset_handle_by_ref(&server_dataset_ref)
             .await
             .unwrap();
 

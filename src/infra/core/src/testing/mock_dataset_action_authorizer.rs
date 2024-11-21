@@ -9,8 +9,10 @@
 
 use std::collections::HashSet;
 
+use internal_error::InternalError;
 use kamu_core::auth::{
     self,
+    ClassifyByAllowanceResponse,
     DatasetAction,
     DatasetActionAuthorizer,
     DatasetActionNotEnoughPermissionsError,
@@ -25,6 +27,7 @@ use opendatafabric::{DatasetAlias, DatasetHandle};
 
 mockall::mock! {
     pub DatasetActionAuthorizer {}
+
     #[async_trait::async_trait]
     impl DatasetActionAuthorizer for DatasetActionAuthorizer {
         async fn check_action_allowed(
@@ -34,6 +37,18 @@ mockall::mock! {
         ) -> Result<(), DatasetActionUnauthorizedError>;
 
         async fn get_allowed_actions(&self, dataset_handle: &DatasetHandle) -> HashSet<DatasetAction>;
+
+        async fn filter_datasets_allowing(
+            &self,
+            dataset_handles: Vec<DatasetHandle>,
+            action: DatasetAction,
+        ) -> Result<Vec<DatasetHandle>, InternalError>;
+
+        async fn classify_datasets_by_allowance(
+            &self,
+            dataset_handles: Vec<DatasetHandle>,
+            action: DatasetAction,
+        ) -> Result<ClassifyByAllowanceResponse, InternalError>;
     }
 }
 
@@ -131,6 +146,37 @@ impl MockDatasetActionAuthorizer {
                 .with(dataset_handle_predicate, eq(action))
                 .never();
         }
+
+        self
+    }
+
+    pub fn make_expect_classify_datasets_by_allowance(
+        mut self,
+        action: auth::DatasetAction,
+        times: usize,
+        authorized: HashSet<DatasetAlias>,
+    ) -> Self {
+        self.expect_classify_datasets_by_allowance()
+            .with(always(), eq(action))
+            .times(times)
+            .returning(move |handles, action| {
+                let mut good = Vec::new();
+                let mut bad = Vec::new();
+
+                for handle in handles {
+                    if authorized.contains(&handle.alias) {
+                        good.push(handle);
+                    } else {
+                        let error = Self::denying_error(&handle, action);
+                        bad.push((handle, error));
+                    }
+                }
+
+                Ok(ClassifyByAllowanceResponse {
+                    authorized_handles: good,
+                    unauthorized_handles_with_errors: bad,
+                })
+            });
 
         self
     }

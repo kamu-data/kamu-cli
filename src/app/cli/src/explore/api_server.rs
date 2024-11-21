@@ -20,7 +20,7 @@ use dill::{Catalog, CatalogBuilder};
 use http_common::ApiError;
 use indoc::indoc;
 use internal_error::*;
-use kamu::domain::{Protocols, ServerUrlConfig};
+use kamu::domain::{Protocols, ServerUrlConfig, TenancyConfig};
 use kamu_adapter_http::e2e::e2e_router;
 use kamu_flow_system_inmem::domain::FlowExecutor;
 use kamu_task_system_inmem::domain::TaskExecutor;
@@ -46,7 +46,7 @@ impl APIServer {
     pub async fn new(
         base_catalog: &Catalog,
         cli_catalog: &Catalog,
-        multi_tenant_workspace: bool,
+        tenancy_config: TenancyConfig,
         address: Option<IpAddr>,
         port: Option<u16>,
         external_address: Option<IpAddr>,
@@ -115,23 +115,21 @@ impl APIServer {
             .merge(kamu_adapter_http::general::root_router())
             .nest(
                 "/odata",
-                if multi_tenant_workspace {
-                    kamu_adapter_odata::router_multi_tenant()
-                } else {
-                    kamu_adapter_odata::router_single_tenant()
+                match tenancy_config {
+                    TenancyConfig::MultiTenant => kamu_adapter_odata::router_multi_tenant(),
+                    TenancyConfig::SingleTenant => kamu_adapter_odata::router_single_tenant(),
                 },
             )
             .nest(
-                if multi_tenant_workspace {
-                    "/:account_name/:dataset_name"
-                } else {
-                    "/:dataset_name"
+                match tenancy_config {
+                    TenancyConfig::MultiTenant => "/:account_name/:dataset_name",
+                    TenancyConfig::SingleTenant => "/:dataset_name",
                 },
                 kamu_adapter_http::add_dataset_resolver_layer(
                     OpenApiRouter::new()
                         .merge(kamu_adapter_http::smart_transfer_protocol_router())
                         .merge(kamu_adapter_http::data::dataset_router()),
-                    multi_tenant_workspace,
+                    tenancy_config,
                 ),
             );
 

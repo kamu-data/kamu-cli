@@ -79,10 +79,10 @@ impl<TServerHarness: ServerSideHarness> SmartPushExistingEvolvedDatasetScenario<
         .await;
 
         // Extend client-side dataset with new nodes
-        let client_repo = client_harness.dataset_repository();
+        let client_registry = client_harness.dataset_registry();
         let client_dataset_ref = make_dataset_ref(&client_account_name, "foo");
-        client_repo
-            .find_dataset_by_ref(&client_dataset_ref)
+        client_registry
+            .get_dataset_by_ref(&client_dataset_ref)
             .await
             .unwrap()
             .commit_event(
@@ -97,7 +97,7 @@ impl<TServerHarness: ServerSideHarness> SmartPushExistingEvolvedDatasetScenario<
             .unwrap();
 
         let client_commit_result = commit_add_data_event(
-            client_repo.as_ref(),
+            client_registry.as_ref(),
             &client_dataset_ref,
             &client_dataset_layout,
             None,

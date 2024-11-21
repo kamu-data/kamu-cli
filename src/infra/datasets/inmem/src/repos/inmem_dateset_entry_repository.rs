@@ -7,38 +7,30 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::HashMap;
-use std::sync::Arc;
+use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::sync::{Arc, Mutex};
 
-use dill::{component, interface, scope, Singleton};
-use kamu_datasets::{
-    DatasetEntry,
-    DatasetEntryByNameNotFoundError,
-    DatasetEntryNameCollisionError,
-    DatasetEntryNotFoundError,
-    DatasetEntryRepository,
-    DeleteEntryDatasetError,
-    GetDatasetEntriesByOwnerIdError,
-    GetDatasetEntryByNameError,
-    GetDatasetEntryError,
-    SaveDatasetEntryError,
-    SaveDatasetEntryErrorDuplicate,
-    UpdateDatasetEntryNameError,
-};
+use database_common::PaginationOpts;
+use dill::*;
+use internal_error::InternalError;
+use kamu_datasets::*;
 use opendatafabric::{AccountID, DatasetID, DatasetName};
-use tokio::sync::RwLock;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Default)]
 struct State {
     rows: HashMap<DatasetID, DatasetEntry>,
+    rows_by_name: BTreeMap<DatasetName, DatasetEntry>,
+    rows_by_owner: HashMap<AccountID, BTreeSet<DatasetID>>,
 }
 
 impl State {
     fn new() -> Self {
         Self {
             rows: HashMap::new(),
+            rows_by_name: BTreeMap::new(),
+            rows_by_owner: HashMap::new(),
         }
     }
 }
@@ -46,7 +38,7 @@ impl State {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct InMemoryDatasetEntryRepository {
-    state: Arc<RwLock<State>>,
+    state: Arc<Mutex<State>>,
 }
 
 #[component(pub)]
@@ -55,7 +47,7 @@ pub struct InMemoryDatasetEntryRepository {
 impl InMemoryDatasetEntryRepository {
     pub fn new() -> Self {
         Self {
-            state: Arc::new(RwLock::new(State::new())),
+            state: Arc::new(Mutex::new(State::new())),
         }
     }
 }
@@ -64,19 +56,41 @@ impl InMemoryDatasetEntryRepository {
 
 #[async_trait::async_trait]
 impl DatasetEntryRepository for InMemoryDatasetEntryRepository {
-    async fn dataset_entries_count(&self) -> Result<usize, GetDatasetEntryError> {
-        let readable_state = self.state.read().await;
+    async fn dataset_entries_count(&self) -> Result<usize, InternalError> {
+        let readable_state = self.state.lock().unwrap();
+        Ok(readable_state.rows.len())
+    }
 
-        let dataset_entries_count = readable_state.rows.len();
+    async fn dataset_entries_count_by_owner_id(
+        &self,
+        owner_id: &AccountID,
+    ) -> Result<usize, InternalError> {
+        let readable_state = self.state.lock().unwrap();
+        let owner_entires = readable_state.rows_by_owner.get(owner_id);
+        Ok(owner_entires.map_or(0, BTreeSet::len))
+    }
 
-        Ok(dataset_entries_count)
+    fn get_dataset_entries(&self, pagination: PaginationOpts) -> DatasetEntryStream {
+        let dataset_entries_page: Vec<_> = {
+            let readable_state = self.state.lock().unwrap();
+            readable_state
+                .rows_by_name
+                .values()
+                .skip(pagination.offset)
+                .take(pagination.limit)
+                .cloned()
+                .map(Ok)
+                .collect()
+        };
+
+        Box::pin(futures::stream::iter(dataset_entries_page))
     }
 
     async fn get_dataset_entry(
         &self,
         dataset_id: &DatasetID,
     ) -> Result<DatasetEntry, GetDatasetEntryError> {
-        let readable_state = self.state.read().await;
+        let readable_state = self.state.lock().unwrap();
 
         let maybe_dataset_entry = readable_state.rows.get(dataset_id);
 
@@ -87,12 +101,32 @@ impl DatasetEntryRepository for InMemoryDatasetEntryRepository {
         Ok(dataset_entry.clone())
     }
 
-    async fn get_dataset_entry_by_name(
+    async fn get_multiple_dataset_entries(
+        &self,
+        dataset_ids: &[DatasetID],
+    ) -> Result<DatasetEntriesResolution, GetMultipleDatasetEntriesError> {
+        let readable_state = self.state.lock().unwrap();
+
+        let mut resolution = DatasetEntriesResolution::default();
+
+        for dataset_id in dataset_ids {
+            let maybe_dataset_entry = readable_state.rows.get(dataset_id);
+            if let Some(dataset_entry) = maybe_dataset_entry {
+                resolution.resolved_entries.push(dataset_entry.clone());
+            } else {
+                resolution.unresolved_entries.push(dataset_id.clone());
+            }
+        }
+
+        Ok(resolution)
+    }
+
+    async fn get_dataset_entry_by_owner_and_name(
         &self,
         owner_id: &AccountID,
         name: &DatasetName,
     ) -> Result<DatasetEntry, GetDatasetEntryByNameError> {
-        let readable_state = self.state.read().await;
+        let readable_state = self.state.lock().unwrap();
 
         let maybe_dataset_entry = readable_state
             .rows
@@ -108,31 +142,35 @@ impl DatasetEntryRepository for InMemoryDatasetEntryRepository {
         Ok(dataset_entry.clone())
     }
 
-    async fn get_dataset_entries_by_owner_id(
+    fn get_dataset_entries_by_owner_id(
         &self,
         owner_id: &AccountID,
-    ) -> Result<Vec<DatasetEntry>, GetDatasetEntriesByOwnerIdError> {
-        let readable_state = self.state.read().await;
+        pagination: PaginationOpts,
+    ) -> DatasetEntryStream<'_> {
+        let dataset_entries_page: Vec<_> = {
+            let readable_state = self.state.lock().unwrap();
+            if let Some(dataset_ids) = readable_state.rows_by_owner.get(owner_id) {
+                dataset_ids
+                    .iter()
+                    .skip(pagination.offset)
+                    .take(pagination.limit)
+                    .map(|dataset_id| readable_state.rows.get(dataset_id).unwrap())
+                    .cloned()
+                    .map(Ok)
+                    .collect()
+            } else {
+                vec![]
+            }
+        };
 
-        let dataset_entries = readable_state
-            .rows
-            .values()
-            .fold(vec![], |mut acc, dataset| {
-                if dataset.owner_id == *owner_id {
-                    acc.push(dataset.clone());
-                }
-
-                acc
-            });
-
-        Ok(dataset_entries)
+        Box::pin(futures::stream::iter(dataset_entries_page))
     }
 
     async fn save_dataset_entry(
         &self,
         dataset_entry: &DatasetEntry,
     ) -> Result<(), SaveDatasetEntryError> {
-        let mut writable_state = self.state.write().await;
+        let mut writable_state = self.state.lock().unwrap();
 
         for row in writable_state.rows.values() {
             if row.id == dataset_entry.id {
@@ -148,6 +186,18 @@ impl DatasetEntryRepository for InMemoryDatasetEntryRepository {
             .rows
             .insert(dataset_entry.id.clone(), dataset_entry.clone());
 
+        writable_state
+            .rows_by_name
+            .insert(dataset_entry.name.clone(), dataset_entry.clone());
+
+        writable_state
+            .rows_by_owner
+            .entry(dataset_entry.owner_id.clone())
+            .and_modify(|owner_dataset_ids| {
+                owner_dataset_ids.insert(dataset_entry.id.clone());
+            })
+            .or_insert_with(|| BTreeSet::from_iter([dataset_entry.id.clone()]));
+
         Ok(())
     }
 
@@ -156,7 +206,7 @@ impl DatasetEntryRepository for InMemoryDatasetEntryRepository {
         dataset_id: &DatasetID,
         new_name: &DatasetName,
     ) -> Result<(), UpdateDatasetEntryNameError> {
-        let mut writable_state = self.state.write().await;
+        let mut writable_state = self.state.lock().unwrap();
 
         let maybe_dataset_entry = writable_state.rows.get(dataset_id);
 
@@ -176,9 +226,20 @@ impl DatasetEntryRepository for InMemoryDatasetEntryRepository {
 
         // To avoid frustrating the borrow checker, we have to do a second look-up.
         // Safety: We're already guaranteed that the entry will be present.
-        let found_dataset_entry = writable_state.rows.get_mut(dataset_id).unwrap();
+        let old_name = {
+            let found_dataset_entry = writable_state.rows.get_mut(dataset_id).unwrap();
+            let old_name = found_dataset_entry.name.clone();
+            found_dataset_entry.name = new_name.clone();
+            old_name
+        };
 
-        found_dataset_entry.name = new_name.clone();
+        // Mirror the change in named collection
+        let mut entry = writable_state
+            .rows_by_name
+            .remove(&old_name)
+            .expect("named record must be present");
+        entry.name = new_name.clone();
+        writable_state.rows_by_name.insert(new_name.clone(), entry);
 
         Ok(())
     }
@@ -187,11 +248,17 @@ impl DatasetEntryRepository for InMemoryDatasetEntryRepository {
         &self,
         dataset_id: &DatasetID,
     ) -> Result<(), DeleteEntryDatasetError> {
-        let mut writable_state = self.state.write().await;
+        let mut writable_state = self.state.lock().unwrap();
 
-        let not_found = writable_state.rows.remove(dataset_id).is_none();
-
-        if not_found {
+        let maybe_removed_entry = writable_state.rows.remove(dataset_id);
+        if let Some(removed_entry) = maybe_removed_entry {
+            writable_state.rows_by_name.remove(&removed_entry.name);
+            writable_state
+                .rows_by_owner
+                .get_mut(&removed_entry.owner_id)
+                .unwrap()
+                .remove(&removed_entry.id);
+        } else {
             return Err(DatasetEntryNotFoundError::new(dataset_id.clone()).into());
         }
 

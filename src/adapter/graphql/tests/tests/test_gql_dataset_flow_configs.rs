@@ -11,9 +11,10 @@ use async_graphql::value;
 use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use dill::Component;
 use indoc::indoc;
-use kamu::testing::{MetadataFactory, MockPollingIngestService, MockTransformService};
+use kamu::testing::{MetadataFactory, MockPollingIngestService, MockTransformRequestPlanner};
 use kamu::{
     CreateDatasetFromSnapshotUseCaseImpl,
+    DatasetRegistryRepoBridge,
     DatasetRepositoryLocalFs,
     DatasetRepositoryWriter,
     DependencyGraphServiceInMemory,
@@ -24,7 +25,8 @@ use kamu_core::{
     CreateDatasetResult,
     DatasetRepository,
     PollingIngestService,
-    TransformService,
+    TenancyConfig,
+    TransformRequestPlanner,
 };
 use kamu_flow_system_inmem::InMemoryFlowConfigurationEventStore;
 use kamu_flow_system_services::FlowConfigurationServiceImpl;
@@ -39,7 +41,7 @@ use crate::utils::{authentication_catalogs, expect_anonymous_access_error};
 #[test_log::test(tokio::test)]
 async fn test_crud_time_delta_root_dataset() {
     let harness = FlowConfigHarness::with_overrides(FlowRunsHarnessOverrides {
-        transform_service_mock: Some(MockTransformService::with_set_transform()),
+        transform_planner_mock: Some(MockTransformRequestPlanner::with_set_transform()),
         polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
     })
     .await;
@@ -210,7 +212,7 @@ async fn test_crud_time_delta_root_dataset() {
 #[test_log::test(tokio::test)]
 async fn test_time_delta_validation() {
     let harness = FlowConfigHarness::with_overrides(FlowRunsHarnessOverrides {
-        transform_service_mock: Some(MockTransformService::with_set_transform()),
+        transform_planner_mock: Some(MockTransformRequestPlanner::with_set_transform()),
         polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
     })
     .await;
@@ -286,7 +288,7 @@ async fn test_time_delta_validation() {
 #[test_log::test(tokio::test)]
 async fn test_crud_cron_root_dataset() {
     let harness = FlowConfigHarness::with_overrides(FlowRunsHarnessOverrides {
-        transform_service_mock: Some(MockTransformService::with_set_transform()),
+        transform_planner_mock: Some(MockTransformRequestPlanner::with_set_transform()),
         polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
     })
     .await;
@@ -495,7 +497,7 @@ async fn test_crud_cron_root_dataset() {
 #[test_log::test(tokio::test)]
 async fn test_crud_transform_derived_dataset() {
     let harness = FlowConfigHarness::with_overrides(FlowRunsHarnessOverrides {
-        transform_service_mock: Some(MockTransformService::with_set_transform()),
+        transform_planner_mock: Some(MockTransformRequestPlanner::with_set_transform()),
         polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
     })
     .await;
@@ -614,7 +616,7 @@ async fn test_crud_transform_derived_dataset() {
 #[test_log::test(tokio::test)]
 async fn test_crud_compaction_root_dataset() {
     let harness = FlowConfigHarness::with_overrides(FlowRunsHarnessOverrides {
-        transform_service_mock: Some(MockTransformService::with_set_transform()),
+        transform_planner_mock: Some(MockTransformRequestPlanner::with_set_transform()),
         polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
     })
     .await;
@@ -732,7 +734,7 @@ async fn test_crud_compaction_root_dataset() {
 #[test_log::test(tokio::test)]
 async fn test_transform_config_validation() {
     let harness = FlowConfigHarness::with_overrides(FlowRunsHarnessOverrides {
-        transform_service_mock: Some(MockTransformService::with_set_transform()),
+        transform_planner_mock: Some(MockTransformRequestPlanner::with_set_transform()),
         polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
     })
     .await;
@@ -801,7 +803,7 @@ async fn test_transform_config_validation() {
 #[test_log::test(tokio::test)]
 async fn test_compaction_config_validation() {
     let harness = FlowConfigHarness::with_overrides(FlowRunsHarnessOverrides {
-        transform_service_mock: Some(MockTransformService::with_set_transform()),
+        transform_planner_mock: Some(MockTransformRequestPlanner::with_set_transform()),
         polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
     })
     .await;
@@ -926,7 +928,7 @@ async fn test_pause_resume_dataset_flows() {
     // Setup initial flow configs for datasets
 
     let harness = FlowConfigHarness::with_overrides(FlowRunsHarnessOverrides {
-        transform_service_mock: Some(MockTransformService::with_set_transform()),
+        transform_planner_mock: Some(MockTransformRequestPlanner::with_set_transform()),
         polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
     })
     .await;
@@ -1151,7 +1153,7 @@ async fn test_pause_resume_dataset_flows() {
 #[test_log::test(tokio::test)]
 async fn test_conditions_not_met_for_flows() {
     let harness = FlowConfigHarness::with_overrides(FlowRunsHarnessOverrides {
-        transform_service_mock: Some(MockTransformService::without_set_transform()),
+        transform_planner_mock: Some(MockTransformRequestPlanner::without_set_transform()),
         polling_service_mock: Some(MockPollingIngestService::without_active_polling_source()),
     })
     .await;
@@ -1240,7 +1242,7 @@ async fn test_conditions_not_met_for_flows() {
 #[test_log::test(tokio::test)]
 async fn test_incorrect_dataset_kinds_for_flow_type() {
     let harness = FlowConfigHarness::with_overrides(FlowRunsHarnessOverrides {
-        transform_service_mock: Some(MockTransformService::with_set_transform()),
+        transform_planner_mock: Some(MockTransformRequestPlanner::with_set_transform()),
         polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
     })
     .await;
@@ -1398,7 +1400,7 @@ async fn test_incorrect_dataset_kinds_for_flow_type() {
 #[test_log::test(tokio::test)]
 async fn test_set_metadataonly_compaction_config_form_derivative() {
     let harness = FlowConfigHarness::with_overrides(FlowRunsHarnessOverrides {
-        transform_service_mock: Some(MockTransformService::with_set_transform()),
+        transform_planner_mock: Some(MockTransformRequestPlanner::with_set_transform()),
         polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
     })
     .await;
@@ -1454,7 +1456,7 @@ async fn test_set_metadataonly_compaction_config_form_derivative() {
 #[test_log::test(tokio::test)]
 async fn test_set_config_for_hard_compaction_fails() {
     let harness = FlowConfigHarness::with_overrides(FlowRunsHarnessOverrides {
-        transform_service_mock: Some(MockTransformService::without_set_transform()),
+        transform_planner_mock: Some(MockTransformRequestPlanner::without_set_transform()),
         polling_service_mock: Some(MockPollingIngestService::without_active_polling_source()),
     })
     .await;
@@ -1542,7 +1544,7 @@ async fn test_set_config_for_hard_compaction_fails() {
 #[test_log::test(tokio::test)]
 async fn test_anonymous_setters_fail() {
     let harness = FlowConfigHarness::with_overrides(FlowRunsHarnessOverrides {
-        transform_service_mock: Some(MockTransformService::with_set_transform()),
+        transform_planner_mock: Some(MockTransformRequestPlanner::with_set_transform()),
         polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
     })
     .await;
@@ -1599,7 +1601,7 @@ async fn test_anonymous_setters_fail() {
 
 #[derive(Default)]
 struct FlowRunsHarnessOverrides {
-    transform_service_mock: Option<MockTransformService>,
+    transform_planner_mock: Option<MockTransformRequestPlanner>,
     polling_service_mock: Option<MockPollingIngestService>,
 }
 
@@ -1616,26 +1618,24 @@ impl FlowConfigHarness {
         let datasets_dir = tempdir.path().join("datasets");
         std::fs::create_dir(&datasets_dir).unwrap();
 
-        let transform_service_mock = overrides.transform_service_mock.unwrap_or_default();
+        let transform_planner_mock = overrides.transform_planner_mock.unwrap_or_default();
         let polling_service_mock = overrides.polling_service_mock.unwrap_or_default();
 
         let catalog_base = {
             let mut b = dill::CatalogBuilder::new();
 
             b.add::<DummyOutboxImpl>()
-                .add_builder(
-                    DatasetRepositoryLocalFs::builder()
-                        .with_root(datasets_dir)
-                        .with_multi_tenant(false),
-                )
+                .add_value(TenancyConfig::SingleTenant)
+                .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
                 .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
                 .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
+                .add::<DatasetRegistryRepoBridge>()
                 .add::<CreateDatasetFromSnapshotUseCaseImpl>()
                 .add::<SystemTimeSourceDefault>()
                 .add_value(polling_service_mock)
                 .bind::<dyn PollingIngestService, MockPollingIngestService>()
-                .add_value(transform_service_mock)
-                .bind::<dyn TransformService, MockTransformService>()
+                .add_value(transform_planner_mock)
+                .bind::<dyn TransformRequestPlanner, MockTransformRequestPlanner>()
                 .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
                 .add::<DependencyGraphServiceInMemory>()
                 .add::<FlowConfigurationServiceImpl>()

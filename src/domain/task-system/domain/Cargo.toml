@@ -25,6 +25,7 @@ doctest = false
 database-common = { workspace = true }
 enum-variants = { workspace = true }
 event-sourcing = { workspace = true }
+internal-error = { workspace = true }
 messaging-outbox = { workspace = true }
 
 opendatafabric = { workspace = true }

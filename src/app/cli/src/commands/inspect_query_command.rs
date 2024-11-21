@@ -20,7 +20,7 @@ use super::{CLIError, Command};
 use crate::{OutputConfig, WritePager};
 
 pub struct InspectQueryCommand {
-    dataset_repo: Arc<dyn DatasetRepository>,
+    dataset_registry: Arc<dyn DatasetRegistry>,
     dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
     dataset_ref: DatasetRef,
     output_config: Arc<OutputConfig>,
@@ -28,13 +28,13 @@ pub struct InspectQueryCommand {
 
 impl InspectQueryCommand {
     pub fn new(
-        dataset_repo: Arc<dyn DatasetRepository>,
+        dataset_registry: Arc<dyn DatasetRegistry>,
         dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
         dataset_ref: DatasetRef,
         output_config: Arc<OutputConfig>,
     ) -> Self {
         Self {
-            dataset_repo,
+            dataset_registry,
             dataset_action_authorizer,
             dataset_ref,
             output_config,
@@ -46,9 +46,9 @@ impl InspectQueryCommand {
         output: &mut impl Write,
         dataset_handle: &DatasetHandle,
     ) -> Result<(), CLIError> {
-        let dataset = self.dataset_repo.get_dataset_by_handle(dataset_handle);
+        let resolved_dataset = self.dataset_registry.get_dataset_by_handle(dataset_handle);
 
-        let mut blocks = dataset.as_metadata_chain().iter_blocks();
+        let mut blocks = resolved_dataset.as_metadata_chain().iter_blocks();
         while let Some((block_hash, block)) = blocks.try_next().await? {
             match &block.event {
                 MetadataEvent::SetTransform(SetTransform { inputs, transform }) => {
@@ -174,8 +174,8 @@ impl InspectQueryCommand {
 impl Command for InspectQueryCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
         let dataset_handle = self
-            .dataset_repo
-            .resolve_dataset_ref(&self.dataset_ref)
+            .dataset_registry
+            .resolve_dataset_handle_by_ref(&self.dataset_ref)
             .await?;
 
         self.dataset_action_authorizer

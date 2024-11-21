@@ -42,6 +42,12 @@ impl AppendDatasetMetadataBatchUseCaseImpl {
 
 #[async_trait::async_trait]
 impl AppendDatasetMetadataBatchUseCase for AppendDatasetMetadataBatchUseCaseImpl {
+    #[tracing::instrument(
+        level = "info",
+        name = "AppendDatasetMetadataBatchUseCase::execute",
+        skip_all,
+        fields(dataset_handle, ?new_blocks, force_update_if_diverged)
+    )]
     async fn execute(
         &self,
         dataset: &dyn Dataset,

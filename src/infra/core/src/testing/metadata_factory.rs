@@ -650,6 +650,23 @@ impl ExecuteTransformBuilder {
         self
     }
 
+    pub fn empty_query_inputs_from_particular_ids<I>(mut self, dataset_ids: I) -> Self
+    where
+        I: IntoIterator<Item = DatasetID>,
+    {
+        self.v.query_inputs = dataset_ids
+            .into_iter()
+            .map(|dataset_id| ExecuteTransformInput {
+                dataset_id,
+                prev_block_hash: None,
+                new_block_hash: None,
+                prev_offset: None,
+                new_offset: None,
+            })
+            .collect();
+        self
+    }
+
     pub fn empty_query_inputs_from_seeded_ids<I, A>(mut self, aliases: I) -> Self
     where
         I: IntoIterator<Item = A>,

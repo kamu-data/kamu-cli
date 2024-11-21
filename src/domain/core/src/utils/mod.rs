@@ -10,3 +10,6 @@
 pub mod metadata_chain_comparator;
 pub mod owned_file;
 pub mod paths;
+
+mod tenancy_config;
+pub use tenancy_config::*;

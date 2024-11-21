@@ -18,39 +18,36 @@ use opendatafabric::*;
 use crate::utils::cached_object::CachedObject;
 use crate::*;
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub struct VerificationServiceImpl {
-    dataset_repo: Arc<dyn DatasetRepository>,
-    dataset_authorizer: Arc<dyn domain::auth::DatasetActionAuthorizer>,
-    transform_service: Arc<dyn TransformService>,
+    transform_request_planner: Arc<dyn TransformRequestPlanner>,
+    transform_execution_svc: Arc<dyn TransformExecutionService>,
 }
 
 #[component(pub)]
 #[interface(dyn VerificationService)]
 impl VerificationServiceImpl {
     pub fn new(
-        dataset_repo: Arc<dyn DatasetRepository>,
-        dataset_authorizer: Arc<dyn domain::auth::DatasetActionAuthorizer>,
-        transform_service: Arc<dyn TransformService>,
+        transform_request_planner: Arc<dyn TransformRequestPlanner>,
+        transform_execution_svc: Arc<dyn TransformExecutionService>,
     ) -> Self {
         Self {
-            dataset_repo,
-            dataset_authorizer,
-            transform_service,
+            transform_request_planner,
+            transform_execution_svc,
         }
     }
 
     #[tracing::instrument(level = "info", skip_all)]
-    async fn check_data_integrity<'a>(
-        &'a self,
-        dataset_handle: &'a DatasetHandle,
+    async fn check_data_integrity(
+        &self,
+        resolved_dataset: &ResolvedDataset,
         dataset_kind: DatasetKind,
         block_range: (Option<Multihash>, Option<Multihash>),
         check_logical_hashes: bool,
         listener: Arc<dyn VerificationListener>,
     ) -> Result<(), VerificationError> {
-        let dataset = self.dataset_repo.get_dataset_by_handle(dataset_handle);
-
-        let chain = dataset.as_metadata_chain();
+        let chain = resolved_dataset.as_metadata_chain();
 
         let head = match block_range.1 {
             None => chain.resolve_ref(&BlockRef::Head).await?,
@@ -81,7 +78,7 @@ impl VerificationServiceImpl {
 
             if let Some(output_slice) = &block.event.new_data {
                 // Check size first
-                let size_actual = dataset
+                let size_actual = resolved_dataset
                     .as_data_repo()
                     .get_size(&output_slice.physical_hash)
                     .await
@@ -99,8 +96,11 @@ impl VerificationServiceImpl {
                     ));
                 }
 
-                let data_hashing_helper =
-                    CachedObject::from(&output_slice.physical_hash, dataset.as_data_repo()).await?;
+                let data_hashing_helper = CachedObject::from(
+                    &output_slice.physical_hash,
+                    resolved_dataset.as_data_repo(),
+                )
+                .await?;
 
                 // Do a fast pass using physical hash
                 let physical_hash_actual = data_hashing_helper.physical_hash().await.int_err()?;
@@ -139,7 +139,7 @@ impl VerificationServiceImpl {
 
                 if let Some(checkpoint) = block.event.new_checkpoint {
                     // Check size
-                    let size_actual = dataset
+                    let size_actual = resolved_dataset
                         .as_checkpoint_repo()
                         .get_size(&checkpoint.physical_hash)
                         .await
@@ -158,9 +158,11 @@ impl VerificationServiceImpl {
                     }
 
                     // Check physical hash
-                    let checkpoint_hashing_helper =
-                        CachedObject::from(&checkpoint.physical_hash, dataset.as_checkpoint_repo())
-                            .await?;
+                    let checkpoint_hashing_helper = CachedObject::from(
+                        &checkpoint.physical_hash,
+                        resolved_dataset.as_checkpoint_repo(),
+                    )
+                    .await?;
 
                     let physical_hash_actual =
                         checkpoint_hashing_helper.physical_hash().await.int_err()?;
@@ -193,15 +195,13 @@ impl VerificationServiceImpl {
     }
 
     #[tracing::instrument(level = "info", skip_all)]
-    async fn check_metadata_integrity<'a>(
-        &'a self,
-        dataset_handle: &'a DatasetHandle,
+    async fn check_metadata_integrity(
+        &self,
+        resolved_dataset: &ResolvedDataset,
         block_range: (Option<Multihash>, Option<Multihash>),
         listener: Arc<dyn VerificationListener>,
     ) -> Result<(), VerificationError> {
-        let dataset = self.dataset_repo.get_dataset_by_handle(dataset_handle);
-
-        let chain = dataset.as_metadata_chain();
+        let chain = resolved_dataset.as_metadata_chain();
 
         let head = match block_range.1 {
             None => chain.resolve_ref(&BlockRef::Head).await?,
@@ -211,7 +211,7 @@ impl VerificationServiceImpl {
 
         listener.begin_phase(VerificationPhase::MetadataIntegrity);
 
-        let blocks: Vec<_> = dataset
+        let blocks: Vec<_> = resolved_dataset
             .as_metadata_chain()
             .iter_blocks_interval(&head, tail.as_ref(), false)
             .try_collect()
@@ -248,74 +248,77 @@ impl VerificationServiceImpl {
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[async_trait::async_trait]
 impl VerificationService for VerificationServiceImpl {
-    #[tracing::instrument(level = "info", skip_all, fields(%dataset_ref, ?block_range))]
+    #[tracing::instrument(
+        level = "info",
+        skip_all,
+        fields(
+            target_alias=%request.target.get_alias(),
+            block_range=?request.block_range
+        )
+    )]
     async fn verify(
         &self,
-        dataset_ref: &DatasetRef,
-        block_range: (Option<Multihash>, Option<Multihash>),
-        options: VerificationOptions,
+        request: VerificationRequest<ResolvedDataset>,
         maybe_listener: Option<Arc<dyn VerificationListener>>,
     ) -> VerificationResult {
-        let dataset_handle = match self.dataset_repo.resolve_dataset_ref(dataset_ref).await {
-            Ok(v) => v,
-            Err(e) => return VerificationResult::err_no_handle(e),
-        };
-
-        match self
-            .dataset_authorizer
-            .check_action_allowed(&dataset_handle, domain::auth::DatasetAction::Read)
-            .await
-        {
-            Ok(_) => {}
-            Err(e) => return VerificationResult::err(dataset_handle, e),
-        };
-
-        let dataset = self.dataset_repo.get_dataset_by_handle(&dataset_handle);
-
-        let dataset_kind = match dataset.get_summary(GetSummaryOpts::default()).await {
+        let dataset_kind = match request.target.get_summary(GetSummaryOpts::default()).await {
             Ok(summary) => summary.kind,
-            Err(e) => return VerificationResult::err(dataset_handle, e.int_err()),
+            Err(e) => return VerificationResult::err(request.target.take_handle(), e.int_err()),
         };
 
         let listener = maybe_listener.unwrap_or(Arc::new(NullVerificationListener {}));
         listener.begin();
 
         let outcome = try {
-            if options.check_integrity {
+            if request.options.check_integrity {
                 self.check_metadata_integrity(
-                    &dataset_handle,
-                    block_range.clone(),
+                    &request.target,
+                    request.block_range.clone(),
                     listener.clone(),
                 )
                 .await?;
 
                 self.check_data_integrity(
-                    &dataset_handle,
+                    &request.target,
                     dataset_kind,
-                    block_range.clone(),
-                    options.check_logical_hashes,
+                    request.block_range.clone(),
+                    request.options.check_logical_hashes,
                     listener.clone(),
                 )
                 .await?;
             }
 
-            if dataset_kind == DatasetKind::Derivative && options.replay_transformations {
-                self.transform_service
-                    .verify_transform(
-                        &dataset_handle.as_local_ref(),
-                        block_range.clone(),
-                        Some(listener.clone()),
+            if dataset_kind == DatasetKind::Derivative && request.options.replay_transformations {
+                let plan = self
+                    .transform_request_planner
+                    .build_transform_verification_plan(
+                        request.target.clone(),
+                        request.block_range.clone(),
                     )
-                    .await?;
+                    .await
+                    .map_err(|e| {
+                        VerificationError::VerifyTransform(VerifyTransformError::Plan(e))
+                    })?;
+
+                self.transform_execution_svc
+                    .execute_verify_transform(request.target.clone(), plan, Some(listener.clone()))
+                    .await
+                    .map_err(|e| {
+                        VerificationError::VerifyTransform(VerifyTransformError::Execute(e))
+                    })?;
             }
         };
 
         let result = VerificationResult {
-            dataset_handle: Some(dataset_handle),
+            dataset_handle: Some(request.target.take_handle()),
             outcome,
         };
+
+        tracing::debug!(result = ?result, "Dataset verification finished");
 
         match &result.outcome {
             Ok(_) => listener.success(&result),
@@ -325,36 +328,24 @@ impl VerificationService for VerificationServiceImpl {
         result
     }
 
+    #[tracing::instrument(level = "info", skip_all)]
     async fn verify_multi(
         &self,
-        requests: Vec<VerificationRequest>,
-        options: VerificationOptions,
-        maybe_listener: Option<Arc<dyn VerificationMultiListener>>,
+        requests: Vec<VerificationRequest<ResolvedDataset>>,
+        maybe_multi_listener: Option<Arc<dyn VerificationMultiListener>>,
     ) -> Vec<VerificationResult> {
-        let listener = maybe_listener.unwrap_or(Arc::new(NullVerificationMultiListener {}));
+        let multi_listener =
+            maybe_multi_listener.unwrap_or(Arc::new(NullVerificationMultiListener {}));
 
         let mut results = Vec::new();
         for request in requests {
-            let res = match self
-                .dataset_repo
-                .resolve_dataset_ref(&request.dataset_ref)
-                .await
-            {
-                Ok(dataset_handle) => {
-                    self.verify(
-                        &request.dataset_ref,
-                        request.block_range,
-                        options.clone(),
-                        listener.begin_verify(&dataset_handle),
-                    )
-                    .await
-                }
-                Err(e) => VerificationResult::err_no_handle(e),
-            };
-
-            results.push(res);
+            let dataset_handle = request.target.get_handle();
+            let listener = multi_listener.begin_verify(dataset_handle);
+            results.push(self.verify(request, listener).await);
         }
 
         results
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

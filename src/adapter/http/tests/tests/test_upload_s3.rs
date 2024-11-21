@@ -26,6 +26,7 @@ use kamu_accounts_services::{
     PredefinedAccountsRegistrator,
 };
 use kamu_adapter_http::{FileUploadLimitConfig, UploadContext, UploadService, UploadServiceS3};
+use kamu_core::TenancyConfig;
 use opendatafabric::AccountID;
 use serde_json::json;
 use time_source::SystemTimeSourceDefault;
@@ -80,7 +81,7 @@ impl Harness {
 
         let authentication_service = catalog.get_one::<AuthenticationServiceImpl>().unwrap();
 
-        let api_server = TestAPIServer::new(catalog, listener, true);
+        let api_server = TestAPIServer::new(catalog, listener, TenancyConfig::MultiTenant);
 
         Self {
             _s3: s3,

@@ -31,25 +31,17 @@ pub trait PollingIngestService: Send + Sync {
     /// Returns an active polling source, if any
     async fn get_active_polling_source(
         &self,
-        dataset_ref: &DatasetRef,
+        target: ResolvedDataset,
     ) -> Result<Option<(Multihash, MetadataBlockTyped<SetPollingSource>)>, GetDatasetError>;
 
     /// Uses polling source definition in metadata to ingest data from an
     /// external source
     async fn ingest(
         &self,
-        dataset_ref: &DatasetRef,
+        target: ResolvedDataset,
         options: PollingIngestOptions,
-        listener: Option<Arc<dyn PollingIngestListener>>,
+        maybe_listener: Option<Arc<dyn PollingIngestListener>>,
     ) -> Result<PollingIngestResult, PollingIngestError>;
-
-    /// A batch version of [PollingIngestService::ingest]
-    async fn ingest_multi(
-        &self,
-        dataset_refs: Vec<DatasetRef>,
-        options: PollingIngestOptions,
-        listener: Option<Arc<dyn PollingIngestMultiListener>>,
-    ) -> Vec<PollingIngestResponse>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -89,12 +81,6 @@ impl Default for SchemaInferenceOpts {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug)]
-pub struct PollingIngestResponse {
-    pub dataset_ref: DatasetRef,
-    pub result: Result<PollingIngestResult, PollingIngestError>,
-}
 
 #[derive(Debug)]
 pub enum PollingIngestResult {
@@ -233,13 +219,6 @@ impl TemplateInvalidPatternError {
 // TODO: Revisit error granularity
 #[derive(Debug, Error)]
 pub enum PollingIngestError {
-    #[error(transparent)]
-    DatasetNotFound(
-        #[from]
-        #[backtrace]
-        DatasetNotFoundError,
-    ),
-
     #[error("Source is unreachable at {path}")]
     Unreachable {
         path: String,
@@ -332,13 +311,6 @@ pub enum PollingIngestError {
     ),
 
     #[error(transparent)]
-    Access(
-        #[from]
-        #[backtrace]
-        AccessError,
-    ),
-
-    #[error(transparent)]
     InvalidParameterFormat(
         #[from]
         #[backtrace]
@@ -358,24 +330,6 @@ pub enum PollingIngestError {
         #[backtrace]
         InternalError,
     ),
-}
-
-impl From<GetDatasetError> for PollingIngestError {
-    fn from(v: GetDatasetError) -> Self {
-        match v {
-            GetDatasetError::NotFound(e) => Self::DatasetNotFound(e),
-            GetDatasetError::Internal(e) => Self::Internal(e),
-        }
-    }
-}
-
-impl From<auth::DatasetActionUnauthorizedError> for PollingIngestError {
-    fn from(v: auth::DatasetActionUnauthorizedError) -> Self {
-        match v {
-            auth::DatasetActionUnauthorizedError::Access(e) => Self::Access(e),
-            auth::DatasetActionUnauthorizedError::Internal(e) => Self::Internal(e),
-        }
-    }
 }
 
 impl From<FindDatasetEnvVarError> for PollingIngestError {

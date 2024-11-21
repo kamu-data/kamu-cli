@@ -40,7 +40,7 @@ impl<TServerHarness: ServerSideHarness>
         let client_account_name = client_harness.operating_account_name();
         let server_account_name = server_harness.operating_account_name();
 
-        let server_repo = server_harness.cli_dataset_repository();
+        let server_repo = server_harness.cli_dataset_registry();
 
         let client_create_result = client_harness
             .create_dataset_from_snapshot()
@@ -82,7 +82,7 @@ impl<TServerHarness: ServerSideHarness>
 
         // Extend server-side dataset with new node
         server_repo
-            .find_dataset_by_ref(&make_dataset_ref(&server_account_name, "foo"))
+            .get_dataset_by_ref(&make_dataset_ref(&server_account_name, "foo"))
             .await
             .unwrap()
             .commit_event(

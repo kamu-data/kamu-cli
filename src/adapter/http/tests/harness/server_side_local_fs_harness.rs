@@ -31,6 +31,7 @@ use kamu::{
     CreateDatasetFromSnapshotUseCaseImpl,
     CreateDatasetUseCaseImpl,
     DatasetLayout,
+    DatasetRegistryRepoBridge,
     DatasetRepositoryLocalFs,
     DatasetRepositoryWriter,
     DependencyGraphServiceInMemory,
@@ -40,6 +41,7 @@ use kamu::{
 };
 use kamu_accounts::testing::MockAuthenticationService;
 use kamu_accounts::{Account, AuthenticationService};
+use kamu_core::{DatasetRegistry, TenancyConfig};
 use messaging_outbox::DummyOutboxImpl;
 use opendatafabric::{AccountName, DatasetAlias, DatasetHandle};
 use tempfile::TempDir;
@@ -101,14 +103,12 @@ impl ServerSideLocalFsHarness {
                 .add_value(time_source.clone())
                 .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
                 .add::<DependencyGraphServiceInMemory>()
-                .add_builder(
-                    DatasetRepositoryLocalFs::builder()
-                        .with_root(datasets_dir)
-                        .with_multi_tenant(options.multi_tenant),
-                )
+                .add_value(options.tenancy_config)
+                .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
                 .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
                 .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
                 .add_value(server_authentication_mock(&account))
+                .add::<DatasetRegistryRepoBridge>()
                 .bind::<dyn AuthenticationService, MockAuthenticationService>()
                 .add_value(ServerUrlConfig::new_test(Some(&base_url_rest)))
                 .add::<CompactionServiceImpl>()
@@ -128,7 +128,7 @@ impl ServerSideLocalFsHarness {
         let api_server = TestAPIServer::new(
             create_web_user_catalog(&base_catalog, &options),
             listener,
-            options.multi_tenant,
+            options.tenancy_config,
         );
 
         Self {
@@ -157,16 +157,15 @@ impl ServerSideLocalFsHarness {
 #[async_trait::async_trait]
 impl ServerSideHarness for ServerSideLocalFsHarness {
     fn operating_account_name(&self) -> Option<AccountName> {
-        if self.options.multi_tenant {
-            Some(AccountName::new_unchecked(SERVER_ACCOUNT_NAME))
-        } else {
-            None
+        match self.options.tenancy_config {
+            TenancyConfig::MultiTenant => Some(AccountName::new_unchecked(SERVER_ACCOUNT_NAME)),
+            TenancyConfig::SingleTenant => None,
         }
     }
 
-    fn cli_dataset_repository(&self) -> Arc<dyn DatasetRepository> {
+    fn cli_dataset_registry(&self) -> Arc<dyn DatasetRegistry> {
         let cli_catalog = create_cli_user_catalog(&self.base_catalog);
-        cli_catalog.get_one::<dyn DatasetRepository>().unwrap()
+        cli_catalog.get_one::<dyn DatasetRegistry>().unwrap()
     }
 
     fn cli_create_dataset_use_case(&self) -> Arc<dyn CreateDatasetUseCase> {
@@ -206,8 +205,8 @@ impl ServerSideHarness for ServerSideLocalFsHarness {
     fn dataset_url_with_scheme(&self, dataset_alias: &DatasetAlias, scheme: &str) -> Url {
         let api_server_address = self.api_server_addr();
         Url::from_str(
-            if self.options.multi_tenant {
-                format!(
+            match self.options.tenancy_config {
+                TenancyConfig::MultiTenant => format!(
                     "{}://{}/{}/{}",
                     scheme,
                     api_server_address,
@@ -217,12 +216,11 @@ impl ServerSideHarness for ServerSideLocalFsHarness {
                         panic!("Account name not specified in alias");
                     },
                     dataset_alias.dataset_name
-                )
-            } else {
-                format!(
+                ),
+                TenancyConfig::SingleTenant => format!(
                     "{}://{}/{}",
                     scheme, api_server_address, dataset_alias.dataset_name
-                )
+                ),
             }
             .as_str(),
         )
@@ -230,8 +228,9 @@ impl ServerSideHarness for ServerSideLocalFsHarness {
     }
 
     fn dataset_layout(&self, dataset_handle: &DatasetHandle) -> DatasetLayout {
-        let root_path = if self.options.multi_tenant {
-            self.internal_datasets_folder_path()
+        let root_path = match self.options.tenancy_config {
+            TenancyConfig::MultiTenant => self
+                .internal_datasets_folder_path()
                 .join(
                     if let Some(account_name) = &dataset_handle.alias.account_name {
                         account_name.to_string()
@@ -239,10 +238,10 @@ impl ServerSideHarness for ServerSideLocalFsHarness {
                         panic!("Account name not specified in alias");
                     },
                 )
-                .join(dataset_handle.id.as_multibase().to_stack_string())
-        } else {
-            self.internal_datasets_folder_path()
-                .join(dataset_handle.alias.dataset_name.clone())
+                .join(dataset_handle.id.as_multibase().to_stack_string()),
+            TenancyConfig::SingleTenant => self
+                .internal_datasets_folder_path()
+                .join(dataset_handle.alias.dataset_name.clone()),
         };
         DatasetLayout::new(root_path.as_path())
     }

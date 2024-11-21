@@ -34,15 +34,15 @@ pub trait MessageConsumerT<TMessage: 'static + Message>: MessageConsumer {
 pub struct MessageConsumerMeta {
     pub consumer_name: &'static str,
     pub feeding_producers: &'static [&'static str],
-    pub durability: MessageConsumptionDurability,
+    pub delivery: MessageDeliveryMechanism,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
-pub enum MessageConsumptionDurability {
-    Durable,
-    BestEffort,
+pub enum MessageDeliveryMechanism {
+    Transactional,
+    Immediate,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

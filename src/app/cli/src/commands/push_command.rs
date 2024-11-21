@@ -24,8 +24,8 @@ use crate::output::OutputConfig;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct PushCommand {
-    push_svc: Arc<dyn PushService>,
-    dataset_repo: Arc<dyn DatasetRepository>,
+    push_dataset_use_case: Arc<dyn PushDatasetUseCase>,
+    dataset_registry: Arc<dyn DatasetRegistry>,
     refs: Vec<DatasetRefPattern>,
     all: bool,
     recursive: bool,
@@ -34,12 +34,13 @@ pub struct PushCommand {
     to: Option<DatasetPushTarget>,
     dataset_visibility: DatasetVisibility,
     output_config: Arc<OutputConfig>,
+    tenancy_config: TenancyConfig,
 }
 
 impl PushCommand {
     pub fn new<I>(
-        push_svc: Arc<dyn PushService>,
-        dataset_repo: Arc<dyn DatasetRepository>,
+        push_dataset_use_case: Arc<dyn PushDatasetUseCase>,
+        dataset_registry: Arc<dyn DatasetRegistry>,
         refs: I,
         all: bool,
         recursive: bool,
@@ -48,13 +49,14 @@ impl PushCommand {
         to: Option<DatasetPushTarget>,
         dataset_visibility: DatasetVisibility,
         output_config: Arc<OutputConfig>,
+        tenancy_config: TenancyConfig,
     ) -> Self
     where
         I: IntoIterator<Item = DatasetRefPattern>,
     {
         Self {
-            push_svc,
-            dataset_repo,
+            push_dataset_use_case,
+            dataset_registry,
             refs: refs.into_iter().collect(),
             all,
             recursive,
@@ -63,6 +65,7 @@ impl PushCommand {
             to,
             dataset_visibility,
             output_config,
+            tenancy_config,
         }
     }
 
@@ -71,15 +74,42 @@ impl PushCommand {
         listener: Option<Arc<dyn SyncMultiListener>>,
     ) -> Result<Vec<PushResponse>, CLIError> {
         let dataset_refs: Vec<_> =
-            filter_datasets_by_local_pattern(self.dataset_repo.as_ref(), self.refs.clone())
+            filter_datasets_by_local_pattern(self.dataset_registry.as_ref(), self.refs.clone())
                 .map_ok(|dataset_handle| dataset_handle.as_local_ref())
                 .try_collect()
                 .await?;
 
-        Ok(self
-            .push_svc
-            .push_multi(
-                dataset_refs,
+        let mut dataset_handles = Vec::new();
+        let mut error_responses = Vec::new();
+        // TODO: batch resolution
+        for dataset_ref in &dataset_refs {
+            match self
+                .dataset_registry
+                .resolve_dataset_handle_by_ref(dataset_ref)
+                .await
+            {
+                Ok(hdl) => dataset_handles.push(hdl),
+                Err(e) => {
+                    let push_error = match e {
+                        GetDatasetError::NotFound(e) => PushError::SourceNotFound(e),
+                        GetDatasetError::Internal(e) => PushError::Internal(e),
+                    };
+                    error_responses.push(PushResponse {
+                        local_handle: None,
+                        target: None,
+                        result: Err(push_error),
+                    });
+                }
+            }
+        }
+
+        if !error_responses.is_empty() {
+            return Ok(error_responses);
+        }
+
+        self.push_dataset_use_case
+            .execute_multi(
+                dataset_handles,
                 PushMultiOptions {
                     all: self.all,
                     recursive: self.recursive,
@@ -89,7 +119,8 @@ impl PushCommand {
                 },
                 listener,
             )
-            .await)
+            .await
+            .map_err(CLIError::failure)
     }
 
     fn sync_options(&self) -> SyncOptions {
@@ -101,7 +132,7 @@ impl PushCommand {
     }
 
     async fn push_with_progress(&self) -> Result<Vec<PushResponse>, CLIError> {
-        let progress = PrettyPushProgress::new(self.dataset_repo.is_multi_tenant());
+        let progress = PrettyPushProgress::new(self.tenancy_config);
         let listener = Arc::new(progress.clone());
         self.do_push(Some(listener.clone())).await
     }
@@ -139,7 +170,7 @@ impl Command for PushCommand {
 
         for res in &push_results {
             match &res.result {
-                Ok(r) => match r {
+                Ok(sync_result) => match sync_result {
                     SyncResult::UpToDate => up_to_date += 1,
                     SyncResult::Updated { .. } => updated += 1,
                 },
@@ -196,14 +227,14 @@ impl Command for PushCommand {
 #[derive(Clone)]
 struct PrettyPushProgress {
     pub multi_progress: Arc<indicatif::MultiProgress>,
-    pub multi_tenant_workspace: bool,
+    pub tenancy_config: TenancyConfig,
 }
 
 impl PrettyPushProgress {
-    fn new(multi_tenant_workspace: bool) -> Self {
+    fn new(tenancy_config: TenancyConfig) -> Self {
         Self {
             multi_progress: Arc::new(indicatif::MultiProgress::new()),
-            multi_tenant_workspace,
+            tenancy_config,
         }
     }
 }
@@ -215,7 +246,7 @@ impl SyncMultiListener for PrettyPushProgress {
         dst: &DatasetRefAny,
     ) -> Option<Arc<dyn SyncListener>> {
         Some(Arc::new(PrettySyncProgress::new(
-            src.as_local_ref(|_| !self.multi_tenant_workspace)
+            src.as_local_ref(|_| self.tenancy_config == TenancyConfig::SingleTenant)
                 .expect("Expected local ref"),
             dst.as_remote_ref(|_| true).expect("Expected remote ref"),
             self.multi_progress.clone(),

@@ -14,6 +14,7 @@ use chrono::{DateTime, Utc};
 use internal_error::*;
 use opendatafabric::*;
 use thiserror::Error;
+use url::Url;
 
 pub use crate::utils::owned_file::OwnedFile;
 use crate::*;
@@ -63,6 +64,8 @@ pub trait Dataset: Send + Sync {
         data: Option<&OwnedFile>,
         checkpoint: Option<&CheckpointRef>,
     ) -> Result<ExecuteTransform, InternalError>;
+
+    fn get_storage_internal_url(&self) -> &Url;
 
     fn as_metadata_chain(&self) -> &dyn MetadataChain;
     fn as_data_repo(&self) -> &dyn ObjectRepository;

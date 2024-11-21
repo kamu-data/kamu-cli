@@ -22,6 +22,10 @@ use kamu_datasets_services::DatasetKeyValueServiceSysEnv;
 use opendatafabric::*;
 use time_source::SystemTimeSourceDefault;
 
+use crate::TransformTestHelper;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 async fn test_engine_io_common<
     TDatasetRepo: DatasetRepository + DatasetRepositoryWriter + 'static,
 >(
@@ -37,18 +41,14 @@ async fn test_engine_io_common<
     let engine_provisioner = Arc::new(EngineProvisionerLocal::new(
         EngineProvisionerLocalConfig::default(),
         Arc::new(ContainerRuntime::default()),
-        dataset_repo.clone(),
         run_info_dir.clone(),
     ));
 
-    let dataset_action_authorizer = Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new());
     let object_store_registry = Arc::new(ObjectStoreRegistryImpl::new(object_stores));
     let time_source = Arc::new(SystemTimeSourceDefault);
     let dataset_env_var_sys_env = Arc::new(DatasetKeyValueServiceSysEnv::new());
 
     let ingest_svc = PollingIngestServiceImpl::new(
-        dataset_repo.clone(),
-        dataset_action_authorizer.clone(),
         Arc::new(FetchService::new(
             Arc::new(ContainerRuntime::default()),
             None,
@@ -66,18 +66,15 @@ async fn test_engine_io_common<
         time_source.clone(),
     );
 
-    let transform_svc = TransformServiceImpl::new(
-        dataset_repo.clone(),
-        dataset_action_authorizer.clone(),
-        engine_provisioner.clone(),
-        Arc::new(SystemTimeSourceDefault),
+    let transform_helper = TransformTestHelper::build(
+        Arc::new(DatasetRegistryRepoBridge::new(dataset_repo.clone())),
+        time_source.clone(),
         Arc::new(CompactionServiceImpl::new(
-            dataset_action_authorizer.clone(),
-            dataset_repo.clone(),
             object_store_registry.clone(),
             time_source.clone(),
             run_info_dir.clone(),
         )),
+        engine_provisioner.clone(),
     );
 
     ///////////////////////////////////////////////////////////////////////////
@@ -122,14 +119,15 @@ async fn test_engine_io_common<
 
     let root_alias = root_snapshot.name.clone();
 
-    dataset_repo
+    let root_created = dataset_repo
         .create_dataset_from_snapshot(root_snapshot)
         .await
-        .unwrap();
+        .unwrap()
+        .create_dataset_result;
 
     ingest_svc
         .ingest(
-            &root_alias.as_local_ref(),
+            ResolvedDataset::from(&root_created),
             PollingIngestOptions::default(),
             None,
         )
@@ -151,29 +149,19 @@ async fn test_engine_io_common<
         )
         .build();
 
-    let deriv_alias = deriv_snapshot.name.clone();
-
-    let dataset_deriv = dataset_repo
+    let deriv_created = dataset_repo
         .create_dataset_from_snapshot(deriv_snapshot)
         .await
         .unwrap()
-        .create_dataset_result
-        .dataset;
+        .create_dataset_result;
 
-    let block_hash = match transform_svc
-        .transform(
-            &deriv_alias.as_local_ref(),
-            TransformOptions::default(),
-            None,
-        )
-        .await
-        .unwrap()
-    {
+    let block_hash = match transform_helper.transform_dataset(&deriv_created).await {
         TransformResult::Updated { new_head, .. } => new_head,
         v => panic!("Unexpected result: {v:?}"),
     };
 
-    let block = dataset_deriv
+    let block = deriv_created
+        .dataset
         .as_metadata_chain()
         .get_block(&block_hash)
         .await
@@ -207,27 +195,20 @@ async fn test_engine_io_common<
 
     ingest_svc
         .ingest(
-            &root_alias.as_local_ref(),
+            ResolvedDataset::from(&root_created),
             PollingIngestOptions::default(),
             None,
         )
         .await
         .unwrap();
 
-    let block_hash = match transform_svc
-        .transform(
-            &deriv_alias.as_local_ref(),
-            TransformOptions::default(),
-            None,
-        )
-        .await
-        .unwrap()
-    {
+    let block_hash = match transform_helper.transform_dataset(&deriv_created).await {
         TransformResult::Updated { new_head, .. } => new_head,
         v => panic!("Unexpected result: {v:?}"),
     };
 
-    let block = dataset_deriv
+    let block = deriv_created
+        .dataset
         .as_metadata_chain()
         .get_block(&block_hash)
         .await
@@ -244,12 +225,11 @@ async fn test_engine_io_common<
     // Verify
     ///////////////////////////////////////////////////////////////////////////
 
-    let verify_result = transform_svc
-        .verify_transform(&deriv_alias.as_local_ref(), (None, None), None)
-        .await;
-
+    let verify_result = transform_helper.verify_transform(&deriv_created).await;
     assert_matches!(verify_result, Ok(()));
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(containerized, engine, transform, datafusion)]
 #[test_log::test(tokio::test)]
@@ -267,11 +247,8 @@ async fn test_engine_io_local_file_mount() {
         .add::<kamu_core::auth::AlwaysHappyDatasetActionAuthorizer>()
         .add::<DatasetKeyValueServiceSysEnv>()
         .add_value(CurrentAccountSubject::new_test())
-        .add_builder(
-            DatasetRepositoryLocalFs::builder()
-                .with_root(datasets_dir)
-                .with_multi_tenant(false),
-        )
+        .add_value(TenancyConfig::SingleTenant)
+        .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
         .build();
 
@@ -292,6 +269,8 @@ async fn test_engine_io_local_file_mount() {
     .await;
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[test_group::group(containerized, engine, transform, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_engine_io_s3_to_local_file_mount_proxy() {
@@ -308,11 +287,8 @@ async fn test_engine_io_s3_to_local_file_mount_proxy() {
         .add::<SystemTimeSourceDefault>()
         .add::<kamu_core::auth::AlwaysHappyDatasetActionAuthorizer>()
         .add_value(CurrentAccountSubject::new_test())
-        .add_builder(
-            DatasetRepositoryS3::builder()
-                .with_s3_context(s3_context.clone())
-                .with_multi_tenant(false),
-        )
+        .add_value(TenancyConfig::SingleTenant)
+        .add_builder(DatasetRepositoryS3::builder().with_s3_context(s3_context.clone()))
         .bind::<dyn DatasetRepository, DatasetRepositoryS3>()
         .build();
 
@@ -337,3 +313,5 @@ async fn test_engine_io_s3_to_local_file_mount_proxy() {
     )
     .await;
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

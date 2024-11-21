@@ -13,7 +13,7 @@ use dill::Component;
 use domain::DatasetRepository;
 use kamu::*;
 use kamu_accounts::{CurrentAccountSubject, DEFAULT_ACCOUNT_NAME};
-use kamu_core::CreateDatasetFromSnapshotUseCase;
+use kamu_core::{CreateDatasetFromSnapshotUseCase, TenancyConfig};
 use messaging_outbox::{Outbox, OutboxImmediateImpl};
 use tempfile::TempDir;
 use time_source::SystemTimeSourceDefault;
@@ -29,7 +29,7 @@ struct LocalFsRepoHarness {
 }
 
 impl LocalFsRepoHarness {
-    pub fn create(tempdir: &TempDir, multi_tenant: bool) -> Self {
+    pub fn create(tempdir: &TempDir, tenancy_config: TenancyConfig) -> Self {
         let datasets_dir = tempdir.path().join("datasets");
         std::fs::create_dir(&datasets_dir).unwrap();
 
@@ -41,11 +41,8 @@ impl LocalFsRepoHarness {
             )
             .bind::<dyn Outbox, OutboxImmediateImpl>()
             .add_value(CurrentAccountSubject::new_test())
-            .add_builder(
-                DatasetRepositoryLocalFs::builder()
-                    .with_root(datasets_dir)
-                    .with_multi_tenant(multi_tenant),
-            )
+            .add_value(tenancy_config)
+            .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
             .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
             .add::<CreateDatasetFromSnapshotUseCaseImpl>();
@@ -69,7 +66,7 @@ impl LocalFsRepoHarness {
 #[tokio::test]
 async fn test_create_dataset() {
     let tempdir = tempfile::tempdir().unwrap();
-    let harness = LocalFsRepoHarness::create(&tempdir, false);
+    let harness = LocalFsRepoHarness::create(&tempdir, TenancyConfig::SingleTenant);
 
     test_dataset_repository_shared::test_create_dataset(harness.dataset_repo.as_ref(), None).await;
 }
@@ -79,7 +76,7 @@ async fn test_create_dataset() {
 #[tokio::test]
 async fn test_create_dataset_multi_tenant() {
     let tempdir = tempfile::tempdir().unwrap();
-    let harness = LocalFsRepoHarness::create(&tempdir, true);
+    let harness = LocalFsRepoHarness::create(&tempdir, TenancyConfig::MultiTenant);
 
     test_dataset_repository_shared::test_create_dataset(
         harness.dataset_repo.as_ref(),
@@ -93,7 +90,7 @@ async fn test_create_dataset_multi_tenant() {
 #[tokio::test]
 async fn test_create_dataset_same_name_multiple_tenants() {
     let tempdir = tempfile::tempdir().unwrap();
-    let harness = LocalFsRepoHarness::create(&tempdir, true);
+    let harness = LocalFsRepoHarness::create(&tempdir, TenancyConfig::MultiTenant);
 
     test_dataset_repository_shared::test_create_dataset_same_name_multiple_tenants(
         harness.dataset_repo.as_ref(),
@@ -106,7 +103,7 @@ async fn test_create_dataset_same_name_multiple_tenants() {
 #[tokio::test]
 async fn test_create_dataset_from_snapshot() {
     let tempdir = tempfile::tempdir().unwrap();
-    let harness = LocalFsRepoHarness::create(&tempdir, false);
+    let harness = LocalFsRepoHarness::create(&tempdir, TenancyConfig::SingleTenant);
 
     test_dataset_repository_shared::test_create_dataset_from_snapshot(
         harness.dataset_repo.as_ref(),
@@ -120,7 +117,7 @@ async fn test_create_dataset_from_snapshot() {
 #[tokio::test]
 async fn test_create_dataset_from_snapshot_multi_tenant() {
     let tempdir = tempfile::tempdir().unwrap();
-    let harness = LocalFsRepoHarness::create(&tempdir, true);
+    let harness = LocalFsRepoHarness::create(&tempdir, TenancyConfig::MultiTenant);
 
     test_dataset_repository_shared::test_create_dataset_from_snapshot(
         harness.dataset_repo.as_ref(),
@@ -134,7 +131,7 @@ async fn test_create_dataset_from_snapshot_multi_tenant() {
 #[tokio::test]
 async fn test_rename_dataset() {
     let tempdir = tempfile::tempdir().unwrap();
-    let harness = LocalFsRepoHarness::create(&tempdir, false);
+    let harness = LocalFsRepoHarness::create(&tempdir, TenancyConfig::SingleTenant);
 
     test_dataset_repository_shared::test_rename_dataset(harness.dataset_repo.as_ref(), None).await;
 }
@@ -144,7 +141,7 @@ async fn test_rename_dataset() {
 #[tokio::test]
 async fn test_rename_dataset_multi_tenant() {
     let tempdir = tempfile::tempdir().unwrap();
-    let harness = LocalFsRepoHarness::create(&tempdir, true);
+    let harness = LocalFsRepoHarness::create(&tempdir, TenancyConfig::MultiTenant);
 
     test_dataset_repository_shared::test_rename_dataset(
         harness.dataset_repo.as_ref(),
@@ -158,7 +155,7 @@ async fn test_rename_dataset_multi_tenant() {
 #[tokio::test]
 async fn test_rename_dataset_same_name_multiple_tenants() {
     let tempdir = tempfile::tempdir().unwrap();
-    let harness = LocalFsRepoHarness::create(&tempdir, true);
+    let harness = LocalFsRepoHarness::create(&tempdir, TenancyConfig::MultiTenant);
 
     test_dataset_repository_shared::test_rename_dataset_same_name_multiple_tenants(
         harness.dataset_repo.as_ref(),
@@ -171,7 +168,7 @@ async fn test_rename_dataset_same_name_multiple_tenants() {
 #[tokio::test]
 async fn test_delete_dataset() {
     let tempdir = tempfile::tempdir().unwrap();
-    let harness = LocalFsRepoHarness::create(&tempdir, false);
+    let harness = LocalFsRepoHarness::create(&tempdir, TenancyConfig::SingleTenant);
 
     test_dataset_repository_shared::test_delete_dataset(
         harness.dataset_repo.as_ref(),
@@ -186,7 +183,7 @@ async fn test_delete_dataset() {
 #[tokio::test]
 async fn test_delete_dataset_multi_tenant() {
     let tempdir = tempfile::tempdir().unwrap();
-    let harness = LocalFsRepoHarness::create(&tempdir, true);
+    let harness = LocalFsRepoHarness::create(&tempdir, TenancyConfig::MultiTenant);
 
     test_dataset_repository_shared::test_delete_dataset(
         harness.dataset_repo.as_ref(),
@@ -201,7 +198,7 @@ async fn test_delete_dataset_multi_tenant() {
 #[tokio::test]
 async fn test_iterate_datasets() {
     let tempdir = tempfile::tempdir().unwrap();
-    let harness = LocalFsRepoHarness::create(&tempdir, false);
+    let harness = LocalFsRepoHarness::create(&tempdir, TenancyConfig::SingleTenant);
 
     test_dataset_repository_shared::test_iterate_datasets(harness.dataset_repo.as_ref()).await;
 }
@@ -211,7 +208,7 @@ async fn test_iterate_datasets() {
 #[tokio::test]
 async fn test_iterate_datasets_multi_tenant() {
     let tempdir = tempfile::tempdir().unwrap();
-    let harness = LocalFsRepoHarness::create(&tempdir, true);
+    let harness = LocalFsRepoHarness::create(&tempdir, TenancyConfig::MultiTenant);
 
     test_dataset_repository_shared::test_iterate_datasets_multi_tenant(
         harness.dataset_repo.as_ref(),
@@ -224,7 +221,7 @@ async fn test_iterate_datasets_multi_tenant() {
 #[tokio::test]
 async fn test_create_and_get_case_insensetive_dataset() {
     let tempdir = tempfile::tempdir().unwrap();
-    let harness = LocalFsRepoHarness::create(&tempdir, false);
+    let harness = LocalFsRepoHarness::create(&tempdir, TenancyConfig::SingleTenant);
 
     test_dataset_repository_shared::test_create_and_get_case_insensetive_dataset(
         harness.dataset_repo.as_ref(),
@@ -238,7 +235,7 @@ async fn test_create_and_get_case_insensetive_dataset() {
 #[tokio::test]
 async fn test_create_and_get_case_insensetive_dataset_multi_tenant() {
     let tempdir = tempfile::tempdir().unwrap();
-    let harness = LocalFsRepoHarness::create(&tempdir, true);
+    let harness = LocalFsRepoHarness::create(&tempdir, TenancyConfig::MultiTenant);
 
     test_dataset_repository_shared::test_create_and_get_case_insensetive_dataset(
         harness.dataset_repo.as_ref(),
@@ -252,7 +249,7 @@ async fn test_create_and_get_case_insensetive_dataset_multi_tenant() {
 #[tokio::test]
 async fn test_create_multiple_datasets_with_same_id() {
     let tempdir = tempfile::tempdir().unwrap();
-    let harness = LocalFsRepoHarness::create(&tempdir, false);
+    let harness = LocalFsRepoHarness::create(&tempdir, TenancyConfig::SingleTenant);
 
     test_dataset_repository_shared::test_create_multiple_datasets_with_same_id(
         harness.dataset_repo.as_ref(),
@@ -266,7 +263,7 @@ async fn test_create_multiple_datasets_with_same_id() {
 #[tokio::test]
 async fn test_create_multiple_datasets_with_same_id_multi_tenant() {
     let tempdir = tempfile::tempdir().unwrap();
-    let harness = LocalFsRepoHarness::create(&tempdir, true);
+    let harness = LocalFsRepoHarness::create(&tempdir, TenancyConfig::MultiTenant);
 
     test_dataset_repository_shared::test_create_multiple_datasets_with_same_id(
         harness.dataset_repo.as_ref(),

@@ -8,91 +8,59 @@
 // by the Apache License, Version 2.0.
 
 use std::assert_matches::assert_matches;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use datafusion::arrow::array::{Array, Int32Array, StringArray};
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use datafusion::arrow::record_batch::RecordBatch;
-use dill::Component;
 use kamu::domain::*;
-use kamu::testing::{MetadataFactory, MockDatasetActionAuthorizer, ParquetWriterHelper};
+use kamu::testing::{MetadataFactory, ParquetWriterHelper};
 use kamu::*;
-use kamu_accounts::CurrentAccountSubject;
 use opendatafabric::*;
-use time_source::SystemTimeSourceDefault;
 
-use super::test_pull_service_impl::TestTransformService;
+use crate::BaseRepoHarness;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
 async fn test_verify_data_consistency() {
-    let tempdir = tempfile::tempdir().unwrap();
-    let datasets_dir = tempdir.path().join("datasets");
-    std::fs::create_dir(&datasets_dir).unwrap();
+    let harness = VerifyHarness::new();
 
-    let dataset_alias = DatasetAlias::new(None, DatasetName::new_unchecked("bar"));
+    let foo_alias = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
+    let bar_alias = DatasetAlias::new(None, DatasetName::new_unchecked("bar"));
 
-    let catalog = dill::CatalogBuilder::new()
-        .add::<SystemTimeSourceDefault>()
-        .add_value(CurrentAccountSubject::new_test())
-        .add_value(
-            MockDatasetActionAuthorizer::new().expect_check_read_dataset(&dataset_alias, 3, true),
-        )
-        .bind::<dyn auth::DatasetActionAuthorizer, MockDatasetActionAuthorizer>()
-        .add_builder(
-            DatasetRepositoryLocalFs::builder()
-                .with_root(datasets_dir)
-                .with_multi_tenant(false),
-        )
-        .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-        .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
-        .add_value(TestTransformService::new(Arc::new(Mutex::new(Vec::new()))))
-        .bind::<dyn TransformService, TestTransformService>()
-        .add::<VerificationServiceImpl>()
-        .build();
-
-    let verification_svc = catalog.get_one::<dyn VerificationService>().unwrap();
-    let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
-    let dataset_repo_writer = catalog.get_one::<dyn DatasetRepositoryWriter>().unwrap();
-
-    dataset_repo_writer
-        .create_dataset_from_snapshot(
-            MetadataFactory::dataset_snapshot()
-                .name("foo")
-                .kind(DatasetKind::Root)
-                .push_event(MetadataFactory::set_polling_source().build())
-                .push_event(MetadataFactory::set_data_schema().build())
-                .build(),
+    let foo = harness.create_root_dataset(&foo_alias).await;
+    foo.dataset
+        .commit_event(
+            MetadataEvent::SetDataSchema(MetadataFactory::set_data_schema().build()),
+            CommitOpts::default(),
         )
         .await
         .unwrap();
 
-    dataset_repo_writer
-        .create_dataset_from_snapshot(
-            MetadataFactory::dataset_snapshot()
-                .name(dataset_alias.clone())
-                .kind(DatasetKind::Derivative)
-                .push_event(
-                    MetadataFactory::set_transform()
-                        .inputs_from_refs(["foo"])
-                        .build(),
-                )
-                .push_event(MetadataFactory::set_data_schema().build())
-                .build(),
+    let bar = harness
+        .create_derived_dataset(&bar_alias, vec![foo_alias.as_local_ref()])
+        .await;
+    bar.dataset
+        .commit_event(
+            MetadataEvent::SetDataSchema(MetadataFactory::set_data_schema().build()),
+            CommitOpts::default(),
         )
         .await
         .unwrap();
 
     assert_matches!(
-        verification_svc
+        harness
+            .verification_svc
             .verify(
-                &dataset_alias.as_local_ref(),
-                (None, None),
-                VerificationOptions {
-                    check_integrity: true,
-                    check_logical_hashes: true,
-                    replay_transformations: false
+                VerificationRequest {
+                    target: ResolvedDataset::from(&bar),
+                    block_range: (None, None),
+                    options: VerificationOptions {
+                        check_integrity: true,
+                        check_logical_hashes: true,
+                        replay_transformations: false
+                    },
                 },
                 None,
             )
@@ -112,7 +80,7 @@ async fn test_verify_data_consistency() {
     let b: Arc<dyn Array> = Arc::new(StringArray::from(vec!["a", "b", "c", "d", "e"]));
     let record_batch =
         RecordBatch::try_new(Arc::clone(&schema), vec![Arc::clone(&a), Arc::clone(&b)]).unwrap();
-    let data_path = tempdir.path().join("data");
+    let data_path = harness.temp_dir_path().join("data");
 
     ParquetWriterHelper::from_record_batch(&data_path, &record_batch).unwrap();
     let data_logical_hash =
@@ -121,12 +89,8 @@ async fn test_verify_data_consistency() {
         kamu_data_utils::data::hash::get_file_physical_hash(&data_path).unwrap();
 
     // Commit data
-    let dataset = dataset_repo
-        .find_dataset_by_ref(&dataset_alias.as_local_ref())
-        .await
-        .unwrap();
-
-    let head = dataset
+    let head = bar
+        .dataset
         .commit_add_data(
             AddDataParams {
                 prev_checkpoint: None,
@@ -144,7 +108,7 @@ async fn test_verify_data_consistency() {
         .new_head;
 
     assert_matches!(
-        dataset.as_metadata_chain().get_block(&head).await.unwrap(),
+        bar.dataset.as_metadata_chain().get_block(&head).await.unwrap(),
         MetadataBlock {
             event: MetadataEvent::AddData(AddData {
                 new_data: Some(DataSlice {
@@ -159,14 +123,17 @@ async fn test_verify_data_consistency() {
 
     // Check verification succeeds
     assert_matches!(
-        verification_svc
+        harness
+            .verification_svc
             .verify(
-                &dataset_alias.as_local_ref(),
-                (None, None),
-                VerificationOptions {
-                    check_integrity: true,
-                    check_logical_hashes: true,
-                    replay_transformations: false
+                VerificationRequest {
+                    target: ResolvedDataset::from(&bar),
+                    block_range: (None, None),
+                    options: VerificationOptions {
+                        check_integrity: true,
+                        check_logical_hashes: true,
+                        replay_transformations: false
+                    },
                 },
                 None,
             )
@@ -183,7 +150,7 @@ async fn test_verify_data_consistency() {
         RecordBatch::try_new(Arc::clone(&schema), vec![Arc::clone(&a), Arc::clone(&b)]).unwrap();
 
     let local_data_path = kamu_data_utils::data::local_url::into_local_path(
-        dataset
+        bar.dataset
             .as_data_repo()
             .get_internal_url(&data_physical_hash)
             .await,
@@ -194,10 +161,16 @@ async fn test_verify_data_consistency() {
 
     // Check verification fails
     assert_matches!(
-        verification_svc.verify(
-            &dataset_alias.as_local_ref(),
-            (None, None),
-            VerificationOptions {check_integrity: true, check_logical_hashes: true, replay_transformations: false},
+        harness.verification_svc.verify(
+            VerificationRequest {
+                target: ResolvedDataset::from(&bar),
+                block_range: (None, None),
+                options: VerificationOptions {
+                    check_integrity: true,
+                    check_logical_hashes: true,
+                    replay_transformations: false
+                },
+            },
             None,
         ).await,
         VerificationResult {
@@ -210,6 +183,32 @@ async fn test_verify_data_consistency() {
             ..
         } if block_hash == head && expected == data_logical_hash,
     );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[oop::extend(BaseRepoHarness, base_repo_harness)]
+struct VerifyHarness {
+    base_repo_harness: BaseRepoHarness,
+    verification_svc: Arc<dyn VerificationService>,
+}
+
+impl VerifyHarness {
+    fn new() -> Self {
+        let base_repo_harness = BaseRepoHarness::new(TenancyConfig::SingleTenant);
+
+        let catalog = dill::CatalogBuilder::new_chained(base_repo_harness.catalog())
+            .add::<TransformRequestPlannerImpl>()
+            .add::<TransformExecutionServiceImpl>()
+            .add::<EngineProvisionerNull>()
+            .add::<VerificationServiceImpl>()
+            .build();
+
+        Self {
+            base_repo_harness,
+            verification_svc: catalog.get_one().unwrap(),
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

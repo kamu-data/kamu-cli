@@ -14,26 +14,22 @@ use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_core::*;
 use opendatafabric::serde::yaml::Manifest;
 use opendatafabric::*;
+use thiserror::Error;
 
 use super::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Clone)]
+#[component(pub)]
+#[interface(dyn RemoteAliasesRegistry)]
 pub struct RemoteAliasesRegistryImpl {
-    dataset_repo: Arc<dyn DatasetRepository>,
+    dataset_registry: Arc<dyn DatasetRegistry>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[component(pub)]
-#[interface(dyn RemoteAliasesRegistry)]
 impl RemoteAliasesRegistryImpl {
-    pub fn new(dataset_repo: Arc<dyn DatasetRepository>) -> Self {
-        Self { dataset_repo }
-    }
-
-    async fn read_config(dataset: Arc<dyn Dataset>) -> Result<DatasetConfig, InternalError> {
+    async fn read_config(dataset: &dyn Dataset) -> Result<DatasetConfig, InternalError> {
         match dataset.as_info_repo().get("config").await {
             Ok(bytes) => {
                 let manifest: Manifest<DatasetConfig> =
@@ -48,7 +44,7 @@ impl RemoteAliasesRegistryImpl {
     }
 
     async fn write_config(
-        dataset: Arc<dyn Dataset>,
+        dataset: &dyn Dataset,
         config: &DatasetConfig,
     ) -> Result<(), InternalError> {
         let manifest = Manifest {
@@ -72,11 +68,11 @@ impl RemoteAliasesRegistryImpl {
 impl RemoteAliasesRegistry for RemoteAliasesRegistryImpl {
     async fn get_remote_aliases(
         &self,
-        dataset_ref: &DatasetRef,
+        dataset_handle: &DatasetHandle,
     ) -> Result<Box<dyn RemoteAliases>, GetAliasesError> {
-        let dataset = self.dataset_repo.find_dataset_by_ref(dataset_ref).await?;
-        let config = Self::read_config(dataset.clone()).await?;
-        Ok(Box::new(RemoteAliasesImpl::new(dataset, config)))
+        let resolved_dataset = self.dataset_registry.get_dataset_by_handle(dataset_handle);
+        let config = Self::read_config(resolved_dataset.as_ref()).await?;
+        Ok(Box::new(RemoteAliasesImpl::new(resolved_dataset, config)))
     }
 }
 
@@ -85,13 +81,16 @@ impl RemoteAliasesRegistry for RemoteAliasesRegistryImpl {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct RemoteAliasesImpl {
-    dataset: Arc<dyn Dataset>,
+    resolved_dataset: ResolvedDataset,
     config: DatasetConfig,
 }
 
 impl RemoteAliasesImpl {
-    fn new(dataset: Arc<dyn Dataset>, config: DatasetConfig) -> Self {
-        Self { dataset, config }
+    fn new(resolved_dataset: ResolvedDataset, config: DatasetConfig) -> Self {
+        Self {
+            resolved_dataset,
+            config,
+        }
     }
 }
 
@@ -142,7 +141,8 @@ impl RemoteAliases for RemoteAliasesImpl {
         let remote_ref = remote_ref.to_owned();
         if !aliases.contains(&remote_ref) {
             aliases.push(remote_ref);
-            RemoteAliasesRegistryImpl::write_config(self.dataset.clone(), &self.config).await?;
+            RemoteAliasesRegistryImpl::write_config(self.resolved_dataset.as_ref(), &self.config)
+                .await?;
             Ok(true)
         } else {
             Ok(false)
@@ -161,7 +161,8 @@ impl RemoteAliases for RemoteAliasesImpl {
 
         if let Some(i) = aliases.iter().position(|r| *r == *remote_ref) {
             aliases.remove(i);
-            RemoteAliasesRegistryImpl::write_config(self.dataset.clone(), &self.config).await?;
+            RemoteAliasesRegistryImpl::write_config(self.resolved_dataset.as_ref(), &self.config)
+                .await?;
             Ok(true)
         } else {
             Ok(false)
@@ -176,7 +177,8 @@ impl RemoteAliases for RemoteAliasesImpl {
         let len = aliases.len();
         if !aliases.is_empty() {
             aliases.clear();
-            RemoteAliasesRegistryImpl::write_config(self.dataset.clone(), &self.config).await?;
+            RemoteAliasesRegistryImpl::write_config(self.resolved_dataset.as_ref(), &self.config)
+                .await?;
         }
         Ok(len)
     }
@@ -192,12 +194,14 @@ pub struct RemoteAliasesRegistryNull;
 impl RemoteAliasesRegistry for RemoteAliasesRegistryNull {
     async fn get_remote_aliases(
         &self,
-        dataset_ref: &DatasetRef,
+        _dataset_handle: &DatasetHandle,
     ) -> Result<Box<dyn RemoteAliases>, GetAliasesError> {
-        Err(DatasetNotFoundError {
-            dataset_ref: dataset_ref.clone(),
-        }
-        .into())
+        #[derive(Error, Debug)]
+        #[error("get_remote_aliases requested from stub implementation")]
+        struct NullError {}
+
+        let e = NullError {};
+        Err(GetAliasesError::Internal(e.int_err()))
     }
 }
 

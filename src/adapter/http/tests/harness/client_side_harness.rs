@@ -18,6 +18,7 @@ use dill::Component;
 use headers::Header;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu::domain::*;
+use kamu::utils::simple_transfer_protocol::SimpleTransferProtocol;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_adapter_http::{OdfSmtpVersion, SmartTransferProtocolClientWs};
@@ -48,14 +49,14 @@ const CLIENT_ACCOUNT_NAME: &str = "kamu-client";
 pub(crate) struct ClientSideHarness {
     tempdir: TempDir,
     catalog: dill::Catalog,
-    pull_service: Arc<dyn PullService>,
-    push_service: Arc<dyn PushService>,
+    pull_dataset_use_case: Arc<dyn PullDatasetUseCase>,
+    push_dataset_use_case: Arc<dyn PushDatasetUseCase>,
     access_token_resover: Arc<dyn OdfServerAccessTokenResolver>,
     options: ClientSideHarnessOptions,
 }
 
 pub(crate) struct ClientSideHarnessOptions {
-    pub multi_tenant: bool,
+    pub tenancy_config: TenancyConfig,
     pub authenticated_remotely: bool,
 }
 
@@ -98,13 +99,12 @@ impl ClientSideHarness {
 
         b.add::<SystemTimeSourceDefault>();
 
-        b.add_builder(
-            DatasetRepositoryLocalFs::builder()
-                .with_root(datasets_dir)
-                .with_multi_tenant(options.multi_tenant),
-        )
-        .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-        .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>();
+        b.add_value(options.tenancy_config);
+
+        b.add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
+            .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+            .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
+            .add::<DatasetRegistryRepoBridge>();
 
         b.add::<RemoteRepositoryRegistryImpl>();
 
@@ -125,16 +125,20 @@ impl ClientSideHarness {
         b.add::<DatasetFactoryImpl>();
 
         b.add::<SmartTransferProtocolClientWs>();
+        b.add::<SimpleTransferProtocol>();
 
         b.add::<SyncServiceImpl>();
+        b.add::<SyncRequestBuilder>();
 
-        b.add::<TransformServiceImpl>();
+        b.add::<TransformRequestPlannerImpl>();
+        b.add::<TransformElaborationServiceImpl>();
+        b.add::<TransformExecutionServiceImpl>();
 
         b.add::<CompactionServiceImpl>();
 
-        b.add::<PullServiceImpl>();
+        b.add::<PullRequestPlannerImpl>();
 
-        b.add::<PushServiceImpl>();
+        b.add::<PushRequestPlannerImpl>();
 
         b.add::<DatasetKeyValueServiceSysEnv>();
 
@@ -142,6 +146,8 @@ impl ClientSideHarness {
         b.add::<CreateDatasetFromSnapshotUseCaseImpl>();
         b.add::<CommitDatasetEventUseCaseImpl>();
         b.add::<CreateDatasetUseCaseImpl>();
+        b.add::<PullDatasetUseCaseImpl>();
+        b.add::<PushDatasetUseCaseImpl>();
 
         b.add_value(ContainerRuntime::default());
         b.add_value(kamu::utils::ipfs_wrapper::IpfsClient::default());
@@ -151,8 +157,8 @@ impl ClientSideHarness {
 
         let catalog = b.build();
 
-        let pull_service = catalog.get_one::<dyn PullService>().unwrap();
-        let push_service = catalog.get_one::<dyn PushService>().unwrap();
+        let pull_dataset_use_case = catalog.get_one::<dyn PullDatasetUseCase>().unwrap();
+        let push_dataset_use_case = catalog.get_one::<dyn PushDatasetUseCase>().unwrap();
         let access_token_resover = catalog
             .get_one::<dyn OdfServerAccessTokenResolver>()
             .unwrap();
@@ -160,23 +166,25 @@ impl ClientSideHarness {
         Self {
             tempdir,
             catalog,
-            pull_service,
-            push_service,
+            pull_dataset_use_case,
+            push_dataset_use_case,
             access_token_resover,
             options,
         }
     }
 
     pub fn operating_account_name(&self) -> Option<AccountName> {
-        if self.options.multi_tenant && self.options.authenticated_remotely {
+        if self.options.tenancy_config == TenancyConfig::MultiTenant
+            && self.options.authenticated_remotely
+        {
             Some(AccountName::new_unchecked(CLIENT_ACCOUNT_NAME))
         } else {
             None
         }
     }
 
-    pub fn dataset_repository(&self) -> Arc<dyn DatasetRepository> {
-        self.catalog.get_one::<dyn DatasetRepository>().unwrap()
+    pub fn dataset_registry(&self) -> Arc<dyn DatasetRegistry> {
+        self.catalog.get_one::<dyn DatasetRegistry>().unwrap()
     }
 
     pub fn create_dataset_from_snapshot(&self) -> Arc<dyn CreateDatasetFromSnapshotUseCase> {
@@ -197,12 +205,12 @@ impl ClientSideHarness {
 
     // TODO: accept alias or handle
     pub fn dataset_layout(&self, dataset_id: &DatasetID, dataset_name: &str) -> DatasetLayout {
-        let root_path = if self.options.multi_tenant {
-            self.internal_datasets_folder_path()
+        let root_path = match self.options.tenancy_config {
+            TenancyConfig::MultiTenant => self
+                .internal_datasets_folder_path()
                 .join(CLIENT_ACCOUNT_NAME)
-                .join(dataset_id.as_multibase().to_stack_string())
-        } else {
-            self.internal_datasets_folder_path().join(dataset_name)
+                .join(dataset_id.as_multibase().to_stack_string()),
+            TenancyConfig::SingleTenant => self.internal_datasets_folder_path().join(dataset_name),
         };
         DatasetLayout::new(root_path.as_path())
     }
@@ -212,10 +220,12 @@ impl ClientSideHarness {
         dataset_ref: DatasetRefAny,
         force: bool,
     ) -> Vec<PullResponse> {
-        self.pull_service
-            .pull_multi(
-                vec![dataset_ref],
-                PullMultiOptions {
+        self.pull_dataset_use_case
+            .execute_multi(
+                vec![PullRequest::from_any_ref(&dataset_ref, |_| {
+                    self.options.tenancy_config == TenancyConfig::SingleTenant
+                })],
+                PullOptions {
                     sync_options: SyncOptions {
                         create_if_not_exists: true,
                         force,
@@ -247,9 +257,15 @@ impl ClientSideHarness {
         force: bool,
         dataset_visibility: DatasetVisibility,
     ) -> Vec<PushResponse> {
-        self.push_service
-            .push_multi(
-                vec![dataset_local_ref],
+        let dataset_handle = self
+            .dataset_registry()
+            .resolve_dataset_handle_by_ref(&dataset_local_ref)
+            .await
+            .unwrap();
+
+        self.push_dataset_use_case
+            .execute_multi(
+                vec![dataset_handle],
                 PushMultiOptions {
                     sync_options: SyncOptions {
                         create_if_not_exists: true,
@@ -263,6 +279,7 @@ impl ClientSideHarness {
                 None,
             )
             .await
+            .unwrap()
     }
 
     pub async fn push_dataset_result(

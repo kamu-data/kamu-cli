@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use database_common::PaginationOpts;
+use database_common::{DatabaseTransactionRunner, PaginationOpts};
 use database_common_macros::{transactional_method1, transactional_method2};
 use dill::*;
 use init_on_startup::{InitOnStartup, InitOnStartupMeta};
@@ -22,7 +22,7 @@ use tracing::Instrument as _;
 
 pub struct TaskExecutorImpl {
     catalog: Catalog,
-    task_logical_plan_runner: Arc<dyn TaskLogicalPlanRunner>,
+    task_runner: Arc<dyn TaskRunner>,
     time_source: Arc<dyn SystemTimeSource>,
 }
 
@@ -40,12 +40,12 @@ pub struct TaskExecutorImpl {
 impl TaskExecutorImpl {
     pub fn new(
         catalog: Catalog,
-        task_logical_plan_runner: Arc<dyn TaskLogicalPlanRunner>,
+        task_runner: Arc<dyn TaskRunner>,
         time_source: Arc<dyn SystemTimeSource>,
     ) -> Self {
         Self {
             catalog,
-            task_logical_plan_runner,
+            task_runner,
             time_source,
         }
     }
@@ -143,14 +143,22 @@ impl TaskExecutorImpl {
         tracing::debug!(
             task_id = %task.task_id,
             logical_plan = ?task.logical_plan,
-            "Running task",
+            "Preparing task to run",
         );
 
-        // Run task via logical plan
-        let task_run_result = self
-            .task_logical_plan_runner
-            .run_plan(&task.logical_plan)
-            .await;
+        // Prepare task definition (requires transaction)
+        let task_definition = DatabaseTransactionRunner::new(self.catalog.clone())
+            .transactional_with(
+                |task_definition_planner: Arc<dyn TaskDefinitionPlanner>| async move {
+                    task_definition_planner
+                        .prepare_task_definition(&task.logical_plan)
+                        .await
+                },
+            )
+            .await?;
+
+        // Run task via ldefinition
+        let task_run_result = self.task_runner.run_task(task_definition).await;
 
         // Deal with errors: we should not interrupt the main loop if task fails
         let task_outcome = match task_run_result {

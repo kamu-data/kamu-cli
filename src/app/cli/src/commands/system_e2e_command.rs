@@ -10,7 +10,7 @@
 use std::sync::Arc;
 
 use internal_error::ResultIntoInternal;
-use kamu::domain::{DatasetRepository, MetadataChainExt};
+use kamu::domain::{DatasetRegistry, DatasetRegistryExt, MetadataChainExt};
 use opendatafabric::DatasetRef;
 
 use super::{CLIError, Command};
@@ -20,14 +20,14 @@ use super::{CLIError, Command};
 pub struct SystemE2ECommand {
     action: String,
     dataset_ref: Option<DatasetRef>,
-    dataset_repo: Arc<dyn DatasetRepository>,
+    dataset_registry: Arc<dyn DatasetRegistry>,
 }
 
 impl SystemE2ECommand {
     pub fn new<S>(
         action: S,
         dataset_ref: Option<DatasetRef>,
-        dataset_repo: Arc<dyn DatasetRepository>,
+        dataset_registry: Arc<dyn DatasetRegistry>,
     ) -> Self
     where
         S: Into<String>,
@@ -35,7 +35,7 @@ impl SystemE2ECommand {
         Self {
             action: action.into(),
             dataset_ref,
-            dataset_repo,
+            dataset_registry,
         }
     }
 }
@@ -49,9 +49,12 @@ impl Command for SystemE2ECommand {
                     return Err(CLIError::usage_error("dataset required"));
                 };
 
-                let dataset = self.dataset_repo.find_dataset_by_ref(dataset_ref).await?;
+                let resolved_dataset = self
+                    .dataset_registry
+                    .get_dataset_by_ref(dataset_ref)
+                    .await?;
 
-                let maybe_physical_hash = dataset
+                let maybe_physical_hash = resolved_dataset
                     .as_metadata_chain()
                     .last_data_block_with_new_data()
                     .await?
@@ -63,7 +66,7 @@ impl Command for SystemE2ECommand {
                     return Err(CLIError::usage_error("DataSlice not found"));
                 };
 
-                let internal_url = dataset
+                let internal_url = resolved_dataset
                     .as_data_repo()
                     .get_internal_url(&physical_hash)
                     .await;

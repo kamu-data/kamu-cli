@@ -27,8 +27,6 @@ use super::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct PollingIngestServiceImpl {
-    dataset_repo: Arc<dyn DatasetRepository>,
-    dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
     fetch_service: Arc<FetchService>,
     engine_provisioner: Arc<dyn EngineProvisioner>,
     object_store_registry: Arc<dyn ObjectStoreRegistry>,
@@ -44,8 +42,6 @@ pub struct PollingIngestServiceImpl {
 #[dill::interface(dyn PollingIngestService)]
 impl PollingIngestServiceImpl {
     pub fn new(
-        dataset_repo: Arc<dyn DatasetRepository>,
-        dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
         fetch_service: Arc<FetchService>,
         engine_provisioner: Arc<dyn EngineProvisioner>,
         object_store_registry: Arc<dyn ObjectStoreRegistry>,
@@ -55,8 +51,6 @@ impl PollingIngestServiceImpl {
         time_source: Arc<dyn SystemTimeSource>,
     ) -> Self {
         Self {
-            dataset_repo,
-            dataset_action_authorizer,
             fetch_service,
             engine_provisioner,
             object_store_registry,
@@ -69,24 +63,15 @@ impl PollingIngestServiceImpl {
 
     async fn do_ingest(
         &self,
-        dataset_ref: &DatasetRef,
+        target: ResolvedDataset,
         options: PollingIngestOptions,
         get_listener: impl FnOnce(&DatasetHandle) -> Option<Arc<dyn PollingIngestListener>>,
     ) -> Result<PollingIngestResult, PollingIngestError> {
-        let dataset_handle = self.dataset_repo.resolve_dataset_ref(dataset_ref).await?;
-
-        self.dataset_action_authorizer
-            .check_action_allowed(&dataset_handle, auth::DatasetAction::Write)
-            .await?;
-
-        let dataset = self.dataset_repo.get_dataset_by_handle(&dataset_handle);
-
-        let listener =
-            get_listener(&dataset_handle).unwrap_or_else(|| Arc::new(NullPollingIngestListener));
+        let listener = get_listener(target.get_handle())
+            .unwrap_or_else(|| Arc::new(NullPollingIngestListener));
 
         self.ingest_loop(IngestLoopArgs {
-            dataset_handle,
-            dataset,
+            target,
             options,
             listener,
         })
@@ -97,7 +82,7 @@ impl PollingIngestServiceImpl {
         level = "info",
         skip_all,
         fields(
-            dataset_handle = %args.dataset_handle,
+            dataset_handle = %args.target.get_handle(),
         )
     )]
     async fn ingest_loop(
@@ -105,7 +90,7 @@ impl PollingIngestServiceImpl {
         args: IngestLoopArgs,
     ) -> Result<PollingIngestResult, PollingIngestError> {
         let ctx = ingest_common::new_session_context(self.object_store_registry.clone());
-        let mut data_writer = DataWriterDataFusion::builder(args.dataset.clone(), ctx.clone())
+        let mut data_writer = DataWriterDataFusion::builder((*args.target).clone(), ctx.clone())
             .with_metadata_state_scanned(None)
             .await
             .int_err()?
@@ -140,7 +125,7 @@ impl PollingIngestServiceImpl {
 
             // TODO: Avoid excessive cloning
             let iteration_args = IngestIterationArgs {
-                dataset_handle: args.dataset_handle.clone(),
+                dataset_handle: args.target.get_handle().clone(),
                 iteration,
                 operation_id,
                 operation_dir,
@@ -609,15 +594,13 @@ impl PollingIngestServiceImpl {
 
 #[async_trait::async_trait]
 impl PollingIngestService for PollingIngestServiceImpl {
-    #[tracing::instrument(level = "info", skip_all, fields(%dataset_ref))]
+    #[tracing::instrument(level = "info", skip_all, fields(target=%target.get_handle()))]
     async fn get_active_polling_source(
         &self,
-        dataset_ref: &DatasetRef,
+        target: ResolvedDataset,
     ) -> Result<Option<(Multihash, MetadataBlockTyped<SetPollingSource>)>, GetDatasetError> {
-        let dataset = self.dataset_repo.find_dataset_by_ref(dataset_ref).await?;
-
         // TODO: Support source evolution
-        Ok(dataset
+        Ok(target
             .as_metadata_chain()
             .accept_one(SearchSetPollingSourceVisitor::new())
             .await
@@ -625,45 +608,14 @@ impl PollingIngestService for PollingIngestServiceImpl {
             .into_hashed_block())
     }
 
-    #[tracing::instrument(level = "info", skip_all, fields(%dataset_ref))]
+    #[tracing::instrument(level = "info", skip_all, fields(target=%target.get_handle()))]
     async fn ingest(
         &self,
-        dataset_ref: &DatasetRef,
+        target: ResolvedDataset,
         options: PollingIngestOptions,
         maybe_listener: Option<Arc<dyn PollingIngestListener>>,
     ) -> Result<PollingIngestResult, PollingIngestError> {
-        self.do_ingest(dataset_ref, options, |_| maybe_listener)
-            .await
-    }
-
-    #[tracing::instrument(level = "info", skip_all)]
-    async fn ingest_multi(
-        &self,
-        dataset_refs: Vec<DatasetRef>,
-        options: PollingIngestOptions,
-        maybe_multi_listener: Option<Arc<dyn PollingIngestMultiListener>>,
-    ) -> Vec<PollingIngestResponse> {
-        let multi_listener =
-            maybe_multi_listener.unwrap_or_else(|| Arc::new(NullPollingIngestMultiListener));
-
-        let futures: Vec<_> = dataset_refs
-            .iter()
-            .map(|dataset_ref| {
-                self.do_ingest(dataset_ref, options.clone(), |hdl| {
-                    multi_listener.begin_ingest(hdl)
-                })
-            })
-            .collect();
-
-        let results = futures::future::join_all(futures).await;
-        dataset_refs
-            .into_iter()
-            .zip(results)
-            .map(|(dataset_ref, result)| PollingIngestResponse {
-                dataset_ref,
-                result,
-            })
-            .collect()
+        self.do_ingest(target, options, |_| maybe_listener).await
     }
 }
 
@@ -681,8 +633,7 @@ pub(crate) struct PrepStepResult {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct IngestLoopArgs {
-    dataset_handle: DatasetHandle,
-    dataset: Arc<dyn Dataset>,
+    target: ResolvedDataset,
     options: PollingIngestOptions,
     listener: Arc<dyn PollingIngestListener>,
 }

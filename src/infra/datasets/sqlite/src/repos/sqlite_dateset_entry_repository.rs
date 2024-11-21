@@ -7,11 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::{TransactionRef, TransactionRefT};
+use std::collections::HashSet;
+
+use database_common::{PaginationOpts, TransactionRef, TransactionRefT};
 use dill::{component, interface};
-use internal_error::{ErrorIntoInternal, ResultIntoInternal};
+use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_datasets::*;
 use opendatafabric::{AccountID, DatasetID, DatasetName};
+use sqlx::Row;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -33,7 +36,7 @@ impl SqliteDatasetEntryRepository {
 
 #[async_trait::async_trait]
 impl DatasetEntryRepository for SqliteDatasetEntryRepository {
-    async fn dataset_entries_count(&self) -> Result<usize, GetDatasetEntryError> {
+    async fn dataset_entries_count(&self) -> Result<usize, InternalError> {
         let mut tr = self.transaction.lock().await;
 
         let connection_mut = tr.connection_mut().await?;
@@ -49,6 +52,65 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
         .int_err()?;
 
         Ok(usize::try_from(dataset_entries_count).unwrap_or(0))
+    }
+
+    async fn dataset_entries_count_by_owner_id(
+        &self,
+        owner_id: &AccountID,
+    ) -> Result<usize, InternalError> {
+        let stack_owner_id = owner_id.as_did_str().to_stack_string();
+        let owner_id_as_str = stack_owner_id.as_str();
+
+        let mut tr = self.transaction.lock().await;
+
+        let connection_mut = tr.connection_mut().await?;
+
+        let dataset_entries_count = sqlx::query_scalar!(
+            r#"
+            SELECT COUNT(*)
+            FROM dataset_entries
+            WHERE owner_id = $1
+            "#,
+            owner_id_as_str
+        )
+        .fetch_one(connection_mut)
+        .await
+        .int_err()?;
+
+        Ok(usize::try_from(dataset_entries_count).unwrap())
+    }
+
+    fn get_dataset_entries(&self, pagination: PaginationOpts) -> DatasetEntryStream {
+        Box::pin(async_stream::stream! {
+            let mut tr = self.transaction.lock().await;
+            let connection_mut = tr.connection_mut().await?;
+
+            let limit = i64::try_from(pagination.limit).int_err()?;
+            let offset = i64::try_from(pagination.offset).int_err()?;
+
+            let mut query_stream = sqlx::query_as!(
+                DatasetEntryRowModel,
+                r#"
+                SELECT
+                    dataset_id   as "id: _",
+                    owner_id     as "owner_id: _",
+                    dataset_name as name,
+                    created_at   as "created_at: _"
+                FROM dataset_entries
+                ORDER BY dataset_name ASC
+                LIMIT $1 OFFSET $2
+                "#,
+                limit,
+                offset,
+            )
+            .fetch(connection_mut)
+            .map_err(ErrorIntoInternal::int_err);
+
+            use futures::TryStreamExt;
+            while let Some(entry) = query_stream.try_next().await? {
+                yield Ok(entry.into());
+            }
+        })
     }
 
     async fn get_dataset_entry(
@@ -85,7 +147,76 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
         }
     }
 
-    async fn get_dataset_entry_by_name(
+    async fn get_multiple_dataset_entries(
+        &self,
+        dataset_ids: &[DatasetID],
+    ) -> Result<DatasetEntriesResolution, GetMultipleDatasetEntriesError> {
+        let mut tr = self.transaction.lock().await;
+
+        let connection_mut = tr.connection_mut().await?;
+
+        let placeholders = dataset_ids
+            .iter()
+            .map(|_| "?")
+            .collect::<Vec<_>>()
+            .join(", ");
+
+        let query_str = format!(
+            r#"
+            SELECT dataset_id as id,
+                   owner_id,
+                   dataset_name as name,
+                   created_at
+            FROM dataset_entries
+            WHERE dataset_id IN ({placeholders})
+            ORDER BY created_at
+            "#,
+        );
+
+        // ToDo replace it by macro once sqlx will support it
+        // https://github.com/launchbadge/sqlx/blob/main/FAQ.md#how-can-i-do-a-select--where-foo-in--query
+        let mut query = sqlx::query(&query_str);
+        for dataset_id in dataset_ids {
+            query = query.bind(dataset_id.to_string());
+        }
+
+        let dataset_rows = query
+            .fetch_all(connection_mut)
+            .await
+            .int_err()
+            .map_err(GetMultipleDatasetEntriesError::Internal)?;
+
+        let resolved_entries: Vec<_> = dataset_rows
+            .into_iter()
+            .map(|row| {
+                DatasetEntry::new(
+                    row.get_unchecked("id"),
+                    row.get_unchecked("owner_id"),
+                    DatasetName::new_unchecked(&row.get::<String, &str>("name")),
+                    row.get_unchecked("created_at"),
+                )
+            })
+            .collect();
+
+        let resolved_dataset_ids: HashSet<_> = resolved_entries
+            .iter()
+            .map(|entry: &DatasetEntry| &entry.id)
+            .cloned()
+            .collect();
+
+        let unresolved_entries = dataset_ids
+            .iter()
+            .filter(|id| !resolved_dataset_ids.contains(id))
+            .cloned()
+            .collect();
+
+        Ok(DatasetEntriesResolution {
+            resolved_entries,
+            unresolved_entries,
+        })
+    }
+
+    async fn get_dataset_entry_by_owner_and_name(
         &self,
         owner_id: &AccountID,
         name: &DatasetName,
@@ -123,34 +254,45 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
         }
     }
 
-    async fn get_dataset_entries_by_owner_id(
+    fn get_dataset_entries_by_owner_id(
         &self,
         owner_id: &AccountID,
-    ) -> Result<Vec<DatasetEntry>, GetDatasetEntriesByOwnerIdError> {
-        let mut tr = self.transaction.lock().await;
-
-        let connection_mut = tr.connection_mut().await?;
-
+        pagination: PaginationOpts,
+    ) -> DatasetEntryStream<'_> {
         let stack_owner_id = owner_id.as_did_str().to_stack_string();
-        let owner_id_as_str = stack_owner_id.as_str();
 
-        let dataset_entry_rows = sqlx::query_as!(
-            DatasetEntryRowModel,
-            r#"
-            SELECT dataset_id   as "id: _",
-                   owner_id     as "owner_id: _",
-                   dataset_name as name,
-                   created_at   as "created_at: _"
-            FROM dataset_entries
-            WHERE owner_id = $1
-            "#,
-            owner_id_as_str,
-        )
-        .fetch_all(connection_mut)
-        .await
-        .int_err()?;
+        let limit = i64::try_from(pagination.limit).unwrap();
+        let offset = i64::try_from(pagination.offset).unwrap();
 
-        Ok(dataset_entry_rows.into_iter().map(Into::into).collect())
+        Box::pin(async_stream::stream! {
+            let mut tr = self.transaction.lock().await;
+
+            let connection_mut = tr.connection_mut().await?;
+
+            let owner_id_as_str = stack_owner_id.as_str();
+
+            let mut query_stream = sqlx::query_as!(
+                DatasetEntryRowModel,
+                r#"
+                SELECT dataset_id   as "id: _",
+                    owner_id     as "owner_id: _",
+                    dataset_name as name,
+                    created_at   as "created_at: _"
+                FROM dataset_entries
+                WHERE owner_id = $1
+                LIMIT $2 OFFSET $3
+                "#,
+                owner_id_as_str,
+                limit,
+                offset
+            )
+            .fetch(connection_mut);
+
+            use futures::TryStreamExt;
+            while let Some(row) = query_stream.try_next().await.int_err()? {
+                yield Ok(row.into());
+            }
+        })
     }
 
     async fn save_dataset_entry(
