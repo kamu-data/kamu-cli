@@ -862,7 +862,7 @@
       "name": ""
     },
     "title": "kamu-cli",
-    "version": "0.207.2"
+    "version": "0.207.3"
   },
   "openapi": "3.1.0",
   "paths": {

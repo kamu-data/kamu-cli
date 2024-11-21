@@ -11,7 +11,7 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## [Unreleased]
+## [0.207.3] - 2024-11-21
 ### Changed
 - Add version for `OutboxMessage` structure to prevent startup failures after breaking changes
 

@@ -560,7 +560,7 @@ mod tests {
             writer.finish().unwrap();
         }
 
-        assert_eq!(std::str::from_utf8(&buf).unwrap(), "");
+        assert_eq!(std::str::from_utf8(&buf).unwrap(), "[]");
     }
 
     // AoS
