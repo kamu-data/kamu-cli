@@ -1010,7 +1010,6 @@
             "name": "contentLength",
             "required": true,
             "schema": {
-              "maximum": 100000000,
               "minimum": 0,
               "type": "integer"
             }
@@ -1068,16 +1067,11 @@
             "content": {
               "application/octet-stream": {
                 "schema": {
-                  "items": {
-                    "format": "int32",
-                    "minimum": 0,
-                    "type": "integer"
-                  },
-                  "type": "array"
+                  "default": null
                 }
               }
             },
-            "description": ""
+            "description": "file content"
           }
         },
         "security": [
@@ -1260,7 +1254,6 @@
             "required": false,
             "schema": {
               "format": "int64",
-              "maximum": 100000000,
               "minimum": 0,
               "type": "integer"
             }
@@ -1272,7 +1265,6 @@
             "required": false,
             "schema": {
               "format": "int64",
-              "maximum": 100000000,
               "minimum": 0,
               "type": "integer"
             }
@@ -1427,6 +1419,24 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "Name of the account",
+            "in": "path",
+            "name": "account_name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Name of the dataset",
+            "in": "path",
+            "name": "dataset_name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -1434,16 +1444,11 @@
             "content": {
               "application/octet-stream": {
                 "schema": {
-                  "items": {
-                    "format": "int32",
-                    "minimum": 0,
-                    "type": "integer"
-                  },
-                  "type": "array"
+                  "default": null
                 }
               }
             },
-            "description": ""
+            "description": "block content"
           }
         },
         "security": [
@@ -1470,6 +1475,24 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "Name of the account",
+            "in": "path",
+            "name": "account_name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Name of the dataset",
+            "in": "path",
+            "name": "dataset_name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -1477,16 +1500,11 @@
             "content": {
               "application/octet-stream": {
                 "schema": {
-                  "items": {
-                    "format": "int32",
-                    "minimum": 0,
-                    "type": "integer"
-                  },
-                  "type": "array"
+                  "default": null
                 }
               }
             },
-            "description": ""
+            "description": "checkpoint file content"
           }
         },
         "security": [
@@ -1507,6 +1525,24 @@
             "description": "Physical hash of the block",
             "in": "path",
             "name": "physical_hash",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Name of the account",
+            "in": "path",
+            "name": "account_name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Name of the dataset",
+            "in": "path",
+            "name": "dataset_name",
             "required": true,
             "schema": {
               "type": "string"
@@ -1564,6 +1600,24 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "Name of the account",
+            "in": "path",
+            "name": "account_name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Name of the dataset",
+            "in": "path",
+            "name": "dataset_name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -1571,16 +1625,11 @@
             "content": {
               "application/octet-stream": {
                 "schema": {
-                  "items": {
-                    "format": "int32",
-                    "minimum": 0,
-                    "type": "integer"
-                  },
-                  "type": "array"
+                  "default": null
                 }
               }
             },
-            "description": ""
+            "description": "data file content"
           }
         },
         "security": [
@@ -1601,6 +1650,24 @@
             "description": "Physical hash of the block",
             "in": "path",
             "name": "physical_hash",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Name of the account",
+            "in": "path",
+            "name": "account_name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Name of the dataset",
+            "in": "path",
+            "name": "dataset_name",
             "required": true,
             "schema": {
               "type": "string"
@@ -1671,6 +1738,24 @@
                 "null"
               ]
             }
+          },
+          {
+            "description": "Name of the account",
+            "in": "path",
+            "name": "account_name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Name of the dataset",
+            "in": "path",
+            "name": "dataset_name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -1735,6 +1820,24 @@
             "schema": {
               "$ref": "#/components/schemas/SchemaFormat"
             }
+          },
+          {
+            "description": "Name of the account",
+            "in": "path",
+            "name": "account_name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Name of the dataset",
+            "in": "path",
+            "name": "dataset_name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -1764,6 +1867,26 @@
     "/{dataset_name}/pull": {
       "get": {
         "operationId": "dataset_pull_ws_upgrade_handler",
+        "parameters": [
+          {
+            "description": "Name of the account",
+            "in": "path",
+            "name": "account_name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Name of the dataset",
+            "in": "path",
+            "name": "dataset_name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -1791,6 +1914,26 @@
     "/{dataset_name}/push": {
       "get": {
         "operationId": "dataset_push_ws_upgrade_handler",
+        "parameters": [
+          {
+            "description": "Name of the account",
+            "in": "path",
+            "name": "account_name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Name of the dataset",
+            "in": "path",
+            "name": "dataset_name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -1823,6 +1966,24 @@
             "description": "Name of the reference",
             "in": "path",
             "name": "reference",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Name of the account",
+            "in": "path",
+            "name": "account_name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Name of the dataset",
+            "in": "path",
+            "name": "dataset_name",
             "required": true,
             "schema": {
               "type": "string"
@@ -1864,7 +2025,6 @@
             "required": false,
             "schema": {
               "format": "int64",
-              "maximum": 100000000,
               "minimum": 0,
               "type": "integer"
             }
@@ -1876,7 +2036,6 @@
             "required": false,
             "schema": {
               "format": "int64",
-              "maximum": 100000000,
               "minimum": 0,
               "type": "integer"
             }
@@ -1897,6 +2056,24 @@
             "required": true,
             "schema": {
               "$ref": "#/components/schemas/SchemaFormat"
+            }
+          },
+          {
+            "description": "Name of the account",
+            "in": "path",
+            "name": "account_name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Name of the dataset",
+            "in": "path",
+            "name": "dataset_name",
+            "required": true,
+            "schema": {
+              "type": "string"
             }
           }
         ],

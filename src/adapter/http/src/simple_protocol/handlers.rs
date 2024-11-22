@@ -24,7 +24,7 @@ use url::Url;
 
 use crate::smart_protocol::messages::SMART_TRANSFER_PROTOCOL_VERSION;
 use crate::smart_protocol::{AxumServerPullProtocolInstance, AxumServerPushProtocolInstance};
-use crate::{BearerHeader, OdfSmtpVersion, OdfSmtpVersionTyped};
+use crate::{BearerHeader, DatasetAliasInPath, OdfSmtpVersion, OdfSmtpVersionTyped};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -57,7 +57,7 @@ pub struct PhysicalHashFromPath {
 #[utoipa::path(
     get,
     path = "/refs/{reference}",
-    params(RefFromPath),
+    params(RefFromPath, DatasetAliasInPath),
     responses((status = OK, body = String)),
     tag = "odf-transfer",
     security(
@@ -87,8 +87,8 @@ pub async fn dataset_refs_handler(
 #[utoipa::path(
     get,
     path = "/blocks/{block_hash}",
-    params(BlockHashFromPath),
-    responses((status = OK, body = Vec<u8>)),
+    params(BlockHashFromPath, DatasetAliasInPath),
+    responses((status = OK, description = "block content", content_type = "application/octet-stream", body = ())),
     tag = "odf-transfer",
     security(
         (),
@@ -123,8 +123,8 @@ pub async fn dataset_blocks_handler(
 #[utoipa::path(
     get,
     path = "/data/{physical_hash}",
-    params(PhysicalHashFromPath),
-    responses((status = OK, body = Vec<u8>)),
+    params(PhysicalHashFromPath, DatasetAliasInPath),
+    responses((status = OK, description = "data file content", content_type = "application/octet-stream", body = ())),
     tag = "odf-transfer",
     security(
         (),
@@ -144,8 +144,8 @@ pub async fn dataset_data_get_handler(
 #[utoipa::path(
     get,
     path = "/checkpoints/{physical_hash}",
-    params(PhysicalHashFromPath),
-    responses((status = OK, body = Vec<u8>)),
+    params(PhysicalHashFromPath, DatasetAliasInPath),
+    responses((status = OK, description = "checkpoint file content", content_type = "application/octet-stream", body = ())),
     tag = "odf-transfer",
     security(
         (),
@@ -182,7 +182,7 @@ async fn dataset_get_object_common(
 #[utoipa::path(
     put,
     path = "/data/{physical_hash}",
-    params(PhysicalHashFromPath),
+    params(PhysicalHashFromPath, DatasetAliasInPath),
     request_body = Vec<u8>,
     responses((status = OK, body = ())),
     tag = "odf-transfer",
@@ -212,7 +212,7 @@ pub async fn dataset_data_put_handler(
 #[utoipa::path(
     put,
     path = "/checkpoints/{physical_hash}",
-    params(PhysicalHashFromPath),
+    params(PhysicalHashFromPath, DatasetAliasInPath),
     request_body = Vec<u8>,
     responses((status = OK, body = ())),
     tag = "odf-transfer",
@@ -267,6 +267,7 @@ async fn dataset_put_object_common(
 #[utoipa::path(
     get,
     path = "/push",
+    params(DatasetAliasInPath),
     responses((status = OK, body = ())),
     tag = "odf-transfer",
     security(
@@ -336,6 +337,7 @@ pub async fn dataset_push_ws_upgrade_handler(
 #[utoipa::path(
     get,
     path = "/pull",
+    params(DatasetAliasInPath),
     responses((status = OK, body = ())),
     tag = "odf-transfer",
     security(

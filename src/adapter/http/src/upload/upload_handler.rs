@@ -27,7 +27,6 @@ use crate::{MakeUploadContextError, SaveUploadError, UploadService};
 pub struct PlatformFileUploadQuery {
     pub file_name: String,
 
-    #[param(maximum = 100_000_000)]
     pub content_length: usize,
 
     #[param(value_type = Option<String>)]
@@ -131,7 +130,7 @@ pub async fn platform_file_upload_post_handler(
     get,
     path = "/platform/file/upload/{upload_token}",
     params(UploadFromPath),
-    responses((status = OK, body = Vec<u8>)),
+    responses((status = OK, description = "file content", content_type = "application/octet-stream", body = ())),
     tag = "kamu",
     security(
         (),  // Note: anonymous access is fine to read uploaded files

@@ -190,3 +190,15 @@ where
         })
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// NOTE: This type is used only to describe these parameters in OpenAPI
+#[derive(serde::Deserialize, utoipa::IntoParams)]
+#[into_params(parameter_in = Path)]
+pub struct DatasetAliasInPath {
+    /// Name of the account
+    pub account_name: String,
+    /// Name of the dataset
+    pub dataset_name: String,
+}

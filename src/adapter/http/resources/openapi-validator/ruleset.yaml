@@ -9,4 +9,9 @@ rules:
   ibm-required-enum-properties-in-response: off
   ibm-required-array-properties-in-response: off  # almost agree
   no-$ref-siblings: off
+  ibm-integer-attributes: off  # Don't require minimum/maximum for all integers
+  # TODO: Temporary, until we restructure our API rules
+  ibm-no-consecutive-path-parameter-segments: warn
+  # TODO: Important rule but currently conflicts with "prefixItems" added by utoipa
+  ibm-schema-keywords: warn
 

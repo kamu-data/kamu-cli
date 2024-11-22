@@ -5786,6 +5786,7 @@ dependencies = [
  "shlex",
  "signal-hook",
  "tempfile",
+ "test-group",
  "test-log",
  "thiserror 1.0.69",
  "time-source",

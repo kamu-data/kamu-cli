@@ -17,6 +17,7 @@ use kamu_core::*;
 use opendatafabric::DatasetRef;
 
 use super::query_types::{DataFormat, Schema, SchemaFormat};
+use crate::DatasetAliasInPath;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -24,7 +25,7 @@ use super::query_types::{DataFormat, Schema, SchemaFormat};
 #[utoipa::path(
     get,
     path = "/tail",
-    params(DatasetTailParams),
+    params(DatasetTailParams, DatasetAliasInPath),
     responses((status = OK, body = DatasetTailResponse)),
     tag = "odf-query",
     security(
@@ -81,12 +82,10 @@ pub async fn dataset_tail_handler(
 pub struct DatasetTailParams {
     /// Number of leading records to skip when returning result (used for
     /// pagination)
-    #[param(maximum = 100_000_000)]
     #[serde(default)]
     pub skip: u64,
 
     /// Maximum number of records to return (used for pagination)
-    #[param(maximum = 100_000_000)]
     #[serde(default = "DatasetTailParams::default_limit")]
     pub limit: u64,
 

@@ -13,6 +13,7 @@ use std::path::PathBuf;
 use clap::builder::PossibleValue;
 use clap::CommandFactory;
 
+#[test_group::group(resourcegen)]
 #[test_log::test(tokio::test)]
 async fn generate_reference_markdown() {
     let command = kamu_cli::cli::Cli::command();

@@ -18,6 +18,7 @@ use kamu_core::*;
 use opendatafabric as odf;
 
 use super::query_types;
+use crate::DatasetAliasInPath;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -136,7 +137,7 @@ pub struct Ref {
 #[utoipa::path(
     get,
     path = "/metadata",
-    params(DatasetMetadataParams),
+    params(DatasetMetadataParams, DatasetAliasInPath),
     responses((status = OK, body = DatasetMetadataResponse)),
     tag = "odf-query",
     security(

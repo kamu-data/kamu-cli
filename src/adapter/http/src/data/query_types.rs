@@ -222,12 +222,10 @@ pub struct QueryParams {
 
     /// Number of leading records to skip when returning result (used for
     /// pagination)
-    #[param(maximum = 100_000_000)]
     #[serde(default)]
     pub skip: u64,
 
     /// Maximum number of records to return (used for pagination)
-    #[param(maximum = 100_000_000)]
     #[serde(default = "QueryRequest::default_limit")]
     pub limit: u64,
 
@@ -236,6 +234,7 @@ pub struct QueryParams {
     #[serde(default)]
     pub data_format: DataFormat,
 
+    // TODO: Remove `value_type` annotation once https://github.com/juhaku/utoipa/issues/1215 is fixed
     /// How to encode the schema of the result
     #[param(value_type = SchemaFormat)]
     pub schema_format: Option<SchemaFormat>,

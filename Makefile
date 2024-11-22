@@ -17,7 +17,7 @@ MIGRATION_DIRS := ./migrations/mysql ./migrations/postgres ./migrations/sqlite
 ###############################################################################
 
 .PHONY: lint
-lint: lint-rustfmt lint-repo lint-deps clippy lint-sqlx
+lint: lint-rustfmt lint-repo lint-deps clippy lint-openapi lint-sqlx
 
 
 .PHONY: lint-rustfmt
@@ -45,6 +45,7 @@ clippy:
 	cargo clippy --workspace --all-targets -- -D warnings
 
 
+# See: https://github.com/IBM/openapi-validator
 .PHONY: lint-openapi
 lint-openapi:
 	docker run --rm -t \
@@ -216,6 +217,15 @@ release-minor:
 .PHONY: release-major
 release-major:
 	cargo run -p kamu-repo-tools --bin release -- --major
+
+
+###############################################################################
+# Generated resources
+###############################################################################
+
+.PHONY: resources
+resources:
+	$(TEST_LOG_PARAMS) cargo nextest run -E 'test(::resourcegen::)'
 
 
 ###############################################################################

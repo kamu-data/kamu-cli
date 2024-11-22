@@ -213,6 +213,7 @@ kamu-cli-puppet = { workspace = true, default-features = false, features = [
 ] }
 
 pretty_assertions = { version = "1" }
+test-group = { version = "1" }
 test-log = { version = "0.2", features = ["trace"] }
 
 
