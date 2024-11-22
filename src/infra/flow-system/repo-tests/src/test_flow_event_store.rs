@@ -1166,7 +1166,10 @@ pub async fn test_dataset_flow_run_stats(catalog: &Catalog) {
 
     // No stats initially
     let stats = flow_event_store
-        .get_dataset_flow_run_stats(&dataset_id, DatasetFlowType::Ingest)
+        .get_flow_run_stats(&FlowKey::Dataset(FlowKeyDataset {
+            dataset_id: dataset_id.clone(),
+            flow_type: DatasetFlowType::Ingest,
+        }))
         .await
         .unwrap();
     assert_eq!(stats, EMPTY_STATS);
@@ -1190,7 +1193,10 @@ pub async fn test_dataset_flow_run_stats(catalog: &Catalog) {
     // Stats hasn't changed
 
     let stats = flow_event_store
-        .get_dataset_flow_run_stats(&dataset_id, DatasetFlowType::Ingest)
+        .get_flow_run_stats(&FlowKey::Dataset(FlowKeyDataset {
+            dataset_id: dataset_id.clone(),
+            flow_type: DatasetFlowType::Ingest,
+        }))
         .await
         .unwrap();
     assert_eq!(stats, EMPTY_STATS);
@@ -1200,7 +1206,10 @@ pub async fn test_dataset_flow_run_stats(catalog: &Catalog) {
 
     // still no change
     let stats = flow_event_store
-        .get_dataset_flow_run_stats(&dataset_id, DatasetFlowType::Ingest)
+        .get_flow_run_stats(&FlowKey::Dataset(FlowKeyDataset {
+            dataset_id: dataset_id.clone(),
+            flow_type: DatasetFlowType::Ingest,
+        }))
         .await
         .unwrap();
     assert_eq!(stats, EMPTY_STATS);
@@ -1212,7 +1221,10 @@ pub async fn test_dataset_flow_run_stats(catalog: &Catalog) {
 
     // Finally, stats got updated
     let stats = flow_event_store
-        .get_dataset_flow_run_stats(&dataset_id, DatasetFlowType::Ingest)
+        .get_flow_run_stats(&FlowKey::Dataset(FlowKeyDataset {
+            dataset_id: dataset_id.clone(),
+            flow_type: DatasetFlowType::Ingest,
+        }))
         .await
         .unwrap();
     assert_matches!(
@@ -1236,7 +1248,10 @@ pub async fn test_dataset_flow_run_stats(catalog: &Catalog) {
 
     // Still storing old stats
     let new_stats = flow_event_store
-        .get_dataset_flow_run_stats(&dataset_id, DatasetFlowType::Ingest)
+        .get_flow_run_stats(&FlowKey::Dataset(FlowKeyDataset {
+            dataset_id: dataset_id.clone(),
+            flow_type: DatasetFlowType::Ingest,
+        }))
         .await
         .unwrap();
     assert_eq!(new_stats, stats);
@@ -1246,7 +1261,10 @@ pub async fn test_dataset_flow_run_stats(catalog: &Catalog) {
 
     // Still storing old stats
     let new_stats = flow_event_store
-        .get_dataset_flow_run_stats(&dataset_id, DatasetFlowType::Ingest)
+        .get_flow_run_stats(&FlowKey::Dataset(FlowKeyDataset {
+            dataset_id: dataset_id.clone(),
+            flow_type: DatasetFlowType::Ingest,
+        }))
         .await
         .unwrap();
     assert_eq!(new_stats, stats);
@@ -1258,7 +1276,10 @@ pub async fn test_dataset_flow_run_stats(catalog: &Catalog) {
 
     // Stats got updated: success stayed as previously, attempt refreshed
     let new_stats = flow_event_store
-        .get_dataset_flow_run_stats(&dataset_id, DatasetFlowType::Ingest)
+        .get_flow_run_stats(&FlowKey::Dataset(FlowKeyDataset {
+            dataset_id: dataset_id.clone(),
+            flow_type: DatasetFlowType::Ingest,
+        }))
         .await
         .unwrap();
     assert_matches!(
@@ -1277,7 +1298,9 @@ pub async fn test_system_flow_run_stats(catalog: &Catalog) {
 
     // No stats initially
     let stats = flow_event_store
-        .get_system_flow_run_stats(SystemFlowType::GC)
+        .get_flow_run_stats(&FlowKey::System(FlowKeySystem {
+            flow_type: SystemFlowType::GC,
+        }))
         .await
         .unwrap();
     assert_eq!(stats, EMPTY_STATS);
@@ -1301,7 +1324,9 @@ pub async fn test_system_flow_run_stats(catalog: &Catalog) {
     // Stats hasn't changed
 
     let stats = flow_event_store
-        .get_system_flow_run_stats(SystemFlowType::GC)
+        .get_flow_run_stats(&FlowKey::System(FlowKeySystem {
+            flow_type: SystemFlowType::GC,
+        }))
         .await
         .unwrap();
     assert_eq!(stats, EMPTY_STATS);
@@ -1311,7 +1336,9 @@ pub async fn test_system_flow_run_stats(catalog: &Catalog) {
 
     // still no change
     let stats = flow_event_store
-        .get_system_flow_run_stats(SystemFlowType::GC)
+        .get_flow_run_stats(&FlowKey::System(FlowKeySystem {
+            flow_type: SystemFlowType::GC,
+        }))
         .await
         .unwrap();
     assert_eq!(stats, EMPTY_STATS);
@@ -1323,7 +1350,9 @@ pub async fn test_system_flow_run_stats(catalog: &Catalog) {
 
     // Finally, stats got updated
     let stats = flow_event_store
-        .get_system_flow_run_stats(SystemFlowType::GC)
+        .get_flow_run_stats(&FlowKey::System(FlowKeySystem {
+            flow_type: SystemFlowType::GC,
+        }))
         .await
         .unwrap();
     assert_matches!(
@@ -1347,7 +1376,9 @@ pub async fn test_system_flow_run_stats(catalog: &Catalog) {
 
     // Still storing old stats
     let new_stats = flow_event_store
-        .get_system_flow_run_stats(SystemFlowType::GC)
+        .get_flow_run_stats(&FlowKey::System(FlowKeySystem {
+            flow_type: SystemFlowType::GC,
+        }))
         .await
         .unwrap();
     assert_eq!(new_stats, stats);
@@ -1357,7 +1388,9 @@ pub async fn test_system_flow_run_stats(catalog: &Catalog) {
 
     // Still storing old stats
     let new_stats = flow_event_store
-        .get_system_flow_run_stats(SystemFlowType::GC)
+        .get_flow_run_stats(&FlowKey::System(FlowKeySystem {
+            flow_type: SystemFlowType::GC,
+        }))
         .await
         .unwrap();
     assert_eq!(new_stats, stats);
@@ -1369,7 +1402,9 @@ pub async fn test_system_flow_run_stats(catalog: &Catalog) {
 
     // Stats got updated: success stayed as previously, attempt refreshed
     let new_stats = flow_event_store
-        .get_system_flow_run_stats(SystemFlowType::GC)
+        .get_flow_run_stats(&FlowKey::System(FlowKeySystem {
+            flow_type: SystemFlowType::GC,
+        }))
         .await
         .unwrap();
     assert_matches!(

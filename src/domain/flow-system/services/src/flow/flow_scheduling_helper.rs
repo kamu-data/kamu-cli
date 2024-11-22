@@ -68,9 +68,23 @@ impl FlowSchedulingHelper {
         match &flow_key {
             FlowKey::Dataset(_) => {
                 match &rule {
-                    FlowConfigurationRule::TransformRule(_) => {
-                        self.schedule_auto_polling_flow_unconditionally(start_time, &flow_key)
+                    FlowConfigurationRule::TransformRule(transform_rule) => {
+                        let flow_run_stats =
+                            self.flow_event_store.get_flow_run_stats(&flow_key).await?;
+                        if flow_run_stats.last_success_time.is_some() {
+                            self.trigger_flow_common(
+                                &flow_key,
+                                FlowTrigger::AutoPolling(FlowTriggerAutoPolling {
+                                    trigger_time: start_time,
+                                }),
+                                FlowTriggerContext::Batching(*transform_rule),
+                                None,
+                            )
                             .await?;
+                        } else {
+                            self.schedule_auto_polling_flow_unconditionally(start_time, &flow_key)
+                                .await?;
+                        }
                     }
                     FlowConfigurationRule::IngestRule(ingest_rule) => {
                         self.schedule_auto_polling_flow(
@@ -325,7 +339,7 @@ impl FlowSchedulingHelper {
         config_snapshot_maybe: Option<FlowConfigurationSnapshot>,
     ) -> Result<FlowState, InternalError> {
         // Query previous runs stats to determine activation time
-        let flow_run_stats = self.flow_run_stats(flow_key).await?;
+        let flow_run_stats = self.flow_event_store.get_flow_run_stats(flow_key).await?;
 
         // Flows may not be attempted more frequent than mandatory throttling period.
         // If flow has never run before, let it go without restriction.
@@ -647,21 +661,6 @@ impl FlowSchedulingHelper {
         );
 
         Ok(flow)
-    }
-
-    async fn flow_run_stats(&self, flow_key: &FlowKey) -> Result<FlowRunStats, InternalError> {
-        match flow_key {
-            FlowKey::Dataset(fk_dataset) => {
-                self.flow_event_store
-                    .get_dataset_flow_run_stats(&fk_dataset.dataset_id, fk_dataset.flow_type)
-                    .await
-            }
-            FlowKey::System(fk_system) => {
-                self.flow_event_store
-                    .get_system_flow_run_stats(fk_system.flow_type)
-                    .await
-            }
-        }
     }
 
     async fn schedule_flow_for_activation(

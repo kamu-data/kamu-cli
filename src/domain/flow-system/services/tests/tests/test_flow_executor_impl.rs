@@ -6075,5 +6075,213 @@ async fn test_abort_flow_after_task_finishes() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_log::test(tokio::test)]
+async fn test_respect_last_success_time_when_activate_configuration() {
+    let harness = FlowHarness::new().await;
+
+    let foo_create_result = harness
+        .create_root_dataset(DatasetAlias {
+            dataset_name: DatasetName::new_unchecked("foo"),
+            account_name: None,
+        })
+        .await;
+    let foo_id = foo_create_result.dataset_handle.id;
+
+    let bar_id = harness
+        .create_derived_dataset(
+            DatasetAlias {
+                dataset_name: DatasetName::new_unchecked("bar"),
+                account_name: None,
+            },
+            vec![foo_id.clone()],
+        )
+        .await;
+
+    harness
+        .set_dataset_flow_ingest(
+            harness.now_datetime(),
+            foo_id.clone(),
+            DatasetFlowType::Ingest,
+            IngestRule {
+                fetch_uncacheable: false,
+                schedule_condition: Duration::milliseconds(100).into(),
+            },
+        )
+        .await;
+
+    harness
+        .set_dataset_flow_transform_rule(
+            harness.now_datetime(),
+            bar_id.clone(),
+            DatasetFlowType::ExecuteTransform,
+            TransformRule::new_checked(1, Duration::seconds(10)).unwrap(),
+        )
+        .await;
+
+    // Enforce dependency graph initialization
+    harness.eager_initialization().await;
+
+    // Flow listener will collect snapshots at important moments of time
+    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
+    test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
+
+    // Remember start time
+    let start_time = harness
+        .now_datetime()
+        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
+        .unwrap();
+
+    // Run scheduler concurrently with manual triggers script
+    tokio::select! {
+      // Run API service
+      res = harness.flow_executor.run() => res.int_err(),
+
+      // Run simulation script and task drivers
+      _ = async {
+          // Task 0: "foo" start running at 10ms, finish at 20ms
+          let task0_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(0),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
+                dataset_id: Some(foo_id.clone()),
+                run_since_start: Duration::milliseconds(10),
+                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
+                expected_logical_plan: LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
+                  dataset_id: foo_id.clone(),
+                  fetch_uncacheable: false
+                }),
+          });
+          let task0_handle = task0_driver.run();
+
+          // Task 1: "bar" start running at 20ms, finish at 30ms
+          let task1_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(1),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
+                dataset_id: Some(bar_id.clone()),
+                run_since_start: Duration::milliseconds(20),
+                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
+                expected_logical_plan: LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
+                  dataset_id: bar_id.clone(),
+                  fetch_uncacheable: false
+                }),
+          });
+          let task1_handle = task1_driver.run();
+
+          // Main simulation script
+          let main_handle = async {
+              // Initially both "foo" isscheduled without waiting.
+              // "foo":
+              //  - flow 0: task 0 starts at 10ms, finishes at 20ms
+              //  - next flow 2 queued for 120ms (20ms initiated + 100ms period)
+              // "bar":
+              //  - flow 1: task 1 starts at 20ms, finishes at 30ms
+              //  - next flow 3 queued for 90ms (30ms initiated + 60ms period)
+
+              // 50ms: Pause flow config before next flow runs
+              harness.advance_time(Duration::milliseconds(50)).await;
+              harness.pause_dataset_flow(start_time + Duration::milliseconds(50), foo_id.clone(), DatasetFlowType::Ingest).await;
+              harness.pause_dataset_flow(start_time + Duration::milliseconds(50), bar_id.clone(), DatasetFlowType::ExecuteTransform).await;
+
+              // 100ms: Wake up after initially planned "bar" scheduling but before planned "foo" scheduling:
+              //  - "foo":
+              //    - resumed with period 100ms
+              //    - last success at 20ms
+              //    - scheduled for 120ms (still wait a little bit since last success)
+              //  - "bar":
+              //    - resumed with period 60ms
+              //    - last success at 30ms
+              //    - gets scheduled immediately (waited longer than 30ms last success + 60ms period)
+              harness.advance_time(Duration::milliseconds(50)).await;
+              harness.resume_dataset_flow(start_time + Duration::milliseconds(100), foo_id.clone(), DatasetFlowType::Ingest).await;
+              harness.resume_dataset_flow(start_time + Duration::milliseconds(100), bar_id.clone(), DatasetFlowType::ExecuteTransform).await;
+              test_flow_listener
+                  .make_a_snapshot(start_time + Duration::milliseconds(100))
+                  .await;
+
+              // 150ms: finish
+              harness.advance_time(Duration::milliseconds(50)).await;
+          };
+
+          tokio::join!(task0_handle, task1_handle, main_handle)
+
+       } => Ok(()),
+    }
+    .unwrap();
+
+    pretty_assertions::assert_eq!(
+        format!("{}", test_flow_listener.as_ref()),
+        indoc::indoc!(
+            r#"
+            #0: +0ms:
+              "bar" ExecuteTransform:
+                Flow ID = 1 Waiting AutoPolling
+              "foo" Ingest:
+                Flow ID = 0 Waiting AutoPolling
+
+            #1: +0ms:
+              "bar" ExecuteTransform:
+                Flow ID = 1 Waiting AutoPolling Executor(task=1, since=0ms)
+              "foo" Ingest:
+                Flow ID = 0 Waiting AutoPolling Executor(task=0, since=0ms)
+
+            #2: +10ms:
+              "bar" ExecuteTransform:
+                Flow ID = 1 Waiting AutoPolling Executor(task=1, since=0ms)
+              "foo" Ingest:
+                Flow ID = 0 Running(task=0)
+
+            #3: +20ms:
+              "bar" ExecuteTransform:
+                Flow ID = 1 Waiting AutoPolling Executor(task=1, since=0ms)
+              "foo" Ingest:
+                Flow ID = 2 Waiting AutoPolling Schedule(wakeup=120ms)
+                Flow ID = 0 Finished Success
+
+            #4: +20ms:
+              "bar" ExecuteTransform:
+                Flow ID = 1 Running(task=1)
+              "foo" Ingest:
+                Flow ID = 2 Waiting AutoPolling Schedule(wakeup=120ms)
+                Flow ID = 0 Finished Success
+
+            #5: +30ms:
+              "bar" ExecuteTransform:
+                Flow ID = 1 Finished Success
+              "foo" Ingest:
+                Flow ID = 2 Waiting AutoPolling Schedule(wakeup=120ms)
+                Flow ID = 0 Finished Success
+
+            #6: +50ms:
+              "bar" ExecuteTransform:
+                Flow ID = 1 Finished Success
+              "foo" Ingest:
+                Flow ID = 2 Finished Aborted
+                Flow ID = 0 Finished Success
+
+            #7: +100ms:
+              "bar" ExecuteTransform:
+                Flow ID = 4 Waiting AutoPolling Batching(1, until=10100ms)
+                Flow ID = 1 Finished Success
+              "foo" Ingest:
+                Flow ID = 3 Waiting AutoPolling Schedule(wakeup=120ms)
+                Flow ID = 2 Finished Aborted
+                Flow ID = 0 Finished Success
+
+            #8: +120ms:
+              "bar" ExecuteTransform:
+                Flow ID = 4 Waiting AutoPolling Batching(1, until=10100ms)
+                Flow ID = 1 Finished Success
+              "foo" Ingest:
+                Flow ID = 3 Waiting AutoPolling Executor(task=2, since=120ms)
+                Flow ID = 2 Finished Aborted
+                Flow ID = 0 Finished Success
+
+      "#
+        )
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 // TODO next:
 //  - derived more than 1 level
