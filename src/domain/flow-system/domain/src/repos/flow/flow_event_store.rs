@@ -29,18 +29,8 @@ pub trait FlowEventStore: EventStore<FlowState> {
         flow_key: &FlowKey,
     ) -> Result<Option<FlowID>, InternalError>;
 
-    /// Returns last run statistics for the dataset flow of certain type
-    async fn get_dataset_flow_run_stats(
-        &self,
-        dataset_id: &DatasetID,
-        flow_type: DatasetFlowType,
-    ) -> Result<FlowRunStats, InternalError>;
-
-    /// Returns last run statistics for the system flow of certain type
-    async fn get_system_flow_run_stats(
-        &self,
-        flow_type: SystemFlowType,
-    ) -> Result<FlowRunStats, InternalError>;
+    /// Returns last run statistics for certain type
+    async fn get_flow_run_stats(&self, flow_key: &FlowKey) -> Result<FlowRunStats, InternalError>;
 
     /// Returns nearest time when one or more flows are scheduled for activation
     async fn nearest_flow_activation_moment(&self) -> Result<Option<DateTime<Utc>>, InternalError>;

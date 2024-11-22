@@ -11,6 +11,10 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Unreleased]
+### Fixed
+- `EXECUTE_TRANSFORM` flows now respect last success run time during config enabling and api-server restarting
+
 ## [0.208.1] - 2024-11-22
 ### Fixed
 - `kamu-base-with-data-mt` image building

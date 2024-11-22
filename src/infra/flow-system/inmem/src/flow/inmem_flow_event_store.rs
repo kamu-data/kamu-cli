@@ -313,6 +313,28 @@ impl InMemoryFlowEventStore {
             }
         }
     }
+
+    fn get_dataset_flow_run_stats(
+        &self,
+        dataset_id: &DatasetID,
+        flow_type: DatasetFlowType,
+    ) -> FlowRunStats {
+        let state = self.inner.as_state();
+        let g = state.lock().unwrap();
+        g.dataset_flow_last_run_stats
+            .get(BorrowedFlowKeyDataset::new(dataset_id, flow_type).as_trait())
+            .copied()
+            .unwrap_or_default()
+    }
+
+    fn get_system_flow_run_stats(&self, flow_type: SystemFlowType) -> FlowRunStats {
+        let state = self.inner.as_state();
+        let g = state.lock().unwrap();
+        g.system_flow_last_run_stats
+            .get(&flow_type)
+            .copied()
+            .unwrap_or_default()
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -416,31 +438,17 @@ impl FlowEventStore for InMemoryFlowEventStore {
         })
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id, ?flow_type))]
-    async fn get_dataset_flow_run_stats(
-        &self,
-        dataset_id: &DatasetID,
-        flow_type: DatasetFlowType,
-    ) -> Result<FlowRunStats, InternalError> {
-        let state = self.inner.as_state();
-        let g = state.lock().unwrap();
-        Ok(g.dataset_flow_last_run_stats
-            .get(BorrowedFlowKeyDataset::new(dataset_id, flow_type).as_trait())
-            .copied()
-            .unwrap_or_default())
-    }
-
-    #[tracing::instrument(level = "debug", skip_all, fields(?flow_type))]
-    async fn get_system_flow_run_stats(
-        &self,
-        flow_type: SystemFlowType,
-    ) -> Result<FlowRunStats, InternalError> {
-        let state = self.inner.as_state();
-        let g = state.lock().unwrap();
-        Ok(g.system_flow_last_run_stats
-            .get(&flow_type)
-            .copied()
-            .unwrap_or_default())
+    #[tracing::instrument(level = "debug", skip_all, fields(?flow_key))]
+    async fn get_flow_run_stats(&self, flow_key: &FlowKey) -> Result<FlowRunStats, InternalError> {
+        Ok(match flow_key {
+            FlowKey::Dataset(dataset_flow_key) => self.get_dataset_flow_run_stats(
+                &dataset_flow_key.dataset_id,
+                dataset_flow_key.flow_type,
+            ),
+            FlowKey::System(system_flow_key) => {
+                self.get_system_flow_run_stats(system_flow_key.flow_type)
+            }
+        })
     }
 
     /// Returns nearest time when one or more flows are scheduled for activation

@@ -217,6 +217,131 @@ impl SqliteFlowEventStore {
         let last_event_id = rows.last().unwrap().event_id;
         Ok(EventID::new(last_event_id))
     }
+
+    async fn get_dataset_flow_run_stats(
+        &self,
+        dataset_id: &DatasetID,
+        flow_type: DatasetFlowType,
+    ) -> Result<FlowRunStats, InternalError> {
+        let mut tr = self.transaction.lock().await;
+
+        let dataset_id = dataset_id.to_string();
+
+        let connection_mut = tr.connection_mut().await?;
+        let maybe_attempt_result = sqlx::query_as!(
+            RunStatsRow,
+            r#"
+            SELECT attempt.last_event_time as "last_event_time: _"
+            FROM (
+                SELECT e.event_id as event_id, e.event_time AS last_event_time
+                    FROM flow_events e
+                    INNER JOIN flows f ON f.flow_id = e.flow_id
+                    WHERE
+                        e.event_type = 'FlowEventTaskFinished' AND
+                        f.dataset_id = $1 AND
+                        f.dataset_flow_type = $2
+                    ORDER BY e.event_id DESC
+                    LIMIT 1
+            ) AS attempt
+            "#,
+            dataset_id,
+            flow_type,
+        )
+        .map(|event_row| event_row.last_event_time)
+        .fetch_optional(connection_mut)
+        .await
+        .int_err()?;
+
+        let connection_mut = tr.connection_mut().await?;
+        let maybe_success_result = sqlx::query_as!(
+            RunStatsRow,
+            r#"
+            SELECT success.last_event_time as "last_event_time: _"
+            FROM (
+                SELECT e.event_id as event_id, e.event_time AS last_event_time
+                    FROM flow_events e
+                    INNER JOIN flows f ON f.flow_id = e.flow_id
+                    WHERE
+                        e.event_type = 'FlowEventTaskFinished' AND
+                        e.event_payload ->> '$.TaskFinished.task_outcome.Success' IS NOT NULL AND
+                        f.dataset_id = $1 AND
+                        f.dataset_flow_type = $2
+                    ORDER BY e.event_id DESC
+                    LIMIT 1
+            ) AS success
+            "#,
+            dataset_id,
+            flow_type
+        )
+        .map(|event_row| event_row.last_event_time)
+        .fetch_optional(connection_mut)
+        .await
+        .int_err()?;
+
+        Ok(FlowRunStats {
+            last_attempt_time: maybe_attempt_result,
+            last_success_time: maybe_success_result,
+        })
+    }
+
+    async fn get_system_flow_run_stats(
+        &self,
+        flow_type: SystemFlowType,
+    ) -> Result<FlowRunStats, InternalError> {
+        let mut tr = self.transaction.lock().await;
+
+        let connection_mut = tr.connection_mut().await?;
+        let maybe_attempt_result = sqlx::query_as!(
+            RunStatsRow,
+            r#"
+            SELECT attempt.last_event_time as "last_event_time: _"
+            FROM (
+                SELECT e.event_id as event_id, e.event_time AS last_event_time
+                    FROM flow_events e
+                    INNER JOIN flows f ON f.flow_id = e.flow_id
+                    WHERE
+                        e.event_type = 'FlowEventTaskFinished' AND
+                        f.system_flow_type = $1
+                    ORDER BY e.event_id DESC
+                    LIMIT 1
+            ) AS attempt
+            "#,
+            flow_type
+        )
+        .map(|event_row| event_row.last_event_time)
+        .fetch_optional(connection_mut)
+        .await
+        .int_err()?;
+
+        let connection_mut = tr.connection_mut().await?;
+        let maybe_success_result = sqlx::query_as!(
+            RunStatsRow,
+            r#"
+            SELECT success.last_event_time as "last_event_time: _"
+            FROM (
+                SELECT e.event_id as event_id, e.event_time AS last_event_time
+                    FROM flow_events e
+                    INNER JOIN flows f ON f.flow_id = e.flow_id
+                    WHERE
+                        e.event_type = 'FlowEventTaskFinished' AND
+                        e.event_payload ->> '$.TaskFinished.task_outcome.Success' IS NOT NULL AND
+                        f.system_flow_type = $1
+                    ORDER BY e.event_id DESC
+                    LIMIT 1
+            ) AS success
+            "#,
+            flow_type
+        )
+        .map(|event_row| event_row.last_event_time)
+        .fetch_optional(connection_mut)
+        .await
+        .int_err()?;
+
+        Ok(FlowRunStats {
+            last_attempt_time: maybe_attempt_result,
+            last_success_time: maybe_success_result,
+        })
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -424,129 +549,20 @@ impl FlowEventStore for SqliteFlowEventStore {
         Ok(maybe_flow_id.map(|id| FlowID::try_from(id).unwrap()))
     }
 
-    async fn get_dataset_flow_run_stats(
-        &self,
-        dataset_id: &DatasetID,
-        flow_type: DatasetFlowType,
-    ) -> Result<FlowRunStats, InternalError> {
-        let mut tr = self.transaction.lock().await;
-
-        let dataset_id = dataset_id.to_string();
-
-        let connection_mut = tr.connection_mut().await?;
-        let maybe_attempt_result = sqlx::query_as!(
-            RunStatsRow,
-            r#"
-            SELECT attempt.last_event_time as "last_event_time: _"
-            FROM (
-                SELECT e.event_id as event_id, e.event_time AS last_event_time
-                    FROM flow_events e
-                    INNER JOIN flows f ON f.flow_id = e.flow_id
-                    WHERE
-                        e.event_type = 'FlowEventTaskFinished' AND
-                        f.dataset_id = $1 AND
-                        f.dataset_flow_type = $2
-                    ORDER BY e.event_id DESC
-                    LIMIT 1
-            ) AS attempt
-            "#,
-            dataset_id,
-            flow_type,
-        )
-        .map(|event_row| event_row.last_event_time)
-        .fetch_optional(connection_mut)
-        .await
-        .int_err()?;
-
-        let connection_mut = tr.connection_mut().await?;
-        let maybe_success_result = sqlx::query_as!(
-            RunStatsRow,
-            r#"
-            SELECT success.last_event_time as "last_event_time: _"
-            FROM (
-                SELECT e.event_id as event_id, e.event_time AS last_event_time
-                    FROM flow_events e
-                    INNER JOIN flows f ON f.flow_id = e.flow_id
-                    WHERE
-                        e.event_type = 'FlowEventTaskFinished' AND
-                        e.event_payload ->> '$.TaskFinished.task_outcome.Success' IS NOT NULL AND
-                        f.dataset_id = $1 AND
-                        f.dataset_flow_type = $2
-                    ORDER BY e.event_id DESC
-                    LIMIT 1
-            ) AS success
-            "#,
-            dataset_id,
-            flow_type
-        )
-        .map(|event_row| event_row.last_event_time)
-        .fetch_optional(connection_mut)
-        .await
-        .int_err()?;
-
-        Ok(FlowRunStats {
-            last_attempt_time: maybe_attempt_result,
-            last_success_time: maybe_success_result,
-        })
-    }
-
-    async fn get_system_flow_run_stats(
-        &self,
-        flow_type: SystemFlowType,
-    ) -> Result<FlowRunStats, InternalError> {
-        let mut tr = self.transaction.lock().await;
-
-        let connection_mut = tr.connection_mut().await?;
-        let maybe_attempt_result = sqlx::query_as!(
-            RunStatsRow,
-            r#"
-            SELECT attempt.last_event_time as "last_event_time: _"
-            FROM (
-                SELECT e.event_id as event_id, e.event_time AS last_event_time
-                    FROM flow_events e
-                    INNER JOIN flows f ON f.flow_id = e.flow_id
-                    WHERE
-                        e.event_type = 'FlowEventTaskFinished' AND
-                        f.system_flow_type = $1
-                    ORDER BY e.event_id DESC
-                    LIMIT 1
-            ) AS attempt
-            "#,
-            flow_type
-        )
-        .map(|event_row| event_row.last_event_time)
-        .fetch_optional(connection_mut)
-        .await
-        .int_err()?;
-
-        let connection_mut = tr.connection_mut().await?;
-        let maybe_success_result = sqlx::query_as!(
-            RunStatsRow,
-            r#"
-            SELECT success.last_event_time as "last_event_time: _"
-            FROM (
-                SELECT e.event_id as event_id, e.event_time AS last_event_time
-                    FROM flow_events e
-                    INNER JOIN flows f ON f.flow_id = e.flow_id
-                    WHERE
-                        e.event_type = 'FlowEventTaskFinished' AND
-                        e.event_payload ->> '$.TaskFinished.task_outcome.Success' IS NOT NULL AND
-                        f.system_flow_type = $1
-                    ORDER BY e.event_id DESC
-                    LIMIT 1
-            ) AS success
-            "#,
-            flow_type
-        )
-        .map(|event_row| event_row.last_event_time)
-        .fetch_optional(connection_mut)
-        .await
-        .int_err()?;
-
-        Ok(FlowRunStats {
-            last_attempt_time: maybe_attempt_result,
-            last_success_time: maybe_success_result,
-        })
+    async fn get_flow_run_stats(&self, flow_key: &FlowKey) -> Result<FlowRunStats, InternalError> {
+        match flow_key {
+            FlowKey::Dataset(dataset_flow_key) => {
+                self.get_dataset_flow_run_stats(
+                    &dataset_flow_key.dataset_id,
+                    dataset_flow_key.flow_type,
+                )
+                .await
+            }
+            FlowKey::System(system_flow_key) => {
+                self.get_system_flow_run_stats(system_flow_key.flow_type)
+                    .await
+            }
+        }
     }
 
     /// Returns nearest time when one or more flows are scheduled for activation
