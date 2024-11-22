@@ -11,11 +11,16 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [0.208.1] - 2024-11-22
+### Fixed
+- `kamu-base-with-data-mt` image building
+
 ## [0.208.0] - 2024-11-21
+### Added
 Introduced `DatasetRegistry` abstraction, encapsulating listing and resolution of datasets:
 - Registry is backed by database-stored dataset entries, which are automatically maintained
 - Scope for `DatasetRepository` is now limited to support `DatasetRegistry` and in-memory dataset dependency graph
-- New concept of `ResolvedDataset`: a wrapper arround `Arc<dyn Dataset>`, aware of dataset identity
+- New concept of `ResolvedDataset`: a wrapper around `Arc<dyn Dataset>`, aware of dataset identity
 - `DatasetRegistryRepoBridge` utility connects both abstractions in a simple way for testing needs
 - Query and Dataset Search functions now consider only the datasets accessible for current user
 - Core services now explicitly separate planning (transactional) and execution (non-transactional) processing phases
