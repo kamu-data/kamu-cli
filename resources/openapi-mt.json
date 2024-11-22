@@ -768,16 +768,14 @@
     }
   },
   "info": {
-    "contact": {
-      "email": "dev@kamu.dev",
-      "name": "Kamu Data Inc."
-    },
-    "description": "Decentralized data management tool",
+    "description": "You are currently running Kamu CLI in the API server mode. For a fully-featured\nserver consider using [Kamu Node](https://docs.kamu.dev/node/).\n\n## Auth\nSome operation require an **API token**. Pass `--get-token` command line argument\nfor CLI to generate a token for you.\n\n## Resources\n- [Documentation](https://docs.kamu.dev)\n- [Discord](https://discord.gg/nU6TXRQNXC)\n- [Other protocols](https://docs.kamu.dev/node/protocols/)\n- [Open Data Fabric specification](https://docs.kamu.dev/odf/)\n",
     "license": {
-      "name": ""
+      "name": "BSL",
+      "url": "https://docs.kamu.dev/license/"
     },
-    "title": "kamu-cli",
-    "version": "0.208.1"
+    "termsOfService": "https://docs.kamu.dev/terms-of-service/",
+    "title": "Kamu REST API",
+    "version": ""
   },
   "openapi": "3.1.0",
   "paths": {
@@ -2135,23 +2133,23 @@
   },
   "tags": [
     {
-      "description": "Core ODF APIs",
+      "description": "Core ODF APIs.\n\n[Open Data Fabric](https://docs.kamu.dev/odf/) (ODF) is a specification for\nopen data formats and protocols for interoperable data exchange and processing.\nKamu is just one possible implementation of this spec. APIs in this group are\npart of the spec and thus should be supported by most ODF implementations.\n",
       "name": "odf-core"
     },
     {
-      "description": "ODF Data Transfer APIs",
+      "description": "ODF Data Transfer APIs.\n\nThis group includes two main protocols:\n\n- [Simple Transfer Protocol](https://docs.kamu.dev/odf/spec/#simple-transfer-protocol)\n(SiTP) is a bare-minimum read-only protocol used for synchronizing datasets between\nrepositories. It is simple to implement and support, but accesses metadata blocks and\nother dataset components on individual object basis which may be inefficient for\nlarge datasets.\n\n- [Smart Transfer Protocol](https://docs.kamu.dev/odf/spec/#smart-transfer-protocol)\n(SmTP) is an extension of SiTP that adds efficient batch transfer of small objects,\ncompression, and can proxy reads and writes of large objects directly to underlying\nstorage.\n",
       "name": "odf-transfer"
     },
     {
-      "description": "ODF Data Query APIs",
+      "description": "ODF Data Query APIs.\n\nAPIs in this group allow to query data and metadata of datasets and generate\ncryptographic proofs for the results.\n",
       "name": "odf-query"
     },
     {
-      "description": "General Node APIs",
+      "description": "General Node APIs.\n\nAPIs in this group are either Kamu-specific or are experimental before they\nare included into ODF spec.\n",
       "name": "kamu"
     },
     {
-      "description": "OData Adapter",
+      "description": "OData Adapter.\n\nThis group f APIs represente an [OData](https://learn.microsoft.com/en-us/odata/overview)\nprotocol adapter on top of the ODF query API. See\n[datafusion-odata](https://github.com/kamu-data/datafusion-odata/) library for details\non what parts of the OData protocol are currently supported.\n",
       "name": "kamu-odata"
     }
   ]

@@ -131,17 +131,12 @@ tonic = { version = "0.12", default-features = false }
 tower = "0.5"
 tower-http = { version = "0.6", features = ["trace", "cors"] }
 utoipa = { version = "5", default-features = true, features = ["macros"] }
-utoipa-swagger-ui = { version = "8", default-features = true, features = [
-    "axum",
-] }
 utoipa-axum = { version = "0.1", default-features = true, features = [] }
 
 # Web UI
 rust-embed = { optional = true, version = "8", features = [
     "interpolate-folder-path",
-    # TODO: Re-enable compression when utoipa-swagger-ui supports it
-    # See: https://github.com/juhaku/utoipa/issues/1151
-    # "compression",
+    "compression",
 ] }
 mime = "0.3"
 mime_guess = "2"

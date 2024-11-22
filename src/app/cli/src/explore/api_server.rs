@@ -27,7 +27,6 @@ use kamu_task_system_inmem::domain::TaskExecutor;
 use messaging_outbox::OutboxExecutor;
 use tokio::sync::Notify;
 use url::Url;
-use utoipa::OpenApi as _;
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
 
@@ -94,7 +93,7 @@ impl APIServer {
             }))
             .build();
 
-        let mut router = OpenApiRouter::with_openapi(ApiDoc::openapi())
+        let mut router = OpenApiRouter::with_openapi(build_openapi().build())
             .route("/", axum::routing::get(root))
             .route(
                 // IMPORTANT: The same name is used inside e2e_middleware_fn().
@@ -176,8 +175,10 @@ impl APIServer {
             .layer(Extension(api_server_catalog));
 
         let (router, api) = router.split_for_parts();
-        let router =
-            router.merge(utoipa_swagger_ui::SwaggerUi::new("/swagger").url("/openapi.json", api));
+        let router = router
+            .route("/openapi.json", axum::routing::get(openapi_spec))
+            .route("/openapi", axum::routing::get(openapi_playground))
+            .layer(Extension(Arc::new(api)));
 
         let server = axum::serve(listener, router.into_make_service());
 
@@ -229,10 +230,92 @@ async fn root() -> impl axum::response::IntoResponse {
         <h1>Kamu HTTP Server</h1>
         <ul>
             <li><a href="/graphql">GraphQL Playground</li>
-            <li><a href="/swagger/">Swagger UI</li>
+            <li><a href="/openapi">OpenAPI Playground</li>
         </ul>
         "#
     ))
+}
+
+async fn openapi_playground() -> impl axum::response::IntoResponse {
+    // NOTE: Keep in sync with kamu-docs repo
+    axum::response::Html(indoc!(
+        r#"
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Kamu REST API Reference</title>
+            <meta charset="utf-8" />
+            <meta name="viewport" content="width=device-width, initial-scale=1" />
+            <style>
+                :root {
+                    --scalar-custom-header-height: 50px;
+                }
+
+                .custom-header {
+                    height: var(--scalar-custom-header-height);
+                    background-color: var(--scalar-background-1);
+                    box-shadow: inset 0 -1px 0 var(--scalar-border-color);
+                    color: var(--scalar-color-1);
+                    font-size: var(--scalar-font-size-2);
+                    padding: 0 18px;
+                    position: sticky;
+                    justify-content: space-between;
+                    top: 0;
+                    z-index: 100;
+                }
+
+                .custom-header,
+                .custom-header nav {
+                    display: flex;
+                    align-items: center;
+                    gap: 18px;
+                }
+
+                .custom-header a:hover {
+                    color: var(--scalar-color-2);
+                }
+            </style>
+        </head>
+        <body>
+            <header class="custom-header scalar-app">
+            <b>Kamu REST API</b>
+            <nav>
+                <a href="https://docs.kamu.dev/">Docs</a>
+                <a href="https://discord.gg/nU6TXRQNXC">Discord</a>
+            </nav>
+            </header>
+
+            <script id="api-reference"></script>
+
+            <script>
+            var configuration = {
+                theme: "purple",
+                spec: {
+                    url: "/openapi.json",
+                },
+                servers: [
+                    {
+                        url: "/",
+                        description: "Current Node",
+                    },
+                ],
+            };
+
+            document.getElementById("api-reference").dataset.configuration =
+                JSON.stringify(configuration);
+            </script>
+
+            <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
+        </body>
+        </html>
+        "#
+    ))
+}
+
+async fn openapi_spec(
+    Extension(api): Extension<Arc<utoipa::openapi::OpenApi>>,
+) -> impl axum::response::IntoResponse {
+    axum::Json(api)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -261,37 +344,123 @@ async fn graphql_playground_handler() -> impl axum::response::IntoResponse {
 // OpenAPI root
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(utoipa::OpenApi)]
-#[openapi(
-    modifiers(&TokenAuthAddon),
-    tags(
-        (name = "odf-core", description = "Core ODF APIs"),
-        (name = "odf-transfer", description = "ODF Data Transfer APIs"),
-        (name = "odf-query", description = "ODF Data Query APIs"),
-        (name = "kamu", description = "General Node APIs"),
-        (name = "kamu-odata", description = "OData Adapter"),
-    )
-)]
-struct ApiDoc;
+fn build_openapi() -> utoipa::openapi::OpenApiBuilder {
+    use utoipa::openapi::security::*;
+    use utoipa::openapi::tag::*;
+    use utoipa::openapi::*;
 
-struct TokenAuthAddon;
-
-impl utoipa::Modify for TokenAuthAddon {
-    fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
-        use utoipa::openapi::security::*;
-
-        if let Some(components) = openapi.components.as_mut() {
-            components.add_security_scheme(
-                "api_key",
-                SecurityScheme::Http(
-                    HttpBuilder::new()
-                        .scheme(HttpAuthScheme::Bearer)
-                        .bearer_format("AccessToken")
+    OpenApiBuilder::new()
+        .info(
+            InfoBuilder::new()
+                .title("Kamu REST API")
+                .terms_of_service(Some("https://docs.kamu.dev/terms-of-service/"))
+                .license(Some(
+                    LicenseBuilder::new()
+                        .name("BSL")
+                        .url(Some("https://docs.kamu.dev/license/"))
                         .build(),
-                ),
-            );
-        }
-    }
+                ))
+                .description(Some(indoc::indoc!(
+                    r#"
+                    You are currently running Kamu CLI in the API server mode. For a fully-featured
+                    server consider using [Kamu Node](https://docs.kamu.dev/node/).
+
+                    ## Auth
+                    Some operation require an **API token**. Pass `--get-token` command line argument
+                    for CLI to generate a token for you.
+
+                    ## Resources
+                    - [Documentation](https://docs.kamu.dev)
+                    - [Discord](https://discord.gg/nU6TXRQNXC)
+                    - [Other protocols](https://docs.kamu.dev/node/protocols/)
+                    - [Open Data Fabric specification](https://docs.kamu.dev/odf/)
+                    "#
+                ))),
+        )
+        .tags(Some([
+            TagBuilder::new()
+                .name("odf-core")
+                .description(Some(indoc::indoc!(
+                    r#"
+                    Core ODF APIs.
+
+                    [Open Data Fabric](https://docs.kamu.dev/odf/) (ODF) is a specification for
+                    open data formats and protocols for interoperable data exchange and processing.
+                    Kamu is just one possible implementation of this spec. APIs in this group are
+                    part of the spec and thus should be supported by most ODF implementations.
+                    "#
+                )))
+                .build(),
+            TagBuilder::new()
+                .name("odf-transfer")
+                .description(Some(indoc::indoc!(
+                    r#"
+                    ODF Data Transfer APIs.
+
+                    This group includes two main protocols:
+
+                    - [Simple Transfer Protocol](https://docs.kamu.dev/odf/spec/#simple-transfer-protocol)
+                    (SiTP) is a bare-minimum read-only protocol used for synchronizing datasets between
+                    repositories. It is simple to implement and support, but accesses metadata blocks and
+                    other dataset components on individual object basis which may be inefficient for
+                    large datasets.
+
+                    - [Smart Transfer Protocol](https://docs.kamu.dev/odf/spec/#smart-transfer-protocol)
+                    (SmTP) is an extension of SiTP that adds efficient batch transfer of small objects,
+                    compression, and can proxy reads and writes of large objects directly to underlying
+                    storage.
+                    "#
+                )))
+                .build(),
+            TagBuilder::new()
+                .name("odf-query")
+                .description(Some(indoc::indoc!(
+                    r#"
+                    ODF Data Query APIs.
+
+                    APIs in this group allow to query data and metadata of datasets and generate
+                    cryptographic proofs for the results.
+                    "#
+                )))
+                .build(),
+            TagBuilder::new()
+                .name("kamu")
+                .description(Some(indoc::indoc!(
+                    r#"
+                    General Node APIs.
+
+                    APIs in this group are either Kamu-specific or are experimental before they
+                    are included into ODF spec.
+                    "#
+                )))
+                .build(),
+            TagBuilder::new()
+                .name("kamu-odata")
+                .description(Some(indoc::indoc!(
+                    r#"
+                    OData Adapter.
+
+                    This group f APIs represente an [OData](https://learn.microsoft.com/en-us/odata/overview)
+                    protocol adapter on top of the ODF query API. See
+                    [datafusion-odata](https://github.com/kamu-data/datafusion-odata/) library for details
+                    on what parts of the OData protocol are currently supported.
+                    "#
+                )))
+                .build(),
+        ]))
+        .components(Some(
+            ComponentsBuilder::new()
+                .security_scheme(
+                    "api_key",
+                    SecurityScheme::Http(
+                        HttpBuilder::new()
+                            .scheme(HttpAuthScheme::Bearer)
+                            .bearer_format("AccessToken")
+                            .build(),
+                    ),
+                )
+                .build(),
+        ))
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
