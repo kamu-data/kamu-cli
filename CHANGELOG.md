@@ -14,6 +14,7 @@ Recommendation: for ease of reading, use the following order:
 ## [Unreleased]
 ### Fixed
 - `EXECUTE_TRANSFORM` flows now respect last success run time during config enabling and api-server restarting
+- `kamu login`: add repo with `odf+` schema protocol
 
 ## [0.208.1] - 2024-11-22
 ### Fixed

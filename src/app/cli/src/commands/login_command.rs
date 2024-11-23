@@ -11,6 +11,7 @@ use std::sync::Arc;
 
 use console::style as s;
 use kamu::domain::{AddRepoError, RemoteRepositoryRegistry};
+use kamu::UrlExt;
 use opendatafabric::RepoName;
 use url::Url;
 
@@ -91,10 +92,10 @@ impl LoginCommand {
         let repo_name = self.repo_name.clone().unwrap_or(
             RepoName::try_from(frontend_url.host_str().unwrap()).map_err(CLIError::failure)?,
         );
-        match self
-            .remote_repo_reg
-            .add_repository(&repo_name, backend_url.clone())
-        {
+        match self.remote_repo_reg.add_repository(
+            &repo_name,
+            backend_url.as_odf_protocol().map_err(CLIError::failure)?,
+        ) {
             Ok(_) => Ok(()),
             Err(_err @ AddRepoError::AlreadyExists(_)) => Ok(()),
             Err(e) => Err(CLIError::failure(e)),
