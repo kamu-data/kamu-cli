@@ -219,11 +219,13 @@ async fn test_login_add_repo(kamu: KamuCliPuppet) {
 
     let repo_list = kamu.get_list_of_repos().await;
 
+    let expected_url_1 = "odf+http://example.com/";
+
     let expected_repo_list = vec![RepoRecord {
         name: odf::RepoName::new_unchecked(
             url::Url::try_from(dummy_url).unwrap().host_str().unwrap(),
         ),
-        url: url::Url::try_from(dummy_url).unwrap(),
+        url: url::Url::try_from(expected_url_1).unwrap(),
     }];
 
     pretty_assertions::assert_eq!(expected_repo_list, repo_list);
@@ -248,16 +250,18 @@ async fn test_login_add_repo(kamu: KamuCliPuppet) {
 
     let repo_list = kamu.get_list_of_repos().await;
 
+    let expected_url_2 = "odf+http://example-new.com/";
+
     let expected_repo_list = vec![
         RepoRecord {
             name: odf::RepoName::new_unchecked(
                 url::Url::try_from(dummy_url).unwrap().host_str().unwrap(),
             ),
-            url: url::Url::try_from(dummy_url).unwrap(),
+            url: url::Url::try_from(expected_url_1).unwrap(),
         },
         RepoRecord {
             name: odf::RepoName::new_unchecked(expected_repo_name),
-            url: url::Url::try_from(new_dummy_url).unwrap(),
+            url: url::Url::try_from(expected_url_2).unwrap(),
         },
     ];
 
