@@ -16,6 +16,7 @@ use indoc::indoc;
 use kamu::testing::MetadataFactory;
 use kamu::*;
 use kamu_core::*;
+use kamu_datasets_services::DependencyGraphServiceImpl;
 use messaging_outbox::DummyOutboxImpl;
 use opendatafabric::serde::yaml::YamlMetadataEventSerializer;
 use opendatafabric::*;
@@ -531,7 +532,7 @@ impl GraphQLMetadataChainHarness {
                 .add::<CreateDatasetUseCaseImpl>()
                 .add::<CreateDatasetFromSnapshotUseCaseImpl>()
                 .add::<CommitDatasetEventUseCaseImpl>()
-                .add::<DependencyGraphServiceInMemory>()
+                .add::<DependencyGraphServiceImpl>()
                 .add_value(tenancy_config)
                 .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
                 .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()

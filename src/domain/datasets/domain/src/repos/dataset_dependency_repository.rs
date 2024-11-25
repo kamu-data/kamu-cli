@@ -9,15 +9,32 @@
 
 use std::pin::Pin;
 
-use futures::Stream;
 use internal_error::InternalError;
 use opendatafabric::DatasetID;
+use tokio_stream::Stream;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait DependencyGraphRepository: Sync + Send {
-    fn list_dependencies_of_all_datasets(&self) -> DatasetDependenciesIDStream;
+pub trait DatasetDependencyRepository: Send + Sync {
+    async fn stores_any_dependencies(&self) -> Result<bool, InternalError>;
+
+    fn list_all_dependencies(&self) -> DatasetDependenciesIDStream;
+
+    async fn add_upstream_dependencies(
+        &self,
+        downstream_dataset_id: &DatasetID,
+        upstream_dataset_ids: &[&DatasetID],
+    ) -> Result<(), InternalError>;
+
+    async fn remove_upstream_dependencies(
+        &self,
+        downstream_dataset_id: &DatasetID,
+        upstream_dataset_ids: &[&DatasetID],
+    ) -> Result<(), InternalError>;
+
+    async fn remove_all_dependencies_of(&self, dataset_id: &DatasetID)
+        -> Result<(), InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

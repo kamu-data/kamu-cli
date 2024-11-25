@@ -14,6 +14,7 @@ use indoc::indoc;
 use kamu::testing::MetadataFactory;
 use kamu::*;
 use kamu_core::*;
+use kamu_datasets_services::DependencyGraphServiceImpl;
 use messaging_outbox::DummyOutboxImpl;
 use opendatafabric::*;
 use time_source::SystemTimeSourceDefault;
@@ -45,7 +46,7 @@ async fn test_current_push_sources() {
             .add::<ObjectStoreRegistryImpl>()
             .add::<DataFormatRegistryImpl>()
             .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
-            .add::<DependencyGraphServiceInMemory>();
+            .add::<DependencyGraphServiceImpl>();
 
         NoOpDatabasePlugin::init_database_components(&mut b);
 

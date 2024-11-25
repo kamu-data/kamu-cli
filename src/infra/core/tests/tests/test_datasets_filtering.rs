@@ -10,6 +10,7 @@
 use std::str::FromStr;
 
 use futures::TryStreamExt;
+use kamu::testing::BaseRepoHarness;
 use kamu::utils::datasets_filtering::{
     get_local_datasets_stream,
     matches_local_ref_pattern,
@@ -18,8 +19,6 @@ use kamu::utils::datasets_filtering::{
 use kamu_accounts::DEFAULT_ACCOUNT_NAME;
 use kamu_core::TenancyConfig;
 use opendatafabric::*;
-
-use crate::BaseRepoHarness;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

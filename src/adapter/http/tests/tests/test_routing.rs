@@ -18,6 +18,7 @@ use kamu::domain::*;
 use kamu::testing::*;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
+use kamu_datasets_services::DependencyGraphServiceImpl;
 use messaging_outbox::DummyOutboxImpl;
 use opendatafabric::*;
 use time_source::SystemTimeSourceDefault;
@@ -42,7 +43,7 @@ async fn setup_repo() -> RepoFixture {
     let mut b = dill::CatalogBuilder::new();
     b.add::<SystemTimeSourceDefault>()
         .add::<DummyOutboxImpl>()
-        .add::<DependencyGraphServiceInMemory>()
+        .add::<DependencyGraphServiceImpl>()
         .add_value(TenancyConfig::SingleTenant)
         .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()

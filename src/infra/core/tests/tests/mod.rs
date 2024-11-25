@@ -14,7 +14,6 @@ mod test_compact_service_impl;
 mod test_dataset_changes_service_impl;
 mod test_dataset_ownership_service_inmem;
 mod test_datasets_filtering;
-mod test_dependency_graph_inmem;
 mod test_metadata_chain_comparator;
 mod test_pull_request_planner_impl;
 mod test_push_request_planner_impl;

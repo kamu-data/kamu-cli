@@ -12,19 +12,10 @@ use opendatafabric::DatasetID;
 use thiserror::Error;
 use tokio_stream::Stream;
 
-use crate::DependencyGraphRepository;
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 pub trait DependencyGraphService: Sync + Send {
-    /// Forces initialization of graph data, if it wasn't initialized already.
-    /// Ignored if called multiple times
-    async fn eager_initialization(
-        &self,
-        repository: &dyn DependencyGraphRepository,
-    ) -> Result<(), InternalError>;
-
     /// Iterates over 1st level of dataset's downstream dependencies
     async fn get_downstream_dependencies(
         &self,

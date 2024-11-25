@@ -11,15 +11,15 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use dill::Component;
-use futures::{future, StreamExt, TryStreamExt};
+use futures::{future, StreamExt};
 use internal_error::ResultIntoInternal;
-use kamu::testing::MetadataFactory;
+use kamu::testing::{BaseRepoHarness, MetadataFactory};
 use kamu::*;
 use kamu_core::*;
+use kamu_datasets::{DatasetDependencies, DatasetDependencyRepository};
+use kamu_datasets_services::DependencyGraphServiceImpl;
 use messaging_outbox::{register_message_dispatcher, Outbox, OutboxImmediateImpl};
 use opendatafabric::*;
-
-use crate::BaseRepoHarness;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -85,7 +85,6 @@ async fn test_multi_tenant_repository() {
 async fn test_service_queries() {
     let harness = DependencyGraphHarness::new(TenancyConfig::SingleTenant);
     harness.create_single_tenant_graph().await;
-    harness.eager_initialization().await;
 
     assert_eq!(
         harness.dataset_dependencies_report("foo").await,
@@ -124,7 +123,6 @@ async fn test_service_queries() {
 async fn test_service_new_datasets() {
     let harness = DependencyGraphHarness::new(TenancyConfig::SingleTenant);
     harness.create_single_tenant_graph().await;
-    harness.eager_initialization().await;
 
     harness.create_root_dataset(None, "test-root").await;
 
@@ -168,7 +166,6 @@ async fn test_service_new_datasets() {
 async fn test_service_derived_dataset_modifies_links() {
     let harness = DependencyGraphHarness::new(TenancyConfig::SingleTenant);
     harness.create_single_tenant_graph().await;
-    harness.eager_initialization().await;
 
     assert_eq!(
         harness.dataset_dependencies_report("bar").await,
@@ -260,7 +257,6 @@ async fn test_service_derived_dataset_modifies_links() {
 async fn test_service_dataset_deleted() {
     let harness = DependencyGraphHarness::new(TenancyConfig::SingleTenant);
     harness.create_single_tenant_graph().await;
-    harness.eager_initialization().await;
 
     assert_eq!(
         harness.dataset_dependencies_report("foo-bar").await,
@@ -605,10 +601,10 @@ async fn test_in_dependency_order() {
 
 #[oop::extend(BaseRepoHarness, base_repo_harness)]
 struct DependencyGraphHarness {
-    base_repo_harness: BaseRepoHarness,
+    base_repo_harness: kamu::testing::BaseRepoHarness,
     catalog: dill::Catalog,
     dependency_graph_service: Arc<dyn DependencyGraphService>,
-    dependency_graph_repository: Arc<dyn DependencyGraphRepository>,
+    dataset_dependency_repo: Arc<dyn DatasetDependencyRepository>,
 }
 
 impl DependencyGraphHarness {
@@ -622,7 +618,7 @@ impl DependencyGraphHarness {
         )
         .bind::<dyn Outbox, OutboxImmediateImpl>()
         .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
-        .add::<DependencyGraphServiceInMemory>()
+        .add::<DependencyGraphServiceImpl>()
         .add::<CreateDatasetFromSnapshotUseCaseImpl>()
         .add::<CommitDatasetEventUseCaseImpl>()
         .add::<DeleteDatasetUseCaseImpl>();
@@ -634,26 +630,26 @@ impl DependencyGraphHarness {
 
         let catalog = b.build();
 
-        let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
+        let dataset_dependency_repo = catalog
+            .get_one::<dyn DatasetDependencyRepository>()
+            .unwrap();
 
         let dependency_graph_service = catalog.get_one::<dyn DependencyGraphService>().unwrap();
-
-        // Note: don't place into catalog, avoid cyclic dependency
-        let dependency_graph_repository =
-            Arc::new(DependencyGraphRepositoryInMemory::new(dataset_repo.clone()));
 
         Self {
             base_repo_harness,
             catalog,
             dependency_graph_service,
-            dependency_graph_repository,
+            dataset_dependency_repo,
         }
     }
 
     async fn list_all_dependencies(&self) -> Vec<(String, String)> {
+        use futures::TryStreamExt;
+
         let dependencies: Vec<_> = self
-            .dependency_graph_repository
-            .list_dependencies_of_all_datasets()
+            .dataset_dependency_repo
+            .list_all_dependencies()
             .try_collect()
             .await
             .unwrap();
@@ -695,13 +691,6 @@ impl DependencyGraphHarness {
             .map(|(name1, name2)| format!("{name1} -> {name2}"))
             .collect::<Vec<_>>()
             .join("\n")
-    }
-
-    async fn eager_initialization(&self) {
-        self.dependency_graph_service
-            .eager_initialization(self.dependency_graph_repository.as_ref())
-            .await
-            .unwrap();
     }
 
     async fn dataset_dependencies_report(&self, dataset_name: &str) -> String {
@@ -1024,7 +1013,6 @@ impl DependencyGraphHarness {
 async fn create_large_dataset_graph() -> DependencyGraphHarness {
     let dependency_harness = DependencyGraphHarness::new(TenancyConfig::SingleTenant);
     dependency_harness.create_single_tenant_graph().await;
-    dependency_harness.eager_initialization().await;
 
     /*
        Graph representation:

@@ -19,6 +19,7 @@ use kamu::testing::MetadataFactory;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::*;
+use kamu_datasets_services::DependencyGraphServiceImpl;
 use kamu_flow_system::*;
 use kamu_flow_system_inmem::*;
 use kamu_flow_system_services::*;
@@ -426,7 +427,6 @@ async fn test_dataset_deleted() {
 struct FlowConfigurationHarness {
     _tmp_dir: tempfile::TempDir,
     catalog: Catalog,
-    dataset_repo: Arc<dyn DatasetRepository>,
     flow_configuration_service: Arc<dyn FlowConfigurationService>,
     flow_configuration_event_store: Arc<dyn FlowConfigurationEventStore>,
     config_listener: Arc<FlowConfigTestListener>,
@@ -457,7 +457,7 @@ impl FlowConfigurationHarness {
             .add::<DatasetRegistryRepoBridge>()
             .add_value(CurrentAccountSubject::new_test())
             .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
-            .add::<DependencyGraphServiceInMemory>()
+            .add::<DependencyGraphServiceImpl>()
             .add::<CreateDatasetFromSnapshotUseCaseImpl>()
             .add::<DeleteDatasetUseCaseImpl>();
 
@@ -479,7 +479,6 @@ impl FlowConfigurationHarness {
         let flow_configuration_event_store = catalog
             .get_one::<dyn FlowConfigurationEventStore>()
             .unwrap();
-        let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
         let flow_config_events_listener = catalog.get_one::<FlowConfigTestListener>().unwrap();
 
         Self {
@@ -487,7 +486,6 @@ impl FlowConfigurationHarness {
             catalog,
             flow_configuration_service,
             flow_configuration_event_store,
-            dataset_repo,
             config_listener: flow_config_events_listener,
         }
     }
@@ -663,19 +661,6 @@ impl FlowConfigurationHarness {
     }
 
     async fn delete_dataset(&self, dataset_id: &DatasetID) {
-        // Eagerly push dependency graph initialization before deletes.
-        // It's ignored, if requested 2nd time
-        let dependency_graph_service = self
-            .catalog
-            .get_one::<dyn DependencyGraphService>()
-            .unwrap();
-        let dependency_graph_repository =
-            DependencyGraphRepositoryInMemory::new(self.dataset_repo.clone());
-        dependency_graph_service
-            .eager_initialization(&dependency_graph_repository)
-            .await
-            .unwrap();
-
         // Do the actual deletion
         let delete_dataset = self.catalog.get_one::<dyn DeleteDatasetUseCase>().unwrap();
         delete_dataset

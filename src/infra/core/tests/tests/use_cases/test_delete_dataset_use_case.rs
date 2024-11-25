@@ -12,17 +12,11 @@ use std::sync::Arc;
 
 use dill::Catalog;
 use kamu::testing::MockDatasetActionAuthorizer;
-use kamu::{
-    DeleteDatasetUseCaseImpl,
-    DependencyGraphRepositoryInMemory,
-    DependencyGraphServiceInMemory,
-};
+use kamu::DeleteDatasetUseCaseImpl;
 use kamu_core::{
     DatasetLifecycleMessage,
-    DatasetRepository,
     DeleteDatasetError,
     DeleteDatasetUseCase,
-    DependencyGraphService,
     GetDatasetError,
 };
 use messaging_outbox::{consume_deserialized_message, ConsumerFilter, Message, MockOutbox};
@@ -45,7 +39,6 @@ async fn test_delete_dataset_success_via_ref() {
     let harness = DeleteUseCaseHarness::new(mock_authorizer, mock_outbox);
 
     harness.create_root_dataset(&alias_foo).await;
-    harness.dependencies_eager_initialization().await;
 
     harness
         .use_case
@@ -74,7 +67,6 @@ async fn test_delete_dataset_success_via_handle() {
     let harness = DeleteUseCaseHarness::new(mock_authorizer, mock_outbox);
 
     let foo = harness.create_root_dataset(&alias_foo).await;
-    harness.dependencies_eager_initialization().await;
 
     harness
         .use_case
@@ -116,7 +108,6 @@ async fn test_delete_unauthorized() {
     );
 
     let foo = harness.create_root_dataset(&alias_foo).await;
-    harness.dependencies_eager_initialization().await;
 
     assert_matches!(
         harness
@@ -145,7 +136,6 @@ async fn test_delete_dataset_respects_dangling_refs() {
     let derived = harness
         .create_derived_dataset(&alias_bar, vec![alias_foo.as_local_ref()])
         .await;
-    harness.dependencies_eager_initialization().await;
 
     assert_matches!(
         harness.use_case.execute_via_handle(&root.dataset_handle).await,
@@ -197,8 +187,6 @@ async fn test_delete_dataset_respects_dangling_refs() {
 struct DeleteUseCaseHarness {
     base_harness: BaseUseCaseHarness,
     catalog: Catalog,
-    dependency_graph_service: Arc<dyn DependencyGraphService>,
-    dataset_repo: Arc<dyn DatasetRepository>,
     use_case: Arc<dyn DeleteDatasetUseCase>,
 }
 
@@ -215,29 +203,17 @@ impl DeleteUseCaseHarness {
 
         let catalog = dill::CatalogBuilder::new_chained(base_harness.catalog())
             .add::<DeleteDatasetUseCaseImpl>()
-            .add::<DependencyGraphServiceInMemory>()
+            // TODO: replace with mocks
+            // .add::<DependencyGraphServiceInMemory>()
             .build();
 
-        let dependency_graph_service = catalog.get_one().unwrap();
         let use_case = catalog.get_one().unwrap();
-        let dataset_repo = catalog.get_one().unwrap();
 
         Self {
             base_harness,
             catalog,
-            dependency_graph_service,
-            dataset_repo,
             use_case,
         }
-    }
-
-    async fn dependencies_eager_initialization(&self) {
-        self.dependency_graph_service
-            .eager_initialization(&DependencyGraphRepositoryInMemory::new(
-                self.dataset_repo.clone(),
-            ))
-            .await
-            .unwrap();
     }
 
     async fn consume_message<TMessage: Message + 'static>(&self, message: TMessage) {
