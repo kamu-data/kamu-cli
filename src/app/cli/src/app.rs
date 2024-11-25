@@ -160,7 +160,6 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
         let output_config = configure_output_format(&args, &workspace_svc);
         base_catalog_builder.add_value(output_config.clone());
         base_catalog_builder.add_value(Interact::new(args.yes, output_config.is_tty));
-        base_catalog_builder.add::<ConfirmDeleteService>(); // Should be added after Interact
 
         let guards = configure_logging(&output_config, &workspace_layout, args.no_color);
 
@@ -543,6 +542,7 @@ pub fn configure_cli_catalog(
         WorkspaceService::builder().with_multi_tenant(tenancy_config == TenancyConfig::MultiTenant),
     );
     b.add::<odf_server::LoginService>();
+    b.add::<ConfirmDeleteService>();
 
     b
 }

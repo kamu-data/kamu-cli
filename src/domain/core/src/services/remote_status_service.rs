@@ -13,6 +13,29 @@ use thiserror::Error;
 
 use crate::utils::metadata_chain_comparator::CompareChainsResult;
 use crate::AccessError;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait::async_trait]
+pub trait RemoteStatusService: Send + Sync {
+    /// Returns sync status of all push remotes connected with a given dataset
+    async fn check_remotes_status(
+        &self,
+        dataset_handle: &DatasetHandle,
+    ) -> Result<DatasetPushStatuses, InternalError>;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct PushStatus {
+    pub remote: DatasetRefRemote,
+    pub check_result: Result<CompareChainsResult, StatusCheckError>,
+}
+
+pub struct DatasetPushStatuses {
+    pub statuses: Vec<PushStatus>,
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Error)]
@@ -33,20 +56,4 @@ pub enum StatusCheckError {
     ),
 }
 
-pub struct PushStatus {
-    pub remote: DatasetRefRemote,
-    pub check_result: Result<CompareChainsResult, StatusCheckError>,
-}
-
-pub struct DatasetPushStatuses {
-    pub statuses: Vec<PushStatus>,
-}
-
-#[async_trait::async_trait]
-pub trait RemoteStatusService: Send + Sync {
-    /// Returns sync status of all push remotes connected with a given dataset
-    async fn check_remotes_status(
-        &self,
-        dataset_handle: &DatasetHandle,
-    ) -> Result<DatasetPushStatuses, InternalError>;
-}
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
