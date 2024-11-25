@@ -20,10 +20,8 @@ use opendatafabric::{AccountID, AccountName};
 #[derive(Debug, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct AccountResponse {
-    #[schema(value_type = String)]
     pub id: AccountID,
 
-    #[schema(value_type = String)]
     pub account_name: AccountName,
 }
 

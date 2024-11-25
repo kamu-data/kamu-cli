@@ -28,6 +28,7 @@ sqlx = ["dep:sqlx"]
 sqlx-mysql = ["sqlx", "sqlx/mysql"]
 sqlx-postgres = ["sqlx", "sqlx/postgres"]
 sqlx-sqlite = ["sqlx", "sqlx/sqlite"]
+utoipa = ["multiformats/utoipa", "dep:utoipa", "dep:serde_json"]
 
 
 [dependencies]
@@ -72,6 +73,10 @@ arrow = { optional = true, version = "53", default-features = false, features = 
     "ipc",
 ] }
 sqlx = { optional = true, version = "0.8", default-features = false }
+utoipa = { optional = true, version = "5", default-features = false, features = [
+] }
+serde_json = { optional = true, version = "1", default-features = false }
+
 
 [dev-dependencies]
 indoc = "2"

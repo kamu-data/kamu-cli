@@ -25,6 +25,7 @@ doctest = false
 default = []
 
 testing = ["dep:mockall"]
+utoipa = ["dep:utoipa"]
 
 
 [dependencies]
@@ -62,6 +63,8 @@ serde_with = { version = "3", default-features = false }
 
 # Optional
 mockall = { optional = true, version = "0.13", default-features = false }
+utoipa = { optional = true, version = "5", default-features = false, features = [
+] }
 
 
 [dev-dependencies]

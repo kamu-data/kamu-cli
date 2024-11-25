@@ -13,6 +13,11 @@ edition = { workspace = true }
 publish = { workspace = true }
 
 
+[features]
+default = []
+utoipa = ["dep:utoipa", "dep:serde_json"]
+
+
 [lints]
 workspace = true
 
@@ -41,3 +46,8 @@ thiserror = { version = "1", default-features = false, features = [] }
 unsigned-varint = { version = "0.8", default-features = false, features = [
     "std",
 ] }
+
+# Optional
+utoipa = { optional = true, version = "5", default-features = false, features = [
+] }
+serde_json = { optional = true, version = "1", default-features = false }

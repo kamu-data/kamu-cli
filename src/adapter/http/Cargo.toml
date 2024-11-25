@@ -35,9 +35,9 @@ http-common = { workspace = true }
 # TODO: Adapters should depend only on kamu-domain crate and be implementation-agnostic
 kamu = { workspace = true }
 kamu-accounts = { workspace = true }
-kamu-core = { workspace = true }
+kamu-core = { workspace = true, features = ["utoipa"] }
 kamu-data-utils = { workspace = true }
-opendatafabric = { workspace = true }
+opendatafabric = { workspace = true, features = ["utoipa"] }
 time-source = { workspace = true }
 
 aws-sdk-s3 = { version = "1" }

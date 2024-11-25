@@ -161,6 +161,7 @@ pub struct EngineDesc {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ::serde::Serialize, ::serde::Deserialize)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 pub enum QueryDialect {
     SqlDataFusion,
     SqlFlink,

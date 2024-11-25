@@ -6021,6 +6021,7 @@ dependencies = [
  "tokio-stream",
  "tracing",
  "url",
+ "utoipa",
 ]
 
 [[package]]
@@ -7202,9 +7203,11 @@ dependencies = [
  "hex",
  "rand",
  "serde",
+ "serde_json",
  "sha3",
  "thiserror 1.0.69",
  "unsigned-varint",
+ "utoipa",
 ]
 
 [[package]]
@@ -7615,6 +7618,7 @@ dependencies = [
  "prost",
  "rand",
  "serde",
+ "serde_json",
  "serde_with",
  "serde_yaml",
  "sha3",
@@ -7622,6 +7626,7 @@ dependencies = [
  "thiserror 1.0.69",
  "tonic",
  "url",
+ "utoipa",
 ]
 
 [[package]]

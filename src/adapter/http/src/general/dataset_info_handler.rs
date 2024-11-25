@@ -23,7 +23,6 @@ use crate::axum_utils::ensure_authenticated_account;
 #[derive(Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct DatasetOwnerInfo {
-    #[schema(value_type = String)]
     pub account_name: AccountName,
 
     // TODO: This should not be optional. Awaiting dataset repository refactoring.
@@ -34,14 +33,12 @@ pub struct DatasetOwnerInfo {
 #[derive(Debug, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct DatasetInfoResponse {
-    #[schema(value_type = String)]
     pub id: DatasetID,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     #[schema(value_type = DatasetOwnerInfo, required = false)]
     pub owner: Option<DatasetOwnerInfo>,
 
-    #[schema(value_type = String)]
     pub dataset_name: DatasetName,
 }
 

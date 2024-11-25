@@ -78,7 +78,6 @@ pub struct QueryRequest {
     pub query: String,
 
     /// Dialect of the query
-    #[schema(value_type = String)]
     #[serde(default = "QueryRequest::default_query_dialect")]
     pub query_dialect: domain::QueryDialect,
 
@@ -345,15 +344,12 @@ pub struct Outputs {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Commitment {
     /// Hash of the "input" object in the [multihash](https://multiformats.io/multihash/) format
-    #[schema(value_type = String)]
     pub input_hash: odf::Multihash,
 
     /// Hash of the "output" object in the [multihash](https://multiformats.io/multihash/) format
-    #[schema(value_type = String)]
     pub output_hash: odf::Multihash,
 
     /// Hash of the "subQueries" object in the [multihash](https://multiformats.io/multihash/) format
-    #[schema(value_type = String)]
     pub sub_queries_hash: odf::Multihash,
 }
 
@@ -364,11 +360,9 @@ pub struct Proof {
     pub r#type: ProofType,
 
     /// DID (public key) of the node performing the computation
-    #[schema(value_type = String)]
     pub verification_method: odf::DidKey,
 
     /// Signature: `multibase(sign(canonicalize(commitment)))`
-    #[schema(value_type = String)]
     pub proof_value: odf::Signature,
 }
 
@@ -387,16 +381,16 @@ pub enum ProofType {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct DatasetState {
     /// Globally unique identity of the dataset
-    #[schema(value_type = String)]
     pub id: odf::DatasetID,
 
     /// Alias to be used in the query
+    #[schema(example = json!("kamu/eth-to-usd"))]
     pub alias: String,
 
     /// Last block hash of the input datasets that was or should be considered
     /// during the query planning
     #[serde(skip_serializing_if = "Option::is_none")]
-    #[schema(value_type = String)]
+    #[schema(value_type = odf::Multihash)]
     pub block_hash: Option<odf::Multihash>,
 }
 
@@ -536,14 +530,10 @@ impl serde::Serialize for Schema {
     }
 }
 
-impl utoipa::ToSchema for Schema {
-    fn name() -> std::borrow::Cow<'static, str> {
-        std::borrow::Cow::Borrowed("Schema")
-    }
-}
+impl utoipa::ToSchema for Schema {}
 impl utoipa::PartialSchema for Schema {
     fn schema() -> utoipa::openapi::RefOr<utoipa::openapi::schema::Schema> {
-        utoipa::openapi::ObjectBuilder::new().into()
+        utoipa::openapi::Schema::default().into()
     }
 }
 

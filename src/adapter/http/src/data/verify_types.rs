@@ -146,10 +146,8 @@ pub enum VerificationFailed {
 pub struct OutputMismatch {
     pub message: String,
 
-    #[schema(value_type = String)]
     pub expected_hash: odf::Multihash,
 
-    #[schema(value_type = String)]
     pub actual_hash: odf::Multihash,
 }
 
@@ -173,7 +171,6 @@ impl OutputMismatch {
 pub struct DatasetNotFound {
     pub message: String,
 
-    #[schema(value_type = String)]
     pub dataset_id: odf::DatasetID,
 }
 
@@ -194,10 +191,8 @@ impl DatasetNotFound {
 pub struct DatasetBlockNotFound {
     pub message: String,
 
-    #[schema(value_type = String)]
     pub dataset_id: odf::DatasetID,
 
-    #[schema(value_type = String)]
     pub block_hash: odf::Multihash,
 }
 

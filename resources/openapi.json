@@ -1,13 +1,25 @@
 {
   "components": {
     "schemas": {
+      "AccountID": {
+        "examples": [
+          "did:odf:fed01989de31f27202c3b989de31f27202c3b103636f656e746078ac3c053218d8e6b"
+        ],
+        "type": "string"
+      },
+      "AccountName": {
+        "examples": [
+          "my-account"
+        ],
+        "type": "string"
+      },
       "AccountResponse": {
         "properties": {
           "accountName": {
-            "type": "string"
+            "$ref": "#/components/schemas/AccountName"
           },
           "id": {
-            "type": "string"
+            "$ref": "#/components/schemas/AccountID"
           }
         },
         "required": [
@@ -31,16 +43,16 @@
         "additionalProperties": false,
         "properties": {
           "inputHash": {
-            "description": "Hash of the \"input\" object in the [multihash](https://multiformats.io/multihash/) format",
-            "type": "string"
+            "$ref": "#/components/schemas/Multihash",
+            "description": "Hash of the \"input\" object in the [multihash](https://multiformats.io/multihash/) format"
           },
           "outputHash": {
-            "description": "Hash of the \"output\" object in the [multihash](https://multiformats.io/multihash/) format",
-            "type": "string"
+            "$ref": "#/components/schemas/Multihash",
+            "description": "Hash of the \"output\" object in the [multihash](https://multiformats.io/multihash/) format"
           },
           "subQueriesHash": {
-            "description": "Hash of the \"subQueries\" object in the [multihash](https://multiformats.io/multihash/) format",
-            "type": "string"
+            "$ref": "#/components/schemas/Multihash",
+            "description": "Hash of the \"subQueries\" object in the [multihash](https://multiformats.io/multihash/) format"
           }
         },
         "required": [
@@ -61,10 +73,10 @@
       "DatasetBlockNotFound": {
         "properties": {
           "block_hash": {
-            "type": "string"
+            "$ref": "#/components/schemas/Multihash"
           },
           "dataset_id": {
-            "type": "string"
+            "$ref": "#/components/schemas/DatasetID"
           },
           "message": {
             "type": "string"
@@ -77,13 +89,19 @@
         ],
         "type": "object"
       },
+      "DatasetID": {
+        "examples": [
+          "did:odf:fed01969b7413a41f25ba969b7413a41f25ba4016461736574607650ec170632ade10"
+        ],
+        "type": "string"
+      },
       "DatasetInfoResponse": {
         "properties": {
           "datasetName": {
-            "type": "string"
+            "$ref": "#/components/schemas/DatasetName"
           },
           "id": {
-            "type": "string"
+            "$ref": "#/components/schemas/DatasetID"
           },
           "owner": {
             "$ref": "#/components/schemas/DatasetOwnerInfo"
@@ -107,10 +125,16 @@
         ],
         "type": "object"
       },
+      "DatasetName": {
+        "examples": [
+          "my-dataset"
+        ],
+        "type": "string"
+      },
       "DatasetNotFound": {
         "properties": {
           "dataset_id": {
-            "type": "string"
+            "$ref": "#/components/schemas/DatasetID"
           },
           "message": {
             "type": "string"
@@ -128,7 +152,7 @@
             "type": "string"
           },
           "accountName": {
-            "type": "string"
+            "$ref": "#/components/schemas/AccountName"
           }
         },
         "required": [
@@ -141,15 +165,16 @@
         "properties": {
           "alias": {
             "description": "Alias to be used in the query",
+            "example": "kamu/eth-to-usd",
             "type": "string"
           },
           "blockHash": {
-            "description": "Last block hash of the input datasets that was or should be considered\nduring the query planning",
-            "type": "string"
+            "$ref": "#/components/schemas/Multihash",
+            "description": "Last block hash of the input datasets that was or should be considered\nduring the query planning"
           },
           "id": {
-            "description": "Globally unique identity of the dataset",
-            "type": "string"
+            "$ref": "#/components/schemas/DatasetID",
+            "description": "Globally unique identity of the dataset"
           }
         },
         "required": [
@@ -182,6 +207,12 @@
           "dataFormat"
         ],
         "type": "object"
+      },
+      "DidKey": {
+        "examples": [
+          "did:key:z6MkmgVreHBu2ABaD59Jq1J2JneXwzpsUWwEWXS4kLhjb4V4"
+        ],
+        "type": "string"
       },
       "Include": {
         "enum": [
@@ -317,6 +348,12 @@
         ],
         "type": "object"
       },
+      "Multihash": {
+        "examples": [
+          "f162070983d692f648185febe6d6fa607630ae68649f7e6fc45b94680096c06e4fadb"
+        ],
+        "type": "string"
+      },
       "NodeInfoResponse": {
         "properties": {
           "isMultiTenant": {
@@ -367,10 +404,10 @@
       "OutputMismatch": {
         "properties": {
           "actual_hash": {
-            "type": "string"
+            "$ref": "#/components/schemas/Multihash"
           },
           "expected_hash": {
-            "type": "string"
+            "$ref": "#/components/schemas/Multihash"
           },
           "message": {
             "type": "string"
@@ -411,16 +448,16 @@
         "additionalProperties": false,
         "properties": {
           "proofValue": {
-            "description": "Signature: `multibase(sign(canonicalize(commitment)))`",
-            "type": "string"
+            "$ref": "#/components/schemas/Signature",
+            "description": "Signature: `multibase(sign(canonicalize(commitment)))`"
           },
           "type": {
             "$ref": "#/components/schemas/ProofType",
             "description": "Type of the proof provided"
           },
           "verificationMethod": {
-            "description": "DID (public key) of the node performing the computation",
-            "type": "string"
+            "$ref": "#/components/schemas/DidKey",
+            "description": "DID (public key) of the node performing the computation"
           }
         },
         "required": [
@@ -433,6 +470,15 @@
       "ProofType": {
         "enum": [
           "Ed25519Signature2020"
+        ],
+        "type": "string"
+      },
+      "QueryDialect": {
+        "enum": [
+          "SqlDataFusion",
+          "SqlFlink",
+          "SqlRisingWave",
+          "SqlSpark"
         ],
         "type": "string"
       },
@@ -474,8 +520,8 @@
             "type": "string"
           },
           "queryDialect": {
-            "description": "Dialect of the query",
-            "type": "string"
+            "$ref": "#/components/schemas/QueryDialect",
+            "description": "Dialect of the query"
           },
           "schemaFormat": {
             "$ref": "#/components/schemas/SchemaFormat",
@@ -537,6 +583,12 @@
           "ArrowJson",
           "Parquet",
           "ParquetJson"
+        ],
+        "type": "string"
+      },
+      "Signature": {
+        "examples": [
+          "uAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
         ],
         "type": "string"
       },
@@ -1216,7 +1268,7 @@
     },
     "/query": {
       "get": {
-        "description": "Functions exactly like the POST version of the endpoint with all parameters passed in the query string instead of the body. See POST endpoin documentation for details.\n",
+        "description": "Functions exactly like the [POST version](#tag/odf-query/POST/query) of the\nendpoint with all parameters passed in the query string instead of the body.",
         "operationId": "query_handler",
         "parameters": [
           {
