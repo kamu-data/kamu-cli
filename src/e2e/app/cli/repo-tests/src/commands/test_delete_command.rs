@@ -8,6 +8,8 @@
 // by the Apache License, Version 2.0.
 
 use kamu_cli_e2e_common::{
+    KamuApiServerClient,
+    KamuApiServerClientExt,
     DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR,
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_2,
@@ -171,20 +173,41 @@ pub async fn test_delete_dataset_all(kamu: KamuCliPuppet) {
     }
 }
 
-pub async fn test_delete_warning(kamu: KamuCliPuppet) {
+pub async fn test_delete_warning(mut kamu_node_api_client: KamuApiServerClient) {
+    let kamu: KamuCliPuppet = KamuCliPuppet::new_workspace_tmp(true).await;
+
     let ds_name_str = "player-scores";
     let ds_name: odf::DatasetName = odf::DatasetName::new_unchecked(ds_name_str);
 
-    kamu.execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
-        .await
-        .success();
+    kamu.execute_with_input(
+        ["add", "--stdin", "--name", ds_name_str],
+        DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
+    )
+    .await
+    .success();
 
-    // TODO: use remote http repo as well
     let repo_path = kamu.workspace_path().join("repo");
     let file_repo_url = Url::from_file_path(&repo_path).unwrap();
     kamu.execute(["repo", "add", "file-repo", file_repo_url.as_str()])
         .await
         .success();
+
+    let kamu_node_url = kamu_node_api_client.get_base_url().clone();
+    let token = kamu_node_api_client.auth().login_as_e2e_user().await;
+
+    kamu.assert_success_command_execution(
+        [
+            "login",
+            "--access-token",
+            token.as_str(),
+            "--repo-name",
+            "remote-repo",
+            kamu_node_url.as_str(),
+        ],
+        None,
+        Some([format!("Login successful: {kamu_node_url}").as_str()]),
+    )
+    .await;
 
     kamu.execute_with_input(
         ["ingest", ds_name_str, "--stdin", "--source-name", "default"],
@@ -193,7 +216,7 @@ pub async fn test_delete_warning(kamu: KamuCliPuppet) {
     .await
     .success();
 
-    kamu.execute(["push", ds_name_str, "--to", "file-repo/pull-1"])
+    kamu.execute(["push", ds_name_str, "--to", "remote-repo/pull-1"])
         .await
         .success();
 
@@ -280,7 +303,12 @@ pub async fn test_delete_warning(kamu: KamuCliPuppet) {
     )
     .await;
 
-    let pull_1_url = Url::from_file_path(repo_path.join("pull-1")).unwrap();
+    let pull_1_url = kamu_node_api_client
+        .get_odf_node_url()
+        .join("e2e-user/")
+        .unwrap()
+        .join("pull-1")
+        .unwrap();
     let pull_1_2_url = Url::from_file_path(repo_path.join("pull-1-2")).unwrap();
     let pull_1_3_4_url = Url::from_file_path(repo_path.join("pull-1-3-4")).unwrap();
     let removed_url = Url::from_file_path(repo_path.join("removed")).unwrap();
@@ -293,6 +321,7 @@ pub async fn test_delete_warning(kamu: KamuCliPuppet) {
              - could not check state of '{removed_url}'. Error: Remote dataset not found
         "#
     );
+
     kamu.assert_success_command_execution(
         ["--yes", "delete", "--all"],
         None,
