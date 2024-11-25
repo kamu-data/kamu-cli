@@ -24,6 +24,7 @@ pub struct VerifyRequest {
 
     /// Information about processing performed by other nodes as part of the
     /// original operation
+    #[schema(example = json!([]))]
     pub sub_queries: Vec<query::SubQuery>,
 
     /// Commitment created by the original operation

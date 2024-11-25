@@ -74,6 +74,7 @@ mod tests {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct QueryRequest {
     /// Query string
+    #[schema(example = "select event_time, from, to, close from \"kamu/eth-to-usd\"")]
     pub query: String,
 
     /// Dialect of the query
@@ -90,8 +91,8 @@ pub struct QueryRequest {
     pub include: BTreeSet<Include>,
 
     /// What representation to use for the schema
-    #[schema(value_type = SchemaFormat)]
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = SchemaFormat)]
     pub schema_format: Option<SchemaFormat>,
 
     /// Optional information used to affix an alias to the specific
@@ -277,6 +278,7 @@ pub struct QueryResponse {
     /// Information about processing performed by other nodes as part of this
     /// operation
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(example = json!([]))]
     pub sub_queries: Option<Vec<SubQuery>>,
 
     /// Succinct commitment
@@ -319,6 +321,10 @@ pub struct SubQuery {
 #[serde(rename_all = "camelCase")]
 pub struct Outputs {
     /// Resulting data
+    #[schema(example = json!([
+        {"event_time": "2024-09-02T21:50:00Z", "from": "eth", "to": "usd", "close": 2537.07},
+        {"event_time": "2024-09-02T21:51:00Z", "from": "eth", "to": "usd", "close": 2541.37},
+    ]))]
     pub data: serde_json::Value,
 
     /// How data is laid out in the response
@@ -484,9 +490,8 @@ pub enum SchemaFormat {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, serde::Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, serde::Deserialize)]
 pub struct Schema {
-    #[schema(value_type = Object)]
     schema: datafusion::arrow::datatypes::SchemaRef,
     format: SchemaFormat,
 }
@@ -528,6 +533,17 @@ impl serde::Serialize for Schema {
                 serializer.collect_str(&std::str::from_utf8(&buf).unwrap())
             }
         }
+    }
+}
+
+impl utoipa::ToSchema for Schema {
+    fn name() -> std::borrow::Cow<'static, str> {
+        std::borrow::Cow::Borrowed("Schema")
+    }
+}
+impl utoipa::PartialSchema for Schema {
+    fn schema() -> utoipa::openapi::RefOr<utoipa::openapi::schema::Schema> {
+        utoipa::openapi::ObjectBuilder::new().into()
     }
 }
 

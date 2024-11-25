@@ -470,6 +470,7 @@
           },
           "query": {
             "description": "Query string",
+            "example": "select event_time, from, to, close from \"kamu/eth-to-usd\"",
             "type": "string"
           },
           "queryDialect": {
@@ -513,6 +514,7 @@
           },
           "subQueries": {
             "description": "Information about processing performed by other nodes as part of this\noperation",
+            "example": [],
             "items": {
               "$ref": "#/components/schemas/SubQuery"
             },
@@ -528,18 +530,6 @@
         "type": "object"
       },
       "Schema": {
-        "properties": {
-          "format": {
-            "$ref": "#/components/schemas/SchemaFormat"
-          },
-          "schema": {
-            "type": "object"
-          }
-        },
-        "required": [
-          "schema",
-          "format"
-        ],
         "type": "object"
       },
       "SchemaFormat": {
@@ -728,6 +718,7 @@
           },
           "subQueries": {
             "description": "Information about processing performed by other nodes as part of the\noriginal operation",
+            "example": [],
             "items": {
               "$ref": "#/components/schemas/SubQuery"
             },
@@ -1225,6 +1216,7 @@
     },
     "/query": {
       "get": {
+        "description": "Functions exactly like the POST version of the endpoint with all parameters passed in the query string instead of the body. See POST endpoin documentation for details.\n",
         "operationId": "query_handler",
         "parameters": [
           {
@@ -1322,6 +1314,7 @@
         ]
       },
       "post": {
+        "description": "### Regular Queries\nThis endpoint lets you execute arbitrary SQL that can access multiple\ndatasets at once.\n\nExample request body:\n```json\n{\n    \"query\": \"select event_time, from, to, close from \\\"kamu/eth-to-usd\\\"\",\n    \"limit\": 3,\n    \"queryDialect\": \"SqlDataFusion\",\n    \"dataFormat\": \"JsonAoA\",\n    \"schemaFormat\": \"ArrowJson\"\n}\n```\n\nExample response:\n```json\n{\n    \"output\": {\n        \"data\": [\n            [\"2024-09-02T21:50:00Z\", \"eth\", \"usd\", 2537.07],\n            [\"2024-09-02T21:51:00Z\", \"eth\", \"usd\", 2541.37],\n            [\"2024-09-02T21:52:00Z\", \"eth\", \"usd\", 2542.66]\n        ],\n        \"dataFormat\": \"JsonAoA\",\n        \"schema\": {\"fields\": [\"...\"]},\n        \"schemaFormat\": \"ArrowJson\"\n    }\n}\n```\n\n### Verifiable Queries\n[Cryptographic proofs](https://docs.kamu.dev/node/commitments) can be\nalso requested to hold the node **forever accountable** for the provided\nresult.\n\nExample request body:\n```json\n{\n    \"query\": \"select event_time, from, to, close from \\\"kamu/eth-to-usd\\\"\",\n    \"limit\": 3,\n    \"queryDialect\": \"SqlDataFusion\",\n    \"dataFormat\": \"JsonAoA\",\n    \"schemaFormat\": \"ArrowJson\",\n    \"include\": [\"proof\"]\n}\n```\n\nCurrently we support verifiability by ensuring that queries are\ndeterministic and fully reproducible and signing the original response with\nNode's private key. In future more types of proofs will be supported.\n\nExample response:\n```json\n{\n    \"input\": {\n        \"query\": \"select event_time, from, to, close from \\\"kamu/eth-to-usd\\\"\",\n        \"queryDialect\": \"SqlDataFusion\",\n        \"dataFormat\": \"JsonAoA\",\n        \"include\": [\"Input\", \"Proof\", \"Schema\"],\n        \"schemaFormat\": \"ArrowJson\",\n        \"datasets\": [{\n            \"id\": \"did:odf:fed0119d20360650afd3d412c6b11529778b784c697559c0107d37ee5da61465726c4\",\n            \"alias\": \"kamu/eth-to-usd\",\n            \"blockHash\": \"f1620708557a44c88d23c83f2b915abc10a41cc38d2a278e851e5dc6bb02b7e1f9a1a\"\n        }],\n        \"skip\": 0,\n        \"limit\": 3\n    },\n    \"output\": {\n        \"data\": [\n            [\"2024-09-02T21:50:00Z\", \"eth\", \"usd\", 2537.07],\n            [\"2024-09-02T21:51:00Z\", \"eth\", \"usd\", 2541.37],\n            [\"2024-09-02T21:52:00Z\", \"eth\", \"usd\", 2542.66]\n        ],\n        \"dataFormat\": \"JsonAoA\",\n        \"schema\": {\"fields\": [\"...\"]},\n        \"schemaFormat\": \"ArrowJson\"\n    },\n    \"subQueries\": [],\n    \"commitment\": {\n        \"inputHash\": \"f1620e23f7d8cdde7504eadb86f3cdf34b3b1a7d71f10fe5b54b528dd803387422efc\",\n        \"outputHash\": \"f1620e91f4d3fa26bc4ca0c49d681c8b630550239b64d3cbcfd7c6c2d6ff45998b088\",\n        \"subQueriesHash\": \"f1620ca4510738395af1429224dd785675309c344b2b549632e20275c69b15ed1d210\"\n    },\n    \"proof\": {\n        \"type\": \"Ed25519Signature2020\",\n        \"verificationMethod\": \"did:key:z6MkkhJQPHpA41mTPLFgBeygnjeeADUSwuGDoF9pbGQsfwZp\",\n        \"proofValue\": \"uJfY3_g03WbmqlQG8TL-WUxKYU8ZoJaP14MzOzbnJedNiu7jpoKnCTNnDI3TYuaXv89vKlirlGs-5AN06mBseCg\"\n    }\n}\n```\n\nA client that gets a proof in response should\nperform [a few basic steps](https://docs.kamu.dev/node/commitments#response-validation) to validate\nthe proof integrity. For example making sure that the DID in\n`proof.verificationMethod` actually corresponds to the node you're querying\ndata from and that the signature in `proof.proofValue` is actually valid.\nOnly after this you can use this proof to hold the node accountable for the\nresult.\n\nA proof can be stored long-term and then disputed at a later point using\nyour own node or a 3rd party node you can trust via the\n[`/verify`](#tag/odf-query/POST/verify) endpoint.\n\nSee [commitments documentation](https://docs.kamu.dev/node/commitments) for details.",
         "operationId": "query_handler_post",
         "requestBody": {
           "content": {
@@ -1359,7 +1352,7 @@
     },
     "/verify": {
       "post": {
-        "description": "See [commitments documentation](https://docs.kamu.dev/node/commitments/) for details.",
+        "description": "A query proof can be stored long-term and then disputed at a later point\nusing this endpoint.\n\nExample request:\n```json\n{\n    \"input\": {\n        \"query\": \"select event_time, from, to, close from \\\"kamu/eth-to-usd\\\"\",\n        \"queryDialect\": \"SqlDataFusion\",\n        \"dataFormat\": \"JsonAoA\",\n        \"include\": [\"Input\", \"Proof\", \"Schema\"],\n        \"schemaFormat\": \"ArrowJson\",\n        \"datasets\": [{\n            \"id\": \"did:odf:fed0..26c4\",\n            \"alias\": \"kamu/eth-to-usd\",\n            \"blockHash\": \"f162..9a1a\"\n        }],\n        \"skip\": 0,\n        \"limit\": 3\n    },\n    \"subQueries\": [],\n    \"commitment\": {\n        \"inputHash\": \"f162..2efc\",\n        \"outputHash\": \"f162..b088\",\n        \"subQueriesHash\": \"f162..d210\"\n    },\n    \"proof\": {\n        \"type\": \"Ed25519Signature2020\",\n        \"verificationMethod\": \"did:key:z6Mk..fwZp\",\n        \"proofValue\": \"uJfY..seCg\"\n    }\n}\n```\n\nExample response:\n```json\n{\n    \"ok\": false,\n    \"error\": {\n        \"kind\": \"VerificationFailed::OutputMismatch\",\n        \"actual_hash\": \"f162..c12a\",\n        \"expected_hash\": \"f162..2a2d\",\n        \"message\": \"Query was reproduced but resulted in output hash different from expected.\n                    This means that the output was either falsified, or the query\n                    reproducibility was not guaranteed by the system.\",\n    }\n}\n```\n\nSee [commitments documentation](https://docs.kamu.dev/node/commitments) for details.",
         "operationId": "verify_handler",
         "requestBody": {
           "content": {
@@ -1375,6 +1368,34 @@
           "200": {
             "content": {
               "application/json": {
+                "examples": {
+                  "Invalid commitment": {
+                    "value": {
+                      "error": {
+                        "kind": "InvalidRequest::BadSignature",
+                        "message": "The commitment is invalid and cannot be disputed: bad signature"
+                      },
+                      "ok": false
+                    }
+                  },
+                  "Success": {
+                    "summary": "Verified successfully",
+                    "value": {
+                      "ok": true
+                    }
+                  },
+                  "Verification fail": {
+                    "value": {
+                      "error": {
+                        "actual_hash": "f1620b039179a8a4ce2c252aa6f2f25798251c19b75fc1508d9d511a191e0487d64a7",
+                        "expected_hash": "f162080084bf2fba02475726feb2cab2d8215eab14bc6bdd8bfb2c8151257032ecd8b",
+                        "kind": "VerificationFailed::OutputMismatch",
+                        "message": "Query was reproduced but resulted in output hash different from expected. This means that the output was either falsified, or the query reproducibility was not guaranteed by the system."
+                      },
+                      "ok": false
+                    }
+                  }
+                },
                 "schema": {
                   "$ref": "#/components/schemas/VerifyResponse"
                 }
