@@ -55,13 +55,18 @@ impl From<remote_status_service::DatasetPushStatuses> for DatasetPushStatuses {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(SimpleObject, Debug, Clone)]
+pub struct CompareChainsResultReason {
+    pub message: String,
+}
+
+#[derive(SimpleObject, Debug, Clone)]
 pub struct CompareChainsResultError {
-    pub error: String,
+    pub reason: CompareChainsResultReason,
 }
 
 #[derive(SimpleObject, Debug, Clone)]
 pub struct CompareChainsResultStatus {
-    pub status: CompareChainsStatus,
+    pub message: CompareChainsStatus,
 }
 
 #[derive(Enum, Debug, Copy, Clone, PartialEq, Eq)]
@@ -83,26 +88,28 @@ impl From<Result<comp::CompareChainsResult, StatusCheckError>> for CompareChains
         match value {
             Ok(comp::CompareChainsResult::Equal) => {
                 CompareChainsResult::Status(CompareChainsResultStatus {
-                    status: CompareChainsStatus::Equal,
+                    message: CompareChainsStatus::Equal,
                 })
             }
             Ok(comp::CompareChainsResult::LhsAhead { .. }) => {
                 CompareChainsResult::Status(CompareChainsResultStatus {
-                    status: CompareChainsStatus::Behind,
+                    message: CompareChainsStatus::Behind,
                 })
             }
             Ok(comp::CompareChainsResult::LhsBehind { .. }) => {
                 CompareChainsResult::Status(CompareChainsResultStatus {
-                    status: CompareChainsStatus::Ahead,
+                    message: CompareChainsStatus::Ahead,
                 })
             }
             Ok(comp::CompareChainsResult::Divergence { .. }) => {
                 CompareChainsResult::Status(CompareChainsResultStatus {
-                    status: CompareChainsStatus::Diverged,
+                    message: CompareChainsStatus::Diverged,
                 })
             }
             Err(e) => CompareChainsResult::Error(CompareChainsResultError {
-                error: e.to_string(),
+                reason: CompareChainsResultReason {
+                    message: e.to_string(),
+                },
             }),
         }
     }

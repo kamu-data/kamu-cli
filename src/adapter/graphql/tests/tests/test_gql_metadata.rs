@@ -126,8 +126,8 @@ async fn test_push_statuses() {
                             statuses {
                                 remote,
                                 result {
-                                    ... on CompareChainsResultStatus { status }
-                                    ... on CompareChainsResultError { error }
+                                    ... on CompareChainsResultStatus { message }
+                                    ... on CompareChainsResultError { reason { message } }
                                 }
                             }
                         }
@@ -155,31 +155,33 @@ async fn test_push_statuses() {
                             {
                                 "remote": "https://example.com/ahead",
                                 "result": {
-                                    "status": "AHEAD"
+                                    "message": "AHEAD"
                                 }
                             },
                             {
                                 "remote": "https://example.com/behind",
                                 "result": {
-                                    "status": "BEHIND"
+                                    "message": "BEHIND"
                                 }
                             },
                             {
                                 "remote": "https://example.com/diverged",
                                 "result": {
-                                    "status": "DIVERGED"
+                                    "message": "DIVERGED"
                                 }
                             },
                             {
                                 "remote": "https://example.com/equal",
                                 "result": {
-                                    "status": "EQUAL"
+                                    "message": "EQUAL"
                                 }
                             },
                             {
                                 "remote": "https://example.com/not-found",
                                 "result": {
-                                    "error": "Remote dataset not found"
+                                    "reason": {
+                                        "message": "Remote dataset not found"
+                                    }
                                 }
                             }
                         ]

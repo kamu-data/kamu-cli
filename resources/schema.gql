@@ -267,11 +267,15 @@ type CompactionMetadataOnly {
 union CompareChainsResult = CompareChainsResultStatus | CompareChainsResultError
 
 type CompareChainsResultError {
-	error: String!
+	reason: CompareChainsResultReason!
+}
+
+type CompareChainsResultReason {
+	message: String!
 }
 
 type CompareChainsResultStatus {
-	status: CompareChainsStatus!
+	message: CompareChainsStatus!
 }
 
 enum CompareChainsStatus {
