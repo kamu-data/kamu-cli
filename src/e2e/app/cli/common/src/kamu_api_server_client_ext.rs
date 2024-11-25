@@ -1038,7 +1038,7 @@ impl SwaggerApi<'_> {
     pub async fn main_page(&self) -> String {
         let response = self
             .client
-            .rest_api_call(Method::GET, "/swagger/", None)
+            .rest_api_call(Method::GET, "/openapi", None)
             .await;
 
         pretty_assertions::assert_eq!(StatusCode::OK, response.status());

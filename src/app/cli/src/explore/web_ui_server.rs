@@ -151,7 +151,7 @@ impl WebUIServer {
             }))
             .build();
 
-        let (router, _api) = OpenApiRouter::new()
+        let (router, api) = OpenApiRouter::new()
             .route(
                 "/assets/runtime-config.json",
                 axum::routing::get(runtime_config_handler),
@@ -206,12 +206,18 @@ impl WebUIServer {
                 "/system/metrics",
                 axum::routing::get(observability::metrics::metrics_handler),
             )
+            .merge(kamu_adapter_http::openapi::router().into())
             .layer(axum::extract::Extension(web_ui_catalog))
             .layer(axum::extract::Extension(gql_schema))
             .layer(axum::extract::Extension(web_ui_config))
             .split_for_parts();
 
-        let server = axum::serve(listener, router.into_make_service());
+        let server = axum::serve(
+            listener,
+            router
+                .layer(axum::extract::Extension(Arc::new(api)))
+                .into_make_service(),
+        );
 
         Ok(Self {
             server,

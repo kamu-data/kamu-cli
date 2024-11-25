@@ -35,6 +35,9 @@ jobs:
       - name: Lint license headers
         run: |
           cargo test -p kamu-repo-tools -- license_header
+      - name: Lint OpenAPI spec
+        run: |
+          make lint-openapi
       - name: clippy
         uses: actions-rs/cargo@v1
         with:

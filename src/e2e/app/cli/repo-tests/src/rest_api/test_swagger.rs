@@ -48,7 +48,7 @@ async fn test_swagger_page(kamu_api_server_client: KamuApiServerClient) {
     let page = kamu_api_server_client.swagger().main_page().await;
 
     assert!(
-        page.contains("<title>Swagger UI</title>"),
+        page.contains("<title>Kamu REST API Reference</title>"),
         "{}",
         indoc::formatdoc!(
             r#"

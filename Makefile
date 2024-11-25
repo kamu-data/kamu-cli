@@ -51,8 +51,8 @@ lint-openapi:
 	docker run --rm -t \
 		-v "${PWD}:/data:ro" \
   		ibmdevxsdk/openapi-validator:latest \
-		--config src/adapter/http/resources/openapi-validator/config.yaml \
-		--ruleset src/adapter/http/resources/openapi-validator/ruleset.yaml \
+		--config src/adapter/http/resources/openapi/linter-config.yaml \
+		--ruleset src/adapter/http/resources/openapi/linter-ruleset.yaml \
     	resources/openapi-mt.json
 
 

@@ -1273,6 +1273,7 @@
         "parameters": [
           {
             "description": "Query to execute (e.g. SQL)",
+            "example": "select 1",
             "in": "query",
             "name": "query",
             "required": true,

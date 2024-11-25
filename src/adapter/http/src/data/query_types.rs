@@ -213,6 +213,7 @@ pub enum Include {
 #[into_params(parameter_in = Query)]
 pub struct QueryParams {
     /// Query to execute (e.g. SQL)
+    #[param(example = "select 1")]
     pub query: String,
 
     /// Dialect of the query
