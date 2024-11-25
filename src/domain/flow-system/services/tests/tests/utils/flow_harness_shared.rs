@@ -29,6 +29,7 @@ use kamu_accounts_services::{
     PredefinedAccountsRegistrator,
 };
 use kamu_core::*;
+use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
 use kamu_datasets_services::DependencyGraphServiceImpl;
 use kamu_flow_system::*;
 use kamu_flow_system_inmem::*;
@@ -166,6 +167,7 @@ impl FlowHarness {
             .add::<AccessTokenServiceImpl>()
             .add::<InMemoryAccessTokenRepository>()
             .add::<DependencyGraphServiceImpl>()
+            .add::<InMemoryDatasetDependencyRepository>()
             .add::<DatasetOwnershipServiceInMemory>()
             .add::<TaskSchedulerImpl>()
             .add::<InMemoryTaskEventStore>()

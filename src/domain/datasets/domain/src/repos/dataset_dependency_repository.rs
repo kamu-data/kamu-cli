@@ -24,13 +24,13 @@ pub trait DatasetDependencyRepository: Send + Sync {
     async fn add_upstream_dependencies(
         &self,
         downstream_dataset_id: &DatasetID,
-        upstream_dataset_ids: &[&DatasetID],
+        new_upstream_dataset_ids: &[&DatasetID],
     ) -> Result<(), InternalError>;
 
     async fn remove_upstream_dependencies(
         &self,
         downstream_dataset_id: &DatasetID,
-        upstream_dataset_ids: &[&DatasetID],
+        obsolete_upstream_dataset_ids: &[&DatasetID],
     ) -> Result<(), InternalError>;
 
     async fn remove_all_dependencies_of(&self, dataset_id: &DatasetID)

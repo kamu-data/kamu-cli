@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            DELETE FROM dataset_dependencies WHERE upstream_dataset_id = $1 OR downstream_dataset_id = $1\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "1776bfa36bd8640aa6d3e3e7fb0f9f830d337ebc165d6bf0025122856e14933f"
+}

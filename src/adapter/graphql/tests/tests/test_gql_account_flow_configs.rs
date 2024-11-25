@@ -33,6 +33,7 @@ use kamu_accounts::{JwtAuthenticationConfig, DEFAULT_ACCOUNT_NAME, DEFAULT_ACCOU
 use kamu_accounts_inmem::InMemoryAccessTokenRepository;
 use kamu_accounts_services::{AccessTokenServiceImpl, AuthenticationServiceImpl};
 use kamu_core::*;
+use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
 use kamu_datasets_services::DependencyGraphServiceImpl;
 use kamu_flow_system::FlowExecutorConfig;
 use kamu_flow_system_inmem::{InMemoryFlowConfigurationEventStore, InMemoryFlowEventStore};
@@ -671,6 +672,7 @@ impl FlowConfigHarness {
             .add_value(JwtAuthenticationConfig::default())
             .bind::<dyn kamu::domain::auth::DatasetActionAuthorizer, MockDatasetActionAuthorizer>()
             .add::<DependencyGraphServiceImpl>()
+            .add::<InMemoryDatasetDependencyRepository>()
             .add::<InMemoryFlowConfigurationEventStore>()
             .add::<InMemoryFlowEventStore>()
             .add_value(FlowExecutorConfig::new(

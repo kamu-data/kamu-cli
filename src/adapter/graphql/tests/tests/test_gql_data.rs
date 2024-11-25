@@ -26,6 +26,7 @@ use kamu_accounts_services::{
     PredefinedAccountsRegistrator,
 };
 use kamu_core::*;
+use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
 use kamu_datasets_services::DependencyGraphServiceImpl;
 use messaging_outbox::DummyOutboxImpl;
 use opendatafabric::*;
@@ -58,6 +59,7 @@ async fn create_catalog_with_local_workspace(
         let mut b = dill::CatalogBuilder::new();
 
         b.add::<DependencyGraphServiceImpl>()
+            .add::<InMemoryDatasetDependencyRepository>()
             .add_value(current_account_subject)
             .add_value(predefined_accounts_config)
             .add_value(tenancy_config)

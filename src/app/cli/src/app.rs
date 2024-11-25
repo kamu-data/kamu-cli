@@ -25,11 +25,6 @@ use kamu_adapter_http::{FileUploadLimitConfig, UploadServiceLocal};
 use kamu_adapter_oauth::GithubAuthenticationConfig;
 use kamu_auth_rebac_services::{MultiTenantRebacDatasetLifecycleMessageConsumer, RebacServiceImpl};
 use kamu_datasets::DatasetEnvVar;
-use kamu_datasets_services::{
-    DatasetEntryIndexer,
-    DatasetEntryServiceImpl,
-    DependencyGraphServiceImpl,
-};
 use kamu_flow_system_inmem::domain::{FlowConfigurationUpdatedMessage, FlowProgressMessage};
 use kamu_flow_system_services::{
     MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE,
@@ -135,7 +130,8 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
         );
 
         if workspace_svc.is_in_workspace() {
-            base_catalog_builder.add::<DatasetEntryIndexer>();
+            base_catalog_builder.add::<kamu_datasets_services::DatasetEntryIndexer>();
+            base_catalog_builder.add::<kamu_datasets_services::DependencyGraphIndexer>();
         }
 
         base_catalog_builder.add_value(JwtAuthenticationConfig::load_from_env());
@@ -431,8 +427,6 @@ pub fn configure_base_catalog(
     b.add::<kamu::utils::simple_transfer_protocol::SimpleTransferProtocol>();
     b.add::<kamu_adapter_http::SmartTransferProtocolClientWs>();
 
-    b.add::<DependencyGraphServiceImpl>();
-
     b.add::<AppendDatasetMetadataBatchUseCaseImpl>();
     b.add::<CommitDatasetEventUseCaseImpl>();
     b.add::<CompactDatasetUseCaseImpl>();
@@ -476,7 +470,8 @@ pub fn configure_base_catalog(
         b.add::<MultiTenantRebacDatasetLifecycleMessageConsumer>();
     }
 
-    b.add::<DatasetEntryServiceImpl>();
+    b.add::<kamu_datasets_services::DatasetEntryServiceImpl>();
+    b.add::<kamu_datasets_services::DependencyGraphServiceImpl>();
 
     b.add_builder(
         messaging_outbox::OutboxImmediateImpl::builder()

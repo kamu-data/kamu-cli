@@ -27,6 +27,7 @@ use kamu_core::{
     TenancyConfig,
     TransformRequestPlanner,
 };
+use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
 use kamu_datasets_services::DependencyGraphServiceImpl;
 use kamu_flow_system_inmem::InMemoryFlowConfigurationEventStore;
 use kamu_flow_system_services::FlowConfigurationServiceImpl;
@@ -1638,6 +1639,7 @@ impl FlowConfigHarness {
                 .bind::<dyn TransformRequestPlanner, MockTransformRequestPlanner>()
                 .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
                 .add::<DependencyGraphServiceImpl>()
+                .add::<InMemoryDatasetDependencyRepository>()
                 .add::<FlowConfigurationServiceImpl>()
                 .add::<InMemoryFlowConfigurationEventStore>()
                 .add::<DatabaseTransactionRunner>();

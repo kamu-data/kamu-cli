@@ -17,6 +17,7 @@ use kamu::testing::{BaseRepoHarness, MetadataFactory};
 use kamu::*;
 use kamu_core::*;
 use kamu_datasets::{DatasetDependencies, DatasetDependencyRepository};
+use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
 use kamu_datasets_services::DependencyGraphServiceImpl;
 use messaging_outbox::{register_message_dispatcher, Outbox, OutboxImmediateImpl};
 use opendatafabric::*;
@@ -292,6 +293,8 @@ async fn test_service_dataset_deleted() {
     );
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[test_log::test(tokio::test)]
 async fn test_get_recursive_downstream_dependencies() {
     let harness = create_large_dataset_graph().await;
@@ -498,6 +501,8 @@ async fn test_get_recursive_downstream_dependencies() {
     assert_eq!(result, expected_result);
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[test_log::test(tokio::test)]
 async fn test_get_recursive_upstream_dependencies() {
     let harness = create_large_dataset_graph().await;
@@ -551,6 +556,8 @@ async fn test_get_recursive_upstream_dependencies() {
 
     assert_eq!(result, expected_result);
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
 async fn test_in_dependency_order() {
@@ -619,6 +626,7 @@ impl DependencyGraphHarness {
         .bind::<dyn Outbox, OutboxImmediateImpl>()
         .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
         .add::<DependencyGraphServiceImpl>()
+        .add::<InMemoryDatasetDependencyRepository>()
         .add::<CreateDatasetFromSnapshotUseCaseImpl>()
         .add::<CommitDatasetEventUseCaseImpl>()
         .add::<DeleteDatasetUseCaseImpl>();

@@ -19,7 +19,6 @@ use kamu_core::{
     DependencyGraphService,
     DependencyOrder,
     GetDependenciesError,
-    MESSAGE_CONSUMER_KAMU_CORE_DEPENDENCY_GRAPH_SERVICE,
     MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
 };
 use kamu_datasets::{DatasetDependencies, DatasetDependencyRepository};
@@ -33,6 +32,8 @@ use opendatafabric::DatasetID;
 use petgraph::stable_graph::{NodeIndex, StableDiGraph};
 use petgraph::visit::{depth_first_search, Bfs, DfsEvent, Reversed};
 use petgraph::Direction;
+
+use crate::MESSAGE_CONSUMER_KAMU_DEPENDENCY_GRAPH_SERVICE;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -81,9 +82,9 @@ impl State {
 #[interface(dyn MessageConsumer)]
 #[interface(dyn MessageConsumerT<DatasetLifecycleMessage>)]
 #[meta(MessageConsumerMeta {
-    consumer_name: MESSAGE_CONSUMER_KAMU_CORE_DEPENDENCY_GRAPH_SERVICE,
+    consumer_name: MESSAGE_CONSUMER_KAMU_DEPENDENCY_GRAPH_SERVICE,
     feeding_producers: &[MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE],
-    delivery: MessageDeliveryMechanism::Immediate,
+    delivery: MessageDeliveryMechanism::Transactional,
  })]
 #[scope(Singleton)]
 impl DependencyGraphServiceImpl {

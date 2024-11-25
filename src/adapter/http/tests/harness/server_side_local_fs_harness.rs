@@ -41,6 +41,7 @@ use kamu::{
 use kamu_accounts::testing::MockAuthenticationService;
 use kamu_accounts::{Account, AuthenticationService};
 use kamu_core::{DatasetRegistry, TenancyConfig};
+use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
 use kamu_datasets_services::DependencyGraphServiceImpl;
 use messaging_outbox::DummyOutboxImpl;
 use opendatafabric::{AccountName, DatasetAlias, DatasetHandle};
@@ -103,6 +104,7 @@ impl ServerSideLocalFsHarness {
                 .add_value(time_source.clone())
                 .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
                 .add::<DependencyGraphServiceImpl>()
+                .add::<InMemoryDatasetDependencyRepository>()
                 .add_value(options.tenancy_config)
                 .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
                 .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()

@@ -22,6 +22,7 @@ use kamu::utils::simple_transfer_protocol::SimpleTransferProtocol;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_adapter_http::{OdfSmtpVersion, SmartTransferProtocolClientWs};
+use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
 use kamu_datasets_services::{DatasetKeyValueServiceSysEnv, DependencyGraphServiceImpl};
 use messaging_outbox::DummyOutboxImpl;
 use opendatafabric::{
@@ -81,6 +82,7 @@ impl ClientSideHarness {
         b.add::<DummyOutboxImpl>();
 
         b.add::<DependencyGraphServiceImpl>();
+        b.add::<InMemoryDatasetDependencyRepository>();
 
         b.add_value(CurrentAccountSubject::logged(
             AccountID::new_seeded_ed25519(CLIENT_ACCOUNT_NAME.as_bytes()),

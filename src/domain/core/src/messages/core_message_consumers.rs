@@ -12,7 +12,4 @@
 pub const MESSAGE_CONSUMER_KAMU_CORE_DATASET_OWNERSHIP_SERVICE: &str =
     "dev.kamu.domain.core.services.DatasetOwnershipService";
 
-pub const MESSAGE_CONSUMER_KAMU_CORE_DEPENDENCY_GRAPH_SERVICE: &str =
-    "dev.kamu.domain.core.services.DependencyGraphService";
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -19,6 +19,7 @@ use kamu::testing::MetadataFactory;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::*;
+use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
 use kamu_datasets_services::DependencyGraphServiceImpl;
 use kamu_flow_system::*;
 use kamu_flow_system_inmem::*;
@@ -458,6 +459,7 @@ impl FlowConfigurationHarness {
             .add_value(CurrentAccountSubject::new_test())
             .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
             .add::<DependencyGraphServiceImpl>()
+            .add::<InMemoryDatasetDependencyRepository>()
             .add::<CreateDatasetFromSnapshotUseCaseImpl>()
             .add::<DeleteDatasetUseCaseImpl>();
 

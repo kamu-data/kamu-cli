@@ -52,6 +52,7 @@ use kamu_core::{
     TransformRequestPlanner,
     MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
 };
+use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
 use kamu_datasets_services::DependencyGraphServiceImpl;
 use kamu_flow_system::{
     Flow,
@@ -3166,6 +3167,7 @@ impl FlowRunsHarness {
             .add::<SystemTimeSourceDefault>()
             .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
             .add::<DependencyGraphServiceImpl>()
+            .add::<InMemoryDatasetDependencyRepository>()
             .add::<InMemoryFlowConfigurationEventStore>()
             .add::<InMemoryFlowEventStore>()
             .add_value(FlowExecutorConfig::new(

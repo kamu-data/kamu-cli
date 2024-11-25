@@ -26,7 +26,7 @@ use kamu_core::{
     TenancyConfig,
 };
 use kamu_datasets::DatasetEnvVarsConfig;
-use kamu_datasets_inmem::InMemoryDatasetEnvVarRepository;
+use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEnvVarRepository};
 use kamu_datasets_services::{DatasetEnvVarServiceImpl, DependencyGraphServiceImpl};
 use messaging_outbox::DummyOutboxImpl;
 use opendatafabric::DatasetKind;
@@ -360,6 +360,7 @@ impl DatasetEnvVarsHarness {
                 .add::<SystemTimeSourceDefault>()
                 .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
                 .add::<DependencyGraphServiceImpl>()
+                .add::<InMemoryDatasetDependencyRepository>()
                 .add::<DatabaseTransactionRunner>()
                 .add::<DatasetEnvVarServiceImpl>()
                 .add::<InMemoryDatasetEnvVarRepository>();

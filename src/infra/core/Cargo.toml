@@ -156,6 +156,7 @@ kamu-accounts-inmem = { workspace = true }
 kamu-accounts-services = { workspace = true }
 kamu-data-utils = { workspace = true, features = ["testing"] }
 kamu-datasets-services = { workspace = true }
+kamu-datasets-inmem = { workspace = true }
 
 criterion = { version = "0.5", features = ["async_tokio"] }
 datafusion = { version = "42", default-features = false, features = [
