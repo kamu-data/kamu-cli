@@ -99,8 +99,5 @@ ignore = [
     "RUSTSEC-2024-0370",
     # Unmaintained (instant)
     # https://rustsec.org/advisories/RUSTSEC-2024-0384.html
-    "RUSTSEC-2024-0384",
-    # rustls crate vulnerability
-    # https://rustsec.org/advisories/RUSTSEC-2024-0399
-    "RUSTSEC-2024-0399",
+    "RUSTSEC-2024-0384"
 ]
