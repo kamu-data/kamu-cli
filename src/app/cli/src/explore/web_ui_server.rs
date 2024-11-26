@@ -151,66 +151,68 @@ impl WebUIServer {
             }))
             .build();
 
-        let (router, api) = OpenApiRouter::new()
-            .route(
-                "/assets/runtime-config.json",
-                axum::routing::get(runtime_config_handler),
-            )
-            .route(
-                "/graphql",
-                axum::routing::get(graphql_playground_handler).post(graphql_handler),
-            )
-            .merge(kamu_adapter_http::data::root_router())
-            .routes(routes!(
-                kamu_adapter_http::platform_file_upload_prepare_post_handler
-            ))
-            .routes(routes!(
-                kamu_adapter_http::platform_file_upload_post_handler,
-                kamu_adapter_http::platform_file_upload_get_handler
-            ))
-            .nest(
-                "/odata",
-                match tenancy_config {
-                    TenancyConfig::MultiTenant => kamu_adapter_odata::router_multi_tenant(),
-                    TenancyConfig::SingleTenant => kamu_adapter_odata::router_single_tenant(),
-                },
-            )
-            .nest(
-                match tenancy_config {
-                    TenancyConfig::MultiTenant => "/:account_name/:dataset_name",
-                    TenancyConfig::SingleTenant => "/:dataset_name",
-                },
-                kamu_adapter_http::add_dataset_resolver_layer(
-                    OpenApiRouter::new()
-                        .merge(kamu_adapter_http::smart_transfer_protocol_router())
-                        .merge(kamu_adapter_http::data::dataset_router()),
-                    tenancy_config,
-                ),
-            )
-            .fallback(app_handler)
-            .layer(kamu_adapter_http::AuthenticationLayer::new())
-            .layer(
-                tower_http::cors::CorsLayer::new()
-                    .allow_origin(tower_http::cors::Any)
-                    .allow_methods(vec![http::Method::GET, http::Method::POST])
-                    .allow_headers(tower_http::cors::Any),
-            )
-            .layer(observability::axum::http_layer())
-            // Note: Healthcheck and metrics routes are placed before the tracing layer (layers
-            // execute bottom-up) to avoid spam in logs
-            .route(
-                "/system/health",
-                axum::routing::get(observability::health::health_handler),
-            )
-            .route(
-                "/system/metrics",
-                axum::routing::get(observability::metrics::metrics_handler),
-            )
-            .merge(kamu_adapter_http::openapi::router().into())
-            .layer(axum::extract::Extension(web_ui_catalog))
-            .layer(axum::extract::Extension(gql_schema))
-            .layer(axum::extract::Extension(web_ui_config))
-            .split_for_parts();
+        let (router, api) = OpenApiRouter::with_openapi(
+            kamu_adapter_http::openapi::spec_builder(crate::app::VERSION, "").build(),
+        )
+        .route(
+            "/assets/runtime-config.json",
+            axum::routing::get(runtime_config_handler),
+        )
+        .route(
+            "/graphql",
+            axum::routing::get(graphql_playground_handler).post(graphql_handler),
+        )
+        .merge(kamu_adapter_http::data::root_router())
+        .routes(routes!(
+            kamu_adapter_http::platform_file_upload_prepare_post_handler
+        ))
+        .routes(routes!(
+            kamu_adapter_http::platform_file_upload_post_handler,
+            kamu_adapter_http::platform_file_upload_get_handler
+        ))
+        .nest(
+            "/odata",
+            match tenancy_config {
+                TenancyConfig::MultiTenant => kamu_adapter_odata::router_multi_tenant(),
+                TenancyConfig::SingleTenant => kamu_adapter_odata::router_single_tenant(),
+            },
+        )
+        .nest(
+            match tenancy_config {
+                TenancyConfig::MultiTenant => "/:account_name/:dataset_name",
+                TenancyConfig::SingleTenant => "/:dataset_name",
+            },
+            kamu_adapter_http::add_dataset_resolver_layer(
+                OpenApiRouter::new()
+                    .merge(kamu_adapter_http::smart_transfer_protocol_router())
+                    .merge(kamu_adapter_http::data::dataset_router()),
+                tenancy_config,
+            ),
+        )
+        .fallback(app_handler)
+        .layer(kamu_adapter_http::AuthenticationLayer::new())
+        .layer(
+            tower_http::cors::CorsLayer::new()
+                .allow_origin(tower_http::cors::Any)
+                .allow_methods(vec![http::Method::GET, http::Method::POST])
+                .allow_headers(tower_http::cors::Any),
+        )
+        .layer(observability::axum::http_layer())
+        // Note: Healthcheck and metrics routes are placed before the tracing layer (layers
+        // execute bottom-up) to avoid spam in logs
+        .route(
+            "/system/health",
+            axum::routing::get(observability::health::health_handler),
+        )
+        .route(
+            "/system/metrics",
+            axum::routing::get(observability::metrics::metrics_handler),
+        )
+        .merge(kamu_adapter_http::openapi::router().into())
+        .layer(axum::extract::Extension(web_ui_catalog))
+        .layer(axum::extract::Extension(gql_schema))
+        .layer(axum::extract::Extension(web_ui_config))
+        .split_for_parts();
 
         let server = axum::serve(
             listener,

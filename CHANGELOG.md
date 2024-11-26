@@ -11,7 +11,10 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## [Unreleased]
+## [0.209.0] - 2024-11-25
+### Changed
+- Improved OpenAPI integration
+- Replaced Swagger with Scalar for presenting OpenAPI spec
 ### Fixed
 - `EXECUTE_TRANSFORM` flows now respect last success run time during config enabling and api-server restarting
 - `kamu login`: add repo with `odf+` schema protocol

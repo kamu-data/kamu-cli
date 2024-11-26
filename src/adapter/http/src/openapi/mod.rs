@@ -31,7 +31,7 @@ pub fn router() -> axum::Router {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn spec_builder(description: &str) -> utoipa::openapi::OpenApiBuilder {
+pub fn spec_builder(version: &str, description: &str) -> utoipa::openapi::OpenApiBuilder {
     use utoipa::openapi::security::*;
     use utoipa::openapi::tag::*;
     use utoipa::openapi::*;
@@ -40,6 +40,7 @@ pub fn spec_builder(description: &str) -> utoipa::openapi::OpenApiBuilder {
         .info(
             InfoBuilder::new()
                 .title("Kamu REST API")
+                .version(version)
                 .terms_of_service(Some("https://docs.kamu.dev/terms-of-service/"))
                 .license(Some(
                     LicenseBuilder::new()
