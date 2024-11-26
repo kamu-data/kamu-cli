@@ -46,7 +46,7 @@ async fn test_check_remotes_status_equal() {
     let remote = harness.push_dataset(&local_ds.dataset_handle).await;
 
     let result = harness
-        .service
+        .remote_status_service
         .check_remotes_status(&local_ds.dataset_handle)
         .await
         .unwrap();
@@ -57,6 +57,8 @@ async fn test_check_remotes_status_equal() {
     assert_eq!(&status.remote, &remote);
     assert_matches!(status.check_result, Ok(CompareChainsResult::Equal));
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
 async fn test_check_remotes_status_remote_behind() {
@@ -75,7 +77,7 @@ async fn test_check_remotes_status_remote_behind() {
         .unwrap();
 
     let result = harness
-        .service
+        .remote_status_service
         .check_remotes_status(&local_ds.dataset_handle)
         .await
         .unwrap();
@@ -89,6 +91,8 @@ async fn test_check_remotes_status_remote_behind() {
         Ok(CompareChainsResult::LhsAhead { .. })
     );
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
 async fn test_check_remotes_status_remote_ahead() {
@@ -119,7 +123,7 @@ async fn test_check_remotes_status_remote_ahead() {
         .unwrap();
 
     let result = harness
-        .service
+        .remote_status_service
         .check_remotes_status(&local_ds.dataset_handle)
         .await
         .unwrap();
@@ -133,6 +137,8 @@ async fn test_check_remotes_status_remote_ahead() {
         Ok(CompareChainsResult::LhsBehind { .. })
     );
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
 async fn test_check_remotes_status_remote_diverge() {
@@ -180,7 +186,7 @@ async fn test_check_remotes_status_remote_diverge() {
         .unwrap();
 
     let result = harness
-        .service
+        .remote_status_service
         .check_remotes_status(&local_ds.dataset_handle)
         .await
         .unwrap();
@@ -195,6 +201,8 @@ async fn test_check_remotes_status_remote_diverge() {
     );
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[tokio::test]
 async fn test_check_remotes_status_not_found() {
     let harness = RemoteStatusTestHarness::new();
@@ -205,7 +213,7 @@ async fn test_check_remotes_status_not_found() {
     fs::remove_dir_all(harness.remote_repos_dir.join("repo1")).unwrap();
 
     let result = harness
-        .service
+        .remote_status_service
         .check_remotes_status(&local_ds.dataset_handle)
         .await
         .unwrap();
@@ -220,9 +228,12 @@ async fn test_check_remotes_status_not_found() {
     );
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[oop::extend(BaseRepoHarness, base_repo_harness)]
 struct RemoteStatusTestHarness {
     base_repo_harness: BaseRepoHarness,
-    service: Arc<dyn RemoteStatusService>,
+    remote_status_service: Arc<dyn RemoteStatusService>,
     sync_service: Arc<dyn SyncService>,
     sync_builder: Arc<SyncRequestBuilder>,
     remote_aliases_reg: Arc<dyn RemoteAliasesRegistry>,
@@ -251,7 +262,7 @@ impl RemoteStatusTestHarness {
 
         Self {
             base_repo_harness,
-            service: catalog.get_one().unwrap(),
+            remote_status_service: catalog.get_one().unwrap(),
             sync_service: catalog.get_one().unwrap(),
             sync_builder: catalog.get_one().unwrap(),
             remote_aliases_reg: catalog.get_one().unwrap(),
@@ -266,8 +277,7 @@ impl RemoteStatusTestHarness {
             MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build())
                 .build_typed();
 
-        self.base_repo_harness
-            .dataset_repo_writer()
+        self.dataset_repo_writer()
             .create_dataset(&local_alias, seed_block)
             .await
             .unwrap()
@@ -313,3 +323,5 @@ impl RemoteStatusTestHarness {
             .build()
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
