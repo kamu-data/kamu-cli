@@ -142,6 +142,13 @@ pub const DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_3: &str = indoc::i
     "#
 );
 
+pub const DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_4: &str = indoc::indoc!(
+    r#"
+    {"match_time": "2000-01-04", "match_id": 4, "player_id": "Bob", "score": 120}
+    {"match_time": "2000-01-04", "match_id": 4, "player_id": "Alice", "score": 50}
+    "#
+);
+
 pub const E2E_USER_ACCOUNT_NAME_STR: &str = "e2e-user";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

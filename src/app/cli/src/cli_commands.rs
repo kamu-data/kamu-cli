@@ -36,7 +36,6 @@ pub fn get_command(
             cli_catalog.get_one()?,
             cli_catalog.get_one()?,
             cli_catalog.get_one()?,
-            cli_catalog.get_one()?,
             c.manifest,
             c.name,
             c.recursive,
@@ -45,6 +44,7 @@ pub fn get_command(
             c.visibility.into(),
             cli_catalog.get_one()?,
             tenancy_config,
+            cli_catalog.get_one()?,
         )),
         cli::Command::Complete(c) => {
             let in_workspace =
@@ -97,8 +97,8 @@ pub fn get_command(
         cli::Command::Delete(c) => Box::new(DeleteCommand::new(
             cli_catalog.get_one()?,
             cli_catalog.get_one()?,
-            cli_catalog.get_one()?,
             validate_many_dataset_patterns(cli_catalog, c.dataset)?,
+            cli_catalog.get_one()?,
             cli_catalog.get_one()?,
             c.all,
             c.recursive,

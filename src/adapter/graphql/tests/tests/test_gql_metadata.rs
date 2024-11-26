@@ -91,7 +91,7 @@ async fn test_current_push_sources() {
 
     let schema = kamu_adapter_graphql::schema_quiet();
     let res = schema
-        .execute(async_graphql::Request::new(request_code.clone()).data(catalog_authorized.clone()))
+        .execute(Request::new(request_code.clone()).data(catalog_authorized.clone()))
         .await;
     assert!(res.is_ok(), "{res:?}");
 
@@ -141,7 +141,7 @@ async fn test_current_push_sources() {
         .unwrap();
 
     let res = schema
-        .execute(async_graphql::Request::new(request_code.clone()).data(catalog_authorized))
+        .execute(Request::new(request_code.clone()).data(catalog_authorized))
         .await;
     assert!(res.is_ok(), "{res:?}");
 

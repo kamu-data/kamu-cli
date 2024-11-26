@@ -53,6 +53,7 @@ use crate::{
     odf_server,
     spawn_password_refreshing_job,
     try_build_db_connection_settings,
+    ConfirmDeleteService,
     GcService,
     WorkspaceLayout,
     WorkspaceService,
@@ -446,6 +447,8 @@ pub fn configure_base_catalog(
 
     b.add::<WatermarkServiceImpl>();
 
+    b.add::<RemoteStatusServiceImpl>();
+
     b.add::<ResetServiceImpl>();
 
     b.add::<ProvenanceServiceImpl>();
@@ -539,6 +542,7 @@ pub fn configure_cli_catalog(
         WorkspaceService::builder().with_multi_tenant(tenancy_config == TenancyConfig::MultiTenant),
     );
     b.add::<odf_server::LoginService>();
+    b.add::<ConfirmDeleteService>();
 
     b
 }

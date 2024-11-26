@@ -21,6 +21,7 @@ use opendatafabric as odf;
 
 use crate::prelude::*;
 use crate::queries::*;
+use crate::scalars::DatasetPushStatuses;
 
 pub struct DatasetMetadata {
     dataset_handle: odf::DatasetHandle,
@@ -180,6 +181,14 @@ impl DatasetMetadata {
         push_sources.sort_by(|a, b| a.source_name.cmp(&b.source_name));
 
         Ok(push_sources)
+    }
+
+    /// Sync statuses of push remotes
+    async fn push_sync_statuses(&self, ctx: &Context<'_>) -> Result<DatasetPushStatuses> {
+        let service = from_catalog::<dyn domain::RemoteStatusService>(ctx).unwrap();
+        let statuses = service.check_remotes_status(&self.dataset_handle).await?;
+
+        Ok(statuses.into())
     }
 
     /// Current transformation used by the derivative dataset

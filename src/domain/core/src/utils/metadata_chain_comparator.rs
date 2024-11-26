@@ -274,7 +274,7 @@ impl MetadataChainComparator {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub enum CompareChainsResult {
     Equal,
     LhsAhead {

@@ -11,6 +11,10 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Unreleased]
+### Added
+- Console warning when deleting datasets which are out of sync with their push remotes
+
 ## [0.209.0] - 2024-11-25
 ### Changed
 - Improved OpenAPI integration

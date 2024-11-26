@@ -70,6 +70,10 @@ impl DatasetFactoryImpl {
     }
 
     fn get_http(base_url: &Url, header_map: http::HeaderMap) -> impl Dataset {
+        // When joining url without trailing '/', last path part is being dropped
+        let mut base_url = base_url.clone();
+        base_url.ensure_trailing_slash();
+
         let client = reqwest::Client::new();
 
         DatasetImpl::new(
