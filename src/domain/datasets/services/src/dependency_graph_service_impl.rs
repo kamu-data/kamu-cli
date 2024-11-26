@@ -84,7 +84,7 @@ impl State {
 #[meta(MessageConsumerMeta {
     consumer_name: MESSAGE_CONSUMER_KAMU_DEPENDENCY_GRAPH_SERVICE,
     feeding_producers: &[MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE],
-    delivery: MessageDeliveryMechanism::Transactional,
+    delivery: MessageDeliveryMechanism::Immediate,
  })]
 #[scope(Singleton)]
 impl DependencyGraphServiceImpl {

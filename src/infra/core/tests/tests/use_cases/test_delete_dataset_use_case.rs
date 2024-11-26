@@ -19,6 +19,8 @@ use kamu_core::{
     DeleteDatasetUseCase,
     GetDatasetError,
 };
+use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
+use kamu_datasets_services::{DependencyGraphIndexer, DependencyGraphServiceImpl};
 use messaging_outbox::{consume_deserialized_message, ConsumerFilter, Message, MockOutbox};
 use opendatafabric::{DatasetAlias, DatasetName};
 
@@ -39,6 +41,7 @@ async fn test_delete_dataset_success_via_ref() {
     let harness = DeleteUseCaseHarness::new(mock_authorizer, mock_outbox);
 
     harness.create_root_dataset(&alias_foo).await;
+    harness.reindex_depedency_graph().await;
 
     harness
         .use_case
@@ -67,6 +70,7 @@ async fn test_delete_dataset_success_via_handle() {
     let harness = DeleteUseCaseHarness::new(mock_authorizer, mock_outbox);
 
     let foo = harness.create_root_dataset(&alias_foo).await;
+    harness.reindex_depedency_graph().await;
 
     harness
         .use_case
@@ -108,6 +112,7 @@ async fn test_delete_unauthorized() {
     );
 
     let foo = harness.create_root_dataset(&alias_foo).await;
+    harness.reindex_depedency_graph().await;
 
     assert_matches!(
         harness
@@ -136,6 +141,7 @@ async fn test_delete_dataset_respects_dangling_refs() {
     let derived = harness
         .create_derived_dataset(&alias_bar, vec![alias_foo.as_local_ref()])
         .await;
+    harness.reindex_depedency_graph().await;
 
     assert_matches!(
         harness.use_case.execute_via_handle(&root.dataset_handle).await,
@@ -188,6 +194,7 @@ struct DeleteUseCaseHarness {
     base_harness: BaseUseCaseHarness,
     catalog: Catalog,
     use_case: Arc<dyn DeleteDatasetUseCase>,
+    indexer: Arc<DependencyGraphIndexer>,
 }
 
 impl DeleteUseCaseHarness {
@@ -203,16 +210,19 @@ impl DeleteUseCaseHarness {
 
         let catalog = dill::CatalogBuilder::new_chained(base_harness.catalog())
             .add::<DeleteDatasetUseCaseImpl>()
-            // TODO: replace with mocks
-            // .add::<DependencyGraphServiceInMemory>()
+            .add::<DependencyGraphServiceImpl>()
+            .add::<InMemoryDatasetDependencyRepository>()
+            .add::<DependencyGraphIndexer>()
             .build();
 
         let use_case = catalog.get_one().unwrap();
+        let indexer = catalog.get_one().unwrap();
 
         Self {
             base_harness,
             catalog,
             use_case,
+            indexer,
         }
     }
 
@@ -226,6 +236,11 @@ impl DeleteUseCaseHarness {
         )
         .await
         .unwrap();
+    }
+
+    async fn reindex_depedency_graph(&self) {
+        use init_on_startup::InitOnStartup;
+        self.indexer.run_initialization().await.unwrap();
     }
 }
 

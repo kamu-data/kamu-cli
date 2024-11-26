@@ -123,6 +123,8 @@ impl Command for DeleteCommand {
             .await
             .map_err(CLIError::critical)?;
 
+        tracing::info!(dataset_ids=?dataset_ids, "Delete order defined");
+
         for id in &dataset_ids {
             match self
                 .delete_dataset
