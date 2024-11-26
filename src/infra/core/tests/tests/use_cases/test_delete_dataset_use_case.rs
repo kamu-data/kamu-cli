@@ -33,6 +33,7 @@ async fn test_delete_dataset_success_via_ref() {
     let alias_foo = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
 
     let mut mock_outbox = MockOutbox::new();
+    expect_outbox_dataset_about_2_delete(&mut mock_outbox, 1);
     expect_outbox_dataset_deleted(&mut mock_outbox, 1);
 
     let mock_authorizer =
@@ -41,7 +42,7 @@ async fn test_delete_dataset_success_via_ref() {
     let harness = DeleteUseCaseHarness::new(mock_authorizer, mock_outbox);
 
     harness.create_root_dataset(&alias_foo).await;
-    harness.reindex_depedency_graph().await;
+    harness.reindex_dependency_graph().await;
 
     harness
         .use_case
@@ -62,6 +63,7 @@ async fn test_delete_dataset_success_via_handle() {
     let alias_foo = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
 
     let mut mock_outbox = MockOutbox::new();
+    expect_outbox_dataset_about_2_delete(&mut mock_outbox, 1);
     expect_outbox_dataset_deleted(&mut mock_outbox, 1);
 
     let mock_authorizer =
@@ -70,7 +72,7 @@ async fn test_delete_dataset_success_via_handle() {
     let harness = DeleteUseCaseHarness::new(mock_authorizer, mock_outbox);
 
     let foo = harness.create_root_dataset(&alias_foo).await;
-    harness.reindex_depedency_graph().await;
+    harness.reindex_dependency_graph().await;
 
     harness
         .use_case
@@ -112,7 +114,7 @@ async fn test_delete_unauthorized() {
     );
 
     let foo = harness.create_root_dataset(&alias_foo).await;
-    harness.reindex_depedency_graph().await;
+    harness.reindex_dependency_graph().await;
 
     assert_matches!(
         harness
@@ -133,6 +135,7 @@ async fn test_delete_dataset_respects_dangling_refs() {
     let alias_bar = DatasetAlias::new(None, DatasetName::new_unchecked("bar"));
 
     let mut mock_outbox = MockOutbox::new();
+    expect_outbox_dataset_about_2_delete(&mut mock_outbox, 2);
     expect_outbox_dataset_deleted(&mut mock_outbox, 2);
 
     let harness = DeleteUseCaseHarness::new(MockDatasetActionAuthorizer::allowing(), mock_outbox);
@@ -141,7 +144,7 @@ async fn test_delete_dataset_respects_dangling_refs() {
     let derived = harness
         .create_derived_dataset(&alias_bar, vec![alias_foo.as_local_ref()])
         .await;
-    harness.reindex_depedency_graph().await;
+    harness.reindex_dependency_graph().await;
 
     assert_matches!(
         harness.use_case.execute_via_handle(&root.dataset_handle).await,
@@ -158,6 +161,11 @@ async fn test_delete_dataset_respects_dangling_refs() {
         .unwrap();
 
     harness
+        .consume_message(DatasetLifecycleMessage::about_2_delete(
+            derived.dataset_handle.id.clone(),
+        ))
+        .await;
+    harness
         .consume_message(DatasetLifecycleMessage::deleted(derived.dataset_handle.id))
         .await;
 
@@ -173,6 +181,11 @@ async fn test_delete_dataset_respects_dangling_refs() {
         .await
         .unwrap();
 
+    harness
+        .consume_message(DatasetLifecycleMessage::about_2_delete(
+            root.dataset_handle.id.clone(),
+        ))
+        .await;
     harness
         .consume_message(DatasetLifecycleMessage::deleted(root.dataset_handle.id))
         .await;
@@ -238,7 +251,7 @@ impl DeleteUseCaseHarness {
         .unwrap();
     }
 
-    async fn reindex_depedency_graph(&self) {
+    async fn reindex_dependency_graph(&self) {
         use init_on_startup::InitOnStartup;
         self.indexer.run_initialization().await.unwrap();
     }

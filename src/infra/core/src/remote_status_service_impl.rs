@@ -122,7 +122,7 @@ impl RemoteStatusService for RemoteStatusServiceImpl {
             });
         }
 
-        tracing::debug!(?statuses, "Determined push aliase statuses");
+        tracing::debug!(?statuses, "Determined push alias statuses");
 
         Ok(DatasetPushStatuses { statuses })
     }

@@ -188,7 +188,8 @@ impl MessageConsumerT<DatasetLifecycleMessage> for DatasetOwnershipServiceInMemo
                 }
             }
             DatasetLifecycleMessage::DependenciesUpdated(_)
-            | DatasetLifecycleMessage::Renamed(_) => {
+            | DatasetLifecycleMessage::Renamed(_)
+            | DatasetLifecycleMessage::About2Delete(_) => {
                 // No action required
             }
         }

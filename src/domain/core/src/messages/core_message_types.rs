@@ -23,8 +23,9 @@ const DATASET_LIFECYCLE_OUTBOX_VERSION: u32 = 1;
 pub enum DatasetLifecycleMessage {
     Created(DatasetLifecycleMessageCreated),
     DependenciesUpdated(DatasetLifecycleMessageDependenciesUpdated),
-    Deleted(DatasetLifecycleMessageDeleted),
     Renamed(DatasetLifecycleMessageRenamed),
+    About2Delete(DatasetLifecycleMessageAbout2Delete),
+    Deleted(DatasetLifecycleMessageDeleted),
 }
 
 impl DatasetLifecycleMessage {
@@ -47,6 +48,10 @@ impl DatasetLifecycleMessage {
             dataset_id,
             new_upstream_ids,
         })
+    }
+
+    pub fn about_2_delete(dataset_id: DatasetID) -> Self {
+        Self::About2Delete(DatasetLifecycleMessageAbout2Delete { dataset_id })
     }
 
     pub fn deleted(dataset_id: DatasetID) -> Self {
@@ -91,6 +96,13 @@ pub struct DatasetLifecycleMessageCreated {
 pub struct DatasetLifecycleMessageDependenciesUpdated {
     pub dataset_id: DatasetID,
     pub new_upstream_ids: Vec<DatasetID>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DatasetLifecycleMessageAbout2Delete {
+    pub dataset_id: DatasetID,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

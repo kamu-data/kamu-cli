@@ -99,10 +99,9 @@ impl InitOnStartup for DependencyGraphIndexer {
     async fn run_initialization(&self) -> Result<(), InternalError> {
         if self.was_indexed().await? {
             tracing::debug!("Skip initialization: dependency graph was already indexed");
-            return Ok(());
+        } else {
+            self.index_dependencies_from_storage().await?;
         }
-
-        self.index_dependencies_from_storage().await?;
 
         self.dependency_graph_service
             .load_dependency_graph(

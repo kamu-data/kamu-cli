@@ -545,7 +545,8 @@ impl MessageConsumerT<DatasetLifecycleMessage> for DatasetEntryServiceImpl {
                 self.handle_dataset_lifecycle_renamed_message(message).await
             }
 
-            DatasetLifecycleMessage::DependenciesUpdated(_) => {
+            DatasetLifecycleMessage::DependenciesUpdated(_)
+            | DatasetLifecycleMessage::About2Delete(_) => {
                 // No action required
                 Ok(())
             }
