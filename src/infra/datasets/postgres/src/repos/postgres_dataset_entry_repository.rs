@@ -78,7 +78,14 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
         Ok(usize::try_from(dataset_entries_count.unwrap_or(0)).unwrap())
     }
 
-    fn get_dataset_entries(&self, pagination: PaginationOpts) -> DatasetEntryStream {
+    // TODO: Private Datasets: use only one lifetime specification (here and below)
+    async fn get_dataset_entries<'a, 'b>(
+        &'a self,
+        pagination: PaginationOpts,
+    ) -> DatasetEntryStream<'b>
+    where
+        'a: 'b,
+    {
         Box::pin(async_stream::stream! {
             let mut tr = self.transaction.lock().await;
             let connection_mut = tr.connection_mut().await?;
@@ -230,11 +237,14 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
         }
     }
 
-    fn get_dataset_entries_by_owner_id(
-        &self,
+    async fn get_dataset_entries_by_owner_id<'a, 'b>(
+        &'a self,
         owner_id: &AccountID,
         pagination: PaginationOpts,
-    ) -> DatasetEntryStream<'_> {
+    ) -> DatasetEntryStream<'b>
+    where
+        'a: 'b,
+    {
         let stack_owner_id = owner_id.as_did_str().to_stack_string();
 
         Box::pin(async_stream::stream! {

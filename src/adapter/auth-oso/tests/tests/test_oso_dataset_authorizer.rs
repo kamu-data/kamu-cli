@@ -16,10 +16,21 @@ use kamu::{CreateDatasetUseCaseImpl, DatasetRepositoryWriter, MockDatasetReposit
 use kamu_accounts::{AnonymousAccountReason, CurrentAccountSubject};
 use kamu_adapter_auth_oso::{KamuAuthOso, OsoDatasetAuthorizer};
 use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer, DatasetActionUnauthorizedError};
-use kamu_core::{AccessError, CreateDatasetUseCase, DatasetRepository, TenancyConfig};
-use messaging_outbox::DummyOutboxImpl;
-use opendatafabric::{AccountID, AccountName, DatasetAlias, DatasetHandle, DatasetKind};
-use tempfile::TempDir;
+use kamu_core::{
+    AccessError,
+    DatasetLifecycleMessage,
+    DatasetVisibility,
+    TenancyConfig,
+    MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
+};
+use messaging_outbox::{
+    register_message_dispatcher,
+    ConsumerFilter,
+    Outbox,
+    OutboxExt,
+    OutboxImmediateImpl,
+};
+use opendatafabric as odf;
 use time_source::SystemTimeSourceDefault;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

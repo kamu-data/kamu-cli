@@ -738,6 +738,11 @@ type DatasetPermissions {
 	canSchedule: Boolean!
 }
 
+type DatasetProperties {
+	allowsAnonymousRead: Boolean!
+	allowsPublicRead: Boolean!
+}
+
 type DatasetPushStatus {
 	remote: DatasetRefRemote!
 	result: CompareChainsResult!
@@ -745,11 +750,6 @@ type DatasetPushStatus {
 
 type DatasetPushStatuses {
 	statuses: [DatasetPushStatus!]!
-}
-
-type DatasetProperties {
-	allowsAnonymousRead: Boolean!
-	allowsPublicRead: Boolean!
 }
 
 scalar DatasetRef

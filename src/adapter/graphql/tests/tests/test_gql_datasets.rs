@@ -31,8 +31,8 @@ use crate::utils::{authentication_catalogs, expect_anonymous_access_error};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 macro_rules! test_dataset_create_empty_without_visibility {
-    ($is_multi_tenant:literal) => {
-        let harness = GraphQLDatasetsHarness::new($is_multi_tenant).await;
+    ($tenancy_config:expr) => {
+        let harness = GraphQLDatasetsHarness::new($tenancy_config).await;
 
         let request_code = indoc::indoc!(
             r#"
@@ -83,8 +83,8 @@ macro_rules! test_dataset_create_empty_without_visibility {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 macro_rules! test_dataset_create_empty_public {
-    ($is_multi_tenant:literal) => {
-        let harness = GraphQLDatasetsHarness::new($is_multi_tenant).await;
+    ($tenancy_config:expr) => {
+        let harness = GraphQLDatasetsHarness::new($tenancy_config).await;
 
         let request_code = indoc::indoc!(
             r#"
@@ -110,7 +110,7 @@ macro_rules! test_dataset_create_empty_public {
         expect_anonymous_access_error(harness.execute_anonymous_query(request_code).await);
 
         let res = harness.execute_authorized_query(request_code).await;
-        let expected_publicly_available = $is_multi_tenant;
+        let expected_publicly_available = $tenancy_config == TenancyConfig::MultiTenant;
 
         assert!(res.is_ok(), "{res:?}");
         pretty_assertions::assert_eq!(
@@ -330,28 +330,28 @@ async fn test_dataset_by_account_id() {
 
 #[test_log::test(tokio::test)]
 async fn test_dataset_create_empty_without_visibility_st() {
-    test_dataset_create_empty_without_visibility!(false);
+    test_dataset_create_empty_without_visibility!(TenancyConfig::SingleTenant);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
 async fn test_dataset_create_empty_without_visibility_mt() {
-    test_dataset_create_empty_without_visibility!(true);
+    test_dataset_create_empty_without_visibility!(TenancyConfig::MultiTenant);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
 async fn test_dataset_create_empty_public_st() {
-    test_dataset_create_empty_public!(false);
+    test_dataset_create_empty_public!(TenancyConfig::SingleTenant);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
 async fn test_dataset_create_empty_public_mt() {
-    test_dataset_create_empty_public!(true);
+    test_dataset_create_empty_public!(TenancyConfig::MultiTenant);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -793,7 +793,7 @@ impl GraphQLDatasetsHarness {
 
             b.add::<SystemTimeSourceDefault>()
                 .add_builder(
-                    messaging_outbox::OutboxImmediateImpl::builder()
+                    OutboxImmediateImpl::builder()
                         .with_consumer_filter(messaging_outbox::ConsumerFilter::AllConsumers),
                 )
                 .bind::<dyn Outbox, OutboxImmediateImpl>()
@@ -812,7 +812,7 @@ impl GraphQLDatasetsHarness {
                 .add::<RebacServiceImpl>()
                 .add::<InMemoryRebacRepository>();
 
-            if is_multi_tenant {
+            if tenancy_config == TenancyConfig::MultiTenant {
                 b.add::<MultiTenantRebacDatasetLifecycleMessageConsumer>();
             }
 

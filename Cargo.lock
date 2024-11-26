@@ -5425,7 +5425,9 @@ name = "kamu-adapter-auth-oso"
 version = "0.209.0"
 dependencies = [
  "async-trait",
+ "database-common",
  "dill",
+ "futures",
  "init-on-startup",
  "internal-error",
  "kamu",
@@ -5710,6 +5712,7 @@ name = "kamu-auth-rebac-services"
 version = "0.209.0"
 dependencies = [
  "async-trait",
+ "database-common",
  "dill",
  "futures",
  "init-on-startup",

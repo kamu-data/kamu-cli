@@ -8,13 +8,14 @@
 // by the Apache License, Version 2.0.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use database_common::PaginationOpts;
 use dill::*;
 use internal_error::InternalError;
 use kamu_datasets::*;
 use opendatafabric::{AccountID, DatasetID, DatasetName};
+use tokio::sync::RwLock;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -68,14 +69,20 @@ impl DatasetEntryRepository for InMemoryDatasetEntryRepository {
         &self,
         owner_id: &AccountID,
     ) -> Result<usize, InternalError> {
-        let readable_state = self.state.lock().unwrap();
-        let owner_entires = readable_state.rows_by_owner.get(owner_id);
-        Ok(owner_entires.map_or(0, BTreeSet::len))
+        let readable_state = self.state.read().await;
+
+        let owner_entries = readable_state.rows_by_owner.get(owner_id);
+
+        Ok(owner_entries.map_or(0, BTreeSet::len))
     }
 
-    fn get_dataset_entries(&self, pagination: PaginationOpts) -> DatasetEntryStream {
-        let dataset_entries_page: Vec<_> = {
-            let readable_state = self.state.lock().unwrap();
+    async fn get_dataset_entries<'a, 'b>(
+        &'a self,
+        pagination: PaginationOpts,
+    ) -> DatasetEntryStream<'b> {
+        let dataset_entries_page = {
+            let readable_state = self.state.read().await;
+
             readable_state
                 .rows_by_name
                 .values()
@@ -83,7 +90,7 @@ impl DatasetEntryRepository for InMemoryDatasetEntryRepository {
                 .take(pagination.limit)
                 .cloned()
                 .map(Ok)
-                .collect()
+                .collect::<Vec<_>>()
         };
 
         Box::pin(futures::stream::iter(dataset_entries_page))
@@ -108,7 +115,7 @@ impl DatasetEntryRepository for InMemoryDatasetEntryRepository {
         &self,
         dataset_ids: &[DatasetID],
     ) -> Result<DatasetEntriesResolution, GetMultipleDatasetEntriesError> {
-        let readable_state = self.state.lock().unwrap();
+        let readable_state = self.state.read().await;
 
         let mut resolution = DatasetEntriesResolution::default();
 
@@ -145,13 +152,14 @@ impl DatasetEntryRepository for InMemoryDatasetEntryRepository {
         Ok(dataset_entry.clone())
     }
 
-    fn get_dataset_entries_by_owner_id(
-        &self,
+    async fn get_dataset_entries_by_owner_id<'a, 'b>(
+        &'a self,
         owner_id: &AccountID,
         pagination: PaginationOpts,
-    ) -> DatasetEntryStream<'_> {
-        let dataset_entries_page: Vec<_> = {
-            let readable_state = self.state.lock().unwrap();
+    ) -> DatasetEntryStream<'b> {
+        let dataset_entries_page = {
+            let readable_state = self.state.read().await;
+
             if let Some(dataset_ids) = readable_state.rows_by_owner.get(owner_id) {
                 dataset_ids
                     .iter()
@@ -160,7 +168,7 @@ impl DatasetEntryRepository for InMemoryDatasetEntryRepository {
                     .map(|dataset_id| readable_state.rows.get(dataset_id).unwrap())
                     .cloned()
                     .map(Ok)
-                    .collect()
+                    .collect::<Vec<_>>()
             } else {
                 vec![]
             }
@@ -251,7 +259,7 @@ impl DatasetEntryRepository for InMemoryDatasetEntryRepository {
         &self,
         dataset_id: &DatasetID,
     ) -> Result<(), DeleteEntryDatasetError> {
-        let mut writable_state = self.state.lock().unwrap();
+        let mut writable_state = self.state.write().await;
 
         let maybe_removed_entry = writable_state.rows.remove(dataset_id);
         if let Some(removed_entry) = maybe_removed_entry {

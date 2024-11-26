@@ -80,7 +80,10 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
         Ok(usize::try_from(dataset_entries_count).unwrap())
     }
 
-    fn get_dataset_entries(&self, pagination: PaginationOpts) -> DatasetEntryStream {
+    async fn get_dataset_entries<'a: 'b, 'b>(
+        &'a self,
+        pagination: PaginationOpts,
+    ) -> DatasetEntryStream<'b> {
         Box::pin(async_stream::stream! {
             let mut tr = self.transaction.lock().await;
             let connection_mut = tr.connection_mut().await?;
@@ -254,11 +257,14 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
         }
     }
 
-    fn get_dataset_entries_by_owner_id(
-        &self,
+    async fn get_dataset_entries_by_owner_id<'a, 'b>(
+        &'a self,
         owner_id: &AccountID,
         pagination: PaginationOpts,
-    ) -> DatasetEntryStream<'_> {
+    ) -> DatasetEntryStream<'b>
+    where
+        'a: 'b,
+    {
         let stack_owner_id = owner_id.as_did_str().to_stack_string();
 
         let limit = i64::try_from(pagination.limit).unwrap();

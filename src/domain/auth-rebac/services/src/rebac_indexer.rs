@@ -9,6 +9,7 @@
 
 use std::sync::Arc;
 
+use database_common::PaginationOpts;
 use dill::{component, interface, meta};
 use init_on_startup::{InitOnStartup, InitOnStartupMeta};
 use internal_error::{InternalError, ResultIntoInternal};
@@ -68,11 +69,16 @@ impl RebacIndexer {
 
     #[tracing::instrument(level = "debug", skip_all)]
     async fn index_dataset_entries(&self) -> Result<(), InternalError> {
+        use futures::TryStreamExt;
+
+        // TODO: Private Datasets: use DatasetEntryService
+        //       (also it removes futures dep)
         let dataset_entries = self
             .dataset_entry_repository
-            .get_dataset_entries()
+            .get_dataset_entries(PaginationOpts::all())
             .await
-            .int_err()?;
+            .try_collect::<Vec<_>>()
+            .await?;
 
         for dataset_entry in dataset_entries {
             for (name, value) in [

@@ -500,15 +500,11 @@ pub fn configure_base_catalog(
     b.add::<odf_server::AccessTokenRegistryService>();
     b.add::<odf_server::CLIAccessTokenStore>();
 
-    kamu_auth_rebac_services::register_dependencies(&mut b, multi_tenant_workspace);
+    kamu_auth_rebac_services::register_dependencies(&mut b, tenancy_config);
 
     kamu_adapter_auth_oso::register_dependencies(&mut b);
 
     b.add::<DatabaseTransactionRunner>();
-
-    if tenancy_config == TenancyConfig::MultiTenant {
-        b.add::<MultiTenantRebacDatasetLifecycleMessageConsumer>();
-    }
 
     b.add::<DatasetEntryServiceImpl>();
 

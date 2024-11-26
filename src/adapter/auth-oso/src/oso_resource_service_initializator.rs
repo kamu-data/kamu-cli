@@ -10,6 +10,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use database_common::PaginationOpts;
 use dill::*;
 use init_on_startup::{InitOnStartup, InitOnStartupMeta};
 use internal_error::{InternalError, ResultIntoInternal};
@@ -67,11 +68,16 @@ impl InitOnStartup for OsoResourceServiceInitializator {
         name = "OsoResourceServiceInitializator::run_initialization"
     )]
     async fn run_initialization(&self) -> Result<(), InternalError> {
+        use futures::TryStreamExt;
+
+        // TODO: Private Datasets: use DatasetEntryService
+        //       (also it removes futures dep)
         let dataset_entries = self
             .dataset_entry_repository
-            .get_dataset_entries()
+            .get_dataset_entries(PaginationOpts::all())
             .await
-            .int_err()?;
+            .try_collect::<Vec<_>>()
+            .await?;
         let accounts = self.account_repository.get_accounts().await.int_err()?;
         let accounts_map = accounts
             .into_iter()

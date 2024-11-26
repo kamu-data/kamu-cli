@@ -346,15 +346,21 @@ impl DatasetEntryService for DatasetEntryServiceImpl {
     ) -> Result<DatasetEntryListing, ListDatasetEntriesError> {
         use futures::TryStreamExt;
 
-        let total_count = self.dataset_entry_repo.dataset_entries_count().await?;
+        let total_count = self
+            .dataset_entry_repo
+            .dataset_entries_count()
+            .await
+            .int_err()?;
         let entries = self
             .dataset_entry_repo
             .get_dataset_entries(pagination)
+            .await
             .try_collect()
             .await?;
 
         Ok(DatasetEntryListing {
             list: entries,
+            // TODO: Private Datasets: use entries.len()?
             total_count,
         })
     }
@@ -373,6 +379,7 @@ impl DatasetEntryService for DatasetEntryServiceImpl {
         let entries = self
             .dataset_entry_repo
             .get_dataset_entries_by_owner_id(&owner_id, pagination)
+            .await
             .try_collect()
             .await?;
 

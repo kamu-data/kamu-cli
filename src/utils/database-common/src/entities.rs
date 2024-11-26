@@ -15,4 +15,14 @@ pub struct PaginationOpts {
     pub offset: usize,
 }
 
+impl PaginationOpts {
+    pub fn all() -> Self {
+        PaginationOpts {
+            // i64 type is used because sometimes repositories use a conversion to it
+            limit: i64::MAX as usize,
+            offset: 0,
+        }
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

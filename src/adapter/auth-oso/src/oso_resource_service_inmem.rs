@@ -22,7 +22,7 @@ use messaging_outbox::{
     MessageConsumer,
     MessageConsumerMeta,
     MessageConsumerT,
-    MessageConsumptionDurability,
+    MessageDeliveryMechanism,
 };
 use opendatafabric as odf;
 use tokio::sync::{RwLock, RwLockReadGuard};
@@ -54,7 +54,7 @@ pub struct OsoResourceServiceInMem {
 #[meta(MessageConsumerMeta {
     consumer_name: MESSAGE_CONSUMER_KAMU_AUTH_OSO_OSO_RESOURCE_SERVICE,
     feeding_producers: &[MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE],
-    durability: MessageConsumptionDurability::Durable,
+    delivery: MessageDeliveryMechanism::Transactional,
  })]
 impl OsoResourceServiceInMem {
     pub fn new() -> Self {

@@ -122,18 +122,17 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
     #[tracing::instrument(level = "debug", skip_all, fields(dataset_handles=?dataset_handles, action=%action))]
     async fn filter_datasets_allowing(
         &self,
-        dataset_handles: Vec<DatasetHandle>,
+        dataset_handles: Vec<odf::DatasetHandle>,
         action: DatasetAction,
-    ) -> Result<Vec<DatasetHandle>, InternalError> {
+    ) -> Result<Vec<odf::DatasetHandle>, InternalError> {
+        // TODO: Private Datasets: revisit
+
         let mut matched_dataset_handles = Vec::new();
         for hdl in dataset_handles {
+            let (actor, dataset_resource) = self.user_dataset_pair(&hdl).await?;
             let is_allowed = self
                 .oso
-                .is_allowed(
-                    self.actor(),
-                    action.to_string(),
-                    self.dataset_resource(&hdl),
-                )
+                .is_allowed(actor, action, dataset_resource)
                 .int_err()?;
             if is_allowed {
                 matched_dataset_handles.push(hdl);
@@ -146,20 +145,19 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
     #[tracing::instrument(level = "debug", skip_all, fields(dataset_handles=?dataset_handles, action=%action))]
     async fn classify_datasets_by_allowance(
         &self,
-        dataset_handles: Vec<DatasetHandle>,
+        dataset_handles: Vec<odf::DatasetHandle>,
         action: DatasetAction,
     ) -> Result<ClassifyByAllowanceResponse, InternalError> {
+        // TODO: Private Datasets: revisit
+
         let mut matched_dataset_handles = Vec::with_capacity(dataset_handles.len());
         let mut unmatched_results = Vec::new();
 
         for hdl in dataset_handles {
+            let (actor, dataset_resource) = self.user_dataset_pair(&hdl).await?;
             let is_allowed = self
                 .oso
-                .is_allowed(
-                    self.actor(),
-                    action.to_string(),
-                    self.dataset_resource(&hdl),
-                )
+                .is_allowed(actor, action, dataset_resource)
                 .int_err()?;
             if is_allowed {
                 matched_dataset_handles.push(hdl);
