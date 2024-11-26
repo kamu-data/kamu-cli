@@ -59,6 +59,7 @@ pub type DatasetIDStream<'a> = std::pin::Pin<Box<dyn Stream<Item = DatasetID> + 
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Debug)]
 pub enum DependencyOrder {
     BreadthFirst,
     DepthFirst,

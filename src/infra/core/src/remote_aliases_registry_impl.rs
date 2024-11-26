@@ -66,12 +66,16 @@ impl RemoteAliasesRegistryImpl {
 
 #[async_trait::async_trait]
 impl RemoteAliasesRegistry for RemoteAliasesRegistryImpl {
+    #[tracing::instrument(level = "debug", skip_all, fields(?dataset_handle))]
     async fn get_remote_aliases(
         &self,
         dataset_handle: &DatasetHandle,
     ) -> Result<Box<dyn RemoteAliases>, GetAliasesError> {
         let resolved_dataset = self.dataset_registry.get_dataset_by_handle(dataset_handle);
+
         let config = Self::read_config(resolved_dataset.as_ref()).await?;
+        tracing::debug!(?config, "Loaded dataset config");
+
         Ok(Box::new(RemoteAliasesImpl::new(resolved_dataset, config)))
     }
 }

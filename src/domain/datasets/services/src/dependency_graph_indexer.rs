@@ -105,7 +105,10 @@ impl InitOnStartup for DependencyGraphIndexer {
         self.index_dependencies_from_storage().await?;
 
         self.dependency_graph_service
-            .load_dependency_graph(self.dataset_dependency_repo.as_ref())
+            .load_dependency_graph(
+                self.dataset_registry.as_ref(),
+                self.dataset_dependency_repo.as_ref(),
+            )
             .await?;
 
         Ok(())

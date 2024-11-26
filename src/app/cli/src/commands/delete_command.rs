@@ -113,6 +113,8 @@ impl Command for DeleteCommand {
             .confirm_delete(&dataset_handles)
             .await?;
 
+        tracing::info!(?dataset_handles, "Trying to define delete order");
+
         // TODO: Multiple rounds of resolving IDs to handles
         let dataset_ids = self
             .dependency_graph_service
@@ -123,7 +125,7 @@ impl Command for DeleteCommand {
             .await
             .map_err(CLIError::critical)?;
 
-        tracing::info!(dataset_ids=?dataset_ids, "Delete order defined");
+        tracing::info!(?dataset_ids, "Delete order defined");
 
         for id in &dataset_ids {
             match self

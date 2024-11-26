@@ -16,6 +16,7 @@ use kamu_core::{
     DatasetIDStream,
     DatasetLifecycleMessage,
     DatasetNodeNotFoundError,
+    DatasetRegistry,
     DependencyGraphService,
     DependencyOrder,
     GetDependenciesError,
@@ -69,6 +70,7 @@ impl State {
                 let node_index = self.datasets_graph.add_node(dataset_id.clone());
                 self.dataset_node_indices
                     .insert(dataset_id.clone(), node_index);
+                tracing::debug!(%dataset_id, "Inserted new dependency graph node");
                 node_index
             }
         }
@@ -97,15 +99,24 @@ impl DependencyGraphServiceImpl {
     #[tracing::instrument(level = "debug", skip_all)]
     pub async fn load_dependency_graph(
         &self,
-        repository: &dyn DatasetDependencyRepository,
+        dataset_registry: &dyn DatasetRegistry,
+        dependency_repository: &dyn DatasetDependencyRepository,
     ) -> Result<(), InternalError> {
         use tokio_stream::StreamExt;
 
         let mut state = self.state.write().await;
-        assert!(state.datasets_graph.node_count() == 0);
+        assert!(state.datasets_graph.node_count() == 0 && state.datasets_graph.edge_count() == 0);
 
-        let mut dependencies_stream = repository.list_all_dependencies();
+        tracing::debug!("Restoring dataset nodes in dependency graph");
 
+        let mut datasets_stream = dataset_registry.all_dataset_handles();
+        while let Some(Ok(dataset_handle)) = datasets_stream.next().await {
+            state.get_or_create_dataset_node(&dataset_handle.id);
+        }
+
+        tracing::debug!("Restoring dependency graph edges");
+
+        let mut dependencies_stream = dependency_repository.list_all_dependencies();
         while let Some(Ok(dataset_dependencies)) = dependencies_stream.next().await {
             let DatasetDependencies {
                 downstream_dataset_id,
@@ -198,6 +209,12 @@ impl DependencyGraphServiceImpl {
     ) -> Result<Vec<DatasetID>, GetDependenciesError> {
         let state = self.state.read().await;
 
+        tracing::debug!(
+            num_nodes = % state.datasets_graph.node_count(),
+            num_edges = % state.datasets_graph.edge_count(),
+            "Graph state before breadth first search"
+        );
+
         let reversed_graph = Reversed(&state.datasets_graph);
         let nodes_to_search = self.get_nodes_from_dataset_ids(&dataset_ids, &state)?;
 
@@ -232,6 +249,12 @@ impl DependencyGraphServiceImpl {
         dataset_ids: Vec<DatasetID>,
     ) -> Result<Vec<DatasetID>, GetDependenciesError> {
         let state = self.state.read().await;
+
+        tracing::debug!(
+            num_nodes = % state.datasets_graph.node_count(),
+            num_edges = % state.datasets_graph.edge_count(),
+            "Graph state before depth first search"
+        );
 
         let nodes_to_search = self.get_nodes_from_dataset_ids(&dataset_ids, &state)?;
 
@@ -336,6 +359,7 @@ impl DependencyGraphService for DependencyGraphServiceImpl {
         Ok(Box::pin(tokio_stream::iter(upstream_node_datasets)))
     }
 
+    #[tracing::instrument(level = "debug", skip_all, fields(?dataset_ids, ?order))]
     async fn in_dependency_order(
         &self,
         dataset_ids: Vec<DatasetID>,
