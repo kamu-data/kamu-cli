@@ -106,7 +106,7 @@ impl DatasetDependencyRepository for PostgresDatasetDependencyRepository {
         &self,
         downstream_dataset_id: &DatasetID,
         new_upstream_dataset_ids: &[&DatasetID],
-    ) -> Result<(), InternalError> {
+    ) -> Result<(), AddDependenciesError> {
         if new_upstream_dataset_ids.is_empty() {
             return Ok(());
         }
@@ -125,11 +125,18 @@ impl DatasetDependencyRepository for PostgresDatasetDependencyRepository {
             b.push_bind(upsteam_dataset_id.as_did_str().to_string());
         });
 
-        query_builder
-            .build()
-            .execute(connection_mut)
-            .await
-            .int_err()?;
+        let query_result = query_builder.build().execute(connection_mut).await;
+        if let Err(e) = query_result {
+            return Err(match e {
+                sqlx::Error::Database(e) if e.is_unique_violation() => {
+                    AddDependencyDuplicateError {
+                        downstream_dataset_id: downstream_dataset_id.clone(),
+                    }
+                    .into()
+                }
+                _ => AddDependenciesError::Internal(e.int_err()),
+            });
+        }
 
         Ok(())
     }
@@ -138,7 +145,7 @@ impl DatasetDependencyRepository for PostgresDatasetDependencyRepository {
         &self,
         downstream_dataset_id: &DatasetID,
         obsolete_upstream_dataset_ids: &[&DatasetID],
-    ) -> Result<(), InternalError> {
+    ) -> Result<(), RemoveDependenciesError> {
         if obsolete_upstream_dataset_ids.is_empty() {
             return Ok(());
         }
@@ -153,7 +160,7 @@ impl DatasetDependencyRepository for PostgresDatasetDependencyRepository {
             .map(|id| id.as_did_str().to_string())
             .collect();
 
-        sqlx::query!(
+        let delete_result = sqlx::query!(
             r#"
             DELETE FROM dataset_dependencies WHERE downstream_dataset_id = $1 AND upstream_dataset_id = ANY($2)
             "#,
@@ -163,6 +170,13 @@ impl DatasetDependencyRepository for PostgresDatasetDependencyRepository {
         .execute(&mut *connection_mut)
         .await
         .int_err()?;
+
+        if delete_result.rows_affected() == 0 {
+            return Err(RemoveDependencyMissingError {
+                downstream_dataset_id: downstream_dataset_id.clone(),
+            }
+            .into());
+        }
 
         Ok(())
     }

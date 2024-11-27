@@ -57,6 +57,46 @@ database_transactional_test!(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+database_transactional_test!(
+    storage = postgres,
+    fixture = dataset_dependency_repo::test_add_duplicate_dependency,
+    harness = PostgresDatasetDependencyRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = postgres,
+    fixture = dataset_dependency_repo::test_remove_dependency,
+    harness = PostgresDatasetDependencyRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = postgres,
+    fixture = dataset_dependency_repo::test_remove_missing_dependency,
+    harness = PostgresDatasetDependencyRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = postgres,
+    fixture = dataset_dependency_repo::test_remove_all_dataset_dependencies,
+    harness = PostgresDatasetDependencyRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = postgres,
+    fixture = dataset_dependency_repo::test_remove_orphan_dependencies,
+    harness = PostgresDatasetDependencyRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 struct PostgresDatasetDependencyRepositoryHarness {
     catalog: Catalog,
 }

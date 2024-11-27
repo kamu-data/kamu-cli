@@ -452,11 +452,13 @@ impl MessageConsumerT<DatasetLifecycleMessage> for DependencyGraphServiceImpl {
 
                 repository
                     .remove_upstream_dependencies(&message.dataset_id, &obsolete_dependencies)
-                    .await?;
+                    .await
+                    .int_err()?;
 
                 repository
                     .add_upstream_dependencies(&message.dataset_id, &added_dependencies)
-                    .await?;
+                    .await
+                    .int_err()?;
 
                 for obsolete_upstream_id in obsolete_dependencies {
                     self.remove_dependency(&mut state, obsolete_upstream_id, &message.dataset_id);

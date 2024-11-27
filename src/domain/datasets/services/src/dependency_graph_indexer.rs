@@ -80,7 +80,8 @@ impl DependencyGraphIndexer {
 
             self.dataset_dependency_repo
                 .add_upstream_dependencies(&dataset_handle.id, &upstream_dependencies)
-                .await?;
+                .await
+                .int_err()?;
         }
 
         Ok(())

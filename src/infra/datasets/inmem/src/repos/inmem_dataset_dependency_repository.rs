@@ -12,11 +12,7 @@ use std::sync::{Arc, Mutex};
 
 use dill::*;
 use internal_error::InternalError;
-use kamu_datasets::{
-    DatasetDependencies,
-    DatasetDependenciesIDStream,
-    DatasetDependencyRepository,
-};
+use kamu_datasets::*;
 use opendatafabric::DatasetID;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -60,6 +56,7 @@ impl DatasetDependencyRepository for InMemoryDatasetDependencyRepository {
             guard
                 .upstream_by_downstream
                 .iter()
+                .filter(|(_, upstreams)| !upstreams.is_empty())
                 .map(|(downstream_dataset_id, upstreams)| {
                     let mut upstream_dataset_ids: Vec<_> = upstreams.iter().cloned().collect();
                     upstream_dataset_ids.sort();
@@ -79,7 +76,11 @@ impl DatasetDependencyRepository for InMemoryDatasetDependencyRepository {
         &self,
         downstream_dataset_id: &DatasetID,
         new_upstream_dataset_ids: &[&DatasetID],
-    ) -> Result<(), InternalError> {
+    ) -> Result<(), AddDependenciesError> {
+        if new_upstream_dataset_ids.is_empty() {
+            return Ok(());
+        }
+
         let mut guard = self.state.lock().unwrap();
 
         let upstreams = guard
@@ -96,7 +97,14 @@ impl DatasetDependencyRepository for InMemoryDatasetDependencyRepository {
                 .downstream_by_upstream
                 .entry((*new_upstream_dataset_id).clone())
                 .or_default();
-            downstreams.insert(downstream_dataset_id.clone());
+            let inserted = downstreams.insert(downstream_dataset_id.clone());
+            if !inserted {
+                return Err(AddDependenciesError::Duplicate(
+                    AddDependencyDuplicateError {
+                        downstream_dataset_id: downstream_dataset_id.clone(),
+                    },
+                ));
+            }
         }
 
         Ok(())
@@ -106,11 +114,26 @@ impl DatasetDependencyRepository for InMemoryDatasetDependencyRepository {
         &self,
         downstream_dataset_id: &DatasetID,
         obsolete_upstream_dataset_ids: &[&DatasetID],
-    ) -> Result<(), InternalError> {
+    ) -> Result<(), RemoveDependenciesError> {
+        if obsolete_upstream_dataset_ids.is_empty() {
+            return Ok(());
+        }
+
         let mut guard = self.state.lock().unwrap();
 
         let maybe_current_upstreams = guard.upstream_by_downstream.get_mut(downstream_dataset_id);
         if let Some(current_upstreams) = maybe_current_upstreams {
+            let some_missing = obsolete_upstream_dataset_ids
+                .iter()
+                .any(|id| !current_upstreams.contains(*id));
+            if some_missing {
+                return Err(RemoveDependenciesError::NotFound(
+                    RemoveDependencyMissingError {
+                        downstream_dataset_id: downstream_dataset_id.clone(),
+                    },
+                ));
+            }
+
             for obsolete_upstream_id in obsolete_upstream_dataset_ids {
                 current_upstreams.remove(*obsolete_upstream_id);
             }
@@ -122,6 +145,12 @@ impl DatasetDependencyRepository for InMemoryDatasetDependencyRepository {
                     downstreams.remove(downstream_dataset_id);
                 }
             }
+        } else {
+            return Err(RemoveDependenciesError::NotFound(
+                RemoveDependencyMissingError {
+                    downstream_dataset_id: downstream_dataset_id.clone(),
+                },
+            ));
         }
 
         Ok(())
@@ -139,6 +168,16 @@ impl DatasetDependencyRepository for InMemoryDatasetDependencyRepository {
                     guard.downstream_by_upstream.get_mut(&upstream_dataset_id)
                 {
                     downstreams.remove(dataset_id);
+                }
+            }
+        }
+
+        if let Some(downstreams) = guard.downstream_by_upstream.remove(dataset_id) {
+            for downstream_dataset_id in downstreams {
+                if let Some(upstreams) =
+                    guard.upstream_by_downstream.get_mut(&downstream_dataset_id)
+                {
+                    upstreams.remove(dataset_id);
                 }
             }
         }

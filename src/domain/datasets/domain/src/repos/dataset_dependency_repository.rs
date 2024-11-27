@@ -11,6 +11,7 @@ use std::pin::Pin;
 
 use internal_error::InternalError;
 use opendatafabric::DatasetID;
+use thiserror::Error;
 use tokio_stream::Stream;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -25,13 +26,13 @@ pub trait DatasetDependencyRepository: Send + Sync {
         &self,
         downstream_dataset_id: &DatasetID,
         new_upstream_dataset_ids: &[&DatasetID],
-    ) -> Result<(), InternalError>;
+    ) -> Result<(), AddDependenciesError>;
 
     async fn remove_upstream_dependencies(
         &self,
         downstream_dataset_id: &DatasetID,
         obsolete_upstream_dataset_ids: &[&DatasetID],
-    ) -> Result<(), InternalError>;
+    ) -> Result<(), RemoveDependenciesError>;
 
     async fn remove_all_dependencies_of(&self, dataset_id: &DatasetID)
         -> Result<(), InternalError>;
@@ -47,5 +48,43 @@ pub struct DatasetDependencies {
 
 pub type DatasetDependenciesIDStream<'a> =
     Pin<Box<dyn Stream<Item = Result<DatasetDependencies, InternalError>> + Send + 'a>>;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Error)]
+pub enum AddDependenciesError {
+    #[error(transparent)]
+    Duplicate(#[from] AddDependencyDuplicateError),
+
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Error)]
+pub enum RemoveDependenciesError {
+    #[error(transparent)]
+    NotFound(#[from] RemoveDependencyMissingError),
+
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+#[error("Upstream dependency duplicate for dataset '{downstream_dataset_id}'")]
+pub struct AddDependencyDuplicateError {
+    pub downstream_dataset_id: DatasetID,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+#[error("Upstream dependency not found for dataset '{downstream_dataset_id}'")]
+pub struct RemoveDependencyMissingError {
+    pub downstream_dataset_id: DatasetID,
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

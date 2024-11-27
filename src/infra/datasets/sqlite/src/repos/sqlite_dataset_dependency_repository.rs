@@ -107,7 +107,7 @@ impl DatasetDependencyRepository for SqliteDatasetDependencyRepository {
         &self,
         downstream_dataset_id: &DatasetID,
         new_upstream_dataset_ids: &[&DatasetID],
-    ) -> Result<(), InternalError> {
+    ) -> Result<(), AddDependenciesError> {
         if new_upstream_dataset_ids.is_empty() {
             return Ok(());
         }
@@ -126,11 +126,18 @@ impl DatasetDependencyRepository for SqliteDatasetDependencyRepository {
             b.push_bind(upsteam_dataset_id.as_did_str().to_string());
         });
 
-        query_builder
-            .build()
-            .execute(connection_mut)
-            .await
-            .int_err()?;
+        let query_result = query_builder.build().execute(connection_mut).await;
+        if let Err(e) = query_result {
+            return Err(match e {
+                sqlx::Error::Database(e) if e.is_unique_violation() => {
+                    AddDependencyDuplicateError {
+                        downstream_dataset_id: downstream_dataset_id.clone(),
+                    }
+                    .into()
+                }
+                _ => AddDependenciesError::Internal(e.int_err()),
+            });
+        }
 
         Ok(())
     }
@@ -139,7 +146,7 @@ impl DatasetDependencyRepository for SqliteDatasetDependencyRepository {
         &self,
         downstream_dataset_id: &DatasetID,
         obsolete_upstream_dataset_ids: &[&DatasetID],
-    ) -> Result<(), InternalError> {
+    ) -> Result<(), RemoveDependenciesError> {
         if obsolete_upstream_dataset_ids.is_empty() {
             return Ok(());
         }
@@ -150,7 +157,8 @@ impl DatasetDependencyRepository for SqliteDatasetDependencyRepository {
 
         let placeholders = obsolete_upstream_dataset_ids
             .iter()
-            .map(|_| "?")
+            .enumerate()
+            .map(|(i, _)| format!("${}", i + 2))
             .collect::<Vec<_>>()
             .join(", ");
 
@@ -159,7 +167,7 @@ impl DatasetDependencyRepository for SqliteDatasetDependencyRepository {
             DELETE FROM dataset_dependencies
             WHERE
                 downstream_dataset_id = $1 AND
-                upstream_dataset_id = IN ({placeholders})
+                upstream_dataset_id IN ({placeholders})
             "#,
         );
 
@@ -171,7 +179,13 @@ impl DatasetDependencyRepository for SqliteDatasetDependencyRepository {
             query = query.bind(upstream_dataset_id.to_string());
         }
 
-        query.execute(&mut *connection_mut).await.int_err()?;
+        let delete_result = query.execute(&mut *connection_mut).await.int_err()?;
+        if delete_result.rows_affected() == 0 {
+            return Err(RemoveDependencyMissingError {
+                downstream_dataset_id: downstream_dataset_id.clone(),
+            }
+            .into());
+        }
 
         Ok(())
     }

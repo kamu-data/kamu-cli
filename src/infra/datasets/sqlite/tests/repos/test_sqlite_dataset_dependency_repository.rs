@@ -57,6 +57,46 @@ database_transactional_test!(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+database_transactional_test!(
+    storage = sqlite,
+    fixture = dataset_dependency_repo::test_add_duplicate_dependency,
+    harness = SqliteDatasetDependencyRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = sqlite,
+    fixture = dataset_dependency_repo::test_remove_dependency,
+    harness = SqliteDatasetDependencyRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = sqlite,
+    fixture = dataset_dependency_repo::test_remove_missing_dependency,
+    harness = SqliteDatasetDependencyRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = sqlite,
+    fixture = dataset_dependency_repo::test_remove_all_dataset_dependencies,
+    harness = SqliteDatasetDependencyRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = sqlite,
+    fixture = dataset_dependency_repo::test_remove_orphan_dependencies,
+    harness = SqliteDatasetDependencyRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 struct SqliteDatasetDependencyRepositoryHarness {
     catalog: Catalog,
 }

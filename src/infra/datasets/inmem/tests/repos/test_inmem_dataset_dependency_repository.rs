@@ -55,6 +55,46 @@ database_transactional_test!(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+database_transactional_test!(
+    storage = inmem,
+    fixture = dataset_dependency_repo::test_add_duplicate_dependency,
+    harness = InMemoryDatasetDependencyRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem,
+    fixture = dataset_dependency_repo::test_remove_dependency,
+    harness = InMemoryDatasetDependencyRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem,
+    fixture = dataset_dependency_repo::test_remove_missing_dependency,
+    harness = InMemoryDatasetDependencyRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem,
+    fixture = dataset_dependency_repo::test_remove_all_dataset_dependencies,
+    harness = InMemoryDatasetDependencyRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem,
+    fixture = dataset_dependency_repo::test_remove_orphan_dependencies,
+    harness = InMemoryDatasetDependencyRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 struct InMemoryDatasetDependencyRepositoryHarness {
     catalog: Catalog,
 }

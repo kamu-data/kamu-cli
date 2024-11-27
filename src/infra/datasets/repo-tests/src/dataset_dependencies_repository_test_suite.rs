@@ -12,7 +12,7 @@ use std::assert_matches::assert_matches;
 use dill::Catalog;
 use itertools::{assert_equal, sorted};
 use kamu_accounts::AccountRepository;
-use kamu_datasets::{DatasetDependencies, DatasetDependencyRepository, DatasetEntryRepository};
+use kamu_datasets::*;
 
 use crate::helpers::*;
 
@@ -337,6 +337,267 @@ pub async fn test_dependency_fanouts(catalog: &Catalog) {
             },
         ]),
     );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_add_duplicate_dependency(catalog: &Catalog) {
+    let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
+    let dataset_entry_repo = catalog.get_one::<dyn DatasetEntryRepository>().unwrap();
+    let dataset_dependency_repo = catalog
+        .get_one::<dyn DatasetDependencyRepository>()
+        .unwrap();
+
+    let account = new_account(&account_repo).await;
+
+    let entry_foo = new_dataset_entry_with(&account, "foo");
+    let entry_bar = new_dataset_entry_with(&account, "bar");
+
+    for entry in [&entry_foo, &entry_bar] {
+        dataset_entry_repo.save_dataset_entry(entry).await.unwrap();
+    }
+
+    let res = dataset_dependency_repo
+        .add_upstream_dependencies(&entry_bar.id, &[&entry_foo.id])
+        .await;
+    assert_matches!(res, Ok(()));
+
+    let res = dataset_dependency_repo
+        .add_upstream_dependencies(&entry_bar.id, &[&entry_foo.id])
+        .await;
+    assert_matches!(
+        res,
+        Err(AddDependenciesError::Duplicate(
+            AddDependencyDuplicateError {
+                downstream_dataset_id
+            }
+        )) if downstream_dataset_id == entry_bar.id
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_remove_dependency(catalog: &Catalog) {
+    let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
+    let dataset_entry_repo = catalog.get_one::<dyn DatasetEntryRepository>().unwrap();
+    let dataset_dependency_repo = catalog
+        .get_one::<dyn DatasetDependencyRepository>()
+        .unwrap();
+
+    let account = new_account(&account_repo).await;
+
+    let entry_foo = new_dataset_entry_with(&account, "foo");
+    let entry_bar = new_dataset_entry_with(&account, "bar");
+    let entry_baz = new_dataset_entry_with(&account, "baz");
+
+    for entry in [&entry_foo, &entry_bar, &entry_baz] {
+        dataset_entry_repo.save_dataset_entry(entry).await.unwrap();
+    }
+
+    let res = dataset_dependency_repo
+        .add_upstream_dependencies(&entry_baz.id, &[&entry_foo.id, &entry_bar.id])
+        .await;
+    assert_matches!(res, Ok(()));
+
+    use futures::TryStreamExt;
+    let dependencies: Vec<_> = dataset_dependency_repo
+        .list_all_dependencies()
+        .try_collect()
+        .await
+        .unwrap();
+
+    assert_equal(
+        dependencies,
+        vec![DatasetDependencies {
+            downstream_dataset_id: entry_baz.id.clone(),
+            upstream_dataset_ids: sorted(vec![entry_foo.id.clone(), entry_bar.id.clone()])
+                .collect(),
+        }],
+    );
+
+    let res = dataset_dependency_repo
+        .remove_upstream_dependencies(&entry_baz.id, &[&entry_foo.id])
+        .await;
+    assert_matches!(res, Ok(()));
+
+    let dependencies: Vec<_> = dataset_dependency_repo
+        .list_all_dependencies()
+        .try_collect()
+        .await
+        .unwrap();
+
+    assert_equal(
+        dependencies,
+        vec![DatasetDependencies {
+            downstream_dataset_id: entry_baz.id.clone(),
+            upstream_dataset_ids: vec![entry_bar.id.clone()],
+        }],
+    );
+
+    let res = dataset_dependency_repo
+        .remove_upstream_dependencies(&entry_baz.id, &[&entry_bar.id])
+        .await;
+    assert_matches!(res, Ok(()));
+
+    let dependencies: Vec<_> = dataset_dependency_repo
+        .list_all_dependencies()
+        .try_collect()
+        .await
+        .unwrap();
+
+    assert!(dependencies.is_empty());
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_remove_missing_dependency(catalog: &Catalog) {
+    let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
+    let dataset_entry_repo = catalog.get_one::<dyn DatasetEntryRepository>().unwrap();
+    let dataset_dependency_repo = catalog
+        .get_one::<dyn DatasetDependencyRepository>()
+        .unwrap();
+
+    let account = new_account(&account_repo).await;
+
+    let entry_foo = new_dataset_entry_with(&account, "foo");
+    let entry_bar = new_dataset_entry_with(&account, "bar");
+    let entry_baz = new_dataset_entry_with(&account, "baz");
+
+    for entry in [&entry_foo, &entry_bar, &entry_baz] {
+        dataset_entry_repo.save_dataset_entry(entry).await.unwrap();
+    }
+
+    let res = dataset_dependency_repo
+        .add_upstream_dependencies(&entry_bar.id, &[&entry_foo.id])
+        .await;
+    assert_matches!(res, Ok(()));
+
+    let res = dataset_dependency_repo
+        .remove_upstream_dependencies(&entry_baz.id, &[&entry_foo.id])
+        .await;
+    assert_matches!(res, Err(RemoveDependenciesError::NotFound(RemoveDependencyMissingError {
+        downstream_dataset_id
+    })) if downstream_dataset_id == entry_baz.id);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_remove_all_dataset_dependencies(catalog: &Catalog) {
+    let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
+    let dataset_entry_repo = catalog.get_one::<dyn DatasetEntryRepository>().unwrap();
+    let dataset_dependency_repo = catalog
+        .get_one::<dyn DatasetDependencyRepository>()
+        .unwrap();
+
+    let account = new_account(&account_repo).await;
+
+    let entry_foo = new_dataset_entry_with(&account, "foo");
+    let entry_bar = new_dataset_entry_with(&account, "bar");
+    let entry_baz = new_dataset_entry_with(&account, "baz");
+
+    for entry in [&entry_foo, &entry_bar, &entry_baz] {
+        dataset_entry_repo.save_dataset_entry(entry).await.unwrap();
+    }
+
+    let res = dataset_dependency_repo
+        .add_upstream_dependencies(&entry_bar.id, &[&entry_foo.id])
+        .await;
+    assert_matches!(res, Ok(()));
+
+    let res = dataset_dependency_repo
+        .add_upstream_dependencies(&entry_baz.id, &[&entry_foo.id, &entry_bar.id])
+        .await;
+    assert_matches!(res, Ok(()));
+
+    use futures::TryStreamExt;
+    let dependencies: Vec<_> = dataset_dependency_repo
+        .list_all_dependencies()
+        .try_collect()
+        .await
+        .unwrap();
+
+    assert_equal(
+        sorted(dependencies),
+        sorted(vec![
+            DatasetDependencies {
+                downstream_dataset_id: entry_bar.id.clone(),
+                upstream_dataset_ids: vec![entry_foo.id.clone()],
+            },
+            DatasetDependencies {
+                downstream_dataset_id: entry_baz.id.clone(),
+                upstream_dataset_ids: sorted(vec![entry_foo.id.clone(), entry_bar.id.clone()])
+                    .collect(),
+            },
+        ]),
+    );
+
+    /////
+
+    let res = dataset_dependency_repo
+        .remove_all_dependencies_of(&entry_foo.id)
+        .await;
+    assert_matches!(res, Ok(()));
+
+    let dependencies: Vec<_> = dataset_dependency_repo
+        .list_all_dependencies()
+        .try_collect()
+        .await
+        .unwrap();
+
+    assert_equal(
+        dependencies,
+        vec![DatasetDependencies {
+            downstream_dataset_id: entry_baz.id.clone(),
+            upstream_dataset_ids: vec![entry_bar.id.clone()],
+        }],
+    );
+
+    /////
+
+    let res = dataset_dependency_repo
+        .remove_all_dependencies_of(&entry_baz.id)
+        .await;
+    assert_matches!(res, Ok(()));
+
+    let dependencies: Vec<_> = dataset_dependency_repo
+        .list_all_dependencies()
+        .try_collect()
+        .await
+        .unwrap();
+
+    assert!(dependencies.is_empty());
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_remove_orphan_dependencies(catalog: &Catalog) {
+    let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
+    let dataset_entry_repo = catalog.get_one::<dyn DatasetEntryRepository>().unwrap();
+    let dataset_dependency_repo = catalog
+        .get_one::<dyn DatasetDependencyRepository>()
+        .unwrap();
+
+    let account = new_account(&account_repo).await;
+
+    let entry_foo = new_dataset_entry_with(&account, "foo");
+    dataset_entry_repo
+        .save_dataset_entry(&entry_foo)
+        .await
+        .unwrap();
+
+    let res = dataset_dependency_repo
+        .remove_all_dependencies_of(&entry_foo.id)
+        .await;
+    assert_matches!(res, Ok(()));
+
+    use futures::TryStreamExt;
+    let dependencies: Vec<_> = dataset_dependency_repo
+        .list_all_dependencies()
+        .try_collect()
+        .await
+        .unwrap();
+
+    assert!(dependencies.is_empty());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
