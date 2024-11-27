@@ -45,13 +45,18 @@ impl RepositoryDeleteCommand {
 
 #[async_trait::async_trait(?Send)]
 impl Command for RepositoryDeleteCommand {
-    async fn run(&mut self) -> Result<(), CLIError> {
-        if self.names.is_empty() && !self.all {
-            return Err(CLIError::usage_error(
-                "Specify a repository or use --all flag",
-            ));
+    async fn validate_args(&self) -> Result<(), CLIError> {
+        match (self.names.as_slice(), self.all) {
+            ([], false) => Err(CLIError::usage_error("Specify repository(s) or pass --all")),
+            ([], true) => Ok(()),
+            ([_head, ..], false) => Ok(()),
+            ([_head, ..], true) => Err(CLIError::usage_error(
+                "You can either specify repository(s) or pass --all",
+            )),
         }
+    }
 
+    async fn run(&mut self) -> Result<(), CLIError> {
         let repo_names: Vec<_> = if self.all {
             self.remote_repo_reg.get_all_repositories().collect()
         } else {
