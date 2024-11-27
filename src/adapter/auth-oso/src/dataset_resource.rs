@@ -38,16 +38,14 @@ impl DatasetResource {
         }
     }
 
-    #[allow(dead_code)]
-    pub fn authorize_reader(&mut self, reader: &str) {
+    pub fn authorize_reader(&mut self, reader_account_id: &odf::AccountID) {
         self.authorized_users
-            .insert(reader.to_string(), ROLE_READER);
+            .insert(reader_account_id.to_string(), ROLE_READER);
     }
 
-    #[allow(dead_code)]
-    pub fn authorize_editor(&mut self, editor: &str) {
+    pub fn authorize_editor(&mut self, editor_account_id: &odf::AccountID) {
         self.authorized_users
-            .insert(editor.to_string(), ROLE_EDITOR);
+            .insert(editor_account_id.to_string(), ROLE_EDITOR);
     }
 }
 

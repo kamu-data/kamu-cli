@@ -25,7 +25,6 @@ use kamu_accounts_services::PredefinedAccountsRegistrator;
 use kamu_adapter_http::{FileUploadLimitConfig, UploadServiceLocal};
 use kamu_adapter_oauth::GithubAuthenticationConfig;
 use kamu_datasets::DatasetEnvVar;
-use kamu_datasets_services::{DatasetEntryIndexer, DatasetEntryServiceImpl};
 use kamu_flow_system_inmem::domain::{FlowConfigurationUpdatedMessage, FlowProgressMessage};
 use kamu_flow_system_services::{
     MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE,
@@ -139,10 +138,12 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
         );
 
         base_catalog_builder.add_builder(
-            DatasetEntryIndexer::builder().with_is_in_workspace(workspace_svc.is_in_workspace()),
+            kamu_datasets_services::DatasetEntryIndexer::builder()
+                .with_is_in_workspace(workspace_svc.is_in_workspace()),
         );
         // The indexer has no other interfaces
-        base_catalog_builder.bind::<dyn InitOnStartup, DatasetEntryIndexer>();
+        base_catalog_builder
+            .bind::<dyn InitOnStartup, kamu_datasets_services::DatasetEntryIndexer>();
 
         base_catalog_builder.add_value(JwtAuthenticationConfig::load_from_env());
         base_catalog_builder.add_value(GithubAuthenticationConfig::load_from_env());
@@ -513,7 +514,7 @@ pub fn configure_base_catalog(
 
     b.add::<DatabaseTransactionRunner>();
 
-    b.add::<DatasetEntryServiceImpl>();
+    b.add::<kamu_datasets_services::DatasetEntryServiceImpl>();
 
     b.add_builder(
         messaging_outbox::OutboxImmediateImpl::builder()

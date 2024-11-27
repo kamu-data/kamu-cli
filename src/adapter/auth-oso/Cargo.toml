@@ -26,10 +26,13 @@ database-common = { workspace = true }
 init-on-startup = { workspace = true }
 internal-error = { workspace = true }
 kamu-accounts = { workspace = true }
+kamu-accounts-inmem = { workspace = true }
+kamu-accounts-services = { workspace = true }
 kamu-auth-rebac = { workspace = true }
 kamu-auth-rebac-services = { workspace = true }
 kamu-core = { workspace = true, default-features = false, features = ["oso"] }
 kamu-datasets = { workspace = true }
+kamu-datasets-inmem = { workspace = true }
 kamu-datasets-services = { workspace = true }
 messaging-outbox = { workspace = true }
 opendatafabric = { workspace = true }
@@ -37,8 +40,7 @@ opendatafabric = { workspace = true }
 async-trait = "0.1"
 dill = "0.9"
 futures = { version = "0.3", default-features = false }
-oso = "0.27"
-oso-derive = "0.27"
+oso = { version = "0.27", default-features = false, features = ["derive"] }
 tokio = { version = "1", default-features = false, features = ["macros"] }
 tracing = { version = "0.1", default-features = false }
 
@@ -48,7 +50,4 @@ kamu-auth-rebac-inmem = { workspace = true }
 kamu-auth-rebac-services = { workspace = true }
 time-source = { workspace = true }
 
-tempfile = "3"
 test-log = { version = "0.2", features = ["trace"] }
-tokio = { version = "1", default-features = false, features = [] }
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }

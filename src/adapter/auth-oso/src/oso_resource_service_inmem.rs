@@ -54,7 +54,8 @@ pub struct OsoResourceServiceInMem {
 #[meta(MessageConsumerMeta {
     consumer_name: MESSAGE_CONSUMER_KAMU_AUTH_OSO_OSO_RESOURCE_SERVICE,
     feeding_producers: &[MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE],
-    delivery: MessageDeliveryMechanism::Transactional,
+    // This is a workaround, since we need the result of processing immediately, not after some time
+    delivery: MessageDeliveryMechanism::Immediate,
  })]
 impl OsoResourceServiceInMem {
     pub fn new() -> Self {
@@ -90,10 +91,6 @@ impl OsoResourceServiceInMem {
         (user_actor, dataset_resource)
     }
 
-    fn anonymous_user_actor() -> UserActor {
-        UserActor::new("", true, false)
-    }
-
     fn user_actor(
         &self,
         readable_state: &RwLockReadGuard<'_, State>,
@@ -107,7 +104,7 @@ impl OsoResourceServiceInMem {
                 .get(account_entity_id.as_str())
                 .cloned()
         } else {
-            Some(Self::anonymous_user_actor())
+            Some(UserActor::anonymous())
         }
     }
 

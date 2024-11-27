@@ -25,10 +25,18 @@ pub struct UserActor {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl UserActor {
-    pub fn new(account_id: &odf::AccountID, anonymous: bool, is_admin: bool) -> Self {
+    pub fn anonymous() -> Self {
+        UserActor {
+            account_id: String::new(),
+            anonymous: true,
+            is_admin: false,
+        }
+    }
+
+    pub fn logged(account_id: &odf::AccountID, is_admin: bool) -> Self {
         Self {
             account_id: account_id.to_string(),
-            anonymous,
+            anonymous: false,
             is_admin,
         }
     }

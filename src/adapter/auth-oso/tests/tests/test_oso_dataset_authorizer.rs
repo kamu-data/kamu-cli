@@ -12,9 +12,18 @@ use std::collections::HashSet;
 use std::sync::Arc;
 
 use dill::Component;
+use init_on_startup::InitOnStartup;
 use kamu::{CreateDatasetUseCaseImpl, DatasetRepositoryWriter, MockDatasetRepositoryWriter};
-use kamu_accounts::{AnonymousAccountReason, CurrentAccountSubject};
-use kamu_adapter_auth_oso::{KamuAuthOso, OsoDatasetAuthorizer};
+use kamu_accounts::{
+    AccountConfig,
+    AnonymousAccountReason,
+    CurrentAccountSubject,
+    PredefinedAccountsConfig,
+};
+use kamu_accounts_inmem::InMemoryAccountRepository;
+use kamu_accounts_services::{LoginPasswordAuthProvider, PredefinedAccountsRegistrator};
+use kamu_adapter_auth_oso::OsoResourceServiceInitializator;
+use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer, DatasetActionUnauthorizedError};
 use kamu_core::{
     AccessError,
@@ -23,6 +32,8 @@ use kamu_core::{
     TenancyConfig,
     MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
 };
+use kamu_datasets_inmem::InMemoryDatasetEntryRepository;
+use kamu_datasets_services::DatasetEntryIndexer;
 use messaging_outbox::{
     register_message_dispatcher,
     ConsumerFilter,
@@ -37,7 +48,7 @@ use time_source::SystemTimeSourceDefault;
 
 #[test_log::test(tokio::test)]
 async fn test_owner_can_read_and_write_private_dataset() {
-    let harness = DatasetAuthorizerHarness::new(logged("john"));
+    let harness = DatasetAuthorizerHarness::new(logged("john")).await;
     let dataset_handle = harness
         .create_private_dataset(dataset_alias("john/foo"))
         .await;
@@ -70,7 +81,7 @@ async fn test_owner_can_read_and_write_private_dataset() {
 
 #[test_log::test(tokio::test)]
 async fn test_guest_can_read_but_not_write_public_dataset() {
-    let harness = DatasetAuthorizerHarness::new(anonymous());
+    let harness = DatasetAuthorizerHarness::new(anonymous()).await;
     let dataset_handle = harness
         .create_public_dataset(dataset_alias("john/foo"))
         .await;
@@ -113,26 +124,43 @@ pub struct DatasetAuthorizerHarness {
 }
 
 impl DatasetAuthorizerHarness {
-    pub fn new(current_account_subject: CurrentAccountSubject) -> Self {
+    pub async fn new(current_account_subject: CurrentAccountSubject) -> Self {
+        let mut predefined_accounts_config = PredefinedAccountsConfig::new();
+
+        if let CurrentAccountSubject::Logged(logged_account) = &current_account_subject {
+            predefined_accounts_config
+                .predefined
+                .push(AccountConfig::from_name(
+                    logged_account.account_name.clone(),
+                ));
+        }
+
         let catalog = {
             let mut b = dill::CatalogBuilder::new();
 
             b.add::<SystemTimeSourceDefault>()
-                .add_value(TenancyConfig::MultiTenant)
                 .add_value(current_account_subject)
-                .add::<KamuAuthOso>()
-                .add::<OsoDatasetAuthorizer>()
-                .add::<kamu_auth_rebac_services::RebacServiceImpl>()
-                .add::<kamu_auth_rebac_inmem::InMemoryRebacRepository>()
-                .add::<kamu_auth_rebac_services::MultiTenantRebacDatasetLifecycleMessageConsumer>()
+                .add_value(predefined_accounts_config)
+                .add::<PredefinedAccountsRegistrator>()
+                .add::<InMemoryRebacRepository>()
                 .add_builder(
                     OutboxImmediateImpl::builder()
                         .with_consumer_filter(ConsumerFilter::AllConsumers),
                 )
+                .add_builder(DatasetEntryIndexer::builder().with_is_in_workspace(true))
+                // The indexer has no other interfaces
+                .bind::<dyn InitOnStartup, DatasetEntryIndexer>()
+                .add::<InMemoryDatasetEntryRepository>()
+                .add::<InMemoryAccountRepository>()
+                .add::<LoginPasswordAuthProvider>()
                 .bind::<dyn Outbox, OutboxImmediateImpl>()
                 .add_value(MockDatasetRepositoryWriter::new())
                 .bind::<dyn DatasetRepositoryWriter, MockDatasetRepositoryWriter>()
                 .add::<CreateDatasetUseCaseImpl>();
+
+            kamu_adapter_auth_oso::register_dependencies(&mut b);
+
+            kamu_auth_rebac_services::register_dependencies(&mut b, TenancyConfig::MultiTenant);
 
             register_message_dispatcher::<DatasetLifecycleMessage>(
                 &mut b,
@@ -140,6 +168,22 @@ impl DatasetAuthorizerHarness {
             );
 
             b.build()
+        };
+
+        {
+            use init_on_startup::InitOnStartup;
+            catalog
+                .get_one::<PredefinedAccountsRegistrator>()
+                .unwrap()
+                .run_initialization()
+                .await
+                .unwrap();
+            catalog
+                .get_one::<OsoResourceServiceInitializator>()
+                .unwrap()
+                .run_initialization()
+                .await
+                .unwrap();
         };
 
         Self {

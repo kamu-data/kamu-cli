@@ -11,6 +11,7 @@ use std::path::{Path, PathBuf};
 use std::{ffi, fs};
 
 use chrono::{DateTime, Utc};
+use opendatafabric as odf;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -21,6 +22,7 @@ pub type ExecuteCommandResult = assert_cmd::assert::Assert;
 pub struct KamuCliPuppet {
     workspace_path: PathBuf,
     system_time: Option<DateTime<Utc>>,
+    account: Option<odf::AccountName>,
     temp_dir: Option<tempfile::TempDir>,
 }
 
@@ -31,23 +33,46 @@ impl KamuCliPuppet {
         Self {
             workspace_path,
             system_time: None,
+            account: None,
             temp_dir: None,
         }
     }
 
     pub async fn new_workspace_tmp(is_multi_tenant: bool) -> Self {
-        Self::new_workspace_tmp_inner(NewWorkspaceOptions {
-            is_multi_tenant,
+        if is_multi_tenant {
+            Self::new_workspace_tmp_multi_tenant().await
+        } else {
+            Self::new_workspace_tmp_single_tenant().await
+        }
+    }
+
+    pub async fn new_workspace_tmp_single_tenant() -> Self {
+        Self::new_workspace_tmp_with(NewWorkspaceOptions::default()).await
+    }
+
+    pub async fn new_workspace_tmp_multi_tenant() -> Self {
+        Self::new_workspace_tmp_with(NewWorkspaceOptions {
+            is_multi_tenant: true,
+            kamu_config: Some(
+                indoc::indoc!(
+                    r#"
+                    kind: CLIConfig
+                    version: 1
+                    content:
+                      users:
+                        predefined:
+                          - accountName: e2e-user
+                    "#
+                )
+                .into(),
+            ),
+            account: Some(odf::AccountName::new_unchecked("e2e-user")),
             ..Default::default()
         })
         .await
     }
 
     pub async fn new_workspace_tmp_with(options: NewWorkspaceOptions) -> Self {
-        Self::new_workspace_tmp_inner(options).await
-    }
-
-    async fn new_workspace_tmp_inner(options: NewWorkspaceOptions) -> Self {
         let temp_dir = tempfile::tempdir().unwrap();
 
         if let Some(config) = options.kamu_config {
@@ -77,6 +102,10 @@ impl KamuCliPuppet {
 
     pub fn set_system_time(&mut self, t: Option<DateTime<Utc>>) {
         self.system_time = t;
+    }
+
+    pub fn set_account(&mut self, account: Option<odf::AccountName>) {
+        self.account = account;
     }
 
     pub fn workspace_path(&self) -> &Path {
@@ -158,6 +187,10 @@ impl KamuCliPuppet {
             command.args(["--system-time", system_time.as_str()]);
         }
 
+        if let Some(account) = &self.account {
+            command.args(["--account", account.as_str()]);
+        }
+
         command.args(cmd);
 
         if let Some(input) = maybe_input {
@@ -177,6 +210,7 @@ pub struct NewWorkspaceOptions {
     pub is_multi_tenant: bool,
     pub kamu_config: Option<String>,
     pub env_vars: Vec<(String, String)>,
+    pub account: Option<odf::AccountName>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

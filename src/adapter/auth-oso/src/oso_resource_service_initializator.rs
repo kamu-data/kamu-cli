@@ -110,7 +110,7 @@ impl InitOnStartup for OsoResourceServiceInitializator {
                 .await
                 .int_err()?;
 
-            let user_actor = UserActor::new(&account.id, false, properties.is_admin);
+            let user_actor = UserActor::logged(&account.id, properties.is_admin);
 
             user_actors.push((account.id.to_string(), user_actor));
         }
