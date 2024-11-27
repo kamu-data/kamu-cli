@@ -33,6 +33,7 @@ use kamu_flow_system_services::{
 };
 use kamu_task_system_inmem::domain::{TaskProgressMessage, MESSAGE_PRODUCER_KAMU_TASK_EXECUTOR};
 use messaging_outbox::{register_message_dispatcher, Outbox, OutboxDispatchingImpl};
+use opendatafabric as odf;
 use time_source::{SystemTimeSource, SystemTimeSourceDefault, SystemTimeSourceStub};
 use tracing::{warn, Instrument};
 
@@ -128,12 +129,13 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
             tenancy_config,
             current_account.to_current_account_subject(),
         );
+        let is_e2e_testing = args.e2e_output_data_path.is_some();
 
         let mut base_catalog_builder = configure_base_catalog(
             &workspace_layout,
             tenancy_config,
             args.system_time.map(Into::into),
-            args.e2e_output_data_path.is_some(),
+            is_e2e_testing,
         );
 
         base_catalog_builder.add_builder(
@@ -173,7 +175,12 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
             "Initializing {BINARY_NAME}"
         );
 
-        register_config_in_catalog(&config, &mut base_catalog_builder, tenancy_config);
+        register_config_in_catalog(
+            &config,
+            &mut base_catalog_builder,
+            tenancy_config,
+            is_e2e_testing,
+        );
 
         let base_catalog = base_catalog_builder.build();
 
@@ -610,6 +617,7 @@ pub fn register_config_in_catalog(
     config: &config::CLIConfig,
     catalog_builder: &mut CatalogBuilder,
     tenancy_config: TenancyConfig,
+    is_e2e_testing: bool,
 ) {
     let network_ns = config.engine.as_ref().unwrap().network_ns.unwrap();
 
@@ -726,13 +734,20 @@ pub fn register_config_in_catalog(
     if tenancy_config == TenancyConfig::MultiTenant {
         let mut implicit_user_config = PredefinedAccountsConfig::new();
         implicit_user_config.predefined.push(
-            AccountConfig::from_name(opendatafabric::AccountName::new_unchecked(
+            AccountConfig::from_name(odf::AccountName::new_unchecked(
                 AccountService::default_account_name(TenancyConfig::MultiTenant).as_str(),
             ))
             .set_display_name(AccountService::default_user_name(
                 TenancyConfig::MultiTenant,
             )),
         );
+
+        if is_e2e_testing {
+            let e2e_user_config =
+                AccountConfig::from_name(odf::AccountName::new_unchecked("e2e-user"));
+
+            implicit_user_config.predefined.push(e2e_user_config);
+        }
 
         use merge::Merge;
         let mut user_config = config.users.clone().unwrap();
