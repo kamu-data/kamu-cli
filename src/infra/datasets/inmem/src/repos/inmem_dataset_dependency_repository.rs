@@ -61,9 +61,12 @@ impl DatasetDependencyRepository for InMemoryDatasetDependencyRepository {
                 .upstream_by_downstream
                 .iter()
                 .map(|(downstream_dataset_id, upstreams)| {
+                    let mut upstream_dataset_ids: Vec<_> = upstreams.iter().cloned().collect();
+                    upstream_dataset_ids.sort();
+
                     Ok(DatasetDependencies {
                         downstream_dataset_id: downstream_dataset_id.clone(),
-                        upstream_dataset_ids: upstreams.iter().cloned().collect(),
+                        upstream_dataset_ids,
                     })
                 })
                 .collect()

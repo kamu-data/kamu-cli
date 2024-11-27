@@ -63,7 +63,7 @@ impl DatasetDependencyRepository for PostgresDatasetDependencyRepository {
                     downstream_dataset_id as "downstream_dataset_id: _",
                     upstream_dataset_id as "upstream_dataset_id: _"
                 FROM dataset_dependencies
-                ORDER BY downstream_dataset_id
+                ORDER BY downstream_dataset_id, upstream_dataset_id
                 "#,
             )
             .fetch(connection_mut)
@@ -94,11 +94,10 @@ impl DatasetDependencyRepository for PostgresDatasetDependencyRepository {
             }
 
             if !current_upstreams.is_empty() {
-                let last_downstream_id = maybe_last_downstream_id.expect("last downstream id to be present");
-                    yield Ok(DatasetDependencies {
-                        downstream_dataset_id: last_downstream_id,
-                        upstream_dataset_ids: current_upstreams,
-                    });
+                yield Ok(DatasetDependencies {
+                    downstream_dataset_id: maybe_last_downstream_id.expect("last downstream id to be present"),
+                    upstream_dataset_ids: current_upstreams,
+                });
             }
         })
     }

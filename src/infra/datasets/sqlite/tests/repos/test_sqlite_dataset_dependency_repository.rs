@@ -7,67 +7,70 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::PostgresTransactionManager;
+use database_common::SqliteTransactionManager;
 use database_common_macros::database_transactional_test;
 use dill::{Catalog, CatalogBuilder};
-use kamu_datasets_postgres::PostgresDatasetEnvVarRepository;
-use kamu_datasets_repo_tests::dataset_env_var_repo;
-use sqlx::PgPool;
+use kamu_accounts_sqlite::SqliteAccountRepository;
+use kamu_datasets_repo_tests::dataset_dependency_repo;
+use kamu_datasets_sqlite::{SqliteDatasetDependencyRepository, SqliteDatasetEntryRepository};
+use sqlx::SqlitePool;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = postgres,
-    fixture = dataset_env_var_repo::test_missing_dataset_env_var_not_found,
-    harness = PostgresDatasetEnvVarRepositoryHarness
+    storage = sqlite,
+    fixture = dataset_dependency_repo::test_crud_single_dependency,
+    harness = SqliteDatasetDependencyRepositoryHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = postgres,
-    fixture = dataset_env_var_repo::test_insert_and_get_dataset_env_var,
-    harness = PostgresDatasetEnvVarRepositoryHarness
+    storage = sqlite,
+    fixture = dataset_dependency_repo::test_several_unrelated_dependencies,
+    harness = SqliteDatasetDependencyRepositoryHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = postgres,
-    fixture = dataset_env_var_repo::test_insert_and_get_multiple_dataset_env_vars,
-    harness = PostgresDatasetEnvVarRepositoryHarness
+    storage = sqlite,
+    fixture = dataset_dependency_repo::test_dependency_chain,
+    harness = SqliteDatasetDependencyRepositoryHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = postgres,
-    fixture = dataset_env_var_repo::test_delete_dataset_env_vars,
-    harness = PostgresDatasetEnvVarRepositoryHarness
+    storage = sqlite,
+    fixture = dataset_dependency_repo::test_dependency_fanins,
+    harness = SqliteDatasetDependencyRepositoryHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = postgres,
-    fixture = dataset_env_var_repo::test_modify_dataset_env_vars,
-    harness = PostgresDatasetEnvVarRepositoryHarness
+    storage = sqlite,
+    fixture = dataset_dependency_repo::test_dependency_fanouts,
+    harness = SqliteDatasetDependencyRepositoryHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-struct PostgresDatasetEnvVarRepositoryHarness {
+struct SqliteDatasetDependencyRepositoryHarness {
     catalog: Catalog,
 }
 
-impl PostgresDatasetEnvVarRepositoryHarness {
-    pub fn new(pg_pool: PgPool) -> Self {
-        // Initialize catalog with predefined Postgres pool
+impl SqliteDatasetDependencyRepositoryHarness {
+    pub fn new(sqlite_pool: SqlitePool) -> Self {
         let mut catalog_builder = CatalogBuilder::new();
-        catalog_builder.add_value(pg_pool);
-        catalog_builder.add::<PostgresTransactionManager>();
 
-        catalog_builder.add::<PostgresDatasetEnvVarRepository>();
+        catalog_builder.add_value(sqlite_pool);
+        catalog_builder.add::<SqliteTransactionManager>();
+
+        catalog_builder.add::<SqliteAccountRepository>();
+        catalog_builder.add::<SqliteDatasetEntryRepository>();
+        catalog_builder.add::<SqliteDatasetDependencyRepository>();
 
         Self {
             catalog: catalog_builder.build(),

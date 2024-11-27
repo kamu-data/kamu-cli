@@ -7,67 +7,65 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::PostgresTransactionManager;
 use database_common_macros::database_transactional_test;
 use dill::{Catalog, CatalogBuilder};
-use kamu_datasets_postgres::PostgresDatasetEnvVarRepository;
-use kamu_datasets_repo_tests::dataset_env_var_repo;
-use sqlx::PgPool;
+use kamu_accounts_inmem::InMemoryAccountRepository;
+use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEntryRepository};
+use kamu_datasets_repo_tests::dataset_dependency_repo;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = postgres,
-    fixture = dataset_env_var_repo::test_missing_dataset_env_var_not_found,
-    harness = PostgresDatasetEnvVarRepositoryHarness
+    storage = inmem,
+    fixture = dataset_dependency_repo::test_crud_single_dependency,
+    harness = InMemoryDatasetDependencyRepositoryHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = postgres,
-    fixture = dataset_env_var_repo::test_insert_and_get_dataset_env_var,
-    harness = PostgresDatasetEnvVarRepositoryHarness
+    storage = inmem,
+    fixture = dataset_dependency_repo::test_several_unrelated_dependencies,
+    harness = InMemoryDatasetDependencyRepositoryHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = postgres,
-    fixture = dataset_env_var_repo::test_insert_and_get_multiple_dataset_env_vars,
-    harness = PostgresDatasetEnvVarRepositoryHarness
+    storage = inmem,
+    fixture = dataset_dependency_repo::test_dependency_chain,
+    harness = InMemoryDatasetDependencyRepositoryHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = postgres,
-    fixture = dataset_env_var_repo::test_delete_dataset_env_vars,
-    harness = PostgresDatasetEnvVarRepositoryHarness
+    storage = inmem,
+    fixture = dataset_dependency_repo::test_dependency_fanins,
+    harness = InMemoryDatasetDependencyRepositoryHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = postgres,
-    fixture = dataset_env_var_repo::test_modify_dataset_env_vars,
-    harness = PostgresDatasetEnvVarRepositoryHarness
+    storage = inmem,
+    fixture = dataset_dependency_repo::test_dependency_fanouts,
+    harness = InMemoryDatasetDependencyRepositoryHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-struct PostgresDatasetEnvVarRepositoryHarness {
+struct InMemoryDatasetDependencyRepositoryHarness {
     catalog: Catalog,
 }
 
-impl PostgresDatasetEnvVarRepositoryHarness {
-    pub fn new(pg_pool: PgPool) -> Self {
-        // Initialize catalog with predefined Postgres pool
+impl InMemoryDatasetDependencyRepositoryHarness {
+    pub fn new() -> Self {
         let mut catalog_builder = CatalogBuilder::new();
-        catalog_builder.add_value(pg_pool);
-        catalog_builder.add::<PostgresTransactionManager>();
 
-        catalog_builder.add::<PostgresDatasetEnvVarRepository>();
+        catalog_builder.add::<InMemoryAccountRepository>();
+        catalog_builder.add::<InMemoryDatasetEntryRepository>();
+        catalog_builder.add::<InMemoryDatasetDependencyRepository>();
 
         Self {
             catalog: catalog_builder.build(),

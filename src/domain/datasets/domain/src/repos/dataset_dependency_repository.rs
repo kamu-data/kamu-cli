@@ -39,6 +39,7 @@ pub trait DatasetDependencyRepository: Send + Sync {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct DatasetDependencies {
     pub downstream_dataset_id: DatasetID,
     pub upstream_dataset_ids: Vec<DatasetID>,

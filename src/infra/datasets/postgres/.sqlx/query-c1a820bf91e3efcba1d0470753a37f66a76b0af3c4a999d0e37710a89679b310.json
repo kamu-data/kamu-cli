@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n                SELECT\n                    downstream_dataset_id as \"downstream_dataset_id: _\",\n                    upstream_dataset_id as \"upstream_dataset_id: _\"\n                FROM dataset_dependencies\n                ORDER BY downstream_dataset_id\n                ",
+  "query": "\n                SELECT\n                    downstream_dataset_id as \"downstream_dataset_id: _\",\n                    upstream_dataset_id as \"upstream_dataset_id: _\"\n                FROM dataset_dependencies\n                ORDER BY downstream_dataset_id, upstream_dataset_id\n                ",
   "describe": {
     "columns": [
       {
@@ -22,5 +22,5 @@
       false
     ]
   },
-  "hash": "1dfb89e69a8a5810ef10ea6c97ed003cd8e40be633a89b2a831a1c85c79ca08f"
+  "hash": "c1a820bf91e3efcba1d0470753a37f66a76b0af3c4a999d0e37710a89679b310"
 }

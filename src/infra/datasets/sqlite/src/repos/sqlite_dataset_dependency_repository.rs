@@ -63,7 +63,7 @@ impl DatasetDependencyRepository for SqliteDatasetDependencyRepository {
                     downstream_dataset_id as "downstream_dataset_id: _",
                     upstream_dataset_id as "upstream_dataset_id: _"
                 FROM dataset_dependencies
-                ORDER BY downstream_dataset_id
+                ORDER BY downstream_dataset_id, upstream_dataset_id
                 "#,
             )
             .fetch(connection_mut)
