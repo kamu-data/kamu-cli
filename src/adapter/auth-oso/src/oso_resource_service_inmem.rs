@@ -132,7 +132,7 @@ impl OsoResourceServiceInMem {
 
         let entity_id = message.dataset_id.to_string();
         let dataset_resource = DatasetResource::new(
-            message.dataset_name.as_str(),
+            &message.owner_account_id,
             message.dataset_visibility == DatasetVisibility::Public,
         );
 

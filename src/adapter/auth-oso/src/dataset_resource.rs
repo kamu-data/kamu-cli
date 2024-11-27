@@ -9,6 +9,7 @@
 
 use std::collections::HashMap;
 
+use opendatafabric as odf;
 use oso::PolarClass;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -19,7 +20,7 @@ const ROLE_EDITOR: &str = "Editor";
 #[derive(PolarClass, Debug, Clone)]
 pub struct DatasetResource {
     #[polar(attribute)]
-    pub created_by: String,
+    pub owner_account_id: String,
     #[polar(attribute)]
     pub allows_public_read: bool,
     #[polar(attribute)]
@@ -29,9 +30,9 @@ pub struct DatasetResource {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl DatasetResource {
-    pub fn new(created_by: &str, allows_public_read: bool) -> Self {
+    pub fn new(owner_account_id: &odf::AccountID, allows_public_read: bool) -> Self {
         Self {
-            created_by: created_by.to_string(),
+            owner_account_id: owner_account_id.to_string(),
             allows_public_read,
             authorized_users: HashMap::new(),
         }
@@ -56,8 +57,8 @@ impl std::fmt::Display for DatasetResource {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "Dataset(created_by='{}', allows_public_read={}, num_authorizations={})",
-            &self.created_by,
+            "Dataset(owner_account_id='{}', allows_public_read={}, num_authorizations={})",
+            &self.owner_account_id,
             self.allows_public_read,
             self.authorized_users.len(),
         )

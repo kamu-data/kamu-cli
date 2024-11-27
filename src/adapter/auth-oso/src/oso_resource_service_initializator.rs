@@ -95,10 +95,8 @@ impl InitOnStartup for OsoResourceServiceInitializator {
                 .await
                 .int_err()?;
 
-            // TODO: Private Datasets: temporary: will be replaced by id
             let owner = accounts_map.get(&dataset_entry.owner_id).unwrap();
-            let dataset_resource =
-                DatasetResource::new(&owner.account_name, properties.allows_public_read);
+            let dataset_resource = DatasetResource::new(&owner.id, properties.allows_public_read);
 
             dataset_resources.push((dataset_entry.id.to_string(), dataset_resource));
         }
@@ -112,8 +110,7 @@ impl InitOnStartup for OsoResourceServiceInitializator {
                 .await
                 .int_err()?;
 
-            let user_actor =
-                UserActor::new(account.account_name.as_str(), false, properties.is_admin);
+            let user_actor = UserActor::new(&account.id, false, properties.is_admin);
 
             user_actors.push((account.id.to_string(), user_actor));
         }
