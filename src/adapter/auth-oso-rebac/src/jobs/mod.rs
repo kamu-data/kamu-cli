@@ -11,7 +11,7 @@
 
 // TODO: Private Datasets: move to domain?
 
-pub const JOB_KAMU_AUTH_OSO_OSO_RESOURCE_SERVICE_INITIALIZATOR: &str =
-    "dev.kamu.auth-oso.OsoResourceServiceInitializator";
+pub const JOB_KAMU_AUTH_OSO_REBAC_OSO_RESOURCE_SERVICE_INITIALIZATOR: &str =
+    "dev.kamu.auth-oso-rebac.OsoResourceServiceInitializator";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

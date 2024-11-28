@@ -23,7 +23,7 @@ use crate::{
     DatasetResource,
     OsoResourceServiceInMem,
     UserActor,
-    JOB_KAMU_AUTH_OSO_OSO_RESOURCE_SERVICE_INITIALIZATOR,
+    JOB_KAMU_AUTH_OSO_REBAC_OSO_RESOURCE_SERVICE_INITIALIZATOR,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -40,7 +40,7 @@ pub struct OsoResourceServiceInitializator {
 #[component(pub)]
 #[interface(dyn InitOnStartup)]
 #[meta(InitOnStartupMeta {
-    job_name: JOB_KAMU_AUTH_OSO_OSO_RESOURCE_SERVICE_INITIALIZATOR,
+    job_name: JOB_KAMU_AUTH_OSO_REBAC_OSO_RESOURCE_SERVICE_INITIALIZATOR,
     depends_on: &[JOB_KAMU_REBAC_INDEXER],
     requires_transaction: true,
 })]

@@ -1,6 +1,5 @@
 [package]
-# TODO: Private Datasets: add rebac to the name?
-name = "kamu-adapter-auth-oso"
+name = "kamu-adapter-auth-oso-rebac"
 description = "Authorization adapter for Kamu domain based on OSO library & ReBAC properties"
 version = { workspace = true }
 homepage = { workspace = true }

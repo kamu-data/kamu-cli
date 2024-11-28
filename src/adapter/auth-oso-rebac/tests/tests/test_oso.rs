@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_adapter_auth_oso::{DatasetResource, KamuAuthOso, UserActor};
+use kamu_adapter_auth_oso_rebac::{DatasetResource, KamuAuthOso, UserActor};
 use kamu_core::auth::DatasetAction;
 use opendatafabric as odf;
 

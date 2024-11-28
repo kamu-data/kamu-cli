@@ -510,7 +510,7 @@ pub fn configure_base_catalog(
 
     kamu_auth_rebac_services::register_dependencies(&mut b, tenancy_config);
 
-    kamu_adapter_auth_oso::register_dependencies(&mut b);
+    kamu_adapter_auth_oso_rebac::register_dependencies(&mut b);
 
     b.add::<DatabaseTransactionRunner>();
 

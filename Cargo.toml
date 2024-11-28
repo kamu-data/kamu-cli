@@ -69,7 +69,7 @@ members = [
     "src/infra/messaging-outbox/postgres",
     "src/infra/messaging-outbox/sqlite",
     # Adapters
-    "src/adapter/auth-oso",
+    "src/adapter/auth-oso-rebac",
     "src/adapter/flight-sql",
     "src/adapter/graphql",
     "src/adapter/http",
@@ -167,7 +167,7 @@ kamu-messaging-outbox-sqlite = { version = "0.209.0", path = "src/infra/messagin
 kamu-messaging-outbox-repo-tests = { version = "0.209.0", path = "src/infra/messaging-outbox/repo-tests", default-features = false }
 
 # Adapters
-kamu-adapter-auth-oso = { version = "0.209.0", path = "src/adapter/auth-oso", default-features = false }
+kamu-adapter-auth-oso-rebac = { version = "0.209.0", path = "src/adapter/auth-oso-rebac", default-features = false }
 kamu-adapter-flight-sql = { version = "0.209.0", path = "src/adapter/flight-sql", default-features = false }
 kamu-adapter-graphql = { version = "0.209.0", path = "src/adapter/graphql", default-features = false }
 kamu-adapter-http = { version = "0.209.0", path = "src/adapter/http", default-features = false }

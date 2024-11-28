@@ -27,7 +27,11 @@ use messaging_outbox::{
 use opendatafabric as odf;
 use tokio::sync::{RwLock, RwLockReadGuard};
 
-use crate::{DatasetResource, UserActor, MESSAGE_CONSUMER_KAMU_AUTH_OSO_OSO_RESOURCE_SERVICE};
+use crate::{
+    DatasetResource,
+    UserActor,
+    MESSAGE_CONSUMER_KAMU_AUTH_OSO_REBAC_OSO_RESOURCE_SERVICE,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -52,7 +56,7 @@ pub struct OsoResourceServiceInMem {
 #[interface(dyn MessageConsumer)]
 #[interface(dyn MessageConsumerT<DatasetLifecycleMessage>)]
 #[meta(MessageConsumerMeta {
-    consumer_name: MESSAGE_CONSUMER_KAMU_AUTH_OSO_OSO_RESOURCE_SERVICE,
+    consumer_name: MESSAGE_CONSUMER_KAMU_AUTH_OSO_REBAC_OSO_RESOURCE_SERVICE,
     feeding_producers: &[MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE],
     // This is a workaround, since we need the result of processing immediately, not after some time
     delivery: MessageDeliveryMechanism::Immediate,
