@@ -14,6 +14,8 @@ Recommendation: for ease of reading, use the following order:
 ## [Unreleased]
 ### Added
 - Console warning when deleting datasets which are out of sync with their push remotes
+### Changed
+- Separated Web UI runtime and UI configuration flags. UI configuration is now provided by API server too.
 ### Fixed
 - Typo in feature flags (enableDatasetEnvVarsManagement)
                                                   ^

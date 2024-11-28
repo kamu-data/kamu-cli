@@ -18,7 +18,9 @@ use internal_error::ResultIntoInternal;
 use kamu::domain::TenancyConfig;
 use kamu_accounts::*;
 use kamu_accounts_services::PasswordLoginCredentials;
+use kamu_adapter_http::FileUploadLimitConfig;
 use kamu_adapter_oauth::*;
+use kamu_datasets::DatasetEnvVarsConfig;
 use tracing::Instrument;
 
 use super::{CLIError, Command};
@@ -36,6 +38,8 @@ pub struct APIServerRunCommand {
     external_address: Option<IpAddr>,
     get_token: bool,
     predefined_accounts_config: Arc<PredefinedAccountsConfig>,
+    file_upload_limit_config: Arc<FileUploadLimitConfig>,
+    dataset_env_vars_config: Arc<DatasetEnvVarsConfig>,
     account_subject: Arc<CurrentAccountSubject>,
     github_auth_config: Arc<GithubAuthenticationConfig>,
     e2e_output_data_path: Option<PathBuf>,
@@ -52,6 +56,8 @@ impl APIServerRunCommand {
         external_address: Option<IpAddr>,
         get_token: bool,
         predefined_accounts_config: Arc<PredefinedAccountsConfig>,
+        file_upload_limit_config: Arc<FileUploadLimitConfig>,
+        dataset_env_vars_config: Arc<DatasetEnvVarsConfig>,
         account_subject: Arc<CurrentAccountSubject>,
         github_auth_config: Arc<GithubAuthenticationConfig>,
         e2e_output_data_path: Option<PathBuf>,
@@ -66,6 +72,8 @@ impl APIServerRunCommand {
             external_address,
             get_token,
             predefined_accounts_config,
+            file_upload_limit_config,
+            dataset_env_vars_config,
             account_subject,
             github_auth_config,
             e2e_output_data_path,
@@ -138,6 +146,8 @@ impl Command for APIServerRunCommand {
             self.tenancy_config,
             self.address,
             self.port,
+            self.file_upload_limit_config.clone(),
+            self.dataset_env_vars_config.is_enabled(),
             self.external_address,
             self.e2e_output_data_path.as_ref(),
         )

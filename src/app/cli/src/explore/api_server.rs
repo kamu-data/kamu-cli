@@ -22,6 +22,7 @@ use indoc::indoc;
 use internal_error::*;
 use kamu::domain::{Protocols, ServerUrlConfig, TenancyConfig};
 use kamu_adapter_http::e2e::e2e_router;
+use kamu_adapter_http::FileUploadLimitConfig;
 use kamu_flow_system_inmem::domain::FlowExecutor;
 use kamu_task_system_inmem::domain::TaskExecutor;
 use messaging_outbox::OutboxExecutor;
@@ -29,6 +30,8 @@ use tokio::sync::Notify;
 use url::Url;
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
+
+use super::{UIConfiguration, UIFeatureFlags};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -48,6 +51,8 @@ impl APIServer {
         tenancy_config: TenancyConfig,
         address: Option<IpAddr>,
         port: Option<u16>,
+        file_upload_limit_config: Arc<FileUploadLimitConfig>,
+        enable_dataset_env_vars_management: bool,
         external_address: Option<IpAddr>,
         e2e_output_data_path: Option<&PathBuf>,
     ) -> Result<Self, InternalError> {
@@ -93,6 +98,16 @@ impl APIServer {
             }))
             .build();
 
+        let ui_configuration = UIConfiguration {
+            ingest_upload_file_limit_mb: file_upload_limit_config.max_file_size_in_mb(),
+            feature_flags: UIFeatureFlags {
+                enable_logout: true,
+                enable_scheduling: true,
+                enable_dataset_env_vars_management,
+                enable_terms_of_service: true,
+            },
+        };
+
         let mut router = OpenApiRouter::with_openapi(
             kamu_adapter_http::openapi::spec_builder(
                 crate::app::VERSION,
@@ -116,6 +131,10 @@ impl APIServer {
             .build(),
         )
         .route("/", axum::routing::get(root))
+        .route(
+            "/ui-config",
+            axum::routing::get(ui_configuration_handler),
+        )
         .route(
             // IMPORTANT: The same name is used inside e2e_middleware_fn().
             //            If there is a need to change, please update there too.
@@ -196,6 +215,7 @@ impl APIServer {
         let router = router
             .layer(Extension(gql_schema))
             .layer(Extension(api_server_catalog))
+            .layer(Extension(ui_configuration))
             .layer(Extension(Arc::new(api)));
 
         let server = axum::serve(listener, router.into_make_service());
@@ -252,6 +272,14 @@ async fn root() -> impl axum::response::IntoResponse {
         </ul>
         "#
     ))
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+async fn ui_configuration_handler(
+    ui_configuration: axum::extract::Extension<UIConfiguration>,
+) -> axum::Json<UIConfiguration> {
+    axum::Json(ui_configuration.0)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

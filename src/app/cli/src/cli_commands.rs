@@ -420,6 +420,8 @@ pub fn get_command(
                     cli_catalog.get_one()?,
                     cli_catalog.get_one()?,
                     cli_catalog.get_one()?,
+                    cli_catalog.get_one()?,
+                    cli_catalog.get_one()?,
                     args.e2e_output_data_path,
                 )),
                 Some(cli::SystemApiServerSubCommand::GqlQuery(ssc)) => Box::new(
