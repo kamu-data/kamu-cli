@@ -333,3 +333,28 @@ pub async fn test_delete_warning(mut kamu_node_api_client: KamuApiServerClient) 
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_delete_args_validation(kamu: KamuCliPuppet) {
+    kamu.assert_success_command_execution(
+        ["delete", "--all"],
+        None,
+        Some(["There are no datasets matching the pattern"]),
+    )
+    .await;
+
+    kamu.assert_failure_command_execution(
+        ["delete", "player-scores", "--all"],
+        None,
+        Some(["You can either specify dataset(s) or pass --all"]),
+    )
+    .await;
+
+    kamu.assert_failure_command_execution(
+        ["delete"],
+        None,
+        Some(["Specify dataset(s) or pass --all"]),
+    )
+    .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

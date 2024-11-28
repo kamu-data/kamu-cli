@@ -58,10 +58,13 @@ impl DeleteCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for DeleteCommand {
     async fn validate_args(&self) -> Result<(), CLIError> {
-        if self.dataset_ref_patterns.is_empty() && !self.all {
-            Err(CLIError::usage_error("Specify a dataset or use --all flag"))
-        } else {
-            Ok(())
+        match (self.dataset_ref_patterns.as_slice(), self.all) {
+            ([], false) => Err(CLIError::usage_error("Specify dataset(s) or pass --all")),
+            ([], true) => Ok(()),
+            ([_head, ..], false) => Ok(()),
+            ([_head, ..], true) => Err(CLIError::usage_error(
+                "You can either specify dataset(s) or pass --all",
+            )),
         }
     }
 
