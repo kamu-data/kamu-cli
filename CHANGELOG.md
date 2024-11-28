@@ -14,6 +14,11 @@ Recommendation: for ease of reading, use the following order:
 ## [Unreleased]
 ### Added
 - Console warning when deleting datasets which are out of sync with their push remotes
+### Changed
+- Speed up project build time by removing unused dependencies which were not detected by automated tools
+- Private Datasets:
+  - Deletion of previously created ReBAC-properties and reindexing
+  - OSO: updating the schema to use identifiers instead of names
 
 ## [0.209.0] - 2024-11-25
 ### Changed
