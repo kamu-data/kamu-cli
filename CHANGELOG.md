@@ -11,7 +11,7 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## [Unreleased]
+## [0.210.0] - 2024-11-28
 ### Added
 - Console warning when deleting datasets which are out of sync with their push remotes
 ### Changed
