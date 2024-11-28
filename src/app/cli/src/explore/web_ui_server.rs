@@ -64,10 +64,7 @@ struct WebUILoginInstructions {
 struct WebUIFeatureFlags {
     enable_logout: bool,
     enable_scheduling: bool,
-    // TODO: Correct a typo in `WebUIFeatureFlags`
-    //       (content of `assets/runtime-config.json`)
-    //       https://github.com/kamu-data/kamu-cli/issues/841
-    enable_dataset_env_vars_managment: bool,
+    enable_dataset_env_vars_management: bool,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -127,10 +124,7 @@ impl WebUIServer {
                 enable_logout: false,
                 // No way to configure scheduling of datasets
                 enable_scheduling: false,
-                // TODO: Correct a typo in `WebUIFeatureFlags`
-                //       (content of `assets/runtime-config.json`)
-                //       https://github.com/kamu-data/kamu-cli/issues/841
-                enable_dataset_env_vars_managment: enable_dataset_env_vars_management,
+                enable_dataset_env_vars_management,
             },
         };
 
