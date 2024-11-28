@@ -106,7 +106,6 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
         }
     }
 
-    // TODO: Private Datasets: more concrete error handling
     #[tracing::instrument(level = "debug", skip_all, fields(%dataset_handle))]
     async fn get_allowed_actions(
         &self,

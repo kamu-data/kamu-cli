@@ -70,8 +70,6 @@ impl InitOnStartup for OsoResourceServiceInitializator {
     async fn run_initialization(&self) -> Result<(), InternalError> {
         use futures::TryStreamExt;
 
-        // TODO: Private Datasets: use DatasetEntryService
-        //       (also it removes futures dep)
         let dataset_entries = self
             .dataset_entry_repository
             .get_dataset_entries(PaginationOpts::all())

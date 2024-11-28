@@ -35,7 +35,6 @@ pub struct DatasetEntryIndexer {
     time_source: Arc<dyn SystemTimeSource>,
     dataset_repo: Arc<dyn DatasetRepository>,
     account_repository: Arc<dyn AccountRepository>,
-    // TODO: Private Datasets: re-visit after rebasing
     is_in_workspace: bool,
 }
 
