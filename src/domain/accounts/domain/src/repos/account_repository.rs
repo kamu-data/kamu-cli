@@ -21,7 +21,7 @@ use crate::Account;
 pub trait AccountRepository: Send + Sync {
     async fn create_account(&self, account: &Account) -> Result<(), CreateAccountError>;
 
-    // TODO: Private Datasets: tests
+    // TODO: Private Datasets: tests & stream version
     async fn get_accounts(&self) -> Result<Vec<Account>, GetAccountsError>;
 
     async fn get_account_by_id(

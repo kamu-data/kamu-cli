@@ -53,21 +53,51 @@ impl OsoDatasetAuthorizer {
         dataset_handle: &odf::DatasetHandle,
     ) -> Result<(UserActor, DatasetResource), InternalError> {
         let dataset_id = &dataset_handle.id;
-        let maybe_account_id = match self.current_account_subject.as_ref() {
-            CurrentAccountSubject::Anonymous(_) => None,
-            CurrentAccountSubject::Logged(logged_account) => Some(&logged_account.account_id),
-        };
+        let maybe_account_id = self.get_maybe_logged_account_id();
+
         let (maybe_user_actor, maybe_dataset_resource) = self
             .oso_resource_service
             .user_dataset_pair(dataset_id, maybe_account_id)
             .await;
 
         let user_actor = maybe_user_actor
-            .ok_or_else(|| format!("UserActor not found: {maybe_account_id:?}",).int_err())?;
+            .ok_or_else(|| format!("UserActor not found: {maybe_account_id:?}").int_err())?;
         let dataset_resource = maybe_dataset_resource
             .ok_or_else(|| format!("DatasetResource not found: {dataset_id}").int_err())?;
 
         Ok((user_actor, dataset_resource))
+    }
+
+    async fn user_actor(&self) -> Result<UserActor, InternalError> {
+        let maybe_account_id = self.get_maybe_logged_account_id();
+
+        let maybe_user_actor = self.oso_resource_service.user_actor(maybe_account_id).await;
+
+        let user_actor = maybe_user_actor
+            .ok_or_else(|| format!("UserActor not found: {maybe_account_id:?}").int_err())?;
+
+        Ok(user_actor)
+    }
+
+    async fn dataset_resource(
+        &self,
+        dataset_handle: &odf::DatasetHandle,
+    ) -> Result<DatasetResource, InternalError> {
+        let dataset_id = &dataset_handle.id;
+
+        let maybe_dataset_resource = self.oso_resource_service.dataset_resource(dataset_id).await;
+
+        let dataset_resource = maybe_dataset_resource
+            .ok_or_else(|| format!("DatasetResource not found: {dataset_id}").int_err())?;
+
+        Ok(dataset_resource)
+    }
+
+    fn get_maybe_logged_account_id(&self) -> Option<&odf::AccountID> {
+        match self.current_account_subject.as_ref() {
+            CurrentAccountSubject::Anonymous(_) => None,
+            CurrentAccountSubject::Logged(logged_account) => Some(&logged_account.account_id),
+        }
     }
 }
 
@@ -81,27 +111,22 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
         dataset_handle: &odf::DatasetHandle,
         action: DatasetAction,
     ) -> Result<(), DatasetActionUnauthorizedError> {
-        let (actor, dataset_resource) = self.user_dataset_pair(dataset_handle).await?;
+        let (user_actor, dataset_resource) = self.user_dataset_pair(dataset_handle).await?;
 
         match self
             .oso
-            .is_allowed(actor, action.to_string(), dataset_resource)
+            .is_allowed(user_actor, action.to_string(), dataset_resource)
         {
-            Ok(r) => {
-                if r {
-                    Ok(())
-                } else {
-                    Err(DatasetActionUnauthorizedError::Access(
-                        AccessError::Forbidden(
-                            DatasetActionNotEnoughPermissionsError {
-                                action,
-                                dataset_ref: dataset_handle.as_local_ref(),
-                            }
-                            .into(),
-                        ),
-                    ))
-                }
-            }
+            Ok(allowed) if allowed => Ok(()),
+            Ok(_not_allowed) => Err(DatasetActionUnauthorizedError::Access(
+                AccessError::Forbidden(
+                    DatasetActionNotEnoughPermissionsError {
+                        action,
+                        dataset_ref: dataset_handle.as_local_ref(),
+                    }
+                    .into(),
+                ),
+            )),
             Err(e) => Err(DatasetActionUnauthorizedError::Internal(e.int_err())),
         }
     }
@@ -111,10 +136,10 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
         &self,
         dataset_handle: &odf::DatasetHandle,
     ) -> Result<HashSet<DatasetAction>, InternalError> {
-        let (actor, dataset_resource) = self.user_dataset_pair(dataset_handle).await?;
+        let (user_actor, dataset_resource) = self.user_dataset_pair(dataset_handle).await?;
 
         self.oso
-            .get_allowed_actions(actor, dataset_resource)
+            .get_allowed_actions(user_actor, dataset_resource)
             .int_err()
     }
 
@@ -124,15 +149,17 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
         dataset_handles: Vec<odf::DatasetHandle>,
         action: DatasetAction,
     ) -> Result<Vec<odf::DatasetHandle>, InternalError> {
-        // TODO: Private Datasets: revisit
+        let user_actor = self.user_actor().await?;
+        let mut matched_dataset_handles = Vec::with_capacity(dataset_handles.len());
 
-        let mut matched_dataset_handles = Vec::new();
         for hdl in dataset_handles {
-            let (actor, dataset_resource) = self.user_dataset_pair(&hdl).await?;
+            let dataset_resource = self.dataset_resource(&hdl).await?;
+
             let is_allowed = self
                 .oso
-                .is_allowed(actor, action, dataset_resource)
+                .is_allowed(user_actor.clone(), action, dataset_resource)
                 .int_err()?;
+
             if is_allowed {
                 matched_dataset_handles.push(hdl);
             }
@@ -147,17 +174,18 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
         dataset_handles: Vec<odf::DatasetHandle>,
         action: DatasetAction,
     ) -> Result<ClassifyByAllowanceResponse, InternalError> {
-        // TODO: Private Datasets: revisit
-
+        let user_actor = self.user_actor().await?;
         let mut matched_dataset_handles = Vec::with_capacity(dataset_handles.len());
         let mut unmatched_results = Vec::new();
 
         for hdl in dataset_handles {
-            let (actor, dataset_resource) = self.user_dataset_pair(&hdl).await?;
+            let dataset_resource = self.dataset_resource(&hdl).await?;
+
             let is_allowed = self
                 .oso
-                .is_allowed(actor, action, dataset_resource)
+                .is_allowed(user_actor.clone(), action, dataset_resource)
                 .int_err()?;
+
             if is_allowed {
                 matched_dataset_handles.push(hdl);
             } else {

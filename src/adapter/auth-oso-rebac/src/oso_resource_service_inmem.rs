@@ -89,13 +89,25 @@ impl OsoResourceServiceInMem {
     ) -> (Option<UserActor>, Option<DatasetResource>) {
         let readable_state = self.state.read().await;
 
-        let user_actor = self.user_actor(&readable_state, maybe_account_id);
-        let dataset_resource = self.dataset_resource(&readable_state, dataset_id);
+        let user_actor = self.user_actor_impl(&readable_state, maybe_account_id);
+        let dataset_resource = self.dataset_resource_impl(&readable_state, dataset_id);
 
         (user_actor, dataset_resource)
     }
 
-    fn user_actor(
+    pub async fn user_actor(&self, maybe_account_id: Option<&odf::AccountID>) -> Option<UserActor> {
+        let readable_state = self.state.read().await;
+
+        self.user_actor_impl(&readable_state, maybe_account_id)
+    }
+
+    pub async fn dataset_resource(&self, dataset_id: &odf::DatasetID) -> Option<DatasetResource> {
+        let readable_state = self.state.read().await;
+
+        self.dataset_resource_impl(&readable_state, dataset_id)
+    }
+
+    fn user_actor_impl(
         &self,
         readable_state: &RwLockReadGuard<'_, State>,
         maybe_account_id: Option<&odf::AccountID>,
@@ -112,7 +124,7 @@ impl OsoResourceServiceInMem {
         }
     }
 
-    fn dataset_resource(
+    fn dataset_resource_impl(
         &self,
         readable_state: &RwLockReadGuard<'_, State>,
         dataset_id: &odf::DatasetID,

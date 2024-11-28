@@ -23,7 +23,7 @@ Recommendation: for ease of reading, use the following order:
   - E2E: Using the correct account in multi-tenant mode
     - And also the possibility of set it up
   - GQL, added `Dataset.properties` to access the dataset ReBAC properties
-  - GQL, added `DatasetMut.setVisibility()` to access the dataset ReBAC properties
+  - GQL, added `DatasetMut.setVisibility()` to be able to update ReBAC properties
 
 ## [0.209.0] - 2024-11-25
 ### Changed
