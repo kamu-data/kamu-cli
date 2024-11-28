@@ -43,7 +43,6 @@ async-graphql = { version = "7", features = [
     "apollo_tracing",
 ] }
 async-trait = { version = "0.1", default-features = false }
-cron = { version = "0.12", default-features = false }
 chrono = "0.4"
 datafusion = { version = "42", default-features = false, features = [
     "serde",
@@ -86,4 +85,3 @@ tempfile = "3"
 test-group = { version = "1" }
 test-log = { version = "0.2", features = ["trace"] }
 tokio = { version = "1", default-features = false, features = [] }
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }

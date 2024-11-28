@@ -38,7 +38,6 @@ tokio = { version = "1", default-features = false, features = ["sync"] }
 tracing = "0.1"
 serde = "1"
 sha2 = "0.10"
-uuid = "1"
 
 [dependencies.sqlx]
 version = "0.8"
@@ -53,3 +52,6 @@ features = [
     "chrono",
     "migrate",
 ]
+
+
+[dev-dependencies]

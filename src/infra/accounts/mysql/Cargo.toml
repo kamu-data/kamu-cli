@@ -36,7 +36,6 @@ sqlx = { version = "0.8", default-features = false, features = [
     "mysql",
     "chrono",
 ] }
-thiserror = { version = "1", default-features = false }
 tracing = { version = "0.1", default-features = false }
 uuid = "1"
 
