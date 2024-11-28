@@ -134,7 +134,7 @@ impl APIServer {
         .route(
             "/ui-config",
             axum::routing::get(ui_configuration_handler),
-        )        
+        )
         .route(
             // IMPORTANT: The same name is used inside e2e_middleware_fn().
             //            If there is a need to change, please update there too.
