@@ -19,6 +19,9 @@ pub use notebook_server_impl::*;
 mod sql_shell_impl;
 pub use sql_shell_impl::*;
 
+mod ui_configuration;
+pub(crate) use ui_configuration::*;
+
 #[cfg(feature = "web-ui")]
 mod web_ui_server;
 #[cfg(feature = "web-ui")]
