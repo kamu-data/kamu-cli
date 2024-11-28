@@ -24,4 +24,4 @@ RUN apt update  \
 
 FROM ghcr.io/kamu-data/kamu-base:latest
 
-COPY --from=builder /app/target/debug/kamu-cli /usr/bin/kamu
+COPY --from=builder /app/target/debug/kamu-cli /usr/local/bin/kamu
