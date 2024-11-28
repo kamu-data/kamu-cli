@@ -76,10 +76,10 @@ impl DatasetEntryRepository for InMemoryDatasetEntryRepository {
         Ok(owner_entries.map_or(0, BTreeSet::len))
     }
 
-    async fn get_dataset_entries<'a, 'b>(
+    async fn get_dataset_entries<'a>(
         &'a self,
         pagination: PaginationOpts,
-    ) -> DatasetEntryStream<'b> {
+    ) -> DatasetEntryStream<'a> {
         let dataset_entries_page = {
             let readable_state = self.state.read().await;
 
@@ -152,11 +152,11 @@ impl DatasetEntryRepository for InMemoryDatasetEntryRepository {
         Ok(dataset_entry.clone())
     }
 
-    async fn get_dataset_entries_by_owner_id<'a, 'b>(
+    async fn get_dataset_entries_by_owner_id<'a>(
         &'a self,
         owner_id: &AccountID,
         pagination: PaginationOpts,
-    ) -> DatasetEntryStream<'b> {
+    ) -> DatasetEntryStream<'a> {
         let dataset_entries_page = {
             let readable_state = self.state.read().await;
 

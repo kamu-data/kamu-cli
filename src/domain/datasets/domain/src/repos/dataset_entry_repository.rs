@@ -26,20 +26,16 @@ pub trait DatasetEntryRepository: Send + Sync {
         owner_id: &AccountID,
     ) -> Result<usize, InternalError>;
 
-    async fn get_dataset_entries<'a, 'b>(
+    async fn get_dataset_entries<'a>(
         &'a self,
         pagination: PaginationOpts,
-    ) -> DatasetEntryStream<'b>
-    where
-        'a: 'b;
+    ) -> DatasetEntryStream<'a>;
 
-    async fn get_dataset_entries_by_owner_id<'a, 'b>(
+    async fn get_dataset_entries_by_owner_id<'a>(
         &'a self,
         owner_id: &AccountID,
         pagination: PaginationOpts,
-    ) -> DatasetEntryStream<'b>
-    where
-        'a: 'b;
+    ) -> DatasetEntryStream<'a>;
 
     async fn get_dataset_entry(
         &self,
