@@ -14,6 +14,9 @@ Recommendation: for ease of reading, use the following order:
 ## [Unreleased]
 ### Added
 - Console warning when deleting datasets which are out of sync with their push remotes
+### Fixed
+- Typo in feature flags (enableDatasetEnvVarsManagement)
+                                                  ^
 
 ## [0.209.0] - 2024-11-25
 ### Changed
