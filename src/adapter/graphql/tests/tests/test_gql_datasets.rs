@@ -43,10 +43,6 @@ macro_rules! test_dataset_create_empty_without_visibility {
                     dataset {
                       name
                       alias
-                      properties {
-                        allowsAnonymousRead
-                        allowsPublicRead
-                      }
                     }
                   }
                 }
@@ -67,10 +63,6 @@ macro_rules! test_dataset_create_empty_without_visibility {
                         "dataset": {
                             "name": "foo",
                             "alias": "foo",
-                            "properties": {
-                                "allowsAnonymousRead": false,
-                                "allowsPublicRead": false
-                            }
                         }
                     }
                 }
@@ -95,10 +87,6 @@ macro_rules! test_dataset_create_empty_public {
                     dataset {
                       name
                       alias
-                      properties {
-                        allowsAnonymousRead
-                        allowsPublicRead
-                      }
                     }
                   }
                 }
@@ -110,7 +98,6 @@ macro_rules! test_dataset_create_empty_public {
         expect_anonymous_access_error(harness.execute_anonymous_query(request_code).await);
 
         let res = harness.execute_authorized_query(request_code).await;
-        let expected_publicly_available = $tenancy_config == TenancyConfig::MultiTenant;
 
         assert!(res.is_ok(), "{res:?}");
         pretty_assertions::assert_eq!(
@@ -120,10 +107,6 @@ macro_rules! test_dataset_create_empty_public {
                         "dataset": {
                             "name": "foo",
                             "alias": "foo",
-                            "properties": {
-                                "allowsAnonymousRead": false,
-                                "allowsPublicRead": expected_publicly_available
-                            }
                         }
                     }
                 }

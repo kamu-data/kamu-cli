@@ -482,10 +482,6 @@ type Dataset {
 	Various endpoints for interacting with data
 	"""
 	endpoints: DatasetEndpoints!
-	"""
-	Access to dataset properties
-	"""
-	properties: DatasetProperties!
 }
 
 scalar DatasetAlias
@@ -736,11 +732,6 @@ type DatasetPermissions {
 	canRename: Boolean!
 	canCommit: Boolean!
 	canSchedule: Boolean!
-}
-
-type DatasetProperties {
-	allowsAnonymousRead: Boolean!
-	allowsPublicRead: Boolean!
 }
 
 type DatasetPushStatus {
