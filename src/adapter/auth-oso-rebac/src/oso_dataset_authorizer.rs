@@ -39,12 +39,12 @@ impl OsoDatasetAuthorizer {
     pub fn new(
         kamu_auth_oso: Arc<KamuAuthOso>,
         current_account_subject: Arc<CurrentAccountSubject>,
-        oso_resource_holder: Arc<OsoResourceServiceInMem>,
+        oso_resource_service: Arc<OsoResourceServiceInMem>,
     ) -> Self {
         Self {
             oso: kamu_auth_oso.oso.clone(),
             current_account_subject,
-            oso_resource_service: oso_resource_holder,
+            oso_resource_service,
         }
     }
 
