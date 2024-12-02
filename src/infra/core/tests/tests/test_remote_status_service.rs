@@ -14,7 +14,7 @@ use std::sync::Arc;
 
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use dill::CatalogBuilder;
-use kamu::testing::{DummySmartTransferProtocolClient, MetadataFactory};
+use kamu::testing::{BaseRepoHarness, DummySmartTransferProtocolClient, MetadataFactory};
 use kamu::utils::ipfs_wrapper::IpfsClient;
 use kamu::utils::simple_transfer_protocol::SimpleTransferProtocol;
 use kamu::{
@@ -32,8 +32,6 @@ use kamu_core::utils::metadata_chain_comparator::CompareChainsResult;
 use kamu_core::*;
 use opendatafabric::*;
 use url::Url;
-
-use crate::BaseRepoHarness;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

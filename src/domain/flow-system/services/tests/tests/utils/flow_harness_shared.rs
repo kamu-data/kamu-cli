@@ -29,6 +29,8 @@ use kamu_accounts_services::{
     PredefinedAccountsRegistrator,
 };
 use kamu_core::*;
+use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
+use kamu_datasets_services::DependencyGraphServiceImpl;
 use kamu_flow_system::*;
 use kamu_flow_system_inmem::*;
 use kamu_flow_system_services::*;
@@ -60,7 +62,6 @@ pub(crate) const SCHEDULING_MANDATORY_THROTTLING_PERIOD_MS: i64 = SCHEDULING_ALI
 pub(crate) struct FlowHarness {
     _tmp_dir: tempfile::TempDir,
     pub catalog: dill::Catalog,
-    pub dataset_repo: Arc<dyn DatasetRepository>,
     pub flow_configuration_service: Arc<dyn FlowConfigurationService>,
     pub flow_configuration_event_store: Arc<dyn FlowConfigurationEventStore>,
     pub flow_executor: Arc<FlowExecutorImpl>,
@@ -165,7 +166,8 @@ impl FlowHarness {
             .add_value(JwtAuthenticationConfig::default())
             .add::<AccessTokenServiceImpl>()
             .add::<InMemoryAccessTokenRepository>()
-            .add::<DependencyGraphServiceInMemory>()
+            .add::<DependencyGraphServiceImpl>()
+            .add::<InMemoryDatasetDependencyRepository>()
             .add::<DatasetOwnershipServiceInMemory>()
             .add::<TaskSchedulerImpl>()
             .add::<InMemoryTaskEventStore>()
@@ -205,7 +207,6 @@ impl FlowHarness {
             .get_one::<dyn FlowConfigurationEventStore>()
             .unwrap();
         let flow_event_store = catalog.get_one::<dyn FlowEventStore>().unwrap();
-        let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
         let auth_svc = catalog.get_one::<dyn AuthenticationService>().unwrap();
 
         Self {
@@ -216,7 +217,6 @@ impl FlowHarness {
             flow_configuration_service,
             flow_configuration_event_store,
             flow_event_store,
-            dataset_repo,
             fake_system_time_source,
             auth_svc,
         }
@@ -271,8 +271,6 @@ impl FlowHarness {
     }
 
     pub async fn eager_initialization(&self) {
-        self.initialize_dependency_graph().await;
-
         use init_on_startup::InitOnStartup;
         let dataset_ownership_initializer = self
             .catalog
@@ -286,25 +284,7 @@ impl FlowHarness {
         self.flow_executor.run_initialization().await.unwrap();
     }
 
-    pub async fn initialize_dependency_graph(&self) {
-        let dependency_graph_service = self
-            .catalog
-            .get_one::<dyn DependencyGraphService>()
-            .unwrap();
-        let dependency_graph_repository =
-            DependencyGraphRepositoryInMemory::new(self.dataset_repo.clone());
-
-        dependency_graph_service
-            .eager_initialization(&dependency_graph_repository)
-            .await
-            .unwrap();
-    }
-
     pub async fn delete_dataset(&self, dataset_id: &DatasetID) {
-        // Eagerly push dependency graph initialization before deletes.
-        // It's ignored, if requested 2nd time
-        self.initialize_dependency_graph().await;
-
         // Do the actual deletion
         let delete_dataset = self.catalog.get_one::<dyn DeleteDatasetUseCase>().unwrap();
         delete_dataset

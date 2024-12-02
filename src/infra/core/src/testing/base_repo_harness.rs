@@ -11,8 +11,6 @@ use std::path::Path;
 use std::sync::Arc;
 
 use dill::{Catalog, Component};
-use kamu::testing::MetadataFactory;
-use kamu::{DatasetRegistryRepoBridge, DatasetRepositoryLocalFs, DatasetRepositoryWriter};
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::{
     CreateDatasetResult,
@@ -29,6 +27,9 @@ use opendatafabric::serde::flatbuffers::FlatbuffersMetadataBlockSerializer;
 use opendatafabric::serde::MetadataBlockSerializer;
 use opendatafabric::{DatasetAlias, DatasetKind, DatasetRef, MetadataBlock, Multicodec, Multihash};
 use time_source::SystemTimeSourceDefault;
+
+use crate::testing::MetadataFactory;
+use crate::{DatasetRegistryRepoBridge, DatasetRepositoryLocalFs, DatasetRepositoryWriter};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

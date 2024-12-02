@@ -66,6 +66,7 @@ impl PostgresDatasetEnvVarRepositoryHarness {
         let mut catalog_builder = CatalogBuilder::new();
         catalog_builder.add_value(pg_pool);
         catalog_builder.add::<PostgresTransactionManager>();
+
         catalog_builder.add::<PostgresDatasetEnvVarRepository>();
 
         Self {

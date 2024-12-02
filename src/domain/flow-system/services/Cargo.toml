@@ -56,6 +56,8 @@ serde_with = { version = "3", default-features = false }
 kamu = { workspace = true, features = ["testing"] }
 kamu-accounts-inmem = { workspace = true }
 kamu-accounts-services = { workspace = true }
+kamu-datasets-inmem = { workspace = true }
+kamu-datasets-services = { workspace = true }
 kamu-flow-system-inmem = { workspace = true }
 kamu-task-system-inmem = { workspace = true }
 kamu-task-system-services = { workspace = true }

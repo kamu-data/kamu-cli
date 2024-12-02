@@ -94,6 +94,7 @@ impl RemoteStatusServiceImpl {
 
 #[async_trait]
 impl RemoteStatusService for RemoteStatusServiceImpl {
+    #[tracing::instrument(level = "debug", skip_all, fields(%dataset_handle))]
     async fn check_remotes_status(
         &self,
         dataset_handle: &DatasetHandle,
@@ -110,6 +111,8 @@ impl RemoteStatusService for RemoteStatusServiceImpl {
         let push_aliases: Vec<&DatasetRefRemote> =
             aliases.get_by_kind(RemoteAliasKind::Push).collect();
 
+        tracing::debug!(?push_aliases, "Fetched dataset remote push aliases");
+
         let mut statuses = vec![];
 
         for alias in push_aliases {
@@ -118,6 +121,8 @@ impl RemoteStatusService for RemoteStatusServiceImpl {
                 check_result: self.status(lhs_chain, &lhs_head, alias).await,
             });
         }
+
+        tracing::debug!(?statuses, "Determined push alias statuses");
 
         Ok(DatasetPushStatuses { statuses })
     }

@@ -36,7 +36,6 @@ use kamu::{
     DatasetRegistryRepoBridge,
     DatasetRepositoryS3,
     DatasetRepositoryWriter,
-    DependencyGraphServiceInMemory,
     ObjectStoreBuilderLocalFs,
     ObjectStoreBuilderS3,
     ObjectStoreRegistryImpl,
@@ -44,6 +43,8 @@ use kamu::{
 use kamu_accounts::testing::MockAuthenticationService;
 use kamu_accounts::{Account, AuthenticationService};
 use kamu_core::{DatasetRegistry, TenancyConfig};
+use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
+use kamu_datasets_services::DependencyGraphServiceImpl;
 use messaging_outbox::DummyOutboxImpl;
 use opendatafabric::{AccountName, DatasetAlias, DatasetHandle};
 use time_source::{SystemTimeSource, SystemTimeSourceStub};
@@ -97,7 +98,8 @@ impl ServerSideS3Harness {
                 .add_value(RunInfoDir::new(run_info_dir))
                 .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
                 .add::<DummyOutboxImpl>()
-                .add::<DependencyGraphServiceInMemory>()
+                .add::<DependencyGraphServiceImpl>()
+                .add::<InMemoryDatasetDependencyRepository>()
                 .add_value(options.tenancy_config)
                 .add_builder(DatasetRepositoryS3::builder().with_s3_context(s3_context.clone()))
                 .bind::<dyn DatasetRepository, DatasetRepositoryS3>()

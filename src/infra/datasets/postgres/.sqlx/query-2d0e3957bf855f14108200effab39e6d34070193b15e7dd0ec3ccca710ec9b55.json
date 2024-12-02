@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            DELETE FROM dataset_dependencies WHERE downstream_dataset_id = $1 AND upstream_dataset_id = ANY($2)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "TextArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "2d0e3957bf855f14108200effab39e6d34070193b15e7dd0ec3ccca710ec9b55"
+}

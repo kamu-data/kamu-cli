@@ -11,6 +11,10 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Unreleased]
+### Changed
+- Dataset dependency graph is now backed with a database, removing need in dependendency scanning at startup.
+
 ## [0.210.0] - 2024-11-28
 ### Added
 - Console warning when deleting datasets which are out of sync with their push remotes

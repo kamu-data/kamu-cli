@@ -12,7 +12,17 @@ use std::sync::Arc;
 
 use dill::*;
 use internal_error::{InternalError, ResultIntoInternal};
-use kamu_core::*;
+use kamu_core::{
+    DatasetIDStream,
+    DatasetLifecycleMessage,
+    DatasetNodeNotFoundError,
+    DatasetRegistry,
+    DependencyGraphService,
+    DependencyOrder,
+    GetDependenciesError,
+    MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
+};
+use kamu_datasets::{DatasetDependencies, DatasetDependencyRepository};
 use messaging_outbox::{
     MessageConsumer,
     MessageConsumerMeta,
@@ -24,10 +34,11 @@ use petgraph::stable_graph::{NodeIndex, StableDiGraph};
 use petgraph::visit::{depth_first_search, Bfs, DfsEvent, Reversed};
 use petgraph::Direction;
 
+use crate::MESSAGE_CONSUMER_KAMU_DEPENDENCY_GRAPH_SERVICE;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct DependencyGraphServiceInMemory {
-    repository: Option<Arc<dyn DependencyGraphRepository>>,
+pub struct DependencyGraphServiceImpl {
     state: Arc<tokio::sync::RwLock<State>>,
 }
 
@@ -37,7 +48,6 @@ pub struct DependencyGraphServiceInMemory {
 struct State {
     datasets_graph: StableDiGraph<DatasetID, ()>,
     dataset_node_indices: HashMap<DatasetID, NodeIndex>,
-    initially_scanned: bool,
 }
 
 impl State {
@@ -60,6 +70,7 @@ impl State {
                 let node_index = self.datasets_graph.add_node(dataset_id.clone());
                 self.dataset_node_indices
                     .insert(dataset_id.clone(), node_index);
+                tracing::debug!(%dataset_id, "Inserted new dependency graph node");
                 node_index
             }
         }
@@ -73,45 +84,39 @@ impl State {
 #[interface(dyn MessageConsumer)]
 #[interface(dyn MessageConsumerT<DatasetLifecycleMessage>)]
 #[meta(MessageConsumerMeta {
-    consumer_name: MESSAGE_CONSUMER_KAMU_CORE_DEPENDENCY_GRAPH_SERVICE,
+    consumer_name: MESSAGE_CONSUMER_KAMU_DEPENDENCY_GRAPH_SERVICE,
     feeding_producers: &[MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE],
     delivery: MessageDeliveryMechanism::Immediate,
  })]
 #[scope(Singleton)]
-impl DependencyGraphServiceInMemory {
-    pub fn new(repository: Option<Arc<dyn DependencyGraphRepository>>) -> Self {
+impl DependencyGraphServiceImpl {
+    pub fn new() -> Self {
         Self {
-            repository,
             state: Arc::new(tokio::sync::RwLock::new(State::default())),
         }
     }
 
-    async fn ensure_datasets_initially_scanned(&self) -> Result<(), InternalError> {
-        let mut state = self.state.write().await;
-        if state.initially_scanned {
-            return Ok(());
-        }
-
-        self.ensure_datasets_initially_scanned_with(
-            &mut state,
-            self.repository
-                .as_ref()
-                .expect("Dependencies graph repository not present")
-                .as_ref(),
-        )
-        .await
-    }
-
     #[tracing::instrument(level = "debug", skip_all)]
-    async fn ensure_datasets_initially_scanned_with(
+    pub async fn load_dependency_graph(
         &self,
-        state: &mut State,
-        repository: &dyn DependencyGraphRepository,
+        dataset_registry: &dyn DatasetRegistry,
+        dependency_repository: &dyn DatasetDependencyRepository,
     ) -> Result<(), InternalError> {
         use tokio_stream::StreamExt;
 
-        let mut dependencies_stream = repository.list_dependencies_of_all_datasets();
+        let mut state = self.state.write().await;
+        assert!(state.datasets_graph.node_count() == 0 && state.datasets_graph.edge_count() == 0);
 
+        tracing::debug!("Restoring dataset nodes in dependency graph");
+
+        let mut datasets_stream = dataset_registry.all_dataset_handles();
+        while let Some(Ok(dataset_handle)) = datasets_stream.next().await {
+            state.get_or_create_dataset_node(&dataset_handle.id);
+        }
+
+        tracing::debug!("Restoring dependency graph edges");
+
+        let mut dependencies_stream = dependency_repository.list_all_dependencies();
         while let Some(Ok(dataset_dependencies)) = dependencies_stream.next().await {
             let DatasetDependencies {
                 downstream_dataset_id,
@@ -120,14 +125,12 @@ impl DependencyGraphServiceInMemory {
 
             if !upstream_dataset_ids.is_empty() {
                 for upstream_dataset_id in upstream_dataset_ids {
-                    self.add_dependency(state, &upstream_dataset_id, &downstream_dataset_id);
+                    self.add_dependency(&mut state, &upstream_dataset_id, &downstream_dataset_id);
                 }
             } else {
                 state.get_or_create_dataset_node(&downstream_dataset_id);
             }
         }
-
-        state.initially_scanned = true;
 
         tracing::debug!(
             num_nodes = % state.datasets_graph.node_count(),
@@ -206,6 +209,12 @@ impl DependencyGraphServiceInMemory {
     ) -> Result<Vec<DatasetID>, GetDependenciesError> {
         let state = self.state.read().await;
 
+        tracing::debug!(
+            num_nodes = % state.datasets_graph.node_count(),
+            num_edges = % state.datasets_graph.edge_count(),
+            "Graph state before breadth first search"
+        );
+
         let reversed_graph = Reversed(&state.datasets_graph);
         let nodes_to_search = self.get_nodes_from_dataset_ids(&dataset_ids, &state)?;
 
@@ -241,6 +250,12 @@ impl DependencyGraphServiceInMemory {
     ) -> Result<Vec<DatasetID>, GetDependenciesError> {
         let state = self.state.read().await;
 
+        tracing::debug!(
+            num_nodes = % state.datasets_graph.node_count(),
+            num_edges = % state.datasets_graph.edge_count(),
+            "Graph state before depth first search"
+        );
+
         let nodes_to_search = self.get_nodes_from_dataset_ids(&dataset_ids, &state)?;
 
         let mut result = vec![];
@@ -265,33 +280,11 @@ impl DependencyGraphServiceInMemory {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl DependencyGraphService for DependencyGraphServiceInMemory {
-    /// Forces initialization of graph data, if it wasn't initialized already.
-    /// Ignored if called multiple times
-    #[tracing::instrument(level = "debug", skip_all)]
-    async fn eager_initialization(
-        &self,
-        repository: &dyn DependencyGraphRepository,
-    ) -> Result<(), InternalError> {
-        let mut state = self.state.write().await;
-        if state.initially_scanned {
-            return Ok(());
-        }
-
-        self.ensure_datasets_initially_scanned_with(&mut state, repository)
-            .await
-    }
-
+impl DependencyGraphService for DependencyGraphServiceImpl {
     async fn get_recursive_upstream_dependencies(
         &self,
         dataset_ids: Vec<DatasetID>,
     ) -> Result<DatasetIDStream, GetDependenciesError> {
-        self.ensure_datasets_initially_scanned()
-            .await
-            .int_err()
-            .map_err(GetDependenciesError::Internal)
-            .unwrap();
-
         let result = self
             .run_recursive_reversed_breadth_first_search(dataset_ids)
             .await?;
@@ -303,12 +296,6 @@ impl DependencyGraphService for DependencyGraphServiceInMemory {
         &self,
         dataset_ids: Vec<DatasetID>,
     ) -> Result<DatasetIDStream, GetDependenciesError> {
-        self.ensure_datasets_initially_scanned()
-            .await
-            .int_err()
-            .map_err(GetDependenciesError::Internal)
-            .unwrap();
-
         let result = self.run_recursive_depth_first_search(dataset_ids).await?;
 
         Ok(Box::pin(tokio_stream::iter(result)))
@@ -320,11 +307,6 @@ impl DependencyGraphService for DependencyGraphServiceInMemory {
         &self,
         dataset_id: &DatasetID,
     ) -> Result<DatasetIDStream, GetDependenciesError> {
-        self.ensure_datasets_initially_scanned()
-            .await
-            .int_err()
-            .map_err(GetDependenciesError::Internal)?;
-
         let downstream_node_datasets: Vec<_> = {
             let state = self.state.read().await;
 
@@ -354,11 +336,6 @@ impl DependencyGraphService for DependencyGraphServiceInMemory {
         &self,
         dataset_id: &DatasetID,
     ) -> Result<DatasetIDStream, GetDependenciesError> {
-        self.ensure_datasets_initially_scanned()
-            .await
-            .int_err()
-            .map_err(GetDependenciesError::Internal)?;
-
         let upstream_node_datasets: Vec<_> = {
             let state = self.state.read().await;
 
@@ -382,17 +359,12 @@ impl DependencyGraphService for DependencyGraphServiceInMemory {
         Ok(Box::pin(tokio_stream::iter(upstream_node_datasets)))
     }
 
+    #[tracing::instrument(level = "debug", skip_all, fields(?dataset_ids, ?order))]
     async fn in_dependency_order(
         &self,
         dataset_ids: Vec<DatasetID>,
         order: DependencyOrder,
     ) -> Result<Vec<DatasetID>, GetDependenciesError> {
-        self.ensure_datasets_initially_scanned()
-            .await
-            .int_err()
-            .map_err(GetDependenciesError::Internal)
-            .unwrap();
-
         let original_set: std::collections::HashSet<_> = dataset_ids.iter().cloned().collect();
 
         let mut result = match order {
@@ -413,23 +385,27 @@ impl DependencyGraphService for DependencyGraphServiceInMemory {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl MessageConsumer for DependencyGraphServiceInMemory {}
+impl MessageConsumer for DependencyGraphServiceImpl {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl MessageConsumerT<DatasetLifecycleMessage> for DependencyGraphServiceInMemory {
+impl MessageConsumerT<DatasetLifecycleMessage> for DependencyGraphServiceImpl {
     #[tracing::instrument(
         level = "debug",
         skip_all,
-        name = "DependencyGraphServiceInMemory[DatasetLifecycleMessage]"
+        name = "DependencyGraphServiceImpl[DatasetLifecycleMessage]"
     )]
     async fn consume_message(
         &self,
-        _: &Catalog,
+        catalog: &Catalog,
         message: &DatasetLifecycleMessage,
     ) -> Result<(), InternalError> {
         tracing::debug!(received_message = ?message, "Received dataset lifecycle message");
+
+        let repository = catalog
+            .get_one::<dyn DatasetDependencyRepository>()
+            .unwrap();
 
         let mut state = self.state.write().await;
 
@@ -463,11 +439,28 @@ impl MessageConsumerT<DatasetLifecycleMessage> for DependencyGraphServiceInMemor
                 let new_upstream_ids: HashSet<_> =
                     message.new_upstream_ids.iter().cloned().collect();
 
-                for obsolete_upstream_id in existing_upstream_ids.difference(&new_upstream_ids) {
+                let obsolete_dependencies: Vec<_> = existing_upstream_ids
+                    .difference(&new_upstream_ids)
+                    .collect();
+                let added_dependencies: Vec<_> = new_upstream_ids
+                    .difference(&existing_upstream_ids)
+                    .collect();
+
+                repository
+                    .remove_upstream_dependencies(&message.dataset_id, &obsolete_dependencies)
+                    .await
+                    .int_err()?;
+
+                repository
+                    .add_upstream_dependencies(&message.dataset_id, &added_dependencies)
+                    .await
+                    .int_err()?;
+
+                for obsolete_upstream_id in obsolete_dependencies {
                     self.remove_dependency(&mut state, obsolete_upstream_id, &message.dataset_id);
                 }
 
-                for added_id in new_upstream_ids.difference(&existing_upstream_ids) {
+                for added_id in added_dependencies {
                     self.add_dependency(&mut state, added_id, &message.dataset_id);
                 }
             }

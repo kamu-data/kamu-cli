@@ -35,6 +35,7 @@ futures = "0.3"
 secrecy = "0.10"
 thiserror = { version = "1", default-features = false }
 tokio = { version = "1", default-features = false }
+tokio-stream = "0.1"
 tracing = { version = "0.1", default-features = false }
 uuid = "1"
 

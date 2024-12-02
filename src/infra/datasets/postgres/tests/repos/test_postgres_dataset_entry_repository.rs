@@ -107,6 +107,7 @@ impl PostgresDatasetEntryRepositoryHarness {
 
         catalog_builder.add_value(pg_pool);
         catalog_builder.add::<PostgresTransactionManager>();
+
         catalog_builder.add::<PostgresAccountRepository>();
         catalog_builder.add::<PostgresDatasetEntryRepository>();
 

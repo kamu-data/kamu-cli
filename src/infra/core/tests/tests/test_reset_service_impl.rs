@@ -11,11 +11,9 @@ use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
 use kamu::domain::*;
-use kamu::testing::*;
+use kamu::testing::{BaseRepoHarness, *};
 use kamu::*;
 use opendatafabric::*;
-
-use crate::BaseRepoHarness;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
