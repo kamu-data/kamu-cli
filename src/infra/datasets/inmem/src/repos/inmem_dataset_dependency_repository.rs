@@ -15,8 +15,6 @@ use internal_error::InternalError;
 use kamu_datasets::*;
 use opendatafabric::DatasetID;
 
-use super::InMemoryDatasetEntryRemovalListener;
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Default)]
@@ -33,7 +31,7 @@ pub struct InMemoryDatasetDependencyRepository {
 
 #[component(pub)]
 #[interface(dyn DatasetDependencyRepository)]
-#[interface(dyn InMemoryDatasetEntryRemovalListener)]
+#[interface(dyn DatasetEntryRemovalListener)]
 #[scope(Singleton)]
 impl InMemoryDatasetDependencyRepository {
     pub fn new() -> Self {
@@ -163,7 +161,7 @@ impl DatasetDependencyRepository for InMemoryDatasetDependencyRepository {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl InMemoryDatasetEntryRemovalListener for InMemoryDatasetDependencyRepository {
+impl DatasetEntryRemovalListener for InMemoryDatasetDependencyRepository {
     async fn on_dataset_entry_removed(&self, dataset_id: &DatasetID) -> Result<(), InternalError> {
         let mut guard = self.state.lock().unwrap();
 

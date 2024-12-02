@@ -38,7 +38,7 @@ impl State {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct InMemoryDatasetEntryRepository {
-    listeners: Vec<Arc<dyn InMemoryDatasetEntryRemovalListener>>,
+    listeners: Vec<Arc<dyn DatasetEntryRemovalListener>>,
     state: Arc<Mutex<State>>,
 }
 
@@ -46,7 +46,7 @@ pub struct InMemoryDatasetEntryRepository {
 #[interface(dyn DatasetEntryRepository)]
 #[scope(Singleton)]
 impl InMemoryDatasetEntryRepository {
-    pub fn new(listeners: Vec<Arc<dyn InMemoryDatasetEntryRemovalListener>>) -> Self {
+    pub fn new(listeners: Vec<Arc<dyn DatasetEntryRemovalListener>>) -> Self {
         Self {
             listeners,
             state: Arc::new(Mutex::new(State::new())),
@@ -275,13 +275,6 @@ impl DatasetEntryRepository for InMemoryDatasetEntryRepository {
 
         Ok(())
     }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[async_trait::async_trait]
-pub trait InMemoryDatasetEntryRemovalListener: Send + Sync {
-    async fn on_dataset_entry_removed(&self, dataset_id: &DatasetID) -> Result<(), InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -22,6 +22,7 @@ pub struct PostgresDatasetDependencyRepository {
 
 #[component(pub)]
 #[interface(dyn DatasetDependencyRepository)]
+#[interface(dyn DatasetEntryRemovalListener)]
 impl PostgresDatasetDependencyRepository {
     pub fn new(transaction: TransactionRef) -> Self {
         Self {
@@ -177,6 +178,31 @@ impl DatasetDependencyRepository for PostgresDatasetDependencyRepository {
             }
             .into());
         }
+
+        Ok(())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait::async_trait]
+impl DatasetEntryRemovalListener for PostgresDatasetDependencyRepository {
+    async fn on_dataset_entry_removed(&self, dataset_id: &DatasetID) -> Result<(), InternalError> {
+        let mut tr = self.transaction.lock().await;
+
+        let connection_mut = tr.connection_mut().await?;
+
+        let stack_dataset_id = dataset_id.as_did_str().to_stack_string();
+
+        sqlx::query!(
+            r#"
+            DELETE FROM dataset_dependencies WHERE downstream_dataset_id = $1 OR upstream_dataset_id = $1
+            "#,
+            stack_dataset_id.as_str(),
+        )
+        .execute(&mut *connection_mut)
+        .await
+        .int_err()?;
 
         Ok(())
     }
