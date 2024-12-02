@@ -14,22 +14,7 @@ use database_common::PaginationOpts;
 use dill::{component, interface, meta, Catalog};
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_accounts::{AccountRepository, CurrentAccountSubject};
-use kamu_core::{
-    DatasetHandleStream,
-    DatasetHandlesResolution,
-    DatasetLifecycleMessage,
-    DatasetLifecycleMessageCreated,
-    DatasetLifecycleMessageDeleted,
-    DatasetLifecycleMessageRenamed,
-    DatasetNotFoundError,
-    DatasetRegistry,
-    DatasetRepository,
-    GetDatasetError,
-    GetMultipleDatasetsError,
-    ResolvedDataset,
-    TenancyConfig,
-    MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
-};
+use kamu_core::*;
 use kamu_datasets::*;
 use messaging_outbox::{
     MessageConsumer,

@@ -9,13 +9,9 @@
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub const MESSAGE_CONSUMER_KAMU_DATASET_ENTRY_SERVICE: &str =
-    "dev.kamu.domain.datasets.DatasetEntryService";
-
-pub const MESSAGE_CONSUMER_KAMU_DEPENDENCY_GRAPH_SERVICE: &str =
-    "dev.kamu.domain.datasets.DependencyGraphService";
-
-pub const MESSAGE_CONSUMER_KAMU_DATASET_KEY_BLOCKS_SERVICE: &str =
-    "dev.kamu.domain.datasets.DatasetKeyBlocksService";
+#[async_trait::async_trait]
+pub trait DatasetKeyBlocksService: Sync + Send {
+    // TODO
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -132,6 +132,7 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
         if workspace_svc.is_in_workspace() {
             base_catalog_builder.add::<kamu_datasets_services::DatasetEntryIndexer>();
             base_catalog_builder.add::<kamu_datasets_services::DependencyGraphIndexer>();
+            base_catalog_builder.add::<kamu_datasets_services::DatasetKeyBlocksIndexer>();
         }
 
         base_catalog_builder.add_value(JwtAuthenticationConfig::load_from_env());
@@ -472,6 +473,7 @@ pub fn configure_base_catalog(
 
     b.add::<kamu_datasets_services::DatasetEntryServiceImpl>();
     b.add::<kamu_datasets_services::DependencyGraphServiceImpl>();
+    b.add::<kamu_datasets_services::DatasetKeyBlocksServiceImpl>();
 
     b.add_builder(
         messaging_outbox::OutboxImmediateImpl::builder()
