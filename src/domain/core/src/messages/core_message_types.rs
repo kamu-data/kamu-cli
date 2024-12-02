@@ -24,7 +24,6 @@ pub enum DatasetLifecycleMessage {
     Created(DatasetLifecycleMessageCreated),
     DependenciesUpdated(DatasetLifecycleMessageDependenciesUpdated),
     Renamed(DatasetLifecycleMessageRenamed),
-    AboutToDelete(DatasetLifecycleMessageAboutToDelete),
     Deleted(DatasetLifecycleMessageDeleted),
 }
 
@@ -48,10 +47,6 @@ impl DatasetLifecycleMessage {
             dataset_id,
             new_upstream_ids,
         })
-    }
-
-    pub fn about_to_delete(dataset_id: DatasetID) -> Self {
-        Self::AboutToDelete(DatasetLifecycleMessageAboutToDelete { dataset_id })
     }
 
     pub fn deleted(dataset_id: DatasetID) -> Self {
@@ -96,13 +91,6 @@ pub struct DatasetLifecycleMessageCreated {
 pub struct DatasetLifecycleMessageDependenciesUpdated {
     pub dataset_id: DatasetID,
     pub new_upstream_ids: Vec<DatasetID>,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct DatasetLifecycleMessageAboutToDelete {
-    pub dataset_id: DatasetID,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

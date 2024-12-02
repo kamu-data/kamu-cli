@@ -414,15 +414,15 @@ impl MessageConsumerT<DatasetLifecycleMessage> for DependencyGraphServiceImpl {
                 state.get_or_create_dataset_node(&message.dataset_id);
             }
 
-            DatasetLifecycleMessage::AboutToDelete(message) => {
+            DatasetLifecycleMessage::Deleted(message) => {
                 let node_index = state.get_dataset_node(&message.dataset_id).int_err()?;
 
                 state.datasets_graph.remove_node(node_index);
                 state.dataset_node_indices.remove(&message.dataset_id);
 
-                repository
-                    .remove_all_dependencies_of(&message.dataset_id)
-                    .await?;
+                //repository
+                //    .remove_all_dependencies_of(&message.dataset_id)
+                //    .await?;
             }
 
             DatasetLifecycleMessage::DependenciesUpdated(message) => {
@@ -469,7 +469,7 @@ impl MessageConsumerT<DatasetLifecycleMessage> for DependencyGraphServiceImpl {
                 }
             }
 
-            DatasetLifecycleMessage::Renamed(_) | DatasetLifecycleMessage::Deleted(_) => {
+            DatasetLifecycleMessage::Renamed(_) => {
                 // No action required
             }
         }

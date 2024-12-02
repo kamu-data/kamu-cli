@@ -136,15 +136,7 @@ impl DeleteDatasetUseCase for DeleteDatasetUseCaseImpl {
             .delete_dataset(dataset_handle)
             .await?;
 
-        // Notify interested parties in 2 phases:
-        // - about to delete
-        // - actual delete
-        self.outbox
-            .post_message(
-                MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
-                DatasetLifecycleMessage::about_to_delete(dataset_handle.id.clone()),
-            )
-            .await?;
+        // Notify interested parties
         self.outbox
             .post_message(
                 MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,

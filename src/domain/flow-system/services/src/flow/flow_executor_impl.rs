@@ -722,8 +722,7 @@ impl MessageConsumerT<DatasetLifecycleMessage> for FlowExecutorImpl {
 
             DatasetLifecycleMessage::Created(_)
             | DatasetLifecycleMessage::DependenciesUpdated(_)
-            | DatasetLifecycleMessage::Renamed(_)
-            | DatasetLifecycleMessage::AboutToDelete(_) => {
+            | DatasetLifecycleMessage::Renamed(_) => {
                 // No action required
             }
         }
