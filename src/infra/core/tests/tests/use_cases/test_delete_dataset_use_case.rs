@@ -33,7 +33,7 @@ async fn test_delete_dataset_success_via_ref() {
     let alias_foo = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
 
     let mut mock_outbox = MockOutbox::new();
-    expect_outbox_dataset_about_2_delete(&mut mock_outbox, 1);
+    expect_outbox_dataset_about_to_delete(&mut mock_outbox, 1);
     expect_outbox_dataset_deleted(&mut mock_outbox, 1);
 
     let mock_authorizer =
@@ -63,7 +63,7 @@ async fn test_delete_dataset_success_via_handle() {
     let alias_foo = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
 
     let mut mock_outbox = MockOutbox::new();
-    expect_outbox_dataset_about_2_delete(&mut mock_outbox, 1);
+    expect_outbox_dataset_about_to_delete(&mut mock_outbox, 1);
     expect_outbox_dataset_deleted(&mut mock_outbox, 1);
 
     let mock_authorizer =
@@ -135,7 +135,7 @@ async fn test_delete_dataset_respects_dangling_refs() {
     let alias_bar = DatasetAlias::new(None, DatasetName::new_unchecked("bar"));
 
     let mut mock_outbox = MockOutbox::new();
-    expect_outbox_dataset_about_2_delete(&mut mock_outbox, 2);
+    expect_outbox_dataset_about_to_delete(&mut mock_outbox, 2);
     expect_outbox_dataset_deleted(&mut mock_outbox, 2);
 
     let harness = DeleteUseCaseHarness::new(MockDatasetActionAuthorizer::allowing(), mock_outbox);
@@ -161,7 +161,7 @@ async fn test_delete_dataset_respects_dangling_refs() {
         .unwrap();
 
     harness
-        .consume_message(DatasetLifecycleMessage::about_2_delete(
+        .consume_message(DatasetLifecycleMessage::about_to_delete(
             derived.dataset_handle.id.clone(),
         ))
         .await;
@@ -182,7 +182,7 @@ async fn test_delete_dataset_respects_dangling_refs() {
         .unwrap();
 
     harness
-        .consume_message(DatasetLifecycleMessage::about_2_delete(
+        .consume_message(DatasetLifecycleMessage::about_to_delete(
             root.dataset_handle.id.clone(),
         ))
         .await;

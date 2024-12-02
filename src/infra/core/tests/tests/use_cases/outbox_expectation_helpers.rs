@@ -73,7 +73,7 @@ pub(crate) fn expect_outbox_dataset_renamed(mock_outbox: &mut MockOutbox, times:
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn expect_outbox_dataset_about_2_delete(mock_outbox: &mut MockOutbox, times: usize) {
+pub(crate) fn expect_outbox_dataset_about_to_delete(mock_outbox: &mut MockOutbox, times: usize) {
     mock_outbox
         .expect_post_message_as_json()
         .with(
@@ -81,7 +81,7 @@ pub(crate) fn expect_outbox_dataset_about_2_delete(mock_outbox: &mut MockOutbox,
             function(|message_as_json: &serde_json::Value| {
                 matches!(
                     serde_json::from_value::<DatasetLifecycleMessage>(message_as_json.clone()),
-                    Ok(DatasetLifecycleMessage::About2Delete(_))
+                    Ok(DatasetLifecycleMessage::AboutToDelete(_))
                 )
             }),
             always(),

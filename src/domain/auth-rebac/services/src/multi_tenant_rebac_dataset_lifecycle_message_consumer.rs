@@ -103,7 +103,7 @@ impl MessageConsumerT<DatasetLifecycleMessage> for MultiTenantRebacDatasetLifecy
 
             DatasetLifecycleMessage::DependenciesUpdated(_)
             | DatasetLifecycleMessage::Renamed(_)
-            | DatasetLifecycleMessage::About2Delete(_) => {
+            | DatasetLifecycleMessage::AboutToDelete(_) => {
                 // No action required
                 Ok(())
             }

@@ -142,7 +142,7 @@ impl DeleteDatasetUseCase for DeleteDatasetUseCaseImpl {
         self.outbox
             .post_message(
                 MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
-                DatasetLifecycleMessage::about_2_delete(dataset_handle.id.clone()),
+                DatasetLifecycleMessage::about_to_delete(dataset_handle.id.clone()),
             )
             .await?;
         self.outbox

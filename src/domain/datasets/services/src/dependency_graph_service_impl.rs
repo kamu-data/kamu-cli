@@ -414,7 +414,7 @@ impl MessageConsumerT<DatasetLifecycleMessage> for DependencyGraphServiceImpl {
                 state.get_or_create_dataset_node(&message.dataset_id);
             }
 
-            DatasetLifecycleMessage::About2Delete(message) => {
+            DatasetLifecycleMessage::AboutToDelete(message) => {
                 let node_index = state.get_dataset_node(&message.dataset_id).int_err()?;
 
                 state.datasets_graph.remove_node(node_index);
