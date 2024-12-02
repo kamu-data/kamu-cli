@@ -9,8 +9,10 @@
 
 mod sqlite_dataset_dependency_repository;
 mod sqlite_dataset_env_var_repository;
+mod sqlite_dataset_key_blocks_repository;
 mod sqlite_dateset_entry_repository;
 
 pub use sqlite_dataset_dependency_repository::*;
 pub use sqlite_dataset_env_var_repository::*;
+pub use sqlite_dataset_key_blocks_repository::*;
 pub use sqlite_dateset_entry_repository::*;

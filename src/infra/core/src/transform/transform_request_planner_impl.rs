@@ -101,7 +101,6 @@ impl TransformRequestPlannerImpl {
 impl TransformRequestPlanner for TransformRequestPlannerImpl {
     /// Returns an active transform, if any
     #[tracing::instrument(level = "debug", skip_all, fields(target=%target.get_handle()))]
-    ///
     async fn get_active_transform(
         &self,
         target: ResolvedDataset,
