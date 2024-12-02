@@ -180,29 +180,6 @@ impl DatasetDependencyRepository for PostgresDatasetDependencyRepository {
 
         Ok(())
     }
-
-    async fn remove_all_dependencies_of(
-        &self,
-        dataset_id: &DatasetID,
-    ) -> Result<(), InternalError> {
-        let mut tr = self.transaction.lock().await;
-
-        let connection_mut = tr.connection_mut().await?;
-
-        let stack_dataset_id = dataset_id.as_did_str().to_stack_string();
-
-        sqlx::query!(
-            r#"
-            DELETE FROM dataset_dependencies WHERE upstream_dataset_id = $1 OR downstream_dataset_id = $1
-            "#,
-            stack_dataset_id.as_str(),
-        )
-        .execute(&mut *connection_mut)
-        .await
-        .int_err()?;
-
-        Ok(())
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

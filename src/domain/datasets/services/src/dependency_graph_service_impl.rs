@@ -419,10 +419,6 @@ impl MessageConsumerT<DatasetLifecycleMessage> for DependencyGraphServiceImpl {
 
                 state.datasets_graph.remove_node(node_index);
                 state.dataset_node_indices.remove(&message.dataset_id);
-
-                //repository
-                //    .remove_all_dependencies_of(&message.dataset_id)
-                //    .await?;
             }
 
             DatasetLifecycleMessage::DependenciesUpdated(message) => {

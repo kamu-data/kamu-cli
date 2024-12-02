@@ -533,9 +533,7 @@ pub async fn test_remove_all_dataset_dependencies(catalog: &Catalog) {
 
     /////
 
-    let res = dataset_dependency_repo
-        .remove_all_dependencies_of(&entry_foo.id)
-        .await;
+    let res = dataset_entry_repo.delete_dataset_entry(&entry_foo.id).await;
     assert_matches!(res, Ok(()));
 
     let dependencies: Vec<_> = dataset_dependency_repo
@@ -554,9 +552,7 @@ pub async fn test_remove_all_dataset_dependencies(catalog: &Catalog) {
 
     /////
 
-    let res = dataset_dependency_repo
-        .remove_all_dependencies_of(&entry_baz.id)
-        .await;
+    let res = dataset_entry_repo.delete_dataset_entry(&entry_baz.id).await;
     assert_matches!(res, Ok(()));
 
     let dependencies: Vec<_> = dataset_dependency_repo
@@ -585,9 +581,7 @@ pub async fn test_remove_orphan_dependencies(catalog: &Catalog) {
         .await
         .unwrap();
 
-    let res = dataset_dependency_repo
-        .remove_all_dependencies_of(&entry_foo.id)
-        .await;
+    let res = dataset_entry_repo.delete_dataset_entry(&entry_foo.id).await;
     assert_matches!(res, Ok(()));
 
     use futures::TryStreamExt;

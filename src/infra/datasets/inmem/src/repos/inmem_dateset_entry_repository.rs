@@ -12,7 +12,7 @@ use std::sync::{Arc, Mutex};
 
 use database_common::PaginationOpts;
 use dill::*;
-use internal_error::InternalError;
+use internal_error::{InternalError, ResultIntoInternal};
 use kamu_datasets::*;
 use opendatafabric::{AccountID, DatasetID, DatasetName};
 
@@ -38,6 +38,7 @@ impl State {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct InMemoryDatasetEntryRepository {
+    listeners: Vec<Arc<dyn InMemoryDatasetEntryRemovalListener>>,
     state: Arc<Mutex<State>>,
 }
 
@@ -45,8 +46,9 @@ pub struct InMemoryDatasetEntryRepository {
 #[interface(dyn DatasetEntryRepository)]
 #[scope(Singleton)]
 impl InMemoryDatasetEntryRepository {
-    pub fn new() -> Self {
+    pub fn new(listeners: Vec<Arc<dyn InMemoryDatasetEntryRemovalListener>>) -> Self {
         Self {
+            listeners,
             state: Arc::new(Mutex::new(State::new())),
         }
     }
@@ -248,22 +250,38 @@ impl DatasetEntryRepository for InMemoryDatasetEntryRepository {
         &self,
         dataset_id: &DatasetID,
     ) -> Result<(), DeleteEntryDatasetError> {
-        let mut writable_state = self.state.lock().unwrap();
+        {
+            let mut writable_state = self.state.lock().unwrap();
 
-        let maybe_removed_entry = writable_state.rows.remove(dataset_id);
-        if let Some(removed_entry) = maybe_removed_entry {
-            writable_state.rows_by_name.remove(&removed_entry.name);
-            writable_state
-                .rows_by_owner
-                .get_mut(&removed_entry.owner_id)
-                .unwrap()
-                .remove(&removed_entry.id);
-        } else {
-            return Err(DatasetEntryNotFoundError::new(dataset_id.clone()).into());
+            let maybe_removed_entry = writable_state.rows.remove(dataset_id);
+            if let Some(removed_entry) = maybe_removed_entry {
+                writable_state.rows_by_name.remove(&removed_entry.name);
+                writable_state
+                    .rows_by_owner
+                    .get_mut(&removed_entry.owner_id)
+                    .unwrap()
+                    .remove(&removed_entry.id);
+            } else {
+                return Err(DatasetEntryNotFoundError::new(dataset_id.clone()).into());
+            }
+        }
+
+        for listener in &self.listeners {
+            listener
+                .on_dataset_entry_removed(dataset_id)
+                .await
+                .int_err()?;
         }
 
         Ok(())
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait::async_trait]
+pub trait InMemoryDatasetEntryRemovalListener: Send + Sync {
+    async fn on_dataset_entry_removed(&self, dataset_id: &DatasetID) -> Result<(), InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
