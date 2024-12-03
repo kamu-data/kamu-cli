@@ -12,10 +12,8 @@ use std::sync::{Arc, Mutex};
 
 use dill::*;
 use internal_error::InternalError;
-use kamu_datasets::{DatasetKeyBlockRow, DatasetKeyBlockType, DatasetKeyBlocksRepository};
+use kamu_datasets::*;
 use opendatafabric::DatasetID;
-
-use super::InMemoryDatasetEntryRemovalListener;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -37,7 +35,7 @@ pub struct InMemoryDatasetKeyBlocksRepository {
 
 #[component(pub)]
 #[interface(dyn DatasetKeyBlocksRepository)]
-#[interface(dyn InMemoryDatasetEntryRemovalListener)]
+#[interface(dyn DatasetEntryRemovalListener)]
 #[scope(Singleton)]
 impl InMemoryDatasetKeyBlocksRepository {
     pub fn new() -> Self {
@@ -124,7 +122,7 @@ impl DatasetKeyBlocksRepository for InMemoryDatasetKeyBlocksRepository {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl InMemoryDatasetEntryRemovalListener for InMemoryDatasetKeyBlocksRepository {
+impl DatasetEntryRemovalListener for InMemoryDatasetKeyBlocksRepository {
     async fn on_dataset_entry_removed(&self, dataset_id: &DatasetID) -> Result<(), InternalError> {
         let mut guard = self.state.lock().unwrap();
 
