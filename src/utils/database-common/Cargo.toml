@@ -22,22 +22,24 @@ doctest = false
 
 
 [dependencies]
-aws-config = "1"
-aws-sdk-secretsmanager = "1"
-aws-credential-types = "1"
+async-stream = "0.3"
 async-trait = "0.1"
+aws-config = "1"
+aws-credential-types = "1"
+aws-sdk-secretsmanager = "1"
 chrono = { version = "0.4", default-features = false }
 dill = "0.9"
+futures = { version = "0.3", default-features = false }
 hex = "0.4"
 hmac = "0.12"
 internal-error = { workspace = true }
 secrecy = "0.10"
+serde = "1"
 serde_json = "1"
+sha2 = "0.10"
 thiserror = { version = "1", default-features = false }
 tokio = { version = "1", default-features = false, features = ["sync"] }
 tracing = "0.1"
-serde = "1"
-sha2 = "0.10"
 
 [dependencies.sqlx]
 version = "0.8"
@@ -55,3 +57,6 @@ features = [
 
 
 [dev-dependencies]
+mockall = { version = "0.13", default-features = false }
+pretty_assertions = { version = "1" }
+tokio = { version = "1", default-features = true, features = ["macros"] }
