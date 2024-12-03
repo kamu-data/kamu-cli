@@ -22,7 +22,8 @@ CREATE TABLE dataset_key_blocks
     block_event_type key_metadata_event_type NOT NULL,
     block_extra_key VARCHAR(100),
     block_sequence_number BIGINT NOT NULL,
-    block_event_payload JSONB NOT NULL
+    block_hash VARCHAR(100) NOT NULL,
+    block_payload JSONB NOT NULL
 );
 
 CREATE UNIQUE INDEX idx_dataset_key_blocks

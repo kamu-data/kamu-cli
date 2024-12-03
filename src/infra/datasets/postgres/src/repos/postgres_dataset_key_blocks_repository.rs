@@ -11,7 +11,7 @@ use database_common::{TransactionRef, TransactionRefT};
 use dill::{component, interface};
 use internal_error::InternalError;
 use kamu_datasets::*;
-use opendatafabric::DatasetID;
+use opendatafabric::{DatasetID, MetadataEventTypeFlags};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -54,7 +54,7 @@ impl DatasetKeyBlocksRepository for PostgresDatasetKeyBlocksRepository {
     async fn try_loading_key_dataset_blocks(
         &self,
         _dataset_id: &DatasetID,
-        _block_types: &[DatasetKeyBlockType],
+        _flags: MetadataEventTypeFlags,
     ) -> Result<Vec<DatasetKeyBlockRow>, InternalError> {
         // TODO
         unimplemented!()

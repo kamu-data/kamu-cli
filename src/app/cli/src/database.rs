@@ -116,7 +116,8 @@ pub fn configure_database_components(
             b.add::<kamu_datasets_postgres::PostgresDatasetEnvVarRepository>();
             b.add::<kamu_datasets_postgres::PostgresDatasetEntryRepository>();
             b.add::<kamu_datasets_postgres::PostgresDatasetDependencyRepository>();
-            b.add::<kamu_datasets_postgres::PostgresDatasetKeyBlocksRepository>();
+            b.add::<kamu_datasets_inmem::InMemoryDatasetKeyBlocksRepository>();
+            // b.add::<kamu_datasets_postgres::PostgresDatasetKeyBlocksRepository>();
 
             b.add::<kamu_flow_system_postgres::PostgresFlowConfigurationEventStore>();
             b.add::<kamu_flow_system_postgres::PostgresFlowEventStore>();
@@ -161,7 +162,8 @@ pub fn configure_database_components(
             b.add::<kamu_datasets_sqlite::SqliteDatasetEnvVarRepository>();
             b.add::<kamu_datasets_sqlite::SqliteDatasetEntryRepository>();
             b.add::<kamu_datasets_sqlite::SqliteDatasetDependencyRepository>();
-            b.add::<kamu_datasets_sqlite::SqliteDatasetKeyBlocksRepository>();
+            b.add::<kamu_datasets_inmem::InMemoryDatasetKeyBlocksRepository>();
+            // b.add::<kamu_datasets_sqlite::SqliteDatasetKeyBlocksRepository>();
 
             b.add::<kamu_flow_system_sqlite::SqliteFlowConfigurationEventStore>();
             b.add::<kamu_flow_system_sqlite::SqliteFlowEventStore>();

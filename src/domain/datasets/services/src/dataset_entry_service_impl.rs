@@ -33,13 +33,14 @@ use opendatafabric::{
 };
 use time_source::SystemTimeSource;
 
-use crate::MESSAGE_CONSUMER_KAMU_DATASET_ENTRY_SERVICE;
+use crate::{DatabaseBackedDataset, MESSAGE_CONSUMER_KAMU_DATASET_ENTRY_SERVICE};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct DatasetEntryServiceImpl {
     time_source: Arc<dyn SystemTimeSource>,
     dataset_entry_repo: Arc<dyn DatasetEntryRepository>,
+    dataset_key_blocks_repo: Arc<dyn DatasetKeyBlocksRepository>,
     dataset_repo: Arc<dyn DatasetRepository>,
     account_repo: Arc<dyn AccountRepository>,
     current_account_subject: Arc<CurrentAccountSubject>,
@@ -73,6 +74,7 @@ impl DatasetEntryServiceImpl {
     pub fn new(
         time_source: Arc<dyn SystemTimeSource>,
         dataset_entry_repo: Arc<dyn DatasetEntryRepository>,
+        dataset_key_blocks_repo: Arc<dyn DatasetKeyBlocksRepository>,
         dataset_repo: Arc<dyn DatasetRepository>,
         account_repo: Arc<dyn AccountRepository>,
         current_account_subject: Arc<CurrentAccountSubject>,
@@ -81,6 +83,7 @@ impl DatasetEntryServiceImpl {
         Self {
             time_source,
             dataset_entry_repo,
+            dataset_key_blocks_repo,
             dataset_repo,
             account_repo,
             current_account_subject,
@@ -492,8 +495,15 @@ impl DatasetRegistry for DatasetEntryServiceImpl {
     // Note: in future we will be resolving storage repository,
     // but for now we have just a single one
     fn get_dataset_by_handle(&self, dataset_handle: &DatasetHandle) -> ResolvedDataset {
-        let dataset = self.dataset_repo.get_dataset_by_handle(dataset_handle);
-        ResolvedDataset::new(dataset, dataset_handle.clone())
+        let storage_dataset = self.dataset_repo.get_dataset_by_handle(dataset_handle);
+
+        let db_backed_dataset = Arc::new(DatabaseBackedDataset::new(
+            self.dataset_key_blocks_repo.clone(),
+            storage_dataset,
+            dataset_handle.id.clone(),
+        ));
+
+        ResolvedDataset::new(db_backed_dataset, dataset_handle.clone())
     }
 }
 

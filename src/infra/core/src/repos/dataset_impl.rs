@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::sync::Arc;
+
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
@@ -18,10 +20,11 @@ use url::Url;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct DatasetImpl<MetaChain, DataRepo, CheckpointRepo, InfoRepo> {
-    metadata_chain: MetaChain,
+    metadata_chain: Arc<MetaChain>,
     data_repo: DataRepo,
     checkpoint_repo: CheckpointRepo,
     info_repo: InfoRepo,
+    simple_acceptor: ScanningDatasetCurrentStateAcceptor,
     storage_internal_url: Url,
 }
 
@@ -30,7 +33,7 @@ pub struct DatasetImpl<MetaChain, DataRepo, CheckpointRepo, InfoRepo> {
 impl<MetaChain, DataRepo, CheckpointRepo, InfoRepo>
     DatasetImpl<MetaChain, DataRepo, CheckpointRepo, InfoRepo>
 where
-    MetaChain: MetadataChain + Sync + Send,
+    MetaChain: MetadataChain + Sync + Send + 'static,
     DataRepo: ObjectRepository + Sync + Send,
     CheckpointRepo: ObjectRepository + Sync + Send,
     InfoRepo: NamedObjectRepository + Sync + Send,
@@ -42,11 +45,15 @@ where
         info_repo: InfoRepo,
         storage_internal_url: Url,
     ) -> Self {
+        let metadata_chain = Arc::new(metadata_chain);
+        let simple_acceptor = ScanningDatasetCurrentStateAcceptor::new(metadata_chain.clone());
+
         Self {
             metadata_chain,
             data_repo,
             checkpoint_repo,
             info_repo,
+            simple_acceptor,
             storage_internal_url,
         }
     }
@@ -365,7 +372,7 @@ impl UpdateSummaryIncrement {
 impl<MetaChain, DataRepo, CheckpointRepo, InfoRepo> Dataset
     for DatasetImpl<MetaChain, DataRepo, CheckpointRepo, InfoRepo>
 where
-    MetaChain: MetadataChain + Sync + Send,
+    MetaChain: MetadataChain + Sync + Send + 'static,
     DataRepo: ObjectRepository + Sync + Send,
     CheckpointRepo: ObjectRepository + Sync + Send,
     InfoRepo: NamedObjectRepository + Sync + Send,
@@ -593,8 +600,12 @@ where
         &self.storage_internal_url
     }
 
+    fn as_current_state_acceptor(&self) -> &dyn DatasetCurrentStateAcceptor {
+        &self.simple_acceptor
+    }
+
     fn as_metadata_chain(&self) -> &dyn MetadataChain {
-        &self.metadata_chain
+        self.metadata_chain.as_ref()
     }
 
     fn as_data_repo(&self) -> &dyn ObjectRepository {
@@ -609,3 +620,35 @@ where
         &self.info_repo
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+struct ScanningDatasetCurrentStateAcceptor {
+    chain: Arc<dyn MetadataChain>,
+}
+
+impl ScanningDatasetCurrentStateAcceptor {
+    fn new(chain: Arc<dyn MetadataChain>) -> Self {
+        Self { chain }
+    }
+}
+
+#[async_trait::async_trait]
+impl DatasetCurrentStateAcceptor for ScanningDatasetCurrentStateAcceptor {
+    /// A method of accepting Visitors ([MetadataChainVisitor]) that allows us
+    /// to go through the metadata chain once and, if desired,
+    /// bypassing blocks of no interest.
+    async fn accept(
+        &self,
+        visitors: &mut [&mut dyn MetadataChainVisitor<Error = Infallible>],
+    ) -> Result<(), AcceptVisitorError<InternalError>> {
+        match self.chain.accept(visitors).await {
+            Ok(_) => {}
+            Err(_) => unreachable!(),
+        }
+
+        Ok(())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

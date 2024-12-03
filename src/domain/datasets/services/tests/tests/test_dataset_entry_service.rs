@@ -27,8 +27,10 @@ use kamu_datasets::{
     DatasetEntry,
     DatasetEntryNotFoundError,
     DatasetEntryRepository,
+    DatasetKeyBlocksRepository,
     GetDatasetEntryError,
     MockDatasetEntryRepository,
+    MockDatasetKeyBlocksRepository,
 };
 use kamu_datasets_services::{DatasetEntryIndexer, DatasetEntryServiceImpl};
 use messaging_outbox::{register_message_dispatcher, Outbox, OutboxExt, OutboxImmediateImpl};
@@ -214,6 +216,9 @@ impl DatasetEntryServiceHarness {
 
             b.add_value(mock_dataset_entry_repository);
             b.bind::<dyn DatasetEntryRepository, MockDatasetEntryRepository>();
+
+            b.add_value(MockDatasetKeyBlocksRepository::new());
+            b.bind::<dyn DatasetKeyBlocksRepository, MockDatasetKeyBlocksRepository>();
 
             let t = frozen_time_point();
             let fake_system_time_source = FakeSystemTimeSource::new(t);

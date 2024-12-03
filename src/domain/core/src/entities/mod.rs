@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 pub mod dataset;
+pub mod dataset_current_state_acceptor;
 pub mod dataset_summary;
 pub mod engine;
 pub mod metadata_chain;
@@ -16,6 +17,7 @@ pub mod resolved_dataset;
 pub mod resolved_datasets_map;
 
 pub use dataset::*;
+pub use dataset_current_state_acceptor::*;
 pub use dataset_summary::*;
 pub use metadata_chain::*;
 pub use metadata_stream::*;

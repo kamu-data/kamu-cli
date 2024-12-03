@@ -243,7 +243,7 @@ impl QueryServiceImpl {
         let resolved_dataset = self.resolve_dataset(dataset_ref).await?;
 
         let schema = resolved_dataset
-            .as_metadata_chain()
+            .as_current_state_acceptor()
             .accept_one(SearchSetDataSchemaVisitor::new())
             .await
             .int_err()?
@@ -352,7 +352,7 @@ impl QueryService for QueryServiceImpl {
         }
 
         let vocab: DatasetVocabulary = resolved_dataset
-            .as_metadata_chain()
+            .as_current_state_acceptor()
             .accept_one(SearchSetVocabVisitor::new())
             .await
             .int_err()?

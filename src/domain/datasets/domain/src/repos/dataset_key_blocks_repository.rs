@@ -8,10 +8,11 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::InternalError;
-use opendatafabric::{DatasetID, MetadataEvent};
+use opendatafabric::{DatasetID, MetadataBlock, MetadataEvent, MetadataEventTypeFlags, Multihash};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[cfg_attr(any(feature = "testing", test), mockall::automock)]
 #[async_trait::async_trait]
 pub trait DatasetKeyBlocksRepository: Send + Sync {
     async fn save_key_dataset_block(
@@ -29,7 +30,7 @@ pub trait DatasetKeyBlocksRepository: Send + Sync {
     async fn try_loading_key_dataset_blocks(
         &self,
         dataset_id: &DatasetID,
-        block_types: &[DatasetKeyBlockType],
+        flags: MetadataEventTypeFlags,
     ) -> Result<Vec<DatasetKeyBlockRow>, InternalError>;
 }
 
@@ -37,13 +38,13 @@ pub trait DatasetKeyBlocksRepository: Send + Sync {
 
 #[derive(Debug, Clone)]
 pub struct DatasetKeyBlockRow {
-    pub sequence_number: u64,
-    pub event: MetadataEvent,
+    pub block_hash: Multihash,
+    pub block: MetadataBlock,
 }
 
 impl DatasetKeyBlockRow {
     pub fn key_block_type(&self) -> DatasetKeyBlockType {
-        match &self.event {
+        match &self.block.event {
             MetadataEvent::Seed(_) => DatasetKeyBlockType::Seed,
             MetadataEvent::SetPollingSource(_) => DatasetKeyBlockType::SetPollingSource,
             MetadataEvent::SetTransform(_) => DatasetKeyBlockType::SetTransform,
@@ -63,7 +64,7 @@ impl DatasetKeyBlockRow {
     }
 
     pub fn key_block_extra_key(&self) -> Option<String> {
-        if let MetadataEvent::AddPushSource(push_source) = &self.event {
+        if let MetadataEvent::AddPushSource(push_source) = &self.block.event {
             Some(push_source.source_name.clone())
         } else {
             None
@@ -84,6 +85,42 @@ pub enum DatasetKeyBlockType {
     SetLicense,
     SetDataSchema,
     AddPushSource,
+}
+
+impl DatasetKeyBlockType {
+    pub fn vec_from_flags(flags: MetadataEventTypeFlags) -> Vec<DatasetKeyBlockType> {
+        let mut res = Vec::new();
+
+        if flags.contains(MetadataEventTypeFlags::SEED) {
+            res.push(DatasetKeyBlockType::Seed);
+        }
+        if flags.contains(MetadataEventTypeFlags::SET_POLLING_SOURCE) {
+            res.push(DatasetKeyBlockType::SetPollingSource);
+        }
+        if flags.contains(MetadataEventTypeFlags::SET_TRANSFORM) {
+            res.push(DatasetKeyBlockType::SetTransform);
+        }
+        if flags.contains(MetadataEventTypeFlags::SET_VOCAB) {
+            res.push(DatasetKeyBlockType::SetVocab);
+        }
+        if flags.contains(MetadataEventTypeFlags::SET_ATTACHMENTS) {
+            res.push(DatasetKeyBlockType::SetAttachments);
+        }
+        if flags.contains(MetadataEventTypeFlags::SET_INFO) {
+            res.push(DatasetKeyBlockType::SetInfo);
+        }
+        if flags.contains(MetadataEventTypeFlags::SET_LICENSE) {
+            res.push(DatasetKeyBlockType::SetLicense);
+        }
+        if flags.contains(MetadataEventTypeFlags::SET_DATA_SCHEMA) {
+            res.push(DatasetKeyBlockType::SetDataSchema);
+        }
+        if flags.contains(MetadataEventTypeFlags::ADD_PUSH_SOURCE) {
+            res.push(DatasetKeyBlockType::AddPushSource);
+        }
+
+        res
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -13,7 +13,7 @@ use std::sync::{Arc, Mutex};
 use dill::*;
 use internal_error::InternalError;
 use kamu_datasets::*;
-use opendatafabric::DatasetID;
+use opendatafabric::{DatasetID, MetadataEventTypeFlags};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -92,7 +92,7 @@ impl DatasetKeyBlocksRepository for InMemoryDatasetKeyBlocksRepository {
         if let Some(dataset_key_blocks) = guard.key_blocks_by_dataset.get_mut(dataset_id) {
             dataset_key_blocks
                 .blocks_by_type
-                .retain(|_, row| row.sequence_number <= sequence_number);
+                .retain(|_, row| row.block.sequence_number <= sequence_number);
         }
 
         Ok(())
@@ -101,8 +101,10 @@ impl DatasetKeyBlocksRepository for InMemoryDatasetKeyBlocksRepository {
     async fn try_loading_key_dataset_blocks(
         &self,
         dataset_id: &DatasetID,
-        block_types: &[DatasetKeyBlockType],
+        flags: MetadataEventTypeFlags,
     ) -> Result<Vec<DatasetKeyBlockRow>, InternalError> {
+        let block_types = DatasetKeyBlockType::vec_from_flags(flags);
+
         let guard = self.state.lock().unwrap();
 
         if let Some(dataset_key_blocks) = guard.key_blocks_by_dataset.get(dataset_id) {
