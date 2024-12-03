@@ -34,9 +34,9 @@ macro_rules! test_pagination {
         } = $test_pagination_opts;
 
         let entity_source = entity_source(total_entity_count, expected_entities_call_count);
-        let streamer = EntityStreamer::<TestEntity>::new(start_offset, page_limit);
+        let streamer = EntityStreamer::new(start_offset, page_limit);
 
-        let stream = streamer.stream_entities(
+        let stream = streamer.into_stream(
             || async {
                 let arguments = entity_source.init_arguments().await;
                 Ok(arguments)

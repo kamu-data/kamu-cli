@@ -10,7 +10,7 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};
 
-use database_common::PaginationOpts;
+use database_common::{EntityListing, EntityStreamer, PaginationOpts};
 use dill::{component, interface, meta, Catalog};
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_accounts::{AccountRepository, CurrentAccountSubject};
@@ -37,6 +37,8 @@ use messaging_outbox::{
     MessageConsumerT,
     MessageDeliveryMechanism,
 };
+// TODO: use odf as namespace alias
+use opendatafabric as odf;
 use opendatafabric::{
     AccountID,
     AccountName,
@@ -168,7 +170,7 @@ impl DatasetEntryServiceImpl {
         let first_seen_account_ids = {
             let accounts_cache = self.accounts_cache.lock().unwrap();
 
-            let mut first_seen_account_ids: HashSet<AccountID> = HashSet::new();
+            let mut first_seen_account_ids = HashSet::new();
             for entry in &entries {
                 if !accounts_cache.id2names.contains_key(&entry.owner_id) {
                     first_seen_account_ids.insert(entry.owner_id.clone());
@@ -280,51 +282,37 @@ impl DatasetEntryServiceImpl {
         }
     }
 
-    fn stream_datasets<'a, Args, HInitArgs, HInitArgsFut, HListing, HListingFut>(
-        &'a self,
-        get_args_callback: HInitArgs,
-        next_entries_callback: HListing,
-    ) -> DatasetHandleStream<'a>
-    where
-        Args: Clone + Send + 'a,
-        HInitArgs: FnOnce() -> HInitArgsFut + Send + 'a,
-        HInitArgsFut: std::future::Future<Output = Result<Args, InternalError>> + Send + 'a,
-        HListing: Fn(Args, PaginationOpts) -> HListingFut + Send + 'a,
-        HListingFut: std::future::Future<Output = Result<DatasetEntryListing, ListDatasetEntriesError>>
-            + Send
-            + 'a,
-    {
-        Box::pin(async_stream::try_stream! {
-            // Init arguments
-            let args = get_args_callback().await?;
+    async fn list_all_dataset_handles(
+        &self,
+        pagination: PaginationOpts,
+    ) -> Result<EntityListing<DatasetHandle>, InternalError> {
+        let dataset_entry_listing = self.list_all_entries(pagination).await.int_err()?;
 
-            // Tracking pagination progress
-            let mut offset = 0;
-            let limit = 100;
+        Ok(EntityListing {
+            total_count: dataset_entry_listing.total_count,
+            list: self
+                .entries_as_handles(dataset_entry_listing.list)
+                .await
+                .int_err()?,
+        })
+    }
 
-            loop {
-                // Load a page of dataset entries
-                let entries_page = next_entries_callback(args.clone(), PaginationOpts { limit, offset })
-                    .await
-                    .int_err()?;
+    async fn list_all_dataset_handles_by_owner_name(
+        &self,
+        owner_id: odf::AccountID,
+        pagination: PaginationOpts,
+    ) -> Result<EntityListing<DatasetHandle>, InternalError> {
+        let dataset_entry_listing = self
+            .list_entries_owned_by(owner_id, pagination)
+            .await
+            .int_err()?;
 
-                // Actually read entires
-                let loaded_entries_count = entries_page.list.len();
-
-                // Convert entries to handles
-                let handles = self.entries_as_handles(entries_page.list).await.int_err()?;
-
-                // Stream the entries
-                for hdl in handles {
-                    yield hdl;
-                }
-
-                // Next page
-                offset += loaded_entries_count;
-                if offset >= entries_page.total_count {
-                    break;
-                }
-            }
+        Ok(EntityListing {
+            total_count: dataset_entry_listing.total_count,
+            list: self
+                .entries_as_handles(dataset_entry_listing.list)
+                .await
+                .int_err()?,
         })
     }
 
@@ -360,7 +348,6 @@ impl DatasetEntryService for DatasetEntryServiceImpl {
 
         Ok(DatasetEntryListing {
             list: entries,
-            // TODO: Private Datasets: use entries.len()?
             total_count,
         })
     }
@@ -395,18 +382,18 @@ impl DatasetEntryService for DatasetEntryServiceImpl {
 #[async_trait::async_trait]
 impl DatasetRegistry for DatasetEntryServiceImpl {
     #[tracing::instrument(level = "debug", skip_all)]
-    fn all_dataset_handles<'a>(&'a self) -> DatasetHandleStream<'a> {
+    fn all_dataset_handles(&self) -> DatasetHandleStream {
         #[derive(Clone)]
         struct NoArgs {}
 
-        self.stream_datasets(
+        EntityStreamer::default().into_stream(
             || async { Ok(NoArgs {}) },
-            |_, pagination| self.list_all_entries(pagination),
+            |_, pagination| self.list_all_dataset_handles(pagination),
         )
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(%owner_name))]
-    fn all_dataset_handles_by_owner(&self, owner_name: &AccountName) -> DatasetHandleStream<'_> {
+    fn all_dataset_handles_by_owner(&self, owner_name: &AccountName) -> DatasetHandleStream {
         #[derive(Clone)]
         struct OwnerArgs {
             owner_id: AccountID,
@@ -414,14 +401,16 @@ impl DatasetRegistry for DatasetEntryServiceImpl {
 
         let owner_name = owner_name.clone();
 
-        self.stream_datasets(
+        EntityStreamer::default().into_stream(
             move || async move {
                 let owner_id = self
                     .resolve_account_id_by_maybe_name(Some(&owner_name))
                     .await?;
                 Ok(OwnerArgs { owner_id })
             },
-            |args, pagination| self.list_entries_owned_by(args.owner_id, pagination),
+            |args, pagination| {
+                self.list_all_dataset_handles_by_owner_name(args.owner_id, pagination)
+            },
         )
     }
 

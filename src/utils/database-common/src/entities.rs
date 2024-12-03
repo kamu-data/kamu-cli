@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use std::future::Future;
-use std::marker::PhantomData;
 use std::pin::Pin;
 
 use futures::Stream;
@@ -34,18 +33,16 @@ impl PaginationOpts {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct EntityStreamer<Entity> {
+pub struct EntityStreamer {
     start_offset: usize,
     page_limit: usize,
-    _phantom: PhantomData<Entity>,
 }
 
-impl<Entity> Default for EntityStreamer<Entity> {
+impl Default for EntityStreamer {
     fn default() -> Self {
         Self {
             start_offset: 0,
             page_limit: 100,
-            _phantom: PhantomData,
         }
     }
 }
@@ -55,27 +52,25 @@ pub struct EntityListing<Entity> {
     pub total_count: usize,
 }
 
-impl<Entity> EntityStreamer<Entity>
-where
-    Entity: Send,
-{
-    pub type EntityStream<'a> =
+impl EntityStreamer {
+    pub type EntityStream<'a, Entity> =
         Pin<Box<dyn Stream<Item = Result<Entity, InternalError>> + Send + 'a>>;
 
     pub fn new(start_offset: usize, page_limit: usize) -> Self {
         Self {
             start_offset,
             page_limit,
-            _phantom: PhantomData,
         }
     }
 
-    pub fn stream_entities<'a, Args, HInitArgs, HInitArgsFut, HListing, HListingFut>(
-        &'a self,
+    pub fn into_stream<'a, Entity, Args, HInitArgs, HInitArgsFut, HListing, HListingFut>(
+        self,
         get_args_callback: HInitArgs,
         next_entities_callback: HListing,
-    ) -> Self::EntityStream<'_>
+    ) -> Self::EntityStream<'a, Entity>
     where
+        Entity: Send + 'a,
+
         Args: Clone + Send + 'a,
 
         HInitArgs: FnOnce() -> HInitArgsFut + Send + 'a,
