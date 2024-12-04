@@ -25,16 +25,6 @@ struct State {
     rows_by_owner: HashMap<AccountID, BTreeSet<DatasetID>>,
 }
 
-impl State {
-    fn new() -> Self {
-        Self {
-            rows: HashMap::new(),
-            rows_by_name: BTreeMap::new(),
-            rows_by_owner: HashMap::new(),
-        }
-    }
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct InMemoryDatasetEntryRepository {
@@ -49,7 +39,7 @@ impl InMemoryDatasetEntryRepository {
     pub fn new(listeners: Vec<Arc<dyn DatasetEntryRemovalListener>>) -> Self {
         Self {
             listeners,
-            state: Arc::new(Mutex::new(State::new())),
+            state: Arc::new(Mutex::new(State::default())),
         }
     }
 }
