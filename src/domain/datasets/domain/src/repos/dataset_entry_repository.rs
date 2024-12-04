@@ -9,7 +9,7 @@
 
 use database_common::PaginationOpts;
 use internal_error::InternalError;
-use opendatafabric::{AccountID, DatasetID, DatasetName};
+use opendatafabric as odf;
 use thiserror::Error;
 
 use crate::DatasetEntry;
@@ -23,31 +23,31 @@ pub trait DatasetEntryRepository: Send + Sync {
 
     async fn dataset_entries_count_by_owner_id(
         &self,
-        owner_id: &AccountID,
+        owner_id: &odf::AccountID,
     ) -> Result<usize, InternalError>;
 
     fn get_dataset_entries(&self, pagination: PaginationOpts) -> DatasetEntryStream<'_>;
 
     fn get_dataset_entries_by_owner_id(
         &self,
-        owner_id: &AccountID,
+        owner_id: &odf::AccountID,
         pagination: PaginationOpts,
     ) -> DatasetEntryStream<'_>;
 
     async fn get_dataset_entry(
         &self,
-        dataset_id: &DatasetID,
+        dataset_id: &odf::DatasetID,
     ) -> Result<DatasetEntry, GetDatasetEntryError>;
 
     async fn get_multiple_dataset_entries(
         &self,
-        dataset_ids: &[DatasetID],
+        dataset_ids: &[odf::DatasetID],
     ) -> Result<DatasetEntriesResolution, GetMultipleDatasetEntriesError>;
 
     async fn get_dataset_entry_by_owner_and_name(
         &self,
-        owner_id: &AccountID,
-        name: &DatasetName,
+        owner_id: &odf::AccountID,
+        name: &odf::DatasetName,
     ) -> Result<DatasetEntry, GetDatasetEntryByNameError>;
 
     async fn save_dataset_entry(
@@ -57,13 +57,13 @@ pub trait DatasetEntryRepository: Send + Sync {
 
     async fn update_dataset_entry_name(
         &self,
-        dataset_id: &DatasetID,
-        new_name: &DatasetName,
+        dataset_id: &odf::DatasetID,
+        new_name: &odf::DatasetName,
     ) -> Result<(), UpdateDatasetEntryNameError>;
 
     async fn delete_dataset_entry(
         &self,
-        dataset_id: &DatasetID,
+        dataset_id: &odf::DatasetID,
     ) -> Result<(), DeleteEntryDatasetError>;
 }
 
@@ -78,7 +78,7 @@ pub type DatasetEntryStream<'a> = std::pin::Pin<
 #[derive(Default, Debug, Eq, PartialEq)]
 pub struct DatasetEntriesResolution {
     pub resolved_entries: Vec<DatasetEntry>,
-    pub unresolved_entries: Vec<DatasetID>,
+    pub unresolved_entries: Vec<odf::DatasetID>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -101,11 +101,11 @@ pub enum GetMultipleDatasetEntriesError {
 #[derive(Error, Debug)]
 #[error("Dataset entry with dataset_id '{dataset_id}' not found")]
 pub struct DatasetEntryNotFoundError {
-    pub dataset_id: DatasetID,
+    pub dataset_id: odf::DatasetID,
 }
 
 impl DatasetEntryNotFoundError {
-    pub fn new(dataset_id: DatasetID) -> Self {
+    pub fn new(dataset_id: odf::DatasetID) -> Self {
         Self { dataset_id }
     }
 }
@@ -124,12 +124,12 @@ pub enum GetDatasetEntryByNameError {
 #[derive(Error, Debug)]
 #[error("Dataset entry with owner_id '{owner_id}' and name '{dataset_name}' not found")]
 pub struct DatasetEntryByNameNotFoundError {
-    pub owner_id: AccountID,
-    pub dataset_name: DatasetName,
+    pub owner_id: odf::AccountID,
+    pub dataset_name: odf::DatasetName,
 }
 
 impl DatasetEntryByNameNotFoundError {
-    pub fn new(owner_id: AccountID, dataset_name: DatasetName) -> Self {
+    pub fn new(owner_id: odf::AccountID, dataset_name: odf::DatasetName) -> Self {
         Self {
             owner_id,
             dataset_name,
@@ -154,11 +154,11 @@ pub enum SaveDatasetEntryError {
 #[derive(Error, Debug)]
 #[error("Dataset entry with dataset_id '{dataset_id}' already exists")]
 pub struct SaveDatasetEntryErrorDuplicate {
-    pub dataset_id: DatasetID,
+    pub dataset_id: odf::DatasetID,
 }
 
 impl SaveDatasetEntryErrorDuplicate {
-    pub fn new(dataset_id: DatasetID) -> Self {
+    pub fn new(dataset_id: odf::DatasetID) -> Self {
         Self { dataset_id }
     }
 }
@@ -180,11 +180,11 @@ pub enum UpdateDatasetEntryNameError {
 #[derive(Error, Debug)]
 #[error("Dataset entry with name {dataset_name} for same owner already exists")]
 pub struct DatasetEntryNameCollisionError {
-    pub dataset_name: DatasetName,
+    pub dataset_name: odf::DatasetName,
 }
 
 impl DatasetEntryNameCollisionError {
-    pub fn new(dataset_name: DatasetName) -> Self {
+    pub fn new(dataset_name: odf::DatasetName) -> Self {
         Self { dataset_name }
     }
 }
@@ -204,7 +204,10 @@ pub enum DeleteEntryDatasetError {
 
 #[async_trait::async_trait]
 pub trait DatasetEntryRemovalListener: Send + Sync {
-    async fn on_dataset_entry_removed(&self, dataset_id: &DatasetID) -> Result<(), InternalError>;
+    async fn on_dataset_entry_removed(
+        &self,
+        dataset_id: &odf::DatasetID,
+    ) -> Result<(), InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

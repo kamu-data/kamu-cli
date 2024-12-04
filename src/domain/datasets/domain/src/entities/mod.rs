@@ -7,11 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod block_pointer;
 #[cfg(feature = "sqlx")]
 mod dataset_dependency_entry;
 mod dataset_entry;
 mod dataset_env_var;
 
+pub use block_pointer::*;
 #[cfg(feature = "sqlx")]
 pub use dataset_dependency_entry::*;
 pub use dataset_entry::*;
