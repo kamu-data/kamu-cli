@@ -167,6 +167,189 @@ async fn test_pagination_start_offset_is_greater_than_the_total_entity_count() {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_paged_page_processing_of_input_data_by_ref() {
+    fn assert_page(page: &[&TestEntity], pagination: &PaginationOpts) {
+        match pagination.offset {
+            0 => {
+                pretty_assertions::assert_eq!(
+                    vec![
+                        &TestEntity { id: 0 },
+                        &TestEntity { id: 1 },
+                        &TestEntity { id: 2 },
+                    ],
+                    page
+                );
+            }
+            3 => {
+                pretty_assertions::assert_eq!(
+                    vec![
+                        &TestEntity { id: 3 },
+                        &TestEntity { id: 4 },
+                        &TestEntity { id: 5 },
+                    ],
+                    page
+                );
+            }
+            6 => {
+                pretty_assertions::assert_eq!(
+                    vec![
+                        &TestEntity { id: 6 },
+                        &TestEntity { id: 7 },
+                        &TestEntity { id: 8 },
+                    ],
+                    page
+                );
+            }
+            9 => {
+                pretty_assertions::assert_eq!(vec![&TestEntity { id: 9 },], page);
+            }
+            _ => {
+                unreachable!()
+            }
+        }
+    }
+
+    let input_data = vec![
+        TestEntity { id: 0 },
+        TestEntity { id: 1 },
+        TestEntity { id: 2 },
+        TestEntity { id: 3 },
+        TestEntity { id: 4 },
+        TestEntity { id: 5 },
+        TestEntity { id: 6 },
+        TestEntity { id: 7 },
+        TestEntity { id: 8 },
+        TestEntity { id: 9 },
+    ];
+
+    struct CollectionArgs<'a> {
+        pub input_data: &'a Vec<TestEntity>,
+    }
+
+    let streamer = EntityStreamer::new(0, 3);
+
+    let stream = streamer.into_stream(
+        || async {
+            Ok(Arc::new(CollectionArgs {
+                input_data: &input_data,
+            }))
+        },
+        |input, pagination| {
+            let input_len = input.input_data.len();
+
+            let input_page = input
+                .input_data
+                .iter()
+                .skip(pagination.offset)
+                .take(pagination.safe_limit(input_len))
+                .collect::<Vec<_>>();
+
+            assert_page(&input_page, &pagination);
+
+            async move {
+                Ok(EntityListing {
+                    list: input_page,
+                    total_count: input_len,
+                })
+            }
+        },
+    );
+
+    stream.try_collect::<Vec<_>>().await.unwrap();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_paged_page_processing_of_input_data_by_value() {
+    #[derive(Debug, Clone, PartialEq)]
+    struct ClonableTestEntity {
+        id: usize,
+    }
+
+    fn assert_page(page: &[ClonableTestEntity], pagination: &PaginationOpts) {
+        match pagination.offset {
+            0 => {
+                pretty_assertions::assert_eq!(
+                    vec![
+                        ClonableTestEntity { id: 0 },
+                        ClonableTestEntity { id: 1 },
+                        ClonableTestEntity { id: 2 },
+                    ],
+                    page
+                );
+            }
+            3 => {
+                pretty_assertions::assert_eq!(
+                    vec![
+                        ClonableTestEntity { id: 3 },
+                        ClonableTestEntity { id: 4 },
+                        ClonableTestEntity { id: 5 },
+                    ],
+                    page
+                );
+            }
+            6 => {
+                pretty_assertions::assert_eq!(
+                    vec![
+                        ClonableTestEntity { id: 6 },
+                        ClonableTestEntity { id: 7 },
+                        ClonableTestEntity { id: 8 },
+                    ],
+                    page
+                );
+            }
+            9 => {
+                pretty_assertions::assert_eq!(vec![ClonableTestEntity { id: 9 },], page);
+            }
+            _ => {
+                unreachable!()
+            }
+        }
+    }
+
+    let input_data = vec![
+        ClonableTestEntity { id: 0 },
+        ClonableTestEntity { id: 1 },
+        ClonableTestEntity { id: 2 },
+        ClonableTestEntity { id: 3 },
+        ClonableTestEntity { id: 4 },
+        ClonableTestEntity { id: 5 },
+        ClonableTestEntity { id: 6 },
+        ClonableTestEntity { id: 7 },
+        ClonableTestEntity { id: 8 },
+        ClonableTestEntity { id: 9 },
+    ];
+
+    let streamer = EntityStreamer::new(0, 3);
+
+    let stream = streamer.into_stream(
+        || async { Ok(Arc::new(input_data)) },
+        |input, pagination| {
+            let input_page = input
+                .iter()
+                .skip(pagination.offset)
+                .take(pagination.safe_limit(input.len()))
+                .cloned()
+                .collect::<Vec<_>>();
+
+            assert_page(&input_page, &pagination);
+
+            async move {
+                Ok(EntityListing {
+                    list: input_page,
+                    total_count: input.len(),
+                })
+            }
+        },
+    );
+
+    stream.try_collect::<Vec<_>>().await.unwrap();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Helpers
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
