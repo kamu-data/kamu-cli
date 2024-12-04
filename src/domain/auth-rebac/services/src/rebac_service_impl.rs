@@ -203,7 +203,7 @@ impl RebacService for RebacServiceImpl {
 
     async fn get_dataset_properties_by_ids(
         &self,
-        dataset_ids: Vec<odf::DatasetID>,
+        dataset_ids: &[odf::DatasetID],
     ) -> Result<HashMap<odf::DatasetID, DatasetProperties>, GetPropertiesError> {
         let dataset_entities = dataset_ids
             .iter()
@@ -219,7 +219,7 @@ impl RebacService for RebacServiceImpl {
         let mut dataset_properties_map = HashMap::new();
 
         for dataset_id in dataset_ids {
-            dataset_properties_map.insert(dataset_id, DatasetProperties::default());
+            dataset_properties_map.insert(dataset_id.clone(), DatasetProperties::default());
         }
 
         let entity_properties_it =
