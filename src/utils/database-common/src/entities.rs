@@ -29,6 +29,12 @@ impl PaginationOpts {
             offset: 0,
         }
     }
+
+    pub fn safe_limit(&self, total: usize) -> usize {
+        let rest = total.saturating_sub(self.offset);
+
+        self.limit.min(rest)
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

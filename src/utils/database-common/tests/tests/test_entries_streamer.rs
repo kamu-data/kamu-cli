@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::cmp::min;
 use std::sync::Arc;
 
 use database_common::{EntityListing, EntityStreamer, PaginationOpts};
@@ -186,17 +185,9 @@ fn entity_source(
         .expect_entities()
         .times(expected_entities_call_count)
         .returning(move |pagination| {
-            let safe_limit = if pagination.offset + pagination.limit > total_entities_count {
-                let delta = total_entities_count.saturating_sub(pagination.offset);
-
-                min(pagination.limit, delta)
-            } else {
-                pagination.limit
-            };
-
             let result = (0..)
                 .skip(pagination.offset)
-                .take(safe_limit)
+                .take(pagination.safe_limit(total_entities_count))
                 .map(|id| TestEntity { id })
                 .collect::<Vec<_>>();
 
