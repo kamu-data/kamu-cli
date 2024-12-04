@@ -7,9 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::PaginationOpts;
+use database_common::{EntityListing, PaginationOpts};
 use internal_error::InternalError;
-use opendatafabric::AccountID;
+use opendatafabric as odf;
 use thiserror::Error;
 
 use crate::DatasetEntry;
@@ -21,20 +21,13 @@ pub trait DatasetEntryService: Sync + Send {
     async fn list_all_entries(
         &self,
         pagination: PaginationOpts,
-    ) -> Result<DatasetEntryListing, ListDatasetEntriesError>;
+    ) -> Result<EntityListing<DatasetEntry>, ListDatasetEntriesError>;
 
     async fn list_entries_owned_by(
         &self,
-        owner_id: AccountID,
+        owner_id: odf::AccountID,
         pagination: PaginationOpts,
-    ) -> Result<DatasetEntryListing, ListDatasetEntriesError>;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub struct DatasetEntryListing {
-    pub list: Vec<DatasetEntry>,
-    pub total_count: usize,
+    ) -> Result<EntityListing<DatasetEntry>, ListDatasetEntriesError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

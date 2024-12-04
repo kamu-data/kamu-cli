@@ -331,7 +331,7 @@ impl DatasetEntryService for DatasetEntryServiceImpl {
     async fn list_all_entries(
         &self,
         pagination: PaginationOpts,
-    ) -> Result<DatasetEntryListing, ListDatasetEntriesError> {
+    ) -> Result<EntityListing<DatasetEntry>, ListDatasetEntriesError> {
         use futures::TryStreamExt;
 
         let total_count = self
@@ -346,7 +346,7 @@ impl DatasetEntryService for DatasetEntryServiceImpl {
             .try_collect()
             .await?;
 
-        Ok(DatasetEntryListing {
+        Ok(EntityListing {
             list: entries,
             total_count,
         })
@@ -356,7 +356,7 @@ impl DatasetEntryService for DatasetEntryServiceImpl {
         &self,
         owner_id: AccountID,
         pagination: PaginationOpts,
-    ) -> Result<DatasetEntryListing, ListDatasetEntriesError> {
+    ) -> Result<EntityListing<DatasetEntry>, ListDatasetEntriesError> {
         use futures::TryStreamExt;
 
         let total_count = self
@@ -370,7 +370,7 @@ impl DatasetEntryService for DatasetEntryServiceImpl {
             .try_collect()
             .await?;
 
-        Ok(DatasetEntryListing {
+        Ok(EntityListing {
             list: entries,
             total_count,
         })
