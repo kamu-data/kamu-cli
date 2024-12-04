@@ -43,6 +43,11 @@ pub trait RebacRepository: Send + Sync {
         entity: &Entity,
     ) -> Result<Vec<(PropertyName, PropertyValue)>, GetEntityPropertiesError>;
 
+    async fn get_entity_properties_by_ids(
+        &self,
+        entity: &[Entity],
+    ) -> Result<Vec<(Entity, PropertyName, PropertyValue)>, GetEntityPropertiesError>;
+
     // Relations
 
     async fn insert_entities_relation(

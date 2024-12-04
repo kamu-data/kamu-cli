@@ -7,9 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use dill::{component, interface};
+use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_auth_rebac::{
     AccountProperties,
     AccountPropertyName,
@@ -23,7 +25,6 @@ use kamu_auth_rebac::{
     DeleteRelationError,
     Entity,
     EntityWithRelation,
-    GetEntityPropertiesError,
     GetPropertiesError,
     InsertEntitiesRelationError,
     InsertRelationError,
@@ -96,9 +97,7 @@ impl RebacService for RebacServiceImpl {
             .rebac_repo
             .get_entity_properties(&account_entity)
             .await
-            .map_err(|err| match err {
-                GetEntityPropertiesError::Internal(e) => e,
-            })?;
+            .int_err()?;
 
         let account_properties = entity_properties
             .into_iter()
@@ -179,9 +178,7 @@ impl RebacService for RebacServiceImpl {
             .rebac_repo
             .get_entity_properties(&dataset_entity)
             .await
-            .map_err(|err| match err {
-                GetEntityPropertiesError::Internal(e) => e,
-            })?;
+            .int_err()?;
 
         let dataset_properties = entity_properties
             .into_iter()
@@ -202,6 +199,56 @@ impl RebacService for RebacServiceImpl {
             });
 
         Ok(dataset_properties)
+    }
+
+    async fn get_dataset_properties_by_ids(
+        &self,
+        dataset_ids: Vec<odf::DatasetID>,
+    ) -> Result<HashMap<odf::DatasetID, DatasetProperties>, GetPropertiesError> {
+        let dataset_entities = dataset_ids
+            .iter()
+            .map(|id| Entity::new_dataset(id.to_string()))
+            .collect::<Vec<_>>();
+
+        let entity_properties = self
+            .rebac_repo
+            .get_entity_properties_by_ids(&dataset_entities)
+            .await
+            .int_err()?;
+
+        let mut dataset_properties_map = HashMap::new();
+
+        for dataset_id in dataset_ids {
+            dataset_properties_map.insert(dataset_id, DatasetProperties::default());
+        }
+
+        let entity_properties_it =
+            entity_properties
+                .into_iter()
+                .map(|(entity, name, value)| match name {
+                    PropertyName::Dataset(dataset_property_name) => {
+                        (entity.entity_id, dataset_property_name, value)
+                    }
+                    PropertyName::Account(_) => unreachable!(),
+                });
+
+        for (entity_id, name, value) in entity_properties_it {
+            let dataset_id = odf::DatasetID::from_did_str(&entity_id).int_err()?;
+            let dataset_properties = dataset_properties_map
+                .get_mut(&dataset_id)
+                .ok_or_else(|| format!("dataset_id not found: {dataset_id}").int_err())?;
+
+            match name {
+                DatasetPropertyName::AllowsAnonymousRead => {
+                    dataset_properties.allows_anonymous_read = value == PROPERTY_VALUE_BOOLEAN_TRUE;
+                }
+                DatasetPropertyName::AllowsPublicRead => {
+                    dataset_properties.allows_public_read = value == PROPERTY_VALUE_BOOLEAN_TRUE;
+                }
+            };
+        }
+
+        Ok(dataset_properties_map)
     }
 
     async fn insert_account_dataset_relation(

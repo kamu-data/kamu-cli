@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashMap;
+
 use internal_error::InternalError;
 use opendatafabric::{AccountID, DatasetID};
 use thiserror::Error;
@@ -68,6 +70,12 @@ pub trait RebacService: Send + Sync {
         &self,
         dataset_id: &DatasetID,
     ) -> Result<DatasetProperties, GetPropertiesError>;
+
+    async fn get_dataset_properties_by_ids(
+        &self,
+        // TODO: Private Datasets: use Cow?
+        dataset_ids: Vec<DatasetID>,
+    ) -> Result<HashMap<DatasetID, DatasetProperties>, GetPropertiesError>;
 
     // Relations
     async fn insert_account_dataset_relation(

@@ -180,6 +180,14 @@ impl RebacRepository for SqliteRebacRepository {
             .map_err(GetEntityPropertiesError::Internal)
     }
 
+    async fn get_entity_properties_by_ids(
+        &self,
+        _entity: &[Entity],
+    ) -> Result<Vec<(Entity, PropertyName, PropertyValue)>, GetEntityPropertiesError> {
+        // TODO: Private Datasets: implement
+        todo!()
+    }
+
     async fn insert_entities_relation(
         &self,
         subject_entity: &Entity,
