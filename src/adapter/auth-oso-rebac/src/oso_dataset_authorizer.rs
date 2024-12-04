@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use dill::*;
@@ -57,8 +57,8 @@ impl OsoDatasetAuthorizer {
 
         let (maybe_user_actor, maybe_dataset_resource) = self
             .oso_resource_service
-            .user_dataset_pair(dataset_id, maybe_account_id)
-            .await;
+            .user_dataset_pair(maybe_account_id, dataset_id)
+            .await?;
 
         let user_actor = maybe_user_actor
             .ok_or_else(|| format!("UserActor not found: {maybe_account_id:?}").int_err())?;
@@ -71,26 +71,15 @@ impl OsoDatasetAuthorizer {
     async fn user_actor(&self) -> Result<UserActor, InternalError> {
         let maybe_account_id = self.get_maybe_logged_account_id();
 
-        let maybe_user_actor = self.oso_resource_service.user_actor(maybe_account_id).await;
+        let maybe_user_actor = self
+            .oso_resource_service
+            .user_actor(maybe_account_id)
+            .await?;
 
         let user_actor = maybe_user_actor
             .ok_or_else(|| format!("UserActor not found: {maybe_account_id:?}").int_err())?;
 
         Ok(user_actor)
-    }
-
-    async fn dataset_resource(
-        &self,
-        dataset_handle: &odf::DatasetHandle,
-    ) -> Result<DatasetResource, InternalError> {
-        let dataset_id = &dataset_handle.id;
-
-        let maybe_dataset_resource = self.oso_resource_service.dataset_resource(dataset_id).await;
-
-        let dataset_resource = maybe_dataset_resource
-            .ok_or_else(|| format!("DatasetResource not found: {dataset_id}").int_err())?;
-
-        Ok(dataset_resource)
     }
 
     fn get_maybe_logged_account_id(&self) -> Option<&odf::AccountID> {
@@ -152,16 +141,38 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
         let user_actor = self.user_actor().await?;
         let mut matched_dataset_handles = Vec::with_capacity(dataset_handles.len());
 
-        for hdl in dataset_handles {
-            let dataset_resource = self.dataset_resource(&hdl).await?;
+        let dataset_ids = dataset_handles
+            .iter()
+            .map(|hdl| hdl.id.clone())
+            .collect::<Vec<_>>();
+        let dataset_resources_resolution = self
+            .oso_resource_service
+            .get_multiple_dataset_resources(&dataset_ids)
+            .await
+            .int_err()?;
+        let mut dataset_handle_id_mapping =
+            dataset_handles
+                .into_iter()
+                .fold(HashMap::new(), |mut acc, hdl| {
+                    acc.insert(hdl.id.clone(), hdl);
+                    acc
+                });
 
+        for (dataset_id, dataset_resource) in dataset_resources_resolution.resolved_resources {
             let is_allowed = self
                 .oso
                 .is_allowed(user_actor.clone(), action, dataset_resource)
                 .int_err()?;
 
             if is_allowed {
-                matched_dataset_handles.push(hdl);
+                let dataset_handle = dataset_handle_id_mapping
+                    // Thus we obtain the value without cloning
+                    .remove(&dataset_id)
+                    .ok_or_else(|| {
+                        format!("Unexpectedly, dataset_handle was found: {dataset_id}").int_err()
+                    })?;
+
+                matched_dataset_handles.push(dataset_handle);
             }
         }
 
@@ -178,8 +189,30 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
         let mut matched_dataset_handles = Vec::with_capacity(dataset_handles.len());
         let mut unmatched_results = Vec::new();
 
-        for hdl in dataset_handles {
-            let dataset_resource = self.dataset_resource(&hdl).await?;
+        let dataset_ids = dataset_handles
+            .iter()
+            .map(|hdl| hdl.id.clone())
+            .collect::<Vec<_>>();
+        let dataset_resources_resolution = self
+            .oso_resource_service
+            .get_multiple_dataset_resources(&dataset_ids)
+            .await
+            .int_err()?;
+        let mut dataset_handle_id_mapping =
+            dataset_handles
+                .into_iter()
+                .fold(HashMap::new(), |mut acc, hdl| {
+                    acc.insert(hdl.id.clone(), hdl);
+                    acc
+                });
+
+        for (dataset_id, dataset_resource) in dataset_resources_resolution.resolved_resources {
+            let dataset_handle = dataset_handle_id_mapping
+                // Thus we obtain the value without cloning
+                .remove(&dataset_id)
+                .ok_or_else(|| {
+                    format!("Unexpectedly, dataset_handle was found: {dataset_id}").int_err()
+                })?;
 
             let is_allowed = self
                 .oso
@@ -187,11 +220,11 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
                 .int_err()?;
 
             if is_allowed {
-                matched_dataset_handles.push(hdl);
+                matched_dataset_handles.push(dataset_handle);
             } else {
-                let dataset_ref = hdl.as_local_ref();
+                let dataset_ref = dataset_handle.as_local_ref();
                 unmatched_results.push((
-                    hdl,
+                    dataset_handle,
                     DatasetActionUnauthorizedError::Access(AccessError::Forbidden(
                         DatasetActionNotEnoughPermissionsError {
                             action,
