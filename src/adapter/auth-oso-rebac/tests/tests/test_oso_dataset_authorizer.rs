@@ -12,8 +12,6 @@ use std::collections::HashSet;
 use std::sync::Arc;
 
 use dill::Component;
-use init_on_startup::InitOnStartup;
-use kamu::{CreateDatasetUseCaseImpl, DatasetRepositoryWriter, MockDatasetRepositoryWriter};
 use kamu_accounts::{
     AccountConfig,
     AnonymousAccountReason,
@@ -24,15 +22,17 @@ use kamu_accounts_inmem::InMemoryAccountRepository;
 use kamu_accounts_services::{LoginPasswordAuthProvider, PredefinedAccountsRegistrator};
 use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer, DatasetActionUnauthorizedError};
+use kamu_core::testing::MockDatasetRepository;
 use kamu_core::{
     AccessError,
     DatasetLifecycleMessage,
+    DatasetRepository,
     DatasetVisibility,
     TenancyConfig,
     MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
 };
 use kamu_datasets_inmem::InMemoryDatasetEntryRepository;
-use kamu_datasets_services::DatasetEntryIndexer;
+use kamu_datasets_services::DatasetEntryServiceImpl;
 use messaging_outbox::{
     register_message_dispatcher,
     ConsumerFilter,
@@ -135,6 +135,8 @@ impl DatasetAuthorizerHarness {
         }
 
         let catalog = {
+            let tenancy_config = TenancyConfig::MultiTenant;
+
             let mut b = dill::CatalogBuilder::new();
 
             b.add::<SystemTimeSourceDefault>()
@@ -146,20 +148,18 @@ impl DatasetAuthorizerHarness {
                     OutboxImmediateImpl::builder()
                         .with_consumer_filter(ConsumerFilter::AllConsumers),
                 )
-                .add_builder(DatasetEntryIndexer::builder().with_is_in_workspace(true))
-                // The indexer has no other interfaces
-                .bind::<dyn InitOnStartup, DatasetEntryIndexer>()
+                .add_value(MockDatasetRepository::new())
+                .bind::<dyn DatasetRepository, MockDatasetRepository>()
+                .add_value(tenancy_config)
+                .add::<DatasetEntryServiceImpl>()
                 .add::<InMemoryDatasetEntryRepository>()
                 .add::<InMemoryAccountRepository>()
                 .add::<LoginPasswordAuthProvider>()
-                .bind::<dyn Outbox, OutboxImmediateImpl>()
-                .add_value(MockDatasetRepositoryWriter::new())
-                .bind::<dyn DatasetRepositoryWriter, MockDatasetRepositoryWriter>()
-                .add::<CreateDatasetUseCaseImpl>();
+                .bind::<dyn Outbox, OutboxImmediateImpl>();
 
             kamu_adapter_auth_oso_rebac::register_dependencies(&mut b);
 
-            kamu_auth_rebac_services::register_dependencies(&mut b, TenancyConfig::MultiTenant);
+            kamu_auth_rebac_services::register_dependencies(&mut b, tenancy_config);
 
             register_message_dispatcher::<DatasetLifecycleMessage>(
                 &mut b,

@@ -502,6 +502,7 @@ pub fn configure_base_catalog(
 
     b.add::<kamu_accounts_services::AuthenticationServiceImpl>();
     b.add::<kamu_accounts_services::AccessTokenServiceImpl>();
+    b.add::<kamu_accounts_services::AccountServiceImpl>();
     b.add::<PredefinedAccountsRegistrator>();
 
     // Give both CLI and server access to stored repo access tokens
