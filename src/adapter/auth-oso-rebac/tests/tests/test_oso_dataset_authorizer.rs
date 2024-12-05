@@ -22,7 +22,6 @@ use kamu_accounts::{
 };
 use kamu_accounts_inmem::InMemoryAccountRepository;
 use kamu_accounts_services::{LoginPasswordAuthProvider, PredefinedAccountsRegistrator};
-use kamu_adapter_auth_oso_rebac::OsoResourceServiceInitializator;
 use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer, DatasetActionUnauthorizedError};
 use kamu_core::{
@@ -174,12 +173,6 @@ impl DatasetAuthorizerHarness {
             use init_on_startup::InitOnStartup;
             catalog
                 .get_one::<PredefinedAccountsRegistrator>()
-                .unwrap()
-                .run_initialization()
-                .await
-                .unwrap();
-            catalog
-                .get_one::<OsoResourceServiceInitializator>()
                 .unwrap()
                 .run_initialization()
                 .await

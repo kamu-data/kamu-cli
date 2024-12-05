@@ -15,7 +15,6 @@ mod jobs;
 mod kamu_auth_oso;
 mod messages;
 mod oso_dataset_authorizer;
-mod oso_resource_service_initializator;
 mod oso_resource_service_inmem;
 mod user_actor;
 
@@ -25,6 +24,5 @@ pub use jobs::*;
 pub use kamu_auth_oso::*;
 pub use messages::*;
 pub use oso_dataset_authorizer::*;
-pub use oso_resource_service_initializator::*;
 pub use oso_resource_service_inmem::*;
 pub use user_actor::*;
