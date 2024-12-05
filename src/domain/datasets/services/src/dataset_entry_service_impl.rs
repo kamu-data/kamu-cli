@@ -328,6 +328,16 @@ impl DatasetEntryServiceImpl {
 
 #[async_trait::async_trait]
 impl DatasetEntryService for DatasetEntryServiceImpl {
+    fn all_entries(&self) -> DatasetEntryStream {
+        EntityStreamer::default().into_stream(
+            || async { Ok(()) },
+            |_, pagination| {
+                let list_fut = self.list_all_entries(pagination);
+                async { list_fut.await.int_err() }
+            },
+        )
+    }
+
     async fn list_all_entries(
         &self,
         pagination: PaginationOpts,

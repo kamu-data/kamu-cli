@@ -12,12 +12,15 @@ use internal_error::InternalError;
 use opendatafabric as odf;
 use thiserror::Error;
 
-use crate::DatasetEntry;
+use crate::{DatasetEntry, DatasetEntryStream};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 pub trait DatasetEntryService: Sync + Send {
+    // TODO: Private Datasets: extract to DatasetEntryRegistry?
+    fn all_entries(&self) -> DatasetEntryStream;
+
     async fn list_all_entries(
         &self,
         pagination: PaginationOpts,
@@ -30,6 +33,8 @@ pub trait DatasetEntryService: Sync + Send {
     ) -> Result<EntityListing<DatasetEntry>, ListDatasetEntriesError>;
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Errors
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]

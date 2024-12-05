@@ -22,14 +22,6 @@ pub struct PaginationOpts {
 }
 
 impl PaginationOpts {
-    pub fn all() -> Self {
-        PaginationOpts {
-            // i64 type is used because sometimes repositories use a conversion to it
-            limit: usize::try_from(i64::MAX).unwrap(),
-            offset: 0,
-        }
-    }
-
     pub fn safe_limit(&self, total: usize) -> usize {
         let rest = total.saturating_sub(self.offset);
 

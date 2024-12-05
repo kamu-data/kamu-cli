@@ -9,13 +9,12 @@
 
 use std::sync::Arc;
 
-use database_common::PaginationOpts;
 use dill::{component, interface, meta};
 use init_on_startup::{InitOnStartup, InitOnStartupMeta};
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_accounts::{AccountRepository, JOB_KAMU_ACCOUNTS_PREDEFINED_ACCOUNTS_REGISTRATOR};
 use kamu_auth_rebac::{AccountPropertyName, DatasetPropertyName, RebacRepository, RebacService};
-use kamu_datasets::DatasetEntryRepository;
+use kamu_datasets::DatasetEntryService;
 use kamu_datasets_services::JOB_KAMU_DATASETS_DATASET_ENTRY_INDEXER;
 
 use crate::JOB_KAMU_REBAC_INDEXER;
@@ -25,7 +24,7 @@ use crate::JOB_KAMU_REBAC_INDEXER;
 pub struct RebacIndexer {
     rebac_repo: Arc<dyn RebacRepository>,
     rebac_service: Arc<dyn RebacService>,
-    dataset_entry_repository: Arc<dyn DatasetEntryRepository>,
+    dataset_entry_service: Arc<dyn DatasetEntryService>,
     account_repository: Arc<dyn AccountRepository>,
 }
 
@@ -43,13 +42,13 @@ impl RebacIndexer {
     pub fn new(
         rebac_repo: Arc<dyn RebacRepository>,
         rebac_service: Arc<dyn RebacService>,
-        dataset_entry_repository: Arc<dyn DatasetEntryRepository>,
+        dataset_entry_service: Arc<dyn DatasetEntryService>,
         account_repository: Arc<dyn AccountRepository>,
     ) -> Self {
         Self {
             rebac_repo,
             rebac_service,
-            dataset_entry_repository,
+            dataset_entry_service,
             account_repository,
         }
     }
@@ -71,16 +70,9 @@ impl RebacIndexer {
     async fn index_dataset_entries(&self) -> Result<(), InternalError> {
         use futures::TryStreamExt;
 
-        // TODO: Private Datasets: use DatasetEntryService
-        //       (also it removes futures dep)
-        let dataset_entries = self
-            .dataset_entry_repository
-            .get_dataset_entries(PaginationOpts::all())
-            .await
-            .try_collect::<Vec<_>>()
-            .await?;
+        let mut dataset_entry_stream = self.dataset_entry_service.all_entries();
 
-        for dataset_entry in dataset_entries {
+        while let Some(dataset_entry) = dataset_entry_stream.try_next().await? {
             for (name, value) in [
                 DatasetPropertyName::allows_public_read(false),
                 DatasetPropertyName::allows_anonymous_read(false),
