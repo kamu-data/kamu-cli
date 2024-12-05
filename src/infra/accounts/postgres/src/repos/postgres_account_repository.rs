@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::{TransactionRef, TransactionRefT};
+use database_common::{PaginationOpts, TransactionRef, TransactionRefT};
 use dill::{component, interface};
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use opendatafabric::{AccountID, AccountName};
@@ -86,36 +86,37 @@ impl AccountRepository for PostgresAccountRepository {
         Ok(())
     }
 
-    async fn get_accounts(&self) -> Result<Vec<Account>, GetAccountsError> {
-        let mut tr = self.transaction.lock().await;
-
-        let connection_mut = tr
-            .connection_mut()
-            .await
-            .map_err(GetAccountsError::Internal)?;
-
-        let account_rows = sqlx::query_as!(
-            AccountRowModel,
-            r#"
-            SELECT id            AS "id: _",
-                   account_name,
-                   email,
-                   display_name,
-                   account_type  AS "account_type: AccountType",
-                   avatar_url,
-                   registered_at,
-                   is_admin,
-                   provider,
-                   provider_identity_key
-            FROM accounts
-            "#,
-        )
-        .fetch_all(connection_mut)
-        .await
-        .int_err()
-        .map_err(GetAccountsError::Internal)?;
-
-        Ok(account_rows.into_iter().map(Into::into).collect())
+    async fn get_accounts(&self, _pagination: PaginationOpts) -> AccountStream {
+        todo!()
+        // let mut tr = self.transaction.lock().await;
+        //
+        // let connection_mut = tr
+        //     .connection_mut()
+        //     .await
+        //     .map_err(GetAccountsError::Internal)?;
+        //
+        // let account_rows = sqlx::query_as!(
+        //     AccountRowModel,
+        //     r#"
+        //     SELECT id            AS "id: _",
+        //            account_name,
+        //            email,
+        //            display_name,
+        //            account_type  AS "account_type: AccountType",
+        //            avatar_url,
+        //            registered_at,
+        //            is_admin,
+        //            provider,
+        //            provider_identity_key
+        //     FROM accounts
+        //     "#,
+        // )
+        // .fetch_all(connection_mut)
+        // .await
+        // .int_err()
+        // .map_err(GetAccountsError::Internal)?;
+        //
+        // Ok(account_rows.into_iter().map(Into::into).collect())
     }
 
     async fn get_account_by_id(

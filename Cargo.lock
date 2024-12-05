@@ -5294,6 +5294,7 @@ dependencies = [
  "database-common",
  "database-common-macros",
  "dill",
+ "futures",
  "internal-error",
  "kamu-accounts",
  "kamu-accounts-repo-tests",
@@ -5308,11 +5309,13 @@ dependencies = [
 name = "kamu-accounts-mysql"
 version = "0.209.0"
 dependencies = [
+ "async-stream",
  "async-trait",
  "chrono",
  "database-common",
  "database-common-macros",
  "dill",
+ "futures",
  "internal-error",
  "kamu-accounts",
  "kamu-accounts-repo-tests",
@@ -5389,11 +5392,13 @@ dependencies = [
 name = "kamu-accounts-sqlite"
 version = "0.209.0"
 dependencies = [
+ "async-stream",
  "async-trait",
  "chrono",
  "database-common",
  "database-common-macros",
  "dill",
+ "futures",
  "internal-error",
  "kamu-accounts",
  "kamu-accounts-repo-tests",
@@ -5430,6 +5435,7 @@ dependencies = [
  "opendatafabric",
  "oso",
  "test-log",
+ "thiserror 1.0.69",
  "time-source",
  "tokio",
  "tracing",

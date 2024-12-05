@@ -10,6 +10,7 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
+use database_common::PaginationOpts;
 use dill::*;
 use opendatafabric::{AccountID, AccountName};
 
@@ -105,16 +106,21 @@ impl AccountRepository for InMemoryAccountRepository {
         Ok(())
     }
 
-    async fn get_accounts(&self) -> Result<Vec<Account>, GetAccountsError> {
-        let readable_state = self.state.lock().unwrap();
+    async fn get_accounts(&self, pagination: PaginationOpts) -> AccountStream {
+        let dataset_entries_page = {
+            let readable_state = self.state.lock().unwrap();
 
-        let accounts = readable_state
-            .accounts_by_id
-            .values()
-            .cloned()
-            .collect::<Vec<_>>();
+            readable_state
+                .accounts_by_id
+                .values()
+                .skip(pagination.offset)
+                .take(pagination.limit)
+                .cloned()
+                .map(Ok)
+                .collect::<Vec<_>>()
+        };
 
-        Ok(accounts)
+        Box::pin(futures::stream::iter(dataset_entries_page))
     }
 
     async fn get_account_by_id(
