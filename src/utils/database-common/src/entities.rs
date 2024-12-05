@@ -11,7 +11,7 @@ use std::future::Future;
 use std::pin::Pin;
 
 use futures::Stream;
-use internal_error::{InternalError, ResultIntoInternal};
+use internal_error::InternalError;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -31,6 +31,16 @@ impl PaginationOpts {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub struct EntityListing<Entity> {
+    pub list: Vec<Entity>,
+    pub total_count: usize,
+}
+
+pub type EntityStream<'a, Entity> =
+    Pin<Box<dyn Stream<Item = Result<Entity, InternalError>> + Send + 'a>>;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub struct EntityStreamer {
     start_offset: usize,
     page_limit: usize,
@@ -45,15 +55,7 @@ impl Default for EntityStreamer {
     }
 }
 
-pub struct EntityListing<Entity> {
-    pub list: Vec<Entity>,
-    pub total_count: usize,
-}
-
 impl EntityStreamer {
-    pub type EntityStream<'a, Entity> =
-        Pin<Box<dyn Stream<Item = Result<Entity, InternalError>> + Send + 'a>>;
-
     pub fn new(start_offset: usize, page_limit: usize) -> Self {
         Self {
             start_offset,
@@ -65,7 +67,7 @@ impl EntityStreamer {
         self,
         get_args_callback: HInitArgs,
         next_entities_callback: HListing,
-    ) -> Self::EntityStream<'a, Entity>
+    ) -> EntityStream<'a, Entity>
     where
         Entity: Send + 'a,
 
@@ -92,8 +94,7 @@ impl EntityStreamer {
                 // Load a page of dataset entities
                 let entities_page =
                     next_entities_callback(args.clone(), PaginationOpts { limit, offset })
-                        .await
-                        .int_err()?;
+                        .await?;
 
                 // Actually read entities
                 let loaded_entries_count = entities_page.list.len();
