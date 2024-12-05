@@ -61,6 +61,14 @@ impl InMemoryAccountRepository {
 
 #[async_trait::async_trait]
 impl AccountRepository for InMemoryAccountRepository {
+    async fn accounts_count(&self) -> Result<usize, AccountsCountError> {
+        let readable_state = self.state.lock().unwrap();
+
+        let accounts_count = readable_state.accounts_by_id.len();
+
+        Ok(accounts_count)
+    }
+
     async fn create_account(&self, account: &Account) -> Result<(), CreateAccountError> {
         let mut guard = self.state.lock().unwrap();
         if guard.accounts_by_id.contains_key(&account.id) {

@@ -12,7 +12,7 @@ use std::sync::Arc;
 use dill::{component, interface, meta};
 use init_on_startup::{InitOnStartup, InitOnStartupMeta};
 use internal_error::{InternalError, ResultIntoInternal};
-use kamu_accounts::{AccountRepository, JOB_KAMU_ACCOUNTS_PREDEFINED_ACCOUNTS_REGISTRATOR};
+use kamu_accounts::{AccountService, JOB_KAMU_ACCOUNTS_PREDEFINED_ACCOUNTS_REGISTRATOR};
 use kamu_auth_rebac::{AccountPropertyName, DatasetPropertyName, RebacRepository, RebacService};
 use kamu_datasets::DatasetEntryService;
 use kamu_datasets_services::JOB_KAMU_DATASETS_DATASET_ENTRY_INDEXER;
@@ -25,7 +25,7 @@ pub struct RebacIndexer {
     rebac_repo: Arc<dyn RebacRepository>,
     rebac_service: Arc<dyn RebacService>,
     dataset_entry_service: Arc<dyn DatasetEntryService>,
-    account_repository: Arc<dyn AccountRepository>,
+    account_service: Arc<dyn AccountService>,
 }
 
 #[component(pub)]
@@ -43,13 +43,13 @@ impl RebacIndexer {
         rebac_repo: Arc<dyn RebacRepository>,
         rebac_service: Arc<dyn RebacService>,
         dataset_entry_service: Arc<dyn DatasetEntryService>,
-        account_repository: Arc<dyn AccountRepository>,
+        account_service: Arc<dyn AccountService>,
     ) -> Self {
         Self {
             rebac_repo,
             rebac_service,
             dataset_entry_service,
-            account_repository,
+            account_service,
         }
     }
 
@@ -89,9 +89,11 @@ impl RebacIndexer {
 
     #[tracing::instrument(level = "debug", skip_all)]
     async fn index_accounts(&self) -> Result<(), InternalError> {
-        let accounts = self.account_repository.get_accounts().await.int_err()?;
+        use futures::TryStreamExt;
 
-        for account in accounts {
+        let mut accounts_stream = self.account_service.all_accounts();
+
+        while let Some(account) = accounts_stream.try_next().await? {
             for (name, value) in [AccountPropertyName::is_admin(account.is_admin)] {
                 self.rebac_service
                     .set_account_property(&account.id, name, &value)

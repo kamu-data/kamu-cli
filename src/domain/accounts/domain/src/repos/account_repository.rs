@@ -20,6 +20,9 @@ use crate::Account;
 
 #[async_trait::async_trait]
 pub trait AccountRepository: Send + Sync {
+    // TODO: Private Datasets: tests
+    async fn accounts_count(&self) -> Result<usize, AccountsCountError>;
+
     async fn create_account(&self, account: &Account) -> Result<(), CreateAccountError>;
 
     // TODO: Private Datasets: tests
@@ -62,6 +65,14 @@ pub type AccountStream<'a> = EntityStream<'a, Account>;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Errors
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum AccountsCountError {
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]

@@ -33,6 +33,10 @@ impl PostgresAccountRepository {
 
 #[async_trait::async_trait]
 impl AccountRepository for PostgresAccountRepository {
+    async fn accounts_count(&self) -> Result<usize, AccountsCountError> {
+        todo!()
+    }
+
     async fn create_account(&self, account: &Account) -> Result<(), CreateAccountError> {
         let mut tr = self.transaction.lock().await;
 

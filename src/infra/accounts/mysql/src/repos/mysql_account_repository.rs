@@ -34,6 +34,10 @@ impl MySqlAccountRepository {
 
 #[async_trait::async_trait]
 impl AccountRepository for MySqlAccountRepository {
+    async fn accounts_count(&self) -> Result<usize, AccountsCountError> {
+        todo!()
+    }
+
     async fn create_account(&self, account: &Account) -> Result<(), CreateAccountError> {
         let mut tr = self.transaction.lock().await;
 

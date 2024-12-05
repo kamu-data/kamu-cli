@@ -34,6 +34,24 @@ impl SqliteAccountRepository {
 
 #[async_trait::async_trait]
 impl AccountRepository for SqliteAccountRepository {
+    async fn accounts_count(&self) -> Result<usize, AccountsCountError> {
+        let mut tr = self.transaction.lock().await;
+
+        let connection_mut = tr.connection_mut().await?;
+
+        let accounts_count = sqlx::query_scalar!(
+            r#"
+            SELECT COUNT(*)
+            FROM accounts
+            "#,
+        )
+        .fetch_one(connection_mut)
+        .await
+        .int_err()?;
+
+        Ok(usize::try_from(accounts_count).unwrap_or(0))
+    }
+
     async fn create_account(&self, account: &Account) -> Result<(), CreateAccountError> {
         let mut tr = self.transaction.lock().await;
 
