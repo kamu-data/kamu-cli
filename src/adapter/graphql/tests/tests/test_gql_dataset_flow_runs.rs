@@ -46,6 +46,7 @@ use kamu_core::{
     DatasetIntervalIncrement,
     DatasetLifecycleMessage,
     DatasetRepository,
+    MetadataChainExt,
     PollingIngestService,
     PullResult,
     TenancyConfig,

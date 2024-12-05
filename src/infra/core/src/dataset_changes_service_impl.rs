@@ -61,8 +61,7 @@ impl DatasetChangesServiceImpl {
     ) -> Result<Multihash, GetIncrementError> {
         resolved_dataset
             .as_metadata_chain()
-            .as_reference_repo()
-            .get(&BlockRef::Head)
+            .resolve_ref(&BlockRef::Head)
             .await
             .map_err(|e| match e {
                 GetRefError::Access(e) => GetIncrementError::Access(e),

@@ -10,6 +10,7 @@
 use std::convert::TryFrom;
 
 use async_trait::async_trait;
+use bytes::Bytes;
 use futures::{StreamExt, TryStreamExt};
 use internal_error::*;
 use opendatafabric::{MetadataBlock, Multihash};
@@ -403,57 +404,24 @@ impl<'a> MetadataChain for MetadataChainWithStats<'a> {
         self.chain.resolve_ref(r).await
     }
 
-    async fn get_block(&self, hash: &Multihash) -> Result<MetadataBlock, GetBlockError> {
-        (self.on_read)(1);
-        self.chain.get_block(hash).await
-    }
-
     async fn contains_block(&self, hash: &Multihash) -> Result<bool, ContainsBlockError> {
         (self.on_read)(1);
         self.chain.contains_block(hash).await
     }
 
-    fn iter_blocks_interval<'b>(
-        &'b self,
-        head: &'b Multihash,
-        tail: Option<&'b Multihash>,
-        ignore_missing_tail: bool,
-    ) -> DynMetadataStream<'b> {
-        Box::pin(
-            self.chain
-                .iter_blocks_interval(head, tail, ignore_missing_tail)
-                .map(|v| {
-                    (self.on_read)(1);
-                    v
-                }),
-        )
+    async fn get_block_size(&self, hash: &Multihash) -> Result<u64, GetBlockDataError> {
+        (self.on_read)(1);
+        self.chain.get_block_size(hash).await
     }
 
-    fn iter_blocks_interval_inclusive<'b>(
-        &'b self,
-        head: &'b Multihash,
-        tail: &'b Multihash,
-        ignore_missing_tail: bool,
-    ) -> DynMetadataStream<'b> {
-        Box::pin(
-            self.chain
-                .iter_blocks_interval_inclusive(head, tail, ignore_missing_tail)
-                .map(|v| {
-                    (self.on_read)(1);
-                    v
-                }),
-        )
+    async fn get_block_bytes(&self, hash: &Multihash) -> Result<Bytes, GetBlockDataError> {
+        (self.on_read)(1);
+        self.chain.get_block_bytes(hash).await
     }
 
-    fn iter_blocks_interval_ref<'b>(
-        &'b self,
-        head: &'b BlockRef,
-        tail: Option<&'b BlockRef>,
-    ) -> DynMetadataStream<'b> {
-        Box::pin(self.chain.iter_blocks_interval_ref(head, tail).map(|v| {
-            (self.on_read)(1);
-            v
-        }))
+    async fn get_block(&self, hash: &Multihash) -> Result<MetadataBlock, GetBlockError> {
+        (self.on_read)(1);
+        self.chain.get_block(hash).await
     }
 
     async fn set_ref<'b>(
@@ -471,14 +439,6 @@ impl<'a> MetadataChain for MetadataChainWithStats<'a> {
         opts: AppendOpts<'b>,
     ) -> Result<Multihash, AppendError> {
         self.chain.append(block, opts).await
-    }
-
-    fn as_reference_repo(&self) -> &dyn ReferenceRepository {
-        self.chain.as_reference_repo()
-    }
-
-    fn as_metadata_block_repository(&self) -> &dyn MetadataBlockRepository {
-        self.chain.as_metadata_block_repository()
     }
 }
 
