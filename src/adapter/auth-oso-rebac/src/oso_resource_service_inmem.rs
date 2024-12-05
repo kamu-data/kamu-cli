@@ -60,18 +60,6 @@ impl OsoResourceServiceInMem {
     }
 
     // TODO: Private Datasets: concrete the error (absorb option to NotFound error?)
-    pub async fn user_dataset_pair(
-        &self,
-        maybe_account_id: Option<&odf::AccountID>,
-        dataset_id: &odf::DatasetID,
-    ) -> Result<(Option<UserActor>, Option<DatasetResource>), InternalError> {
-        let user_actor = self.user_actor(maybe_account_id).await?;
-        let dataset_resource = self.dataset_resource(dataset_id).await?;
-
-        Ok((user_actor, dataset_resource))
-    }
-
-    // TODO: Private Datasets: concrete the error (absorb option to NotFound error?)
     pub async fn user_actor(
         &self,
         maybe_account_id: Option<&odf::AccountID>,
@@ -198,9 +186,13 @@ impl OsoResourceServiceInMem {
                     let mut dataset_resources = Vec::with_capacity(dataset_properties_map.len());
 
                     for (dataset_id, dataset_properties) in dataset_properties_map {
-                        let owner_id = dataset_id_owner_id_mapping
-                            .get(&dataset_id)
-                            .ok_or_else(|| format!("owner_id not found: {dataset_id}").int_err())?;
+                        let owner_id =
+                            dataset_id_owner_id_mapping
+                                .get(&dataset_id)
+                                .ok_or_else(|| {
+                                    format!("Unexpectedly, owner_id not found: {dataset_id}")
+                                        .int_err()
+                                })?;
 
                         let dataset_resource =
                             DatasetResource::new(owner_id, dataset_properties.allows_public_read);

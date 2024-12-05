@@ -17,6 +17,7 @@ use kamu_core::auth::*;
 use kamu_core::AccessError;
 use opendatafabric as odf;
 use oso::Oso;
+use tokio::try_join;
 
 use crate::dataset_resource::*;
 use crate::user_actor::*;
@@ -48,26 +49,6 @@ impl OsoDatasetAuthorizer {
         }
     }
 
-    async fn user_dataset_pair(
-        &self,
-        dataset_handle: &odf::DatasetHandle,
-    ) -> Result<(UserActor, DatasetResource), InternalError> {
-        let dataset_id = &dataset_handle.id;
-        let maybe_account_id = self.get_maybe_logged_account_id();
-
-        let (maybe_user_actor, maybe_dataset_resource) = self
-            .oso_resource_service
-            .user_dataset_pair(maybe_account_id, dataset_id)
-            .await?;
-
-        let user_actor = maybe_user_actor
-            .ok_or_else(|| format!("UserActor not found: {maybe_account_id:?}").int_err())?;
-        let dataset_resource = maybe_dataset_resource
-            .ok_or_else(|| format!("DatasetResource not found: {dataset_id}").int_err())?;
-
-        Ok((user_actor, dataset_resource))
-    }
-
     async fn user_actor(&self) -> Result<UserActor, InternalError> {
         let maybe_account_id = self.get_maybe_logged_account_id();
 
@@ -80,6 +61,23 @@ impl OsoDatasetAuthorizer {
             .ok_or_else(|| format!("UserActor not found: {maybe_account_id:?}").int_err())?;
 
         Ok(user_actor)
+    }
+
+    async fn dataset_resource(
+        &self,
+        dataset_handle: &odf::DatasetHandle,
+    ) -> Result<DatasetResource, InternalError> {
+        let dataset_id = &dataset_handle.id;
+
+        let maybe_dataset_resource = self
+            .oso_resource_service
+            .dataset_resource(dataset_id)
+            .await?;
+
+        let dataset_resource = maybe_dataset_resource
+            .ok_or_else(|| format!("DatasetResource not found: {dataset_id}").int_err())?;
+
+        Ok(dataset_resource)
     }
 
     fn get_maybe_logged_account_id(&self) -> Option<&odf::AccountID> {
@@ -100,7 +98,8 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
         dataset_handle: &odf::DatasetHandle,
         action: DatasetAction,
     ) -> Result<(), DatasetActionUnauthorizedError> {
-        let (user_actor, dataset_resource) = self.user_dataset_pair(dataset_handle).await?;
+        let (user_actor, dataset_resource) =
+            try_join!(self.user_actor(), self.dataset_resource(dataset_handle))?;
 
         match self
             .oso
@@ -125,7 +124,8 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
         &self,
         dataset_handle: &odf::DatasetHandle,
     ) -> Result<HashSet<DatasetAction>, InternalError> {
-        let (user_actor, dataset_resource) = self.user_dataset_pair(dataset_handle).await?;
+        let (user_actor, dataset_resource) =
+            try_join!(self.user_actor(), self.dataset_resource(dataset_handle))?;
 
         self.oso
             .get_allowed_actions(user_actor, dataset_resource)
