@@ -308,7 +308,7 @@ async fn test_append_unexpected_ref() {
                     .prev(&hash, 0)
                     .build(),
                 AppendOpts {
-                    check_ref_is: Some(Some(&invalid_hash)),
+                    check_ref_mode: AppendCheckRefMode::EqualsTo(Some(&invalid_hash)),
                     ..Default::default()
                 }
             )

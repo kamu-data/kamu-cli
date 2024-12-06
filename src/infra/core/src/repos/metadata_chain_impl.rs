@@ -162,11 +162,13 @@ where
             }?;
         }
 
-        if opts.update_ref.is_some()
-            && (opts.check_ref_is.is_some() || opts.check_ref_is_prev_block)
-        {
+        if opts.update_ref.is_some() && !matches!(opts.check_ref_mode, AppendCheckRefMode::None) {
             let r = opts.update_ref.unwrap();
-            let expected = opts.check_ref_is.unwrap_or(block.prev_block_hash.as_ref());
+            let expected = match opts.check_ref_mode {
+                AppendCheckRefMode::None => unreachable!(),
+                AppendCheckRefMode::IsPrevBlock => block.prev_block_hash.as_ref(),
+                AppendCheckRefMode::EqualsTo(hash) => hash,
+            };
 
             let actual = match self.ref_repo.get(r).await {
                 Ok(h) => Ok(Some(h)),

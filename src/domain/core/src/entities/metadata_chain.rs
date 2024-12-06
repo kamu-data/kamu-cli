@@ -536,13 +536,8 @@ pub struct AppendOpts<'a> {
     /// Update specified reference to the block after appending
     pub update_ref: Option<&'a BlockRef>,
 
-    /// Validate that `update_ref` points to the same block as
-    /// `block.prev_block_hash` (compare-and-swap)
-    pub check_ref_is_prev_block: bool,
-
-    /// Validate that `update_ref` points to the specified block
-    /// (compare-and-swap)
-    pub check_ref_is: Option<Option<&'a Multihash>>,
+    /// Reference validation kind
+    pub check_ref_mode: AppendCheckRefMode<'a>,
 
     /// Append block using the provided hash computed elsewhere.
     ///
@@ -554,13 +549,26 @@ pub struct AppendOpts<'a> {
     pub expected_hash: Option<&'a Multihash>,
 }
 
+#[derive(Clone, Debug)]
+pub enum AppendCheckRefMode<'a> {
+    /// No validation
+    None,
+
+    /// Validate that `update_ref` points to the same block as
+    /// `block.prev_block_hash` (compare-and-swap)
+    IsPrevBlock,
+
+    /// Validate that `update_ref` points to the specified block
+    /// (compare-and-swap)
+    EqualsTo(Option<&'a Multihash>),
+}
+
 impl Default for AppendOpts<'_> {
     fn default() -> Self {
         Self {
             validation: AppendValidation::Full,
             update_ref: Some(&BlockRef::Head),
-            check_ref_is_prev_block: true,
-            check_ref_is: None,
+            check_ref_mode: AppendCheckRefMode::IsPrevBlock,
             precomputed_hash: None,
             expected_hash: None,
         }
