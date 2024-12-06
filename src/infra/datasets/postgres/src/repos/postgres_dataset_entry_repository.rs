@@ -98,7 +98,6 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
                     dataset_name as name,
                     created_at   as "created_at: _"
                 FROM dataset_entries
-                ORDER BY dataset_name ASC
                 LIMIT $1 OFFSET $2
                 "#,
                 limit,
@@ -133,7 +132,6 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
                    created_at   as "created_at: _"
             FROM dataset_entries
             WHERE dataset_id = $1
-            ORDER BY created_at
             "#,
             stack_dataset_id.as_str(),
         )
@@ -156,10 +154,7 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
 
         let connection_mut = tr.connection_mut().await?;
 
-        let dataset_ids_search: Vec<_> = dataset_ids
-            .iter()
-            .map(|dataset_id| dataset_id.to_string())
-            .collect();
+        let dataset_ids_search: Vec<_> = dataset_ids.iter().map(ToString::to_string).collect();
 
         let resolved_entries = sqlx::query_as!(
             DatasetEntryRowModel,
@@ -170,7 +165,6 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
                    created_at   as "created_at: _"
             FROM dataset_entries
             WHERE dataset_id = ANY($1)
-            ORDER BY dataset_id
             "#,
             &dataset_ids_search,
         )
@@ -356,7 +350,9 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
 
         let delete_result = sqlx::query!(
             r#"
-            DELETE FROM dataset_entries WHERE dataset_id = $1
+            DELETE
+            FROM dataset_entries
+            WHERE dataset_id = $1
             "#,
             stack_dataset_id.as_str(),
         )
