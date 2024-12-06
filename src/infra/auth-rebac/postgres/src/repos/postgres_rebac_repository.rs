@@ -176,24 +176,30 @@ impl RebacRepository for PostgresRebacRepository {
         &self,
         entities: &[Entity],
     ) -> Result<Vec<(Entity, PropertyName, PropertyValue)>, GetEntityPropertiesError> {
+        if entities.is_empty() {
+            return Ok(vec![]);
+        }
+
         let mut tr = self.transaction.lock().await;
 
         let connection_mut = tr.connection_mut().await?;
 
-        let placeholder_list = (1..=entities.len())
-            .map(|i| {
-                // i | idxs
-                // 1 | 1, 2
-                // 2 | 3, 4
-                // 3 | 5, 6
-                // ...
-                let entity_type_idx = i * 2 - 1;
-                let entity_id_idx = i * 2;
+        let placeholder_list = {
+            (1..=entities.len())
+                .map(|i| {
+                    // i | idxs
+                    // 1 | 1, 2
+                    // 2 | 3, 4
+                    // 3 | 5, 6
+                    // ...
+                    let entity_type_idx = i * 2 - 1;
+                    let entity_id_idx = i * 2;
 
-                format!("(${entity_type_idx},${entity_id_idx})")
-            })
-            .intersperse(",".to_string())
-            .collect::<String>();
+                    format!("(${entity_type_idx},${entity_id_idx})")
+                })
+                .intersperse(",".to_string())
+                .collect::<String>()
+        };
 
         // TODO: replace it by macro once sqlx will support it
         // https://github.com/launchbadge/sqlx/blob/main/FAQ.md#how-can-i-do-a-select--where-foo-in--query
@@ -201,7 +207,7 @@ impl RebacRepository for PostgresRebacRepository {
             r#"
             SELECT entity_type, entity_id, property_name, property_value
             FROM auth_rebac_properties
-            WHERE (entity_type, entity_id) IN ({placeholder_list});
+            WHERE (entity_type, entity_id) IN ({placeholder_list})
             "#,
         );
 

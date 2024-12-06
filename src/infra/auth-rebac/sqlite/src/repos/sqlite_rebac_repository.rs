@@ -187,6 +187,10 @@ impl RebacRepository for SqliteRebacRepository {
         &self,
         entities: &[Entity],
     ) -> Result<Vec<(Entity, PropertyName, PropertyValue)>, GetEntityPropertiesError> {
+        if entities.is_empty() {
+            return Ok(vec![]);
+        }
+
         let mut tr = self.transaction.lock().await;
 
         let connection_mut = tr.connection_mut().await?;
@@ -212,7 +216,7 @@ impl RebacRepository for SqliteRebacRepository {
             r#"
             SELECT entity_type, entity_id, property_name, property_value
             FROM auth_rebac_properties
-            WHERE (entity_type, entity_id) IN ({placeholder_list});
+            WHERE (entity_type, entity_id) IN ({placeholder_list})
             "#,
         );
 
