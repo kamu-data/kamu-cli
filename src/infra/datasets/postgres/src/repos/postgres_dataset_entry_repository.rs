@@ -158,7 +158,7 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
 
         let dataset_ids_search: Vec<_> = dataset_ids
             .iter()
-            .map(|dataset_id| dataset_id.as_did_str().to_string())
+            .map(|dataset_id| dataset_id.to_string())
             .collect();
 
         let resolved_entries = sqlx::query_as!(
