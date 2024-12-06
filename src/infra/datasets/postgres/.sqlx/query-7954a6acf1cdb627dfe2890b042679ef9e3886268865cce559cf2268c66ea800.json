@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            SELECT dataset_id   as \"id: _\",\n                   owner_id     as \"owner_id: _\",\n                   dataset_name as name,\n                   created_at   as \"created_at: _\"\n            FROM dataset_entries\n            WHERE dataset_id = $1\n            ORDER BY created_at\n            ",
+  "query": "\n            SELECT dataset_id   as \"id: _\",\n                   owner_id     as \"owner_id: _\",\n                   dataset_name as name,\n                   created_at   as \"created_at: _\"\n            FROM dataset_entries\n            WHERE dataset_id = $1\n            ",
   "describe": {
     "columns": [
       {
@@ -36,5 +36,5 @@
       false
     ]
   },
-  "hash": "fcb34f3fa8f59b1f8190694fc38dc66874757b9f56f23ed86f8494c6ed4b0b7a"
+  "hash": "7954a6acf1cdb627dfe2890b042679ef9e3886268865cce559cf2268c66ea800"
 }

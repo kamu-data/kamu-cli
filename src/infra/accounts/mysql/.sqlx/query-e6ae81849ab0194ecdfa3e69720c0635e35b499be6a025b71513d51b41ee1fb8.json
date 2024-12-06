@@ -1,6 +1,6 @@
 {
   "db_name": "MySQL",
-  "query": "\n            SELECT id            AS \"id: _\",\n                   account_name,\n                   email         AS \"email?\",\n                   display_name,\n                   account_type  AS \"account_type: AccountType\",\n                   avatar_url,\n                   registered_at AS \"registered_at: _\",\n                   is_admin      AS \"is_admin: _\",\n                   provider,\n                   provider_identity_key\n            FROM accounts\n            ",
+  "query": "\n                SELECT id            AS \"id: _\",\n                       account_name,\n                       email         AS \"email?\",\n                       display_name,\n                       account_type  AS \"account_type: AccountType\",\n                       avatar_url,\n                       registered_at AS \"registered_at: _\",\n                       is_admin      AS \"is_admin: _\",\n                       provider,\n                       provider_identity_key\n                FROM accounts\n                ORDER BY registered_at ASC\n                LIMIT ? OFFSET ?\n                ",
   "describe": {
     "columns": [
       {
@@ -95,7 +95,7 @@
       }
     ],
     "parameters": {
-      "Right": 0
+      "Right": 2
     },
     "nullable": [
       false,
@@ -110,5 +110,5 @@
       false
     ]
   },
-  "hash": "b90722f9d68f56ba659435b655631ff92d8157134e6d544d47f9dbcb4c089dd6"
+  "hash": "e6ae81849ab0194ecdfa3e69720c0635e35b499be6a025b71513d51b41ee1fb8"
 }
