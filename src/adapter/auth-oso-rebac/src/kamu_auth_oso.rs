@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::ops::Deref;
 use std::sync::Arc;
 
 use dill::component;
@@ -50,6 +51,16 @@ impl KamuAuthOso {
         oso.load_str(include_str!("schema.polar"))?;
 
         Ok(oso)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl Deref for KamuAuthOso {
+    type Target = Arc<Oso>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.oso
     }
 }
 

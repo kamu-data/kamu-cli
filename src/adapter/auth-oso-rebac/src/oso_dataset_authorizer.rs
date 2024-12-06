@@ -16,7 +16,6 @@ use kamu_accounts::CurrentAccountSubject;
 use kamu_core::auth::*;
 use kamu_core::AccessError;
 use opendatafabric as odf;
-use oso::Oso;
 use tokio::try_join;
 
 use crate::dataset_resource::*;
@@ -26,7 +25,7 @@ use crate::{KamuAuthOso, OsoResourceServiceImpl};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct OsoDatasetAuthorizer {
-    oso: Arc<Oso>,
+    kamu_auth_oso: Arc<KamuAuthOso>,
     current_account_subject: Arc<CurrentAccountSubject>,
     oso_resource_service: Arc<OsoResourceServiceImpl>,
 }
@@ -36,14 +35,13 @@ pub struct OsoDatasetAuthorizer {
 #[component(pub)]
 #[interface(dyn DatasetActionAuthorizer)]
 impl OsoDatasetAuthorizer {
-    #[expect(clippy::needless_pass_by_value)]
     pub fn new(
         kamu_auth_oso: Arc<KamuAuthOso>,
         current_account_subject: Arc<CurrentAccountSubject>,
         oso_resource_service: Arc<OsoResourceServiceImpl>,
     ) -> Self {
         Self {
-            oso: kamu_auth_oso.oso.clone(),
+            kamu_auth_oso,
             current_account_subject,
             oso_resource_service,
         }
@@ -102,7 +100,7 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
             try_join!(self.user_actor(), self.dataset_resource(dataset_handle))?;
 
         match self
-            .oso
+            .kamu_auth_oso
             .is_allowed(user_actor, action.to_string(), dataset_resource)
         {
             Ok(allowed) if allowed => Ok(()),
@@ -127,7 +125,7 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
         let (user_actor, dataset_resource) =
             try_join!(self.user_actor(), self.dataset_resource(dataset_handle))?;
 
-        self.oso
+        self.kamu_auth_oso
             .get_allowed_actions(user_actor, dataset_resource)
             .int_err()
     }
@@ -160,7 +158,7 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
 
         for (dataset_id, dataset_resource) in dataset_resources_resolution.resolved_resources {
             let is_allowed = self
-                .oso
+                .kamu_auth_oso
                 .is_allowed(user_actor.clone(), action, dataset_resource)
                 .int_err()?;
 
@@ -215,7 +213,7 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
                 })?;
 
             let is_allowed = self
-                .oso
+                .kamu_auth_oso
                 .is_allowed(user_actor.clone(), action, dataset_resource)
                 .int_err()?;
 
