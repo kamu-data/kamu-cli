@@ -11,6 +11,10 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Unreleased]
+### Changed
+- Upgraded to `datafusion v43`
+
 ## [0.211.0] - 2024-12-02
 ### Changed
 - Dataset dependency graph is now backed with a database, removing need in dependendency scanning at startup.

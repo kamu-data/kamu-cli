@@ -39,7 +39,7 @@ merge = "0.1"
 secrecy = "0.10"
 serde = "1"
 serde_with = { version = "3", default-features = false }
-thiserror = { version = "1", default-features = false }
+thiserror = { version = "2", default-features = false }
 tokio-stream = "0.1"
 uuid = { version = "1", default-features = false, features = ["v4"] }
 
