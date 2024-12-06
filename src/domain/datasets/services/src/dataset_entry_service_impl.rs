@@ -412,10 +412,14 @@ impl DatasetRegistry for DatasetEntryServiceImpl {
                 let owner_id = self
                     .resolve_account_id_by_maybe_name(Some(&owner_name))
                     .await?;
-                Ok(OwnerArgs { owner_id })
+                Ok(Arc::new(OwnerArgs { owner_id }))
             },
-            |args, pagination| {
-                self.list_all_dataset_handles_by_owner_name(args.owner_id, pagination)
+            move |args, pagination| {
+                let args = args.clone();
+                async move {
+                    self.list_all_dataset_handles_by_owner_name(&args.owner_id, pagination)
+                        .await
+                }
             },
         )
     }

@@ -28,7 +28,7 @@ pub trait DatasetEntryService: Sync + Send {
 
     async fn list_entries_owned_by(
         &self,
-        owner_id: odf::AccountID,
+        owner_id: &odf::AccountID,
         pagination: PaginationOpts,
     ) -> Result<EntityListing<DatasetEntry>, ListDatasetEntriesError>;
 }
