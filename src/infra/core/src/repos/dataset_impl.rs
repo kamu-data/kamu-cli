@@ -593,10 +593,6 @@ where
         &self.storage_internal_url
     }
 
-    fn as_metadata_chain(&self) -> &dyn MetadataChain {
-        &self.metadata_chain
-    }
-
     fn as_data_repo(&self) -> &dyn ObjectRepository {
         &self.data_repo
     }
@@ -609,3 +605,21 @@ where
         &self.info_repo
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait]
+impl<MetaChain, DataRepo, CheckpointRepo, InfoRepo> AsMetadataChain
+    for DatasetImpl<MetaChain, DataRepo, CheckpointRepo, InfoRepo>
+where
+    MetaChain: MetadataChain + Sync + Send,
+    DataRepo: ObjectRepository + Sync + Send,
+    CheckpointRepo: ObjectRepository + Sync + Send,
+    InfoRepo: NamedObjectRepository + Sync + Send,
+{
+    fn as_metadata_chain(&self) -> &dyn MetadataChain {
+        &self.metadata_chain
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

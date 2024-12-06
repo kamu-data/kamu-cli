@@ -48,7 +48,7 @@ use opendatafabric::{
 };
 use time_source::SystemTimeSource;
 
-use crate::MESSAGE_CONSUMER_KAMU_DATASET_ENTRY_SERVICE;
+use crate::{ManagedDatasetImpl, MESSAGE_CONSUMER_KAMU_DATASET_ENTRY_SERVICE};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -60,6 +60,7 @@ pub struct DatasetEntryServiceImpl {
     current_account_subject: Arc<CurrentAccountSubject>,
     tenancy_config: Arc<TenancyConfig>,
     accounts_cache: Arc<Mutex<AccountsCache>>,
+    // managed_entities: Arc<Mutex<ManagedDatasetsMap>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -68,6 +69,13 @@ pub struct DatasetEntryServiceImpl {
 struct AccountsCache {
     id2names: HashMap<AccountID, AccountName>,
     names2ids: HashMap<AccountName, AccountID>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Default)]
+struct ManagedDatasetsMap {
+    _dataset_by_id: HashMap<DatasetID, Arc<ManagedDatasetImpl>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -101,6 +109,7 @@ impl DatasetEntryServiceImpl {
             current_account_subject,
             tenancy_config,
             accounts_cache: Default::default(),
+            // managed_entities: Default::default(),
         }
     }
 
@@ -504,11 +513,31 @@ impl DatasetRegistry for DatasetEntryServiceImpl {
         })
     }
 
-    // Note: in future we will be resolving storage repository,
-    // but for now we have just a single one
     fn get_dataset_by_handle(&self, dataset_handle: &DatasetHandle) -> ResolvedDataset {
-        let dataset = self.dataset_repo.get_dataset_by_handle(dataset_handle);
-        ResolvedDataset::new(dataset, dataset_handle.clone())
+        /*let mut guard = self.managed_entities.lock().unwrap();
+        let managed_dataset =
+            if let Some(managed_dataset) = guard.dataset_by_id.get(&dataset_handle.id) {
+                managed_dataset.clone()
+            } else {
+                // Note: in future we will be resolving storage repository,
+                // but for now we have just a single one
+                let storage_dataset = self.dataset_repo.get_dataset_by_handle(dataset_handle);
+
+                let managed_dataset = Arc::new(ManagedDatasetImpl::new(
+                    storage_dataset,
+                    dataset_handle.id.clone(),
+                ));
+                guard
+                    .dataset_by_id
+                    .insert(dataset_handle.id.clone(), managed_dataset.clone());
+
+                managed_dataset
+            };
+
+        ResolvedDataset::new(managed_dataset, dataset_handle.clone())*/
+
+        let storage_dataset = self.dataset_repo.get_dataset_by_handle(dataset_handle);
+        ResolvedDataset::new(storage_dataset, dataset_handle.clone())
     }
 }
 

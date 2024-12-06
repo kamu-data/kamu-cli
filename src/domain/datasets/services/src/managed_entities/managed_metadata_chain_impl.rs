@@ -22,7 +22,7 @@ use super::ManagedEntity;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct ManagedMetadataChainImpl {
-    storage_chain: Arc<dyn MetadataChain>,
+    storage_chain_container: Arc<dyn AsMetadataChain>,
     dataset_id: odf::DatasetID,
     initial_state: State,
     modified_state: RwLock<Option<State>>,
@@ -66,16 +66,21 @@ impl Eq for State {}
 
 impl ManagedMetadataChainImpl {
     pub fn new(
-        storage_chain: Arc<dyn MetadataChain>,
+        storage_chain_container: Arc<dyn AsMetadataChain>,
         dataset_id: odf::DatasetID,
         initial_refs: BTreeMap<BlockRef, odf::Multihash>,
     ) -> Self {
         Self {
-            storage_chain,
+            storage_chain_container,
             dataset_id,
             initial_state: State { refs: initial_refs },
             modified_state: RwLock::new(None),
         }
+    }
+
+    #[inline]
+    fn get_storage_chain(&self) -> &dyn MetadataChain {
+        self.storage_chain_container.as_metadata_chain()
     }
 }
 
@@ -90,19 +95,19 @@ impl MetadataChain for ManagedMetadataChainImpl {
     }
 
     async fn contains_block(&self, hash: &odf::Multihash) -> Result<bool, ContainsBlockError> {
-        self.storage_chain.contains_block(hash).await
+        self.get_storage_chain().contains_block(hash).await
     }
 
     async fn get_block_size(&self, hash: &odf::Multihash) -> Result<u64, GetBlockDataError> {
-        self.storage_chain.get_block_size(hash).await
+        self.get_storage_chain().get_block_size(hash).await
     }
 
     async fn get_block_bytes(&self, hash: &odf::Multihash) -> Result<Bytes, GetBlockDataError> {
-        self.storage_chain.get_block_bytes(hash).await
+        self.get_storage_chain().get_block_bytes(hash).await
     }
 
     async fn get_block(&self, hash: &odf::Multihash) -> Result<odf::MetadataBlock, GetBlockError> {
-        self.storage_chain.get_block(hash).await
+        self.get_storage_chain().get_block(hash).await
     }
 
     async fn set_ref<'a>(
@@ -153,7 +158,7 @@ impl MetadataChain for ManagedMetadataChainImpl {
     ) -> Result<odf::Multihash, AppendError> {
         // Append new block to storage level
         let new_head = self
-            .storage_chain
+            .get_storage_chain()
             .append(
                 block,
                 AppendOpts {
@@ -216,7 +221,7 @@ impl ManagedEntity for ManagedMetadataChainImpl {
                     .int_err()?;
 
                 // Question: should this be at post-commit phase? maybe via Outbox?
-                self.storage_chain
+                self.get_storage_chain()
                     .set_ref(block_ref, block_hash, SetRefOpts::default())
                     .await
                     .int_err()?;

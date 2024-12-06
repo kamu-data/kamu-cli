@@ -13,7 +13,7 @@ use internal_error::InternalError;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait ManagedEntity {
+pub trait ManagedEntity: Sync + Send {
     async fn do_commit(&self, transactional_catalog: &Catalog) -> Result<(), InternalError>;
 }
 
