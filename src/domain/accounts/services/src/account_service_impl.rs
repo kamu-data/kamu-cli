@@ -9,10 +9,16 @@
 
 use std::sync::Arc;
 
-use database_common::{EntityListing, EntityPageStreamer, PaginationOpts};
+use database_common::{EntityPageListing, EntityPageStreamer, PaginationOpts};
 use dill::*;
 use internal_error::ResultIntoInternal;
-use kamu_accounts::{Account, AccountRepository, AccountService, AccountStream, ListAccountError};
+use kamu_accounts::{
+    Account,
+    AccountPageStream,
+    AccountRepository,
+    AccountService,
+    ListAccountError,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -32,7 +38,7 @@ impl AccountServiceImpl {
 
 #[async_trait::async_trait]
 impl AccountService for AccountServiceImpl {
-    fn all_accounts(&self) -> AccountStream {
+    fn all_accounts(&self) -> AccountPageStream {
         EntityPageStreamer::default().into_stream(
             || async { Ok(()) },
             |_, pagination| {
@@ -45,7 +51,7 @@ impl AccountService for AccountServiceImpl {
     async fn list_all_accounts(
         &self,
         pagination: PaginationOpts,
-    ) -> Result<EntityListing<Account>, ListAccountError> {
+    ) -> Result<EntityPageListing<Account>, ListAccountError> {
         use futures::TryStreamExt;
 
         let total_count = self.account_repo.accounts_count().await.int_err()?;
@@ -56,7 +62,7 @@ impl AccountService for AccountServiceImpl {
             .try_collect()
             .await?;
 
-        Ok(EntityListing {
+        Ok(EntityPageListing {
             list: entries,
             total_count,
         })

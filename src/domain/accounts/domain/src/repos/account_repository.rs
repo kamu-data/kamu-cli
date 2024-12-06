@@ -9,7 +9,7 @@
 
 use std::fmt::Display;
 
-use database_common::{EntityStream, PaginationOpts};
+use database_common::{EntityPageStream, PaginationOpts};
 use internal_error::InternalError;
 use opendatafabric::{AccountID, AccountName};
 use thiserror::Error;
@@ -26,7 +26,7 @@ pub trait AccountRepository: Send + Sync {
     async fn create_account(&self, account: &Account) -> Result<(), CreateAccountError>;
 
     // TODO: Private Datasets: tests
-    async fn get_accounts(&self, pagination: PaginationOpts) -> AccountStream;
+    async fn get_accounts(&self, pagination: PaginationOpts) -> AccountPageStream;
 
     async fn get_account_by_id(
         &self,
@@ -61,7 +61,7 @@ pub trait AccountRepository: Send + Sync {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub type AccountStream<'a> = EntityStream<'a, Account>;
+pub type AccountPageStream<'a> = EntityPageStream<'a, Account>;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Errors

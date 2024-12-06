@@ -10,7 +10,7 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
-use database_common::{EntityListing, EntityPageStreamer, PaginationOpts};
+use database_common::{EntityPageListing, EntityPageStreamer, PaginationOpts};
 use dill::{component, interface, meta, Catalog};
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_accounts::{AccountRepository, CurrentAccountSubject};
@@ -281,10 +281,10 @@ impl DatasetEntryServiceImpl {
     async fn list_all_dataset_handles(
         &self,
         pagination: PaginationOpts,
-    ) -> Result<EntityListing<odf::DatasetHandle>, InternalError> {
+    ) -> Result<EntityPageListing<odf::DatasetHandle>, InternalError> {
         let dataset_entry_listing = self.list_all_entries(pagination).await.int_err()?;
 
-        Ok(EntityListing {
+        Ok(EntityPageListing {
             total_count: dataset_entry_listing.total_count,
             list: self
                 .entries_as_handles(dataset_entry_listing.list)
@@ -297,13 +297,13 @@ impl DatasetEntryServiceImpl {
         &self,
         owner_id: &odf::AccountID,
         pagination: PaginationOpts,
-    ) -> Result<EntityListing<odf::DatasetHandle>, InternalError> {
+    ) -> Result<EntityPageListing<odf::DatasetHandle>, InternalError> {
         let dataset_entry_listing = self
             .list_entries_owned_by(owner_id, pagination)
             .await
             .int_err()?;
 
-        Ok(EntityListing {
+        Ok(EntityPageListing {
             total_count: dataset_entry_listing.total_count,
             list: self
                 .entries_as_handles(dataset_entry_listing.list)
@@ -341,7 +341,7 @@ impl DatasetEntryService for DatasetEntryServiceImpl {
     async fn list_all_entries(
         &self,
         pagination: PaginationOpts,
-    ) -> Result<EntityListing<DatasetEntry>, ListDatasetEntriesError> {
+    ) -> Result<EntityPageListing<DatasetEntry>, ListDatasetEntriesError> {
         use futures::TryStreamExt;
 
         let total_count = self
@@ -356,7 +356,7 @@ impl DatasetEntryService for DatasetEntryServiceImpl {
             .try_collect()
             .await?;
 
-        Ok(EntityListing {
+        Ok(EntityPageListing {
             list: entries,
             total_count,
         })
@@ -366,7 +366,7 @@ impl DatasetEntryService for DatasetEntryServiceImpl {
         &self,
         owner_id: &odf::AccountID,
         pagination: PaginationOpts,
-    ) -> Result<EntityListing<DatasetEntry>, ListDatasetEntriesError> {
+    ) -> Result<EntityPageListing<DatasetEntry>, ListDatasetEntriesError> {
         use futures::TryStreamExt;
 
         let total_count = self
@@ -380,7 +380,7 @@ impl DatasetEntryService for DatasetEntryServiceImpl {
             .try_collect()
             .await?;
 
-        Ok(EntityListing {
+        Ok(EntityPageListing {
             list: entries,
             total_count,
         })

@@ -104,7 +104,7 @@ impl AccountRepository for PostgresAccountRepository {
         Ok(())
     }
 
-    async fn get_accounts(&self, pagination: PaginationOpts) -> AccountStream {
+    async fn get_accounts(&self, pagination: PaginationOpts) -> AccountPageStream {
         Box::pin(async_stream::stream! {
             let mut tr = self.transaction.lock().await;
             let connection_mut = tr.connection_mut().await?;

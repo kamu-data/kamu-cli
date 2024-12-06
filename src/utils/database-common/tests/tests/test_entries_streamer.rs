@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use database_common::{EntityListing, EntityPageStreamer, PaginationOpts};
+use database_common::{EntityPageListing, EntityPageStreamer, PaginationOpts};
 use futures::TryStreamExt;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -249,7 +249,7 @@ async fn test_paged_page_processing_of_input_data_by_ref() {
             assert_page(&input_page, &pagination);
 
             async move {
-                Ok(EntityListing {
+                Ok(EntityPageListing {
                     list: input_page,
                     total_count: input_len,
                 })
@@ -338,7 +338,7 @@ async fn test_paged_page_processing_of_input_data_by_value() {
             assert_page(&input_page, &pagination);
 
             async move {
-                Ok(EntityListing {
+                Ok(EntityPageListing {
                     list: input_page,
                     total_count: input.len(),
                 })
@@ -374,7 +374,7 @@ fn entity_source(
                 .map(|id| TestEntity { id })
                 .collect::<Vec<_>>();
 
-            EntityListing {
+            EntityPageListing {
                 list: result,
                 total_count: total_entities_count,
             }
@@ -397,7 +397,7 @@ struct TestEntity {
 trait EntitySource {
     async fn init_arguments(&self) -> NoArgs;
 
-    async fn entities(&self, pagination: PaginationOpts) -> EntityListing<TestEntity>;
+    async fn entities(&self, pagination: PaginationOpts) -> EntityPageListing<TestEntity>;
 }
 
 mockall::mock! {
@@ -407,7 +407,7 @@ mockall::mock! {
     impl EntitySource for EntitySource {
         async fn init_arguments(&self) -> NoArgs;
 
-        async fn entities(&self, pagination: PaginationOpts) -> EntityListing<TestEntity>;
+        async fn entities(&self, pagination: PaginationOpts) -> EntityPageListing<TestEntity>;
     }
 }
 

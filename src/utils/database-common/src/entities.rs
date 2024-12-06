@@ -31,12 +31,12 @@ impl PaginationOpts {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct EntityListing<Entity> {
+pub struct EntityPageListing<Entity> {
     pub list: Vec<Entity>,
     pub total_count: usize,
 }
 
-pub type EntityStream<'a, Entity> =
+pub type EntityPageStream<'a, Entity> =
     Pin<Box<dyn Stream<Item = Result<Entity, InternalError>> + Send + 'a>>;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -67,7 +67,7 @@ impl EntityPageStreamer {
         self,
         get_args_callback: HInitArgs,
         next_entities_callback: HListing,
-    ) -> EntityStream<'a, Entity>
+    ) -> EntityPageStream<'a, Entity>
     where
         Entity: Send + 'a,
 
@@ -77,7 +77,7 @@ impl EntityPageStreamer {
         HInitArgsFut: Future<Output = Result<Args, InternalError>> + Send + 'a,
 
         HListing: Fn(Args, PaginationOpts) -> HListingFut + Send + 'a,
-        HListingFut: Future<Output = Result<EntityListing<Entity>, InternalError>> + Send + 'a,
+        HListingFut: Future<Output = Result<EntityPageListing<Entity>, InternalError>> + Send + 'a,
     {
         let init_offset = self.start_offset;
         let init_limit = self.page_limit;

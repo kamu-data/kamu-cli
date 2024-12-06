@@ -10,7 +10,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use database_common::{EntityListing, EntityPageStreamer};
+use database_common::{EntityPageListing, EntityPageStreamer};
 use dill::*;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_accounts::{AccountNotFoundByIdError, AccountRepository, GetAccountByIdError};
@@ -193,7 +193,7 @@ impl OsoResourceServiceImpl {
                         dataset_resources.push((dataset_id, dataset_resource));
                     }
 
-                    Ok(EntityListing {
+                    Ok(EntityPageListing {
                         list: dataset_resources,
                         total_count: dataset_entries.len(),
                     })

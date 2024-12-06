@@ -114,7 +114,7 @@ impl AccountRepository for InMemoryAccountRepository {
         Ok(())
     }
 
-    async fn get_accounts(&self, pagination: PaginationOpts) -> AccountStream {
+    async fn get_accounts(&self, pagination: PaginationOpts) -> AccountPageStream {
         let dataset_entries_page = {
             let readable_state = self.state.lock().unwrap();
 
