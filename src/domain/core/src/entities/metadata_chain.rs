@@ -461,7 +461,7 @@ impl<T> MetadataChainExt for T where T: MetadataChain + ?Sized {}
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// References are named pointers to metadata blocks
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub enum BlockRef {
     Head,
 }

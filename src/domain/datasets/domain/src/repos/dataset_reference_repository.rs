@@ -11,8 +11,6 @@ use internal_error::InternalError;
 use opendatafabric as odf;
 use thiserror::Error;
 
-use crate::BlockPointer;
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
@@ -21,14 +19,26 @@ pub trait DatasetReferenceRepository: Send + Sync {
         &self,
         dataset_id: &odf::DatasetID,
         block_ref_name: &str,
-        block_ptr: BlockPointer,
-    ) -> Result<(), InternalError>;
+        maybe_prev_block_hash: Option<&odf::Multihash>,
+        new_block_hash: &odf::Multihash,
+    ) -> Result<(), SetDatasetReferenceError>;
 
     async fn get_dataset_reference(
         &self,
         dataset_id: &odf::DatasetID,
         block_ref_name: &str,
-    ) -> Result<BlockPointer, GetDatasetReferenceError>;
+    ) -> Result<odf::Multihash, GetDatasetReferenceError>;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Error)]
+pub enum SetDatasetReferenceError {
+    #[error(transparent)]
+    CASFailed(#[from] DatasetReferenceCASError),
+
+    #[error(transparent)]
+    Internal(#[from] InternalError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -40,6 +50,36 @@ pub enum GetDatasetReferenceError {
 
     #[error(transparent)]
     Internal(#[from] InternalError),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Error)]
+#[error(
+    "When updating reference '{block_ref_name}' for dataset '{dataset_id}', expected to point at \
+     {expected_prev_block_hash:?} but points at {actual_prev_block_hash:?}"
+)]
+pub struct DatasetReferenceCASError {
+    pub dataset_id: odf::DatasetID,
+    pub block_ref_name: String,
+    pub expected_prev_block_hash: Option<odf::Multihash>,
+    pub actual_prev_block_hash: Option<odf::Multihash>,
+}
+
+impl DatasetReferenceCASError {
+    pub fn new(
+        dataset_id: &odf::DatasetID,
+        block_ref_name: &str,
+        expected_prev_block_hash: Option<&odf::Multihash>,
+        actual_prev_block_hash: Option<&odf::Multihash>,
+    ) -> Self {
+        Self {
+            dataset_id: dataset_id.clone(),
+            block_ref_name: block_ref_name.to_string(),
+            expected_prev_block_hash: expected_prev_block_hash.cloned(),
+            actual_prev_block_hash: actual_prev_block_hash.cloned(),
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

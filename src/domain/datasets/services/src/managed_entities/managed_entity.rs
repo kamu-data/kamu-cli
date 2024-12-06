@@ -7,14 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use opendatafabric as odf;
+use dill::Catalog;
+use internal_error::InternalError;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone)]
-pub struct BlockPointer {
-    pub block_hash: odf::Multihash,
-    pub block_sequence_number: u64,
+#[async_trait::async_trait]
+pub trait ManagedEntity {
+    async fn do_commit(&self, transactional_catalog: &Catalog) -> Result<(), InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

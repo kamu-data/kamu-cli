@@ -7,12 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-#[cfg(feature = "sqlx")]
-mod dataset_dependency_entry;
-mod dataset_entry;
-mod dataset_env_var;
+mod managed_entity;
+mod managed_metadata_chain_impl;
 
-#[cfg(feature = "sqlx")]
-pub use dataset_dependency_entry::*;
-pub use dataset_entry::*;
-pub use dataset_env_var::*;
+pub use managed_entity::*;
+pub use managed_metadata_chain_impl::*;
