@@ -16,7 +16,7 @@ use crate::*;
 pub fn register_dependencies(catalog_builder: &mut CatalogBuilder) {
     catalog_builder.add::<KamuAuthOso>();
     catalog_builder.add::<OsoDatasetAuthorizer>();
-    catalog_builder.add::<OsoResourceServiceInMem>();
+    catalog_builder.add::<OsoResourceServiceImpl>();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

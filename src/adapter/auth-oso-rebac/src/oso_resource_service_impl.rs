@@ -33,8 +33,8 @@ struct State {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// TODO: Private Datasets: add Service trait
-pub struct OsoResourceServiceInMem {
+// TODO: Private Datasets: add Service trait?
+pub struct OsoResourceServiceImpl {
     state: RwLock<State>,
     dataset_entry_repo: Arc<dyn DatasetEntryRepository>,
     rebac_service: Arc<dyn RebacService>,
@@ -45,7 +45,7 @@ pub struct OsoResourceServiceInMem {
 // TODO: Private Datasets: This service should be a singleton
 //                         Alternative: put the state into a separate component
 // #[scope(Singleton)]
-impl OsoResourceServiceInMem {
+impl OsoResourceServiceImpl {
     pub fn new(
         dataset_entry_repo: Arc<dyn DatasetEntryRepository>,
         rebac_service: Arc<dyn RebacService>,

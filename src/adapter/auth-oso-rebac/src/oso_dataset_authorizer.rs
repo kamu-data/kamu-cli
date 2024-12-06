@@ -21,14 +21,14 @@ use tokio::try_join;
 
 use crate::dataset_resource::*;
 use crate::user_actor::*;
-use crate::{KamuAuthOso, OsoResourceServiceInMem};
+use crate::{KamuAuthOso, OsoResourceServiceImpl};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct OsoDatasetAuthorizer {
     oso: Arc<Oso>,
     current_account_subject: Arc<CurrentAccountSubject>,
-    oso_resource_service: Arc<OsoResourceServiceInMem>,
+    oso_resource_service: Arc<OsoResourceServiceImpl>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -40,7 +40,7 @@ impl OsoDatasetAuthorizer {
     pub fn new(
         kamu_auth_oso: Arc<KamuAuthOso>,
         current_account_subject: Arc<CurrentAccountSubject>,
-        oso_resource_service: Arc<OsoResourceServiceInMem>,
+        oso_resource_service: Arc<OsoResourceServiceImpl>,
     ) -> Self {
         Self {
             oso: kamu_auth_oso.oso.clone(),
