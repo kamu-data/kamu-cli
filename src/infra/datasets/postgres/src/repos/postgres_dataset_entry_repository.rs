@@ -98,6 +98,7 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
                     dataset_name as name,
                     created_at   as "created_at: _"
                 FROM dataset_entries
+                ORDER BY created_at ASC
                 LIMIT $1 OFFSET $2
                 "#,
                 limit,
