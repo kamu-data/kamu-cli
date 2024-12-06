@@ -26,7 +26,7 @@ pub(crate) enum FlowStartCondition {
 impl FlowStartCondition {
     pub async fn create_from_raw_flow_data(
         start_condition: &fs::FlowStartCondition,
-        matching_triggers: &[fs::FlowTrigger],
+        matching_triggers: &[fs::FlowTriggerType],
         ctx: &Context<'_>,
     ) -> Result<Self, InternalError> {
         Ok(match start_condition {
@@ -46,7 +46,7 @@ impl FlowStartCondition {
 
                 // For each dataset trigger, add accumulated changes since trigger first fired
                 for trigger in matching_triggers {
-                    if let fs::FlowTrigger::InputDatasetFlow(dataset_trigger) = trigger
+                    if let fs::FlowTriggerType::InputDatasetFlow(dataset_trigger) = trigger
                         && let fs::FlowResult::DatasetUpdate(dataset_update) =
                             &dataset_trigger.flow_result
                         && let fs::FlowResultDatasetUpdate::Changed(update_result) = dataset_update

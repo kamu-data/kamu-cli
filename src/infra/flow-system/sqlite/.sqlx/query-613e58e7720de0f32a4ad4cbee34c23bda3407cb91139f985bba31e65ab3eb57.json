@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT COUNT(event_id) AS events_count\n                FROM flow_trigger_events\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "events_count",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "613e58e7720de0f32a4ad4cbee34c23bda3407cb91139f985bba31e65ab3eb57"
+}

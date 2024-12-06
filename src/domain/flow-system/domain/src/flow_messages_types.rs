@@ -11,12 +11,20 @@ use chrono::{DateTime, Utc};
 use messaging_outbox::Message;
 use serde::{Deserialize, Serialize};
 
-use crate::{FlowConfigurationRule, FlowID, FlowKey, FlowOutcome};
+use crate::{
+    FlowConfigurationRule,
+    FlowID,
+    FlowKey,
+    FlowOutcome,
+    FlowTriggerRule,
+    FlowTriggerType,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 const FLOW_EXECUTOR_UPDATE_OUTBOX_VERSION: u32 = 1;
 const FLOW_CONFIGURATION_UPDATE_OUTBOX_VERSION: u32 = 1;
+const FLOW_TRIGGER_UPDATE_OUTBOX_VERSION: u32 = 1;
 const FLOW_PROGRESS_OUTBOX_VERSION: u32 = 1;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -25,7 +33,6 @@ const FLOW_PROGRESS_OUTBOX_VERSION: u32 = 1;
 pub struct FlowConfigurationUpdatedMessage {
     pub event_time: DateTime<Utc>,
     pub flow_key: FlowKey,
-    pub paused: bool,
     pub rule: FlowConfigurationRule,
 }
 
@@ -136,3 +143,18 @@ pub struct FlowProgressMessageCancelled {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FlowTriggerUpdatedMessage {
+    pub event_time: DateTime<Utc>,
+    pub flow_key: FlowKey,
+    pub paused: bool,
+    pub rule: Option<FlowTriggerRule>,
+    pub trigger_type: FlowTriggerType,
+}
+
+impl Message for FlowTriggerUpdatedMessage {
+    fn version() -> u32 {
+        FLOW_TRIGGER_UPDATE_OUTBOX_VERSION
+    }
+}

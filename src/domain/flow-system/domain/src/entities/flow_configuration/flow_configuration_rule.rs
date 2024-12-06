@@ -9,14 +9,12 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::{CompactionRule, IngestRule, ResetRule, Schedule, TransformRule};
+use crate::{CompactionRule, IngestRule, ResetRule};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum FlowConfigurationRule {
-    Schedule(Schedule),
-    TransformRule(TransformRule),
     CompactionRule(CompactionRule),
     IngestRule(IngestRule),
     ResetRule(ResetRule),

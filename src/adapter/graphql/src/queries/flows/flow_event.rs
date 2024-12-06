@@ -112,7 +112,7 @@ impl FlowEventInitiated {
         Ok(Self {
             event_id: event_id.into(),
             event_time: event.event_time,
-            trigger: FlowTrigger::build(event.trigger, ctx).await?,
+            trigger: FlowTrigger::build(&event.trigger, ctx).await?,
         })
     }
 }
@@ -158,7 +158,7 @@ impl FlowEventTriggerAdded {
         Ok(Self {
             event_id: event_id.into(),
             event_time: event.event_time,
-            trigger: FlowTrigger::build(event.trigger, ctx).await?,
+            trigger: FlowTrigger::build(&event.trigger, ctx).await?,
         })
     }
 }

@@ -197,7 +197,7 @@ impl Flow {
 
     /// Primary flow trigger
     async fn primary_trigger(&self, ctx: &Context<'_>) -> Result<FlowTrigger, InternalError> {
-        FlowTrigger::build(self.flow_state.primary_trigger().clone(), ctx).await
+        FlowTrigger::build(self.flow_state.primary_trigger(), ctx).await
     }
 
     /// Start condition

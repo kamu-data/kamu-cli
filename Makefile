@@ -9,7 +9,8 @@ MYSQL_CRATES := ./src/infra/accounts/mysql ./src/e2e/app/cli/mysql
 
 SQLITE_CRATES := ./src/infra/accounts/sqlite ./src/infra/auth-rebac/sqlite ./src/infra/datasets/sqlite ./src/infra/task-system/sqlite ./src/infra/flow-system/sqlite ./src/infra/messaging-outbox/sqlite ./src/e2e/app/cli/sqlite
 
-ALL_DATABASE_CRATES := $(POSTGRES_CRATES) $(MYSQL_CRATES) $(SQLITE_CRATES)
+# ALL_DATABASE_CRATES := $(POSTGRES_CRATES) $(MYSQL_CRATES) $(SQLITE_CRATES)
+ALL_DATABASE_CRATES := $(POSTGRES_CRATES) $(SQLITE_CRATES)
 MIGRATION_DIRS := ./migrations/mysql ./migrations/postgres ./migrations/sqlite
 
 ###############################################################################

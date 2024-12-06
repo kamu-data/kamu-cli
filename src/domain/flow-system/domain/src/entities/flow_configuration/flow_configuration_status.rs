@@ -12,16 +12,14 @@
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FlowConfigurationStatus {
     Active,
-    PausedTemporarily,
-    StoppedPermanently,
+    Deleted,
 }
 
 impl FlowConfigurationStatus {
     pub fn is_active(&self) -> bool {
         match self {
             FlowConfigurationStatus::Active => true,
-            FlowConfigurationStatus::PausedTemporarily
-            | FlowConfigurationStatus::StoppedPermanently => false,
+            FlowConfigurationStatus::Deleted => false,
         }
     }
 }

@@ -24,15 +24,21 @@ pub(crate) enum FlowTrigger {
 }
 
 impl FlowTrigger {
-    pub async fn build(trigger: fs::FlowTrigger, ctx: &Context<'_>) -> Result<Self, InternalError> {
-        Ok(match trigger {
-            fs::FlowTrigger::Manual(manual) => {
-                let initiator = Account::from_account_id(ctx, manual.initiator_account_id).await?;
+    pub async fn build(
+        trigger: &fs::FlowTriggerType,
+        ctx: &Context<'_>,
+    ) -> Result<Self, InternalError> {
+        Ok(match &trigger {
+            fs::FlowTriggerType::Manual(manual) => {
+                let initiator =
+                    Account::from_account_id(ctx, manual.initiator_account_id.clone()).await?;
                 Self::Manual(FlowTriggerManual { initiator })
             }
-            fs::FlowTrigger::AutoPolling(auto_polling) => Self::AutoPolling(auto_polling.into()),
-            fs::FlowTrigger::Push(push) => Self::Push(push.into()),
-            fs::FlowTrigger::InputDatasetFlow(input) => {
+            fs::FlowTriggerType::AutoPolling(auto_polling) => {
+                Self::AutoPolling(auto_polling.clone().into())
+            }
+            fs::FlowTriggerType::Push(push) => Self::Push(push.clone().into()),
+            fs::FlowTriggerType::InputDatasetFlow(input) => {
                 let dataset_registry = from_catalog::<dyn DatasetRegistry>(ctx).unwrap();
                 let hdl = dataset_registry
                     .resolve_dataset_handle_by_ref(&input.dataset_id.as_local_ref())

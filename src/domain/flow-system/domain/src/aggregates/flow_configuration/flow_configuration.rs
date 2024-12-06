@@ -21,19 +21,13 @@ pub struct FlowConfiguration(
 
 impl FlowConfiguration {
     /// Creates a flow configuration
-    pub fn new(
-        now: DateTime<Utc>,
-        flow_key: FlowKey,
-        paused: bool,
-        rule: FlowConfigurationRule,
-    ) -> Self {
+    pub fn new(now: DateTime<Utc>, flow_key: FlowKey, rule: FlowConfigurationRule) -> Self {
         Self(
             Aggregate::new(
                 flow_key.clone(),
                 FlowConfigurationEventCreated {
                     event_time: now,
                     flow_key,
-                    paused,
                     rule,
                 },
             )
@@ -45,52 +39,14 @@ impl FlowConfiguration {
     pub fn modify_configuration(
         &mut self,
         now: DateTime<Utc>,
-        paused: bool,
         new_rule: FlowConfigurationRule,
     ) -> Result<(), ProjectionError<FlowConfigurationState>> {
         let event = FlowConfigurationEventModified {
             event_time: now,
             flow_key: self.flow_key.clone(),
-            paused,
             rule: new_rule,
         };
         self.apply(event)
-    }
-
-    /// Pause configuration
-    pub fn pause(
-        &mut self,
-        now: DateTime<Utc>,
-    ) -> Result<(), ProjectionError<FlowConfigurationState>> {
-        if self.is_active() {
-            let event = FlowConfigurationEventModified {
-                event_time: now,
-                flow_key: self.flow_key.clone(),
-                paused: true,
-                rule: self.rule.clone(),
-            };
-            self.apply(event)
-        } else {
-            Ok(())
-        }
-    }
-
-    /// Resume configuration
-    pub fn resume(
-        &mut self,
-        now: DateTime<Utc>,
-    ) -> Result<(), ProjectionError<FlowConfigurationState>> {
-        if self.is_active() {
-            Ok(())
-        } else {
-            let event = FlowConfigurationEventModified {
-                event_time: now,
-                flow_key: self.flow_key.clone(),
-                paused: false,
-                rule: self.rule.clone(),
-            };
-            self.apply(event)
-        }
     }
 
     /// Handle dataset removal

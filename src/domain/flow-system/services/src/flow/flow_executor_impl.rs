@@ -164,10 +164,15 @@ impl FlowExecutorImpl {
                     scheduling_helper
                         .trigger_flow_common(
                             &flow.flow_key,
-                            FlowTrigger::AutoPolling(FlowTriggerAutoPolling {
-                                trigger_time: start_time,
-                            }),
-                            FlowTriggerContext::Batching(b.active_transform_rule),
+                            &FlowTrigger::new(
+                                self.time_source.now(),
+                                flow.flow_key.clone(),
+                                false,
+                                Some(FlowTriggerRule::Batching(b.active_transform_rule)),
+                                FlowTriggerType::AutoPolling(FlowTriggerAutoPolling {
+                                    trigger_time: start_time,
+                                }),
+                            ),
                             None,
                         )
                         .await?;
@@ -186,21 +191,21 @@ impl FlowExecutorImpl {
         target_catalog: &Catalog,
         start_time: DateTime<Utc>,
     ) -> Result<(), InternalError> {
-        let flow_configuration_service = target_catalog
-            .get_one::<dyn FlowConfigurationService>()
+        let flow_trigger_service = target_catalog
+            .get_one::<dyn FlowTriggerService>()
             .unwrap();
         let flow_event_store = target_catalog.get_one::<dyn FlowEventStore>().unwrap();
 
-        // Query all enabled flow configurations
-        let enabled_configurations: Vec<_> = flow_configuration_service
-            .list_enabled_configurations()
+        // Query all enabled flow triggers
+        let enabled_triggers: Vec<_> = flow_trigger_service
+            .list_enabled_triggers()
             .try_collect()
             .await?;
 
         // Split configs by those which have a schedule or different rules
-        let (schedule_configs, non_schedule_configs): (Vec<_>, Vec<_>) = enabled_configurations
+        let (schedule_configs, non_schedule_configs): (Vec<_>, Vec<_>) = enabled_triggers
             .into_iter()
-            .partition(|config| matches!(config.rule, FlowConfigurationRule::Schedule(_)));
+            .partition(|config| matches!(config.rule, Some(FlowTriggerRule::Schedule(_))));
 
         let scheduling_helper = target_catalog.get_one::<FlowSchedulingHelper>().unwrap();
 
@@ -209,20 +214,21 @@ impl FlowExecutorImpl {
         //
         // Thought: maybe we need topological sorting by derived relations as well to
         // optimize the initial execution order, but batching rules may work just fine
-        for enabled_config in schedule_configs
+        for enabled_trigger in schedule_configs
             .into_iter()
             .chain(non_schedule_configs.into_iter())
         {
             // Do not re-trigger the flow that has already triggered
             let maybe_pending_flow_id = flow_event_store
-                .try_get_pending_flow(&enabled_config.flow_key)
+                .try_get_pending_flow(&enabled_trigger.flow_key)
                 .await?;
             if maybe_pending_flow_id.is_none() {
                 scheduling_helper
-                    .activate_flow_configuration(
+                    .activate_flow_trigger(
                         start_time,
-                        enabled_config.flow_key,
-                        enabled_config.rule,
+                        enabled_trigger.flow_key,
+                        // Unwrap is safe due to previous check during partitioning
+                        enabled_trigger.rule.unwrap(),
                     )
                     .await?;
             }
@@ -632,6 +638,7 @@ impl MessageConsumerT<TaskProgressMessage> for FlowExecutorImpl {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// ToDo#Separate activate trigger instead
 #[async_trait::async_trait]
 impl MessageConsumerT<FlowConfigurationUpdatedMessage> for FlowExecutorImpl {
     #[tracing::instrument(
@@ -644,30 +651,30 @@ impl MessageConsumerT<FlowConfigurationUpdatedMessage> for FlowExecutorImpl {
         target_catalog: &Catalog,
         message: &FlowConfigurationUpdatedMessage,
     ) -> Result<(), InternalError> {
-        tracing::debug!(received_message = ?message, "Received flow configuration message");
+//         tracing::debug!(received_message = ?message, "Received flow configuration message");
 
-        if message.paused {
-            let maybe_pending_flow_id = {
-                let flow_event_store = target_catalog.get_one::<dyn FlowEventStore>().unwrap();
-                flow_event_store
-                    .try_get_pending_flow(&message.flow_key)
-                    .await?
-            };
+//         if message.paused {
+//             let maybe_pending_flow_id = {
+//                 let flow_event_store = target_catalog.get_one::<dyn FlowEventStore>().unwrap();
+//                 flow_event_store
+//                     .try_get_pending_flow(&message.flow_key)
+//                     .await?
+//             };
 
-            if let Some(flow_id) = maybe_pending_flow_id {
-                let abort_helper = target_catalog.get_one::<FlowAbortHelper>().unwrap();
-                abort_helper.abort_flow(flow_id).await?;
-            }
-        } else {
-            let scheduling_helper = target_catalog.get_one::<FlowSchedulingHelper>().unwrap();
-            scheduling_helper
-                .activate_flow_configuration(
-                    self.executor_config.round_time(message.event_time)?,
-                    message.flow_key.clone(),
-                    message.rule.clone(),
-                )
-                .await?;
-        }
+//             if let Some(flow_id) = maybe_pending_flow_id {
+//                 let abort_helper = target_catalog.get_one::<FlowAbortHelper>().unwrap();
+//                 abort_helper.abort_flow(flow_id).await?;
+//             }
+//         } else {
+//             let scheduling_helper = target_catalog.get_one::<FlowSchedulingHelper>().unwrap();
+//             scheduling_helper
+//                 .activate_flow_configuration(
+//                     self.executor_config.round_time(message.event_time)?,
+//                     message.flow_key.clone(),
+//                     message.rule.clone(),
+//                 )
+//                 .await?;
+//         }
 
         Ok(())
     }

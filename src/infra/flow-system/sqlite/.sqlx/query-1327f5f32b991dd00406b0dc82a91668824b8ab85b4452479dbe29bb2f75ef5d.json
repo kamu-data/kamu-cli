@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                SELECT event_id, event_payload as \"event_payload: _\"\n                FROM flow_trigger_events\n                WHERE dataset_id = $1\n                    AND dataset_flow_type = $2\n                    AND (cast($3 as INT8) IS NULL or event_id > $3)\n                    AND (cast($4 as INT8) IS NULL or event_id <= $4)\n                ORDER BY event_id ASC\n                ",
+  "describe": {
+    "columns": [
+      {
+        "name": "event_id",
+        "ordinal": 0,
+        "type_info": "Integer"
+      },
+      {
+        "name": "event_payload: _",
+        "ordinal": 1,
+        "type_info": "Null"
+      }
+    ],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "1327f5f32b991dd00406b0dc82a91668824b8ab85b4452479dbe29bb2f75ef5d"
+}

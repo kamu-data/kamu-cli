@@ -31,9 +31,7 @@ use crate::prelude::*;
 
 #[derive(SimpleObject, Clone, PartialEq, Eq)]
 pub struct FlowConfiguration {
-    pub paused: bool,
     pub ingest: Option<FlowConfigurationIngest>,
-    pub transform: Option<FlowConfigurationTransform>,
     pub compaction: Option<FlowConfigurationCompaction>,
     pub reset: Option<FlowConfigurationReset>,
 }
@@ -41,12 +39,6 @@ pub struct FlowConfiguration {
 impl From<kamu_flow_system::FlowConfigurationState> for FlowConfiguration {
     fn from(value: kamu_flow_system::FlowConfigurationState) -> Self {
         Self {
-            paused: !value.is_active(),
-            transform: if let FlowConfigurationRule::TransformRule(condition) = &value.rule {
-                Some((*condition).into())
-            } else {
-                None
-            },
             ingest: if let FlowConfigurationRule::IngestRule(ingest_rule) = &value.rule {
                 Some(ingest_rule.clone().into())
             } else {
@@ -76,7 +68,6 @@ impl From<kamu_flow_system::FlowConfigurationState> for FlowConfiguration {
 
 #[derive(SimpleObject, Clone, PartialEq, Eq)]
 pub struct FlowConfigurationIngest {
-    pub schedule: FlowConfigurationSchedule,
     pub fetch_uncacheable: bool,
 }
 
@@ -84,12 +75,6 @@ impl From<IngestRule> for FlowConfigurationIngest {
     fn from(value: IngestRule) -> Self {
         Self {
             fetch_uncacheable: value.fetch_uncacheable,
-            schedule: match value.schedule_condition {
-                Schedule::TimeDelta(time_delta) => {
-                    FlowConfigurationSchedule::TimeDelta(time_delta.every.into())
-                }
-                Schedule::Cron(cron) => FlowConfigurationSchedule::Cron(cron.clone().into()),
-            },
         }
     }
 }
@@ -278,7 +263,6 @@ impl From<chrono::Duration> for TimeDelta {
 
 #[derive(OneofObject)]
 pub enum FlowRunConfiguration {
-    Transform(TransformConditionInput),
     Compaction(CompactionConditionInput),
     Ingest(IngestConditionInput),
     Reset(ResetConditionInput),
@@ -318,18 +302,6 @@ impl From<&TimeDeltaInput> for chrono::Duration {
             TimeUnit::Hours => chrono::Duration::try_hours(every).unwrap(),
             TimeUnit::Minutes => chrono::Duration::try_minutes(every).unwrap(),
         }
-    }
-}
-
-#[derive(InputObject, Clone)]
-pub struct TransformConditionInput {
-    pub min_records_to_await: u64,
-    pub max_batching_interval: TimeDeltaInput,
-}
-
-impl From<TransformConditionInput> for FlowRunConfiguration {
-    fn from(value: TransformConditionInput) -> Self {
-        Self::Transform(value)
     }
 }
 
@@ -406,17 +378,8 @@ impl TryFrom<IngestConditionInput> for IngestRule {
     type Error = ScheduleCronError;
 
     fn try_from(value: IngestConditionInput) -> std::result::Result<Self, Self::Error> {
-        let schedule = match value.schedule {
-            ScheduleInput::TimeDelta(td) => {
-                Schedule::TimeDelta(ScheduleTimeDelta { every: td.into() })
-            }
-            ScheduleInput::Cron5ComponentExpression(cron_5component_expression) => {
-                Schedule::try_from_5component_cron_expression(&cron_5component_expression)?
-            }
-        };
         Ok(Self {
             fetch_uncacheable: value.fetch_uncacheable,
-            schedule_condition: schedule,
         })
     }
 }
@@ -424,6 +387,25 @@ impl TryFrom<IngestConditionInput> for IngestRule {
 impl From<IngestConditionInput> for FlowRunConfiguration {
     fn from(value: IngestConditionInput) -> Self {
         Self::Ingest(value)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(OneofObject, Clone)]
+pub enum FlowConfigurationInput {
+    Ingest(IngestConditionInput),
+    Compaction(CompactionConditionInput),
+}
+
+impl From<FlowConfigurationInput> for FlowRunConfiguration {
+    fn from(value: FlowConfigurationInput) -> Self {
+        match value {
+            FlowConfigurationInput::Ingest(ingest_input) => Self::Ingest(ingest_input),
+            FlowConfigurationInput::Compaction(compaction_input) => {
+                Self::Compaction(compaction_input)
+            }
+        }
     }
 }
 
@@ -442,22 +424,6 @@ impl FlowRunConfiguration {
                     if let Self::Ingest(ingest_input) = flow_run_configuration {
                         return Ok(Some(FlowConfigurationSnapshot::Ingest(IngestRule {
                             fetch_uncacheable: ingest_input.fetch_uncacheable,
-                            schedule_condition: match &ingest_input.schedule {
-                                ScheduleInput::TimeDelta(td) => {
-                                    Schedule::TimeDelta(ScheduleTimeDelta { every: td.into() })
-                                }
-                                ScheduleInput::Cron5ComponentExpression(
-                                    cron_5component_expression,
-                                ) => Schedule::try_from_5component_cron_expression(
-                                    cron_5component_expression,
-                                )
-                                .map_err(|_| {
-                                    FlowInvalidRunConfigurations {
-                                        error: "Invalid schedule flow run configuration"
-                                            .to_string(),
-                                    }
-                                })?,
-                            },
                         })));
                     }
                     return Err(FlowInvalidRunConfigurations {
@@ -466,27 +432,7 @@ impl FlowRunConfiguration {
                     });
                 }
             }
-            DatasetFlowType::ExecuteTransform => {
-                if let Some(flow_run_configuration) = flow_run_configuration_maybe {
-                    if let Self::Transform(transform_input) = flow_run_configuration {
-                        return Ok(Some(FlowConfigurationSnapshot::Transform(
-                            TransformRule::new_checked(
-                                transform_input.min_records_to_await,
-                                transform_input.max_batching_interval.clone().into(),
-                            )
-                            .map_err(|_| {
-                                FlowInvalidRunConfigurations {
-                                    error: "Invalid transform flow run configuration".to_string(),
-                                }
-                            })?,
-                        )));
-                    }
-                    return Err(FlowInvalidRunConfigurations {
-                        error: "Incompatible flow run configuration and dataset flow type"
-                            .to_string(),
-                    });
-                }
-            }
+            DatasetFlowType::ExecuteTransform => return Ok(None),
             DatasetFlowType::HardCompaction => {
                 if let Some(flow_run_configuration) = flow_run_configuration_maybe {
                     if let Self::Compaction(compaction_input) = flow_run_configuration {
@@ -569,11 +515,6 @@ impl FlowRunConfiguration {
         match self {
             Self::Ingest(_) => {
                 if flow_type == DatasetFlowType::Ingest {
-                    return Ok(());
-                }
-            }
-            Self::Transform(_) => {
-                if flow_type == DatasetFlowType::ExecuteTransform {
                     return Ok(());
                 }
             }

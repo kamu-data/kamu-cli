@@ -117,6 +117,7 @@ pub fn configure_database_components(
             b.add::<kamu_datasets_postgres::PostgresDatasetEntryRepository>();
 
             b.add::<kamu_flow_system_postgres::PostgresFlowConfigurationEventStore>();
+            b.add::<kamu_flow_system_postgres::PostgresFlowTriggerEventStore>();
             b.add::<kamu_flow_system_postgres::PostgresFlowEventStore>();
 
             b.add::<kamu_task_system_postgres::PostgresTaskEventStore>();
@@ -139,6 +140,7 @@ pub fn configure_database_components(
             b.add::<kamu_datasets_inmem::InMemoryDatasetEntryRepository>();
 
             b.add::<kamu_flow_system_inmem::InMemoryFlowConfigurationEventStore>();
+            b.add::<kamu_flow_system_inmem::InMemoryFlowTriggerEventStore>();
             b.add::<kamu_flow_system_inmem::InMemoryFlowEventStore>();
 
             b.add::<kamu_task_system_inmem::InMemoryTaskEventStore>();
@@ -158,6 +160,7 @@ pub fn configure_database_components(
             b.add::<kamu_datasets_sqlite::SqliteDatasetEntryRepository>();
 
             b.add::<kamu_flow_system_sqlite::SqliteFlowConfigurationEventStore>();
+            b.add::<kamu_flow_system_sqlite::SqliteFlowTriggerEventStore>();
             b.add::<kamu_flow_system_sqlite::SqliteFlowEventStore>();
 
             b.add::<kamu_task_system_sqlite::SqliteTaskSystemEventStore>();
@@ -183,6 +186,7 @@ pub fn configure_in_memory_components(b: &mut CatalogBuilder) {
     b.add::<kamu_accounts_inmem::InMemoryAccountRepository>();
     b.add::<kamu_accounts_inmem::InMemoryAccessTokenRepository>();
     b.add::<kamu_flow_system_inmem::InMemoryFlowConfigurationEventStore>();
+    b.add::<kamu_flow_system_inmem::InMemoryFlowTriggerEventStore>();
     b.add::<kamu_flow_system_inmem::InMemoryFlowEventStore>();
     b.add::<kamu_task_system_inmem::InMemoryTaskEventStore>();
     b.add::<kamu_datasets_inmem::InMemoryDatasetEnvVarRepository>();

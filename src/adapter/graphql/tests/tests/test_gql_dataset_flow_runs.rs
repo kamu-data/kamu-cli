@@ -64,6 +64,7 @@ use kamu_flow_system::{
     FlowID,
     FlowTrigger,
     FlowTriggerAutoPolling,
+    FlowTriggerType,
     METADATA_TASK_FLOW_ID,
 };
 use kamu_flow_system_inmem::{InMemoryFlowConfigurationEventStore, InMemoryFlowEventStore};
@@ -2564,7 +2565,7 @@ async fn test_history_of_completed_flow() {
     harness
         .mimic_flow_secondary_trigger(
             flow_id,
-            FlowTrigger::AutoPolling(FlowTriggerAutoPolling {
+            FlowTriggerType::AutoPolling(FlowTriggerAutoPolling {
                 trigger_time: Utc::now(),
             }),
         )

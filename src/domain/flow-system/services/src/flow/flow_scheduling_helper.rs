@@ -25,6 +25,7 @@ use crate::{DownstreamDependencyTriggerType, MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS
 pub(crate) struct FlowSchedulingHelper {
     flow_event_store: Arc<dyn FlowEventStore>,
     flow_configuration_service: Arc<dyn FlowConfigurationService>,
+    flow_trigger_service: Arc<dyn FlowTriggerService>,
     outbox: Arc<dyn Outbox>,
     dataset_changes_service: Arc<dyn DatasetChangesService>,
     dependency_graph_service: Arc<dyn DependencyGraphService>,
@@ -38,6 +39,7 @@ impl FlowSchedulingHelper {
     pub(crate) fn new(
         flow_event_store: Arc<dyn FlowEventStore>,
         flow_configuration_service: Arc<dyn FlowConfigurationService>,
+        flow_trigger_service: Arc<dyn FlowTriggerService>,
         outbox: Arc<dyn Outbox>,
         dataset_changes_service: Arc<dyn DatasetChangesService>,
         dependency_graph_service: Arc<dyn DependencyGraphService>,
@@ -48,6 +50,7 @@ impl FlowSchedulingHelper {
         Self {
             flow_event_store,
             flow_configuration_service,
+            flow_trigger_service,
             outbox,
             dataset_changes_service,
             dependency_graph_service,
@@ -57,53 +60,46 @@ impl FlowSchedulingHelper {
         }
     }
 
-    pub(crate) async fn activate_flow_configuration(
+    pub(crate) async fn activate_flow_trigger(
         &self,
         start_time: DateTime<Utc>,
         flow_key: FlowKey,
-        rule: FlowConfigurationRule,
+        rule: FlowTriggerRule,
     ) -> Result<(), InternalError> {
-        tracing::trace!(flow_key = ?flow_key, rule = ?rule, "Activating flow configuration");
+        tracing::trace!(flow_key = ?flow_key, rule = ?rule, "Activating flow trigger");
 
         match &flow_key {
-            FlowKey::Dataset(_) => {
-                match &rule {
-                    FlowConfigurationRule::TransformRule(transform_rule) => {
-                        let flow_run_stats =
-                            self.flow_event_store.get_flow_run_stats(&flow_key).await?;
-                        if flow_run_stats.last_success_time.is_some() {
-                            self.trigger_flow_common(
-                                &flow_key,
-                                FlowTrigger::AutoPolling(FlowTriggerAutoPolling {
+            FlowKey::Dataset(_) => match &rule {
+                FlowTriggerRule::Batching(transform_rule) => {
+                    let flow_run_stats =
+                        self.flow_event_store.get_flow_run_stats(&flow_key).await?;
+                    if flow_run_stats.last_success_time.is_some() {
+                        self.trigger_flow_common(
+                            &flow_key,
+                            &FlowTrigger::new(
+                                self.time_source.now(),
+                                flow_key.clone(),
+                                false,
+                                Some(FlowTriggerRule::Batching(transform_rule.clone())),
+                                FlowTriggerType::AutoPolling(FlowTriggerAutoPolling {
                                     trigger_time: start_time,
                                 }),
-                                FlowTriggerContext::Batching(*transform_rule),
-                                None,
-                            )
-                            .await?;
-                        } else {
-                            self.schedule_auto_polling_flow_unconditionally(start_time, &flow_key)
-                                .await?;
-                        }
-                    }
-                    FlowConfigurationRule::IngestRule(ingest_rule) => {
-                        self.schedule_auto_polling_flow(
-                            start_time,
-                            &flow_key,
-                            &ingest_rule.schedule_condition,
+                            ),
+                            None,
                         )
                         .await?;
+                    } else {
+                        self.schedule_auto_polling_flow_unconditionally(start_time, &flow_key)
+                            .await?;
                     }
-                    // Such as compaction and reset is very dangerous operation we
-                    // skip running it during activation flow configurations.
-                    // And schedule will be used only for system flows
-                    FlowConfigurationRule::CompactionRule(_)
-                    | FlowConfigurationRule::Schedule(_)
-                    | FlowConfigurationRule::ResetRule(_) => (),
                 }
-            }
+                FlowTriggerRule::Schedule(schedule_rule) => {
+                    self.schedule_auto_polling_flow(start_time, &flow_key, &schedule_rule)
+                        .await?;
+                }
+            },
             FlowKey::System(_) => {
-                if let FlowConfigurationRule::Schedule(schedule) = &rule {
+                if let FlowTriggerRule::Schedule(schedule) = &rule {
                     self.schedule_auto_polling_flow(start_time, &flow_key, schedule)
                         .await?;
                 } else {
@@ -123,8 +119,8 @@ impl FlowSchedulingHelper {
         flow_key: &FlowKey,
     ) -> Result<(), InternalError> {
         let maybe_active_schedule = self
-            .flow_configuration_service
-            .try_get_flow_schedule(flow_key.clone())
+            .flow_trigger_service
+            .try_get_flow_schedule_rule(flow_key.clone())
             .await
             .int_err()?;
 
@@ -150,7 +146,7 @@ impl FlowSchedulingHelper {
             if dependent_dataset_flow_plans.is_empty() {
                 return Ok(());
             }
-            let trigger = FlowTrigger::InputDatasetFlow(FlowTriggerInputDatasetFlow {
+            let trigger_type = FlowTriggerType::InputDatasetFlow(FlowTriggerInputDatasetFlow {
                 trigger_time: input_success_time,
                 dataset_id: fk_dataset.dataset_id.clone(),
                 flow_type: fk_dataset.flow_type,
@@ -159,13 +155,14 @@ impl FlowSchedulingHelper {
             });
             // For each, trigger needed flow
             for dependent_dataset_flow_plan in dependent_dataset_flow_plans {
-                self.trigger_flow_common(
-                    &dependent_dataset_flow_plan.flow_key,
-                    trigger.clone(),
-                    dependent_dataset_flow_plan.flow_trigger_context,
-                    dependent_dataset_flow_plan.maybe_config_snapshot,
-                )
-                .await?;
+                // #ToDo handle dependencies flow
+                // self.trigger_flow_common(
+                //     &dependent_dataset_flow_plan.flow_key,
+                //     trigger.clone(),
+                //     dependent_dataset_flow_plan.flow_trigger_context,
+                //     dependent_dataset_flow_plan.maybe_config_snapshot,
+                // )
+                // .await?;
             }
 
             Ok(())
@@ -199,8 +196,8 @@ impl FlowSchedulingHelper {
             DownstreamDependencyTriggerType::TriggerAllEnabledExecuteTransform => {
                 for dataset_id in dependent_dataset_ids {
                     if let Some(transform_rule) = self
-                        .flow_configuration_service
-                        .try_get_dataset_transform_rule(
+                        .flow_trigger_service
+                        .try_get_flow_batching_rule(
                             dataset_id.clone(),
                             DatasetFlowType::ExecuteTransform,
                         )
@@ -302,16 +299,18 @@ impl FlowSchedulingHelper {
         schedule: &Schedule,
     ) -> Result<FlowState, InternalError> {
         tracing::trace!(flow_key = ?flow_key, schedule = ?schedule, "Enqueuing scheduled flow");
-
-        self.trigger_flow_common(
-            flow_key,
-            FlowTrigger::AutoPolling(FlowTriggerAutoPolling {
+        let flow_trigger = FlowTrigger::new(
+            self.time_source.now(),
+            flow_key.clone(),
+            false,
+            Some(FlowTriggerRule::Schedule(schedule.clone())),
+            FlowTriggerType::AutoPolling(FlowTriggerAutoPolling {
                 trigger_time: start_time,
             }),
-            FlowTriggerContext::Scheduled(schedule.clone()),
-            None,
-        )
-        .await
+        );
+
+        self.trigger_flow_common(flow_key, &flow_trigger, None)
+            .await
     }
 
     pub(crate) async fn schedule_auto_polling_flow_unconditionally(
@@ -320,22 +319,23 @@ impl FlowSchedulingHelper {
         flow_key: &FlowKey,
     ) -> Result<FlowState, InternalError> {
         // Very similar to manual trigger, but automatic reasons
-        self.trigger_flow_common(
-            flow_key,
-            FlowTrigger::AutoPolling(FlowTriggerAutoPolling {
+        let flow_trigger = FlowTrigger::new(
+            self.time_source.now(),
+            flow_key.clone(),
+            false,
+            None,
+            FlowTriggerType::AutoPolling(FlowTriggerAutoPolling {
                 trigger_time: start_time,
             }),
-            FlowTriggerContext::Unconditional,
-            None,
-        )
-        .await
+        );
+        self.trigger_flow_common(flow_key, &flow_trigger, None)
+            .await
     }
 
     pub(crate) async fn trigger_flow_common(
         &self,
         flow_key: &FlowKey,
-        trigger: FlowTrigger,
-        context: FlowTriggerContext,
+        trigger: &FlowTrigger,
         config_snapshot_maybe: Option<FlowConfigurationSnapshot>,
     ) -> Result<FlowState, InternalError> {
         // Query previous runs stats to determine activation time
@@ -343,7 +343,7 @@ impl FlowSchedulingHelper {
 
         // Flows may not be attempted more frequent than mandatory throttling period.
         // If flow has never run before, let it go without restriction.
-        let trigger_time = trigger.trigger_time();
+        let trigger_time = trigger.trigger_type.trigger_time();
         let mut throttling_boundary_time =
             flow_run_stats.last_attempt_time.map_or(trigger_time, |t| {
                 t + self.executor_config.mandatory_throttling_period
@@ -352,6 +352,18 @@ impl FlowSchedulingHelper {
         if throttling_boundary_time < trigger_time {
             throttling_boundary_time = trigger_time;
         }
+
+        let trigger_context = match &trigger.rule {
+            None => FlowTriggerContext::Unconditional,
+            Some(rule) => match rule {
+                FlowTriggerRule::Schedule(schedule) => {
+                    FlowTriggerContext::Scheduled(schedule.clone())
+                }
+                FlowTriggerRule::Batching(batching) => {
+                    FlowTriggerContext::Batching(batching.clone())
+                }
+            },
+        };
 
         // Is a pending flow present for this config?
         match self.find_pending_flow(flow_key).await? {
@@ -363,10 +375,10 @@ impl FlowSchedulingHelper {
                     .int_err()?;
 
                 // Only merge unique triggers, ignore identical
-                flow.add_trigger_if_unique(self.time_source.now(), trigger)
+                flow.add_trigger_if_unique(self.time_source.now(), trigger.trigger_type.clone())
                     .int_err()?;
 
-                match context {
+                match trigger_context {
                     FlowTriggerContext::Batching(transform_rule) => {
                         // Is this rule still waited?
                         if matches!(flow.start_condition, Some(FlowStartCondition::Batching(_))) {
@@ -431,7 +443,7 @@ impl FlowSchedulingHelper {
                     )
                     .await?;
 
-                match context {
+                match trigger_context {
                     FlowTriggerContext::Batching(transform_rule) => {
                         // Don't activate if batching condition not satisfied
                         self.evaluate_flow_transform_rule(
@@ -523,8 +535,8 @@ impl FlowSchedulingHelper {
 
         // Scan each accumulated trigger to decide
         for trigger in &flow.triggers {
-            if let FlowTrigger::InputDatasetFlow(trigger) = trigger {
-                match &trigger.flow_result {
+            if let FlowTriggerType::InputDatasetFlow(ref trigger_type) = trigger {
+                match &trigger_type.flow_result {
                     FlowResult::Empty | FlowResult::DatasetReset(_) => {}
                     FlowResult::DatasetCompact(_) => {
                         is_compacted = true;
@@ -537,7 +549,7 @@ impl FlowSchedulingHelper {
                             let increment = self
                                 .dataset_changes_service
                                 .get_increment_since(
-                                    &trigger.dataset_id,
+                                    &trigger_type.dataset_id,
                                     update_result.old_head.as_ref(),
                                 )
                                 .await
@@ -647,7 +659,7 @@ impl FlowSchedulingHelper {
         &self,
         flow_event_store: &dyn FlowEventStore,
         flow_key: FlowKey,
-        trigger: FlowTrigger,
+        trigger: &FlowTrigger,
         config_snapshot: Option<FlowConfigurationSnapshot>,
     ) -> Result<Flow, InternalError> {
         tracing::trace!(flow_key = ?flow_key, trigger = ?trigger, "Creating new flow");
@@ -656,7 +668,7 @@ impl FlowSchedulingHelper {
             self.time_source.now(),
             flow_event_store.new_flow_id().await?,
             flow_key,
-            trigger,
+            trigger.trigger_type.clone(),
             config_snapshot,
         );
 
