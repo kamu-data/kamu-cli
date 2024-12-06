@@ -5331,11 +5331,13 @@ dependencies = [
 name = "kamu-accounts-postgres"
 version = "0.209.0"
 dependencies = [
+ "async-stream",
  "async-trait",
  "chrono",
  "database-common",
  "database-common-macros",
  "dill",
+ "futures",
  "internal-error",
  "kamu-accounts",
  "kamu-accounts-repo-tests",

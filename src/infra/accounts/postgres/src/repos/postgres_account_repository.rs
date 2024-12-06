@@ -104,37 +104,43 @@ impl AccountRepository for PostgresAccountRepository {
         Ok(())
     }
 
-    async fn get_accounts(&self, _pagination: PaginationOpts) -> AccountStream {
-        todo!()
-        // let mut tr = self.transaction.lock().await;
-        //
-        // let connection_mut = tr
-        //     .connection_mut()
-        //     .await
-        //     .map_err(GetAccountsError::Internal)?;
-        //
-        // let account_rows = sqlx::query_as!(
-        //     AccountRowModel,
-        //     r#"
-        //     SELECT id            AS "id: _",
-        //            account_name,
-        //            email,
-        //            display_name,
-        //            account_type  AS "account_type: AccountType",
-        //            avatar_url,
-        //            registered_at,
-        //            is_admin,
-        //            provider,
-        //            provider_identity_key
-        //     FROM accounts
-        //     "#,
-        // )
-        // .fetch_all(connection_mut)
-        // .await
-        // .int_err()
-        // .map_err(GetAccountsError::Internal)?;
-        //
-        // Ok(account_rows.into_iter().map(Into::into).collect())
+    async fn get_accounts(&self, pagination: PaginationOpts) -> AccountStream {
+        Box::pin(async_stream::stream! {
+            let mut tr = self.transaction.lock().await;
+            let connection_mut = tr.connection_mut().await?;
+
+            let limit = i64::try_from(pagination.limit).int_err()?;
+            let offset = i64::try_from(pagination.offset).int_err()?;
+
+            let mut query_stream = sqlx::query_as!(
+                AccountRowModel,
+                r#"
+                SELECT id           AS "id: _",
+                       account_name,
+                       email,
+                       display_name,
+                       account_type AS "account_type: AccountType",
+                       avatar_url,
+                       registered_at,
+                       is_admin,
+                       provider,
+                       provider_identity_key
+                FROM accounts
+                ORDER BY registered_at ASC
+                LIMIT $1 OFFSET $2
+                "#,
+                limit,
+                offset,
+            )
+            .fetch(connection_mut)
+            .map_err(ErrorIntoInternal::int_err);
+
+            use futures::TryStreamExt;
+
+            while let Some(account_row_model) = query_stream.try_next().await? {
+                yield Ok(account_row_model.into());
+            }
+        })
     }
 
     async fn get_account_by_id(
