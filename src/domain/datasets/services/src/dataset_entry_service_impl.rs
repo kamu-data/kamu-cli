@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::collections::{HashMap, HashSet};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use database_common::{EntityListing, EntityStreamer, PaginationOpts};
 use dill::{component, interface, meta, Catalog};
@@ -49,6 +49,7 @@ use opendatafabric::{
     DatasetRef,
 };
 use time_source::SystemTimeSource;
+use tokio::sync::RwLock;
 
 use crate::MESSAGE_CONSUMER_KAMU_DATASET_ENTRY_SERVICE;
 
@@ -61,11 +62,13 @@ pub struct DatasetEntryServiceImpl {
     account_repo: Arc<dyn AccountRepository>,
     current_account_subject: Arc<CurrentAccountSubject>,
     tenancy_config: Arc<TenancyConfig>,
-    accounts_cache: Arc<Mutex<AccountsCache>>,
+    accounts_cache: Arc<RwLock<AccountsCache>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// TODO: Private Datasets: Q: DatasetEntryServiceImpl is not singleton,
+//                            but has a cache -- is that intentional?
 #[derive(Default)]
 struct AccountsCache {
     id2names: HashMap<AccountID, AccountName>,
@@ -168,11 +171,14 @@ impl DatasetEntryServiceImpl {
     ) -> Result<Vec<DatasetHandle>, ListDatasetEntriesError> {
         // Select which accounts haven't been processed yet
         let first_seen_account_ids = {
-            let accounts_cache = self.accounts_cache.lock().unwrap();
+            let readable_accounts_cache = self.accounts_cache.read().await;
 
             let mut first_seen_account_ids = HashSet::new();
             for entry in &entries {
-                if !accounts_cache.id2names.contains_key(&entry.owner_id) {
+                if !readable_accounts_cache
+                    .id2names
+                    .contains_key(&entry.owner_id)
+                {
                     first_seen_account_ids.insert(entry.owner_id.clone());
                 }
             }
@@ -189,12 +195,12 @@ impl DatasetEntryServiceImpl {
                 .await
                 .int_err()?;
 
-            let mut accounts_cache = self.accounts_cache.lock().unwrap();
+            let mut writable_accounts_cache = self.accounts_cache.write().await;
             for account in accounts {
-                accounts_cache
+                writable_accounts_cache
                     .id2names
                     .insert(account.id.clone(), account.account_name.clone());
-                accounts_cache
+                writable_accounts_cache
                     .names2ids
                     .insert(account.account_name, account.id);
             }
@@ -202,10 +208,10 @@ impl DatasetEntryServiceImpl {
 
         // Convert the entries to handles
         let mut handles = Vec::new();
-        let accounts_cache = self.accounts_cache.lock().unwrap();
+        let readable_accounts_cache = self.accounts_cache.read().await;
         for entry in &entries {
             // By now we should now the account name
-            let maybe_owner_name = accounts_cache.id2names.get(&entry.owner_id);
+            let maybe_owner_name = readable_accounts_cache.id2names.get(&entry.owner_id);
             if let Some(owner_name) = maybe_owner_name {
                 // Form DatasetHandle
                 handles.push(DatasetHandle::new(
@@ -224,8 +230,8 @@ impl DatasetEntryServiceImpl {
         account_id: &AccountID,
     ) -> Result<AccountName, InternalError> {
         let maybe_cached_name = {
-            let accounts_cache = self.accounts_cache.lock().unwrap();
-            accounts_cache.id2names.get(account_id).cloned()
+            let readable_accounts_cache = self.accounts_cache.read().await;
+            readable_accounts_cache.id2names.get(account_id).cloned()
         };
 
         if let Some(name) = maybe_cached_name {
@@ -237,11 +243,11 @@ impl DatasetEntryServiceImpl {
                 .await
                 .int_err()?;
 
-            let mut accounts_cache = self.accounts_cache.lock().unwrap();
-            accounts_cache
+            let mut writable_accounts_cache = self.accounts_cache.write().await;
+            writable_accounts_cache
                 .id2names
                 .insert(account_id.clone(), account.account_name.clone());
-            accounts_cache
+            writable_accounts_cache
                 .names2ids
                 .insert(account.account_name.clone(), account_id.clone());
 
@@ -257,8 +263,8 @@ impl DatasetEntryServiceImpl {
             .unwrap_or_else(|| self.current_account_subject.account_name_or_default());
 
         let maybe_cached_id = {
-            let accounts_cache = self.accounts_cache.lock().unwrap();
-            accounts_cache.names2ids.get(account_name).cloned()
+            let readable_accounts_cache = self.accounts_cache.read().await;
+            readable_accounts_cache.names2ids.get(account_name).cloned()
         };
 
         if let Some(id) = maybe_cached_id {
@@ -270,11 +276,11 @@ impl DatasetEntryServiceImpl {
                 .await
                 .int_err()?;
 
-            let mut accounts_cache = self.accounts_cache.lock().unwrap();
-            accounts_cache
+            let mut writable_accounts_cache = self.accounts_cache.write().await;
+            writable_accounts_cache
                 .id2names
                 .insert(account.id.clone(), account_name.clone());
-            accounts_cache
+            writable_accounts_cache
                 .names2ids
                 .insert(account_name.clone(), account.id.clone());
 
