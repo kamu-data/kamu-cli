@@ -168,10 +168,30 @@ impl RebacRepository for InMemoryRebacRepository {
 
     async fn get_entity_properties_by_ids(
         &self,
-        _entity: &[Entity],
+        entities: &[Entity],
     ) -> Result<Vec<(Entity, PropertyName, PropertyValue)>, GetEntityPropertiesError> {
-        // TODO: Private Datasets: implement
-        todo!()
+        let entities_set = entities.iter().cloned().collect::<HashSet<_>>();
+
+        let readable_state = self.state.read().await;
+
+        let entities_properties = readable_state
+            .entities_properties_map
+            .iter()
+            .filter(|(entity, _)| entities_set.contains(entity))
+            .map(|(entity, entity_properties)| {
+                entity_properties
+                    .iter()
+                    .map(|(property_name, property_value)| {
+                        (entity.clone(), *property_name, property_value.clone())
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .fold(Vec::new(), |mut acc, entity_properties| {
+                acc.extend(entity_properties);
+                acc
+            });
+
+        Ok(entities_properties)
     }
 
     async fn insert_entities_relation(
