@@ -370,7 +370,7 @@ impl DatasetRepositoryWriter for DatasetRepositoryS3 {
                 AppendOpts {
                     // We are using head ref CAS to detect previous existence of a dataset
                     // as atomically as possible
-                    check_ref_is: Some(None),
+                    check_ref_mode: AppendCheckRefMode::EqualsTo(None),
                     ..AppendOpts::default()
                 },
             )
