@@ -10,6 +10,7 @@
 use std::path::Path;
 use std::sync::Arc;
 
+use auth::DummyOdfServerAccessTokenResolver;
 use kamu::domain::*;
 use kamu::testing::{MetadataFactory, ParquetWriterHelper};
 use kamu::*;
@@ -18,6 +19,7 @@ use kamu_cli_puppet::extensions::KamuCliPuppetExt;
 use kamu_cli_puppet::KamuCliPuppet;
 use opendatafabric::serde::yaml::Manifest;
 use opendatafabric::*;
+use url::Url;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -90,7 +92,16 @@ async fn init_v0_workspace(workspace_path: &Path) {
     let dataset_name = DatasetName::new_unchecked("foo");
     let dataset_dir = datasets_dir.join(&dataset_name);
 
-    let dataset = DatasetFactoryImpl::get_local_fs(DatasetLayout::create(&dataset_dir).unwrap());
+    let dataset_factory = DatasetFactoryImpl::new(
+        IpfsGateway::default(),
+        Arc::new(DummyOdfServerAccessTokenResolver::new()),
+    );
+
+    let dataset_dir_as_url = Url::from_file_path(&dataset_dir).unwrap();
+    let dataset = dataset_factory
+        .get_dataset(&dataset_dir_as_url, false)
+        .await
+        .unwrap();
 
     // Metadata & refs
     dataset

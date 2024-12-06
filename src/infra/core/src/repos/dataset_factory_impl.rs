@@ -54,7 +54,7 @@ impl DatasetFactoryImpl {
         }
     }
 
-    pub fn get_local_fs(layout: DatasetLayout) -> DatasetImplLocalFS {
+    fn get_local_fs(layout: DatasetLayout) -> DatasetImplLocalFS {
         DatasetImpl::new(
             MetadataChainImpl::new(
                 MetadataBlockRepositoryCachingInMem::new(MetadataBlockRepositoryImpl::new(
@@ -116,7 +116,7 @@ impl DatasetFactoryImpl {
     /// credential resolution from scratch which can be very expensive. If you
     /// already have an established [S3Context] use
     /// [DatasetFactoryImpl::get_s3_from_context()] function instead.
-    pub async fn get_s3_from_url(base_url: Url) -> Result<impl Dataset, InternalError> {
+    async fn get_s3_from_url(base_url: Url) -> Result<impl Dataset, InternalError> {
         // TODO: We should ensure optimal credential reuse. Perhaps in future we should
         // create a cache of S3Contexts keyed by an endpoint.
         let s3_context = S3Context::from_url(&base_url).await;

@@ -8,18 +8,31 @@
 // by the Apache License, Version 2.0.
 
 use std::assert_matches::assert_matches;
+use std::sync::Arc;
 
+use auth::DummyOdfServerAccessTokenResolver;
 use kamu::domain::*;
 use kamu::testing::*;
 use kamu::*;
 use opendatafabric::*;
+use url::Url;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
 async fn test_summary_updates() {
     let tmp_dir = tempfile::tempdir().unwrap();
-    let layout = DatasetLayout::create(tmp_dir.path()).unwrap();
 
-    let ds = DatasetFactoryImpl::get_local_fs(layout);
+    let dataset_factory = DatasetFactoryImpl::new(
+        IpfsGateway::default(),
+        Arc::new(DummyOdfServerAccessTokenResolver::new()),
+    );
+
+    let dataset_dir_as_url = Url::from_file_path(tmp_dir.path()).unwrap();
+    let ds = dataset_factory
+        .get_dataset(&dataset_dir_as_url, false)
+        .await
+        .unwrap();
 
     assert_matches!(
         ds.get_summary(GetSummaryOpts::default()).await,
@@ -116,3 +129,5 @@ async fn test_summary_updates() {
         }
     );
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
