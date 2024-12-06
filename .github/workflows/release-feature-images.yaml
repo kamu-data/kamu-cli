@@ -1,0 +1,43 @@
+name: release-feature-images
+on:
+  push:
+    tags:
+      - feature-*-v[0-9]+
+env:
+  # AWS credentials (needed only to list a bucket)
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  AWS_DEFAULT_REGION: us-west-2
+jobs:
+  build_images:
+    name: Build Feature Images
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build base feature image
+        run: |
+          cd images/
+          make kamu-base-feature-branch
+
+      - name: Build feature images with sample data
+        run: |
+          cd images/
+          make kamu-base-with-data-feature-branch
+          make kamu-base-with-data-mt-feature-branch
+          make kamu-base-with-env-var-storage-feature-branch
+
+      - name: Publish feature images
+        run: |
+          cd images
+          make kamu-base-feature-branch-push
+          make kamu-base-with-data-feature-branch-push
+          make kamu-base-with-data-mt-feature-branch-push
+          make kamu-base-with-env-var-storage-feature-branch-push
