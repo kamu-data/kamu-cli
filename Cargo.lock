@@ -2936,6 +2936,7 @@ dependencies = [
  "aws-sdk-secretsmanager",
  "chrono",
  "dill",
+ "futures",
  "hex",
  "hmac",
  "internal-error",

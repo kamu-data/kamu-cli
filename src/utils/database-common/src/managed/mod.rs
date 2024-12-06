@@ -7,8 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod managed_dataset_impl;
-mod managed_metadata_chain_impl;
+mod managed_entity;
+mod managed_impl;
+mod managed_operation;
+mod managed_operation_factory;
 
-pub use managed_dataset_impl::*;
-pub use managed_metadata_chain_impl::*;
+pub use managed_entity::*;
+pub use managed_impl::*;
+pub use managed_operation::*;
+pub use managed_operation_factory::*;

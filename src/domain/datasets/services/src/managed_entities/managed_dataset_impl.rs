@@ -8,15 +8,18 @@
 // by the Apache License, Version 2.0.
 
 use std::collections::BTreeMap;
+use std::str::FromStr;
 use std::sync::Arc;
 
+use database_common::ManagedEntity;
 use dill::Catalog;
-use internal_error::InternalError;
+use internal_error::{InternalError, ResultIntoInternal};
 use kamu_core::*;
+use kamu_datasets::DatasetReferenceRepository;
 use opendatafabric as odf;
 use url::Url;
 
-use super::{ManagedEntity, ManagedMetadataChainImpl};
+use super::ManagedMetadataChainImpl;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -28,16 +31,49 @@ pub struct ManagedDatasetImpl {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl ManagedDatasetImpl {
-    pub fn new(storage_dataset: Arc<dyn Dataset>, dataset_id: odf::DatasetID) -> Self {
-        let managed_chain = ManagedMetadataChainImpl::new(
-            storage_dataset.clone(),
-            dataset_id,
-            BTreeMap::new(), // TODO
-        );
-        Self {
+    pub async fn create(
+        dataset_reference_repo: &dyn DatasetReferenceRepository,
+        storage_dataset: Arc<dyn Dataset>,
+        dataset_id: odf::DatasetID,
+        head: odf::Multihash,
+    ) -> Result<Self, InternalError> {
+        dataset_reference_repo
+            .set_dataset_reference(&dataset_id, BlockRef::Head.as_str(), None, &head)
+            .await
+            .int_err()?;
+
+        let initial_refs = BTreeMap::from_iter([(BlockRef::Head, head)]);
+        let managed_chain =
+            ManagedMetadataChainImpl::new(storage_dataset.clone(), dataset_id, initial_refs);
+
+        Ok(Self {
             storage_dataset,
             managed_chain,
+        })
+    }
+
+    pub async fn load(
+        dataset_reference_repo: &dyn DatasetReferenceRepository,
+        storage_dataset: Arc<dyn Dataset>,
+        dataset_id: odf::DatasetID,
+    ) -> Result<Self, InternalError> {
+        let raw_references = dataset_reference_repo
+            .get_all_dataset_references(&dataset_id)
+            .await?;
+
+        let mut initial_refs = BTreeMap::new();
+        for (block_ref_name, block_hash) in raw_references {
+            let block_ref = BlockRef::from_str(&block_ref_name).int_err()?;
+            initial_refs.insert(block_ref, block_hash);
         }
+
+        let managed_chain =
+            ManagedMetadataChainImpl::new(storage_dataset.clone(), dataset_id, initial_refs);
+
+        Ok(Self {
+            storage_dataset,
+            managed_chain,
+        })
     }
 }
 
@@ -132,8 +168,15 @@ impl Dataset for ManagedDatasetImpl {
 
 #[async_trait::async_trait]
 impl ManagedEntity for ManagedDatasetImpl {
-    async fn do_commit(&self, transactional_catalog: &Catalog) -> Result<(), InternalError> {
-        self.managed_chain.do_commit(transactional_catalog).await
+    async fn do_commit(
+        self: Arc<Self>,
+        transactional_catalog: &Catalog,
+    ) -> Result<(), InternalError> {
+        Arc::<Self>::into_inner(self)
+            .expect("Nobody else should keep managed dataset reference")
+            .managed_chain
+            .do_commit(transactional_catalog)
+            .await
     }
 }
 

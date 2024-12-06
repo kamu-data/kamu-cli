@@ -15,6 +15,7 @@ use dill::{component, interface, meta, Catalog};
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_accounts::{AccountRepository, CurrentAccountSubject};
 use kamu_core::{
+    Dataset,
     DatasetHandleStream,
     DatasetHandlesResolution,
     DatasetLifecycleMessage,
@@ -48,7 +49,7 @@ use opendatafabric::{
 };
 use time_source::SystemTimeSource;
 
-use crate::{ManagedDatasetImpl, MESSAGE_CONSUMER_KAMU_DATASET_ENTRY_SERVICE};
+use crate::MESSAGE_CONSUMER_KAMU_DATASET_ENTRY_SERVICE;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -59,23 +60,30 @@ pub struct DatasetEntryServiceImpl {
     account_repo: Arc<dyn AccountRepository>,
     current_account_subject: Arc<CurrentAccountSubject>,
     tenancy_config: Arc<TenancyConfig>,
-    accounts_cache: Arc<Mutex<AccountsCache>>,
-    // managed_entities: Arc<Mutex<ManagedDatasetsMap>>,
+    cache: Arc<Mutex<Cache>>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Default)]
+struct Cache {
+    accounts: AccountsCache,
+    datasets: DatasetsCache,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Default)]
 struct AccountsCache {
-    id2names: HashMap<AccountID, AccountName>,
-    names2ids: HashMap<AccountName, AccountID>,
+    names_by_ids: HashMap<AccountID, AccountName>,
+    ids_by_names: HashMap<AccountName, AccountID>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Default)]
-struct ManagedDatasetsMap {
-    _dataset_by_id: HashMap<DatasetID, Arc<ManagedDatasetImpl>>,
+struct DatasetsCache {
+    datasets_by_id: HashMap<DatasetID, Arc<dyn Dataset>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -108,8 +116,7 @@ impl DatasetEntryServiceImpl {
             account_repo,
             current_account_subject,
             tenancy_config,
-            accounts_cache: Default::default(),
-            // managed_entities: Default::default(),
+            cache: Arc::new(Mutex::new(Cache::default())),
         }
     }
 
@@ -138,7 +145,9 @@ impl DatasetEntryServiceImpl {
         self.dataset_entry_repo
             .save_dataset_entry(&entry)
             .await
-            .int_err()
+            .int_err()?;
+
+        Ok(())
     }
 
     async fn handle_dataset_lifecycle_deleted_message(
@@ -175,11 +184,11 @@ impl DatasetEntryServiceImpl {
     ) -> Result<Vec<DatasetHandle>, ListDatasetEntriesError> {
         // Select which accounts haven't been processed yet
         let first_seen_account_ids = {
-            let accounts_cache = self.accounts_cache.lock().unwrap();
+            let accounts_cache = &self.cache.lock().unwrap().accounts;
 
             let mut first_seen_account_ids: HashSet<AccountID> = HashSet::new();
             for entry in &entries {
-                if !accounts_cache.id2names.contains_key(&entry.owner_id) {
+                if !accounts_cache.names_by_ids.contains_key(&entry.owner_id) {
                     first_seen_account_ids.insert(entry.owner_id.clone());
                 }
             }
@@ -196,23 +205,23 @@ impl DatasetEntryServiceImpl {
                 .await
                 .int_err()?;
 
-            let mut accounts_cache = self.accounts_cache.lock().unwrap();
+            let accounts_cache = &mut self.cache.lock().unwrap().accounts;
             for account in accounts {
                 accounts_cache
-                    .id2names
+                    .names_by_ids
                     .insert(account.id.clone(), account.account_name.clone());
                 accounts_cache
-                    .names2ids
+                    .ids_by_names
                     .insert(account.account_name, account.id);
             }
         }
 
         // Convert the entries to handles
         let mut handles = Vec::new();
-        let accounts_cache = self.accounts_cache.lock().unwrap();
+        let accounts_cache = &self.cache.lock().unwrap().accounts;
         for entry in &entries {
             // By now we should now the account name
-            let maybe_owner_name = accounts_cache.id2names.get(&entry.owner_id);
+            let maybe_owner_name = accounts_cache.names_by_ids.get(&entry.owner_id);
             if let Some(owner_name) = maybe_owner_name {
                 // Form DatasetHandle
                 handles.push(DatasetHandle::new(
@@ -231,8 +240,8 @@ impl DatasetEntryServiceImpl {
         account_id: &AccountID,
     ) -> Result<AccountName, InternalError> {
         let maybe_cached_name = {
-            let accounts_cache = self.accounts_cache.lock().unwrap();
-            accounts_cache.id2names.get(account_id).cloned()
+            let accounts_cache = &self.cache.lock().unwrap().accounts;
+            accounts_cache.names_by_ids.get(account_id).cloned()
         };
 
         if let Some(name) = maybe_cached_name {
@@ -244,12 +253,12 @@ impl DatasetEntryServiceImpl {
                 .await
                 .int_err()?;
 
-            let mut accounts_cache = self.accounts_cache.lock().unwrap();
+            let accounts_cache = &mut self.cache.lock().unwrap().accounts;
             accounts_cache
-                .id2names
+                .names_by_ids
                 .insert(account_id.clone(), account.account_name.clone());
             accounts_cache
-                .names2ids
+                .ids_by_names
                 .insert(account.account_name.clone(), account_id.clone());
 
             Ok(account.account_name)
@@ -264,8 +273,8 @@ impl DatasetEntryServiceImpl {
             .unwrap_or_else(|| self.current_account_subject.account_name_or_default());
 
         let maybe_cached_id = {
-            let accounts_cache = self.accounts_cache.lock().unwrap();
-            accounts_cache.names2ids.get(account_name).cloned()
+            let accounts_cache = &self.cache.lock().unwrap().accounts;
+            accounts_cache.ids_by_names.get(account_name).cloned()
         };
 
         if let Some(id) = maybe_cached_id {
@@ -277,12 +286,12 @@ impl DatasetEntryServiceImpl {
                 .await
                 .int_err()?;
 
-            let mut accounts_cache = self.accounts_cache.lock().unwrap();
+            let accounts_cache = &mut self.cache.lock().unwrap().accounts;
             accounts_cache
-                .id2names
+                .names_by_ids
                 .insert(account.id.clone(), account_name.clone());
             accounts_cache
-                .names2ids
+                .ids_by_names
                 .insert(account_name.clone(), account.id.clone());
 
             Ok(account.id)
@@ -514,30 +523,21 @@ impl DatasetRegistry for DatasetEntryServiceImpl {
     }
 
     fn get_dataset_by_handle(&self, dataset_handle: &DatasetHandle) -> ResolvedDataset {
-        /*let mut guard = self.managed_entities.lock().unwrap();
-        let managed_dataset =
-            if let Some(managed_dataset) = guard.dataset_by_id.get(&dataset_handle.id) {
-                managed_dataset.clone()
-            } else {
-                // Note: in future we will be resolving storage repository,
-                // but for now we have just a single one
-                let storage_dataset = self.dataset_repo.get_dataset_by_handle(dataset_handle);
+        let datasets_cache = &mut self.cache.lock().unwrap().datasets;
+        let dataset = if let Some(dataset) = datasets_cache.datasets_by_id.get(&dataset_handle.id) {
+            dataset.clone()
+        } else {
+            // Note: in future we will be resolving storage repository,
+            // but for now we have just a single one
+            let dataset = self.dataset_repo.get_dataset_by_handle(dataset_handle);
+            datasets_cache
+                .datasets_by_id
+                .insert(dataset_handle.id.clone(), dataset.clone());
 
-                let managed_dataset = Arc::new(ManagedDatasetImpl::new(
-                    storage_dataset,
-                    dataset_handle.id.clone(),
-                ));
-                guard
-                    .dataset_by_id
-                    .insert(dataset_handle.id.clone(), managed_dataset.clone());
+            dataset
+        };
 
-                managed_dataset
-            };
-
-        ResolvedDataset::new(managed_dataset, dataset_handle.clone())*/
-
-        let storage_dataset = self.dataset_repo.get_dataset_by_handle(dataset_handle);
-        ResolvedDataset::new(storage_dataset, dataset_handle.clone())
+        ResolvedDataset::new(dataset, dataset_handle.clone())
     }
 }
 

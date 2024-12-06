@@ -9,7 +9,7 @@
 
 use database_common::{TransactionRef, TransactionRefT};
 use dill::{component, interface};
-use internal_error::ResultIntoInternal;
+use internal_error::{InternalError, ResultIntoInternal};
 use kamu_datasets::*;
 use opendatafabric as odf;
 
@@ -59,12 +59,12 @@ impl DatasetReferenceRepository for SqliteDatasetReferenceRepository {
                 INSERT INTO dataset_references (dataset_id, block_ref_name, block_hash)
                     VALUES ($1, $2, $3)
                     ON CONFLICT(dataset_id, block_ref_name)
-                    DO UPDATE SET block_hash = $4 WHERE dataset_references.block_hash = $3
+                    DO UPDATE SET block_hash = $3 WHERE dataset_references.block_hash = $4
                 "#,
                 dataset_id_str,
                 block_ref_name,
-                maybe_prev_block_hash_str,
                 block_hash_str,
+                maybe_prev_block_hash_str,
             )
             .execute(connection_mut)
             .await
@@ -127,6 +127,40 @@ impl DatasetReferenceRepository for SqliteDatasetReferenceRepository {
             }
             .into())
         }
+    }
+
+    async fn get_all_dataset_references(
+        &self,
+        dataset_id: &odf::DatasetID,
+    ) -> Result<Vec<(String, odf::Multihash)>, InternalError> {
+        let mut tr = self.transaction.lock().await;
+
+        let connection_mut = tr.connection_mut().await?;
+
+        let stack_dataset_id = dataset_id.as_did_str().to_stack_string();
+        let stack_dataset_id_str = stack_dataset_id.as_str();
+
+        let records = sqlx::query!(
+            r#"
+            SELECT block_ref_name, block_hash
+                FROM dataset_references
+                WHERE dataset_id = $1
+            "#,
+            stack_dataset_id_str,
+        )
+        .fetch_all(connection_mut)
+        .await
+        .int_err()?;
+
+        Ok(records
+            .into_iter()
+            .map(|record| {
+                (
+                    record.block_ref_name,
+                    odf::Multihash::from_multibase(&record.block_hash).unwrap(),
+                )
+            })
+            .collect())
     }
 }
 

@@ -137,6 +137,21 @@ impl DatasetReferenceRepository for InMemoryDatasetReferenceRepository {
             },
         ))
     }
+
+    async fn get_all_dataset_references(
+        &self,
+        dataset_id: &odf::DatasetID,
+    ) -> Result<Vec<(String, odf::Multihash)>, InternalError> {
+        let guard = self.state.lock().unwrap();
+        if let Some(dataset_references) = guard.references.get(dataset_id) {
+            Ok(dataset_references
+                .iter()
+                .map(|(block_ref_name, block_hash)| (block_ref_name.clone(), block_hash.clone()))
+                .collect())
+        } else {
+            Ok(vec![])
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

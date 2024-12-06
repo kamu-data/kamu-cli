@@ -10,7 +10,7 @@
 use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
-use database_common::NoOpDatabasePlugin;
+use database_common::{ManagedOperationFactoryImpl, NoOpDatabasePlugin};
 use dill::{Catalog, CatalogBuilder, Component};
 use kamu::utils::ipfs_wrapper::IpfsClient;
 use kamu::{
@@ -28,7 +28,7 @@ use kamu::{
 };
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::auth::DummyOdfServerAccessTokenResolver;
-use kamu_core::{DatasetRepository, TenancyConfig};
+use kamu_core::{DatasetRepository, DummyManagedDatasetService, TenancyConfig};
 use kamu_datasets::DatasetEnvVarsConfig;
 use kamu_datasets_inmem::InMemoryDatasetEnvVarRepository;
 use kamu_datasets_services::DatasetEnvVarServiceImpl;
@@ -199,6 +199,8 @@ impl TaskExecutorHarness {
             .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
             .add::<DatasetRegistryRepoBridge>()
             .add_value(CurrentAccountSubject::new_test())
+            .add::<ManagedOperationFactoryImpl>()
+            .add::<DummyManagedDatasetService>()
             .add_value(TenancyConfig::SingleTenant)
             .add_value(DatasetEnvVarsConfig::sample());
 

@@ -17,8 +17,6 @@ use kamu_core::*;
 use kamu_datasets::DatasetReferenceRepository;
 use opendatafabric as odf;
 
-use super::ManagedEntity;
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct ManagedMetadataChainImpl {
@@ -81,6 +79,47 @@ impl ManagedMetadataChainImpl {
     #[inline]
     fn get_storage_chain(&self) -> &dyn MetadataChain {
         self.storage_chain_container.as_metadata_chain()
+    }
+
+    pub async fn do_commit(self, transactional_catalog: &Catalog) -> Result<(), InternalError> {
+        let maybe_modified_state = {
+            let mut modified_guard = self.modified_state.write().unwrap();
+            if modified_guard
+                .as_ref()
+                .is_some_and(|state| *state != self.initial_state)
+            {
+                modified_guard.take()
+            } else {
+                None
+            }
+        };
+
+        if let Some(modified_state) = maybe_modified_state {
+            let dataset_reference_repo = transactional_catalog
+                .get_one::<dyn DatasetReferenceRepository>()
+                .unwrap();
+
+            for (block_ref, block_hash) in &modified_state.refs {
+                let maybe_initial_hash = self.initial_state.try_get_ref(block_ref);
+                dataset_reference_repo
+                    .set_dataset_reference(
+                        &self.dataset_id,
+                        block_ref.as_str(),
+                        maybe_initial_hash,
+                        block_hash,
+                    )
+                    .await
+                    .int_err()?;
+
+                // Question: should this be at post-commit phase? maybe via Outbox?
+                self.get_storage_chain()
+                    .set_ref(block_ref, block_hash, SetRefOpts::default())
+                    .await
+                    .int_err()?;
+            }
+        }
+
+        Ok(())
     }
 }
 
@@ -183,52 +222,6 @@ impl MetadataChain for ManagedMetadataChainImpl {
         }
 
         Ok(new_head)
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[async_trait::async_trait]
-impl ManagedEntity for ManagedMetadataChainImpl {
-    async fn do_commit(&self, transactional_catalog: &Catalog) -> Result<(), InternalError> {
-        let maybe_modified_state = {
-            let mut modified_guard = self.modified_state.write().unwrap();
-            if modified_guard
-                .as_ref()
-                .is_some_and(|state| *state != self.initial_state)
-            {
-                modified_guard.take()
-            } else {
-                None
-            }
-        };
-
-        if let Some(modified_state) = maybe_modified_state {
-            let dataset_reference_repo = transactional_catalog
-                .get_one::<dyn DatasetReferenceRepository>()
-                .unwrap();
-
-            for (block_ref, block_hash) in &modified_state.refs {
-                let maybe_initial_hash = self.initial_state.try_get_ref(block_ref);
-                dataset_reference_repo
-                    .set_dataset_reference(
-                        &self.dataset_id,
-                        block_ref.as_str(),
-                        maybe_initial_hash,
-                        block_hash,
-                    )
-                    .await
-                    .int_err()?;
-
-                // Question: should this be at post-commit phase? maybe via Outbox?
-                self.get_storage_chain()
-                    .set_ref(block_ref, block_hash, SetRefOpts::default())
-                    .await
-                    .int_err()?;
-            }
-        }
-
-        Ok(())
     }
 }
 

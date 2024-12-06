@@ -28,6 +28,11 @@ pub trait DatasetReferenceRepository: Send + Sync {
         dataset_id: &odf::DatasetID,
         block_ref_name: &str,
     ) -> Result<odf::Multihash, GetDatasetReferenceError>;
+
+    async fn get_all_dataset_references(
+        &self,
+        dataset_id: &odf::DatasetID,
+    ) -> Result<Vec<(String, odf::Multihash)>, InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

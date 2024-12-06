@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::sync::Arc;
+
 use dill::Catalog;
 use internal_error::InternalError;
 
@@ -14,7 +16,10 @@ use internal_error::InternalError;
 
 #[async_trait::async_trait]
 pub trait ManagedEntity: Sync + Send {
-    async fn do_commit(&self, transactional_catalog: &Catalog) -> Result<(), InternalError>;
+    async fn do_commit(
+        self: Arc<Self>,
+        transactional_catalog: &Catalog,
+    ) -> Result<(), InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

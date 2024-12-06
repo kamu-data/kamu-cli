@@ -14,7 +14,11 @@ use std::sync::Arc;
 use async_utils::ResultAsync;
 use chrono::{DateTime, Duration, Utc};
 use container_runtime::{ContainerRuntime, ContainerRuntimeConfig};
-use database_common::DatabaseTransactionRunner;
+use database_common::{
+    run_with_managed_operation,
+    DatabaseTransactionRunner,
+    ManagedOperationFactoryImpl,
+};
 use dill::*;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu::domain::*;
@@ -326,12 +330,13 @@ where
     RE: From<InternalError>,
 {
     if !transactional {
-        f(catalog).await
+        run_with_managed_operation(f, &catalog).await
     } else {
         let transaction_runner = DatabaseTransactionRunner::new(catalog);
-
         transaction_runner
-            .transactional(|transactional_catalog| async move { f(transactional_catalog).await })
+            .transactional(|transactional_catalog| async move {
+                run_with_managed_operation(f, &transactional_catalog).await
+            })
             .await
     }
 }
@@ -463,6 +468,7 @@ pub fn configure_base_catalog(
     b.add::<kamu_adapter_auth_oso::OsoDatasetAuthorizer>();
 
     b.add::<DatabaseTransactionRunner>();
+    b.add::<ManagedOperationFactoryImpl>();
 
     b.add::<RebacServiceImpl>();
 
@@ -472,6 +478,7 @@ pub fn configure_base_catalog(
 
     b.add::<kamu_datasets_services::DatasetEntryServiceImpl>();
     b.add::<kamu_datasets_services::DependencyGraphServiceImpl>();
+    b.add::<kamu_datasets_services::ManagedDatasetServiceImpl>();
 
     b.add_builder(
         messaging_outbox::OutboxImmediateImpl::builder()
