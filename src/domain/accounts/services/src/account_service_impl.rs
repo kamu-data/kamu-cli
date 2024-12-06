@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use database_common::{EntityListing, EntityStreamer, PaginationOpts};
+use database_common::{EntityListing, EntityPageStreamer, PaginationOpts};
 use dill::*;
 use internal_error::ResultIntoInternal;
 use kamu_accounts::{Account, AccountRepository, AccountService, AccountStream, ListAccountError};
@@ -33,7 +33,7 @@ impl AccountServiceImpl {
 #[async_trait::async_trait]
 impl AccountService for AccountServiceImpl {
     fn all_accounts(&self) -> AccountStream {
-        EntityStreamer::default().into_stream(
+        EntityPageStreamer::default().into_stream(
             || async { Ok(()) },
             |_, pagination| {
                 let list_fut = self.list_all_accounts(pagination);

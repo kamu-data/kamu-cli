@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use database_common::{EntityListing, EntityStreamer, PaginationOpts};
+use database_common::{EntityListing, EntityPageStreamer, PaginationOpts};
 use futures::TryStreamExt;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -33,7 +33,7 @@ macro_rules! test_pagination {
         } = $test_pagination_opts;
 
         let entity_source = entity_source(total_entity_count, expected_entities_call_count);
-        let streamer = EntityStreamer::new(start_offset, page_limit);
+        let streamer = EntityPageStreamer::new(start_offset, page_limit);
 
         let stream = streamer.into_stream(
             || async {
@@ -228,7 +228,7 @@ async fn test_paged_page_processing_of_input_data_by_ref() {
         pub input_data: &'a Vec<TestEntity>,
     }
 
-    let streamer = EntityStreamer::new(0, 3);
+    let streamer = EntityPageStreamer::new(0, 3);
 
     let stream = streamer.into_stream(
         || async {
@@ -323,7 +323,7 @@ async fn test_paged_page_processing_of_input_data_by_value() {
         ClonableTestEntity { id: 9 },
     ];
 
-    let streamer = EntityStreamer::new(0, 3);
+    let streamer = EntityPageStreamer::new(0, 3);
 
     let stream = streamer.into_stream(
         || async { Ok(Arc::new(input_data)) },

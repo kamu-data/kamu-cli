@@ -41,12 +41,12 @@ pub type EntityStream<'a, Entity> =
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct EntityStreamer {
+pub struct EntityPageStreamer {
     start_offset: usize,
     page_limit: usize,
 }
 
-impl Default for EntityStreamer {
+impl Default for EntityPageStreamer {
     fn default() -> Self {
         Self {
             start_offset: 0,
@@ -55,7 +55,7 @@ impl Default for EntityStreamer {
     }
 }
 
-impl EntityStreamer {
+impl EntityPageStreamer {
     pub fn new(start_offset: usize, page_limit: usize) -> Self {
         Self {
             start_offset,

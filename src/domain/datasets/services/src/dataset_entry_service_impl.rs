@@ -10,7 +10,7 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
-use database_common::{EntityListing, EntityStreamer, PaginationOpts};
+use database_common::{EntityListing, EntityPageStreamer, PaginationOpts};
 use dill::{component, interface, meta, Catalog};
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_accounts::{AccountRepository, CurrentAccountSubject};
@@ -335,7 +335,7 @@ impl DatasetEntryServiceImpl {
 #[async_trait::async_trait]
 impl DatasetEntryService for DatasetEntryServiceImpl {
     fn all_entries(&self) -> DatasetEntryStream {
-        EntityStreamer::default().into_stream(
+        EntityPageStreamer::default().into_stream(
             || async { Ok(()) },
             |_, pagination| {
                 let list_fut = self.list_all_entries(pagination);
@@ -399,11 +399,8 @@ impl DatasetEntryService for DatasetEntryServiceImpl {
 impl DatasetRegistry for DatasetEntryServiceImpl {
     #[tracing::instrument(level = "debug", skip_all)]
     fn all_dataset_handles(&self) -> DatasetHandleStream {
-        #[derive(Clone)]
-        struct NoArgs {}
-
-        EntityStreamer::default().into_stream(
-            || async { Ok(NoArgs {}) },
+        EntityPageStreamer::default().into_stream(
+            || async { Ok(()) },
             |_, pagination| self.list_all_dataset_handles(pagination),
         )
     }
@@ -417,7 +414,7 @@ impl DatasetRegistry for DatasetEntryServiceImpl {
 
         let owner_name = owner_name.clone();
 
-        EntityStreamer::default().into_stream(
+        EntityPageStreamer::default().into_stream(
             move || async move {
                 let owner_id = self
                     .resolve_account_id_by_maybe_name(Some(&owner_name))

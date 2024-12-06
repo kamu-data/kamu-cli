@@ -10,7 +10,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use database_common::{EntityListing, EntityStreamer};
+use database_common::{EntityListing, EntityPageStreamer};
 use dill::*;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_accounts::{AccountRepository, GetAccountByIdError};
@@ -155,7 +155,7 @@ impl OsoResourceServiceInMem {
             .await
             .int_err()?;
 
-        let dataset_resources_stream = EntityStreamer::default().into_stream(
+        let dataset_resources_stream = EntityPageStreamer::default().into_stream(
             || async { Ok(Arc::new(resolved_entries)) },
             |dataset_entries, pagination| {
                 let dataset_entries_page = dataset_entries
