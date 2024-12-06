@@ -37,17 +37,7 @@ use messaging_outbox::{
     MessageConsumerT,
     MessageDeliveryMechanism,
 };
-// TODO: use odf as namespace alias
 use opendatafabric as odf;
-use opendatafabric::{
-    AccountID,
-    AccountName,
-    DatasetAlias,
-    DatasetHandle,
-    DatasetID,
-    DatasetName,
-    DatasetRef,
-};
 use time_source::SystemTimeSource;
 use tokio::sync::RwLock;
 
@@ -71,8 +61,8 @@ pub struct DatasetEntryServiceImpl {
 //                            but has a cache -- is that intentional?
 #[derive(Default)]
 struct AccountsCache {
-    id2names: HashMap<AccountID, AccountName>,
-    names2ids: HashMap<AccountName, AccountID>,
+    id2names: HashMap<odf::AccountID, odf::AccountName>,
+    names2ids: HashMap<odf::AccountName, odf::AccountID>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -168,7 +158,7 @@ impl DatasetEntryServiceImpl {
     async fn entries_as_handles(
         &self,
         entries: Vec<DatasetEntry>,
-    ) -> Result<Vec<DatasetHandle>, ListDatasetEntriesError> {
+    ) -> Result<Vec<odf::DatasetHandle>, ListDatasetEntriesError> {
         // Select which accounts haven't been processed yet
         let first_seen_account_ids = {
             let readable_accounts_cache = self.accounts_cache.read().await;
@@ -214,7 +204,7 @@ impl DatasetEntryServiceImpl {
             let maybe_owner_name = readable_accounts_cache.id2names.get(&entry.owner_id);
             if let Some(owner_name) = maybe_owner_name {
                 // Form DatasetHandle
-                handles.push(DatasetHandle::new(
+                handles.push(odf::DatasetHandle::new(
                     entry.id.clone(),
                     self.make_alias(owner_name.clone(), entry.name.clone()),
                 ));
@@ -227,8 +217,8 @@ impl DatasetEntryServiceImpl {
 
     async fn resolve_account_name_by_id(
         &self,
-        account_id: &AccountID,
-    ) -> Result<AccountName, InternalError> {
+        account_id: &odf::AccountID,
+    ) -> Result<odf::AccountName, InternalError> {
         let maybe_cached_name = {
             let readable_accounts_cache = self.accounts_cache.read().await;
             readable_accounts_cache.id2names.get(account_id).cloned()
@@ -257,8 +247,8 @@ impl DatasetEntryServiceImpl {
 
     async fn resolve_account_id_by_maybe_name(
         &self,
-        maybe_account_name: Option<&AccountName>,
-    ) -> Result<AccountID, InternalError> {
+        maybe_account_name: Option<&odf::AccountName>,
+    ) -> Result<odf::AccountID, InternalError> {
         let account_name = maybe_account_name
             .unwrap_or_else(|| self.current_account_subject.account_name_or_default());
 
@@ -291,7 +281,7 @@ impl DatasetEntryServiceImpl {
     async fn list_all_dataset_handles(
         &self,
         pagination: PaginationOpts,
-    ) -> Result<EntityListing<DatasetHandle>, InternalError> {
+    ) -> Result<EntityListing<odf::DatasetHandle>, InternalError> {
         let dataset_entry_listing = self.list_all_entries(pagination).await.int_err()?;
 
         Ok(EntityListing {
@@ -305,9 +295,9 @@ impl DatasetEntryServiceImpl {
 
     async fn list_all_dataset_handles_by_owner_name(
         &self,
-        owner_id: odf::AccountID,
+        owner_id: &odf::AccountID,
         pagination: PaginationOpts,
-    ) -> Result<EntityListing<DatasetHandle>, InternalError> {
+    ) -> Result<EntityListing<odf::DatasetHandle>, InternalError> {
         let dataset_entry_listing = self
             .list_entries_owned_by(owner_id, pagination)
             .await
@@ -322,10 +312,14 @@ impl DatasetEntryServiceImpl {
         })
     }
 
-    fn make_alias(&self, owner_name: AccountName, dataset_name: DatasetName) -> DatasetAlias {
+    fn make_alias(
+        &self,
+        owner_name: odf::AccountName,
+        dataset_name: odf::DatasetName,
+    ) -> odf::DatasetAlias {
         match *self.tenancy_config {
-            TenancyConfig::MultiTenant => DatasetAlias::new(Some(owner_name), dataset_name),
-            TenancyConfig::SingleTenant => DatasetAlias::new(None, dataset_name),
+            TenancyConfig::MultiTenant => odf::DatasetAlias::new(Some(owner_name), dataset_name),
+            TenancyConfig::SingleTenant => odf::DatasetAlias::new(None, dataset_name),
         }
     }
 }
@@ -370,18 +364,18 @@ impl DatasetEntryService for DatasetEntryServiceImpl {
 
     async fn list_entries_owned_by(
         &self,
-        owner_id: AccountID,
+        owner_id: &odf::AccountID,
         pagination: PaginationOpts,
     ) -> Result<EntityListing<DatasetEntry>, ListDatasetEntriesError> {
         use futures::TryStreamExt;
 
         let total_count = self
             .dataset_entry_repo
-            .dataset_entries_count_by_owner_id(&owner_id)
+            .dataset_entries_count_by_owner_id(owner_id)
             .await?;
         let entries = self
             .dataset_entry_repo
-            .get_dataset_entries_by_owner_id(&owner_id, pagination)
+            .get_dataset_entries_by_owner_id(owner_id, pagination)
             .await
             .try_collect()
             .await?;
@@ -406,10 +400,9 @@ impl DatasetRegistry for DatasetEntryServiceImpl {
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(%owner_name))]
-    fn all_dataset_handles_by_owner(&self, owner_name: &AccountName) -> DatasetHandleStream {
-        #[derive(Clone)]
+    fn all_dataset_handles_by_owner(&self, owner_name: &odf::AccountName) -> DatasetHandleStream {
         struct OwnerArgs {
-            owner_id: AccountID,
+            owner_id: odf::AccountID,
         }
 
         let owner_name = owner_name.clone();
@@ -430,11 +423,11 @@ impl DatasetRegistry for DatasetEntryServiceImpl {
     #[tracing::instrument(level = "debug", skip_all, fields(%dataset_ref))]
     async fn resolve_dataset_handle_by_ref(
         &self,
-        dataset_ref: &DatasetRef,
-    ) -> Result<DatasetHandle, GetDatasetError> {
+        dataset_ref: &odf::DatasetRef,
+    ) -> Result<odf::DatasetHandle, GetDatasetError> {
         match dataset_ref {
-            DatasetRef::Handle(h) => Ok(h.clone()),
-            DatasetRef::Alias(alias) => {
+            odf::DatasetRef::Handle(h) => Ok(h.clone()),
+            odf::DatasetRef::Alias(alias) => {
                 let owner_id = self
                     .resolve_account_id_by_maybe_name(alias.account_name.as_ref())
                     .await?;
@@ -443,7 +436,7 @@ impl DatasetRegistry for DatasetEntryServiceImpl {
                     .get_dataset_entry_by_owner_and_name(&owner_id, &alias.dataset_name)
                     .await
                 {
-                    Ok(entry) => Ok(DatasetHandle::new(entry.id.clone(), alias.clone())),
+                    Ok(entry) => Ok(odf::DatasetHandle::new(entry.id.clone(), alias.clone())),
                     Err(GetDatasetEntryByNameError::NotFound(_)) => {
                         Err(GetDatasetError::NotFound(DatasetNotFoundError {
                             dataset_ref: dataset_ref.clone(),
@@ -454,10 +447,10 @@ impl DatasetRegistry for DatasetEntryServiceImpl {
                     }
                 }
             }
-            DatasetRef::ID(id) => match self.dataset_entry_repo.get_dataset_entry(id).await {
+            odf::DatasetRef::ID(id) => match self.dataset_entry_repo.get_dataset_entry(id).await {
                 Ok(entry) => {
                     let owner_name = self.resolve_account_name_by_id(&entry.owner_id).await?;
-                    Ok(DatasetHandle::new(
+                    Ok(odf::DatasetHandle::new(
                         entry.id.clone(),
                         self.make_alias(owner_name, entry.name.clone()),
                     ))
@@ -475,7 +468,7 @@ impl DatasetRegistry for DatasetEntryServiceImpl {
     #[tracing::instrument(level = "debug", skip_all, fields(?dataset_ids))]
     async fn resolve_multiple_dataset_handles_by_ids(
         &self,
-        dataset_ids: Vec<DatasetID>,
+        dataset_ids: Vec<odf::DatasetID>,
     ) -> Result<DatasetHandlesResolution, GetMultipleDatasetsError> {
         let entries_resolution = self
             .dataset_entry_repo
@@ -515,7 +508,7 @@ impl DatasetRegistry for DatasetEntryServiceImpl {
 
     // Note: in future we will be resolving storage repository,
     // but for now we have just a single one
-    fn get_dataset_by_handle(&self, dataset_handle: &DatasetHandle) -> ResolvedDataset {
+    fn get_dataset_by_handle(&self, dataset_handle: &odf::DatasetHandle) -> ResolvedDataset {
         let dataset = self.dataset_repo.get_dataset_by_handle(dataset_handle);
         ResolvedDataset::new(dataset, dataset_handle.clone())
     }
