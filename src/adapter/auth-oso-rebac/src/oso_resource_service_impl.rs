@@ -13,9 +13,14 @@ use std::sync::Arc;
 use database_common::{EntityListing, EntityPageStreamer};
 use dill::*;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
-use kamu_accounts::{AccountRepository, GetAccountByIdError};
+use kamu_accounts::{AccountNotFoundByIdError, AccountRepository, GetAccountByIdError};
 use kamu_auth_rebac::RebacService;
-use kamu_datasets::{DatasetEntriesResolution, DatasetEntryRepository, GetDatasetEntryError};
+use kamu_datasets::{
+    DatasetEntriesResolution,
+    DatasetEntryNotFoundError,
+    DatasetEntryRepository,
+    GetDatasetEntryError,
+};
 use opendatafabric as odf;
 use thiserror::Error;
 use tokio::sync::RwLock;
@@ -59,13 +64,12 @@ impl OsoResourceServiceImpl {
         }
     }
 
-    // TODO: Private Datasets: concrete the error (absorb option to NotFound error?)
     pub async fn user_actor(
         &self,
         maybe_account_id: Option<&odf::AccountID>,
-    ) -> Result<Option<UserActor>, InternalError> {
+    ) -> Result<UserActor, GetUserActorError> {
         let Some(account_id) = maybe_account_id else {
-            return Ok(Some(UserActor::anonymous()));
+            return Ok(UserActor::anonymous());
         };
 
         // First, an attempt to get from the cache
@@ -78,8 +82,8 @@ impl OsoResourceServiceImpl {
                 .get(account_id_stack.as_str())
                 .cloned();
 
-            if maybe_cached_user_actor.is_some() {
-                return Ok(maybe_cached_user_actor);
+            if let Some(cached_user_actor) = maybe_cached_user_actor {
+                return Ok(cached_user_actor);
             }
         }
 
@@ -87,12 +91,7 @@ impl OsoResourceServiceImpl {
         let user_actor = {
             let account = match self.account_repo.get_account_by_id(account_id).await {
                 Ok(found_account) => found_account,
-                Err(get_err) => {
-                    return match get_err {
-                        GetAccountByIdError::NotFound(_) => Ok(None),
-                        e => Err(e.int_err()),
-                    }
-                }
+                Err(e) => return Err(e.into()),
             };
 
             let account_properties = self
@@ -111,22 +110,16 @@ impl OsoResourceServiceImpl {
             .user_actor_cache_map
             .insert(user_actor.account_id.clone(), user_actor.clone());
 
-        Ok(Some(user_actor))
+        Ok(user_actor)
     }
 
-    // TODO: Private Datasets: concrete the error (absorb option to NotFound error?)
     pub async fn dataset_resource(
         &self,
         dataset_id: &odf::DatasetID,
-    ) -> Result<Option<DatasetResource>, InternalError> {
+    ) -> Result<DatasetResource, GetDatasetResourceError> {
         let dataset_entry = match self.dataset_entry_repo.get_dataset_entry(dataset_id).await {
             Ok(found_dataset_entry) => found_dataset_entry,
-            Err(get_err) => {
-                return match get_err {
-                    GetDatasetEntryError::NotFound(_) => Ok(None),
-                    e => Err(e.int_err()),
-                }
-            }
+            Err(e) => return Err(e.into()),
         };
         let dataset_properties = self
             .rebac_service
@@ -139,7 +132,7 @@ impl OsoResourceServiceImpl {
             dataset_properties.allows_public_read,
         );
 
-        Ok(Some(dataset_resource))
+        Ok(dataset_resource)
     }
 
     pub async fn get_multiple_dataset_resources(
@@ -226,6 +219,46 @@ pub struct DatasetResourcesResolution {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Errors
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum GetUserActorError {
+    #[error(transparent)]
+    NotFound(#[from] AccountNotFoundByIdError),
+
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+}
+
+impl From<GetAccountByIdError> for GetUserActorError {
+    fn from(err: GetAccountByIdError) -> Self {
+        match err {
+            GetAccountByIdError::NotFound(e) => Self::NotFound(e),
+            GetAccountByIdError::Internal(e) => Self::Internal(e),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum GetDatasetResourceError {
+    #[error(transparent)]
+    NotFound(#[from] DatasetEntryNotFoundError),
+
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+}
+
+impl From<GetDatasetEntryError> for GetDatasetResourceError {
+    fn from(err: GetDatasetEntryError) -> Self {
+        match err {
+            GetDatasetEntryError::NotFound(e) => Self::NotFound(e),
+            GetDatasetEntryError::Internal(e) => Self::Internal(e),
+        }
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]

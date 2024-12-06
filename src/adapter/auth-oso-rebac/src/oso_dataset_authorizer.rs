@@ -50,13 +50,11 @@ impl OsoDatasetAuthorizer {
     async fn user_actor(&self) -> Result<UserActor, InternalError> {
         let maybe_account_id = self.get_maybe_logged_account_id();
 
-        let maybe_user_actor = self
+        let user_actor = self
             .oso_resource_service
             .user_actor(maybe_account_id)
-            .await?;
-
-        let user_actor = maybe_user_actor
-            .ok_or_else(|| format!("UserActor not found: {maybe_account_id:?}").int_err())?;
+            .await
+            .int_err()?;
 
         Ok(user_actor)
     }
@@ -67,13 +65,11 @@ impl OsoDatasetAuthorizer {
     ) -> Result<DatasetResource, InternalError> {
         let dataset_id = &dataset_handle.id;
 
-        let maybe_dataset_resource = self
+        let dataset_resource = self
             .oso_resource_service
             .dataset_resource(dataset_id)
-            .await?;
-
-        let dataset_resource = maybe_dataset_resource
-            .ok_or_else(|| format!("DatasetResource not found: {dataset_id}").int_err())?;
+            .await
+            .int_err()?;
 
         Ok(dataset_resource)
     }
