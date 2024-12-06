@@ -41,10 +41,10 @@ pub struct OsoResourceServiceInMem {
     account_repo: Arc<dyn AccountRepository>,
 }
 
-// TODO: Private Datasets: Add ReBAC-specific messages to update properties at
-//       runtime
 #[component(pub)]
-#[scope(Singleton)]
+// TODO: Private Datasets: This service should be a singleton
+//                         Alternative: put the state into a separate component
+// #[scope(Singleton)]
 impl OsoResourceServiceInMem {
     pub fn new(
         dataset_entry_repo: Arc<dyn DatasetEntryRepository>,
