@@ -198,7 +198,6 @@ impl RebacRepository for SqliteRebacRepository {
                 // 2 | 3, 4
                 // 3 | 5, 6
                 // ...
-
                 let entity_type_idx = i * 2 - 1;
                 let entity_id_idx = i * 2;
 
