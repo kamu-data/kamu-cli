@@ -10,7 +10,12 @@
 use std::collections::HashSet;
 
 use chrono::{DateTime, Utc};
-use database_common::{PaginationOpts, TransactionRef, TransactionRefT};
+use database_common::{
+    sqlite_generate_placeholders_list,
+    PaginationOpts,
+    TransactionRef,
+    TransactionRefT,
+};
 use dill::*;
 use futures::TryStreamExt;
 use kamu_flow_system::*;
@@ -42,14 +47,6 @@ impl SqliteFlowEventStore {
             InitiatorFilter::System => vec![SYSTEM_INITIATOR.to_string()],
             InitiatorFilter::Account(a) => a.iter().map(ToString::to_string).collect(),
         }
-    }
-
-    fn generate_placeholders_list<T>(args: &[T], index_offset: usize) -> String {
-        args.iter()
-            .enumerate()
-            .map(|(i, _)| format!("${}", i + index_offset))
-            .collect::<Vec<_>>()
-            .join(", ")
     }
 
     async fn register_flow(
@@ -659,7 +656,7 @@ impl FlowEventStore for SqliteFlowEventStore {
                 "#,
                 maybe_initiators
                     .as_ref()
-                    .map(|initiators| Self::generate_placeholders_list(initiators, 7))
+                    .map(|initiators| sqlite_generate_placeholders_list(initiators.len(), 7))
                     .unwrap_or_default(),
             );
 
@@ -677,10 +674,9 @@ impl FlowEventStore for SqliteFlowEventStore {
                 }
             }
 
-            let mut query_stream = query.try_map(|event_row: SqliteRow| {
-                Ok(FlowID::new(event_row.get(0)))
-            })
-            .fetch(connection_mut);
+            let mut query_stream = query
+                .try_map(|event_row: SqliteRow| Ok(FlowID::new(event_row.get(0))))
+                .fetch(connection_mut);
 
             while let Some(flow_id) = query_stream.try_next().await.int_err()? {
                 yield Ok(flow_id);
@@ -716,7 +712,7 @@ impl FlowEventStore for SqliteFlowEventStore {
             "#,
             maybe_initiators
                 .as_ref()
-                .map(|initiators| Self::generate_placeholders_list(initiators, 5))
+                .map(|initiators| sqlite_generate_placeholders_list(initiators.len(), 5))
                 .unwrap_or_default()
         );
 
@@ -757,9 +753,7 @@ impl FlowEventStore for SqliteFlowEventStore {
         Box::pin(async_stream::stream! {
             let mut tr = self.transaction.lock().await;
 
-            let connection_mut = tr
-                .connection_mut()
-                .await?;
+            let connection_mut = tr.connection_mut().await?;
 
             let query_str = format!(
                 r#"
@@ -771,10 +765,13 @@ impl FlowEventStore for SqliteFlowEventStore {
                 ORDER BY flow_id DESC
                 LIMIT $4 OFFSET $5
                 "#,
-                Self::generate_placeholders_list(&dataset_ids, 6),
+                sqlite_generate_placeholders_list(dataset_ids.len(), 6),
                 maybe_initiators
                     .as_ref()
-                    .map(|initiators| Self::generate_placeholders_list(initiators, 6 + dataset_ids.len()))
+                    .map(|initiators| sqlite_generate_placeholders_list(
+                        initiators.len(),
+                        6 + dataset_ids.len()
+                    ))
                     .unwrap_or_default()
             );
 
@@ -795,10 +792,9 @@ impl FlowEventStore for SqliteFlowEventStore {
                 }
             }
 
-            let mut query_stream = query.try_map(|event_row: SqliteRow| {
-                Ok(FlowID::new(event_row.get(0)))
-            })
-            .fetch(connection_mut);
+            let mut query_stream = query
+                .try_map(|event_row: SqliteRow| Ok(FlowID::new(event_row.get(0))))
+                .fetch(connection_mut);
 
             while let Some(flow_id) = query_stream.try_next().await.int_err()? {
                 yield Ok(flow_id);
@@ -853,9 +849,7 @@ impl FlowEventStore for SqliteFlowEventStore {
         Box::pin(async_stream::stream! {
             let mut tr = self.transaction.lock().await;
 
-            let connection_mut = tr
-                .connection_mut()
-                .await?;
+            let connection_mut = tr.connection_mut().await?;
 
             let query_str = format!(
                 r#"
@@ -869,7 +863,7 @@ impl FlowEventStore for SqliteFlowEventStore {
                 "#,
                 maybe_initiators
                     .as_ref()
-                    .map(|initiators| Self::generate_placeholders_list(initiators, 6))
+                    .map(|initiators| sqlite_generate_placeholders_list(initiators.len(), 6))
                     .unwrap_or_default()
             );
 
@@ -886,10 +880,9 @@ impl FlowEventStore for SqliteFlowEventStore {
                 }
             }
 
-            let mut query_stream = query.try_map(|event_row: SqliteRow| {
-                Ok(FlowID::new(event_row.get(0)))
-            })
-            .fetch(connection_mut);
+            let mut query_stream = query
+                .try_map(|event_row: SqliteRow| Ok(FlowID::new(event_row.get(0))))
+                .fetch(connection_mut);
 
             while let Some(flow_id) = query_stream.try_next().await.int_err()? {
                 yield Ok(flow_id);
@@ -923,7 +916,7 @@ impl FlowEventStore for SqliteFlowEventStore {
             "#,
             maybe_initiators
                 .as_ref()
-                .map(|initiators| Self::generate_placeholders_list(initiators, 4))
+                .map(|initiators| sqlite_generate_placeholders_list(initiators.len(), 4))
                 .unwrap_or_default()
         );
 
@@ -959,9 +952,7 @@ impl FlowEventStore for SqliteFlowEventStore {
         Box::pin(async_stream::stream! {
             let mut tr = self.transaction.lock().await;
 
-            let connection_mut = tr
-                .connection_mut()
-                .await?;
+            let connection_mut = tr.connection_mut().await?;
 
             let query_str = format!(
                 r#"
@@ -974,7 +965,7 @@ impl FlowEventStore for SqliteFlowEventStore {
                 "#,
                 maybe_initiators
                     .as_ref()
-                    .map(|initiators| Self::generate_placeholders_list(initiators, 5))
+                    .map(|initiators| sqlite_generate_placeholders_list(initiators.len(), 5))
                     .unwrap_or_default()
             );
 
@@ -990,10 +981,9 @@ impl FlowEventStore for SqliteFlowEventStore {
                 }
             }
 
-            let mut query_stream = query.try_map(|event_row: SqliteRow| {
-                Ok(FlowID::new(event_row.get(0)))
-            })
-            .fetch(connection_mut);
+            let mut query_stream = query
+                .try_map(|event_row: SqliteRow| Ok(FlowID::new(event_row.get(0))))
+                .fetch(connection_mut);
 
             while let Some(flow_id) = query_stream.try_next().await.int_err()? {
                 yield Ok(flow_id);
@@ -1022,7 +1012,7 @@ impl FlowEventStore for SqliteFlowEventStore {
             "#,
             maybe_initiators
                 .as_ref()
-                .map(|initiators| Self::generate_placeholders_list(initiators, 3))
+                .map(|initiators| sqlite_generate_placeholders_list(initiators.len(), 3))
                 .unwrap_or_default()
         );
 

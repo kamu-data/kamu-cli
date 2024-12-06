@@ -38,9 +38,6 @@ chrono = { version = "0.4", default-features = false }
 dill = "0.9"
 futures = { version = "0.3", default-features = false }
 secrecy = "0.10"
-serde = "1"
-serde_json = "1"
-thiserror = { version = "1", default-features = false }
 tokio = { version = "1", default-features = false }
 tracing = { version = "0.1", default-features = false }
 uuid = { version = "1", default-features = false }

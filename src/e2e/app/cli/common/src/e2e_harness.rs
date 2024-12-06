@@ -236,6 +236,7 @@ impl KamuCliApiServerHarness {
                     is_multi_tenant,
                     kamu_config,
                     env_vars,
+                    account: None,
                 })
                 .await
             }

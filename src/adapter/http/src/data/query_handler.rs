@@ -70,7 +70,7 @@ use super::query_types::{QueryResponse, *};
 /// }
 /// ```
 ///
-/// Currently we support verifiability by ensuring that queries are
+/// Currently, we support verifiability by ensuring that queries are
 /// deterministic and fully reproducible and signing the original response with
 /// Node's private key. In future more types of proofs will be supported.
 ///

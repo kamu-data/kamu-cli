@@ -7,10 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_adapter_auth_oso::dataset_resource::DatasetResource;
-use kamu_adapter_auth_oso::user_actor::UserActor;
-use kamu_adapter_auth_oso::KamuAuthOso;
+use kamu_adapter_auth_oso_rebac::{DatasetResource, KamuAuthOso, UserActor};
 use kamu_core::auth::DatasetAction;
+use opendatafabric as odf;
+
+// TODO: Private Datasets: cover all other schema branches
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -30,21 +31,24 @@ macro_rules! assert_forbidden {
 
 #[test_log::test(tokio::test)]
 async fn test_owner_can_read_and_write() {
+    let owner_account_id = random_account_id();
     let is_admin = false;
-    let user_actor = UserActor::new("foo", false, is_admin);
-    let dataset_resource = DatasetResource::new("foo", false);
+    let owner_user_actor = UserActor::logged(&owner_account_id, is_admin);
+
+    let allows_public_read = false;
+    let owned_dataset_resource = DatasetResource::new(&owner_account_id, allows_public_read);
 
     let oso = KamuAuthOso::new().oso;
 
     let write_result = oso.is_allowed(
-        user_actor.clone(),
-        format!("{}", DatasetAction::Write),
-        dataset_resource.clone(),
+        owner_user_actor.clone(),
+        DatasetAction::Write,
+        owned_dataset_resource.clone(),
     );
     let read_result = oso.is_allowed(
-        user_actor.clone(),
-        format!("{}", DatasetAction::Read),
-        dataset_resource.clone(),
+        owner_user_actor.clone(),
+        DatasetAction::Read,
+        owned_dataset_resource.clone(),
     );
 
     assert_allowed!(write_result);
@@ -56,20 +60,22 @@ async fn test_owner_can_read_and_write() {
 #[test_log::test(tokio::test)]
 async fn test_unrelated_can_read_public() {
     let is_admin = false;
-    let user_actor = UserActor::new("foo", false, is_admin);
-    let dataset_resource = DatasetResource::new("bar", true);
+    let unrelated_user_actor = UserActor::logged(&random_account_id(), is_admin);
+
+    let allows_public_read = true;
+    let public_dataset_resource = DatasetResource::new(&random_account_id(), allows_public_read);
 
     let oso = KamuAuthOso::new().oso;
 
     let write_result = oso.is_allowed(
-        user_actor.clone(),
-        format!("{}", DatasetAction::Write),
-        dataset_resource.clone(),
+        unrelated_user_actor.clone(),
+        DatasetAction::Write,
+        public_dataset_resource.clone(),
     );
     let read_result = oso.is_allowed(
-        user_actor.clone(),
-        format!("{}", DatasetAction::Read),
-        dataset_resource.clone(),
+        unrelated_user_actor.clone(),
+        DatasetAction::Read,
+        public_dataset_resource.clone(),
     );
 
     assert_forbidden!(write_result);
@@ -81,20 +87,22 @@ async fn test_unrelated_can_read_public() {
 #[test_log::test(tokio::test)]
 async fn test_unrelated_cannot_read_private() {
     let is_admin = false;
-    let user_actor = UserActor::new("foo", false, is_admin);
-    let dataset_resource = DatasetResource::new("bar", false);
+    let unrelated_user_actor = UserActor::logged(&random_account_id(), is_admin);
+
+    let allows_public_read = false;
+    let private_dataset_resource = DatasetResource::new(&random_account_id(), allows_public_read);
 
     let oso = KamuAuthOso::new().oso;
 
     let write_result = oso.is_allowed(
-        user_actor.clone(),
-        format!("{}", DatasetAction::Write),
-        dataset_resource.clone(),
+        unrelated_user_actor.clone(),
+        DatasetAction::Write,
+        private_dataset_resource.clone(),
     );
     let read_result = oso.is_allowed(
-        user_actor.clone(),
-        format!("{}", DatasetAction::Read),
-        dataset_resource.clone(),
+        unrelated_user_actor.clone(),
+        DatasetAction::Read,
+        private_dataset_resource.clone(),
     );
 
     assert_forbidden!(write_result);
@@ -105,22 +113,26 @@ async fn test_unrelated_cannot_read_private() {
 
 #[test_log::test(tokio::test)]
 async fn test_having_explicit_read_permission_in_private_dataset() {
+    let reader_account_id = random_account_id();
     let is_admin = false;
-    let user_actor = UserActor::new("foo", false, is_admin);
-    let mut dataset_resource = DatasetResource::new("bar", false);
-    dataset_resource.authorize_reader("foo");
+    let reader_user_actor = UserActor::logged(&reader_account_id, is_admin);
+
+    let allows_public_read = false;
+    let mut private_dataset_resource =
+        DatasetResource::new(&random_account_id(), allows_public_read);
+    private_dataset_resource.authorize_reader(&reader_account_id);
 
     let oso = KamuAuthOso::new().oso;
 
     let write_result = oso.is_allowed(
-        user_actor.clone(),
-        format!("{}", DatasetAction::Write),
-        dataset_resource.clone(),
+        reader_user_actor.clone(),
+        DatasetAction::Write,
+        private_dataset_resource.clone(),
     );
     let read_result = oso.is_allowed(
-        user_actor.clone(),
-        format!("{}", DatasetAction::Read),
-        dataset_resource.clone(),
+        reader_user_actor.clone(),
+        DatasetAction::Read,
+        private_dataset_resource.clone(),
     );
 
     assert_forbidden!(write_result);
@@ -131,22 +143,26 @@ async fn test_having_explicit_read_permission_in_private_dataset() {
 
 #[test_log::test(tokio::test)]
 async fn test_having_explicit_write_permission_in_private_dataset() {
+    let editor_account_id = random_account_id();
     let is_admin = false;
-    let user_actor = UserActor::new("foo", false, is_admin);
-    let mut dataset_resource = DatasetResource::new("bar", false);
-    dataset_resource.authorize_editor("foo");
+    let editor_user_actor = UserActor::logged(&editor_account_id, is_admin);
+
+    let allows_public_read = false;
+    let mut private_dataset_resource =
+        DatasetResource::new(&random_account_id(), allows_public_read);
+    private_dataset_resource.authorize_editor(&editor_account_id);
 
     let oso = KamuAuthOso::new().oso;
 
     let write_result = oso.is_allowed(
-        user_actor.clone(),
-        format!("{}", DatasetAction::Write),
-        dataset_resource.clone(),
+        editor_user_actor.clone(),
+        DatasetAction::Write,
+        private_dataset_resource.clone(),
     );
     let read_result = oso.is_allowed(
-        user_actor.clone(),
-        format!("{}", DatasetAction::Read),
-        dataset_resource.clone(),
+        editor_user_actor.clone(),
+        DatasetAction::Read,
+        private_dataset_resource.clone(),
     );
 
     assert_allowed!(write_result);
@@ -158,24 +174,34 @@ async fn test_having_explicit_write_permission_in_private_dataset() {
 #[test_log::test(tokio::test)]
 async fn test_admin_can_read_and_write_another_private_dataset() {
     let is_admin = true;
-    let user_actor = UserActor::new("foo", false, is_admin);
-    let dataset_resource = DatasetResource::new("bar", false);
+    let admin_user_actor = UserActor::logged(&random_account_id(), is_admin);
+
+    let allows_public_read = false;
+    let dataset_resource = DatasetResource::new(&random_account_id(), allows_public_read);
 
     let oso = KamuAuthOso::new().oso;
 
     let write_result = oso.is_allowed(
-        user_actor.clone(),
-        format!("{}", DatasetAction::Write),
+        admin_user_actor.clone(),
+        DatasetAction::Write,
         dataset_resource.clone(),
     );
     let read_result = oso.is_allowed(
-        user_actor.clone(),
-        format!("{}", DatasetAction::Read),
+        admin_user_actor.clone(),
+        DatasetAction::Read,
         dataset_resource.clone(),
     );
 
     assert_allowed!(write_result);
     assert_allowed!(read_result);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Helpers
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn random_account_id() -> odf::AccountID {
+    odf::AccountID::new_generated_ed25519().1
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

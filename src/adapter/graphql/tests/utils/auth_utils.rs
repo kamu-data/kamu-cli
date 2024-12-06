@@ -54,14 +54,15 @@ pub async fn authentication_catalogs(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub fn expect_anonymous_access_error(response: async_graphql::Response) {
-    assert!(response.is_err());
-    assert_eq!(
+    assert!(response.is_err(), "{response:#?}");
+
+    pretty_assertions::assert_eq!(
+        vec![ANONYMOUS_ACCESS_FORBIDDEN_MESSAGE.to_string()],
         response
             .errors
             .into_iter()
             .map(|e| e.message)
             .collect::<Vec<_>>(),
-        vec![ANONYMOUS_ACCESS_FORBIDDEN_MESSAGE.to_string()]
     );
 }
 

@@ -42,4 +42,3 @@ indoc = "2"
 test-log = { version = "0.2", features = ["trace"] }
 tokio = { version = "1", default-features = false, features = [] }
 tokio-stream = { version = "0.1", default-features = false, features = ["net"] }
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }

@@ -22,7 +22,8 @@ use crate::prelude::{AccessTokenID, AccountID, AccountName};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// TODO: Return gql-specific error and get rid of unwraps
+// TODO: Replace with from_catalog_n!() macro
+//       Return gql-specific error and get rid of unwraps
 pub(crate) fn from_catalog<T>(ctx: &Context<'_>) -> Result<Arc<T>, dill::InjectionError>
 where
     T: ?Sized + Send + Sync + 'static,
@@ -30,6 +31,23 @@ where
     let cat = ctx.data::<dill::Catalog>().unwrap();
     cat.get_one::<T>()
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+macro_rules! from_catalog_n {
+    ($gql_ctx:ident, $T:ty ) => {{
+        let catalog = $gql_ctx.data::<dill::Catalog>().unwrap();
+
+        catalog.get_one::<$T>().int_err()?
+    }};
+    ($gql_ctx:ident, $T:ty, $($Ts:ty),+) => {{
+        let catalog = $gql_ctx.data::<dill::Catalog>().unwrap();
+
+        ( catalog.get_one::<$T>().int_err()?, $( catalog.get_one::<$Ts>().int_err()? ),+ )
+    }};
+}
+
+pub(crate) use from_catalog_n;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -233,3 +251,5 @@ impl From<GqlError> for async_graphql::Error {
         }
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -17,13 +17,14 @@ use tonic::Status;
 pub type Token = String;
 
 #[async_trait::async_trait]
-#[allow(unused_variables)]
 pub trait SessionFactory: Send + Sync {
-    async fn authenticate(&self, username: &str, password: &str) -> Result<Token, Status> {
+    async fn authenticate(&self, _username: &str, _password: &str) -> Result<Token, Status> {
         Err(Status::unauthenticated("Invalid credentials!"))
     }
 
-    async fn get_context(&self, token: &Token) -> Result<Arc<SessionContext>, Status> {
+    async fn get_context(&self, _token: &Token) -> Result<Arc<SessionContext>, Status> {
         Err(Status::unauthenticated("Invalid credentials!"))?
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

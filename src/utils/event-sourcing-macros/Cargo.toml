@@ -29,3 +29,6 @@ syn = { version = "2", default-features = false, features = [
     "printing",
     "proc-macro",
 ] }
+
+
+[dev-dependencies]

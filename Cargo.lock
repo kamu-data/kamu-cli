@@ -2495,7 +2495,6 @@ dependencies = [
  "thiserror 1.0.69",
  "tokio",
  "tracing",
- "tracing-subscriber",
  "url",
 ]
 
@@ -2920,15 +2919,19 @@ checksum = "e8566979429cf69b49a5c740c60791108e86440e8be149bbea4fe54d2c32d6e2"
 name = "database-common"
 version = "0.209.0"
 dependencies = [
+ "async-stream",
  "async-trait",
  "aws-config",
  "aws-credential-types",
  "aws-sdk-secretsmanager",
  "chrono",
  "dill",
+ "futures",
  "hex",
  "hmac",
  "internal-error",
+ "mockall",
+ "pretty_assertions",
  "secrecy",
  "serde",
  "serde_json",
@@ -2937,7 +2940,6 @@ dependencies = [
  "thiserror 1.0.69",
  "tokio",
  "tracing",
- "uuid",
 ]
 
 [[package]]
@@ -3862,7 +3864,6 @@ dependencies = [
  "event-sourcing-macros",
  "futures",
  "internal-error",
- "serde",
  "thiserror 1.0.69",
  "tokio",
  "tokio-stream",
@@ -5185,7 +5186,6 @@ dependencies = [
  "aws-config",
  "aws-credential-types",
  "aws-sdk-s3",
- "aws-smithy-http",
  "aws-smithy-types",
  "axum",
  "bytes",
@@ -5210,7 +5210,6 @@ dependencies = [
  "glob",
  "hex",
  "http 1.1.0",
- "hyper 1.5.1",
  "indoc 2.0.5",
  "init-on-startup",
  "internal-error",
@@ -5226,16 +5225,13 @@ dependencies = [
  "kamu-ingest-datafusion",
  "lazy_static",
  "libc",
- "like",
  "messaging-outbox",
  "mockall",
  "nanoid",
  "object_store",
  "oop",
  "opendatafabric",
- "parking_lot",
  "petgraph",
- "pin-project",
  "pretty_assertions",
  "rand",
  "random-names",
@@ -5243,7 +5239,6 @@ dependencies = [
  "reqwest",
  "ringbuf",
  "rumqttc",
- "secrecy",
  "serde",
  "serde_json",
  "serde_with",
@@ -5260,10 +5255,8 @@ dependencies = [
  "tower 0.5.1",
  "tower-http",
  "tracing",
- "tracing-subscriber",
  "trust-dns-resolver",
  "url",
- "walkdir",
  "zip",
 ]
 
@@ -5289,7 +5282,6 @@ dependencies = [
  "serde_with",
  "sqlx",
  "thiserror 1.0.69",
- "tracing",
  "uuid",
 ]
 
@@ -5302,15 +5294,14 @@ dependencies = [
  "database-common",
  "database-common-macros",
  "dill",
+ "futures",
  "internal-error",
  "kamu-accounts",
  "kamu-accounts-repo-tests",
  "opendatafabric",
  "test-group",
  "test-log",
- "thiserror 1.0.69",
  "tokio",
- "tracing",
  "uuid",
 ]
 
@@ -5318,11 +5309,13 @@ dependencies = [
 name = "kamu-accounts-mysql"
 version = "0.209.0"
 dependencies = [
+ "async-stream",
  "async-trait",
  "chrono",
  "database-common",
  "database-common-macros",
  "dill",
+ "futures",
  "internal-error",
  "kamu-accounts",
  "kamu-accounts-repo-tests",
@@ -5330,7 +5323,6 @@ dependencies = [
  "sqlx",
  "test-group",
  "test-log",
- "thiserror 1.0.69",
  "tracing",
  "uuid",
 ]
@@ -5339,11 +5331,13 @@ dependencies = [
 name = "kamu-accounts-postgres"
 version = "0.209.0"
 dependencies = [
+ "async-stream",
  "async-trait",
  "chrono",
  "database-common",
  "database-common-macros",
  "dill",
+ "futures",
  "internal-error",
  "kamu-accounts",
  "kamu-accounts-repo-tests",
@@ -5351,7 +5345,6 @@ dependencies = [
  "sqlx",
  "test-group",
  "test-log",
- "thiserror 1.0.69",
  "tracing",
  "uuid",
 ]
@@ -5381,6 +5374,7 @@ dependencies = [
  "chrono",
  "database-common",
  "dill",
+ "futures",
  "init-on-startup",
  "internal-error",
  "jsonwebtoken",
@@ -5388,11 +5382,9 @@ dependencies = [
  "kamu-accounts-inmem",
  "opendatafabric",
  "password-hash",
- "random-names",
  "serde",
  "serde_json",
  "test-log",
- "thiserror 1.0.69",
  "time-source",
  "tokio",
  "tracing",
@@ -5403,11 +5395,13 @@ dependencies = [
 name = "kamu-accounts-sqlite"
 version = "0.209.0"
 dependencies = [
+ "async-stream",
  "async-trait",
  "chrono",
  "database-common",
  "database-common-macros",
  "dill",
+ "futures",
  "internal-error",
  "kamu-accounts",
  "kamu-accounts-repo-tests",
@@ -5415,31 +5409,38 @@ dependencies = [
  "sqlx",
  "test-group",
  "test-log",
- "thiserror 1.0.69",
  "tracing",
  "uuid",
 ]
 
 [[package]]
-name = "kamu-adapter-auth-oso"
+name = "kamu-adapter-auth-oso-rebac"
 version = "0.209.0"
 dependencies = [
  "async-trait",
+ "database-common",
  "dill",
+ "futures",
+ "init-on-startup",
  "internal-error",
- "kamu",
  "kamu-accounts",
+ "kamu-accounts-inmem",
+ "kamu-accounts-services",
+ "kamu-auth-rebac",
+ "kamu-auth-rebac-inmem",
+ "kamu-auth-rebac-services",
  "kamu-core",
+ "kamu-datasets",
+ "kamu-datasets-inmem",
+ "kamu-datasets-services",
  "messaging-outbox",
  "opendatafabric",
  "oso",
- "oso-derive",
- "tempfile",
  "test-log",
+ "thiserror 1.0.69",
  "time-source",
  "tokio",
  "tracing",
- "tracing-subscriber",
 ]
 
 [[package]]
@@ -5461,7 +5462,6 @@ dependencies = [
  "tokio-stream",
  "tonic",
  "tracing",
- "tracing-subscriber",
  "uuid",
 ]
 
@@ -5473,7 +5473,6 @@ dependencies = [
  "async-trait",
  "chrono",
  "container-runtime",
- "cron",
  "database-common",
  "datafusion",
  "dill",
@@ -5486,6 +5485,9 @@ dependencies = [
  "kamu-accounts",
  "kamu-accounts-inmem",
  "kamu-accounts-services",
+ "kamu-auth-rebac",
+ "kamu-auth-rebac-inmem",
+ "kamu-auth-rebac-services",
  "kamu-core",
  "kamu-data-utils",
  "kamu-datasets",
@@ -5512,7 +5514,6 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "tracing",
- "tracing-subscriber",
  "url",
  "uuid",
 ]
@@ -5542,7 +5543,6 @@ dependencies = [
  "http 1.1.0",
  "http-body-util",
  "http-common",
- "hyper 1.5.1",
  "indoc 2.0.5",
  "init-on-startup",
  "internal-error",
@@ -5564,7 +5564,6 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_with",
- "sha3",
  "strum",
  "tar",
  "tempfile",
@@ -5579,7 +5578,6 @@ dependencies = [
  "tower 0.5.1",
  "tower-http",
  "tracing",
- "tracing-subscriber",
  "url",
  "utoipa",
  "utoipa-axum",
@@ -5591,7 +5589,6 @@ name = "kamu-adapter-oauth"
 version = "0.209.0"
 dependencies = [
  "async-trait",
- "chrono",
  "dill",
  "http 1.1.0",
  "internal-error",
@@ -5601,8 +5598,6 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 1.0.69",
- "tokio",
- "tracing",
 ]
 
 [[package]]
@@ -5619,7 +5614,6 @@ dependencies = [
  "futures",
  "http 1.1.0",
  "http-common",
- "hyper 1.5.1",
  "indoc 2.0.5",
  "internal-error",
  "kamu",
@@ -5628,9 +5622,7 @@ dependencies = [
  "messaging-outbox",
  "opendatafabric",
  "pretty_assertions",
- "quick-xml",
  "reqwest",
- "serde",
  "tempfile",
  "test-group",
  "test-log",
@@ -5683,7 +5675,6 @@ dependencies = [
  "sqlx",
  "test-group",
  "test-log",
- "tokio",
 ]
 
 [[package]]
@@ -5692,7 +5683,6 @@ version = "0.209.0"
 dependencies = [
  "dill",
  "kamu-auth-rebac",
- "tokio",
 ]
 
 [[package]]
@@ -5700,12 +5690,17 @@ name = "kamu-auth-rebac-services"
 version = "0.209.0"
 dependencies = [
  "async-trait",
+ "database-common",
  "dill",
  "futures",
+ "init-on-startup",
  "internal-error",
+ "kamu-accounts",
  "kamu-auth-rebac",
  "kamu-auth-rebac-inmem",
  "kamu-core",
+ "kamu-datasets",
+ "kamu-datasets-services",
  "messaging-outbox",
  "opendatafabric",
  "serde_json",
@@ -5728,7 +5723,6 @@ dependencies = [
  "sqlx",
  "test-group",
  "test-log",
- "tokio",
 ]
 
 [[package]]
@@ -5741,7 +5735,6 @@ dependencies = [
  "async-trait",
  "async-utils",
  "axum",
- "axum-extra",
  "cfg-if",
  "chrono",
  "chrono-humanize",
@@ -5763,7 +5756,6 @@ dependencies = [
  "http 1.1.0",
  "http-common",
  "humansize",
- "hyper 1.5.1",
  "indicatif",
  "indoc 2.0.5",
  "init-on-startup",
@@ -5776,7 +5768,7 @@ dependencies = [
  "kamu-accounts-postgres",
  "kamu-accounts-services",
  "kamu-accounts-sqlite",
- "kamu-adapter-auth-oso",
+ "kamu-adapter-auth-oso-rebac",
  "kamu-adapter-flight-sql",
  "kamu-adapter-graphql",
  "kamu-adapter-http",
@@ -5900,7 +5892,6 @@ dependencies = [
  "indoc 2.0.5",
  "kamu-cli-e2e-common",
  "kamu-cli-e2e-repo-tests",
- "paste",
  "test-group",
  "test-log",
  "tokio",
@@ -5913,7 +5904,6 @@ dependencies = [
  "indoc 2.0.5",
  "kamu-cli-e2e-common",
  "kamu-cli-e2e-repo-tests",
- "paste",
  "sqlx",
  "test-group",
  "test-log",
@@ -5927,7 +5917,6 @@ dependencies = [
  "indoc 2.0.5",
  "kamu-cli-e2e-common",
  "kamu-cli-e2e-repo-tests",
- "paste",
  "sqlx",
  "test-group",
  "test-log",
@@ -5941,7 +5930,6 @@ dependencies = [
  "chrono",
  "http-common",
  "indoc 2.0.5",
- "internal-error",
  "kamu",
  "kamu-accounts",
  "kamu-adapter-http",
@@ -5955,7 +5943,6 @@ dependencies = [
  "reqwest",
  "serde_json",
  "tempfile",
- "tokio",
  "url",
 ]
 
@@ -5966,7 +5953,6 @@ dependencies = [
  "indoc 2.0.5",
  "kamu-cli-e2e-common",
  "kamu-cli-e2e-repo-tests",
- "paste",
  "sqlx",
  "test-group",
  "test-log",
@@ -5996,7 +5982,6 @@ dependencies = [
 name = "kamu-core"
 version = "0.209.0"
 dependencies = [
- "async-stream",
  "async-trait",
  "bytes",
  "chrono",
@@ -6012,6 +5997,7 @@ dependencies = [
  "mockall",
  "object_store",
  "opendatafabric",
+ "oso",
  "pathdiff",
  "pin-project",
  "serde",
@@ -6019,7 +6005,6 @@ dependencies = [
  "thiserror 1.0.69",
  "tokio",
  "tokio-stream",
- "tracing",
  "url",
  "utoipa",
 ]
@@ -6045,7 +6030,6 @@ dependencies = [
  "thiserror 1.0.69",
  "tokio",
  "tracing",
- "tracing-subscriber",
  "url",
 ]
 
@@ -6057,9 +6041,6 @@ dependencies = [
  "async-trait",
  "aws-config",
  "aws-credential-types",
- "aws-sdk-sso",
- "aws-sdk-ssooidc",
- "aws-sdk-sts",
  "clap",
  "datafusion",
  "dirs",
@@ -6067,7 +6048,6 @@ dependencies = [
  "object_store",
  "parking_lot",
  "parquet",
- "regex",
  "rustyline",
  "tokio",
  "url",
@@ -6098,9 +6078,7 @@ dependencies = [
 name = "kamu-datasets-inmem"
 version = "0.209.0"
 dependencies = [
- "async-stream",
  "async-trait",
- "chrono",
  "database-common",
  "database-common-macros",
  "dill",
@@ -6110,12 +6088,9 @@ dependencies = [
  "kamu-datasets",
  "kamu-datasets-repo-tests",
  "opendatafabric",
- "secrecy",
  "test-group",
  "test-log",
- "thiserror 1.0.69",
  "tokio",
- "tracing",
  "uuid",
 ]
 
@@ -6125,7 +6100,6 @@ version = "0.209.0"
 dependencies = [
  "async-stream",
  "async-trait",
- "chrono",
  "database-common",
  "database-common-macros",
  "dill",
@@ -6135,12 +6109,9 @@ dependencies = [
  "kamu-datasets",
  "kamu-datasets-repo-tests",
  "opendatafabric",
- "secrecy",
  "sqlx",
  "test-group",
  "test-log",
- "thiserror 1.0.69",
- "tracing",
  "uuid",
 ]
 
@@ -6181,10 +6152,7 @@ dependencies = [
  "opendatafabric",
  "pretty_assertions",
  "secrecy",
- "serde",
- "serde_json",
  "test-log",
- "thiserror 1.0.69",
  "time-source",
  "tokio",
  "tracing",
@@ -6197,7 +6165,6 @@ version = "0.209.0"
 dependencies = [
  "async-stream",
  "async-trait",
- "chrono",
  "database-common",
  "database-common-macros",
  "dill",
@@ -6207,12 +6174,9 @@ dependencies = [
  "kamu-datasets",
  "kamu-datasets-repo-tests",
  "opendatafabric",
- "secrecy",
  "sqlx",
  "test-group",
  "test-log",
- "thiserror 1.0.69",
- "tracing",
  "uuid",
 ]
 
@@ -6224,7 +6188,6 @@ dependencies = [
  "chrono",
  "cron",
  "database-common",
- "datafusion",
  "dill",
  "enum-variants",
  "event-sourcing",
@@ -6241,38 +6204,26 @@ dependencies = [
  "strum",
  "thiserror 1.0.69",
  "tokio-stream",
- "tracing",
- "url",
 ]
 
 [[package]]
 name = "kamu-flow-system-inmem"
 version = "0.209.0"
 dependencies = [
- "async-stream",
  "async-trait",
  "chrono",
- "cron",
  "database-common",
  "database-common-macros",
  "dill",
  "futures",
- "internal-error",
  "kamu-flow-system",
  "kamu-flow-system-repo-tests",
- "kamu-task-system",
  "opendatafabric",
- "serde",
- "serde_with",
- "tempfile",
  "test-group",
  "test-log",
- "thiserror 1.0.69",
  "tokio",
  "tokio-stream",
  "tracing",
- "tracing-subscriber",
- "url",
 ]
 
 [[package]]
@@ -6290,14 +6241,10 @@ dependencies = [
  "kamu-flow-system",
  "kamu-flow-system-repo-tests",
  "opendatafabric",
- "serde",
  "serde_json",
  "sqlx",
  "test-group",
  "test-log",
- "tokio",
- "tokio-stream",
- "tracing",
 ]
 
 [[package]]
@@ -6343,18 +6290,11 @@ dependencies = [
  "observability",
  "opendatafabric",
  "pretty_assertions",
- "serde",
- "serde_json",
- "serde_with",
  "tempfile",
  "test-log",
- "thiserror 1.0.69",
  "time-source",
  "tokio",
- "tokio-stream",
  "tracing",
- "tracing-subscriber",
- "url",
 ]
 
 [[package]]
@@ -6372,14 +6312,10 @@ dependencies = [
  "kamu-flow-system",
  "kamu-flow-system-repo-tests",
  "opendatafabric",
- "serde",
  "serde_json",
  "sqlx",
  "test-group",
  "test-log",
- "tokio",
- "tokio-stream",
- "tracing",
 ]
 
 [[package]]
@@ -6390,7 +6326,6 @@ dependencies = [
  "chrono",
  "criterion",
  "datafusion",
- "digest 0.10.7",
  "futures",
  "geo-types",
  "geojson",
@@ -6404,7 +6339,6 @@ dependencies = [
  "rand",
  "serde",
  "serde_json",
- "sha3",
  "shapefile",
  "tempfile",
  "test-group",
@@ -6412,8 +6346,6 @@ dependencies = [
  "thiserror 1.0.69",
  "tokio",
  "tracing",
- "tracing-subscriber",
- "url",
  "walkdir",
  "zip",
 ]
@@ -6423,7 +6355,6 @@ name = "kamu-messaging-outbox-inmem"
 version = "0.209.0"
 dependencies = [
  "async-trait",
- "chrono",
  "database-common-macros",
  "dill",
  "internal-error",
@@ -6431,10 +6362,8 @@ dependencies = [
  "messaging-outbox",
  "test-group",
  "test-log",
- "thiserror 1.0.69",
  "tokio",
  "tokio-stream",
- "tracing",
 ]
 
 [[package]]
@@ -6443,7 +6372,6 @@ version = "0.209.0"
 dependencies = [
  "async-stream",
  "async-trait",
- "chrono",
  "database-common",
  "database-common-macros",
  "dill",
@@ -6454,10 +6382,6 @@ dependencies = [
  "sqlx",
  "test-group",
  "test-log",
- "thiserror 1.0.69",
- "tokio",
- "tracing",
- "uuid",
 ]
 
 [[package]]
@@ -6465,7 +6389,6 @@ name = "kamu-messaging-outbox-repo-tests"
 version = "0.209.0"
 dependencies = [
  "chrono",
- "database-common",
  "dill",
  "futures",
  "messaging-outbox",
@@ -6480,7 +6403,6 @@ version = "0.209.0"
 dependencies = [
  "async-stream",
  "async-trait",
- "chrono",
  "database-common",
  "database-common-macros",
  "dill",
@@ -6492,9 +6414,6 @@ dependencies = [
  "sqlx",
  "test-group",
  "test-log",
- "thiserror 1.0.69",
- "tokio",
- "tracing",
 ]
 
 [[package]]
@@ -6536,12 +6455,10 @@ name = "kamu-task-system-inmem"
 version = "0.209.0"
 dependencies = [
  "async-trait",
- "chrono",
  "database-common",
  "database-common-macros",
  "dill",
  "futures",
- "internal-error",
  "kamu-task-system",
  "kamu-task-system-repo-tests",
  "opendatafabric",
@@ -6556,7 +6473,6 @@ version = "0.209.0"
 dependencies = [
  "async-stream",
  "async-trait",
- "chrono",
  "database-common",
  "database-common-macros",
  "dill",
@@ -6569,8 +6485,6 @@ dependencies = [
  "sqlx",
  "test-group",
  "test-log",
- "tokio",
- "tokio-stream",
 ]
 
 [[package]]
@@ -6589,7 +6503,6 @@ dependencies = [
 name = "kamu-task-system-services"
 version = "0.209.0"
 dependencies = [
- "async-stream",
  "async-trait",
  "chrono",
  "database-common",
@@ -6609,7 +6522,6 @@ dependencies = [
  "messaging-outbox",
  "mockall",
  "observability",
- "opendatafabric",
  "serde_json",
  "tempfile",
  "test-log",
@@ -6637,8 +6549,6 @@ dependencies = [
  "sqlx",
  "test-group",
  "test-log",
- "tokio",
- "tokio-stream",
 ]
 
 [[package]]
@@ -7609,14 +7519,11 @@ dependencies = [
  "ed25519-dalek",
  "enum-variants",
  "flatbuffers",
- "futures-core",
- "hex",
  "indoc 2.0.5",
  "internal-error",
  "like",
  "multiformats",
  "prost",
- "rand",
  "serde",
  "serde_json",
  "serde_with",

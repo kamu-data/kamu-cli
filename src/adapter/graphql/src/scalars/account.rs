@@ -40,7 +40,7 @@ impl From<&AccountID> for odf::AccountID {
 
 impl From<AccountID> for String {
     fn from(val: AccountID) -> Self {
-        val.0.as_did_str().to_string()
+        val.0.to_string()
     }
 }
 

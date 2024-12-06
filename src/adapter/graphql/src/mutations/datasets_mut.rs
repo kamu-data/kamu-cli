@@ -114,7 +114,6 @@ impl DatasetsMut {
 
     // TODO: Multi-tenant resolution for derivative dataset inputs (should it only
     //       work by ID?)
-    #[allow(unused_variables)]
     #[graphql(skip)]
     async fn create_from_snapshot_impl(
         &self,

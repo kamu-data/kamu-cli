@@ -14,6 +14,15 @@ Recommendation: for ease of reading, use the following order:
 ## [Unreleased]
 ### Added
 - Console warning when deleting datasets which are out of sync with their push remotes
+### Changed
+- Speed up project build time by removing unused dependencies which were not detected by automated tools
+- Private Datasets:
+  - Deletion of previously created ReBAC-properties and reindexing
+  - OSO: updating the schema to use identifiers instead of names
+  - OSO: added resource storage for access speed
+  - E2E: Using the correct account in multi-tenant mode
+    - And also the possibility of set it up
+  - GQL, added `DatasetMut.setVisibility()` to be able to update ReBAC properties
 
 ## [0.209.0] - 2024-11-25
 ### Changed

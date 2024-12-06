@@ -102,7 +102,7 @@ kamu_cli_execute_command_e2e_test!(
 
 kamu_cli_execute_command_e2e_test!(
     storage = postgres,
-    fixture = kamu_cli_e2e_repo_tests::commands::test_pull_derivative_st,
+    fixture = kamu_cli_e2e_repo_tests::commands::test_pull_derivative_mt,
     options = Options::default()
         .with_multi_tenant()
         .with_frozen_system_time(),

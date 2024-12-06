@@ -303,7 +303,7 @@ async fn test_revoke_access_token() {
             "auth": {
                 "revokeAccessToken": {
                     "__typename": "RevokeResultSuccess",
-                    "message": "Access token revoked succesfully"
+                    "message": "Access token revoked successfully"
                 }
             }
         })

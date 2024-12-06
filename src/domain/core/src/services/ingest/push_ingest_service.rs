@@ -94,12 +94,11 @@ pub enum PushIngestStage {
     Commit,
 }
 
-#[allow(unused_variables)]
 pub trait PushIngestListener: Send + Sync {
     fn begin(&self) {}
-    fn on_stage_progress(&self, stage: PushIngestStage, _progress: u64, _out_of: TotalSteps) {}
-    fn success(&self, result: &PushIngestResult) {}
-    fn error(&self, error: &PushIngestError) {}
+    fn on_stage_progress(&self, _stage: PushIngestStage, _progress: u64, _out_of: TotalSteps) {}
+    fn success(&self, _result: &PushIngestResult) {}
+    fn error(&self, _error: &PushIngestError) {}
 
     fn get_pull_image_listener(self: Arc<Self>) -> Option<Arc<dyn PullImageListener>> {
         None

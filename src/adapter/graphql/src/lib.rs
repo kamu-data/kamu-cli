@@ -10,6 +10,7 @@
 #![feature(error_generic_member_access)]
 #![feature(int_roundings)]
 #![feature(let_chains)]
+#![feature(lint_reasons)]
 
 pub mod extensions;
 pub(crate) mod mutations;

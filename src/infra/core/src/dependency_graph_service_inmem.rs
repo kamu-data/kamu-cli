@@ -305,7 +305,6 @@ impl DependencyGraphService for DependencyGraphServiceInMemory {
     ) -> Result<DatasetIDStream, GetDependenciesError> {
         self.ensure_datasets_initially_scanned()
             .await
-            .int_err()
             .map_err(GetDependenciesError::Internal)
             .unwrap();
 
@@ -356,7 +355,6 @@ impl DependencyGraphService for DependencyGraphServiceInMemory {
     ) -> Result<DatasetIDStream, GetDependenciesError> {
         self.ensure_datasets_initially_scanned()
             .await
-            .int_err()
             .map_err(GetDependenciesError::Internal)?;
 
         let upstream_node_datasets: Vec<_> = {

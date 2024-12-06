@@ -85,12 +85,13 @@ pub async fn test_stream_many_entries(catalog: &Catalog) {
     use futures::TryStreamExt;
 
     {
-        let get_res: Result<Vec<_>, _> = dataset_entry_repo
+        let get_res = dataset_entry_repo
             .get_dataset_entries(PaginationOpts {
                 limit: 100,
                 offset: 0,
             })
-            .try_collect()
+            .await
+            .try_collect::<Vec<_>>()
             .await;
         let expected_dataset_entries = vec![];
 
@@ -131,12 +132,13 @@ pub async fn test_stream_many_entries(catalog: &Catalog) {
     }
 
     {
-        let get_res: Result<Vec<_>, _> = dataset_entry_repo
+        let get_res = dataset_entry_repo
             .get_dataset_entries(PaginationOpts {
                 limit: 100,
                 offset: 0,
             })
-            .try_collect()
+            .await
+            .try_collect::<Vec<_>>()
             .await;
         let expected_dataset_entries = vec![
             dataset_entry_acc_1_1,
@@ -329,7 +331,7 @@ pub async fn test_get_dataset_entries_by_owner_id(catalog: &Catalog) {
             0,
         );
 
-        let get_res: Result<Vec<_>, _> = dataset_entry_repo
+        let get_res = dataset_entry_repo
             .get_dataset_entries_by_owner_id(
                 &account_1.id,
                 PaginationOpts {
@@ -337,7 +339,8 @@ pub async fn test_get_dataset_entries_by_owner_id(catalog: &Catalog) {
                     offset: 0,
                 },
             )
-            .try_collect()
+            .await
+            .try_collect::<Vec<_>>()
             .await;
         let expected_dataset_entries = vec![];
 
@@ -348,7 +351,7 @@ pub async fn test_get_dataset_entries_by_owner_id(catalog: &Catalog) {
         );
     }
     {
-        let get_res: Result<Vec<_>, _> = dataset_entry_repo
+        let get_res = dataset_entry_repo
             .get_dataset_entries_by_owner_id(
                 &account_2.id,
                 PaginationOpts {
@@ -356,7 +359,8 @@ pub async fn test_get_dataset_entries_by_owner_id(catalog: &Catalog) {
                     offset: 0,
                 },
             )
-            .try_collect()
+            .await
+            .try_collect::<Vec<_>>()
             .await;
         let expected_dataset_entries = vec![];
 
@@ -392,7 +396,7 @@ pub async fn test_get_dataset_entries_by_owner_id(catalog: &Catalog) {
         assert_matches!(save_res, Ok(_));
     }
     {
-        let get_res: Result<Vec<_>, _> = dataset_entry_repo
+        let get_res = dataset_entry_repo
             .get_dataset_entries_by_owner_id(
                 &account_1.id,
                 PaginationOpts {
@@ -400,7 +404,8 @@ pub async fn test_get_dataset_entries_by_owner_id(catalog: &Catalog) {
                     offset: 0,
                 },
             )
-            .try_collect()
+            .await
+            .try_collect::<Vec<_>>()
             .await;
         let mut expected_dataset_entries = vec![dataset_entry_acc_1_1, dataset_entry_acc_1_2];
 
@@ -426,7 +431,7 @@ pub async fn test_get_dataset_entries_by_owner_id(catalog: &Catalog) {
         );
     }
     {
-        let get_res: Result<Vec<_>, _> = dataset_entry_repo
+        let get_res = dataset_entry_repo
             .get_dataset_entries_by_owner_id(
                 &account_2.id,
                 PaginationOpts {
@@ -434,7 +439,8 @@ pub async fn test_get_dataset_entries_by_owner_id(catalog: &Catalog) {
                     offset: 0,
                 },
             )
-            .try_collect()
+            .await
+            .try_collect::<Vec<_>>()
             .await;
         let expected_dataset_entries = vec![dataset_entry_acc_2_3];
 

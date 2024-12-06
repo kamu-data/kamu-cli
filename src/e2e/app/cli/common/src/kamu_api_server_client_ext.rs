@@ -446,6 +446,17 @@ impl DatasetApi<'_> {
     }
 
     pub async fn create_dataset(&self, dataset_snapshot_yaml: &str) -> CreateDatasetResponse {
+        self.create_dataset_with_visibility(dataset_snapshot_yaml, true)
+            .await
+    }
+
+    pub async fn create_dataset_with_visibility(
+        &self,
+        dataset_snapshot_yaml: &str,
+        is_public: bool,
+    ) -> CreateDatasetResponse {
+        let dataset_visibility_value = if is_public { "PUBLIC" } else { "PRIVATE" };
+
         let create_response = self
             .client
             .graphql_api_call(
@@ -453,7 +464,7 @@ impl DatasetApi<'_> {
                     r#"
                     mutation {
                       datasets {
-                        createFromSnapshot(snapshot: "<snapshot>", snapshotFormat: YAML) {
+                        createFromSnapshot(snapshot: "<snapshot>", snapshotFormat: YAML, datasetVisibility: "<dataset_visibility_value>") {
                           message
                           ... on CreateDatasetResultSuccess {
                             dataset {
@@ -466,6 +477,7 @@ impl DatasetApi<'_> {
                     "#,
                 )
                 .replace("<snapshot>", dataset_snapshot_yaml)
+                .replace("<dataset_visibility_value>", dataset_visibility_value)
                 .as_str(),
             )
             .await;

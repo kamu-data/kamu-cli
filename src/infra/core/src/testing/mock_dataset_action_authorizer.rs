@@ -36,7 +36,10 @@ mockall::mock! {
             action: DatasetAction,
         ) -> Result<(), DatasetActionUnauthorizedError>;
 
-        async fn get_allowed_actions(&self, dataset_handle: &DatasetHandle) -> HashSet<DatasetAction>;
+        async fn get_allowed_actions(
+            &self,
+            dataset_handle: &DatasetHandle,
+        ) -> Result<HashSet<DatasetAction>, InternalError>;
 
         async fn filter_datasets_allowing(
             &self,

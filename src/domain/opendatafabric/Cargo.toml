@@ -38,7 +38,6 @@ multiformats = { workspace = true }
 
 chrono = { version = "0.4", features = ["serde"] }
 digest = "0.10"
-futures-core = "0.3"
 thiserror = { version = "1", default-features = false }
 bitflags = { version = "2", default-features = false }
 
@@ -54,12 +53,10 @@ ed25519-dalek = { version = "2", default-features = false, features = [
     "zeroize",
     "rand_core",
 ] }
-rand = "0.8"
 
 # Serialization
 base64 = { version = "0.22", default-features = false, features = ["std"] }
 flatbuffers = "24"
-hex = "0.4"
 serde = { version = "1", features = ["derive"] }
 serde_with = "3"
 serde_yaml = "0.9"

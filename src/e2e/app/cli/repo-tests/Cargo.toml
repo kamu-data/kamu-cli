@@ -27,7 +27,6 @@ normal = ["kamu-cli"]
 
 [dependencies]
 http-common = { workspace = true }
-internal-error = { workspace = true }
 kamu = { workspace = true, features = ["testing"] }
 kamu-accounts = { workspace = true }
 kamu-adapter-http = { workspace = true }
@@ -47,7 +46,6 @@ pretty_assertions = { version = "1" }
 reqwest = { version = "0.12", default-features = false, features = [] }
 serde_json = { version = "1", default-features = false }
 tempfile = { version = "3" }
-tokio = { version = "1", default-features = false, features = [] }
 url = { version = "2", default-features = false }
 
 

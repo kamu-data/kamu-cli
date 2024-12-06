@@ -102,7 +102,7 @@ where
             kamu_adapter_http::smart_transfer_protocol_router()
                 .layer(kamu_adapter_http::DatasetResolverLayer::new(
                     identity_extractor,
-                    |_| false, /* does not mater for routing tests */
+                    |_| false, /* does not matter for routing tests */
                 ))
                 .layer(axum::extract::Extension(catalog)),
         )

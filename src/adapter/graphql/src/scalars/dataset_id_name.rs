@@ -35,7 +35,7 @@ impl From<DatasetID> for odf::DatasetID {
 
 impl From<DatasetID> for String {
     fn from(val: DatasetID) -> Self {
-        val.0.as_did_str().to_string()
+        val.0.to_string()
     }
 }
 

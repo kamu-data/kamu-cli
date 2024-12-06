@@ -28,13 +28,11 @@ init-on-startup = { workspace = true }
 internal-error = { workspace = true }
 messaging-outbox = { workspace = true }
 observability = { workspace = true }
-opendatafabric = { workspace = true }
 kamu-core = { workspace = true }
 kamu-datasets = { workspace = true }
 time-source = { workspace = true }
 kamu-task-system = { workspace = true }
 
-async-stream = "0.3"
 async-trait = { version = "0.1", default-features = false }
 dill = "0.9"
 futures = "0.3"

@@ -43,7 +43,6 @@ impl Datasets {
     }
 
     /// Returns dataset by its owner and name
-    #[allow(unused_variables)]
     async fn by_owner_and_name(
         &self,
         ctx: &Context<'_>,
@@ -102,8 +101,6 @@ impl Datasets {
     }
 
     /// Returns datasets belonging to the specified account
-    #[allow(unused_variables)]
-    #[allow(clippy::unused_async)]
     async fn by_account_id(
         &self,
         ctx: &Context<'_>,
@@ -139,7 +136,6 @@ impl Datasets {
     }
 
     /// Returns datasets belonging to the specified account
-    #[allow(unused_variables)]
     async fn by_account_name(
         &self,
         ctx: &Context<'_>,

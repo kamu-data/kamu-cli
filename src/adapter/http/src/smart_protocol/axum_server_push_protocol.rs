@@ -240,13 +240,13 @@ impl AxumServerPushProtocolInstance {
                     Ok(create_result) => {
                         self.maybe_dataset = Some(create_result.dataset);
                     }
-                    Err(ref _e @ CreateDatasetError::RefCollision(ref err)) => {
+                    Err(CreateDatasetError::RefCollision(err)) => {
                         return Err(PushServerError::RefCollision(RefCollisionError {
-                            id: err.id.clone(),
+                            id: err.id,
                         }));
                     }
-                    Err(ref _e @ CreateDatasetError::NameCollision(ref err)) => {
-                        return Err(PushServerError::NameCollision(err.clone()));
+                    Err(CreateDatasetError::NameCollision(err)) => {
+                        return Err(PushServerError::NameCollision(err));
                     }
                     Err(e) => {
                         return Err(PushServerError::Internal(PhaseInternalError {
