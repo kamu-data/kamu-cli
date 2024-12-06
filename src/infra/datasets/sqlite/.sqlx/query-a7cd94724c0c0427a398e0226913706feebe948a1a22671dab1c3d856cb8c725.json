@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                INSERT INTO dataset_references (dataset_id, block_ref_name, block_hash)\n                    VALUES ($1, $2, $3)\n                    ON CONFLICT(dataset_id, block_ref_name)\n                    DO UPDATE SET block_hash = $4 WHERE dataset_references.block_hash = $3\n                ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "a7cd94724c0c0427a398e0226913706feebe948a1a22671dab1c3d856cb8c725"
+}

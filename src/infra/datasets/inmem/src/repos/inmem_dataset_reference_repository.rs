@@ -13,11 +13,12 @@ use std::sync::{Arc, Mutex};
 use dill::*;
 use internal_error::InternalError;
 use kamu_datasets::{
-    BlockPointer,
     DatasetEntryRemovalListener,
+    DatasetReferenceCASError,
     DatasetReferenceNotFoundError,
     DatasetReferenceRepository,
     GetDatasetReferenceError,
+    SetDatasetReferenceError,
 };
 use opendatafabric as odf;
 
@@ -25,7 +26,7 @@ use opendatafabric as odf;
 
 #[derive(Default)]
 struct State {
-    references: HashMap<odf::DatasetID, HashMap<String, BlockPointer>>,
+    references: HashMap<odf::DatasetID, HashMap<String, odf::Multihash>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -54,19 +55,63 @@ impl DatasetReferenceRepository for InMemoryDatasetReferenceRepository {
         &self,
         dataset_id: &odf::DatasetID,
         block_ref_name: &str,
-        block_ptr: BlockPointer,
-    ) -> Result<(), InternalError> {
+        maybe_prev_block_hash: Option<&odf::Multihash>,
+        block_hash: &odf::Multihash,
+    ) -> Result<(), SetDatasetReferenceError> {
         let mut guard = self.state.lock().unwrap();
         if let Some(dataset_references) = guard.references.get_mut(dataset_id) {
-            if let Some(ptr_ref) = dataset_references.get_mut(block_ref_name) {
-                *ptr_ref = block_ptr;
+            if let Some(hash_ref) = dataset_references.get_mut(block_ref_name) {
+                match maybe_prev_block_hash {
+                    Some(expected_prev_block_hash) => {
+                        if expected_prev_block_hash != hash_ref {
+                            return Err(DatasetReferenceCASError::new(
+                                dataset_id,
+                                block_ref_name,
+                                maybe_prev_block_hash,
+                                Some(hash_ref),
+                            )
+                            .into());
+                        }
+
+                        *hash_ref = block_hash.clone();
+                    }
+                    None => {
+                        return Err(DatasetReferenceCASError::new(
+                            dataset_id,
+                            block_ref_name,
+                            None,
+                            Some(hash_ref),
+                        )
+                        .into());
+                    }
+                }
             } else {
-                dataset_references.insert(block_ref_name.to_string(), block_ptr);
+                if maybe_prev_block_hash.is_some() {
+                    return Err(DatasetReferenceCASError::new(
+                        dataset_id,
+                        block_ref_name,
+                        maybe_prev_block_hash,
+                        None,
+                    )
+                    .into());
+                }
+
+                dataset_references.insert(block_ref_name.to_string(), block_hash.clone());
             }
         } else {
+            if maybe_prev_block_hash.is_some() {
+                return Err(DatasetReferenceCASError::new(
+                    dataset_id,
+                    block_ref_name,
+                    maybe_prev_block_hash,
+                    None,
+                )
+                .into());
+            }
+
             guard.references.insert(
                 dataset_id.clone(),
-                HashMap::from_iter([(block_ref_name.to_string(), block_ptr)]),
+                HashMap::from_iter([(block_ref_name.to_string(), block_hash.clone())]),
             );
         }
 
@@ -77,11 +122,11 @@ impl DatasetReferenceRepository for InMemoryDatasetReferenceRepository {
         &self,
         dataset_id: &odf::DatasetID,
         block_ref_name: &str,
-    ) -> Result<BlockPointer, GetDatasetReferenceError> {
+    ) -> Result<odf::Multihash, GetDatasetReferenceError> {
         let guard = self.state.lock().unwrap();
         if let Some(dataset_references) = guard.references.get(dataset_id) {
-            if let Some(block_ptr) = dataset_references.get(block_ref_name) {
-                return Ok(block_ptr.clone());
+            if let Some(block_hash) = dataset_references.get(block_ref_name) {
+                return Ok(block_hash.clone());
             }
         }
 

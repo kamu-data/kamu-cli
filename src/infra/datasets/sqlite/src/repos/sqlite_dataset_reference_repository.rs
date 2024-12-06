@@ -9,7 +9,7 @@
 
 use database_common::{TransactionRef, TransactionRefT};
 use dill::{component, interface};
-use internal_error::{InternalError, ResultIntoInternal};
+use internal_error::ResultIntoInternal;
 use kamu_datasets::*;
 use opendatafabric as odf;
 
@@ -37,44 +37,67 @@ impl DatasetReferenceRepository for SqliteDatasetReferenceRepository {
         &self,
         dataset_id: &odf::DatasetID,
         block_ref_name: &str,
-        block_ptr: BlockPointer,
-    ) -> Result<(), InternalError> {
-        let mut tr = self.transaction.lock().await;
+        maybe_prev_block_hash: Option<&odf::Multihash>,
+        block_hash: &odf::Multihash,
+    ) -> Result<(), SetDatasetReferenceError> {
+        let query_result = {
+            let mut tr = self.transaction.lock().await;
 
-        let connection_mut = tr.connection_mut().await?;
+            let connection_mut = tr.connection_mut().await?;
 
-        let dataset_id = dataset_id.to_string();
-        let dataset_id_str = dataset_id.as_str();
+            let dataset_id = dataset_id.to_string();
+            let dataset_id_str = dataset_id.as_str();
 
-        let block_hash = block_ptr.block_hash.to_string();
-        let block_hash_str = block_hash.as_str();
+            let maybe_prev_block_hash = maybe_prev_block_hash.map(ToString::to_string);
+            let maybe_prev_block_hash_str = maybe_prev_block_hash.as_deref();
 
-        let block_sequence_number = i64::try_from(block_ptr.block_sequence_number).unwrap();
+            let block_hash = block_hash.to_string();
+            let block_hash_str = block_hash.as_str();
 
-        sqlx::query!(
-            r#"
-            INSERT INTO dataset_references (dataset_id, block_ref_name, block_hash, block_sequence_number)
-                VALUES ($1, $2, $3, $4)
-                ON CONFLICT(dataset_id, block_ref_name)
-                DO UPDATE SET block_hash = $3, block_sequence_number = $4
-            "#,
-            dataset_id_str,
-            block_ref_name,
-            block_hash_str,
-            block_sequence_number,
-        )
-        .execute(connection_mut)
-        .await
-        .int_err()?;
+            sqlx::query!(
+                r#"
+                INSERT INTO dataset_references (dataset_id, block_ref_name, block_hash)
+                    VALUES ($1, $2, $3)
+                    ON CONFLICT(dataset_id, block_ref_name)
+                    DO UPDATE SET block_hash = $4 WHERE dataset_references.block_hash = $3
+                "#,
+                dataset_id_str,
+                block_ref_name,
+                maybe_prev_block_hash_str,
+                block_hash_str,
+            )
+            .execute(connection_mut)
+            .await
+            .int_err()?
+        };
 
-        Ok(())
+        if query_result.rows_affected() == 0 {
+            let maybe_actual_block_hash =
+                match self.get_dataset_reference(dataset_id, block_ref_name).await {
+                    Ok(actual_block_hash) => Some(actual_block_hash),
+                    Err(GetDatasetReferenceError::NotFound(_)) => None,
+                    Err(GetDatasetReferenceError::Internal(e)) => return Err(e.into()),
+                };
+
+            assert_ne!(maybe_actual_block_hash.as_ref(), maybe_prev_block_hash);
+            Err(SetDatasetReferenceError::CASFailed(
+                DatasetReferenceCASError::new(
+                    dataset_id,
+                    block_ref_name,
+                    maybe_prev_block_hash,
+                    maybe_actual_block_hash.as_ref(),
+                ),
+            ))
+        } else {
+            Ok(())
+        }
     }
 
     async fn get_dataset_reference(
         &self,
         dataset_id: &odf::DatasetID,
         block_ref_name: &str,
-    ) -> Result<BlockPointer, GetDatasetReferenceError> {
+    ) -> Result<odf::Multihash, GetDatasetReferenceError> {
         let mut tr = self.transaction.lock().await;
 
         let connection_mut = tr.connection_mut().await?;
@@ -82,9 +105,9 @@ impl DatasetReferenceRepository for SqliteDatasetReferenceRepository {
         let stack_dataset_id = dataset_id.as_did_str().to_stack_string();
         let stack_dataset_id_str = stack_dataset_id.as_str();
 
-        let maybe_block_pointer_record = sqlx::query!(
+        let maybe_record = sqlx::query!(
             r#"
-            SELECT block_hash, block_sequence_number
+            SELECT block_hash
                 FROM dataset_references
                 WHERE dataset_id = $1 AND block_ref_name = $2
             "#,
@@ -95,13 +118,8 @@ impl DatasetReferenceRepository for SqliteDatasetReferenceRepository {
         .await
         .int_err()?;
 
-        if let Some(block_pointer_record) = maybe_block_pointer_record {
-            Ok(BlockPointer {
-                block_hash: odf::Multihash::from_multibase(&block_pointer_record.block_hash)
-                    .unwrap(),
-                block_sequence_number: u64::try_from(block_pointer_record.block_sequence_number)
-                    .unwrap(),
-            })
+        if let Some(record) = maybe_record {
+            Ok(odf::Multihash::from_multibase(&record.block_hash).unwrap())
         } else {
             Err(DatasetReferenceNotFoundError {
                 dataset_id: dataset_id.clone(),

@@ -20,8 +20,6 @@ mod dataset_key_value_service_impl;
 mod dataset_key_value_service_sys_env;
 mod dependency_graph_indexer;
 mod dependency_graph_service_impl;
-mod jobs;
-mod messages;
 
 pub use dataset_entry_indexer::*;
 pub use dataset_entry_service_impl::*;
@@ -31,5 +29,11 @@ pub use dataset_key_value_service_impl::*;
 pub use dataset_key_value_service_sys_env::*;
 pub use dependency_graph_indexer::*;
 pub use dependency_graph_service_impl::*;
+
+mod jobs;
+mod managed_entities;
+mod messages;
+
 pub use jobs::*;
+pub use managed_entities::*;
 pub use messages::*;
