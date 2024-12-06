@@ -5423,7 +5423,6 @@ dependencies = [
  "futures",
  "init-on-startup",
  "internal-error",
- "kamu",
  "kamu-accounts",
  "kamu-accounts-inmem",
  "kamu-accounts-services",
