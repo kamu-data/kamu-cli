@@ -10,7 +10,7 @@
 use dill::Catalog;
 use kamu::testing::{BaseRepoHarness, MockDatasetActionAuthorizer};
 use kamu_core::auth::DatasetActionAuthorizer;
-use kamu_core::{DummyManagedDatasetService, TenancyConfig};
+use kamu_core::TenancyConfig;
 use messaging_outbox::{MockOutbox, Outbox};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -67,7 +67,6 @@ impl BaseUseCaseHarness {
             .bind::<dyn DatasetActionAuthorizer, MockDatasetActionAuthorizer>()
             .add_value(options.mock_outbox)
             .bind::<dyn Outbox, MockOutbox>()
-            .add::<DummyManagedDatasetService>()
             .build();
 
         Self {

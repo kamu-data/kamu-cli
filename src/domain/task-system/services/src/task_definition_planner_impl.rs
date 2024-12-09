@@ -20,7 +20,6 @@ use kamu_task_system::*;
 
 pub struct TaskDefinitionPlannerImpl {
     dataset_registry: Arc<dyn DatasetRegistry>,
-    managed_dataset_service: Arc<dyn ManagedDatasetService>,
     dataset_env_vars_svc: Arc<dyn DatasetEnvVarService>,
     pull_request_planner: Arc<dyn PullRequestPlanner>,
     tenancy_config: Arc<TenancyConfig>,
@@ -33,14 +32,12 @@ pub struct TaskDefinitionPlannerImpl {
 impl TaskDefinitionPlannerImpl {
     pub fn new(
         dataset_registry: Arc<dyn DatasetRegistry>,
-        managed_dataset_service: Arc<dyn ManagedDatasetService>,
         dataset_env_vars_svc: Arc<dyn DatasetEnvVarService>,
         pull_request_planner: Arc<dyn PullRequestPlanner>,
         tenancy_config: Arc<TenancyConfig>,
     ) -> Self {
         Self {
             dataset_registry,
-            managed_dataset_service,
             dataset_env_vars_svc,
             pull_request_planner,
             tenancy_config,
@@ -113,14 +110,10 @@ impl TaskDefinitionPlannerImpl {
         args: &LogicalPlanResetDataset,
     ) -> Result<TaskDefinition, InternalError> {
         let target = self
-            .managed_dataset_service
-            .existing_managed(
-                self.dataset_registry
-                    .get_dataset_by_ref(&args.dataset_id.as_local_ref())
-                    .await
-                    .int_err()?,
-            )
-            .await?;
+            .dataset_registry
+            .get_dataset_by_ref(&args.dataset_id.as_local_ref())
+            .await
+            .int_err()?;
 
         Ok(TaskDefinition::Reset(TaskDefinitionReset {
             target,

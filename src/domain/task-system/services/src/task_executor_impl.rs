@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use database_common::{DatabaseTransactionRunner, ManagedOperationFactory, PaginationOpts};
+use database_common::{DatabaseTransactionRunner, PaginationOpts};
 use database_common_macros::{transactional_method1, transactional_method2};
 use dill::*;
 use init_on_startup::{InitOnStartup, InitOnStartupMeta};
@@ -24,7 +24,6 @@ pub struct TaskExecutorImpl {
     catalog: Catalog,
     task_runner: Arc<dyn TaskRunner>,
     time_source: Arc<dyn SystemTimeSource>,
-    managed_operation_factory: Arc<dyn ManagedOperationFactory>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -43,13 +42,11 @@ impl TaskExecutorImpl {
         catalog: Catalog,
         task_runner: Arc<dyn TaskRunner>,
         time_source: Arc<dyn SystemTimeSource>,
-        managed_operation_factory: Arc<dyn ManagedOperationFactory>,
     ) -> Self {
         Self {
             catalog,
             task_runner,
             time_source,
-            managed_operation_factory,
         }
     }
 
@@ -149,42 +146,19 @@ impl TaskExecutorImpl {
             "Preparing task to run",
         );
 
-        // Create managed operation
-        let managed_operation_ref = self.managed_operation_factory.create_operation().await;
+        // Prepare task definition (requires transaction)
+        let task_definition = DatabaseTransactionRunner::new(self.catalog.clone())
+            .transactional_with(
+                |task_definition_planner: Arc<dyn TaskDefinitionPlanner>| async move {
+                    task_definition_planner
+                        .prepare_task_definition(&task.logical_plan)
+                        .await
+                },
+            )
+            .await?;
 
-        // Plan and run task, sharing this operational context
-        let task_run_result = {
-            // Create a child catalog with operation context attached
-            let operation_catalog = CatalogBuilder::new_chained(&self.catalog)
-                .add_value(managed_operation_ref.clone())
-                .build();
-
-            // Prepare task definition (requires transaction)
-            let task_definition = DatabaseTransactionRunner::new(operation_catalog.clone())
-                .transactional_with(
-                    |task_definition_planner: Arc<dyn TaskDefinitionPlanner>| async move {
-                        task_definition_planner
-                            .prepare_task_definition(&task.logical_plan)
-                            .await
-                    },
-                )
-                .await?;
-
-            // Run task via definition
-            self.task_runner.run_task(task_definition).await
-        };
-
-        // Commit operation changes in case of success
-        let task_run_result = match task_run_result {
-            Ok(task_outcome) => {
-                // Commit operation changes
-                match managed_operation_ref.do_commit().await {
-                    Ok(_) => Ok(task_outcome),
-                    Err(e) => Err(e),
-                }
-            }
-            Err(e) => Err(e),
-        };
+        // Run task via definition
+        let task_run_result = self.task_runner.run_task(task_definition).await;
 
         // Deal with errors: we should not interrupt the main loop if task fails
         let task_outcome = match task_run_result {

@@ -11,13 +11,7 @@ use std::sync::Arc;
 
 use dill::{component, interface};
 use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer};
-use kamu_core::{
-    DatasetRegistry,
-    ManagedDatasetService,
-    ResetDatasetUseCase,
-    ResetError,
-    ResetService,
-};
+use kamu_core::{DatasetRegistry, ResetDatasetUseCase, ResetError, ResetService};
 use opendatafabric::{DatasetHandle, Multihash};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -28,7 +22,6 @@ pub struct ResetDatasetUseCaseImpl {
     reset_service: Arc<dyn ResetService>,
     dataset_registry: Arc<dyn DatasetRegistry>,
     dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
-    managed_dataset_service: Arc<dyn ManagedDatasetService>,
 }
 
 impl ResetDatasetUseCaseImpl {
@@ -36,13 +29,11 @@ impl ResetDatasetUseCaseImpl {
         reset_service: Arc<dyn ResetService>,
         dataset_registry: Arc<dyn DatasetRegistry>,
         dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
-        managed_dataset_service: Arc<dyn ManagedDatasetService>,
     ) -> Self {
         Self {
             reset_service,
             dataset_registry,
             dataset_action_authorizer,
-            managed_dataset_service,
         }
     }
 }
@@ -67,10 +58,7 @@ impl ResetDatasetUseCase for ResetDatasetUseCaseImpl {
             .await?;
 
         // Resolve dataset
-        let resolved_dataset = self
-            .managed_dataset_service
-            .existing_managed(self.dataset_registry.get_dataset_by_handle(dataset_handle))
-            .await?;
+        let resolved_dataset = self.dataset_registry.get_dataset_by_handle(dataset_handle);
 
         // Actual action
         self.reset_service

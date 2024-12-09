@@ -19,12 +19,10 @@ pub use db_error::*;
 pub use db_provider::*;
 pub use entities::*;
 
-mod managed;
 mod password;
 mod plugins;
 mod transactions;
 
-pub use managed::*;
 pub use password::*;
 pub use plugins::*;
 pub use transactions::*;
