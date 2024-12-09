@@ -22,14 +22,7 @@ use crate::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait]
-pub trait AsMetadataChain: Send + Sync {
-    fn as_metadata_chain(&self) -> &dyn MetadataChain;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[async_trait]
-pub trait Dataset: AsMetadataChain + Send + Sync {
+pub trait Dataset: Send + Sync {
     /// Helper function to append a generic event to metadata chain.
     ///
     /// Warning: Don't use when synchronizing blocks from another dataset.
@@ -74,6 +67,7 @@ pub trait Dataset: AsMetadataChain + Send + Sync {
 
     fn get_storage_internal_url(&self) -> &Url;
 
+    fn as_metadata_chain(&self) -> &dyn MetadataChain;
     fn as_data_repo(&self) -> &dyn ObjectRepository;
     fn as_checkpoint_repo(&self) -> &dyn ObjectRepository;
     fn as_info_repo(&self) -> &dyn NamedObjectRepository;
