@@ -16,11 +16,6 @@ use kamu_flow_system::{
     FlowConfigurationSnapshot,
     IngestRule,
     ResetRule,
-    Schedule,
-    ScheduleCron,
-    ScheduleCronError,
-    ScheduleTimeDelta,
-    TransformRule,
 };
 use opendatafabric::DatasetHandle;
 
@@ -75,27 +70,6 @@ impl From<IngestRule> for FlowConfigurationIngest {
     fn from(value: IngestRule) -> Self {
         Self {
             fetch_uncacheable: value.fetch_uncacheable,
-        }
-    }
-}
-
-#[derive(Union, Clone, PartialEq, Eq)]
-pub enum FlowConfigurationSchedule {
-    TimeDelta(TimeDelta),
-    Cron(Cron5ComponentExpression),
-}
-
-#[derive(SimpleObject, Clone, PartialEq, Eq)]
-pub struct FlowConfigurationTransform {
-    pub min_records_to_await: u64,
-    pub max_batching_interval: TimeDelta,
-}
-
-impl From<TransformRule> for FlowConfigurationTransform {
-    fn from(value: TransformRule) -> Self {
-        Self {
-            min_records_to_await: value.min_records_to_await(),
-            max_batching_interval: (*value.max_batching_interval()).into(),
         }
     }
 }
@@ -184,125 +158,11 @@ impl From<CompactionRuleMetadataOnly> for CompactionMetadataOnly {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(SimpleObject, Clone, PartialEq, Eq)]
-pub struct Cron5ComponentExpression {
-    pub cron_5component_expression: String,
-}
-
-impl From<ScheduleCron> for Cron5ComponentExpression {
-    fn from(value: ScheduleCron) -> Self {
-        Self {
-            cron_5component_expression: value.source_5component_cron_expression,
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(SimpleObject, Clone, PartialEq, Eq)]
-pub struct TimeDelta {
-    pub every: i64,
-    pub unit: TimeUnit,
-}
-
-#[derive(Enum, Clone, Copy, PartialEq, Eq)]
-pub enum TimeUnit {
-    Minutes,
-    Hours,
-    Days,
-    Weeks,
-}
-
-impl From<chrono::Duration> for TimeDelta {
-    fn from(value: chrono::Duration) -> Self {
-        assert!(
-            value.num_seconds() > 0,
-            "Positive interval expected, but received [{value}]"
-        );
-
-        let num_weeks = value.num_weeks();
-        if (value - chrono::Duration::try_weeks(num_weeks).unwrap()).is_zero() {
-            return Self {
-                every: num_weeks,
-                unit: TimeUnit::Weeks,
-            };
-        }
-
-        let num_days = value.num_days();
-        if (value - chrono::Duration::try_days(num_days).unwrap()).is_zero() {
-            return Self {
-                every: num_days,
-                unit: TimeUnit::Days,
-            };
-        }
-
-        let num_hours = value.num_hours();
-        if (value - chrono::Duration::try_hours(num_hours).unwrap()).is_zero() {
-            return Self {
-                every: num_hours,
-                unit: TimeUnit::Hours,
-            };
-        }
-
-        let num_minutes = value.num_minutes();
-        if (value - chrono::Duration::try_minutes(num_minutes).unwrap()).is_zero() {
-            return Self {
-                every: num_minutes,
-                unit: TimeUnit::Minutes,
-            };
-        }
-
-        panic!(
-            "Expecting intervals not smaller than 1 minute that are clearly dividable by unit, \
-             but received [{value}]"
-        );
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 #[derive(OneofObject)]
 pub enum FlowRunConfiguration {
     Compaction(CompactionConditionInput),
     Ingest(IngestConditionInput),
     Reset(ResetConditionInput),
-}
-
-#[derive(OneofObject, Clone)]
-pub enum ScheduleInput {
-    TimeDelta(TimeDeltaInput),
-    /// Supported CRON syntax: min hour dayOfMonth month dayOfWeek
-    Cron5ComponentExpression(String),
-}
-
-#[derive(InputObject, Clone)]
-pub struct TimeDeltaInput {
-    pub every: u32,
-    pub unit: TimeUnit,
-}
-
-impl From<TimeDeltaInput> for chrono::Duration {
-    fn from(value: TimeDeltaInput) -> Self {
-        let every = i64::from(value.every);
-        match value.unit {
-            TimeUnit::Weeks => chrono::Duration::try_weeks(every).unwrap(),
-            TimeUnit::Days => chrono::Duration::try_days(every).unwrap(),
-            TimeUnit::Hours => chrono::Duration::try_hours(every).unwrap(),
-            TimeUnit::Minutes => chrono::Duration::try_minutes(every).unwrap(),
-        }
-    }
-}
-
-impl From<&TimeDeltaInput> for chrono::Duration {
-    fn from(value: &TimeDeltaInput) -> Self {
-        let every = i64::from(value.every);
-        match value.unit {
-            TimeUnit::Weeks => chrono::Duration::try_weeks(every).unwrap(),
-            TimeUnit::Days => chrono::Duration::try_days(every).unwrap(),
-            TimeUnit::Hours => chrono::Duration::try_hours(every).unwrap(),
-            TimeUnit::Minutes => chrono::Duration::try_minutes(every).unwrap(),
-        }
-    }
 }
 
 #[derive(OneofObject, Clone)]
@@ -371,16 +231,13 @@ impl From<CompactionConditionInput> for FlowRunConfiguration {
 pub struct IngestConditionInput {
     /// Flag indicates to ignore cache during ingest step for API calls
     pub fetch_uncacheable: bool,
-    pub schedule: ScheduleInput,
 }
 
-impl TryFrom<IngestConditionInput> for IngestRule {
-    type Error = ScheduleCronError;
-
-    fn try_from(value: IngestConditionInput) -> std::result::Result<Self, Self::Error> {
-        Ok(Self {
+impl From<IngestConditionInput> for IngestRule {
+    fn from(value: IngestConditionInput) -> Self {
+        Self {
             fetch_uncacheable: value.fetch_uncacheable,
-        })
+        }
     }
 }
 

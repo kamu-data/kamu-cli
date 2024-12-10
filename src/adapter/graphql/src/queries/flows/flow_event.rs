@@ -10,7 +10,7 @@
 use chrono::{DateTime, Utc};
 use {event_sourcing as evs, kamu_flow_system as fs, kamu_task_system as ts};
 
-use super::{FlowStartCondition, FlowTrigger};
+use super::{FlowStartCondition, FlowTriggerType};
 use crate::prelude::*;
 use crate::queries::Task;
 use crate::utils;
@@ -100,7 +100,7 @@ impl FlowEvent {
 pub struct FlowEventInitiated {
     event_id: EventID,
     event_time: DateTime<Utc>,
-    trigger: FlowTrigger,
+    trigger: FlowTriggerType,
 }
 
 impl FlowEventInitiated {
@@ -112,7 +112,7 @@ impl FlowEventInitiated {
         Ok(Self {
             event_id: event_id.into(),
             event_time: event.event_time,
-            trigger: FlowTrigger::build(&event.trigger, ctx).await?,
+            trigger: FlowTriggerType::build(&event.trigger, ctx).await?,
         })
     }
 }
@@ -146,7 +146,7 @@ impl FlowEventStartConditionUpdated {
 pub struct FlowEventTriggerAdded {
     event_id: EventID,
     event_time: DateTime<Utc>,
-    trigger: FlowTrigger,
+    trigger: FlowTriggerType,
 }
 
 impl FlowEventTriggerAdded {
@@ -158,7 +158,7 @@ impl FlowEventTriggerAdded {
         Ok(Self {
             event_id: event_id.into(),
             event_time: event.event_time,
-            trigger: FlowTrigger::build(&event.trigger, ctx).await?,
+            trigger: FlowTriggerType::build(&event.trigger, ctx).await?,
         })
     }
 }

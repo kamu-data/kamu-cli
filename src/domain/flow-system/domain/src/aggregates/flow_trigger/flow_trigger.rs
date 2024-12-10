@@ -18,14 +18,12 @@ use crate::*;
 pub struct FlowTrigger(Aggregate<FlowTriggerState, (dyn FlowTriggerEventStore + 'static)>);
 
 impl FlowTrigger {
-    // ToDo#Separate check if this event is sent
     /// Creates a flow trigger rule
     pub fn new(
         now: DateTime<Utc>,
         flow_key: FlowKey,
         paused: bool,
         rule: Option<FlowTriggerRule>,
-        trigger_type: FlowTriggerType,
     ) -> Self {
         Self(
             Aggregate::new(
@@ -35,7 +33,6 @@ impl FlowTrigger {
                     flow_key,
                     paused,
                     rule,
-                    trigger_type,
                 },
             )
             .unwrap(),
@@ -54,7 +51,6 @@ impl FlowTrigger {
             flow_key: self.flow_key.clone(),
             paused,
             rule: Some(new_rule),
-            trigger_type: self.trigger_type.clone(),
         };
         self.apply(event)
     }
@@ -67,7 +63,6 @@ impl FlowTrigger {
                 flow_key: self.flow_key.clone(),
                 paused: true,
                 rule: self.rule.clone(),
-                trigger_type: self.trigger_type.clone(),
             };
             self.apply(event)
         } else {
@@ -85,7 +80,6 @@ impl FlowTrigger {
                 flow_key: self.flow_key.clone(),
                 paused: false,
                 rule: self.rule.clone(),
-                trigger_type: self.trigger_type.clone(),
             };
             self.apply(event)
         }

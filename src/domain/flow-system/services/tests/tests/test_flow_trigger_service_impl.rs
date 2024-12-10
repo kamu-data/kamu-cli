@@ -17,7 +17,7 @@ use dill::*;
 use futures::TryStreamExt;
 use kamu::testing::MetadataFactory;
 use kamu::*;
-use kamu_accounts::{CurrentAccountSubject, DEFAULT_ACCOUNT_ID};
+use kamu_accounts::CurrentAccountSubject;
 use kamu_core::*;
 use kamu_flow_system::*;
 use kamu_flow_system_inmem::*;
@@ -39,41 +39,29 @@ async fn test_visibility() {
     let bar_id = harness.create_root_dataset("bar").await;
 
     let foo_ingest_trigger = FlowTriggerRule::Schedule(Duration::weeks(1).into());
-    let foo_ingest_trigger_type = FlowTriggerType::AutoPolling(FlowTriggerAutoPolling {
-        trigger_time: Utc::now(),
-    });
     harness
         .set_dataset_flow_trigger(
             foo_id.clone(),
             DatasetFlowType::Ingest,
             foo_ingest_trigger.clone(),
-            foo_ingest_trigger_type.clone(),
         )
         .await;
 
     let foo_compaction_trigger = FlowTriggerRule::Schedule(Duration::days(1).into());
-    let foo_compaction_trigger_type = FlowTriggerType::AutoPolling(FlowTriggerAutoPolling {
-        trigger_time: Utc::now(),
-    });
     harness
         .set_dataset_flow_trigger(
             foo_id.clone(),
             DatasetFlowType::HardCompaction,
             foo_compaction_trigger.clone(),
-            foo_compaction_trigger_type.clone(),
         )
         .await;
 
     let bar_ingest_trigger = FlowTriggerRule::Schedule(Duration::weeks(1).into());
-    let bar_ingest_trigger_type = FlowTriggerType::AutoPolling(FlowTriggerAutoPolling {
-        trigger_time: Utc::now(),
-    });
     harness
         .set_dataset_flow_trigger(
             bar_id.clone(),
             DatasetFlowType::Ingest,
             bar_ingest_trigger.clone(),
-            bar_ingest_trigger_type.clone(),
         )
         .await;
 
@@ -104,15 +92,11 @@ async fn test_pause_resume_individual_dataset_flows() {
     // Make a dataset and configure daily ingestion schedule
     let foo_id = harness.create_root_dataset("foo").await;
     let foo_ingest_trigger = FlowTriggerRule::Schedule(Duration::weeks(1).into());
-    let foo_ingest_trigger_type = FlowTriggerType::AutoPolling(FlowTriggerAutoPolling {
-        trigger_time: Utc::now(),
-    });
     harness
         .set_dataset_flow_trigger(
             foo_id.clone(),
             DatasetFlowType::Ingest,
             foo_ingest_trigger.clone(),
-            foo_ingest_trigger_type.clone(),
         )
         .await;
 
@@ -178,27 +162,19 @@ async fn test_pause_resume_all_dataset_flows() {
     // Make a dataset and configure ingestion and compaction schedule
     let foo_id = harness.create_root_dataset("foo").await;
     let foo_ingest_trigger = FlowTriggerRule::Schedule(Duration::weeks(1).into());
-    let foo_ingest_trigger_type = FlowTriggerType::AutoPolling(FlowTriggerAutoPolling {
-        trigger_time: Utc::now(),
-    });
     harness
         .set_dataset_flow_trigger(
             foo_id.clone(),
             DatasetFlowType::Ingest,
             foo_ingest_trigger.clone(),
-            foo_ingest_trigger_type.clone(),
         )
         .await;
     let foo_compaction_trigger = FlowTriggerRule::Schedule(Duration::weeks(1).into());
-    let foo_compaction_trigger_type = FlowTriggerType::AutoPolling(FlowTriggerAutoPolling {
-        trigger_time: Utc::now(),
-    });
     harness
         .set_dataset_flow_trigger(
             foo_id.clone(),
             DatasetFlowType::HardCompaction,
             foo_compaction_trigger.clone(),
-            foo_compaction_trigger_type.clone(),
         )
         .await;
 
@@ -341,15 +317,11 @@ async fn test_dataset_deleted() {
     // Make a dataset and configure ingest trigger
     let foo_id = harness.create_root_dataset("foo").await;
     let foo_ingest_trigger = FlowTriggerRule::Schedule(Duration::weeks(1).into());
-    let foo_ingest_trigger_type = FlowTriggerType::AutoPolling(FlowTriggerAutoPolling {
-        trigger_time: Utc::now(),
-    });
     harness
         .set_dataset_flow_trigger(
             foo_id.clone(),
             DatasetFlowType::Ingest,
             foo_ingest_trigger.clone(),
-            foo_ingest_trigger_type.clone(),
         )
         .await;
 
@@ -474,10 +446,6 @@ impl FlowTriggerHarness {
                 system_flow_type.into(),
                 false,
                 FlowTriggerRule::Schedule(schedule),
-                FlowTriggerType::Manual(FlowTriggerManual {
-                    trigger_time: Utc::now(),
-                    initiator_account_id: DEFAULT_ACCOUNT_ID.clone(),
-                }),
             )
             .await?;
         Ok(())
@@ -488,7 +456,6 @@ impl FlowTriggerHarness {
         dataset_id: DatasetID,
         dataset_flow_type: DatasetFlowType,
         trigger_rule: FlowTriggerRule,
-        trigger_type: FlowTriggerType,
     ) {
         self.flow_trigger_service
             .set_trigger(
@@ -496,7 +463,6 @@ impl FlowTriggerHarness {
                 FlowKeyDataset::new(dataset_id, dataset_flow_type).into(),
                 false,
                 trigger_rule,
-                trigger_type,
             )
             .await
             .unwrap();

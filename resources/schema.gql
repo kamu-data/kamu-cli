@@ -80,13 +80,6 @@ type AccountEdge {
 	node: Account!
 }
 
-type AccountFlowConfigs {
-	"""
-	Checks if all configs of all datasets in account are disabled
-	"""
-	allPaused: Boolean!
-}
-
 type AccountFlowConfigsMut {
 	resumeAccountDatasetFlows: Boolean!
 	pauseAccountDatasetFlows: Boolean!
@@ -104,15 +97,22 @@ type AccountFlowRuns {
 	listDatasetsWithFlow: DatasetConnection!
 }
 
+type AccountFlowTriggers {
+	"""
+	Checks if all triggers of all datasets in account are disabled
+	"""
+	allPaused: Boolean!
+}
+
 type AccountFlows {
 	"""
 	Returns interface for flow runs queries
 	"""
 	runs: AccountFlowRuns!
 	"""
-	Returns interface for flow configurations queries
+	Returns interface for flow triggers queries
 	"""
-	configs: AccountFlowConfigs!
+	triggers: AccountFlowTriggers!
 }
 
 type AccountFlowsMut {
@@ -198,6 +198,11 @@ type AuthMut {
 	accountDetails(accessToken: String!): Account!
 	createAccessToken(accountId: AccountID!, tokenName: String!): CreateTokenResult!
 	revokeAccessToken(tokenId: AccessTokenID!): RevokeResult!
+}
+
+input BatchingInput {
+	minRecordsToAwait: Int!
+	maxBatchingInterval: TimeDeltaInput!
 }
 
 type BlockRef {
@@ -544,18 +549,10 @@ type DatasetFlowConfigs {
 	Returns defined configuration for a flow of specified type
 	"""
 	byType(datasetFlowType: DatasetFlowType!): FlowConfiguration
-	"""
-	Checks if all configs of this dataset are disabled
-	"""
-	allPaused: Boolean!
 }
 
 type DatasetFlowConfigsMut {
-	setConfigIngest(datasetFlowType: DatasetFlowType!, paused: Boolean!, ingest: IngestConditionInput!): SetFlowConfigResult!
-	setConfigTransform(datasetFlowType: DatasetFlowType!, paused: Boolean!, transform: TransformConditionInput!): SetFlowTransformConfigResult!
-	setConfigCompaction(datasetFlowType: DatasetFlowType!, compactionArgs: CompactionConditionInput!): SetFlowCompactionConfigResult!
-	pauseFlows(datasetFlowType: DatasetFlowType): Boolean!
-	resumeFlows(datasetFlowType: DatasetFlowType): Boolean!
+	setConfig(datasetFlowType: DatasetFlowType!, configInput: FlowConfigurationInput!): SetFlowConfigResult!
 }
 
 input DatasetFlowFilters {
@@ -575,6 +572,23 @@ type DatasetFlowRunsMut {
 	cancelScheduledTasks(flowId: FlowID!): CancelScheduledTasksResult!
 }
 
+type DatasetFlowTriggers {
+	"""
+	Returns defined trigger for a flow of specified type
+	"""
+	byType(datasetFlowType: DatasetFlowType!): FlowTrigger
+	"""
+	Checks if all triggers of this dataset are disabled
+	"""
+	allPaused: Boolean!
+}
+
+type DatasetFlowTriggersMut {
+	setTrigger(datasetFlowType: DatasetFlowType!, paused: Boolean!, triggerInput: FlowTriggerInput!): SetFlowTriggerResult!
+	pauseFlows(datasetFlowType: DatasetFlowType): Boolean!
+	resumeFlows(datasetFlowType: DatasetFlowType): Boolean!
+}
+
 enum DatasetFlowType {
 	INGEST
 	EXECUTE_TRANSFORM
@@ -588,6 +602,10 @@ type DatasetFlows {
 	"""
 	configs: DatasetFlowConfigs!
 	"""
+	Returns interface for flow triggers queries
+	"""
+	triggers: DatasetFlowTriggers!
+	"""
 	Returns interface for flow runs queries
 	"""
 	runs: DatasetFlowRuns!
@@ -596,6 +614,7 @@ type DatasetFlows {
 type DatasetFlowsMut {
 	configs: DatasetFlowConfigsMut!
 	runs: DatasetFlowRunsMut!
+	triggers: DatasetFlowTriggersMut!
 }
 
 scalar DatasetID
@@ -942,7 +961,7 @@ type Flow {
 	"""
 	Primary flow trigger
 	"""
-	primaryTrigger: FlowTrigger!
+	primaryTrigger: FlowTriggerType!
 	"""
 	Start condition
 	"""
@@ -958,9 +977,7 @@ type FlowAbortedResult {
 }
 
 type FlowConfiguration {
-	paused: Boolean!
 	ingest: FlowConfigurationIngest
-	transform: FlowConfigurationTransform
 	compaction: FlowConfigurationCompaction
 	reset: FlowConfigurationReset
 }
@@ -972,8 +989,12 @@ type FlowConfigurationCompactionRule {
 }
 
 type FlowConfigurationIngest {
-	schedule: FlowConfigurationSchedule!
 	fetchUncacheable: Boolean!
+}
+
+input FlowConfigurationInput @oneOf {
+	ingest: IngestConditionInput
+	compaction: CompactionConditionInput
 }
 
 type FlowConfigurationReset {
@@ -990,14 +1011,7 @@ input FlowConfigurationResetToSeedDummy {
 	dummy: String!
 }
 
-union FlowConfigurationSchedule = TimeDelta | Cron5ComponentExpression
-
-union FlowConfigurationSnapshot = FlowConfigurationTransform | FlowConfigurationCompactionRule | FlowConfigurationIngest | FlowConfigurationReset
-
-type FlowConfigurationTransform {
-	minRecordsToAwait: Int!
-	maxBatchingInterval: TimeDelta!
-}
+union FlowConfigurationSnapshot = FlowConfigurationCompactionRule | FlowConfigurationIngest | FlowConfigurationReset
 
 type FlowConnection {
 	"""
@@ -1097,7 +1111,7 @@ type FlowEventAborted implements FlowEvent {
 type FlowEventInitiated implements FlowEvent {
 	eventId: EventID!
 	eventTime: DateTime!
-	trigger: FlowTrigger!
+	trigger: FlowTriggerType!
 }
 
 type FlowEventScheduledForActivation implements FlowEvent {
@@ -1123,7 +1137,7 @@ type FlowEventTaskChanged implements FlowEvent {
 type FlowEventTriggerAdded implements FlowEvent {
 	eventId: EventID!
 	eventTime: DateTime!
-	trigger: FlowTrigger!
+	trigger: FlowTriggerType!
 }
 
 type FlowFailedError {
@@ -1143,13 +1157,13 @@ type FlowFailureReasonInputDatasetCompacted {
 
 scalar FlowID
 
-type FlowIncompatibleDatasetKind implements SetFlowConfigResult & SetFlowTransformConfigResult & SetFlowCompactionConfigResult & TriggerFlowResult {
+type FlowIncompatibleDatasetKind implements SetFlowConfigResult & TriggerFlowResult & SetFlowTriggerResult {
 	expectedDatasetKind: DatasetKind!
 	actualDatasetKind: DatasetKind!
 	message: String!
 }
 
-type FlowInvalidCompactionConfig implements SetFlowCompactionConfigResult {
+type FlowInvalidConfigInputError implements SetFlowConfigResult {
 	reason: String!
 	message: String!
 }
@@ -1159,7 +1173,7 @@ type FlowInvalidRunConfigurations implements TriggerFlowResult {
 	message: String!
 }
 
-type FlowInvalidTransformConfig implements SetFlowTransformConfigResult {
+type FlowInvalidTriggerInputError implements SetFlowTriggerResult {
 	reason: String!
 	message: String!
 }
@@ -1171,13 +1185,12 @@ type FlowNotFound implements GetFlowResult & CancelScheduledTasksResult {
 
 union FlowOutcome = FlowSuccessResult | FlowFailedError | FlowAbortedResult
 
-type FlowPreconditionsNotMet implements SetFlowConfigResult & SetFlowTransformConfigResult & TriggerFlowResult {
+type FlowPreconditionsNotMet implements SetFlowConfigResult & TriggerFlowResult & SetFlowTriggerResult {
 	preconditions: String!
 	message: String!
 }
 
 input FlowRunConfiguration @oneOf {
-	transform: TransformConditionInput
 	compaction: CompactionConditionInput
 	ingest: IngestConditionInput
 	reset: ResetConditionInput
@@ -1186,7 +1199,7 @@ input FlowRunConfiguration @oneOf {
 union FlowStartCondition = FlowStartConditionSchedule | FlowStartConditionThrottling | FlowStartConditionBatching | FlowStartConditionExecutor
 
 type FlowStartConditionBatching {
-	activeTransformRule: FlowConfigurationTransform!
+	activeBatchingRule: FlowTriggerBatchingRule!
 	batchingDeadline: DateTime!
 	accumulatedRecordsCount: Int!
 	watermarkModified: Boolean!
@@ -1232,10 +1245,24 @@ type FlowTimingRecords {
 	finishedAt: DateTime
 }
 
-union FlowTrigger = FlowTriggerManual | FlowTriggerAutoPolling | FlowTriggerPush | FlowTriggerInputDatasetFlow
+type FlowTrigger {
+	paused: Boolean!
+	schedule: FlowTriggerSchedule
+	batching: FlowTriggerBatchingRule
+}
 
 type FlowTriggerAutoPolling {
 	dummy: Boolean!
+}
+
+type FlowTriggerBatchingRule {
+	minRecordsToAwait: Int!
+	maxBatchingInterval: TimeDelta!
+}
+
+input FlowTriggerInput @oneOf {
+	schedule: ScheduleInput
+	batching: BatchingInput
 }
 
 type FlowTriggerInputDatasetFlow {
@@ -1252,7 +1279,15 @@ type FlowTriggerPush {
 	dummy: Boolean!
 }
 
-type FlowTypeIsNotSupported implements SetFlowConfigResult & SetFlowTransformConfigResult & SetFlowCompactionConfigResult {
+type FlowTriggerSchedule {
+	rule: FlowTriggerScheduleRule!
+}
+
+union FlowTriggerScheduleRule = TimeDelta | Cron5ComponentExpression
+
+union FlowTriggerType = FlowTriggerManual | FlowTriggerAutoPolling | FlowTriggerPush | FlowTriggerInputDatasetFlow
+
+type FlowTypeIsNotSupported implements SetFlowConfigResult & SetFlowTriggerResult {
 	message: String!
 }
 
@@ -1271,7 +1306,6 @@ input IngestConditionInput {
 	Flag indicates to ignore cache during ingest step for API calls
 	"""
 	fetchUncacheable: Boolean!
-	schedule: ScheduleInput!
 }
 
 input InitiatorFilterInput @oneOf {
@@ -1691,20 +1725,21 @@ type SetDataSchema {
 	schema: DataSchema!
 }
 
-interface SetFlowCompactionConfigResult {
-	message: String!
-}
-
 interface SetFlowConfigResult {
 	message: String!
 }
 
-type SetFlowConfigSuccess implements SetFlowConfigResult & SetFlowTransformConfigResult & SetFlowCompactionConfigResult {
+type SetFlowConfigSuccess implements SetFlowConfigResult {
 	config: FlowConfiguration!
 	message: String!
 }
 
-interface SetFlowTransformConfigResult {
+interface SetFlowTriggerResult {
+	message: String!
+}
+
+type SetFlowTriggerSuccess implements SetFlowTriggerResult {
+	trigger: FlowTrigger!
 	message: String!
 }
 
@@ -1888,11 +1923,6 @@ enum TimeUnit {
 }
 
 union Transform = TransformSql
-
-input TransformConditionInput {
-	minRecordsToAwait: Int!
-	maxBatchingInterval: TimeDeltaInput!
-}
 
 type TransformInput {
 	datasetRef: DatasetRef!

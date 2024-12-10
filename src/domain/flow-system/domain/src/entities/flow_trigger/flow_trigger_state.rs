@@ -11,14 +11,7 @@ use event_sourcing::{Projection, ProjectionError, ProjectionEvent};
 use serde::{Deserialize, Serialize};
 
 use super::{FlowTriggerEvent, FlowTriggerRule, FlowTriggerStatus};
-use crate::{
-    FlowKey,
-    FlowTriggerEventCreated,
-    FlowTriggerEventModified,
-    FlowTriggerType,
-    Schedule,
-    TransformRule,
-};
+use crate::{BatchingRule, FlowKey, FlowTriggerEventCreated, FlowTriggerEventModified, Schedule};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -30,8 +23,6 @@ pub struct FlowTriggerState {
     pub rule: Option<FlowTriggerRule>,
     /// Trigger status
     pub status: FlowTriggerStatus,
-    /// Trigger type
-    pub trigger_type: FlowTriggerType,
 }
 
 impl FlowTriggerState {
@@ -46,19 +37,11 @@ impl FlowTriggerState {
         })
     }
 
-    pub fn try_get_batching_rule(self) -> Option<TransformRule> {
+    pub fn try_get_batching_rule(self) -> Option<BatchingRule> {
         self.rule.and_then(|rule| match rule {
             FlowTriggerRule::Batching(batching) => Some(batching),
             FlowTriggerRule::Schedule(_) => None,
         })
-    }
-
-    pub fn is_unique_vs(&self, existing_triggers: &[Self]) -> bool {
-        let existing_trigger_types: Vec<_> = existing_triggers
-            .iter()
-            .map(|existing_trigger| existing_trigger.trigger_type.clone())
-            .collect();
-        self.trigger_type.is_unique_vs(&existing_trigger_types)
     }
 }
 
@@ -77,7 +60,6 @@ impl Projection for FlowTriggerState {
                     flow_key,
                     paused,
                     rule,
-                    trigger_type,
                     ..
                 }) => Ok(Self {
                     flow_key,
@@ -87,7 +69,6 @@ impl Projection for FlowTriggerState {
                         FlowTriggerStatus::Active
                     },
                     rule,
-                    trigger_type,
                 }),
                 _ => Err(ProjectionError::new(None, event)),
             },

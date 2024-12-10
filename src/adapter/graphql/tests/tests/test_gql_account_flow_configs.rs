@@ -36,7 +36,11 @@ use kamu_accounts_inmem::InMemoryAccessTokenRepository;
 use kamu_accounts_services::{AccessTokenServiceImpl, AuthenticationServiceImpl};
 use kamu_core::*;
 use kamu_flow_system::FlowExecutorConfig;
-use kamu_flow_system_inmem::{InMemoryFlowConfigurationEventStore, InMemoryFlowEventStore};
+use kamu_flow_system_inmem::{
+    InMemoryFlowConfigurationEventStore,
+    InMemoryFlowEventStore,
+    InMemoryFlowTriggerEventStore,
+};
 use kamu_task_system_inmem::InMemoryTaskEventStore;
 use kamu_task_system_services::TaskSchedulerImpl;
 use messaging_outbox::{register_message_dispatcher, Outbox, OutboxImmediateImpl};
@@ -322,13 +326,12 @@ async fn test_pause_resume_account_flows() {
         })
     );
 
-    let mutation_code = FlowConfigHarness::set_ingest_config_time_delta_mutation(
+    let mutation_code = FlowConfigHarness::set_ingest_trigger_time_delta_mutation(
         &foo_create_result.dataset_handle.id,
         "INGEST",
         false,
         1,
         "DAYS",
-        false,
     );
     let response = schema
         .execute(
@@ -379,7 +382,7 @@ async fn test_pause_resume_account_flows() {
             "datasets": {
                 "byId": {
                     "flows": {
-                        "configs": {
+                        "triggers": {
                             "allPaused": true
                         }
                     }
@@ -428,7 +431,7 @@ async fn test_pause_resume_account_flows() {
             "datasets": {
                 "byId": {
                     "flows": {
-                        "configs": {
+                        "triggers": {
                             "allPaused": false
                         }
                     }
@@ -529,13 +532,12 @@ async fn test_account_configs_all_paused() {
         })
     );
 
-    let mutation_code = FlowConfigHarness::set_ingest_config_time_delta_mutation(
+    let mutation_code = FlowConfigHarness::set_ingest_trigger_time_delta_mutation(
         &bar_create_result.dataset_handle.id,
         "INGEST",
         false,
         1,
         "DAYS",
-        false,
     );
     let response = schema
         .execute(
@@ -561,7 +563,7 @@ async fn test_account_configs_all_paused() {
             "accounts": {
                 "byName": {
                     "flows": {
-                        "configs": {
+                        "triggers": {
                             "allPaused": false
                         }
                     }
@@ -609,7 +611,7 @@ async fn test_account_configs_all_paused() {
             "accounts": {
                 "byName": {
                     "flows": {
-                        "configs": {
+                        "triggers": {
                             "allPaused": true
                         }
                     }
@@ -677,6 +679,7 @@ impl FlowConfigHarness {
             .add_value(dependency_graph_mock)
             .bind::<dyn DependencyGraphRepository, MockDependencyGraphRepository>()
             .add::<InMemoryFlowConfigurationEventStore>()
+            .add::<InMemoryFlowTriggerEventStore>()
             .add::<InMemoryFlowEventStore>()
             .add_value(FlowExecutorConfig::new(
                 Duration::seconds(1),
@@ -855,7 +858,7 @@ impl FlowConfigHarness {
                                           __typename
                                           ... on FlowStartConditionBatching {
                                               accumulatedRecordsCount
-                                              activeTransformRule {
+                                              activeBatchingRule {
                                                   __typename
                                                   minRecordsToAwait
                                                   maxBatchingInterval {
@@ -990,7 +993,7 @@ impl FlowConfigHarness {
                 datasets {
                     byId (datasetId: "<id>") {
                         flows {
-                            configs {
+                            triggers {
                                 allPaused
                             }
                         }
@@ -1009,7 +1012,7 @@ impl FlowConfigHarness {
                 accounts {
                     byName (name: "<account_name>") {
                         flows {
-                            configs {
+                            triggers {
                                 allPaused
                             }
                         }
@@ -1021,13 +1024,12 @@ impl FlowConfigHarness {
         .replace("<account_name>", account_name)
     }
 
-    fn set_ingest_config_time_delta_mutation(
+    fn set_ingest_trigger_time_delta_mutation(
         id: &DatasetID,
         dataset_flow_type: &str,
         paused: bool,
         every: u64,
         unit: &str,
-        feach_uncacheable: bool,
     ) -> String {
         indoc!(
             r#"
@@ -1035,12 +1037,11 @@ impl FlowConfigHarness {
                 datasets {
                     byId (datasetId: "<id>") {
                         flows {
-                            configs {
-                                setConfigIngest (
+                            triggers {
+                                setTrigger (
                                     datasetFlowType: "<dataset_flow_type>",
                                     paused: <paused>,
-                                    ingest: {
-                                        fetchUncacheable: <feach_uncacheable>,
+                                    triggerInput: {
                                         schedule: {
                                             timeDelta: { every: <every>, unit: "<unit>" }
                                         }
@@ -1048,13 +1049,12 @@ impl FlowConfigHarness {
                                 ) {
                                     __typename,
                                     message
-                                    ... on SetFlowConfigSuccess {
-                                        config {
+                                    ... on SetFlowTriggerSuccess {
+                                        trigger {
                                             __typename
                                             paused
-                                            ingest {
-                                                fetchUncacheable
-                                                schedule {
+                                            schedule {
+                                                rule {
                                                     __typename
                                                     ... on TimeDelta {
                                                         every
@@ -1062,10 +1062,7 @@ impl FlowConfigHarness {
                                                     }
                                                 }
                                             }
-                                            transform {
-                                                __typename
-                                            }
-                                            compaction {
+                                            batching {
                                                 __typename
                                             }
                                         }
@@ -1081,10 +1078,6 @@ impl FlowConfigHarness {
         .replace("<id>", &id.to_string())
         .replace("<dataset_flow_type>", dataset_flow_type)
         .replace("<paused>", if paused { "true" } else { "false" })
-        .replace(
-            "<feach_uncacheable>",
-            if feach_uncacheable { "true" } else { "false" },
-        )
         .replace("<every>", every.to_string().as_str())
         .replace("<unit>", unit)
     }

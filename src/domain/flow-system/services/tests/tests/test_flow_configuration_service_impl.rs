@@ -343,18 +343,6 @@ impl FlowConfigurationHarness {
         flow_configuration.into()
     }
 
-    async fn get_system_flow_config_from_store(
-        &self,
-        system_flow_type: SystemFlowType,
-    ) -> FlowConfigurationState {
-        let flow_key: FlowKey = FlowKey::System(FlowKeySystem::new(system_flow_type));
-        let flow_configuration =
-            FlowConfiguration::load(flow_key, self.flow_configuration_event_store.as_ref())
-                .await
-                .unwrap();
-        flow_configuration.into()
-    }
-
     async fn create_root_dataset(&self, dataset_name: &str) -> DatasetID {
         let create_dataset_from_snapshot = self
             .catalog

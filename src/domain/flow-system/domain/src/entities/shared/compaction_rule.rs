@@ -18,15 +18,15 @@ pub enum CompactionRule {
     MetadataOnly(CompactionRuleMetadataOnly),
 }
 
-impl Into<CompactionRule> for CompactionRuleFull {
-    fn into(self) -> CompactionRule {
-        CompactionRule::Full(self)
+impl From<CompactionRuleFull> for CompactionRule {
+    fn from(value: CompactionRuleFull) -> Self {
+        Self::Full(value)
     }
 }
 
-impl Into<CompactionRule> for CompactionRuleMetadataOnly {
-    fn into(self) -> CompactionRule {
-        CompactionRule::MetadataOnly(self)
+impl From<CompactionRuleMetadataOnly> for CompactionRule {
+    fn from(value: CompactionRuleMetadataOnly) -> Self {
+        Self::MetadataOnly(value)
     }
 }
 

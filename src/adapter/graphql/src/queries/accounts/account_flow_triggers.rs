@@ -10,43 +10,42 @@
 use futures::StreamExt;
 use kamu_accounts::Account as AccountEntity;
 use kamu_core::DatasetOwnershipService;
-use kamu_flow_system::FlowConfigurationService;
+use kamu_flow_system::FlowTriggerService;
 
 use crate::prelude::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct AccountFlowConfigs {
+pub struct AccountFlowTriggers {
     account: AccountEntity,
 }
 
 #[Object]
-impl AccountFlowConfigs {
+impl AccountFlowTriggers {
     #[graphql(skip)]
     pub fn new(account: AccountEntity) -> Self {
         Self { account }
     }
 
-    /// Checks if all configs of all datasets in account are disabled
+    /// Checks if all triggers of all datasets in account are disabled
     async fn all_paused(&self, ctx: &Context<'_>) -> Result<bool> {
-        // let dataset_ownership_service = from_catalog::<dyn
-        // DatasetOwnershipService>(ctx).unwrap(); let owned_dataset_ids: Vec<_>
-        // = dataset_ownership_service     .get_owned_datasets(&self.account.id)
-        //     .await?;
-        // let flow_config_service = from_catalog::<dyn
-        // FlowConfigurationService>(ctx).unwrap();
+        let dataset_ownership_service = from_catalog::<dyn DatasetOwnershipService>(ctx).unwrap();
+        let owned_dataset_ids: Vec<_> = dataset_ownership_service
+            .get_owned_datasets(&self.account.id)
+            .await?;
+        let flow_trigger_service = from_catalog::<dyn FlowTriggerService>(ctx).unwrap();
 
-        // let mut all_configurations = flow_config_service
-        //     .find_configurations_by_datasets(owned_dataset_ids)
-        //     .await;
+        let mut all_triggers = flow_trigger_service
+            .find_triggers_by_datasets(owned_dataset_ids)
+            .await;
 
-        // while let Some(configuration_result) = all_configurations.next().await {
-        //     if let Ok(configuration) = configuration_result
-        //         && configuration.is_active()
-        //     {
-        //         return Ok(false);
-        //     }
-        // }
+        while let Some(trigger_result) = all_triggers.next().await {
+            if let Ok(trigger) = trigger_result
+                && trigger.is_active()
+            {
+                return Ok(false);
+            }
+        }
 
         Ok(true)
     }

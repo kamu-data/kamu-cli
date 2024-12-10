@@ -8,13 +8,13 @@
 // by the Apache License, Version 2.0.
 
 mod account;
-mod account_flow_configs;
 mod account_flow_runs;
+mod account_flow_triggers;
 mod account_flows;
 mod accounts;
 
 pub(crate) use account::*;
-pub(crate) use account_flow_configs::*;
 pub(crate) use account_flow_runs::*;
+pub(crate) use account_flow_triggers::*;
 pub(crate) use account_flows::*;
 pub(crate) use accounts::*;

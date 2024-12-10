@@ -72,7 +72,6 @@ impl FlowTriggerServiceImpl {
             flow_key: state.flow_key.clone(),
             rule: state.rule.clone(),
             paused: !state.is_active(),
-            trigger_type: state.trigger_type.clone(),
         };
 
         self.outbox
@@ -136,7 +135,6 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
         flow_key: FlowKey,
         paused: bool,
         rule: FlowTriggerRule,
-        trigger_type: FlowTriggerType,
     ) -> Result<FlowTriggerState, SetFlowTriggerError> {
         tracing::info!(
             flow_key = ?flow_key,
@@ -157,13 +155,7 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
                 flow_trigger
             }
             // New trigger
-            None => FlowTrigger::new(
-                self.time_source.now(),
-                flow_key.clone(),
-                paused,
-                Some(rule),
-                trigger_type,
-            ),
+            None => FlowTrigger::new(self.time_source.now(), flow_key.clone(), paused, Some(rule)),
         };
 
         flow_trigger
@@ -316,6 +308,29 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
         }
 
         Ok(())
+    }
+
+    /// Find all triggers by datasets
+    #[tracing::instrument(level = "info", skip_all, fields(?dataset_ids))]
+    async fn find_triggers_by_datasets(
+        &self,
+        dataset_ids: Vec<DatasetID>,
+    ) -> FlowTriggerStateStream {
+        Box::pin(async_stream::try_stream! {
+            for dataset_flow_type in DatasetFlowType::all() {
+                for dataset_id in &dataset_ids {
+                    let maybe_flow_trigger =
+                        FlowTrigger::try_load(
+                            FlowKeyDataset::new(dataset_id.clone(), *dataset_flow_type).into(), self.event_store.as_ref()
+                        )
+                        .await
+                        .int_err()?;
+                    if let Some(flow_trigger) = maybe_flow_trigger {
+                        yield flow_trigger.into();
+                    }
+                }
+            }
+        })
     }
 }
 

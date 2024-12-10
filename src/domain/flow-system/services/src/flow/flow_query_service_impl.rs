@@ -18,7 +18,6 @@ use internal_error::ResultIntoInternal;
 use kamu_core::DatasetOwnershipService;
 use kamu_flow_system::*;
 use opendatafabric::{AccountID, DatasetID};
-use time_source::SystemTimeSource;
 
 use crate::{FlowAbortHelper, FlowSchedulingHelper};
 
@@ -29,7 +28,6 @@ pub struct FlowQueryServiceImpl {
     flow_event_store: Arc<dyn FlowEventStore>,
     dataset_ownership_service: Arc<dyn DatasetOwnershipService>,
     executor_config: Arc<FlowExecutorConfig>,
-    time_source: Arc<dyn SystemTimeSource>,
 }
 
 #[component(pub)]
@@ -40,14 +38,12 @@ impl FlowQueryServiceImpl {
         flow_event_store: Arc<dyn FlowEventStore>,
         dataset_ownership_service: Arc<dyn DatasetOwnershipService>,
         executor_config: Arc<FlowExecutorConfig>,
-        time_source: Arc<dyn SystemTimeSource>,
     ) -> Self {
         Self {
             catalog,
             flow_event_store,
             dataset_ownership_service,
             executor_config,
-            time_source,
         }
     }
 }
@@ -292,16 +288,11 @@ impl FlowQueryService for FlowQueryServiceImpl {
         scheduling_helper
             .trigger_flow_common(
                 &flow_key,
-                &FlowTrigger::new(
-                    self.time_source.now(),
-                    flow_key.clone(),
-                    false,
-                    None,
-                    FlowTriggerType::Manual(FlowTriggerManual {
-                        trigger_time: activation_time,
-                        initiator_account_id,
-                    }),
-                ),
+                None,
+                FlowTriggerType::Manual(FlowTriggerManual {
+                    trigger_time: activation_time,
+                    initiator_account_id,
+                }),
                 config_snapshot_maybe,
             )
             .await

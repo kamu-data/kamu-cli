@@ -63,7 +63,6 @@ pub(crate) struct FlowHarness {
     pub dataset_repo: Arc<dyn DatasetRepository>,
     pub flow_configuration_service: Arc<dyn FlowConfigurationService>,
     pub flow_trigger_service: Arc<dyn FlowTriggerService>,
-    pub flow_configuration_event_store: Arc<dyn FlowConfigurationEventStore>,
     pub flow_trigger_event_store: Arc<dyn FlowTriggerEventStore>,
     pub flow_executor: Arc<FlowExecutorImpl>,
     pub flow_query_service: Arc<dyn FlowQueryService>,
@@ -209,9 +208,6 @@ impl FlowHarness {
         let flow_query_service = catalog.get_one::<dyn FlowQueryService>().unwrap();
         let flow_configuration_service = catalog.get_one::<dyn FlowConfigurationService>().unwrap();
         let flow_trigger_service = catalog.get_one::<dyn FlowTriggerService>().unwrap();
-        let flow_configuration_event_store = catalog
-            .get_one::<dyn FlowConfigurationEventStore>()
-            .unwrap();
         let flow_trigger_event_store = catalog.get_one::<dyn FlowTriggerEventStore>().unwrap();
         let flow_event_store = catalog.get_one::<dyn FlowEventStore>().unwrap();
         let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
@@ -224,7 +220,6 @@ impl FlowHarness {
             flow_query_service,
             flow_configuration_service,
             flow_trigger_service,
-            flow_configuration_event_store,
             flow_trigger_event_store,
             flow_event_store,
             dataset_repo,
@@ -330,7 +325,6 @@ impl FlowHarness {
         dataset_id: DatasetID,
         dataset_flow_type: DatasetFlowType,
         trigger_rule: FlowTriggerRule,
-        trigger_type: FlowTriggerType,
     ) {
         self.flow_trigger_service
             .set_trigger(
@@ -338,7 +332,6 @@ impl FlowHarness {
                 FlowKeyDataset::new(dataset_id, dataset_flow_type).into(),
                 false,
                 trigger_rule,
-                trigger_type,
             )
             .await
             .unwrap();
@@ -395,45 +388,45 @@ impl FlowHarness {
             .unwrap();
     }
 
-    // pub async fn pause_dataset_flow(
-    //     &self,
-    //     request_time: DateTime<Utc>,
-    //     dataset_id: DatasetID,
-    //     dataset_flow_type: DatasetFlowType,
-    // ) {
-    //     let flow_key: FlowKey = FlowKeyDataset::new(dataset_id,
-    // dataset_flow_type).into();     let current_config = self
-    //         .flow_configuration_service
-    //         .find_configuration(flow_key.clone())
-    //         .await
-    //         .unwrap()
-    //         .unwrap();
+    pub async fn pause_dataset_flow(
+        &self,
+        request_time: DateTime<Utc>,
+        dataset_id: DatasetID,
+        dataset_flow_type: DatasetFlowType,
+    ) {
+        let flow_key: FlowKey = FlowKeyDataset::new(dataset_id, dataset_flow_type).into();
+        let current_trigger = self
+            .flow_trigger_service
+            .find_trigger(flow_key.clone())
+            .await
+            .unwrap()
+            .unwrap();
 
-    //     self.flow_configuration_service
-    //         .set_configuration(request_time, flow_key, true, current_config.rule)
-    //         .await
-    //         .unwrap();
-    // }
+        self.flow_trigger_service
+            .set_trigger(request_time, flow_key, true, current_trigger.rule.unwrap())
+            .await
+            .unwrap();
+    }
 
-    // pub async fn resume_dataset_flow(
-    //     &self,
-    //     request_time: DateTime<Utc>,
-    //     dataset_id: DatasetID,
-    //     dataset_flow_type: DatasetFlowType,
-    // ) {
-    //     let flow_key: FlowKey = FlowKeyDataset::new(dataset_id,
-    // dataset_flow_type).into();     let current_config = self
-    //         .flow_configuration_service
-    //         .find_configuration(flow_key.clone())
-    //         .await
-    //         .unwrap()
-    //         .unwrap();
+    pub async fn resume_dataset_flow(
+        &self,
+        request_time: DateTime<Utc>,
+        dataset_id: DatasetID,
+        dataset_flow_type: DatasetFlowType,
+    ) {
+        let flow_key: FlowKey = FlowKeyDataset::new(dataset_id, dataset_flow_type).into();
+        let current_trigger = self
+            .flow_trigger_service
+            .find_trigger(flow_key.clone())
+            .await
+            .unwrap()
+            .unwrap();
 
-    //     self.flow_configuration_service
-    //         .set_configuration(request_time, flow_key, false,
-    // current_config.rule)         .await
-    //         .unwrap();
-    // }
+        self.flow_trigger_service
+            .set_trigger(request_time, flow_key, false, current_trigger.rule.unwrap())
+            .await
+            .unwrap();
+    }
 
     pub fn task_driver(&self, args: TaskDriverArgs) -> TaskDriver {
         TaskDriver::new(

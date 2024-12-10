@@ -15,7 +15,6 @@ use kamu_flow_system::{
     FlowConfigurationService,
     FlowKeyDataset,
     IngestRule,
-    ScheduleCronError,
     SetFlowConfigurationError,
 };
 use opendatafabric as odf;
@@ -71,6 +70,13 @@ impl DatasetFlowConfigsMut {
             Err(e) => return Ok(SetFlowConfigResult::FlowInvalidConfigInput(e)),
         };
 
+        if let Some(e) =
+            ensure_flow_preconditions(ctx, &self.dataset_handle, dataset_flow_type, None).await?
+        {
+            return Ok(SetFlowConfigResult::PreconditionsNotMet(e));
+        }
+        ensure_scheduling_permission(ctx, &self.dataset_handle).await?;
+
         let flow_config_service = from_catalog::<dyn FlowConfigurationService>(ctx).unwrap();
 
         let res = flow_config_service
@@ -89,50 +95,6 @@ impl DatasetFlowConfigsMut {
             config: res.into(),
         }))
     }
-
-    // #[graphql(guard = "LoggedInGuard::new()")]
-    // async fn pause_flows(
-    //     &self,
-    //     ctx: &Context<'_>,
-    //     dataset_flow_type: Option<DatasetFlowType>,
-    // ) -> Result<bool> {
-    //     ensure_scheduling_permission(ctx, &self.dataset_handle).await?;
-
-    //     let flow_config_service = from_catalog::<dyn
-    // FlowConfigurationService>(ctx).unwrap();
-
-    //     flow_config_service
-    //         .pause_dataset_flows(
-    //             Utc::now(),
-    //             &self.dataset_handle.id,
-    //             dataset_flow_type.map(Into::into),
-    //         )
-    //         .await?;
-
-    //     Ok(true)
-    // }
-
-    // #[graphql(guard = "LoggedInGuard::new()")]
-    // async fn resume_flows(
-    //     &self,
-    //     ctx: &Context<'_>,
-    //     dataset_flow_type: Option<DatasetFlowType>,
-    // ) -> Result<bool> {
-    //     ensure_scheduling_permission(ctx, &self.dataset_handle).await?;
-
-    //     let flow_config_service = from_catalog::<dyn
-    // FlowConfigurationService>(ctx).unwrap();
-
-    //     flow_config_service
-    //         .resume_dataset_flows(
-    //             Utc::now(),
-    //             &self.dataset_handle.id,
-    //             dataset_flow_type.map(Into::into),
-    //         )
-    //         .await?;
-
-    //     Ok(true)
-    // }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -172,32 +134,6 @@ impl FlowTypeIsNotSupported {
 
 #[derive(SimpleObject, Debug, Clone)]
 #[graphql(complex)]
-pub(crate) struct FlowInvalidTransformConfig {
-    reason: String,
-}
-
-#[ComplexObject]
-impl FlowInvalidTransformConfig {
-    pub async fn message(&self) -> String {
-        self.reason.clone()
-    }
-}
-
-#[derive(SimpleObject, Debug, Clone)]
-#[graphql(complex)]
-pub(crate) struct FlowInvalidCompactionConfig {
-    reason: String,
-}
-
-#[ComplexObject]
-impl FlowInvalidCompactionConfig {
-    pub async fn message(&self) -> String {
-        self.reason.clone()
-    }
-}
-
-#[derive(SimpleObject, Debug, Clone)]
-#[graphql(complex)]
 pub struct FlowInvalidConfigInputError {
     reason: String,
 }
@@ -209,33 +145,6 @@ impl FlowInvalidConfigInputError {
     }
 }
 
-impl From<ScheduleCronError> for FlowInvalidConfigInputError {
-    fn from(value: ScheduleCronError) -> Self {
-        Self {
-            reason: value.to_string(),
-        }
-    }
-}
-
-#[derive(Interface)]
-#[graphql(field(name = "message", ty = "String"))]
-enum SetFlowCompactionConfigResult {
-    Success(SetFlowConfigSuccess),
-    IncompatibleDatasetKind(FlowIncompatibleDatasetKind),
-    InvalidCompactionConfig(FlowInvalidCompactionConfig),
-    TypeIsNotSupported(FlowTypeIsNotSupported),
-}
-
-#[derive(Interface)]
-#[graphql(field(name = "message", ty = "String"))]
-enum SetFlowTransformConfigResult {
-    Success(SetFlowConfigSuccess),
-    IncompatibleDatasetKind(FlowIncompatibleDatasetKind),
-    InvalidTransformConfig(FlowInvalidTransformConfig),
-    PreconditionsNotMet(FlowPreconditionsNotMet),
-    TypeIsNotSupported(FlowTypeIsNotSupported),
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl TryFrom<FlowConfigurationInput> for FlowConfigurationRule {
@@ -244,7 +153,7 @@ impl TryFrom<FlowConfigurationInput> for FlowConfigurationRule {
     fn try_from(value: FlowConfigurationInput) -> std::result::Result<Self, Self::Error> {
         match value {
             FlowConfigurationInput::Ingest(ingest_input) => {
-                let ingest_rule: IngestRule = ingest_input.try_into()?;
+                let ingest_rule: IngestRule = ingest_input.into();
                 Ok(Self::IngestRule(ingest_rule))
             }
             FlowConfigurationInput::Compaction(compaction_input) => match compaction_input {

@@ -16,14 +16,14 @@ use crate::queries::{Account, Dataset};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Union)]
-pub(crate) enum FlowTrigger {
+pub(crate) enum FlowTriggerType {
     Manual(FlowTriggerManual),
     AutoPolling(FlowTriggerAutoPolling),
     Push(FlowTriggerPush),
     InputDatasetFlow(FlowTriggerInputDatasetFlow),
 }
 
-impl FlowTrigger {
+impl FlowTriggerType {
     pub async fn build(
         trigger: &fs::FlowTriggerType,
         ctx: &Context<'_>,

@@ -81,7 +81,7 @@ impl<T: FlowConfigurationService + ?Sized> FlowConfigurationServiceExt for T {
         let maybe_config = self
             .find_configuration(FlowKey::dataset(dataset_id, flow_type))
             .await?;
-        Ok(maybe_config.and_then(|config| config.try_get_ingest_rule()))
+        Ok(maybe_config.and_then(FlowConfigurationState::try_get_ingest_rule))
     }
 
     async fn try_get_dataset_compaction_rule(
@@ -92,7 +92,7 @@ impl<T: FlowConfigurationService + ?Sized> FlowConfigurationServiceExt for T {
         let maybe_config = self
             .find_configuration(FlowKey::dataset(dataset_id, flow_type))
             .await?;
-        Ok(maybe_config.and_then(|config| config.try_get_compaction_rule()))
+        Ok(maybe_config.and_then(FlowConfigurationState::try_get_compaction_rule))
     }
 
     async fn try_get_dataset_reset_rule(
@@ -103,7 +103,7 @@ impl<T: FlowConfigurationService + ?Sized> FlowConfigurationServiceExt for T {
         let maybe_config = self
             .find_configuration(FlowKey::dataset(dataset_id, flow_type))
             .await?;
-        Ok(maybe_config.and_then(|config| config.try_get_reset_rule()))
+        Ok(maybe_config.and_then(FlowConfigurationState::try_get_reset_rule))
     }
 
     async fn try_get_config_snapshot_by_key(

@@ -32,7 +32,6 @@ pub trait FlowTriggerService: Sync + Send {
         flow_key: FlowKey,
         paused: bool,
         rule: FlowTriggerRule,
-        trigger_type: FlowTriggerType,
     ) -> Result<FlowTriggerState, SetFlowTriggerError>;
 
     /// Lists all flow configurations, which are currently enabled
@@ -86,6 +85,12 @@ pub trait FlowTriggerService: Sync + Send {
         request_time: DateTime<Utc>,
         maybe_system_flow_type: Option<SystemFlowType>,
     ) -> Result<(), InternalError>;
+
+    /// Find all triggers by dataset ids
+    async fn find_triggers_by_datasets(
+        &self,
+        dataset_ids: Vec<DatasetID>,
+    ) -> FlowTriggerStateStream;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -101,7 +106,7 @@ pub trait FlowTriggerServiceExt {
         &self,
         dataset_id: DatasetID,
         flow_type: DatasetFlowType,
-    ) -> Result<Option<TransformRule>, FindFlowTriggerError>;
+    ) -> Result<Option<BatchingRule>, FindFlowTriggerError>;
 }
 
 #[async_trait::async_trait]
@@ -126,7 +131,7 @@ impl<T: FlowTriggerService + ?Sized> FlowTriggerServiceExt for T {
         &self,
         dataset_id: DatasetID,
         flow_type: DatasetFlowType,
-    ) -> Result<Option<TransformRule>, FindFlowTriggerError> {
+    ) -> Result<Option<BatchingRule>, FindFlowTriggerError> {
         let maybe_trigger = self
             .find_trigger(FlowKey::dataset(dataset_id, flow_type))
             .await?;

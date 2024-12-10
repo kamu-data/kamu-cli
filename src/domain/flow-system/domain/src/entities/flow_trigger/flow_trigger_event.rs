@@ -30,7 +30,6 @@ pub struct FlowTriggerEventCreated {
     pub flow_key: FlowKey,
     pub paused: bool,
     pub rule: Option<FlowTriggerRule>,
-    pub trigger_type: FlowTriggerType,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -41,7 +40,6 @@ pub struct FlowTriggerEventModified {
     pub flow_key: FlowKey,
     pub paused: bool,
     pub rule: Option<FlowTriggerRule>,
-    pub trigger_type: FlowTriggerType,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -12,7 +12,13 @@ use kamu_core::{DatasetChangesService, DatasetRegistry, DatasetRegistryExt, Poll
 use kamu_flow_system::FlowResultDatasetUpdate;
 use {kamu_flow_system as fs, opendatafabric as odf};
 
-use super::{FlowConfigurationSnapshot, FlowEvent, FlowOutcome, FlowStartCondition, FlowTrigger};
+use super::{
+    FlowConfigurationSnapshot,
+    FlowEvent,
+    FlowOutcome,
+    FlowStartCondition,
+    FlowTriggerType,
+};
 use crate::prelude::*;
 use crate::queries::{Account, Task};
 use crate::utils;
@@ -196,8 +202,8 @@ impl Flow {
     }
 
     /// Primary flow trigger
-    async fn primary_trigger(&self, ctx: &Context<'_>) -> Result<FlowTrigger, InternalError> {
-        FlowTrigger::build(self.flow_state.primary_trigger(), ctx).await
+    async fn primary_trigger(&self, ctx: &Context<'_>) -> Result<FlowTriggerType, InternalError> {
+        FlowTriggerType::build(self.flow_state.primary_trigger(), ctx).await
     }
 
     /// Start condition

@@ -9,15 +9,14 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::{Schedule, TransformRule};
+use crate::{BatchingRule, Schedule};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum FlowTriggerRule {
     Schedule(Schedule),
-    // ToDo#Separate rename to batching
-    Batching(TransformRule),
+    Batching(BatchingRule),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

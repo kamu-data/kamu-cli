@@ -62,13 +62,20 @@ use kamu_flow_system::{
     FlowExecutorConfig,
     FlowExecutorTestDriver,
     FlowID,
-    FlowTrigger,
     FlowTriggerAutoPolling,
     FlowTriggerType,
+    FlowTriggerUpdatedMessage,
     METADATA_TASK_FLOW_ID,
 };
-use kamu_flow_system_inmem::{InMemoryFlowConfigurationEventStore, InMemoryFlowEventStore};
-use kamu_flow_system_services::MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE;
+use kamu_flow_system_inmem::{
+    InMemoryFlowConfigurationEventStore,
+    InMemoryFlowEventStore,
+    InMemoryFlowTriggerEventStore,
+};
+use kamu_flow_system_services::{
+    MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE,
+    MESSAGE_PRODUCER_KAMU_FLOW_TRIGGER_SERVICE,
+};
 use kamu_task_system::{self as ts, TaskMetadata};
 use kamu_task_system_inmem::InMemoryTaskEventStore;
 use kamu_task_system_services::TaskSchedulerImpl;
@@ -3195,6 +3202,7 @@ impl FlowRunsHarness {
             .add_value(dependency_graph_mock)
             .bind::<dyn DependencyGraphRepository, MockDependencyGraphRepository>()
             .add::<InMemoryFlowConfigurationEventStore>()
+            .add::<InMemoryFlowTriggerEventStore>()
             .add::<InMemoryFlowEventStore>()
             .add_value(FlowExecutorConfig::new(
                 Duration::seconds(1),
@@ -3227,6 +3235,10 @@ impl FlowRunsHarness {
             register_message_dispatcher::<FlowConfigurationUpdatedMessage>(
                 &mut b,
                 MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE,
+            );
+            register_message_dispatcher::<FlowTriggerUpdatedMessage>(
+                &mut b,
+                MESSAGE_PRODUCER_KAMU_FLOW_TRIGGER_SERVICE,
             );
 
             b.build()
@@ -3315,7 +3327,7 @@ impl FlowRunsHarness {
             .unwrap()
     }
 
-    async fn mimic_flow_secondary_trigger(&self, flow_id: &str, flow_trigger: FlowTrigger) {
+    async fn mimic_flow_secondary_trigger(&self, flow_id: &str, flow_trigger: FlowTriggerType) {
         let flow_event_store = self
             .catalog_authorized
             .get_one::<dyn FlowEventStore>()
@@ -3525,7 +3537,7 @@ impl FlowRunsHarness {
                                             __typename
                                             ... on FlowStartConditionBatching {
                                                 accumulatedRecordsCount
-                                                activeTransformRule {
+                                                activeBatchingRule {
                                                     __typename
                                                     minRecordsToAwait
                                                     maxBatchingInterval {
@@ -3545,23 +3557,8 @@ impl FlowRunsHarness {
                                             }
                                         }
                                         configSnapshot {
-                                            ... on FlowConfigurationTransform {
-                                                maxBatchingInterval {
-                                                    every
-                                                    unit
-                                                }
-                                                minRecordsToAwait
-                                                __typename
-                                            }
                                             ... on FlowConfigurationIngest {
                                                 fetchUncacheable
-                                                schedule {
-                                                    ... on TimeDelta {
-                                                        every
-                                                        unit
-                                                    }
-                                                    __typename
-                                                }
                                                 __typename
                                             }
                                             ... on FlowConfigurationReset {
