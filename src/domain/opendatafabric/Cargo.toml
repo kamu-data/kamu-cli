@@ -28,6 +28,7 @@ sqlx = ["dep:sqlx"]
 sqlx-mysql = ["sqlx", "sqlx/mysql"]
 sqlx-postgres = ["sqlx", "sqlx/postgres"]
 sqlx-sqlite = ["sqlx", "sqlx/sqlite"]
+utoipa = ["multiformats/utoipa", "dep:utoipa", "dep:serde_json"]
 
 
 [dependencies]
@@ -38,7 +39,7 @@ multiformats = { workspace = true }
 chrono = { version = "0.4", features = ["serde"] }
 digest = "0.10"
 futures-core = "0.3"
-thiserror = { version = "1", default-features = false }
+thiserror = { version = "2", default-features = false, features = ["std"] }
 bitflags = { version = "2", default-features = false }
 
 
@@ -72,6 +73,10 @@ arrow = { optional = true, version = "53", default-features = false, features = 
     "ipc",
 ] }
 sqlx = { optional = true, version = "0.8", default-features = false }
+utoipa = { optional = true, version = "5", default-features = false, features = [
+] }
+serde_json = { optional = true, version = "1", default-features = false }
+
 
 [dev-dependencies]
 indoc = "2"

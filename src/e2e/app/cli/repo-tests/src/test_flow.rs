@@ -141,7 +141,7 @@ pub async fn test_gql_dataset_all_flows_paused(mut kamu_api_server_client: KamuA
                       "flows": {
                         "__typename": "DatasetFlows",
                         "triggers": {
-                          "__typename": "DatasetFlowConfigs",
+                          "__typename": "DatasetFlowTriggers",
                           "allPaused": true
                         }
                       }

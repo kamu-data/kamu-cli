@@ -24,6 +24,7 @@ pub struct VerifyRequest {
 
     /// Information about processing performed by other nodes as part of the
     /// original operation
+    #[schema(example = json!([]))]
     pub sub_queries: Vec<query::SubQuery>,
 
     /// Commitment created by the original operation
@@ -43,6 +44,7 @@ pub struct VerifyResponse {
 
     /// Will contain error details if validation was unsuccessful
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = ValidationError)]
     pub error: Option<ValidationError>,
 }
 
@@ -144,10 +146,8 @@ pub enum VerificationFailed {
 pub struct OutputMismatch {
     pub message: String,
 
-    #[schema(value_type = String)]
     pub expected_hash: odf::Multihash,
 
-    #[schema(value_type = String)]
     pub actual_hash: odf::Multihash,
 }
 
@@ -171,7 +171,6 @@ impl OutputMismatch {
 pub struct DatasetNotFound {
     pub message: String,
 
-    #[schema(value_type = String)]
     pub dataset_id: odf::DatasetID,
 }
 
@@ -192,10 +191,8 @@ impl DatasetNotFound {
 pub struct DatasetBlockNotFound {
     pub message: String,
 
-    #[schema(value_type = String)]
     pub dataset_id: odf::DatasetID,
 
-    #[schema(value_type = String)]
     pub block_hash: odf::Multihash,
 }
 

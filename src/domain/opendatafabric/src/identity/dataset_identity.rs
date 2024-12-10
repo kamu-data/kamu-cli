@@ -495,3 +495,43 @@ impl_parse_error!(DatasetAliasRemote);
 impl_parse_error!(DatasetAliasPattern);
 
 impl_serde!(DatasetAliasRemote, DatasetAliasRemoteSerdeVisitor);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(feature = "utoipa")]
+impl utoipa::ToSchema for DatasetName {}
+
+#[cfg(feature = "utoipa")]
+impl utoipa::PartialSchema for DatasetName {
+    fn schema() -> utoipa::openapi::RefOr<utoipa::openapi::schema::Schema> {
+        use utoipa::openapi::schema::*;
+
+        Schema::Object(
+            ObjectBuilder::new()
+                .schema_type(SchemaType::Type(Type::String))
+                .examples([serde_json::json!("my-dataset")])
+                .build(),
+        )
+        .into()
+    }
+}
+
+#[cfg(feature = "utoipa")]
+impl utoipa::ToSchema for AccountName {}
+
+#[cfg(feature = "utoipa")]
+impl utoipa::PartialSchema for AccountName {
+    fn schema() -> utoipa::openapi::RefOr<utoipa::openapi::schema::Schema> {
+        use utoipa::openapi::schema::*;
+
+        Schema::Object(
+            ObjectBuilder::new()
+                .schema_type(SchemaType::Type(Type::String))
+                .examples([serde_json::json!("my-account")])
+                .build(),
+        )
+        .into()
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -6068,9 +6068,7 @@ async fn test_respect_last_success_time_when_activate_configuration() {
             harness.now_datetime(),
             bar_id.clone(),
             DatasetFlowType::ExecuteTransform,
-            FlowTriggerRule::Batching(
-                BatchingRule::new_checked(1, Duration::seconds(10)).unwrap(),
-            ),
+            FlowTriggerRule::Batching(BatchingRule::new_checked(1, Duration::seconds(10)).unwrap()),
         )
         .await;
 

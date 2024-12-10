@@ -18,7 +18,6 @@ use indoc::indoc;
 use kamu::testing::{
     MetadataFactory,
     MockDatasetChangesService,
-    MockDependencyGraphRepository,
     MockPollingIngestService,
     MockTransformRequestPlanner,
 };
@@ -28,7 +27,6 @@ use kamu::{
     DatasetRegistryRepoBridge,
     DatasetRepositoryLocalFs,
     DatasetRepositoryWriter,
-    DependencyGraphServiceInMemory,
 };
 use kamu_accounts::{
     CurrentAccountSubject,
@@ -48,13 +46,14 @@ use kamu_core::{
     DatasetIntervalIncrement,
     DatasetLifecycleMessage,
     DatasetRepository,
-    DependencyGraphRepository,
     PollingIngestService,
     PullResult,
     TenancyConfig,
     TransformRequestPlanner,
     MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
 };
+use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
+use kamu_datasets_services::DependencyGraphServiceImpl;
 use kamu_flow_system::{
     Flow,
     FlowConfigurationUpdatedMessage,
@@ -90,7 +89,6 @@ use crate::utils::{authentication_catalogs, expect_anonymous_access_error};
 #[test_log::test(tokio::test)]
 async fn test_trigger_ingest_root_dataset() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
-        dependency_graph_mock: Some(MockDependencyGraphRepository::no_dependencies()),
         dataset_changes_mock: Some(MockDatasetChangesService::with_increment_between(
             DatasetIntervalIncrement {
                 num_blocks: 1,
@@ -445,7 +443,6 @@ async fn test_trigger_ingest_root_dataset() {
 #[test_log::test(tokio::test)]
 async fn test_trigger_reset_root_dataset_flow() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
-        dependency_graph_mock: Some(MockDependencyGraphRepository::no_dependencies()),
         dataset_changes_mock: Some(MockDatasetChangesService::default()),
         transform_planner_mock: Some(MockTransformRequestPlanner::with_set_transform()),
         polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
@@ -609,7 +606,6 @@ async fn test_trigger_reset_root_dataset_flow() {
 #[test_log::test(tokio::test)]
 async fn test_trigger_reset_root_dataset_flow_with_invalid_head() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
-        dependency_graph_mock: Some(MockDependencyGraphRepository::no_dependencies()),
         dataset_changes_mock: Some(MockDatasetChangesService::default()),
         transform_planner_mock: Some(MockTransformRequestPlanner::with_set_transform()),
         polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
@@ -705,7 +701,6 @@ async fn test_trigger_reset_root_dataset_flow_with_invalid_head() {
 #[test_log::test(tokio::test)]
 async fn test_trigger_execute_transform_derived_dataset() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
-        dependency_graph_mock: Some(MockDependencyGraphRepository::no_dependencies()),
         dataset_changes_mock: Some(MockDatasetChangesService::with_increment_between(
             DatasetIntervalIncrement {
                 num_blocks: 1,
@@ -926,7 +921,6 @@ async fn test_trigger_execute_transform_derived_dataset() {
 #[test_log::test(tokio::test)]
 async fn test_trigger_compaction_root_dataset() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
-        dependency_graph_mock: Some(MockDependencyGraphRepository::no_dependencies()),
         dataset_changes_mock: Some(MockDatasetChangesService::with_increment_between(
             DatasetIntervalIncrement {
                 num_blocks: 1,
@@ -1285,7 +1279,6 @@ async fn test_trigger_compaction_root_dataset() {
 #[test_log::test(tokio::test)]
 async fn test_list_flows_with_filters_and_pagination() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
-        dependency_graph_mock: None,
         dataset_changes_mock: None,
         transform_planner_mock: Some(MockTransformRequestPlanner::with_set_transform()),
         polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
@@ -1690,7 +1683,6 @@ async fn test_list_flows_with_filters_and_pagination() {
 #[test_log::test(tokio::test)]
 async fn test_list_flow_initiators() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
-        dependency_graph_mock: None,
         dataset_changes_mock: None,
         transform_planner_mock: Some(MockTransformRequestPlanner::with_set_transform()),
         polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
@@ -1783,7 +1775,6 @@ async fn test_list_flow_initiators() {
 #[test_log::test(tokio::test)]
 async fn test_conditions_not_met_for_flows() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
-        dependency_graph_mock: None,
         dataset_changes_mock: None,
         transform_planner_mock: Some(MockTransformRequestPlanner::without_set_transform()),
         polling_service_mock: Some(MockPollingIngestService::without_active_polling_source()),
@@ -1866,7 +1857,6 @@ async fn test_conditions_not_met_for_flows() {
 #[test_log::test(tokio::test)]
 async fn test_incorrect_dataset_kinds_for_flow_type() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
-        dependency_graph_mock: None,
         dataset_changes_mock: None,
         transform_planner_mock: Some(MockTransformRequestPlanner::with_set_transform()),
         polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
@@ -1983,7 +1973,6 @@ async fn test_incorrect_dataset_kinds_for_flow_type() {
 #[test_log::test(tokio::test)]
 async fn test_cancel_ingest_root_dataset() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
-        dependency_graph_mock: None,
         dataset_changes_mock: None,
         transform_planner_mock: Some(MockTransformRequestPlanner::with_set_transform()),
         polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
@@ -2055,7 +2044,6 @@ async fn test_cancel_ingest_root_dataset() {
 #[test_log::test(tokio::test)]
 async fn test_cancel_running_transform_derived_dataset() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
-        dependency_graph_mock: None,
         dataset_changes_mock: None,
         transform_planner_mock: Some(MockTransformRequestPlanner::with_set_transform()),
         polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
@@ -2132,7 +2120,6 @@ async fn test_cancel_running_transform_derived_dataset() {
 #[test_log::test(tokio::test)]
 async fn test_cancel_hard_compaction_root_dataset() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
-        dependency_graph_mock: None,
         dataset_changes_mock: None,
         transform_planner_mock: Some(MockTransformRequestPlanner::with_set_transform()),
         polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
@@ -2204,7 +2191,6 @@ async fn test_cancel_hard_compaction_root_dataset() {
 #[test_log::test(tokio::test)]
 async fn test_cancel_wrong_flow_id_fails() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
-        dependency_graph_mock: None,
         dataset_changes_mock: None,
         transform_planner_mock: Some(MockTransformRequestPlanner::with_set_transform()),
         polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
@@ -2248,7 +2234,6 @@ async fn test_cancel_wrong_flow_id_fails() {
 #[test_log::test(tokio::test)]
 async fn test_cancel_foreign_flow_fails() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
-        dependency_graph_mock: None,
         dataset_changes_mock: None,
         transform_planner_mock: Some(MockTransformRequestPlanner::with_set_transform()),
         polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
@@ -2309,7 +2294,6 @@ async fn test_cancel_foreign_flow_fails() {
 #[test_log::test(tokio::test)]
 async fn test_cancel_waiting_flow() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
-        dependency_graph_mock: None,
         dataset_changes_mock: None,
         transform_planner_mock: Some(MockTransformRequestPlanner::with_set_transform()),
         polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
@@ -2379,7 +2363,6 @@ async fn test_cancel_waiting_flow() {
 #[test_log::test(tokio::test)]
 async fn test_cancel_already_aborted_flow() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
-        dependency_graph_mock: None,
         dataset_changes_mock: None,
         transform_planner_mock: Some(MockTransformRequestPlanner::with_set_transform()),
         polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
@@ -2464,7 +2447,6 @@ async fn test_cancel_already_aborted_flow() {
 #[test_log::test(tokio::test)]
 async fn test_cancel_already_succeeded_flow() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
-        dependency_graph_mock: Some(MockDependencyGraphRepository::no_dependencies()),
         dataset_changes_mock: None,
         transform_planner_mock: Some(MockTransformRequestPlanner::with_set_transform()),
         polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
@@ -2544,7 +2526,6 @@ async fn test_cancel_already_succeeded_flow() {
 #[test_log::test(tokio::test)]
 async fn test_history_of_completed_flow() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
-        dependency_graph_mock: Some(MockDependencyGraphRepository::no_dependencies()),
         dataset_changes_mock: None,
         transform_planner_mock: Some(MockTransformRequestPlanner::with_set_transform()),
         polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
@@ -2680,7 +2661,6 @@ async fn test_history_of_completed_flow() {
 #[test_log::test(tokio::test)]
 async fn test_execute_transfrom_flow_error_after_compaction() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
-        dependency_graph_mock: Some(MockDependencyGraphRepository::no_dependencies()),
         dataset_changes_mock: Some(MockDatasetChangesService::with_increment_between(
             DatasetIntervalIncrement {
                 num_blocks: 1,
@@ -2986,7 +2966,6 @@ async fn test_execute_transfrom_flow_error_after_compaction() {
 #[test_log::test(tokio::test)]
 async fn test_anonymous_operation_fails() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
-        dependency_graph_mock: None,
         dataset_changes_mock: None,
         transform_planner_mock: Some(MockTransformRequestPlanner::with_set_transform()),
         polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
@@ -3026,7 +3005,6 @@ async fn test_anonymous_operation_fails() {
 #[test_log::test(tokio::test)]
 async fn test_config_snapshot_returned_correctly() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
-        dependency_graph_mock: Some(MockDependencyGraphRepository::no_dependencies()),
         dataset_changes_mock: Some(MockDatasetChangesService::with_increment_between(
             DatasetIntervalIncrement {
                 num_blocks: 1,
@@ -3163,7 +3141,6 @@ struct FlowRunsHarness {
 
 #[derive(Default)]
 struct FlowRunsHarnessOverrides {
-    dependency_graph_mock: Option<MockDependencyGraphRepository>,
     dataset_changes_mock: Option<MockDatasetChangesService>,
     transform_planner_mock: Option<MockTransformRequestPlanner>,
     polling_service_mock: Option<MockPollingIngestService>,
@@ -3176,7 +3153,6 @@ impl FlowRunsHarness {
         std::fs::create_dir(&datasets_dir).unwrap();
 
         let dataset_changes_mock = overrides.dataset_changes_mock.unwrap_or_default();
-        let dependency_graph_mock = overrides.dependency_graph_mock.unwrap_or_default();
         let transform_planner_mock = overrides.transform_planner_mock.unwrap_or_default();
         let polling_service_mock = overrides.polling_service_mock.unwrap_or_default();
 
@@ -3198,9 +3174,8 @@ impl FlowRunsHarness {
             .bind::<dyn DatasetChangesService, MockDatasetChangesService>()
             .add::<SystemTimeSourceDefault>()
             .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
-            .add::<DependencyGraphServiceInMemory>()
-            .add_value(dependency_graph_mock)
-            .bind::<dyn DependencyGraphRepository, MockDependencyGraphRepository>()
+            .add::<DependencyGraphServiceImpl>()
+            .add::<InMemoryDatasetDependencyRepository>()
             .add::<InMemoryFlowConfigurationEventStore>()
             .add::<InMemoryFlowTriggerEventStore>()
             .add::<InMemoryFlowEventStore>()

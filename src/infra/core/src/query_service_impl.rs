@@ -68,11 +68,16 @@ impl QueryServiceImpl {
         // options in transform DTOs)
         cfg.options_mut().sql_parser.enable_ident_normalization = false;
 
+        // TODO: Disabling Utf8View types due to unresolved issues
+        // See: https://github.com/apache/datafusion/issues/13510
+        // See: https://github.com/apache/datafusion/issues/13504
+        cfg.options_mut().execution.parquet.schema_force_view_types = false;
+
         let runtime_config = RuntimeConfig {
             object_store_registry: self.object_store_registry.clone().as_datafusion_registry(),
             ..RuntimeConfig::default()
         };
-        let runtime = Arc::new(RuntimeEnv::new(runtime_config).unwrap());
+        let runtime = Arc::new(RuntimeEnv::try_new(runtime_config).unwrap());
         let session_context = SessionContext::new_with_config_rt(cfg, runtime);
 
         let schema = KamuSchema::prepare(

@@ -14,12 +14,11 @@ use kamu::domain::*;
 use opendatafabric::*;
 
 use super::{BatchError, CLIError, Command};
-use crate::{Interact, OutputConfig};
+use crate::{ConfirmDeleteService, OutputConfig};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct AddCommand {
-    interact: Arc<Interact>,
     resource_loader: Arc<dyn ResourceLoader>,
     dataset_registry: Arc<dyn DatasetRegistry>,
     create_dataset_from_snapshot: Arc<dyn CreateDatasetFromSnapshotUseCase>,
@@ -32,11 +31,11 @@ pub struct AddCommand {
     dataset_visibility: DatasetVisibility,
     output_config: Arc<OutputConfig>,
     tenancy_config: TenancyConfig,
+    confirm_delete_service: Arc<ConfirmDeleteService>,
 }
 
 impl AddCommand {
     pub fn new<I, S>(
-        interact: Arc<Interact>,
         resource_loader: Arc<dyn ResourceLoader>,
         dataset_registry: Arc<dyn DatasetRegistry>,
         create_dataset_from_snapshot: Arc<dyn CreateDatasetFromSnapshotUseCase>,
@@ -49,13 +48,13 @@ impl AddCommand {
         dataset_visibility: DatasetVisibility,
         output_config: Arc<OutputConfig>,
         tenancy_config: TenancyConfig,
+        confirm_delete_service: Arc<ConfirmDeleteService>,
     ) -> Self
     where
         I: IntoIterator<Item = S>,
         S: Into<String>,
     {
         Self {
-            interact,
             resource_loader,
             dataset_registry,
             create_dataset_from_snapshot,
@@ -68,6 +67,7 @@ impl AddCommand {
             dataset_visibility,
             output_config,
             tenancy_config,
+            confirm_delete_service,
         }
     }
 
@@ -288,12 +288,9 @@ impl Command for AddCommand {
             }
 
             if !already_exist.is_empty() {
-                self.interact.require_confirmation(format!(
-                    "{}\n  {}\n{}",
-                    console::style("You are about to delete following dataset(s):").yellow(),
-                    itertools::join(already_exist.iter().map(|h| &h.alias), "\n  "),
-                    console::style("This operation is irreversible!").yellow(),
-                ))?;
+                self.confirm_delete_service
+                    .confirm_delete(&already_exist)
+                    .await?;
 
                 // TODO: Private Datasets: delete permissions should be checked in multi-tenant
                 //                         scenario

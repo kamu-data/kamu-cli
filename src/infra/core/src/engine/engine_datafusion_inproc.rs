@@ -61,6 +61,7 @@ impl EngineDatafusionInproc {
             input: Arc::new(logical_plan),
             or_replace: false,
             definition: Some(query.to_string()),
+            temporary: false,
         }));
 
         ctx.execute_logical_plan(create_view).await.int_err()?;

@@ -7,27 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::pin::Pin;
-
-use futures::Stream;
-use internal_error::InternalError;
 use opendatafabric::DatasetID;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[async_trait::async_trait]
-pub trait DependencyGraphRepository: Sync + Send {
-    fn list_dependencies_of_all_datasets(&self) -> DatasetDependenciesIDStream;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub struct DatasetDependencies {
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub struct DatasetDependencyEntryRowModel {
     pub downstream_dataset_id: DatasetID,
-    pub upstream_dataset_ids: Vec<DatasetID>,
+    pub upstream_dataset_id: DatasetID,
 }
-
-pub type DatasetDependenciesIDStream<'a> =
-    Pin<Box<dyn Stream<Item = Result<DatasetDependencies, InternalError>> + Send + 'a>>;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

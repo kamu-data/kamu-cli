@@ -11,6 +11,7 @@ use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
 use chrono::{DateTime, TimeZone, Utc};
+use kamu::testing::BaseRepoHarness;
 use kamu::{RemoteAliasesRegistryImpl, WatermarkServiceImpl};
 use kamu_core::{
     ResolvedDataset,
@@ -20,8 +21,6 @@ use kamu_core::{
     WatermarkService,
 };
 use opendatafabric::{DatasetAlias, DatasetName};
-
-use crate::BaseRepoHarness;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

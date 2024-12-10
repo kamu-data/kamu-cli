@@ -14,11 +14,9 @@ use datafusion::arrow::array::{Array, Int32Array, StringArray};
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use datafusion::arrow::record_batch::RecordBatch;
 use kamu::domain::*;
-use kamu::testing::{MetadataFactory, ParquetWriterHelper};
+use kamu::testing::{BaseRepoHarness, MetadataFactory, ParquetWriterHelper};
 use kamu::*;
 use opendatafabric::*;
-
-use crate::BaseRepoHarness;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

@@ -20,7 +20,7 @@ kamu_cli_execute_command_e2e_test!(
 
 kamu_cli_execute_command_e2e_test!(
     storage = inmem,
-    fixture = kamu_cli_e2e_repo_tests::commands::test_delete_dataset_recursive
+    fixture = kamu_cli_e2e_repo_tests::commands::test_delete_dataset_recursive,
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -28,6 +28,24 @@ kamu_cli_execute_command_e2e_test!(
 kamu_cli_execute_command_e2e_test!(
     storage = inmem,
     fixture = kamu_cli_e2e_repo_tests::commands::test_delete_dataset_all
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_run_api_server_e2e_test!(
+    storage = inmem,
+    fixture = kamu_cli_e2e_repo_tests::commands::test_delete_warning
+    options = Options::default()
+        .with_multi_tenant()
+        .with_today_as_frozen_system_time(),
+    extra_test_groups = "engine, ingest, datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_execute_command_e2e_test!(
+    storage = inmem,
+    fixture = kamu_cli_e2e_repo_tests::commands::test_delete_args_validation
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

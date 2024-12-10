@@ -74,10 +74,10 @@ mod tests {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct QueryRequest {
     /// Query string
+    #[schema(example = "select event_time, from, to, close from \"kamu/eth-to-usd\"")]
     pub query: String,
 
     /// Dialect of the query
-    #[schema(value_type = String)]
     #[serde(default = "QueryRequest::default_query_dialect")]
     pub query_dialect: domain::QueryDialect,
 
@@ -91,6 +91,7 @@ pub struct QueryRequest {
 
     /// What representation to use for the schema
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = SchemaFormat)]
     pub schema_format: Option<SchemaFormat>,
 
     /// Optional information used to affix an alias to the specific
@@ -100,10 +101,12 @@ pub struct QueryRequest {
 
     /// Pagination: skips first N records
     #[serde(default)]
+    #[schema(maximum = 100_000_000)]
     pub skip: u64,
 
     /// Pagination: limits number of records in response to N
     #[serde(default = "QueryRequest::default_limit")]
+    #[schema(maximum = 100_000_000)]
     pub limit: u64,
 }
 
@@ -207,8 +210,10 @@ pub enum Include {
 
 #[derive(Debug, serde::Deserialize, utoipa::IntoParams)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[into_params(parameter_in = Query)]
 pub struct QueryParams {
     /// Query to execute (e.g. SQL)
+    #[param(example = "select 1")]
     pub query: String,
 
     /// Dialect of the query
@@ -230,7 +235,9 @@ pub struct QueryParams {
     #[serde(default)]
     pub data_format: DataFormat,
 
+    // TODO: Remove `value_type` annotation once https://github.com/juhaku/utoipa/issues/1215 is fixed
     /// How to encode the schema of the result
+    #[param(value_type = SchemaFormat)]
     pub schema_format: Option<SchemaFormat>,
 
     /// What information to include in the response
@@ -262,6 +269,7 @@ impl From<QueryParams> for QueryRequest {
 pub struct QueryResponse {
     /// Inputs that can be used to fully reproduce the query
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = QueryRequest)]
     pub input: Option<QueryRequest>,
 
     /// Query results
@@ -270,14 +278,17 @@ pub struct QueryResponse {
     /// Information about processing performed by other nodes as part of this
     /// operation
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(example = json!([]))]
     pub sub_queries: Option<Vec<SubQuery>>,
 
     /// Succinct commitment
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Commitment)]
     pub commitment: Option<Commitment>,
 
     /// Signature block
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Proof)]
     pub proof: Option<Proof>,
 }
 
@@ -310,6 +321,10 @@ pub struct SubQuery {
 #[serde(rename_all = "camelCase")]
 pub struct Outputs {
     /// Resulting data
+    #[schema(example = json!([
+        {"event_time": "2024-09-02T21:50:00Z", "from": "eth", "to": "usd", "close": 2537.07},
+        {"event_time": "2024-09-02T21:51:00Z", "from": "eth", "to": "usd", "close": 2541.37},
+    ]))]
     pub data: serde_json::Value,
 
     /// How data is laid out in the response
@@ -317,10 +332,12 @@ pub struct Outputs {
 
     /// Schema of the resulting data
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Schema)]
     pub schema: Option<Schema>,
 
     /// What representation is used for the schema
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = SchemaFormat)]
     pub schema_format: Option<SchemaFormat>,
 }
 
@@ -328,15 +345,12 @@ pub struct Outputs {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Commitment {
     /// Hash of the "input" object in the [multihash](https://multiformats.io/multihash/) format
-    #[schema(value_type = String)]
     pub input_hash: odf::Multihash,
 
     /// Hash of the "output" object in the [multihash](https://multiformats.io/multihash/) format
-    #[schema(value_type = String)]
     pub output_hash: odf::Multihash,
 
     /// Hash of the "subQueries" object in the [multihash](https://multiformats.io/multihash/) format
-    #[schema(value_type = String)]
     pub sub_queries_hash: odf::Multihash,
 }
 
@@ -347,11 +361,9 @@ pub struct Proof {
     pub r#type: ProofType,
 
     /// DID (public key) of the node performing the computation
-    #[schema(value_type = String)]
     pub verification_method: odf::DidKey,
 
     /// Signature: `multibase(sign(canonicalize(commitment)))`
-    #[schema(value_type = String)]
     pub proof_value: odf::Signature,
 }
 
@@ -370,16 +382,16 @@ pub enum ProofType {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct DatasetState {
     /// Globally unique identity of the dataset
-    #[schema(value_type = String)]
     pub id: odf::DatasetID,
 
     /// Alias to be used in the query
+    #[schema(example = json!("kamu/eth-to-usd"))]
     pub alias: String,
 
     /// Last block hash of the input datasets that was or should be considered
     /// during the query planning
     #[serde(skip_serializing_if = "Option::is_none")]
-    #[schema(value_type = String)]
+    #[schema(value_type = odf::Multihash)]
     pub block_hash: Option<odf::Multihash>,
 }
 
@@ -473,9 +485,8 @@ pub enum SchemaFormat {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, serde::Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, serde::Deserialize)]
 pub struct Schema {
-    #[schema(value_type = Object)]
     schema: datafusion::arrow::datatypes::SchemaRef,
     format: SchemaFormat,
 }
@@ -517,6 +528,13 @@ impl serde::Serialize for Schema {
                 serializer.collect_str(&std::str::from_utf8(&buf).unwrap())
             }
         }
+    }
+}
+
+impl utoipa::ToSchema for Schema {}
+impl utoipa::PartialSchema for Schema {
+    fn schema() -> utoipa::openapi::RefOr<utoipa::openapi::schema::Schema> {
+        utoipa::openapi::Schema::default().into()
     }
 }
 

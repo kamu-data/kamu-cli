@@ -99,3 +99,27 @@ pub enum SignatureDecodeError {
     #[error("Invalid signature length, expected {expected} actual {actual}")]
     InvalidLength { actual: usize, expected: usize },
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(feature = "utoipa")]
+impl utoipa::ToSchema for Signature {}
+
+#[cfg(feature = "utoipa")]
+impl utoipa::PartialSchema for Signature {
+    fn schema() -> utoipa::openapi::RefOr<utoipa::openapi::schema::Schema> {
+        use utoipa::openapi::schema::*;
+
+        Schema::Object(
+            ObjectBuilder::new()
+                .schema_type(SchemaType::Type(Type::String))
+                .examples([serde_json::json!(Signature::from_bytes(
+                    &[0; ed25519_dalek::SIGNATURE_LENGTH]
+                ))])
+                .build(),
+        )
+        .into()
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

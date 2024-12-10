@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_flow_system::{FlowTriggerRule, Schedule, ScheduleCron, ScheduleTimeDelta, BatchingRule};
+use kamu_flow_system::{BatchingRule, FlowTriggerRule, Schedule, ScheduleCron, ScheduleTimeDelta};
 
 use crate::mutations::{FlowInvalidTriggerInputError, FlowTypeIsNotSupported};
 use crate::prelude::*;

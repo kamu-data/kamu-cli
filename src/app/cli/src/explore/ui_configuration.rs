@@ -7,29 +7,26 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_core::{DatasetDependenciesIDStream, DependencyGraphRepository};
+use serde::Serialize;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-mockall::mock! {
-    pub DependencyGraphRepository {}
-
-    #[async_trait::async_trait]
-    impl DependencyGraphRepository for DependencyGraphRepository {
-        fn list_dependencies_of_all_datasets(&self) -> DatasetDependenciesIDStream<'_>;
-    }
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct UIConfiguration {
+    pub(crate) ingest_upload_file_limit_mb: usize,
+    pub(crate) feature_flags: UIFeatureFlags,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl MockDependencyGraphRepository {
-    pub fn no_dependencies() -> Self {
-        let mut dependency_graph_repo_mock = MockDependencyGraphRepository::default();
-        dependency_graph_repo_mock
-            .expect_list_dependencies_of_all_datasets()
-            .return_once(|| Box::pin(futures::stream::empty()));
-        dependency_graph_repo_mock
-    }
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct UIFeatureFlags {
+    pub(crate) enable_logout: bool,
+    pub(crate) enable_scheduling: bool,
+    pub(crate) enable_dataset_env_vars_management: bool,
+    pub(crate) enable_terms_of_service: bool,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

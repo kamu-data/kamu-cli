@@ -38,7 +38,7 @@ aws-sdk-ssooidc = "1"
 aws-sdk-sts = "1"
 aws-credential-types = "1"
 clap = { version = "4", features = ["derive"] }
-datafusion = { version = "42", features = [
+datafusion = { version = "43", features = [
     "crypto_expressions",
     "datetime_expressions",
     "encoding_expressions",

@@ -20,12 +20,13 @@ use time_source::SystemTimeSource;
 use tokio::io::AsyncRead;
 
 use crate::axum_utils::ensure_authenticated_account;
-use crate::{UploadService, UploadTokenBase64Json, UploadTokenIntoStreamError};
+use crate::{DatasetAliasInPath, UploadService, UploadTokenBase64Json, UploadTokenIntoStreamError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, serde::Deserialize, utoipa::IntoParams)]
 #[serde(rename_all = "camelCase")]
+#[into_params(parameter_in = Query)]
 pub struct IngestParams {
     source_name: Option<String>,
 
@@ -51,7 +52,7 @@ struct IngestTaskArguments {
 #[utoipa::path(
     post,
     path = "/ingest",
-    params(IngestParams),
+    params(IngestParams, DatasetAliasInPath),
     request_body = Vec<u8>,
     responses((status = OK, body = ())),
     tag = "kamu",

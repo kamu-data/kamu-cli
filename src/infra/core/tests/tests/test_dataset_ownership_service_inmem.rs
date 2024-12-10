@@ -11,6 +11,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
+use kamu::testing::BaseRepoHarness;
 use kamu::{DatasetOwnershipServiceInMemory, DatasetOwnershipServiceInMemoryStateInitializer};
 use kamu_accounts::{
     AccountConfig,
@@ -28,8 +29,6 @@ use kamu_accounts_services::{
 };
 use kamu_core::{DatasetOwnershipService, TenancyConfig};
 use opendatafabric::{AccountID, AccountName, DatasetAlias, DatasetID, DatasetName};
-
-use crate::BaseRepoHarness;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

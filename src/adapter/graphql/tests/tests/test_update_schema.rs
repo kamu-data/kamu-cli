@@ -11,6 +11,7 @@ use std::path::PathBuf;
 
 use indoc::formatdoc;
 
+#[test_group::group(resourcegen)]
 #[test_log::test(tokio::test)]
 async fn update_graphql_schema() {
     let mut schema_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));

@@ -25,7 +25,6 @@ use kamu_adapter_http::{FileUploadLimitConfig, UploadServiceLocal};
 use kamu_adapter_oauth::GithubAuthenticationConfig;
 use kamu_auth_rebac_services::{MultiTenantRebacDatasetLifecycleMessageConsumer, RebacServiceImpl};
 use kamu_datasets::DatasetEnvVar;
-use kamu_datasets_services::{DatasetEntryIndexer, DatasetEntryServiceImpl};
 use kamu_flow_system_inmem::domain::{FlowConfigurationUpdatedMessage, FlowProgressMessage};
 use kamu_flow_system_services::{
     MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE,
@@ -53,6 +52,7 @@ use crate::{
     odf_server,
     spawn_password_refreshing_job,
     try_build_db_connection_settings,
+    ConfirmDeleteService,
     GcService,
     WorkspaceLayout,
     WorkspaceService,
@@ -122,12 +122,6 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
 
     // Configure application
     let (guards, base_catalog, cli_catalog, maybe_server_catalog, output_config) = {
-        let dependencies_graph_repository = prepare_dependencies_graph_repository(
-            &workspace_layout,
-            tenancy_config,
-            current_account.to_current_account_subject(),
-        );
-
         let mut base_catalog_builder = configure_base_catalog(
             &workspace_layout,
             tenancy_config,
@@ -136,7 +130,8 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
         );
 
         if workspace_svc.is_in_workspace() {
-            base_catalog_builder.add::<DatasetEntryIndexer>();
+            base_catalog_builder.add::<kamu_datasets_services::DatasetEntryIndexer>();
+            base_catalog_builder.add::<kamu_datasets_services::DependencyGraphIndexer>();
         }
 
         base_catalog_builder.add_value(JwtAuthenticationConfig::load_from_env());
@@ -151,10 +146,6 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
         } else {
             configure_in_memory_components(&mut base_catalog_builder);
         };
-
-        base_catalog_builder
-            .add_value(dependencies_graph_repository)
-            .bind::<dyn DependencyGraphRepository, DependencyGraphRepositoryInMemory>();
 
         let output_config = configure_output_format(&args, &workspace_svc);
         base_catalog_builder.add_value(output_config.clone());
@@ -349,33 +340,6 @@ where
 // Catalog
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn prepare_dependencies_graph_repository(
-    workspace_layout: &WorkspaceLayout,
-    tenancy_config: TenancyConfig,
-    current_account_subject: CurrentAccountSubject,
-) -> DependencyGraphRepositoryInMemory {
-    // Construct a special catalog just to create 1 object, but with a repository
-    // bound to CLI user. It also should be authorized to access any dataset.
-
-    let special_catalog_for_graph = CatalogBuilder::new()
-        .add::<SystemTimeSourceDefault>()
-        .add_value(tenancy_config)
-        .add_builder(
-            DatasetRepositoryLocalFs::builder().with_root(workspace_layout.datasets_dir.clone()),
-        )
-        .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-        .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
-        .add_value(current_account_subject)
-        .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
-        .add::<DependencyGraphServiceInMemory>()
-        // Don't add its own initializer, leave optional dependency uninitialized
-        .build();
-
-    let dataset_repo = special_catalog_for_graph.get_one().unwrap();
-
-    DependencyGraphRepositoryInMemory::new(dataset_repo)
-}
-
 // Public only for tests
 pub fn configure_base_catalog(
     workspace_layout: &WorkspaceLayout,
@@ -446,6 +410,8 @@ pub fn configure_base_catalog(
 
     b.add::<WatermarkServiceImpl>();
 
+    b.add::<RemoteStatusServiceImpl>();
+
     b.add::<ResetServiceImpl>();
 
     b.add::<ProvenanceServiceImpl>();
@@ -460,8 +426,6 @@ pub fn configure_base_catalog(
 
     b.add::<kamu::utils::simple_transfer_protocol::SimpleTransferProtocol>();
     b.add::<kamu_adapter_http::SmartTransferProtocolClientWs>();
-
-    b.add::<DependencyGraphServiceInMemory>();
 
     b.add::<AppendDatasetMetadataBatchUseCaseImpl>();
     b.add::<CommitDatasetEventUseCaseImpl>();
@@ -506,7 +470,8 @@ pub fn configure_base_catalog(
         b.add::<MultiTenantRebacDatasetLifecycleMessageConsumer>();
     }
 
-    b.add::<DatasetEntryServiceImpl>();
+    b.add::<kamu_datasets_services::DatasetEntryServiceImpl>();
+    b.add::<kamu_datasets_services::DependencyGraphServiceImpl>();
 
     b.add_builder(
         messaging_outbox::OutboxImmediateImpl::builder()
@@ -539,6 +504,7 @@ pub fn configure_cli_catalog(
         WorkspaceService::builder().with_multi_tenant(tenancy_config == TenancyConfig::MultiTenant),
     );
     b.add::<odf_server::LoginService>();
+    b.add::<ConfirmDeleteService>();
 
     b
 }

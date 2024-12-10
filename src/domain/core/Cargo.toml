@@ -25,6 +25,7 @@ doctest = false
 default = []
 
 testing = ["dep:mockall"]
+utoipa = ["dep:utoipa"]
 
 
 [dependencies]
@@ -44,14 +45,14 @@ futures = { version = "0.3", default-features = false }
 http = { version = "1" }
 pathdiff = { version = "0.2", default-features = false }
 pin-project = { version = "1", default-features = false }
-thiserror = { version = "1", default-features = false }
+thiserror = { version = "2", default-features = false, features = ["std"] }
 tokio = { version = "1", default-features = false }
 tokio-stream = { version = "0.1", default-features = false }
 tracing = { version = "0.1", default-features = false }
 url = { version = "2", default-features = false, features = ["serde"] }
 
 # TODO: Avoid this dependency or depend on sub-crates
-datafusion = { version = "42", default-features = false, features = [
+datafusion = { version = "43", default-features = false, features = [
     "parquet",
 ] }
 object_store = { version = "0.11", default-features = false }
@@ -62,6 +63,8 @@ serde_with = { version = "3", default-features = false }
 
 # Optional
 mockall = { optional = true, version = "0.13", default-features = false }
+utoipa = { optional = true, version = "5", default-features = false, features = [
+] }
 
 
 [dev-dependencies]

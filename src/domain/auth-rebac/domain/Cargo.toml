@@ -31,7 +31,7 @@ opendatafabric = { workspace = true }
 
 async-trait = "0.1"
 strum = { version = "0.26", features = ["derive"] }
-thiserror = { version = "1", default-features = false }
+thiserror = { version = "2", default-features = false, features = ["std"] }
 
 # Optional
 sqlx = { optional = true, version = "0.8", default-features = false, features = [

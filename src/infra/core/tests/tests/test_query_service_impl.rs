@@ -737,7 +737,7 @@ async fn test_sql_statement_with_state_simple() {
                 source_event_time: Utc::now(),
                 new_watermark: None,
                 new_source_state: None,
-                data_staging_path: tempdir.path().join(".temp-data"),
+                data_staging_path: tempdir.path().join(".temp-data.parquet"),
             },
         )
         .await
@@ -816,7 +816,7 @@ async fn test_sql_statement_with_state_simple() {
                 source_event_time: Utc::now(),
                 new_watermark: None,
                 new_source_state: None,
-                data_staging_path: tempdir.path().join(".temp-data"),
+                data_staging_path: tempdir.path().join(".temp-data.parquet"),
             },
         )
         .await
@@ -965,7 +965,7 @@ async fn test_sql_statement_with_state_cte() {
                 source_event_time: Utc::now(),
                 new_watermark: None,
                 new_source_state: None,
-                data_staging_path: tempdir.path().join(".temp-data"),
+                data_staging_path: tempdir.path().join(".temp-data.parquet"),
             },
         )
         .await
@@ -1015,7 +1015,7 @@ async fn test_sql_statement_with_state_cte() {
                 source_event_time: Utc::now(),
                 new_watermark: None,
                 new_source_state: None,
-                data_staging_path: tempdir.path().join(".temp-data"),
+                data_staging_path: tempdir.path().join(".temp-data.parquet"),
             },
         )
         .await
@@ -1113,7 +1113,7 @@ async fn test_sql_statement_with_state_cte() {
                 source_event_time: Utc::now(),
                 new_watermark: None,
                 new_source_state: None,
-                data_staging_path: tempdir.path().join(".temp-data"),
+                data_staging_path: tempdir.path().join(".temp-data.parquet"),
             },
         )
         .await
@@ -1142,7 +1142,7 @@ async fn test_sql_statement_with_state_cte() {
                 source_event_time: Utc::now(),
                 new_watermark: None,
                 new_source_state: None,
-                data_staging_path: tempdir.path().join(".temp-data"),
+                data_staging_path: tempdir.path().join(".temp-data.parquet"),
             },
         )
         .await

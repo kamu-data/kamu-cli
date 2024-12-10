@@ -57,7 +57,7 @@ pub async fn odata_service_handler_st(
     get,
     path = "/{account_name}",
     params(
-        ("account_name", description = "Account name")
+        ("account_name" = String, Path, description = "Account name")
     ),
     responses((status = OK, body = String)),
     tag = "kamu-odata",
@@ -99,7 +99,7 @@ pub async fn odata_metadata_handler_st(
     get,
     path = "/{account_name}/$metadata",
     params(
-        ("account_name", description = "Account name")
+        ("account_name" = String, Path, description = "Account name")
     ),
     responses((status = OK, body = String)),
     tag = "kamu-odata",
@@ -123,7 +123,7 @@ pub async fn odata_metadata_handler_mt(
     get,
     path = "/{dataset_name}",
     params(
-        ("dataset_name", description = "Dataset name")
+        ("dataset_name" = String, Path, description = "Dataset name")
     ),
     responses((status = OK, body = String)),
     tag = "kamu-odata",
@@ -147,8 +147,8 @@ pub async fn odata_collection_handler_st(
     get,
     path = "/{account_name}/{dataset_name}",
     params(
-        ("account_name", description = "Account name"),
-        ("dataset_name", description = "Dataset name"),
+        ("account_name" = String, Path, description = "Account name"),
+        ("dataset_name" = String, Path, description = "Dataset name"),
     ),
     responses((status = OK, body = String)),
     tag = "kamu-odata",
@@ -261,3 +261,5 @@ fn map_err(err: ODataError) -> ApiError {
         ODataError::Internal(err) => ApiError::new(err, http::StatusCode::INTERNAL_SERVER_ERROR),
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

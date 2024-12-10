@@ -21,11 +21,12 @@ use kamu::{
     DatasetRegistryRepoBridge,
     DatasetRepositoryLocalFs,
     DatasetRepositoryWriter,
-    DependencyGraphServiceInMemory,
 };
 use kamu_accounts::testing::MockAuthenticationService;
 use kamu_accounts::*;
 use kamu_core::TenancyConfig;
+use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
+use kamu_datasets_services::DependencyGraphServiceImpl;
 use messaging_outbox::DummyOutboxImpl;
 use mockall::predicate::{eq, function};
 use opendatafabric::{DatasetAlias, DatasetHandle, DatasetKind, DatasetName, DatasetRef};
@@ -221,7 +222,8 @@ impl ServerHarness {
 
             b.add::<SystemTimeSourceDefault>()
                 .add::<DummyOutboxImpl>()
-                .add::<DependencyGraphServiceInMemory>()
+                .add::<DependencyGraphServiceImpl>()
+                .add::<InMemoryDatasetDependencyRepository>()
                 .add_value(MockAuthenticationService::resolving_token(
                     DUMMY_ACCESS_TOKEN,
                     Account::dummy(),

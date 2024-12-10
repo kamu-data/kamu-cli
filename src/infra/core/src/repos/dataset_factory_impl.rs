@@ -70,6 +70,10 @@ impl DatasetFactoryImpl {
     }
 
     fn get_http(base_url: &Url, header_map: http::HeaderMap) -> impl Dataset {
+        // When joining url without trailing '/', last path part is being dropped
+        let mut base_url = base_url.clone();
+        base_url.ensure_trailing_slash();
+
         let client = reqwest::Client::new();
 
         DatasetImpl::new(
@@ -216,7 +220,7 @@ impl DatasetFactoryImpl {
     }
 
     async fn resolve_ipns_dnslink(&self, domain: &str) -> Result<String, InternalError> {
-        let r = trust_dns_resolver::TokioAsyncResolver::tokio_from_system_conf().int_err()?;
+        let r = hickory_resolver::TokioAsyncResolver::tokio_from_system_conf().int_err()?;
         let query = format!("_dnslink.{domain}");
         let result = r.txt_lookup(&query).await.int_err()?;
 

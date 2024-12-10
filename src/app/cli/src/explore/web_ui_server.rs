@@ -34,6 +34,8 @@ use url::Url;
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
 
+use super::{UIConfiguration, UIFeatureFlags};
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(RustEmbed)]
@@ -44,12 +46,10 @@ struct HttpRoot;
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
-struct WebUIConfig {
+struct WebUIRuntimeConfiguration {
     api_server_gql_url: String,
     api_server_http_url: String,
-    ingest_upload_file_limit_mb: usize,
     login_instructions: Option<WebUILoginInstructions>,
-    feature_flags: WebUIFeatureFlags,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -57,17 +57,6 @@ struct WebUIConfig {
 struct WebUILoginInstructions {
     login_method: String,
     login_credentials_json: String,
-}
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct WebUIFeatureFlags {
-    enable_logout: bool,
-    enable_scheduling: bool,
-    // TODO: Correct a typo in `WebUIFeatureFlags`
-    //       (content of `assets/runtime-config.json`)
-    //       https://github.com/kamu-data/kamu-cli/issues/841
-    enable_dataset_env_vars_managment: bool,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -117,20 +106,21 @@ impl WebUIServer {
 
         let web_ui_url = format!("http://{local_addr}");
 
-        let web_ui_config = WebUIConfig {
+        let web_ui_runtime_configuration = WebUIRuntimeConfiguration {
             api_server_gql_url: format!("http://{local_addr}/graphql"),
             api_server_http_url: web_ui_url.clone(),
             login_instructions: Some(login_instructions.clone()),
+        };
+
+        let ui_configuration = UIConfiguration {
             ingest_upload_file_limit_mb: file_upload_limit_config.max_file_size_in_mb(),
-            feature_flags: WebUIFeatureFlags {
+            feature_flags: UIFeatureFlags {
                 // No way to log out, always logging in a predefined user
                 enable_logout: false,
                 // No way to configure scheduling of datasets
                 enable_scheduling: false,
-                // TODO: Correct a typo in `WebUIFeatureFlags`
-                //       (content of `assets/runtime-config.json`)
-                //       https://github.com/kamu-data/kamu-cli/issues/841
-                enable_dataset_env_vars_managment: enable_dataset_env_vars_management,
+                enable_dataset_env_vars_management,
+                enable_terms_of_service: true,
             },
         };
 
@@ -151,67 +141,77 @@ impl WebUIServer {
             }))
             .build();
 
-        let (router, _api) = OpenApiRouter::new()
-            .route(
-                "/assets/runtime-config.json",
-                axum::routing::get(runtime_config_handler),
-            )
-            .route(
-                "/graphql",
-                axum::routing::get(graphql_playground_handler).post(graphql_handler),
-            )
-            .merge(kamu_adapter_http::data::root_router())
-            .routes(routes!(
-                kamu_adapter_http::platform_file_upload_prepare_post_handler
-            ))
-            .routes(routes!(
-                kamu_adapter_http::platform_file_upload_post_handler,
-                kamu_adapter_http::platform_file_upload_get_handler
-            ))
-            .nest(
-                "/odata",
-                match tenancy_config {
-                    TenancyConfig::MultiTenant => kamu_adapter_odata::router_multi_tenant(),
-                    TenancyConfig::SingleTenant => kamu_adapter_odata::router_single_tenant(),
-                },
-            )
-            .nest(
-                match tenancy_config {
-                    TenancyConfig::MultiTenant => "/:account_name/:dataset_name",
-                    TenancyConfig::SingleTenant => "/:dataset_name",
-                },
-                kamu_adapter_http::add_dataset_resolver_layer(
-                    OpenApiRouter::new()
-                        .merge(kamu_adapter_http::smart_transfer_protocol_router())
-                        .merge(kamu_adapter_http::data::dataset_router()),
-                    tenancy_config,
-                ),
-            )
-            .fallback(app_handler)
-            .layer(kamu_adapter_http::AuthenticationLayer::new())
-            .layer(
-                tower_http::cors::CorsLayer::new()
-                    .allow_origin(tower_http::cors::Any)
-                    .allow_methods(vec![http::Method::GET, http::Method::POST])
-                    .allow_headers(tower_http::cors::Any),
-            )
-            .layer(observability::axum::http_layer())
-            // Note: Healthcheck and metrics routes are placed before the tracing layer (layers
-            // execute bottom-up) to avoid spam in logs
-            .route(
-                "/system/health",
-                axum::routing::get(observability::health::health_handler),
-            )
-            .route(
-                "/system/metrics",
-                axum::routing::get(observability::metrics::metrics_handler),
-            )
-            .layer(axum::extract::Extension(web_ui_catalog))
-            .layer(axum::extract::Extension(gql_schema))
-            .layer(axum::extract::Extension(web_ui_config))
-            .split_for_parts();
+        let (router, api) = OpenApiRouter::with_openapi(
+            kamu_adapter_http::openapi::spec_builder(crate::app::VERSION, "").build(),
+        )
+        .route(
+            "/assets/runtime-config.json",
+            axum::routing::get(runtime_configuration_handler),
+        )
+        .route("/ui-config", axum::routing::get(ui_configuration_handler))
+        .route(
+            "/graphql",
+            axum::routing::get(graphql_playground_handler).post(graphql_handler),
+        )
+        .merge(kamu_adapter_http::data::root_router())
+        .routes(routes!(
+            kamu_adapter_http::platform_file_upload_prepare_post_handler
+        ))
+        .routes(routes!(
+            kamu_adapter_http::platform_file_upload_post_handler,
+            kamu_adapter_http::platform_file_upload_get_handler
+        ))
+        .nest(
+            "/odata",
+            match tenancy_config {
+                TenancyConfig::MultiTenant => kamu_adapter_odata::router_multi_tenant(),
+                TenancyConfig::SingleTenant => kamu_adapter_odata::router_single_tenant(),
+            },
+        )
+        .nest(
+            match tenancy_config {
+                TenancyConfig::MultiTenant => "/:account_name/:dataset_name",
+                TenancyConfig::SingleTenant => "/:dataset_name",
+            },
+            kamu_adapter_http::add_dataset_resolver_layer(
+                OpenApiRouter::new()
+                    .merge(kamu_adapter_http::smart_transfer_protocol_router())
+                    .merge(kamu_adapter_http::data::dataset_router()),
+                tenancy_config,
+            ),
+        )
+        .fallback(app_handler)
+        .layer(kamu_adapter_http::AuthenticationLayer::new())
+        .layer(
+            tower_http::cors::CorsLayer::new()
+                .allow_origin(tower_http::cors::Any)
+                .allow_methods(vec![http::Method::GET, http::Method::POST])
+                .allow_headers(tower_http::cors::Any),
+        )
+        .layer(observability::axum::http_layer())
+        // Note: Healthcheck and metrics routes are placed before the tracing layer (layers
+        // execute bottom-up) to avoid spam in logs
+        .route(
+            "/system/health",
+            axum::routing::get(observability::health::health_handler),
+        )
+        .route(
+            "/system/metrics",
+            axum::routing::get(observability::metrics::metrics_handler),
+        )
+        .merge(kamu_adapter_http::openapi::router().into())
+        .layer(axum::extract::Extension(web_ui_catalog))
+        .layer(axum::extract::Extension(gql_schema))
+        .layer(axum::extract::Extension(web_ui_runtime_configuration))
+        .layer(axum::extract::Extension(ui_configuration))
+        .split_for_parts();
 
-        let server = axum::serve(listener, router.into_make_service());
+        let server = axum::serve(
+            listener,
+            router
+                .layer(axum::extract::Extension(Arc::new(api)))
+                .into_make_service(),
+        );
 
         Ok(Self {
             server,
@@ -274,10 +274,18 @@ async fn app_handler(uri: Uri) -> impl IntoResponse {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-async fn runtime_config_handler(
-    web_ui_config: axum::extract::Extension<WebUIConfig>,
-) -> axum::Json<WebUIConfig> {
-    axum::Json(web_ui_config.0)
+async fn runtime_configuration_handler(
+    web_ui_runtime_configuration: axum::extract::Extension<WebUIRuntimeConfiguration>,
+) -> axum::Json<WebUIRuntimeConfiguration> {
+    axum::Json(web_ui_runtime_configuration.0)
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+async fn ui_configuration_handler(
+    ui_configuration: axum::extract::Extension<UIConfiguration>,
+) -> axum::Json<UIConfiguration> {
+    axum::Json(ui_configuration.0)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

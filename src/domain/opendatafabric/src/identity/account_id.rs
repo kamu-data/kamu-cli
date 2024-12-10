@@ -186,3 +186,23 @@ impl<'de> serde::de::Visitor<'de> for AccountIDSerdeVisitor {
 super::sqlx::impl_sqlx!(AccountID);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(feature = "utoipa")]
+impl utoipa::ToSchema for AccountID {}
+
+#[cfg(feature = "utoipa")]
+impl utoipa::PartialSchema for AccountID {
+    fn schema() -> utoipa::openapi::RefOr<utoipa::openapi::schema::Schema> {
+        use utoipa::openapi::schema::*;
+
+        Schema::Object(
+            ObjectBuilder::new()
+                .schema_type(SchemaType::Type(Type::String))
+                .examples([serde_json::json!(AccountID::new_seeded_ed25519(b"account"))])
+                .build(),
+        )
+        .into()
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

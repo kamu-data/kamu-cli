@@ -389,10 +389,17 @@ impl DataWriterDataFusion {
     }
 
     fn is_schema_equivalent_rec(lhs: &Field, rhs: &Field) -> bool {
-        // Ignore nullability
-        lhs.name() == rhs.name()
-            && lhs.data_type() == rhs.data_type()
-            && lhs.metadata() == rhs.metadata()
+        // Rules:
+        // - Ignore nullability (temporarily until we regain control over it)
+        // - Treat Utf8 equivalent to Utf8View
+        if lhs.name() != rhs.name() || lhs.metadata() != rhs.metadata() {
+            return false;
+        }
+        match (lhs.data_type(), rhs.data_type()) {
+            (l, r) if l == r => true,
+            (DataType::Utf8, DataType::Utf8View) | (DataType::Utf8View, DataType::Utf8) => true,
+            _ => false,
+        }
     }
 
     // TODO: Externalize configuration
@@ -436,6 +443,14 @@ impl DataWriterDataFusion {
     ) -> Result<Option<OwnedFile>, InternalError> {
         use datafusion::arrow::array::UInt64Array;
 
+        // FIXME: The  extension is currently necessary for DataFusion to
+        // respect the single-file output
+        // See: https://github.com/apache/datafusion/issues/13323
+        assert!(
+            path.extension().is_some(),
+            "Ouput file name must have an extension"
+        );
+
         let res = df
             .write_parquet(
                 path.as_os_str().to_str().unwrap(),
@@ -463,6 +478,7 @@ impl DataWriterDataFusion {
                 num_records,
                 "Produced parquet file",
             );
+            assert!(file.as_path().is_file());
             Ok(Some(file))
         } else {
             tracing::info!("Produced empty result",);

@@ -131,17 +131,12 @@ tonic = { version = "0.12", default-features = false }
 tower = "0.5"
 tower-http = { version = "0.6", features = ["trace", "cors"] }
 utoipa = { version = "5", default-features = true, features = ["macros"] }
-utoipa-swagger-ui = { version = "8", default-features = true, features = [
-    "axum",
-] }
 utoipa-axum = { version = "0.1", default-features = true, features = [] }
 
 # Web UI
 rust-embed = { optional = true, version = "8", features = [
     "interpolate-folder-path",
-    # TODO: Re-enable compression when utoipa-swagger-ui supports it
-    # See: https://github.com/juhaku/utoipa/issues/1151
-    # "compression",
+    "compression",
 ] }
 mime = "0.3"
 mime_guess = "2"
@@ -171,7 +166,7 @@ tracing-bunyan-formatter = "0.3"
 async-trait = "0.1"
 chrono = "0.4"
 cfg-if = "1" # Conditional compilation
-datafusion = { version = "42", default-features = false, features = [
+datafusion = { version = "43", default-features = false, features = [
     "crypto_expressions",
     "encoding_expressions",
     "parquet",
@@ -193,7 +188,7 @@ secrecy = "0.10"
 shlex = "1" # Parsing partial input for custom completions
 signal-hook = "0.3" # Signal handling
 tempfile = "3"
-thiserror = { version = "1", default-features = false }
+thiserror = { version = "2", default-features = false, features = ["std"] }
 tokio = { version = "1", default-features = false, features = ["io-util"] }
 tokio-stream = { version = "0.1", default-features = false, features = ["net"] }
 tokio-util = { version = "0.7", default-features = false, features = ["io"] }
@@ -213,6 +208,7 @@ kamu-cli-puppet = { workspace = true, default-features = false, features = [
 ] }
 
 pretty_assertions = { version = "1" }
+test-group = { version = "1" }
 test-log = { version = "0.2", features = ["trace"] }
 
 

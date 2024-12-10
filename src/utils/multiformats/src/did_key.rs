@@ -325,3 +325,23 @@ impl<'a> std::fmt::Display for DidKeyMultibaseFmt<'a> {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(feature = "utoipa")]
+impl utoipa::ToSchema for DidKey {}
+
+#[cfg(feature = "utoipa")]
+impl utoipa::PartialSchema for DidKey {
+    fn schema() -> utoipa::openapi::RefOr<utoipa::openapi::schema::Schema> {
+        use utoipa::openapi::schema::*;
+
+        Schema::Object(
+            ObjectBuilder::new()
+                .schema_type(SchemaType::Type(Type::String))
+                .examples([serde_json::json!(DidKey::new_seeded_ed25519(b"key"))])
+                .build(),
+        )
+        .into()
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

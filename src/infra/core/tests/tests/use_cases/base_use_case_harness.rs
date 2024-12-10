@@ -8,12 +8,10 @@
 // by the Apache License, Version 2.0.
 
 use dill::Catalog;
-use kamu::testing::MockDatasetActionAuthorizer;
+use kamu::testing::{BaseRepoHarness, MockDatasetActionAuthorizer};
 use kamu_core::auth::DatasetActionAuthorizer;
 use kamu_core::TenancyConfig;
 use messaging_outbox::{MockOutbox, Outbox};
-
-use crate::BaseRepoHarness;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

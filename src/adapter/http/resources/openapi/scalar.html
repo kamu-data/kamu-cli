@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Kamu REST API Reference</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+        :root {
+            --scalar-custom-header-height: 50px;
+        }
+
+        .custom-header {
+            height: var(--scalar-custom-header-height);
+            background-color: var(--scalar-background-1);
+            box-shadow: inset 0 -1px 0 var(--scalar-border-color);
+            color: var(--scalar-color-1);
+            font-size: var(--scalar-font-size-2);
+            padding: 0 18px;
+            position: sticky;
+            justify-content: space-between;
+            top: 0;
+            z-index: 100;
+        }
+
+        .custom-header,
+        .custom-header nav {
+            display: flex;
+            align-items: center;
+            gap: 18px;
+        }
+
+        .custom-header a:hover {
+            color: var(--scalar-color-2);
+        }
+    </style>
+</head>
+<body>
+    <header class="custom-header scalar-app">
+    <b>Kamu REST API</b>
+    <nav>
+        <a href="https://docs.kamu.dev/">Docs</a>
+        <a href="https://discord.gg/nU6TXRQNXC">Discord</a>
+    </nav>
+    </header>
+
+    <script id="api-reference"></script>
+
+    <script>
+    var configuration = {
+        theme: "purple",
+        spec: {
+            url: "/openapi.json",
+        },
+        servers: [
+            {
+                url: "/",
+                description: "Current Node",
+            },
+        ],
+    };
+
+    document.getElementById("api-reference").dataset.configuration =
+        JSON.stringify(configuration);
+    </script>
+
+    <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
+</body>
+</html>

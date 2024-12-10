@@ -12,4 +12,7 @@
 pub const MESSAGE_CONSUMER_KAMU_DATASET_ENTRY_SERVICE: &str =
     "dev.kamu.domain.datasets.DatasetEntryService";
 
+pub const MESSAGE_CONSUMER_KAMU_DEPENDENCY_GRAPH_SERVICE: &str =
+    "dev.kamu.domain.datasets.DependencyGraphService";
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

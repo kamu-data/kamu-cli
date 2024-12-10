@@ -23,8 +23,8 @@ const DATASET_LIFECYCLE_OUTBOX_VERSION: u32 = 1;
 pub enum DatasetLifecycleMessage {
     Created(DatasetLifecycleMessageCreated),
     DependenciesUpdated(DatasetLifecycleMessageDependenciesUpdated),
-    Deleted(DatasetLifecycleMessageDeleted),
     Renamed(DatasetLifecycleMessageRenamed),
+    Deleted(DatasetLifecycleMessageDeleted),
 }
 
 impl DatasetLifecycleMessage {

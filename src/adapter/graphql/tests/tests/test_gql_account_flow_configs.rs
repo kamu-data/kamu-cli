@@ -18,7 +18,6 @@ use kamu::testing::{
     MetadataFactory,
     MockDatasetActionAuthorizer,
     MockDatasetChangesService,
-    MockDependencyGraphRepository,
     MockPollingIngestService,
     MockTransformRequestPlanner,
 };
@@ -29,12 +28,13 @@ use kamu::{
     DatasetRegistryRepoBridge,
     DatasetRepositoryLocalFs,
     DatasetRepositoryWriter,
-    DependencyGraphServiceInMemory,
 };
 use kamu_accounts::{JwtAuthenticationConfig, DEFAULT_ACCOUNT_NAME, DEFAULT_ACCOUNT_NAME_STR};
 use kamu_accounts_inmem::InMemoryAccessTokenRepository;
 use kamu_accounts_services::{AccessTokenServiceImpl, AuthenticationServiceImpl};
 use kamu_core::*;
+use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
+use kamu_datasets_services::DependencyGraphServiceImpl;
 use kamu_flow_system::FlowExecutorConfig;
 use kamu_flow_system_inmem::{
     InMemoryFlowConfigurationEventStore,
@@ -632,7 +632,6 @@ struct FlowConfigHarness {
 
 #[derive(Default)]
 struct FlowRunsHarnessOverrides {
-    dependency_graph_mock: Option<MockDependencyGraphRepository>,
     dataset_changes_mock: Option<MockDatasetChangesService>,
     transform_planner_mock: Option<MockTransformRequestPlanner>,
     polling_service_mock: Option<MockPollingIngestService>,
@@ -646,7 +645,6 @@ impl FlowConfigHarness {
         std::fs::create_dir(&datasets_dir).unwrap();
 
         let dataset_changes_mock = overrides.dataset_changes_mock.unwrap_or_default();
-        let dependency_graph_mock = overrides.dependency_graph_mock.unwrap_or_default();
         let transform_planner_mock = overrides.transform_planner_mock.unwrap_or_default();
         let polling_service_mock = overrides.polling_service_mock.unwrap_or_default();
         let mock_dataset_action_authorizer =
@@ -675,9 +673,8 @@ impl FlowConfigHarness {
             .add::<InMemoryAccessTokenRepository>()
             .add_value(JwtAuthenticationConfig::default())
             .bind::<dyn kamu::domain::auth::DatasetActionAuthorizer, MockDatasetActionAuthorizer>()
-            .add::<DependencyGraphServiceInMemory>()
-            .add_value(dependency_graph_mock)
-            .bind::<dyn DependencyGraphRepository, MockDependencyGraphRepository>()
+            .add::<DependencyGraphServiceImpl>()
+            .add::<InMemoryDatasetDependencyRepository>()
             .add::<InMemoryFlowConfigurationEventStore>()
             .add::<InMemoryFlowTriggerEventStore>()
             .add::<InMemoryFlowEventStore>()

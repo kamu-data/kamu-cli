@@ -22,14 +22,16 @@ use indoc::indoc;
 use internal_error::*;
 use kamu::domain::{Protocols, ServerUrlConfig, TenancyConfig};
 use kamu_adapter_http::e2e::e2e_router;
+use kamu_adapter_http::FileUploadLimitConfig;
 use kamu_flow_system_inmem::domain::FlowExecutor;
 use kamu_task_system_inmem::domain::TaskExecutor;
 use messaging_outbox::OutboxExecutor;
 use tokio::sync::Notify;
 use url::Url;
-use utoipa::OpenApi as _;
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
+
+use super::{UIConfiguration, UIFeatureFlags};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -49,6 +51,8 @@ impl APIServer {
         tenancy_config: TenancyConfig,
         address: Option<IpAddr>,
         port: Option<u16>,
+        file_upload_limit_config: Arc<FileUploadLimitConfig>,
+        enable_dataset_env_vars_management: bool,
         external_address: Option<IpAddr>,
         e2e_output_data_path: Option<&PathBuf>,
     ) -> Result<Self, InternalError> {
@@ -94,44 +98,79 @@ impl APIServer {
             }))
             .build();
 
-        let mut router = OpenApiRouter::with_openapi(ApiDoc::openapi())
-            .route("/", axum::routing::get(root))
-            .route(
-                // IMPORTANT: The same name is used inside e2e_middleware_fn().
-                //            If there is a need to change, please update there too.
-                "/graphql",
-                axum::routing::get(graphql_playground_handler).post(graphql_handler),
-            )
-            .routes(routes!(kamu_adapter_http::platform_login_handler))
-            .routes(routes!(kamu_adapter_http::platform_token_validate_handler))
-            .routes(routes!(
-                kamu_adapter_http::platform_file_upload_prepare_post_handler
-            ))
-            .routes(routes!(
-                kamu_adapter_http::platform_file_upload_post_handler,
-                kamu_adapter_http::platform_file_upload_get_handler
-            ))
-            .merge(kamu_adapter_http::data::root_router())
-            .merge(kamu_adapter_http::general::root_router())
-            .nest(
-                "/odata",
-                match tenancy_config {
-                    TenancyConfig::MultiTenant => kamu_adapter_odata::router_multi_tenant(),
-                    TenancyConfig::SingleTenant => kamu_adapter_odata::router_single_tenant(),
-                },
-            )
-            .nest(
-                match tenancy_config {
-                    TenancyConfig::MultiTenant => "/:account_name/:dataset_name",
-                    TenancyConfig::SingleTenant => "/:dataset_name",
-                },
-                kamu_adapter_http::add_dataset_resolver_layer(
-                    OpenApiRouter::new()
-                        .merge(kamu_adapter_http::smart_transfer_protocol_router())
-                        .merge(kamu_adapter_http::data::dataset_router()),
-                    tenancy_config,
+        let ui_configuration = UIConfiguration {
+            ingest_upload_file_limit_mb: file_upload_limit_config.max_file_size_in_mb(),
+            feature_flags: UIFeatureFlags {
+                enable_logout: true,
+                enable_scheduling: true,
+                enable_dataset_env_vars_management,
+                enable_terms_of_service: true,
+            },
+        };
+
+        let mut router = OpenApiRouter::with_openapi(
+            kamu_adapter_http::openapi::spec_builder(
+                crate::app::VERSION,
+                indoc::indoc!(
+                    r#"
+                    You are currently running Kamu CLI in the API server mode. For a fully-featured
+                    server consider using [Kamu Node](https://docs.kamu.dev/node/).
+
+                    ## Auth
+                    Some operation require an **API token**. Pass `--get-token` command line argument
+                    for CLI to generate a token for you.
+
+                    ## Resources
+                    - [Documentation](https://docs.kamu.dev)
+                    - [Discord](https://discord.gg/nU6TXRQNXC)
+                    - [Other protocols](https://docs.kamu.dev/node/protocols/)
+                    - [Open Data Fabric specification](https://docs.kamu.dev/odf/)
+                    "#
                 ),
-            );
+            )
+            .build(),
+        )
+        .route("/", axum::routing::get(root))
+        .route(
+            "/ui-config",
+            axum::routing::get(ui_configuration_handler),
+        )
+        .route(
+            // IMPORTANT: The same name is used inside e2e_middleware_fn().
+            //            If there is a need to change, please update there too.
+            "/graphql",
+            axum::routing::get(graphql_playground_handler).post(graphql_handler),
+        )
+        .routes(routes!(kamu_adapter_http::platform_login_handler))
+        .routes(routes!(kamu_adapter_http::platform_token_validate_handler))
+        .routes(routes!(
+            kamu_adapter_http::platform_file_upload_prepare_post_handler
+        ))
+        .routes(routes!(
+            kamu_adapter_http::platform_file_upload_post_handler,
+            kamu_adapter_http::platform_file_upload_get_handler
+        ))
+        .merge(kamu_adapter_http::data::root_router())
+        .merge(kamu_adapter_http::general::root_router())
+        .nest(
+            "/odata",
+            match tenancy_config {
+                TenancyConfig::MultiTenant => kamu_adapter_odata::router_multi_tenant(),
+                TenancyConfig::SingleTenant => kamu_adapter_odata::router_single_tenant(),
+            },
+        )
+        .nest(
+            match tenancy_config {
+                TenancyConfig::MultiTenant => "/:account_name/:dataset_name",
+                TenancyConfig::SingleTenant => "/:dataset_name",
+            },
+            kamu_adapter_http::add_dataset_resolver_layer(
+                OpenApiRouter::new()
+                    .merge(kamu_adapter_http::smart_transfer_protocol_router())
+                    .merge(kamu_adapter_http::data::dataset_router()),
+                tenancy_config,
+            ),
+        );
 
         let is_e2e_testing = e2e_output_data_path.is_some();
 
@@ -150,8 +189,8 @@ impl APIServer {
                     .allow_headers(tower_http::cors::Any),
             )
             .layer(observability::axum::http_layer())
-            // Note: Healthcheck and metrics routes are placed before the tracing layer (layers
-            // execute bottom-up) to avoid spam in logs
+            // Note: Healthcheck, metrics, and OpenAPI routes are placed before the tracing layer
+            // (layers execute bottom-up) to avoid spam in logs
             .route(
                 "/system/health",
                 axum::routing::get(observability::health::health_handler),
@@ -159,7 +198,8 @@ impl APIServer {
             .route(
                 "/system/metrics",
                 axum::routing::get(observability::metrics::metrics_handler),
-            );
+            )
+            .merge(kamu_adapter_http::openapi::router().into());
 
         let maybe_shutdown_notify = if is_e2e_testing {
             let shutdown_notify = Arc::new(Notify::new());
@@ -171,13 +211,12 @@ impl APIServer {
             None
         };
 
-        router = router
-            .layer(Extension(gql_schema))
-            .layer(Extension(api_server_catalog));
-
         let (router, api) = router.split_for_parts();
-        let router =
-            router.merge(utoipa_swagger_ui::SwaggerUi::new("/swagger").url("/openapi.json", api));
+        let router = router
+            .layer(Extension(gql_schema))
+            .layer(Extension(api_server_catalog))
+            .layer(Extension(ui_configuration))
+            .layer(Extension(Arc::new(api)));
 
         let server = axum::serve(listener, router.into_make_service());
 
@@ -229,10 +268,18 @@ async fn root() -> impl axum::response::IntoResponse {
         <h1>Kamu HTTP Server</h1>
         <ul>
             <li><a href="/graphql">GraphQL Playground</li>
-            <li><a href="/swagger/">Swagger UI</li>
+            <li><a href="/openapi">OpenAPI Playground</li>
         </ul>
         "#
     ))
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+async fn ui_configuration_handler(
+    ui_configuration: axum::extract::Extension<UIConfiguration>,
+) -> axum::Json<UIConfiguration> {
+    axum::Json(ui_configuration.0)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -255,43 +302,6 @@ async fn graphql_playground_handler() -> impl axum::response::IntoResponse {
     axum::response::Html(async_graphql::http::playground_source(
         async_graphql::http::GraphQLPlaygroundConfig::new("/graphql"),
     ))
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// OpenAPI root
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(utoipa::OpenApi)]
-#[openapi(
-    modifiers(&TokenAuthAddon),
-    tags(
-        (name = "odf-core", description = "Core ODF APIs"),
-        (name = "odf-transfer", description = "ODF Data Transfer APIs"),
-        (name = "odf-query", description = "ODF Data Query APIs"),
-        (name = "kamu", description = "General Node APIs"),
-        (name = "kamu-odata", description = "OData Adapter"),
-    )
-)]
-struct ApiDoc;
-
-struct TokenAuthAddon;
-
-impl utoipa::Modify for TokenAuthAddon {
-    fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
-        use utoipa::openapi::security::*;
-
-        if let Some(components) = openapi.components.as_mut() {
-            components.add_security_scheme(
-                "api_key",
-                SecurityScheme::Http(
-                    HttpBuilder::new()
-                        .scheme(HttpAuthScheme::Bearer)
-                        .bearer_format("AccessToken")
-                        .build(),
-                ),
-            );
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

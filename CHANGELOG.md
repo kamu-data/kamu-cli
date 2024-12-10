@@ -12,6 +12,26 @@ Recommendation: for ease of reading, use the following order:
 -->
 
 ## [Unreleased]
+### Changed
+- Upgraded to `datafusion v43`
+
+## [0.211.0] - 2024-12-02
+### Changed
+- Dataset dependency graph is now backed with a database, removing need in dependendency scanning at startup.
+
+## [0.210.0] - 2024-11-28
+### Added
+- Console warning when deleting datasets which are out of sync with their push remotes
+### Changed
+- Separated Web UI runtime and UI configuration flags. UI configuration is now provided by API server too.
+### Fixed
+- Typo in feature flags (enableDatasetEnvVarsManagement)
+                                                  ^
+
+## [0.209.0] - 2024-11-25
+### Changed
+- Improved OpenAPI integration
+- Replaced Swagger with Scalar for presenting OpenAPI spec
 ### Fixed
 - `EXECUTE_TRANSFORM` flows now respect last success run time during config enabling and api-server restarting
 - `kamu login`: add repo with `odf+` schema protocol

@@ -25,6 +25,7 @@ use crate::data::verify_types::{
     InvalidRequestInputHash,
     InvalidRequestSubQueriesHash,
     OutputMismatch,
+    ValidationError,
     VerifyRequest,
     VerifyResponse,
 };
@@ -33,13 +34,87 @@ use crate::data::verify_types::{
 
 /// Verify query commitment
 ///
-/// See [commitments documentation](https://docs.kamu.dev/node/commitments/) for details.
+/// A query proof can be stored long-term and then disputed at a later point
+/// using this endpoint.
+///
+/// Example request:
+/// ```json
+/// {
+///     "input": {
+///         "query": "select event_time, from, to, close from \"kamu/eth-to-usd\"",
+///         "queryDialect": "SqlDataFusion",
+///         "dataFormat": "JsonAoA",
+///         "include": ["Input", "Proof", "Schema"],
+///         "schemaFormat": "ArrowJson",
+///         "datasets": [{
+///             "id": "did:odf:fed0..26c4",
+///             "alias": "kamu/eth-to-usd",
+///             "blockHash": "f162..9a1a"
+///         }],
+///         "skip": 0,
+///         "limit": 3
+///     },
+///     "subQueries": [],
+///     "commitment": {
+///         "inputHash": "f162..2efc",
+///         "outputHash": "f162..b088",
+///         "subQueriesHash": "f162..d210"
+///     },
+///     "proof": {
+///         "type": "Ed25519Signature2020",
+///         "verificationMethod": "did:key:z6Mk..fwZp",
+///         "proofValue": "uJfY..seCg"
+///     }
+/// }
+/// ```
+///
+/// Example response:
+/// ```json
+/// {
+///     "ok": false,
+///     "error": {
+///         "kind": "VerificationFailed::OutputMismatch",
+///         "actual_hash": "f162..c12a",
+///         "expected_hash": "f162..2a2d",
+///         "message": "Query was reproduced but resulted in output hash different from expected.
+///                     This means that the output was either falsified, or the query
+///                     reproducibility was not guaranteed by the system.",
+///     }
+/// }
+/// ```
+///
+/// See [commitments documentation](https://docs.kamu.dev/node/commitments) for details.
 #[utoipa::path(
     post,
     path = "/verify",
     request_body = VerifyRequest,
     responses(
-        (status = OK, body = VerifyResponse),
+        (
+            status = OK, body = VerifyResponse, examples(
+                ("Success" = (summary = "Verified successfully", value = json!(
+                    VerifyResponse { ok: true, error: None}
+                ))),
+                ("Invalid commitment" = (value = json!(
+                    VerifyResponse {
+                        ok: false,
+                        error: Some(ValidationError::InvalidRequest(
+                            InvalidRequestBadSignature::new("bad signature").into()
+                        ))
+                    }
+                ))),
+                ("Verification fail" = (value = json!(
+                    VerifyResponse {
+                        ok: false,
+                        error: Some(
+                            ValidationError::VerificationFailed(
+                            OutputMismatch::new(
+                                odf::Multihash::from_digest_sha3_256(b"a"),
+                                odf::Multihash::from_digest_sha3_256(b"b")).into()
+                        ))
+                    }
+                ))),
+            )
+        ),
         (status = BAD_REQUEST, body = ApiErrorResponse),
     ),
     tag = "odf-query",

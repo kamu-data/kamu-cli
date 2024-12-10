@@ -178,6 +178,9 @@ pub fn new_session_context(object_store_registry: Arc<dyn ObjectStoreRegistry>) 
     use datafusion::execution::runtime_env::{RuntimeConfig, RuntimeEnv};
     use datafusion::prelude::*;
 
+    // TODO: Disabling Utf8View types due to unresolved issues
+    // See: https://github.com/apache/datafusion/issues/13510
+    // See: https://github.com/apache/datafusion/issues/13504
     let mut config = SessionConfig::new().with_default_catalog_and_schema("kamu", "kamu");
 
     // Forcing cese-sensitive identifiers in case-insensitive language seems to
@@ -189,12 +192,21 @@ pub fn new_session_context(object_store_registry: Arc<dyn ObjectStoreRegistry>) 
     // options in transform DTOs)
     config.options_mut().sql_parser.enable_ident_normalization = false;
 
+    // TODO: Disabling Utf8View types due to unresolved issues
+    // See: https://github.com/apache/datafusion/issues/13510
+    // See: https://github.com/apache/datafusion/issues/13504
+    config
+        .options_mut()
+        .execution
+        .parquet
+        .schema_force_view_types = false;
+
     let runtime_config = RuntimeConfig {
         object_store_registry: object_store_registry.as_datafusion_registry(),
         ..RuntimeConfig::default()
     };
 
-    let runtime = Arc::new(RuntimeEnv::new(runtime_config).unwrap());
+    let runtime = Arc::new(RuntimeEnv::try_new(runtime_config).unwrap());
 
     #[allow(unused_mut)]
     let mut ctx = SessionContext::new_with_config_rt(config, runtime);

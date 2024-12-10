@@ -9,8 +9,7 @@ MYSQL_CRATES := ./src/infra/accounts/mysql ./src/e2e/app/cli/mysql
 
 SQLITE_CRATES := ./src/infra/accounts/sqlite ./src/infra/auth-rebac/sqlite ./src/infra/datasets/sqlite ./src/infra/task-system/sqlite ./src/infra/flow-system/sqlite ./src/infra/messaging-outbox/sqlite ./src/e2e/app/cli/sqlite
 
-# ALL_DATABASE_CRATES := $(POSTGRES_CRATES) $(MYSQL_CRATES) $(SQLITE_CRATES)
-ALL_DATABASE_CRATES := $(POSTGRES_CRATES) $(SQLITE_CRATES)
+ALL_DATABASE_CRATES := $(POSTGRES_CRATES) $(MYSQL_CRATES) $(SQLITE_CRATES)
 MIGRATION_DIRS := ./migrations/mysql ./migrations/postgres ./migrations/sqlite
 
 ###############################################################################
@@ -18,18 +17,48 @@ MIGRATION_DIRS := ./migrations/mysql ./migrations/postgres ./migrations/sqlite
 ###############################################################################
 
 .PHONY: lint
-lint:
+lint: lint-rustfmt lint-repo lint-deps clippy lint-openapi lint-sqlx
+
+
+.PHONY: lint-rustfmt
+lint-rustfmt:
 	cargo fmt --check
+
+
+.PHONY: lint-repo
+lint-repo:
 	cargo test -p kamu-repo-tools
+
+
+.PHONY: lint-deps
+lint-deps:
 	cargo deny check --hide-inclusion-graph
-	# cargo udeps --all-targets
-	cargo clippy --workspace --all-targets -- -D warnings
+
+
+.PHONY: lint-sqlx
+lint-sqlx:
 	$(foreach crate,$(ALL_DATABASE_CRATES),(cd $(crate) && cargo sqlx prepare --check);)
 
 
 .PHONY: clippy
 clippy:
 	cargo clippy --workspace --all-targets -- -D warnings
+
+
+# See: https://github.com/IBM/openapi-validator
+.PHONY: lint-openapi
+lint-openapi:
+	docker run --rm -t \
+		-v "${PWD}:/data:ro" \
+  		ibmdevxsdk/openapi-validator:latest \
+		--config src/adapter/http/resources/openapi/linter-config.yaml \
+		--ruleset src/adapter/http/resources/openapi/linter-ruleset.yaml \
+    	resources/openapi-mt.json
+
+
+.PHONY: lint-udeps
+lint-udeps:
+	cargo udeps --all-targets
 
 ###############################################################################
 # Lint (with fixes)
@@ -188,6 +217,15 @@ release-minor:
 .PHONY: release-major
 release-major:
 	cargo run -p kamu-repo-tools --bin release -- --major
+
+
+###############################################################################
+# Generated resources
+###############################################################################
+
+.PHONY: resources
+resources:
+	$(TEST_LOG_PARAMS) cargo nextest run -E 'test(::resourcegen::)'
 
 
 ###############################################################################

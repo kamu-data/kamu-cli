@@ -67,6 +67,14 @@ impl CatalogProvider for KamuCatalog {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl std::fmt::Debug for KamuCatalog {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("KamuCatalog").finish_non_exhaustive()
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Schema
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -229,6 +237,14 @@ impl SchemaProvider for KamuSchema {
         } else {
             Ok(None)
         }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl std::fmt::Debug for KamuSchema {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("KamuSchema").finish_non_exhaustive()
     }
 }
 
@@ -483,6 +499,16 @@ impl TableProvider for KamuTable {
 
     fn statistics(&self) -> Option<Statistics> {
         None
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl std::fmt::Debug for KamuTable {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("KamuTable")
+            .field("resolved_dataset", &self.resolved_dataset)
+            .finish_non_exhaustive()
     }
 }
 

@@ -17,6 +17,7 @@ use kamu_core::*;
 use opendatafabric::DatasetRef;
 
 use super::query_types::{DataFormat, Schema, SchemaFormat};
+use crate::DatasetAliasInPath;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -24,7 +25,7 @@ use super::query_types::{DataFormat, Schema, SchemaFormat};
 #[utoipa::path(
     get,
     path = "/tail",
-    params(DatasetTailParams),
+    params(DatasetTailParams, DatasetAliasInPath),
     responses((status = OK, body = DatasetTailResponse)),
     tag = "odf-query",
     security(
@@ -77,6 +78,7 @@ pub async fn dataset_tail_handler(
 // TODO: Sanity limits
 #[derive(Debug, serde::Deserialize, utoipa::IntoParams)]
 #[serde(rename_all = "camelCase")]
+#[into_params(parameter_in = Query)]
 pub struct DatasetTailParams {
     /// Number of leading records to skip when returning result (used for
     /// pagination)
@@ -92,6 +94,7 @@ pub struct DatasetTailParams {
     pub data_format: DataFormat,
 
     /// How to encode the schema of the result
+    #[param(value_type = SchemaFormat)]
     pub schema_format: Option<SchemaFormat>,
 }
 
@@ -115,10 +118,12 @@ pub struct DatasetTailResponse {
 
     /// Schema of the resulting data
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Schema)]
     pub schema: Option<Schema>,
 
     /// What representation is used for the schema
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = SchemaFormat)]
     pub schema_format: Option<SchemaFormat>,
 }
 

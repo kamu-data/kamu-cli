@@ -211,3 +211,23 @@ impl<'de> serde::de::Visitor<'de> for DatasetIDSerdeVisitor {
 super::sqlx::impl_sqlx!(DatasetID);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(feature = "utoipa")]
+impl utoipa::ToSchema for DatasetID {}
+
+#[cfg(feature = "utoipa")]
+impl utoipa::PartialSchema for DatasetID {
+    fn schema() -> utoipa::openapi::RefOr<utoipa::openapi::schema::Schema> {
+        use utoipa::openapi::schema::*;
+
+        Schema::Object(
+            ObjectBuilder::new()
+                .schema_type(SchemaType::Type(Type::String))
+                .examples([serde_json::json!(DatasetID::new_seeded_ed25519(b"dataset"))])
+                .build(),
+        )
+        .into()
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -9,9 +9,14 @@
 
 #![feature(assert_matches)]
 
+mod dataset_dependencies_repository_test_suite;
 mod dataset_entry_repository_test_suite;
 mod dataset_env_var_repository_test_suite;
+mod helpers;
 
+pub mod dataset_dependency_repo {
+    pub use crate::dataset_dependencies_repository_test_suite::*;
+}
 pub mod dataset_entry_repo {
     pub use crate::dataset_entry_repository_test_suite::*;
 }

@@ -36,9 +36,9 @@ sqlx = { version = "0.8", default-features = false, features = [
     "macros",
     "postgres",
     "chrono",
-    "json"
+    "json",
 ] }
-thiserror = { version = "1", default-features = false }
+thiserror = { version = "2", default-features = false, features = ["std"] }
 tracing = { version = "0.1", default-features = false }
 uuid = "1"
 

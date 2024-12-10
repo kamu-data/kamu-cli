@@ -16,27 +16,27 @@ use kamu::utils::datasets_filtering::filter_datasets_by_local_pattern;
 use opendatafabric::*;
 
 use super::{CLIError, Command};
-use crate::Interact;
+use crate::ConfirmDeleteService;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct DeleteCommand {
-    interact: Arc<Interact>,
     dataset_registry: Arc<dyn DatasetRegistry>,
     delete_dataset: Arc<dyn DeleteDatasetUseCase>,
     dataset_ref_patterns: Vec<DatasetRefPattern>,
     dependency_graph_service: Arc<dyn DependencyGraphService>,
+    confirm_delete_service: Arc<ConfirmDeleteService>,
     all: bool,
     recursive: bool,
 }
 
 impl DeleteCommand {
     pub fn new<I>(
-        interact: Arc<Interact>,
         dataset_registry: Arc<dyn DatasetRegistry>,
         delete_dataset: Arc<dyn DeleteDatasetUseCase>,
         dataset_ref_patterns: I,
         dependency_graph_service: Arc<dyn DependencyGraphService>,
+        confirm_delete_service: Arc<ConfirmDeleteService>,
         all: bool,
         recursive: bool,
     ) -> Self
@@ -44,11 +44,11 @@ impl DeleteCommand {
         I: IntoIterator<Item = DatasetRefPattern>,
     {
         Self {
-            interact,
             dataset_registry,
             delete_dataset,
             dataset_ref_patterns: dataset_ref_patterns.into_iter().collect(),
             dependency_graph_service,
+            confirm_delete_service,
             all,
             recursive,
         }
@@ -57,11 +57,18 @@ impl DeleteCommand {
 
 #[async_trait::async_trait(?Send)]
 impl Command for DeleteCommand {
-    async fn run(&mut self) -> Result<(), CLIError> {
-        if self.dataset_ref_patterns.is_empty() && !self.all {
-            return Err(CLIError::usage_error("Specify a dataset or use --all flag"));
+    async fn validate_args(&self) -> Result<(), CLIError> {
+        match (self.dataset_ref_patterns.as_slice(), self.all) {
+            ([], false) => Err(CLIError::usage_error("Specify dataset(s) or pass --all")),
+            ([], true) => Ok(()),
+            ([_head, ..], false) => Ok(()),
+            ([_head, ..], true) => Err(CLIError::usage_error(
+                "You can either specify dataset(s) or pass --all",
+            )),
         }
+    }
 
+    async fn run(&mut self) -> Result<(), CLIError> {
         let dataset_handles: Vec<DatasetHandle> = if self.all {
             self.dataset_registry
                 .all_dataset_handles()
@@ -102,12 +109,11 @@ impl Command for DeleteCommand {
             return Ok(());
         }
 
-        self.interact.require_confirmation(format!(
-            "{}\n  {}\n{}",
-            console::style("You are about to delete following dataset(s):").yellow(),
-            itertools::join(dataset_handles.iter().map(|h| &h.alias), "\n  "),
-            console::style("This operation is irreversible!").yellow(),
-        ))?;
+        self.confirm_delete_service
+            .confirm_delete(&dataset_handles)
+            .await?;
+
+        tracing::info!(?dataset_handles, "Trying to define delete order");
 
         // TODO: Multiple rounds of resolving IDs to handles
         let dataset_ids = self
@@ -118,6 +124,8 @@ impl Command for DeleteCommand {
             )
             .await
             .map_err(CLIError::critical)?;
+
+        tracing::info!(?dataset_ids, "Delete order defined");
 
         for id in &dataset_ids {
             match self
