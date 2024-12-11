@@ -15,12 +15,12 @@ use opendatafabric::DatasetID;
 
 use crate::prelude::*;
 
-pub struct AccountFlowConfigsMut {
+pub struct AccountFlowTriggersMut {
     account: Account,
 }
 
 #[Object]
-impl AccountFlowConfigsMut {
+impl AccountFlowTriggersMut {
     #[graphql(skip)]
     pub fn new(account: Account) -> Self {
         Self { account }

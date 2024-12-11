@@ -357,7 +357,7 @@ async fn test_pause_resume_account_flows() {
             "accounts": {
                 "byName": {
                     "flows": {
-                        "configs": {
+                        "triggers": {
                             "pauseAccountDatasetFlows": true
                         }
                     }
@@ -367,7 +367,7 @@ async fn test_pause_resume_account_flows() {
     );
 
     let request_code =
-        FlowConfigHarness::all_paused_config_query(&foo_create_result.dataset_handle.id);
+        FlowConfigHarness::all_paused_trigger_query(&foo_create_result.dataset_handle.id);
     let response = schema
         .execute(
             async_graphql::Request::new(request_code.clone())
@@ -406,7 +406,7 @@ async fn test_pause_resume_account_flows() {
             "accounts": {
                 "byName": {
                     "flows": {
-                        "configs": {
+                        "triggers": {
                             "resumeAccountDatasetFlows": true
                         }
                     }
@@ -416,7 +416,7 @@ async fn test_pause_resume_account_flows() {
     );
 
     let request_code =
-        FlowConfigHarness::all_paused_config_query(&foo_create_result.dataset_handle.id);
+        FlowConfigHarness::all_paused_trigger_query(&foo_create_result.dataset_handle.id);
     let response = schema
         .execute(
             async_graphql::Request::new(request_code.clone())
@@ -444,7 +444,7 @@ async fn test_pause_resume_account_flows() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_account_configs_all_paused() {
+async fn test_account_triggers_all_paused() {
     let schema = kamu_adapter_graphql::schema_quiet();
 
     let foo_dataset_alias = DatasetAlias::new(
@@ -548,7 +548,7 @@ async fn test_account_configs_all_paused() {
 
     assert!(response.is_ok(), "{response:?}");
 
-    let request_code = FlowConfigHarness::all_paused_account_configs_query(&DEFAULT_ACCOUNT_NAME);
+    let request_code = FlowConfigHarness::all_paused_account_triggers_query(&DEFAULT_ACCOUNT_NAME);
     let response = schema
         .execute(
             async_graphql::Request::new(request_code.clone())
@@ -587,7 +587,7 @@ async fn test_account_configs_all_paused() {
             "accounts": {
                 "byName": {
                     "flows": {
-                        "configs": {
+                        "triggers": {
                             "pauseAccountDatasetFlows": true
                         }
                     }
@@ -596,7 +596,7 @@ async fn test_account_configs_all_paused() {
         })
     );
 
-    let request_code = FlowConfigHarness::all_paused_account_configs_query(&DEFAULT_ACCOUNT_NAME);
+    let request_code = FlowConfigHarness::all_paused_account_triggers_query(&DEFAULT_ACCOUNT_NAME);
     let response = schema
         .execute(
             async_graphql::Request::new(request_code.clone())
@@ -952,7 +952,7 @@ impl FlowConfigHarness {
                 accounts {
                     byName (accountName: "<name>") {
                         flows {
-                            configs {
+                            triggers {
                                 pauseAccountDatasetFlows
                             }
                         }
@@ -971,7 +971,7 @@ impl FlowConfigHarness {
                 accounts {
                     byName (accountName: "<name>") {
                         flows {
-                            configs {
+                            triggers {
                                 resumeAccountDatasetFlows
                             }
                         }
@@ -983,7 +983,7 @@ impl FlowConfigHarness {
         .replace("<name>", account_name.as_ref())
     }
 
-    fn all_paused_config_query(id: &DatasetID) -> String {
+    fn all_paused_trigger_query(id: &DatasetID) -> String {
         indoc!(
             r#"
             {
@@ -1002,7 +1002,7 @@ impl FlowConfigHarness {
         .replace("<id>", &id.to_string())
     }
 
-    fn all_paused_account_configs_query(account_name: &AccountName) -> String {
+    fn all_paused_account_triggers_query(account_name: &AccountName) -> String {
         indoc!(
             r#"
             {
@@ -1051,12 +1051,10 @@ impl FlowConfigHarness {
                                             __typename
                                             paused
                                             schedule {
-                                                rule {
-                                                    __typename
-                                                    ... on TimeDelta {
-                                                        every
-                                                        unit
-                                                    }
+                                                __typename
+                                                ... on TimeDelta {
+                                                    every
+                                                    unit
                                                 }
                                             }
                                             batching {

@@ -57,14 +57,12 @@ async fn test_crud_time_delta_root_dataset() {
                             byType (datasetFlowType: "INGEST") {
                                 __typename
                                 schedule {
-                                    rule {
-                                        __typename
-                                        ... on TimeDelta {
-                                            every
-                                            unit
-                                        }
+                                    __typename
+                                    ... on TimeDelta {
+                                        every
+                                        unit
                                     }
-                                }
+                            }
                                 batching {
                                     __typename
                                 }
@@ -132,11 +130,9 @@ async fn test_crud_time_delta_root_dataset() {
                                     "__typename": "FlowTrigger",
                                     "paused": false,
                                     "schedule": {
-                                        "rule": {
-                                            "__typename": "TimeDelta",
-                                            "every": 1,
-                                            "unit": "DAYS"
-                                        },
+                                        "__typename": "TimeDelta",
+                                        "every": 1,
+                                        "unit": "DAYS"
                                     },
                                     "batching": null,
                                 }
@@ -178,11 +174,9 @@ async fn test_crud_time_delta_root_dataset() {
                                     "__typename": "FlowTrigger",
                                     "paused": true,
                                     "schedule": {
-                                        "rule": {
-                                            "__typename": "TimeDelta",
-                                            "every": 2,
-                                            "unit": "HOURS"
-                                        },
+                                        "__typename": "TimeDelta",
+                                        "every": 2,
+                                        "unit": "HOURS"
                                     },
                                     "batching": null,
                                 }
@@ -291,11 +285,9 @@ async fn test_crud_cron_root_dataset() {
                                 __typename
                                 paused
                                 schedule {
-                                    rule {
-                                        __typename
-                                        ... on Cron5ComponentExpression {
-                                            cron5ComponentExpression
-                                        }
+                                    __typename
+                                    ... on Cron5ComponentExpression {
+                                        cron5ComponentExpression
                                     }
                                 }
                                 batching {
@@ -364,10 +356,8 @@ async fn test_crud_cron_root_dataset() {
                                     "__typename": "FlowTrigger",
                                     "paused": false,
                                     "schedule": {
-                                        "rule": {
-                                            "__typename": "Cron5ComponentExpression",
-                                            "cron5ComponentExpression": "*/2 * * * *",
-                                        },
+                                        "__typename": "Cron5ComponentExpression",
+                                        "cron5ComponentExpression": "*/2 * * * *",
                                     },
                                     "batching": null,
                                 }
@@ -408,10 +398,8 @@ async fn test_crud_cron_root_dataset() {
                                     "__typename": "FlowTrigger",
                                     "paused": true,
                                     "schedule": {
-                                        "rule": {
-                                            "__typename": "Cron5ComponentExpression",
-                                            "cron5ComponentExpression": "0 */1 * * *",
-                                        },
+                                        "__typename": "Cron5ComponentExpression",
+                                        "cron5ComponentExpression": "0 */1 * * *",
                                     },
                                     "batching": null,
                                 }
@@ -673,7 +661,6 @@ async fn test_batching_trigger_validation() {
                     }
             })
         );
-        println!("1");
     }
 }
 
@@ -1189,7 +1176,7 @@ impl FlowTriggerHarness {
 
     fn extract_time_delta_from_response(response_json: &serde_json::Value) -> (u64, &str) {
         let schedule_json = &response_json["datasets"]["byId"]["flows"]["triggers"]["setTrigger"]
-            ["trigger"]["schedule"]["rule"];
+            ["trigger"]["schedule"];
 
         (
             schedule_json["every"].as_u64().unwrap(),
@@ -1227,12 +1214,10 @@ impl FlowTriggerHarness {
                                             __typename
                                             paused
                                             schedule {
-                                                rule {
-                                                    __typename
-                                                    ... on TimeDelta {
-                                                        every
-                                                        unit
-                                                    }
+                                                __typename
+                                                ... on TimeDelta {
+                                                    every
+                                                    unit
                                                 }
                                             }
                                             batching {
@@ -1284,11 +1269,9 @@ impl FlowTriggerHarness {
                                             __typename,
                                             paused
                                             schedule {
-                                                rule {
-                                                    __typename
-                                                    ... on Cron5ComponentExpression {
-                                                        cron5ComponentExpression
-                                                    }
+                                                __typename
+                                                ... on Cron5ComponentExpression {
+                                                    cron5ComponentExpression
                                                 }
                                             }
                                             batching {

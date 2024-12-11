@@ -17,24 +17,15 @@ use crate::prelude::*;
 #[derive(SimpleObject, Clone, PartialEq, Eq)]
 pub struct FlowTrigger {
     pub paused: bool,
-    pub schedule: Option<FlowTriggerSchedule>,
+    pub schedule: Option<FlowTriggerScheduleRule>,
     pub batching: Option<FlowTriggerBatchingRule>,
 }
 
-#[derive(SimpleObject, Clone, PartialEq, Eq)]
-pub struct FlowTriggerSchedule {
-    pub rule: FlowTriggerScheduleRule,
-}
-
-impl From<Schedule> for FlowTriggerSchedule {
+impl From<Schedule> for FlowTriggerScheduleRule {
     fn from(value: Schedule) -> Self {
-        Self {
-            rule: match value {
-                Schedule::TimeDelta(time_delta) => {
-                    FlowTriggerScheduleRule::TimeDelta(time_delta.every.into())
-                }
-                Schedule::Cron(cron) => FlowTriggerScheduleRule::Cron(cron.clone().into()),
-            },
+        match value {
+            Schedule::TimeDelta(time_delta) => Self::TimeDelta(time_delta.every.into()),
+            Schedule::Cron(cron) => Self::Cron(cron.clone().into()),
         }
     }
 }

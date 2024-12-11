@@ -80,11 +80,6 @@ type AccountEdge {
 	node: Account!
 }
 
-type AccountFlowConfigsMut {
-	resumeAccountDatasetFlows: Boolean!
-	pauseAccountDatasetFlows: Boolean!
-}
-
 input AccountFlowFilters {
 	byFlowType: DatasetFlowType
 	byStatus: FlowStatus
@@ -104,6 +99,11 @@ type AccountFlowTriggers {
 	allPaused: Boolean!
 }
 
+type AccountFlowTriggersMut {
+	resumeAccountDatasetFlows: Boolean!
+	pauseAccountDatasetFlows: Boolean!
+}
+
 type AccountFlows {
 	"""
 	Returns interface for flow runs queries
@@ -116,7 +116,7 @@ type AccountFlows {
 }
 
 type AccountFlowsMut {
-	configs: AccountFlowConfigsMut!
+	triggers: AccountFlowTriggersMut!
 }
 
 scalar AccountID
@@ -1283,7 +1283,7 @@ type FlowTimingRecords {
 
 type FlowTrigger {
 	paused: Boolean!
-	schedule: FlowTriggerSchedule
+	schedule: FlowTriggerScheduleRule
 	batching: FlowTriggerBatchingRule
 }
 
@@ -1313,10 +1313,6 @@ type FlowTriggerManual {
 
 type FlowTriggerPush {
 	dummy: Boolean!
-}
-
-type FlowTriggerSchedule {
-	rule: FlowTriggerScheduleRule!
 }
 
 union FlowTriggerScheduleRule = TimeDelta | Cron5ComponentExpression
