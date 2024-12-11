@@ -19,7 +19,6 @@ use kamu_core::DatasetOwnershipService;
 use kamu_flow_system::*;
 use opendatafabric::{AccountID, DatasetID};
 
-use super::FlowTriggerContext;
 use crate::{FlowAbortHelper, FlowSchedulingHelper};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -289,11 +288,11 @@ impl FlowQueryService for FlowQueryServiceImpl {
         scheduling_helper
             .trigger_flow_common(
                 &flow_key,
-                FlowTrigger::Manual(FlowTriggerManual {
+                None,
+                FlowTriggerType::Manual(FlowTriggerManual {
                     trigger_time: activation_time,
                     initiator_account_id,
                 }),
-                FlowTriggerContext::Unconditional,
                 config_snapshot_maybe,
             )
             .await

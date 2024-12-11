@@ -49,8 +49,16 @@ async fn test_read_initial_config_and_queue_without_waiting() {
             DatasetFlowType::Ingest,
             IngestRule {
                 fetch_uncacheable: false,
-                schedule_condition: Duration::milliseconds(60).into(),
             },
+        )
+        .await;
+
+    harness
+        .set_dataset_flow_trigger(
+            harness.now_datetime(),
+            foo_id.clone(),
+            DatasetFlowType::Ingest,
+            FlowTriggerRule::Schedule(Duration::milliseconds(60).into()),
         )
         .await;
     harness.eager_initialization().await;
@@ -171,18 +179,15 @@ async fn test_read_initial_config_shouldnt_queue_in_recovery_case() {
 
     // Configure ingestion schedule every 60ms, but use event store directly
     harness
-        .flow_configuration_event_store
+        .flow_trigger_event_store
         .save_events(
             &foo_flow_key,
             None,
-            vec![FlowConfigurationEventCreated {
+            vec![FlowTriggerEventCreated {
                 event_time: start_time,
                 flow_key: foo_flow_key.clone(),
                 paused: false,
-                rule: FlowConfigurationRule::IngestRule(IngestRule {
-                    fetch_uncacheable: false,
-                    schedule_condition: Duration::milliseconds(60).into(),
-                }),
+                rule: Some(FlowTriggerRule::Schedule(Duration::milliseconds(60).into())),
             }
             .into()],
         )
@@ -202,7 +207,7 @@ async fn test_read_initial_config_shouldnt_queue_in_recovery_case() {
                     event_time: start_time,
                     flow_id,
                     flow_key: foo_flow_key.clone(),
-                    trigger: FlowTrigger::AutoPolling(FlowTriggerAutoPolling {
+                    trigger: FlowTriggerType::AutoPolling(FlowTriggerAutoPolling {
                         trigger_time: start_time,
                     }),
                     config_snapshot: None,
@@ -347,19 +352,16 @@ async fn test_cron_config() {
 
                     // Enable CRON config (we are skipping moment 0s)
                     harness
-                      .set_dataset_flow_ingest(
+                      .set_dataset_flow_trigger(
                           harness.now_datetime(),
                           foo_id.clone(),
                           DatasetFlowType::Ingest,
-                          IngestRule {
-                              fetch_uncacheable: false,
-                              schedule_condition: Schedule::Cron(ScheduleCron {
-                                  source_5component_cron_expression: String::from("<irrelevant>"),
-                                  cron_schedule: cron::Schedule::from_str("*/5 * * * * *").unwrap(),
-                                  }),
-                                },
-                            )
-                            .await;
+                          FlowTriggerRule::Schedule(Schedule::Cron(ScheduleCron {
+                            source_5component_cron_expression: String::from("<irrelevant>"),
+                            cron_schedule: cron::Schedule::from_str("*/5 * * * * *").unwrap(),
+                          })),
+                        )
+                        .await;
                     test_flow_listener
                         .make_a_snapshot(start_time + Duration::seconds(1))
                         .await;
@@ -430,14 +432,11 @@ async fn test_manual_trigger() {
 
     // Note: only "foo" has auto-schedule, "bar" hasn't
     harness
-        .set_dataset_flow_ingest(
+        .set_dataset_flow_trigger(
             harness.now_datetime(),
             foo_id.clone(),
             DatasetFlowType::Ingest,
-            IngestRule {
-                fetch_uncacheable: false,
-                schedule_condition: Duration::milliseconds(90).into(),
-            },
+            FlowTriggerRule::Schedule(Duration::milliseconds(90).into()),
         )
         .await;
     harness.eager_initialization().await;
@@ -647,8 +646,15 @@ async fn test_ingest_trigger_with_ingest_config() {
             DatasetFlowType::Ingest,
             IngestRule {
                 fetch_uncacheable: true,
-                schedule_condition: Duration::milliseconds(90).into(),
             },
+        )
+        .await;
+    harness
+        .set_dataset_flow_trigger(
+            harness.now_datetime(),
+            foo_id.clone(),
+            DatasetFlowType::Ingest,
+            FlowTriggerRule::Schedule(Duration::milliseconds(90).into()),
         )
         .await;
     harness.eager_initialization().await;
@@ -1245,7 +1251,7 @@ async fn test_reset_trigger_keep_metadata_compaction_for_derivatives() {
 
           // Main simulation script
           let main_handle = async {
-              harness.advance_time(Duration::milliseconds(300)).await;
+              harness.advance_time(Duration::milliseconds(400)).await;
           };
 
           // tokio::join!(trigger0_handle, task0_handle, main_handle)
@@ -2205,25 +2211,19 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
     let bar_id = bar_create_result.dataset_handle.id;
 
     harness
-        .set_dataset_flow_ingest(
+        .set_dataset_flow_trigger(
             harness.now_datetime(),
             foo_id.clone(),
             DatasetFlowType::Ingest,
-            IngestRule {
-                fetch_uncacheable: false,
-                schedule_condition: Duration::milliseconds(50).into(),
-            },
+            FlowTriggerRule::Schedule(Duration::milliseconds(50).into()),
         )
         .await;
     harness
-        .set_dataset_flow_ingest(
+        .set_dataset_flow_trigger(
             harness.now_datetime(),
             bar_id.clone(),
             DatasetFlowType::Ingest,
-            IngestRule {
-                fetch_uncacheable: false,
-                schedule_condition: Duration::milliseconds(80).into(),
-            },
+            FlowTriggerRule::Schedule(Duration::milliseconds(80).into()),
         )
         .await;
     harness.eager_initialization().await;
@@ -2283,7 +2283,7 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
                 //  - flow 1: task 0 starts at 10ms, finishes at 20ms
                 //  - next flow 3 queued for 70ms (20+50)
 
-                // 50ms: Pause both flow configs in between completion 2 first tasks and queuing
+                // 50ms: Pause both flow triggers in between completion 2 first tasks and queuing
                 harness.advance_time(Duration::milliseconds(50)).await;
                 harness.pause_dataset_flow(start_time + Duration::milliseconds(50), foo_id.clone(), DatasetFlowType::Ingest).await;
                 harness.pause_dataset_flow(start_time + Duration::milliseconds(50), bar_id.clone(), DatasetFlowType::Ingest).await;
@@ -2293,14 +2293,15 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
                 //    - gets resumed with previous period of 50ms
                 //    - gets scheduled immediately at 80ms (waited >= 1 period)
                 //  - "bar":
-                //    - gets a config update for period of 70ms
+                //    - gets a trigger update for period of 70ms
                 //    - get queued for 100ms (last success at 30ms + period of 70ms)
                 harness.advance_time(Duration::milliseconds(30)).await;
                 harness.resume_dataset_flow(start_time + Duration::milliseconds(80), foo_id.clone(), DatasetFlowType::Ingest).await;
-                harness.set_dataset_flow_ingest(start_time + Duration::milliseconds(80), bar_id.clone(), DatasetFlowType::Ingest, IngestRule {
-                  fetch_uncacheable: false,
-                  schedule_condition: Duration::milliseconds(70).into(),
-              }).await;
+                harness.set_dataset_flow_trigger(
+                  start_time + Duration::milliseconds(80),
+                  bar_id.clone(), DatasetFlowType::Ingest,
+                  FlowTriggerRule::Schedule(Duration::milliseconds(70).into()),
+                ).await;
                 test_flow_listener
                     .make_a_snapshot(start_time + Duration::milliseconds(80))
                     .await;
@@ -2433,26 +2434,20 @@ async fn test_respect_last_success_time_when_schedule_resumes() {
     let bar_id = bar_create_result.dataset_handle.id;
 
     harness
-        .set_dataset_flow_ingest(
+        .set_dataset_flow_trigger(
             harness.now_datetime(),
             foo_id.clone(),
             DatasetFlowType::Ingest,
-            IngestRule {
-                fetch_uncacheable: false,
-                schedule_condition: Duration::milliseconds(100).into(),
-            },
+            FlowTriggerRule::Schedule(Duration::milliseconds(100).into()),
         )
         .await;
 
     harness
-        .set_dataset_flow_ingest(
+        .set_dataset_flow_trigger(
             harness.now_datetime(),
             bar_id.clone(),
             DatasetFlowType::Ingest,
-            IngestRule {
-                fetch_uncacheable: false,
-                schedule_condition: Duration::milliseconds(60).into(),
-            },
+            FlowTriggerRule::Schedule(Duration::milliseconds(60).into()),
         )
         .await;
 
@@ -2664,25 +2659,19 @@ async fn test_dataset_deleted() {
     let bar_id = bar_create_result.dataset_handle.id;
 
     harness
-        .set_dataset_flow_ingest(
+        .set_dataset_flow_trigger(
             harness.now_datetime(),
             foo_id.clone(),
             DatasetFlowType::Ingest,
-            IngestRule {
-                fetch_uncacheable: false,
-                schedule_condition: Duration::milliseconds(50).into(),
-            },
+            FlowTriggerRule::Schedule(Duration::milliseconds(50).into()),
         )
         .await;
     harness
-        .set_dataset_flow_ingest(
+        .set_dataset_flow_trigger(
             harness.now_datetime(),
             bar_id.clone(),
             DatasetFlowType::Ingest,
-            IngestRule {
-                fetch_uncacheable: false,
-                schedule_condition: Duration::milliseconds(70).into(),
-            },
+            FlowTriggerRule::Schedule(Duration::milliseconds(70).into()),
         )
         .await;
     harness.eager_initialization().await;
@@ -2859,14 +2848,11 @@ async fn test_task_completions_trigger_next_loop_on_success() {
 
     for dataset_id in [&foo_id, &bar_id, &baz_id] {
         harness
-            .set_dataset_flow_ingest(
+            .set_dataset_flow_trigger(
                 harness.now_datetime(),
                 dataset_id.clone(),
                 DatasetFlowType::Ingest,
-                IngestRule {
-                    fetch_uncacheable: false,
-                    schedule_condition: Duration::milliseconds(40).into(),
-                },
+                FlowTriggerRule::Schedule(Duration::milliseconds(40).into()),
             )
             .await;
     }
@@ -3077,23 +3063,20 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
         .await;
 
     harness
-        .set_dataset_flow_ingest(
+        .set_dataset_flow_trigger(
             harness.now_datetime(),
             foo_id.clone(),
             DatasetFlowType::Ingest,
-            IngestRule {
-                fetch_uncacheable: false,
-                schedule_condition: Duration::milliseconds(80).into(),
-            },
+            FlowTriggerRule::Schedule(Duration::milliseconds(80).into()),
         )
         .await;
 
     harness
-        .set_dataset_flow_transform_rule(
+        .set_dataset_flow_trigger(
             harness.now_datetime(),
             bar_id.clone(),
             DatasetFlowType::ExecuteTransform,
-            TransformRule::new_checked(1, Duration::seconds(1)).unwrap(),
+            FlowTriggerRule::Batching(BatchingRule::new_checked(1, Duration::seconds(1)).unwrap()),
         )
         .await;
 
@@ -3472,35 +3455,29 @@ async fn test_throttling_derived_dataset_with_2_parents() {
         .await;
 
     harness
-        .set_dataset_flow_ingest(
+        .set_dataset_flow_trigger(
             harness.now_datetime(),
             foo_id.clone(),
             DatasetFlowType::Ingest,
-            IngestRule {
-                fetch_uncacheable: false,
-                schedule_condition: Duration::milliseconds(50).into(),
-            },
+            FlowTriggerRule::Schedule(Duration::milliseconds(50).into()),
         )
         .await;
 
     harness
-        .set_dataset_flow_ingest(
+        .set_dataset_flow_trigger(
             harness.now_datetime(),
             bar_id.clone(),
             DatasetFlowType::Ingest,
-            IngestRule {
-                fetch_uncacheable: false,
-                schedule_condition: Duration::milliseconds(150).into(),
-            },
+            FlowTriggerRule::Schedule(Duration::milliseconds(150).into()),
         )
         .await;
 
     harness
-        .set_dataset_flow_transform_rule(
+        .set_dataset_flow_trigger(
             harness.now_datetime(),
             baz_id.clone(),
             DatasetFlowType::ExecuteTransform,
-            TransformRule::new_checked(1, Duration::hours(24)).unwrap(),
+            FlowTriggerRule::Batching(BatchingRule::new_checked(1, Duration::hours(24)).unwrap()),
         )
         .await;
 
@@ -3952,23 +3929,22 @@ async fn test_batching_condition_records_reached() {
         .await;
 
     harness
-        .set_dataset_flow_ingest(
+        .set_dataset_flow_trigger(
             harness.now_datetime(),
             foo_id.clone(),
             DatasetFlowType::Ingest,
-            IngestRule {
-                fetch_uncacheable: false,
-                schedule_condition: Duration::milliseconds(50).into(),
-            },
+            FlowTriggerRule::Schedule(Duration::milliseconds(50).into()),
         )
         .await;
 
     harness
-        .set_dataset_flow_transform_rule(
+        .set_dataset_flow_trigger(
             harness.now_datetime(),
             bar_id.clone(),
             DatasetFlowType::ExecuteTransform,
-            TransformRule::new_checked(10, Duration::milliseconds(120)).unwrap(),
+            FlowTriggerRule::Batching(
+                BatchingRule::new_checked(10, Duration::milliseconds(120)).unwrap(),
+            ),
         )
         .await;
 
@@ -4275,23 +4251,22 @@ async fn test_batching_condition_timeout() {
         .await;
 
     harness
-        .set_dataset_flow_ingest(
+        .set_dataset_flow_trigger(
             harness.now_datetime(),
             foo_id.clone(),
             DatasetFlowType::Ingest,
-            IngestRule {
-                fetch_uncacheable: false,
-                schedule_condition: Duration::milliseconds(50).into(),
-            },
+            FlowTriggerRule::Schedule(Duration::milliseconds(50).into()),
         )
         .await;
 
     harness
-        .set_dataset_flow_transform_rule(
+        .set_dataset_flow_trigger(
             harness.now_datetime(),
             bar_id.clone(),
             DatasetFlowType::ExecuteTransform,
-            TransformRule::new_checked(10, Duration::milliseconds(150)).unwrap(),
+            FlowTriggerRule::Batching(
+                BatchingRule::new_checked(10, Duration::milliseconds(150)).unwrap(),
+            ),
         )
         .await;
 
@@ -4549,23 +4524,22 @@ async fn test_batching_condition_watermark() {
         .await;
 
     harness
-        .set_dataset_flow_ingest(
+        .set_dataset_flow_trigger(
             harness.now_datetime(),
             foo_id.clone(),
             DatasetFlowType::Ingest,
-            IngestRule {
-                fetch_uncacheable: false,
-                schedule_condition: Duration::milliseconds(40).into(),
-            },
+            FlowTriggerRule::Schedule(Duration::milliseconds(40).into()),
         )
         .await;
 
     harness
-        .set_dataset_flow_transform_rule(
+        .set_dataset_flow_trigger(
             harness.now_datetime(),
             bar_id.clone(),
             DatasetFlowType::ExecuteTransform,
-            TransformRule::new_checked(10, Duration::milliseconds(200)).unwrap(),
+            FlowTriggerRule::Batching(
+                BatchingRule::new_checked(10, Duration::milliseconds(200)).unwrap(),
+            ),
         )
         .await;
 
@@ -4880,35 +4854,31 @@ async fn test_batching_condition_with_2_inputs() {
         .await;
 
     harness
-        .set_dataset_flow_ingest(
+        .set_dataset_flow_trigger(
             harness.now_datetime(),
             foo_id.clone(),
             DatasetFlowType::Ingest,
-            IngestRule {
-                fetch_uncacheable: false,
-                schedule_condition: Duration::milliseconds(80).into(),
-            },
+            FlowTriggerRule::Schedule(Duration::milliseconds(80).into()),
         )
         .await;
 
     harness
-        .set_dataset_flow_ingest(
+        .set_dataset_flow_trigger(
             harness.now_datetime(),
             bar_id.clone(),
             DatasetFlowType::Ingest,
-            IngestRule {
-                fetch_uncacheable: false,
-                schedule_condition: Duration::milliseconds(120).into(),
-            },
+            FlowTriggerRule::Schedule(Duration::milliseconds(120).into()),
         )
         .await;
 
     harness
-        .set_dataset_flow_transform_rule(
+        .set_dataset_flow_trigger(
             harness.now_datetime(),
             baz_id.clone(),
             DatasetFlowType::ExecuteTransform,
-            TransformRule::new_checked(15, Duration::milliseconds(200)).unwrap(),
+            FlowTriggerRule::Batching(
+                BatchingRule::new_checked(15, Duration::milliseconds(200)).unwrap(),
+            ),
         )
         .await;
 
@@ -5681,14 +5651,11 @@ async fn test_abort_flow_before_scheduling_tasks() {
     let foo_id = foo_create_result.dataset_handle.id;
 
     harness
-        .set_dataset_flow_ingest(
+        .set_dataset_flow_trigger(
             harness.now_datetime(),
             foo_id.clone(),
             DatasetFlowType::Ingest,
-            IngestRule {
-                fetch_uncacheable: false,
-                schedule_condition: Duration::milliseconds(100).into(),
-            },
+            FlowTriggerRule::Schedule(Duration::milliseconds(100).into()),
         )
         .await;
     harness.eager_initialization().await;
@@ -5777,14 +5744,11 @@ async fn test_abort_flow_after_scheduling_still_waiting_for_executor() {
     let foo_id = foo_create_result.dataset_handle.id;
 
     harness
-        .set_dataset_flow_ingest(
+        .set_dataset_flow_trigger(
             harness.now_datetime(),
             foo_id.clone(),
             DatasetFlowType::Ingest,
-            IngestRule {
-                fetch_uncacheable: false,
-                schedule_condition: Duration::milliseconds(50).into(),
-            },
+            FlowTriggerRule::Schedule(Duration::milliseconds(50).into()),
         )
         .await;
     harness.eager_initialization().await;
@@ -5878,14 +5842,11 @@ async fn test_abort_flow_after_task_running_has_started() {
     let foo_id = foo_create_result.dataset_handle.id;
 
     harness
-        .set_dataset_flow_ingest(
+        .set_dataset_flow_trigger(
             harness.now_datetime(),
             foo_id.clone(),
             DatasetFlowType::Ingest,
-            IngestRule {
-                fetch_uncacheable: false,
-                schedule_condition: Duration::milliseconds(50).into(),
-            },
+            FlowTriggerRule::Schedule(Duration::milliseconds(50).into()),
         )
         .await;
     harness.eager_initialization().await;
@@ -5968,14 +5929,11 @@ async fn test_abort_flow_after_task_finishes() {
     let foo_id = foo_create_result.dataset_handle.id;
 
     harness
-        .set_dataset_flow_ingest(
+        .set_dataset_flow_trigger(
             harness.now_datetime(),
             foo_id.clone(),
             DatasetFlowType::Ingest,
-            IngestRule {
-                fetch_uncacheable: false,
-                schedule_condition: Duration::milliseconds(50).into(),
-            },
+            FlowTriggerRule::Schedule(Duration::milliseconds(50).into()),
         )
         .await;
     harness.eager_initialization().await;
@@ -6096,25 +6054,21 @@ async fn test_respect_last_success_time_when_activate_configuration() {
             vec![foo_id.clone()],
         )
         .await;
-
     harness
-        .set_dataset_flow_ingest(
+        .set_dataset_flow_trigger(
             harness.now_datetime(),
             foo_id.clone(),
             DatasetFlowType::Ingest,
-            IngestRule {
-                fetch_uncacheable: false,
-                schedule_condition: Duration::milliseconds(100).into(),
-            },
+            FlowTriggerRule::Schedule(Duration::milliseconds(100).into()),
         )
         .await;
 
     harness
-        .set_dataset_flow_transform_rule(
+        .set_dataset_flow_trigger(
             harness.now_datetime(),
             bar_id.clone(),
             DatasetFlowType::ExecuteTransform,
-            TransformRule::new_checked(1, Duration::seconds(10)).unwrap(),
+            FlowTriggerRule::Batching(BatchingRule::new_checked(1, Duration::seconds(10)).unwrap()),
         )
         .await;
 

@@ -22,7 +22,7 @@ pub struct FlowState {
     /// Flow key
     pub flow_key: FlowKey,
     /// Triggers
-    pub triggers: Vec<FlowTrigger>,
+    pub triggers: Vec<FlowTriggerType>,
     /// Start condition (if defined)
     pub start_condition: Option<FlowStartCondition>,
     /// Timing records
@@ -49,7 +49,7 @@ pub struct FlowTimingRecords {
 
 impl FlowState {
     /// Extract primary trigger
-    pub fn primary_trigger(&self) -> &FlowTrigger {
+    pub fn primary_trigger(&self) -> &FlowTriggerType {
         // At least 1 trigger is initially defined for sure
         self.triggers.first().unwrap()
     }

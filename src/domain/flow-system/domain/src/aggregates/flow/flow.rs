@@ -24,7 +24,7 @@ impl Flow {
         now: DateTime<Utc>,
         flow_id: FlowID,
         flow_key: FlowKey,
-        trigger: FlowTrigger,
+        trigger: FlowTriggerType,
         config_snapshot: Option<FlowConfigurationSnapshot>,
     ) -> Self {
         Self(
@@ -65,7 +65,7 @@ impl Flow {
     pub fn add_trigger_if_unique(
         &mut self,
         now: DateTime<Utc>,
-        trigger: FlowTrigger,
+        trigger: FlowTriggerType,
     ) -> Result<bool, ProjectionError<FlowState>> {
         if trigger.is_unique_vs(&self.triggers) {
             let event = FlowEventTriggerAdded {

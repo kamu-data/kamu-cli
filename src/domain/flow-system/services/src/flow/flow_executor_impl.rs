@@ -36,9 +36,9 @@ use crate::{
     FlowAbortHelper,
     FlowSchedulingHelper,
     MESSAGE_CONSUMER_KAMU_FLOW_EXECUTOR,
-    MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE,
     MESSAGE_PRODUCER_KAMU_FLOW_EXECUTOR,
     MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE,
+    MESSAGE_PRODUCER_KAMU_FLOW_TRIGGER_SERVICE,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -57,13 +57,13 @@ pub struct FlowExecutorImpl {
 #[interface(dyn MessageConsumer)]
 #[interface(dyn MessageConsumerT<TaskProgressMessage>)]
 #[interface(dyn MessageConsumerT<DatasetLifecycleMessage>)]
-#[interface(dyn MessageConsumerT<FlowConfigurationUpdatedMessage>)]
+#[interface(dyn MessageConsumerT<FlowTriggerUpdatedMessage>)]
 #[meta(MessageConsumerMeta {
     consumer_name: MESSAGE_CONSUMER_KAMU_FLOW_EXECUTOR,
     feeding_producers: &[
         MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
         MESSAGE_PRODUCER_KAMU_TASK_EXECUTOR,
-        MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE
+        MESSAGE_PRODUCER_KAMU_FLOW_TRIGGER_SERVICE
     ],
     delivery: MessageDeliveryMechanism::Transactional,
 })]
@@ -164,10 +164,10 @@ impl FlowExecutorImpl {
                     scheduling_helper
                         .trigger_flow_common(
                             &flow.flow_key,
-                            FlowTrigger::AutoPolling(FlowTriggerAutoPolling {
+                            Some(FlowTriggerRule::Batching(b.active_batching_rule)),
+                            FlowTriggerType::AutoPolling(FlowTriggerAutoPolling {
                                 trigger_time: start_time,
                             }),
-                            FlowTriggerContext::Batching(b.active_transform_rule),
                             None,
                         )
                         .await?;
@@ -186,21 +186,19 @@ impl FlowExecutorImpl {
         target_catalog: &Catalog,
         start_time: DateTime<Utc>,
     ) -> Result<(), InternalError> {
-        let flow_configuration_service = target_catalog
-            .get_one::<dyn FlowConfigurationService>()
-            .unwrap();
+        let flow_trigger_service = target_catalog.get_one::<dyn FlowTriggerService>().unwrap();
         let flow_event_store = target_catalog.get_one::<dyn FlowEventStore>().unwrap();
 
-        // Query all enabled flow configurations
-        let enabled_configurations: Vec<_> = flow_configuration_service
-            .list_enabled_configurations()
+        // Query all enabled flow triggers
+        let enabled_triggers: Vec<_> = flow_trigger_service
+            .list_enabled_triggers()
             .try_collect()
             .await?;
 
         // Split configs by those which have a schedule or different rules
-        let (schedule_configs, non_schedule_configs): (Vec<_>, Vec<_>) = enabled_configurations
+        let (schedule_configs, non_schedule_configs): (Vec<_>, Vec<_>) = enabled_triggers
             .into_iter()
-            .partition(|config| matches!(config.rule, FlowConfigurationRule::Schedule(_)));
+            .partition(|config| matches!(config.rule, Some(FlowTriggerRule::Schedule(_))));
 
         let scheduling_helper = target_catalog.get_one::<FlowSchedulingHelper>().unwrap();
 
@@ -209,20 +207,20 @@ impl FlowExecutorImpl {
         //
         // Thought: maybe we need topological sorting by derived relations as well to
         // optimize the initial execution order, but batching rules may work just fine
-        for enabled_config in schedule_configs
+        for enabled_trigger in schedule_configs
             .into_iter()
             .chain(non_schedule_configs.into_iter())
         {
             // Do not re-trigger the flow that has already triggered
             let maybe_pending_flow_id = flow_event_store
-                .try_get_pending_flow(&enabled_config.flow_key)
+                .try_get_pending_flow(&enabled_trigger.flow_key)
                 .await?;
             if maybe_pending_flow_id.is_none() {
                 scheduling_helper
-                    .activate_flow_configuration(
+                    .activate_flow_trigger(
                         start_time,
-                        enabled_config.flow_key,
-                        enabled_config.rule,
+                        enabled_trigger.flow_key,
+                        enabled_trigger.rule,
                     )
                     .await?;
             }
@@ -633,16 +631,16 @@ impl MessageConsumerT<TaskProgressMessage> for FlowExecutorImpl {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl MessageConsumerT<FlowConfigurationUpdatedMessage> for FlowExecutorImpl {
+impl MessageConsumerT<FlowTriggerUpdatedMessage> for FlowExecutorImpl {
     #[tracing::instrument(
         level = "debug",
         skip_all,
-        name = "FlowExecutorImpl[FlowConfigurationUpdatedMessage]"
+        name = "FlowExecutorImpl[FlowTriggerUpdatedMessage]"
     )]
     async fn consume_message(
         &self,
         target_catalog: &Catalog,
-        message: &FlowConfigurationUpdatedMessage,
+        message: &FlowTriggerUpdatedMessage,
     ) -> Result<(), InternalError> {
         tracing::debug!(received_message = ?message, "Received flow configuration message");
 
@@ -661,7 +659,7 @@ impl MessageConsumerT<FlowConfigurationUpdatedMessage> for FlowExecutorImpl {
         } else {
             let scheduling_helper = target_catalog.get_one::<FlowSchedulingHelper>().unwrap();
             scheduling_helper
-                .activate_flow_configuration(
+                .activate_flow_trigger(
                     self.executor_config.round_time(message.event_time)?,
                     message.flow_key.clone(),
                     message.rule.clone(),
@@ -737,7 +735,7 @@ impl MessageConsumerT<DatasetLifecycleMessage> for FlowExecutorImpl {
 pub enum FlowTriggerContext {
     Unconditional,
     Scheduled(Schedule),
-    Batching(TransformRule),
+    Batching(BatchingRule),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -745,7 +743,7 @@ pub enum FlowTriggerContext {
 #[derive(Debug, Eq, PartialEq)]
 pub struct DownstreamDependencyFlowPlan {
     pub flow_key: FlowKey,
-    pub flow_trigger_context: FlowTriggerContext,
+    pub flow_trigger_rule: Option<FlowTriggerRule>,
     pub maybe_config_snapshot: Option<FlowConfigurationSnapshot>,
 }
 

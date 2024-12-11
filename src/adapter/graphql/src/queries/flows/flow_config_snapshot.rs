@@ -15,7 +15,6 @@ use crate::prelude::*;
 
 #[derive(Union)]
 pub enum FlowConfigurationSnapshot {
-    Transform(FlowConfigurationTransform),
     Compaction(FlowConfigurationCompactionRule),
     Ingest(FlowConfigurationIngest),
     Reset(FlowConfigurationReset),
@@ -32,12 +31,6 @@ impl From<fs::FlowConfigurationSnapshot> for FlowConfigurationSnapshot {
     fn from(value: fs::FlowConfigurationSnapshot) -> Self {
         match value {
             fs::FlowConfigurationSnapshot::Ingest(ingest_rule) => Self::Ingest(ingest_rule.into()),
-            fs::FlowConfigurationSnapshot::Transform(transform_rule) => {
-                Self::Transform(transform_rule.into())
-            }
-            fs::FlowConfigurationSnapshot::Schedule(_) => {
-                unreachable!()
-            }
             fs::FlowConfigurationSnapshot::Reset(reset_rule) => Self::Reset(reset_rule.into()),
             fs::FlowConfigurationSnapshot::Compaction(compaction_rule) => {
                 Self::Compaction(FlowConfigurationCompactionRule {
