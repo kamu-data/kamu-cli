@@ -23,7 +23,8 @@ impl OwnedFile {
     pub fn new(path: impl Into<PathBuf>) -> Self {
         let path = path.into();
 
-        assert!(path.exists(), "path: {}", path.display());
+        assert!(path.exists(), "Path does not exist: {}", path.display());
+        assert!(path.is_file(), "Path is not a file: {}", path.display());
 
         Self { path: Some(path) }
     }

@@ -35,3 +35,29 @@ pub async fn assert_data_eq(df: DataFrame, expected: &str) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub fn assert_parquet_offsets_are_in_order(data_path: &std::path::Path) {
+    use ::datafusion::arrow::array::{downcast_array, Int64Array};
+    use ::datafusion::parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
+
+    let reader = ParquetRecordBatchReaderBuilder::try_new(std::fs::File::open(data_path).unwrap())
+        .unwrap()
+        .build()
+        .unwrap();
+
+    let mut expected_offset = 0;
+
+    for batch in reader {
+        let batch = batch.unwrap();
+        let offsets_dyn = batch.column_by_name("offset").unwrap();
+        let offsets = downcast_array::<Int64Array>(offsets_dyn);
+        for i in 0..offsets.len() {
+            let actual_offset = offsets.value(i);
+            assert_eq!(
+                actual_offset, expected_offset,
+                "Offset column in parquet file is not sequentially ordered"
+            );
+            expected_offset += 1;
+        }
+    }
+}

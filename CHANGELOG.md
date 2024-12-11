@@ -14,6 +14,8 @@ Recommendation: for ease of reading, use the following order:
 ## [Unreleased]
 ### Changed
 - Upgraded to `datafusion v43`
+### Fixed
+- Ingest was sometimes producing Parquet files with non-sequential `offset` column which violated the ODF spec
 
 ## [0.211.0] - 2024-12-02
 ### Changed

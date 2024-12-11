@@ -318,20 +318,16 @@ impl DataWriterDataFusion {
             )
             .int_err()?;
 
-        // Offset & event time
-        // Note: ODF expects events within one chunk to be sorted by event time, so we
-        // ensure data is held in one partition to avoid reordering when saving to
-        // parquet.
+        // Assign offset based on the merge strategy's sort order
         // TODO: For some reason this adds two columns: the expected
         // "offset", but also "ROW_NUMBER()" for now we simply filter out the
         // latter.
         let df = df
-            .repartition(Partitioning::RoundRobinBatch(1))
-            .int_err()?
             .with_column(
                 &self.meta.vocab.offset_column,
                 datafusion::functions_window::row_number::row_number()
                     .order_by(self.merge_strategy.sort_order())
+                    .partition_by(vec![lit(1)])
                     .build()
                     .int_err()?,
             )
@@ -361,6 +357,13 @@ impl DataWriterDataFusion {
         let full_columns_str: Vec<_> = full_columns.iter().map(String::as_str).collect();
 
         let df = df.select_columns(&full_columns_str).int_err()?;
+
+        // Note: As the very last step we sort the data by offset to guarantee its
+        // sequential layout in the parquet file
+        let df = df
+            .sort(vec![col(&self.meta.vocab.offset_column).sort(true, true)])
+            .int_err()?;
+
         Ok(df)
     }
 
@@ -460,7 +463,11 @@ impl DataWriterDataFusion {
             .await
             .int_err()?;
 
-        let file = OwnedFile::new(path);
+        let file = if path.exists() {
+            Some(OwnedFile::new(path))
+        } else {
+            None
+        };
 
         assert_eq!(res.len(), 1);
         assert_eq!(res[0].num_columns(), 1);
@@ -473,12 +480,12 @@ impl DataWriterDataFusion {
             .value(0);
 
         if num_records > 0 {
+            let file = file.unwrap();
             tracing::info!(
                 path = ?file.as_path(),
                 num_records,
                 "Produced parquet file",
             );
-            assert!(file.as_path().is_file());
             Ok(Some(file))
         } else {
             tracing::info!("Produced empty result",);
