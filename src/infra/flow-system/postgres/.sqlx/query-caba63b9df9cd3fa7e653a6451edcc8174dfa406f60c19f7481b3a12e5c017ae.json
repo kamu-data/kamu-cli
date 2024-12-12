@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT COUNT(DISTINCT dataset_id)\n                FROM flow_trigger_events\n                WHERE\n                    dataset_id IS NOT NULL AND\n                    event_type = 'FlowTriggerEventCreated'\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "count",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "caba63b9df9cd3fa7e653a6451edcc8174dfa406f60c19f7481b3a12e5c017ae"
+}

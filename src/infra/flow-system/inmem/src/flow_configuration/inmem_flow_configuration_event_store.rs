@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use database_common::PaginationOpts;
 use dill::*;
 use kamu_flow_system::*;
 use opendatafabric::DatasetID;
@@ -98,13 +99,26 @@ impl EventStore<FlowConfigurationState> for InMemoryFlowConfigurationEventStore 
 #[async_trait::async_trait]
 impl FlowConfigurationEventStore for InMemoryFlowConfigurationEventStore {
     #[tracing::instrument(level = "debug", skip_all)]
-    fn list_all_dataset_ids(&self) -> FailableDatasetIDStream {
-        use futures::StreamExt;
+    async fn list_dataset_ids(
+        &self,
+        pagination: &PaginationOpts,
+    ) -> Result<Vec<DatasetID>, InternalError> {
+        Ok(self
+            .inner
+            .as_state()
+            .lock()
+            .unwrap()
+            .dataset_ids
+            .iter()
+            .skip(pagination.offset)
+            .take(pagination.limit)
+            .cloned()
+            .collect())
+    }
 
-        let dataset_ids = self.inner.as_state().lock().unwrap().dataset_ids.clone();
-
-        // TODO: re-consider performance impact
-        Box::pin(tokio_stream::iter(dataset_ids).map(Ok))
+    #[tracing::instrument(level = "debug", skip_all)]
+    async fn all_dataset_ids_count(&self) -> Result<usize, InternalError> {
+        Ok(self.inner.as_state().lock().unwrap().dataset_ids.len())
     }
 }
 

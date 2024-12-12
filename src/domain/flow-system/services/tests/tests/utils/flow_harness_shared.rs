@@ -319,14 +319,12 @@ impl FlowHarness {
 
     pub async fn set_dataset_flow_ingest(
         &self,
-        request_time: DateTime<Utc>,
         dataset_id: DatasetID,
         dataset_flow_type: DatasetFlowType,
         ingest_rule: IngestRule,
     ) {
         self.flow_configuration_service
             .set_configuration(
-                request_time,
                 FlowKeyDataset::new(dataset_id, dataset_flow_type).into(),
                 FlowConfigurationRule::IngestRule(ingest_rule),
             )
@@ -336,14 +334,12 @@ impl FlowHarness {
 
     pub async fn set_dataset_flow_reset_rule(
         &self,
-        request_time: DateTime<Utc>,
         dataset_id: DatasetID,
         dataset_flow_type: DatasetFlowType,
         reset_rule: ResetRule,
     ) {
         self.flow_configuration_service
             .set_configuration(
-                request_time,
                 FlowKeyDataset::new(dataset_id, dataset_flow_type).into(),
                 FlowConfigurationRule::ResetRule(reset_rule),
             )
@@ -353,14 +349,12 @@ impl FlowHarness {
 
     pub async fn set_dataset_flow_compaction_rule(
         &self,
-        request_time: DateTime<Utc>,
         dataset_id: DatasetID,
         dataset_flow_type: DatasetFlowType,
         compaction_rule: CompactionRule,
     ) {
         self.flow_configuration_service
             .set_configuration(
-                request_time,
                 FlowKeyDataset::new(dataset_id, dataset_flow_type).into(),
                 FlowConfigurationRule::CompactionRule(compaction_rule),
             )

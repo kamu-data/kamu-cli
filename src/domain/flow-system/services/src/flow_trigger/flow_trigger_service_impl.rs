@@ -10,8 +10,8 @@
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
+use database_common::PaginationOpts;
 use dill::*;
-use futures::TryStreamExt;
 use kamu_core::{DatasetLifecycleMessage, MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE};
 use kamu_flow_system::{FlowTriggerEventStore, *};
 use messaging_outbox::{
@@ -182,15 +182,25 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
                 }
             }
 
-            let dataset_ids: Vec<_> = self.event_store.list_all_dataset_ids().try_collect().await?;
+            let dataset_list_per_page = 10;
+            let mut current_page = 0;
+            let datasets_count = self.event_store.all_dataset_ids_count().await?;
 
-            for dataset_id in dataset_ids {
-                for dataset_flow_type in DatasetFlowType::all() {
-                    let maybe_flow_trigger = FlowTrigger::try_load(FlowKeyDataset::new(dataset_id.clone(), *dataset_flow_type).into(), self.event_store.as_ref()).await.int_err()?;
-                    if let Some(flow_trigger) = maybe_flow_trigger && flow_trigger.is_active() {
-                        yield flow_trigger.into();
+            while datasets_count > current_page * dataset_list_per_page {
+                let dataset_ids: Vec<_> = self.event_store.list_dataset_ids(&PaginationOpts {
+                    limit: dataset_list_per_page,
+                    offset: current_page * dataset_list_per_page,
+                }).await?;
+
+                for dataset_id in dataset_ids {
+                    for dataset_flow_type in DatasetFlowType::all() {
+                        let maybe_flow_trigger = FlowTrigger::try_load(FlowKeyDataset::new(dataset_id.clone(), *dataset_flow_type).into(), self.event_store.as_ref()).await.int_err()?;
+                        if let Some(flow_trigger) = maybe_flow_trigger && flow_trigger.is_active() {
+                            yield flow_trigger.into();
+                        }
                     }
                 }
+                current_page += 1;
             }
         })
     }

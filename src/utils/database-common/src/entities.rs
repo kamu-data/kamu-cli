@@ -9,6 +9,8 @@
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+use sqlx::prelude::FromRow;
+
 #[derive(Debug, Copy, Clone)]
 pub struct PaginationOpts {
     pub limit: usize,
@@ -16,3 +18,14 @@ pub struct PaginationOpts {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, sqlx::FromRow, PartialEq, Eq)]
+pub struct EventModel {
+    pub event_id: i64,
+    pub event_payload: sqlx::types::JsonValue,
+}
+
+#[derive(Debug, FromRow)]
+pub struct ReturningEventModel {
+    pub event_id: i64,
+}

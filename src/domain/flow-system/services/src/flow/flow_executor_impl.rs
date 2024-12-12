@@ -97,9 +97,9 @@ impl FlowExecutorImpl {
             .await?;
 
         // Restore auto polling flows:
-        //   - read active configurations
+        //   - read active triggers
         //   - automatically trigger flows, if they are not waiting already
-        self.restore_auto_polling_flows_from_configurations(&transaction_catalog, start_time)
+        self.restore_auto_polling_flows_from_triggers(&transaction_catalog, start_time)
             .await?;
 
         // Publish progress event
@@ -181,7 +181,7 @@ impl FlowExecutorImpl {
     }
 
     #[tracing::instrument(level = "debug", skip_all)]
-    async fn restore_auto_polling_flows_from_configurations(
+    async fn restore_auto_polling_flows_from_triggers(
         &self,
         target_catalog: &Catalog,
         start_time: DateTime<Utc>,
@@ -195,8 +195,8 @@ impl FlowExecutorImpl {
             .try_collect()
             .await?;
 
-        // Split configs by those which have a schedule or different rules
-        let (schedule_configs, non_schedule_configs): (Vec<_>, Vec<_>) = enabled_triggers
+        // Split triggers by those which have a schedule or different rules
+        let (schedule_triggers, non_schedule_triggers): (Vec<_>, Vec<_>) = enabled_triggers
             .into_iter()
             .partition(|config| matches!(config.rule, Some(FlowTriggerRule::Schedule(_))));
 
@@ -207,9 +207,9 @@ impl FlowExecutorImpl {
         //
         // Thought: maybe we need topological sorting by derived relations as well to
         // optimize the initial execution order, but batching rules may work just fine
-        for enabled_trigger in schedule_configs
+        for enabled_trigger in schedule_triggers
             .into_iter()
-            .chain(non_schedule_configs.into_iter())
+            .chain(non_schedule_triggers.into_iter())
         {
             // Do not re-trigger the flow that has already triggered
             let maybe_pending_flow_id = flow_event_store

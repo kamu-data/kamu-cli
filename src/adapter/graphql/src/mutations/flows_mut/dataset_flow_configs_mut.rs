@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use chrono::Utc;
 use kamu_flow_system::{
     CompactionRuleFull,
     CompactionRuleMetadataOnly,
@@ -81,7 +80,6 @@ impl DatasetFlowConfigsMut {
 
         let res = flow_config_service
             .set_configuration(
-                Utc::now(),
                 FlowKeyDataset::new(self.dataset_handle.id.clone(), dataset_flow_type.into())
                     .into(),
                 configuration_rule,

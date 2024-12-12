@@ -11,7 +11,6 @@ use std::assert_matches::assert_matches;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use chrono::Utc;
 use dill::*;
 use futures::TryStreamExt;
 use kamu::testing::MetadataFactory;
@@ -122,7 +121,6 @@ async fn test_modify() {
         DatasetFlowType::HardCompaction,
         &foo_compaction_config,
     );
-    assert_eq!(1, harness.configuration_events_count());
 
     // Now make the config with different parameters
     let foo_compaction_config_2 = FlowConfigurationRule::CompactionRule(CompactionRule::Full(
@@ -145,7 +143,6 @@ async fn test_modify() {
         DatasetFlowType::HardCompaction,
         &foo_compaction_config_2,
     );
-    assert_eq!(2, harness.configuration_events_count());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -288,7 +285,6 @@ impl FlowConfigurationHarness {
     ) {
         self.flow_configuration_service
             .set_configuration(
-                Utc::now(),
                 FlowKeyDataset::new(dataset_id, dataset_flow_type).into(),
                 configuration_rule,
             )

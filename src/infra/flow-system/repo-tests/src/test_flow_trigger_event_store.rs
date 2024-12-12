@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{Duration, Utc};
+use database_common::PaginationOpts;
 use dill::Catalog;
 use futures::TryStreamExt;
 use kamu_flow_system::*;
@@ -35,8 +36,10 @@ pub async fn test_event_store_empty(catalog: &Catalog) {
     assert_eq!(events, []);
 
     let dataset_ids: Vec<_> = event_store
-        .list_all_dataset_ids()
-        .try_collect()
+        .list_dataset_ids(&PaginationOpts {
+            limit: 10,
+            offset: 0,
+        })
         .await
         .unwrap();
 
@@ -155,8 +158,10 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
     assert_eq!(&events[..], [event_3.into()]);
 
     let mut dataset_ids: Vec<_> = event_store
-        .list_all_dataset_ids()
-        .try_collect()
+        .list_dataset_ids(&PaginationOpts {
+            limit: 10,
+            offset: 0,
+        })
         .await
         .unwrap();
 

@@ -44,7 +44,6 @@ async fn test_read_initial_config_and_queue_without_waiting() {
 
     harness
         .set_dataset_flow_ingest(
-            harness.now_datetime(),
             foo_id.clone(),
             DatasetFlowType::Ingest,
             IngestRule {
@@ -641,7 +640,6 @@ async fn test_ingest_trigger_with_ingest_config() {
 
     harness
         .set_dataset_flow_ingest(
-            harness.now_datetime(),
             foo_id.clone(),
             DatasetFlowType::Ingest,
             IngestRule {
@@ -1005,7 +1003,6 @@ async fn test_manual_trigger_reset() {
     harness.eager_initialization().await;
     harness
         .set_dataset_flow_reset_rule(
-            harness.now_datetime(),
             create_dataset_result.dataset_handle.id.clone(),
             DatasetFlowType::Reset,
             ResetRule {
@@ -1136,7 +1133,6 @@ async fn test_reset_trigger_keep_metadata_compaction_for_derivatives() {
 
     harness
         .set_dataset_flow_reset_rule(
-            harness.now_datetime(),
             create_foo_result.dataset_handle.id.clone(),
             DatasetFlowType::Reset,
             ResetRule {
@@ -1346,7 +1342,6 @@ async fn test_manual_trigger_compaction_with_config() {
     harness.eager_initialization().await;
     harness
         .set_dataset_flow_compaction_rule(
-            harness.now_datetime(),
             foo_id.clone(),
             DatasetFlowType::HardCompaction,
             CompactionRule::Full(
@@ -1463,7 +1458,6 @@ async fn test_full_hard_compaction_trigger_keep_metadata_compaction_for_derivati
 
     harness
         .set_dataset_flow_compaction_rule(
-            harness.now_datetime(),
             foo_id.clone(),
             DatasetFlowType::HardCompaction,
             CompactionRule::Full(
@@ -1692,7 +1686,6 @@ async fn test_manual_trigger_keep_metadata_only_with_recursive_compaction() {
 
     harness
         .set_dataset_flow_compaction_rule(
-            harness.now_datetime(),
             foo_id.clone(),
             DatasetFlowType::HardCompaction,
             CompactionRule::MetadataOnly(CompactionRuleMetadataOnly { recursive: true }),
@@ -1922,7 +1915,6 @@ async fn test_manual_trigger_keep_metadata_only_without_recursive_compaction() {
 
     harness
         .set_dataset_flow_compaction_rule(
-            harness.now_datetime(),
             foo_id.clone(),
             DatasetFlowType::HardCompaction,
             CompactionRule::MetadataOnly(CompactionRuleMetadataOnly { recursive: false }),
@@ -2058,7 +2050,6 @@ async fn test_manual_trigger_keep_metadata_only_compaction_multiple_accounts() {
 
     harness
         .set_dataset_flow_compaction_rule(
-            harness.now_datetime(),
             foo_id.clone(),
             DatasetFlowType::HardCompaction,
             CompactionRule::MetadataOnly(CompactionRuleMetadataOnly { recursive: true }),
