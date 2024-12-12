@@ -11,7 +11,7 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## [Unreleased]
+## [0.212.0] - 2024-12-11
 ### Changed
 - Upgraded to `datafusion v43`
 ### Fixed
