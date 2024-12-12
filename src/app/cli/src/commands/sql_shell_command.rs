@@ -12,7 +12,7 @@ use std::time::Duration;
 
 use container_runtime::ContainerRuntime;
 use internal_error::*;
-use kamu::domain::{QueryOptions, QueryService};
+use kamu::domain::{ExportFormat, ExportService, QueryOptions, QueryService};
 use kamu::*;
 use kamu_datafusion_cli::exec;
 use kamu_datafusion_cli::print_format::PrintFormat;
@@ -42,9 +42,12 @@ pub struct SqlShellCommand {
     engine_prov_config: Arc<EngineProvisionerLocalConfig>,
     output_config: Arc<OutputConfig>,
     container_runtime: Arc<ContainerRuntime>,
+    export_service: Arc<dyn ExportService>,
     command: Option<String>,
     url: Option<String>,
     engine: Option<SqlShellEngine>,
+    output_path: Option<String>,
+    partition_size: Option<usize>,
 }
 
 impl SqlShellCommand {
@@ -54,9 +57,12 @@ impl SqlShellCommand {
         engine_prov_config: Arc<EngineProvisionerLocalConfig>,
         output_config: Arc<OutputConfig>,
         container_runtime: Arc<ContainerRuntime>,
+        export_service: Arc<dyn ExportService>,
         command: Option<String>,
         url: Option<String>,
         engine: Option<SqlShellEngine>,
+        output_path: Option<String>,
+        partition_size: Option<usize>,
     ) -> Self {
         Self {
             query_svc,
@@ -64,9 +70,12 @@ impl SqlShellCommand {
             engine_prov_config,
             output_config,
             container_runtime,
+            export_service,
             command,
             url,
             engine,
+            output_path,
+            partition_size,
         }
     }
 
@@ -107,6 +116,9 @@ impl SqlShellCommand {
                             "{:?} format is not yet supported by this command",
                             self.output_config.format
                         )
+                    }
+                    OutputFormat::Parquet => {
+                        unimplemented!("Parquet format is applicable for data export only")
                     }
                 },
                 self.url.clone(),
@@ -162,17 +174,50 @@ impl SqlShellCommand {
 
         Ok(())
     }
+
+    async fn run_datafusion_export_command(&self) -> Result<(), CLIError> {
+        match (&self.command, &self.output_path) {
+            (Some(command), Some(output_path)) => {
+                let format = match self.output_config.format {
+                    OutputFormat::Csv => ExportFormat::Csv,
+                    OutputFormat::NdJson => ExportFormat::NdJson,
+                    OutputFormat::Parquet => ExportFormat::Parquet,
+                    _ => unimplemented!("Not supported format"), // todo: improve message
+                };
+
+                let rows_exported = self
+                    .export_service
+                    .export_to_fs(&command, &output_path, format, self.partition_size)
+                    .await?;
+                eprintln!("Exported {} rows", rows_exported);
+            }
+            _ => unreachable!(),
+        }
+        Ok(())
+    }
 }
 
 #[async_trait::async_trait(?Send)]
 impl Command for SqlShellCommand {
+    async fn validate_args(&self) -> Result<(), CLIError> {
+        // todo:
+        // - output_path and partition_size set only for datafusion engine
+        // - partition_size is set only when output_path is not empty
+        Ok(())
+    }
+
     async fn run(&mut self) -> Result<(), CLIError> {
         let engine = self.engine.unwrap_or(SqlShellEngine::Datafusion);
 
-        match (engine, &self.command, &self.url) {
-            (SqlShellEngine::Datafusion, None, None) => self.run_datafusion_cli_command().await,
-            (SqlShellEngine::Datafusion, Some(_), None) => self.run_datafusion_command().await,
-            (SqlShellEngine::Spark, _, _) => self.run_spark_shell().await,
+        match (engine, &self.command, &self.url, &self.output_path) {
+            (SqlShellEngine::Datafusion, None, None, None) => {
+                self.run_datafusion_cli_command().await
+            }
+            (SqlShellEngine::Datafusion, Some(_), None, Some(_)) => {
+                self.run_datafusion_export_command().await
+            }
+            (SqlShellEngine::Datafusion, Some(_), None, _) => self.run_datafusion_command().await,
+            (SqlShellEngine::Spark, _, _, _) => self.run_spark_shell().await,
             _ => unreachable!(),
         }
     }
