@@ -66,6 +66,9 @@ impl OutputConfig {
             OutputFormat::JsonAoA => Box::new(JsonArrayOfArraysWriter::new(std::io::stdout())),
             OutputFormat::NdJson => Box::new(JsonLineDelimitedWriter::new(std::io::stdout())),
             OutputFormat::Table => Box::new(TableWriter::new(schema, fmt, std::io::stdout())),
+            OutputFormat::Parquet => {
+                unimplemented!("Parquet format is applicable for data export only")
+            }
         }
     }
 }
@@ -98,6 +101,10 @@ pub enum OutputFormat {
     /// A pretty human-readable table
     #[clap(name = "table")]
     Table,
+
+    /// Parquet columnar storage. Only available when exporting to file(s)
+    #[clap(name = "parquet")]
+    Parquet,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

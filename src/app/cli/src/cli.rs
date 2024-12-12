@@ -83,6 +83,7 @@ pub enum Command {
     Completions(Completions),
     Config(Config),
     Delete(Delete),
+    Export(Export),
     Ingest(Ingest),
     Init(Init),
     Inspect(Inspect),
@@ -366,6 +367,27 @@ pub struct Delete {
     /// Local dataset reference(s)
     #[arg(value_parser = parsers::dataset_ref_pattern)]
     pub dataset: Vec<odf::DatasetRefPattern>,
+}
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Export a dataset
+#[derive(Debug, clap::Args)]
+#[command(after_help = r#"
+This command exports a dataset to a file(s) of a given format.
+TODO: add extend doc
+"#)]
+pub struct Export {
+    #[arg(index = 1)]
+    pub dataset: String,
+
+    #[arg(long)]
+    pub output_path: String, //todo pathbuf
+
+    #[arg(long, value_parser = ["parquet", "json", "csv"])]
+    pub output_format: String, //todo value_parser = ["csv", ...]
+
+    #[arg(long)]
+    pub partition_size: Option<usize>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1225,6 +1247,12 @@ pub struct Sql {
     /// SQL script file to execute
     #[arg(long, value_name = "FILE")]
     pub script: Option<PathBuf>,
+
+    #[arg(long)]
+    pub output_path: Option<String>, //todo pathbuf
+
+    #[arg(long)]
+    pub partition_size: Option<usize>,
 }
 
 #[derive(Debug, clap::Subcommand)]
