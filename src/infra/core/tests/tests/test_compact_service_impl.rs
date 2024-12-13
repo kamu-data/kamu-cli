@@ -10,13 +10,13 @@
 use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
-use chrono::{DateTime, NaiveDate, TimeDelta, TimeZone, Utc};
+use chrono::{DateTime, TimeZone, Utc};
 use datafusion::execution::config::SessionConfig;
 use datafusion::execution::context::SessionContext;
 use dill::Component;
 use domain::{CompactionError, CompactionOptions, CompactionResult, CompactionService};
 use futures::TryStreamExt;
-use indoc::{formatdoc, indoc};
+use indoc::indoc;
 use kamu::domain::*;
 use kamu::testing::{DatasetDataHelper, LocalS3Server, MetadataFactory};
 use kamu::utils::s3_context::S3Context;
@@ -741,7 +741,7 @@ async fn test_large_dataset_compact() {
     let created = harness.create_test_root_dataset().await;
     let dataset_ref = created.dataset_handle.as_local_ref();
 
-    harness.ingest_multiple_blocks(&created, 100).await;
+    harness.ingest_multiple_blocks(&created, 100, 2).await;
 
     let data_helper = harness.dataset_data_helper(&dataset_ref).await;
 
@@ -769,8 +769,8 @@ async fn test_large_dataset_compact() {
                 +--------+----+----------------------+----------------------+------+------------+
                 | offset | op | system_time          | date                 | city | population |
                 +--------+----+----------------------+----------------------+------+------------+
-                | 198    | 0  | 2050-01-01T12:00:00Z | 2020-04-09T00:00:00Z | A    | 1000       |
-                | 199    | 0  | 2050-01-01T12:00:00Z | 2020-04-10T00:00:00Z | B    | 2000       |
+                | 198    | 0  | 2050-01-01T12:00:00Z | 2010-01-01T03:18:00Z | A    | 198        |
+                | 199    | 0  | 2050-01-01T12:00:00Z | 2010-01-01T03:19:00Z | B    | 199        |
                 +--------+----+----------------------+----------------------+------+------------+
                 "#
             ),
@@ -819,16 +819,16 @@ async fn test_large_dataset_compact() {
                 +--------+----+----------------------+----------------------+------+------------+
                 | offset | op | system_time          | date                 | city | population |
                 +--------+----+----------------------+----------------------+------+------------+
-                | 190    | 0  | 2050-01-01T12:00:00Z | 2020-04-05T00:00:00Z | A    | 1000       |
-                | 191    | 0  | 2050-01-01T12:00:00Z | 2020-04-06T00:00:00Z | B    | 2000       |
-                | 192    | 0  | 2050-01-01T12:00:00Z | 2020-04-06T00:00:00Z | A    | 1000       |
-                | 193    | 0  | 2050-01-01T12:00:00Z | 2020-04-07T00:00:00Z | B    | 2000       |
-                | 194    | 0  | 2050-01-01T12:00:00Z | 2020-04-07T00:00:00Z | A    | 1000       |
-                | 195    | 0  | 2050-01-01T12:00:00Z | 2020-04-08T00:00:00Z | B    | 2000       |
-                | 196    | 0  | 2050-01-01T12:00:00Z | 2020-04-08T00:00:00Z | A    | 1000       |
-                | 197    | 0  | 2050-01-01T12:00:00Z | 2020-04-09T00:00:00Z | B    | 2000       |
-                | 198    | 0  | 2050-01-01T12:00:00Z | 2020-04-09T00:00:00Z | A    | 1000       |
-                | 199    | 0  | 2050-01-01T12:00:00Z | 2020-04-10T00:00:00Z | B    | 2000       |
+                | 190    | 0  | 2050-01-01T12:00:00Z | 2010-01-01T03:10:00Z | A    | 190        |
+                | 191    | 0  | 2050-01-01T12:00:00Z | 2010-01-01T03:11:00Z | B    | 191        |
+                | 192    | 0  | 2050-01-01T12:00:00Z | 2010-01-01T03:12:00Z | A    | 192        |
+                | 193    | 0  | 2050-01-01T12:00:00Z | 2010-01-01T03:13:00Z | B    | 193        |
+                | 194    | 0  | 2050-01-01T12:00:00Z | 2010-01-01T03:14:00Z | A    | 194        |
+                | 195    | 0  | 2050-01-01T12:00:00Z | 2010-01-01T03:15:00Z | B    | 195        |
+                | 196    | 0  | 2050-01-01T12:00:00Z | 2010-01-01T03:16:00Z | A    | 196        |
+                | 197    | 0  | 2050-01-01T12:00:00Z | 2010-01-01T03:17:00Z | B    | 197        |
+                | 198    | 0  | 2050-01-01T12:00:00Z | 2010-01-01T03:18:00Z | A    | 198        |
+                | 199    | 0  | 2050-01-01T12:00:00Z | 2010-01-01T03:19:00Z | B    | 199        |
                 +--------+----+----------------------+----------------------+------+------------+
                 "#
             ),
@@ -839,6 +839,85 @@ async fn test_large_dataset_compact() {
         &old_blocks.first().unwrap().event,
         &new_blocks.first().unwrap().event,
     );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(ingest, datafusion, compact)]
+#[test]
+fn test_compact_offsets_are_sequential() {
+    // Ensure we run with multiple threads otherwise DataFusion's
+    // `target_partitions` setting doesn't matter
+    tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(4)
+        .build()
+        .unwrap()
+        .block_on(test_compact_offsets_are_sequential_impl());
+}
+
+async fn test_compact_offsets_are_sequential_impl() {
+    testing_logger::setup();
+    let harness = CompactTestHarness::new();
+
+    let created = harness.create_test_root_dataset().await;
+    let dataset_ref = created.dataset_handle.as_local_ref();
+
+    harness.ingest_multiple_blocks(&created, 10, 10000).await;
+
+    let data_helper = harness.dataset_data_helper(&dataset_ref).await;
+
+    let old_blocks = harness.get_dataset_blocks(&dataset_ref).await;
+
+    assert_eq!(old_blocks.len(), 14);
+
+    assert_matches!(
+        harness
+            .compact_dataset(
+                &created,
+                CompactionOptions {
+                    max_slice_records: Some(u64::MAX),
+                    max_slice_size: Some(u64::MAX),
+                    ..CompactionOptions::default()
+                },
+            )
+            .await,
+        Ok(CompactionResult::Success {
+            new_head,
+            old_head,
+            new_num_blocks: 5,
+            old_num_blocks: 14
+        }) if new_head != old_head,
+    );
+
+    testing_logger::validate(|capture| {
+        let plan = capture
+            .iter()
+            .filter(|c| c.body.contains("Optimized physical plan:"))
+            .last()
+            .unwrap()
+            .body
+            .trim();
+
+        let end = plan.find("...").unwrap();
+        let start = plan[0..end].rfind('[').unwrap();
+        let plan_clean = plan[0..=start].to_string() + &plan[end..plan.len()];
+
+        pretty_assertions::assert_eq!(
+            indoc::indoc!(
+                r#"
+                Optimized physical plan:
+                DataSinkExec: sink=ParquetSink(file_groups=[])
+                  SortExec: expr=[offset@0 ASC NULLS LAST], preserve_partitioning=[false]
+                    ParquetExec: file_groups={1 group: [[...]]}, projection=[offset, op, system_time, date, city, population]
+                "#
+            )
+            .trim(),
+            plan_clean
+        );
+    });
+
+    let data_path = data_helper.get_last_data_file().await;
+    kamu_data_utils::testing::assert_parquet_offsets_are_in_order(&data_path);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1208,23 +1287,35 @@ impl CompactTestHarness {
         DatasetDataHelper::new_with_context((*resolved_dataset).clone(), self.ctx.clone())
     }
 
-    async fn ingest_multiple_blocks(&self, dataset_created: &CreateDatasetResult, amount: i64) {
-        let start_date = NaiveDate::parse_from_str("2020-01-01", "%Y-%m-%d").unwrap();
+    async fn ingest_multiple_blocks(
+        &self,
+        dataset_created: &CreateDatasetResult,
+        blocks: i64,
+        records_per_block: i64,
+    ) {
+        use std::io::Write;
 
-        for i in 0..amount {
-            let a_date = start_date + TimeDelta::try_days(i).unwrap();
-            let b_date = start_date + TimeDelta::try_days(i + 1).unwrap();
+        let mut event_time = Utc.with_ymd_and_hms(2010, 1, 1, 0, 0, 0).unwrap();
+        let cities = ["A", "B", "C", "D"];
 
-            let start_date_str = formatdoc!(
-                "
-                date,city,population
-                {},A,1000
-                {},B,2000
-                ",
-                a_date.to_string(),
-                b_date.to_string()
-            );
-            self.ingest_data(start_date_str, dataset_created).await;
+        for b in 0..blocks {
+            let mut data = Vec::new();
+            writeln!(&mut data, "date,city,population").unwrap();
+
+            for r in 0..records_per_block {
+                writeln!(
+                    &mut data,
+                    "{},{},{}",
+                    event_time.to_rfc3339(),
+                    cities[usize::try_from(r).unwrap() % cities.len()],
+                    b * records_per_block + r
+                )
+                .unwrap();
+
+                event_time += chrono::Duration::minutes(1);
+            }
+            self.ingest_data(String::from_utf8(data).unwrap(), dataset_created)
+                .await;
         }
     }
 

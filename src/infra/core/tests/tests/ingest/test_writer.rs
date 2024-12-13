@@ -522,10 +522,175 @@ async fn test_data_writer_rejects_incompatible_schema() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(engine, ingest, datafusion)]
+#[test]
+fn test_data_writer_offsets_are_sequential_partitioned() {
+    // Ensure our logic is resistant to partitioning
+    let ctx = SessionContext::new_with_config(SessionConfig::new().with_target_partitions(4));
+
+    // Ensure we run with multiple threads
+    // otherwise `target_partitions` doesn't matter
+    let plan = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(4)
+        .build()
+        .unwrap()
+        .block_on(test_data_writer_offsets_are_sequential_impl(ctx));
+
+    pretty_assertions::assert_eq!(
+        indoc::indoc!(
+            r#"
+            Optimized physical plan:
+            DataSinkExec: sink=ParquetSink(file_groups=[])
+              SortPreservingMergeExec: [offset@0 ASC]
+                SortExec: expr=[offset@0 ASC], preserve_partitioning=[true]
+                  ProjectionExec: expr=[CAST(row_number() PARTITION BY [Int32(1)] ORDER BY [event_time ASC NULLS FIRST] ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW@5 AS Int64) + -1 as offset, op@0 as op, system_time@4 as system_time, event_time@1 as event_time, city@2 as city, population@3 as population]
+                    BoundedWindowAggExec: wdw=[row_number() PARTITION BY [Int32(1)] ORDER BY [event_time ASC NULLS FIRST] ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW: Ok(Field { name: "row_number() PARTITION BY [Int32(1)] ORDER BY [event_time ASC NULLS FIRST] ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW", data_type: UInt64, nullable: false, dict_id: 0, dict_is_ordered: false, metadata: {} }), frame: WindowFrame { units: Rows, start_bound: Preceding(UInt64(NULL)), end_bound: CurrentRow, is_causal: true }], mode=[Sorted]
+                      SortExec: expr=[event_time@1 ASC], preserve_partitioning=[true]
+                        CoalesceBatchesExec: target_batch_size=8192
+                          RepartitionExec: partitioning=Hash([1], 4), input_partitions=4
+                            ProjectionExec: expr=[0 as op, CASE WHEN event_time@0 IS NULL THEN 946728000000 ELSE event_time@0 END as event_time, city@1 as city, population@2 as population, 1262347200000 as system_time]
+                              ProjectionExec: expr=[CAST(event_time@0 AS Timestamp(Millisecond, Some("UTC"))) as event_time, city@1 as city, population@2 as population]
+                                JsonExec: file_groups={4 groups: [[tmp/data.ndjson:0..2991668], [tmp/data.ndjson:2991668..5983336], [tmp/data.ndjson:5983336..8975004], [tmp/data.ndjson:8975004..11966670]]}, projection=[event_time, city, population]
+            "#
+        ).trim(),
+        plan
+    );
+}
+
+#[test_group::group(engine, ingest, datafusion)]
+#[test]
+fn test_data_writer_offsets_are_sequential_serialized() {
+    let ctx = SessionContext::new_with_config(SessionConfig::new().with_target_partitions(1));
+
+    // Ensure we run with multiple threads
+    let plan = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(4)
+        .build()
+        .unwrap()
+        .block_on(test_data_writer_offsets_are_sequential_impl(ctx));
+
+    pretty_assertions::assert_eq!(
+        indoc::indoc!(
+            r#"
+            Optimized physical plan:
+            DataSinkExec: sink=ParquetSink(file_groups=[])
+              SortExec: expr=[offset@0 ASC], preserve_partitioning=[false]
+                ProjectionExec: expr=[CAST(row_number() PARTITION BY [Int32(1)] ORDER BY [event_time ASC NULLS FIRST] ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW@5 AS Int64) + -1 as offset, op@0 as op, system_time@4 as system_time, event_time@1 as event_time, city@2 as city, population@3 as population]
+                  BoundedWindowAggExec: wdw=[row_number() PARTITION BY [Int32(1)] ORDER BY [event_time ASC NULLS FIRST] ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW: Ok(Field { name: "row_number() PARTITION BY [Int32(1)] ORDER BY [event_time ASC NULLS FIRST] ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW", data_type: UInt64, nullable: false, dict_id: 0, dict_is_ordered: false, metadata: {} }), frame: WindowFrame { units: Rows, start_bound: Preceding(UInt64(NULL)), end_bound: CurrentRow, is_causal: true }], mode=[Sorted]
+                    SortExec: expr=[event_time@1 ASC], preserve_partitioning=[false]
+                      ProjectionExec: expr=[0 as op, CASE WHEN event_time@0 IS NULL THEN 946728000000 ELSE event_time@0 END as event_time, city@1 as city, population@2 as population, 1262347200000 as system_time]
+                        ProjectionExec: expr=[CAST(event_time@0 AS Timestamp(Millisecond, Some("UTC"))) as event_time, city@1 as city, population@2 as population]
+                          JsonExec: file_groups={1 group: [[tmp/data.ndjson:0..11966670]]}, projection=[event_time, city, population]
+            "#
+        ).trim(),
+        plan
+    );
+}
+
+async fn test_data_writer_offsets_are_sequential_impl(ctx: SessionContext) -> String {
+    use std::io::Write;
+
+    testing_logger::setup();
+
+    let harness = Harness::new(vec![MetadataFactory::set_polling_source()
+        .merge(odf::MergeStrategyLedger {
+            primary_key: vec!["event_time".to_string(), "city".to_string()],
+        })
+        .build()
+        .into()])
+    .await;
+
+    let mut writer = DataWriterDataFusion::builder(harness.dataset.clone(), ctx.clone())
+        .with_metadata_state_scanned(None)
+        .await
+        .unwrap()
+        .build();
+
+    let mut event_time = Utc.with_ymd_and_hms(2010, 1, 1, 0, 0, 0).unwrap();
+    let data_path = harness.temp_dir.path().join("data.ndjson");
+    let mut file = std::fs::File::create_new(&data_path).unwrap();
+
+    // Generate a lot of data to make parquet split it into chunks
+    for i in 0..50_000 {
+        for city in ["A", "B", "C"] {
+            writeln!(
+                &mut file,
+                "{{\"event_time\": \"{}\", \"city\": \"{}\", \"population\": \"{}\"}}",
+                event_time.to_rfc3339(),
+                city,
+                i,
+            )
+            .unwrap();
+        }
+        event_time += chrono::Duration::minutes(1);
+    }
+
+    let df = ReaderNdJson::new(
+        ctx.clone(),
+        odf::ReadStepNdJson {
+            schema: Some(vec![
+                "event_time TIMESTAMP".to_string(),
+                "city STRING".to_string(),
+                "population BIGINT".to_string(),
+            ]),
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap()
+    .read(&data_path)
+    .await
+    .unwrap();
+
+    writer
+        .write(
+            Some(df),
+            WriteDataOpts {
+                system_time: harness.system_time,
+                source_event_time: harness.source_event_time,
+                new_watermark: None,
+                new_source_state: None,
+                data_staging_path: harness.temp_dir.path().join("data.parquet"),
+            },
+        )
+        .await
+        .unwrap();
+
+    let data_path = harness.get_last_data_file().await;
+
+    kamu_data_utils::testing::assert_parquet_offsets_are_in_order(&data_path);
+
+    let plan = std::sync::Mutex::new(String::new());
+    testing_logger::validate(|capture| {
+        let p = capture
+            .iter()
+            .find(|c| c.body.contains("Optimized physical plan:"))
+            .unwrap()
+            .body
+            .trim()
+            .replace(
+                harness
+                    .temp_dir
+                    .path()
+                    .display()
+                    .to_string()
+                    .trim_start_matches('/'),
+                "tmp",
+            );
+
+        *plan.lock().unwrap() = p;
+    });
+    plan.into_inner().unwrap()
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_data_writer_ledger_orders_by_event_time() {
     let mut harness = Harness::new(vec![MetadataFactory::set_polling_source()
-        .merge(odf::MergeStrategyAppend {})
+        .merge(odf::MergeStrategyLedger {
+            primary_key: vec!["event_time".to_string(), "city".to_string()],
+        })
         .build()
         .into()])
     .await;

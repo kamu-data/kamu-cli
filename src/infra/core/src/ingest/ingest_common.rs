@@ -178,10 +178,12 @@ pub fn new_session_context(object_store_registry: Arc<dyn ObjectStoreRegistry>) 
     use datafusion::execution::runtime_env::{RuntimeConfig, RuntimeEnv};
     use datafusion::prelude::*;
 
-    // TODO: Disabling Utf8View types due to unresolved issues
-    // See: https://github.com/apache/datafusion/issues/13510
-    // See: https://github.com/apache/datafusion/issues/13504
-    let mut config = SessionConfig::new().with_default_catalog_and_schema("kamu", "kamu");
+    // Note: We use single partition as ingest currently always reads one file at a
+    // time and repartitioning of data likely to hurt performance rather than
+    // improve it
+    let mut config = SessionConfig::new()
+        .with_target_partitions(1)
+        .with_default_catalog_and_schema("kamu", "kamu");
 
     // Forcing cese-sensitive identifiers in case-insensitive language seems to
     // be a lesser evil than following DataFusion's default behavior of forcing
