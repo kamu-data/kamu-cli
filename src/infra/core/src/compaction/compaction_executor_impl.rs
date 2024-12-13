@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -54,13 +55,14 @@ impl CompactionExecutionServiceImpl {
 
     async fn merge_files(
         &self,
-        data_slice_batches: &mut [CompactionDataSliceBatch],
-        offset_column: &str,
+        plan: &CompactionPlan,
         compaction_dir_path: &Path,
-    ) -> Result<(), CompactionExecutionError> {
+    ) -> Result<HashMap<usize, PathBuf>, CompactionExecutionError> {
         let ctx = new_session_context(self.object_store_registry.clone());
 
-        for (index, data_slice_batch) in data_slice_batches.iter_mut().enumerate() {
+        let mut new_file_paths = HashMap::new();
+
+        for (index, data_slice_batch) in plan.data_slice_batches.iter().enumerate() {
             if let CompactionDataSliceBatch::CompactedBatch(data_slice_batch_info) =
                 data_slice_batch
             {
@@ -76,7 +78,9 @@ impl CompactionExecutionServiceImpl {
                     .int_err()?
                     // TODO: PERF: Consider passing sort order hint to `read_parquet` to let DF now
                     // that the data is already pre-sorted
-                    .sort(vec![col(Column::from_name(offset_column)).sort(true, false)])
+                    .sort(vec![
+                        col(Column::from_name(&plan.offset_column_name)).sort(true, false)
+                    ])
                     .int_err()?;
 
                 // FIXME: The .parquet extension is currently necessary for DataFusion to
@@ -94,17 +98,18 @@ impl CompactionExecutionServiceImpl {
                     )
                     .await
                     .int_err()?;
-                data_slice_batch_info.new_file_path = Some(new_file_path);
+                new_file_paths.insert(index, new_file_path);
             }
         }
 
-        Ok(())
+        Ok(new_file_paths)
     }
 
     async fn commit_new_blocks(
         &self,
         target: &ResolvedDataset,
         plan: &CompactionPlan,
+        new_file_paths: HashMap<usize, PathBuf>,
     ) -> Result<(Vec<Url>, odf::Multihash, usize), CompactionExecutionError> {
         let chain = target.as_metadata_chain();
         let mut current_head = plan.seed.clone();
@@ -112,7 +117,7 @@ impl CompactionExecutionServiceImpl {
         // set it to 1 to include seed block
         let mut new_num_blocks: usize = 1;
 
-        for data_slice_batch in plan.data_slice_batches.iter().rev() {
+        for (index, data_slice_batch) in plan.data_slice_batches.iter().enumerate().rev() {
             match data_slice_batch {
                 CompactionDataSliceBatch::SingleBlock(block_hash) => {
                     let block = chain.get_block(block_hash).await.int_err()?;
@@ -157,9 +162,9 @@ impl CompactionExecutionServiceImpl {
                     let commit_result = target
                         .commit_add_data(
                             add_data_params,
-                            Some(OwnedFile::new(
-                                data_slice_batch_info.new_file_path.as_ref().unwrap(),
-                            )),
+                            Some(OwnedFile::new(new_file_paths.get(&index).expect(
+                                "File path for the compacted chunk should be defined",
+                            ))),
                             new_checkpoint_ref,
                             CommitOpts {
                                 block_ref: &BlockRef::Head,
@@ -190,7 +195,7 @@ impl CompactionExecutionService for CompactionExecutionServiceImpl {
     async fn execute_compaction(
         &self,
         target: ResolvedDataset,
-        mut plan: CompactionPlan,
+        plan: CompactionPlan,
         maybe_listener: Option<Arc<dyn CompactionListener>>,
     ) -> Result<CompactionResult, CompactionExecutionError> {
         // if slices amount +1(seed block) eq to amount of blocks we will not perform
@@ -204,16 +209,12 @@ impl CompactionExecutionService for CompactionExecutionServiceImpl {
         let compaction_dir_path = self.create_run_compaction_dir()?;
 
         listener.begin_phase(CompactionPhase::MergeDataslices);
-        self.merge_files(
-            &mut plan.data_slice_batches,
-            plan.offset_column_name.as_str(),
-            &compaction_dir_path,
-        )
-        .await?;
+        let new_file_paths = self.merge_files(&plan, &compaction_dir_path).await?;
 
         listener.begin_phase(CompactionPhase::CommitNewBlocks);
-        let (_old_data_slices, new_head, new_num_blocks) =
-            self.commit_new_blocks(&target, &plan).await?;
+        let (_old_data_slices, new_head, new_num_blocks) = self
+            .commit_new_blocks(&target, &plan, new_file_paths)
+            .await?;
 
         let old_head = target
             .as_metadata_chain()
