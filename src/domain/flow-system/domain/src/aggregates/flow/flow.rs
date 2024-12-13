@@ -61,6 +61,20 @@ impl Flow {
         }
     }
 
+    /// Define config snapshot
+    pub fn modify_config_snapshot(
+        &mut self,
+        now: DateTime<Utc>,
+        config_snapshot: FlowConfigurationSnapshot,
+    ) -> Result<(), ProjectionError<FlowState>> {
+        let event = FlowConfigSnapshotModified {
+            event_time: now,
+            flow_id: self.flow_id,
+            config_snapshot,
+        };
+        self.apply(event)
+    }
+
     /// Add extra trigger, if it's unique
     pub fn add_trigger_if_unique(
         &mut self,

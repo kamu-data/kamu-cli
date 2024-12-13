@@ -1012,6 +1012,12 @@ type FlowAbortedResult {
 	message: String!
 }
 
+type FlowConfigSnapshotModified implements FlowEvent {
+	eventId: EventID!
+	eventTime: DateTime!
+	configSnapshot: FlowConfigurationSnapshot!
+}
+
 type FlowConfiguration {
 	ingest: FlowConfigurationIngest
 	compaction: FlowConfigurationCompaction

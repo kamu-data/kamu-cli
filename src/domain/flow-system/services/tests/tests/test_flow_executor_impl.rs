@@ -491,7 +491,7 @@ async fn test_manual_trigger() {
                     finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
                     expected_logical_plan: LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
                       dataset_id: bar_id.clone(),
-                      fetch_uncacheable: false
+                      fetch_uncacheable: true
                     }),
                 });
                 let task2_handle = task2_driver.run();
@@ -501,6 +501,7 @@ async fn test_manual_trigger() {
                     flow_key: foo_flow_key,
                     run_since_start: Duration::milliseconds(40),
                     initiator_id: None,
+                    flow_configuration_snapshot_maybe: None,
                 });
                 let trigger0_handle = trigger0_driver.run();
 
@@ -509,6 +510,9 @@ async fn test_manual_trigger() {
                     flow_key: bar_flow_key,
                     run_since_start: Duration::milliseconds(80),
                     initiator_id: None,
+                    flow_configuration_snapshot_maybe: Some(FlowConfigurationSnapshot::Ingest(IngestRule {
+                      fetch_uncacheable: true
+                    })),
                 });
                 let trigger1_handle = trigger1_driver.run();
 
@@ -718,6 +722,7 @@ async fn test_ingest_trigger_with_ingest_config() {
                     flow_key: foo_flow_key,
                     run_since_start: Duration::milliseconds(40),
                     initiator_id: None,
+                    flow_configuration_snapshot_maybe: None,
                 });
                 let trigger0_handle = trigger0_driver.run();
 
@@ -726,6 +731,7 @@ async fn test_ingest_trigger_with_ingest_config() {
                     flow_key: bar_flow_key,
                     run_since_start: Duration::milliseconds(80),
                     initiator_id: None,
+                    flow_configuration_snapshot_maybe: None,
                 });
                 let trigger1_handle = trigger1_driver.run();
 
@@ -908,6 +914,7 @@ async fn test_manual_trigger_compaction() {
                     flow_key: foo_flow_key,
                     run_since_start: Duration::milliseconds(10),
                     initiator_id: None,
+                    flow_configuration_snapshot_maybe: None,
                 });
                 let trigger0_handle = trigger0_driver.run();
 
@@ -916,6 +923,7 @@ async fn test_manual_trigger_compaction() {
                     flow_key: bar_flow_key,
                     run_since_start: Duration::milliseconds(50),
                     initiator_id: None,
+                    flow_configuration_snapshot_maybe: None,
                 });
                 let trigger1_handle = trigger1_driver.run();
 
@@ -1054,6 +1062,7 @@ async fn test_manual_trigger_reset() {
                     flow_key: foo_flow_key,
                     run_since_start: Duration::milliseconds(10),
                     initiator_id: None,
+                    flow_configuration_snapshot_maybe: None,
                 });
                 let trigger0_handle = trigger0_driver.run();
 
@@ -1170,6 +1179,7 @@ async fn test_reset_trigger_keep_metadata_compaction_for_derivatives() {
               flow_key: foo_flow_key,
               run_since_start: Duration::milliseconds(10),
               initiator_id: None,
+              flow_configuration_snapshot_maybe: None,
           });
           let trigger0_handle = trigger0_driver.run();
 
@@ -1383,6 +1393,7 @@ async fn test_manual_trigger_compaction_with_config() {
                     flow_key: foo_flow_key,
                     run_since_start: Duration::milliseconds(20),
                     initiator_id: None,
+                    flow_configuration_snapshot_maybe: None,
                 });
                 let trigger0_handle = trigger0_driver.run();
 
@@ -1487,6 +1498,7 @@ async fn test_full_hard_compaction_trigger_keep_metadata_compaction_for_derivati
               flow_key: foo_flow_key,
               run_since_start: Duration::milliseconds(10),
               initiator_id: None,
+              flow_configuration_snapshot_maybe: None,
           });
           let trigger0_handle = trigger0_driver.run();
 
@@ -1714,6 +1726,7 @@ async fn test_manual_trigger_keep_metadata_only_with_recursive_compaction() {
                 flow_key: foo_flow_key,
                 run_since_start: Duration::milliseconds(10),
                 initiator_id: None,
+                flow_configuration_snapshot_maybe: None,
             });
             let trigger0_handle = trigger0_driver.run();
 
@@ -1943,6 +1956,7 @@ async fn test_manual_trigger_keep_metadata_only_without_recursive_compaction() {
                 flow_key: foo_flow_key,
                 run_since_start: Duration::milliseconds(10),
                 initiator_id: None,
+                flow_configuration_snapshot_maybe: None,
             });
             let trigger0_handle = trigger0_driver.run();
 
@@ -2099,6 +2113,7 @@ async fn test_manual_trigger_keep_metadata_only_compaction_multiple_accounts() {
                 flow_key: foo_flow_key,
                 run_since_start: Duration::milliseconds(10),
                 initiator_id: None,
+                flow_configuration_snapshot_maybe: None,
             });
             let trigger0_handle = trigger0_driver.run();
 
@@ -3319,6 +3334,7 @@ async fn test_throttling_manual_triggers() {
             flow_key: foo_flow_key.clone(),
             run_since_start: Duration::milliseconds(20),
             initiator_id: None,
+            flow_configuration_snapshot_maybe: None,
         });
         let trigger0_handle = trigger0_driver.run();
 
@@ -3327,6 +3343,7 @@ async fn test_throttling_manual_triggers() {
             flow_key: foo_flow_key.clone(),
             run_since_start: Duration::milliseconds(30),
             initiator_id: None,
+            flow_configuration_snapshot_maybe: None,
         });
         let trigger1_handle = trigger1_driver.run();
 
@@ -3335,6 +3352,7 @@ async fn test_throttling_manual_triggers() {
           flow_key: foo_flow_key,
           run_since_start: Duration::milliseconds(70),
           initiator_id: None,
+          flow_configuration_snapshot_maybe: None,
         });
         let trigger2_handle = trigger2_driver.run();
 
@@ -5389,6 +5407,7 @@ async fn test_list_all_flow_initiators() {
                     flow_key: foo_flow_key,
                     run_since_start: Duration::milliseconds(10),
                     initiator_id: Some(foo_account_id.clone()),
+                    flow_configuration_snapshot_maybe: None,
                 });
                 let trigger0_handle = trigger0_driver.run();
 
@@ -5397,6 +5416,7 @@ async fn test_list_all_flow_initiators() {
                     flow_key: bar_flow_key,
                     run_since_start: Duration::milliseconds(50),
                     initiator_id: Some(bar_account_id.clone()),
+                    flow_configuration_snapshot_maybe: None,
                 });
                 let trigger1_handle = trigger1_driver.run();
 
@@ -5549,6 +5569,7 @@ async fn test_list_all_datasets_with_flow() {
                     flow_key: foo_flow_key,
                     run_since_start: Duration::milliseconds(10),
                     initiator_id: Some(foo_account_id.clone()),
+                    flow_configuration_snapshot_maybe: None,
                 });
                 let trigger0_handle = trigger0_driver.run();
 
@@ -5557,6 +5578,7 @@ async fn test_list_all_datasets_with_flow() {
                     flow_key: bar_flow_key,
                     run_since_start: Duration::milliseconds(50),
                     initiator_id: Some(bar_account_id.clone()),
+                    flow_configuration_snapshot_maybe: None,
                 });
                 let trigger1_handle = trigger1_driver.run();
 

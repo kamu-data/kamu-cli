@@ -401,6 +401,11 @@ impl FlowSchedulingHelper {
                                     throttling_boundary_time,
                                     trigger_time,
                                 )?;
+                            };
+
+                            if let Some(config_snapshot) = config_snapshot_maybe {
+                                flow.modify_config_snapshot(trigger_time, config_snapshot)
+                                    .int_err()?;
                             }
 
                             // Schedule the flow earlier than previously planned
