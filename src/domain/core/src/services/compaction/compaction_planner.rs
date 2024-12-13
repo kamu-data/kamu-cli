@@ -59,10 +59,17 @@ impl Default for CompactionOptions {
 
 #[derive(Debug)]
 pub struct CompactionPlan {
-    pub old_seed: odf::Multihash,
+    pub seed: odf::Multihash,
     pub old_num_blocks: usize,
     pub offset_column_name: String,
     pub data_slice_batches: Vec<CompactionDataSliceBatch>,
+}
+
+impl CompactionPlan {
+    pub fn has_no_effect(&self) -> bool {
+        // slices amount +1(seed block) eq to amount of blocks we should not compact
+        self.data_slice_batches.len() + 1 == self.old_num_blocks
+    }
 }
 
 #[allow(clippy::large_enum_variant)]

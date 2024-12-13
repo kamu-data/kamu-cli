@@ -40,7 +40,7 @@ impl CompactionPlannerImpl {
         // Declare mut values for result
 
         let mut old_num_blocks: usize = 0;
-        let mut old_seed: Option<odf::Multihash> = None;
+        let mut maybe_seed: Option<odf::Multihash> = None;
 
         let mut current_hash: Option<odf::Multihash> = None;
         let mut vocab_event: Option<odf::SetVocab> = None;
@@ -122,7 +122,7 @@ impl CompactionPlannerImpl {
                             add_data_event.new_watermark;
                     }
                 }
-                odf::MetadataEvent::Seed(_) => old_seed = Some(block_hash),
+                odf::MetadataEvent::Seed(_) => maybe_seed = Some(block_hash),
                 odf::MetadataEvent::ExecuteTransform(_) => {
                     if keep_metadata_only {
                         continue;
@@ -151,7 +151,7 @@ impl CompactionPlannerImpl {
         Ok(CompactionPlan {
             data_slice_batches,
             offset_column_name: vocab.offset_column,
-            old_seed: old_seed.unwrap(),
+            seed: maybe_seed.expect("Seed must be present"),
             old_num_blocks,
         })
     }

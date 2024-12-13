@@ -107,7 +107,7 @@ impl CompactionExecutionServiceImpl {
         plan: &CompactionPlan,
     ) -> Result<(Vec<Url>, odf::Multihash, usize), CompactionExecutionError> {
         let chain = target.as_metadata_chain();
-        let mut current_head = plan.old_seed.clone();
+        let mut current_head = plan.seed.clone();
         let mut old_data_slices: Vec<Url> = vec![];
         // set it to 1 to include seed block
         let mut new_num_blocks: usize = 1;
@@ -215,6 +215,12 @@ impl CompactionExecutionService for CompactionExecutionServiceImpl {
         let (_old_data_slices, new_head, new_num_blocks) =
             self.commit_new_blocks(&target, &plan).await?;
 
+        let old_head = target
+            .as_metadata_chain()
+            .resolve_ref(&BlockRef::Head)
+            .await
+            .int_err()?;
+
         target
             .as_metadata_chain()
             .set_ref(
@@ -228,7 +234,7 @@ impl CompactionExecutionService for CompactionExecutionServiceImpl {
             .await?;
 
         let res = CompactionResult::Success {
-            old_head: plan.old_seed, // TODO: is this intented?
+            old_head,
             new_head,
             old_num_blocks: plan.old_num_blocks,
             new_num_blocks,
