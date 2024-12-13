@@ -132,7 +132,7 @@ impl NotebookServerImpl {
             .environment_vars(environment_vars)
             .args([
                 "jupyter".to_owned(),
-                "notebook".to_owned(),
+                "lab".to_owned(),
                 "--allow-root".to_owned(),
                 "--ip".to_owned(),
                 address
@@ -140,9 +140,6 @@ impl NotebookServerImpl {
                     .to_string(),
                 "--port".to_owned(),
                 jupyter_port_in_container.to_string(),
-                // TODO: Remove show_banner option after Sparkmagic supports notebook >= 7.0.0
-                // See: https://github.com/jupyter-incubator/sparkmagic/issues/885
-                "--NotebookApp.show_banner=False".to_string(),
             ])
             .stdout(if inherit_stdio {
                 Stdio::inherit()

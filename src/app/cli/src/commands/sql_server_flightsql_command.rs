@@ -83,6 +83,7 @@ impl Command for SqlServerFlightSqlCommand {
         eprintln!("{}", s("Use Ctrl+C to stop the server").yellow());
 
         Server::builder()
+            .layer(observability::tonic::grpc_layer())
             .add_service(FlightServiceServer::new(kamu_service))
             .serve_with_incoming(tokio_stream::wrappers::TcpListenerStream::new(listener))
             .await

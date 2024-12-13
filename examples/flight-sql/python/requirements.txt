@@ -3,4 +3,5 @@ adbc_driver_flightsql
 flightsql-dbapi
 sqlalchemy
 pandas
+pyarrow
 jpype1

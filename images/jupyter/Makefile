@@ -1,5 +1,5 @@
 PLATFORM=linux/amd64
-BASE_IMAGE:=quay.io/jupyter/minimal-notebook:2024-02-13
+BASE_IMAGE:=quay.io/jupyter/minimal-notebook:2024-12-09
 
 
 # Requires QEMU
@@ -26,4 +26,4 @@ requirements-platform:
 .PHONY: requirements-install-freeze
 requirements-install-freeze:
 	mamba install -y --file requirements/$(PLATFORM)/requirements.in
-	mamba list --export > requirements/$(PLATFORM)/requirements.txt
+	mamba env export --no-builds > requirements/$(PLATFORM)/env.yaml

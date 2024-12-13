@@ -1,8 +1,4 @@
-# TODO: Pinned due to sparkmagic installation issue
-# See: https://github.com/jupyter-incubator/sparkmagic/issues/825
-# See workaround applied in: https://github.com/jupyter-incubator/sparkmagic/blob/master/Dockerfile.jupyter
-notebook==6.5.5
-
+ipywidgets
 sparkmagic
 
 pandas
@@ -17,5 +13,9 @@ hvplot
 pandas-bokeh
 folium
 altair
-mapboxgl
 shapely
+
+# TODO: Installed in Dockerfile via pip
+# This is a semi-permanent hack for `mapboxgl` package being broken in conda-forge
+# See: https://github.com/kamu-data/kamu-cli/issues/533
+# mapboxgl

@@ -11,6 +11,7 @@ pub mod axum;
 pub mod config;
 pub mod health;
 pub mod init;
+pub mod tonic;
 pub mod tracing;
 
 #[cfg(feature = "prometheus")]
