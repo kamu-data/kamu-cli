@@ -17,7 +17,6 @@ use internal_error::{InternalError, ResultIntoInternal};
 use kamu::domain::{
     CacheDir,
     CommitDatasetEventUseCase,
-    CompactionService,
     CreateDatasetFromSnapshotUseCase,
     CreateDatasetUseCase,
     DatasetRepository,
@@ -27,7 +26,8 @@ use kamu::domain::{
 use kamu::{
     AppendDatasetMetadataBatchUseCaseImpl,
     CommitDatasetEventUseCaseImpl,
-    CompactionServiceImpl,
+    CompactionExecutionServiceImpl,
+    CompactionPlannerImpl,
     CreateDatasetFromSnapshotUseCaseImpl,
     CreateDatasetUseCaseImpl,
     DatasetLayout,
@@ -40,7 +40,7 @@ use kamu::{
 };
 use kamu_accounts::testing::MockAuthenticationService;
 use kamu_accounts::{Account, AuthenticationService};
-use kamu_core::{DatasetRegistry, TenancyConfig};
+use kamu_core::{CompactionExecutionService, CompactionPlanner, DatasetRegistry, TenancyConfig};
 use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
 use kamu_datasets_services::DependencyGraphServiceImpl;
 use messaging_outbox::DummyOutboxImpl;
@@ -113,7 +113,8 @@ impl ServerSideLocalFsHarness {
                 .add::<DatasetRegistryRepoBridge>()
                 .bind::<dyn AuthenticationService, MockAuthenticationService>()
                 .add_value(ServerUrlConfig::new_test(Some(&base_url_rest)))
-                .add::<CompactionServiceImpl>()
+                .add::<CompactionPlannerImpl>()
+                .add::<CompactionExecutionServiceImpl>()
                 .add::<ObjectStoreRegistryImpl>()
                 .add::<ObjectStoreBuilderLocalFs>()
                 .add::<RemoteRepositoryRegistryImpl>()
@@ -191,9 +192,16 @@ impl ServerSideHarness for ServerSideLocalFsHarness {
             .unwrap()
     }
 
-    fn cli_compaction_service(&self) -> Arc<dyn CompactionService> {
+    fn cli_compaction_planner(&self) -> Arc<dyn CompactionPlanner> {
         let cli_catalog = create_cli_user_catalog(&self.base_catalog);
-        cli_catalog.get_one::<dyn CompactionService>().unwrap()
+        cli_catalog.get_one::<dyn CompactionPlanner>().unwrap()
+    }
+
+    fn cli_compaction_execution_service(&self) -> Arc<dyn CompactionExecutionService> {
+        let cli_catalog = create_cli_user_catalog(&self.base_catalog);
+        cli_catalog
+            .get_one::<dyn CompactionExecutionService>()
+            .unwrap()
     }
 
     fn api_server_addr(&self) -> String {

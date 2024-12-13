@@ -21,7 +21,7 @@ pub struct TaskRunnerImpl {
     transform_elaboration_service: Arc<dyn TransformElaborationService>,
     transform_execution_service: Arc<dyn TransformExecutionService>,
     reset_service: Arc<dyn ResetService>,
-    compaction_service: Arc<dyn CompactionService>,
+    compaction_execution_svc: Arc<dyn CompactionExecutionService>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -34,14 +34,14 @@ impl TaskRunnerImpl {
         transform_elaboration_service: Arc<dyn TransformElaborationService>,
         transform_execution_service: Arc<dyn TransformExecutionService>,
         reset_service: Arc<dyn ResetService>,
-        compaction_service: Arc<dyn CompactionService>,
+        compaction_execution_svc: Arc<dyn CompactionExecutionService>,
     ) -> Self {
         Self {
             polling_ingest_service,
             transform_elaboration_service,
             transform_execution_service,
             reset_service,
-            compaction_service,
+            compaction_execution_svc,
         }
     }
 
@@ -190,8 +190,8 @@ impl TaskRunnerImpl {
         task_compact: TaskDefinitionHardCompact,
     ) -> Result<TaskOutcome, InternalError> {
         let compaction_result = self
-            .compaction_service
-            .compact_dataset(task_compact.target, task_compact.compaction_options, None)
+            .compaction_execution_svc
+            .execute_compaction(task_compact.target, task_compact.compaction_plan, None)
             .await;
 
         match compaction_result {

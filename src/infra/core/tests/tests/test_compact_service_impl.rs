@@ -14,7 +14,7 @@ use chrono::{DateTime, TimeZone, Utc};
 use datafusion::execution::config::SessionConfig;
 use datafusion::execution::context::SessionContext;
 use dill::Component;
-use domain::{CompactionError, CompactionOptions, CompactionResult, CompactionService};
+use domain::{CompactionError, CompactionOptions, CompactionResult};
 use futures::TryStreamExt;
 use indoc::indoc;
 use kamu::domain::*;
@@ -727,7 +727,9 @@ async fn test_dataset_compaction_derive_error() {
         harness
             .compact_dataset(&created, CompactionOptions::default(),)
             .await,
-        Err(CompactionError::InvalidDatasetKind(_)),
+        Err(CompactionError::Planning(
+            CompactionPlanningError::InvalidDatasetKind(_)
+        )),
     );
 }
 
@@ -1062,7 +1064,8 @@ struct CompactTestHarness {
     _temp_dir: tempfile::TempDir,
     dataset_registry: Arc<dyn DatasetRegistry>,
     dataset_repo_writer: Arc<dyn DatasetRepositoryWriter>,
-    compaction_svc: Arc<CompactionServiceImpl>,
+    compaction_planner: Arc<dyn CompactionPlanner>,
+    compaction_execution_svc: Arc<dyn CompactionExecutionService>,
     push_ingest_svc: Arc<PushIngestServiceImpl>,
     transform_helper: TransformTestHelper,
     verification_svc: Arc<dyn VerificationService>,
@@ -1097,7 +1100,8 @@ impl CompactTestHarness {
             .add::<ObjectStoreRegistryImpl>()
             .add::<ObjectStoreBuilderLocalFs>()
             .add::<DataFormatRegistryImpl>()
-            .add::<CompactionServiceImpl>()
+            .add::<CompactionPlannerImpl>()
+            .add::<CompactionExecutionServiceImpl>()
             .add::<PushIngestServiceImpl>()
             .add::<TransformRequestPlannerImpl>()
             .add::<TransformElaborationServiceImpl>()
@@ -1111,7 +1115,8 @@ impl CompactTestHarness {
 
         let dataset_registry = catalog.get_one::<dyn DatasetRegistry>().unwrap();
         let dataset_repo_writer = catalog.get_one::<dyn DatasetRepositoryWriter>().unwrap();
-        let compaction_svc = catalog.get_one::<CompactionServiceImpl>().unwrap();
+        let compaction_planner = catalog.get_one::<dyn CompactionPlanner>().unwrap();
+        let compaction_execution_svc = catalog.get_one::<dyn CompactionExecutionService>().unwrap();
         let push_ingest_svc = catalog.get_one::<PushIngestServiceImpl>().unwrap();
         let verification_svc = catalog.get_one::<dyn VerificationService>().unwrap();
 
@@ -1121,7 +1126,8 @@ impl CompactTestHarness {
             _temp_dir: temp_dir,
             dataset_registry,
             dataset_repo_writer,
-            compaction_svc,
+            compaction_planner,
+            compaction_execution_svc,
             push_ingest_svc,
             transform_helper,
             verification_svc,
@@ -1158,7 +1164,8 @@ impl CompactTestHarness {
             .add::<TransformElaborationServiceImpl>()
             .add::<TransformExecutionServiceImpl>()
             .add::<DataFormatRegistryImpl>()
-            .add::<CompactionServiceImpl>()
+            .add::<CompactionPlannerImpl>()
+            .add::<CompactionExecutionServiceImpl>()
             .add_value(CurrentAccountSubject::new_test())
             .build();
 
@@ -1170,7 +1177,8 @@ impl CompactTestHarness {
             _temp_dir: temp_dir,
             dataset_registry: catalog.get_one().unwrap(),
             dataset_repo_writer: catalog.get_one().unwrap(),
-            compaction_svc: catalog.get_one().unwrap(),
+            compaction_planner: catalog.get_one().unwrap(),
+            compaction_execution_svc: catalog.get_one().unwrap(),
             push_ingest_svc: catalog.get_one().unwrap(),
             transform_helper,
             verification_svc: catalog.get_one().unwrap(),
@@ -1427,12 +1435,24 @@ impl CompactTestHarness {
         dataset_create_result: &CreateDatasetResult,
         compaction_options: CompactionOptions,
     ) -> Result<CompactionResult, CompactionError> {
-        self.compaction_svc
-            .compact_dataset(
+        let compaction_plan = self
+            .compaction_planner
+            .build_compaction_plan(
                 ResolvedDataset::from(dataset_create_result),
                 compaction_options,
-                Some(Arc::new(NullCompactionListener {})),
+                None,
             )
-            .await
+            .await?;
+
+        let result = self
+            .compaction_execution_svc
+            .execute_compaction(
+                ResolvedDataset::from(dataset_create_result),
+                compaction_plan,
+                None,
+            )
+            .await?;
+
+        Ok(result)
     }
 }

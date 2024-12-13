@@ -153,7 +153,8 @@ impl CompactUseCaseHarness {
 
         let catalog = dill::CatalogBuilder::new_chained(base_harness.catalog())
             .add::<CompactDatasetUseCaseImpl>()
-            .add::<CompactionServiceImpl>()
+            .add::<CompactionPlannerImpl>()
+            .add::<CompactionExecutionServiceImpl>()
             .add::<ObjectStoreRegistryImpl>()
             .build();
 

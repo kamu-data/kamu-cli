@@ -397,7 +397,8 @@ pub fn configure_base_catalog(
 
     b.add::<VerificationServiceImpl>();
 
-    b.add::<CompactionServiceImpl>();
+    b.add::<CompactionPlannerImpl>();
+    b.add::<CompactionExecutionServiceImpl>();
 
     b.add::<SearchServiceImpl>();
 

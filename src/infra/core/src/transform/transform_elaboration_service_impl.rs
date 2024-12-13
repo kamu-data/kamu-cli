@@ -22,7 +22,8 @@ use crate::build_preliminary_request_ext;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct TransformElaborationServiceImpl {
-    compaction_svc: Arc<dyn CompactionService>,
+    compaction_planner: Arc<dyn CompactionPlanner>,
+    compaction_execution_svc: Arc<dyn CompactionExecutionService>,
     time_source: Arc<dyn SystemTimeSource>,
 }
 
@@ -30,11 +31,13 @@ pub struct TransformElaborationServiceImpl {
 #[interface(dyn TransformElaborationService)]
 impl TransformElaborationServiceImpl {
     pub fn new(
-        compaction_svc: Arc<dyn CompactionService>,
+        compaction_planner: Arc<dyn CompactionPlanner>,
+        compaction_execution_svc: Arc<dyn CompactionExecutionService>,
         time_source: Arc<dyn SystemTimeSource>,
     ) -> Self {
         Self {
-            compaction_svc,
+            compaction_planner,
+            compaction_execution_svc,
             time_source,
         }
     }
@@ -186,9 +189,9 @@ impl TransformElaborationService for TransformElaborationServiceImpl {
                     "Interval error detected - resetting on diverged input",
                 );
 
-                let compaction_result = self
-                    .compaction_svc
-                    .compact_dataset(
+                let compaction_plan = self
+                    .compaction_planner
+                    .build_compaction_plan(
                         target.clone(),
                         CompactionOptions {
                             keep_metadata_only: true,
@@ -196,6 +199,12 @@ impl TransformElaborationService for TransformElaborationServiceImpl {
                         },
                         None,
                     )
+                    .await
+                    .int_err()?;
+
+                let compaction_result = self
+                    .compaction_execution_svc
+                    .execute_compaction(target.clone(), compaction_plan, None)
                     .await
                     .int_err()?;
 

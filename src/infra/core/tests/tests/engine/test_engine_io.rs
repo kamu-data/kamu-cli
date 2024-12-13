@@ -69,7 +69,8 @@ async fn test_engine_io_common<
     let transform_helper = TransformTestHelper::build(
         Arc::new(DatasetRegistryRepoBridge::new(dataset_repo.clone())),
         time_source.clone(),
-        Arc::new(CompactionServiceImpl::new(
+        Arc::new(CompactionPlannerImpl {}),
+        Arc::new(CompactionExecutionServiceImpl::new(
             object_store_registry.clone(),
             time_source.clone(),
             run_info_dir.clone(),

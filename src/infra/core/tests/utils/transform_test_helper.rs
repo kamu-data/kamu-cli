@@ -16,7 +16,8 @@ use kamu::{
     TransformRequestPlannerImpl,
 };
 use kamu_core::{
-    CompactionService,
+    CompactionExecutionService,
+    CompactionPlanner,
     CreateDatasetResult,
     DatasetRegistry,
     EngineProvisioner,
@@ -43,7 +44,8 @@ impl TransformTestHelper {
     pub fn build(
         dataset_registry: Arc<dyn DatasetRegistry>,
         system_time_source: Arc<dyn SystemTimeSource>,
-        compaction_svc: Arc<dyn CompactionService>,
+        compaction_planner: Arc<dyn CompactionPlanner>,
+        compaction_execution_svc: Arc<dyn CompactionExecutionService>,
         engine_provisioner: Arc<dyn EngineProvisioner>,
     ) -> Self {
         Self {
@@ -52,7 +54,8 @@ impl TransformTestHelper {
                 system_time_source.clone(),
             )),
             transform_elab_svc: Arc::new(TransformElaborationServiceImpl::new(
-                compaction_svc,
+                compaction_planner,
+                compaction_execution_svc,
                 system_time_source,
             )),
             transform_exec_svc: Arc::new(TransformExecutionServiceImpl::new(engine_provisioner)),

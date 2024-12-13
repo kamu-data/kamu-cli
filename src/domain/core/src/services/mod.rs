@@ -10,13 +10,19 @@
 // Re-exports
 pub use container_runtime::{NullPullImageListener, PullImageListener};
 
-pub mod compaction_service;
+pub mod compaction;
+pub mod ingest;
+pub mod transform;
+
+pub use compaction::*;
+pub use ingest::*;
+pub use transform::*;
+
 pub mod dataset_changes_service;
 pub mod dataset_ownership_service;
 pub mod dataset_registry;
 pub mod dependency_graph_service;
 pub mod engine_provisioner;
-pub mod ingest;
 pub mod provenance_service;
 pub mod pull_request_planner;
 pub mod push_request_planner;
@@ -30,17 +36,14 @@ pub mod resource_loader;
 pub mod search_service;
 pub mod server_url_config;
 pub mod sync_service;
-pub mod transform;
 pub mod verification_service;
 pub mod watermark_service;
 
-pub use compaction_service::*;
 pub use dataset_changes_service::*;
 pub use dataset_ownership_service::*;
 pub use dataset_registry::*;
 pub use dependency_graph_service::*;
 pub use engine_provisioner::*;
-pub use ingest::*;
 pub use provenance_service::*;
 pub use pull_request_planner::*;
 pub use push_request_planner::*;
@@ -54,6 +57,5 @@ pub use resource_loader::*;
 pub use search_service::*;
 pub use server_url_config::*;
 pub use sync_service::*;
-pub use transform::*;
 pub use verification_service::*;
 pub use watermark_service::*;

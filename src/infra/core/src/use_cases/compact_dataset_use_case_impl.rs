@@ -14,12 +14,13 @@ use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer};
 use kamu_core::{
     CompactDatasetUseCase,
     CompactionError,
+    CompactionExecutionService,
     CompactionListener,
     CompactionMultiListener,
     CompactionOptions,
+    CompactionPlanner,
     CompactionResponse,
     CompactionResult,
-    CompactionService,
     DatasetRegistry,
     NullCompactionMultiListener,
 };
@@ -30,19 +31,22 @@ use opendatafabric::DatasetHandle;
 #[component(pub)]
 #[interface(dyn CompactDatasetUseCase)]
 pub struct CompactDatasetUseCaseImpl {
-    compaction_service: Arc<dyn CompactionService>,
+    compaction_planner: Arc<dyn CompactionPlanner>,
+    compaction_execution_svc: Arc<dyn CompactionExecutionService>,
     dataset_registry: Arc<dyn DatasetRegistry>,
     dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
 }
 
 impl CompactDatasetUseCaseImpl {
     pub fn new(
-        compaction_service: Arc<dyn CompactionService>,
+        compaction_planner: Arc<dyn CompactionPlanner>,
+        compaction_execution_svc: Arc<dyn CompactionExecutionService>,
         dataset_registry: Arc<dyn DatasetRegistry>,
         dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
     ) -> Self {
         Self {
-            compaction_service,
+            compaction_planner,
+            compaction_execution_svc,
             dataset_registry,
             dataset_action_authorizer,
         }
@@ -71,10 +75,19 @@ impl CompactDatasetUseCase for CompactDatasetUseCaseImpl {
         // Resolve dataset
         let target = self.dataset_registry.get_dataset_by_handle(dataset_handle);
 
-        // Actual action
-        self.compaction_service
-            .compact_dataset(target, options, maybe_listener)
-            .await
+        // Plan compacting
+        let compaction_plan = self
+            .compaction_planner
+            .build_compaction_plan(target.clone(), options, maybe_listener.clone())
+            .await?;
+
+        // Execute compacting
+        let compaction_result = self
+            .compaction_execution_svc
+            .execute_compaction(target, compaction_plan, maybe_listener)
+            .await?;
+
+        Ok(compaction_result)
     }
 
     #[tracing::instrument(

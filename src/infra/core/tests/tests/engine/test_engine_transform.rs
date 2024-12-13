@@ -259,7 +259,8 @@ impl TestHarness {
             .add::<TransformRequestPlannerImpl>()
             .add::<TransformElaborationServiceImpl>()
             .add::<TransformExecutionServiceImpl>()
-            .add::<CompactionServiceImpl>()
+            .add::<CompactionPlannerImpl>()
+            .add::<CompactionExecutionServiceImpl>()
             .add::<DatasetKeyValueServiceSysEnv>()
             .add_value(SystemTimeSourceStub::new_set(
                 Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap(),

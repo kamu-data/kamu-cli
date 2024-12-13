@@ -34,7 +34,8 @@ struct TransformTestHarness {
     transform_request_planner: Arc<dyn TransformRequestPlanner>,
     transform_elab_svc: Arc<dyn TransformElaborationService>,
     transform_exec_svc: Arc<dyn TransformExecutionService>,
-    compaction_service: Arc<dyn CompactionService>,
+    compaction_planner: Arc<dyn CompactionPlanner>,
+    compaction_exec_svc: Arc<dyn CompactionExecutionService>,
     push_ingest_svc: Arc<PushIngestServiceImpl>,
 }
 
@@ -59,7 +60,8 @@ impl TransformTestHarness {
             .add::<SystemTimeSourceDefault>()
             .add::<ObjectStoreRegistryImpl>()
             .add::<ObjectStoreBuilderLocalFs>()
-            .add::<CompactionServiceImpl>()
+            .add::<CompactionPlannerImpl>()
+            .add::<CompactionExecutionServiceImpl>()
             .add::<DataFormatRegistryImpl>()
             .add::<PushIngestServiceImpl>()
             .bind::<dyn PushIngestService, PushIngestServiceImpl>()
@@ -75,7 +77,8 @@ impl TransformTestHarness {
             _tempdir: tempdir,
             dataset_registry: catalog.get_one().unwrap(),
             dataset_repo_writer: catalog.get_one().unwrap(),
-            compaction_service: catalog.get_one().unwrap(),
+            compaction_planner: catalog.get_one().unwrap(),
+            compaction_exec_svc: catalog.get_one().unwrap(),
             push_ingest_svc: catalog.get_one().unwrap(),
             transform_request_planner: catalog.get_one().unwrap(),
             transform_elab_svc: catalog.get_one().unwrap(),
@@ -237,6 +240,23 @@ impl TransformTestHarness {
                 .1
                 .map_err(TransformError::Execute),
         }
+    }
+
+    async fn compact(&self, dataset: &CreateDatasetResult) {
+        let compaction_plan = self
+            .compaction_planner
+            .build_compaction_plan(
+                ResolvedDataset::from(dataset),
+                CompactionOptions::default(),
+                None,
+            )
+            .await
+            .unwrap();
+
+        self.compaction_exec_svc
+            .execute_compaction(ResolvedDataset::from(dataset), compaction_plan, None)
+            .await
+            .unwrap();
     }
 }
 
@@ -700,15 +720,7 @@ async fn test_transform_with_compaction_retry() {
     let transform_result = harness.transform(&bar, TransformOptions::default()).await;
     assert_matches!(transform_result, Ok(TransformResult::Updated { .. }));
 
-    let foo_dataset = harness
-        .dataset_registry
-        .get_dataset_by_handle(&foo_created_result.dataset_handle);
-
-    harness
-        .compaction_service
-        .compact_dataset(foo_dataset, CompactionOptions::default(), None)
-        .await
-        .unwrap();
+    harness.compact(&foo_created_result).await;
 
     let transform_result = harness.transform(&bar, TransformOptions::default()).await;
 

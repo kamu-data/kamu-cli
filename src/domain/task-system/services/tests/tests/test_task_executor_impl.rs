@@ -14,6 +14,7 @@ use database_common::NoOpDatabasePlugin;
 use dill::{Catalog, CatalogBuilder, Component};
 use kamu::utils::ipfs_wrapper::IpfsClient;
 use kamu::{
+    CompactionPlannerImpl,
     DatasetFactoryImpl,
     DatasetRegistryRepoBridge,
     DatasetRepositoryLocalFs,
@@ -183,6 +184,7 @@ impl TaskExecutorHarness {
             .bind::<dyn Outbox, MockOutbox>()
             .add::<SystemTimeSourceDefault>()
             .add::<PullRequestPlannerImpl>()
+            .add::<CompactionPlannerImpl>()
             .add::<TransformRequestPlannerImpl>()
             .add::<SyncRequestBuilder>()
             .add::<DatasetFactoryImpl>()

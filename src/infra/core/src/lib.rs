@@ -19,6 +19,7 @@
 // Re-exports
 pub use kamu_core as domain;
 
+mod compaction;
 mod engine;
 pub mod ingest;
 mod query;
@@ -29,7 +30,13 @@ mod transform;
 mod use_cases;
 pub mod utils;
 
-mod compaction_service_impl;
+pub use compaction::*;
+pub use engine::*;
+pub use ingest::*;
+pub use repos::*;
+pub use transform::*;
+pub use use_cases::*;
+
 mod dataset_changes_service_impl;
 mod dataset_config;
 mod dataset_layout;
@@ -51,14 +58,11 @@ mod sync_service_impl;
 mod verification_service_impl;
 mod watermark_service_impl;
 
-pub use compaction_service_impl::*;
 pub use dataset_changes_service_impl::*;
 pub use dataset_config::*;
 pub use dataset_layout::*;
 pub use dataset_ownership_service_inmem::*;
 pub use dataset_registry_repo_bridge::*;
-pub use engine::*;
-pub use ingest::*;
 pub use provenance_service_impl::*;
 pub use pull_request_planner_impl::*;
 pub use push_request_planner_impl::*;
@@ -67,13 +71,10 @@ pub use remote_alias_resolver_impl::*;
 pub use remote_aliases_registry_impl::*;
 pub use remote_repository_registry_impl::*;
 pub use remote_status_service_impl::*;
-pub use repos::*;
 pub use reset_service_impl::*;
 pub use resource_loader_impl::*;
 pub use search_service_impl::*;
 pub use sync_request_builder::*;
 pub use sync_service_impl::*;
-pub use transform::*;
-pub use use_cases::*;
 pub use verification_service_impl::*;
 pub use watermark_service_impl::*;
