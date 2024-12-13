@@ -126,6 +126,13 @@ impl Projection for FlowState {
                             })
                         }
                     }
+                    E::ConfigSnapshotModified(FlowConfigSnapshotModified {
+                        config_snapshot,
+                        ..
+                    }) => Ok(FlowState {
+                        config_snapshot: Some(config_snapshot),
+                        ..s
+                    }),
                     E::TriggerAdded(FlowEventTriggerAdded { ref trigger, .. }) => {
                         if s.outcome.is_some() {
                             Err(ProjectionError::new(Some(s), event))
