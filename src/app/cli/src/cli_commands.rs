@@ -109,6 +109,7 @@ pub fn get_command(
             c.output_path,
             c.output_format,
             c.partition_size,
+            args.quiet,
         )),
         cli::Command::Ingest(c) => Box::new(IngestCommand::new(
             cli_catalog.get_one()?,
