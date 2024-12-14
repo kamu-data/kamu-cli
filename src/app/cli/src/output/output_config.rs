@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::fmt::{Display, Formatter};
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -75,7 +76,7 @@ impl OutputConfig {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, Copy, clap::ValueEnum)]
+#[derive(Debug, Clone, Copy, PartialEq, clap::ValueEnum)]
 pub enum OutputFormat {
     /// Comma-separated values
     #[clap(name = "csv")]
@@ -105,6 +106,21 @@ pub enum OutputFormat {
     /// Parquet columnar storage. Only available when exporting to file(s)
     #[clap(name = "parquet")]
     Parquet,
+}
+
+impl Display for OutputFormat {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let str_val = match *self {
+            OutputFormat::Csv => "csv",
+            OutputFormat::Json => "json",
+            OutputFormat::NdJson => "ndjson",
+            OutputFormat::JsonSoA => "json-soa",
+            OutputFormat::JsonAoA => "json-aoa",
+            OutputFormat::Table => "table",
+            OutputFormat::Parquet => "parquet",
+        };
+        f.write_str(str_val)
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

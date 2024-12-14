@@ -9,12 +9,21 @@
 
 use std::sync::Arc;
 
-use datafusion::arrow::array::{AsArray, PrimitiveArray, RecordBatch, UInt64Array};
+use datafusion::arrow::array::{AsArray, RecordBatch};
 use datafusion::arrow::datatypes::UInt64Type;
+use datafusion::common::DataFusionError;
 use datafusion::dataframe::DataFrameWriteOptions;
+use datafusion::prelude::SessionContext;
 use dill::{component, interface};
-use internal_error::{InternalError, ResultIntoInternal};
-use kamu_core::{ExportFormat, ExportService, QueryService, SessionConfigOverrides};
+use internal_error::{ErrorIntoInternal, ResultIntoInternal};
+use kamu_core::{
+    ExportError,
+    ExportFormat,
+    ExportQueryError,
+    ExportService,
+    QueryService,
+    SessionConfigOverrides,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -29,53 +38,35 @@ impl ExportServiceImpl {
         Self { query_service }
     }
 
-    fn records_written(&self, batches: &Vec<RecordBatch>) -> Result<u64, InternalError> {
+    fn records_written(&self, batches: &Vec<RecordBatch>) -> Result<u64, ExportError> {
         let mut total = 0;
         for batch in batches {
-            let col = batch
+            let maybe_count = batch
                 .column_by_name("count")
-                .ok_or("cannot get count col")
-                .int_err()?; //todo: error
-            let data: &PrimitiveArray<UInt64Type> = col
-                .as_primitive_opt::<UInt64Type>()
-                .ok_or("cannot cast count col data")
-                .int_err()?; //todo: error
-            let count = data
-                .values()
-                .get(0)
-                .ok_or("cannot get count value")
-                .int_err()?; //todo: error;
-            total += count;
+                .and_then(|col| col.as_primitive_opt::<UInt64Type>())
+                .and_then(|data| data.values().first());
+
+            if let Some(count) = maybe_count {
+                total += count;
+            } else {
+                return Err(ExportError::Internal(
+                    "Failed to calculate number of exported rows".int_err(),
+                ));
+            }
         }
         Ok(total)
     }
-}
 
-#[async_trait::async_trait]
-impl ExportService for ExportServiceImpl {
-    async fn export_to_fs(
+    async fn execute(
         &self,
-        sql_query: &String,
-        path: &String,
+        ctx: SessionContext,
+        sql_query: &str,
+        path: &str,
         format: ExportFormat,
-        partition_row_count: Option<usize>,
-    ) -> Result<u64, InternalError> {
-        // todo switch to specific error
-        let config_overrides = SessionConfigOverrides {
-            target_partitions: Some(1),
-            soft_max_rows_per_output_file: partition_row_count,
-            minimum_parallel_output_files: Some(1),
-        };
+    ) -> Result<Vec<RecordBatch>, DataFusionError> {
+        let df = ctx.sql(sql_query).await?;
 
-        let ctx = self
-            .query_service
-            .create_session_with_config_overrides(config_overrides)
-            .await
-            .unwrap(); //todo
-
-        let df = ctx.sql(sql_query).await.unwrap(); // todo: remove unwrap
-
-        let result = match format {
+        match format {
             ExportFormat::Parquet => {
                 df.write_parquet(path, DataFrameWriteOptions::new(), None)
                     .await
@@ -86,8 +77,44 @@ impl ExportService for ExportServiceImpl {
                     .await
             }
         }
-        .int_err();
+    }
+}
 
-        result.and_then(|result| self.records_written(&result))
+#[async_trait::async_trait]
+impl ExportService for ExportServiceImpl {
+    async fn export_to_fs(
+        &self,
+        sql_query: &str,
+        path: &str,
+        format: ExportFormat,
+        partition_row_count: Option<usize>,
+    ) -> Result<u64, ExportError> {
+        let config_overrides = SessionConfigOverrides {
+            target_partitions: Some(1),
+            soft_max_rows_per_output_file: partition_row_count,
+            minimum_parallel_output_files: Some(1),
+        };
+
+        let ctx = self
+            .query_service
+            .create_session_with_config_overrides(config_overrides)
+            .await
+            .int_err()?;
+
+        let result = self
+            .execute(ctx, sql_query, path, format)
+            .await
+            .map_err(|err| match err {
+                err @ (DataFusionError::Plan(_)
+                | DataFusionError::SQL(_, _)
+                | DataFusionError::Execution(_)
+                | DataFusionError::SchemaError(..)) => ExportError::Query(ExportQueryError {
+                    context: err.to_string(),
+                    source: err.into(),
+                }),
+                other => ExportError::Internal(other.int_err()),
+            })?;
+
+        self.records_written(&result)
     }
 }

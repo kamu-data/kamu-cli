@@ -12,6 +12,7 @@ use std::time::Duration;
 
 use container_runtime::ContainerRuntime;
 use internal_error::*;
+use itertools::Itertools;
 use kamu::domain::{ExportFormat, ExportService, QueryOptions, QueryService};
 use kamu::*;
 use kamu_datafusion_cli::exec;
@@ -48,6 +49,7 @@ pub struct SqlShellCommand {
     engine: Option<SqlShellEngine>,
     output_path: Option<String>,
     partition_size: Option<usize>,
+    supported_export_formats: Vec<OutputFormat>,
 }
 
 impl SqlShellCommand {
@@ -76,6 +78,11 @@ impl SqlShellCommand {
             engine,
             output_path,
             partition_size,
+            supported_export_formats: vec![
+                OutputFormat::Csv,
+                OutputFormat::NdJson,
+                OutputFormat::Parquet,
+            ],
         }
     }
 
@@ -182,7 +189,11 @@ impl SqlShellCommand {
                     OutputFormat::Csv => ExportFormat::Csv,
                     OutputFormat::NdJson => ExportFormat::NdJson,
                     OutputFormat::Parquet => ExportFormat::Parquet,
-                    _ => unimplemented!("Not supported format"), // todo: improve message
+                    not_supported => {
+                        // Normally should be unreachable, as the case should be caught by
+                        // `validate_args` function.
+                        unimplemented!("Format {:?} is not supported.", &not_supported)
+                    }
                 };
 
                 let rows_exported = self
@@ -200,9 +211,31 @@ impl SqlShellCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for SqlShellCommand {
     async fn validate_args(&self) -> Result<(), CLIError> {
-        // todo:
-        // - output_path and partition_size set only for datafusion engine
-        // - partition_size is set only when output_path is not empty
+        // Bulk export related checks
+        if self.output_path.is_some() {
+            match self.engine {
+                None | Some(SqlShellEngine::Datafusion) => (),
+                _ => {
+                    return Err(CLIError::usage_error(
+                        "Data export to file(s) is available with DataFusion (default) engine only",
+                    ))
+                }
+            }
+
+            let supported = &self.supported_export_formats;
+            if !supported.contains(&self.output_config.format) {
+                let supported_str = supported.iter().map(|f| format!("'{}'", f)).join(", ");
+                return Err(CLIError::usage_error(format!(
+                    "Invalid output format for export '{}'. Supported formats: {}",
+                    &self.output_config.format, supported_str
+                )));
+            }
+        } else if self.partition_size.is_some() {
+            return Err(CLIError::usage_error(
+                "Partitioning is only supported for data export to file(s)",
+            ));
+        }
+
         Ok(())
     }
 

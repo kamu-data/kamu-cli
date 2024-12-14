@@ -383,8 +383,8 @@ pub struct Export {
     #[arg(long)]
     pub output_path: String, //todo pathbuf
 
-    #[arg(long, value_parser = ["parquet", "json", "csv"])]
-    pub output_format: String, //todo value_parser = ["csv", ...]
+    #[arg(long, value_parser = ["parquet", "ndjson", "csv"])]
+    pub output_format: String,
 
     #[arg(long)]
     pub partition_size: Option<usize>,
