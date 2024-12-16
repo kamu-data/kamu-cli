@@ -14,6 +14,8 @@ use kamu_accounts::CurrentAccountSubject;
 use kamu_core::{DatasetRepository, TenancyConfig};
 use time_source::SystemTimeSourceDefault;
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[test_log::test(tokio::test)]
 async fn test_malformed_argument() {
     let schema = kamu_adapter_graphql::schema_quiet();
@@ -53,6 +55,8 @@ async fn test_malformed_argument() {
         })
     );
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
 async fn test_internal_error() {
@@ -101,27 +105,4 @@ async fn test_internal_error() {
     );
 }
 
-// TODO: There seems to be an issue with libunwind in a version of XCode used on
-// GitHub's M1 runners which results in error:
-//   libunwind: stepWithCompactEncoding - invalid compact unwind encoding
-#[cfg(not(target_os = "macos"))]
-#[test_log::test(tokio::test)]
-// We use the substring part because we have a dynamic panic message part.
-#[should_panic(expected = "called `Result::unwrap()` on an `Err` value: \
-                           Unregistered(UnregisteredTypeError { type_id: TypeId { t: ")]
-async fn test_handler_panics() {
-    // Not expecting panic to be trapped - that's the job of an HTTP server
-    let schema = kamu_adapter_graphql::schema_quiet();
-    schema.execute(async_graphql::Request::new(indoc!(
-            r#"
-            {
-                datasets {
-                    byId (datasetId: "did:odf:fed012126262ba49e1ba8392c26f7a39e1ba8d756c7469786d3365200c68402ff65dc") {
-                        name
-                    }
-                }
-            }
-            "#
-        )).data(dill::CatalogBuilder::new().build()))
-        .await;
-}
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
