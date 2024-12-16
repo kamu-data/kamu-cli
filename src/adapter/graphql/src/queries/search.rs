@@ -45,7 +45,7 @@ impl Search {
         // TODO: Private Datasets: PERF: find a way to narrow down the number of records
         //       to filter, e.g.:
         //       - Anonymous: get all the public
-        //       - Logged: all available based on ReBAC
+        //       - Logged: all owned datasets and datasets with relations
         let filtered_dataset_handles: Vec<_> = dataset_registry
             .all_dataset_handles()
             .filter_ok(|hdl| hdl.alias.dataset_name.contains(&query))

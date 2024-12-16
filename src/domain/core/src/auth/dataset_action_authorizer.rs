@@ -23,7 +23,7 @@ use crate::AccessError;
 pub trait DatasetActionAuthorizer: Sync + Send {
     async fn check_action_allowed(
         &self,
-        // TODO: Private Datasets: just odf::DatasetID? here and below
+        // TODO: Private Datasets: use odf::DatasetID, here and below
         dataset_handle: &odf::DatasetHandle,
         action: DatasetAction,
     ) -> Result<(), DatasetActionUnauthorizedError>;

@@ -38,6 +38,7 @@ impl DatasetResource {
         }
     }
 
+    // TODO: Private Datasets: use for relations
     pub fn authorize_reader(&mut self, reader_account_id: &odf::AccountID) {
         self.authorized_users
             .insert(reader_account_id.to_string(), ROLE_READER);

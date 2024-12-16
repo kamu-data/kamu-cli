@@ -17,12 +17,14 @@ Recommendation: for ease of reading, use the following order:
 ### Changed
 - Speed up project build time by removing unused dependencies which were not detected by automated tools
 - Private Datasets:
-  - Deletion of previously created ReBAC-properties and reindexing
+  - OSO: using user actors / dateset resources that come from the database
+    - Thus, any access check relies on real entities
+  - GQL, added `DatasetMut.setVisibility()` to be able to change the dataset visibility after it has been created
+  - Deletion of previously created (and unused) ReBAC-properties and reindexing
   - OSO: updating the schema to use identifiers instead of names
   - OSO: added resource storage for access speed
   - E2E: Using the correct account in multi-tenant mode
     - And also the possibility of set it up
-  - GQL, added `DatasetMut.setVisibility()` to be able to update ReBAC properties
 
 ## [0.209.0] - 2024-11-25
 ### Changed

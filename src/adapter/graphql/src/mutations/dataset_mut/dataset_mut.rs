@@ -19,7 +19,7 @@ use crate::mutations::{
     DatasetMetadataMut,
 };
 use crate::prelude::*;
-use crate::utils::ensure_dataset_env_vars_enabled;
+use crate::utils::{ensure_dataset_env_vars_enabled, from_catalog_n};
 use crate::LoggedInGuard;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -164,7 +164,7 @@ impl DatasetMut {
     ) -> Result<SetDatasetPropertyResultSuccess> {
         ensure_account_owns_dataset(ctx, &self.dataset_handle).await?;
 
-        let rebac_svc = from_catalog::<dyn kamu_auth_rebac::RebacService>(ctx).unwrap();
+        let rebac_svc = from_catalog_n!(ctx, dyn kamu_auth_rebac::RebacService);
 
         let (allows_public_read, allows_anonymous_read) = match visibility {
             DatasetVisibilityInput::Private(_) => (false, false),
@@ -175,19 +175,10 @@ impl DatasetMut {
 
         use kamu_auth_rebac::DatasetPropertyName;
 
-        let (allows_public_read_property, allows_anonymous_read_property) = (
+        for (name, value) in [
             DatasetPropertyName::allows_public_read(allows_public_read),
             DatasetPropertyName::allows_anonymous_read(allows_anonymous_read),
-        );
-        {
-            let (name, value) = allows_public_read_property;
-            rebac_svc
-                .set_dataset_property(&self.dataset_handle.id, name, &value)
-                .await
-                .int_err()?;
-        }
-        {
-            let (name, value) = allows_anonymous_read_property;
+        ] {
             rebac_svc
                 .set_dataset_property(&self.dataset_handle.id, name, &value)
                 .await

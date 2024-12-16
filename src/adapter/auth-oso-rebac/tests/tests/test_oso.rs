@@ -38,7 +38,7 @@ async fn test_owner_can_read_and_write() {
     let allows_public_read = false;
     let owned_dataset_resource = DatasetResource::new(&owner_account_id, allows_public_read);
 
-    let oso = KamuAuthOso::new().oso;
+    let oso = KamuAuthOso::new();
 
     let write_result = oso.is_allowed(
         owner_user_actor.clone(),
@@ -65,7 +65,7 @@ async fn test_unrelated_can_read_public() {
     let allows_public_read = true;
     let public_dataset_resource = DatasetResource::new(&random_account_id(), allows_public_read);
 
-    let oso = KamuAuthOso::new().oso;
+    let oso = KamuAuthOso::new();
 
     let write_result = oso.is_allowed(
         unrelated_user_actor.clone(),
@@ -92,7 +92,7 @@ async fn test_unrelated_cannot_read_private() {
     let allows_public_read = false;
     let private_dataset_resource = DatasetResource::new(&random_account_id(), allows_public_read);
 
-    let oso = KamuAuthOso::new().oso;
+    let oso = KamuAuthOso::new();
 
     let write_result = oso.is_allowed(
         unrelated_user_actor.clone(),
@@ -122,7 +122,7 @@ async fn test_having_explicit_read_permission_in_private_dataset() {
         DatasetResource::new(&random_account_id(), allows_public_read);
     private_dataset_resource.authorize_reader(&reader_account_id);
 
-    let oso = KamuAuthOso::new().oso;
+    let oso = KamuAuthOso::new();
 
     let write_result = oso.is_allowed(
         reader_user_actor.clone(),
@@ -152,7 +152,7 @@ async fn test_having_explicit_write_permission_in_private_dataset() {
         DatasetResource::new(&random_account_id(), allows_public_read);
     private_dataset_resource.authorize_editor(&editor_account_id);
 
-    let oso = KamuAuthOso::new().oso;
+    let oso = KamuAuthOso::new();
 
     let write_result = oso.is_allowed(
         editor_user_actor.clone(),
@@ -179,7 +179,7 @@ async fn test_admin_can_read_and_write_another_private_dataset() {
     let allows_public_read = false;
     let dataset_resource = DatasetResource::new(&random_account_id(), allows_public_read);
 
-    let oso = KamuAuthOso::new().oso;
+    let oso = KamuAuthOso::new();
 
     let write_result = oso.is_allowed(
         admin_user_actor.clone(),

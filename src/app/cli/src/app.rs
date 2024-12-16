@@ -137,6 +137,10 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
             is_e2e_testing,
         );
 
+        // NOTE: Register DatasetEntryIndexer in DI, since it is referenced by other
+        //       components (via InitOnStartup)
+        // TODO: PERF: Do not register InitOnStartup-components if we are not inside the
+        //       workspace
         base_catalog_builder.add_builder(
             kamu_datasets_services::DatasetEntryIndexer::builder()
                 .with_is_in_workspace(workspace_svc.is_in_workspace()),

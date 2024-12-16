@@ -18,6 +18,7 @@ use crate::{DatasetEntry, DatasetEntryStream};
 
 #[async_trait::async_trait]
 pub trait DatasetEntryService: Sync + Send {
+    // TODO: Private Datasets: tests
     // TODO: Private Datasets: extract to DatasetEntryRegistry?
     fn all_entries(&self) -> DatasetEntryStream;
 

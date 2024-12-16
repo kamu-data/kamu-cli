@@ -57,8 +57,6 @@ pub struct DatasetEntryServiceImpl {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// TODO: Private Datasets: Q: DatasetEntryServiceImpl is not singleton,
-//                            but has a cache -- is that intentional?
 #[derive(Default)]
 struct AccountsCache {
     id2names: HashMap<odf::AccountID, odf::AccountName>,
