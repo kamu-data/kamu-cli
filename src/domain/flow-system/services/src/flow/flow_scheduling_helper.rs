@@ -64,13 +64,13 @@ impl FlowSchedulingHelper {
         &self,
         start_time: DateTime<Utc>,
         flow_key: FlowKey,
-        rule: Option<FlowTriggerRule>,
+        rule: FlowTriggerRule,
     ) -> Result<(), InternalError> {
         tracing::trace!(flow_key = ?flow_key, rule = ?rule, "Activating flow trigger");
 
         match &flow_key {
             FlowKey::Dataset(_) => match &rule {
-                Some(FlowTriggerRule::Batching(batching_rule)) => {
+                FlowTriggerRule::Batching(batching_rule) => {
                     let flow_run_stats =
                         self.flow_event_store.get_flow_run_stats(&flow_key).await?;
                     if flow_run_stats.last_success_time.is_some() {
@@ -88,14 +88,13 @@ impl FlowSchedulingHelper {
                             .await?;
                     }
                 }
-                Some(FlowTriggerRule::Schedule(schedule_rule)) => {
+                FlowTriggerRule::Schedule(schedule_rule) => {
                     self.schedule_auto_polling_flow(start_time, &flow_key, schedule_rule)
                         .await?;
                 }
-                None => {}
             },
             FlowKey::System(_) => {
-                if let Some(FlowTriggerRule::Schedule(schedule)) = &rule {
+                if let FlowTriggerRule::Schedule(schedule) = &rule {
                     self.schedule_auto_polling_flow(start_time, &flow_key, schedule)
                         .await?;
                 } else {
@@ -170,7 +169,7 @@ impl FlowSchedulingHelper {
     async fn make_downstream_dependencies_flow_plans(
         &self,
         fk_dataset: &FlowKeyDataset,
-        maybe_config_snapshot: Option<&FlowConfigurationSnapshot>,
+        maybe_config_snapshot: Option<&FlowConfigurationRule>,
     ) -> Result<Vec<DownstreamDependencyFlowPlan>, InternalError> {
         // ToDo: extend dependency graph with possibility to fetch downstream
         // dependencies by owner
@@ -235,7 +234,7 @@ impl FlowSchedulingHelper {
                                 flow_trigger_rule: None,
                                 // Currently we trigger Hard compaction recursively only in keep
                                 // metadata only mode
-                                maybe_config_snapshot: Some(FlowConfigurationSnapshot::Compaction(
+                                maybe_config_snapshot: Some(FlowConfigurationRule::CompactionRule(
                                     CompactionRule::MetadataOnly(CompactionRuleMetadataOnly {
                                         recursive: true,
                                     }),
@@ -256,7 +255,7 @@ impl FlowSchedulingHelper {
     fn classify_dependent_trigger_type(
         &self,
         dataset_flow_type: DatasetFlowType,
-        maybe_config_snapshot: Option<&FlowConfigurationSnapshot>,
+        maybe_config_snapshot: Option<&FlowConfigurationRule>,
     ) -> DownstreamDependencyTriggerType {
         match dataset_flow_type {
             DatasetFlowType::Ingest | DatasetFlowType::ExecuteTransform => {
@@ -264,7 +263,7 @@ impl FlowSchedulingHelper {
             }
             DatasetFlowType::HardCompaction => {
                 if let Some(config_snapshot) = &maybe_config_snapshot
-                    && let FlowConfigurationSnapshot::Compaction(compaction_rule) = config_snapshot
+                    && let FlowConfigurationRule::CompactionRule(compaction_rule) = config_snapshot
                 {
                     if compaction_rule.recursive() {
                         DownstreamDependencyTriggerType::TriggerOwnHardCompaction
@@ -277,7 +276,7 @@ impl FlowSchedulingHelper {
             }
             DatasetFlowType::Reset => {
                 if let Some(config_snapshot) = &maybe_config_snapshot
-                    && let FlowConfigurationSnapshot::Reset(reset_rule) = config_snapshot
+                    && let FlowConfigurationRule::ResetRule(reset_rule) = config_snapshot
                     && reset_rule.recursive
                 {
                     DownstreamDependencyTriggerType::TriggerOwnHardCompaction
@@ -327,9 +326,9 @@ impl FlowSchedulingHelper {
     pub(crate) async fn trigger_flow_common(
         &self,
         flow_key: &FlowKey,
-        trigger_rule: Option<FlowTriggerRule>,
+        trigger_rule_maybe: Option<FlowTriggerRule>,
         trigger_type: FlowTriggerType,
-        config_snapshot_maybe: Option<FlowConfigurationSnapshot>,
+        config_snapshot_maybe: Option<FlowConfigurationRule>,
     ) -> Result<FlowState, InternalError> {
         // Query previous runs stats to determine activation time
         let flow_run_stats = self.flow_event_store.get_flow_run_stats(flow_key).await?;
@@ -346,7 +345,7 @@ impl FlowSchedulingHelper {
             throttling_boundary_time = trigger_time;
         }
 
-        let trigger_context = match &trigger_rule {
+        let trigger_context = match &trigger_rule_maybe {
             None => FlowTriggerContext::Unconditional,
             Some(rule) => match rule {
                 FlowTriggerRule::Schedule(schedule) => {
@@ -656,7 +655,7 @@ impl FlowSchedulingHelper {
         flow_event_store: &dyn FlowEventStore,
         flow_key: FlowKey,
         trigger_type: &FlowTriggerType,
-        config_snapshot: Option<FlowConfigurationSnapshot>,
+        config_snapshot: Option<FlowConfigurationRule>,
     ) -> Result<Flow, InternalError> {
         tracing::trace!(flow_key = ?flow_key, trigger = ?trigger_type, "Creating new flow");
 

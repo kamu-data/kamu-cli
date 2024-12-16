@@ -142,7 +142,7 @@ pub struct FlowTriggerUpdatedMessage {
     pub event_time: DateTime<Utc>,
     pub flow_key: FlowKey,
     pub paused: bool,
-    pub rule: Option<FlowTriggerRule>,
+    pub rule: FlowTriggerRule,
 }
 
 impl Message for FlowTriggerUpdatedMessage {

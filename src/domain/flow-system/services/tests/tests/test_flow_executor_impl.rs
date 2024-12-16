@@ -186,7 +186,7 @@ async fn test_read_initial_config_shouldnt_queue_in_recovery_case() {
                 event_time: start_time,
                 flow_key: foo_flow_key.clone(),
                 paused: false,
-                rule: Some(FlowTriggerRule::Schedule(Duration::milliseconds(60).into())),
+                rule: FlowTriggerRule::Schedule(Duration::milliseconds(60).into()),
             }
             .into()],
         )
@@ -510,7 +510,7 @@ async fn test_manual_trigger() {
                     flow_key: bar_flow_key,
                     run_since_start: Duration::milliseconds(80),
                     initiator_id: None,
-                    flow_configuration_snapshot_maybe: Some(FlowConfigurationSnapshot::Ingest(IngestRule {
+                    flow_configuration_snapshot_maybe: Some(FlowConfigurationRule::IngestRule(IngestRule {
                       fetch_uncacheable: true
                     })),
                 });

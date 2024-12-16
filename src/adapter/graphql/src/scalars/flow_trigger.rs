@@ -55,12 +55,12 @@ impl From<kamu_flow_system::FlowTriggerState> for FlowTrigger {
     fn from(value: kamu_flow_system::FlowTriggerState) -> Self {
         Self {
             paused: !value.is_active(),
-            batching: if let Some(FlowTriggerRule::Batching(condition)) = &value.rule {
+            batching: if let FlowTriggerRule::Batching(condition) = &value.rule {
                 Some((*condition).into())
             } else {
                 None
             },
-            schedule: if let Some(FlowTriggerRule::Schedule(schedule_rule)) = &value.rule {
+            schedule: if let FlowTriggerRule::Schedule(schedule_rule) = &value.rule {
                 Some(schedule_rule.clone().into())
             } else {
                 None

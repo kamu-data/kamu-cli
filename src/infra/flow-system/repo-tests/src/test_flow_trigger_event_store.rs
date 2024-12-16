@@ -58,21 +58,17 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
         event_time: Utc::now(),
         flow_key: flow_key_1.clone(),
         paused: false,
-        rule: Some(FlowTriggerRule::Schedule(Schedule::TimeDelta(
-            ScheduleTimeDelta {
-                every: Duration::seconds(5),
-            },
-        ))),
+        rule: FlowTriggerRule::Schedule(Schedule::TimeDelta(ScheduleTimeDelta {
+            every: Duration::seconds(5),
+        })),
     };
     let event_1_2 = FlowTriggerEventModified {
         event_time: Utc::now(),
         flow_key: flow_key_1.clone(),
         paused: true,
-        rule: Some(FlowTriggerRule::Schedule(Schedule::TimeDelta(
-            ScheduleTimeDelta {
-                every: Duration::seconds(5),
-            },
-        ))),
+        rule: FlowTriggerRule::Schedule(Schedule::TimeDelta(ScheduleTimeDelta {
+            every: Duration::seconds(5),
+        })),
     };
 
     event_store
@@ -95,9 +91,9 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
         event_time: Utc::now(),
         flow_key: flow_key_2.clone(),
         paused: false,
-        rule: Some(FlowTriggerRule::Schedule(
+        rule: FlowTriggerRule::Schedule(
             Schedule::try_from_5component_cron_expression("0 * * * *").unwrap(),
-        )),
+        ),
     };
 
     event_store
@@ -114,11 +110,9 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
         event_time: Utc::now(),
         flow_key: flow_key_3.clone(),
         paused: false,
-        rule: Some(FlowTriggerRule::Schedule(Schedule::TimeDelta(
-            ScheduleTimeDelta {
-                every: Duration::seconds(5),
-            },
-        ))),
+        rule: FlowTriggerRule::Schedule(Schedule::TimeDelta(ScheduleTimeDelta {
+            every: Duration::seconds(5),
+        })),
     };
 
     event_store
@@ -188,31 +182,25 @@ pub async fn test_event_store_get_events_with_windowing(catalog: &Catalog) {
         event_time: Utc::now(),
         flow_key: flow_key.clone(),
         paused: false,
-        rule: Some(FlowTriggerRule::Schedule(Schedule::TimeDelta(
-            ScheduleTimeDelta {
-                every: Duration::seconds(5),
-            },
-        ))),
+        rule: FlowTriggerRule::Schedule(Schedule::TimeDelta(ScheduleTimeDelta {
+            every: Duration::seconds(5),
+        })),
     };
     let event_2 = FlowTriggerEventModified {
         event_time: Utc::now(),
         flow_key: flow_key.clone(),
         paused: false,
-        rule: Some(FlowTriggerRule::Schedule(Schedule::TimeDelta(
-            ScheduleTimeDelta {
-                every: Duration::seconds(5),
-            },
-        ))),
+        rule: FlowTriggerRule::Schedule(Schedule::TimeDelta(ScheduleTimeDelta {
+            every: Duration::seconds(5),
+        })),
     };
     let event_3 = FlowTriggerEventCreated {
         event_time: Utc::now(),
         flow_key: flow_key.clone(),
         paused: false,
-        rule: Some(FlowTriggerRule::Schedule(Schedule::TimeDelta(
-            ScheduleTimeDelta {
-                every: Duration::seconds(5),
-            },
-        ))),
+        rule: FlowTriggerRule::Schedule(Schedule::TimeDelta(ScheduleTimeDelta {
+            every: Duration::seconds(5),
+        })),
     };
 
     let latest_event_id = event_store

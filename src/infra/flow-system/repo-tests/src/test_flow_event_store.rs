@@ -2464,7 +2464,7 @@ impl<'a> DatasetFlowGenerator<'a> {
         flow_type: DatasetFlowType,
         expected_status: FlowStatus,
         initial_trigger: FlowTriggerType,
-        config_snapshot: Option<FlowConfigurationSnapshot>,
+        config_snapshot: Option<FlowConfigurationRule>,
     ) -> FlowID {
         let flow_id = self.flow_event_store.new_flow_id().await.unwrap();
 
@@ -2537,7 +2537,7 @@ impl SystemFlowGenerator {
         flow_type: SystemFlowType,
         expected_status: FlowStatus,
         initial_trigger_type: FlowTriggerType,
-        config_snapshot: Option<FlowConfigurationSnapshot>,
+        config_snapshot: Option<FlowConfigurationRule>,
     ) -> FlowID {
         let flow_id = self.flow_event_store.new_flow_id().await.unwrap();
 

@@ -25,7 +25,7 @@ impl Flow {
         flow_id: FlowID,
         flow_key: FlowKey,
         trigger: FlowTriggerType,
-        config_snapshot: Option<FlowConfigurationSnapshot>,
+        config_snapshot: Option<FlowConfigurationRule>,
     ) -> Self {
         Self(
             Aggregate::new(
@@ -65,7 +65,7 @@ impl Flow {
     pub fn modify_config_snapshot(
         &mut self,
         now: DateTime<Utc>,
-        config_snapshot: FlowConfigurationSnapshot,
+        config_snapshot: FlowConfigurationRule,
     ) -> Result<(), ProjectionError<FlowState>> {
         let event = FlowConfigSnapshotModified {
             event_time: now,

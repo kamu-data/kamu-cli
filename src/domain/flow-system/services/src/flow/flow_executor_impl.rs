@@ -198,7 +198,7 @@ impl FlowExecutorImpl {
         // Split triggers by those which have a schedule or different rules
         let (schedule_triggers, non_schedule_triggers): (Vec<_>, Vec<_>) = enabled_triggers
             .into_iter()
-            .partition(|config| matches!(config.rule, Some(FlowTriggerRule::Schedule(_))));
+            .partition(|config| matches!(config.rule, FlowTriggerRule::Schedule(_)));
 
         let scheduling_helper = target_catalog.get_one::<FlowSchedulingHelper>().unwrap();
 
@@ -363,14 +363,14 @@ impl FlowExecutorImpl {
     pub fn make_task_logical_plan(
         &self,
         flow_key: &FlowKey,
-        maybe_config_snapshot: Option<&FlowConfigurationSnapshot>,
+        maybe_config_snapshot: Option<&FlowConfigurationRule>,
     ) -> Result<LogicalPlan, InternalError> {
         match flow_key {
             FlowKey::Dataset(flow_key) => match flow_key.flow_type {
                 DatasetFlowType::Ingest | DatasetFlowType::ExecuteTransform => {
                     let mut fetch_uncacheable = false;
                     if let Some(config_snapshot) = maybe_config_snapshot
-                        && let FlowConfigurationSnapshot::Ingest(ingest_rule) = config_snapshot
+                        && let FlowConfigurationRule::IngestRule(ingest_rule) = config_snapshot
                     {
                         fetch_uncacheable = ingest_rule.fetch_uncacheable;
                     }
@@ -385,7 +385,7 @@ impl FlowExecutorImpl {
                     let mut keep_metadata_only = false;
 
                     if let Some(config_snapshot) = maybe_config_snapshot
-                        && let FlowConfigurationSnapshot::Compaction(compaction_rule) =
+                        && let FlowConfigurationRule::CompactionRule(compaction_rule) =
                             config_snapshot
                     {
                         max_slice_size = compaction_rule.max_slice_size();
@@ -405,7 +405,7 @@ impl FlowExecutorImpl {
                 }
                 DatasetFlowType::Reset => {
                     if let Some(config_rule) = maybe_config_snapshot
-                        && let FlowConfigurationSnapshot::Reset(reset_rule) = config_rule
+                        && let FlowConfigurationRule::ResetRule(reset_rule) = config_rule
                     {
                         return Ok(LogicalPlan::ResetDataset(LogicalPlanResetDataset {
                             dataset_id: flow_key.dataset_id.clone(),
@@ -744,7 +744,7 @@ pub enum FlowTriggerContext {
 pub struct DownstreamDependencyFlowPlan {
     pub flow_key: FlowKey,
     pub flow_trigger_rule: Option<FlowTriggerRule>,
-    pub maybe_config_snapshot: Option<FlowConfigurationSnapshot>,
+    pub maybe_config_snapshot: Option<FlowConfigurationRule>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

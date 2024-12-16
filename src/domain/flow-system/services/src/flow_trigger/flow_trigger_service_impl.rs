@@ -155,7 +155,7 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
                 flow_trigger
             }
             // New trigger
-            None => FlowTrigger::new(self.time_source.now(), flow_key.clone(), paused, Some(rule)),
+            None => FlowTrigger::new(self.time_source.now(), flow_key.clone(), paused, rule),
         };
 
         flow_trigger

@@ -66,7 +66,7 @@ pub trait FlowConfigurationServiceExt {
     async fn try_get_config_snapshot_by_key(
         &self,
         flow_key: FlowKey,
-    ) -> Result<Option<FlowConfigurationSnapshot>, FindFlowConfigurationError>;
+    ) -> Result<Option<FlowConfigurationRule>, FindFlowConfigurationError>;
 }
 
 #[async_trait::async_trait]
@@ -131,7 +131,7 @@ impl<T: FlowConfigurationService + ?Sized> FlowConfigurationServiceExt for T {
     async fn try_get_config_snapshot_by_key(
         &self,
         flow_key: FlowKey,
-    ) -> Result<Option<FlowConfigurationSnapshot>, FindFlowConfigurationError> {
+    ) -> Result<Option<FlowConfigurationRule>, FindFlowConfigurationError> {
         let maybe_snapshot = match flow_key {
             FlowKey::System(_) => None,
             FlowKey::Dataset(dataset_flow_key) => match dataset_flow_key.flow_type {
@@ -142,21 +142,21 @@ impl<T: FlowConfigurationService + ?Sized> FlowConfigurationServiceExt for T {
                         dataset_flow_key.flow_type,
                     )
                     .await?
-                    .map(FlowConfigurationSnapshot::Ingest),
+                    .map(FlowConfigurationRule::IngestRule),
                 DatasetFlowType::Reset => self
                     .try_get_dataset_reset_rule(
                         dataset_flow_key.dataset_id,
                         dataset_flow_key.flow_type,
                     )
                     .await?
-                    .map(FlowConfigurationSnapshot::Reset),
+                    .map(FlowConfigurationRule::ResetRule),
                 DatasetFlowType::HardCompaction => self
                     .try_get_dataset_compaction_rule(
                         dataset_flow_key.dataset_id,
                         dataset_flow_key.flow_type,
                     )
                     .await?
-                    .map(FlowConfigurationSnapshot::Compaction),
+                    .map(FlowConfigurationRule::CompactionRule),
             },
         };
 

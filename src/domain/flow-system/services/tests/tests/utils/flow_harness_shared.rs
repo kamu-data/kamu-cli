@@ -377,7 +377,7 @@ impl FlowHarness {
             .unwrap();
 
         self.flow_trigger_service
-            .set_trigger(request_time, flow_key, true, current_trigger.rule.unwrap())
+            .set_trigger(request_time, flow_key, true, current_trigger.rule)
             .await
             .unwrap();
     }
@@ -397,7 +397,7 @@ impl FlowHarness {
             .unwrap();
 
         self.flow_trigger_service
-            .set_trigger(request_time, flow_key, false, current_trigger.rule.unwrap())
+            .set_trigger(request_time, flow_key, false, current_trigger.rule)
             .await
             .unwrap();
     }

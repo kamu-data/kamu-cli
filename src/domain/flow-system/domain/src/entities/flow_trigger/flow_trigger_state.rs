@@ -20,7 +20,7 @@ pub struct FlowTriggerState {
     /// Flow key
     pub flow_key: FlowKey,
     /// Trigger rule
-    pub rule: Option<FlowTriggerRule>,
+    pub rule: FlowTriggerRule,
     /// Trigger status
     pub status: FlowTriggerStatus,
 }
@@ -31,17 +31,17 @@ impl FlowTriggerState {
     }
 
     pub fn try_get_schedule_rule(self) -> Option<Schedule> {
-        self.rule.and_then(|rule| match rule {
+        match self.rule {
             FlowTriggerRule::Schedule(schedule) => Some(schedule),
             FlowTriggerRule::Batching(_) => None,
-        })
+        }
     }
 
     pub fn try_get_batching_rule(self) -> Option<BatchingRule> {
-        self.rule.and_then(|rule| match rule {
+        match self.rule {
             FlowTriggerRule::Batching(batching) => Some(batching),
             FlowTriggerRule::Schedule(_) => None,
-        })
+        }
     }
 }
 

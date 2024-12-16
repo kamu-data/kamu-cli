@@ -280,7 +280,7 @@ impl FlowQueryService for FlowQueryServiceImpl {
         trigger_time: DateTime<Utc>,
         flow_key: FlowKey,
         initiator_account_id: AccountID,
-        config_snapshot_maybe: Option<FlowConfigurationSnapshot>,
+        config_snapshot_maybe: Option<FlowConfigurationRule>,
     ) -> Result<FlowState, RequestFlowError> {
         let activation_time = self.executor_config.round_time(trigger_time)?;
 

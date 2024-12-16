@@ -13,7 +13,6 @@ use kamu_flow_system::{
     CompactionRuleFull,
     CompactionRuleMetadataOnly,
     FlowConfigurationRule,
-    FlowConfigurationSnapshot,
     IngestRule,
     ResetRule,
 };
@@ -274,12 +273,12 @@ impl FlowRunConfiguration {
         dataset_flow_type: &DatasetFlowType,
         dataset_handle: &DatasetHandle,
         flow_run_configuration_maybe: Option<&FlowRunConfiguration>,
-    ) -> Result<Option<FlowConfigurationSnapshot>, FlowInvalidRunConfigurations> {
+    ) -> Result<Option<FlowConfigurationRule>, FlowInvalidRunConfigurations> {
         match dataset_flow_type {
             DatasetFlowType::Ingest => {
                 if let Some(flow_run_configuration) = flow_run_configuration_maybe {
                     if let Self::Ingest(ingest_input) = flow_run_configuration {
-                        return Ok(Some(FlowConfigurationSnapshot::Ingest(IngestRule {
+                        return Ok(Some(FlowConfigurationRule::IngestRule(IngestRule {
                             fetch_uncacheable: ingest_input.fetch_uncacheable,
                         })));
                     }
@@ -293,7 +292,7 @@ impl FlowRunConfiguration {
             DatasetFlowType::HardCompaction => {
                 if let Some(flow_run_configuration) = flow_run_configuration_maybe {
                     if let Self::Compaction(compaction_input) = flow_run_configuration {
-                        return Ok(Some(FlowConfigurationSnapshot::Compaction(
+                        return Ok(Some(FlowConfigurationRule::CompactionRule(
                             match compaction_input {
                                 CompactionConditionInput::Full(compaction_input) => {
                                     CompactionRule::Full(
@@ -344,7 +343,7 @@ impl FlowRunConfiguration {
                         } else {
                             current_head_hash
                         };
-                        return Ok(Some(FlowConfigurationSnapshot::Reset(ResetRule {
+                        return Ok(Some(FlowConfigurationRule::ResetRule(ResetRule {
                             new_head_hash: reset_input.new_head_hash().map(Into::into),
                             old_head_hash,
                             recursive: reset_input.recursive,
@@ -355,7 +354,7 @@ impl FlowRunConfiguration {
                             .to_string(),
                     });
                 }
-                return Ok(Some(FlowConfigurationSnapshot::Reset(ResetRule {
+                return Ok(Some(FlowConfigurationRule::ResetRule(ResetRule {
                     new_head_hash: None,
                     old_head_hash: current_head_hash,
                     recursive: false,

@@ -29,7 +29,7 @@ pub struct FlowTriggerEventCreated {
     pub event_time: DateTime<Utc>,
     pub flow_key: FlowKey,
     pub paused: bool,
-    pub rule: Option<FlowTriggerRule>,
+    pub rule: FlowTriggerRule,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -39,7 +39,7 @@ pub struct FlowTriggerEventModified {
     pub event_time: DateTime<Utc>,
     pub flow_key: FlowKey,
     pub paused: bool,
-    pub rule: Option<FlowTriggerRule>,
+    pub rule: FlowTriggerRule,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

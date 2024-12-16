@@ -19,12 +19,7 @@ pub struct FlowTrigger(Aggregate<FlowTriggerState, (dyn FlowTriggerEventStore + 
 
 impl FlowTrigger {
     /// Creates a flow trigger rule
-    pub fn new(
-        now: DateTime<Utc>,
-        flow_key: FlowKey,
-        paused: bool,
-        rule: Option<FlowTriggerRule>,
-    ) -> Self {
+    pub fn new(now: DateTime<Utc>, flow_key: FlowKey, paused: bool, rule: FlowTriggerRule) -> Self {
         Self(
             Aggregate::new(
                 flow_key.clone(),
@@ -50,7 +45,7 @@ impl FlowTrigger {
             event_time: now,
             flow_key: self.flow_key.clone(),
             paused,
-            rule: Some(new_rule),
+            rule: new_rule,
         };
         self.apply(event)
     }

@@ -62,7 +62,7 @@ pub struct FlowEventInitiated {
     pub flow_id: FlowID,
     pub flow_key: FlowKey,
     pub trigger: FlowTriggerType,
-    pub config_snapshot: Option<FlowConfigurationSnapshot>,
+    pub config_snapshot: Option<FlowConfigurationRule>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -90,7 +90,7 @@ pub struct FlowEventTriggerAdded {
 pub struct FlowConfigSnapshotModified {
     pub event_time: DateTime<Utc>,
     pub flow_id: FlowID,
-    pub config_snapshot: FlowConfigurationSnapshot,
+    pub config_snapshot: FlowConfigurationRule,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

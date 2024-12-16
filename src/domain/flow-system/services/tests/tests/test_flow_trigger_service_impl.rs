@@ -133,7 +133,7 @@ async fn test_pause_resume_individual_dataset_flows() {
         flow_trigger_state.status,
         FlowTriggerStatus::PausedTemporarily
     );
-    assert_eq!(flow_trigger_state.rule, Some(foo_ingest_trigger.clone()));
+    assert_eq!(flow_trigger_state.rule, foo_ingest_trigger.clone());
 
     // Now, resume the trigger
     harness
@@ -215,10 +215,7 @@ async fn test_pause_resume_all_dataset_flows() {
         flow_trigger_ingest_state.status,
         FlowTriggerStatus::PausedTemporarily
     );
-    assert_eq!(
-        flow_trigger_ingest_state.rule,
-        Some(foo_ingest_trigger.clone())
-    );
+    assert_eq!(flow_trigger_ingest_state.rule, foo_ingest_trigger.clone());
 
     let flow_trigger_compaction_state = harness
         .get_dataset_flow_trigger_from_store(foo_id.clone(), DatasetFlowType::HardCompaction)
@@ -229,7 +226,7 @@ async fn test_pause_resume_all_dataset_flows() {
     );
     assert_eq!(
         flow_trigger_compaction_state.rule,
-        Some(foo_compaction_trigger.clone())
+        foo_compaction_trigger.clone()
     );
 
     // Now, resume all triggers
@@ -295,7 +292,7 @@ async fn test_pause_resume_individual_system_flows() {
     );
     assert_eq!(
         flow_trigger_state.rule,
-        Some(FlowTriggerRule::Schedule(gc_schedule.clone()))
+        FlowTriggerRule::Schedule(gc_schedule.clone())
     );
 
     // Now, resume the triggers
@@ -348,7 +345,7 @@ async fn test_dataset_deleted() {
     let flow_config_state = harness
         .get_dataset_flow_trigger_from_store(foo_id, DatasetFlowType::Ingest)
         .await;
-    assert_eq!(flow_config_state.rule, Some(foo_ingest_trigger));
+    assert_eq!(flow_config_state.rule, foo_ingest_trigger);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -479,7 +476,7 @@ impl FlowTriggerHarness {
             triggers.get(&(FlowKeyDataset::new(dataset_id, dataset_flow_type).into())),
             Some(FlowTriggerState {
                 status: FlowTriggerStatus::Active,
-                rule: Some(actual_rule),
+                rule: actual_rule,
                 ..
             }) if actual_rule == expected_rule
         );
@@ -495,7 +492,7 @@ impl FlowTriggerHarness {
             enabled_triggers.get(&(system_flow_type.into())),
             Some(FlowTriggerState {
                 status: FlowTriggerStatus::Active,
-                rule: Some(FlowTriggerRule::Schedule(actual_schedule)),
+                rule: FlowTriggerRule::Schedule(actual_schedule),
                 ..
             }) if actual_schedule == expected_schedule
         );
