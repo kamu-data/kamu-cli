@@ -19,6 +19,30 @@ use crate::prelude::{AccessTokenID, AccountID, AccountName};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// `unwrap()`-free helper macro to hide the logic for extracting DI components
+/// from a catalog using [`async_graphql::Context`] that is present for each GQL
+/// request.
+///
+/// If one of the required DI components is not found, `.int_err()?` will be
+/// initiated.
+///
+/// There is also a variant of the macro for exceptional situations that uses
+/// `unwrap()` internally: [`unsafe_from_catalog_n!`].
+///
+/// # Examples
+///
+/// ```
+/// // Most often, we extract only one component:
+/// let current_account_subject = from_catalog_n!(ctx, CurrentAccountSubject);
+///
+/// // But sometimes, three at once:
+/// let (dataset_registry, polling_ingest_svc, dataset_changes_svc) = from_catalog_n!(
+///     ctx,
+///     dyn DatasetRegistry,
+///     dyn PollingIngestService,
+///     dyn DatasetChangesService
+/// );
+/// ```
 macro_rules! from_catalog_n {
     ($gql_ctx:ident, $T:ty ) => {{
         let catalog = $gql_ctx.data::<dill::Catalog>().unwrap();
@@ -36,6 +60,9 @@ pub(crate) use from_catalog_n;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Unsafe variant of [`from_catalog_n!`] macro.
+///
+/// Try to avoid using it.
 macro_rules! unsafe_from_catalog_n {
     ($gql_ctx:ident, $T:ty ) => {{
         let catalog = $gql_ctx.data::<dill::Catalog>().unwrap();
@@ -157,7 +184,7 @@ pub(crate) fn check_logged_account_id_match(
     ctx: &Context<'_>,
     account_id: &AccountID,
 ) -> Result<(), GqlError> {
-    let current_account_subject = from_catalog::<CurrentAccountSubject>(ctx).unwrap();
+    let current_account_subject = from_catalog_n!(ctx, CurrentAccountSubject);
 
     if let CurrentAccountSubject::Logged(logged_account) = current_account_subject.as_ref() {
         if logged_account.account_id == account_id.clone().into() {

@@ -41,6 +41,36 @@ pub type EntityPageStream<'a, Entity> =
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// `EntityPageStreamer` is a helper hiding the pagination logic.
+/// The default page size is `100` rows, but this value can be changed if
+/// desired.
+///
+/// The primary method is [`EntityPageStreamer::into_stream()`].
+///
+/// # Examples
+/// ```
+/// // Usage without arguments for page callback:
+/// let dataset_handles_stream = EntityPageStreamer::default().into_stream(
+///     || async { Ok(()) },
+///     |_, pagination| self.list_all_dataset_handles(pagination),
+/// );
+///
+/// // An example use case with passing some value to each page callback:
+/// let dataset_handles_by_owner_name_stream = EntityPageStreamer::default().into_stream(
+///     move || async move {
+///         let owner_id = self
+///             .resolve_account_id_by_maybe_name(Some(&owner_name))
+///             .await?;
+///         Ok(Arc::new(owner_id))
+///     },
+///     move |owner_id, pagination| async move {
+///         self.list_all_dataset_handles_by_owner_name(&owner_id, pagination)
+///             .await
+///     },
+/// )
+///
+/// // More examples can be found in unit tests.
+/// ```
 pub struct EntityPageStreamer {
     start_offset: usize,
     page_limit: usize,
@@ -63,6 +93,14 @@ impl EntityPageStreamer {
         }
     }
 
+    /// # Arguments
+    /// * `get_args_callback` - a function to generating arguments for
+    ///   `next_entities_callback`. Note, it is only called once.
+    /// * `next_entities_callback` - a function that will be called for each
+    ///   page.
+    ///
+    /// # Examples
+    /// You can find examples of use in [`EntityPageStreamer`].
     pub fn into_stream<'a, Entity, Args, HInitArgs, HInitArgsFut, HListing, HListingFut>(
         self,
         get_args_callback: HInitArgs,

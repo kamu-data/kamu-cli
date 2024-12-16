@@ -12,7 +12,7 @@
 /// Utility to generate the placeholder list. Helpful when using dynamic SQL
 /// generation.
 ///
-/// ### Examples
+/// # Examples
 /// ```
 /// // Output for `arguments_count`=3 & `index_offset`=0
 /// "$0,$1,$2"
