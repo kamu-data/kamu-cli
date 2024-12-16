@@ -59,6 +59,7 @@ impl Default for CompactionOptions {
 #[derive(Debug)]
 pub struct CompactionPlan {
     pub seed: odf::Multihash,
+    pub old_head: odf::Multihash,
     pub old_num_blocks: usize,
     pub offset_column_name: String,
     pub data_slice_batches: Vec<CompactionDataSliceBatch>,

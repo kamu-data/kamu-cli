@@ -216,12 +216,6 @@ impl CompactionExecutionService for CompactionExecutionServiceImpl {
             .commit_new_blocks(&target, &plan, new_file_paths)
             .await?;
 
-        let old_head = target
-            .as_metadata_chain()
-            .resolve_ref(&BlockRef::Head)
-            .await
-            .int_err()?;
-
         target
             .as_metadata_chain()
             .set_ref(
@@ -235,7 +229,7 @@ impl CompactionExecutionService for CompactionExecutionServiceImpl {
             .await?;
 
         let res = CompactionResult::Success {
-            old_head,
+            old_head: plan.old_head,
             new_head,
             old_num_blocks: plan.old_num_blocks,
             new_num_blocks,
