@@ -339,7 +339,12 @@ impl PullDatasetUseCaseImpl {
         maybe_listener: Option<Arc<dyn PollingIngestListener>>,
     ) -> Result<PullResponse, InternalError> {
         let ingest_response = polling_ingest_svc
-            .ingest(pii.target.clone(), ingest_options, maybe_listener)
+            .ingest(
+                pii.target.clone(),
+                pii.metadata_state,
+                ingest_options,
+                maybe_listener,
+            )
             .await;
 
         Ok(PullResponse {

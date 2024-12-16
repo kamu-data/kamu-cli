@@ -705,13 +705,15 @@ async fn test_sql_statement_with_state_simple() {
         )
         .await
         .unwrap();
-    let foo_id = foo_create.dataset_handle.id;
-    let foo_dataset = foo_create.dataset;
+    let foo_id = &foo_create.dataset_handle.id;
 
-    let mut writer = DataWriterDataFusion::builder(foo_dataset.clone(), ctx.clone())
-        .with_metadata_state_scanned(None)
-        .await
-        .unwrap()
+    let metadata_state =
+        DataWriterMetadataState::build(ResolvedDataset::from(&foo_create), &BlockRef::Head, None)
+            .await
+            .unwrap();
+
+    let mut writer = DataWriterDataFusion::builder(ResolvedDataset::from(&foo_create), ctx.clone())
+        .with_metadata_state(metadata_state)
         .build();
 
     writer
@@ -783,7 +785,8 @@ async fn test_sql_statement_with_state_simple() {
             foo_id.clone(),
             QueryStateDataset {
                 alias: "foo".to_string(),
-                block_hash: foo_dataset
+                block_hash: foo_create
+                    .dataset
                     .as_metadata_chain()
                     .resolve_ref(&BlockRef::Head)
                     .await
@@ -923,7 +926,7 @@ async fn test_sql_statement_with_state_cte() {
 
     // Dataset `foo`
     let foo_alias = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
-    let foo_create = dataset_repo_writer
+    let foo_created = dataset_repo_writer
         .create_dataset(
             &foo_alias,
             MetadataFactory::metadata_block(
@@ -933,14 +936,17 @@ async fn test_sql_statement_with_state_cte() {
         )
         .await
         .unwrap();
-    let foo_id = foo_create.dataset_handle.id;
-    let foo_dataset = foo_create.dataset;
+    let foo_id = &foo_created.dataset_handle.id;
 
-    let mut writer_foo = DataWriterDataFusion::builder(foo_dataset.clone(), ctx.clone())
-        .with_metadata_state_scanned(None)
-        .await
-        .unwrap()
-        .build();
+    let foo_metadata_state =
+        DataWriterMetadataState::build(ResolvedDataset::from(&foo_created), &BlockRef::Head, None)
+            .await
+            .unwrap();
+
+    let mut writer_foo =
+        DataWriterDataFusion::builder(ResolvedDataset::from(&foo_created), ctx.clone())
+            .with_metadata_state(foo_metadata_state)
+            .build();
 
     writer_foo
         .write(
@@ -973,7 +979,7 @@ async fn test_sql_statement_with_state_cte() {
 
     // Dataset `bar`
     let bar_alias = DatasetAlias::new(None, DatasetName::new_unchecked("bar"));
-    let bar_create = dataset_repo_writer
+    let bar_created = dataset_repo_writer
         .create_dataset(
             &bar_alias,
             MetadataFactory::metadata_block(
@@ -983,14 +989,17 @@ async fn test_sql_statement_with_state_cte() {
         )
         .await
         .unwrap();
-    let bar_id = bar_create.dataset_handle.id;
-    let bar_dataset = bar_create.dataset;
+    let bar_id = &bar_created.dataset_handle.id;
 
-    let mut writer_bar = DataWriterDataFusion::builder(bar_dataset.clone(), ctx.clone())
-        .with_metadata_state_scanned(None)
-        .await
-        .unwrap()
-        .build();
+    let bar_metadata_state =
+        DataWriterMetadataState::build(ResolvedDataset::from(&bar_created), &BlockRef::Head, None)
+            .await
+            .unwrap();
+
+    let mut writer_bar =
+        DataWriterDataFusion::builder(ResolvedDataset::from(&bar_created), ctx.clone())
+            .with_metadata_state(bar_metadata_state)
+            .build();
 
     writer_bar
         .write(
@@ -1068,7 +1077,8 @@ async fn test_sql_statement_with_state_cte() {
                 foo_id.clone(),
                 QueryStateDataset {
                     alias: "foo".to_string(),
-                    block_hash: foo_dataset
+                    block_hash: foo_created
+                        .dataset
                         .as_metadata_chain()
                         .resolve_ref(&BlockRef::Head)
                         .await
@@ -1079,7 +1089,8 @@ async fn test_sql_statement_with_state_cte() {
                 bar_id.clone(),
                 QueryStateDataset {
                     alias: "bar".to_string(),
-                    block_hash: bar_dataset
+                    block_hash: bar_created
+                        .dataset
                         .as_metadata_chain()
                         .resolve_ref(&BlockRef::Head)
                         .await
@@ -1270,7 +1281,7 @@ async fn test_sql_statement_with_state_cte() {
                             block_hash: Some(
                                 res.state
                                     .input_datasets
-                                    .get(&foo_id)
+                                    .get(foo_id)
                                     .unwrap()
                                     .block_hash
                                     .clone(),
@@ -1285,7 +1296,7 @@ async fn test_sql_statement_with_state_cte() {
                             block_hash: Some(
                                 res.state
                                     .input_datasets
-                                    .get(&bar_id)
+                                    .get(bar_id)
                                     .unwrap()
                                     .block_hash
                                     .clone(),

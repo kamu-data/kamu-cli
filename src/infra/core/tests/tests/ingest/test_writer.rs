@@ -9,7 +9,6 @@
 
 use std::assert_matches::assert_matches;
 use std::path::PathBuf;
-use std::sync::Arc;
 
 use chrono::{DateTime, TimeZone, Utc};
 use datafusion::prelude::*;
@@ -599,10 +598,13 @@ async fn test_data_writer_offsets_are_sequential_impl(ctx: SessionContext) -> St
         .into()])
     .await;
 
-    let mut writer = DataWriterDataFusion::builder(harness.dataset.clone(), ctx.clone())
-        .with_metadata_state_scanned(None)
-        .await
-        .unwrap()
+    let metadata_state =
+        DataWriterMetadataState::build(harness.target.clone(), &BlockRef::Head, None)
+            .await
+            .unwrap();
+
+    let mut writer = DataWriterDataFusion::builder(harness.target.clone(), ctx.clone())
+        .with_metadata_state(metadata_state)
         .build();
 
     let mut event_time = Utc.with_ymd_and_hms(2010, 1, 1, 0, 0, 0).unwrap();
@@ -1042,20 +1044,20 @@ async fn test_data_writer_builder_scan_no_source() {
     .into()])
     .await;
 
-    let b = DataWriterDataFusion::builder(harness.dataset.clone(), harness.ctx.clone())
-        .with_metadata_state_scanned(None)
-        .await
-        .unwrap();
+    let metadata_state =
+        DataWriterMetadataState::build(harness.target.clone(), &BlockRef::Head, None)
+            .await
+            .unwrap();
 
     let head = harness
-        .dataset
+        .target
         .as_metadata_chain()
         .resolve_ref(&BlockRef::Head)
         .await
         .unwrap();
 
     assert_matches!(
-        b.metadata_state().unwrap(),
+        metadata_state,
         DataWriterMetadataState {
             head: h,
             schema: None,
@@ -1067,7 +1069,7 @@ async fn test_data_writer_builder_scan_no_source() {
             prev_watermark: None,
             prev_source_state: None,
             ..
-        } if *h == head && vocab.event_time_column == "foo"
+        } if h == head && vocab.event_time_column == "foo"
 
     );
 }
@@ -1084,13 +1086,13 @@ async fn test_data_writer_builder_scan_polling_source() {
         .into()])
     .await;
 
-    let b = DataWriterDataFusion::builder(harness.dataset.clone(), harness.ctx.clone())
-        .with_metadata_state_scanned(None)
-        .await
-        .unwrap();
+    let metadata_state =
+        DataWriterMetadataState::build(harness.target.clone(), &BlockRef::Head, None)
+            .await
+            .unwrap();
 
     assert_matches!(
-        b.metadata_state().unwrap(),
+        metadata_state,
         DataWriterMetadataState {
             schema: None,
             source_event: Some(_),
@@ -1101,7 +1103,7 @@ async fn test_data_writer_builder_scan_polling_source() {
             prev_watermark: None,
             prev_source_state: None,
             ..
-        } if *vocab == odf::DatasetVocabulary::default()
+        } if vocab == odf::DatasetVocabulary::default()
     );
 }
 
@@ -1125,13 +1127,13 @@ async fn test_data_writer_builder_scan_push_source() {
         .into()])
     .await;
 
-    let b = DataWriterDataFusion::builder(harness.dataset.clone(), harness.ctx.clone())
-        .with_metadata_state_scanned(None)
-        .await
-        .unwrap();
+    let metadata_state =
+        DataWriterMetadataState::build(harness.target.clone(), &BlockRef::Head, None)
+            .await
+            .unwrap();
 
     assert_matches!(
-        b.metadata_state().unwrap(),
+        metadata_state,
         DataWriterMetadataState {
             schema: None,
             source_event: Some(_),
@@ -1142,7 +1144,7 @@ async fn test_data_writer_builder_scan_push_source() {
             prev_watermark: None,
             prev_source_state: None,
             ..
-        } if *vocab == odf::DatasetVocabulary::default()
+        } if vocab == odf::DatasetVocabulary::default()
     );
 }
 
@@ -1175,13 +1177,13 @@ async fn test_data_writer_builder_scan_push_source_with_extra_events() {
     ])
     .await;
 
-    let b = DataWriterDataFusion::builder(harness.dataset.clone(), harness.ctx.clone())
-        .with_metadata_state_scanned(None)
-        .await
-        .unwrap();
+    let metadata_state =
+        DataWriterMetadataState::build(harness.target.clone(), &BlockRef::Head, None)
+            .await
+            .unwrap();
 
     assert_matches!(
-        b.metadata_state().unwrap(),
+        metadata_state,
         DataWriterMetadataState {
             schema: None,
             source_event: Some(_),
@@ -1192,7 +1194,7 @@ async fn test_data_writer_builder_scan_push_source_with_extra_events() {
             prev_watermark: None,
             prev_source_state: None,
             ..
-        } if *vocab == odf::DatasetVocabulary::default()
+        } if vocab == odf::DatasetVocabulary::default()
     );
 }
 
@@ -1200,7 +1202,7 @@ async fn test_data_writer_builder_scan_push_source_with_extra_events() {
 
 struct Harness {
     temp_dir: tempfile::TempDir,
-    dataset: Arc<dyn Dataset>,
+    target: ResolvedDataset,
     writer: DataWriterDataFusion,
     ctx: SessionContext,
 
@@ -1226,7 +1228,7 @@ impl Harness {
 
         let dataset_repo = catalog.get_one::<DatasetRepositoryLocalFs>().unwrap();
 
-        let dataset = dataset_repo
+        let foo_created = dataset_repo
             .create_dataset(
                 &DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo")),
                 MetadataFactory::metadata_block(
@@ -1236,11 +1238,11 @@ impl Harness {
                 .build_typed(),
             )
             .await
-            .unwrap()
-            .dataset;
+            .unwrap();
 
         for event in dataset_events {
-            dataset
+            foo_created
+                .dataset
                 .commit_event(
                     event,
                     CommitOpts {
@@ -1252,17 +1254,21 @@ impl Harness {
                 .unwrap();
         }
 
-        let ctx = SessionContext::new_with_config(SessionConfig::new().with_target_partitions(1));
+        let foo_target = ResolvedDataset::from(&foo_created);
 
-        let writer = DataWriterDataFusion::builder(dataset.clone(), ctx.clone())
-            .with_metadata_state_scanned(None)
-            .await
-            .unwrap()
+        let foo_metadata_state =
+            DataWriterMetadataState::build(foo_target.clone(), &BlockRef::Head, None)
+                .await
+                .unwrap();
+
+        let ctx = SessionContext::new_with_config(SessionConfig::new().with_target_partitions(1));
+        let writer = DataWriterDataFusion::builder(foo_target.clone(), ctx.clone())
+            .with_metadata_state(foo_metadata_state)
             .build();
 
         Self {
             temp_dir,
-            dataset,
+            target: foo_target,
             writer,
             ctx,
             system_time,
@@ -1279,10 +1285,13 @@ impl Harness {
     }
 
     async fn reset_writer(&mut self) {
-        self.writer = DataWriterDataFusion::builder(self.dataset.clone(), self.ctx.clone())
-            .with_metadata_state_scanned(None)
-            .await
-            .unwrap()
+        let latest_metadata_state =
+            DataWriterMetadataState::build(self.target.clone(), &BlockRef::Head, None)
+                .await
+                .unwrap();
+
+        self.writer = DataWriterDataFusion::builder(self.target.clone(), self.ctx.clone())
+            .with_metadata_state(latest_metadata_state)
             .build();
     }
 
@@ -1339,7 +1348,7 @@ impl Harness {
         use futures::StreamExt;
 
         let (hash, block) = self
-            .dataset
+            .target
             .as_metadata_chain()
             .iter_blocks()
             .filter_ok(|(_, b)| b.as_typed::<odf::SetDataSchema>().is_some())
@@ -1355,7 +1364,7 @@ impl Harness {
         use futures::StreamExt;
 
         let (_, block) = self
-            .dataset
+            .target
             .as_metadata_chain()
             .iter_blocks()
             .next()
@@ -1369,7 +1378,7 @@ impl Harness {
         let block = self.get_last_data_block().await;
 
         kamu_data_utils::data::local_url::into_local_path(
-            self.dataset
+            self.target
                 .as_data_repo()
                 .get_internal_url(&block.event.new_data.unwrap().physical_hash)
                 .await,

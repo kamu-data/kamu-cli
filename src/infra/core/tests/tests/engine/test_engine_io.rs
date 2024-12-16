@@ -126,9 +126,17 @@ async fn test_engine_io_common<
         .unwrap()
         .create_dataset_result;
 
+    let root_target = ResolvedDataset::from(&root_created);
+
+    let root_metadata_state =
+        DataWriterMetadataState::build(root_target.clone(), &BlockRef::Head, None)
+            .await
+            .unwrap();
+
     ingest_svc
         .ingest(
-            ResolvedDataset::from(&root_created),
+            root_target.clone(),
+            Box::new(root_metadata_state),
             PollingIngestOptions::default(),
             None,
         )
@@ -194,9 +202,15 @@ async fn test_engine_io_common<
     )
     .unwrap();
 
+    let root_metadata_state =
+        DataWriterMetadataState::build(root_target.clone(), &BlockRef::Head, None)
+            .await
+            .unwrap();
+
     ingest_svc
         .ingest(
-            ResolvedDataset::from(&root_created),
+            root_target,
+            Box::new(root_metadata_state),
             PollingIngestOptions::default(),
             None,
         )

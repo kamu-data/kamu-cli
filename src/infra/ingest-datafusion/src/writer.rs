@@ -23,17 +23,15 @@ use datafusion::prelude::*;
 use internal_error::*;
 use kamu_core::ingest::*;
 use kamu_core::*;
-use odf::{AsTypedBlock, DatasetVocabulary, MetadataEvent};
+use odf::{AsTypedBlock, DatasetVocabulary};
 use opendatafabric as odf;
-
-use crate::visitor::SourceEventVisitor;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Implementation of the [`DataWriter`] interface using Apache `DataFusion`
 /// engine
 pub struct DataWriterDataFusion {
-    dataset: Arc<dyn Dataset>,
+    target: ResolvedDataset,
     merge_strategy: Arc<dyn MergeStrategy>,
     block_ref: BlockRef,
 
@@ -44,39 +42,24 @@ pub struct DataWriterDataFusion {
     ctx: SessionContext,
 }
 
-/// Contains a projection of the metadata needed for [`DataWriter`] to function
-#[derive(Debug, Clone)]
-pub struct DataWriterMetadataState {
-    pub head: odf::Multihash,
-    pub schema: Option<SchemaRef>,
-    pub source_event: Option<odf::MetadataEvent>,
-    pub merge_strategy: odf::MergeStrategy,
-    pub vocab: odf::DatasetVocabulary,
-    pub data_slices: Vec<odf::Multihash>,
-    pub prev_offset: Option<u64>,
-    pub prev_checkpoint: Option<odf::Multihash>,
-    pub prev_watermark: Option<DateTime<Utc>>,
-    pub prev_source_state: Option<odf::SourceState>,
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl DataWriterDataFusion {
-    pub fn builder(dataset: Arc<dyn Dataset>, ctx: SessionContext) -> DataWriterDataFusionBuilder {
+    pub fn builder(dataset: ResolvedDataset, ctx: SessionContext) -> DataWriterDataFusionBuilder {
         DataWriterDataFusionBuilder::new(dataset, ctx)
     }
 
     /// Use [`Self::builder`] to create an instance
     fn new(
         ctx: SessionContext,
-        dataset: Arc<dyn Dataset>,
+        target: ResolvedDataset,
         merge_strategy: Arc<dyn MergeStrategy>,
         block_ref: BlockRef,
         metadata_state: DataWriterMetadataState,
     ) -> Self {
         Self {
             ctx,
-            dataset,
+            target,
             merge_strategy,
             block_ref,
             meta: metadata_state,
@@ -226,7 +209,7 @@ impl DataWriterDataFusion {
             return Ok(None);
         }
 
-        let data_repo = self.dataset.as_data_repo();
+        let data_repo = self.target.as_data_repo();
 
         use futures::StreamExt;
         let prev_data_paths: Vec<_> = futures::stream::iter(prev_data_slices.iter().rev())
@@ -678,7 +661,8 @@ impl DataWriter for DataWriterDataFusion {
             tracing::info!(schema = ?new_schema, "Final output schema");
 
             if let Some(prev_schema) = &self.meta.schema {
-                Self::validate_output_schema_equivalence(prev_schema, &new_schema)?;
+                let arrow_schema = prev_schema.schema_as_arrow().int_err()?;
+                Self::validate_output_schema_equivalence(&arrow_schema, &new_schema)?;
             }
 
             // Write output
@@ -775,7 +759,7 @@ impl DataWriter for DataWriterDataFusion {
         if let Some(new_schema) = staged.new_schema {
             // TODO: Make commit of schema and data atomic
             let commit_schema_result = self
-                .dataset
+                .target
                 .commit_event(
                     odf::SetDataSchema::new(&new_schema).into(),
                     CommitOpts {
@@ -790,13 +774,13 @@ impl DataWriter for DataWriterDataFusion {
 
             // Update state
             self.meta.head = commit_schema_result.new_head;
-            self.meta.schema = Some(new_schema);
+            self.meta.schema = Some(odf::SetDataSchema::new(new_schema.as_ref()));
         }
 
         // Commit `AddData` event
         let add_data_block = if let Some(add_data) = staged.add_data {
             let commit_data_result = self
-                .dataset
+                .target
                 .commit_add_data(
                     add_data,
                     staged.data_file,
@@ -813,7 +797,7 @@ impl DataWriter for DataWriterDataFusion {
 
             // Update state for the next append
             let new_block = self
-                .dataset
+                .target
                 .as_metadata_chain()
                 .get_block(&commit_data_result.new_head)
                 .await
@@ -857,16 +841,16 @@ impl DataWriter for DataWriterDataFusion {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct DataWriterDataFusionBuilder {
-    dataset: Arc<dyn Dataset>,
+    target: ResolvedDataset,
     ctx: SessionContext,
     block_ref: BlockRef,
     metadata_state: Option<DataWriterMetadataState>,
 }
 
 impl DataWriterDataFusionBuilder {
-    pub fn new(dataset: Arc<dyn Dataset>, ctx: SessionContext) -> Self {
+    pub fn new(target: ResolvedDataset, ctx: SessionContext) -> Self {
         Self {
-            dataset,
+            target,
             ctx,
             block_ref: BlockRef::Head,
             metadata_state: None,
@@ -890,113 +874,6 @@ impl DataWriterDataFusionBuilder {
         }
     }
 
-    /// Scans metadata chain to populate the needed metadata
-    ///
-    /// * `source_name` - name of the source to use when extracting the metadata
-    ///   needed for writing. Leave empty for polling sources or to use the only
-    ///   push source defined when there is no ambiguity.
-    pub async fn with_metadata_state_scanned(
-        self,
-        source_name: Option<&str>,
-    ) -> Result<Self, ScanMetadataError> {
-        type Flag = odf::MetadataEventTypeFlags;
-        type Decision = MetadataVisitorDecision;
-
-        // TODO: PERF: Full metadata scan below - this is expensive and should be
-        //       improved using skip lists.
-
-        let head = self
-            .dataset
-            .as_metadata_chain()
-            .resolve_ref(&self.block_ref)
-            .await
-            .int_err()?;
-        let mut seed_visitor = SearchSeedVisitor::new().adapt_err();
-        let mut set_vocab_visitor = SearchSetVocabVisitor::new().adapt_err();
-        let mut set_data_schema_visitor = SearchSetDataSchemaVisitor::new().adapt_err();
-        let mut prev_source_state_visitor = SearchSourceStateVisitor::new(source_name).adapt_err();
-        let mut add_data_visitor = SearchAddDataVisitor::new().adapt_err();
-        let mut add_data_collection_visitor = GenericCallbackVisitor::new(
-            Vec::new(),
-            Decision::NextOfType(Flag::ADD_DATA),
-            |state, _, block| {
-                let MetadataEvent::AddData(e) = &block.event else {
-                    unreachable!()
-                };
-
-                if let Some(output_data) = &e.new_data {
-                    state.push(output_data.physical_hash.clone());
-                }
-
-                Decision::NextOfType(Flag::ADD_DATA)
-            },
-        )
-        .adapt_err();
-        let mut source_event_visitor = SourceEventVisitor::new(source_name);
-
-        self.dataset
-            .as_metadata_chain()
-            .accept_by_hash(
-                &mut [
-                    &mut source_event_visitor,
-                    &mut seed_visitor,
-                    &mut set_vocab_visitor,
-                    &mut add_data_visitor,
-                    &mut set_data_schema_visitor,
-                    &mut prev_source_state_visitor,
-                    &mut add_data_collection_visitor,
-                ],
-                &head,
-            )
-            .await?;
-
-        {
-            let seed = seed_visitor
-                .into_inner()
-                .into_event()
-                .expect("Dataset without blocks");
-
-            assert_eq!(seed.dataset_kind, odf::DatasetKind::Root);
-        }
-
-        let (source_event, merge_strategy) =
-            source_event_visitor.get_source_event_and_merge_strategy()?;
-        let (prev_offset, prev_watermark, prev_checkpoint) = {
-            match add_data_visitor.into_inner().into_event() {
-                Some(e) => (
-                    e.last_offset(),
-                    e.new_watermark,
-                    e.new_checkpoint.map(|cp| cp.physical_hash),
-                ),
-                None => (None, None, None),
-            }
-        };
-        let metadata_state = DataWriterMetadataState {
-            head,
-            schema: set_data_schema_visitor
-                .into_inner()
-                .into_event()
-                .as_ref()
-                .map(odf::SetDataSchema::schema_as_arrow)
-                .transpose() // Option<Result<SchemaRef, E>> -> Result<Option<SchemaRef>, E>
-                .int_err()?,
-            source_event,
-            merge_strategy,
-            vocab: set_vocab_visitor
-                .into_inner()
-                .into_event()
-                .unwrap_or_default()
-                .into(),
-            data_slices: add_data_collection_visitor.into_inner().into_state(),
-            prev_offset,
-            prev_checkpoint,
-            prev_watermark,
-            prev_source_state: prev_source_state_visitor.into_inner().into_state(),
-        };
-
-        Ok(self.with_metadata_state(metadata_state))
-    }
-
     pub fn build(self) -> DataWriterDataFusion {
         let Some(metadata_state) = self.metadata_state else {
             // TODO: Typestate
@@ -1011,7 +888,7 @@ impl DataWriterDataFusionBuilder {
 
         DataWriterDataFusion::new(
             self.ctx,
-            self.dataset,
+            self.target,
             merge_strategy,
             self.block_ref,
             metadata_state,
@@ -1037,50 +914,3 @@ impl DataWriterDataFusionBuilder {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, thiserror::Error)]
-pub enum ScanMetadataError {
-    #[error(transparent)]
-    SourceNotFound(
-        #[from]
-        #[backtrace]
-        SourceNotFoundError,
-    ),
-    #[error(transparent)]
-    Internal(
-        #[from]
-        #[backtrace]
-        InternalError,
-    ),
-}
-
-impl From<AcceptVisitorError<ScanMetadataError>> for ScanMetadataError {
-    fn from(v: AcceptVisitorError<ScanMetadataError>) -> Self {
-        match v {
-            AcceptVisitorError::Visitor(err) => err,
-            AcceptVisitorError::Traversal(err) => Self::Internal(err.int_err()),
-        }
-    }
-}
-
-#[derive(Debug, thiserror::Error)]
-#[error("{message}")]
-pub struct SourceNotFoundError {
-    pub source_name: Option<String>,
-    message: String,
-}
-
-impl SourceNotFoundError {
-    pub fn new(source_name: Option<impl Into<String>>, message: impl Into<String>) -> Self {
-        Self {
-            source_name: source_name.map(std::convert::Into::into),
-            message: message.into(),
-        }
-    }
-}
-
-impl From<SourceNotFoundError> for PushSourceNotFoundError {
-    fn from(val: SourceNotFoundError) -> Self {
-        PushSourceNotFoundError::new(val.source_name)
-    }
-}

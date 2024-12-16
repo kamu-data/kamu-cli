@@ -33,6 +33,7 @@ pub trait PollingIngestService: Send + Sync {
     async fn ingest(
         &self,
         target: ResolvedDataset,
+        metadata_state: Box<DataWriterMetadataState>,
         options: PollingIngestOptions,
         maybe_listener: Option<Arc<dyn PollingIngestListener>>,
     ) -> Result<PollingIngestResult, PollingIngestError>;

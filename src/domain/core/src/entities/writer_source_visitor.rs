@@ -7,11 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_core::{
-    HashedMetadataBlockRef,
-    MetadataChainVisitor,
-    MetadataVisitorDecision as Decision,
-};
 use opendatafabric::{
     AddPushSource,
     MergeStrategy,
@@ -21,17 +16,23 @@ use opendatafabric::{
     SetPollingSource,
 };
 
-use crate::{ScanMetadataError, SourceNotFoundError};
+use crate::{
+    HashedMetadataBlockRef,
+    MetadataChainVisitor,
+    MetadataVisitorDecision as Decision,
+    ScanMetadataError,
+    SourceNotFoundError,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct SourceEventVisitor<'a> {
+pub struct WriterSourceEventVisitor<'a> {
     maybe_source_name: Option<&'a str>,
     next_block_flags: Flag,
     maybe_source_event: Option<MetadataEvent>,
 }
 
-impl<'a> SourceEventVisitor<'a> {
+impl<'a> WriterSourceEventVisitor<'a> {
     pub fn new(maybe_source_name: Option<&'a str>) -> Self {
         const INITIAL_NEXT_BLOCK_FLAGS: Flag = Flag::SET_POLLING_SOURCE
             .union(Flag::DISABLE_POLLING_SOURCE)
@@ -106,7 +107,7 @@ impl<'a> SourceEventVisitor<'a> {
     }
 }
 
-impl<'a> MetadataChainVisitor for SourceEventVisitor<'a> {
+impl<'a> MetadataChainVisitor for WriterSourceEventVisitor<'a> {
     type Error = ScanMetadataError;
 
     fn initial_decision(&self) -> Decision {

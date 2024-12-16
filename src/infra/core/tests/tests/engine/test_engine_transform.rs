@@ -279,6 +279,12 @@ impl TestHarness {
             transform_helper,
         }
     }
+
+    async fn build_metadata_state(&self, created: &CreateDatasetResult) -> DataWriterMetadataState {
+        DataWriterMetadataState::build(ResolvedDataset::from(created), &BlockRef::Head, None)
+            .await
+            .unwrap()
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -338,10 +344,15 @@ async fn test_transform_common(transform: Transform, test_retractions: bool) {
         .unwrap()
         .create_dataset_result;
 
+    let root_target = ResolvedDataset::from(&root_created);
+
+    let root_metadata_state = harness.build_metadata_state(&root_created).await;
+
     harness
         .ingest_svc
         .ingest(
-            ResolvedDataset::from(&root_created),
+            root_target.clone(),
+            Box::new(root_metadata_state),
             PollingIngestOptions::default(),
             None,
         )
@@ -440,10 +451,13 @@ async fn test_transform_common(transform: Transform, test_retractions: bool) {
     )
     .unwrap();
 
+    let root_metadata_state = harness.build_metadata_state(&root_created).await;
+
     harness
         .ingest_svc
         .ingest(
-            ResolvedDataset::from(&root_created),
+            root_target.clone(),
+            Box::new(root_metadata_state),
             PollingIngestOptions::default(),
             None,
         )

@@ -10,6 +10,7 @@
 use std::sync::Arc;
 
 use kamu_core::{
+    DataWriterMetadataState,
     PollingIngestError,
     PollingIngestListener,
     PollingIngestOptions,
@@ -29,6 +30,7 @@ mockall::mock! {
         async fn ingest(
             &self,
             target: ResolvedDataset,
+            metadata_state: Box<DataWriterMetadataState>,
             options: PollingIngestOptions,
             listener: Option<Arc<dyn PollingIngestListener>>,
         ) -> Result<PollingIngestResult, PollingIngestError>;
@@ -40,9 +42,9 @@ mockall::mock! {
 impl MockPollingIngestService {
     pub fn make_expect_ingest(mut self, dataset_alias: odf::DatasetAlias) -> Self {
         self.expect_ingest()
-            .withf(move |target, _, _| target.get_alias() == &dataset_alias)
+            .withf(move |target, _, _, _| target.get_alias() == &dataset_alias)
             .times(1)
-            .returning(|_, _, _| {
+            .returning(|_, _, _, _| {
                 Ok(PollingIngestResult::UpToDate {
                     no_source_defined: false,
                     uncacheable: false,

@@ -18,6 +18,7 @@ use kamu_core::{
     BlockRef,
     CommitError,
     DataWriter,
+    DataWriterMetadataState,
     GetAliasesError,
     GetSummaryOpts,
     GetWatermarkError,
@@ -115,13 +116,15 @@ impl WatermarkService for WatermarkServiceImpl {
             return Err(SetWatermarkError::IsDerivative);
         }
 
+        let metadata_state = DataWriterMetadataState::build(target.clone(), &BlockRef::Head, None)
+            .await
+            .int_err()?;
+
         let mut writer = DataWriterDataFusion::builder(
-            (*target).clone(),
+            target.clone(),
             datafusion::prelude::SessionContext::new(),
         )
-        .with_metadata_state_scanned(None)
-        .await
-        .int_err()?
+        .with_metadata_state(metadata_state)
         .build();
 
         match writer

@@ -61,39 +61,24 @@ impl PollingIngestServiceImpl {
         }
     }
 
-    async fn do_ingest(
-        &self,
-        target: ResolvedDataset,
-        options: PollingIngestOptions,
-        get_listener: impl FnOnce(&DatasetHandle) -> Option<Arc<dyn PollingIngestListener>>,
-    ) -> Result<PollingIngestResult, PollingIngestError> {
-        let listener = get_listener(target.get_handle())
-            .unwrap_or_else(|| Arc::new(NullPollingIngestListener));
-
-        self.ingest_loop(IngestLoopArgs {
-            target,
-            options,
-            listener,
-        })
-        .await
-    }
-
     #[tracing::instrument(
         level = "info",
         skip_all,
         fields(
-            dataset_handle = %args.target.get_handle(),
+            dataset_handle = %target.get_handle(),
+            metadata_state = ?metadata_state,
         )
     )]
     async fn ingest_loop(
         &self,
-        args: IngestLoopArgs,
+        target: ResolvedDataset,
+        metadata_state: Box<DataWriterMetadataState>,
+        options: PollingIngestOptions,
+        listener: Arc<dyn PollingIngestListener>,
     ) -> Result<PollingIngestResult, PollingIngestError> {
         let ctx = ingest_common::new_session_context(self.object_store_registry.clone());
-        let mut data_writer = DataWriterDataFusion::builder((*args.target).clone(), ctx.clone())
-            .with_metadata_state_scanned(None)
-            .await
-            .int_err()?
+        let mut data_writer = DataWriterDataFusion::builder(target.clone(), ctx.clone())
+            .with_metadata_state(Box::into_inner(metadata_state))
             .build();
 
         let Some(MetadataEvent::SetPollingSource(polling_source)) =
@@ -106,8 +91,8 @@ impl PollingIngestServiceImpl {
                 uncacheable: false,
             };
 
-            args.listener.begin();
-            args.listener.success(&result);
+            listener.begin();
+            listener.success(&result);
             return Ok(result);
         };
 
@@ -125,14 +110,14 @@ impl PollingIngestServiceImpl {
 
             // TODO: Avoid excessive cloning
             let iteration_args = IngestIterationArgs {
-                dataset_handle: args.target.get_handle().clone(),
+                dataset_handle: target.get_handle().clone(),
                 iteration,
                 operation_id,
                 operation_dir,
                 system_time: self.time_source.now(),
-                options: args.options.clone(),
+                options: options.clone(),
                 polling_source: polling_source.clone(),
-                listener: args.listener.clone(),
+                listener: listener.clone(),
                 ctx: new_ctx,
                 data_writer: &mut data_writer,
             };
@@ -147,7 +132,7 @@ impl PollingIngestServiceImpl {
                         None => unreachable!(),
                     };
 
-                    if !has_more || !args.options.exhaust_sources {
+                    if !has_more || !options.exhaust_sources {
                         break;
                     }
                 }
@@ -600,10 +585,14 @@ impl PollingIngestService for PollingIngestServiceImpl {
     async fn ingest(
         &self,
         target: ResolvedDataset,
+        metadata_state: Box<DataWriterMetadataState>,
         options: PollingIngestOptions,
         maybe_listener: Option<Arc<dyn PollingIngestListener>>,
     ) -> Result<PollingIngestResult, PollingIngestError> {
-        self.do_ingest(target, options, |_| maybe_listener).await
+        let listener = maybe_listener.unwrap_or_else(|| Arc::new(NullPollingIngestListener));
+
+        self.ingest_loop(target, metadata_state, options, listener)
+            .await
     }
 }
 
@@ -619,12 +608,6 @@ pub(crate) struct PrepStepResult {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-struct IngestLoopArgs {
-    target: ResolvedDataset,
-    options: PollingIngestOptions,
-    listener: Arc<dyn PollingIngestListener>,
-}
 
 struct IngestIterationArgs<'a> {
     dataset_handle: DatasetHandle,

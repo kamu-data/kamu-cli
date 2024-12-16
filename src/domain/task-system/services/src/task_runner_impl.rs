@@ -86,7 +86,12 @@ impl TaskRunnerImpl {
     ) -> Result<TaskOutcome, InternalError> {
         let ingest_response = self
             .polling_ingest_service
-            .ingest(ingest_item.target, ingest_options, None)
+            .ingest(
+                ingest_item.target,
+                ingest_item.metadata_state,
+                ingest_options,
+                None,
+            )
             .await;
         match ingest_response {
             Ok(ingest_result) => Ok(TaskOutcome::Success(TaskResult::UpdateDatasetResult(

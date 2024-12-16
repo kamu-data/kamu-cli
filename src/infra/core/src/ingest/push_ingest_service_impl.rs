@@ -71,19 +71,19 @@ impl PushIngestServiceImpl {
             ingest_common::new_session_context(self.object_store_registry.clone());
 
         let mut data_writer = self
-            .make_data_writer((*target).clone(), source_name, ctx.clone())
+            .make_data_writer(target.clone(), source_name, ctx.clone())
             .await?;
 
         let push_source = match (data_writer.source_event(), opts.auto_create_push_source) {
             // No push source, and it's allowed to create
             (None, true) => {
                 let add_push_source_event = self
-                    .auto_create_push_source((*target).clone(), "auto", &opts)
+                    .auto_create_push_source(target.clone(), "auto", &opts)
                     .await?;
 
                 // Update data writer, as we've modified the dataset
                 data_writer = self
-                    .make_data_writer((*target).clone(), source_name, ctx.clone())
+                    .make_data_writer(target, source_name, ctx.clone())
                     .await?;
                 Ok(add_push_source_event)
             }
@@ -127,15 +127,14 @@ impl PushIngestServiceImpl {
 
     async fn make_data_writer(
         &self,
-        dataset: Arc<dyn Dataset>,
+        target: ResolvedDataset,
         source_name: Option<&str>,
         ctx: SessionContext,
     ) -> Result<DataWriterDataFusion, PushIngestError> {
-        match DataWriterDataFusion::builder(dataset, ctx)
-            .with_metadata_state_scanned(source_name)
-            .await
-        {
-            Ok(b) => Ok(b.build()),
+        match DataWriterMetadataState::build(target.clone(), &BlockRef::Head, source_name).await {
+            Ok(state) => Ok(DataWriterDataFusion::builder(target.clone(), ctx)
+                .with_metadata_state(state)
+                .build()),
             Err(ScanMetadataError::SourceNotFound(err)) => {
                 Err(PushIngestError::SourceNotFound(err.into()))
             }
@@ -145,7 +144,7 @@ impl PushIngestServiceImpl {
 
     async fn auto_create_push_source(
         &self,
-        dataset: Arc<dyn Dataset>,
+        target: ResolvedDataset,
         source_name: &str,
         opts: &PushIngestOpts,
     ) -> Result<AddPushSource, PushIngestError> {
@@ -171,7 +170,7 @@ impl PushIngestServiceImpl {
             merge: opendatafabric::MergeStrategy::Append(opendatafabric::MergeStrategyAppend {}),
         };
 
-        let commit_result = dataset
+        let commit_result = target
             .commit_event(
                 MetadataEvent::AddPushSource(add_push_source_event.clone()),
                 CommitOpts {

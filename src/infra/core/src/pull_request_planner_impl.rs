@@ -142,7 +142,7 @@ impl PullRequestPlannerImpl {
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(?pi))]
-    fn build_ingest_item(&self, pi: PullItem) -> PullIngestItem {
+    async fn build_ingest_item(&self, pi: PullItem) -> Result<PullIngestItem, PullResponse> {
         assert!(pi.maybe_remote_ref.is_none());
 
         let hdl = match pi.local_target {
@@ -152,10 +152,20 @@ impl PullRequestPlannerImpl {
             }
         };
 
-        PullIngestItem {
-            depth: pi.depth,
-            target: self.dataset_registry.get_dataset_by_handle(&hdl),
-            maybe_original_request: pi.maybe_original_request,
+        let target = self.dataset_registry.get_dataset_by_handle(&hdl);
+        match DataWriterMetadataState::build(target.clone(), &BlockRef::Head, None).await {
+            Ok(metadata_state) => Ok(PullIngestItem {
+                depth: pi.depth,
+                target,
+                metadata_state: Box::new(metadata_state),
+                maybe_original_request: pi.maybe_original_request,
+            }),
+            Err(e) => Err(PullResponse {
+                maybe_original_request: pi.maybe_original_request,
+                maybe_local_ref: Some(hdl.as_local_ref()),
+                maybe_remote_ref: None,
+                result: Err(PullError::ScanMetadata(e)),
+            }),
         }
     }
 
@@ -309,9 +319,15 @@ impl PullRequestPlanner for PullRequestPlannerImpl {
             for item in batch {
                 // Ingest?
                 if depth == 0 && item.maybe_remote_ref.is_none() {
-                    let pii = self.build_ingest_item(item);
-                    tracing::debug!(depth, ?pii, "Added ingest item to pull plan");
-                    jobs.push(PullPlanIterationJob::Ingest(pii));
+                    match self.build_ingest_item(item).await {
+                        Ok(pii) => {
+                            tracing::debug!(depth, ?pii, "Added ingest item to pull plan");
+                            jobs.push(PullPlanIterationJob::Ingest(pii));
+                        }
+                        Err(ingest_error) => {
+                            errors.push(ingest_error);
+                        }
+                    }
 
                 // Sync?
                 } else if depth == 0 && item.maybe_remote_ref.is_some() {
