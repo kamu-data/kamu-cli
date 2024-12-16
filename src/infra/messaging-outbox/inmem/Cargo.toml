@@ -26,12 +26,9 @@ messaging-outbox = { workspace = true }
 internal-error = { workspace = true }
 
 async-trait = { version = "0.1", default-features = false }
-chrono = { version = "0.4", default-features = false }
 dill = "0.9"
 tokio = { version = "1", default-features = false }
 tokio-stream = "0.1"
-thiserror = { version = "2", default-features = false, features = ["std"] }
-tracing = { version = "0.1", default-features = false }
 
 
 [dev-dependencies]
@@ -40,4 +37,3 @@ kamu-messaging-outbox-repo-tests = { workspace = true }
 
 test-group = { version = "1" }
 test-log = { version = "0.2", features = ["trace"] }
-tokio = { version = "1", default-features = false, features = ["rt", "macros"] }
