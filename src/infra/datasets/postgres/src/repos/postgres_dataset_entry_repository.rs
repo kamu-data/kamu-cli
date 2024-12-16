@@ -35,7 +35,7 @@ impl PostgresDatasetEntryRepository {
 
 #[async_trait::async_trait]
 impl DatasetEntryRepository for PostgresDatasetEntryRepository {
-    async fn dataset_entries_count(&self) -> Result<usize, InternalError> {
+    async fn dataset_entries_count(&self) -> Result<usize, DatasetEntriesCountError> {
         let mut tr = self.transaction.lock().await;
 
         let connection_mut = tr.connection_mut().await?;
@@ -78,7 +78,10 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
         Ok(usize::try_from(dataset_entries_count.unwrap_or(0)).unwrap())
     }
 
-    fn get_dataset_entries(&self, pagination: PaginationOpts) -> DatasetEntryStream {
+    async fn get_dataset_entries<'a>(
+        &'a self,
+        pagination: PaginationOpts,
+    ) -> DatasetEntryStream<'a> {
         Box::pin(async_stream::stream! {
             let mut tr = self.transaction.lock().await;
             let connection_mut = tr.connection_mut().await?;
@@ -95,7 +98,7 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
                     dataset_name as name,
                     created_at   as "created_at: _"
                 FROM dataset_entries
-                ORDER BY dataset_name ASC
+                ORDER BY created_at ASC
                 LIMIT $1 OFFSET $2
                 "#,
                 limit,
@@ -130,7 +133,6 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
                    created_at   as "created_at: _"
             FROM dataset_entries
             WHERE dataset_id = $1
-            ORDER BY created_at
             "#,
             stack_dataset_id.as_str(),
         )
@@ -153,10 +155,7 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
 
         let connection_mut = tr.connection_mut().await?;
 
-        let dataset_ids_search: Vec<_> = dataset_ids
-            .iter()
-            .map(|dataset_id| dataset_id.as_did_str().to_string())
-            .collect();
+        let dataset_ids_search: Vec<_> = dataset_ids.iter().map(ToString::to_string).collect();
 
         let resolved_entries = sqlx::query_as!(
             DatasetEntryRowModel,
@@ -167,7 +166,6 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
                    created_at   as "created_at: _"
             FROM dataset_entries
             WHERE dataset_id = ANY($1)
-            ORDER BY dataset_id
             "#,
             &dataset_ids_search,
         )
@@ -230,11 +228,11 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
         }
     }
 
-    fn get_dataset_entries_by_owner_id(
-        &self,
+    async fn get_dataset_entries_by_owner_id<'a>(
+        &'a self,
         owner_id: &AccountID,
         pagination: PaginationOpts,
-    ) -> DatasetEntryStream<'_> {
+    ) -> DatasetEntryStream<'a> {
         let stack_owner_id = owner_id.as_did_str().to_stack_string();
 
         Box::pin(async_stream::stream! {
@@ -353,7 +351,9 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
 
         let delete_result = sqlx::query!(
             r#"
-            DELETE FROM dataset_entries WHERE dataset_id = $1
+            DELETE
+            FROM dataset_entries
+            WHERE dataset_id = $1
             "#,
             stack_dataset_id.as_str(),
         )

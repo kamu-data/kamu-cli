@@ -28,7 +28,6 @@ kamu-task-system = { workspace = true }
 
 async-stream = "0.3"
 async-trait = { version = "0.1", default-features = false }
-chrono = { version = "0.4", default-features = false }
 dill = "0.9"
 futures = "0.3"
 serde_json = "1"
@@ -39,7 +38,7 @@ sqlx = { version = "0.8", default-features = false, features = [
     "postgres",
     "chrono"
 ] }
-tokio-stream = { version = "0.1", default-features = false }
+
 
 [dev-dependencies]
 database-common-macros = { workspace = true }
@@ -47,5 +46,4 @@ internal-error = { workspace = true }
 kamu-task-system-repo-tests = { workspace = true }
 
 test-log = { version = "0.2", features = ["trace"] }
-tokio = { version = "1", default-features = false, features = ["rt", "macros"] }
 test-group = { version = "1" }

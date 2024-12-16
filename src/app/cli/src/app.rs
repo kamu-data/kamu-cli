@@ -16,6 +16,7 @@ use chrono::{DateTime, Duration, Utc};
 use container_runtime::{ContainerRuntime, ContainerRuntimeConfig};
 use database_common::DatabaseTransactionRunner;
 use dill::*;
+use init_on_startup::InitOnStartup;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu::domain::*;
 use kamu::*;
@@ -23,9 +24,7 @@ use kamu_accounts::*;
 use kamu_accounts_services::PredefinedAccountsRegistrator;
 use kamu_adapter_http::{FileUploadLimitConfig, UploadServiceLocal};
 use kamu_adapter_oauth::GithubAuthenticationConfig;
-use kamu_auth_rebac_services::{MultiTenantRebacDatasetLifecycleMessageConsumer, RebacServiceImpl};
 use kamu_datasets::DatasetEnvVar;
-use kamu_datasets_services::{DatasetEntryIndexer, DatasetEntryServiceImpl};
 use kamu_flow_system_inmem::domain::{FlowConfigurationUpdatedMessage, FlowProgressMessage};
 use kamu_flow_system_services::{
     MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE,
@@ -33,6 +32,7 @@ use kamu_flow_system_services::{
 };
 use kamu_task_system_inmem::domain::{TaskProgressMessage, MESSAGE_PRODUCER_KAMU_TASK_EXECUTOR};
 use messaging_outbox::{register_message_dispatcher, Outbox, OutboxDispatchingImpl};
+use opendatafabric as odf;
 use time_source::{SystemTimeSource, SystemTimeSourceDefault, SystemTimeSourceStub};
 use tracing::{warn, Instrument};
 
@@ -128,17 +128,26 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
             tenancy_config,
             current_account.to_current_account_subject(),
         );
+        let is_e2e_testing = args.e2e_output_data_path.is_some();
 
         let mut base_catalog_builder = configure_base_catalog(
             &workspace_layout,
             tenancy_config,
             args.system_time.map(Into::into),
-            args.e2e_output_data_path.is_some(),
+            is_e2e_testing,
         );
 
-        if workspace_svc.is_in_workspace() {
-            base_catalog_builder.add::<DatasetEntryIndexer>();
-        }
+        // NOTE: Register DatasetEntryIndexer in DI, since it is referenced by other
+        //       components (via InitOnStartup)
+        // TODO: PERF: Do not register InitOnStartup-components if we are not inside the
+        //       workspace
+        base_catalog_builder.add_builder(
+            kamu_datasets_services::DatasetEntryIndexer::builder()
+                .with_is_in_workspace(workspace_svc.is_in_workspace()),
+        );
+        // The indexer has no other interfaces
+        base_catalog_builder
+            .bind::<dyn InitOnStartup, kamu_datasets_services::DatasetEntryIndexer>();
 
         base_catalog_builder.add_value(JwtAuthenticationConfig::load_from_env());
         base_catalog_builder.add_value(GithubAuthenticationConfig::load_from_env());
@@ -171,7 +180,12 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
             "Initializing {BINARY_NAME}"
         );
 
-        register_config_in_catalog(&config, &mut base_catalog_builder, tenancy_config);
+        register_config_in_catalog(
+            &config,
+            &mut base_catalog_builder,
+            tenancy_config,
+            is_e2e_testing,
+        );
 
         let base_catalog = base_catalog_builder.build();
 
@@ -492,24 +506,20 @@ pub fn configure_base_catalog(
 
     b.add::<kamu_accounts_services::AuthenticationServiceImpl>();
     b.add::<kamu_accounts_services::AccessTokenServiceImpl>();
+    b.add::<kamu_accounts_services::AccountServiceImpl>();
     b.add::<PredefinedAccountsRegistrator>();
 
     // Give both CLI and server access to stored repo access tokens
     b.add::<odf_server::AccessTokenRegistryService>();
     b.add::<odf_server::CLIAccessTokenStore>();
 
-    b.add::<kamu_adapter_auth_oso::KamuAuthOso>();
-    b.add::<kamu_adapter_auth_oso::OsoDatasetAuthorizer>();
+    kamu_auth_rebac_services::register_dependencies(&mut b, tenancy_config);
+
+    kamu_adapter_auth_oso_rebac::register_dependencies(&mut b);
 
     b.add::<DatabaseTransactionRunner>();
 
-    b.add::<RebacServiceImpl>();
-
-    if tenancy_config == TenancyConfig::MultiTenant {
-        b.add::<MultiTenantRebacDatasetLifecycleMessageConsumer>();
-    }
-
-    b.add::<DatasetEntryServiceImpl>();
+    b.add::<kamu_datasets_services::DatasetEntryServiceImpl>();
 
     b.add_builder(
         messaging_outbox::OutboxImmediateImpl::builder()
@@ -613,6 +623,7 @@ pub fn register_config_in_catalog(
     config: &config::CLIConfig,
     catalog_builder: &mut CatalogBuilder,
     tenancy_config: TenancyConfig,
+    is_e2e_testing: bool,
 ) {
     let network_ns = config.engine.as_ref().unwrap().network_ns.unwrap();
 
@@ -729,13 +740,20 @@ pub fn register_config_in_catalog(
     if tenancy_config == TenancyConfig::MultiTenant {
         let mut implicit_user_config = PredefinedAccountsConfig::new();
         implicit_user_config.predefined.push(
-            AccountConfig::from_name(opendatafabric::AccountName::new_unchecked(
+            AccountConfig::from_name(odf::AccountName::new_unchecked(
                 AccountService::default_account_name(TenancyConfig::MultiTenant).as_str(),
             ))
             .set_display_name(AccountService::default_user_name(
                 TenancyConfig::MultiTenant,
             )),
         );
+
+        if is_e2e_testing {
+            let e2e_user_config =
+                AccountConfig::from_name(odf::AccountName::new_unchecked("e2e-user"));
+
+            implicit_user_config.predefined.push(e2e_user_config);
+        }
 
         use merge::Merge;
         let mut user_config = config.users.clone().unwrap();

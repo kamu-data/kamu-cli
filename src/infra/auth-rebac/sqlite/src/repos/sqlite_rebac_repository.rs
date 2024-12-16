@@ -7,10 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::borrow::Cow;
+
 use database_common::{TransactionRef, TransactionRefT};
 use dill::{component, interface};
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_auth_rebac::*;
+use sqlx::Row;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -32,6 +35,24 @@ impl SqliteRebacRepository {
 
 #[async_trait::async_trait]
 impl RebacRepository for SqliteRebacRepository {
+    async fn properties_count(&self) -> Result<usize, PropertiesCountError> {
+        let mut tr = self.transaction.lock().await;
+
+        let connection_mut = tr.connection_mut().await?;
+
+        let properties_count = sqlx::query_scalar!(
+            r#"
+            SELECT COUNT(*)
+            FROM auth_rebac_properties
+            "#,
+        )
+        .fetch_one(connection_mut)
+        .await
+        .int_err()?;
+
+        Ok(usize::try_from(properties_count).unwrap())
+    }
+
     async fn set_entity_property(
         &self,
         entity: &Entity,
@@ -160,6 +181,70 @@ impl RebacRepository for SqliteRebacRepository {
             .map(TryInto::try_into)
             .collect::<Result<Vec<_>, _>>()
             .map_err(GetEntityPropertiesError::Internal)
+    }
+
+    async fn get_entity_properties_by_ids(
+        &self,
+        entities: &[Entity],
+    ) -> Result<Vec<(Entity, PropertyName, PropertyValue)>, GetEntityPropertiesError> {
+        if entities.is_empty() {
+            return Ok(vec![]);
+        }
+
+        let mut tr = self.transaction.lock().await;
+
+        let connection_mut = tr.connection_mut().await?;
+
+        let placeholder_list = (1..=entities.len())
+            .map(|i| {
+                // i | idxs
+                // 1 | 1, 2
+                // 2 | 3, 4
+                // 3 | 5, 6
+                // ...
+                let entity_type_idx = i * 2 - 1;
+                let entity_id_idx = i * 2;
+
+                format!("(${entity_type_idx},${entity_id_idx})")
+            })
+            .intersperse(",".to_string())
+            .collect::<String>();
+
+        // TODO: replace it by macro once sqlx will support it
+        // https://github.com/launchbadge/sqlx/blob/main/FAQ.md#how-can-i-do-a-select--where-foo-in--query
+        let query_str = format!(
+            r#"
+            SELECT entity_type, entity_id, property_name, property_value
+            FROM auth_rebac_properties
+            WHERE (entity_type, entity_id) IN ({placeholder_list})
+            "#,
+        );
+
+        let mut query = sqlx::query(&query_str);
+        for entity in entities {
+            query = query.bind(entity.entity_type);
+            query = query.bind(entity.entity_id.to_string());
+        }
+
+        let raw_rows = query.fetch_all(connection_mut).await.int_err()?;
+        let entity_properties: Vec<_> = raw_rows
+            .into_iter()
+            .map(|row| {
+                let entity_type = row.get_unchecked("entity_type");
+                let entity_id = row.get_unchecked::<String, _>("entity_id");
+                let property_name = row.get_unchecked::<String, _>("property_name").parse()?;
+                let property_value = Cow::Owned(row.get_unchecked("property_value"));
+
+                Ok((
+                    Entity::new(entity_type, entity_id),
+                    property_name,
+                    property_value,
+                ))
+            })
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(GetEntityPropertiesError::Internal)?;
+
+        Ok(entity_properties)
     }
 
     async fn insert_entities_relation(

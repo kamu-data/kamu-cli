@@ -407,7 +407,7 @@ async fn test_data_query_handler() {
                     "datasets": [{
                         "alias": "kamu-server/population",
                         "blockHash": head,
-                        "id": harness.dataset_handle.id.as_did_str().to_string(),
+                        "id": harness.dataset_handle.id.to_string(),
                     }],
                 },
                 "output": {
@@ -453,7 +453,7 @@ async fn test_data_query_handler() {
                     "datasets": [{
                         "alias": "kamu-server/population",
                         "blockHash": head,
-                        "id": harness.dataset_handle.id.as_did_str().to_string(),
+                        "id": harness.dataset_handle.id.to_string(),
                     }],
                 },
                 "output": {
@@ -609,7 +609,7 @@ async fn test_data_verify_handler() {
                     "datasets": [{
                         "alias": "kamu-server/population",
                         "blockHash": head,
-                        "id": harness.dataset_handle.id.as_did_str().to_string(),
+                        "id": harness.dataset_handle.id.to_string(),
                     }],
                 },
                 "output": {

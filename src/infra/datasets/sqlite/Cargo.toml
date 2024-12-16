@@ -29,18 +29,14 @@ opendatafabric = { workspace = true, features = ["sqlx-sqlite"] }
 
 async-stream = "0.3"
 async-trait = { version = "0.1", default-features = false }
-chrono = { version = "0.4", default-features = false }
 dill = "0.9"
 futures = "0.3"
-secrecy = "0.10"
 sqlx = { version = "0.8", default-features = false, features = [
     "runtime-tokio-rustls",
     "macros",
     "sqlite",
     "chrono",
 ] }
-thiserror = { version = "1", default-features = false }
-tracing = { version = "0.1", default-features = false }
 uuid = "1"
 
 

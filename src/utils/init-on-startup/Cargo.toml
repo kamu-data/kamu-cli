@@ -27,7 +27,7 @@ internal-error = { workspace = true }
 
 async-trait = "0.1"
 dill = "0.9"
-petgraph = { version = "0.6", default-features = false, features = ["stable_graph"]}
+petgraph = { version = "0.6", default-features = false, features = ["stable_graph"] }
 thiserror = "1"
 tracing = "0.1"
 

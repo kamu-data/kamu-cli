@@ -22,7 +22,6 @@ doctest = false
 
 
 [dependencies]
-database-common = { workspace = true }
 messaging-outbox = { workspace = true }
 
 chrono = { version = "0.4", default-features = false }
