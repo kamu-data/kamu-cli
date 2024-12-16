@@ -12,7 +12,7 @@ SQLITE_CRATES := ./src/infra/accounts/sqlite ./src/infra/auth-rebac/sqlite ./src
 ALL_DATABASE_CRATES := $(POSTGRES_CRATES) $(MYSQL_CRATES) $(SQLITE_CRATES)
 MIGRATION_DIRS := ./migrations/mysql ./migrations/postgres ./migrations/sqlite
 
-KAMU_CONTAINER_RUNTIME_TYPE ?= docker
+KAMU_CONTAINER_RUNTIME_TYPE ?= podman
 
 ###############################################################################
 # Lint
