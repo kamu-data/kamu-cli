@@ -84,8 +84,15 @@ async fn test_reset_dataset_to_non_existing_block_fails() {
             None,
         )
         .await;
-    assert_matches!(result, Err(ResetError::BlockNotFound(_)));
+    assert_matches!(
+        result,
+        Err(ResetError::Execution(
+            ResetExecutionError::SetReferenceFailed(SetRefError::BlockNotFound(_))
+        ))
+    );
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
 async fn test_reset_dataset_with_wrong_head() {
@@ -99,8 +106,13 @@ async fn test_reset_dataset_with_wrong_head() {
             Some(&test_case.hash_seed_block),
         )
         .await;
-    assert_matches!(result, Err(ResetError::OldHeadMismatch(_)));
+    assert_matches!(
+        result,
+        Err(ResetError::Planning(ResetPlanningError::OldHeadMismatch(_)))
+    );
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
 async fn test_reset_dataset_with_default_seed_block() {
@@ -153,7 +165,8 @@ impl ChainWith2BlocksTestCase {
 #[oop::extend(BaseRepoHarness, base_repo_harness)]
 struct ResetTestHarness {
     base_repo_harness: BaseRepoHarness,
-    reset_svc: Arc<dyn ResetService>,
+    reset_planner: Arc<dyn ResetPlanner>,
+    reset_execution_svc: Arc<dyn ResetExecutionService>,
 }
 
 impl ResetTestHarness {
@@ -161,14 +174,17 @@ impl ResetTestHarness {
         let base_repo_harness = BaseRepoHarness::new(TenancyConfig::SingleTenant);
 
         let catalog = dill::CatalogBuilder::new_chained(base_repo_harness.catalog())
-            .add::<ResetServiceImpl>()
+            .add::<ResetPlannerImpl>()
+            .add::<ResetExecutionServiceImpl>()
             .build();
 
-        let reset_svc = catalog.get_one::<dyn ResetService>().unwrap();
+        let reset_planner = catalog.get_one::<dyn ResetPlanner>().unwrap();
+        let reset_execution_svc = catalog.get_one::<dyn ResetExecutionService>().unwrap();
 
         Self {
             base_repo_harness,
-            reset_svc,
+            reset_planner,
+            reset_execution_svc,
         }
     }
 
@@ -208,11 +224,20 @@ impl ResetTestHarness {
         dataset_handle: &DatasetHandle,
         block_hash: Option<&Multihash>,
         old_head_maybe: Option<&Multihash>,
-    ) -> Result<Multihash, ResetError> {
-        let resolved_dataset = self.resolve_dataset(dataset_handle);
-        self.reset_svc
-            .reset_dataset(resolved_dataset, block_hash, old_head_maybe)
-            .await
+    ) -> Result<ResetResult, ResetError> {
+        let target = self.resolve_dataset(dataset_handle);
+
+        let reset_plan = self
+            .reset_planner
+            .build_reset_plan(target.clone(), block_hash, old_head_maybe)
+            .await?;
+
+        let reset_result = self
+            .reset_execution_svc
+            .execute_reset(target, reset_plan)
+            .await?;
+
+        Ok(reset_result)
     }
 
     async fn get_dataset_head(&self, dataset_handle: &DatasetHandle) -> Multihash {

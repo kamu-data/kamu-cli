@@ -13,20 +13,7 @@ use std::sync::Arc;
 use database_common::NoOpDatabasePlugin;
 use dill::{Catalog, CatalogBuilder, Component};
 use kamu::utils::ipfs_wrapper::IpfsClient;
-use kamu::{
-    CompactionPlannerImpl,
-    DatasetFactoryImpl,
-    DatasetRegistryRepoBridge,
-    DatasetRepositoryLocalFs,
-    DatasetRepositoryWriter,
-    IpfsGateway,
-    PullRequestPlannerImpl,
-    RemoteAliasesRegistryImpl,
-    RemoteReposDir,
-    RemoteRepositoryRegistryImpl,
-    SyncRequestBuilder,
-    TransformRequestPlannerImpl,
-};
+use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::auth::DummyOdfServerAccessTokenResolver;
 use kamu_core::{DatasetRepository, TenancyConfig};
@@ -185,6 +172,7 @@ impl TaskExecutorHarness {
             .add::<SystemTimeSourceDefault>()
             .add::<PullRequestPlannerImpl>()
             .add::<CompactionPlannerImpl>()
+            .add::<ResetPlannerImpl>()
             .add::<TransformRequestPlannerImpl>()
             .add::<SyncRequestBuilder>()
             .add::<DatasetFactoryImpl>()

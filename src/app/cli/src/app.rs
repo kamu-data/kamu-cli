@@ -413,7 +413,8 @@ pub fn configure_base_catalog(
 
     b.add::<RemoteStatusServiceImpl>();
 
-    b.add::<ResetServiceImpl>();
+    b.add::<ResetPlannerImpl>();
+    b.add::<ResetExecutionServiceImpl>();
 
     b.add::<ProvenanceServiceImpl>();
 

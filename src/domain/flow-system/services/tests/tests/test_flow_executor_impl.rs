@@ -1035,7 +1035,11 @@ async fn test_manual_trigger_reset() {
                     task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
                     dataset_id: Some(create_dataset_result.dataset_handle.id.clone()),
                     run_since_start: Duration::milliseconds(20),
-                    finish_in_with: Some((Duration::milliseconds(90), TaskOutcome::Success(TaskResult::ResetDatasetResult(TaskResetDatasetResult { new_head: Multihash::from_digest_sha3_256(b"new-head") })))),
+                    finish_in_with: Some((Duration::milliseconds(90), TaskOutcome::Success(
+                      TaskResult::ResetDatasetResult(TaskResetDatasetResult {
+                        reset_result: ResetResult { new_head: Multihash::from_digest_sha3_256(b"new-head") },
+                      })
+                    ))),
                     expected_logical_plan: LogicalPlan::ResetDataset(LogicalPlanResetDataset {
                       dataset_id: create_dataset_result.dataset_handle.id.clone(),
                       // By deafult should reset to seed block
@@ -1177,7 +1181,11 @@ async fn test_reset_trigger_keep_metadata_compaction_for_derivatives() {
               task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
               dataset_id: Some(create_foo_result.dataset_handle.id.clone()),
               run_since_start: Duration::milliseconds(20),
-              finish_in_with: Some((Duration::milliseconds(70), TaskOutcome::Success(TaskResult::ResetDatasetResult(TaskResetDatasetResult { new_head: Multihash::from_digest_sha3_256(b"new-head") })))),
+              finish_in_with: Some((Duration::milliseconds(70), TaskOutcome::Success(
+                TaskResult::ResetDatasetResult(TaskResetDatasetResult {
+                  reset_result: ResetResult { new_head: Multihash::from_digest_sha3_256(b"new-head") }
+                })
+              ))),
               expected_logical_plan: LogicalPlan::ResetDataset(LogicalPlanResetDataset {
                 dataset_id: create_foo_result.dataset_handle.id.clone(),
                 new_head_hash: Some(dataset_blocks[1].0.clone()),

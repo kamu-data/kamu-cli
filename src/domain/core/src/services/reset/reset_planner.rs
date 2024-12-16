@@ -8,47 +8,39 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::InternalError;
-use opendatafabric::{DatasetHandle, Multihash};
+use opendatafabric as odf;
 use thiserror::Error;
 
-use crate::auth::DatasetActionUnauthorizedError;
-use crate::{AccessError, ResetExecutionError, ResetPlanningError, ResetResult};
+use crate::ResolvedDataset;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait ResetDatasetUseCase: Send + Sync {
-    async fn execute(
+pub trait ResetPlanner: Send + Sync {
+    async fn build_reset_plan(
         &self,
-        dataset_handle: &DatasetHandle,
-        maybe_new_head: Option<&Multihash>,
-        maybe_old_head: Option<&Multihash>,
-    ) -> Result<ResetResult, ResetError>;
+        target: ResolvedDataset,
+        maybe_new_head: Option<&odf::Multihash>,
+        maybe_old_head: Option<&odf::Multihash>,
+    ) -> Result<ResetPlan, ResetPlanningError>;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug)]
+pub struct ResetPlan {
+    pub new_head: odf::Multihash,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Error)]
-pub enum ResetError {
+pub enum ResetPlanningError {
     #[error(transparent)]
-    Planning(
+    OldHeadMismatch(
         #[from]
         #[backtrace]
-        ResetPlanningError,
-    ),
-
-    #[error(transparent)]
-    Execution(
-        #[from]
-        #[backtrace]
-        ResetExecutionError,
-    ),
-
-    #[error(transparent)]
-    Access(
-        #[from]
-        #[backtrace]
-        AccessError,
+        ResetOldHeadMismatchError,
     ),
 
     #[error(transparent)]
@@ -57,13 +49,11 @@ pub enum ResetError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl From<DatasetActionUnauthorizedError> for ResetError {
-    fn from(v: DatasetActionUnauthorizedError) -> Self {
-        match v {
-            DatasetActionUnauthorizedError::Access(e) => Self::Access(e),
-            DatasetActionUnauthorizedError::Internal(e) => Self::Internal(e),
-        }
-    }
+#[derive(Error, Debug)]
+#[error("Current head is {current_head} but expected head is {old_head}")]
+pub struct ResetOldHeadMismatchError {
+    pub current_head: odf::Multihash,
+    pub old_head: odf::Multihash,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

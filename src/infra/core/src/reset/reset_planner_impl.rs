@@ -10,24 +10,31 @@
 use dill::*;
 use internal_error::ResultIntoInternal;
 use kamu_core::*;
-use opendatafabric::*;
+use opendatafabric as odf;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub struct ResetPlannerImpl {}
+
 #[component(pub)]
-#[interface(dyn ResetService)]
-pub struct ResetServiceImpl {}
+#[interface(dyn ResetPlanner)]
+impl ResetPlannerImpl {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl ResetService for ResetServiceImpl {
-    #[tracing::instrument(level = "info", skip_all, fields(new_head = ?new_head_maybe, old_head = ?old_head_maybe))]
-    async fn reset_dataset(
+impl ResetPlanner for ResetPlannerImpl {
+    async fn build_reset_plan(
         &self,
         target: ResolvedDataset,
-        new_head_maybe: Option<&Multihash>,
-        old_head_maybe: Option<&Multihash>,
-    ) -> Result<Multihash, ResetError> {
-        let new_head = if let Some(new_head) = new_head_maybe {
+        maybe_new_head: Option<&odf::Multihash>,
+        maybe_old_head: Option<&odf::Multihash>,
+    ) -> Result<ResetPlan, ResetPlanningError> {
+        let new_head = if let Some(new_head) = maybe_new_head {
             new_head
         } else {
             &target
@@ -39,32 +46,25 @@ impl ResetService for ResetServiceImpl {
                 .unwrap()
                 .0
         };
-        if let Some(old_head) = old_head_maybe
+
+        if let Some(old_head) = maybe_old_head
             && let Some(current_head) = target
                 .as_metadata_chain()
                 .try_get_ref(&BlockRef::Head)
                 .await?
             && old_head != &current_head
         {
-            return Err(ResetError::OldHeadMismatch(OldHeadMismatchError {
-                current_head,
-                old_head: old_head.clone(),
-            }));
+            return Err(ResetPlanningError::OldHeadMismatch(
+                ResetOldHeadMismatchError {
+                    current_head,
+                    old_head: old_head.clone(),
+                },
+            ));
         }
 
-        target
-            .as_metadata_chain()
-            .set_ref(
-                &BlockRef::Head,
-                new_head,
-                SetRefOpts {
-                    validate_block_present: true,
-                    check_ref_is: None,
-                },
-            )
-            .await?;
-
-        Ok(new_head.clone())
+        Ok(ResetPlan {
+            new_head: new_head.clone(),
+        })
     }
 }
 

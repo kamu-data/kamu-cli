@@ -48,6 +48,7 @@ use kamu_core::{
     DatasetRepository,
     PollingIngestService,
     PullResult,
+    ResetResult,
     TenancyConfig,
     TransformRequestPlanner,
     MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
@@ -509,7 +510,9 @@ async fn test_trigger_reset_root_dataset_flow() {
             complete_time,
             ts::TaskOutcome::Success(ts::TaskResult::ResetDatasetResult(
                 ts::TaskResetDatasetResult {
-                    new_head: root_dataset_blocks[1].0.clone(),
+                    reset_result: ResetResult {
+                        new_head: root_dataset_blocks[1].0.clone(),
+                    },
                 },
             )),
         )

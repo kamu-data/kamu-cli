@@ -38,13 +38,13 @@ async fn test_reset_success() {
 
     assert_eq!(harness.num_blocks(ResolvedDataset::from(&foo)).await, 3);
 
-    let new_head = harness
+    let reset_result = harness
         .use_case
         .execute(&foo.dataset_handle, Some(&foo.head), None)
         .await
         .unwrap();
 
-    assert_eq!(new_head, foo.head);
+    assert_eq!(reset_result.new_head, foo.head);
     assert_eq!(harness.num_blocks(ResolvedDataset::from(&foo)).await, 2);
 }
 
@@ -85,7 +85,8 @@ impl ResetUseCaseHarness {
 
         let catalog = dill::CatalogBuilder::new_chained(base_harness.catalog())
             .add::<ResetDatasetUseCaseImpl>()
-            .add::<ResetServiceImpl>()
+            .add::<ResetPlannerImpl>()
+            .add::<ResetExecutionServiceImpl>()
             .build();
 
         let use_case = catalog.get_one::<dyn ResetDatasetUseCase>().unwrap();

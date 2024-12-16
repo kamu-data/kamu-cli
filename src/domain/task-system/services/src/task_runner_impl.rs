@@ -20,8 +20,8 @@ pub struct TaskRunnerImpl {
     polling_ingest_service: Arc<dyn PollingIngestService>,
     transform_elaboration_service: Arc<dyn TransformElaborationService>,
     transform_execution_service: Arc<dyn TransformExecutionService>,
-    reset_service: Arc<dyn ResetService>,
-    compaction_execution_svc: Arc<dyn CompactionExecutionService>,
+    reset_execution_service: Arc<dyn ResetExecutionService>,
+    compaction_execution_service: Arc<dyn CompactionExecutionService>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -33,15 +33,15 @@ impl TaskRunnerImpl {
         polling_ingest_service: Arc<dyn PollingIngestService>,
         transform_elaboration_service: Arc<dyn TransformElaborationService>,
         transform_execution_service: Arc<dyn TransformExecutionService>,
-        reset_service: Arc<dyn ResetService>,
-        compaction_execution_svc: Arc<dyn CompactionExecutionService>,
+        reset_execution_service: Arc<dyn ResetExecutionService>,
+        compaction_execution_service: Arc<dyn CompactionExecutionService>,
     ) -> Self {
         Self {
             polling_ingest_service,
             transform_elaboration_service,
             transform_execution_service,
-            reset_service,
-            compaction_execution_svc,
+            reset_execution_service,
+            compaction_execution_service,
         }
     }
 
@@ -156,21 +156,20 @@ impl TaskRunnerImpl {
         task_reset: TaskDefinitionReset,
     ) -> Result<TaskOutcome, InternalError> {
         let reset_result_maybe = self
-            .reset_service
-            .reset_dataset(
-                task_reset.target,
-                task_reset.new_head_hash.as_ref(),
-                task_reset.old_head_hash.as_ref(),
-            )
+            .reset_execution_service
+            .execute_reset(task_reset.target, task_reset.reset_plan)
             .await;
+
         match reset_result_maybe {
-            Ok(new_head) => Ok(TaskOutcome::Success(TaskResult::ResetDatasetResult(
-                TaskResetDatasetResult { new_head },
+            Ok(reset_result) => Ok(TaskOutcome::Success(TaskResult::ResetDatasetResult(
+                TaskResetDatasetResult { reset_result },
             ))),
             Err(err) => match err {
-                ResetError::BlockNotFound(_) => Ok(TaskOutcome::Failed(
-                    TaskError::ResetDatasetError(ResetDatasetTaskError::ResetHeadNotFound),
-                )),
+                ResetExecutionError::SetReferenceFailed(SetRefError::BlockNotFound(_)) => {
+                    Ok(TaskOutcome::Failed(TaskError::ResetDatasetError(
+                        ResetDatasetTaskError::ResetHeadNotFound,
+                    )))
+                }
                 err => {
                     tracing::error!(
                         error = ?err,
@@ -190,7 +189,7 @@ impl TaskRunnerImpl {
         task_compact: TaskDefinitionHardCompact,
     ) -> Result<TaskOutcome, InternalError> {
         let compaction_result = self
-            .compaction_execution_svc
+            .compaction_execution_service
             .execute_compaction(task_compact.target, task_compact.compaction_plan, None)
             .await;
 

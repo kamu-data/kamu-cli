@@ -12,10 +12,12 @@ pub use container_runtime::{NullPullImageListener, PullImageListener};
 
 pub mod compaction;
 pub mod ingest;
+pub mod reset;
 pub mod transform;
 
 pub use compaction::*;
 pub use ingest::*;
+pub use reset::*;
 pub use transform::*;
 
 pub mod dataset_changes_service;
@@ -31,7 +33,6 @@ pub mod remote_aliases;
 pub mod remote_aliases_registry;
 pub mod remote_repository_registry;
 pub mod remote_status_service;
-pub mod reset_service;
 pub mod resource_loader;
 pub mod search_service;
 pub mod server_url_config;
@@ -52,7 +53,6 @@ pub use remote_aliases::*;
 pub use remote_aliases_registry::*;
 pub use remote_repository_registry::*;
 pub use remote_status_service::*;
-pub use reset_service::*;
 pub use resource_loader::*;
 pub use search_service::*;
 pub use server_url_config::*;
