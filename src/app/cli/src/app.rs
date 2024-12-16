@@ -385,6 +385,8 @@ pub fn configure_base_catalog(
 
     b.add::<DataFormatRegistryImpl>();
 
+    b.add::<MetadataQueryServiceImpl>();
+
     b.add::<FetchService>();
 
     b.add::<PollingIngestServiceImpl>();

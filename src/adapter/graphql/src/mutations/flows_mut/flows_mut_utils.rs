@@ -111,9 +111,8 @@ pub(crate) async fn ensure_flow_preconditions(
 
     match dataset_flow_type {
         DatasetFlowType::Ingest => {
-            let polling_ingest_svc = from_catalog_n!(ctx, dyn kamu_core::PollingIngestService);
-
-            let source_res = polling_ingest_svc
+            let metadata_query_service = from_catalog_n!(ctx, dyn kamu_core::MetadataQueryService);
+            let source_res = metadata_query_service
                 .get_active_polling_source(target)
                 .await
                 .int_err()?;
@@ -124,12 +123,8 @@ pub(crate) async fn ensure_flow_preconditions(
             }
         }
         DatasetFlowType::ExecuteTransform => {
-            let transform_request_planner =
-                from_catalog_n!(ctx, dyn kamu_core::TransformRequestPlanner);
-
-            let source_res = transform_request_planner
-                .get_active_transform(target)
-                .await?;
+            let metadata_query_service = from_catalog_n!(ctx, dyn kamu_core::MetadataQueryService);
+            let source_res = metadata_query_service.get_active_transform(target).await?;
             if source_res.is_none() {
                 return Ok(Some(FlowPreconditionsNotMet {
                     preconditions: "No SetTransform event defined".to_string(),

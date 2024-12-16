@@ -597,20 +597,6 @@ impl PollingIngestServiceImpl {
 #[async_trait::async_trait]
 impl PollingIngestService for PollingIngestServiceImpl {
     #[tracing::instrument(level = "info", skip_all, fields(target=%target.get_handle()))]
-    async fn get_active_polling_source(
-        &self,
-        target: ResolvedDataset,
-    ) -> Result<Option<(Multihash, MetadataBlockTyped<SetPollingSource>)>, GetDatasetError> {
-        // TODO: Support source evolution
-        Ok(target
-            .as_metadata_chain()
-            .accept_one(SearchSetPollingSourceVisitor::new())
-            .await
-            .int_err()?
-            .into_hashed_block())
-    }
-
-    #[tracing::instrument(level = "info", skip_all, fields(target=%target.get_handle()))]
     async fn ingest(
         &self,
         target: ResolvedDataset,

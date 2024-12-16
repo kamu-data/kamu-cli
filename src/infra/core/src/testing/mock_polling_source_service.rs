@@ -9,9 +9,7 @@
 
 use std::sync::Arc;
 
-use chrono::Utc;
 use kamu_core::{
-    GetDatasetError,
     PollingIngestError,
     PollingIngestListener,
     PollingIngestOptions,
@@ -19,18 +17,7 @@ use kamu_core::{
     PollingIngestService,
     ResolvedDataset,
 };
-use opendatafabric::{
-    DatasetAlias,
-    FetchStep,
-    FetchStepUrl,
-    MergeStrategy,
-    MergeStrategyAppend,
-    MetadataBlockTyped,
-    Multihash,
-    ReadStep,
-    ReadStepJson,
-    SetPollingSource,
-};
+use opendatafabric as odf;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -39,11 +26,6 @@ mockall::mock! {
 
     #[async_trait::async_trait]
     impl PollingIngestService for PollingIngestService {
-        async fn get_active_polling_source(
-            &self,
-            target: ResolvedDataset,
-        ) -> Result<Option<(Multihash, MetadataBlockTyped<SetPollingSource>)>, GetDatasetError>;
-
         async fn ingest(
             &self,
             target: ResolvedDataset,
@@ -56,7 +38,7 @@ mockall::mock! {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl MockPollingIngestService {
-    pub fn make_expect_ingest(mut self, dataset_alias: DatasetAlias) -> Self {
+    pub fn make_expect_ingest(mut self, dataset_alias: odf::DatasetAlias) -> Self {
         self.expect_ingest()
             .withf(move |target, _, _| target.get_alias() == &dataset_alias)
             .times(1)
@@ -67,49 +49,6 @@ impl MockPollingIngestService {
                 })
             });
         self
-    }
-
-    pub fn without_active_polling_source() -> Self {
-        let mut dependency_graph_repo_mock = MockPollingIngestService::default();
-        dependency_graph_repo_mock
-            .expect_get_active_polling_source()
-            .returning(|_| Ok(None));
-        dependency_graph_repo_mock
-    }
-
-    pub fn with_active_polling_source() -> Self {
-        let mut dependency_graph_repo_mock = MockPollingIngestService::default();
-        dependency_graph_repo_mock
-            .expect_get_active_polling_source()
-            .returning(|_| {
-                Ok(Some((
-                    Multihash::from_digest_sha3_256(b"a"),
-                    MetadataBlockTyped {
-                        system_time: Utc::now(),
-                        prev_block_hash: None,
-                        event: SetPollingSource {
-                            fetch: FetchStep::Url(FetchStepUrl {
-                                url: "http://foo".to_string(),
-                                event_time: None,
-                                cache: None,
-                                headers: None,
-                            }),
-                            prepare: None,
-                            read: ReadStep::Json(ReadStepJson {
-                                sub_path: None,
-                                schema: None,
-                                date_format: None,
-                                encoding: None,
-                                timestamp_format: None,
-                            }),
-                            preprocess: None,
-                            merge: MergeStrategy::Append(MergeStrategyAppend {}),
-                        },
-                        sequence_number: 0,
-                    },
-                )))
-            });
-        dependency_graph_repo_mock
     }
 }
 

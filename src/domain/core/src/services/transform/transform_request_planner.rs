@@ -20,12 +20,6 @@ use crate::*;
 
 #[async_trait::async_trait]
 pub trait TransformRequestPlanner: Send + Sync {
-    /// Returns an active transform, if any
-    async fn get_active_transform(
-        &self,
-        target: ResolvedDataset,
-    ) -> Result<Option<(Multihash, MetadataBlockTyped<SetTransform>)>, InternalError>;
-
     async fn build_transform_preliminary_plan(
         &self,
         target: ResolvedDataset,

@@ -20,11 +20,9 @@ use opendatafabric::{
     DatasetVocabulary,
     ExecuteTransform,
     MetadataBlock,
-    MetadataBlockTyped,
     MetadataEventTypeFlags,
     Multihash,
     SetDataSchema,
-    SetTransform,
 };
 use random_names::get_random_name;
 use time_source::SystemTimeSource;
@@ -99,22 +97,6 @@ impl TransformRequestPlannerImpl {
 
 #[async_trait::async_trait]
 impl TransformRequestPlanner for TransformRequestPlannerImpl {
-    /// Returns an active transform, if any
-    #[tracing::instrument(level = "debug", skip_all, fields(target=%target.get_handle()))]
-    ///
-    async fn get_active_transform(
-        &self,
-        target: ResolvedDataset,
-    ) -> Result<Option<(Multihash, MetadataBlockTyped<SetTransform>)>, InternalError> {
-        // TODO: Support transform evolution
-        Ok(target
-            .as_metadata_chain()
-            .accept_one(SearchSetTransformVisitor::new())
-            .await
-            .int_err()?
-            .into_hashed_block())
-    }
-
     #[tracing::instrument(level = "info", skip_all, fields(target=%target.get_handle()))]
     async fn build_transform_preliminary_plan(
         &self,

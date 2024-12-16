@@ -23,12 +23,6 @@ use crate::*;
 
 #[async_trait::async_trait]
 pub trait PushIngestService: Send + Sync {
-    /// Returns the set of active push sources
-    async fn get_active_push_sources(
-        &self,
-        target: ResolvedDataset,
-    ) -> Result<Vec<(Multihash, MetadataBlockTyped<AddPushSource>)>, GetDatasetError>;
-
     /// Uses push source definition in metadata to ingest data from the
     /// specified source.
     ///

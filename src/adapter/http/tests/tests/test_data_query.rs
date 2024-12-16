@@ -53,7 +53,6 @@ impl Harness {
             .add_value(identity_config)
             .add::<DataFormatRegistryImpl>()
             .add::<QueryServiceImpl>()
-            .add::<PushIngestServiceImpl>()
             .add::<EngineProvisionerNull>()
             .build();
 

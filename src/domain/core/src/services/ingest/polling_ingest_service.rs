@@ -28,12 +28,6 @@ use crate::*;
 
 #[async_trait::async_trait]
 pub trait PollingIngestService: Send + Sync {
-    /// Returns an active polling source, if any
-    async fn get_active_polling_source(
-        &self,
-        target: ResolvedDataset,
-    ) -> Result<Option<(Multihash, MetadataBlockTyped<SetPollingSource>)>, GetDatasetError>;
-
     /// Uses polling source definition in metadata to ingest data from an
     /// external source
     async fn ingest(

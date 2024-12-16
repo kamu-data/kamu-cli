@@ -419,22 +419,6 @@ impl PushIngestServiceImpl {
 #[async_trait::async_trait]
 impl PushIngestService for PushIngestServiceImpl {
     #[tracing::instrument(level = "info", skip_all, fields(target=%target.get_handle()))]
-    async fn get_active_push_sources(
-        &self,
-        target: ResolvedDataset,
-    ) -> Result<Vec<(Multihash, MetadataBlockTyped<AddPushSource>)>, GetDatasetError> {
-        use futures::TryStreamExt;
-
-        // TODO: Support source disabling and evolution
-        let stream = target
-            .as_metadata_chain()
-            .iter_blocks()
-            .filter_map_ok(|(h, b)| b.into_typed().map(|b| (h, b)));
-
-        Ok(stream.try_collect().await.int_err()?)
-    }
-
-    #[tracing::instrument(level = "info", skip_all, fields(target=%target.get_handle()))]
     async fn ingest_from_url(
         &self,
         target: ResolvedDataset,

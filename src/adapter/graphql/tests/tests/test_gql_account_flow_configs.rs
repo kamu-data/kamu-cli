@@ -14,13 +14,7 @@ use chrono::Duration;
 use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use dill::Component;
 use indoc::indoc;
-use kamu::testing::{
-    MetadataFactory,
-    MockDatasetActionAuthorizer,
-    MockDatasetChangesService,
-    MockPollingIngestService,
-    MockTransformRequestPlanner,
-};
+use kamu::testing::{MetadataFactory, MockDatasetActionAuthorizer, MockDatasetChangesService};
 use kamu::{
     CreateDatasetFromSnapshotUseCaseImpl,
     DatasetOwnershipServiceInMemory,
@@ -28,6 +22,7 @@ use kamu::{
     DatasetRegistryRepoBridge,
     DatasetRepositoryLocalFs,
     DatasetRepositoryWriter,
+    MetadataQueryServiceImpl,
 };
 use kamu_accounts::{JwtAuthenticationConfig, DEFAULT_ACCOUNT_NAME, DEFAULT_ACCOUNT_NAME_STR};
 use kamu_accounts_inmem::InMemoryAccessTokenRepository;
@@ -55,8 +50,6 @@ async fn test_list_account_flows() {
 
     let mock_dataset_action_authorizer = MockDatasetActionAuthorizer::allowing();
     let harness = FlowConfigHarness::with_overrides(FlowRunsHarnessOverrides {
-        transform_planner_mock: Some(MockTransformRequestPlanner::with_set_transform()),
-        polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
         mock_dataset_action_authorizer: Some(mock_dataset_action_authorizer),
         ..Default::default()
     })
@@ -137,8 +130,6 @@ async fn test_list_account_flows() {
 async fn test_list_datasets_with_flow() {
     let mock_dataset_action_authorizer = MockDatasetActionAuthorizer::allowing();
     let harness = FlowConfigHarness::with_overrides(FlowRunsHarnessOverrides {
-        transform_planner_mock: Some(MockTransformRequestPlanner::with_set_transform()),
-        polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
         mock_dataset_action_authorizer: Some(mock_dataset_action_authorizer),
         ..Default::default()
     })
@@ -249,8 +240,6 @@ async fn test_pause_resume_account_flows() {
 
     let mock_dataset_action_authorizer = MockDatasetActionAuthorizer::allowing();
     let harness = FlowConfigHarness::with_overrides(FlowRunsHarnessOverrides {
-        transform_planner_mock: Some(MockTransformRequestPlanner::with_set_transform()),
-        polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
         mock_dataset_action_authorizer: Some(mock_dataset_action_authorizer),
         ..Default::default()
     })
@@ -455,8 +444,6 @@ async fn test_account_configs_all_paused() {
 
     let mock_dataset_action_authorizer = MockDatasetActionAuthorizer::allowing();
     let harness = FlowConfigHarness::with_overrides(FlowRunsHarnessOverrides {
-        transform_planner_mock: Some(MockTransformRequestPlanner::with_set_transform()),
-        polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
         mock_dataset_action_authorizer: Some(mock_dataset_action_authorizer),
         ..Default::default()
     })
@@ -631,8 +618,6 @@ struct FlowConfigHarness {
 #[derive(Default)]
 struct FlowRunsHarnessOverrides {
     dataset_changes_mock: Option<MockDatasetChangesService>,
-    transform_planner_mock: Option<MockTransformRequestPlanner>,
-    polling_service_mock: Option<MockPollingIngestService>,
     mock_dataset_action_authorizer: Option<MockDatasetActionAuthorizer>,
 }
 
@@ -643,8 +628,6 @@ impl FlowConfigHarness {
         std::fs::create_dir(&datasets_dir).unwrap();
 
         let dataset_changes_mock = overrides.dataset_changes_mock.unwrap_or_default();
-        let transform_planner_mock = overrides.transform_planner_mock.unwrap_or_default();
-        let polling_service_mock = overrides.polling_service_mock.unwrap_or_default();
         let mock_dataset_action_authorizer =
             overrides.mock_dataset_action_authorizer.unwrap_or_default();
 
@@ -661,6 +644,7 @@ impl FlowConfigHarness {
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
             .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
             .add::<DatasetRegistryRepoBridge>()
+            .add::<MetadataQueryServiceImpl>()
             .add::<CreateDatasetFromSnapshotUseCaseImpl>()
             .add_value(dataset_changes_mock)
             .bind::<dyn DatasetChangesService, MockDatasetChangesService>()
@@ -681,10 +665,6 @@ impl FlowConfigHarness {
             ))
             .add::<TaskSchedulerImpl>()
             .add::<InMemoryTaskEventStore>()
-            .add_value(transform_planner_mock)
-            .bind::<dyn TransformRequestPlanner, MockTransformRequestPlanner>()
-            .add_value(polling_service_mock)
-            .bind::<dyn PollingIngestService, MockPollingIngestService>()
             .add::<DatasetOwnershipServiceInMemory>()
             .add::<DatasetOwnershipServiceInMemoryStateInitializer>()
             .add::<DatabaseTransactionRunner>();
