@@ -37,7 +37,7 @@ impl DatasetEnvVars {
     ) -> Result<String> {
         utils::check_dataset_read_access(ctx, &self.dataset_handle).await?;
 
-        let dataset_env_var_service = from_catalog::<dyn DatasetEnvVarService>(ctx).unwrap();
+        let dataset_env_var_service = from_catalog_n!(ctx, dyn DatasetEnvVarService);
         let dataset_env_var = dataset_env_var_service
             .get_dataset_env_var_by_id(&dataset_env_var_id)
             .await
@@ -59,10 +59,11 @@ impl DatasetEnvVars {
     ) -> Result<ViewDatasetEnvVarConnection> {
         utils::check_dataset_read_access(ctx, &self.dataset_handle).await?;
 
+        let dataset_env_var_service = from_catalog_n!(ctx, dyn DatasetEnvVarService);
+
         let page = page.unwrap_or(0);
         let per_page = per_page.unwrap_or(Self::DEFAULT_PER_PAGE);
 
-        let dataset_env_var_service = from_catalog::<dyn DatasetEnvVarService>(ctx).unwrap();
         let dataset_env_var_listing = dataset_env_var_service
             .get_all_dataset_env_vars_by_dataset_id(
                 &self.dataset_handle.id,

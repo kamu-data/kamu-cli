@@ -76,7 +76,7 @@ impl DatasetFlowConfigsMut {
             return Ok(SetFlowConfigResult::PreconditionsNotMet(e));
         }
 
-        let flow_config_service = from_catalog::<dyn FlowConfigurationService>(ctx).unwrap();
+        let flow_config_service = from_catalog_n!(ctx, dyn FlowConfigurationService);
         let configuration_rule: IngestRule = ingest
             .try_into()
             .map_err(|e: ScheduleCronError| GqlError::Gql(e.into()))?;
@@ -144,7 +144,7 @@ impl DatasetFlowConfigsMut {
             return Ok(SetFlowTransformConfigResult::PreconditionsNotMet(e));
         }
 
-        let flow_config_service = from_catalog::<dyn FlowConfigurationService>(ctx).unwrap();
+        let flow_config_service = from_catalog_n!(ctx, dyn FlowConfigurationService);
 
         let res = flow_config_service
             .set_configuration(
@@ -212,7 +212,7 @@ impl DatasetFlowConfigsMut {
         }
         ensure_scheduling_permission(ctx, &self.dataset_handle).await?;
 
-        let flow_config_service = from_catalog::<dyn FlowConfigurationService>(ctx).unwrap();
+        let flow_config_service = from_catalog_n!(ctx, dyn FlowConfigurationService);
 
         let res = flow_config_service
             .set_configuration(
@@ -240,7 +240,7 @@ impl DatasetFlowConfigsMut {
     ) -> Result<bool> {
         ensure_scheduling_permission(ctx, &self.dataset_handle).await?;
 
-        let flow_config_service = from_catalog::<dyn FlowConfigurationService>(ctx).unwrap();
+        let flow_config_service = from_catalog_n!(ctx, dyn FlowConfigurationService);
 
         flow_config_service
             .pause_dataset_flows(
@@ -261,7 +261,7 @@ impl DatasetFlowConfigsMut {
     ) -> Result<bool> {
         ensure_scheduling_permission(ctx, &self.dataset_handle).await?;
 
-        let flow_config_service = from_catalog::<dyn FlowConfigurationService>(ctx).unwrap();
+        let flow_config_service = from_catalog_n!(ctx, dyn FlowConfigurationService);
 
         flow_config_service
             .resume_dataset_flows(

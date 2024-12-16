@@ -7,43 +7,69 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::sync::Arc;
-
 use async_graphql::{Context, ErrorExtensions};
 use internal_error::*;
 use kamu_accounts::{CurrentAccountSubject, GetAccessTokenError, LoggedAccount};
 use kamu_core::auth::DatasetActionUnauthorizedError;
 use kamu_core::{DatasetRegistry, ResolvedDataset};
 use kamu_datasets::DatasetEnvVarsConfig;
-use kamu_task_system as ts;
-use opendatafabric::{AccountName as OdfAccountName, DatasetHandle};
+use {kamu_task_system as ts, opendatafabric as odf};
 
 use crate::prelude::{AccessTokenID, AccountID, AccountName};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// TODO: Return gql-specific error and get rid of unwraps
-pub(crate) fn from_catalog<T>(ctx: &Context<'_>) -> Result<Arc<T>, dill::InjectionError>
-where
-    T: ?Sized + Send + Sync + 'static,
-{
-    let cat = ctx.data::<dill::Catalog>().unwrap();
-    cat.get_one::<T>()
+macro_rules! from_catalog_n {
+    ($gql_ctx:ident, $T:ty ) => {{
+        let catalog = $gql_ctx.data::<dill::Catalog>().unwrap();
+
+        catalog.get_one::<$T>().int_err()?
+    }};
+    ($gql_ctx:ident, $T:ty, $($Ts:ty),+) => {{
+        let catalog = $gql_ctx.data::<dill::Catalog>().unwrap();
+
+        ( catalog.get_one::<$T>().int_err()?, $( catalog.get_one::<$Ts>().int_err()? ),+ )
+    }};
+}
+
+pub(crate) use from_catalog_n;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+macro_rules! unsafe_from_catalog_n {
+    ($gql_ctx:ident, $T:ty ) => {{
+        let catalog = $gql_ctx.data::<dill::Catalog>().unwrap();
+
+        catalog.get_one::<$T>().unwrap()
+    }};
+    ($gql_ctx:ident, $T:ty, $($Ts:ty),+) => {{
+        let catalog = $gql_ctx.data::<dill::Catalog>().unwrap();
+
+        ( catalog.get_one::<$T>().unwrap(), $( catalog.get_one::<$Ts>().unwrap() ),+ )
+    }};
+}
+
+pub(crate) use unsafe_from_catalog_n;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) fn get_dataset(
+    ctx: &Context<'_>,
+    dataset_handle: &odf::DatasetHandle,
+) -> Result<ResolvedDataset, InternalError> {
+    let dataset_registry = from_catalog_n!(ctx, dyn DatasetRegistry);
+    let resolved_dataset = dataset_registry.get_dataset_by_handle(dataset_handle);
+
+    Ok(resolved_dataset)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn get_dataset(ctx: &Context<'_>, dataset_handle: &DatasetHandle) -> ResolvedDataset {
-    let dataset_registry = from_catalog::<dyn DatasetRegistry>(ctx).unwrap();
-    dataset_registry.get_dataset_by_handle(dataset_handle)
-}
+pub(crate) fn get_logged_account(ctx: &Context<'_>) -> Result<LoggedAccount, InternalError> {
+    let current_account_subject = from_catalog_n!(ctx, CurrentAccountSubject);
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub(crate) fn get_logged_account(ctx: &Context<'_>) -> LoggedAccount {
-    let current_account_subject = from_catalog::<CurrentAccountSubject>(ctx).unwrap();
     match current_account_subject.as_ref() {
-        CurrentAccountSubject::Logged(la) => la.clone(),
+        CurrentAccountSubject::Logged(la) => Ok(la.clone()),
         CurrentAccountSubject::Anonymous(_) => {
             unreachable!("We are not expecting anonymous accounts")
         }
@@ -54,10 +80,10 @@ pub(crate) fn get_logged_account(ctx: &Context<'_>) -> LoggedAccount {
 
 pub(crate) async fn check_dataset_read_access(
     ctx: &Context<'_>,
-    dataset_handle: &DatasetHandle,
+    dataset_handle: &odf::DatasetHandle,
 ) -> Result<(), GqlError> {
     let dataset_action_authorizer =
-        from_catalog::<dyn kamu_core::auth::DatasetActionAuthorizer>(ctx).int_err()?;
+        from_catalog_n!(ctx, dyn kamu_core::auth::DatasetActionAuthorizer);
 
     dataset_action_authorizer
         .check_action_allowed(dataset_handle, kamu_core::auth::DatasetAction::Read)
@@ -75,10 +101,10 @@ pub(crate) async fn check_dataset_read_access(
 
 pub(crate) async fn check_dataset_write_access(
     ctx: &Context<'_>,
-    dataset_handle: &DatasetHandle,
+    dataset_handle: &odf::DatasetHandle,
 ) -> Result<(), GqlError> {
     let dataset_action_authorizer =
-        from_catalog::<dyn kamu_core::auth::DatasetActionAuthorizer>(ctx).int_err()?;
+        from_catalog_n!(ctx, dyn kamu_core::auth::DatasetActionAuthorizer);
 
     dataset_action_authorizer
         .check_action_allowed(dataset_handle, kamu_core::auth::DatasetAction::Write)
@@ -93,7 +119,7 @@ pub(crate) async fn check_dataset_write_access(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn make_dataset_access_error(dataset_handle: &DatasetHandle) -> GqlError {
+pub(crate) fn make_dataset_access_error(dataset_handle: &odf::DatasetHandle) -> GqlError {
     GqlError::Gql(
         async_graphql::Error::new("Dataset access error")
             .extend_with(|_, eev| eev.set("alias", dataset_handle.alias.to_string())),
@@ -106,7 +132,7 @@ pub(crate) async fn get_task(
     ctx: &Context<'_>,
     task_id: ts::TaskID,
 ) -> Result<ts::TaskState, InternalError> {
-    let task_event_store = from_catalog::<dyn ts::TaskEventStore>(ctx).unwrap();
+    let task_event_store = from_catalog_n!(ctx, dyn ts::TaskEventStore);
     let task = ts::Task::load(task_id, task_event_store.as_ref())
         .await
         .int_err()?;
@@ -116,7 +142,7 @@ pub(crate) async fn get_task(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) fn ensure_dataset_env_vars_enabled(ctx: &Context<'_>) -> Result<(), GqlError> {
-    let dataset_env_vars_config = from_catalog::<DatasetEnvVarsConfig>(ctx).unwrap();
+    let dataset_env_vars_config = from_catalog_n!(ctx, DatasetEnvVarsConfig);
     if !dataset_env_vars_config.as_ref().is_enabled() {
         return Err(GqlError::Gql(async_graphql::Error::new(
             "API is unavailable",
@@ -150,8 +176,11 @@ pub(crate) async fn check_access_token_valid(
     ctx: &Context<'_>,
     token_id: &AccessTokenID,
 ) -> Result<(), GqlError> {
-    let current_account_subject = from_catalog::<CurrentAccountSubject>(ctx).unwrap();
-    let access_token_service = from_catalog::<dyn kamu_accounts::AccessTokenService>(ctx).unwrap();
+    let (current_account_subject, access_token_service) = from_catalog_n!(
+        ctx,
+        CurrentAccountSubject,
+        dyn kamu_accounts::AccessTokenService
+    );
 
     let existing_access_token = access_token_service
         .get_token_by_id(token_id)
@@ -181,10 +210,10 @@ pub(crate) fn check_logged_account_name_match(
     ctx: &Context<'_>,
     account_name: &AccountName,
 ) -> Result<(), GqlError> {
-    let current_account_subject = from_catalog::<CurrentAccountSubject>(ctx).unwrap();
+    let current_account_subject = from_catalog_n!(ctx, CurrentAccountSubject);
 
     if let CurrentAccountSubject::Logged(logged_account) = current_account_subject.as_ref() {
-        if logged_account.account_name == OdfAccountName::from(account_name.clone()) {
+        if logged_account.account_name == odf::AccountName::from(account_name.clone()) {
             return Ok(());
         }
     };
@@ -233,3 +262,5 @@ impl From<GqlError> for async_graphql::Error {
         }
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

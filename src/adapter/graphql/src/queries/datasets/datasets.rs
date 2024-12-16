@@ -27,7 +27,7 @@ impl Datasets {
 
     /// Returns dataset by its ID
     async fn by_id(&self, ctx: &Context<'_>, dataset_id: DatasetID) -> Result<Option<Dataset>> {
-        let dataset_registry = from_catalog::<dyn domain::DatasetRegistry>(ctx).unwrap();
+        let dataset_registry = from_catalog_n!(ctx, dyn domain::DatasetRegistry);
         let hdl = dataset_registry
             .try_resolve_dataset_handle_by_ref(&dataset_id.as_local_ref())
             .await?;
@@ -43,16 +43,14 @@ impl Datasets {
     }
 
     /// Returns dataset by its owner and name
-    #[allow(unused_variables)]
     async fn by_owner_and_name(
         &self,
         ctx: &Context<'_>,
         account_name: AccountName,
         dataset_name: DatasetName,
     ) -> Result<Option<Dataset>> {
+        let dataset_registry = from_catalog_n!(ctx, dyn domain::DatasetRegistry);
         let dataset_alias = odf::DatasetAlias::new(Some(account_name.into()), dataset_name.into());
-
-        let dataset_registry = from_catalog::<dyn domain::DatasetRegistry>(ctx).unwrap();
         let hdl = dataset_registry
             .try_resolve_dataset_handle_by_ref(&dataset_alias.into_local_ref())
             .await?;
@@ -77,7 +75,7 @@ impl Datasets {
         page: Option<usize>,
         per_page: Option<usize>,
     ) -> Result<DatasetConnection> {
-        let dataset_registry = from_catalog::<dyn domain::DatasetRegistry>(ctx).unwrap();
+        let dataset_registry = from_catalog_n!(ctx, dyn domain::DatasetRegistry);
 
         let page = page.unwrap_or(0);
         let per_page = per_page.unwrap_or(Self::DEFAULT_PER_PAGE);
@@ -102,8 +100,6 @@ impl Datasets {
     }
 
     /// Returns datasets belonging to the specified account
-    #[allow(unused_variables)]
-    #[allow(clippy::unused_async)]
     async fn by_account_id(
         &self,
         ctx: &Context<'_>,
@@ -111,8 +107,7 @@ impl Datasets {
         page: Option<usize>,
         per_page: Option<usize>,
     ) -> Result<DatasetConnection> {
-        let authentication_service =
-            from_catalog::<dyn kamu_accounts::AuthenticationService>(ctx).unwrap();
+        let authentication_service = from_catalog_n!(ctx, dyn kamu_accounts::AuthenticationService);
 
         let account_id: odf::AccountID = account_id.into();
         let maybe_account_name = authentication_service
@@ -139,7 +134,6 @@ impl Datasets {
     }
 
     /// Returns datasets belonging to the specified account
-    #[allow(unused_variables)]
     async fn by_account_name(
         &self,
         ctx: &Context<'_>,

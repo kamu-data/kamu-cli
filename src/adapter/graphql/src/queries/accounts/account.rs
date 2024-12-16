@@ -60,7 +60,7 @@ impl Account {
         ctx: &Context<'_>,
         account_id: odf::AccountID,
     ) -> Result<Self, InternalError> {
-        let authentication_service = from_catalog::<dyn AuthenticationService>(ctx).unwrap();
+        let authentication_service = from_catalog_n!(ctx, dyn AuthenticationService);
 
         let account_name = authentication_service
             .find_account_name_by_id(&account_id)
@@ -75,7 +75,7 @@ impl Account {
         ctx: &Context<'_>,
         account_name: odf::AccountName,
     ) -> Result<Option<Self>, InternalError> {
-        let authentication_service = from_catalog::<dyn AuthenticationService>(ctx).unwrap();
+        let authentication_service = from_catalog_n!(ctx, dyn AuthenticationService);
 
         let maybe_account = authentication_service
             .account_by_name(&account_name)
@@ -92,7 +92,7 @@ impl Account {
         if alias.is_multi_tenant() {
             Ok(Self::from_account_name(ctx, alias.account_name.as_ref().unwrap().clone()).await?)
         } else {
-            let current_account_subject = from_catalog::<CurrentAccountSubject>(ctx).unwrap();
+            let current_account_subject = from_catalog_n!(ctx, CurrentAccountSubject);
 
             Ok(Some(match current_account_subject.as_ref() {
                 CurrentAccountSubject::Anonymous(_) => Self::new(
@@ -108,7 +108,7 @@ impl Account {
 
     #[graphql(skip)]
     async fn resolve_full_account_info(&self, ctx: &Context<'_>) -> Result<kamu_accounts::Account> {
-        let authentication_service = from_catalog::<dyn AuthenticationService>(ctx).unwrap();
+        let authentication_service = from_catalog_n!(ctx, dyn AuthenticationService);
 
         let maybe_account_info = authentication_service
             .account_by_id(&self.account_id)

@@ -10,7 +10,6 @@
 use chrono::prelude::*;
 use kamu_core::{
     self as domain,
-    DatasetRegistry,
     MetadataChainExt,
     SearchSetAttachmentsVisitor,
     SearchSetInfoVisitor,
@@ -22,6 +21,9 @@ use opendatafabric as odf;
 use crate::prelude::*;
 use crate::queries::*;
 use crate::scalars::DatasetPushStatuses;
+use crate::utils::get_dataset;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct DatasetMetadata {
     dataset_handle: odf::DatasetHandle,
@@ -34,12 +36,6 @@ impl DatasetMetadata {
         Self { dataset_handle }
     }
 
-    #[graphql(skip)]
-    fn get_dataset(&self, ctx: &Context<'_>) -> domain::ResolvedDataset {
-        let dataset_registry = from_catalog::<dyn domain::DatasetRegistry>(ctx).unwrap();
-        dataset_registry.get_dataset_by_handle(&self.dataset_handle)
-    }
-
     /// Access to the temporal metadata chain of the dataset
     async fn chain(&self) -> MetadataChain {
         MetadataChain::new(self.dataset_handle.clone())
@@ -47,7 +43,7 @@ impl DatasetMetadata {
 
     /// Last recorded watermark
     async fn current_watermark(&self, ctx: &Context<'_>) -> Result<Option<DateTime<Utc>>> {
-        let resolved_dataset = self.get_dataset(ctx);
+        let resolved_dataset = get_dataset(ctx, &self.dataset_handle)?;
 
         Ok(resolved_dataset
             .as_metadata_chain()
@@ -64,10 +60,10 @@ impl DatasetMetadata {
         ctx: &Context<'_>,
         format: Option<DataSchemaFormat>,
     ) -> Result<Option<DataSchema>> {
+        let query_svc = from_catalog_n!(ctx, dyn domain::QueryService);
+
         // TODO: Default to Arrow eventually
         let format = format.unwrap_or(DataSchemaFormat::Parquet);
-
-        let query_svc = from_catalog::<dyn domain::QueryService>(ctx).unwrap();
 
         if let Some(schema) = query_svc
             .get_schema(&self.dataset_handle.as_local_ref())
@@ -85,8 +81,11 @@ impl DatasetMetadata {
 
     /// Current upstream dependencies of a dataset
     async fn current_upstream_dependencies(&self, ctx: &Context<'_>) -> Result<Vec<Dataset>> {
-        let dependency_graph_service =
-            from_catalog::<dyn domain::DependencyGraphService>(ctx).unwrap();
+        let (dependency_graph_service, dataset_registry) = from_catalog_n!(
+            ctx,
+            dyn domain::DependencyGraphService,
+            dyn domain::DatasetRegistry
+        );
 
         use tokio_stream::StreamExt;
         let upstream_dataset_ids: Vec<_> = dependency_graph_service
@@ -96,7 +95,6 @@ impl DatasetMetadata {
             .collect()
             .await;
 
-        let dataset_registry = from_catalog::<dyn domain::DatasetRegistry>(ctx).unwrap();
         let mut upstream = Vec::with_capacity(upstream_dataset_ids.len());
         for upstream_dataset_id in upstream_dataset_ids {
             let hdl = dataset_registry
@@ -120,8 +118,11 @@ impl DatasetMetadata {
     // TODO: Convert to collection
     /// Current downstream dependencies of a dataset
     async fn current_downstream_dependencies(&self, ctx: &Context<'_>) -> Result<Vec<Dataset>> {
-        let dependency_graph_service =
-            from_catalog::<dyn domain::DependencyGraphService>(ctx).unwrap();
+        let (dependency_graph_service, dataset_registry) = from_catalog_n!(
+            ctx,
+            dyn domain::DependencyGraphService,
+            dyn domain::DatasetRegistry
+        );
 
         use tokio_stream::StreamExt;
         let downstream_dataset_ids: Vec<_> = dependency_graph_service
@@ -131,7 +132,6 @@ impl DatasetMetadata {
             .collect()
             .await;
 
-        let dataset_registry = from_catalog::<dyn domain::DatasetRegistry>(ctx).unwrap();
         let mut downstream = Vec::with_capacity(downstream_dataset_ids.len());
         for downstream_dataset_id in downstream_dataset_ids {
             let hdl = dataset_registry
@@ -154,8 +154,11 @@ impl DatasetMetadata {
 
     /// Current polling source used by the root dataset
     async fn current_polling_source(&self, ctx: &Context<'_>) -> Result<Option<SetPollingSource>> {
-        let dataset_registry = from_catalog::<dyn DatasetRegistry>(ctx).unwrap();
-        let polling_ingest_svc = from_catalog::<dyn domain::PollingIngestService>(ctx).unwrap();
+        let (dataset_registry, polling_ingest_svc) = from_catalog_n!(
+            ctx,
+            dyn domain::DatasetRegistry,
+            dyn domain::PollingIngestService
+        );
 
         let source = polling_ingest_svc
             .get_active_polling_source(dataset_registry.get_dataset_by_handle(&self.dataset_handle))
@@ -167,8 +170,11 @@ impl DatasetMetadata {
 
     /// Current push sources used by the root dataset
     async fn current_push_sources(&self, ctx: &Context<'_>) -> Result<Vec<AddPushSource>> {
-        let push_ingest_svc = from_catalog::<dyn domain::PushIngestService>(ctx).unwrap();
-        let dataset_registry = from_catalog::<dyn DatasetRegistry>(ctx).unwrap();
+        let (push_ingest_svc, dataset_registry) = from_catalog_n!(
+            ctx,
+            dyn domain::PushIngestService,
+            dyn domain::DatasetRegistry
+        );
 
         let mut push_sources: Vec<AddPushSource> = push_ingest_svc
             .get_active_push_sources(dataset_registry.get_dataset_by_handle(&self.dataset_handle))
@@ -185,7 +191,7 @@ impl DatasetMetadata {
 
     /// Sync statuses of push remotes
     async fn push_sync_statuses(&self, ctx: &Context<'_>) -> Result<DatasetPushStatuses> {
-        let service = from_catalog::<dyn domain::RemoteStatusService>(ctx).unwrap();
+        let service = from_catalog_n!(ctx, dyn domain::RemoteStatusService);
         let statuses = service.check_remotes_status(&self.dataset_handle).await?;
 
         Ok(statuses.into())
@@ -193,10 +199,11 @@ impl DatasetMetadata {
 
     /// Current transformation used by the derivative dataset
     async fn current_transform(&self, ctx: &Context<'_>) -> Result<Option<SetTransform>> {
-        let transform_request_planner =
-            from_catalog::<dyn kamu_core::TransformRequestPlanner>(ctx).unwrap();
-
-        let dataset_registry = from_catalog::<dyn DatasetRegistry>(ctx).unwrap();
+        let (transform_request_planner, dataset_registry) = from_catalog_n!(
+            ctx,
+            dyn kamu_core::TransformRequestPlanner,
+            dyn domain::DatasetRegistry
+        );
 
         let source = transform_request_planner
             .get_active_transform(dataset_registry.get_dataset_by_handle(&self.dataset_handle))
@@ -207,7 +214,7 @@ impl DatasetMetadata {
 
     /// Current descriptive information about the dataset
     async fn current_info(&self, ctx: &Context<'_>) -> Result<SetInfo> {
-        let resolved_dataset = self.get_dataset(ctx);
+        let resolved_dataset = get_dataset(ctx, &self.dataset_handle)?;
 
         Ok(resolved_dataset
             .as_metadata_chain()
@@ -227,7 +234,7 @@ impl DatasetMetadata {
     /// Current readme file as discovered from attachments associated with the
     /// dataset
     async fn current_readme(&self, ctx: &Context<'_>) -> Result<Option<String>> {
-        let resolved_dataset = self.get_dataset(ctx);
+        let resolved_dataset = get_dataset(ctx, &self.dataset_handle)?;
 
         Ok(resolved_dataset
             .as_metadata_chain()
@@ -248,7 +255,7 @@ impl DatasetMetadata {
 
     /// Current license associated with the dataset
     async fn current_license(&self, ctx: &Context<'_>) -> Result<Option<SetLicense>> {
-        let resolved_dataset = self.get_dataset(ctx);
+        let resolved_dataset = get_dataset(ctx, &self.dataset_handle)?;
 
         Ok(resolved_dataset
             .as_metadata_chain()
@@ -261,7 +268,7 @@ impl DatasetMetadata {
 
     /// Current vocabulary associated with the dataset
     async fn current_vocab(&self, ctx: &Context<'_>) -> Result<Option<SetVocab>> {
-        let resolved_dataset = self.get_dataset(ctx);
+        let resolved_dataset = get_dataset(ctx, &self.dataset_handle)?;
 
         Ok(resolved_dataset
             .as_metadata_chain()
@@ -272,3 +279,5 @@ impl DatasetMetadata {
             .map(Into::into))
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

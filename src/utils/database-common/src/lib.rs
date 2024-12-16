@@ -7,12 +7,15 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+#![feature(iter_intersperse)]
+
 mod db_connection_settings;
 mod db_credentials;
 mod db_error;
 mod db_provider;
 mod entities;
 
+mod helpers;
 mod password;
 mod plugins;
 mod transactions;
@@ -22,6 +25,7 @@ pub use db_credentials::*;
 pub use db_error::*;
 pub use db_provider::*;
 pub use entities::*;
+pub use helpers::*;
 pub use password::*;
 pub use plugins::*;
 pub use transactions::*;

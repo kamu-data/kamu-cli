@@ -43,7 +43,7 @@ impl DatasetEnvVarsMut {
     ) -> Result<SaveDatasetEnvVarResult> {
         utils::check_dataset_write_access(ctx, &self.dataset_handle).await?;
 
-        let dataset_env_var_service = from_catalog::<dyn DatasetEnvVarService>(ctx).unwrap();
+        let dataset_env_var_service = from_catalog_n!(ctx, dyn DatasetEnvVarService);
 
         let dataset_env_var_value = if is_secret {
             DatasetEnvVarValue::Secret(SecretString::from(value))
@@ -85,7 +85,7 @@ impl DatasetEnvVarsMut {
     ) -> Result<DeleteDatasetEnvVarResult> {
         utils::check_dataset_write_access(ctx, &self.dataset_handle).await?;
 
-        let dataset_env_var_service = from_catalog::<dyn DatasetEnvVarService>(ctx).unwrap();
+        let dataset_env_var_service = from_catalog_n!(ctx, dyn DatasetEnvVarService);
 
         match dataset_env_var_service
             .delete_dataset_env_var(&id.clone().into())
@@ -118,7 +118,7 @@ impl DatasetEnvVarsMut {
     ) -> Result<ModifyDatasetEnvVarResult> {
         utils::check_dataset_write_access(ctx, &self.dataset_handle).await?;
 
-        let dataset_env_var_service = from_catalog::<dyn DatasetEnvVarService>(ctx).unwrap();
+        let dataset_env_var_service = from_catalog_n!(ctx, dyn DatasetEnvVarService);
         let dataset_env_var_value = if is_secret {
             DatasetEnvVarValue::Secret(SecretString::from(new_value))
         } else {

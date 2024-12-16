@@ -13,7 +13,9 @@ use opendatafabric as odf;
 
 use crate::prelude::*;
 use crate::queries::*;
-use crate::utils::ensure_dataset_env_vars_enabled;
+use crate::utils::{ensure_dataset_env_vars_enabled, get_dataset};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone)]
 pub struct Dataset {
@@ -33,7 +35,7 @@ impl Dataset {
 
     #[graphql(skip)]
     pub async fn from_ref(ctx: &Context<'_>, dataset_ref: &odf::DatasetRef) -> Result<Dataset> {
-        let dataset_registry = from_catalog::<dyn domain::DatasetRegistry>(ctx).unwrap();
+        let dataset_registry = from_catalog_n!(ctx, dyn domain::DatasetRegistry);
 
         // TODO: Should we resolve reference at this point or allow unresolved and fail
         // later?
@@ -45,12 +47,6 @@ impl Dataset {
             .await?
             .expect("Account must exist");
         Ok(Dataset::new(account, hdl))
-    }
-
-    #[graphql(skip)]
-    fn get_dataset(&self, ctx: &Context<'_>) -> domain::ResolvedDataset {
-        let dataset_registry = from_catalog::<dyn domain::DatasetRegistry>(ctx).unwrap();
-        dataset_registry.get_dataset_by_handle(&self.dataset_handle)
     }
 
     /// Unique identifier of the dataset
@@ -77,7 +73,7 @@ impl Dataset {
 
     /// Returns the kind of dataset (Root or Derivative)
     async fn kind(&self, ctx: &Context<'_>) -> Result<DatasetKind> {
-        let resolved_dataset = self.get_dataset(ctx);
+        let resolved_dataset = get_dataset(ctx, &self.dataset_handle)?;
         let summary = resolved_dataset
             .get_summary(domain::GetSummaryOpts::default())
             .await
@@ -111,7 +107,7 @@ impl Dataset {
     // TODO: PERF: Avoid traversing the entire chain
     /// Creation time of the first metadata block in the chain
     async fn created_at(&self, ctx: &Context<'_>) -> Result<DateTime<Utc>> {
-        let resolved_dataset = self.get_dataset(ctx);
+        let resolved_dataset = get_dataset(ctx, &self.dataset_handle)?;
 
         Ok(resolved_dataset
             .as_metadata_chain()
@@ -125,7 +121,7 @@ impl Dataset {
 
     /// Creation time of the most recent metadata block in the chain
     async fn last_updated_at(&self, ctx: &Context<'_>) -> Result<DateTime<Utc>> {
-        let resolved_dataset = self.get_dataset(ctx);
+        let resolved_dataset = get_dataset(ctx, &self.dataset_handle)?;
 
         Ok(resolved_dataset
             .as_metadata_chain()
@@ -137,8 +133,7 @@ impl Dataset {
     /// Permissions of the current user
     async fn permissions(&self, ctx: &Context<'_>) -> Result<DatasetPermissions> {
         use kamu_core::auth;
-        let dataset_action_authorizer =
-            from_catalog::<dyn auth::DatasetActionAuthorizer>(ctx).unwrap();
+        let dataset_action_authorizer = from_catalog_n!(ctx, dyn auth::DatasetActionAuthorizer);
 
         let allowed_actions = dataset_action_authorizer
             .get_allowed_actions(&self.dataset_handle)
@@ -157,11 +152,13 @@ impl Dataset {
 
     /// Various endpoints for interacting with data
     async fn endpoints(&self, ctx: &Context<'_>) -> DatasetEndpoints<'_> {
-        let config = from_catalog::<ServerUrlConfig>(ctx).unwrap();
+        let config = crate::utils::unsafe_from_catalog_n!(ctx, ServerUrlConfig);
 
         DatasetEndpoints::new(&self.owner, self.dataset_handle.clone(), config)
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct DatasetPermissions {
@@ -171,3 +168,5 @@ pub struct DatasetPermissions {
     can_commit: bool,
     can_schedule: bool,
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
