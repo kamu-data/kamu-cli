@@ -191,20 +191,25 @@ impl Command for IngestCommand {
 
         let mut updated = 0;
         for url in urls {
-            let result = self
+            let target = self.dataset_registry.get_dataset_by_handle(&dataset_handle);
+            let plan = self
                 .push_ingest_svc
-                .ingest_from_url(
-                    self.dataset_registry.get_dataset_by_handle(&dataset_handle),
+                .plan_ingest(
+                    target.clone(),
                     self.source_name.as_deref(),
-                    url,
                     PushIngestOpts {
                         media_type: self.get_media_type()?,
                         source_event_time,
                         auto_create_push_source: false,
                         schema_inference: SchemaInferenceOpts::default(),
                     },
-                    listener.clone(),
                 )
+                .await
+                .map_err(CLIError::failure)?;
+
+            let result = self
+                .push_ingest_svc
+                .ingest_from_url(target, plan, url, listener.clone())
                 .await
                 .map_err(CLIError::failure)?;
 

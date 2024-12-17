@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
@@ -23,6 +24,15 @@ use crate::*;
 
 #[async_trait::async_trait]
 pub trait PushIngestService: Send + Sync {
+    /// Uses or auto-creates push source definition in metadata to plan
+    /// ingestion
+    async fn plan_ingest(
+        &self,
+        target: ResolvedDataset,
+        source_name: Option<&str>,
+        opts: PushIngestOpts,
+    ) -> Result<PushIngestPlan, PushIngestPlanningError>;
+
     /// Uses push source definition in metadata to ingest data from the
     /// specified source.
     ///
@@ -30,9 +40,8 @@ pub trait PushIngestService: Send + Sync {
     async fn ingest_from_url(
         &self,
         target: ResolvedDataset,
-        source_name: Option<&str>,
+        plan: PushIngestPlan,
         url: url::Url,
-        opts: PushIngestOpts,
         listener: Option<Arc<dyn PushIngestListener>>,
     ) -> Result<PushIngestResult, PushIngestError>;
 
@@ -43,9 +52,8 @@ pub trait PushIngestService: Send + Sync {
     async fn ingest_from_file_stream(
         &self,
         target: ResolvedDataset,
-        source_name: Option<&str>,
+        plan: PushIngestPlan,
         data: Box<dyn AsyncRead + Send + Unpin>,
-        opts: PushIngestOpts,
         listener: Option<Arc<dyn PushIngestListener>>,
     ) -> Result<PushIngestResult, PushIngestError>;
 }
@@ -62,6 +70,23 @@ pub struct PushIngestOpts {
     pub auto_create_push_source: bool,
     /// Schema inference configuration
     pub schema_inference: SchemaInferenceOpts,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug)]
+pub struct PushIngestPlan {
+    pub args: PushIngestArgs,
+    pub metadata_state: Box<DataWriterMetadataState>,
+}
+
+#[derive(Debug)]
+pub struct PushIngestArgs {
+    pub operation_id: String,
+    pub operation_dir: PathBuf,
+    pub system_time: DateTime<Utc>,
+    pub opts: PushIngestOpts,
+    pub push_source: AddPushSource,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -112,9 +137,8 @@ impl PushIngestListener for NullPushIngestListener {}
 // Errors
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// TODO: Revisit error granularity
 #[derive(Debug, Error)]
-pub enum PushIngestError {
+pub enum PushIngestPlanningError {
     #[error(transparent)]
     SourceNotFound(
         #[from]
@@ -122,6 +146,33 @@ pub enum PushIngestError {
         PushSourceNotFoundError,
     ),
 
+    #[error(transparent)]
+    UnsupportedMediaType(
+        #[from]
+        #[backtrace]
+        UnsupportedMediaTypeError,
+    ),
+
+    #[error(transparent)]
+    CommitError(
+        #[from]
+        #[backtrace]
+        CommitError,
+    ),
+
+    #[error(transparent)]
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// TODO: Revisit error granularity
+#[derive(Debug, Error)]
+pub enum PushIngestError {
     #[error(transparent)]
     UnsupportedMediaType(
         #[from]

@@ -78,7 +78,7 @@ impl PollingIngestServiceImpl {
     ) -> Result<PollingIngestResult, PollingIngestError> {
         let ctx = ingest_common::new_session_context(self.object_store_registry.clone());
         let mut data_writer = DataWriterDataFusion::builder(target.clone(), ctx.clone())
-            .with_metadata_state(Box::into_inner(metadata_state))
+            .with_metadata_state(*metadata_state)
             .build();
 
         let Some(MetadataEvent::SetPollingSource(polling_source)) =

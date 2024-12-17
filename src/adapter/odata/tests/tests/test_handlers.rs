@@ -429,12 +429,19 @@ impl TestHarness {
         )
         .unwrap();
 
+        let target = ResolvedDataset::from(&ds);
+
+        let ingest_plan = self
+            .push_ingest_svc
+            .plan_ingest(target.clone(), None, PushIngestOpts::default())
+            .await
+            .unwrap();
+
         self.push_ingest_svc
             .ingest_from_url(
                 ResolvedDataset::from(&ds),
-                None,
+                ingest_plan,
                 url::Url::from_file_path(&src_path).unwrap(),
-                PushIngestOpts::default(),
                 None,
             )
             .await

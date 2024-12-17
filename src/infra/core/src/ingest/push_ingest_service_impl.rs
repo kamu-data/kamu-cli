@@ -10,7 +10,6 @@
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use chrono::{DateTime, Utc};
 use datafusion::arrow::array::RecordBatch;
 use datafusion::prelude::{DataFrame, SessionContext};
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
@@ -55,91 +54,20 @@ impl PushIngestServiceImpl {
         }
     }
 
-    async fn do_ingest(
+    async fn prepare_metadata_state(
         &self,
         target: ResolvedDataset,
         source_name: Option<&str>,
-        source: DataSource,
-        opts: PushIngestOpts,
-        listener: Arc<dyn PushIngestListener>,
-    ) -> Result<PushIngestResult, PushIngestError> {
-        let operation_id = get_random_name(None, 10);
-        let operation_dir = self.run_info_dir.join(format!("ingest-{operation_id}"));
-        std::fs::create_dir_all(&operation_dir).int_err()?;
-
-        let ctx: SessionContext =
-            ingest_common::new_session_context(self.object_store_registry.clone());
-
-        let mut data_writer = self
-            .make_data_writer(target.clone(), source_name, ctx.clone())
-            .await?;
-
-        let push_source = match (data_writer.source_event(), opts.auto_create_push_source) {
-            // No push source, and it's allowed to create
-            (None, true) => {
-                let add_push_source_event = self
-                    .auto_create_push_source(target.clone(), "auto", &opts)
-                    .await?;
-
-                // Update data writer, as we've modified the dataset
-                data_writer = self
-                    .make_data_writer(target, source_name, ctx.clone())
-                    .await?;
-                Ok(add_push_source_event)
-            }
-
-            // Got existing push source
-            (Some(MetadataEvent::AddPushSource(e)), _) => Ok(e.clone()),
-
-            // No push source and not allowed to create
-            _ => Err(PushIngestError::SourceNotFound(
-                PushSourceNotFoundError::new(source_name),
-            )),
-        }?;
-
-        let args = PushIngestArgs {
-            operation_id,
-            operation_dir,
-            system_time: self.time_source.now(),
-            opts,
-            listener,
-            ctx,
-            data_writer,
-            push_source,
-        };
-
-        let listener = args.listener.clone();
-        listener.begin();
-
-        match self.do_ingest_inner(source, args).await {
-            Ok(res) => {
-                tracing::info!(result = ?res, "Ingest iteration successful");
-                listener.success(&res);
-                Ok(res)
-            }
-            Err(err) => {
-                tracing::error!(error = ?err, error_msg = %err, "Ingest iteration failed");
-                listener.error(&err);
-                Err(err)
-            }
-        }
-    }
-
-    async fn make_data_writer(
-        &self,
-        target: ResolvedDataset,
-        source_name: Option<&str>,
-        ctx: SessionContext,
-    ) -> Result<DataWriterDataFusion, PushIngestError> {
-        match DataWriterMetadataState::build(target.clone(), &BlockRef::Head, source_name).await {
-            Ok(state) => Ok(DataWriterDataFusion::builder(target.clone(), ctx)
-                .with_metadata_state(state)
-                .build()),
-            Err(ScanMetadataError::SourceNotFound(err)) => {
-                Err(PushIngestError::SourceNotFound(err.into()))
-            }
-            Err(ScanMetadataError::Internal(err)) => Err(PushIngestError::Internal(err)),
-        }
+    ) -> Result<DataWriterMetadataState, PushIngestPlanningError> {
+        let metadata_state = DataWriterMetadataState::build(target, &BlockRef::Head, source_name)
+            .await
+            .map_err(|e| match e {
+                ScanMetadataError::SourceNotFound(err) => {
+                    PushIngestPlanningError::SourceNotFound(err.into())
+                }
+                ScanMetadataError::Internal(err) => PushIngestPlanningError::Internal(err),
+            })?;
+        Ok(metadata_state)
     }
 
     async fn auto_create_push_source(
@@ -147,7 +75,7 @@ impl PushIngestServiceImpl {
         target: ResolvedDataset,
         source_name: &str,
         opts: &PushIngestOpts,
-    ) -> Result<AddPushSource, PushIngestError> {
+    ) -> Result<AddPushSource, PushIngestPlanningError> {
         let read = match &opts.media_type {
             Some(media_type) => {
                 match self
@@ -155,10 +83,10 @@ impl PushIngestServiceImpl {
                     .get_best_effort_config(None, media_type)
                 {
                     Ok(read_step) => Ok(read_step),
-                    Err(e) => Err(PushIngestError::UnsupportedMediaType(e)),
+                    Err(e) => Err(PushIngestPlanningError::UnsupportedMediaType(e)),
                 }
             }
-            None => Err(PushIngestError::SourceNotFound(
+            None => Err(PushIngestPlanningError::SourceNotFound(
                 PushSourceNotFoundError::new(Some(source_name)),
             )),
         }?;
@@ -181,7 +109,40 @@ impl PushIngestServiceImpl {
             .await;
         match commit_result {
             Ok(_) => Ok(add_push_source_event),
-            Err(e) => Err(PushIngestError::CommitError(e)),
+            Err(e) => Err(PushIngestPlanningError::CommitError(e)),
+        }
+    }
+
+    async fn do_ingest(
+        &self,
+        target: ResolvedDataset,
+        plan: PushIngestPlan,
+        source: DataSource,
+        listener: Arc<dyn PushIngestListener>,
+    ) -> Result<PushIngestResult, PushIngestError> {
+        let ctx: SessionContext =
+            ingest_common::new_session_context(self.object_store_registry.clone());
+
+        let data_writer = DataWriterDataFusion::builder(target.clone(), ctx.clone())
+            .with_metadata_state(*plan.metadata_state)
+            .build();
+
+        listener.begin();
+
+        match self
+            .do_ingest_inner(plan.args, source, data_writer, ctx, listener.clone())
+            .await
+        {
+            Ok(res) => {
+                tracing::info!(result = ?res, "Ingest iteration successful");
+                listener.success(&res);
+                Ok(res)
+            }
+            Err(err) => {
+                tracing::error!(error = ?err, error_msg = %err, "Ingest iteration failed");
+                listener.error(&err);
+                Err(err)
+            }
         }
     }
 
@@ -194,29 +155,29 @@ impl PushIngestServiceImpl {
     )]
     async fn do_ingest_inner(
         &self,
+        args: PushIngestArgs,
         source: DataSource,
-        mut args: PushIngestArgs,
+        mut data_writer: DataWriterDataFusion,
+        ctx: SessionContext,
+        listener: Arc<dyn PushIngestListener>,
     ) -> Result<PushIngestResult, PushIngestError> {
-        args.listener
-            .on_stage_progress(PushIngestStage::Read, 0, TotalSteps::Exact(1));
+        listener.on_stage_progress(PushIngestStage::Read, 0, TotalSteps::Exact(1));
+
+        std::fs::create_dir_all(&args.operation_dir).int_err()?;
 
         let input_data_path = self.maybe_fetch(source, &args).await?;
 
-        let df = if let Some(df) = self.read(&input_data_path, &args).await? {
+        let df = if let Some(df) = self.read(&input_data_path, &ctx, &args).await? {
             if let Some(transform) = &args.push_source.preprocess {
-                args.listener.on_stage_progress(
-                    PushIngestStage::Preprocess,
-                    0,
-                    TotalSteps::Exact(1),
-                );
+                listener.on_stage_progress(PushIngestStage::Preprocess, 0, TotalSteps::Exact(1));
 
                 ingest_common::preprocess(
                     &args.operation_id,
                     self.engine_provisioner.as_ref(),
-                    &args.ctx,
+                    &ctx,
                     transform,
                     df,
-                    args.listener.clone().get_engine_provisioning_listener(),
+                    listener.clone().get_engine_provisioning_listener(),
                 )
                 .await?
             } else {
@@ -224,7 +185,7 @@ impl PushIngestServiceImpl {
                     ingest_common::preprocess_default(
                         df,
                         &args.push_source.read,
-                        args.data_writer.vocab(),
+                        data_writer.vocab(),
                         &args.opts.schema_inference,
                     )
                     .int_err()?,
@@ -239,8 +200,7 @@ impl PushIngestServiceImpl {
         let data_staging_path = out_dir.join("data.parquet");
         std::fs::create_dir(&out_dir).int_err()?;
 
-        let stage_result = args
-            .data_writer
+        let stage_result = data_writer
             .stage(
                 df,
                 WriteDataOpts {
@@ -257,10 +217,9 @@ impl PushIngestServiceImpl {
 
         match stage_result {
             Ok(staged) => {
-                args.listener
-                    .on_stage_progress(PushIngestStage::Commit, 0, TotalSteps::Exact(1));
+                listener.on_stage_progress(PushIngestStage::Commit, 0, TotalSteps::Exact(1));
 
-                let res = args.data_writer.commit(staged).await?;
+                let res = data_writer.commit(staged).await?;
 
                 Ok(PushIngestResult::Updated {
                     old_head: res.old_head,
@@ -335,6 +294,7 @@ impl PushIngestServiceImpl {
     async fn read(
         &self,
         input_data_path: &Path,
+        ctx: &SessionContext,
         args: &PushIngestArgs,
     ) -> Result<Option<DataFrame>, PushIngestError> {
         let conf = if let Some(media_type) = &args.opts.media_type {
@@ -354,7 +314,7 @@ impl PushIngestServiceImpl {
         let temp_path = args.operation_dir.join("reader.tmp");
         let reader = self
             .data_format_registry
-            .get_reader(args.ctx.clone(), conf, temp_path)
+            .get_reader(ctx.clone(), conf, temp_path)
             .await?;
 
         if input_data_path.metadata().int_err()?.len() == 0 {
@@ -364,8 +324,7 @@ impl PushIngestServiceImpl {
                     "Returning an empty data frame as input file is empty",
                 );
 
-                let df = args
-                    .ctx
+                let df = ctx
                     .read_batch(RecordBatch::new_empty(read_schema))
                     .int_err()?;
 
@@ -417,20 +376,67 @@ impl PushIngestServiceImpl {
 
 #[async_trait::async_trait]
 impl PushIngestService for PushIngestServiceImpl {
+    /// Uses or auto-creates push source definition in metadata to plan
+    /// ingestion
+    async fn plan_ingest(
+        &self,
+        target: ResolvedDataset,
+        source_name: Option<&str>,
+        opts: PushIngestOpts,
+    ) -> Result<PushIngestPlan, PushIngestPlanningError> {
+        let mut metadata_state = self
+            .prepare_metadata_state(target.clone(), source_name)
+            .await?;
+
+        let push_source = match (&metadata_state.source_event, opts.auto_create_push_source) {
+            // No push source, and it's allowed to create
+            (None, true) => {
+                let add_push_source_event = self
+                    .auto_create_push_source(target.clone(), "auto", &opts)
+                    .await?;
+
+                // Update data writer, as we've modified the dataset
+                metadata_state = self.prepare_metadata_state(target, source_name).await?;
+                Ok(add_push_source_event)
+            }
+
+            // Got existing push source
+            (Some(MetadataEvent::AddPushSource(e)), _) => Ok(e.clone()),
+
+            // No push source and not allowed to create
+            _ => Err(PushIngestPlanningError::SourceNotFound(
+                PushSourceNotFoundError::new(source_name),
+            )),
+        }?;
+
+        let operation_id = get_random_name(None, 10);
+        let operation_dir = self.run_info_dir.join(format!("ingest-{operation_id}"));
+
+        Ok(PushIngestPlan {
+            args: PushIngestArgs {
+                operation_id,
+                operation_dir,
+                system_time: self.time_source.now(),
+                opts,
+                push_source,
+            },
+            metadata_state: Box::new(metadata_state),
+        })
+    }
+
     #[tracing::instrument(level = "info", skip_all, fields(target=%target.get_handle()))]
     async fn ingest_from_url(
         &self,
         target: ResolvedDataset,
-        source_name: Option<&str>,
+        plan: PushIngestPlan,
         url: url::Url,
-        opts: PushIngestOpts,
         listener: Option<Arc<dyn PushIngestListener>>,
     ) -> Result<PushIngestResult, PushIngestError> {
         let listener = listener.unwrap_or_else(|| Arc::new(NullPushIngestListener));
 
-        tracing::info!(%url, ?opts, "Ingesting from url");
+        tracing::info!(%url, ?plan, "Ingesting from url");
 
-        self.do_ingest(target, source_name, DataSource::Url(url), opts, listener)
+        self.do_ingest(target, plan, DataSource::Url(url), listener)
             .await
     }
 
@@ -438,38 +444,24 @@ impl PushIngestService for PushIngestServiceImpl {
     async fn ingest_from_file_stream(
         &self,
         target: ResolvedDataset,
-        source_name: Option<&str>,
+        plan: PushIngestPlan,
         data: Box<dyn AsyncRead + Send + Unpin>,
-        opts: PushIngestOpts,
         listener: Option<Arc<dyn PushIngestListener>>,
     ) -> Result<PushIngestResult, PushIngestError> {
         let listener = listener.unwrap_or_else(|| Arc::new(NullPushIngestListener));
 
-        tracing::info!(?opts, "Ingesting from file stream");
+        tracing::info!(?plan, "Ingesting from file stream");
 
-        self.do_ingest(
-            target,
-            source_name,
-            DataSource::Stream(data),
-            opts,
-            listener,
-        )
-        .await
+        self.do_ingest(target, plan, DataSource::Stream(data), listener)
+            .await
     }
 }
 
-struct PushIngestArgs {
-    operation_id: String,
-    operation_dir: PathBuf,
-    system_time: DateTime<Utc>,
-    opts: PushIngestOpts,
-    listener: Arc<dyn PushIngestListener>,
-    ctx: SessionContext,
-    data_writer: DataWriterDataFusion,
-    push_source: AddPushSource,
-}
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 enum DataSource {
     Url(url::Url),
     Stream(Box<dyn AsyncRead + Send + Unpin>),
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

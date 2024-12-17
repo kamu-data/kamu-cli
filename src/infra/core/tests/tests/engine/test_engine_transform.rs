@@ -770,13 +770,22 @@ async fn test_transform_empty_inputs() {
         .await
         .unwrap();
 
+    let ingest_plan = harness
+        .push_ingest_svc
+        .plan_ingest(
+            ResolvedDataset::from(&root),
+            None,
+            PushIngestOpts::default(),
+        )
+        .await
+        .unwrap();
+
     let ingest_result = harness
         .push_ingest_svc
         .ingest_from_file_stream(
             ResolvedDataset::from(&root),
-            None,
+            ingest_plan,
             Box::new(tokio::io::BufReader::new(std::io::Cursor::new(b""))),
-            PushIngestOpts::default(),
             None,
         )
         .await
@@ -811,15 +820,24 @@ async fn test_transform_empty_inputs() {
     // 3: Input gets some data
     ///////////////////////////////////////////////////////////////////////////
 
+    let ingest_plan = harness
+        .push_ingest_svc
+        .plan_ingest(
+            ResolvedDataset::from(&root),
+            None,
+            PushIngestOpts::default(),
+        )
+        .await
+        .unwrap();
+
     let ingest_result = harness
         .push_ingest_svc
         .ingest_from_file_stream(
             ResolvedDataset::from(&root),
-            None,
+            ingest_plan,
             Box::new(tokio::io::BufReader::new(std::io::Cursor::new(
                 br#"{"city": "A", "population": 100}"#,
             ))),
-            PushIngestOpts::default(),
             None,
         )
         .await

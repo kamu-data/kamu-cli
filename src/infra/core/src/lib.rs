@@ -15,7 +15,6 @@
 #![feature(trait_upcasting)]
 #![feature(let_chains)]
 #![feature(iter_collect_into)]
-#![feature(box_into_inner)]
 
 // Re-exports
 pub use kamu_core as domain;

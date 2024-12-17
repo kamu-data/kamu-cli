@@ -1330,14 +1330,16 @@ impl CompactTestHarness {
     async fn ingest_data(&self, data_str: String, dataset_created: &CreateDatasetResult) {
         let data = std::io::Cursor::new(data_str);
 
+        let target = ResolvedDataset::from(dataset_created);
+
+        let ingest_plan = self
+            .push_ingest_svc
+            .plan_ingest(target.clone(), None, PushIngestOpts::default())
+            .await
+            .unwrap();
+
         self.push_ingest_svc
-            .ingest_from_file_stream(
-                ResolvedDataset::from(dataset_created),
-                None,
-                Box::new(data),
-                PushIngestOpts::default(),
-                None,
-            )
+            .ingest_from_file_stream(target, ingest_plan, Box::new(data), None)
             .await
             .unwrap();
     }

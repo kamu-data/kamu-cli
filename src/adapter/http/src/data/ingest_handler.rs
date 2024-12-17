@@ -14,6 +14,7 @@ use database_common_macros::transactional_handler;
 use dill::Catalog;
 use http::HeaderMap;
 use http_common::*;
+use internal_error::ErrorIntoInternal;
 use kamu_core::*;
 use opendatafabric::DatasetRef;
 use time_source::SystemTimeSource;
@@ -122,7 +123,7 @@ pub async fn dataset_ingest_handler(
 
     // Resolve dataset
     let dataset_registry = catalog.get_one::<dyn DatasetRegistry>().unwrap();
-    let resolved_dataset = dataset_registry
+    let target = dataset_registry
         .get_dataset_by_ref(&dataset_ref)
         .await
         .map_err(ApiError::not_found)?;
@@ -130,35 +131,44 @@ pub async fn dataset_ingest_handler(
     // Authorization check
     let authorizer = catalog.get_one::<dyn DatasetActionAuthorizer>().unwrap();
     authorizer
-        .check_action_allowed(resolved_dataset.get_handle(), auth::DatasetAction::Write)
+        .check_action_allowed(target.get_handle(), auth::DatasetAction::Write)
         .await
         .map_err(|e| match e {
             DatasetActionUnauthorizedError::Access(_) => ApiError::new_forbidden(),
             DatasetActionUnauthorizedError::Internal(e) => e.api_err(),
         })?;
 
-    // Run ingestion
+    // Plan and run ingestion
     let ingest_svc = catalog.get_one::<dyn PushIngestService>().unwrap();
-    match ingest_svc
-        .ingest_from_file_stream(
-            resolved_dataset,
+    let ingest_plan = ingest_svc
+        .plan_ingest(
+            target.clone(),
             params.source_name.as_deref(),
-            arguments.data_stream,
             PushIngestOpts {
                 media_type: arguments.media_type,
                 source_event_time,
                 auto_create_push_source: is_ingest_from_upload,
                 schema_inference: SchemaInferenceOpts::default(),
             },
-            None,
         )
+        .await
+        .map_err(|e| match e {
+            PushIngestPlanningError::SourceNotFound(e) => ApiError::bad_request(e),
+            PushIngestPlanningError::UnsupportedMediaType(_) => {
+                ApiError::new_unsupported_media_type()
+            }
+            PushIngestPlanningError::CommitError(e) => e.int_err().api_err(),
+            PushIngestPlanningError::Internal(e) => e.api_err(),
+        })?;
+
+    match ingest_svc
+        .ingest_from_file_stream(target, ingest_plan, arguments.data_stream, None)
         .await
     {
         // Per note above, we're not including any extra information about the result
         // of the ingest operation at this point to accommodate async execution
         Ok(_) => Ok(()),
         Err(PushIngestError::ReadError(e)) => Err(ApiError::bad_request(e)),
-        Err(PushIngestError::SourceNotFound(e)) => Err(ApiError::bad_request(e)),
         Err(PushIngestError::UnsupportedMediaType(_)) => {
             Err(ApiError::new_unsupported_media_type())
         }
