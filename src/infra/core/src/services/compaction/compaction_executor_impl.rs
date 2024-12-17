@@ -192,6 +192,7 @@ impl CompactionExecutorImpl {
 
 #[async_trait::async_trait]
 impl CompactionExecutor for CompactionExecutorImpl {
+    #[tracing::instrument(level = "debug", skip_all, fields(target=%target.get_handle(), ?plan))]
     async fn execute(
         &self,
         target: ResolvedDataset,
@@ -208,14 +209,17 @@ impl CompactionExecutor for CompactionExecutorImpl {
 
         let compaction_dir_path = self.create_run_compaction_dir()?;
 
+        tracing::debug!("Merging data slices");
         listener.begin_phase(CompactionPhase::MergeDataslices);
         let new_file_paths = self.merge_files(&plan, &compaction_dir_path).await?;
 
+        tracing::debug!("Committing new compacted blocks");
         listener.begin_phase(CompactionPhase::CommitNewBlocks);
         let (_old_data_slices, new_head, new_num_blocks) = self
             .commit_new_blocks(&target, &plan, new_file_paths)
             .await?;
 
+        tracing::debug!("Setting new head");
         target
             .as_metadata_chain()
             .set_ref(

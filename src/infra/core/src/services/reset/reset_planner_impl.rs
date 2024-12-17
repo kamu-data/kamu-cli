@@ -22,6 +22,11 @@ pub struct ResetPlannerImpl {}
 
 #[async_trait::async_trait]
 impl ResetPlanner for ResetPlannerImpl {
+    #[tracing::instrument(
+        level = "debug",
+        skip_all,
+        fields(target=%target.get_handle(), ?maybe_old_head, ?maybe_new_head)
+    )]
     async fn plan_reset(
         &self,
         target: ResolvedDataset,

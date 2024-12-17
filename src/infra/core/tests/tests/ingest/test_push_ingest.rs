@@ -133,7 +133,7 @@ async fn test_ingest_push_url_stream() {
     ));
 
     harness
-        .ingest_from_file_stream(&created, None, Box::new(data), PushIngestOpts::default())
+        .ingest_from_stream(&created, None, Box::new(data), PushIngestOpts::default())
         .await;
 
     data_helper
@@ -832,7 +832,7 @@ impl IngestTestHarness {
         DatasetDataHelper::new_with_context((*resolved_dataset).clone(), self.ctx.clone())
     }
 
-    async fn ingest_from_file_stream(
+    async fn ingest_from_stream(
         &self,
         created: &CreateDatasetResult,
         source_name: Option<&str>,
@@ -848,7 +848,7 @@ impl IngestTestHarness {
             .unwrap();
 
         self.push_ingest_executor
-            .ingest_from_file_stream(target, ingest_plan, data, None)
+            .ingest_from_stream(target, ingest_plan, data, None)
             .await
             .unwrap();
     }

@@ -103,6 +103,7 @@ impl PushIngestPlannerImpl {
 impl PushIngestPlanner for PushIngestPlannerImpl {
     /// Uses or auto-creates push source definition in metadata to plan
     /// ingestion
+    #[tracing::instrument(level = "debug", skip_all, fields(target=%target.get_handle(), ?source_name, ?opts))]
     async fn plan_ingest(
         &self,
         target: ResolvedDataset,
@@ -116,6 +117,7 @@ impl PushIngestPlanner for PushIngestPlannerImpl {
         let push_source = match (&metadata_state.source_event, opts.auto_create_push_source) {
             // No push source, and it's allowed to create
             (None, true) => {
+                tracing::debug!("Auto-creating new push source");
                 let add_push_source_event = self
                     .auto_create_push_source(target.clone(), "auto", &opts)
                     .await?;

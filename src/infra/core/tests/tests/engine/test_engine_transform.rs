@@ -785,7 +785,7 @@ async fn test_transform_empty_inputs() {
 
     let ingest_result = harness
         .push_ingest_executor
-        .ingest_from_file_stream(
+        .ingest_from_stream(
             ResolvedDataset::from(&root),
             ingest_plan,
             Box::new(tokio::io::BufReader::new(std::io::Cursor::new(b""))),
@@ -835,7 +835,7 @@ async fn test_transform_empty_inputs() {
 
     let ingest_result = harness
         .push_ingest_executor
-        .ingest_from_file_stream(
+        .ingest_from_stream(
             ResolvedDataset::from(&root),
             ingest_plan,
             Box::new(tokio::io::BufReader::new(std::io::Cursor::new(

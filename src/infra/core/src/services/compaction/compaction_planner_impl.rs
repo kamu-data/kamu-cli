@@ -22,7 +22,16 @@ use opendatafabric as odf;
 pub struct CompactionPlannerImpl {}
 
 impl CompactionPlannerImpl {
-    #[tracing::instrument(level = "debug", skip_all)]
+    #[tracing::instrument(
+        level = "debug",
+        skip_all,
+        fields(
+            target=%target.get_handle(),
+            max_slice_size,
+            max_slice_records,
+            keep_metadata_only
+        )
+    )]
     async fn plan_dataset_compaction(
         &self,
         target: ResolvedDataset,
@@ -185,6 +194,7 @@ impl CompactionPlannerImpl {
 
 #[async_trait::async_trait]
 impl CompactionPlanner for CompactionPlannerImpl {
+    #[tracing::instrument(level = "debug", skip_all, fields(target=%target.get_handle(), ?options))]
     async fn plan_compaction(
         &self,
         target: ResolvedDataset,

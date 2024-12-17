@@ -47,6 +47,7 @@ pin-project = { version = "1", default-features = false }
 thiserror = { version = "2", default-features = false, features = ["std"] }
 tokio = { version = "1", default-features = false }
 tokio-stream = { version = "0.1", default-features = false }
+tracing = "0.1"
 url = { version = "2", default-features = false, features = ["serde"] }
 
 # TODO: Avoid this dependency or depend on sub-crates

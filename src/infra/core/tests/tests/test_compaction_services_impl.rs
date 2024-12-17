@@ -1337,7 +1337,7 @@ impl CompactTestHarness {
             .unwrap();
 
         self.push_ingest_executor
-            .ingest_from_file_stream(target, ingest_plan, Box::new(data), None)
+            .ingest_from_stream(target, ingest_plan, Box::new(data), None)
             .await
             .unwrap();
     }

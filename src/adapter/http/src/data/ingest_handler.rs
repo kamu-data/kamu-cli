@@ -163,7 +163,7 @@ pub async fn dataset_ingest_handler(
 
     let push_ingest_executor = catalog.get_one::<dyn PushIngestExecutor>().unwrap();
     match push_ingest_executor
-        .ingest_from_file_stream(target, ingest_plan, arguments.data_stream, None)
+        .ingest_from_stream(target, ingest_plan, arguments.data_stream, None)
         .await
     {
         // Per note above, we're not including any extra information about the result

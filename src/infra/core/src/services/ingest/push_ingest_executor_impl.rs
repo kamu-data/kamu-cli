@@ -308,7 +308,7 @@ impl PushIngestExecutorImpl {
 
 #[async_trait::async_trait]
 impl PushIngestExecutor for PushIngestExecutorImpl {
-    #[tracing::instrument(level = "info", skip_all, fields(target=%target.get_handle()))]
+    #[tracing::instrument(level = "info", skip_all, fields(target=%target.get_handle(), ?plan, %url))]
     async fn ingest_from_url(
         &self,
         target: ResolvedDataset,
@@ -324,8 +324,8 @@ impl PushIngestExecutor for PushIngestExecutorImpl {
             .await
     }
 
-    #[tracing::instrument(level = "info", skip_all, fields(target=%target.get_handle()))]
-    async fn ingest_from_file_stream(
+    #[tracing::instrument(level = "info", skip_all, fields(target=%target.get_handle(), ?plan))]
+    async fn ingest_from_stream(
         &self,
         target: ResolvedDataset,
         plan: PushIngestPlan,

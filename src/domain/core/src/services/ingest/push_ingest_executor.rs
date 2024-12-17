@@ -38,7 +38,7 @@ pub trait PushIngestExecutor: Send + Sync {
     /// in-band as a file stream.
     ///
     /// See also [MediaType].
-    async fn ingest_from_file_stream(
+    async fn ingest_from_stream(
         &self,
         target: ResolvedDataset,
         plan: PushIngestPlan,

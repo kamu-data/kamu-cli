@@ -55,6 +55,12 @@ impl DataWriterMetadataState {
     /// * `source_name` - name of the source to use when extracting the metadata
     ///   needed for writing. Leave empty for polling sources or to use the only
     ///   push source defined when there is no ambiguity.
+    #[tracing::instrument(
+        level = "debug",
+        name="DataWriterMetadataState::build",
+        skip_all,
+        fields(target=%target.get_handle(), %block_ref, ?source_name)
+    )]
     pub async fn build(
         target: ResolvedDataset,
         block_ref: &BlockRef,

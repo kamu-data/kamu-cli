@@ -41,6 +41,7 @@ impl SetWatermarkPlannerImpl {
 
 #[async_trait::async_trait]
 impl SetWatermarkPlanner for SetWatermarkPlannerImpl {
+    #[tracing::instrument(level = "debug", skip_all, fields(target=%target.get_handle(), new_watermark))]
     async fn plan_set_watermark(
         &self,
         target: ResolvedDataset,
