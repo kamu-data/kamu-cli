@@ -466,7 +466,6 @@ fn assert_execute_command_result<'a>(
 
     if let Some(expected_stderr_items) = maybe_expected_stderr {
         let stderr = std::str::from_utf8(&command_result.get_output().stderr).unwrap();
-
         for expected_stderr_item in expected_stderr_items {
             assert!(
                 stderr.contains(expected_stderr_item),
