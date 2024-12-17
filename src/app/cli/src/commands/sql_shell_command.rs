@@ -196,9 +196,15 @@ impl SqlShellCommand {
                     }
                 };
 
+                let res = self
+                    .query_svc
+                    .sql_statement(&command, QueryOptions::default())
+                    .await
+                    .map_err(CLIError::failure)?;
+
                 let rows_exported = self
                     .export_service
-                    .export_to_fs(command, output_path, format, self.partition_size)
+                    .export_to_fs(res.df, output_path, format, self.partition_size)
                     .await?;
                 eprintln!("Exported {rows_exported} rows");
             }
