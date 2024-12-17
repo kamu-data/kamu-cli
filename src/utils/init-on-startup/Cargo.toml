@@ -33,6 +33,7 @@ petgraph = { version = "0.6", default-features = false, features = [
 thiserror = { version = "2", default-features = false, features = ["std"] }
 tracing = "0.1"
 
+
 [dev-dependencies]
 paste = "1"
 test-log = { version = "0.2", features = ["trace"] }

@@ -25,8 +25,7 @@ impl AuthMut {
         login_method: String,
         login_credentials_json: String,
     ) -> Result<LoginResponse> {
-        let authentication_service =
-            from_catalog::<dyn kamu_accounts::AuthenticationService>(ctx).unwrap();
+        let authentication_service = from_catalog_n!(ctx, dyn kamu_accounts::AuthenticationService);
 
         let login_result = authentication_service
             .login(login_method.as_str(), login_credentials_json)
@@ -39,8 +38,7 @@ impl AuthMut {
     }
 
     async fn account_details(&self, ctx: &Context<'_>, access_token: String) -> Result<Account> {
-        let authentication_service =
-            from_catalog::<dyn kamu_accounts::AuthenticationService>(ctx).unwrap();
+        let authentication_service = from_catalog_n!(ctx, dyn kamu_accounts::AuthenticationService);
 
         match authentication_service.account_by_token(access_token).await {
             Ok(a) => Ok(Account::from_account(a)),
@@ -56,8 +54,7 @@ impl AuthMut {
     ) -> Result<CreateTokenResult> {
         check_logged_account_id_match(ctx, &account_id)?;
 
-        let access_token_service =
-            from_catalog::<dyn kamu_accounts::AccessTokenService>(ctx).unwrap();
+        let access_token_service = from_catalog_n!(ctx, dyn kamu_accounts::AccessTokenService);
 
         match access_token_service
             .create_access_token(&token_name, &account_id)
@@ -84,8 +81,7 @@ impl AuthMut {
     ) -> Result<RevokeResult> {
         check_access_token_valid(ctx, &token_id).await?;
 
-        let access_token_service =
-            from_catalog::<dyn kamu_accounts::AccessTokenService>(ctx).unwrap();
+        let access_token_service = from_catalog_n!(ctx, dyn kamu_accounts::AccessTokenService);
 
         match access_token_service.revoke_access_token(&token_id).await {
             Ok(_) => Ok(RevokeResult::Success(RevokeResultSuccess { token_id })),
@@ -174,7 +170,7 @@ pub struct RevokeResultSuccess {
 #[ComplexObject]
 impl RevokeResultSuccess {
     async fn message(&self) -> String {
-        "Access token revoked succesfully".to_string()
+        "Access token revoked successfully".to_string()
     }
 }
 

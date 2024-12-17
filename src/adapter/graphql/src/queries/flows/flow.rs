@@ -58,19 +58,21 @@ impl Flow {
     ) -> Result<FlowDescriptionDataset> {
         Ok(match dataset_key.flow_type {
             fs::DatasetFlowType::Ingest => {
-                let dataset_registry = from_catalog::<dyn DatasetRegistry>(ctx).unwrap();
+                let (dataset_registry, polling_ingest_svc, dataset_changes_svc) = from_catalog_n!(
+                    ctx,
+                    dyn DatasetRegistry,
+                    dyn PollingIngestService,
+                    dyn DatasetChangesService
+                );
                 let resolved_dataset = dataset_registry
                     .get_dataset_by_ref(&dataset_key.dataset_id.as_local_ref())
                     .await
                     .int_err()?;
 
-                let polling_ingest_svc = from_catalog::<dyn PollingIngestService>(ctx).unwrap();
                 let maybe_polling_source = polling_ingest_svc
                     .get_active_polling_source(resolved_dataset)
                     .await
                     .int_err()?;
-
-                let dataset_changes_svc = from_catalog::<dyn DatasetChangesService>(ctx).unwrap();
 
                 let ingest_result = FlowDescriptionUpdateResult::from_maybe_flow_outcome(
                     self.flow_state.outcome.as_ref(),
@@ -96,7 +98,7 @@ impl Flow {
                 }
             }
             fs::DatasetFlowType::ExecuteTransform => {
-                let dataset_changes_svc = from_catalog::<dyn DatasetChangesService>(ctx).unwrap();
+                let dataset_changes_svc = from_catalog_n!(ctx, dyn DatasetChangesService);
 
                 FlowDescriptionDataset::ExecuteTransform(FlowDescriptionDatasetExecuteTransform {
                     dataset_id: dataset_key.dataset_id.clone().into(),
@@ -169,7 +171,7 @@ impl Flow {
 
     /// History of flow events
     async fn history(&self, ctx: &Context<'_>) -> Result<Vec<FlowEvent>> {
-        let flow_event_store = from_catalog::<dyn fs::FlowEventStore>(ctx).unwrap();
+        let flow_event_store = from_catalog_n!(ctx, dyn fs::FlowEventStore);
 
         use futures::TryStreamExt;
         let flow_events: Vec<_> = flow_event_store

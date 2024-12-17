@@ -7,24 +7,24 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::sync::Arc;
-
-use datafusion::prelude::SessionContext;
-use tonic::Status;
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub type Token = String;
-
-#[async_trait::async_trait]
-pub trait SessionFactory: Send + Sync {
-    async fn authenticate(&self, _username: &str, _password: &str) -> Result<Token, Status> {
-        Err(Status::unauthenticated("Invalid credentials!"))
-    }
-
-    async fn get_context(&self, _token: &Token) -> Result<Arc<SessionContext>, Status> {
-        Err(Status::unauthenticated("Invalid credentials!"))?
-    }
+/// Utility to generate the placeholder list. Helpful when using dynamic SQL
+/// generation.
+///
+/// # Examples
+/// ```
+/// // Output for `arguments_count`=3 & `index_offset`=0
+/// "$0,$1,$2"
+///
+/// // Output for `arguments_count`=2 & `index_offset`=3
+/// "$3,$4"
+/// ```
+pub fn sqlite_generate_placeholders_list(arguments_count: usize, index_offset: usize) -> String {
+    (0..arguments_count)
+        .map(|i| format!("${}", i + index_offset))
+        .intersperse(",".to_string())
+        .collect()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

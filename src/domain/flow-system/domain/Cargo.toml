@@ -41,8 +41,6 @@ sqlx = { version = "0.8", default-features = false, features = ["macros"] }
 strum = { version = "0.26", features = ["derive"] }
 thiserror = { version = "2", default-features = false, features = ["std"] }
 tokio-stream = { version = "0.1", default-features = false }
-tracing = { version = "0.1", default-features = false }
-url = { version = "2", default-features = false }
 
 # TODO: Make serde optional
 serde = { version = "1", default-features = false, features = ["derive"] }
@@ -50,5 +48,5 @@ serde_with = { version = "3", default-features = false, features = [
     "chrono_0_4",
 ] }
 
+
 [dev-dependencies]
-datafusion = { version = "43", default-features = false }

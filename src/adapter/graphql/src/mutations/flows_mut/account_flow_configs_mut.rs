@@ -16,6 +16,8 @@ use opendatafabric::DatasetID;
 
 use crate::prelude::*;
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub struct AccountFlowConfigsMut {
     account: Account,
 }
@@ -29,7 +31,7 @@ impl AccountFlowConfigsMut {
 
     #[graphql(skip)]
     async fn get_account_dataset_ids(&self, ctx: &Context<'_>) -> Result<Vec<DatasetID>> {
-        let dataset_ownership_service = from_catalog::<dyn DatasetOwnershipService>(ctx).unwrap();
+        let dataset_ownership_service = from_catalog_n!(ctx, dyn DatasetOwnershipService);
         let dataset_ids: Vec<_> = dataset_ownership_service
             .get_owned_datasets(&self.account.id)
             .await?;
@@ -38,7 +40,7 @@ impl AccountFlowConfigsMut {
     }
 
     async fn resume_account_dataset_flows(&self, ctx: &Context<'_>) -> Result<bool> {
-        let flow_config_service = from_catalog::<dyn FlowConfigurationService>(ctx).unwrap();
+        let flow_config_service = from_catalog_n!(ctx, dyn FlowConfigurationService);
 
         let account_dataset_ids = self.get_account_dataset_ids(ctx).await?;
         for dataset_id in &account_dataset_ids {
@@ -52,7 +54,7 @@ impl AccountFlowConfigsMut {
     }
 
     async fn pause_account_dataset_flows(&self, ctx: &Context<'_>) -> Result<bool> {
-        let flow_config_service = from_catalog::<dyn FlowConfigurationService>(ctx).unwrap();
+        let flow_config_service = from_catalog_n!(ctx, dyn FlowConfigurationService);
 
         let account_dataset_ids = self.get_account_dataset_ids(ctx).await?;
         for dataset_id in &account_dataset_ids {
@@ -65,3 +67,5 @@ impl AccountFlowConfigsMut {
         Ok(true)
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

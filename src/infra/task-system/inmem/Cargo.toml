@@ -27,7 +27,6 @@ opendatafabric = { workspace = true }
 kamu-task-system = { workspace = true }
 
 async-trait = { version = "0.1", default-features = false }
-chrono = { version = "0.4", default-features = false }
 dill = "0.9"
 futures = "0.3"
 
@@ -35,7 +34,6 @@ futures = "0.3"
 [dev-dependencies]
 database-common = { workspace = true }
 database-common-macros = { workspace = true }
-internal-error = { workspace = true }
 kamu-task-system-repo-tests = { workspace = true }
 
 test-group = { version = "1" }

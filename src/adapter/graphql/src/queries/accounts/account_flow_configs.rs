@@ -29,11 +29,15 @@ impl AccountFlowConfigs {
 
     /// Checks if all configs of all datasets in account are disabled
     async fn all_paused(&self, ctx: &Context<'_>) -> Result<bool> {
-        let dataset_ownership_service = from_catalog::<dyn DatasetOwnershipService>(ctx).unwrap();
+        let (dataset_ownership_service, flow_config_service) = from_catalog_n!(
+            ctx,
+            dyn DatasetOwnershipService,
+            dyn FlowConfigurationService
+        );
+
         let owned_dataset_ids: Vec<_> = dataset_ownership_service
             .get_owned_datasets(&self.account.id)
             .await?;
-        let flow_config_service = from_catalog::<dyn FlowConfigurationService>(ctx).unwrap();
 
         let mut all_configurations = flow_config_service
             .find_configurations_by_datasets(owned_dataset_ids)

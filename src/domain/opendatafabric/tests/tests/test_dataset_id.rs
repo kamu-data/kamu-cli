@@ -43,7 +43,7 @@ fn test_did_string() {
     assert_eq!(value.key_type(), Multicodec::Ed25519Pub);
 
     assert_eq!(
-        value.as_did_str().to_string(),
+        value.to_string(),
         "did:odf:fed012e6fcce36701dc791488e0d0b1745cc1e33a4c1c9fcc41c63bd343dbbe0970e6",
     );
 

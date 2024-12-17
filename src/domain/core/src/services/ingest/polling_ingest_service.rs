@@ -111,13 +111,12 @@ pub enum PollingIngestStage {
     Commit,
 }
 
-#[allow(unused_variables)]
 pub trait PollingIngestListener: Send + Sync {
     fn begin(&self) {}
-    fn on_cache_hit(&self, created_at: &DateTime<Utc>) {}
-    fn on_stage_progress(&self, stage: PollingIngestStage, _progress: u64, _out_of: TotalSteps) {}
-    fn success(&self, result: &PollingIngestResult) {}
-    fn error(&self, error: &PollingIngestError) {}
+    fn on_cache_hit(&self, _created_at: &DateTime<Utc>) {}
+    fn on_stage_progress(&self, _stage: PollingIngestStage, _progress: u64, _out_of: TotalSteps) {}
+    fn success(&self, _result: &PollingIngestResult) {}
+    fn error(&self, _error: &PollingIngestError) {}
 
     fn get_pull_image_listener(self: Arc<Self>) -> Option<Arc<dyn PullImageListener>> {
         None

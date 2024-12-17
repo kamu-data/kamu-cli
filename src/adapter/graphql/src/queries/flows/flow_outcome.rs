@@ -71,7 +71,7 @@ impl FlowOutcome {
                         }),
                     }),
                     FlowError::InputDatasetCompacted(err) => {
-                        let dataset_registry = from_catalog::<dyn DatasetRegistry>(ctx).unwrap();
+                        let dataset_registry = from_catalog_n!(ctx, dyn DatasetRegistry);
                         let hdl = dataset_registry
                             .resolve_dataset_handle_by_ref(&err.dataset_id.as_local_ref())
                             .await

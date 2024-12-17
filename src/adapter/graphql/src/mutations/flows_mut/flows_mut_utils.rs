@@ -36,7 +36,7 @@ pub(crate) async fn check_if_flow_belongs_to_dataset(
     flow_id: FlowID,
     dataset_handle: &odf::DatasetHandle,
 ) -> Result<Option<FlowInDatasetError>> {
-    let flow_query_service = from_catalog::<dyn fs::FlowQueryService>(ctx).unwrap();
+    let flow_query_service = from_catalog_n!(ctx, dyn fs::FlowQueryService);
 
     match flow_query_service.get_flow(flow_id.into()).await {
         Ok(flow_state) => match flow_state.flow_key {
@@ -76,7 +76,7 @@ pub(crate) async fn ensure_expected_dataset_kind(
     let dataset_flow_type: kamu_flow_system::DatasetFlowType = dataset_flow_type.into();
     match dataset_flow_type.dataset_kind_restriction() {
         Some(expected_kind) => {
-            let resolved_dataset = utils::get_dataset(ctx, dataset_handle);
+            let resolved_dataset = utils::get_dataset(ctx, dataset_handle)?;
 
             let dataset_kind = resolved_dataset
                 .get_summary(GetSummaryOpts::default())
@@ -106,13 +106,12 @@ pub(crate) async fn ensure_flow_preconditions(
     dataset_flow_type: DatasetFlowType,
     flow_run_configuration: Option<&FlowRunConfiguration>,
 ) -> Result<Option<FlowPreconditionsNotMet>> {
-    let dataset_registry = from_catalog::<dyn DatasetRegistry>(ctx).unwrap();
+    let dataset_registry = from_catalog_n!(ctx, dyn DatasetRegistry);
     let target = dataset_registry.get_dataset_by_handle(dataset_handle);
 
     match dataset_flow_type {
         DatasetFlowType::Ingest => {
-            let polling_ingest_svc =
-                from_catalog::<dyn kamu_core::PollingIngestService>(ctx).unwrap();
+            let polling_ingest_svc = from_catalog_n!(ctx, dyn kamu_core::PollingIngestService);
 
             let source_res = polling_ingest_svc
                 .get_active_polling_source(target)
@@ -126,7 +125,7 @@ pub(crate) async fn ensure_flow_preconditions(
         }
         DatasetFlowType::ExecuteTransform => {
             let transform_request_planner =
-                from_catalog::<dyn kamu_core::TransformRequestPlanner>(ctx).unwrap();
+                from_catalog_n!(ctx, dyn kamu_core::TransformRequestPlanner);
 
             let source_res = transform_request_planner
                 .get_active_transform(target)
