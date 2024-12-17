@@ -21,7 +21,7 @@
       {
         "name": "secret_nonce: _",
         "ordinal": 3,
-        "type_info": "Null"
+        "type_info": "Blob"
       },
       {
         "name": "created_at: _",

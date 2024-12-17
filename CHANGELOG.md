@@ -18,6 +18,8 @@ Recommendation: for ease of reading, use the following order:
 - database-common: the logic for pagination of data processing is generalized in `EntityPageStreamer`
 ### Changed
 - Speed up project build time by removing unused dependencies which were not detected by automated tools
+### Fixed
+- `DatasetEnvVar` entity now deletes during deleting `DatasetEntry` entity
 
 ## [0.212.0] - 2024-12-11
 ### Changed
