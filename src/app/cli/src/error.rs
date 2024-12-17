@@ -228,8 +228,7 @@ impl From<ExportError> for CLIError {
     fn from(e: ExportError) -> Self {
         match e {
             ExportError::Internal(_) => Self::critical(e),
-            ExportError::NotImplemented(_) => Self::usage_error_from(e),
-            ExportError::Query(_) => Self::usage_error_from(e),
+            ExportError::NotImplemented(_) | ExportError::Query(_) => Self::usage_error_from(e),
         }
     }
 }

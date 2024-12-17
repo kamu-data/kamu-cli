@@ -198,9 +198,9 @@ impl SqlShellCommand {
 
                 let rows_exported = self
                     .export_service
-                    .export_to_fs(&command, &output_path, format, self.partition_size)
+                    .export_to_fs(command, output_path, format, self.partition_size)
                     .await?;
-                eprintln!("Exported {} rows", rows_exported);
+                eprintln!("Exported {rows_exported} rows");
             }
             _ => unreachable!(),
         }
@@ -224,7 +224,7 @@ impl Command for SqlShellCommand {
 
             let supported = &self.supported_export_formats;
             if !supported.contains(&self.output_config.format) {
-                let supported_str = supported.iter().map(|f| format!("'{}'", f)).join(", ");
+                let supported_str = supported.iter().map(|f| format!("'{f}'")).join(", ");
                 return Err(CLIError::usage_error(format!(
                     "Invalid output format for export '{}'. Supported formats: {}",
                     &self.output_config.format, supported_str

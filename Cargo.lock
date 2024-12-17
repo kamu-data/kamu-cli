@@ -5976,6 +5976,7 @@ name = "kamu-cli-e2e-repo-tests"
 version = "0.213.1"
 dependencies = [
  "chrono",
+ "datafusion",
  "http-common",
  "indoc 2.0.5",
  "kamu",

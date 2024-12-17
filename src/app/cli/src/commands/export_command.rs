@@ -70,7 +70,7 @@ impl Command for ExportCommand {
             eprintln!(
                 "{} {} {}",
                 console::style("Exported").green(),
-                console::style(format!("{}", rows_exported)).green().bold(),
+                console::style(format!("{rows_exported}")).green().bold(),
                 console::style("rows").green()
             );
         }
