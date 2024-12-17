@@ -9,6 +9,7 @@
 
 use std::fmt::{Display, Formatter};
 
+use datafusion::dataframe::DataFrame;
 use internal_error::{BoxedError, InternalError};
 use thiserror::Error;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -19,7 +20,7 @@ use thiserror::Error;
 pub trait ExportService: Send + Sync {
     async fn export_to_fs(
         &self,
-        sql_query: &str,
+        df: DataFrame,
         path: &str,
         format: ExportFormat,
         partition_row_count: Option<usize>,

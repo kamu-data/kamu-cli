@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use kamu::domain::{ExportFormat, ExportService};
+use kamu::domain::{ExportFormat, ExportService, QueryOptions, QueryResponse, QueryService};
 
 use crate::{CLIError, Command};
 
@@ -17,6 +17,7 @@ use crate::{CLIError, Command};
 
 pub struct ExportCommand {
     export_service: Arc<dyn ExportService>,
+    query_service: Arc<dyn QueryService>,
     dataset: String,
     output_path: String,
     output_format: String,
@@ -27,6 +28,7 @@ pub struct ExportCommand {
 impl ExportCommand {
     pub fn new(
         export_service: Arc<dyn ExportService>,
+        query_service: Arc<dyn QueryService>,
         dataset: String,
         output_path: String,
         output_format: String,
@@ -35,6 +37,7 @@ impl ExportCommand {
     ) -> Self {
         Self {
             export_service,
+            query_service,
             dataset,
             output_path,
             output_format,
@@ -61,9 +64,14 @@ impl Command for ExportCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
         let format = self.parse_format()?;
         let query = format!("select * from '{}'", self.dataset);
+        let result: QueryResponse = self
+            .query_service
+            .sql_statement(&query, QueryOptions::default())
+            .await
+            .map_err(CLIError::failure)?; // todo: handle error
         let rows_exported = self
             .export_service
-            .export_to_fs(&query, &self.output_path, format, self.partition_size)
+            .export_to_fs(result.df, &self.output_path, format, self.partition_size)
             .await?;
 
         if !self.quiet {
@@ -74,7 +82,6 @@ impl Command for ExportCommand {
                 console::style("rows").green()
             );
         }
-
         Ok(())
     }
 }

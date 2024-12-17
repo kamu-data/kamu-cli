@@ -105,6 +105,7 @@ pub fn get_command(
         )),
         cli::Command::Export(c) => Box::new(ExportCommand::new(
             cli_catalog.get_one()?,
+            cli_catalog.get_one()?,
             c.dataset,
             c.output_path,
             c.output_format,
