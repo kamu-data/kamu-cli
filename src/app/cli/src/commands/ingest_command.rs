@@ -26,6 +26,7 @@ use crate::OutputConfig;
 pub struct IngestCommand {
     data_format_reg: Arc<dyn DataFormatRegistry>,
     dataset_registry: Arc<dyn DatasetRegistry>,
+    push_ingest_planner: Arc<dyn PushIngestPlanner>,
     push_ingest_svc: Arc<dyn PushIngestService>,
     output_config: Arc<OutputConfig>,
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
@@ -42,6 +43,7 @@ impl IngestCommand {
     pub fn new<I, S>(
         data_format_reg: Arc<dyn DataFormatRegistry>,
         dataset_registry: Arc<dyn DatasetRegistry>,
+        push_ingest_planner: Arc<dyn PushIngestPlanner>,
         push_ingest_svc: Arc<dyn PushIngestService>,
         output_config: Arc<OutputConfig>,
         remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
@@ -60,6 +62,7 @@ impl IngestCommand {
         Self {
             data_format_reg,
             dataset_registry,
+            push_ingest_planner,
             push_ingest_svc,
             output_config,
             remote_alias_reg,
@@ -193,7 +196,7 @@ impl Command for IngestCommand {
         for url in urls {
             let target = self.dataset_registry.get_dataset_by_handle(&dataset_handle);
             let plan = self
-                .push_ingest_svc
+                .push_ingest_planner
                 .plan_ingest(
                     target.clone(),
                     self.source_name.as_deref(),

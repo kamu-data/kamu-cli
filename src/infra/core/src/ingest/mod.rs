@@ -13,6 +13,7 @@ mod ingest_common;
 mod polling_ingest_service_impl;
 mod polling_source_state;
 mod prep_service;
+mod push_ingest_planner_impl;
 mod push_ingest_service_impl;
 
 pub use data_format_registry_impl::*;
@@ -21,4 +22,5 @@ pub use ingest_common::*;
 pub use polling_ingest_service_impl::*;
 pub use polling_source_state::*;
 pub use prep_service::*;
+pub use push_ingest_planner_impl::*;
 pub use push_ingest_service_impl::*;

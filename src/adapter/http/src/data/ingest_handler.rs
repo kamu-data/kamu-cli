@@ -139,8 +139,8 @@ pub async fn dataset_ingest_handler(
         })?;
 
     // Plan and run ingestion
-    let ingest_svc = catalog.get_one::<dyn PushIngestService>().unwrap();
-    let ingest_plan = ingest_svc
+    let ingest_planner = catalog.get_one::<dyn PushIngestPlanner>().unwrap();
+    let ingest_plan = ingest_planner
         .plan_ingest(
             target.clone(),
             params.source_name.as_deref(),
@@ -161,6 +161,7 @@ pub async fn dataset_ingest_handler(
             PushIngestPlanningError::Internal(e) => e.api_err(),
         })?;
 
+    let ingest_svc = catalog.get_one::<dyn PushIngestService>().unwrap();
     match ingest_svc
         .ingest_from_file_stream(target, ingest_plan, arguments.data_stream, None)
         .await

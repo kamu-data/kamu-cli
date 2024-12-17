@@ -1066,7 +1066,8 @@ struct CompactTestHarness {
     dataset_repo_writer: Arc<dyn DatasetRepositoryWriter>,
     compaction_planner: Arc<dyn CompactionPlanner>,
     compaction_execution_svc: Arc<dyn CompactionExecutionService>,
-    push_ingest_svc: Arc<PushIngestServiceImpl>,
+    push_ingest_planner: Arc<dyn PushIngestPlanner>,
+    push_ingest_svc: Arc<dyn PushIngestService>,
     transform_helper: TransformTestHelper,
     verification_svc: Arc<dyn VerificationService>,
     current_date_time: DateTime<Utc>,
@@ -1103,6 +1104,7 @@ impl CompactTestHarness {
             .add::<CompactionPlannerImpl>()
             .add::<CompactionExecutionServiceImpl>()
             .add::<PushIngestServiceImpl>()
+            .add::<PushIngestPlannerImpl>()
             .add::<TransformRequestPlannerImpl>()
             .add::<TransformElaborationServiceImpl>()
             .add::<TransformExecutionServiceImpl>()
@@ -1113,24 +1115,18 @@ impl CompactTestHarness {
             .add::<VerificationServiceImpl>()
             .build();
 
-        let dataset_registry = catalog.get_one::<dyn DatasetRegistry>().unwrap();
-        let dataset_repo_writer = catalog.get_one::<dyn DatasetRepositoryWriter>().unwrap();
-        let compaction_planner = catalog.get_one::<dyn CompactionPlanner>().unwrap();
-        let compaction_execution_svc = catalog.get_one::<dyn CompactionExecutionService>().unwrap();
-        let push_ingest_svc = catalog.get_one::<PushIngestServiceImpl>().unwrap();
-        let verification_svc = catalog.get_one::<dyn VerificationService>().unwrap();
-
         let transform_helper = TransformTestHelper::from_catalog(&catalog);
 
         Self {
             _temp_dir: temp_dir,
-            dataset_registry,
-            dataset_repo_writer,
-            compaction_planner,
-            compaction_execution_svc,
-            push_ingest_svc,
+            dataset_registry: catalog.get_one().unwrap(),
+            dataset_repo_writer: catalog.get_one().unwrap(),
+            compaction_planner: catalog.get_one().unwrap(),
+            compaction_execution_svc: catalog.get_one().unwrap(),
+            push_ingest_planner: catalog.get_one().unwrap(),
+            push_ingest_svc: catalog.get_one().unwrap(),
+            verification_svc: catalog.get_one().unwrap(),
             transform_helper,
-            verification_svc,
             current_date_time,
             ctx: SessionContext::new_with_config(SessionConfig::new().with_target_partitions(1)),
         }
@@ -1160,6 +1156,7 @@ impl CompactTestHarness {
             .bind::<dyn ObjectStoreBuilder, ObjectStoreBuilderS3>()
             .add::<VerificationServiceImpl>()
             .add::<PushIngestServiceImpl>()
+            .add::<PushIngestPlannerImpl>()
             .add::<TransformRequestPlannerImpl>()
             .add::<TransformElaborationServiceImpl>()
             .add::<TransformExecutionServiceImpl>()
@@ -1179,6 +1176,7 @@ impl CompactTestHarness {
             dataset_repo_writer: catalog.get_one().unwrap(),
             compaction_planner: catalog.get_one().unwrap(),
             compaction_execution_svc: catalog.get_one().unwrap(),
+            push_ingest_planner: catalog.get_one().unwrap(),
             push_ingest_svc: catalog.get_one().unwrap(),
             transform_helper,
             verification_svc: catalog.get_one().unwrap(),
@@ -1333,7 +1331,7 @@ impl CompactTestHarness {
         let target = ResolvedDataset::from(dataset_created);
 
         let ingest_plan = self
-            .push_ingest_svc
+            .push_ingest_planner
             .plan_ingest(target.clone(), None, PushIngestOpts::default())
             .await
             .unwrap();

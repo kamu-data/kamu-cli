@@ -392,6 +392,7 @@ pub fn configure_base_catalog(
     b.add::<PollingIngestServiceImpl>();
 
     b.add::<PushIngestServiceImpl>();
+    b.add::<PushIngestPlannerImpl>();
 
     b.add::<TransformRequestPlannerImpl>();
     b.add::<TransformElaborationServiceImpl>();

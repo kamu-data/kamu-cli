@@ -219,6 +219,7 @@ struct TestHarness {
     tempdir: tempfile::TempDir,
     dataset_repo_writer: Arc<dyn DatasetRepositoryWriter>,
     ingest_svc: Arc<dyn PollingIngestService>,
+    push_ingest_planner: Arc<dyn PushIngestPlanner>,
     push_ingest_svc: Arc<dyn PushIngestService>,
     transform_helper: TransformTestHelper,
     time_source: Arc<SystemTimeSourceStub>,
@@ -256,6 +257,7 @@ impl TestHarness {
             .add::<FetchService>()
             .add::<PollingIngestServiceImpl>()
             .add::<PushIngestServiceImpl>()
+            .add::<PushIngestPlannerImpl>()
             .add::<TransformRequestPlannerImpl>()
             .add::<TransformElaborationServiceImpl>()
             .add::<TransformExecutionServiceImpl>()
@@ -274,6 +276,7 @@ impl TestHarness {
             tempdir,
             dataset_repo_writer: catalog.get_one().unwrap(),
             ingest_svc: catalog.get_one().unwrap(),
+            push_ingest_planner: catalog.get_one().unwrap(),
             push_ingest_svc: catalog.get_one().unwrap(),
             time_source: catalog.get_one().unwrap(),
             transform_helper,
@@ -771,7 +774,7 @@ async fn test_transform_empty_inputs() {
         .unwrap();
 
     let ingest_plan = harness
-        .push_ingest_svc
+        .push_ingest_planner
         .plan_ingest(
             ResolvedDataset::from(&root),
             None,
@@ -821,7 +824,7 @@ async fn test_transform_empty_inputs() {
     ///////////////////////////////////////////////////////////////////////////
 
     let ingest_plan = harness
-        .push_ingest_svc
+        .push_ingest_planner
         .plan_ingest(
             ResolvedDataset::from(&root),
             None,

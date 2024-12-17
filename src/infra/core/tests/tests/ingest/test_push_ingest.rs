@@ -767,6 +767,7 @@ struct IngestTestHarness {
     temp_dir: TempDir,
     dataset_registry: Arc<dyn DatasetRegistry>,
     dataset_repo_writer: Arc<dyn DatasetRepositoryWriter>,
+    push_ingest_planner: Arc<dyn PushIngestPlanner>,
     push_ingest_svc: Arc<dyn PushIngestService>,
     ctx: SessionContext,
 }
@@ -800,12 +801,14 @@ impl IngestTestHarness {
             .add::<ObjectStoreBuilderLocalFs>()
             .add::<DataFormatRegistryImpl>()
             .add::<PushIngestServiceImpl>()
+            .add::<PushIngestPlannerImpl>()
             .build();
 
         Self {
             temp_dir,
             dataset_registry: catalog.get_one().unwrap(),
             dataset_repo_writer: catalog.get_one().unwrap(),
+            push_ingest_planner: catalog.get_one().unwrap(),
             push_ingest_svc: catalog.get_one().unwrap(),
             ctx: SessionContext::new_with_config(SessionConfig::new().with_target_partitions(1)),
         }
@@ -839,7 +842,7 @@ impl IngestTestHarness {
         let target = ResolvedDataset::from(created);
 
         let ingest_plan = self
-            .push_ingest_svc
+            .push_ingest_planner
             .plan_ingest(target.clone(), source_name, opts)
             .await
             .unwrap();
@@ -860,7 +863,7 @@ impl IngestTestHarness {
         let target = ResolvedDataset::from(created);
 
         let ingest_plan = self
-            .push_ingest_svc
+            .push_ingest_planner
             .plan_ingest(target.clone(), source_name, opts)
             .await
             .unwrap();

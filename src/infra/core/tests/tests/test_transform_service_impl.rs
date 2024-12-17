@@ -36,7 +36,8 @@ struct TransformTestHarness {
     transform_exec_svc: Arc<dyn TransformExecutionService>,
     compaction_planner: Arc<dyn CompactionPlanner>,
     compaction_exec_svc: Arc<dyn CompactionExecutionService>,
-    push_ingest_svc: Arc<PushIngestServiceImpl>,
+    push_ingest_planner: Arc<dyn PushIngestPlanner>,
+    push_ingest_svc: Arc<dyn PushIngestService>,
 }
 
 impl TransformTestHarness {
@@ -64,7 +65,7 @@ impl TransformTestHarness {
             .add::<CompactionExecutionServiceImpl>()
             .add::<DataFormatRegistryImpl>()
             .add::<PushIngestServiceImpl>()
-            .bind::<dyn PushIngestService, PushIngestServiceImpl>()
+            .add::<PushIngestPlannerImpl>()
             .add_value(engine_provisioner)
             .bind::<dyn EngineProvisioner, TEngineProvisioner>()
             .add::<TransformRequestPlannerImpl>()
@@ -79,6 +80,7 @@ impl TransformTestHarness {
             dataset_repo_writer: catalog.get_one().unwrap(),
             compaction_planner: catalog.get_one().unwrap(),
             compaction_exec_svc: catalog.get_one().unwrap(),
+            push_ingest_planner: catalog.get_one().unwrap(),
             push_ingest_svc: catalog.get_one().unwrap(),
             transform_request_planner: catalog.get_one().unwrap(),
             transform_elab_svc: catalog.get_one().unwrap(),
@@ -193,7 +195,7 @@ impl TransformTestHarness {
         let target = ResolvedDataset::from(dataset_created);
 
         let ingest_plan = self
-            .push_ingest_svc
+            .push_ingest_planner
             .plan_ingest(target.clone(), None, PushIngestOpts::default())
             .await
             .unwrap();

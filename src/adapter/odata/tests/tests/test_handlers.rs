@@ -20,6 +20,7 @@ use kamu_accounts::CurrentAccountSubject;
 use messaging_outbox::DummyOutboxImpl;
 use opendatafabric::*;
 use time_source::{SystemTimeSource, SystemTimeSourceStub};
+use url::Url;
 
 use super::test_api_server::TestAPIServer;
 
@@ -314,6 +315,7 @@ async fn test_collection_handler_by_id_not_found() {
 struct TestHarness {
     temp_dir: tempfile::TempDir,
     catalog: Catalog,
+    push_ingest_planner: Arc<dyn PushIngestPlanner>,
     push_ingest_svc: Arc<dyn PushIngestService>,
     api_server: TestAPIServer,
 }
@@ -358,6 +360,7 @@ impl TestHarness {
                 .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
                 .add::<EngineProvisionerNull>()
                 .add::<PushIngestServiceImpl>()
+                .add::<PushIngestPlannerImpl>()
                 .add::<QueryServiceImpl>()
                 .add_value(ServerUrlConfig::new_test(None));
 
@@ -366,6 +369,7 @@ impl TestHarness {
             b.build()
         };
 
+        let push_ingest_planner = catalog.get_one::<dyn PushIngestPlanner>().unwrap();
         let push_ingest_svc = catalog.get_one::<dyn PushIngestService>().unwrap();
 
         let api_server =
@@ -374,6 +378,7 @@ impl TestHarness {
         Self {
             temp_dir,
             catalog,
+            push_ingest_planner,
             push_ingest_svc,
             api_server,
         }
@@ -429,24 +434,24 @@ impl TestHarness {
         )
         .unwrap();
 
-        let target = ResolvedDataset::from(&ds);
+        self.ingest_from_url(&ds, url::Url::from_file_path(&src_path).unwrap())
+            .await;
+
+        ds
+    }
+
+    async fn ingest_from_url(&self, created: &CreateDatasetResult, url: Url) {
+        let target = ResolvedDataset::from(created);
 
         let ingest_plan = self
-            .push_ingest_svc
+            .push_ingest_planner
             .plan_ingest(target.clone(), None, PushIngestOpts::default())
             .await
             .unwrap();
 
         self.push_ingest_svc
-            .ingest_from_url(
-                ResolvedDataset::from(&ds),
-                ingest_plan,
-                url::Url::from_file_path(&src_path).unwrap(),
-                None,
-            )
+            .ingest_from_url(target, ingest_plan, url, None)
             .await
             .unwrap();
-
-        ds
     }
 }
