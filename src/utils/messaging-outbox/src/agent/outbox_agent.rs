@@ -29,16 +29,16 @@ enum RunMode {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub const JOB_MESSAGING_OUTBOX_STARTUP: &str = "dev.kamu.utils.outbox.OutboxExecutorStartup";
+pub const JOB_MESSAGING_OUTBOX_STARTUP: &str = "dev.kamu.utils.outbox.OutboxAgentStartup";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct OutboxExecutor {
+pub struct OutboxAgent {
     catalog: Catalog,
     config: Arc<OutboxConfig>,
     routes_static_info: Arc<OutboxRoutesStaticInfo>,
     producer_consumption_jobs: Vec<ProducerConsumptionJob>,
-    metrics: Arc<OutboxExecutorMetrics>,
+    metrics: Arc<OutboxAgentMetrics>,
     run_lock: tokio::sync::Mutex<()>,
 }
 
@@ -50,12 +50,12 @@ pub struct OutboxExecutor {
     requires_transaction: false,
 })]
 #[scope(Singleton)]
-impl OutboxExecutor {
+impl OutboxAgent {
     pub fn new(
         catalog: Catalog,
         config: Arc<OutboxConfig>,
         message_dispatchers_by_producers: Vec<Arc<dyn MessageDispatcher>>,
-        metrics: Arc<OutboxExecutorMetrics>,
+        metrics: Arc<OutboxAgentMetrics>,
     ) -> Self {
         let routes_static_info = Arc::new(Self::make_static_routes_info(
             &catalog,
@@ -128,7 +128,7 @@ impl OutboxExecutor {
             RunMode::WhileHasTasks => loop {
                 let processed_consumer_tasks_count = self
                     .run_consumption_iteration()
-                    .instrument(tracing::debug_span!("OutboxExecutor::tick"))
+                    .instrument(tracing::debug_span!("OutboxAgent::tick"))
                     .await?;
 
                 if processed_consumer_tasks_count == 0 {
@@ -140,7 +140,7 @@ impl OutboxExecutor {
 
                 loop {
                     self.run_consumption_iteration()
-                        .instrument(tracing::debug_span!("OutboxExecutor::tick"))
+                        .instrument(tracing::debug_span!("OutboxAgent::tick"))
                         .await?;
 
                     tokio::time::sleep(loop_delay).await;
@@ -272,8 +272,8 @@ impl OutboxExecutor {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl InitOnStartup for OutboxExecutor {
-    #[tracing::instrument(level = "debug", skip_all, name = "OutboxExecutor::run_initialization")]
+impl InitOnStartup for OutboxAgent {
+    #[tracing::instrument(level = "debug", skip_all, name = "OutboxAgent::run_initialization")]
     async fn run_initialization(&self) -> Result<(), InternalError> {
         // Trace current routes
         self.debug_outbox_routes();

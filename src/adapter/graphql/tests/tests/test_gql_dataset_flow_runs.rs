@@ -51,10 +51,10 @@ use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
 use kamu_datasets_services::DependencyGraphServiceImpl;
 use kamu_flow_system::{
     Flow,
+    FlowAgentConfig,
+    FlowAgentTestDriver,
     FlowConfigurationUpdatedMessage,
     FlowEventStore,
-    FlowExecutorConfig,
-    FlowExecutorTestDriver,
     FlowID,
     FlowTrigger,
     FlowTriggerAutoPolling,
@@ -3122,7 +3122,7 @@ impl FlowRunsHarness {
             .add::<InMemoryDatasetDependencyRepository>()
             .add::<InMemoryFlowConfigurationEventStore>()
             .add::<InMemoryFlowEventStore>()
-            .add_value(FlowExecutorConfig::new(
+            .add_value(FlowAgentConfig::new(
                 Duration::seconds(1),
                 Duration::minutes(1),
             ))
@@ -3144,7 +3144,7 @@ impl FlowRunsHarness {
             );
             register_message_dispatcher::<ts::TaskProgressMessage>(
                 &mut b,
-                ts::MESSAGE_PRODUCER_KAMU_TASK_EXECUTOR,
+                ts::MESSAGE_PRODUCER_KAMU_TASK_AGENT,
             );
             register_message_dispatcher::<FlowConfigurationUpdatedMessage>(
                 &mut b,
@@ -3263,7 +3263,7 @@ impl FlowRunsHarness {
     ) -> ts::TaskID {
         let flow_service_test_driver = self
             .catalog_authorized
-            .get_one::<dyn FlowExecutorTestDriver>()
+            .get_one::<dyn FlowAgentTestDriver>()
             .unwrap();
 
         let flow_id = FlowID::new(flow_id.parse::<u64>().unwrap());
@@ -3311,7 +3311,7 @@ impl FlowRunsHarness {
         let outbox = self.catalog_authorized.get_one::<dyn Outbox>().unwrap();
         outbox
             .post_message(
-                ts::MESSAGE_PRODUCER_KAMU_TASK_EXECUTOR,
+                ts::MESSAGE_PRODUCER_KAMU_TASK_AGENT,
                 ts::TaskProgressMessage::running(event_time, task_id, task_metadata),
             )
             .await
@@ -3339,7 +3339,7 @@ impl FlowRunsHarness {
         let outbox = self.catalog_authorized.get_one::<dyn Outbox>().unwrap();
         outbox
             .post_message(
-                ts::MESSAGE_PRODUCER_KAMU_TASK_EXECUTOR,
+                ts::MESSAGE_PRODUCER_KAMU_TASK_AGENT,
                 ts::TaskProgressMessage::finished(event_time, task_id, task_metadata, task_outcome),
             )
             .await

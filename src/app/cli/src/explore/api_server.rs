@@ -23,9 +23,9 @@ use internal_error::*;
 use kamu::domain::{Protocols, ServerUrlConfig, TenancyConfig};
 use kamu_adapter_http::e2e::e2e_router;
 use kamu_adapter_http::FileUploadLimitConfig;
-use kamu_flow_system_inmem::domain::FlowExecutor;
-use kamu_task_system_inmem::domain::TaskExecutor;
-use messaging_outbox::OutboxExecutor;
+use kamu_flow_system_inmem::domain::FlowAgent;
+use kamu_task_system_inmem::domain::TaskAgent;
+use messaging_outbox::OutboxAgent;
 use tokio::sync::Notify;
 use url::Url;
 use utoipa_axum::router::OpenApiRouter;
@@ -38,9 +38,9 @@ use super::{UIConfiguration, UIFeatureFlags};
 pub struct APIServer {
     server: axum::serve::Serve<axum::routing::IntoMakeService<axum::Router>, axum::Router>,
     local_addr: SocketAddr,
-    task_executor: Arc<dyn TaskExecutor>,
-    flow_executor: Arc<dyn FlowExecutor>,
-    outbox_executor: Arc<OutboxExecutor>,
+    task_agent: Arc<dyn TaskAgent>,
+    flow_agent: Arc<dyn FlowAgent>,
+    outbox_agent: Arc<OutboxAgent>,
     maybe_shutdown_notify: Option<Arc<Notify>>,
 }
 
@@ -58,11 +58,11 @@ impl APIServer {
     ) -> Result<Self, InternalError> {
         // Background task executor must run with server privileges to execute tasks on
         // behalf of the system, as they are automatically scheduled
-        let task_executor = cli_catalog.get_one().unwrap();
+        let task_agent = cli_catalog.get_one().unwrap();
 
-        let flow_executor = cli_catalog.get_one().unwrap();
+        let flow_agent = cli_catalog.get_one().unwrap();
 
-        let outbox_executor = cli_catalog.get_one().unwrap();
+        let outbox_agent = cli_catalog.get_one().unwrap();
 
         let gql_schema = kamu_adapter_graphql::schema();
 
@@ -223,9 +223,9 @@ impl APIServer {
         Ok(Self {
             server,
             local_addr,
-            task_executor,
-            flow_executor,
-            outbox_executor,
+            task_agent,
+            flow_agent,
+            outbox_agent,
             maybe_shutdown_notify,
         })
     }
@@ -251,9 +251,9 @@ impl APIServer {
 
         tokio::select! {
             res = server_run_fut => { res.int_err() },
-            res = self.outbox_executor.run() => { res.int_err() },
-            res = self.task_executor.run() => { res.int_err() },
-            res = self.flow_executor.run() => { res.int_err() }
+            res = self.outbox_agent.run() => { res.int_err() },
+            res = self.task_agent.run() => { res.int_err() },
+            res = self.flow_agent.run() => { res.int_err() }
         }
     }
 }

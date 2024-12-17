@@ -9,5 +9,5 @@
 
 mod test_dispatching_outbox_impl;
 mod test_immediate_outbox_impl;
-mod test_outbox_executor;
+mod test_outbox_agent;
 mod test_transactional_outbox_impl;

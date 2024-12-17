@@ -30,7 +30,7 @@ use kamu_accounts_services::{AccessTokenServiceImpl, AuthenticationServiceImpl};
 use kamu_core::*;
 use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
 use kamu_datasets_services::DependencyGraphServiceImpl;
-use kamu_flow_system::FlowExecutorConfig;
+use kamu_flow_system::FlowAgentConfig;
 use kamu_flow_system_inmem::{InMemoryFlowConfigurationEventStore, InMemoryFlowEventStore};
 use kamu_task_system_inmem::InMemoryTaskEventStore;
 use kamu_task_system_services::TaskSchedulerImpl;
@@ -659,7 +659,7 @@ impl FlowConfigHarness {
             .add::<InMemoryDatasetDependencyRepository>()
             .add::<InMemoryFlowConfigurationEventStore>()
             .add::<InMemoryFlowEventStore>()
-            .add_value(FlowExecutorConfig::new(
+            .add_value(FlowAgentConfig::new(
                 Duration::seconds(1),
                 Duration::minutes(1),
             ))

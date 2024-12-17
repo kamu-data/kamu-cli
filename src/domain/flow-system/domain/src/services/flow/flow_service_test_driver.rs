@@ -17,7 +17,7 @@ use crate::FlowID;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait FlowExecutorTestDriver: Sync + Send {
+pub trait FlowAgentTestDriver: Sync + Send {
     /// Pretends it is time to schedule the given flow that was in Queued state
     async fn mimic_flow_scheduled(
         &self,

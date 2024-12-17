@@ -15,7 +15,7 @@ use observability::metrics::MetricsProvider;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug)]
-pub struct OutboxExecutorMetrics {
+pub struct OutboxAgentMetrics {
     pub messages_processed_total: prometheus::IntCounterVec,
     pub messages_pending_total: prometheus::IntGaugeVec,
     pub failed_consumers_total: prometheus::IntGaugeVec,
@@ -24,7 +24,7 @@ pub struct OutboxExecutorMetrics {
 #[component(pub)]
 #[interface(dyn MetricsProvider)]
 #[scope(Singleton)]
-impl OutboxExecutorMetrics {
+impl OutboxAgentMetrics {
     pub fn new() -> Self {
         use prometheus::*;
 
@@ -78,7 +78,7 @@ impl OutboxExecutorMetrics {
     }
 }
 
-impl MetricsProvider for OutboxExecutorMetrics {
+impl MetricsProvider for OutboxAgentMetrics {
     fn register(&self, reg: &prometheus::Registry) -> prometheus::Result<()> {
         reg.register(Box::new(self.messages_processed_total.clone()))?;
         reg.register(Box::new(self.messages_pending_total.clone()))?;

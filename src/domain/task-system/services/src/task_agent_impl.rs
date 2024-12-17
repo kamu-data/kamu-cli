@@ -20,7 +20,7 @@ use tracing::Instrument as _;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct TaskExecutorImpl {
+pub struct TaskAgentImpl {
     catalog: Catalog,
     task_runner: Arc<dyn TaskRunner>,
     time_source: Arc<dyn SystemTimeSource>,
@@ -29,15 +29,15 @@ pub struct TaskExecutorImpl {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
-#[interface(dyn TaskExecutor)]
+#[interface(dyn TaskAgent)]
 #[interface(dyn InitOnStartup)]
 #[meta(InitOnStartupMeta {
-    job_name: JOB_KAMU_TASKS_EXECUTOR_RECOVERY,
+    job_name: JOB_KAMU_TASKS_AGENT_RECOVERY,
     depends_on: &[],
     requires_transaction: false,
 })]
 #[scope(Singleton)]
-impl TaskExecutorImpl {
+impl TaskAgentImpl {
     pub fn new(
         catalog: Catalog,
         task_runner: Arc<dyn TaskRunner>,
@@ -56,7 +56,7 @@ impl TaskExecutorImpl {
         let task_outcome = self
             .run_task(&task)
             .instrument(observability::tracing::root_span!(
-                "TaskExecutor::run_task",
+                "TaskAgent::run_task",
                 task_id = %task.task_id,
             ))
             .await?;
@@ -127,7 +127,7 @@ impl TaskExecutorImpl {
 
         outbox
             .post_message(
-                MESSAGE_PRODUCER_KAMU_TASK_EXECUTOR,
+                MESSAGE_PRODUCER_KAMU_TASK_AGENT,
                 TaskProgressMessage::running(
                     self.time_source.now(),
                     task.task_id,
@@ -199,7 +199,7 @@ impl TaskExecutorImpl {
 
         outbox
             .post_message(
-                MESSAGE_PRODUCER_KAMU_TASK_EXECUTOR,
+                MESSAGE_PRODUCER_KAMU_TASK_AGENT,
                 TaskProgressMessage::finished(
                     self.time_source.now(),
                     task.task_id,
@@ -216,7 +216,7 @@ impl TaskExecutorImpl {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl TaskExecutor for TaskExecutorImpl {
+impl TaskAgent for TaskAgentImpl {
     // TODO: Error and panic handling strategy
     async fn run(&self) -> Result<(), InternalError> {
         loop {
@@ -234,7 +234,7 @@ impl TaskExecutor for TaskExecutorImpl {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl InitOnStartup for TaskExecutorImpl {
+impl InitOnStartup for TaskAgentImpl {
     async fn run_initialization(&self) -> Result<(), InternalError> {
         self.recover_running_tasks().await
     }

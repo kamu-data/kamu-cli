@@ -34,7 +34,7 @@ use kamu_datasets_services::DependencyGraphServiceImpl;
 use kamu_flow_system::*;
 use kamu_flow_system_inmem::*;
 use kamu_flow_system_services::*;
-use kamu_task_system::{TaskProgressMessage, MESSAGE_PRODUCER_KAMU_TASK_EXECUTOR};
+use kamu_task_system::{TaskProgressMessage, MESSAGE_PRODUCER_KAMU_TASK_AGENT};
 use kamu_task_system_inmem::InMemoryTaskEventStore;
 use kamu_task_system_services::TaskSchedulerImpl;
 use messaging_outbox::{register_message_dispatcher, Outbox, OutboxImmediateImpl};
@@ -64,7 +64,7 @@ pub(crate) struct FlowHarness {
     pub catalog: dill::Catalog,
     pub flow_configuration_service: Arc<dyn FlowConfigurationService>,
     pub flow_configuration_event_store: Arc<dyn FlowConfigurationEventStore>,
-    pub flow_executor: Arc<FlowExecutorImpl>,
+    pub flow_agent: Arc<FlowAgentImpl>,
     pub flow_query_service: Arc<dyn FlowQueryService>,
     pub flow_event_store: Arc<dyn FlowEventStore>,
     pub auth_svc: Arc<dyn AuthenticationService>,
@@ -143,7 +143,7 @@ impl FlowHarness {
             )
             .bind::<dyn Outbox, OutboxImmediateImpl>()
             .add::<FlowSystemTestListener>()
-            .add_value(FlowExecutorConfig::new(
+            .add_value(FlowAgentConfig::new(
                 awaiting_step,
                 mandatory_throttling_period,
             ))
@@ -182,15 +182,15 @@ impl FlowHarness {
             );
             register_message_dispatcher::<TaskProgressMessage>(
                 &mut b,
-                MESSAGE_PRODUCER_KAMU_TASK_EXECUTOR,
+                MESSAGE_PRODUCER_KAMU_TASK_AGENT,
             );
             register_message_dispatcher::<FlowConfigurationUpdatedMessage>(
                 &mut b,
                 MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE,
             );
-            register_message_dispatcher::<FlowExecutorUpdatedMessage>(
+            register_message_dispatcher::<FlowAgentUpdatedMessage>(
                 &mut b,
-                MESSAGE_PRODUCER_KAMU_FLOW_EXECUTOR,
+                MESSAGE_PRODUCER_KAMU_FLOW_AGENT,
             );
             register_message_dispatcher::<FlowProgressMessage>(
                 &mut b,
@@ -200,7 +200,7 @@ impl FlowHarness {
             b.build()
         };
 
-        let flow_executor = catalog.get_one::<FlowExecutorImpl>().unwrap();
+        let flow_agent = catalog.get_one::<FlowAgentImpl>().unwrap();
         let flow_query_service = catalog.get_one::<dyn FlowQueryService>().unwrap();
         let flow_configuration_service = catalog.get_one::<dyn FlowConfigurationService>().unwrap();
         let flow_configuration_event_store = catalog
@@ -212,7 +212,7 @@ impl FlowHarness {
         Self {
             _tmp_dir: tmp_dir,
             catalog,
-            flow_executor,
+            flow_agent,
             flow_query_service,
             flow_configuration_service,
             flow_configuration_event_store,
@@ -281,7 +281,7 @@ impl FlowHarness {
             .await
             .unwrap();
 
-        self.flow_executor.run_initialization().await.unwrap();
+        self.flow_agent.run_initialization().await.unwrap();
     }
 
     pub async fn delete_dataset(&self, dataset_id: &DatasetID) {

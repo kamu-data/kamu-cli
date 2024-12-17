@@ -13,7 +13,7 @@ use internal_error::{InternalError, ResultIntoInternal};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait FlowExecutor: Sync + Send {
+pub trait FlowAgent: Sync + Send {
     /// Runs the update main loop
     async fn run(&self) -> Result<(), InternalError>;
 }
@@ -21,7 +21,7 @@ pub trait FlowExecutor: Sync + Send {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug)]
-pub struct FlowExecutorConfig {
+pub struct FlowAgentConfig {
     /// Defines discretion for main scheduling loop: how often new data is
     /// checked and processed
     pub awaiting_step: chrono::Duration,
@@ -29,7 +29,7 @@ pub struct FlowExecutorConfig {
     pub mandatory_throttling_period: chrono::Duration,
 }
 
-impl FlowExecutorConfig {
+impl FlowAgentConfig {
     pub fn new(
         awaiting_step: chrono::Duration,
         mandatory_throttling_period: chrono::Duration,

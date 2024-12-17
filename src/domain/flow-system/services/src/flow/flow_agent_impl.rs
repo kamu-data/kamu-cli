@@ -35,55 +35,55 @@ use tracing::Instrument as _;
 use crate::{
     FlowAbortHelper,
     FlowSchedulingHelper,
-    MESSAGE_CONSUMER_KAMU_FLOW_EXECUTOR,
+    MESSAGE_CONSUMER_KAMU_FLOW_AGENT,
+    MESSAGE_PRODUCER_KAMU_FLOW_AGENT,
     MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE,
-    MESSAGE_PRODUCER_KAMU_FLOW_EXECUTOR,
     MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct FlowExecutorImpl {
+pub struct FlowAgentImpl {
     catalog: Catalog,
     time_source: Arc<dyn SystemTimeSource>,
-    executor_config: Arc<FlowExecutorConfig>,
+    agent_config: Arc<FlowAgentConfig>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
-#[interface(dyn FlowExecutor)]
-#[interface(dyn FlowExecutorTestDriver)]
+#[interface(dyn FlowAgent)]
+#[interface(dyn FlowAgentTestDriver)]
 #[interface(dyn MessageConsumer)]
 #[interface(dyn MessageConsumerT<TaskProgressMessage>)]
 #[interface(dyn MessageConsumerT<DatasetLifecycleMessage>)]
 #[interface(dyn MessageConsumerT<FlowConfigurationUpdatedMessage>)]
 #[meta(MessageConsumerMeta {
-    consumer_name: MESSAGE_CONSUMER_KAMU_FLOW_EXECUTOR,
+    consumer_name: MESSAGE_CONSUMER_KAMU_FLOW_AGENT,
     feeding_producers: &[
         MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
-        MESSAGE_PRODUCER_KAMU_TASK_EXECUTOR,
+        MESSAGE_PRODUCER_KAMU_TASK_AGENT,
         MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE
     ],
     delivery: MessageDeliveryMechanism::Transactional,
 })]
 #[interface(dyn InitOnStartup)]
 #[meta(InitOnStartupMeta {
-    job_name: JOB_KAMU_FLOW_EXECUTOR_RECOVERY,
+    job_name: JOB_KAMU_FLOW_AGENT_RECOVERY,
     depends_on: &[],
     requires_transaction: false,
 })]
 #[scope(Singleton)]
-impl FlowExecutorImpl {
+impl FlowAgentImpl {
     pub fn new(
         catalog: Catalog,
         time_source: Arc<dyn SystemTimeSource>,
-        executor_config: Arc<FlowExecutorConfig>,
+        agent_config: Arc<FlowAgentConfig>,
     ) -> Self {
         Self {
             catalog,
             time_source,
-            executor_config,
+            agent_config,
         }
     }
 
@@ -106,10 +106,10 @@ impl FlowExecutorImpl {
         let outbox = transaction_catalog.get_one::<dyn Outbox>().unwrap();
         outbox
             .post_message(
-                MESSAGE_PRODUCER_KAMU_FLOW_EXECUTOR,
-                FlowExecutorUpdatedMessage {
+                MESSAGE_PRODUCER_KAMU_FLOW_AGENT,
+                FlowAgentUpdatedMessage {
                     update_time: start_time,
-                    update_details: FlowExecutorUpdateDetails::Loaded,
+                    update_details: FlowAgentUpdateDetails::Loaded,
                 },
             )
             .await?;
@@ -253,9 +253,7 @@ impl FlowExecutorImpl {
             flow_event_store,
             transaction_catalog,
         )
-        .instrument(observability::tracing::root_span!(
-            "FlowExecutor::activation"
-        ))
+        .instrument(observability::tracing::root_span!("FlowAgent::activation"))
         .await
     }
 
@@ -311,10 +309,10 @@ impl FlowExecutorImpl {
         let outbox = transaction_catalog.get_one::<dyn Outbox>().unwrap();
         outbox
             .post_message(
-                MESSAGE_PRODUCER_KAMU_FLOW_EXECUTOR,
-                FlowExecutorUpdatedMessage {
+                MESSAGE_PRODUCER_KAMU_FLOW_AGENT,
+                FlowAgentUpdatedMessage {
                     update_time: activation_moment,
-                    update_details: FlowExecutorUpdateDetails::ExecutedTimeslot,
+                    update_details: FlowAgentUpdateDetails::ExecutedTimeslot,
                 },
             )
             .await?;
@@ -446,18 +444,18 @@ impl FlowExecutorImpl {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl FlowExecutor for FlowExecutorImpl {
+impl FlowAgent for FlowAgentImpl {
     /// Runs the update main loop
     async fn run(&self) -> Result<(), InternalError> {
         // Main scanning loop
         loop {
             // Run scheduling for current time slot
             self.tick_current_timeslot()
-                .instrument(tracing::debug_span!("FlowExecutor::tick"))
+                .instrument(tracing::debug_span!("FlowAgent::tick"))
                 .await?;
 
             self.time_source
-                .sleep(self.executor_config.awaiting_step)
+                .sleep(self.agent_config.awaiting_step)
                 .await;
         }
     }
@@ -466,9 +464,9 @@ impl FlowExecutor for FlowExecutorImpl {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl InitOnStartup for FlowExecutorImpl {
+impl InitOnStartup for FlowAgentImpl {
     async fn run_initialization(&self) -> Result<(), InternalError> {
-        let start_time = self.executor_config.round_time(self.time_source.now())?;
+        let start_time = self.agent_config.round_time(self.time_source.now())?;
         self.recover_initial_flows_state(start_time).await
     }
 }
@@ -476,7 +474,7 @@ impl InitOnStartup for FlowExecutorImpl {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl FlowExecutorTestDriver for FlowExecutorImpl {
+impl FlowAgentTestDriver for FlowAgentImpl {
     /// Pretends it is time to schedule the given flow that was not waiting for
     /// anything else
     async fn mimic_flow_scheduled(
@@ -501,17 +499,13 @@ impl FlowExecutorTestDriver for FlowExecutorImpl {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl MessageConsumer for FlowExecutorImpl {}
+impl MessageConsumer for FlowAgentImpl {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl MessageConsumerT<TaskProgressMessage> for FlowExecutorImpl {
-    #[tracing::instrument(
-        level = "debug",
-        skip_all,
-        name = "FlowExecutorImpl[TaskProgressMessage]"
-    )]
+impl MessageConsumerT<TaskProgressMessage> for FlowAgentImpl {
+    #[tracing::instrument(level = "debug", skip_all, name = "FlowAgentImpl[TaskProgressMessage]")]
     async fn consume_message(
         &self,
         target_catalog: &Catalog,
@@ -570,7 +564,7 @@ impl MessageConsumerT<TaskProgressMessage> for FlowExecutorImpl {
                         let scheduling_helper =
                             target_catalog.get_one::<FlowSchedulingHelper>().unwrap();
 
-                        let finish_time = self.executor_config.round_time(message.event_time)?;
+                        let finish_time = self.agent_config.round_time(message.event_time)?;
 
                         // In case of success:
                         //  - execute followup method
@@ -633,11 +627,11 @@ impl MessageConsumerT<TaskProgressMessage> for FlowExecutorImpl {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl MessageConsumerT<FlowConfigurationUpdatedMessage> for FlowExecutorImpl {
+impl MessageConsumerT<FlowConfigurationUpdatedMessage> for FlowAgentImpl {
     #[tracing::instrument(
         level = "debug",
         skip_all,
-        name = "FlowExecutorImpl[FlowConfigurationUpdatedMessage]"
+        name = "FlowAgentImpl[FlowConfigurationUpdatedMessage]"
     )]
     async fn consume_message(
         &self,
@@ -662,7 +656,7 @@ impl MessageConsumerT<FlowConfigurationUpdatedMessage> for FlowExecutorImpl {
             let scheduling_helper = target_catalog.get_one::<FlowSchedulingHelper>().unwrap();
             scheduling_helper
                 .activate_flow_configuration(
-                    self.executor_config.round_time(message.event_time)?,
+                    self.agent_config.round_time(message.event_time)?,
                     message.flow_key.clone(),
                     message.rule.clone(),
                 )
@@ -676,11 +670,11 @@ impl MessageConsumerT<FlowConfigurationUpdatedMessage> for FlowExecutorImpl {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl MessageConsumerT<DatasetLifecycleMessage> for FlowExecutorImpl {
+impl MessageConsumerT<DatasetLifecycleMessage> for FlowAgentImpl {
     #[tracing::instrument(
         level = "debug",
         skip_all,
-        name = "FlowExecutorImpl[DatasetLifecycleMessage]"
+        name = "FlowAgentImpl[DatasetLifecycleMessage]"
     )]
     async fn consume_message(
         &self,

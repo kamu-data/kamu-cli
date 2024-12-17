@@ -15,7 +15,7 @@ use dill::Catalog;
 use internal_error::{InternalError, ResultIntoInternal};
 use tracing::Instrument;
 
-use super::{OutboxExecutorMetrics, OutboxRoutesStaticInfo, ProducerConsumptionTask};
+use super::{OutboxAgentMetrics, OutboxRoutesStaticInfo, ProducerConsumptionTask};
 use crate::{
     ConsumerFilter,
     MessageDispatcher,
@@ -37,7 +37,7 @@ pub(crate) struct ProducerConsumptionJob {
     producer_name: String,
     consumer_names: Vec<String>,
     failed_consumer_names: Mutex<HashSet<String>>,
-    metrics: Arc<OutboxExecutorMetrics>,
+    metrics: Arc<OutboxAgentMetrics>,
 }
 
 impl ProducerConsumptionJob {
@@ -46,7 +46,7 @@ impl ProducerConsumptionJob {
         routes_static_info: Arc<OutboxRoutesStaticInfo>,
         producer_name: String,
         consumer_names: Vec<String>,
-        metrics: Arc<OutboxExecutorMetrics>,
+        metrics: Arc<OutboxAgentMetrics>,
     ) -> Self {
         Self {
             catalog,

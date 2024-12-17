@@ -49,8 +49,8 @@ async fn test_deliver_messages_of_one_type() {
         body: "bar".to_string(),
     };
 
-    let harness = OutboxExecutorHarness::new();
-    harness.outbox_processor.run_initialization().await.unwrap();
+    let harness = OutboxAgentHarness::new();
+    harness.outbox_agent.run_initialization().await.unwrap();
 
     harness
         .outbox
@@ -76,7 +76,7 @@ async fn test_deliver_messages_of_one_type() {
 
     // Run iteration
     harness
-        .outbox_processor
+        .outbox_agent
         .run_single_iteration_only()
         .await
         .unwrap();
@@ -111,8 +111,8 @@ async fn test_deliver_messages_of_two_types() {
         body: "bar".to_string(),
     };
 
-    let harness = OutboxExecutorHarness::new();
-    harness.outbox_processor.run_initialization().await.unwrap();
+    let harness = OutboxAgentHarness::new();
+    harness.outbox_agent.run_initialization().await.unwrap();
 
     harness
         .outbox
@@ -138,7 +138,7 @@ async fn test_deliver_messages_of_two_types() {
 
     // Run iteration
     harness
-        .outbox_processor
+        .outbox_agent
         .run_single_iteration_only()
         .await
         .unwrap();
@@ -174,8 +174,8 @@ async fn test_deliver_messages_multiple_consumers() {
         body: "bar".to_string(),
     };
 
-    let harness = OutboxExecutorHarness::new();
-    harness.outbox_processor.run_initialization().await.unwrap();
+    let harness = OutboxAgentHarness::new();
+    harness.outbox_agent.run_initialization().await.unwrap();
 
     harness
         .outbox
@@ -201,7 +201,7 @@ async fn test_deliver_messages_multiple_consumers() {
 
     // Run iteration
     harness
-        .outbox_processor
+        .outbox_agent
         .run_single_iteration_only()
         .await
         .unwrap();
@@ -235,8 +235,8 @@ async fn test_deliver_messages_multiple_consumers() {
 
 #[test_log::test(tokio::test)]
 async fn test_deliver_messages_with_partial_consumption() {
-    let harness = OutboxExecutorHarness::new();
-    harness.outbox_processor.run_initialization().await.unwrap();
+    let harness = OutboxAgentHarness::new();
+    harness.outbox_agent.run_initialization().await.unwrap();
 
     let message_texts = ["foo", "bar", "baz", "super", "duper"];
     for message_text in message_texts {
@@ -285,7 +285,7 @@ async fn test_deliver_messages_with_partial_consumption() {
 
     // Run iteration
     harness
-        .outbox_processor
+        .outbox_agent
         .run_single_iteration_only()
         .await
         .unwrap();
@@ -325,19 +325,19 @@ async fn test_deliver_messages_with_partial_consumption() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-struct OutboxExecutorHarness {
+struct OutboxAgentHarness {
     catalog: Catalog,
-    outbox_processor: Arc<OutboxExecutor>,
+    outbox_agent: Arc<OutboxAgent>,
     outbox: Arc<dyn Outbox>,
     outbox_consumption_repository: Arc<dyn OutboxMessageConsumptionRepository>,
-    metrics: Arc<OutboxExecutorMetrics>,
+    metrics: Arc<OutboxAgentMetrics>,
 }
 
-impl OutboxExecutorHarness {
+impl OutboxAgentHarness {
     fn new() -> Self {
         let mut b = CatalogBuilder::new();
-        b.add::<OutboxExecutor>();
-        b.add::<OutboxExecutorMetrics>();
+        b.add::<OutboxAgent>();
+        b.add::<OutboxAgentMetrics>();
         b.add_value(OutboxConfig::default());
         b.add::<InMemoryOutboxMessageRepository>();
         b.add::<InMemoryOutboxMessageConsumptionRepository>();
@@ -358,7 +358,7 @@ impl OutboxExecutorHarness {
 
         let catalog = b.build();
 
-        let outbox_processor = catalog.get_one::<OutboxExecutor>().unwrap();
+        let outbox_agent = catalog.get_one::<OutboxAgent>().unwrap();
         let outbox = catalog.get_one::<dyn Outbox>().unwrap();
         let outbox_consumption_repository = catalog
             .get_one::<dyn OutboxMessageConsumptionRepository>()
@@ -367,7 +367,7 @@ impl OutboxExecutorHarness {
 
         Self {
             catalog,
-            outbox_processor,
+            outbox_agent,
             outbox,
             outbox_consumption_repository,
             metrics,

@@ -13,7 +13,7 @@ use std::sync::Arc;
 use internal_error::InternalError;
 
 use super::{
-    OutboxExecutorMetrics,
+    OutboxAgentMetrics,
     OutboxRoutesStaticInfo,
     ProducerConsumptionTask,
     UnconsumedProducerState,
@@ -31,7 +31,7 @@ pub(crate) struct OutboxConsumptionIterationPlanner {
     routes_static_info: Arc<OutboxRoutesStaticInfo>,
     outbox_message_repository: Arc<dyn OutboxMessageRepository>,
     outbox_message_consumption_repository: Arc<dyn OutboxMessageConsumptionRepository>,
-    metrics: Arc<OutboxExecutorMetrics>,
+    metrics: Arc<OutboxAgentMetrics>,
     messages_batch_size: usize,
 }
 
@@ -40,7 +40,7 @@ impl OutboxConsumptionIterationPlanner {
         routes_static_info: Arc<OutboxRoutesStaticInfo>,
         outbox_message_repository: Arc<dyn OutboxMessageRepository>,
         outbox_message_consumption_repository: Arc<dyn OutboxMessageConsumptionRepository>,
-        metrics: Arc<OutboxExecutorMetrics>,
+        metrics: Arc<OutboxAgentMetrics>,
         messages_batch_size: usize,
     ) -> Self {
         Self {

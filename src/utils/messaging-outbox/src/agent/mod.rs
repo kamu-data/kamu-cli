@@ -7,14 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod outbox_agent;
+mod outbox_agent_metrics;
+mod outbox_agent_shared;
 mod outbox_consumption_iteration_planner;
-mod outbox_executor;
-mod outbox_executor_metrics;
-mod outbox_executor_shared;
 mod outbox_producer_consumption_job;
 
+pub use outbox_agent::*;
+pub use outbox_agent_metrics::*;
+pub(crate) use outbox_agent_shared::*;
 pub(crate) use outbox_consumption_iteration_planner::*;
-pub use outbox_executor::*;
-pub use outbox_executor_metrics::*;
-pub(crate) use outbox_executor_shared::*;
 pub(crate) use outbox_producer_consumption_job::*;

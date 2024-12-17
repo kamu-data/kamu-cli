@@ -32,7 +32,7 @@ use time_source::SystemTimeSourceDefault;
 
 #[test_log::test(tokio::test)]
 async fn test_pre_run_requeues_running_tasks() {
-    let harness = TaskExecutorHarness::new(MockOutbox::new(), MockTaskRunner::new());
+    let harness = TaskAgentHarness::new(MockOutbox::new(), MockTaskRunner::new());
 
     // Schedule 3 tasks
     let task_id_1 = harness.schedule_probe_task().await;
@@ -73,24 +73,24 @@ async fn test_pre_run_requeues_running_tasks() {
 async fn test_run_single_task() {
     // Expect the only task to notify about Running and Finished transitions
     let mut mock_outbox = MockOutbox::new();
-    TaskExecutorHarness::add_outbox_task_expectations(&mut mock_outbox, TaskID::new(0));
+    TaskAgentHarness::add_outbox_task_expectations(&mut mock_outbox, TaskID::new(0));
 
     // Expect logical plan runner to run probe
     let mut mock_task_runner = MockTaskRunner::new();
-    TaskExecutorHarness::add_run_probe_plan_expectations(
+    TaskAgentHarness::add_run_probe_plan_expectations(
         &mut mock_task_runner,
         LogicalPlanProbe::default(),
         1,
     );
 
     // Schedule the only task
-    let harness = TaskExecutorHarness::new(mock_outbox, mock_task_runner);
+    let harness = TaskAgentHarness::new(mock_outbox, mock_task_runner);
     let task_id = harness.schedule_probe_task().await;
     let task = harness.get_task(task_id).await;
     assert_eq!(task.status(), TaskStatus::Queued);
 
     // Run execution loop
-    harness.task_executor.run_single_task().await.unwrap();
+    harness.task_agent.run_single_task().await.unwrap();
 
     // Check the task has Finished status at the end
     let task = harness.get_task(task_id).await;
@@ -103,19 +103,19 @@ async fn test_run_single_task() {
 async fn test_run_two_of_three_tasks() {
     // Expect 2 of 3 tasks to notify about Running and Finished transitions
     let mut mock_outbox = MockOutbox::new();
-    TaskExecutorHarness::add_outbox_task_expectations(&mut mock_outbox, TaskID::new(0));
-    TaskExecutorHarness::add_outbox_task_expectations(&mut mock_outbox, TaskID::new(1));
+    TaskAgentHarness::add_outbox_task_expectations(&mut mock_outbox, TaskID::new(0));
+    TaskAgentHarness::add_outbox_task_expectations(&mut mock_outbox, TaskID::new(1));
 
     // Expect logical plan runner to run probe twice
     let mut mock_task_runner = MockTaskRunner::new();
-    TaskExecutorHarness::add_run_probe_plan_expectations(
+    TaskAgentHarness::add_run_probe_plan_expectations(
         &mut mock_task_runner,
         LogicalPlanProbe::default(),
         2,
     );
 
     // Schedule 3 tasks
-    let harness = TaskExecutorHarness::new(mock_outbox, mock_task_runner);
+    let harness = TaskAgentHarness::new(mock_outbox, mock_task_runner);
     let task_id_1 = harness.schedule_probe_task().await;
     let task_id_2 = harness.schedule_probe_task().await;
     let task_id_3 = harness.schedule_probe_task().await;
@@ -129,8 +129,8 @@ async fn test_run_two_of_three_tasks() {
     assert_eq!(task_3.status(), TaskStatus::Queued);
 
     // Run execution loop twice
-    harness.task_executor.run_single_task().await.unwrap();
-    harness.task_executor.run_single_task().await.unwrap();
+    harness.task_agent.run_single_task().await.unwrap();
+    harness.task_agent.run_single_task().await.unwrap();
 
     // Check the 2 tasks Finished, 3rd is still Queued
     let task_1 = harness.get_task(task_id_1).await;
@@ -143,14 +143,14 @@ async fn test_run_two_of_three_tasks() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-struct TaskExecutorHarness {
+struct TaskAgentHarness {
     _tempdir: TempDir,
     catalog: Catalog,
-    task_executor: Arc<dyn TaskExecutor>,
+    task_agent: Arc<dyn TaskAgent>,
     task_scheduler: Arc<dyn TaskScheduler>,
 }
 
-impl TaskExecutorHarness {
+impl TaskAgentHarness {
     pub fn new(mock_outbox: MockOutbox, mock_task_runner: MockTaskRunner) -> Self {
         let tempdir = tempfile::tempdir().unwrap();
 
@@ -161,7 +161,7 @@ impl TaskExecutorHarness {
         std::fs::create_dir(&repos_dir).unwrap();
 
         let mut b = CatalogBuilder::new();
-        b.add::<TaskExecutorImpl>()
+        b.add::<TaskAgentImpl>()
             .add::<TaskSchedulerImpl>()
             .add::<InMemoryTaskEventStore>()
             .add::<TaskDefinitionPlannerImpl>()
@@ -196,13 +196,13 @@ impl TaskExecutorHarness {
 
         let catalog = b.build();
 
-        let task_executor = catalog.get_one().unwrap();
+        let task_agent = catalog.get_one().unwrap();
         let task_scheduler = catalog.get_one().unwrap();
 
         Self {
             _tempdir: tempdir,
             catalog,
-            task_executor,
+            task_agent,
             task_scheduler,
         }
     }
@@ -233,7 +233,7 @@ impl TaskExecutorHarness {
         mock_outbox
             .expect_post_message_as_json()
             .with(
-                eq(MESSAGE_PRODUCER_KAMU_TASK_EXECUTOR),
+                eq(MESSAGE_PRODUCER_KAMU_TASK_AGENT),
                 function(move |message_as_json: &serde_json::Value| {
                     matches!(
                         serde_json::from_value::<TaskProgressMessage>(message_as_json.clone()),
@@ -251,7 +251,7 @@ impl TaskExecutorHarness {
         mock_outbox
             .expect_post_message_as_json()
             .with(
-                eq(MESSAGE_PRODUCER_KAMU_TASK_EXECUTOR),
+                eq(MESSAGE_PRODUCER_KAMU_TASK_AGENT),
                 function(move |message_as_json: &serde_json::Value| {
                     matches!(
                         serde_json::from_value::<TaskProgressMessage>(message_as_json.clone()),

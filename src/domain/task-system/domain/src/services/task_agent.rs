@@ -12,8 +12,8 @@ use crate::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait TaskExecutor: Sync + Send {
-    /// Runs the executor main loop
+pub trait TaskAgent: Sync + Send {
+    /// Runs the agent main loop
     async fn run(&self) -> Result<(), InternalError>;
 
     /// Runs single task only, blocks until it is available (for tests only!)
