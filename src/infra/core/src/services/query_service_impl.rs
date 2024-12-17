@@ -54,10 +54,8 @@ impl QueryServiceImpl {
     async fn session_context(
         &self,
         options: QueryOptions,
-        session_config_overrides: Option<SessionConfigOverrides>,
     ) -> Result<SessionContext, InternalError> {
         let mut cfg = SessionConfig::new()
-            .with_target_partitions(1)
             .with_information_schema(true)
             .with_default_catalog_and_schema("kamu", "kamu");
 
@@ -74,18 +72,6 @@ impl QueryServiceImpl {
         // See: https://github.com/apache/datafusion/issues/13510
         // See: https://github.com/apache/datafusion/issues/13504
         cfg.options_mut().execution.parquet.schema_force_view_types = false;
-
-        if let Some(overrides) = session_config_overrides {
-            if let Some(val) = overrides.target_partitions {
-                cfg.options_mut().execution.target_partitions = val;
-            }
-            if let Some(val) = overrides.minimum_parallel_output_files {
-                cfg.options_mut().execution.minimum_parallel_output_files = val;
-            }
-            if let Some(val) = overrides.soft_max_rows_per_output_file {
-                cfg.options_mut().execution.soft_max_rows_per_output_file = val;
-            }
-        }
 
         let runtime_config = RuntimeConfig {
             object_store_registry: self.object_store_registry.clone().as_datafusion_registry(),
@@ -231,21 +217,18 @@ impl QueryServiceImpl {
         let resolved_dataset = self.resolve_dataset(dataset_ref).await?;
 
         let ctx = self
-            .session_context(
-                QueryOptions {
-                    input_datasets: BTreeMap::from([(
-                        resolved_dataset.get_id().clone(),
-                        QueryOptionsDataset {
-                            alias: resolved_dataset.get_alias().to_string(),
-                            block_hash: None,
-                            hints: Some(DatasetQueryHints {
-                                last_records_to_consider,
-                            }),
-                        },
-                    )]),
-                },
-                None,
-            )
+            .session_context(QueryOptions {
+                input_datasets: BTreeMap::from([(
+                    resolved_dataset.get_id().clone(),
+                    QueryOptionsDataset {
+                        alias: resolved_dataset.get_alias().to_string(),
+                        block_hash: None,
+                        hints: Some(DatasetQueryHints {
+                            last_records_to_consider,
+                        }),
+                    },
+                )]),
+            })
             .await?;
 
         let df = ctx
@@ -347,16 +330,7 @@ impl QueryServiceImpl {
 impl QueryService for QueryServiceImpl {
     #[tracing::instrument(level = "info", skip_all)]
     async fn create_session(&self) -> Result<SessionContext, CreateSessionError> {
-        Ok(self.session_context(QueryOptions::default(), None).await?)
-    }
-
-    async fn create_session_with_config_overrides(
-        &self,
-        overrides: SessionConfigOverrides,
-    ) -> Result<SessionContext, CreateSessionError> {
-        Ok(self
-            .session_context(QueryOptions::default(), Some(overrides))
-            .await?)
+        Ok(self.session_context(QueryOptions::default()).await?)
     }
 
     #[tracing::instrument(
@@ -438,7 +412,7 @@ impl QueryService for QueryServiceImpl {
                 })
                 .collect(),
         };
-        let ctx = self.session_context(options, None).await?;
+        let ctx = self.session_context(options).await?;
         let df = ctx.sql(statement).await?;
 
         Ok(QueryResponse { df, state })
@@ -457,7 +431,7 @@ impl QueryService for QueryServiceImpl {
         &self,
         dataset_ref: &DatasetRef,
     ) -> Result<Option<Type>, QueryError> {
-        let ctx = self.session_context(QueryOptions::default(), None).await?;
+        let ctx = self.session_context(QueryOptions::default()).await?;
         self.get_schema_parquet_impl(&ctx, dataset_ref).await
     }
 
