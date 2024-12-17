@@ -12,7 +12,9 @@ use std::assert_matches::assert_matches;
 use chrono::{SubsecRound, Utc};
 use database_common::PaginationOpts;
 use dill::Catalog;
+use kamu_accounts::AccountRepository;
 use kamu_datasets::{
+    DatasetEntryRepository,
     DatasetEnvVar,
     DatasetEnvVarRepository,
     DatasetEnvVarValue,
@@ -24,6 +26,8 @@ use kamu_datasets::{
 use opendatafabric::DatasetID;
 use secrecy::SecretString;
 use uuid::Uuid;
+
+use crate::helpers::{new_account, new_dataset_entry_with};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -282,6 +286,79 @@ pub async fn test_modify_dataset_env_vars(catalog: &Catalog) {
             .unwrap(),
         std::str::from_utf8(new_value.as_slice()).unwrap()
     );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_delete_all_dataset_env_vars(catalog: &Catalog) {
+    let dataset_env_var_repo = catalog.get_one::<dyn DatasetEnvVarRepository>().unwrap();
+    let dataset_entry_repo = catalog.get_one::<dyn DatasetEntryRepository>().unwrap();
+    let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
+
+    let account = new_account(&account_repo).await;
+    let entry_foo = new_dataset_entry_with(&account, "foo");
+
+    dataset_entry_repo
+        .save_dataset_entry(&entry_foo)
+        .await
+        .unwrap();
+
+    let new_dataset_env_var = DatasetEnvVar::new(
+        "foo",
+        Utc::now().round_subsecs(6),
+        &DatasetEnvVarValue::Regular("foo".to_string()),
+        &entry_foo.id,
+        SAMPLE_DATASET_ENV_VAR_ENCRYPTION_KEY,
+    )
+    .unwrap();
+    let new_bar_dataset_env_var = DatasetEnvVar::new(
+        "bar",
+        Utc::now().round_subsecs(6),
+        &DatasetEnvVarValue::Regular("bar".to_string()),
+        &entry_foo.id,
+        SAMPLE_DATASET_ENV_VAR_ENCRYPTION_KEY,
+    )
+    .unwrap();
+    let save_result = dataset_env_var_repo
+        .save_dataset_env_var(&new_dataset_env_var)
+        .await;
+    assert!(save_result.is_ok());
+    let save_result = dataset_env_var_repo
+        .save_dataset_env_var(&new_bar_dataset_env_var)
+        .await;
+    assert!(save_result.is_ok());
+
+    let db_dataset_env_vars = dataset_env_var_repo
+        .get_all_dataset_env_vars_by_dataset_id(
+            &entry_foo.id,
+            &PaginationOpts {
+                offset: 0,
+                limit: 5,
+            },
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(
+        db_dataset_env_vars,
+        vec![new_dataset_env_var.clone(), new_bar_dataset_env_var.clone()]
+    );
+
+    let res = dataset_entry_repo.delete_dataset_entry(&entry_foo.id).await;
+    assert_matches!(res, Ok(()));
+
+    let db_dataset_env_vars = dataset_env_var_repo
+        .get_all_dataset_env_vars_by_dataset_id(
+            &entry_foo.id,
+            &PaginationOpts {
+                offset: 0,
+                limit: 5,
+            },
+        )
+        .await
+        .unwrap();
+
+    assert!(db_dataset_env_vars.is_empty());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

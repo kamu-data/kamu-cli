@@ -10,8 +10,9 @@
 use database_common::SqliteTransactionManager;
 use database_common_macros::database_transactional_test;
 use dill::{Catalog, CatalogBuilder};
+use kamu_accounts_sqlite::SqliteAccountRepository;
 use kamu_datasets_repo_tests::dataset_env_var_repo;
-use kamu_datasets_sqlite::SqliteDatasetEnvVarRepository;
+use kamu_datasets_sqlite::{SqliteDatasetEntryRepository, SqliteDatasetEnvVarRepository};
 use sqlx::SqlitePool;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -56,6 +57,14 @@ database_transactional_test!(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+database_transactional_test!(
+    storage = sqlite,
+    fixture = dataset_env_var_repo::test_delete_all_dataset_env_vars,
+    harness = SqliteDatasetEnvVarRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 struct SqliteDatasetEnvVarRepositoryHarness {
     catalog: Catalog,
 }
@@ -66,6 +75,9 @@ impl SqliteDatasetEnvVarRepositoryHarness {
         let mut catalog_builder = CatalogBuilder::new();
         catalog_builder.add_value(sqlite_pool);
         catalog_builder.add::<SqliteTransactionManager>();
+
+        catalog_builder.add::<SqliteAccountRepository>();
+        catalog_builder.add::<SqliteDatasetEntryRepository>();
         catalog_builder.add::<SqliteDatasetEnvVarRepository>();
 
         Self {
