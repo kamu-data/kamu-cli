@@ -25,13 +25,6 @@ pub trait QueryService: Send + Sync {
     /// Creates an SQL session for the current user
     async fn create_session(&self) -> Result<SessionContext, CreateSessionError>;
 
-    /// Creates an SQL session for the current user with session context config
-    /// overrides
-    async fn create_session_with_config_overrides(
-        &self,
-        overrides: SessionConfigOverrides,
-    ) -> Result<SessionContext, CreateSessionError>;
-
     /// Returns the specified number of the latest records in the dataset
     /// This is equivalent to SQL query like:
     ///
@@ -150,13 +143,6 @@ pub struct QueryStateDataset {
     /// Last block hash that was considered during the
     /// query planning
     pub block_hash: Multihash,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SessionConfigOverrides {
-    pub target_partitions: Option<usize>,
-    pub soft_max_rows_per_output_file: Option<usize>,
-    pub minimum_parallel_output_files: Option<usize>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
