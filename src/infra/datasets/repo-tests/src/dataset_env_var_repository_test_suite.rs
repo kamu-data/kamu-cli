@@ -66,17 +66,26 @@ pub async fn test_missing_dataset_env_var_not_found(catalog: &Catalog) {
 
 pub async fn test_insert_and_get_dataset_env_var(catalog: &Catalog) {
     let dataset_env_var_repo = catalog.get_one::<dyn DatasetEnvVarRepository>().unwrap();
+    let dataset_entry_repo = catalog.get_one::<dyn DatasetEntryRepository>().unwrap();
+    let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
+
     let dataset_env_var_key = "foo";
     let dataset_env_var_key_string = "foo_value".to_string();
     let dataset_env_var_value =
         DatasetEnvVarValue::Secret(SecretString::from(dataset_env_var_key_string.clone()));
-    let dataset_id = DatasetID::new_seeded_ed25519(b"foo");
+
+    let account = new_account(&account_repo).await;
+    let entry_foo = new_dataset_entry_with(&account, "foo");
+    dataset_entry_repo
+        .save_dataset_entry(&entry_foo)
+        .await
+        .unwrap();
 
     let new_dataset_env_var = DatasetEnvVar::new(
         dataset_env_var_key,
         Utc::now().round_subsecs(6),
         &dataset_env_var_value,
-        &dataset_id,
+        &entry_foo.id,
         SAMPLE_DATASET_ENV_VAR_ENCRYPTION_KEY,
     )
     .unwrap();
@@ -93,14 +102,14 @@ pub async fn test_insert_and_get_dataset_env_var(catalog: &Catalog) {
     assert_eq!(db_dataset_env_var, new_dataset_env_var);
 
     let db_dataset_env_var = dataset_env_var_repo
-        .get_dataset_env_var_by_key_and_dataset_id(dataset_env_var_key, &dataset_id)
+        .get_dataset_env_var_by_key_and_dataset_id(dataset_env_var_key, &entry_foo.id)
         .await
         .unwrap();
     assert_eq!(db_dataset_env_var, new_dataset_env_var);
 
     let db_dataset_env_vars = dataset_env_var_repo
         .get_all_dataset_env_vars_by_dataset_id(
-            &dataset_id,
+            &entry_foo.id,
             &PaginationOpts {
                 offset: 0,
                 limit: 5,
@@ -115,18 +124,28 @@ pub async fn test_insert_and_get_dataset_env_var(catalog: &Catalog) {
 
 pub async fn test_insert_and_get_multiple_dataset_env_vars(catalog: &Catalog) {
     let dataset_env_var_repo = catalog.get_one::<dyn DatasetEnvVarRepository>().unwrap();
+    let dataset_entry_repo = catalog.get_one::<dyn DatasetEntryRepository>().unwrap();
+    let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
+
     let secret_dataset_env_var_key = "foo";
     let secret_dataset_env_var_key_string = "foo_value".to_string();
     let secret_dataset_env_var_value = DatasetEnvVarValue::Secret(SecretString::from(
         secret_dataset_env_var_key_string.clone(),
     ));
-    let dataset_id = DatasetID::new_seeded_ed25519(b"foo");
+
+    let account = new_account(&account_repo).await;
+    let entry_foo = new_dataset_entry_with(&account, "foo");
+
+    dataset_entry_repo
+        .save_dataset_entry(&entry_foo)
+        .await
+        .unwrap();
 
     let new_secret_dataset_env_var = DatasetEnvVar::new(
         secret_dataset_env_var_key,
         Utc::now().round_subsecs(6),
         &secret_dataset_env_var_value,
-        &dataset_id,
+        &entry_foo.id,
         SAMPLE_DATASET_ENV_VAR_ENCRYPTION_KEY,
     )
     .unwrap();
@@ -139,7 +158,7 @@ pub async fn test_insert_and_get_multiple_dataset_env_vars(catalog: &Catalog) {
         dataset_env_var_key,
         Utc::now().round_subsecs(6),
         &dataset_env_var_value,
-        &dataset_id,
+        &entry_foo.id,
         SAMPLE_DATASET_ENV_VAR_ENCRYPTION_KEY,
     )
     .unwrap();
@@ -155,7 +174,7 @@ pub async fn test_insert_and_get_multiple_dataset_env_vars(catalog: &Catalog) {
 
     let mut db_dataset_env_vars = dataset_env_var_repo
         .get_all_dataset_env_vars_by_dataset_id(
-            &dataset_id,
+            &entry_foo.id,
             &PaginationOpts {
                 offset: 0,
                 limit: 5,
@@ -171,7 +190,7 @@ pub async fn test_insert_and_get_multiple_dataset_env_vars(catalog: &Catalog) {
     );
 
     let db_dataset_env_vars_count = dataset_env_var_repo
-        .get_all_dataset_env_vars_count_by_dataset_id(&dataset_id)
+        .get_all_dataset_env_vars_count_by_dataset_id(&entry_foo.id)
         .await
         .unwrap();
 
@@ -182,13 +201,22 @@ pub async fn test_insert_and_get_multiple_dataset_env_vars(catalog: &Catalog) {
 
 pub async fn test_delete_dataset_env_vars(catalog: &Catalog) {
     let dataset_env_var_repo = catalog.get_one::<dyn DatasetEnvVarRepository>().unwrap();
+    let dataset_entry_repo = catalog.get_one::<dyn DatasetEntryRepository>().unwrap();
+    let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
 
-    let dataset_id = DatasetID::new_seeded_ed25519(b"foo");
+    let account = new_account(&account_repo).await;
+    let entry_foo = new_dataset_entry_with(&account, "foo");
+
+    dataset_entry_repo
+        .save_dataset_entry(&entry_foo)
+        .await
+        .unwrap();
+
     let new_dataset_env_var = DatasetEnvVar::new(
         "foo",
         Utc::now().round_subsecs(6),
         &DatasetEnvVarValue::Regular("foo".to_string()),
-        &dataset_id,
+        &entry_foo.id,
         SAMPLE_DATASET_ENV_VAR_ENCRYPTION_KEY,
     )
     .unwrap();
@@ -196,7 +224,7 @@ pub async fn test_delete_dataset_env_vars(catalog: &Catalog) {
         "bar",
         Utc::now().round_subsecs(6),
         &DatasetEnvVarValue::Regular("bar".to_string()),
-        &dataset_id,
+        &entry_foo.id,
         SAMPLE_DATASET_ENV_VAR_ENCRYPTION_KEY,
     )
     .unwrap();
@@ -223,7 +251,7 @@ pub async fn test_delete_dataset_env_vars(catalog: &Catalog) {
 
     let db_dataset_env_vars = dataset_env_var_repo
         .get_all_dataset_env_vars_by_dataset_id(
-            &dataset_id,
+            &entry_foo.id,
             &PaginationOpts {
                 offset: 0,
                 limit: 5,
@@ -239,12 +267,22 @@ pub async fn test_delete_dataset_env_vars(catalog: &Catalog) {
 
 pub async fn test_modify_dataset_env_vars(catalog: &Catalog) {
     let dataset_env_var_repo = catalog.get_one::<dyn DatasetEnvVarRepository>().unwrap();
+    let dataset_entry_repo = catalog.get_one::<dyn DatasetEntryRepository>().unwrap();
+    let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
+
+    let account = new_account(&account_repo).await;
+    let entry_foo = new_dataset_entry_with(&account, "foo");
+
+    dataset_entry_repo
+        .save_dataset_entry(&entry_foo)
+        .await
+        .unwrap();
 
     let new_dataset_env_var = DatasetEnvVar::new(
         "foo",
         Utc::now().round_subsecs(6),
         &DatasetEnvVarValue::Regular("foo".to_string()),
-        &DatasetID::new_seeded_ed25519(b"foo"),
+        &entry_foo.id,
         SAMPLE_DATASET_ENV_VAR_ENCRYPTION_KEY,
     )
     .unwrap();
@@ -359,6 +397,14 @@ pub async fn test_delete_all_dataset_env_vars(catalog: &Catalog) {
         .unwrap();
 
     assert!(db_dataset_env_vars.is_empty());
+    let res = dataset_env_var_repo
+        .get_dataset_env_var_by_id(&new_bar_dataset_env_var.id)
+        .await;
+    assert_matches!(res, Err(GetDatasetEnvVarError::NotFound(_)));
+    let res = dataset_env_var_repo
+        .get_dataset_env_var_by_key_and_dataset_id(&new_dataset_env_var.key, &entry_foo.id)
+        .await;
+    assert_matches!(res, Err(GetDatasetEnvVarError::NotFound(_)));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
