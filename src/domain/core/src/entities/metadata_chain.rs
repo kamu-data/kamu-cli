@@ -162,17 +162,17 @@ pub trait MetadataChainExt: MetadataChain {
     async fn accept_by_ref<E>(
         &self,
         visitors: &mut [&mut dyn MetadataChainVisitor<Error = E>],
-        head: &BlockRef,
+        block_ref: &BlockRef,
     ) -> Result<(), AcceptVisitorError<E>>
     where
         E: Error + Send,
     {
-        let head_hash = self
-            .resolve_ref(head)
+        let block_ref_hash = self
+            .resolve_ref(block_ref)
             .await
             .map_err(IterBlocksError::from)?;
 
-        self.accept_by_hash(visitors, &head_hash).await
+        self.accept_by_hash(visitors, &block_ref_hash).await
     }
 
     /// Same as [Self::accept()], allowing us to define the block interval under

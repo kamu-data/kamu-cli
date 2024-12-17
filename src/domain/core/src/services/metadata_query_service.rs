@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use chrono::{DateTime, Utc};
 use internal_error::InternalError;
 use opendatafabric as odf;
 
@@ -39,6 +40,12 @@ pub trait MetadataQueryService: Send + Sync {
         &self,
         target: ResolvedDataset,
     ) -> Result<Option<(odf::Multihash, odf::MetadataBlockTyped<odf::SetTransform>)>, InternalError>;
+
+    /// Attempt reading watermark that is currently associated with a dataset
+    async fn try_get_current_watermark(
+        &self,
+        dataset: ResolvedDataset,
+    ) -> Result<Option<DateTime<Utc>>, InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

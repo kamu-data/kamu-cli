@@ -12,13 +12,21 @@ use std::sync::Arc;
 
 use chrono::{DateTime, TimeZone, Utc};
 use kamu::testing::BaseRepoHarness;
-use kamu::{RemoteAliasesRegistryImpl, WatermarkServiceImpl};
+use kamu::{
+    MetadataQueryServiceImpl,
+    RemoteAliasesRegistryImpl,
+    SetWatermarkExecutionServiceImpl,
+    SetWatermarkPlannerImpl,
+};
 use kamu_core::{
+    MetadataQueryService,
     ResolvedDataset,
     SetWatermarkError,
+    SetWatermarkExecutionService,
+    SetWatermarkPlanner,
+    SetWatermarkPlanningError,
     SetWatermarkResult,
     TenancyConfig,
-    WatermarkService,
 };
 use opendatafabric::{DatasetAlias, DatasetName};
 
@@ -135,7 +143,9 @@ async fn test_set_watermark_rejects_on_derivative() {
                 Utc.with_ymd_and_hms(2000, 1, 2, 0, 0, 0).unwrap()
             )
             .await,
-        Err(SetWatermarkError::IsDerivative)
+        Err(SetWatermarkError::Planning(
+            SetWatermarkPlanningError::IsDerivative
+        ))
     );
 
     assert_eq!(harness.num_blocks(ResolvedDataset::from(&derived)).await, 2);
@@ -152,7 +162,9 @@ async fn test_set_watermark_rejects_on_derivative() {
 #[oop::extend(BaseRepoHarness, base_repo_harness)]
 struct WatermarkTestHarness {
     base_repo_harness: BaseRepoHarness,
-    watermark_svc: Arc<dyn WatermarkService>,
+    set_watermark_planner: Arc<dyn SetWatermarkPlanner>,
+    set_watermark_execution_svc: Arc<dyn SetWatermarkExecutionService>,
+    metadata_query_svc: Arc<dyn MetadataQueryService>,
 }
 
 impl WatermarkTestHarness {
@@ -161,12 +173,16 @@ impl WatermarkTestHarness {
 
         let catalog = dill::CatalogBuilder::new_chained(base_repo_harness.catalog())
             .add::<RemoteAliasesRegistryImpl>()
-            .add::<WatermarkServiceImpl>()
+            .add::<SetWatermarkPlannerImpl>()
+            .add::<SetWatermarkExecutionServiceImpl>()
+            .add::<MetadataQueryServiceImpl>()
             .build();
 
         Self {
             base_repo_harness,
-            watermark_svc: catalog.get_one().unwrap(),
+            set_watermark_planner: catalog.get_one().unwrap(),
+            set_watermark_execution_svc: catalog.get_one().unwrap(),
+            metadata_query_svc: catalog.get_one().unwrap(),
         }
     }
 
@@ -175,13 +191,21 @@ impl WatermarkTestHarness {
         target: ResolvedDataset,
         new_watermark: DateTime<Utc>,
     ) -> Result<SetWatermarkResult, SetWatermarkError> {
-        self.watermark_svc
-            .set_watermark(target, new_watermark)
-            .await
+        let plan = self
+            .set_watermark_planner
+            .build_set_watermark_plan(target.clone(), new_watermark)
+            .await?;
+
+        let result = self
+            .set_watermark_execution_svc
+            .execute_set_watermark(target, plan)
+            .await?;
+
+        Ok(result)
     }
 
     async fn current_watermark(&self, target: ResolvedDataset) -> Option<DateTime<Utc>> {
-        self.watermark_svc
+        self.metadata_query_svc
             .try_get_current_watermark(target)
             .await
             .unwrap()

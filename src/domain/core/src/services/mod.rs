@@ -14,11 +14,13 @@ pub mod compaction;
 pub mod ingest;
 pub mod reset;
 pub mod transform;
+pub mod watermark;
 
 pub use compaction::*;
 pub use ingest::*;
 pub use reset::*;
 pub use transform::*;
+pub use watermark::*;
 
 pub mod dataset_changes_service;
 pub mod dataset_ownership_service;
@@ -39,7 +41,6 @@ pub mod search_service;
 pub mod server_url_config;
 pub mod sync_service;
 pub mod verification_service;
-pub mod watermark_service;
 
 pub use dataset_changes_service::*;
 pub use dataset_ownership_service::*;
@@ -60,4 +61,3 @@ pub use search_service::*;
 pub use server_url_config::*;
 pub use sync_service::*;
 pub use verification_service::*;
-pub use watermark_service::*;

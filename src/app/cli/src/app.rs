@@ -411,7 +411,8 @@ pub fn configure_base_catalog(
 
     b.add::<PushRequestPlannerImpl>();
 
-    b.add::<WatermarkServiceImpl>();
+    b.add::<SetWatermarkPlannerImpl>();
+    b.add::<SetWatermarkExecutionServiceImpl>();
 
     b.add::<RemoteStatusServiceImpl>();
 

@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use chrono::{DateTime, Utc};
 use dill::*;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_core::*;
@@ -72,6 +73,25 @@ impl MetadataQueryService for MetadataQueryServiceImpl {
             .await
             .int_err()?
             .into_hashed_block())
+    }
+
+    /// Attempt reading watermark that is currently associated with a dataset
+    #[tracing::instrument(level = "info", skip_all)]
+    async fn try_get_current_watermark(
+        &self,
+        resolved_dataset: ResolvedDataset,
+    ) -> Result<Option<DateTime<Utc>>, InternalError> {
+        let mut add_data_visitor = SearchAddDataVisitor::new();
+
+        resolved_dataset
+            .as_metadata_chain()
+            .accept(&mut [&mut add_data_visitor])
+            .await
+            .int_err()?;
+
+        let current_watermark = add_data_visitor.into_event().and_then(|e| e.new_watermark);
+
+        Ok(current_watermark)
     }
 }
 

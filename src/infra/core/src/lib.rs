@@ -31,6 +31,7 @@ pub mod testing;
 mod transform;
 mod use_cases;
 pub mod utils;
+mod watermark;
 
 pub use compaction::*;
 pub use engine::*;
@@ -39,6 +40,7 @@ pub use repos::*;
 pub use reset::*;
 pub use transform::*;
 pub use use_cases::*;
+pub use watermark::*;
 
 mod dataset_changes_service_impl;
 mod dataset_config;
@@ -59,7 +61,6 @@ mod search_service_impl;
 mod sync_request_builder;
 mod sync_service_impl;
 mod verification_service_impl;
-mod watermark_service_impl;
 
 pub use dataset_changes_service_impl::*;
 pub use dataset_config::*;
@@ -80,4 +81,3 @@ pub use search_service_impl::*;
 pub use sync_request_builder::*;
 pub use sync_service_impl::*;
 pub use verification_service_impl::*;
-pub use watermark_service_impl::*;
