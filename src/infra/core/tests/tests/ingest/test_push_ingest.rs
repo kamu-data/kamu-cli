@@ -768,7 +768,7 @@ struct IngestTestHarness {
     dataset_registry: Arc<dyn DatasetRegistry>,
     dataset_repo_writer: Arc<dyn DatasetRepositoryWriter>,
     push_ingest_planner: Arc<dyn PushIngestPlanner>,
-    push_ingest_svc: Arc<dyn PushIngestService>,
+    push_ingest_executor: Arc<dyn PushIngestExecutor>,
     ctx: SessionContext,
 }
 
@@ -800,7 +800,7 @@ impl IngestTestHarness {
             .add::<ObjectStoreRegistryImpl>()
             .add::<ObjectStoreBuilderLocalFs>()
             .add::<DataFormatRegistryImpl>()
-            .add::<PushIngestServiceImpl>()
+            .add::<PushIngestExecutorImpl>()
             .add::<PushIngestPlannerImpl>()
             .build();
 
@@ -809,7 +809,7 @@ impl IngestTestHarness {
             dataset_registry: catalog.get_one().unwrap(),
             dataset_repo_writer: catalog.get_one().unwrap(),
             push_ingest_planner: catalog.get_one().unwrap(),
-            push_ingest_svc: catalog.get_one().unwrap(),
+            push_ingest_executor: catalog.get_one().unwrap(),
             ctx: SessionContext::new_with_config(SessionConfig::new().with_target_partitions(1)),
         }
     }
@@ -847,7 +847,7 @@ impl IngestTestHarness {
             .await
             .unwrap();
 
-        self.push_ingest_svc
+        self.push_ingest_executor
             .ingest_from_file_stream(target, ingest_plan, data, None)
             .await
             .unwrap();
@@ -868,7 +868,7 @@ impl IngestTestHarness {
             .await
             .unwrap();
 
-        self.push_ingest_svc
+        self.push_ingest_executor
             .ingest_from_url(target, ingest_plan, url, None)
             .await
             .unwrap();

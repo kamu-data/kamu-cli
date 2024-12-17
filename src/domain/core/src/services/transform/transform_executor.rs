@@ -28,7 +28,7 @@ use crate::{
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait TransformExecutionService: Send + Sync {
+pub trait TransformExecutor: Send + Sync {
     async fn execute_transform(
         &self,
         target: ResolvedDataset,

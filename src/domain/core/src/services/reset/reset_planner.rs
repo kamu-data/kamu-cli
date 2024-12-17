@@ -17,7 +17,7 @@ use crate::ResolvedDataset;
 
 #[async_trait::async_trait]
 pub trait ResetPlanner: Send + Sync {
-    async fn build_reset_plan(
+    async fn plan_reset(
         &self,
         target: ResolvedDataset,
         maybe_new_head: Option<&odf::Multihash>,

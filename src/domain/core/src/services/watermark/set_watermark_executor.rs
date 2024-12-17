@@ -24,8 +24,8 @@ use crate::{ResolvedDataset, SetWatermarkPlan};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait SetWatermarkExecutionService: Send + Sync {
-    async fn execute_set_watermark(
+pub trait SetWatermarkExecutor: Send + Sync {
+    async fn execute(
         &self,
         target: ResolvedDataset,
         plan: SetWatermarkPlan,

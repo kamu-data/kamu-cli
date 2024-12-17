@@ -8,11 +8,11 @@
 // by the Apache License, Version 2.0.
 
 mod transform_elaboration_service_impl;
-mod transform_execution_service_impl;
+mod transform_executor_impl;
 mod transform_helpers;
 mod transform_request_planner_impl;
 
 pub use transform_elaboration_service_impl::*;
-pub use transform_execution_service_impl::*;
+pub use transform_executor_impl::*;
 pub(crate) use transform_helpers::*;
 pub use transform_request_planner_impl::*;

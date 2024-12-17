@@ -316,7 +316,7 @@ struct TestHarness {
     temp_dir: tempfile::TempDir,
     catalog: Catalog,
     push_ingest_planner: Arc<dyn PushIngestPlanner>,
-    push_ingest_svc: Arc<dyn PushIngestService>,
+    push_ingest_executor: Arc<dyn PushIngestExecutor>,
     api_server: TestAPIServer,
 }
 
@@ -359,7 +359,7 @@ impl TestHarness {
                 ))
                 .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
                 .add::<EngineProvisionerNull>()
-                .add::<PushIngestServiceImpl>()
+                .add::<PushIngestExecutorImpl>()
                 .add::<PushIngestPlannerImpl>()
                 .add::<QueryServiceImpl>()
                 .add_value(ServerUrlConfig::new_test(None));
@@ -370,7 +370,7 @@ impl TestHarness {
         };
 
         let push_ingest_planner = catalog.get_one::<dyn PushIngestPlanner>().unwrap();
-        let push_ingest_svc = catalog.get_one::<dyn PushIngestService>().unwrap();
+        let push_ingest_executor = catalog.get_one::<dyn PushIngestExecutor>().unwrap();
 
         let api_server =
             TestAPIServer::new(catalog.clone(), None, None, TenancyConfig::SingleTenant).await;
@@ -379,7 +379,7 @@ impl TestHarness {
             temp_dir,
             catalog,
             push_ingest_planner,
-            push_ingest_svc,
+            push_ingest_executor,
             api_server,
         }
     }
@@ -449,7 +449,7 @@ impl TestHarness {
             .await
             .unwrap();
 
-        self.push_ingest_svc
+        self.push_ingest_executor
             .ingest_from_url(target, ingest_plan, url, None)
             .await
             .unwrap();

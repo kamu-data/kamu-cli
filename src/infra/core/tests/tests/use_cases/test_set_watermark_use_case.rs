@@ -81,7 +81,7 @@ impl SetWatermarkUseCaseHarness {
         let catalog = dill::CatalogBuilder::new_chained(base_harness.catalog())
             .add::<SetWatermarkUseCaseImpl>()
             .add::<SetWatermarkPlannerImpl>()
-            .add::<SetWatermarkExecutionServiceImpl>()
+            .add::<SetWatermarkExecutorImpl>()
             .add::<RemoteAliasesRegistryImpl>()
             .add::<MetadataQueryServiceImpl>()
             .build();

@@ -23,7 +23,7 @@ use crate::build_preliminary_request_ext;
 
 pub struct TransformElaborationServiceImpl {
     compaction_planner: Arc<dyn CompactionPlanner>,
-    compaction_execution_svc: Arc<dyn CompactionExecutionService>,
+    compaction_executor: Arc<dyn CompactionExecutor>,
     time_source: Arc<dyn SystemTimeSource>,
 }
 
@@ -32,12 +32,12 @@ pub struct TransformElaborationServiceImpl {
 impl TransformElaborationServiceImpl {
     pub fn new(
         compaction_planner: Arc<dyn CompactionPlanner>,
-        compaction_execution_svc: Arc<dyn CompactionExecutionService>,
+        compaction_executor: Arc<dyn CompactionExecutor>,
         time_source: Arc<dyn SystemTimeSource>,
     ) -> Self {
         Self {
             compaction_planner,
-            compaction_execution_svc,
+            compaction_executor,
             time_source,
         }
     }
@@ -191,7 +191,7 @@ impl TransformElaborationService for TransformElaborationServiceImpl {
 
                 let compaction_plan = self
                     .compaction_planner
-                    .build_compaction_plan(
+                    .plan_compaction(
                         target.clone(),
                         CompactionOptions {
                             keep_metadata_only: true,
@@ -203,8 +203,8 @@ impl TransformElaborationService for TransformElaborationServiceImpl {
                     .int_err()?;
 
                 let compaction_result = self
-                    .compaction_execution_svc
-                    .execute_compaction(target.clone(), compaction_plan, None)
+                    .compaction_executor
+                    .execute(target.clone(), compaction_plan, None)
                     .await
                     .int_err()?;
 

@@ -15,14 +15,14 @@ use kamu_ingest_datafusion::DataWriterDataFusion;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
-#[interface(dyn SetWatermarkExecutionService)]
-pub struct SetWatermarkExecutionServiceImpl {}
+#[interface(dyn SetWatermarkExecutor)]
+pub struct SetWatermarkExecutorImpl {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl SetWatermarkExecutionService for SetWatermarkExecutionServiceImpl {
-    async fn execute_set_watermark(
+impl SetWatermarkExecutor for SetWatermarkExecutorImpl {
+    async fn execute(
         &self,
         target: ResolvedDataset,
         plan: SetWatermarkPlan,

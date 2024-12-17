@@ -70,7 +70,7 @@ async fn test_engine_io_common<
         Arc::new(DatasetRegistryRepoBridge::new(dataset_repo.clone())),
         time_source.clone(),
         Arc::new(CompactionPlannerImpl {}),
-        Arc::new(CompactionExecutionServiceImpl::new(
+        Arc::new(CompactionExecutorImpl::new(
             object_store_registry.clone(),
             time_source.clone(),
             run_info_dir.clone(),

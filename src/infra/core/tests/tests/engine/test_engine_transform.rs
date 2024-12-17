@@ -220,7 +220,7 @@ struct TestHarness {
     dataset_repo_writer: Arc<dyn DatasetRepositoryWriter>,
     ingest_svc: Arc<dyn PollingIngestService>,
     push_ingest_planner: Arc<dyn PushIngestPlanner>,
-    push_ingest_svc: Arc<dyn PushIngestService>,
+    push_ingest_executor: Arc<dyn PushIngestExecutor>,
     transform_helper: TransformTestHelper,
     time_source: Arc<SystemTimeSourceStub>,
 }
@@ -256,13 +256,13 @@ impl TestHarness {
             .add::<DataFormatRegistryImpl>()
             .add::<FetchService>()
             .add::<PollingIngestServiceImpl>()
-            .add::<PushIngestServiceImpl>()
+            .add::<PushIngestExecutorImpl>()
             .add::<PushIngestPlannerImpl>()
             .add::<TransformRequestPlannerImpl>()
             .add::<TransformElaborationServiceImpl>()
-            .add::<TransformExecutionServiceImpl>()
+            .add::<TransformExecutorImpl>()
             .add::<CompactionPlannerImpl>()
-            .add::<CompactionExecutionServiceImpl>()
+            .add::<CompactionExecutorImpl>()
             .add::<DatasetKeyValueServiceSysEnv>()
             .add_value(SystemTimeSourceStub::new_set(
                 Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap(),
@@ -277,7 +277,7 @@ impl TestHarness {
             dataset_repo_writer: catalog.get_one().unwrap(),
             ingest_svc: catalog.get_one().unwrap(),
             push_ingest_planner: catalog.get_one().unwrap(),
-            push_ingest_svc: catalog.get_one().unwrap(),
+            push_ingest_executor: catalog.get_one().unwrap(),
             time_source: catalog.get_one().unwrap(),
             transform_helper,
         }
@@ -784,7 +784,7 @@ async fn test_transform_empty_inputs() {
         .unwrap();
 
     let ingest_result = harness
-        .push_ingest_svc
+        .push_ingest_executor
         .ingest_from_file_stream(
             ResolvedDataset::from(&root),
             ingest_plan,
@@ -834,7 +834,7 @@ async fn test_transform_empty_inputs() {
         .unwrap();
 
     let ingest_result = harness
-        .push_ingest_svc
+        .push_ingest_executor
         .ingest_from_file_stream(
             ResolvedDataset::from(&root),
             ingest_plan,

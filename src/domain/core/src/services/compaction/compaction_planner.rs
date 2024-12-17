@@ -27,7 +27,7 @@ pub const DEFAULT_MAX_SLICE_RECORDS: u64 = 10_000;
 
 #[async_trait::async_trait]
 pub trait CompactionPlanner: Send + Sync {
-    async fn build_compaction_plan(
+    async fn plan_compaction(
         &self,
         target: ResolvedDataset,
         options: CompactionOptions,

@@ -22,7 +22,7 @@ use crate::*;
 
 pub struct VerificationServiceImpl {
     transform_request_planner: Arc<dyn TransformRequestPlanner>,
-    transform_execution_svc: Arc<dyn TransformExecutionService>,
+    transform_executor: Arc<dyn TransformExecutor>,
 }
 
 #[component(pub)]
@@ -30,11 +30,11 @@ pub struct VerificationServiceImpl {
 impl VerificationServiceImpl {
     pub fn new(
         transform_request_planner: Arc<dyn TransformRequestPlanner>,
-        transform_execution_svc: Arc<dyn TransformExecutionService>,
+        transform_executor: Arc<dyn TransformExecutor>,
     ) -> Self {
         Self {
             transform_request_planner,
-            transform_execution_svc,
+            transform_executor,
         }
     }
 
@@ -304,7 +304,7 @@ impl VerificationService for VerificationServiceImpl {
                         VerificationError::VerifyTransform(VerifyTransformError::Plan(e))
                     })?;
 
-                self.transform_execution_svc
+                self.transform_executor
                     .execute_verify_transform(request.target.clone(), plan, Some(listener.clone()))
                     .await
                     .map_err(|e| {

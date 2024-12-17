@@ -14,21 +14,15 @@ use opendatafabric as odf;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct ResetPlannerImpl {}
-
 #[component(pub)]
 #[interface(dyn ResetPlanner)]
-impl ResetPlannerImpl {
-    pub fn new() -> Self {
-        Self {}
-    }
-}
+pub struct ResetPlannerImpl {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 impl ResetPlanner for ResetPlannerImpl {
-    async fn build_reset_plan(
+    async fn plan_reset(
         &self,
         target: ResolvedDataset,
         maybe_new_head: Option<&odf::Multihash>,

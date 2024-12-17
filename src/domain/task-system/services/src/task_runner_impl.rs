@@ -19,9 +19,9 @@ use kamu_task_system::*;
 pub struct TaskRunnerImpl {
     polling_ingest_service: Arc<dyn PollingIngestService>,
     transform_elaboration_service: Arc<dyn TransformElaborationService>,
-    transform_execution_service: Arc<dyn TransformExecutionService>,
-    reset_execution_service: Arc<dyn ResetExecutionService>,
-    compaction_execution_service: Arc<dyn CompactionExecutionService>,
+    transform_executor: Arc<dyn TransformExecutor>,
+    reset_executor: Arc<dyn ResetExecutor>,
+    compaction_executor: Arc<dyn CompactionExecutor>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -32,16 +32,16 @@ impl TaskRunnerImpl {
     pub fn new(
         polling_ingest_service: Arc<dyn PollingIngestService>,
         transform_elaboration_service: Arc<dyn TransformElaborationService>,
-        transform_execution_service: Arc<dyn TransformExecutionService>,
-        reset_execution_service: Arc<dyn ResetExecutionService>,
-        compaction_execution_service: Arc<dyn CompactionExecutionService>,
+        transform_executor: Arc<dyn TransformExecutor>,
+        reset_executor: Arc<dyn ResetExecutor>,
+        compaction_executor: Arc<dyn CompactionExecutor>,
     ) -> Self {
         Self {
             polling_ingest_service,
             transform_elaboration_service,
-            transform_execution_service,
-            reset_execution_service,
-            compaction_execution_service,
+            transform_executor,
+            reset_executor,
+            compaction_executor,
         }
     }
 
@@ -135,7 +135,7 @@ impl TaskRunnerImpl {
         match transform_elaboration {
             TransformElaboration::Elaborated(transform_plan) => {
                 let (_, execution_result) = self
-                    .transform_execution_service
+                    .transform_executor
                     .execute_transform(transform_item.target, transform_plan, None)
                     .await;
 
@@ -161,8 +161,8 @@ impl TaskRunnerImpl {
         task_reset: TaskDefinitionReset,
     ) -> Result<TaskOutcome, InternalError> {
         let reset_result_maybe = self
-            .reset_execution_service
-            .execute_reset(task_reset.target, task_reset.reset_plan)
+            .reset_executor
+            .execute(task_reset.target, task_reset.reset_plan)
             .await;
 
         match reset_result_maybe {
@@ -194,8 +194,8 @@ impl TaskRunnerImpl {
         task_compact: TaskDefinitionHardCompact,
     ) -> Result<TaskOutcome, InternalError> {
         let compaction_result = self
-            .compaction_execution_service
-            .execute_compaction(task_compact.target, task_compact.compaction_plan, None)
+            .compaction_executor
+            .execute(task_compact.target, task_compact.compaction_plan, None)
             .await;
 
         match compaction_result {

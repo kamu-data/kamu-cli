@@ -21,7 +21,7 @@ use opendatafabric::DatasetHandle;
 #[interface(dyn SetWatermarkUseCase)]
 pub struct SetWatermarkUseCaseImpl {
     set_watermark_planner: Arc<dyn SetWatermarkPlanner>,
-    set_watermark_execution_svc: Arc<dyn SetWatermarkExecutionService>,
+    set_watermark_executor: Arc<dyn SetWatermarkExecutor>,
     dataset_registry: Arc<dyn DatasetRegistry>,
     dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
 }
@@ -29,13 +29,13 @@ pub struct SetWatermarkUseCaseImpl {
 impl SetWatermarkUseCaseImpl {
     pub fn new(
         set_watermark_planner: Arc<dyn SetWatermarkPlanner>,
-        set_watermark_execution_svc: Arc<dyn SetWatermarkExecutionService>,
+        set_watermark_executor: Arc<dyn SetWatermarkExecutor>,
         dataset_registry: Arc<dyn DatasetRegistry>,
         dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
     ) -> Self {
         Self {
             set_watermark_planner,
-            set_watermark_execution_svc,
+            set_watermark_executor,
             dataset_registry,
             dataset_action_authorizer,
         }
@@ -66,14 +66,11 @@ impl SetWatermarkUseCase for SetWatermarkUseCaseImpl {
         // Make a plan
         let plan = self
             .set_watermark_planner
-            .build_set_watermark_plan(target.clone(), new_watermark)
+            .plan_set_watermark(target.clone(), new_watermark)
             .await?;
 
         // Execute the plan
-        let result = self
-            .set_watermark_execution_svc
-            .execute_set_watermark(target, plan)
-            .await?;
+        let result = self.set_watermark_executor.execute(target, plan).await?;
 
         Ok(result)
     }

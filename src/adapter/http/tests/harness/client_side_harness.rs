@@ -134,10 +134,10 @@ impl ClientSideHarness {
 
         b.add::<TransformRequestPlannerImpl>();
         b.add::<TransformElaborationServiceImpl>();
-        b.add::<TransformExecutionServiceImpl>();
+        b.add::<TransformExecutorImpl>();
 
         b.add::<CompactionPlannerImpl>();
-        b.add::<CompactionExecutionServiceImpl>();
+        b.add::<CompactionExecutorImpl>();
 
         b.add::<PullRequestPlannerImpl>();
 
@@ -206,10 +206,8 @@ impl ClientSideHarness {
         self.catalog.get_one::<dyn CompactionPlanner>().unwrap()
     }
 
-    pub fn compaction_execution_service(&self) -> Arc<dyn CompactionExecutionService> {
-        self.catalog
-            .get_one::<dyn CompactionExecutionService>()
-            .unwrap()
+    pub fn compaction_executor(&self) -> Arc<dyn CompactionExecutor> {
+        self.catalog.get_one::<dyn CompactionExecutor>().unwrap()
     }
 
     // TODO: accept alias or handle

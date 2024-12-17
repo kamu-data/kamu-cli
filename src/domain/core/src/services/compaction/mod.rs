@@ -7,10 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod compaction_execution_service;
+mod compaction_executor;
 mod compaction_listener;
 mod compaction_planner;
 
-pub use compaction_execution_service::*;
+pub use compaction_executor::*;
 pub use compaction_listener::*;
 pub use compaction_planner::*;

@@ -18,13 +18,13 @@ use opendatafabric::{EnumWithVariants, ExecuteTransform, SetDataSchema, Transfor
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct TransformExecutionServiceImpl {
+pub struct TransformExecutorImpl {
     engine_provisioner: Arc<dyn EngineProvisioner>,
 }
 
 #[component(pub)]
-#[interface(dyn TransformExecutionService)]
-impl TransformExecutionServiceImpl {
+#[interface(dyn TransformExecutor)]
+impl TransformExecutorImpl {
     pub fn new(engine_provisioner: Arc<dyn EngineProvisioner>) -> Self {
         Self { engine_provisioner }
     }
@@ -184,7 +184,7 @@ impl TransformExecutionServiceImpl {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl TransformExecutionService for TransformExecutionServiceImpl {
+impl TransformExecutor for TransformExecutorImpl {
     #[tracing::instrument(level = "info", skip_all, fields(target=%target.get_handle(), ?plan))]
     async fn execute_transform(
         &self,

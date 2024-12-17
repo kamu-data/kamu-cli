@@ -33,11 +33,11 @@ struct TransformTestHarness {
     dataset_repo_writer: Arc<dyn DatasetRepositoryWriter>,
     transform_request_planner: Arc<dyn TransformRequestPlanner>,
     transform_elab_svc: Arc<dyn TransformElaborationService>,
-    transform_exec_svc: Arc<dyn TransformExecutionService>,
+    transform_executor: Arc<dyn TransformExecutor>,
     compaction_planner: Arc<dyn CompactionPlanner>,
-    compaction_exec_svc: Arc<dyn CompactionExecutionService>,
+    compaction_executor: Arc<dyn CompactionExecutor>,
     push_ingest_planner: Arc<dyn PushIngestPlanner>,
-    push_ingest_svc: Arc<dyn PushIngestService>,
+    push_ingest_executor: Arc<dyn PushIngestExecutor>,
 }
 
 impl TransformTestHarness {
@@ -62,15 +62,15 @@ impl TransformTestHarness {
             .add::<ObjectStoreRegistryImpl>()
             .add::<ObjectStoreBuilderLocalFs>()
             .add::<CompactionPlannerImpl>()
-            .add::<CompactionExecutionServiceImpl>()
+            .add::<CompactionExecutorImpl>()
             .add::<DataFormatRegistryImpl>()
-            .add::<PushIngestServiceImpl>()
+            .add::<PushIngestExecutorImpl>()
             .add::<PushIngestPlannerImpl>()
             .add_value(engine_provisioner)
             .bind::<dyn EngineProvisioner, TEngineProvisioner>()
             .add::<TransformRequestPlannerImpl>()
             .add::<TransformElaborationServiceImpl>()
-            .add::<TransformExecutionServiceImpl>()
+            .add::<TransformExecutorImpl>()
             .add::<VerificationServiceImpl>()
             .build();
 
@@ -79,12 +79,12 @@ impl TransformTestHarness {
             dataset_registry: catalog.get_one().unwrap(),
             dataset_repo_writer: catalog.get_one().unwrap(),
             compaction_planner: catalog.get_one().unwrap(),
-            compaction_exec_svc: catalog.get_one().unwrap(),
+            compaction_executor: catalog.get_one().unwrap(),
             push_ingest_planner: catalog.get_one().unwrap(),
-            push_ingest_svc: catalog.get_one().unwrap(),
+            push_ingest_executor: catalog.get_one().unwrap(),
             transform_request_planner: catalog.get_one().unwrap(),
             transform_elab_svc: catalog.get_one().unwrap(),
-            transform_exec_svc: catalog.get_one().unwrap(),
+            transform_executor: catalog.get_one().unwrap(),
         }
     }
 
@@ -200,7 +200,7 @@ impl TransformTestHarness {
             .await
             .unwrap();
 
-        self.push_ingest_svc
+        self.push_ingest_executor
             .ingest_from_file_stream(target, ingest_plan, Box::new(data), None)
             .await
             .unwrap();
@@ -238,7 +238,7 @@ impl TransformTestHarness {
         match elaboration {
             TransformElaboration::UpToDate => Ok(TransformResult::UpToDate),
             TransformElaboration::Elaborated(plan) => self
-                .transform_exec_svc
+                .transform_executor
                 .execute_transform(target, plan, None)
                 .await
                 .1
@@ -249,7 +249,7 @@ impl TransformTestHarness {
     async fn compact(&self, dataset: &CreateDatasetResult) {
         let compaction_plan = self
             .compaction_planner
-            .build_compaction_plan(
+            .plan_compaction(
                 ResolvedDataset::from(dataset),
                 CompactionOptions::default(),
                 None,
@@ -257,8 +257,8 @@ impl TransformTestHarness {
             .await
             .unwrap();
 
-        self.compaction_exec_svc
-            .execute_compaction(ResolvedDataset::from(dataset), compaction_plan, None)
+        self.compaction_executor
+            .execute(ResolvedDataset::from(dataset), compaction_plan, None)
             .await
             .unwrap();
     }

@@ -21,7 +21,7 @@ use crate::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait PushIngestService: Send + Sync {
+pub trait PushIngestExecutor: Send + Sync {
     /// Uses push source definition in metadata to ingest data from the
     /// specified source.
     ///

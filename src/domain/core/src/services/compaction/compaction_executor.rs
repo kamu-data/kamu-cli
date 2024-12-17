@@ -19,8 +19,8 @@ use crate::{AccessError, CompactionListener, CompactionPlan, ResolvedDataset, Se
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait CompactionExecutionService: Send + Sync {
-    async fn execute_compaction(
+pub trait CompactionExecutor: Send + Sync {
+    async fn execute(
         &self,
         target: ResolvedDataset,
         plan: CompactionPlan,

@@ -15,7 +15,7 @@ use kamu_core::{
     DatasetRegistry,
     ResetDatasetUseCase,
     ResetError,
-    ResetExecutionService,
+    ResetExecutor,
     ResetPlanner,
     ResetResult,
 };
@@ -27,7 +27,7 @@ use opendatafabric::{DatasetHandle, Multihash};
 #[interface(dyn ResetDatasetUseCase)]
 pub struct ResetDatasetUseCaseImpl {
     reset_planner: Arc<dyn ResetPlanner>,
-    reset_execution_service: Arc<dyn ResetExecutionService>,
+    reset_executor: Arc<dyn ResetExecutor>,
     dataset_registry: Arc<dyn DatasetRegistry>,
     dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
 }
@@ -35,13 +35,13 @@ pub struct ResetDatasetUseCaseImpl {
 impl ResetDatasetUseCaseImpl {
     pub fn new(
         reset_planner: Arc<dyn ResetPlanner>,
-        reset_execution_service: Arc<dyn ResetExecutionService>,
+        reset_executor: Arc<dyn ResetExecutor>,
         dataset_registry: Arc<dyn DatasetRegistry>,
         dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
     ) -> Self {
         Self {
             reset_planner,
-            reset_execution_service,
+            reset_executor,
             dataset_registry,
             dataset_action_authorizer,
         }
@@ -73,14 +73,11 @@ impl ResetDatasetUseCase for ResetDatasetUseCaseImpl {
         // Make a plan
         let reset_plan = self
             .reset_planner
-            .build_reset_plan(target.clone(), maybe_new_head, maybe_old_head)
+            .plan_reset(target.clone(), maybe_new_head, maybe_old_head)
             .await?;
 
         // Execute the plan
-        let reset_result = self
-            .reset_execution_service
-            .execute_reset(target, reset_plan)
-            .await?;
+        let reset_result = self.reset_executor.execute(target, reset_plan).await?;
 
         Ok(reset_result)
     }

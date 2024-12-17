@@ -1065,9 +1065,9 @@ struct CompactTestHarness {
     dataset_registry: Arc<dyn DatasetRegistry>,
     dataset_repo_writer: Arc<dyn DatasetRepositoryWriter>,
     compaction_planner: Arc<dyn CompactionPlanner>,
-    compaction_execution_svc: Arc<dyn CompactionExecutionService>,
+    compaction_executor: Arc<dyn CompactionExecutor>,
     push_ingest_planner: Arc<dyn PushIngestPlanner>,
-    push_ingest_svc: Arc<dyn PushIngestService>,
+    push_ingest_executor: Arc<dyn PushIngestExecutor>,
     transform_helper: TransformTestHelper,
     verification_svc: Arc<dyn VerificationService>,
     current_date_time: DateTime<Utc>,
@@ -1102,12 +1102,12 @@ impl CompactTestHarness {
             .add::<ObjectStoreBuilderLocalFs>()
             .add::<DataFormatRegistryImpl>()
             .add::<CompactionPlannerImpl>()
-            .add::<CompactionExecutionServiceImpl>()
-            .add::<PushIngestServiceImpl>()
+            .add::<CompactionExecutorImpl>()
+            .add::<PushIngestExecutorImpl>()
             .add::<PushIngestPlannerImpl>()
             .add::<TransformRequestPlannerImpl>()
             .add::<TransformElaborationServiceImpl>()
-            .add::<TransformExecutionServiceImpl>()
+            .add::<TransformExecutorImpl>()
             .add_value(
                 mock_engine_provisioner::MockEngineProvisioner::new().stub_provision_engine(),
             )
@@ -1122,9 +1122,9 @@ impl CompactTestHarness {
             dataset_registry: catalog.get_one().unwrap(),
             dataset_repo_writer: catalog.get_one().unwrap(),
             compaction_planner: catalog.get_one().unwrap(),
-            compaction_execution_svc: catalog.get_one().unwrap(),
+            compaction_executor: catalog.get_one().unwrap(),
             push_ingest_planner: catalog.get_one().unwrap(),
-            push_ingest_svc: catalog.get_one().unwrap(),
+            push_ingest_executor: catalog.get_one().unwrap(),
             verification_svc: catalog.get_one().unwrap(),
             transform_helper,
             current_date_time,
@@ -1155,14 +1155,14 @@ impl CompactTestHarness {
             .add_value(ObjectStoreBuilderS3::new(s3_context.clone(), true))
             .bind::<dyn ObjectStoreBuilder, ObjectStoreBuilderS3>()
             .add::<VerificationServiceImpl>()
-            .add::<PushIngestServiceImpl>()
+            .add::<PushIngestExecutorImpl>()
             .add::<PushIngestPlannerImpl>()
             .add::<TransformRequestPlannerImpl>()
             .add::<TransformElaborationServiceImpl>()
-            .add::<TransformExecutionServiceImpl>()
+            .add::<TransformExecutorImpl>()
             .add::<DataFormatRegistryImpl>()
             .add::<CompactionPlannerImpl>()
-            .add::<CompactionExecutionServiceImpl>()
+            .add::<CompactionExecutorImpl>()
             .add_value(CurrentAccountSubject::new_test())
             .build();
 
@@ -1175,9 +1175,9 @@ impl CompactTestHarness {
             dataset_registry: catalog.get_one().unwrap(),
             dataset_repo_writer: catalog.get_one().unwrap(),
             compaction_planner: catalog.get_one().unwrap(),
-            compaction_execution_svc: catalog.get_one().unwrap(),
+            compaction_executor: catalog.get_one().unwrap(),
             push_ingest_planner: catalog.get_one().unwrap(),
-            push_ingest_svc: catalog.get_one().unwrap(),
+            push_ingest_executor: catalog.get_one().unwrap(),
             transform_helper,
             verification_svc: catalog.get_one().unwrap(),
             current_date_time,
@@ -1336,7 +1336,7 @@ impl CompactTestHarness {
             .await
             .unwrap();
 
-        self.push_ingest_svc
+        self.push_ingest_executor
             .ingest_from_file_stream(target, ingest_plan, Box::new(data), None)
             .await
             .unwrap();
@@ -1437,7 +1437,7 @@ impl CompactTestHarness {
     ) -> Result<CompactionResult, CompactionError> {
         let compaction_plan = self
             .compaction_planner
-            .build_compaction_plan(
+            .plan_compaction(
                 ResolvedDataset::from(dataset_create_result),
                 compaction_options,
                 None,
@@ -1445,8 +1445,8 @@ impl CompactTestHarness {
             .await?;
 
         let result = self
-            .compaction_execution_svc
-            .execute_compaction(
+            .compaction_executor
+            .execute(
                 ResolvedDataset::from(dataset_create_result),
                 compaction_plan,
                 None,

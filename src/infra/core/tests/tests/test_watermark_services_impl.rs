@@ -15,14 +15,14 @@ use kamu::testing::BaseRepoHarness;
 use kamu::{
     MetadataQueryServiceImpl,
     RemoteAliasesRegistryImpl,
-    SetWatermarkExecutionServiceImpl,
+    SetWatermarkExecutorImpl,
     SetWatermarkPlannerImpl,
 };
 use kamu_core::{
     MetadataQueryService,
     ResolvedDataset,
     SetWatermarkError,
-    SetWatermarkExecutionService,
+    SetWatermarkExecutor,
     SetWatermarkPlanner,
     SetWatermarkPlanningError,
     SetWatermarkResult,
@@ -163,7 +163,7 @@ async fn test_set_watermark_rejects_on_derivative() {
 struct WatermarkTestHarness {
     base_repo_harness: BaseRepoHarness,
     set_watermark_planner: Arc<dyn SetWatermarkPlanner>,
-    set_watermark_execution_svc: Arc<dyn SetWatermarkExecutionService>,
+    set_watermark_executor: Arc<dyn SetWatermarkExecutor>,
     metadata_query_svc: Arc<dyn MetadataQueryService>,
 }
 
@@ -174,14 +174,14 @@ impl WatermarkTestHarness {
         let catalog = dill::CatalogBuilder::new_chained(base_repo_harness.catalog())
             .add::<RemoteAliasesRegistryImpl>()
             .add::<SetWatermarkPlannerImpl>()
-            .add::<SetWatermarkExecutionServiceImpl>()
+            .add::<SetWatermarkExecutorImpl>()
             .add::<MetadataQueryServiceImpl>()
             .build();
 
         Self {
             base_repo_harness,
             set_watermark_planner: catalog.get_one().unwrap(),
-            set_watermark_execution_svc: catalog.get_one().unwrap(),
+            set_watermark_executor: catalog.get_one().unwrap(),
             metadata_query_svc: catalog.get_one().unwrap(),
         }
     }
@@ -193,13 +193,10 @@ impl WatermarkTestHarness {
     ) -> Result<SetWatermarkResult, SetWatermarkError> {
         let plan = self
             .set_watermark_planner
-            .build_set_watermark_plan(target.clone(), new_watermark)
+            .plan_set_watermark(target.clone(), new_watermark)
             .await?;
 
-        let result = self
-            .set_watermark_execution_svc
-            .execute_set_watermark(target, plan)
-            .await?;
+        let result = self.set_watermark_executor.execute(target, plan).await?;
 
         Ok(result)
     }

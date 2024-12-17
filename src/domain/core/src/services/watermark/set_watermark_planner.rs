@@ -17,7 +17,7 @@ use crate::{DataWriterMetadataState, ResolvedDataset};
 
 #[async_trait::async_trait]
 pub trait SetWatermarkPlanner: Send + Sync {
-    async fn build_set_watermark_plan(
+    async fn plan_set_watermark(
         &self,
         target: ResolvedDataset,
         new_watermark: DateTime<Utc>,

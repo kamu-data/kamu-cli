@@ -12,21 +12,15 @@ use kamu_core::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct ResetExecutionServiceImpl {}
-
 #[component(pub)]
-#[interface(dyn ResetExecutionService)]
-impl ResetExecutionServiceImpl {
-    pub fn new() -> Self {
-        Self {}
-    }
-}
+#[interface(dyn ResetExecutor)]
+pub struct ResetExecutorImpl {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl ResetExecutionService for ResetExecutionServiceImpl {
-    async fn execute_reset(
+impl ResetExecutor for ResetExecutorImpl {
+    async fn execute(
         &self,
         target: ResolvedDataset,
         plan: ResetPlan,

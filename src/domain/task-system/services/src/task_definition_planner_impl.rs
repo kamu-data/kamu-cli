@@ -123,7 +123,7 @@ impl TaskDefinitionPlannerImpl {
 
         let reset_plan = self
             .reset_planner
-            .build_reset_plan(
+            .plan_reset(
                 target.clone(),
                 args.new_head_hash.as_ref(),
                 args.old_head_hash.as_ref(),
@@ -156,7 +156,7 @@ impl TaskDefinitionPlannerImpl {
 
         let compaction_plan = self
             .compaction_planner
-            .build_compaction_plan(target.clone(), compaction_options, None)
+            .plan_compaction(target.clone(), compaction_options, None)
             .await
             .int_err()?;
 

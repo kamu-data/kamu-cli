@@ -166,7 +166,7 @@ impl ChainWith2BlocksTestCase {
 struct ResetTestHarness {
     base_repo_harness: BaseRepoHarness,
     reset_planner: Arc<dyn ResetPlanner>,
-    reset_execution_svc: Arc<dyn ResetExecutionService>,
+    reset_executor: Arc<dyn ResetExecutor>,
 }
 
 impl ResetTestHarness {
@@ -175,16 +175,16 @@ impl ResetTestHarness {
 
         let catalog = dill::CatalogBuilder::new_chained(base_repo_harness.catalog())
             .add::<ResetPlannerImpl>()
-            .add::<ResetExecutionServiceImpl>()
+            .add::<ResetExecutorImpl>()
             .build();
 
         let reset_planner = catalog.get_one::<dyn ResetPlanner>().unwrap();
-        let reset_execution_svc = catalog.get_one::<dyn ResetExecutionService>().unwrap();
+        let reset_executor = catalog.get_one::<dyn ResetExecutor>().unwrap();
 
         Self {
             base_repo_harness,
             reset_planner,
-            reset_execution_svc,
+            reset_executor,
         }
     }
 
@@ -229,13 +229,10 @@ impl ResetTestHarness {
 
         let reset_plan = self
             .reset_planner
-            .build_reset_plan(target.clone(), block_hash, old_head_maybe)
+            .plan_reset(target.clone(), block_hash, old_head_maybe)
             .await?;
 
-        let reset_result = self
-            .reset_execution_svc
-            .execute_reset(target, reset_plan)
-            .await?;
+        let reset_result = self.reset_executor.execute(target, reset_plan).await?;
 
         Ok(reset_result)
     }

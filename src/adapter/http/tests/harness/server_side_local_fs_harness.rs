@@ -26,7 +26,7 @@ use kamu::domain::{
 use kamu::{
     AppendDatasetMetadataBatchUseCaseImpl,
     CommitDatasetEventUseCaseImpl,
-    CompactionExecutionServiceImpl,
+    CompactionExecutorImpl,
     CompactionPlannerImpl,
     CreateDatasetFromSnapshotUseCaseImpl,
     CreateDatasetUseCaseImpl,
@@ -40,7 +40,7 @@ use kamu::{
 };
 use kamu_accounts::testing::MockAuthenticationService;
 use kamu_accounts::{Account, AuthenticationService};
-use kamu_core::{CompactionExecutionService, CompactionPlanner, DatasetRegistry, TenancyConfig};
+use kamu_core::{CompactionExecutor, CompactionPlanner, DatasetRegistry, TenancyConfig};
 use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
 use kamu_datasets_services::DependencyGraphServiceImpl;
 use messaging_outbox::DummyOutboxImpl;
@@ -114,7 +114,7 @@ impl ServerSideLocalFsHarness {
                 .bind::<dyn AuthenticationService, MockAuthenticationService>()
                 .add_value(ServerUrlConfig::new_test(Some(&base_url_rest)))
                 .add::<CompactionPlannerImpl>()
-                .add::<CompactionExecutionServiceImpl>()
+                .add::<CompactionExecutorImpl>()
                 .add::<ObjectStoreRegistryImpl>()
                 .add::<ObjectStoreBuilderLocalFs>()
                 .add::<RemoteRepositoryRegistryImpl>()
@@ -197,11 +197,9 @@ impl ServerSideHarness for ServerSideLocalFsHarness {
         cli_catalog.get_one::<dyn CompactionPlanner>().unwrap()
     }
 
-    fn cli_compaction_execution_service(&self) -> Arc<dyn CompactionExecutionService> {
+    fn cli_compaction_executor(&self) -> Arc<dyn CompactionExecutor> {
         let cli_catalog = create_cli_user_catalog(&self.base_catalog);
-        cli_catalog
-            .get_one::<dyn CompactionExecutionService>()
-            .unwrap()
+        cli_catalog.get_one::<dyn CompactionExecutor>().unwrap()
     }
 
     fn api_server_addr(&self) -> String {

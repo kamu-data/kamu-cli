@@ -27,7 +27,7 @@ pub struct IngestCommand {
     data_format_reg: Arc<dyn DataFormatRegistry>,
     dataset_registry: Arc<dyn DatasetRegistry>,
     push_ingest_planner: Arc<dyn PushIngestPlanner>,
-    push_ingest_svc: Arc<dyn PushIngestService>,
+    push_ingest_executor: Arc<dyn PushIngestExecutor>,
     output_config: Arc<OutputConfig>,
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
     dataset_ref: DatasetRef,
@@ -44,7 +44,7 @@ impl IngestCommand {
         data_format_reg: Arc<dyn DataFormatRegistry>,
         dataset_registry: Arc<dyn DatasetRegistry>,
         push_ingest_planner: Arc<dyn PushIngestPlanner>,
-        push_ingest_svc: Arc<dyn PushIngestService>,
+        push_ingest_executor: Arc<dyn PushIngestExecutor>,
         output_config: Arc<OutputConfig>,
         remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
         dataset_ref: DatasetRef,
@@ -63,7 +63,7 @@ impl IngestCommand {
             data_format_reg,
             dataset_registry,
             push_ingest_planner,
-            push_ingest_svc,
+            push_ingest_executor,
             output_config,
             remote_alias_reg,
             dataset_ref,
@@ -211,7 +211,7 @@ impl Command for IngestCommand {
                 .map_err(CLIError::failure)?;
 
             let result = self
-                .push_ingest_svc
+                .push_ingest_executor
                 .ingest_from_url(target, plan, url, listener.clone())
                 .await
                 .map_err(CLIError::failure)?;

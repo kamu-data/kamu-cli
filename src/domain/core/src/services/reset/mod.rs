@@ -7,8 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod reset_execution_service;
+mod reset_executor;
 mod reset_planner;
 
-pub use reset_execution_service::*;
+pub use reset_executor::*;
 pub use reset_planner::*;

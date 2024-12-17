@@ -14,7 +14,7 @@ use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer};
 use kamu_core::{
     CompactDatasetUseCase,
     CompactionError,
-    CompactionExecutionService,
+    CompactionExecutor,
     CompactionListener,
     CompactionMultiListener,
     CompactionOptions,
@@ -32,7 +32,7 @@ use opendatafabric::DatasetHandle;
 #[interface(dyn CompactDatasetUseCase)]
 pub struct CompactDatasetUseCaseImpl {
     compaction_planner: Arc<dyn CompactionPlanner>,
-    compaction_execution_svc: Arc<dyn CompactionExecutionService>,
+    compaction_executor: Arc<dyn CompactionExecutor>,
     dataset_registry: Arc<dyn DatasetRegistry>,
     dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
 }
@@ -40,13 +40,13 @@ pub struct CompactDatasetUseCaseImpl {
 impl CompactDatasetUseCaseImpl {
     pub fn new(
         compaction_planner: Arc<dyn CompactionPlanner>,
-        compaction_execution_svc: Arc<dyn CompactionExecutionService>,
+        compaction_executor: Arc<dyn CompactionExecutor>,
         dataset_registry: Arc<dyn DatasetRegistry>,
         dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
     ) -> Self {
         Self {
             compaction_planner,
-            compaction_execution_svc,
+            compaction_executor,
             dataset_registry,
             dataset_action_authorizer,
         }
@@ -78,13 +78,13 @@ impl CompactDatasetUseCase for CompactDatasetUseCaseImpl {
         // Plan compacting
         let compaction_plan = self
             .compaction_planner
-            .build_compaction_plan(target.clone(), options, maybe_listener.clone())
+            .plan_compaction(target.clone(), options, maybe_listener.clone())
             .await?;
 
         // Execute compacting
         let compaction_result = self
-            .compaction_execution_svc
-            .execute_compaction(target, compaction_plan, maybe_listener)
+            .compaction_executor
+            .execute(target, compaction_plan, maybe_listener)
             .await?;
 
         Ok(compaction_result)

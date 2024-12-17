@@ -41,7 +41,7 @@ impl SetWatermarkPlannerImpl {
 
 #[async_trait::async_trait]
 impl SetWatermarkPlanner for SetWatermarkPlannerImpl {
-    async fn build_set_watermark_plan(
+    async fn plan_set_watermark(
         &self,
         target: ResolvedDataset,
         new_watermark: DateTime<Utc>,

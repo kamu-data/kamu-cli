@@ -674,7 +674,7 @@ impl PullUseCaseHarness {
             .add_value(mocks.mock_transform_elaboration_service)
             .bind::<dyn TransformElaborationService, MockTransformElaborationService>()
             .add_value(mocks.mock_transform_execution_service)
-            .bind::<dyn TransformExecutionService, MockTransformExecutionService>()
+            .bind::<dyn TransformExecutor, MockTransformExecutionService>()
             .add_value(mocks.mock_sync_service)
             .bind::<dyn SyncService, MockSyncService>()
             .add::<SyncRequestBuilder>()

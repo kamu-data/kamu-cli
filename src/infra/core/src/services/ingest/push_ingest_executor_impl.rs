@@ -22,7 +22,7 @@ use super::ingest_common;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct PushIngestServiceImpl {
+pub struct PushIngestExecutorImpl {
     object_store_registry: Arc<dyn ObjectStoreRegistry>,
     data_format_registry: Arc<dyn DataFormatRegistry>,
     engine_provisioner: Arc<dyn EngineProvisioner>,
@@ -31,8 +31,8 @@ pub struct PushIngestServiceImpl {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component(pub)]
-#[dill::interface(dyn PushIngestService)]
-impl PushIngestServiceImpl {
+#[dill::interface(dyn PushIngestExecutor)]
+impl PushIngestExecutorImpl {
     pub fn new(
         object_store_registry: Arc<dyn ObjectStoreRegistry>,
         data_format_registry: Arc<dyn DataFormatRegistry>,
@@ -307,7 +307,7 @@ impl PushIngestServiceImpl {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl PushIngestService for PushIngestServiceImpl {
+impl PushIngestExecutor for PushIngestExecutorImpl {
     #[tracing::instrument(level = "info", skip_all, fields(target=%target.get_handle()))]
     async fn ingest_from_url(
         &self,

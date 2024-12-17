@@ -197,7 +197,7 @@ impl VerifyHarness {
 
         let catalog = dill::CatalogBuilder::new_chained(base_repo_harness.catalog())
             .add::<TransformRequestPlannerImpl>()
-            .add::<TransformExecutionServiceImpl>()
+            .add::<TransformExecutorImpl>()
             .add::<EngineProvisionerNull>()
             .add::<VerificationServiceImpl>()
             .build();

@@ -86,7 +86,7 @@ impl ResetUseCaseHarness {
         let catalog = dill::CatalogBuilder::new_chained(base_harness.catalog())
             .add::<ResetDatasetUseCaseImpl>()
             .add::<ResetPlannerImpl>()
-            .add::<ResetExecutionServiceImpl>()
+            .add::<ResetExecutorImpl>()
             .build();
 
         let use_case = catalog.get_one::<dyn ResetDatasetUseCase>().unwrap();

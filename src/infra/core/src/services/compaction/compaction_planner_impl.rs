@@ -17,17 +17,13 @@ use opendatafabric as odf;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct CompactionPlannerImpl {}
-
 #[component(pub)]
 #[interface(dyn CompactionPlanner)]
-impl CompactionPlannerImpl {
-    pub fn new() -> Self {
-        Self {}
-    }
+pub struct CompactionPlannerImpl {}
 
+impl CompactionPlannerImpl {
     #[tracing::instrument(level = "debug", skip_all)]
-    async fn plan_dataset_compacting(
+    async fn plan_dataset_compaction(
         &self,
         target: ResolvedDataset,
         max_slice_size: u64,
@@ -189,7 +185,7 @@ impl CompactionPlannerImpl {
 
 #[async_trait::async_trait]
 impl CompactionPlanner for CompactionPlannerImpl {
-    async fn build_compaction_plan(
+    async fn plan_compaction(
         &self,
         target: ResolvedDataset,
         options: CompactionOptions,
@@ -217,7 +213,7 @@ impl CompactionPlanner for CompactionPlannerImpl {
             .unwrap_or(DEFAULT_MAX_SLICE_RECORDS);
 
         match self
-            .plan_dataset_compacting(
+            .plan_dataset_compaction(
                 target,
                 max_slice_size,
                 max_slice_records,

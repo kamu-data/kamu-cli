@@ -96,13 +96,13 @@ impl<TServerHarness: ServerSideHarness> SmartPullExistingDivergedDatasetScenario
             .get_dataset_by_handle(&server_create_result.dataset_handle);
 
         let compaction_planner = server_harness.cli_compaction_planner();
-        let compaction_execution_service = server_harness.cli_compaction_execution_service();
+        let compaction_execution_service = server_harness.cli_compaction_executor();
 
         let server_compaction_result = compaction_execution_service
-            .execute_compaction(
+            .execute(
                 server_dataset.clone(),
                 compaction_planner
-                    .build_compaction_plan(server_dataset, CompactionOptions::default(), None)
+                    .plan_compaction(server_dataset, CompactionOptions::default(), None)
                     .await
                     .unwrap(),
                 None,

@@ -178,7 +178,7 @@ impl VerifyUseCaseHarness {
             .add::<VerifyDatasetUseCaseImpl>()
             .add::<VerificationServiceImpl>()
             .add::<TransformRequestPlannerImpl>()
-            .add::<TransformExecutionServiceImpl>()
+            .add::<TransformExecutorImpl>()
             .add::<EngineProvisionerNull>()
             .build();
 

@@ -17,8 +17,8 @@ use crate::{ResetPlan, ResolvedDataset, SetRefError};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait ResetExecutionService: Send + Sync {
-    async fn execute_reset(
+pub trait ResetExecutor: Send + Sync {
+    async fn execute(
         &self,
         target: ResolvedDataset,
         plan: ResetPlan,

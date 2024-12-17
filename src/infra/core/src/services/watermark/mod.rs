@@ -7,8 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod set_watermark_execution_service_impl;
+mod set_watermark_executor_impl;
 mod set_watermark_planner_impl;
 
-pub use set_watermark_execution_service_impl::*;
+pub use set_watermark_executor_impl::*;
 pub use set_watermark_planner_impl::*;

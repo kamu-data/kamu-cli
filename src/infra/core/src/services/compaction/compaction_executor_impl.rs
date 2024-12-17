@@ -24,15 +24,15 @@ use crate::new_session_context;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct CompactionExecutionServiceImpl {
+pub struct CompactionExecutorImpl {
     object_store_registry: Arc<dyn ObjectStoreRegistry>,
     time_source: Arc<dyn SystemTimeSource>,
     run_info_dir: Arc<RunInfoDir>,
 }
 
 #[component(pub)]
-#[interface(dyn CompactionExecutionService)]
-impl CompactionExecutionServiceImpl {
+#[interface(dyn CompactionExecutor)]
+impl CompactionExecutorImpl {
     pub fn new(
         object_store_registry: Arc<dyn ObjectStoreRegistry>,
         time_source: Arc<dyn SystemTimeSource>,
@@ -191,8 +191,8 @@ impl CompactionExecutionServiceImpl {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl CompactionExecutionService for CompactionExecutionServiceImpl {
-    async fn execute_compaction(
+impl CompactionExecutor for CompactionExecutorImpl {
+    async fn execute(
         &self,
         target: ResolvedDataset,
         plan: CompactionPlan,

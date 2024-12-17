@@ -391,17 +391,17 @@ pub fn configure_base_catalog(
 
     b.add::<PollingIngestServiceImpl>();
 
-    b.add::<PushIngestServiceImpl>();
+    b.add::<PushIngestExecutorImpl>();
     b.add::<PushIngestPlannerImpl>();
 
     b.add::<TransformRequestPlannerImpl>();
     b.add::<TransformElaborationServiceImpl>();
-    b.add::<TransformExecutionServiceImpl>();
+    b.add::<TransformExecutorImpl>();
 
     b.add::<VerificationServiceImpl>();
 
     b.add::<CompactionPlannerImpl>();
-    b.add::<CompactionExecutionServiceImpl>();
+    b.add::<CompactionExecutorImpl>();
 
     b.add::<SearchServiceImpl>();
 
@@ -413,12 +413,12 @@ pub fn configure_base_catalog(
     b.add::<PushRequestPlannerImpl>();
 
     b.add::<SetWatermarkPlannerImpl>();
-    b.add::<SetWatermarkExecutionServiceImpl>();
+    b.add::<SetWatermarkExecutorImpl>();
 
     b.add::<RemoteStatusServiceImpl>();
 
     b.add::<ResetPlannerImpl>();
-    b.add::<ResetExecutionServiceImpl>();
+    b.add::<ResetExecutorImpl>();
 
     b.add::<ProvenanceServiceImpl>();
 
