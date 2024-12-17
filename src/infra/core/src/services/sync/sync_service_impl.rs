@@ -18,14 +18,16 @@ use kamu_core::*;
 use opendatafabric::*;
 use url::Url;
 
-use super::utils::smart_transfer_protocol::SmartTransferProtocolClient;
 use crate::resolve_remote_dataset_url;
 use crate::utils::ipfs_wrapper::*;
 use crate::utils::simple_transfer_protocol::{
     SimpleProtocolTransferOptions,
     SimpleTransferProtocol,
 };
-use crate::utils::smart_transfer_protocol::TransferOptions as SmartTransferOptions;
+use crate::utils::smart_transfer_protocol::{
+    SmartTransferProtocolClient,
+    TransferOptions as SmartTransferOptions,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

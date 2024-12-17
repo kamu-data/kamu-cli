@@ -25,7 +25,7 @@ use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer};
 use kamu_core::*;
 use opendatafabric::*;
 
-use crate::query::*;
+use crate::services::query::*;
 use crate::utils::docker_images;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
