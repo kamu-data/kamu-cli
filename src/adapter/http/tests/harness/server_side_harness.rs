@@ -20,7 +20,6 @@ use kamu::domain::auth::{
 };
 use kamu::domain::{
     CommitDatasetEventUseCase,
-    CompactionService,
     CreateDatasetFromSnapshotUseCase,
     CreateDatasetUseCase,
 };
@@ -28,7 +27,7 @@ use kamu::testing::MockDatasetActionAuthorizer;
 use kamu::DatasetLayout;
 use kamu_accounts::testing::MockAuthenticationService;
 use kamu_accounts::{Account, AccountType, CurrentAccountSubject, PROVIDER_PASSWORD};
-use kamu_core::{DatasetRegistry, TenancyConfig};
+use kamu_core::{CompactionExecutor, CompactionPlanner, DatasetRegistry, TenancyConfig};
 use opendatafabric::{AccountID, AccountName, DatasetAlias, DatasetHandle};
 use reqwest::Url;
 use time_source::SystemTimeSourceStub;
@@ -53,7 +52,9 @@ pub(crate) trait ServerSideHarness {
 
     fn cli_commit_dataset_event_use_case(&self) -> Arc<dyn CommitDatasetEventUseCase>;
 
-    fn cli_compaction_service(&self) -> Arc<dyn CompactionService>;
+    fn cli_compaction_planner(&self) -> Arc<dyn CompactionPlanner>;
+
+    fn cli_compaction_executor(&self) -> Arc<dyn CompactionExecutor>;
 
     fn dataset_layout(&self, dataset_handle: &DatasetHandle) -> DatasetLayout;
 

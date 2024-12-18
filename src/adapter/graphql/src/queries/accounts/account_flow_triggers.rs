@@ -29,11 +29,12 @@ impl AccountFlowTriggers {
 
     /// Checks if all triggers of all datasets in account are disabled
     async fn all_paused(&self, ctx: &Context<'_>) -> Result<bool> {
-        let dataset_ownership_service = from_catalog::<dyn DatasetOwnershipService>(ctx).unwrap();
+        let (dataset_ownership_service, flow_trigger_service) =
+            from_catalog_n!(ctx, dyn DatasetOwnershipService, dyn FlowTriggerService);
+
         let owned_dataset_ids: Vec<_> = dataset_ownership_service
             .get_owned_datasets(&self.account.id)
             .await?;
-        let flow_trigger_service = from_catalog::<dyn FlowTriggerService>(ctx).unwrap();
 
         let mut all_triggers = flow_trigger_service
             .find_triggers_by_datasets(owned_dataset_ids)

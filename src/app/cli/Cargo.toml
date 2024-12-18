@@ -122,9 +122,7 @@ async-graphql = { version = "7", features = [
 ] }
 async-graphql-axum = "7"
 axum = { version = "0.7", features = ["ws"] }
-axum-extra = { version = "0.9", features = ["async-read-body"] }
 http = "1"
-hyper = "1"
 reqwest = { version = "0.12", default-features = false, features = [] }
 serde_json = "1"
 tonic = { version = "0.12", default-features = false }

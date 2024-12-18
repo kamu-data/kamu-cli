@@ -9,14 +9,18 @@
 
 use std::sync::Arc;
 
-use opendatafabric::DatasetHandle;
+use internal_error::InternalError;
+use opendatafabric as odf;
+use thiserror::Error;
 
+use crate::auth::DatasetActionUnauthorizedError;
 use crate::{
-    CompactionError,
+    AccessError,
+    CompactionExecutionError,
     CompactionListener,
     CompactionMultiListener,
     CompactionOptions,
-    CompactionResponse,
+    CompactionPlanningError,
     CompactionResult,
 };
 
@@ -26,17 +30,65 @@ use crate::{
 pub trait CompactDatasetUseCase: Send + Sync {
     async fn execute(
         &self,
-        dataset_handle: &DatasetHandle,
+        dataset_handle: &odf::DatasetHandle,
         options: CompactionOptions,
         maybe_listener: Option<Arc<dyn CompactionListener>>,
     ) -> Result<CompactionResult, CompactionError>;
 
     async fn execute_multi(
         &self,
-        dataset_handles: Vec<DatasetHandle>,
+        dataset_handles: Vec<odf::DatasetHandle>,
         options: CompactionOptions,
         multi_listener: Option<Arc<dyn CompactionMultiListener>>,
     ) -> Vec<CompactionResponse>;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug)]
+pub struct CompactionResponse {
+    pub dataset_ref: odf::DatasetRef,
+    pub result: Result<CompactionResult, CompactionError>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Error)]
+pub enum CompactionError {
+    #[error(transparent)]
+    Planning(
+        #[from]
+        #[backtrace]
+        CompactionPlanningError,
+    ),
+
+    #[error(transparent)]
+    Execution(
+        #[from]
+        #[backtrace]
+        CompactionExecutionError,
+    ),
+
+    #[error(transparent)]
+    Access(
+        #[from]
+        #[backtrace]
+        AccessError,
+    ),
+
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl From<DatasetActionUnauthorizedError> for CompactionError {
+    fn from(v: DatasetActionUnauthorizedError) -> Self {
+        match v {
+            DatasetActionUnauthorizedError::Access(e) => Self::Access(e),
+            DatasetActionUnauthorizedError::Internal(e) => Self::Internal(e),
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

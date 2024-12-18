@@ -39,7 +39,8 @@ impl FlowTriggerType {
             }
             fs::FlowTriggerType::Push(push) => Self::Push(push.clone().into()),
             fs::FlowTriggerType::InputDatasetFlow(input) => {
-                let dataset_registry = from_catalog::<dyn DatasetRegistry>(ctx).unwrap();
+                let dataset_registry = from_catalog_n!(ctx, dyn DatasetRegistry);
+
                 let hdl = dataset_registry
                     .resolve_dataset_handle_by_ref(&input.dataset_id.as_local_ref())
                     .await

@@ -13,6 +13,7 @@ use opendatafabric as odf;
 
 use crate::prelude::*;
 use crate::queries::Account;
+use crate::utils::get_dataset;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // MetadataRef
@@ -41,16 +42,10 @@ impl MetadataChain {
         Self { dataset_handle }
     }
 
-    #[graphql(skip)]
-    fn get_dataset(&self, ctx: &Context<'_>) -> domain::ResolvedDataset {
-        let dataset_registry = from_catalog::<dyn domain::DatasetRegistry>(ctx).unwrap();
-        dataset_registry.get_dataset_by_handle(&self.dataset_handle)
-    }
-
     /// Returns all named metadata block references
     #[tracing::instrument(level = "info", skip_all)]
     async fn refs(&self, ctx: &Context<'_>) -> Result<Vec<BlockRef>> {
-        let resolved_dataset = self.get_dataset(ctx);
+        let resolved_dataset = get_dataset(ctx, &self.dataset_handle)?;
         Ok(vec![BlockRef {
             name: "head".to_owned(),
             block_hash: resolved_dataset
@@ -69,7 +64,7 @@ impl MetadataChain {
         ctx: &Context<'_>,
         hash: Multihash,
     ) -> Result<Option<MetadataBlockExtended>> {
-        let resolved_dataset = self.get_dataset(ctx);
+        let resolved_dataset = get_dataset(ctx, &self.dataset_handle)?;
         let block = resolved_dataset
             .as_metadata_chain()
             .try_get_block(&hash)
@@ -91,7 +86,7 @@ impl MetadataChain {
     ) -> Result<Option<String>> {
         use odf::serde::MetadataBlockSerializer;
 
-        let resolved_dataset = self.get_dataset(ctx);
+        let resolved_dataset = get_dataset(ctx, &self.dataset_handle)?;
         match resolved_dataset
             .as_metadata_chain()
             .try_get_block(&hash)
@@ -119,10 +114,11 @@ impl MetadataChain {
         page: Option<usize>,
         per_page: Option<usize>,
     ) -> Result<MetadataBlockConnection> {
+        let resolved_dataset = get_dataset(ctx, &self.dataset_handle)?;
+
         let page = page.unwrap_or(0);
         let per_page = per_page.unwrap_or(Self::DEFAULT_BLOCKS_PER_PAGE);
 
-        let resolved_dataset = self.get_dataset(ctx);
         let chain = resolved_dataset.as_metadata_chain();
 
         let head = chain.resolve_ref(&domain::BlockRef::Head).await.int_err()?;

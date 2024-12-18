@@ -35,7 +35,7 @@ use kamu_flow_system_services::{
     MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE,
     MESSAGE_PRODUCER_KAMU_FLOW_TRIGGER_SERVICE,
 };
-use kamu_task_system_inmem::domain::{TaskProgressMessage, MESSAGE_PRODUCER_KAMU_TASK_EXECUTOR};
+use kamu_task_system_inmem::domain::{TaskProgressMessage, MESSAGE_PRODUCER_KAMU_TASK_AGENT};
 use messaging_outbox::{register_message_dispatcher, Outbox, OutboxDispatchingImpl};
 use time_source::{SystemTimeSource, SystemTimeSourceDefault, SystemTimeSourceStub};
 use tracing::{warn, Instrument};
@@ -260,8 +260,8 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
     command_result = command_result
         // If successful, then process the Outbox messages while they are present
         .and_then_async(|_| async {
-            let outbox_executor = cli_catalog.get_one::<messaging_outbox::OutboxExecutor>()?;
-            outbox_executor
+            let outbox_agent = cli_catalog.get_one::<messaging_outbox::OutboxAgent>()?;
+            outbox_agent
                 .run_while_has_tasks()
                 .await
                 .map_err(CLIError::critical)
@@ -390,19 +390,23 @@ pub fn configure_base_catalog(
 
     b.add::<DataFormatRegistryImpl>();
 
+    b.add::<MetadataQueryServiceImpl>();
+
     b.add::<FetchService>();
 
     b.add::<PollingIngestServiceImpl>();
 
-    b.add::<PushIngestServiceImpl>();
+    b.add::<PushIngestExecutorImpl>();
+    b.add::<PushIngestPlannerImpl>();
 
     b.add::<TransformRequestPlannerImpl>();
     b.add::<TransformElaborationServiceImpl>();
-    b.add::<TransformExecutionServiceImpl>();
+    b.add::<TransformExecutorImpl>();
 
     b.add::<VerificationServiceImpl>();
 
-    b.add::<CompactionServiceImpl>();
+    b.add::<CompactionPlannerImpl>();
+    b.add::<CompactionExecutorImpl>();
 
     b.add::<SearchServiceImpl>();
 
@@ -413,11 +417,13 @@ pub fn configure_base_catalog(
 
     b.add::<PushRequestPlannerImpl>();
 
-    b.add::<WatermarkServiceImpl>();
+    b.add::<SetWatermarkPlannerImpl>();
+    b.add::<SetWatermarkExecutorImpl>();
 
     b.add::<RemoteStatusServiceImpl>();
 
-    b.add::<ResetServiceImpl>();
+    b.add::<ResetPlannerImpl>();
+    b.add::<ResetExecutorImpl>();
 
     b.add::<ProvenanceServiceImpl>();
 
@@ -485,8 +491,8 @@ pub fn configure_base_catalog(
     b.add::<messaging_outbox::OutboxTransactionalImpl>();
     b.add::<messaging_outbox::OutboxDispatchingImpl>();
     b.bind::<dyn Outbox, OutboxDispatchingImpl>();
-    b.add::<messaging_outbox::OutboxExecutor>();
-    b.add::<messaging_outbox::OutboxExecutorMetrics>();
+    b.add::<messaging_outbox::OutboxAgent>();
+    b.add::<messaging_outbox::OutboxAgentMetrics>();
 
     register_message_dispatcher::<DatasetLifecycleMessage>(
         &mut b,
@@ -525,7 +531,7 @@ pub fn configure_server_catalog(base_catalog: &Catalog) -> CatalogBuilder {
 
     kamu_task_system_services::register_dependencies(&mut b);
 
-    b.add_value(kamu_flow_system_inmem::domain::FlowExecutorConfig::new(
+    b.add_value(kamu_flow_system_inmem::domain::FlowAgentConfig::new(
         Duration::seconds(1),
         Duration::minutes(1),
     ));
@@ -546,7 +552,7 @@ pub fn configure_server_catalog(base_catalog: &Catalog) -> CatalogBuilder {
         MESSAGE_PRODUCER_KAMU_FLOW_TRIGGER_SERVICE,
     );
 
-    register_message_dispatcher::<TaskProgressMessage>(&mut b, MESSAGE_PRODUCER_KAMU_TASK_EXECUTOR);
+    register_message_dispatcher::<TaskProgressMessage>(&mut b, MESSAGE_PRODUCER_KAMU_TASK_AGENT);
 
     b
 }

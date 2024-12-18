@@ -53,7 +53,6 @@ impl Harness {
             .add_value(identity_config)
             .add::<DataFormatRegistryImpl>()
             .add::<QueryServiceImpl>()
-            .add::<PushIngestServiceImpl>()
             .add::<EngineProvisionerNull>()
             .build();
 
@@ -120,11 +119,14 @@ impl Harness {
         }
 
         let ctx = SessionContext::new();
-        let mut writer = DataWriterDataFusion::builder(create_result.dataset.clone(), ctx.clone())
-            .with_metadata_state_scanned(None)
-            .await
-            .unwrap()
-            .build();
+        let mut writer = DataWriterDataFusion::from_metadata_chain(
+            ctx.clone(),
+            ResolvedDataset::from(&create_result),
+            &BlockRef::Head,
+            None,
+        )
+        .await
+        .unwrap();
 
         writer
             .write(
@@ -407,7 +409,7 @@ async fn test_data_query_handler() {
                     "datasets": [{
                         "alias": "kamu-server/population",
                         "blockHash": head,
-                        "id": harness.dataset_handle.id.as_did_str().to_string(),
+                        "id": harness.dataset_handle.id.to_string(),
                     }],
                 },
                 "output": {
@@ -453,7 +455,7 @@ async fn test_data_query_handler() {
                     "datasets": [{
                         "alias": "kamu-server/population",
                         "blockHash": head,
-                        "id": harness.dataset_handle.id.as_did_str().to_string(),
+                        "id": harness.dataset_handle.id.to_string(),
                     }],
                 },
                 "output": {
@@ -609,7 +611,7 @@ async fn test_data_verify_handler() {
                     "datasets": [{
                         "alias": "kamu-server/population",
                         "blockHash": head,
-                        "id": harness.dataset_handle.id.as_did_str().to_string(),
+                        "id": harness.dataset_handle.id.to_string(),
                     }],
                 },
                 "output": {

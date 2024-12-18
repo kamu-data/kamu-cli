@@ -34,7 +34,7 @@ impl DatasetFlowConfigs {
     ) -> Result<Option<FlowConfiguration>> {
         check_dataset_read_access(ctx, &self.dataset_handle).await?;
 
-        let flow_config_service = from_catalog::<dyn FlowConfigurationService>(ctx).unwrap();
+        let flow_config_service = from_catalog_n!(ctx, dyn FlowConfigurationService);
         let maybe_flow_config = flow_config_service
             .find_configuration(
                 FlowKeyDataset::new(self.dataset_handle.id.clone(), dataset_flow_type.into())

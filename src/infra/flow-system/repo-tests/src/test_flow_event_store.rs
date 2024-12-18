@@ -29,7 +29,7 @@ pub async fn test_dataset_flow_empty_filters_distingush_dataset(catalog: &Catalo
     let foo_cases = make_dataset_test_case(flow_event_store.clone()).await;
     let bar_cases = make_dataset_test_case(flow_event_store.clone()).await;
 
-    assert_dataset_flow_expectaitons(
+    assert_dataset_flow_expectations(
         flow_event_store.clone(),
         &foo_cases,
         always_happy_filters.clone(),
@@ -49,7 +49,7 @@ pub async fn test_dataset_flow_empty_filters_distingush_dataset(catalog: &Catalo
     )
     .await;
 
-    assert_dataset_flow_expectaitons(
+    assert_dataset_flow_expectations(
         flow_event_store.clone(),
         &bar_cases,
         always_happy_filters.clone(),
@@ -111,7 +111,7 @@ pub async fn test_dataset_flow_filter_by_status(catalog: &Catalog) {
     ];
 
     for (filters, expected_flow_ids) in cases {
-        assert_dataset_flow_expectaitons(
+        assert_dataset_flow_expectations(
             flow_event_store.clone(),
             &foo_cases,
             filters,
@@ -166,7 +166,7 @@ pub async fn test_dataset_flow_filter_by_flow_type(catalog: &Catalog) {
     ];
 
     for (filters, expected_flow_ids) in cases {
-        assert_dataset_flow_expectaitons(
+        assert_dataset_flow_expectations(
             flow_event_store.clone(),
             &foo_cases,
             filters,
@@ -225,7 +225,7 @@ pub async fn test_dataset_flow_filter_by_initiator(catalog: &Catalog) {
     ];
 
     for (filters, expected_flow_ids) in cases {
-        assert_dataset_flow_expectaitons(
+        assert_dataset_flow_expectations(
             flow_event_store.clone(),
             &foo_cases,
             filters,
@@ -283,7 +283,7 @@ pub async fn test_dataset_flow_filter_by_initiator_with_multiple_variants(catalo
     ];
 
     for (filters, expected_flow_ids) in cases {
-        assert_dataset_flow_expectaitons(
+        assert_dataset_flow_expectations(
             flow_event_store.clone(),
             &foo_cases,
             filters,
@@ -334,7 +334,7 @@ pub async fn test_dataset_flow_filter_combinations(catalog: &Catalog) {
     ];
 
     for (filters, expected_flow_ids) in cases {
-        assert_dataset_flow_expectaitons(
+        assert_dataset_flow_expectations(
             flow_event_store.clone(),
             &foo_cases,
             filters,
@@ -568,7 +568,7 @@ pub async fn test_dataset_flow_pagination(catalog: &Catalog) {
     ];
 
     for (pagination, expected_flow_ids) in cases {
-        assert_dataset_flow_expectaitons(
+        assert_dataset_flow_expectations(
             flow_event_store.clone(),
             &foo_cases,
             Default::default(),
@@ -630,7 +630,7 @@ pub async fn test_dataset_flow_pagination_with_filters(catalog: &Catalog) {
     ];
 
     for (pagination, filters, expected_total_count, expected_flow_ids) in cases {
-        assert_dataset_flow_expectaitons(
+        assert_dataset_flow_expectations(
             flow_event_store.clone(),
             &foo_cases,
             filters,
@@ -670,7 +670,7 @@ pub async fn test_unfiltered_system_flows(catalog: &Catalog) {
 
     let system_case = make_system_test_case(flow_event_store.clone()).await;
 
-    assert_system_flow_expectaitons(
+    assert_system_flow_expectations(
         flow_event_store.clone(),
         SystemFlowFilters::default(),
         PaginationOpts {
@@ -707,7 +707,7 @@ pub async fn test_system_flows_filtered_by_flow_type(catalog: &Catalog) {
     )];
 
     for (filters, expected_flow_ids) in cases {
-        assert_system_flow_expectaitons(
+        assert_system_flow_expectations(
             flow_event_store.clone(),
             filters,
             PaginationOpts {
@@ -753,7 +753,7 @@ pub async fn test_system_flows_filtered_by_flow_status(catalog: &Catalog) {
     ];
 
     for (filters, expected_flow_ids) in cases {
-        assert_system_flow_expectaitons(
+        assert_system_flow_expectations(
             flow_event_store.clone(),
             filters,
             PaginationOpts {
@@ -803,7 +803,7 @@ pub async fn test_system_flows_filtered_by_initiator(catalog: &Catalog) {
     ];
 
     for (filters, expected_flow_ids) in cases {
-        assert_system_flow_expectaitons(
+        assert_system_flow_expectations(
             flow_event_store.clone(),
             filters,
             PaginationOpts {
@@ -853,7 +853,7 @@ pub async fn test_system_flows_complex_filter(catalog: &Catalog) {
     ];
 
     for (filters, expected_flow_ids) in cases {
-        assert_system_flow_expectaitons(
+        assert_system_flow_expectations(
             flow_event_store.clone(),
             filters,
             PaginationOpts {
@@ -912,7 +912,7 @@ pub async fn test_system_flow_pagination(catalog: &Catalog) {
     ];
 
     for (pagination, expected_flow_ids) in cases {
-        assert_system_flow_expectaitons(
+        assert_system_flow_expectations(
             flow_event_store.clone(),
             Default::default(),
             pagination,
@@ -973,7 +973,7 @@ pub async fn test_system_flow_pagination_with_filters(catalog: &Catalog) {
     ];
 
     for (pagination, filters, expected_total_count, expected_flow_ids) in cases {
-        assert_system_flow_expectaitons(
+        assert_system_flow_expectations(
             flow_event_store.clone(),
             filters,
             pagination,
@@ -993,7 +993,7 @@ pub async fn test_all_flows_unpaged(catalog: &Catalog) {
 
     let system_case = make_system_test_case(flow_event_store.clone()).await;
 
-    assert_all_flow_expectaitons(
+    assert_all_flow_expectations(
         flow_event_store.clone(),
         AllFlowFilters::default(),
         PaginationOpts {
@@ -1072,7 +1072,7 @@ pub async fn test_all_flows_pagination(catalog: &Catalog) {
     ];
 
     for (pagination, expected_flow_ids) in cases {
-        assert_all_flow_expectaitons(
+        assert_all_flow_expectations(
             flow_event_store.clone(),
             AllFlowFilters::default(),
             pagination,
@@ -1092,7 +1092,7 @@ pub async fn test_all_flows_filters(catalog: &Catalog) {
 
     let system_case = make_system_test_case(flow_event_store.clone()).await;
 
-    assert_all_flow_expectaitons(
+    assert_all_flow_expectations(
         flow_event_store.clone(),
         AllFlowFilters {
             by_flow_status: Some(FlowStatus::Waiting),
@@ -1111,7 +1111,7 @@ pub async fn test_all_flows_filters(catalog: &Catalog) {
     )
     .await;
 
-    assert_all_flow_expectaitons(
+    assert_all_flow_expectations(
         flow_event_store.clone(),
         AllFlowFilters {
             by_flow_status: Some(FlowStatus::Running),
@@ -1130,7 +1130,7 @@ pub async fn test_all_flows_filters(catalog: &Catalog) {
     )
     .await;
 
-    assert_all_flow_expectaitons(
+    assert_all_flow_expectations(
         flow_event_store.clone(),
         AllFlowFilters {
             by_flow_status: Some(FlowStatus::Finished),
@@ -2365,7 +2365,7 @@ async fn make_system_test_flows(
     }
 }
 
-async fn assert_dataset_flow_expectaitons(
+async fn assert_dataset_flow_expectations(
     flow_event_store: Arc<dyn FlowEventStore>,
     dataset_test_case: &DatasetTestCase,
     filters: DatasetFlowFilters,
@@ -2402,7 +2402,7 @@ async fn assert_multiple_dataset_flow_expectations(
     assert_eq!(flow_ids, expected_flow_ids);
 }
 
-async fn assert_system_flow_expectaitons(
+async fn assert_system_flow_expectations(
     flow_event_store: Arc<dyn FlowEventStore>,
     filters: SystemFlowFilters,
     pagination: PaginationOpts,
@@ -2423,7 +2423,7 @@ async fn assert_system_flow_expectaitons(
     assert_eq!(flow_ids, expected_flow_ids);
 }
 
-async fn assert_all_flow_expectaitons(
+async fn assert_all_flow_expectations(
     flow_event_store: Arc<dyn FlowEventStore>,
     filters: AllFlowFilters,
     pagination: PaginationOpts,

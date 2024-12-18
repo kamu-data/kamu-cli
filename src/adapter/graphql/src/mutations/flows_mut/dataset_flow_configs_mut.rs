@@ -76,7 +76,7 @@ impl DatasetFlowConfigsMut {
         }
         ensure_scheduling_permission(ctx, &self.dataset_handle).await?;
 
-        let flow_config_service = from_catalog::<dyn FlowConfigurationService>(ctx).unwrap();
+        let flow_config_service = from_catalog_n!(ctx, dyn FlowConfigurationService);
 
         let res = flow_config_service
             .set_configuration(

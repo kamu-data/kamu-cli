@@ -42,7 +42,6 @@ async-graphql = { version = "7", features = [
     "apollo_tracing",
 ] }
 async-trait = { version = "0.1", default-features = false }
-cron = { version = "0.12", default-features = false }
 chrono = "0.4"
 datafusion = { version = "43", default-features = false, features = [
     "serde",
@@ -55,7 +54,6 @@ serde_json = "1"
 tokio = { version = "1", default-features = false, features = [] }
 tokio-stream = { version = "0.1", default-features = false }
 tracing = "0.1"
-thiserror = { version = "2", default-features = false, features = ["std"] }
 url = { version = "2", default-features = false }
 uuid = { version = "1", default-features = false }
 
@@ -83,4 +81,3 @@ tempfile = "3"
 test-group = { version = "1" }
 test-log = { version = "0.2", features = ["trace"] }
 tokio = { version = "1", default-features = false, features = [] }
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }

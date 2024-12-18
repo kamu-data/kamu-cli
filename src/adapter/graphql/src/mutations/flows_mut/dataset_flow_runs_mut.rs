@@ -71,8 +71,8 @@ impl DatasetFlowRunsMut {
         // TODO: for some datasets launching manually might not be an option:
         //   i.e., root datasets with push sources require input data to arrive
 
-        let flow_query_service = from_catalog::<dyn fs::FlowQueryService>(ctx).unwrap();
-        let logged_account = utils::get_logged_account(ctx);
+        let flow_query_service = from_catalog_n!(ctx, dyn fs::FlowQueryService);
+        let logged_account = utils::get_logged_account(ctx)?;
 
         let flow_run_snapshot = match FlowRunConfiguration::try_into_snapshot(
             ctx,
@@ -121,7 +121,7 @@ impl DatasetFlowRunsMut {
         }
 
         // Attempt cancelling scheduled tasks
-        let flow_query_service = from_catalog::<dyn fs::FlowQueryService>(ctx).unwrap();
+        let flow_query_service = from_catalog_n!(ctx, dyn fs::FlowQueryService);
         let flow_state = flow_query_service
             .cancel_scheduled_tasks(flow_id.into())
             .await
@@ -132,7 +132,7 @@ impl DatasetFlowRunsMut {
 
         // Pause flow triggers regardless of current state.
         // Duplicate requests are auto-ignored.
-        let flow_trigger_service = from_catalog::<dyn fs::FlowTriggerService>(ctx).unwrap();
+        let flow_trigger_service = from_catalog_n!(ctx, dyn fs::FlowTriggerService);
         flow_trigger_service
             .pause_flow_trigger(Utc::now(), flow_state.flow_key.clone())
             .await?;

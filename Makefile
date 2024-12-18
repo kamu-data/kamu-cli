@@ -12,6 +12,8 @@ SQLITE_CRATES := ./src/infra/accounts/sqlite ./src/infra/auth-rebac/sqlite ./src
 ALL_DATABASE_CRATES := $(POSTGRES_CRATES) $(MYSQL_CRATES) $(SQLITE_CRATES)
 MIGRATION_DIRS := ./migrations/mysql ./migrations/postgres ./migrations/sqlite
 
+KAMU_CONTAINER_RUNTIME_TYPE ?= podman
+
 ###############################################################################
 # Lint
 ###############################################################################
@@ -48,7 +50,7 @@ clippy:
 # See: https://github.com/IBM/openapi-validator
 .PHONY: lint-openapi
 lint-openapi:
-	docker run --rm -t \
+	$(KAMU_CONTAINER_RUNTIME_TYPE) run --rm -t \
 		-v "${PWD}:/data:ro" \
   		ibmdevxsdk/openapi-validator:latest \
 		--config src/adapter/http/resources/openapi/linter-config.yaml \
@@ -89,9 +91,9 @@ sqlx-local-setup: sqlx-local-setup-postgres sqlx-local-setup-mariadb sqlx-local-
 
 .PHONY: sqlx-local-setup-postgres
 sqlx-local-setup-postgres:
-	docker pull postgres:latest
-	docker stop kamu-postgres || true && docker rm kamu-postgres || true
-	docker run --name kamu-postgres -p 5432:5432 -e POSTGRES_USER=root -e POSTGRES_PASSWORD=root -d postgres:latest
+	$(KAMU_CONTAINER_RUNTIME_TYPE) pull postgres:latest
+	$(KAMU_CONTAINER_RUNTIME_TYPE) stop kamu-postgres || true && $(KAMU_CONTAINER_RUNTIME_TYPE) rm kamu-postgres || true
+	$(KAMU_CONTAINER_RUNTIME_TYPE) run --name kamu-postgres -p 5432:5432 -e POSTGRES_USER=root -e POSTGRES_PASSWORD=root -d postgres:latest
 	$(foreach crate,$(POSTGRES_CRATES),$(call Setup_EnvFile,postgres,5432,$(crate)))
 	sleep 3  # Letting the container to start
 	until PGPASSWORD=root psql -h localhost -U root -p 5432 -d root -c '\q'; do sleep 3; done
@@ -100,9 +102,9 @@ sqlx-local-setup-postgres:
 
 .PHONY: sqlx-local-setup-mariadb
 sqlx-local-setup-mariadb:
-	docker pull mariadb:latest
-	docker stop kamu-mariadb || true && docker rm kamu-mariadb || true
-	docker run --name kamu-mariadb -p 3306:3306 -e MARIADB_ROOT_PASSWORD=root -d mariadb:latest
+	$(KAMU_CONTAINER_RUNTIME_TYPE) pull mariadb:latest
+	$(KAMU_CONTAINER_RUNTIME_TYPE) stop kamu-mariadb || true && $(KAMU_CONTAINER_RUNTIME_TYPE) rm kamu-mariadb || true
+	$(KAMU_CONTAINER_RUNTIME_TYPE) run --name kamu-mariadb -p 3306:3306 -e MARIADB_ROOT_PASSWORD=root -d mariadb:latest
 	$(foreach crate,$(MYSQL_CRATES),$(call Setup_EnvFile,mysql,3306,$(crate)))
 	sleep 10  # Letting the container to start
 	until mariadb -h localhost -P 3306 -u root --password=root sys --protocol=tcp -e "SELECT 'Hello'" -b; do sleep 3; done
@@ -121,12 +123,12 @@ sqlx-local-clean: sqlx-local-clean-postgres sqlx-local-clean-mariadb sqlx-local-
 
 .PHONY: sqlx-local-clean-postgres
 sqlx-local-clean-postgres:
-	docker stop kamu-postgres || true && docker rm kamu-postgres || true
+	$(KAMU_CONTAINER_RUNTIME_TYPE) stop kamu-postgres || true && $(KAMU_CONTAINER_RUNTIME_TYPE) rm kamu-postgres || true
 	$(foreach crate,$(POSTGRES_CRATES),rm $(crate)/.env -f ;)
 
 .PHONY: sqlx-local-clean-mariadb
 sqlx-local-clean-mariadb:
-	docker stop kamu-mariadb || true && docker rm kamu-mariadb || true
+	$(KAMU_CONTAINER_RUNTIME_TYPE) stop kamu-mariadb || true && $(KAMU_CONTAINER_RUNTIME_TYPE) rm kamu-mariadb || true
 	$(foreach crate,$(MYSQL_CRATES),rm $(crate)/.env -f ;)
 
 .PHONY: sqlx-local-clean-sqlite

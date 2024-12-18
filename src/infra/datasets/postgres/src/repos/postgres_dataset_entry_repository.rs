@@ -159,10 +159,10 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
 
         let connection_mut = tr.connection_mut().await?;
 
-        let dataset_ids_search: Vec<_> = dataset_ids
+        let dataset_ids_search = dataset_ids
             .iter()
-            .map(|dataset_id| dataset_id.as_did_str().to_string())
-            .collect();
+            .map(ToString::to_string)
+            .collect::<Vec<_>>();
 
         let resolved_entries = sqlx::query_as!(
             DatasetEntryRowModel,

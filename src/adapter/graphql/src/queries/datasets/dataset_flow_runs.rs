@@ -45,7 +45,7 @@ impl DatasetFlowRuns {
             });
         }
 
-        let flow_query_service = from_catalog::<dyn fs::FlowQueryService>(ctx).unwrap();
+        let flow_query_service = from_catalog_n!(ctx, dyn fs::FlowQueryService);
 
         let flow_state = flow_query_service
             .get_flow(flow_id.into())
@@ -66,7 +66,7 @@ impl DatasetFlowRuns {
     ) -> Result<FlowConnection> {
         utils::check_dataset_read_access(ctx, &self.dataset_handle).await?;
 
-        let flow_query_service = from_catalog::<dyn fs::FlowQueryService>(ctx).unwrap();
+        let flow_query_service = from_catalog_n!(ctx, dyn fs::FlowQueryService);
 
         let page = page.unwrap_or(0);
         let per_page = per_page.unwrap_or(Self::DEFAULT_PER_PAGE);
@@ -124,7 +124,7 @@ impl DatasetFlowRuns {
     async fn list_flow_initiators(&self, ctx: &Context<'_>) -> Result<AccountConnection> {
         utils::check_dataset_read_access(ctx, &self.dataset_handle).await?;
 
-        let flow_query_service = from_catalog::<dyn fs::FlowQueryService>(ctx).unwrap();
+        let flow_query_service = from_catalog_n!(ctx, dyn fs::FlowQueryService);
 
         let flow_initiator_ids: Vec<_> = flow_query_service
             .list_all_flow_initiators_by_dataset(&self.dataset_handle.id)
@@ -134,7 +134,7 @@ impl DatasetFlowRuns {
             .try_collect()
             .await?;
 
-        let authentication_service = from_catalog::<dyn AuthenticationService>(ctx).unwrap();
+        let authentication_service = from_catalog_n!(ctx, dyn AuthenticationService);
 
         let matched_flow_initiators: Vec<_> = authentication_service
             .accounts_by_ids(flow_initiator_ids)

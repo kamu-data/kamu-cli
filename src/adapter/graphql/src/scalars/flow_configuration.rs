@@ -324,10 +324,11 @@ impl FlowRunConfiguration {
                 }
             }
             DatasetFlowType::Reset => {
-                let dataset_registry = from_catalog::<dyn kamu_core::DatasetRegistry>(ctx).unwrap();
+                let dataset_registry =
+                    crate::utils::unsafe_from_catalog_n!(ctx, dyn kamu_core::DatasetRegistry);
                 let resolved_dataset = dataset_registry.get_dataset_by_handle(dataset_handle);
 
-                // Assume unwrap safe such as we have checked this existance during
+                // Assume unwrap safe such as we have checked this existence during
                 // validation step
                 let current_head_hash = resolved_dataset
                     .as_metadata_chain()

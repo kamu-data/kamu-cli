@@ -14,13 +14,7 @@ use chrono::Duration;
 use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use dill::Component;
 use indoc::indoc;
-use kamu::testing::{
-    MetadataFactory,
-    MockDatasetActionAuthorizer,
-    MockDatasetChangesService,
-    MockPollingIngestService,
-    MockTransformRequestPlanner,
-};
+use kamu::testing::{MetadataFactory, MockDatasetActionAuthorizer, MockDatasetChangesService};
 use kamu::{
     CreateDatasetFromSnapshotUseCaseImpl,
     DatasetOwnershipServiceInMemory,
@@ -28,6 +22,7 @@ use kamu::{
     DatasetRegistryRepoBridge,
     DatasetRepositoryLocalFs,
     DatasetRepositoryWriter,
+    MetadataQueryServiceImpl,
 };
 use kamu_accounts::{JwtAuthenticationConfig, DEFAULT_ACCOUNT_NAME, DEFAULT_ACCOUNT_NAME_STR};
 use kamu_accounts_inmem::InMemoryAccessTokenRepository;
@@ -35,7 +30,7 @@ use kamu_accounts_services::{AccessTokenServiceImpl, AuthenticationServiceImpl};
 use kamu_core::*;
 use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
 use kamu_datasets_services::DependencyGraphServiceImpl;
-use kamu_flow_system::FlowExecutorConfig;
+use kamu_flow_system::FlowAgentConfig;
 use kamu_flow_system_inmem::{
     InMemoryFlowConfigurationEventStore,
     InMemoryFlowEventStore,
@@ -58,9 +53,7 @@ async fn test_list_account_flows() {
         DatasetAlias::new(Some(DEFAULT_ACCOUNT_NAME.clone()), foo_dataset_name.clone());
 
     let mock_dataset_action_authorizer = MockDatasetActionAuthorizer::allowing();
-    let harness = FlowConfigHarness::with_overrides(FlowRunsHarnessOverrides {
-        transform_planner_mock: Some(MockTransformRequestPlanner::with_set_transform()),
-        polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
+    let harness = FlowTriggerHarness::with_overrides(FlowTriggerHarnessOverrides {
         mock_dataset_action_authorizer: Some(mock_dataset_action_authorizer),
         ..Default::default()
     })
@@ -70,7 +63,7 @@ async fn test_list_account_flows() {
     let schema = kamu_adapter_graphql::schema_quiet();
 
     let request_code =
-        FlowConfigHarness::trigger_flow_mutation(&create_result.dataset_handle.id, "INGEST");
+        FlowTriggerHarness::trigger_flow_mutation(&create_result.dataset_handle.id, "INGEST");
     let response = schema
         .execute(
             async_graphql::Request::new(request_code.clone())
@@ -81,7 +74,7 @@ async fn test_list_account_flows() {
     assert!(response.is_ok(), "{response:?}");
 
     // Should return list of flows for account
-    let request_code = FlowConfigHarness::list_flows_query(&DEFAULT_ACCOUNT_NAME);
+    let request_code = FlowTriggerHarness::list_flows_query(&DEFAULT_ACCOUNT_NAME);
     let response = schema
         .execute(
             async_graphql::Request::new(request_code.clone())
@@ -140,13 +133,12 @@ async fn test_list_account_flows() {
 #[test_log::test(tokio::test)]
 async fn test_list_datasets_with_flow() {
     let mock_dataset_action_authorizer = MockDatasetActionAuthorizer::allowing();
-    let harness = FlowConfigHarness::with_overrides(FlowRunsHarnessOverrides {
-        transform_planner_mock: Some(MockTransformRequestPlanner::with_set_transform()),
-        polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
+    let harness = FlowTriggerHarness::with_overrides(FlowTriggerHarnessOverrides {
         mock_dataset_action_authorizer: Some(mock_dataset_action_authorizer),
         ..Default::default()
     })
     .await;
+
     let foo_dataset_name = DatasetName::new_unchecked("foo");
     let foo_dataset_alias =
         DatasetAlias::new(Some(DEFAULT_ACCOUNT_NAME.clone()), foo_dataset_name.clone());
@@ -159,8 +151,8 @@ async fn test_list_datasets_with_flow() {
     let _bar_create_result = harness.create_root_dataset(bar_dataset_alias).await;
 
     let ingest_mutation_code =
-        FlowConfigHarness::trigger_flow_mutation(&create_result.dataset_handle.id, "INGEST");
-    let compaction_mutation_code = FlowConfigHarness::trigger_flow_mutation(
+        FlowTriggerHarness::trigger_flow_mutation(&create_result.dataset_handle.id, "INGEST");
+    let compaction_mutation_code = FlowTriggerHarness::trigger_flow_mutation(
         &create_result.dataset_handle.id,
         "HARD_COMPACTION",
     );
@@ -252,17 +244,16 @@ async fn test_pause_resume_account_flows() {
     );
 
     let mock_dataset_action_authorizer = MockDatasetActionAuthorizer::allowing();
-    let harness = FlowConfigHarness::with_overrides(FlowRunsHarnessOverrides {
-        transform_planner_mock: Some(MockTransformRequestPlanner::with_set_transform()),
-        polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
+    let harness = FlowTriggerHarness::with_overrides(FlowTriggerHarnessOverrides {
         mock_dataset_action_authorizer: Some(mock_dataset_action_authorizer),
         ..Default::default()
     })
     .await;
+
     let foo_create_result = harness.create_root_dataset(foo_dataset_alias).await;
 
     let request_code =
-        FlowConfigHarness::trigger_flow_mutation(&foo_create_result.dataset_handle.id, "INGEST");
+        FlowTriggerHarness::trigger_flow_mutation(&foo_create_result.dataset_handle.id, "INGEST");
     let response = schema
         .execute(
             async_graphql::Request::new(request_code.clone())
@@ -272,7 +263,7 @@ async fn test_pause_resume_account_flows() {
 
     assert!(response.is_ok(), "{response:?}");
 
-    let request_code = FlowConfigHarness::list_flows_query(&DEFAULT_ACCOUNT_NAME);
+    let request_code = FlowTriggerHarness::list_flows_query(&DEFAULT_ACCOUNT_NAME);
     let response = schema
         .execute(
             async_graphql::Request::new(request_code.clone())
@@ -326,7 +317,7 @@ async fn test_pause_resume_account_flows() {
         })
     );
 
-    let mutation_code = FlowConfigHarness::set_ingest_trigger_time_delta_mutation(
+    let mutation_code = FlowTriggerHarness::set_ingest_trigger_time_delta_mutation(
         &foo_create_result.dataset_handle.id,
         "INGEST",
         false,
@@ -342,7 +333,7 @@ async fn test_pause_resume_account_flows() {
 
     assert!(response.is_ok(), "{response:?}");
 
-    let mutation_code = FlowConfigHarness::pause_account_flows(&DEFAULT_ACCOUNT_NAME);
+    let mutation_code = FlowTriggerHarness::pause_account_flows(&DEFAULT_ACCOUNT_NAME);
     let response = schema
         .execute(
             async_graphql::Request::new(mutation_code.clone())
@@ -367,7 +358,7 @@ async fn test_pause_resume_account_flows() {
     );
 
     let request_code =
-        FlowConfigHarness::all_paused_trigger_query(&foo_create_result.dataset_handle.id);
+        FlowTriggerHarness::all_paused_trigger_query(&foo_create_result.dataset_handle.id);
     let response = schema
         .execute(
             async_graphql::Request::new(request_code.clone())
@@ -391,7 +382,7 @@ async fn test_pause_resume_account_flows() {
         })
     );
 
-    let mutation_code = FlowConfigHarness::resume_account_flows(&DEFAULT_ACCOUNT_NAME);
+    let mutation_code = FlowTriggerHarness::resume_account_flows(&DEFAULT_ACCOUNT_NAME);
     let response = schema
         .execute(
             async_graphql::Request::new(mutation_code.clone())
@@ -416,7 +407,7 @@ async fn test_pause_resume_account_flows() {
     );
 
     let request_code =
-        FlowConfigHarness::all_paused_trigger_query(&foo_create_result.dataset_handle.id);
+        FlowTriggerHarness::all_paused_trigger_query(&foo_create_result.dataset_handle.id);
     let response = schema
         .execute(
             async_graphql::Request::new(request_code.clone())
@@ -457,18 +448,17 @@ async fn test_account_triggers_all_paused() {
     );
 
     let mock_dataset_action_authorizer = MockDatasetActionAuthorizer::allowing();
-    let harness = FlowConfigHarness::with_overrides(FlowRunsHarnessOverrides {
-        transform_planner_mock: Some(MockTransformRequestPlanner::with_set_transform()),
-        polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
+    let harness = FlowTriggerHarness::with_overrides(FlowTriggerHarnessOverrides {
         mock_dataset_action_authorizer: Some(mock_dataset_action_authorizer),
         ..Default::default()
     })
     .await;
+
     let foo_create_result = harness.create_root_dataset(foo_dataset_alias).await;
     let bar_create_result = harness.create_root_dataset(bar_dataset_alias).await;
 
     let request_code =
-        FlowConfigHarness::trigger_flow_mutation(&foo_create_result.dataset_handle.id, "INGEST");
+        FlowTriggerHarness::trigger_flow_mutation(&foo_create_result.dataset_handle.id, "INGEST");
     let response = schema
         .execute(
             async_graphql::Request::new(request_code.clone())
@@ -478,7 +468,7 @@ async fn test_account_triggers_all_paused() {
 
     assert!(response.is_ok(), "{response:?}");
 
-    let request_code = FlowConfigHarness::list_flows_query(&DEFAULT_ACCOUNT_NAME);
+    let request_code = FlowTriggerHarness::list_flows_query(&DEFAULT_ACCOUNT_NAME);
     let response = schema
         .execute(
             async_graphql::Request::new(request_code.clone())
@@ -532,7 +522,7 @@ async fn test_account_triggers_all_paused() {
         })
     );
 
-    let mutation_code = FlowConfigHarness::set_ingest_trigger_time_delta_mutation(
+    let mutation_code = FlowTriggerHarness::set_ingest_trigger_time_delta_mutation(
         &bar_create_result.dataset_handle.id,
         "INGEST",
         false,
@@ -548,7 +538,7 @@ async fn test_account_triggers_all_paused() {
 
     assert!(response.is_ok(), "{response:?}");
 
-    let request_code = FlowConfigHarness::all_paused_account_triggers_query(&DEFAULT_ACCOUNT_NAME);
+    let request_code = FlowTriggerHarness::all_paused_account_triggers_query(&DEFAULT_ACCOUNT_NAME);
     let response = schema
         .execute(
             async_graphql::Request::new(request_code.clone())
@@ -572,7 +562,7 @@ async fn test_account_triggers_all_paused() {
         })
     );
 
-    let mutation_code = FlowConfigHarness::pause_account_flows(&DEFAULT_ACCOUNT_NAME);
+    let mutation_code = FlowTriggerHarness::pause_account_flows(&DEFAULT_ACCOUNT_NAME);
     let response = schema
         .execute(
             async_graphql::Request::new(mutation_code.clone())
@@ -596,7 +586,7 @@ async fn test_account_triggers_all_paused() {
         })
     );
 
-    let request_code = FlowConfigHarness::all_paused_account_triggers_query(&DEFAULT_ACCOUNT_NAME);
+    let request_code = FlowTriggerHarness::all_paused_account_triggers_query(&DEFAULT_ACCOUNT_NAME);
     let response = schema
         .execute(
             async_graphql::Request::new(request_code.clone())
@@ -623,30 +613,26 @@ async fn test_account_triggers_all_paused() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-struct FlowConfigHarness {
+#[derive(Default)]
+struct FlowTriggerHarnessOverrides {
+    dataset_changes_mock: Option<MockDatasetChangesService>,
+    mock_dataset_action_authorizer: Option<MockDatasetActionAuthorizer>,
+}
+
+struct FlowTriggerHarness {
     _tempdir: tempfile::TempDir,
     _catalog_base: dill::Catalog,
     _catalog_anonymous: dill::Catalog,
     catalog_authorized: dill::Catalog,
 }
 
-#[derive(Default)]
-struct FlowRunsHarnessOverrides {
-    dataset_changes_mock: Option<MockDatasetChangesService>,
-    transform_planner_mock: Option<MockTransformRequestPlanner>,
-    polling_service_mock: Option<MockPollingIngestService>,
-    mock_dataset_action_authorizer: Option<MockDatasetActionAuthorizer>,
-}
-
-impl FlowConfigHarness {
-    async fn with_overrides(overrides: FlowRunsHarnessOverrides) -> Self {
+impl FlowTriggerHarness {
+    async fn with_overrides(overrides: FlowTriggerHarnessOverrides) -> Self {
         let tempdir = tempfile::tempdir().unwrap();
         let datasets_dir = tempdir.path().join("datasets");
         std::fs::create_dir(&datasets_dir).unwrap();
 
         let dataset_changes_mock = overrides.dataset_changes_mock.unwrap_or_default();
-        let transform_planner_mock = overrides.transform_planner_mock.unwrap_or_default();
-        let polling_service_mock = overrides.polling_service_mock.unwrap_or_default();
         let mock_dataset_action_authorizer =
             overrides.mock_dataset_action_authorizer.unwrap_or_default();
 
@@ -663,6 +649,7 @@ impl FlowConfigHarness {
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
             .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
             .add::<DatasetRegistryRepoBridge>()
+            .add::<MetadataQueryServiceImpl>()
             .add::<CreateDatasetFromSnapshotUseCaseImpl>()
             .add_value(dataset_changes_mock)
             .bind::<dyn DatasetChangesService, MockDatasetChangesService>()
@@ -678,16 +665,12 @@ impl FlowConfigHarness {
             .add::<InMemoryFlowConfigurationEventStore>()
             .add::<InMemoryFlowTriggerEventStore>()
             .add::<InMemoryFlowEventStore>()
-            .add_value(FlowExecutorConfig::new(
+            .add_value(FlowAgentConfig::new(
                 Duration::seconds(1),
                 Duration::minutes(1),
             ))
             .add::<TaskSchedulerImpl>()
             .add::<InMemoryTaskEventStore>()
-            .add_value(transform_planner_mock)
-            .bind::<dyn TransformRequestPlanner, MockTransformRequestPlanner>()
-            .add_value(polling_service_mock)
-            .bind::<dyn PollingIngestService, MockPollingIngestService>()
             .add::<DatasetOwnershipServiceInMemory>()
             .add::<DatasetOwnershipServiceInMemoryStateInitializer>()
             .add::<DatabaseTransactionRunner>();

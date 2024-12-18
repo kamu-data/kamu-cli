@@ -15,7 +15,7 @@ use crate::{FlowConfigurationRule, FlowID, FlowKey, FlowOutcome, FlowTriggerRule
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-const FLOW_EXECUTOR_UPDATE_OUTBOX_VERSION: u32 = 1;
+const FLOW_AGENT_UPDATE_OUTBOX_VERSION: u32 = 1;
 const FLOW_CONFIGURATION_UPDATE_OUTBOX_VERSION: u32 = 1;
 const FLOW_TRIGGER_UPDATE_OUTBOX_VERSION: u32 = 1;
 const FLOW_PROGRESS_OUTBOX_VERSION: u32 = 1;
@@ -38,21 +38,21 @@ impl Message for FlowConfigurationUpdatedMessage {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FlowExecutorUpdatedMessage {
+pub struct FlowAgentUpdatedMessage {
     pub update_time: DateTime<Utc>,
-    pub update_details: FlowExecutorUpdateDetails,
+    pub update_details: FlowAgentUpdateDetails,
 }
 
-impl Message for FlowExecutorUpdatedMessage {
+impl Message for FlowAgentUpdatedMessage {
     fn version() -> u32 {
-        FLOW_EXECUTOR_UPDATE_OUTBOX_VERSION
+        FLOW_AGENT_UPDATE_OUTBOX_VERSION
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum FlowExecutorUpdateDetails {
+pub enum FlowAgentUpdateDetails {
     Loaded,
     ExecutedTimeslot,
 }

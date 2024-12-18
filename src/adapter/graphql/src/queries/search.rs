@@ -32,9 +32,11 @@ impl Search {
         page: Option<usize>,
         per_page: Option<usize>,
     ) -> Result<SearchResultConnection> {
-        let dataset_registry = from_catalog::<dyn domain::DatasetRegistry>(ctx).unwrap();
-        let dataset_action_authorizer =
-            from_catalog::<dyn domain::auth::DatasetActionAuthorizer>(ctx).unwrap();
+        let (dataset_registry, dataset_action_authorizer) = from_catalog_n!(
+            ctx,
+            dyn domain::DatasetRegistry,
+            dyn domain::auth::DatasetActionAuthorizer
+        );
 
         let page = page.unwrap_or(0);
         let per_page = per_page.unwrap_or(Self::DEFAULT_RESULTS_PER_PAGE);

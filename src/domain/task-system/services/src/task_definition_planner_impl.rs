@@ -22,6 +22,8 @@ pub struct TaskDefinitionPlannerImpl {
     dataset_registry: Arc<dyn DatasetRegistry>,
     dataset_env_vars_svc: Arc<dyn DatasetEnvVarService>,
     pull_request_planner: Arc<dyn PullRequestPlanner>,
+    compaction_planner: Arc<dyn CompactionPlanner>,
+    reset_planner: Arc<dyn ResetPlanner>,
     tenancy_config: Arc<TenancyConfig>,
 }
 
@@ -34,12 +36,16 @@ impl TaskDefinitionPlannerImpl {
         dataset_registry: Arc<dyn DatasetRegistry>,
         dataset_env_vars_svc: Arc<dyn DatasetEnvVarService>,
         pull_request_planner: Arc<dyn PullRequestPlanner>,
+        compaction_planner: Arc<dyn CompactionPlanner>,
+        reset_planner: Arc<dyn ResetPlanner>,
         tenancy_config: Arc<TenancyConfig>,
     ) -> Self {
         Self {
             dataset_registry,
             dataset_env_vars_svc,
             pull_request_planner,
+            compaction_planner,
+            reset_planner,
             tenancy_config,
         }
     }
@@ -115,10 +121,19 @@ impl TaskDefinitionPlannerImpl {
             .await
             .int_err()?;
 
+        let reset_plan = self
+            .reset_planner
+            .plan_reset(
+                target.clone(),
+                args.new_head_hash.as_ref(),
+                args.old_head_hash.as_ref(),
+            )
+            .await
+            .int_err()?;
+
         Ok(TaskDefinition::Reset(TaskDefinitionReset {
             target,
-            new_head_hash: args.new_head_hash.clone(),
-            old_head_hash: args.old_head_hash.clone(),
+            reset_plan,
         }))
     }
 
@@ -139,9 +154,15 @@ impl TaskDefinitionPlannerImpl {
             keep_metadata_only: args.keep_metadata_only,
         };
 
+        let compaction_plan = self
+            .compaction_planner
+            .plan_compaction(target.clone(), compaction_options, None)
+            .await
+            .int_err()?;
+
         Ok(TaskDefinition::HardCompact(TaskDefinitionHardCompact {
             target,
-            compaction_options,
+            compaction_plan,
         }))
     }
 }

@@ -23,8 +23,7 @@ impl Auth {
 
     #[allow(clippy::unused_async)]
     async fn enabled_login_methods(&self, ctx: &Context<'_>) -> Result<Vec<&'static str>> {
-        let authentication_service =
-            from_catalog::<dyn kamu_accounts::AuthenticationService>(ctx).unwrap();
+        let authentication_service = from_catalog_n!(ctx, dyn kamu_accounts::AuthenticationService);
 
         Ok(authentication_service.supported_login_methods())
     }
@@ -38,8 +37,7 @@ impl Auth {
     ) -> Result<AccessTokenConnection> {
         check_logged_account_id_match(ctx, &account_id)?;
 
-        let access_token_service =
-            from_catalog::<dyn kamu_accounts::AccessTokenService>(ctx).unwrap();
+        let access_token_service = from_catalog_n!(ctx, dyn kamu_accounts::AccessTokenService);
 
         let page = page.unwrap_or(0);
         let per_page = per_page.unwrap_or(Self::DEFAULT_PER_PAGE);

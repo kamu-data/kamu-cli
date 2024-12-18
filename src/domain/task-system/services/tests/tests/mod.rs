@@ -9,5 +9,5 @@
 
 mod test_task_aggregate;
 
-mod test_task_executor_impl;
+mod test_task_agent_impl;
 mod test_task_scheduler_impl;

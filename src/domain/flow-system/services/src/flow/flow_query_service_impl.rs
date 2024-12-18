@@ -27,7 +27,7 @@ pub struct FlowQueryServiceImpl {
     catalog: Catalog,
     flow_event_store: Arc<dyn FlowEventStore>,
     dataset_ownership_service: Arc<dyn DatasetOwnershipService>,
-    executor_config: Arc<FlowExecutorConfig>,
+    agent_config: Arc<FlowAgentConfig>,
 }
 
 #[component(pub)]
@@ -37,13 +37,13 @@ impl FlowQueryServiceImpl {
         catalog: Catalog,
         flow_event_store: Arc<dyn FlowEventStore>,
         dataset_ownership_service: Arc<dyn DatasetOwnershipService>,
-        executor_config: Arc<FlowExecutorConfig>,
+        agent_config: Arc<FlowAgentConfig>,
     ) -> Self {
         Self {
             catalog,
             flow_event_store,
             dataset_ownership_service,
-            executor_config,
+            agent_config,
         }
     }
 }
@@ -282,7 +282,7 @@ impl FlowQueryService for FlowQueryServiceImpl {
         initiator_account_id: AccountID,
         config_snapshot_maybe: Option<FlowConfigurationRule>,
     ) -> Result<FlowState, RequestFlowError> {
-        let activation_time = self.executor_config.round_time(trigger_time)?;
+        let activation_time = self.agent_config.round_time(trigger_time)?;
 
         let scheduling_helper = self.catalog.get_one::<FlowSchedulingHelper>().unwrap();
         scheduling_helper

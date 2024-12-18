@@ -8,9 +8,17 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
+use internal_error::InternalError;
 use opendatafabric::DatasetHandle;
+use thiserror::Error;
 
-use crate::{SetWatermarkError, SetWatermarkResult};
+use crate::auth::DatasetActionUnauthorizedError;
+use crate::{
+    AccessError,
+    SetWatermarkExecutionError,
+    SetWatermarkPlanningError,
+    SetWatermarkResult,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -21,6 +29,42 @@ pub trait SetWatermarkUseCase: Send + Sync {
         dataset_handle: &DatasetHandle,
         new_watermark: DateTime<Utc>,
     ) -> Result<SetWatermarkResult, SetWatermarkError>;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Error)]
+pub enum SetWatermarkError {
+    #[error(transparent)]
+    Planning(#[from] SetWatermarkPlanningError),
+
+    #[error(transparent)]
+    Execution(#[from] SetWatermarkExecutionError),
+
+    #[error(transparent)]
+    Access(
+        #[from]
+        #[backtrace]
+        AccessError,
+    ),
+
+    #[error(transparent)]
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl From<DatasetActionUnauthorizedError> for SetWatermarkError {
+    fn from(v: DatasetActionUnauthorizedError) -> Self {
+        match v {
+            DatasetActionUnauthorizedError::Access(e) => Self::Access(e),
+            DatasetActionUnauthorizedError::Internal(e) => Self::Internal(e),
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

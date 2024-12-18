@@ -16,7 +16,7 @@ use dill::*;
 use internal_error::InternalError;
 use kamu_flow_system::*;
 use kamu_flow_system_services::{
-    MESSAGE_PRODUCER_KAMU_FLOW_EXECUTOR,
+    MESSAGE_PRODUCER_KAMU_FLOW_AGENT,
     MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE,
 };
 use messaging_outbox::{
@@ -47,11 +47,11 @@ struct FlowSystemTestListenerState {
 #[component(pub)]
 #[scope(Singleton)]
 #[interface(dyn MessageConsumer)]
-#[interface(dyn MessageConsumerT<FlowExecutorUpdatedMessage>)]
+#[interface(dyn MessageConsumerT<FlowAgentUpdatedMessage>)]
 #[interface(dyn MessageConsumerT<FlowProgressMessage>)]
 #[meta(MessageConsumerMeta {
     consumer_name: "FlowSystemTestListener",
-    feeding_producers: &[MESSAGE_PRODUCER_KAMU_FLOW_EXECUTOR, MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE],
+    feeding_producers: &[MESSAGE_PRODUCER_KAMU_FLOW_AGENT, MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE],
     delivery: MessageDeliveryMechanism::Immediate,
 })]
 impl FlowSystemTestListener {
@@ -240,11 +240,11 @@ impl std::fmt::Display for FlowSystemTestListener {
 impl MessageConsumer for FlowSystemTestListener {}
 
 #[async_trait::async_trait]
-impl MessageConsumerT<FlowExecutorUpdatedMessage> for FlowSystemTestListener {
+impl MessageConsumerT<FlowAgentUpdatedMessage> for FlowSystemTestListener {
     async fn consume_message(
         &self,
         _: &Catalog,
-        message: &FlowExecutorUpdatedMessage,
+        message: &FlowAgentUpdatedMessage,
     ) -> Result<(), InternalError> {
         self.make_a_snapshot(message.update_time).await;
         Ok(())

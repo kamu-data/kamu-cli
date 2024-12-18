@@ -28,17 +28,12 @@ use crate::*;
 
 #[async_trait::async_trait]
 pub trait PollingIngestService: Send + Sync {
-    /// Returns an active polling source, if any
-    async fn get_active_polling_source(
-        &self,
-        target: ResolvedDataset,
-    ) -> Result<Option<(Multihash, MetadataBlockTyped<SetPollingSource>)>, GetDatasetError>;
-
     /// Uses polling source definition in metadata to ingest data from an
     /// external source
     async fn ingest(
         &self,
         target: ResolvedDataset,
+        metadata_state: Box<DataWriterMetadataState>,
         options: PollingIngestOptions,
         maybe_listener: Option<Arc<dyn PollingIngestListener>>,
     ) -> Result<PollingIngestResult, PollingIngestError>;
@@ -111,13 +106,12 @@ pub enum PollingIngestStage {
     Commit,
 }
 
-#[allow(unused_variables)]
 pub trait PollingIngestListener: Send + Sync {
     fn begin(&self) {}
-    fn on_cache_hit(&self, created_at: &DateTime<Utc>) {}
-    fn on_stage_progress(&self, stage: PollingIngestStage, _progress: u64, _out_of: TotalSteps) {}
-    fn success(&self, result: &PollingIngestResult) {}
-    fn error(&self, error: &PollingIngestError) {}
+    fn on_cache_hit(&self, _created_at: &DateTime<Utc>) {}
+    fn on_stage_progress(&self, _stage: PollingIngestStage, _progress: u64, _out_of: TotalSteps) {}
+    fn success(&self, _result: &PollingIngestResult) {}
+    fn error(&self, _error: &PollingIngestError) {}
 
     fn get_pull_image_listener(self: Arc<Self>) -> Option<Arc<dyn PullImageListener>> {
         None

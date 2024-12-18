@@ -110,11 +110,16 @@ impl Command for SetWatermarkCommand {
                 Ok(())
             }
             Err(
-                e @ (SetWatermarkError::IsDerivative
-                | SetWatermarkError::IsRemote
+                e @ (SetWatermarkError::Planning(
+                    SetWatermarkPlanningError::IsRemote | SetWatermarkPlanningError::IsDerivative,
+                )
                 | SetWatermarkError::Access(_)),
             ) => Err(CLIError::failure(e)),
-            Err(e @ SetWatermarkError::Internal(_)) => Err(CLIError::critical(e)),
+            Err(
+                e @ (SetWatermarkError::Execution(SetWatermarkExecutionError::Internal(_))
+                | SetWatermarkError::Planning(SetWatermarkPlanningError::Internal(_))
+                | SetWatermarkError::Internal(_)),
+            ) => Err(CLIError::critical(e)),
         }
     }
 }

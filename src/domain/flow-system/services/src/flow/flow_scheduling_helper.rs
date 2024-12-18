@@ -31,7 +31,7 @@ pub(crate) struct FlowSchedulingHelper {
     dependency_graph_service: Arc<dyn DependencyGraphService>,
     dataset_ownership_service: Arc<dyn DatasetOwnershipService>,
     time_source: Arc<dyn SystemTimeSource>,
-    executor_config: Arc<FlowExecutorConfig>,
+    agent_config: Arc<FlowAgentConfig>,
 }
 
 #[component(pub)]
@@ -45,7 +45,7 @@ impl FlowSchedulingHelper {
         dependency_graph_service: Arc<dyn DependencyGraphService>,
         dataset_ownership_service: Arc<dyn DatasetOwnershipService>,
         time_source: Arc<dyn SystemTimeSource>,
-        executor_config: Arc<FlowExecutorConfig>,
+        agent_config: Arc<FlowAgentConfig>,
     ) -> Self {
         Self {
             flow_event_store,
@@ -56,7 +56,7 @@ impl FlowSchedulingHelper {
             dependency_graph_service,
             dataset_ownership_service,
             time_source,
-            executor_config,
+            agent_config,
         }
     }
 
@@ -338,7 +338,7 @@ impl FlowSchedulingHelper {
         let trigger_time = trigger_type.trigger_time();
         let mut throttling_boundary_time =
             flow_run_stats.last_attempt_time.map_or(trigger_time, |t| {
-                t + self.executor_config.mandatory_throttling_period
+                t + self.agent_config.mandatory_throttling_period
             });
         // It's also possible we are waiting for some start condition much longer..
         if throttling_boundary_time < trigger_time {
@@ -637,7 +637,7 @@ impl FlowSchedulingHelper {
         flow.set_relevant_start_condition(
             self.time_source.now(),
             FlowStartCondition::Throttling(FlowStartConditionThrottling {
-                interval: self.executor_config.mandatory_throttling_period,
+                interval: self.agent_config.mandatory_throttling_period,
                 wake_up_at,
                 shifted_from,
             }),

@@ -18,8 +18,10 @@ use opendatafabric as odf;
 use super::{CommitResultAppendError, CommitResultSuccess, NoChanges};
 use crate::mutations::MetadataChainMut;
 use crate::prelude::*;
-use crate::utils::make_dataset_access_error;
+use crate::utils::{get_dataset, make_dataset_access_error};
 use crate::LoggedInGuard;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct DatasetMetadataMut {
     dataset_handle: odf::DatasetHandle,
@@ -30,13 +32,6 @@ impl DatasetMetadataMut {
     #[graphql(skip)]
     pub fn new(dataset_handle: odf::DatasetHandle) -> Self {
         Self { dataset_handle }
-    }
-
-    #[graphql(skip)]
-    fn get_dataset(&self, ctx: &Context<'_>) -> domain::ResolvedDataset {
-        // TODO: cut off this dependency - extract a higher level use case
-        let dataset_registry = from_catalog::<dyn domain::DatasetRegistry>(ctx).unwrap();
-        dataset_registry.get_dataset_by_handle(&self.dataset_handle)
     }
 
     /// Access to the mutable metadata chain of the dataset
@@ -51,7 +46,7 @@ impl DatasetMetadataMut {
         ctx: &Context<'_>,
         content: Option<String>,
     ) -> Result<UpdateReadmeResult> {
-        let resolved_dataset = self.get_dataset(ctx);
+        let resolved_dataset = get_dataset(ctx, &self.dataset_handle)?;
 
         let old_attachments = resolved_dataset
             .as_metadata_chain()
@@ -112,7 +107,7 @@ impl DatasetMetadataMut {
             attachments: new_attachments.into(),
         };
 
-        let commit_event = from_catalog::<dyn CommitDatasetEventUseCase>(ctx).unwrap();
+        let commit_event = from_catalog_n!(ctx, dyn CommitDatasetEventUseCase);
 
         let result = match commit_event
             .execute(

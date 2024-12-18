@@ -109,6 +109,7 @@ pub fn get_command(
             cli_catalog.get_one()?,
             cli_catalog.get_one()?,
             cli_catalog.get_one()?,
+            cli_catalog.get_one()?,
             validate_dataset_ref(cli_catalog, c.dataset)?,
             c.file.unwrap_or_default(),
             c.source_name,

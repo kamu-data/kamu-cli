@@ -34,8 +34,7 @@ impl DatasetFlowTriggers {
     ) -> Result<Option<FlowTrigger>> {
         check_dataset_read_access(ctx, &self.dataset_handle).await?;
 
-        let flow_trigger_service: std::sync::Arc<dyn FlowTriggerService> =
-            from_catalog::<dyn FlowTriggerService>(ctx).unwrap();
+        let flow_trigger_service = from_catalog_n!(ctx, dyn FlowTriggerService);
         let maybe_flow_trigger = flow_trigger_service
             .find_trigger(
                 FlowKeyDataset::new(self.dataset_handle.id.clone(), dataset_flow_type.into())
@@ -51,7 +50,7 @@ impl DatasetFlowTriggers {
     async fn all_paused(&self, ctx: &Context<'_>) -> Result<bool> {
         check_dataset_read_access(ctx, &self.dataset_handle).await?;
 
-        let flow_trigger_service = from_catalog::<dyn FlowTriggerService>(ctx).unwrap();
+        let flow_trigger_service = from_catalog_n!(ctx, dyn FlowTriggerService);
         for dataset_flow_type in kamu_flow_system::DatasetFlowType::all() {
             let maybe_flow_trigger = flow_trigger_service
                 .find_trigger(

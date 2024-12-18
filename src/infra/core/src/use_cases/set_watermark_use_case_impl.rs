@@ -12,13 +12,7 @@ use std::sync::Arc;
 use chrono::{DateTime, Utc};
 use dill::{component, interface};
 use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer};
-use kamu_core::{
-    DatasetRegistry,
-    SetWatermarkError,
-    SetWatermarkResult,
-    SetWatermarkUseCase,
-    WatermarkService,
-};
+use kamu_core::*;
 use opendatafabric::DatasetHandle;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -26,19 +20,22 @@ use opendatafabric::DatasetHandle;
 #[component(pub)]
 #[interface(dyn SetWatermarkUseCase)]
 pub struct SetWatermarkUseCaseImpl {
-    watermark_service: Arc<dyn WatermarkService>,
+    set_watermark_planner: Arc<dyn SetWatermarkPlanner>,
+    set_watermark_executor: Arc<dyn SetWatermarkExecutor>,
     dataset_registry: Arc<dyn DatasetRegistry>,
     dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
 }
 
 impl SetWatermarkUseCaseImpl {
     pub fn new(
-        watermark_service: Arc<dyn WatermarkService>,
+        set_watermark_planner: Arc<dyn SetWatermarkPlanner>,
+        set_watermark_executor: Arc<dyn SetWatermarkExecutor>,
         dataset_registry: Arc<dyn DatasetRegistry>,
         dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
     ) -> Self {
         Self {
-            watermark_service,
+            set_watermark_planner,
+            set_watermark_executor,
             dataset_registry,
             dataset_action_authorizer,
         }
@@ -64,12 +61,18 @@ impl SetWatermarkUseCase for SetWatermarkUseCaseImpl {
             .await?;
 
         // Resolve dataset
-        let resolved_dataset = self.dataset_registry.get_dataset_by_handle(dataset_handle);
+        let target = self.dataset_registry.get_dataset_by_handle(dataset_handle);
 
-        // Actual action
-        self.watermark_service
-            .set_watermark(resolved_dataset, new_watermark)
-            .await
+        // Make a plan
+        let plan = self
+            .set_watermark_planner
+            .plan_set_watermark(target.clone(), new_watermark)
+            .await?;
+
+        // Execute the plan
+        let result = self.set_watermark_executor.execute(target, plan).await?;
+
+        Ok(result)
     }
 }
 

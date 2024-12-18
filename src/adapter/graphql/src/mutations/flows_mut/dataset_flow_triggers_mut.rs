@@ -65,7 +65,7 @@ impl DatasetFlowTriggersMut {
             return Ok(SetFlowTriggerResult::PreconditionsNotMet(e));
         }
 
-        let flow_trigger_service = from_catalog::<dyn FlowTriggerService>(ctx).unwrap();
+        let flow_trigger_service = from_catalog_n!(ctx, dyn FlowTriggerService);
 
         let res = flow_trigger_service
             .set_trigger(
@@ -93,7 +93,7 @@ impl DatasetFlowTriggersMut {
     ) -> Result<bool> {
         ensure_scheduling_permission(ctx, &self.dataset_handle).await?;
 
-        let flow_trigger_service = from_catalog::<dyn FlowTriggerService>(ctx).unwrap();
+        let flow_trigger_service = from_catalog_n!(ctx, dyn FlowTriggerService);
 
         flow_trigger_service
             .pause_dataset_flows(
@@ -114,7 +114,7 @@ impl DatasetFlowTriggersMut {
     ) -> Result<bool> {
         ensure_scheduling_permission(ctx, &self.dataset_handle).await?;
 
-        let flow_trigger_service = from_catalog::<dyn FlowTriggerService>(ctx).unwrap();
+        let flow_trigger_service = from_catalog_n!(ctx, dyn FlowTriggerService);
 
         flow_trigger_service
             .resume_dataset_flows(
