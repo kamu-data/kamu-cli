@@ -310,7 +310,7 @@ impl PushIngestExecutorImpl {
 
 #[async_trait::async_trait]
 impl PushIngestExecutor for PushIngestExecutorImpl {
-    #[tracing::instrument(level = "info", skip_all, fields(target=%target.get_handle(), ?plan, %url))]
+    #[tracing::instrument(level = "info", skip_all, fields(target=%target.get_handle(), %url))]
     async fn ingest_from_url(
         &self,
         target: ResolvedDataset,
@@ -320,13 +320,11 @@ impl PushIngestExecutor for PushIngestExecutorImpl {
     ) -> Result<PushIngestResult, PushIngestError> {
         let listener = listener.unwrap_or_else(|| Arc::new(NullPushIngestListener));
 
-        tracing::info!(%url, ?plan, "Ingesting from url");
-
         self.do_ingest(target, plan, DataSource::Url(url), listener)
             .await
     }
 
-    #[tracing::instrument(level = "info", skip_all, fields(target=%target.get_handle(), ?plan))]
+    #[tracing::instrument(level = "info", skip_all, fields(target=%target.get_handle()))]
     async fn ingest_from_stream(
         &self,
         target: ResolvedDataset,
@@ -335,8 +333,6 @@ impl PushIngestExecutor for PushIngestExecutorImpl {
         listener: Option<Arc<dyn PushIngestListener>>,
     ) -> Result<PushIngestResult, PushIngestError> {
         let listener = listener.unwrap_or_else(|| Arc::new(NullPushIngestListener));
-
-        tracing::info!(?plan, "Ingesting from file stream");
 
         self.do_ingest(target, plan, DataSource::Stream(data), listener)
             .await

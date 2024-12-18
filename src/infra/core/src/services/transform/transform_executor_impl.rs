@@ -185,7 +185,7 @@ impl TransformExecutorImpl {
 
 #[async_trait::async_trait]
 impl TransformExecutor for TransformExecutorImpl {
-    #[tracing::instrument(level = "info", skip_all, fields(target=%target.get_handle(), ?plan))]
+    #[tracing::instrument(level = "info", skip_all, fields(target=%target.get_handle()))]
     async fn execute_transform(
         &self,
         target: ResolvedDataset,
@@ -212,7 +212,7 @@ impl TransformExecutor for TransformExecutorImpl {
         )
     }
 
-    #[tracing::instrument(level = "info", skip_all, fields(target=%target.get_handle(), ?verification_operation))]
+    #[tracing::instrument(level = "info", skip_all, fields(target=%target.get_handle()))]
     async fn execute_verify_transform(
         &self,
         target: ResolvedDataset,

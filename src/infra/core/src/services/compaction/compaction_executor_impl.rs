@@ -192,7 +192,7 @@ impl CompactionExecutorImpl {
 
 #[async_trait::async_trait]
 impl CompactionExecutor for CompactionExecutorImpl {
-    #[tracing::instrument(level = "debug", skip_all, fields(target=%target.get_handle(), ?plan))]
+    #[tracing::instrument(level = "debug", skip_all, fields(target=%target.get_handle()))]
     async fn execute(
         &self,
         target: ResolvedDataset,

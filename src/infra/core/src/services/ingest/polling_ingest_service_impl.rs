@@ -61,14 +61,6 @@ impl PollingIngestServiceImpl {
         }
     }
 
-    #[tracing::instrument(
-        level = "info",
-        skip_all,
-        fields(
-            dataset_handle = %target.get_handle(),
-            metadata_state = ?metadata_state,
-        )
-    )]
     async fn ingest_loop(
         &self,
         target: ResolvedDataset,

@@ -11,6 +11,10 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [0.213.1] - 2024-12-18
+### Fixed
+- Removed all occurrences of `DataWriterMetadataState` from telemetry spans (too much pressure)
+
 ## [0.213.0] - 2024-12-18
 ### Added
 - kamu-adapter-graphql: added macros (`from_catalog_n!()` & `unsafe_from_catalog_n!()`) 
