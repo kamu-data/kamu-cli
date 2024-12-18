@@ -198,7 +198,7 @@ impl SqlShellCommand {
 
                 let res = self
                     .query_svc
-                    .sql_statement(&command, QueryOptions::default())
+                    .sql_statement(command, QueryOptions::default())
                     .await
                     .map_err(CLIError::failure)?;
 
