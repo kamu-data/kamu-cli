@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
-use kamu_core::{DatasetChangesService, DatasetRegistry, DatasetRegistryExt, PollingIngestService};
+use kamu_core::{DatasetChangesService, DatasetRegistry, DatasetRegistryExt, MetadataQueryService};
 use kamu_flow_system::FlowResultDatasetUpdate;
 use {kamu_flow_system as fs, opendatafabric as odf};
 
@@ -58,19 +58,19 @@ impl Flow {
     ) -> Result<FlowDescriptionDataset> {
         Ok(match dataset_key.flow_type {
             fs::DatasetFlowType::Ingest => {
-                let (dataset_registry, polling_ingest_svc, dataset_changes_svc) = from_catalog_n!(
+                let (dataset_registry, metadata_query_service, dataset_changes_svc) = from_catalog_n!(
                     ctx,
                     dyn DatasetRegistry,
-                    dyn PollingIngestService,
+                    dyn MetadataQueryService,
                     dyn DatasetChangesService
                 );
-                let resolved_dataset = dataset_registry
+                let target = dataset_registry
                     .get_dataset_by_ref(&dataset_key.dataset_id.as_local_ref())
                     .await
                     .int_err()?;
 
-                let maybe_polling_source = polling_ingest_svc
-                    .get_active_polling_source(resolved_dataset)
+                let maybe_polling_source = metadata_query_service
+                    .get_active_polling_source(target)
                     .await
                     .int_err()?;
 

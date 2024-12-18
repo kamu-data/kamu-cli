@@ -8,8 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::InternalError;
-use kamu_core::{CompactionOptions, PullOptions, PullPlanIterationJob, ResolvedDataset};
-use opendatafabric::Multihash;
+use kamu_core::{CompactionPlan, PullOptions, PullPlanIterationJob, ResetPlan, ResolvedDataset};
 
 use crate::{LogicalPlan, LogicalPlanProbe};
 
@@ -53,8 +52,7 @@ pub struct TaskDefinitionUpdate {
 #[derive(Debug)]
 pub struct TaskDefinitionReset {
     pub target: ResolvedDataset,
-    pub new_head_hash: Option<Multihash>,
-    pub old_head_hash: Option<Multihash>,
+    pub reset_plan: ResetPlan,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -62,7 +60,7 @@ pub struct TaskDefinitionReset {
 #[derive(Debug)]
 pub struct TaskDefinitionHardCompact {
     pub target: ResolvedDataset,
-    pub compaction_options: CompactionOptions,
+    pub compaction_plan: CompactionPlan,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

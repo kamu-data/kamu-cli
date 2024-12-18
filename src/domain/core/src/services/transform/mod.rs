@@ -8,13 +8,13 @@
 // by the Apache License, Version 2.0.
 
 mod transform_elaboration_service;
-mod transform_execution_service;
+mod transform_executor;
 mod transform_listener;
 mod transform_request_planner;
 mod transform_types;
 
 pub use transform_elaboration_service::*;
-pub use transform_execution_service::*;
+pub use transform_executor::*;
 pub use transform_listener::*;
 pub use transform_request_planner::*;
 pub use transform_types::*;

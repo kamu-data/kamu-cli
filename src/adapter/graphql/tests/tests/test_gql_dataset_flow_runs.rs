@@ -15,18 +15,14 @@ use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use dill::Component;
 use futures::TryStreamExt;
 use indoc::indoc;
-use kamu::testing::{
-    MetadataFactory,
-    MockDatasetChangesService,
-    MockPollingIngestService,
-    MockTransformRequestPlanner,
-};
+use kamu::testing::{MetadataFactory, MockDatasetChangesService};
 use kamu::{
     CreateDatasetFromSnapshotUseCaseImpl,
     DatasetOwnershipServiceInMemory,
     DatasetRegistryRepoBridge,
     DatasetRepositoryLocalFs,
     DatasetRepositoryWriter,
+    MetadataQueryServiceImpl,
 };
 use kamu_accounts::{
     CurrentAccountSubject,
@@ -46,20 +42,19 @@ use kamu_core::{
     DatasetIntervalIncrement,
     DatasetLifecycleMessage,
     DatasetRepository,
-    PollingIngestService,
     PullResult,
+    ResetResult,
     TenancyConfig,
-    TransformRequestPlanner,
     MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
 };
 use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
 use kamu_datasets_services::DependencyGraphServiceImpl;
 use kamu_flow_system::{
     Flow,
+    FlowAgentConfig,
+    FlowAgentTestDriver,
     FlowConfigurationUpdatedMessage,
     FlowEventStore,
-    FlowExecutorConfig,
-    FlowExecutorTestDriver,
     FlowID,
     FlowTrigger,
     FlowTriggerAutoPolling,
@@ -88,8 +83,6 @@ async fn test_trigger_ingest_root_dataset() {
                 updated_watermark: None,
             },
         )),
-        transform_planner_mock: Some(MockTransformRequestPlanner::with_set_transform()),
-        polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
     })
     .await;
 
@@ -436,8 +429,6 @@ async fn test_trigger_ingest_root_dataset() {
 async fn test_trigger_reset_root_dataset_flow() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
         dataset_changes_mock: Some(MockDatasetChangesService::default()),
-        transform_planner_mock: Some(MockTransformRequestPlanner::with_set_transform()),
-        polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
     })
     .await;
 
@@ -509,7 +500,9 @@ async fn test_trigger_reset_root_dataset_flow() {
             complete_time,
             ts::TaskOutcome::Success(ts::TaskResult::ResetDatasetResult(
                 ts::TaskResetDatasetResult {
-                    new_head: root_dataset_blocks[1].0.clone(),
+                    reset_result: ResetResult {
+                        new_head: root_dataset_blocks[1].0.clone(),
+                    },
                 },
             )),
         )
@@ -599,8 +592,6 @@ async fn test_trigger_reset_root_dataset_flow() {
 async fn test_trigger_reset_root_dataset_flow_with_invalid_head() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
         dataset_changes_mock: Some(MockDatasetChangesService::default()),
-        transform_planner_mock: Some(MockTransformRequestPlanner::with_set_transform()),
-        polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
     })
     .await;
 
@@ -700,8 +691,6 @@ async fn test_trigger_execute_transform_derived_dataset() {
                 updated_watermark: None,
             },
         )),
-        transform_planner_mock: Some(MockTransformRequestPlanner::with_set_transform()),
-        polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
     })
     .await;
 
@@ -920,8 +909,6 @@ async fn test_trigger_compaction_root_dataset() {
                 updated_watermark: None,
             },
         )),
-        transform_planner_mock: Some(MockTransformRequestPlanner::with_set_transform()),
-        polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
     })
     .await;
 
@@ -1272,8 +1259,6 @@ async fn test_trigger_compaction_root_dataset() {
 async fn test_list_flows_with_filters_and_pagination() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
         dataset_changes_mock: None,
-        transform_planner_mock: Some(MockTransformRequestPlanner::with_set_transform()),
-        polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
     })
     .await;
     let create_result = harness.create_root_dataset().await;
@@ -1676,8 +1661,6 @@ async fn test_list_flows_with_filters_and_pagination() {
 async fn test_list_flow_initiators() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
         dataset_changes_mock: None,
-        transform_planner_mock: Some(MockTransformRequestPlanner::with_set_transform()),
-        polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
     })
     .await;
     let create_result = harness.create_root_dataset().await;
@@ -1768,12 +1751,10 @@ async fn test_list_flow_initiators() {
 async fn test_conditions_not_met_for_flows() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
         dataset_changes_mock: None,
-        transform_planner_mock: Some(MockTransformRequestPlanner::without_set_transform()),
-        polling_service_mock: Some(MockPollingIngestService::without_active_polling_source()),
     })
     .await;
-    let create_root_result = harness.create_root_dataset().await;
-    let create_derived_result = harness.create_derived_dataset().await;
+    let create_root_result = harness.create_root_dataset_no_source().await;
+    let create_derived_result = harness.create_derived_dataset_no_transform().await;
 
     ////
 
@@ -1850,8 +1831,6 @@ async fn test_conditions_not_met_for_flows() {
 async fn test_incorrect_dataset_kinds_for_flow_type() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
         dataset_changes_mock: None,
-        transform_planner_mock: Some(MockTransformRequestPlanner::with_set_transform()),
-        polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
     })
     .await;
 
@@ -1966,8 +1945,6 @@ async fn test_incorrect_dataset_kinds_for_flow_type() {
 async fn test_cancel_ingest_root_dataset() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
         dataset_changes_mock: None,
-        transform_planner_mock: Some(MockTransformRequestPlanner::with_set_transform()),
-        polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
     })
     .await;
     let create_result = harness.create_root_dataset().await;
@@ -2037,8 +2014,6 @@ async fn test_cancel_ingest_root_dataset() {
 async fn test_cancel_running_transform_derived_dataset() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
         dataset_changes_mock: None,
-        transform_planner_mock: Some(MockTransformRequestPlanner::with_set_transform()),
-        polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
     })
     .await;
     harness.create_root_dataset().await;
@@ -2113,8 +2088,6 @@ async fn test_cancel_running_transform_derived_dataset() {
 async fn test_cancel_hard_compaction_root_dataset() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
         dataset_changes_mock: None,
-        transform_planner_mock: Some(MockTransformRequestPlanner::with_set_transform()),
-        polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
     })
     .await;
     let create_result = harness.create_root_dataset().await;
@@ -2184,8 +2157,6 @@ async fn test_cancel_hard_compaction_root_dataset() {
 async fn test_cancel_wrong_flow_id_fails() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
         dataset_changes_mock: None,
-        transform_planner_mock: Some(MockTransformRequestPlanner::with_set_transform()),
-        polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
     })
     .await;
     let create_result = harness.create_root_dataset().await;
@@ -2227,8 +2198,6 @@ async fn test_cancel_wrong_flow_id_fails() {
 async fn test_cancel_foreign_flow_fails() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
         dataset_changes_mock: None,
-        transform_planner_mock: Some(MockTransformRequestPlanner::with_set_transform()),
-        polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
     })
     .await;
     let create_root_result = harness.create_root_dataset().await;
@@ -2287,8 +2256,6 @@ async fn test_cancel_foreign_flow_fails() {
 async fn test_cancel_waiting_flow() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
         dataset_changes_mock: None,
-        transform_planner_mock: Some(MockTransformRequestPlanner::with_set_transform()),
-        polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
     })
     .await;
     let create_result = harness.create_root_dataset().await;
@@ -2356,8 +2323,6 @@ async fn test_cancel_waiting_flow() {
 async fn test_cancel_already_aborted_flow() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
         dataset_changes_mock: None,
-        transform_planner_mock: Some(MockTransformRequestPlanner::with_set_transform()),
-        polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
     })
     .await;
     let create_result = harness.create_root_dataset().await;
@@ -2440,8 +2405,6 @@ async fn test_cancel_already_aborted_flow() {
 async fn test_cancel_already_succeeded_flow() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
         dataset_changes_mock: None,
-        transform_planner_mock: Some(MockTransformRequestPlanner::with_set_transform()),
-        polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
     })
     .await;
     let create_result: CreateDatasetResult = harness.create_root_dataset().await;
@@ -2519,8 +2482,6 @@ async fn test_cancel_already_succeeded_flow() {
 async fn test_history_of_completed_flow() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
         dataset_changes_mock: None,
-        transform_planner_mock: Some(MockTransformRequestPlanner::with_set_transform()),
-        polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
     })
     .await;
 
@@ -2660,8 +2621,6 @@ async fn test_execute_transfrom_flow_error_after_compaction() {
                 updated_watermark: None,
             },
         )),
-        transform_planner_mock: Some(MockTransformRequestPlanner::with_set_transform()),
-        polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
     })
     .await;
 
@@ -2959,8 +2918,6 @@ async fn test_execute_transfrom_flow_error_after_compaction() {
 async fn test_anonymous_operation_fails() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
         dataset_changes_mock: None,
-        transform_planner_mock: Some(MockTransformRequestPlanner::with_set_transform()),
-        polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
     })
     .await;
 
@@ -3004,8 +2961,6 @@ async fn test_config_snapshot_returned_correctly() {
                 updated_watermark: None,
             },
         )),
-        transform_planner_mock: Some(MockTransformRequestPlanner::with_set_transform()),
-        polling_service_mock: Some(MockPollingIngestService::with_active_polling_source()),
     })
     .await;
 
@@ -3134,8 +3089,6 @@ struct FlowRunsHarness {
 #[derive(Default)]
 struct FlowRunsHarnessOverrides {
     dataset_changes_mock: Option<MockDatasetChangesService>,
-    transform_planner_mock: Option<MockTransformRequestPlanner>,
-    polling_service_mock: Option<MockPollingIngestService>,
 }
 
 impl FlowRunsHarness {
@@ -3145,8 +3098,6 @@ impl FlowRunsHarness {
         std::fs::create_dir(&datasets_dir).unwrap();
 
         let dataset_changes_mock = overrides.dataset_changes_mock.unwrap_or_default();
-        let transform_planner_mock = overrides.transform_planner_mock.unwrap_or_default();
-        let polling_service_mock = overrides.polling_service_mock.unwrap_or_default();
 
         let catalog_base = {
             let mut b = dill::CatalogBuilder::new();
@@ -3161,6 +3112,7 @@ impl FlowRunsHarness {
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
             .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
             .add::<DatasetRegistryRepoBridge>()
+            .add::<MetadataQueryServiceImpl>()
             .add::<CreateDatasetFromSnapshotUseCaseImpl>()
             .add_value(dataset_changes_mock)
             .bind::<dyn DatasetChangesService, MockDatasetChangesService>()
@@ -3170,16 +3122,12 @@ impl FlowRunsHarness {
             .add::<InMemoryDatasetDependencyRepository>()
             .add::<InMemoryFlowConfigurationEventStore>()
             .add::<InMemoryFlowEventStore>()
-            .add_value(FlowExecutorConfig::new(
+            .add_value(FlowAgentConfig::new(
                 Duration::seconds(1),
                 Duration::minutes(1),
             ))
             .add::<TaskSchedulerImpl>()
             .add::<InMemoryTaskEventStore>()
-            .add_value(transform_planner_mock)
-            .bind::<dyn TransformRequestPlanner, MockTransformRequestPlanner>()
-            .add_value(polling_service_mock)
-            .bind::<dyn PollingIngestService, MockPollingIngestService>()
             .add::<AuthenticationServiceImpl>()
             .add::<AccessTokenServiceImpl>()
             .add::<InMemoryAccessTokenRepository>()
@@ -3196,7 +3144,7 @@ impl FlowRunsHarness {
             );
             register_message_dispatcher::<ts::TaskProgressMessage>(
                 &mut b,
-                ts::MESSAGE_PRODUCER_KAMU_TASK_EXECUTOR,
+                ts::MESSAGE_PRODUCER_KAMU_TASK_AGENT,
             );
             register_message_dispatcher::<FlowConfigurationUpdatedMessage>(
                 &mut b,
@@ -3249,6 +3197,24 @@ impl FlowRunsHarness {
             .unwrap()
     }
 
+    async fn create_root_dataset_no_source(&self) -> CreateDatasetResult {
+        let create_dataset_from_snapshot = self
+            .catalog_authorized
+            .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
+            .unwrap();
+
+        create_dataset_from_snapshot
+            .execute(
+                MetadataFactory::dataset_snapshot()
+                    .kind(DatasetKind::Root)
+                    .name("foo")
+                    .build(),
+                Default::default(),
+            )
+            .await
+            .unwrap()
+    }
+
     async fn create_derived_dataset(&self) -> CreateDatasetResult {
         let create_dataset_from_snapshot = self
             .catalog_authorized
@@ -3272,6 +3238,24 @@ impl FlowRunsHarness {
             .unwrap()
     }
 
+    async fn create_derived_dataset_no_transform(&self) -> CreateDatasetResult {
+        let create_dataset_from_snapshot = self
+            .catalog_authorized
+            .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
+            .unwrap();
+
+        create_dataset_from_snapshot
+            .execute(
+                MetadataFactory::dataset_snapshot()
+                    .name("bar")
+                    .kind(DatasetKind::Derivative)
+                    .build(),
+                Default::default(),
+            )
+            .await
+            .unwrap()
+    }
+
     async fn mimic_flow_scheduled(
         &self,
         flow_id: &str,
@@ -3279,7 +3263,7 @@ impl FlowRunsHarness {
     ) -> ts::TaskID {
         let flow_service_test_driver = self
             .catalog_authorized
-            .get_one::<dyn FlowExecutorTestDriver>()
+            .get_one::<dyn FlowAgentTestDriver>()
             .unwrap();
 
         let flow_id = FlowID::new(flow_id.parse::<u64>().unwrap());
@@ -3327,7 +3311,7 @@ impl FlowRunsHarness {
         let outbox = self.catalog_authorized.get_one::<dyn Outbox>().unwrap();
         outbox
             .post_message(
-                ts::MESSAGE_PRODUCER_KAMU_TASK_EXECUTOR,
+                ts::MESSAGE_PRODUCER_KAMU_TASK_AGENT,
                 ts::TaskProgressMessage::running(event_time, task_id, task_metadata),
             )
             .await
@@ -3355,7 +3339,7 @@ impl FlowRunsHarness {
         let outbox = self.catalog_authorized.get_one::<dyn Outbox>().unwrap();
         outbox
             .post_message(
-                ts::MESSAGE_PRODUCER_KAMU_TASK_EXECUTOR,
+                ts::MESSAGE_PRODUCER_KAMU_TASK_AGENT,
                 ts::TaskProgressMessage::finished(event_time, task_id, task_metadata, task_outcome),
             )
             .await

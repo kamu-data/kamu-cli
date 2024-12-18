@@ -94,7 +94,7 @@ impl TaskScheduler for TaskSchedulerImpl {
             return Ok(None);
         };
 
-        // Mark the task as running and hand it over to Executor
+        // Mark the task as running and hand it over to Agent
         let mut task = Task::load(task_id, self.task_event_store.as_ref())
             .await
             .int_err()?;
@@ -104,7 +104,7 @@ impl TaskScheduler for TaskSchedulerImpl {
         tracing::info!(
             %task_id,
             logical_plan = ?task.logical_plan,
-            "Handing over a task to an executor",
+            "Handing over a task to an agent",
         );
 
         Ok(Some(task))

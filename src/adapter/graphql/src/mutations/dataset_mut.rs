@@ -9,7 +9,7 @@
 
 use chrono::{DateTime, Utc};
 use domain::{DeleteDatasetError, RenameDatasetError};
-use kamu_core::{self as domain, SetWatermarkUseCase};
+use kamu_core::{self as domain, SetWatermarkPlanningError, SetWatermarkUseCase};
 use opendatafabric as odf;
 
 use super::{DatasetEnvVarsMut, DatasetFlowsMut, DatasetMetadataMut};
@@ -139,11 +139,11 @@ impl DatasetMut {
                     new_head: new_head.into(),
                 }))
             }
-            Err(e @ domain::SetWatermarkError::IsDerivative) => {
-                Ok(SetWatermarkResult::IsDerivative(SetWatermarkIsDerivative {
-                    message: e.to_string(),
-                }))
-            }
+            Err(
+                e @ domain::SetWatermarkError::Planning(SetWatermarkPlanningError::IsDerivative),
+            ) => Ok(SetWatermarkResult::IsDerivative(SetWatermarkIsDerivative {
+                message: e.to_string(),
+            })),
             Err(e) => Err(e.int_err().into()),
         }
     }

@@ -219,7 +219,8 @@ struct TestHarness {
     tempdir: tempfile::TempDir,
     dataset_repo_writer: Arc<dyn DatasetRepositoryWriter>,
     ingest_svc: Arc<dyn PollingIngestService>,
-    push_ingest_svc: Arc<dyn PushIngestService>,
+    push_ingest_planner: Arc<dyn PushIngestPlanner>,
+    push_ingest_executor: Arc<dyn PushIngestExecutor>,
     transform_helper: TransformTestHelper,
     time_source: Arc<SystemTimeSourceStub>,
 }
@@ -255,11 +256,13 @@ impl TestHarness {
             .add::<DataFormatRegistryImpl>()
             .add::<FetchService>()
             .add::<PollingIngestServiceImpl>()
-            .add::<PushIngestServiceImpl>()
+            .add::<PushIngestExecutorImpl>()
+            .add::<PushIngestPlannerImpl>()
             .add::<TransformRequestPlannerImpl>()
             .add::<TransformElaborationServiceImpl>()
-            .add::<TransformExecutionServiceImpl>()
-            .add::<CompactionServiceImpl>()
+            .add::<TransformExecutorImpl>()
+            .add::<CompactionPlannerImpl>()
+            .add::<CompactionExecutorImpl>()
             .add::<DatasetKeyValueServiceSysEnv>()
             .add_value(SystemTimeSourceStub::new_set(
                 Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap(),
@@ -273,10 +276,17 @@ impl TestHarness {
             tempdir,
             dataset_repo_writer: catalog.get_one().unwrap(),
             ingest_svc: catalog.get_one().unwrap(),
-            push_ingest_svc: catalog.get_one().unwrap(),
+            push_ingest_planner: catalog.get_one().unwrap(),
+            push_ingest_executor: catalog.get_one().unwrap(),
             time_source: catalog.get_one().unwrap(),
             transform_helper,
         }
+    }
+
+    async fn build_metadata_state(&self, created: &CreateDatasetResult) -> DataWriterMetadataState {
+        DataWriterMetadataState::build(ResolvedDataset::from(created), &BlockRef::Head, None)
+            .await
+            .unwrap()
     }
 }
 
@@ -337,10 +347,15 @@ async fn test_transform_common(transform: Transform, test_retractions: bool) {
         .unwrap()
         .create_dataset_result;
 
+    let root_target = ResolvedDataset::from(&root_created);
+
+    let root_metadata_state = harness.build_metadata_state(&root_created).await;
+
     harness
         .ingest_svc
         .ingest(
-            ResolvedDataset::from(&root_created),
+            root_target.clone(),
+            Box::new(root_metadata_state),
             PollingIngestOptions::default(),
             None,
         )
@@ -439,10 +454,13 @@ async fn test_transform_common(transform: Transform, test_retractions: bool) {
     )
     .unwrap();
 
+    let root_metadata_state = harness.build_metadata_state(&root_created).await;
+
     harness
         .ingest_svc
         .ingest(
-            ResolvedDataset::from(&root_created),
+            root_target.clone(),
+            Box::new(root_metadata_state),
             PollingIngestOptions::default(),
             None,
         )
@@ -755,13 +773,22 @@ async fn test_transform_empty_inputs() {
         .await
         .unwrap();
 
-    let ingest_result = harness
-        .push_ingest_svc
-        .ingest_from_file_stream(
+    let ingest_plan = harness
+        .push_ingest_planner
+        .plan_ingest(
             ResolvedDataset::from(&root),
             None,
-            Box::new(tokio::io::BufReader::new(std::io::Cursor::new(b""))),
             PushIngestOpts::default(),
+        )
+        .await
+        .unwrap();
+
+    let ingest_result = harness
+        .push_ingest_executor
+        .ingest_from_stream(
+            ResolvedDataset::from(&root),
+            ingest_plan,
+            Box::new(tokio::io::BufReader::new(std::io::Cursor::new(b""))),
             None,
         )
         .await
@@ -796,15 +823,24 @@ async fn test_transform_empty_inputs() {
     // 3: Input gets some data
     ///////////////////////////////////////////////////////////////////////////
 
-    let ingest_result = harness
-        .push_ingest_svc
-        .ingest_from_file_stream(
+    let ingest_plan = harness
+        .push_ingest_planner
+        .plan_ingest(
             ResolvedDataset::from(&root),
             None,
+            PushIngestOpts::default(),
+        )
+        .await
+        .unwrap();
+
+    let ingest_result = harness
+        .push_ingest_executor
+        .ingest_from_stream(
+            ResolvedDataset::from(&root),
+            ingest_plan,
             Box::new(tokio::io::BufReader::new(std::io::Cursor::new(
                 br#"{"city": "A", "population": 100}"#,
             ))),
-            PushIngestOpts::default(),
             None,
         )
         .await

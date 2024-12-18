@@ -154,14 +154,15 @@ impl DatasetMetadata {
 
     /// Current polling source used by the root dataset
     async fn current_polling_source(&self, ctx: &Context<'_>) -> Result<Option<SetPollingSource>> {
-        let (dataset_registry, polling_ingest_svc) = from_catalog_n!(
+        let (dataset_registry, metadata_query_service) = from_catalog_n!(
             ctx,
             dyn domain::DatasetRegistry,
-            dyn domain::PollingIngestService
+            dyn domain::MetadataQueryService
         );
 
-        let source = polling_ingest_svc
-            .get_active_polling_source(dataset_registry.get_dataset_by_handle(&self.dataset_handle))
+        let target = dataset_registry.get_dataset_by_handle(&self.dataset_handle);
+        let source = metadata_query_service
+            .get_active_polling_source(target)
             .await
             .int_err()?;
 
@@ -170,14 +171,15 @@ impl DatasetMetadata {
 
     /// Current push sources used by the root dataset
     async fn current_push_sources(&self, ctx: &Context<'_>) -> Result<Vec<AddPushSource>> {
-        let (push_ingest_svc, dataset_registry) = from_catalog_n!(
+        let (metadata_query_service, dataset_registry) = from_catalog_n!(
             ctx,
-            dyn domain::PushIngestService,
+            dyn domain::MetadataQueryService,
             dyn domain::DatasetRegistry
         );
 
-        let mut push_sources: Vec<AddPushSource> = push_ingest_svc
-            .get_active_push_sources(dataset_registry.get_dataset_by_handle(&self.dataset_handle))
+        let target = dataset_registry.get_dataset_by_handle(&self.dataset_handle);
+        let mut push_sources: Vec<AddPushSource> = metadata_query_service
+            .get_active_push_sources(target)
             .await
             .int_err()?
             .into_iter()
@@ -199,15 +201,14 @@ impl DatasetMetadata {
 
     /// Current transformation used by the derivative dataset
     async fn current_transform(&self, ctx: &Context<'_>) -> Result<Option<SetTransform>> {
-        let (transform_request_planner, dataset_registry) = from_catalog_n!(
+        let (metadata_query_service, dataset_registry) = from_catalog_n!(
             ctx,
-            dyn kamu_core::TransformRequestPlanner,
+            dyn kamu_core::MetadataQueryService,
             dyn domain::DatasetRegistry
         );
 
-        let source = transform_request_planner
-            .get_active_transform(dataset_registry.get_dataset_by_handle(&self.dataset_handle))
-            .await?;
+        let target = dataset_registry.get_dataset_by_handle(&self.dataset_handle);
+        let source = metadata_query_service.get_active_transform(target).await?;
 
         Ok(source.map(|(_hash, block)| block.event.into()))
     }

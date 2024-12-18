@@ -16,7 +16,8 @@ use dill::Component;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu::domain::{
     CommitDatasetEventUseCase,
-    CompactionService,
+    CompactionExecutor,
+    CompactionPlanner,
     CreateDatasetFromSnapshotUseCase,
     CreateDatasetUseCase,
     DatasetRepository,
@@ -29,7 +30,8 @@ use kamu::utils::s3_context::S3Context;
 use kamu::{
     AppendDatasetMetadataBatchUseCaseImpl,
     CommitDatasetEventUseCaseImpl,
-    CompactionServiceImpl,
+    CompactionExecutorImpl,
+    CompactionPlannerImpl,
     CreateDatasetFromSnapshotUseCaseImpl,
     CreateDatasetUseCaseImpl,
     DatasetLayout,
@@ -108,7 +110,8 @@ impl ServerSideS3Harness {
                 .add_value(server_authentication_mock(&account))
                 .bind::<dyn AuthenticationService, MockAuthenticationService>()
                 .add_value(ServerUrlConfig::new_test(Some(&base_url_rest)))
-                .add::<CompactionServiceImpl>()
+                .add::<CompactionPlannerImpl>()
+                .add::<CompactionExecutorImpl>()
                 .add::<ObjectStoreRegistryImpl>()
                 .add::<ObjectStoreBuilderLocalFs>()
                 .add_value(ObjectStoreBuilderS3::new(s3_context, true))
@@ -180,9 +183,14 @@ impl ServerSideHarness for ServerSideS3Harness {
             .unwrap()
     }
 
-    fn cli_compaction_service(&self) -> Arc<dyn CompactionService> {
+    fn cli_compaction_planner(&self) -> Arc<dyn CompactionPlanner> {
         let cli_catalog = create_cli_user_catalog(&self.base_catalog);
-        cli_catalog.get_one::<dyn CompactionService>().unwrap()
+        cli_catalog.get_one::<dyn CompactionPlanner>().unwrap()
+    }
+
+    fn cli_compaction_executor(&self) -> Arc<dyn CompactionExecutor> {
+        let cli_catalog = create_cli_user_catalog(&self.base_catalog);
+        cli_catalog.get_one::<dyn CompactionExecutor>().unwrap()
     }
 
     fn dataset_url_with_scheme(&self, dataset_alias: &DatasetAlias, scheme: &str) -> Url {
