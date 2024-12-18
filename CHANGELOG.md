@@ -11,7 +11,7 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## Unreleased
+## [0.213.0] - 2024-12-18
 ### Added
 - kamu-adapter-graphql: added macros (`from_catalog_n!()` & `unsafe_from_catalog_n!()`) 
    that simplify the extraction of components from the DI catalog
