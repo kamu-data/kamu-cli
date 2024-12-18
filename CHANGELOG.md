@@ -18,6 +18,9 @@ Recommendation: for ease of reading, use the following order:
 - database-common: the logic for pagination of data processing is generalized in `EntityPageStreamer`
 ### Changed
 - Speed up project build time by removing unused dependencies which were not detected by automated tools
+- Extracted "planner" and "executor" for compacting, reset, set watermark, push ingest, partially polling ingest.
+- Renamed long-running "executors" to "agents".
+- Introduced `MetadataQueryService` to absorb simple queries that do not have to be defined at the level of metadata chian from the interface point of view.
 ### Fixed
 - `DatasetEnvVar` entity now deletes during deleting `DatasetEntry` entity
 
