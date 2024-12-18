@@ -190,7 +190,7 @@ pub async fn test_export_to_csv_files(kamu: KamuCliPuppet) {
     )
     .await;
 
-    assert!(output_path.exists(), "CSV file should be created");
+    assert!(output_path.exists(), "CSV files should be created");
     assert!(
         output_path.is_dir(),
         "Data should be stored into separate files"
@@ -240,7 +240,7 @@ pub async fn test_export_to_csv_files(kamu: KamuCliPuppet) {
     )
     .await;
 
-    assert!(output_path.exists(), "CSV file should be created");
+    assert!(output_path.exists(), "CSV files should be created");
     assert!(
         output_path.is_dir(),
         "Data should be stored into separate files"
@@ -381,7 +381,7 @@ pub async fn test_export_to_json_files(kamu: KamuCliPuppet) {
     )
     .await;
 
-    assert!(output_path.exists(), "JSON file should be created");
+    assert!(output_path.exists(), "JSON files should be created");
     assert!(
         output_path.is_dir(),
         "Data should be stored into separate files"
@@ -540,7 +540,7 @@ pub async fn test_export_to_parquet_files(kamu: KamuCliPuppet) {
     )
     .await;
 
-    assert!(output_path.exists(), "Parquet file should be created");
+    assert!(output_path.exists(), "Parquet filess should be created");
     assert!(
         output_path.is_dir(),
         "Data should be stored into separate files"
@@ -623,7 +623,7 @@ pub async fn test_export_non_existent_dataset(kamu: KamuCliPuppet) {
             output_path_str,
         ],
         None,
-        Some([]), // todo: check error output
+        Some(["Error: Dataset not found: non-existent"]),
     )
     .await;
 }
