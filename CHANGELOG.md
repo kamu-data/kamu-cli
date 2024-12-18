@@ -15,10 +15,10 @@ Recommendation: for ease of reading, use the following order:
 ### Added
 - Console warning when deleting datasets which are out of sync with their push remotes
 ### Changed
-- Speed up project build time by removing unused dependencies which were not detected by automated tools
 - Private Datasets:
   - OSO: using user actors / dateset resources that come from the database
     - Thus, any access check relies on real entities
+  - GQL, added `Dataset.visibility()` to get the current visibility value
   - GQL, added `DatasetMut.setVisibility()` to be able to change the dataset visibility after it has been created
   - Deletion of previously created (and unused) ReBAC-properties and reindexing
   - OSO: updating the schema to use identifiers instead of names

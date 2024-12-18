@@ -19,6 +19,7 @@ use crate::mutations::{
     DatasetMetadataMut,
 };
 use crate::prelude::*;
+use crate::queries::*;
 use crate::utils::{ensure_dataset_env_vars_enabled, from_catalog_n};
 use crate::LoggedInGuard;
 
@@ -285,24 +286,6 @@ impl DeleteResultDanglingReference {
 pub enum DatasetVisibilityInput {
     Private(PrivateDatasetVisibility),
     Public(PublicDatasetVisibility),
-}
-
-#[derive(Union, Debug, Clone, PartialEq, Eq)]
-pub enum DatasetVisibility {
-    Private(PrivateDatasetVisibility),
-    Public(PublicDatasetVisibility),
-}
-
-#[derive(SimpleObject, InputObject, Debug, Clone, PartialEq, Eq)]
-#[graphql(input_name = "PrivateDatasetVisibilityInput")]
-pub struct PrivateDatasetVisibility {
-    _dummy: Option<String>,
-}
-
-#[derive(SimpleObject, InputObject, Debug, Clone, PartialEq, Eq)]
-#[graphql(input_name = "PublicDatasetVisibilityInput")]
-pub struct PublicDatasetVisibility {
-    anonymous_available: bool,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -13,7 +13,7 @@ use opendatafabric as odf;
 
 use crate::prelude::*;
 use crate::queries::*;
-use crate::utils::ensure_dataset_env_vars_enabled;
+use crate::utils::{ensure_dataset_env_vars_enabled, from_catalog_n};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -85,6 +85,26 @@ impl Dataset {
             .await
             .int_err()?;
         Ok(summary.kind.into())
+    }
+
+    // TODO: Private Datasets: tests
+    /// Returns the visibility of dataset
+    async fn visibility(&self, ctx: &Context<'_>) -> Result<DatasetVisibilityOutput> {
+        let rebac_svc = from_catalog_n!(ctx, dyn kamu_auth_rebac::RebacService);
+
+        let resolved_dataset = self.get_dataset(ctx);
+        let properties = rebac_svc
+            .get_dataset_properties(resolved_dataset.get_id())
+            .await
+            .int_err()?;
+
+        let visibility = if properties.allows_public_read {
+            DatasetVisibilityOutput::public(properties.allows_anonymous_read)
+        } else {
+            DatasetVisibilityOutput::private()
+        };
+
+        Ok(visibility)
     }
 
     /// Access to the data of the dataset
@@ -164,6 +184,38 @@ impl Dataset {
 
         DatasetEndpoints::new(&self.owner, self.dataset_handle.clone(), config)
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Union, Debug, Clone, PartialEq, Eq)]
+pub enum DatasetVisibilityOutput {
+    Private(PrivateDatasetVisibility),
+    Public(PublicDatasetVisibility),
+}
+
+impl DatasetVisibilityOutput {
+    pub fn private() -> Self {
+        Self::Private(PrivateDatasetVisibility { _dummy: None })
+    }
+
+    pub fn public(anonymous_available: bool) -> Self {
+        Self::Public(PublicDatasetVisibility {
+            anonymous_available,
+        })
+    }
+}
+
+#[derive(SimpleObject, InputObject, Debug, Clone, PartialEq, Eq)]
+#[graphql(input_name = "PrivateDatasetVisibilityInput")]
+pub struct PrivateDatasetVisibility {
+    _dummy: Option<String>,
+}
+
+#[derive(SimpleObject, InputObject, Debug, Clone, PartialEq, Eq)]
+#[graphql(input_name = "PublicDatasetVisibilityInput")]
+pub struct PublicDatasetVisibility {
+    pub anonymous_available: bool,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

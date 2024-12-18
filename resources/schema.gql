@@ -451,6 +451,10 @@ type Dataset {
 	"""
 	kind: DatasetKind!
 	"""
+	Returns the visibility of dataset
+	"""
+	visibility: DatasetVisibilityOutput!
+	"""
 	Access to the data of the dataset
 	"""
 	data: DatasetData!
@@ -772,6 +776,8 @@ input DatasetVisibilityInput @oneOf {
 	private: PrivateDatasetVisibilityInput
 	public: PublicDatasetVisibilityInput
 }
+
+union DatasetVisibilityOutput = PrivateDatasetVisibility | PublicDatasetVisibility
 
 type Datasets {
 	"""
@@ -1524,6 +1530,10 @@ type PrepStepPipe {
 	command: [String!]!
 }
 
+type PrivateDatasetVisibility {
+	dummy: String
+}
+
 input PrivateDatasetVisibilityInput {
 	dummy: String
 }
@@ -1531,6 +1541,10 @@ input PrivateDatasetVisibilityInput {
 input PropagationMode @oneOf {
 	custom: FlowConfigurationResetCustom
 	toSeed: FlowConfigurationResetToSeedDummy
+}
+
+type PublicDatasetVisibility {
+	anonymousAvailable: Boolean!
 }
 
 input PublicDatasetVisibilityInput {
