@@ -118,19 +118,15 @@ impl Harness {
                 .unwrap();
         }
 
-        let metadata_state = DataWriterMetadataState::build(
+        let ctx = SessionContext::new();
+        let mut writer = DataWriterDataFusion::from_metadata_chain(
+            ctx.clone(),
             ResolvedDataset::from(&create_result),
             &BlockRef::Head,
             None,
         )
         .await
         .unwrap();
-
-        let ctx = SessionContext::new();
-        let mut writer =
-            DataWriterDataFusion::builder(ResolvedDataset::from(&create_result), ctx.clone())
-                .with_metadata_state(metadata_state)
-                .build();
 
         writer
             .write(

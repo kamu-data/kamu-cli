@@ -35,6 +35,7 @@ use crate::{
 /// Contains a projection of the metadata needed for [`DataWriter`] to function
 #[derive(Debug, Clone)]
 pub struct DataWriterMetadataState {
+    pub block_ref: BlockRef,
     pub head: odf::Multihash,
     pub schema: Option<odf::SetDataSchema>,
     pub source_event: Option<odf::MetadataEvent>,
@@ -135,6 +136,7 @@ impl DataWriterMetadataState {
             }
         };
         Ok(Self {
+            block_ref: block_ref.clone(),
             head,
             schema: set_data_schema_visitor.into_inner().into_event(),
             source_event,

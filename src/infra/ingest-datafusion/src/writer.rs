@@ -33,7 +33,6 @@ use opendatafabric as odf;
 pub struct DataWriterDataFusion {
     target: ResolvedDataset,
     merge_strategy: Arc<dyn MergeStrategy>,
-    block_ref: BlockRef,
 
     // Mutable
     meta: DataWriterMetadataState,
@@ -45,23 +44,30 @@ pub struct DataWriterDataFusion {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl DataWriterDataFusion {
-    pub fn builder(dataset: ResolvedDataset, ctx: SessionContext) -> DataWriterDataFusionBuilder {
-        DataWriterDataFusionBuilder::new(dataset, ctx)
-    }
-
-    /// Use [`Self::builder`] to create an instance
-    fn new(
+    pub async fn from_metadata_chain(
         ctx: SessionContext,
         target: ResolvedDataset,
-        merge_strategy: Arc<dyn MergeStrategy>,
-        block_ref: BlockRef,
+        block_ref: &BlockRef,
+        source_name: Option<&str>,
+    ) -> Result<Self, ScanMetadataError> {
+        let metadata_state =
+            DataWriterMetadataState::build(target.clone(), block_ref, source_name).await?;
+
+        Ok(Self::from_metadata_state(ctx, target, metadata_state))
+    }
+
+    pub fn from_metadata_state(
+        ctx: SessionContext,
+        target: ResolvedDataset,
         metadata_state: DataWriterMetadataState,
     ) -> Self {
+        let merge_strategy =
+            Self::merge_strategy_for(metadata_state.merge_strategy.clone(), &metadata_state.vocab);
+
         Self {
             ctx,
             target,
             merge_strategy,
-            block_ref,
             meta: metadata_state,
         }
     }
@@ -572,6 +578,23 @@ impl DataWriterDataFusion {
 
         Ok((offset_interval, output_watermark))
     }
+
+    fn merge_strategy_for(
+        conf: odf::MergeStrategy,
+        vocab: &DatasetVocabulary,
+    ) -> Arc<dyn MergeStrategy> {
+        use crate::merge_strategies::*;
+
+        match conf {
+            odf::MergeStrategy::Append(_cfg) => Arc::new(MergeStrategyAppend::new(vocab.clone())),
+            odf::MergeStrategy::Ledger(cfg) => {
+                Arc::new(MergeStrategyLedger::new(vocab.clone(), cfg))
+            }
+            odf::MergeStrategy::Snapshot(cfg) => {
+                Arc::new(MergeStrategySnapshot::new(vocab.clone(), cfg))
+            }
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -763,7 +786,7 @@ impl DataWriter for DataWriterDataFusion {
                 .commit_event(
                     odf::SetDataSchema::new(&new_schema).into(),
                     CommitOpts {
-                        block_ref: &self.block_ref,
+                        block_ref: &self.meta.block_ref,
                         system_time: Some(staged.system_time),
                         prev_block_hash: Some(Some(&self.meta.head)),
                         check_object_refs: false,
@@ -786,7 +809,7 @@ impl DataWriter for DataWriterDataFusion {
                     staged.data_file,
                     None,
                     CommitOpts {
-                        block_ref: &self.block_ref,
+                        block_ref: &self.meta.block_ref,
                         system_time: Some(staged.system_time),
                         prev_block_hash: Some(Some(&self.meta.head)),
                         check_object_refs: false,
@@ -833,83 +856,6 @@ impl DataWriter for DataWriterDataFusion {
             new_head: self.meta.head.clone(),
             add_data_block,
         })
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Builder
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub struct DataWriterDataFusionBuilder {
-    target: ResolvedDataset,
-    ctx: SessionContext,
-    block_ref: BlockRef,
-    metadata_state: Option<DataWriterMetadataState>,
-}
-
-impl DataWriterDataFusionBuilder {
-    pub fn new(target: ResolvedDataset, ctx: SessionContext) -> Self {
-        Self {
-            target,
-            ctx,
-            block_ref: BlockRef::Head,
-            metadata_state: None,
-        }
-    }
-
-    pub fn with_block_ref(self, block_ref: BlockRef) -> Self {
-        Self { block_ref, ..self }
-    }
-
-    pub fn metadata_state(&self) -> Option<&DataWriterMetadataState> {
-        self.metadata_state.as_ref()
-    }
-
-    /// Use to specify all needed state for builder to avoid scanning the
-    /// metadata chain
-    pub fn with_metadata_state(self, metadata_state: DataWriterMetadataState) -> Self {
-        Self {
-            metadata_state: Some(metadata_state),
-            ..self
-        }
-    }
-
-    pub fn build(self) -> DataWriterDataFusion {
-        let Some(metadata_state) = self.metadata_state else {
-            // TODO: Typestate
-            panic!(
-                "Writer state is undefined - use with_metadata_state_scanned() to initialize it \
-                 from metadata chain or pass it explicitly via with_metadata_state()"
-            )
-        };
-
-        let merge_strategy =
-            Self::merge_strategy_for(metadata_state.merge_strategy.clone(), &metadata_state.vocab);
-
-        DataWriterDataFusion::new(
-            self.ctx,
-            self.target,
-            merge_strategy,
-            self.block_ref,
-            metadata_state,
-        )
-    }
-
-    fn merge_strategy_for(
-        conf: odf::MergeStrategy,
-        vocab: &DatasetVocabulary,
-    ) -> Arc<dyn MergeStrategy> {
-        use crate::merge_strategies::*;
-
-        match conf {
-            odf::MergeStrategy::Append(_cfg) => Arc::new(MergeStrategyAppend::new(vocab.clone())),
-            odf::MergeStrategy::Ledger(cfg) => {
-                Arc::new(MergeStrategyLedger::new(vocab.clone(), cfg))
-            }
-            odf::MergeStrategy::Snapshot(cfg) => {
-                Arc::new(MergeStrategySnapshot::new(vocab.clone(), cfg))
-            }
-        }
     }
 }
 

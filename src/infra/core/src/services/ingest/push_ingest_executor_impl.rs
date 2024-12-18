@@ -55,9 +55,11 @@ impl PushIngestExecutorImpl {
         let ctx: SessionContext =
             ingest_common::new_session_context(self.object_store_registry.clone());
 
-        let data_writer = DataWriterDataFusion::builder(target.clone(), ctx.clone())
-            .with_metadata_state(*plan.metadata_state)
-            .build();
+        let data_writer = DataWriterDataFusion::from_metadata_state(
+            ctx.clone(),
+            target.clone(),
+            *plan.metadata_state,
+        );
 
         listener.begin();
 

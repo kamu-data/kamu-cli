@@ -77,9 +77,8 @@ impl PollingIngestServiceImpl {
         listener: Arc<dyn PollingIngestListener>,
     ) -> Result<PollingIngestResult, PollingIngestError> {
         let ctx = ingest_common::new_session_context(self.object_store_registry.clone());
-        let mut data_writer = DataWriterDataFusion::builder(target.clone(), ctx.clone())
-            .with_metadata_state(*metadata_state)
-            .build();
+        let mut data_writer =
+            DataWriterDataFusion::from_metadata_state(ctx.clone(), target.clone(), *metadata_state);
 
         let Some(MetadataEvent::SetPollingSource(polling_source)) =
             data_writer.source_event().cloned()

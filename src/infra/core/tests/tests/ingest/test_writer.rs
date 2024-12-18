@@ -598,14 +598,14 @@ async fn test_data_writer_offsets_are_sequential_impl(ctx: SessionContext) -> St
         .into()])
     .await;
 
-    let metadata_state =
-        DataWriterMetadataState::build(harness.target.clone(), &BlockRef::Head, None)
-            .await
-            .unwrap();
-
-    let mut writer = DataWriterDataFusion::builder(harness.target.clone(), ctx.clone())
-        .with_metadata_state(metadata_state)
-        .build();
+    let mut writer = DataWriterDataFusion::from_metadata_chain(
+        ctx.clone(),
+        harness.target.clone(),
+        &BlockRef::Head,
+        None,
+    )
+    .await
+    .unwrap();
 
     let mut event_time = Utc.with_ymd_and_hms(2010, 1, 1, 0, 0, 0).unwrap();
     let data_path = harness.temp_dir.path().join("data.ndjson");
@@ -1256,15 +1256,16 @@ impl Harness {
 
         let foo_target = ResolvedDataset::from(&foo_created);
 
-        let foo_metadata_state =
-            DataWriterMetadataState::build(foo_target.clone(), &BlockRef::Head, None)
-                .await
-                .unwrap();
-
         let ctx = SessionContext::new_with_config(SessionConfig::new().with_target_partitions(1));
-        let writer = DataWriterDataFusion::builder(foo_target.clone(), ctx.clone())
-            .with_metadata_state(foo_metadata_state)
-            .build();
+
+        let writer = DataWriterDataFusion::from_metadata_chain(
+            ctx.clone(),
+            foo_target.clone(),
+            &BlockRef::Head,
+            None,
+        )
+        .await
+        .unwrap();
 
         Self {
             temp_dir,
@@ -1285,14 +1286,14 @@ impl Harness {
     }
 
     async fn reset_writer(&mut self) {
-        let latest_metadata_state =
-            DataWriterMetadataState::build(self.target.clone(), &BlockRef::Head, None)
-                .await
-                .unwrap();
-
-        self.writer = DataWriterDataFusion::builder(self.target.clone(), self.ctx.clone())
-            .with_metadata_state(latest_metadata_state)
-            .build();
+        self.writer = DataWriterDataFusion::from_metadata_chain(
+            self.ctx.clone(),
+            self.target.clone(),
+            &BlockRef::Head,
+            None,
+        )
+        .await
+        .unwrap();
     }
 
     async fn write_opts(

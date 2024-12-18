@@ -707,14 +707,14 @@ async fn test_sql_statement_with_state_simple() {
         .unwrap();
     let foo_id = &foo_create.dataset_handle.id;
 
-    let metadata_state =
-        DataWriterMetadataState::build(ResolvedDataset::from(&foo_create), &BlockRef::Head, None)
-            .await
-            .unwrap();
-
-    let mut writer = DataWriterDataFusion::builder(ResolvedDataset::from(&foo_create), ctx.clone())
-        .with_metadata_state(metadata_state)
-        .build();
+    let mut writer = DataWriterDataFusion::from_metadata_chain(
+        ctx.clone(),
+        ResolvedDataset::from(&foo_create),
+        &BlockRef::Head,
+        None,
+    )
+    .await
+    .unwrap();
 
     writer
         .write(
@@ -938,15 +938,14 @@ async fn test_sql_statement_with_state_cte() {
         .unwrap();
     let foo_id = &foo_created.dataset_handle.id;
 
-    let foo_metadata_state =
-        DataWriterMetadataState::build(ResolvedDataset::from(&foo_created), &BlockRef::Head, None)
-            .await
-            .unwrap();
-
-    let mut writer_foo =
-        DataWriterDataFusion::builder(ResolvedDataset::from(&foo_created), ctx.clone())
-            .with_metadata_state(foo_metadata_state)
-            .build();
+    let mut writer_foo = DataWriterDataFusion::from_metadata_chain(
+        ctx.clone(),
+        ResolvedDataset::from(&foo_created),
+        &BlockRef::Head,
+        None,
+    )
+    .await
+    .unwrap();
 
     writer_foo
         .write(
@@ -991,15 +990,14 @@ async fn test_sql_statement_with_state_cte() {
         .unwrap();
     let bar_id = &bar_created.dataset_handle.id;
 
-    let bar_metadata_state =
-        DataWriterMetadataState::build(ResolvedDataset::from(&bar_created), &BlockRef::Head, None)
-            .await
-            .unwrap();
-
-    let mut writer_bar =
-        DataWriterDataFusion::builder(ResolvedDataset::from(&bar_created), ctx.clone())
-            .with_metadata_state(bar_metadata_state)
-            .build();
+    let mut writer_bar = DataWriterDataFusion::from_metadata_chain(
+        ctx.clone(),
+        ResolvedDataset::from(&bar_created),
+        &BlockRef::Head,
+        None,
+    )
+    .await
+    .unwrap();
 
     writer_bar
         .write(

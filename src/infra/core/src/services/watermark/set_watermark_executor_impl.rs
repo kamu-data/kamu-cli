@@ -28,12 +28,11 @@ impl SetWatermarkExecutor for SetWatermarkExecutorImpl {
         target: ResolvedDataset,
         plan: SetWatermarkPlan,
     ) -> Result<SetWatermarkResult, SetWatermarkExecutionError> {
-        let mut writer = DataWriterDataFusion::builder(
-            target.clone(),
+        let mut writer = DataWriterDataFusion::from_metadata_state(
             datafusion::prelude::SessionContext::new(),
-        )
-        .with_metadata_state(*plan.metadata_state)
-        .build();
+            target.clone(),
+            *plan.metadata_state,
+        );
 
         match writer
             .write_watermark(
