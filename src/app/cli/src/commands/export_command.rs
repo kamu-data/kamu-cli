@@ -7,9 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::path::PathBuf;
 use std::sync::Arc;
 
-use kamu::domain::{ExportFormat, ExportService, QueryOptions, QueryResponse, QueryService};
+use kamu::domain::{ExportFormat, ExportService, QueryService};
+use opendatafabric::DatasetRef;
 
 use crate::{CLIError, Command};
 
@@ -18,8 +20,8 @@ use crate::{CLIError, Command};
 pub struct ExportCommand {
     export_service: Arc<dyn ExportService>,
     query_service: Arc<dyn QueryService>,
-    dataset: String,
-    output_path: String,
+    dataset_ref: DatasetRef,
+    output_path: PathBuf,
     output_format: String,
     partition_size: Option<usize>,
     quiet: bool,
@@ -29,8 +31,8 @@ impl ExportCommand {
     pub fn new(
         export_service: Arc<dyn ExportService>,
         query_service: Arc<dyn QueryService>,
-        dataset: String,
-        output_path: String,
+        dataset_ref: DatasetRef,
+        output_path: PathBuf,
         output_format: String,
         partition_size: Option<usize>,
         quiet: bool,
@@ -38,7 +40,7 @@ impl ExportCommand {
         Self {
             export_service,
             query_service,
-            dataset,
+            dataset_ref,
             output_path,
             output_format,
             partition_size,
@@ -63,15 +65,16 @@ impl ExportCommand {
 impl Command for ExportCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
         let format = self.parse_format()?;
-        let query = format!("select * from '{}'", self.dataset);
-        let result: QueryResponse = self
+
+        let df = self
             .query_service
-            .sql_statement(&query, QueryOptions::default())
+            .get_data(&self.dataset_ref)
             .await
-            .map_err(CLIError::failure)?; // todo: handle error
+            .map_err(CLIError::failure)?;
+
         let rows_exported = self
             .export_service
-            .export_to_fs(result.df, &self.output_path, format, self.partition_size)
+            .export_to_fs(df, &self.output_path, format, self.partition_size)
             .await?;
 
         if !self.quiet {

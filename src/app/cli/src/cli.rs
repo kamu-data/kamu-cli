@@ -10,7 +10,7 @@
 use std::path::PathBuf;
 
 use clap::{ArgAction, Parser};
-use opendatafabric as odf;
+use opendatafabric::{self as odf};
 
 use crate::cli_value_parser::{self as parsers};
 use crate::{
@@ -377,11 +377,12 @@ This command exports a dataset to a file(s) of a given format.
 TODO: add extend doc
 "#)]
 pub struct Export {
-    #[arg(index = 1)]
-    pub dataset: String,
+    /// Local dataset reference
+    #[arg(index = 1, value_parser = parsers::dataset_ref)]
+    pub dataset: odf::DatasetRef,
 
     #[arg(long)]
-    pub output_path: String, //todo pathbuf
+    pub output_path: PathBuf,
 
     #[arg(long, value_parser = ["parquet", "ndjson", "csv"])]
     pub output_format: String,
@@ -1249,8 +1250,14 @@ pub struct Sql {
     pub script: Option<PathBuf>,
 
     #[arg(long)]
-    pub output_path: Option<String>, //todo pathbuf
+    /// When set, result will be stored to a given path instead of being printed
+    /// to stdout.
+    pub output_path: Option<PathBuf>,
 
+    /// When set alongside with `output-path`, query result will be stored to
+    /// files with a given (soft) rows limit per file.
+    /// Dafault is 50m.
+    /// When `output-path` is a file, this argument is ignored.
     #[arg(long)]
     pub partition_size: Option<usize>,
 }
