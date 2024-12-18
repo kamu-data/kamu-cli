@@ -8,10 +8,14 @@
 // by the Apache License, Version 2.0.
 
 use std::fmt::{Display, Formatter};
+use std::path::Path;
 
 use datafusion::dataframe::DataFrame;
 use internal_error::{BoxedError, InternalError};
 use thiserror::Error;
+
+use crate::*;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Service
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -21,7 +25,7 @@ pub trait ExportService: Send + Sync {
     async fn export_to_fs(
         &self,
         df: DataFrame,
-        path: &str,
+        path: &Path,
         format: ExportFormat,
         partition_row_count: Option<usize>,
     ) -> Result<u64, ExportError>;
@@ -79,7 +83,16 @@ pub enum ExportError {
         NotImplementedError,
     ),
     #[error(transparent)]
-    Query(ExportQueryError),
+    DataFusionError(DataFusionError),
+}
+
+impl From<datafusion::error::DataFusionError> for ExportError {
+    fn from(value: datafusion::error::DataFusionError) -> Self {
+        Self::DataFusionError(DataFusionError {
+            source: value,
+            backtrace: std::backtrace::Backtrace::capture(),
+        })
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

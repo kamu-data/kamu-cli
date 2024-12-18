@@ -7,14 +7,15 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::path::Path;
+
 use datafusion::arrow::array::{AsArray, RecordBatch};
 use datafusion::arrow::datatypes::UInt64Type;
-use datafusion::common::DataFusionError;
 use datafusion::dataframe::{DataFrame, DataFrameWriteOptions};
 use datafusion::logical_expr::Partitioning;
 use dill::{component, interface};
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
-use kamu_core::{ExportError, ExportFormat, ExportQueryError, ExportService};
+use kamu_core::{ExportError, ExportFormat, ExportService};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -52,7 +53,7 @@ impl ExportService for ExportServiceImpl {
     async fn export_to_fs(
         &self,
         df: DataFrame,
-        path: &str,
+        path: &Path,
         format: ExportFormat,
         partition_row_count: Option<usize>,
     ) -> Result<u64, ExportError> {
@@ -76,33 +77,25 @@ impl ExportService for ExportServiceImpl {
             .repartition(Partitioning::RoundRobinBatch(1))
             .int_err()?;
 
+        let path_str = path.as_os_str().to_str().unwrap();
+
         let result = match format {
             ExportFormat::Parquet => {
                 export_df
-                    .write_parquet(path, DataFrameWriteOptions::new(), None)
+                    .write_parquet(path_str, DataFrameWriteOptions::new(), None)
                     .await
             }
             ExportFormat::Csv => {
                 export_df
-                    .write_csv(path, DataFrameWriteOptions::new(), None)
+                    .write_csv(path_str, DataFrameWriteOptions::new(), None)
                     .await
             }
             ExportFormat::NdJson => {
                 export_df
-                    .write_json(path, DataFrameWriteOptions::new(), None)
+                    .write_json(path_str, DataFrameWriteOptions::new(), None)
                     .await
             }
-        }
-        .map_err(|err| match err {
-            err @ (DataFusionError::Plan(_)
-            | DataFusionError::SQL(_, _)
-            | DataFusionError::Execution(_)
-            | DataFusionError::SchemaError(..)) => ExportError::Query(ExportQueryError {
-                context: err.to_string(),
-                source: err.into(),
-            }),
-            other => ExportError::Internal(other.int_err()),
-        })?;
+        }?;
 
         self.records_written(&result)
     }
