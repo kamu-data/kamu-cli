@@ -32,7 +32,7 @@ pub trait ExportService: Send + Sync {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Clone, strum::Display, Debug)]
+#[derive(Clone, strum::Display, Debug, strum::EnumIter)]
 pub enum ExportFormat {
     #[strum(to_string = "parquet")]
     Parquet,
