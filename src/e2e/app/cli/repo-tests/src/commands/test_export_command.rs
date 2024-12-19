@@ -602,8 +602,7 @@ pub async fn test_export_to_unsupported_format(kamu: KamuCliPuppet) {
         None,
         Some([
             "error: invalid value 'xls' for '--output-format <OUTPUT_FORMAT>'",
-            "Invalid output format 'xls'",
-            "Supported formats: 'parquet', 'ndjson', and 'csv'",
+            "Supported formats: 'parquet', 'csv', 'ndjson'",
         ]),
     )
     .await;
