@@ -109,7 +109,7 @@ pub fn get_command(
             c.dataset,
             c.output_path,
             c.output_format,
-            c.partition_size,
+            c.records_per_file,
             args.quiet,
         )),
         cli::Command::Ingest(c) => Box::new(IngestCommand::new(
@@ -383,7 +383,7 @@ pub fn get_command(
                 c.url,
                 c.engine,
                 c.output_path,
-                c.partition_size,
+                c.records_per_file,
             )),
             Some(cli::SqlSubCommand::Server(sc)) => {
                 if sc.livy {

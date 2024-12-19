@@ -22,8 +22,8 @@ pub struct ExportCommand {
     query_service: Arc<dyn QueryService>,
     dataset_ref: DatasetRef,
     output_path: Option<PathBuf>,
-    output_format: String,
-    partition_size: Option<usize>,
+    output_format: ExportFormat,
+    records_per_file: Option<usize>,
     quiet: bool,
 }
 
@@ -33,8 +33,8 @@ impl ExportCommand {
         query_service: Arc<dyn QueryService>,
         dataset_ref: DatasetRef,
         output_path: Option<PathBuf>,
-        output_format: String,
-        partition_size: Option<usize>,
+        output_format: ExportFormat,
+        records_per_file: Option<usize>,
         quiet: bool,
     ) -> Self {
         Self {
@@ -43,20 +43,8 @@ impl ExportCommand {
             dataset_ref,
             output_path,
             output_format,
-            partition_size,
+            records_per_file,
             quiet,
-        }
-    }
-
-    fn parse_format(&self) -> Result<ExportFormat, CLIError> {
-        match self.output_format.as_str() {
-            "parquet" => Ok(ExportFormat::Parquet),
-            "ndjson" => Ok(ExportFormat::NdJson),
-            "csv" => Ok(ExportFormat::Csv),
-            _ => Err(CLIError::usage_error(format!(
-                "Invalid output format '{}'. Supported formats: 'parquet', 'ndjson', and 'csv'",
-                &self.output_format
-            ))),
         }
     }
 }
@@ -64,8 +52,6 @@ impl ExportCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for ExportCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
-        let format = self.parse_format()?;
-
         let df = self
             .query_service
             .get_data(&self.dataset_ref)
@@ -83,7 +69,7 @@ impl Command for ExportCommand {
 
         let rows_exported = self
             .export_service
-            .export_to_fs(df, output_path, format, self.partition_size)
+            .export_to_fs(df, output_path, &self.output_format, self.records_per_file)
             .await?;
 
         if !self.quiet {

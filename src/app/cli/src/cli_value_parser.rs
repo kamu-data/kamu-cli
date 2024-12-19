@@ -9,6 +9,7 @@
 
 use std::str::FromStr;
 
+use kamu::domain::ExportFormat;
 use opendatafabric as odf;
 use url::Url;
 
@@ -117,6 +118,19 @@ pub(crate) fn log_filter(s: &str) -> Result<String, String> {
         }?;
     }
     Ok(s.to_string())
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) fn export_format(format: &str) -> Result<ExportFormat, String> {
+    match format {
+        "parquet" => Ok(ExportFormat::Parquet),
+        "ndjson" => Ok(ExportFormat::NdJson),
+        "csv" => Ok(ExportFormat::Csv),
+        _ => Err(format!(
+            "Invalid output format '{format}'. Supported formats: 'parquet', 'ndjson', and 'csv'"
+        )),
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::fmt::{Display, Formatter};
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -76,51 +75,43 @@ impl OutputConfig {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, Copy, PartialEq, clap::ValueEnum)]
+#[derive(strum::Display, Debug, Clone, Copy, PartialEq, clap::ValueEnum)]
 pub enum OutputFormat {
     /// Comma-separated values
     #[clap(name = "csv")]
+    #[strum(to_string = "csv")]
     Csv,
 
     /// Array of Structures format
     #[clap(name = "json")]
+    #[strum(to_string = "json")]
     Json,
 
     /// One Json object per line - easily splittable format
     #[clap(name = "ndjson")]
+    #[strum(to_string = "ndjson")]
     NdJson,
 
     /// Structure of arrays - more compact and efficient format for encoding
     /// entire dataframe
     #[clap(name = "json-soa")]
+    #[strum(to_string = "json-soa")]
     JsonSoA,
 
     /// Array of arrays - compact and efficient and preserves column order
     #[clap(name = "json-aoa")]
+    #[strum(to_string = "json-aoa")]
     JsonAoA,
 
     /// A pretty human-readable table
     #[clap(name = "table")]
+    #[strum(to_string = "table")]
     Table,
 
     /// Parquet columnar storage. Only available when exporting to file(s)
     #[clap(name = "parquet")]
+    #[strum(to_string = "parquet")]
     Parquet,
-}
-
-impl Display for OutputFormat {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let str_val = match *self {
-            OutputFormat::Csv => "csv",
-            OutputFormat::Json => "json",
-            OutputFormat::NdJson => "ndjson",
-            OutputFormat::JsonSoA => "json-soa",
-            OutputFormat::JsonAoA => "json-aoa",
-            OutputFormat::Table => "table",
-            OutputFormat::Parquet => "parquet",
-        };
-        f.write_str(str_val)
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
