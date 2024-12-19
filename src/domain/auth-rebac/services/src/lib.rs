@@ -10,14 +10,12 @@
 // Re-exports
 pub use kamu_auth_rebac as domain;
 
-mod dependencies;
 mod jobs;
 mod messages;
 mod multi_tenant_rebac_dataset_lifecycle_message_consumer;
 mod rebac_indexer;
 mod rebac_service_impl;
 
-pub use dependencies::*;
 pub use jobs::*;
 pub use messages::*;
 pub use multi_tenant_rebac_dataset_lifecycle_message_consumer::*;

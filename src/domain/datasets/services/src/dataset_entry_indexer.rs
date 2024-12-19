@@ -35,7 +35,6 @@ pub struct DatasetEntryIndexer {
     time_source: Arc<dyn SystemTimeSource>,
     dataset_repo: Arc<dyn DatasetRepository>,
     account_repository: Arc<dyn AccountRepository>,
-    is_in_workspace: bool,
 }
 
 #[component(pub)]
@@ -54,14 +53,12 @@ impl DatasetEntryIndexer {
         time_source: Arc<dyn SystemTimeSource>,
         dataset_repo: Arc<dyn DatasetRepository>,
         account_repository: Arc<dyn AccountRepository>,
-        is_in_workspace: bool,
     ) -> Self {
         Self {
             dataset_entry_repo,
             time_source,
             dataset_repo,
             account_repository,
-            is_in_workspace,
         }
     }
 
@@ -178,12 +175,6 @@ impl InitOnStartup for DatasetEntryIndexer {
         name = "DatasetEntryIndexer::run_initialization"
     )]
     async fn run_initialization(&self) -> Result<(), InternalError> {
-        if !self.is_in_workspace {
-            tracing::debug!("Skip initialization: not in a workspace");
-
-            return Ok(());
-        }
-
         if self.has_datasets_indexed().await? {
             tracing::debug!("Skip initialization: datasets already have indexed");
 
