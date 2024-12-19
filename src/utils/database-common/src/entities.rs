@@ -12,8 +12,8 @@ use std::pin::Pin;
 
 use futures::Stream;
 use internal_error::InternalError;
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+use sqlx::prelude::FromRow;
 
 #[derive(Debug, Copy, Clone)]
 pub struct PaginationOpts {
@@ -153,3 +153,14 @@ impl EntityPageStreamer {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, sqlx::FromRow, PartialEq, Eq)]
+pub struct EventModel {
+    pub event_id: i64,
+    pub event_payload: sqlx::types::JsonValue,
+}
+
+#[derive(Debug, FromRow)]
+pub struct ReturningEventModel {
+    pub event_id: i64,
+}

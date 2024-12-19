@@ -9,7 +9,7 @@
 
 use kamu_accounts::Account;
 
-use super::AccountFlowConfigsMut;
+use super::AccountFlowTriggersMut;
 use crate::prelude::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -25,8 +25,8 @@ impl AccountFlowsMut {
         Self { account }
     }
 
-    async fn configs(&self) -> AccountFlowConfigsMut {
-        AccountFlowConfigsMut::new(self.account.clone())
+    async fn triggers(&self) -> AccountFlowTriggersMut {
+        AccountFlowTriggersMut::new(self.account.clone())
     }
 }
 

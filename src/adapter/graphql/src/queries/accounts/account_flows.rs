@@ -9,7 +9,7 @@
 
 use kamu_accounts::Account;
 
-use super::{AccountFlowConfigs, AccountFlowRuns};
+use super::{AccountFlowRuns, AccountFlowTriggers};
 use crate::prelude::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -30,9 +30,9 @@ impl AccountFlows {
         AccountFlowRuns::new(self.account.clone())
     }
 
-    /// Returns interface for flow configurations queries
-    async fn configs(&self) -> AccountFlowConfigs {
-        AccountFlowConfigs::new(self.account.clone())
+    /// Returns interface for flow triggers queries
+    async fn triggers(&self) -> AccountFlowTriggers {
+        AccountFlowTriggers::new(self.account.clone())
     }
 }
 

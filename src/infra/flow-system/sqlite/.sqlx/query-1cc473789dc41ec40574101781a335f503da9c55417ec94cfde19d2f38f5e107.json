@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT COUNT(DISTINCT dataset_id)\n                FROM flow_configuration_events\n                WHERE\n                    dataset_id IS NOT NULL AND\n                    event_type = 'FlowConfigurationEventCreated'\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "COUNT(DISTINCT dataset_id)",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "1cc473789dc41ec40574101781a335f503da9c55417ec94cfde19d2f38f5e107"
+}

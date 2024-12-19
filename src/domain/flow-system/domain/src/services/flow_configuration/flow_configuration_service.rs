@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use chrono::{DateTime, Utc};
 use event_sourcing::TryLoadError;
 use internal_error::{ErrorIntoInternal, InternalError};
 use opendatafabric::DatasetID;
@@ -34,80 +33,18 @@ pub trait FlowConfigurationService: Sync + Send {
     /// Set or modify flow configuration
     async fn set_configuration(
         &self,
-        request_time: DateTime<Utc>,
         flow_key: FlowKey,
-        paused: bool,
         rule: FlowConfigurationRule,
     ) -> Result<FlowConfigurationState, SetFlowConfigurationError>;
 
-    /// Lists all flow configurations, which are currently enabled
-    fn list_enabled_configurations(&self) -> FlowConfigurationStateStream;
-
-    /// Pauses particular flow configuration
-    async fn pause_flow_configuration(
-        &self,
-        request_time: DateTime<Utc>,
-        flow_key: FlowKey,
-    ) -> Result<(), InternalError>;
-
-    /// Resumes particular flow configuration
-    async fn resume_flow_configuration(
-        &self,
-        request_time: DateTime<Utc>,
-        flow_key: FlowKey,
-    ) -> Result<(), InternalError>;
-
-    /// Pauses dataset flows of given type for given dataset.
-    /// If type is omitted, all possible dataset flow types are paused
-    async fn pause_dataset_flows(
-        &self,
-        request_time: DateTime<Utc>,
-        dataset_id: &DatasetID,
-        maybe_dataset_flow_type: Option<DatasetFlowType>,
-    ) -> Result<(), InternalError>;
-
-    /// Pauses system flows of given type.
-    /// If type is omitted, all possible system flow types are paused
-    async fn pause_system_flows(
-        &self,
-        request_time: DateTime<Utc>,
-        maybe_system_flow_type: Option<SystemFlowType>,
-    ) -> Result<(), InternalError>;
-
-    /// Resumes dataset flows of given type for given dataset.
-    /// If type is omitted, all possible types are resumed (where configured)
-    async fn resume_dataset_flows(
-        &self,
-        request_time: DateTime<Utc>,
-        dataset_id: &DatasetID,
-        maybe_dataset_flow_type: Option<DatasetFlowType>,
-    ) -> Result<(), InternalError>;
-
-    /// Resumes system flows of given type.
-    /// If type is omitted, all possible system flow types are resumed (where
-    /// configured)
-    async fn resume_system_flows(
-        &self,
-        request_time: DateTime<Utc>,
-        maybe_system_flow_type: Option<SystemFlowType>,
-    ) -> Result<(), InternalError>;
+    /// Lists all active flow configurations
+    fn list_active_configurations(&self) -> FlowConfigurationStateStream;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 pub trait FlowConfigurationServiceExt {
-    async fn try_get_flow_schedule(
-        &self,
-        flow_key: FlowKey,
-    ) -> Result<Option<Schedule>, FindFlowConfigurationError>;
-
-    async fn try_get_dataset_transform_rule(
-        &self,
-        dataset_id: DatasetID,
-        flow_type: DatasetFlowType,
-    ) -> Result<Option<TransformRule>, FindFlowConfigurationError>;
-
     async fn try_get_dataset_ingest_rule(
         &self,
         dataset_id: DatasetID,
@@ -129,46 +66,11 @@ pub trait FlowConfigurationServiceExt {
     async fn try_get_config_snapshot_by_key(
         &self,
         flow_key: FlowKey,
-    ) -> Result<Option<FlowConfigurationSnapshot>, FindFlowConfigurationError>;
+    ) -> Result<Option<FlowConfigurationRule>, FindFlowConfigurationError>;
 }
 
 #[async_trait::async_trait]
 impl<T: FlowConfigurationService + ?Sized> FlowConfigurationServiceExt for T {
-    async fn try_get_flow_schedule(
-        &self,
-        flow_key: FlowKey,
-    ) -> Result<Option<Schedule>, FindFlowConfigurationError> {
-        let maybe_config = self.find_configuration(flow_key).await?;
-        Ok(
-            if let Some(config) = maybe_config
-                && config.is_active()
-            {
-                config.try_get_schedule()
-            } else {
-                None
-            },
-        )
-    }
-
-    async fn try_get_dataset_transform_rule(
-        &self,
-        dataset_id: DatasetID,
-        flow_type: DatasetFlowType,
-    ) -> Result<Option<TransformRule>, FindFlowConfigurationError> {
-        let maybe_config = self
-            .find_configuration(FlowKey::dataset(dataset_id, flow_type))
-            .await?;
-        Ok(
-            if let Some(config) = maybe_config
-                && config.is_active()
-            {
-                config.try_get_transform_rule()
-            } else {
-                None
-            },
-        )
-    }
-
     async fn try_get_dataset_ingest_rule(
         &self,
         dataset_id: DatasetID,
@@ -229,41 +131,32 @@ impl<T: FlowConfigurationService + ?Sized> FlowConfigurationServiceExt for T {
     async fn try_get_config_snapshot_by_key(
         &self,
         flow_key: FlowKey,
-    ) -> Result<Option<FlowConfigurationSnapshot>, FindFlowConfigurationError> {
+    ) -> Result<Option<FlowConfigurationRule>, FindFlowConfigurationError> {
         let maybe_snapshot = match flow_key {
-            FlowKey::System(_) => self
-                .try_get_flow_schedule(flow_key)
-                .await?
-                .map(FlowConfigurationSnapshot::Schedule),
+            FlowKey::System(_) => None,
             FlowKey::Dataset(dataset_flow_key) => match dataset_flow_key.flow_type {
-                DatasetFlowType::ExecuteTransform => self
-                    .try_get_dataset_transform_rule(
-                        dataset_flow_key.dataset_id,
-                        dataset_flow_key.flow_type,
-                    )
-                    .await?
-                    .map(FlowConfigurationSnapshot::Transform),
+                DatasetFlowType::ExecuteTransform => None,
                 DatasetFlowType::Ingest => self
                     .try_get_dataset_ingest_rule(
                         dataset_flow_key.dataset_id,
                         dataset_flow_key.flow_type,
                     )
                     .await?
-                    .map(FlowConfigurationSnapshot::Ingest),
+                    .map(FlowConfigurationRule::IngestRule),
                 DatasetFlowType::Reset => self
                     .try_get_dataset_reset_rule(
                         dataset_flow_key.dataset_id,
                         dataset_flow_key.flow_type,
                     )
                     .await?
-                    .map(FlowConfigurationSnapshot::Reset),
+                    .map(FlowConfigurationRule::ResetRule),
                 DatasetFlowType::HardCompaction => self
                     .try_get_dataset_compaction_rule(
                         dataset_flow_key.dataset_id,
                         dataset_flow_key.flow_type,
                     )
                     .await?
-                    .map(FlowConfigurationSnapshot::Compaction),
+                    .map(FlowConfigurationRule::CompactionRule),
             },
         };
 

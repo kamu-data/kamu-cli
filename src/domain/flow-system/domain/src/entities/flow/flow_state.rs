@@ -22,7 +22,7 @@ pub struct FlowState {
     /// Flow key
     pub flow_key: FlowKey,
     /// Triggers
-    pub triggers: Vec<FlowTrigger>,
+    pub triggers: Vec<FlowTriggerType>,
     /// Start condition (if defined)
     pub start_condition: Option<FlowStartCondition>,
     /// Timing records
@@ -32,7 +32,7 @@ pub struct FlowState {
     /// Flow outcome
     pub outcome: Option<FlowOutcome>,
     /// Flow config snapshot on the moment when flow was initiated
-    pub config_snapshot: Option<FlowConfigurationSnapshot>,
+    pub config_snapshot: Option<FlowConfigurationRule>,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -49,7 +49,7 @@ pub struct FlowTimingRecords {
 
 impl FlowState {
     /// Extract primary trigger
-    pub fn primary_trigger(&self) -> &FlowTrigger {
+    pub fn primary_trigger(&self) -> &FlowTriggerType {
         // At least 1 trigger is initially defined for sure
         self.triggers.first().unwrap()
     }
@@ -126,6 +126,13 @@ impl Projection for FlowState {
                             })
                         }
                     }
+                    E::ConfigSnapshotModified(FlowConfigSnapshotModified {
+                        config_snapshot,
+                        ..
+                    }) => Ok(FlowState {
+                        config_snapshot: Some(config_snapshot),
+                        ..s
+                    }),
                     E::TriggerAdded(FlowEventTriggerAdded { ref trigger, .. }) => {
                         if s.outcome.is_some() {
                             Err(ProjectionError::new(Some(s), event))
