@@ -370,23 +370,35 @@ pub struct Delete {
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Export a dataset
+/// Exports a dataset
 #[derive(Debug, clap::Args)]
 #[command(after_help = r#"
-This command exports a dataset to a file(s) of a given format.
-TODO: add extend doc
+This command exports a dataset to a file or set of files of a given format.
+
+Output path may be either file or directory.
+When a path contains extention, and no trailing separator, it is considered as a file.
+In all other cases a path is considered as a directory. Examples:
+ - `export/dataset.csv` is a file path
+ - `export/dataset.csv/` is a directory path
+ - `export/dataset/` is a directory path
+ - `export/dataset` is a directory path
 "#)]
 pub struct Export {
     /// Local dataset reference
     #[arg(index = 1, value_parser = parsers::dataset_ref)]
     pub dataset: odf::DatasetRef,
 
+    /// Export destination. Dafault is `<current workdir>/<dataset name>`
     #[arg(long)]
     pub output_path: Option<PathBuf>,
 
+    /// Output format
     #[arg(long, value_parser = ["parquet", "ndjson", "csv"])]
     pub output_format: String,
 
+    /// Number of records per file, if stored into a directory. Default is 5m.
+    /// It's a soft limit. For a sake of export performance real number of
+    /// records may be slightly different.
     #[arg(long)]
     pub partition_size: Option<usize>,
 }
@@ -1203,6 +1215,14 @@ pub struct Search {
 #[command(after_help = r#"
 SQL shell allows you to explore data of all dataset in your workspace using one of the supported data processing engines. This can be a great way to prepare and test a query that you cal later turn into derivative dataset.
 
+Output path may be either file or directory.
+When a path contains extention, and no trailing separator, it is considered as a file.
+In all other cases a path is considered as a directory. Examples:
+ - `export/dataset.csv` is a file path
+ - `export/dataset.csv/` is a directory path
+ - `export/dataset/` is a directory path
+ - `export/dataset` is a directory path
+
 **Examples:**
 
 Drop into SQL shell:
@@ -1249,15 +1269,14 @@ pub struct Sql {
     #[arg(long, value_name = "FILE")]
     pub script: Option<PathBuf>,
 
-    #[arg(long)]
     /// When set, result will be stored to a given path instead of being printed
     /// to stdout.
+    #[arg(long)]
     pub output_path: Option<PathBuf>,
 
-    /// When set alongside with `output-path`, query result will be stored to
-    /// files with a given (soft) rows limit per file.
-    /// Dafault is 50m.
-    /// When `output-path` is a file, this argument is ignored.
+    /// Number of records per file, if stored into a directory. Default is 5m.
+    /// It's a soft limit. For a sake of export performance real number of
+    /// records may be slightly different.
     #[arg(long)]
     pub partition_size: Option<usize>,
 }
