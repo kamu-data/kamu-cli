@@ -22,7 +22,14 @@ pub struct SetWatermarkExecutorImpl {}
 
 #[async_trait::async_trait]
 impl SetWatermarkExecutor for SetWatermarkExecutorImpl {
-    #[tracing::instrument(level = "debug", skip_all, fields(target=%target.get_handle(), ?plan))]
+    #[tracing::instrument(
+        level = "debug",
+        skip_all,
+        fields(
+            target=%target.get_handle(),
+            new_watermark=%plan.new_watermark
+        )
+    )]
     async fn execute(
         &self,
         target: ResolvedDataset,

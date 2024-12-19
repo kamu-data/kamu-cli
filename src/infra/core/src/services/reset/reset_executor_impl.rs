@@ -20,7 +20,7 @@ pub struct ResetExecutorImpl {}
 
 #[async_trait::async_trait]
 impl ResetExecutor for ResetExecutorImpl {
-    #[tracing::instrument(level = "debug", skip_all, fields(target=%target.get_handle(), ?plan))]
+    #[tracing::instrument(level = "debug", skip_all, fields(target=%target.get_handle(), new_head=%plan.new_head))]
     async fn execute(
         &self,
         target: ResolvedDataset,

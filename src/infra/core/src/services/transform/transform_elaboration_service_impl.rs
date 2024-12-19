@@ -151,7 +151,7 @@ impl TransformElaborationServiceImpl {
 
 #[async_trait::async_trait]
 impl TransformElaborationService for TransformElaborationServiceImpl {
-    #[tracing::instrument(level = "info", skip_all, fields(target=%target.get_handle(), ?plan, ?options))]
+    #[tracing::instrument(level = "info", skip_all, fields(target=%target.get_handle(), ?options))]
     async fn elaborate_transform(
         &self,
         target: ResolvedDataset,
