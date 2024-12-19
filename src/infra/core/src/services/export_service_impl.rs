@@ -65,6 +65,12 @@ impl ExportService for ExportServiceImpl {
             .execution
             .minimum_parallel_output_files = 1;
 
+        session_state
+            .config_mut()
+            .options_mut()
+            .execution
+            .target_partitions = 1;
+
         if let Some(partition_size) = partition_row_count {
             session_state
                 .config_mut()
