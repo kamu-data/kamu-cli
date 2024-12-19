@@ -424,6 +424,8 @@ pub fn configure_base_catalog(
 
     b.add::<QueryServiceImpl>();
 
+    b.add::<ExportServiceImpl>();
+
     b.add::<ObjectStoreRegistryImpl>();
 
     b.add::<ObjectStoreBuilderLocalFs>();

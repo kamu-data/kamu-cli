@@ -5845,6 +5845,7 @@ dependencies = [
  "kamu-task-system-postgres",
  "kamu-task-system-services",
  "kamu-task-system-sqlite",
+ "lazy_static",
  "libc",
  "merge",
  "messaging-outbox",
@@ -5869,6 +5870,7 @@ dependencies = [
  "serde_yaml",
  "shlex",
  "signal-hook",
+ "strum",
  "tempfile",
  "test-group",
  "test-log",
@@ -5976,6 +5978,7 @@ name = "kamu-cli-e2e-repo-tests"
 version = "0.213.1"
 dependencies = [
  "chrono",
+ "datafusion",
  "http-common",
  "indoc 2.0.5",
  "kamu",
@@ -6049,6 +6052,7 @@ dependencies = [
  "pin-project",
  "serde",
  "serde_with",
+ "strum",
  "thiserror 2.0.8",
  "tokio",
  "tokio-stream",
