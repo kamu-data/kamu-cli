@@ -103,6 +103,15 @@ pub fn get_command(
             c.all,
             c.recursive,
         )),
+        cli::Command::Export(c) => Box::new(ExportCommand::new(
+            cli_catalog.get_one()?,
+            cli_catalog.get_one()?,
+            c.dataset,
+            c.output_path,
+            c.output_format,
+            c.records_per_file,
+            args.quiet,
+        )),
         cli::Command::Ingest(c) => Box::new(IngestCommand::new(
             cli_catalog.get_one()?,
             cli_catalog.get_one()?,
@@ -369,9 +378,12 @@ pub fn get_command(
                 cli_catalog.get_one()?,
                 cli_catalog.get_one()?,
                 cli_catalog.get_one()?,
+                cli_catalog.get_one()?,
                 c.command,
                 c.url,
                 c.engine,
+                c.output_path,
+                c.records_per_file,
             )),
             Some(cli::SqlSubCommand::Server(sc)) => {
                 if sc.livy {

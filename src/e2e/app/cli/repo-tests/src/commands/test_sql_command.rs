@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::fs::read_dir;
+
 use kamu_cli_e2e_common::{
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
     DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
@@ -138,3 +140,147 @@ pub async fn test_sql_command(kamu: KamuCliPuppet) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_sql_command_exports_to_parquet(kamu: KamuCliPuppet) {
+    kamu.execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
+        .await
+        .success();
+
+    let mut games = String::new();
+    for game_id in 0..50_000 {
+        games.push_str(&format!(
+            r#"
+            {{"match_time": "2000-01-01", "match_id": {game_id}, "player_id": "Alice", "score": 100}}
+            {{"match_time": "2000-01-01", "match_id": {game_id}, "player_id": "Bob", "score": 80}}
+            "#
+        ));
+    }
+
+    kamu.execute_with_input(
+        [
+            "ingest",
+            "player-scores",
+            "--stdin",
+            "--source-name",
+            "default",
+        ],
+        games,
+    )
+    .await
+    .success();
+
+    let output_path = kamu.workspace_path().join("exported.parquet");
+    let output_path_str = output_path.as_os_str().to_str().unwrap();
+
+    kamu.assert_success_command_execution(
+        [
+            "sql",
+            "--command",
+            "select * from 'player-scores'",
+            "--output-format",
+            "parquet",
+            "--output-path",
+            output_path_str,
+        ],
+        None,
+        Some(["Exported 100000 rows"]),
+    )
+    .await;
+
+    assert!(output_path.exists(), "Parquet file should be created");
+    assert!(
+        output_path.is_file(),
+        "All the data should be stored to a single file"
+    );
+
+    let output_path = kamu.workspace_path().join("exported");
+    let output_path_str = output_path.as_os_str().to_str().unwrap();
+
+    kamu.assert_success_command_execution(
+        [
+            "sql",
+            "--command",
+            "select * from 'player-scores'",
+            "--output-format",
+            "parquet",
+            "--output-path",
+            output_path_str,
+            "--records-per-file",
+            "20000",
+        ],
+        None,
+        Some(["Exported 100000 rows"]),
+    )
+    .await;
+
+    assert!(output_path.exists(), "Parquet files should be created");
+    assert!(
+        output_path.is_dir(),
+        "Data should be stored into separate files"
+    );
+    assert!(
+        read_dir(&output_path).unwrap().count() > 1,
+        "Should be several files"
+    );
+}
+
+pub async fn test_sql_command_export_errors(kamu: KamuCliPuppet) {
+    kamu.assert_failure_command_execution(
+        [
+            "sql",
+            "--command",
+            "select * from 'player-scores'",
+            "--output-format",
+            "parquet",
+            "--output-path",
+            "output_path",
+            "--records-per-file",
+            "20000",
+            "--engine",
+            "spark",
+        ],
+        None,
+        Some(["Data export to file(s) is available with DataFusion (default) engine only"]),
+    )
+    .await;
+
+    kamu.assert_failure_command_execution(
+        [
+            "sql",
+            "--command",
+            "select * from 'player-scores'",
+            "--output-format",
+            "table",
+            "--output-path",
+            "output_path",
+        ],
+        None,
+        Some([
+            "Invalid output format for export 'table'. Supported formats: 'csv', 'ndjson', \
+             'parquet'",
+        ]),
+    )
+    .await;
+
+    kamu.assert_failure_command_execution(
+        [
+            "sql",
+            "--command",
+            "select * from 'player-scores'",
+            "--output-format",
+            "parquet",
+            "--records-per-file",
+            "20000",
+        ],
+        None,
+        Some(["Partitioning is only supported for data export to file(s)"]),
+    )
+    .await;
+
+    kamu.assert_failure_command_execution(
+        ["sql", "--command", "select 1", "--output-format", "parquet"],
+        None,
+        Some(["Parquet format is applicable for data export only"]),
+    )
+    .await;
+}
