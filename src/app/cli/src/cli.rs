@@ -382,7 +382,7 @@ pub struct Export {
     pub dataset: odf::DatasetRef,
 
     #[arg(long)]
-    pub output_path: PathBuf,
+    pub output_path: Option<PathBuf>,
 
     #[arg(long, value_parser = ["parquet", "ndjson", "csv"])]
     pub output_format: String,

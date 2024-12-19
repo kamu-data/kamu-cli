@@ -276,4 +276,11 @@ pub async fn test_sql_command_export_errors(kamu: KamuCliPuppet) {
         Some(["Partitioning is only supported for data export to file(s)"]),
     )
     .await;
+
+    kamu.assert_failure_command_execution(
+        ["sql", "--command", "select 1", "--output-format", "parquet"],
+        None,
+        Some(["Parquet format is applicable for data export only"]),
+    )
+    .await;
 }
