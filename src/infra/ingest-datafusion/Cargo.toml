@@ -27,7 +27,7 @@ opendatafabric = { workspace = true, features = ["arrow"] }
 kamu-core = { workspace = true }
 kamu-data-utils = { workspace = true }
 
-datafusion = { version = "42", default-features = false }
+datafusion = { version = "43", default-features = false }
 geo-types = { version = "0.7", default-features = false, features = [] }
 geojson = { version = "0.24", default-features = false, features = [
     "geo-types",
@@ -47,7 +47,7 @@ zip = { version = "2", default-features = false, features = [
 async-trait = "0.1"
 chrono = { version = "0.4", features = ["serde"] }
 futures = "0.3"
-thiserror = "1"
+thiserror = { version = "2", default-features = false, features = ["std"] }
 tokio = { version = "1", default-features = false, features = [
     "fs",
     "process",

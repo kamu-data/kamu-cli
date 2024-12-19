@@ -9,16 +9,16 @@
 
 #![feature(let_chains)]
 
+mod agent;
 mod consumers;
 mod entities;
-mod executors;
 mod message;
 mod repos;
 mod services;
 
+pub use agent::*;
 pub use consumers::*;
 pub use entities::*;
-pub use executors::*;
 pub use message::*;
 pub use repos::*;
 pub use services::*;

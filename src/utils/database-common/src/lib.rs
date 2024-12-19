@@ -7,9 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-#![feature(lint_reasons)]
-#![expect(incomplete_features)]
-#![feature(inherent_associated_types)]
 #![feature(iter_intersperse)]
 
 mod db_connection_settings;

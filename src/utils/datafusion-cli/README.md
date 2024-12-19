@@ -1,9 +1,9 @@
 # datafusion-cli
 
-This crate is heavily based on `datafusion-cli` in the https://github.com/apache/arrow-datafusion/ repository and therefore is licensed under the same `Apache 2.0` license.
+This crate is heavily based on `datafusion-cli` in the https://github.com/apache/datafusion/ repository and therefore is licensed under the same `Apache 2.0` license.
 
 We decided to copy the code instead of using the existing `datafusion-cli` crate because:
-- It was hard to align the dependency versions between our and `arrow-datafusion` repo
+- It was hard to align the dependency versions between our and `datafusion` repo
 - The crate comes with more dependencies than we actually need / want
 - Maintaining optional features in the upstream repo would introduce too much overhead
 - Maintaining a fork was problematic due to `datafusion-cli` sharing the repo with all other `datafusion` crates, not only due to slow clone speed, but also due to `cargo` also switching to use `datafusion` crates from that repo instead of using published artifacts from `crates.io`.

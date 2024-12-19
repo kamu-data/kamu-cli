@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT EXISTS (SELECT * FROM dataset_dependencies LIMIT 1) as has_data\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "has_data",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "2cff2b63ca18bba00390b2b61ec90170110f38925697e5898b1fc9d7e7f91b39"
+}

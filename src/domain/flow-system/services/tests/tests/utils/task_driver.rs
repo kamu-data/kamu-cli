@@ -63,7 +63,7 @@ impl TaskDriver {
         // with assumed immediate delivery
         self.outbox
             .post_message(
-                MESSAGE_PRODUCER_KAMU_TASK_EXECUTOR,
+                MESSAGE_PRODUCER_KAMU_TASK_AGENT,
                 TaskProgressMessage::running(
                     start_time + self.args.run_since_start,
                     self.args.task_id,
@@ -80,7 +80,7 @@ impl TaskDriver {
             // with assummed immediate delivery
             self.outbox
                 .post_message(
-                    MESSAGE_PRODUCER_KAMU_TASK_EXECUTOR,
+                    MESSAGE_PRODUCER_KAMU_TASK_AGENT,
                     TaskProgressMessage::finished(
                         start_time + self.args.run_since_start + finish_in,
                         self.args.task_id,

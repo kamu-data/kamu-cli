@@ -13,6 +13,8 @@ use kamu::testing::MetadataFactory;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::*;
+use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
+use kamu_datasets_services::DependencyGraphServiceImpl;
 use messaging_outbox::DummyOutboxImpl;
 use opendatafabric::*;
 use time_source::SystemTimeSourceDefault;
@@ -28,7 +30,8 @@ async fn test_search_query() {
     let cat = dill::CatalogBuilder::new()
         .add::<SystemTimeSourceDefault>()
         .add::<DummyOutboxImpl>()
-        .add::<DependencyGraphServiceInMemory>()
+        .add::<DependencyGraphServiceImpl>()
+        .add::<InMemoryDatasetDependencyRepository>()
         .add_value(CurrentAccountSubject::new_test())
         .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
         .add_value(TenancyConfig::SingleTenant)

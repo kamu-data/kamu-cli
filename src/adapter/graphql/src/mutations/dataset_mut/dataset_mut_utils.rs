@@ -19,8 +19,8 @@ pub(crate) async fn ensure_account_owns_dataset(
     ctx: &Context<'_>,
     dataset_handle: &odf::DatasetHandle,
 ) -> Result<()> {
-    let dataset_ownership_service = from_catalog::<dyn DatasetOwnershipService>(ctx).unwrap();
-    let logged_account = utils::get_logged_account(ctx);
+    let dataset_ownership_service = from_catalog_n!(ctx, dyn DatasetOwnershipService);
+    let logged_account = utils::get_logged_account(ctx)?;
 
     let not_owner = !dataset_ownership_service
         .is_dataset_owned_by(&dataset_handle.id, &logged_account.account_id)

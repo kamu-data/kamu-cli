@@ -21,6 +21,8 @@ use super::Account;
 use crate::prelude::*;
 use crate::queries::{Dataset, DatasetConnection, Flow, FlowConnection, InitiatorFilterInput};
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub struct AccountFlowRuns {
     account: AccountEntity,
 }
@@ -41,7 +43,7 @@ impl AccountFlowRuns {
         per_page: Option<usize>,
         filters: Option<AccountFlowFilters>,
     ) -> Result<FlowConnection> {
-        let flow_query_service = from_catalog::<dyn fs::FlowQueryService>(ctx).unwrap();
+        let flow_query_service = from_catalog_n!(ctx, dyn fs::FlowQueryService);
 
         let page = page.unwrap_or(0);
         let per_page = per_page.unwrap_or(Self::DEFAULT_PER_PAGE);
@@ -100,7 +102,7 @@ impl AccountFlowRuns {
     }
 
     async fn list_datasets_with_flow(&self, ctx: &Context<'_>) -> Result<DatasetConnection> {
-        let flow_query_service = from_catalog::<dyn fs::FlowQueryService>(ctx).unwrap();
+        let flow_query_service = from_catalog_n!(ctx, dyn fs::FlowQueryService);
 
         let datasets_with_flows: Vec<_> = flow_query_service
             .list_all_datasets_with_flow_by_account(&self.account.id)
@@ -111,7 +113,7 @@ impl AccountFlowRuns {
             .try_collect()
             .await?;
 
-        let dataset_registry = from_catalog::<dyn DatasetRegistry>(ctx).unwrap();
+        let dataset_registry = from_catalog_n!(ctx, dyn DatasetRegistry);
 
         let account = Account::new(
             self.account.id.clone().into(),

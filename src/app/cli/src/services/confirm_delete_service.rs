@@ -30,6 +30,7 @@ impl ConfirmDeleteService {
         }
     }
 
+    #[tracing::instrument(level = "debug", skip_all, fields(?dataset_handles))]
     pub async fn confirm_delete(&self, dataset_handles: &[DatasetHandle]) -> Result<(), CLIError> {
         for hdl in dataset_handles {
             let statuses = self.push_status_service.check_remotes_status(hdl).await?;
@@ -59,6 +60,7 @@ impl ConfirmDeleteService {
             }
 
             let all_synced = out_of_sync.is_empty() && unknown.is_empty();
+            tracing::debug!(%all_synced, ?out_of_sync, ?unknown, "Checking remote status finished");
 
             if !all_synced {
                 eprintln!(

@@ -20,8 +20,7 @@ pub struct Accounts;
 impl Accounts {
     /// Returns account by its ID
     async fn by_id(&self, ctx: &Context<'_>, account_id: AccountID) -> Result<Option<Account>> {
-        let authentication_service =
-            from_catalog::<dyn kamu_accounts::AuthenticationService>(ctx).unwrap();
+        let authentication_service = from_catalog_n!(ctx, dyn kamu_accounts::AuthenticationService);
 
         let account_id: odf::AccountID = account_id.into();
         let maybe_account_name = authentication_service
@@ -34,8 +33,7 @@ impl Accounts {
 
     /// Returns account by its name
     async fn by_name(&self, ctx: &Context<'_>, name: AccountName) -> Result<Option<Account>> {
-        let authentication_service =
-            from_catalog::<dyn kamu_accounts::AuthenticationService>(ctx).unwrap();
+        let authentication_service = from_catalog_n!(ctx, dyn kamu_accounts::AuthenticationService);
 
         let account_name: odf::AccountName = name.into();
 

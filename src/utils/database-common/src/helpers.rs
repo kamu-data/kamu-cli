@@ -9,6 +9,17 @@
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Utility to generate the placeholder list. Helpful when using dynamic SQL
+/// generation.
+///
+/// # Examples
+/// ```
+/// // Output for `arguments_count`=3 & `index_offset`=0
+/// "$0,$1,$2"
+///
+/// // Output for `arguments_count`=2 & `index_offset`=3
+/// "$3,$4"
+/// ```
 pub fn sqlite_generate_placeholders_list(arguments_count: usize, index_offset: usize) -> String {
     (0..arguments_count)
         .map(|i| format!("${}", i + index_offset))

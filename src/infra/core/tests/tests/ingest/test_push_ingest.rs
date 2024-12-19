@@ -20,6 +20,8 @@ use kamu_accounts::CurrentAccountSubject;
 use opendatafabric::*;
 use tempfile::TempDir;
 use time_source::{SystemTimeSource, SystemTimeSourceStub};
+use tokio::io::AsyncRead;
+use url::Url;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -74,16 +76,13 @@ async fn test_ingest_push_url_stream() {
     .unwrap();
 
     harness
-        .push_ingest_svc
         .ingest_from_url(
-            ResolvedDataset::from(&created),
+            &created,
             None,
             url::Url::from_file_path(&src_path).unwrap(),
             PushIngestOpts::default(),
-            None,
         )
-        .await
-        .unwrap();
+        .await;
 
     data_helper
         .assert_last_data_eq(
@@ -134,16 +133,8 @@ async fn test_ingest_push_url_stream() {
     ));
 
     harness
-        .push_ingest_svc
-        .ingest_from_file_stream(
-            ResolvedDataset::from(&created),
-            None,
-            Box::new(data),
-            PushIngestOpts::default(),
-            None,
-        )
-        .await
-        .unwrap();
+        .ingest_from_stream(&created, None, Box::new(data), PushIngestOpts::default())
+        .await;
 
     data_helper
         .assert_last_data_records_eq(indoc!(
@@ -217,19 +208,16 @@ async fn test_ingest_push_media_type_override() {
     .unwrap();
 
     harness
-        .push_ingest_svc
         .ingest_from_url(
-            ResolvedDataset::from(&created),
+            &created,
             None,
             url::Url::from_file_path(&src_path).unwrap(),
             PushIngestOpts {
                 media_type: Some(MediaType::CSV.to_owned()),
                 ..Default::default()
             },
-            None,
         )
-        .await
-        .unwrap();
+        .await;
 
     data_helper
         .assert_last_data_eq(
@@ -270,19 +258,16 @@ async fn test_ingest_push_media_type_override() {
     .unwrap();
 
     harness
-        .push_ingest_svc
         .ingest_from_url(
-            ResolvedDataset::from(&created),
+            &created,
             None,
             url::Url::from_file_path(&src_path).unwrap(),
             PushIngestOpts {
                 media_type: Some(MediaType::NDJSON.to_owned()),
                 ..Default::default()
             },
-            None,
         )
-        .await
-        .unwrap();
+        .await;
 
     data_helper
         .assert_last_data_eq(
@@ -325,19 +310,16 @@ async fn test_ingest_push_media_type_override() {
     .unwrap();
 
     harness
-        .push_ingest_svc
         .ingest_from_url(
-            ResolvedDataset::from(&created),
+            &created,
             None,
             url::Url::from_file_path(&src_path).unwrap(),
             PushIngestOpts {
                 media_type: Some(MediaType::JSON.to_owned()),
                 ..Default::default()
             },
-            None,
         )
-        .await
-        .unwrap();
+        .await;
 
     data_helper
         .assert_last_data_eq(
@@ -413,16 +395,13 @@ async fn test_ingest_push_schema_stability() {
     .unwrap();
 
     harness
-        .push_ingest_svc
         .ingest_from_url(
-            ResolvedDataset::from(&created),
+            &created,
             None,
             url::Url::from_file_path(&src_path).unwrap(),
             PushIngestOpts::default(),
-            None,
         )
-        .await
-        .unwrap();
+        .await;
 
     let set_data_schema = data_helper.get_last_set_data_schema_block().await.event;
 
@@ -498,9 +477,8 @@ async fn test_ingest_inference_automatic_coercion_of_event_time_from_string() {
     .unwrap();
 
     harness
-        .push_ingest_svc
         .ingest_from_url(
-            ResolvedDataset::from(&created),
+            &created,
             None,
             url::Url::from_file_path(&src_path).unwrap(),
             PushIngestOpts {
@@ -510,10 +488,8 @@ async fn test_ingest_inference_automatic_coercion_of_event_time_from_string() {
                 },
                 ..Default::default()
             },
-            None,
         )
-        .await
-        .unwrap();
+        .await;
 
     data_helper
         .assert_last_data_eq(
@@ -576,9 +552,8 @@ async fn test_ingest_inference_automatic_coercion_of_event_time_from_unixtime() 
     .unwrap();
 
     harness
-        .push_ingest_svc
         .ingest_from_url(
-            ResolvedDataset::from(&created),
+            &created,
             None,
             url::Url::from_file_path(&src_path).unwrap(),
             PushIngestOpts {
@@ -588,10 +563,8 @@ async fn test_ingest_inference_automatic_coercion_of_event_time_from_unixtime() 
                 },
                 ..Default::default()
             },
-            None,
         )
-        .await
-        .unwrap();
+        .await;
 
     data_helper
         .assert_last_data_eq(
@@ -654,9 +627,8 @@ async fn test_ingest_inference_automatic_renaming_of_conflicting_columns() {
     .unwrap();
 
     harness
-        .push_ingest_svc
         .ingest_from_url(
-            ResolvedDataset::from(&created),
+            &created,
             None,
             url::Url::from_file_path(&src_path).unwrap(),
             PushIngestOpts {
@@ -666,10 +638,8 @@ async fn test_ingest_inference_automatic_renaming_of_conflicting_columns() {
                 },
                 ..Default::default()
             },
-            None,
         )
-        .await
-        .unwrap();
+        .await;
 
     data_helper
         .assert_last_data_eq(
@@ -753,16 +723,13 @@ async fn test_ingest_sql_case_sensitivity() {
     .unwrap();
 
     harness
-        .push_ingest_svc
         .ingest_from_url(
-            ResolvedDataset::from(&created),
+            &created,
             None,
             url::Url::from_file_path(&src_path).unwrap(),
             PushIngestOpts::default(),
-            None,
         )
-        .await
-        .unwrap();
+        .await;
 
     data_helper
         .assert_last_data_eq(
@@ -800,7 +767,8 @@ struct IngestTestHarness {
     temp_dir: TempDir,
     dataset_registry: Arc<dyn DatasetRegistry>,
     dataset_repo_writer: Arc<dyn DatasetRepositoryWriter>,
-    push_ingest_svc: Arc<dyn PushIngestService>,
+    push_ingest_planner: Arc<dyn PushIngestPlanner>,
+    push_ingest_executor: Arc<dyn PushIngestExecutor>,
     ctx: SessionContext,
 }
 
@@ -832,14 +800,16 @@ impl IngestTestHarness {
             .add::<ObjectStoreRegistryImpl>()
             .add::<ObjectStoreBuilderLocalFs>()
             .add::<DataFormatRegistryImpl>()
-            .add::<PushIngestServiceImpl>()
+            .add::<PushIngestExecutorImpl>()
+            .add::<PushIngestPlannerImpl>()
             .build();
 
         Self {
             temp_dir,
             dataset_registry: catalog.get_one().unwrap(),
             dataset_repo_writer: catalog.get_one().unwrap(),
-            push_ingest_svc: catalog.get_one().unwrap(),
+            push_ingest_planner: catalog.get_one().unwrap(),
+            push_ingest_executor: catalog.get_one().unwrap(),
             ctx: SessionContext::new_with_config(SessionConfig::new().with_target_partitions(1)),
         }
     }
@@ -860,5 +830,47 @@ impl IngestTestHarness {
             .unwrap();
 
         DatasetDataHelper::new_with_context((*resolved_dataset).clone(), self.ctx.clone())
+    }
+
+    async fn ingest_from_stream(
+        &self,
+        created: &CreateDatasetResult,
+        source_name: Option<&str>,
+        data: Box<dyn AsyncRead + Send + Unpin>,
+        opts: PushIngestOpts,
+    ) {
+        let target = ResolvedDataset::from(created);
+
+        let ingest_plan = self
+            .push_ingest_planner
+            .plan_ingest(target.clone(), source_name, opts)
+            .await
+            .unwrap();
+
+        self.push_ingest_executor
+            .ingest_from_stream(target, ingest_plan, data, None)
+            .await
+            .unwrap();
+    }
+
+    async fn ingest_from_url(
+        &self,
+        created: &CreateDatasetResult,
+        source_name: Option<&str>,
+        url: Url,
+        opts: PushIngestOpts,
+    ) {
+        let target = ResolvedDataset::from(created);
+
+        let ingest_plan = self
+            .push_ingest_planner
+            .plan_ingest(target.clone(), source_name, opts)
+            .await
+            .unwrap();
+
+        self.push_ingest_executor
+            .ingest_from_url(target, ingest_plan, url, None)
+            .await
+            .unwrap();
     }
 }

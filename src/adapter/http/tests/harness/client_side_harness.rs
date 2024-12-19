@@ -22,7 +22,8 @@ use kamu::utils::simple_transfer_protocol::SimpleTransferProtocol;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_adapter_http::{OdfSmtpVersion, SmartTransferProtocolClientWs};
-use kamu_datasets_services::DatasetKeyValueServiceSysEnv;
+use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
+use kamu_datasets_services::{DatasetKeyValueServiceSysEnv, DependencyGraphServiceImpl};
 use messaging_outbox::DummyOutboxImpl;
 use opendatafabric::{
     AccountID,
@@ -80,7 +81,8 @@ impl ClientSideHarness {
 
         b.add::<DummyOutboxImpl>();
 
-        b.add::<DependencyGraphServiceInMemory>();
+        b.add::<DependencyGraphServiceImpl>();
+        b.add::<InMemoryDatasetDependencyRepository>();
 
         b.add_value(CurrentAccountSubject::logged(
             AccountID::new_seeded_ed25519(CLIENT_ACCOUNT_NAME.as_bytes()),
@@ -132,9 +134,10 @@ impl ClientSideHarness {
 
         b.add::<TransformRequestPlannerImpl>();
         b.add::<TransformElaborationServiceImpl>();
-        b.add::<TransformExecutionServiceImpl>();
+        b.add::<TransformExecutorImpl>();
 
-        b.add::<CompactionServiceImpl>();
+        b.add::<CompactionPlannerImpl>();
+        b.add::<CompactionExecutorImpl>();
 
         b.add::<PullRequestPlannerImpl>();
 
@@ -199,8 +202,12 @@ impl ClientSideHarness {
             .unwrap()
     }
 
-    pub fn compaction_service(&self) -> Arc<dyn CompactionService> {
-        self.catalog.get_one::<dyn CompactionService>().unwrap()
+    pub fn compaction_planner(&self) -> Arc<dyn CompactionPlanner> {
+        self.catalog.get_one::<dyn CompactionPlanner>().unwrap()
+    }
+
+    pub fn compaction_executor(&self) -> Arc<dyn CompactionExecutor> {
+        self.catalog.get_one::<dyn CompactionExecutor>().unwrap()
     }
 
     // TODO: accept alias or handle

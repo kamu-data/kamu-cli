@@ -33,7 +33,7 @@ impl FlowTrigger {
             fs::FlowTrigger::AutoPolling(auto_polling) => Self::AutoPolling(auto_polling.into()),
             fs::FlowTrigger::Push(push) => Self::Push(push.into()),
             fs::FlowTrigger::InputDatasetFlow(input) => {
-                let dataset_registry = from_catalog::<dyn DatasetRegistry>(ctx).unwrap();
+                let dataset_registry = from_catalog_n!(ctx, dyn DatasetRegistry);
                 let hdl = dataset_registry
                     .resolve_dataset_handle_by_ref(&input.dataset_id.as_local_ref())
                     .await

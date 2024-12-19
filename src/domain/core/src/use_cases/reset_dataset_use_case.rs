@@ -7,9 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use internal_error::InternalError;
 use opendatafabric::{DatasetHandle, Multihash};
+use thiserror::Error;
 
-use crate::ResetError;
+use crate::auth::DatasetActionUnauthorizedError;
+use crate::{AccessError, ResetExecutionError, ResetPlanningError, ResetResult};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -20,7 +23,47 @@ pub trait ResetDatasetUseCase: Send + Sync {
         dataset_handle: &DatasetHandle,
         maybe_new_head: Option<&Multihash>,
         maybe_old_head: Option<&Multihash>,
-    ) -> Result<Multihash, ResetError>;
+    ) -> Result<ResetResult, ResetError>;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Error)]
+pub enum ResetError {
+    #[error(transparent)]
+    Planning(
+        #[from]
+        #[backtrace]
+        ResetPlanningError,
+    ),
+
+    #[error(transparent)]
+    Execution(
+        #[from]
+        #[backtrace]
+        ResetExecutionError,
+    ),
+
+    #[error(transparent)]
+    Access(
+        #[from]
+        #[backtrace]
+        AccessError,
+    ),
+
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl From<DatasetActionUnauthorizedError> for ResetError {
+    fn from(v: DatasetActionUnauthorizedError) -> Self {
+        match v {
+            DatasetActionUnauthorizedError::Access(e) => Self::Access(e),
+            DatasetActionUnauthorizedError::Internal(e) => Self::Internal(e),
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

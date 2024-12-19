@@ -11,6 +11,7 @@ use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
 use auth::DummyOdfServerAccessTokenResolver;
+use kamu::testing::BaseRepoHarness;
 use kamu::*;
 use kamu_core::*;
 use opendatafabric::{
@@ -23,8 +24,6 @@ use opendatafabric::{
 };
 use tempfile::TempDir;
 use url::Url;
-
-use crate::BaseRepoHarness;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

@@ -102,7 +102,7 @@ impl CompactionListener for CompactionProgress {
             .set_message(self.spinner_message("Compaction dataset"));
     }
 
-    fn success(&self, res: &CompactionResult) {
+    fn execute_success(&self, res: &CompactionResult) {
         match res {
             CompactionResult::NothingToDo => {
                 self.curr_progress.finish_with_message(

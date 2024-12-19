@@ -98,9 +98,18 @@ impl<TServerHarness: ServerSideHarness> SmartPushExistingDivergedDatasetScenario
             .get_dataset_by_handle(&client_create_result.dataset_handle);
 
         // Compact at client side
-        let compaction_service = client_harness.compaction_service();
-        let client_compaction_result = compaction_service
-            .compact_dataset(client_dataset, CompactionOptions::default(), None)
+        let compaction_planner = client_harness.compaction_planner();
+        let compaction_execution_service = client_harness.compaction_executor();
+
+        let client_compaction_result = compaction_execution_service
+            .execute(
+                client_dataset.clone(),
+                compaction_planner
+                    .plan_compaction(client_dataset, CompactionOptions::default(), None)
+                    .await
+                    .unwrap(),
+                None,
+            )
             .await
             .unwrap();
 

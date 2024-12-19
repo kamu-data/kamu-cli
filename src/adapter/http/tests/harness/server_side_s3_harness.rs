@@ -16,7 +16,8 @@ use dill::Component;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu::domain::{
     CommitDatasetEventUseCase,
-    CompactionService,
+    CompactionExecutor,
+    CompactionPlanner,
     CreateDatasetFromSnapshotUseCase,
     CreateDatasetUseCase,
     DatasetRepository,
@@ -29,14 +30,14 @@ use kamu::utils::s3_context::S3Context;
 use kamu::{
     AppendDatasetMetadataBatchUseCaseImpl,
     CommitDatasetEventUseCaseImpl,
-    CompactionServiceImpl,
+    CompactionExecutorImpl,
+    CompactionPlannerImpl,
     CreateDatasetFromSnapshotUseCaseImpl,
     CreateDatasetUseCaseImpl,
     DatasetLayout,
     DatasetRegistryRepoBridge,
     DatasetRepositoryS3,
     DatasetRepositoryWriter,
-    DependencyGraphServiceInMemory,
     ObjectStoreBuilderLocalFs,
     ObjectStoreBuilderS3,
     ObjectStoreRegistryImpl,
@@ -44,6 +45,8 @@ use kamu::{
 use kamu_accounts::testing::MockAuthenticationService;
 use kamu_accounts::{Account, AuthenticationService};
 use kamu_core::{DatasetRegistry, TenancyConfig};
+use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
+use kamu_datasets_services::DependencyGraphServiceImpl;
 use messaging_outbox::DummyOutboxImpl;
 use opendatafabric::{AccountName, DatasetAlias, DatasetHandle};
 use time_source::{SystemTimeSource, SystemTimeSourceStub};
@@ -97,7 +100,8 @@ impl ServerSideS3Harness {
                 .add_value(RunInfoDir::new(run_info_dir))
                 .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
                 .add::<DummyOutboxImpl>()
-                .add::<DependencyGraphServiceInMemory>()
+                .add::<DependencyGraphServiceImpl>()
+                .add::<InMemoryDatasetDependencyRepository>()
                 .add_value(options.tenancy_config)
                 .add_builder(DatasetRepositoryS3::builder().with_s3_context(s3_context.clone()))
                 .bind::<dyn DatasetRepository, DatasetRepositoryS3>()
@@ -106,7 +110,8 @@ impl ServerSideS3Harness {
                 .add_value(server_authentication_mock(&account))
                 .bind::<dyn AuthenticationService, MockAuthenticationService>()
                 .add_value(ServerUrlConfig::new_test(Some(&base_url_rest)))
-                .add::<CompactionServiceImpl>()
+                .add::<CompactionPlannerImpl>()
+                .add::<CompactionExecutorImpl>()
                 .add::<ObjectStoreRegistryImpl>()
                 .add::<ObjectStoreBuilderLocalFs>()
                 .add_value(ObjectStoreBuilderS3::new(s3_context, true))
@@ -178,9 +183,14 @@ impl ServerSideHarness for ServerSideS3Harness {
             .unwrap()
     }
 
-    fn cli_compaction_service(&self) -> Arc<dyn CompactionService> {
+    fn cli_compaction_planner(&self) -> Arc<dyn CompactionPlanner> {
         let cli_catalog = create_cli_user_catalog(&self.base_catalog);
-        cli_catalog.get_one::<dyn CompactionService>().unwrap()
+        cli_catalog.get_one::<dyn CompactionPlanner>().unwrap()
+    }
+
+    fn cli_compaction_executor(&self) -> Arc<dyn CompactionExecutor> {
+        let cli_catalog = create_cli_user_catalog(&self.base_catalog);
+        cli_catalog.get_one::<dyn CompactionExecutor>().unwrap()
     }
 
     fn dataset_url_with_scheme(&self, dataset_alias: &DatasetAlias, scheme: &str) -> Url {

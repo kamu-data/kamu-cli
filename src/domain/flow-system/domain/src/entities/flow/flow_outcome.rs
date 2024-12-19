@@ -142,7 +142,7 @@ impl From<ts::TaskResult> for FlowResult {
             }
             ts::TaskResult::ResetDatasetResult(task_reset_result) => {
                 Self::DatasetReset(FlowResultDatasetReset {
-                    new_head: task_reset_result.new_head,
+                    new_head: task_reset_result.reset_result.new_head,
                 })
             }
             ts::TaskResult::CompactionDatasetResult(task_compaction_result) => {

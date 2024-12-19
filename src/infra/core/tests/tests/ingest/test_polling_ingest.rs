@@ -1270,9 +1270,16 @@ impl IngestTestHarness {
         &self,
         created: &CreateDatasetResult,
     ) -> Result<PollingIngestResult, PollingIngestError> {
+        let target = ResolvedDataset::from(created);
+
+        let metadata_state = DataWriterMetadataState::build(target.clone(), &BlockRef::Head, None)
+            .await
+            .unwrap();
+
         self.ingest_svc
             .ingest(
-                ResolvedDataset::from(created),
+                target,
+                Box::new(metadata_state),
                 PollingIngestOptions::default(),
                 None,
             )

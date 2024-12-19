@@ -39,7 +39,7 @@ dill = { version = "0.9" }
 lazy_static = { version = "1" }
 sqlx = { version = "0.8", default-features = false, features = ["macros"] }
 strum = { version = "0.26", features = ["derive"] }
-thiserror = { version = "1", default-features = false }
+thiserror = { version = "2", default-features = false, features = ["std"] }
 tokio-stream = { version = "0.1", default-features = false }
 
 # TODO: Make serde optional

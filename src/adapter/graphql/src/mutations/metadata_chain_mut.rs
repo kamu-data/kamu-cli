@@ -56,7 +56,7 @@ impl MetadataChainMut {
             }
         };
 
-        let commit_dataset_event = from_catalog::<dyn CommitDatasetEventUseCase>(ctx).unwrap();
+        let commit_dataset_event = from_catalog_n!(ctx, dyn CommitDatasetEventUseCase);
 
         let result = match commit_dataset_event
             .execute(&self.dataset_handle, event, domain::CommitOpts::default())

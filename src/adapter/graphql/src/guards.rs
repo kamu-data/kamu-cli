@@ -10,7 +10,7 @@
 use async_graphql::{Context, Guard, Result};
 use kamu_accounts::{AnonymousAccountReason, CurrentAccountSubject};
 
-use crate::prelude::from_catalog;
+use crate::prelude::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -30,7 +30,7 @@ impl LoggedInGuard {
 
 impl Guard for LoggedInGuard {
     async fn check(&self, ctx: &Context<'_>) -> Result<()> {
-        let current_account_subject = from_catalog::<CurrentAccountSubject>(ctx).unwrap();
+        let current_account_subject = from_catalog_n!(ctx, CurrentAccountSubject);
         if let CurrentAccountSubject::Anonymous(reason) = current_account_subject.as_ref() {
             Err(async_graphql::Error::new(match reason {
                 AnonymousAccountReason::NoAuthenticationProvided => {
@@ -49,6 +49,8 @@ impl Guard for LoggedInGuard {
 
 pub const STAFF_ONLY_MESSAGE: &str = "Access restricted to administrators only";
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub struct AdminGuard {}
 
 impl AdminGuard {
@@ -59,7 +61,7 @@ impl AdminGuard {
 
 impl Guard for AdminGuard {
     async fn check(&self, ctx: &Context<'_>) -> Result<()> {
-        let current_account_subject = from_catalog::<CurrentAccountSubject>(ctx).unwrap();
+        let current_account_subject = from_catalog_n!(ctx, CurrentAccountSubject);
 
         match current_account_subject.as_ref() {
             CurrentAccountSubject::Logged(a) if a.is_admin => Ok(()),

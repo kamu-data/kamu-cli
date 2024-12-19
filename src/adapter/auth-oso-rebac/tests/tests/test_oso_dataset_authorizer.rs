@@ -143,6 +143,8 @@ impl DatasetAuthorizerHarness {
                 .add_value(current_account_subject)
                 .add_value(predefined_accounts_config)
                 .add::<PredefinedAccountsRegistrator>()
+                .add::<kamu_auth_rebac_services::RebacServiceImpl>()
+                .add::<kamu_auth_rebac_services::MultiTenantRebacDatasetLifecycleMessageConsumer>()
                 .add::<InMemoryRebacRepository>()
                 .add_builder(
                     OutboxImmediateImpl::builder()
@@ -158,8 +160,6 @@ impl DatasetAuthorizerHarness {
                 .bind::<dyn Outbox, OutboxImmediateImpl>();
 
             kamu_adapter_auth_oso_rebac::register_dependencies(&mut b);
-
-            kamu_auth_rebac_services::register_dependencies(&mut b, tenancy_config);
 
             register_message_dispatcher::<DatasetLifecycleMessage>(
                 &mut b,

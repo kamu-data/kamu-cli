@@ -56,6 +56,7 @@ pub struct PullPlanIteration {
     pub jobs: Vec<PullPlanIterationJob>,
 }
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
 pub enum PullPlanIterationJob {
     Ingest(PullIngestItem),
@@ -87,6 +88,7 @@ impl PullPlanIterationJob {
 pub struct PullIngestItem {
     pub depth: i32,
     pub target: ResolvedDataset,
+    pub metadata_state: Box<DataWriterMetadataState>,
     pub maybe_original_request: Option<PullRequest>,
 }
 
@@ -388,34 +390,48 @@ pub enum PullError {
         #[backtrace]
         DatasetNotFoundError,
     ),
+
     #[error("Cannot choose between multiple pull aliases")]
     AmbiguousSource,
+
     #[error("{0}")]
     InvalidOperation(String),
+
+    #[error(transparent)]
+    ScanMetadata(
+        #[from]
+        #[backtrace]
+        ScanMetadataError,
+    ),
+
     #[error(transparent)]
     PollingIngestError(
         #[from]
         #[backtrace]
         PollingIngestError,
     ),
+
     #[error(transparent)]
     TransformError(
         #[from]
         #[backtrace]
         TransformError,
     ),
+
     #[error(transparent)]
     SyncError(
         #[from]
         #[backtrace]
         SyncError,
     ),
+
     #[error(transparent)]
     Access(
         #[from]
         #[backtrace]
         AccessError,
     ),
+
     #[error(transparent)]
     Internal(
         #[from]

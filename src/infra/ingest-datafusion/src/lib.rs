@@ -12,7 +12,6 @@
 
 pub mod merge_strategies;
 pub mod readers;
-mod visitor;
 mod writer;
 
 pub use kamu_core::ingest::*;

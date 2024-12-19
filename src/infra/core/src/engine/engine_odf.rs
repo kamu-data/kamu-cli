@@ -255,14 +255,17 @@ impl Engine for ODFEngine {
         let _ = std::fs::create_dir_all(&host_in_dir);
         let _ = std::fs::create_dir_all(&host_out_dir);
 
-        let host_input_data_path = host_in_dir.join("input");
-        let host_output_data_path = host_out_dir.join("output");
+        // FIXME: The .parquet extension is currently necessary for DataFusion to
+        // respect the single-file output
+        // See: https://github.com/apache/datafusion/issues/13323
+        let host_input_data_path = host_in_dir.join("input.parquet");
+        let host_output_data_path = host_out_dir.join("output.parquet");
 
         // Note: not using `PathBuf::join()` below to ensure linux style paths
         let container_in_dir = PathBuf::from("/opt/engine/in");
         let container_out_dir = PathBuf::from("/opt/engine/out");
-        let container_input_data_path = PathBuf::from("/opt/engine/in/input");
-        let container_output_data_path = PathBuf::from("/opt/engine/out/output");
+        let container_input_data_path = PathBuf::from("/opt/engine/in/input.parquet");
+        let container_output_data_path = PathBuf::from("/opt/engine/out/output.parquet");
 
         let volumes = vec![
             VolumeSpec {

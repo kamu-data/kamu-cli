@@ -32,7 +32,7 @@ pub struct PullDatasetUseCaseImpl {
     remote_alias_registry: Arc<dyn RemoteAliasesRegistry>,
     polling_ingest_svc: Arc<dyn PollingIngestService>,
     transform_elaboration_svc: Arc<dyn TransformElaborationService>,
-    transform_execution_svc: Arc<dyn TransformExecutionService>,
+    transform_executor: Arc<dyn TransformExecutor>,
     sync_svc: Arc<dyn SyncService>,
     tenancy_config: Arc<TenancyConfig>,
 }
@@ -45,7 +45,7 @@ impl PullDatasetUseCaseImpl {
         remote_alias_registry: Arc<dyn RemoteAliasesRegistry>,
         polling_ingest_svc: Arc<dyn PollingIngestService>,
         transform_elaboration_svc: Arc<dyn TransformElaborationService>,
-        transform_execution_svc: Arc<dyn TransformExecutionService>,
+        transform_executor: Arc<dyn TransformExecutor>,
         sync_svc: Arc<dyn SyncService>,
         tenancy_config: Arc<TenancyConfig>,
     ) -> Self {
@@ -56,7 +56,7 @@ impl PullDatasetUseCaseImpl {
             remote_alias_registry,
             polling_ingest_svc,
             transform_elaboration_svc,
-            transform_execution_svc,
+            transform_executor,
             sync_svc,
             tenancy_config,
         }
@@ -120,7 +120,7 @@ impl PullDatasetUseCaseImpl {
                             pti,
                             options.transform_options,
                             self.transform_elaboration_svc.clone(),
-                            self.transform_execution_svc.clone(),
+                            self.transform_executor.clone(),
                             maybe_listener,
                         ))
                     }
@@ -339,7 +339,12 @@ impl PullDatasetUseCaseImpl {
         maybe_listener: Option<Arc<dyn PollingIngestListener>>,
     ) -> Result<PullResponse, InternalError> {
         let ingest_response = polling_ingest_svc
-            .ingest(pii.target.clone(), ingest_options, maybe_listener)
+            .ingest(
+                pii.target.clone(),
+                pii.metadata_state,
+                ingest_options,
+                maybe_listener,
+            )
             .await;
 
         Ok(PullResponse {
@@ -357,7 +362,7 @@ impl PullDatasetUseCaseImpl {
         pti: PullTransformItem,
         transform_options: TransformOptions,
         transform_elaboration_svc: Arc<dyn TransformElaborationService>,
-        transform_execution_svc: Arc<dyn TransformExecutionService>,
+        transform_executor: Arc<dyn TransformExecutor>,
         maybe_listener: Option<Arc<dyn TransformListener>>,
     ) -> Result<PullResponse, InternalError> {
         // Remember original request
@@ -367,7 +372,7 @@ impl PullDatasetUseCaseImpl {
         async fn run_transform(
             pti: PullTransformItem,
             transform_elaboration_svc: Arc<dyn TransformElaborationService>,
-            transform_execution_svc: Arc<dyn TransformExecutionService>,
+            transform_executor: Arc<dyn TransformExecutor>,
             transform_options: TransformOptions,
             maybe_listener: Option<Arc<dyn TransformListener>>,
         ) -> (ResolvedDataset, Result<TransformResult, PullError>) {
@@ -384,7 +389,7 @@ impl PullDatasetUseCaseImpl {
                 // Elaborate success
                 Ok(TransformElaboration::Elaborated(plan)) => {
                     // Execute phase
-                    let (target, result) = transform_execution_svc
+                    let (target, result) = transform_executor
                         .execute_transform(pti.target, plan, maybe_listener)
                         .await;
                     (
@@ -405,7 +410,7 @@ impl PullDatasetUseCaseImpl {
         let transform_result = run_transform(
             pti,
             transform_elaboration_svc,
-            transform_execution_svc,
+            transform_executor,
             transform_options,
             maybe_listener,
         )

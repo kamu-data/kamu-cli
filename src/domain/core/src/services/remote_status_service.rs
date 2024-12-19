@@ -27,6 +27,7 @@ pub trait RemoteStatusService: Send + Sync {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Debug)]
 pub struct PushStatus {
     pub remote: DatasetRefRemote,
     pub check_result: Result<CompareChainsResult, StatusCheckError>,

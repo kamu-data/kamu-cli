@@ -155,6 +155,7 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
 
 #[async_trait]
 impl DatasetRepositoryWriter for DatasetRepositoryLocalFs {
+    #[tracing::instrument(level = "debug", skip_all, fields(%dataset_alias, ?seed_block))]
     async fn create_dataset(
         &self,
         dataset_alias: &DatasetAlias,
@@ -272,6 +273,7 @@ impl DatasetRepositoryWriter for DatasetRepositoryLocalFs {
         })
     }
 
+    #[tracing::instrument(level = "debug", skip_all, fields(?snapshot))]
     async fn create_dataset_from_snapshot(
         &self,
         snapshot: DatasetSnapshot,
@@ -279,6 +281,7 @@ impl DatasetRepositoryWriter for DatasetRepositoryLocalFs {
         create_dataset_from_snapshot_impl(self, snapshot, self.system_time_source.now()).await
     }
 
+    #[tracing::instrument(level = "debug", skip_all, fields(%dataset_handle, %new_name))]
     async fn rename_dataset(
         &self,
         dataset_handle: &DatasetHandle,
@@ -310,6 +313,7 @@ impl DatasetRepositoryWriter for DatasetRepositoryLocalFs {
         Ok(())
     }
 
+    #[tracing::instrument(level = "debug", skip_all, fields(%dataset_handle))]
     async fn delete_dataset(
         &self,
         dataset_handle: &DatasetHandle,

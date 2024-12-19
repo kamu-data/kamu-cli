@@ -163,3 +163,35 @@ pub async fn test_repository_push_aliases_commands(kamu: KamuCliPuppet) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_repo_delete_args_validation(kamu: KamuCliPuppet) {
+    kamu.assert_success_command_execution(
+        ["repo", "delete", "--all"],
+        None,
+        Some(["There are no repositories to delete"]),
+    )
+    .await;
+
+    kamu.assert_failure_command_execution(
+        ["repo", "delete", "some-repo"],
+        None,
+        Some(["Error: Repository some-repo does not exist"]),
+    )
+    .await;
+
+    kamu.assert_failure_command_execution(
+        ["repo", "delete", "some-repo", "--all"],
+        None,
+        Some(["You can either specify repository(s) or pass --all"]),
+    )
+    .await;
+
+    kamu.assert_failure_command_execution(
+        ["repo", "delete"],
+        None,
+        Some(["Specify repository(s) or pass --all"]),
+    )
+    .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

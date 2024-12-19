@@ -18,7 +18,7 @@ mockall::mock! {
     pub TransformExecutionService {}
 
     #[async_trait::async_trait]
-    impl TransformExecutionService for TransformExecutionService {
+    impl TransformExecutor for TransformExecutionService {
         async fn execute_transform(
             &self,
             target: ResolvedDataset,
