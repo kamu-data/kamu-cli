@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::fmt::{Display, Formatter};
 use std::path::Path;
 
 use datafusion::dataframe::DataFrame;
@@ -26,39 +25,28 @@ pub trait ExportService: Send + Sync {
         &self,
         df: DataFrame,
         path: &Path,
-        format: ExportFormat,
-        partition_row_count: Option<usize>,
+        format: &ExportFormat,
+        records_per_file: Option<usize>,
     ) -> Result<u64, ExportError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Clone, strum::Display, Debug)]
 pub enum ExportFormat {
+    #[strum(to_string = "parquet")]
     Parquet,
-    Csv,
-    NdJson,
-}
 
-impl Display for ExportFormat {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let str_val = match *self {
-            ExportFormat::Parquet => "parquet",
-            ExportFormat::Csv => "csv",
-            ExportFormat::NdJson => "ndjson",
-        };
-        f.write_str(str_val)
-    }
+    #[strum(to_string = "csv")]
+    Csv,
+
+    #[strum(to_string = "ndjson")]
+    NdJson,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Errors
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Error)]
-#[error("{context}")]
-pub struct NotImplementedError {
-    pub context: String,
-}
 
 #[derive(Debug, Error)]
 #[error("Invalid SQL query: {context}")]
@@ -75,12 +63,6 @@ pub enum ExportError {
         #[from]
         #[backtrace]
         InternalError,
-    ),
-    #[error(transparent)]
-    NotImplemented(
-        #[from]
-        #[backtrace]
-        NotImplementedError,
     ),
     #[error(transparent)]
     DataFusionError(DataFusionError),

@@ -19,6 +19,7 @@ use kamu::*;
 use kamu_datafusion_cli::exec;
 use kamu_datafusion_cli::print_format::PrintFormat;
 use kamu_datafusion_cli::print_options::{MaxRows, PrintOptions};
+use lazy_static::lazy_static;
 
 use super::common::PullImageProgress;
 use super::{CLIError, Command};
@@ -29,6 +30,14 @@ use crate::WorkspaceLayout;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub const DEFAULT_MAX_ROWS_FOR_OUTPUT: usize = 40;
+
+lazy_static! {
+    static ref SUPPORTED_EXPORT_FORMATS: Vec<OutputFormat> = vec![
+        OutputFormat::Csv,
+        OutputFormat::NdJson,
+        OutputFormat::Parquet,
+    ];
+}
 
 #[derive(Debug, Clone, Copy, clap::ValueEnum)]
 pub enum SqlShellEngine {
@@ -49,8 +58,7 @@ pub struct SqlShellCommand {
     url: Option<String>,
     engine: Option<SqlShellEngine>,
     output_path: Option<PathBuf>,
-    partition_size: Option<usize>,
-    supported_export_formats: Vec<OutputFormat>,
+    records_per_file: Option<usize>,
 }
 
 impl SqlShellCommand {
@@ -65,7 +73,7 @@ impl SqlShellCommand {
         url: Option<String>,
         engine: Option<SqlShellEngine>,
         output_path: Option<PathBuf>,
-        partition_size: Option<usize>,
+        records_per_file: Option<usize>,
     ) -> Self {
         Self {
             query_svc,
@@ -78,12 +86,7 @@ impl SqlShellCommand {
             url,
             engine,
             output_path,
-            partition_size,
-            supported_export_formats: vec![
-                OutputFormat::Csv,
-                OutputFormat::NdJson,
-                OutputFormat::Parquet,
-            ],
+            records_per_file,
         }
     }
 
@@ -205,7 +208,7 @@ impl SqlShellCommand {
 
                 let rows_exported = self
                     .export_service
-                    .export_to_fs(res.df, output_path, format, self.partition_size)
+                    .export_to_fs(res.df, output_path, &format, self.records_per_file)
                     .await?;
                 eprintln!("Exported {rows_exported} rows");
             }
@@ -229,15 +232,17 @@ impl Command for SqlShellCommand {
                 }
             }
 
-            let supported = &self.supported_export_formats;
-            if !supported.contains(&self.output_config.format) {
-                let supported_str = supported.iter().map(|f| format!("'{f}'")).join(", ");
+            if !SUPPORTED_EXPORT_FORMATS.contains(&self.output_config.format) {
+                let supported_str = SUPPORTED_EXPORT_FORMATS
+                    .iter()
+                    .map(|f| format!("'{f}'"))
+                    .join(", ");
                 return Err(CLIError::usage_error(format!(
                     "Invalid output format for export '{}'. Supported formats: {}",
                     &self.output_config.format, supported_str
                 )));
             }
-        } else if self.partition_size.is_some() {
+        } else if self.records_per_file.is_some() {
             return Err(CLIError::usage_error(
                 "Partitioning is only supported for data export to file(s)",
             ));

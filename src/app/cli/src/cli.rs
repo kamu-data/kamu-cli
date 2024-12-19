@@ -10,6 +10,7 @@
 use std::path::PathBuf;
 
 use clap::{ArgAction, Parser};
+use kamu::domain::ExportFormat;
 use opendatafabric::{self as odf};
 
 use crate::cli_value_parser::{self as parsers};
@@ -393,14 +394,14 @@ pub struct Export {
     pub output_path: Option<PathBuf>,
 
     /// Output format
-    #[arg(long, value_parser = ["parquet", "ndjson", "csv"])]
-    pub output_format: String,
+    #[arg(long, value_parser = parsers::export_format)]
+    pub output_format: ExportFormat,
 
     /// Number of records per file, if stored into a directory. Default is 5m.
     /// It's a soft limit. For a sake of export performance real number of
     /// records may be slightly different.
     #[arg(long)]
-    pub partition_size: Option<usize>,
+    pub records_per_file: Option<usize>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1278,7 +1279,7 @@ pub struct Sql {
     /// It's a soft limit. For a sake of export performance real number of
     /// records may be slightly different.
     #[arg(long)]
-    pub partition_size: Option<usize>,
+    pub records_per_file: Option<usize>,
 }
 
 #[derive(Debug, clap::Subcommand)]

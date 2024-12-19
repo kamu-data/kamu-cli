@@ -54,8 +54,8 @@ impl ExportService for ExportServiceImpl {
         &self,
         df: DataFrame,
         path: &Path,
-        format: ExportFormat,
-        partition_row_count: Option<usize>,
+        format: &ExportFormat,
+        records_per_file: Option<usize>,
     ) -> Result<u64, ExportError> {
         let (mut session_state, plan) = df.into_parts();
 
@@ -71,7 +71,7 @@ impl ExportService for ExportServiceImpl {
             .execution
             .target_partitions = 1;
 
-        if let Some(partition_size) = partition_row_count {
+        if let Some(partition_size) = records_per_file {
             session_state
                 .config_mut()
                 .options_mut()
