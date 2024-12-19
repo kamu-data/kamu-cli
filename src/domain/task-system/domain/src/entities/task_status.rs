@@ -7,8 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_core::{CompactionResult, PullResult};
-use opendatafabric::{DatasetID, Multihash};
+use kamu_core::{CompactionResult, PullResult, ResetResult};
+use opendatafabric as odf;
 use serde::{Deserialize, Serialize};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -61,7 +61,7 @@ pub struct TaskUpdateDatasetResult {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TaskResetDatasetResult {
-    pub new_head: Multihash,
+    pub reset_result: ResetResult,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -93,7 +93,7 @@ pub enum UpdateDatasetTaskError {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct InputDatasetCompactedError {
-    pub dataset_id: DatasetID,
+    pub dataset_id: odf::DatasetID,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

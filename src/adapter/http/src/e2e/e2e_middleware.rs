@@ -29,11 +29,11 @@ pub async fn e2e_middleware_fn(request: Request, next: Next) -> Result<Response,
     let response = next.run(request).await;
 
     if is_mutable_request && response.status().is_success() {
-        let outbox_executor = base_catalog
-            .get_one::<messaging_outbox::OutboxExecutor>()
+        let outbox_agent = base_catalog
+            .get_one::<messaging_outbox::OutboxAgent>()
             .unwrap();
 
-        outbox_executor.run_while_has_tasks().await?;
+        outbox_agent.run_while_has_tasks().await?;
     }
 
     Ok(response)

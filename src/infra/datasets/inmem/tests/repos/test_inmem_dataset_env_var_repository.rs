@@ -9,7 +9,8 @@
 
 use database_common_macros::database_transactional_test;
 use dill::{Catalog, CatalogBuilder};
-use kamu_datasets_inmem::InMemoryDatasetEnvVarRepository;
+use kamu_accounts_inmem::InMemoryAccountRepository;
+use kamu_datasets_inmem::{InMemoryDatasetEntryRepository, InMemoryDatasetEnvVarRepository};
 use kamu_datasets_repo_tests::dataset_env_var_repo;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -54,6 +55,14 @@ database_transactional_test!(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+database_transactional_test!(
+    storage = inmem,
+    fixture = dataset_env_var_repo::test_delete_all_dataset_env_vars,
+    harness = InMemoryDatasetEnvVarRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 struct InMemoryDatasetEnvVarRepositoryHarness {
     catalog: Catalog,
 }
@@ -61,6 +70,8 @@ struct InMemoryDatasetEnvVarRepositoryHarness {
 impl InMemoryDatasetEnvVarRepositoryHarness {
     pub fn new() -> Self {
         let mut catalog_builder = CatalogBuilder::new();
+        catalog_builder.add::<InMemoryAccountRepository>();
+        catalog_builder.add::<InMemoryDatasetEntryRepository>();
         catalog_builder.add::<InMemoryDatasetEnvVarRepository>();
 
         Self {

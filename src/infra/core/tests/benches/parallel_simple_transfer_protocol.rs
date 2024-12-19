@@ -27,7 +27,6 @@ use kamu::{
     DatasetRegistryRepoBridge,
     DatasetRepositoryLocalFs,
     DatasetRepositoryWriter,
-    DependencyGraphServiceInMemory,
     IpfsGateway,
     RemoteReposDir,
     RemoteRepositoryRegistryImpl,
@@ -35,6 +34,8 @@ use kamu::{
     SyncServiceImpl,
 };
 use kamu_accounts::CurrentAccountSubject;
+use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
+use kamu_datasets_services::DependencyGraphServiceImpl;
 use opendatafabric::*;
 use time_source::SystemTimeSourceDefault;
 use url::Url;
@@ -64,7 +65,8 @@ async fn setup_dataset(
     std::fs::create_dir(&repos_dir).unwrap();
 
     let catalog = dill::CatalogBuilder::new()
-        .add::<DependencyGraphServiceInMemory>()
+        .add::<DependencyGraphServiceImpl>()
+        .add::<InMemoryDatasetDependencyRepository>()
         .add_value(ipfs_gateway)
         .add_value(ipfs_client)
         .add_value(CurrentAccountSubject::new_test())

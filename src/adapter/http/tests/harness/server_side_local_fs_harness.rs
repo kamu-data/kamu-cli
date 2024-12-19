@@ -17,7 +17,6 @@ use internal_error::{InternalError, ResultIntoInternal};
 use kamu::domain::{
     CacheDir,
     CommitDatasetEventUseCase,
-    CompactionService,
     CreateDatasetFromSnapshotUseCase,
     CreateDatasetUseCase,
     DatasetRepository,
@@ -27,21 +26,23 @@ use kamu::domain::{
 use kamu::{
     AppendDatasetMetadataBatchUseCaseImpl,
     CommitDatasetEventUseCaseImpl,
-    CompactionServiceImpl,
+    CompactionExecutorImpl,
+    CompactionPlannerImpl,
     CreateDatasetFromSnapshotUseCaseImpl,
     CreateDatasetUseCaseImpl,
     DatasetLayout,
     DatasetRegistryRepoBridge,
     DatasetRepositoryLocalFs,
     DatasetRepositoryWriter,
-    DependencyGraphServiceInMemory,
     ObjectStoreBuilderLocalFs,
     ObjectStoreRegistryImpl,
     RemoteRepositoryRegistryImpl,
 };
 use kamu_accounts::testing::MockAuthenticationService;
 use kamu_accounts::{Account, AuthenticationService};
-use kamu_core::{DatasetRegistry, TenancyConfig};
+use kamu_core::{CompactionExecutor, CompactionPlanner, DatasetRegistry, TenancyConfig};
+use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
+use kamu_datasets_services::DependencyGraphServiceImpl;
 use messaging_outbox::DummyOutboxImpl;
 use opendatafabric::{AccountName, DatasetAlias, DatasetHandle};
 use tempfile::TempDir;
@@ -102,7 +103,8 @@ impl ServerSideLocalFsHarness {
                 .add::<DummyOutboxImpl>()
                 .add_value(time_source.clone())
                 .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
-                .add::<DependencyGraphServiceInMemory>()
+                .add::<DependencyGraphServiceImpl>()
+                .add::<InMemoryDatasetDependencyRepository>()
                 .add_value(options.tenancy_config)
                 .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
                 .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
@@ -111,7 +113,8 @@ impl ServerSideLocalFsHarness {
                 .add::<DatasetRegistryRepoBridge>()
                 .bind::<dyn AuthenticationService, MockAuthenticationService>()
                 .add_value(ServerUrlConfig::new_test(Some(&base_url_rest)))
-                .add::<CompactionServiceImpl>()
+                .add::<CompactionPlannerImpl>()
+                .add::<CompactionExecutorImpl>()
                 .add::<ObjectStoreRegistryImpl>()
                 .add::<ObjectStoreBuilderLocalFs>()
                 .add::<RemoteRepositoryRegistryImpl>()
@@ -189,9 +192,14 @@ impl ServerSideHarness for ServerSideLocalFsHarness {
             .unwrap()
     }
 
-    fn cli_compaction_service(&self) -> Arc<dyn CompactionService> {
+    fn cli_compaction_planner(&self) -> Arc<dyn CompactionPlanner> {
         let cli_catalog = create_cli_user_catalog(&self.base_catalog);
-        cli_catalog.get_one::<dyn CompactionService>().unwrap()
+        cli_catalog.get_one::<dyn CompactionPlanner>().unwrap()
+    }
+
+    fn cli_compaction_executor(&self) -> Arc<dyn CompactionExecutor> {
+        let cli_catalog = create_cli_user_catalog(&self.base_catalog);
+        cli_catalog.get_one::<dyn CompactionExecutor>().unwrap()
     }
 
     fn api_server_addr(&self) -> String {

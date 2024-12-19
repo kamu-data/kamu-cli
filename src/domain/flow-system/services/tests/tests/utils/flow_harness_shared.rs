@@ -29,10 +29,12 @@ use kamu_accounts_services::{
     PredefinedAccountsRegistrator,
 };
 use kamu_core::*;
+use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
+use kamu_datasets_services::DependencyGraphServiceImpl;
 use kamu_flow_system::*;
 use kamu_flow_system_inmem::*;
 use kamu_flow_system_services::*;
-use kamu_task_system::{TaskProgressMessage, MESSAGE_PRODUCER_KAMU_TASK_EXECUTOR};
+use kamu_task_system::{TaskProgressMessage, MESSAGE_PRODUCER_KAMU_TASK_AGENT};
 use kamu_task_system_inmem::InMemoryTaskEventStore;
 use kamu_task_system_services::TaskSchedulerImpl;
 use messaging_outbox::{register_message_dispatcher, Outbox, OutboxImmediateImpl};
@@ -60,10 +62,9 @@ pub(crate) const SCHEDULING_MANDATORY_THROTTLING_PERIOD_MS: i64 = SCHEDULING_ALI
 pub(crate) struct FlowHarness {
     _tmp_dir: tempfile::TempDir,
     pub catalog: dill::Catalog,
-    pub dataset_repo: Arc<dyn DatasetRepository>,
     pub flow_configuration_service: Arc<dyn FlowConfigurationService>,
     pub flow_configuration_event_store: Arc<dyn FlowConfigurationEventStore>,
-    pub flow_executor: Arc<FlowExecutorImpl>,
+    pub flow_agent: Arc<FlowAgentImpl>,
     pub flow_query_service: Arc<dyn FlowQueryService>,
     pub flow_event_store: Arc<dyn FlowEventStore>,
     pub auth_svc: Arc<dyn AuthenticationService>,
@@ -142,7 +143,7 @@ impl FlowHarness {
             )
             .bind::<dyn Outbox, OutboxImmediateImpl>()
             .add::<FlowSystemTestListener>()
-            .add_value(FlowExecutorConfig::new(
+            .add_value(FlowAgentConfig::new(
                 awaiting_step,
                 mandatory_throttling_period,
             ))
@@ -165,7 +166,8 @@ impl FlowHarness {
             .add_value(JwtAuthenticationConfig::default())
             .add::<AccessTokenServiceImpl>()
             .add::<InMemoryAccessTokenRepository>()
-            .add::<DependencyGraphServiceInMemory>()
+            .add::<DependencyGraphServiceImpl>()
+            .add::<InMemoryDatasetDependencyRepository>()
             .add::<DatasetOwnershipServiceInMemory>()
             .add::<TaskSchedulerImpl>()
             .add::<InMemoryTaskEventStore>()
@@ -180,15 +182,15 @@ impl FlowHarness {
             );
             register_message_dispatcher::<TaskProgressMessage>(
                 &mut b,
-                MESSAGE_PRODUCER_KAMU_TASK_EXECUTOR,
+                MESSAGE_PRODUCER_KAMU_TASK_AGENT,
             );
             register_message_dispatcher::<FlowConfigurationUpdatedMessage>(
                 &mut b,
                 MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE,
             );
-            register_message_dispatcher::<FlowExecutorUpdatedMessage>(
+            register_message_dispatcher::<FlowAgentUpdatedMessage>(
                 &mut b,
-                MESSAGE_PRODUCER_KAMU_FLOW_EXECUTOR,
+                MESSAGE_PRODUCER_KAMU_FLOW_AGENT,
             );
             register_message_dispatcher::<FlowProgressMessage>(
                 &mut b,
@@ -198,25 +200,23 @@ impl FlowHarness {
             b.build()
         };
 
-        let flow_executor = catalog.get_one::<FlowExecutorImpl>().unwrap();
+        let flow_agent = catalog.get_one::<FlowAgentImpl>().unwrap();
         let flow_query_service = catalog.get_one::<dyn FlowQueryService>().unwrap();
         let flow_configuration_service = catalog.get_one::<dyn FlowConfigurationService>().unwrap();
         let flow_configuration_event_store = catalog
             .get_one::<dyn FlowConfigurationEventStore>()
             .unwrap();
         let flow_event_store = catalog.get_one::<dyn FlowEventStore>().unwrap();
-        let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
         let auth_svc = catalog.get_one::<dyn AuthenticationService>().unwrap();
 
         Self {
             _tmp_dir: tmp_dir,
             catalog,
-            flow_executor,
+            flow_agent,
             flow_query_service,
             flow_configuration_service,
             flow_configuration_event_store,
             flow_event_store,
-            dataset_repo,
             fake_system_time_source,
             auth_svc,
         }
@@ -271,8 +271,6 @@ impl FlowHarness {
     }
 
     pub async fn eager_initialization(&self) {
-        self.initialize_dependency_graph().await;
-
         use init_on_startup::InitOnStartup;
         let dataset_ownership_initializer = self
             .catalog
@@ -283,28 +281,10 @@ impl FlowHarness {
             .await
             .unwrap();
 
-        self.flow_executor.run_initialization().await.unwrap();
-    }
-
-    pub async fn initialize_dependency_graph(&self) {
-        let dependency_graph_service = self
-            .catalog
-            .get_one::<dyn DependencyGraphService>()
-            .unwrap();
-        let dependency_graph_repository =
-            DependencyGraphRepositoryInMemory::new(self.dataset_repo.clone());
-
-        dependency_graph_service
-            .eager_initialization(&dependency_graph_repository)
-            .await
-            .unwrap();
+        self.flow_agent.run_initialization().await.unwrap();
     }
 
     pub async fn delete_dataset(&self, dataset_id: &DatasetID) {
-        // Eagerly push dependency graph initialization before deletes.
-        // It's ignored, if requested 2nd time
-        self.initialize_dependency_graph().await;
-
         // Do the actual deletion
         let delete_dataset = self.catalog.get_one::<dyn DeleteDatasetUseCase>().unwrap();
         delete_dataset

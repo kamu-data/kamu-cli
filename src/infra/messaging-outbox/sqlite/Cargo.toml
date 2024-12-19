@@ -36,7 +36,7 @@ sqlx = { version = "0.8", default-features = false, features = [
     "macros",
     "sqlite",
     "chrono",
-    "json"
+    "json",
 ] }
 
 

@@ -24,6 +24,7 @@ doctest = false
 [dependencies]
 # We have only tests in this crate
 
+
 [dev-dependencies]
 kamu-cli-e2e-common = { workspace = true }
 kamu-cli-e2e-repo-tests = { workspace = true }

@@ -12,8 +12,6 @@ Recommendation: for ease of reading, use the following order:
 -->
 
 ## [Unreleased]
-### Added
-- Console warning when deleting datasets which are out of sync with their push remotes
 ### Changed
 - Private Datasets:
   - OSO: using user actors / dateset resources that come from the database
@@ -25,6 +23,42 @@ Recommendation: for ease of reading, use the following order:
   - OSO: added resource storage for access speed
   - E2E: Using the correct account in multi-tenant mode
     - And also the possibility of set it up
+
+## [0.213.1] - 2024-12-18
+### Fixed
+- Removed all occurrences of `DataWriterMetadataState` from telemetry spans (too much pressure)
+
+## [0.213.0] - 2024-12-18
+### Added
+- kamu-adapter-graphql: added macros (`from_catalog_n!()` & `unsafe_from_catalog_n!()`) 
+   that simplify the extraction of components from the DI catalog
+- database-common: the logic for pagination of data processing is generalized in `EntityPageStreamer`
+### Changed
+- Speed up project build time by removing unused dependencies which were not detected by automated tools
+- Extracted "planner" and "executor" for compacting, reset, set watermark, push ingest, partially polling ingest.
+- Renamed long-running "executors" to "agents".
+- Introduced `MetadataQueryService` to absorb simple queries that do not have to be defined at the level of metadata chian from the interface point of view.
+### Fixed
+- `DatasetEnvVar` entity now deletes during deleting `DatasetEntry` entity
+
+## [0.212.0] - 2024-12-11
+### Changed
+- Upgraded to `datafusion v43`
+### Fixed
+- Ingest was sometimes producing Parquet files with non-sequential `offset` column which violated the ODF spec
+
+## [0.211.0] - 2024-12-02
+### Changed
+- Dataset dependency graph is now backed with a database, removing need in dependency scanning at startup.
+
+## [0.210.0] - 2024-11-28
+### Added
+- Console warning when deleting datasets which are out of sync with their push remotes
+### Changed
+- Separated Web UI runtime and UI configuration flags. UI configuration is now provided by API server too.
+### Fixed
+- Typo in feature flags (enableDatasetEnvVarsManagement)
+                                                  ^
 
 ## [0.209.0] - 2024-11-25
 ### Changed
@@ -230,7 +264,7 @@ Introduced `DatasetRegistry` abstraction, encapsulating listing and resolution o
 - Outbox refactoring towards true parallelism via Tokio spaned tasks instead of futures
 ### Fixed
 - Failed flows should still propagate `finishedAt` time
-- Eliminate span.enter, replaced with instrument everywhere
+- Eliminate `span.enter`, replaced with instrument everywhere
 
 ## [0.201.0] - 2024-09-18
 ### Added
@@ -245,7 +279,7 @@ Introduced `DatasetRegistry` abstraction, encapsulating listing and resolution o
 - Revised implementation of flow scheduling to avoid in-memory time wheel:
     - recording `FlowEventScheduledForActivation` event (previously, placement moment into the time wheel)
     - replaced binary heap based time wheel operations with event store queries
-    - Postgres/SQlite event stores additionally track activation time for the waiting flows
+    - Postgres/SQLite event stores additionally track activation time for the waiting flows
     - in-memory event store keeps prepared map-based lookup structures for activation time
 
 ## [0.200.0] - 2024-09-13

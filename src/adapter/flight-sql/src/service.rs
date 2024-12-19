@@ -137,7 +137,7 @@ impl KamuFlightSqlService {
             .map_err(|e| Status::internal(format!("Error: {e}")))
     }
 
-    #[allow(clippy::trivially_copy_pass_by_ref)]
+    #[expect(clippy::trivially_copy_pass_by_ref)]
     fn get_catalogs(
         &self,
         ctx: &SessionContext,
@@ -1201,3 +1201,5 @@ impl FlightSqlService for KamuFlightSqlService {
     #[tracing::instrument(level = "debug", skip_all, fields(%id, ?result))]
     async fn register_sql_info(&self, id: i32, result: &SqlInfo) {}
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

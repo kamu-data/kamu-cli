@@ -49,7 +49,7 @@ base64 = { version = "0.22", default-features = false }
 bytes = "1"
 canonical_json = { version = "0.5.0", default-features = false }
 chrono = { version = "0.4", features = ["serde"] }
-datafusion = { version = "42", default-features = false } # TODO: Currently needed for type conversions but ideally should be encapsulated by kamu-core
+datafusion = { version = "43", default-features = false } # TODO: Currently needed for type conversions but ideally should be encapsulated by kamu-core
 dill = "0.9"
 ed25519-dalek = { version = "2", default-features = false, features = [
     "std",
@@ -75,7 +75,7 @@ serde_json = "1"
 serde_with = { version = "3", default-features = false }
 strum = { version = "0.26", features = ["derive"] }
 tar = "0.4"
-thiserror = { version = "1", default-features = false }
+thiserror = { version = "2", default-features = false, features = ["std"] }
 tokio = { version = "1", default-features = false, features = [] }
 tokio-stream = "0.1"
 tokio-util = { version = "0.7", default-features = false, features = [
@@ -108,6 +108,7 @@ kamu-accounts = { workspace = true, features = ["testing"] }
 kamu-accounts-inmem = { workspace = true }
 kamu-accounts-services = { workspace = true }
 kamu-datasets-services = { workspace = true }
+kamu-datasets-inmem = { workspace = true }
 kamu-ingest-datafusion = { workspace = true }
 messaging-outbox = { workspace = true }
 

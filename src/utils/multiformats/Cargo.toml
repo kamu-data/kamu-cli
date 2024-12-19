@@ -42,7 +42,7 @@ rand = { version = "0.8", default-features = false, features = [
 ] }
 sha3 = { version = "0.10", default-features = false, features = [] }
 serde = { version = "1", default-features = false, features = [] }
-thiserror = { version = "1", default-features = false, features = [] }
+thiserror = { version = "2", default-features = false, features = ["std"] }
 unsigned-varint = { version = "0.8", default-features = false, features = [
     "std",
 ] }

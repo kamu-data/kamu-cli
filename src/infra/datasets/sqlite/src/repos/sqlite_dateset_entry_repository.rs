@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::collections::HashSet;
+use std::sync::Arc;
 
 use database_common::{PaginationOpts, TransactionRef, TransactionRefT};
 use dill::{component, interface};
@@ -20,14 +21,19 @@ use sqlx::Row;
 
 pub struct SqliteDatasetEntryRepository {
     transaction: TransactionRefT<sqlx::Sqlite>,
+    listeners: Vec<Arc<dyn DatasetEntryRemovalListener>>,
 }
 
 #[component(pub)]
 #[interface(dyn DatasetEntryRepository)]
 impl SqliteDatasetEntryRepository {
-    pub fn new(transaction: TransactionRef) -> Self {
+    pub fn new(
+        transaction: TransactionRef,
+        listeners: Vec<Arc<dyn DatasetEntryRemovalListener>>,
+    ) -> Self {
         Self {
             transaction: transaction.into(),
+            listeners,
         }
     }
 }
@@ -382,29 +388,36 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
         &self,
         dataset_id: &DatasetID,
     ) -> Result<(), DeleteEntryDatasetError> {
-        let mut tr = self.transaction.lock().await;
+        {
+            let mut tr = self.transaction.lock().await;
 
-        let connection_mut = tr
-            .connection_mut()
+            let connection_mut = tr
+                .connection_mut()
+                .await
+                .map_err(DeleteEntryDatasetError::Internal)?;
+
+            let stack_dataset_id = dataset_id.as_did_str().to_stack_string();
+            let dataset_id_as_str = stack_dataset_id.as_str();
+            let delete_result = sqlx::query!(
+                r#"
+                DELETE FROM dataset_entries WHERE dataset_id = $1
+                "#,
+                dataset_id_as_str,
+            )
+            .execute(&mut *connection_mut)
             .await
-            .map_err(DeleteEntryDatasetError::Internal)?;
+            .int_err()?;
 
-        let stack_dataset_id = dataset_id.as_did_str().to_stack_string();
-        let dataset_id_as_str = stack_dataset_id.as_str();
-        let delete_result = sqlx::query!(
-            r#"
-            DELETE
-            FROM dataset_entries
-            WHERE dataset_id = $1
-            "#,
-            dataset_id_as_str,
-        )
-        .execute(&mut *connection_mut)
-        .await
-        .int_err()?;
+            if delete_result.rows_affected() == 0 {
+                return Err(DatasetEntryNotFoundError::new(dataset_id.clone()).into());
+            }
+        }
 
-        if delete_result.rows_affected() == 0 {
-            return Err(DatasetEntryNotFoundError::new(dataset_id.clone()).into());
+        for listener in &self.listeners {
+            listener
+                .on_dataset_entry_removed(dataset_id)
+                .await
+                .int_err()?;
         }
 
         Ok(())

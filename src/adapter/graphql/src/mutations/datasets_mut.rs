@@ -25,7 +25,7 @@ pub struct DatasetsMut;
 impl DatasetsMut {
     /// Returns a mutable dataset by its ID
     async fn by_id(&self, ctx: &Context<'_>, dataset_id: DatasetID) -> Result<Option<DatasetMut>> {
-        let dataset_registry = from_catalog::<dyn domain::DatasetRegistry>(ctx).unwrap();
+        let dataset_registry = from_catalog_n!(ctx, dyn domain::DatasetRegistry);
         let hdl = dataset_registry
             .try_resolve_dataset_handle_by_ref(&dataset_id.as_local_ref())
             .await?;
@@ -122,7 +122,7 @@ impl DatasetsMut {
         dataset_visibility: domain::DatasetVisibility,
     ) -> Result<CreateDatasetFromSnapshotResult> {
         let create_from_snapshot =
-            from_catalog::<dyn domain::CreateDatasetFromSnapshotUseCase>(ctx).unwrap();
+            from_catalog_n!(ctx, dyn domain::CreateDatasetFromSnapshotUseCase);
 
         let create_options = CreateDatasetUseCaseOptions { dataset_visibility };
 

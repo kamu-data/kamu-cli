@@ -9,7 +9,7 @@
 
 use chrono::{DateTime, Utc};
 use domain::{DeleteDatasetError, RenameDatasetError};
-use kamu_core::{self as domain, SetWatermarkUseCase};
+use kamu_core::{self as domain, SetWatermarkPlanningError, SetWatermarkUseCase};
 use opendatafabric as odf;
 
 use crate::mutations::{
@@ -70,7 +70,7 @@ impl DatasetMut {
             }));
         }
 
-        let rename_dataset = from_catalog::<dyn domain::RenameDatasetUseCase>(ctx).unwrap();
+        let rename_dataset = from_catalog_n!(ctx, dyn domain::RenameDatasetUseCase);
         match rename_dataset
             .execute(&self.dataset_handle.as_local_ref(), &new_name)
             .await
@@ -97,7 +97,7 @@ impl DatasetMut {
     /// Delete the dataset
     #[graphql(guard = "LoggedInGuard::new()")]
     async fn delete(&self, ctx: &Context<'_>) -> Result<DeleteResult> {
-        let delete_dataset = from_catalog::<dyn domain::DeleteDatasetUseCase>(ctx).unwrap();
+        let delete_dataset = from_catalog_n!(ctx, dyn domain::DeleteDatasetUseCase);
         match delete_dataset
             .execute_via_handle(&self.dataset_handle)
             .await
@@ -132,7 +132,7 @@ impl DatasetMut {
         ctx: &Context<'_>,
         watermark: DateTime<Utc>,
     ) -> Result<SetWatermarkResult> {
-        let set_watermark_use_case = from_catalog::<dyn SetWatermarkUseCase>(ctx).unwrap();
+        let set_watermark_use_case = from_catalog_n!(ctx, dyn SetWatermarkUseCase);
         match set_watermark_use_case
             .execute(&self.dataset_handle, watermark)
             .await
@@ -147,11 +147,11 @@ impl DatasetMut {
                     new_head: new_head.into(),
                 }))
             }
-            Err(e @ domain::SetWatermarkError::IsDerivative) => {
-                Ok(SetWatermarkResult::IsDerivative(SetWatermarkIsDerivative {
-                    message: e.to_string(),
-                }))
-            }
+            Err(
+                e @ domain::SetWatermarkError::Planning(SetWatermarkPlanningError::IsDerivative),
+            ) => Ok(SetWatermarkResult::IsDerivative(SetWatermarkIsDerivative {
+                message: e.to_string(),
+            })),
             Err(e) => Err(e.int_err().into()),
         }
     }

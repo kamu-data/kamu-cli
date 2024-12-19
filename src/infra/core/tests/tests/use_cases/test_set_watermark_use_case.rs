@@ -69,7 +69,7 @@ async fn test_set_watermark_unauthorized() {
 struct SetWatermarkUseCaseHarness {
     base_harness: BaseUseCaseHarness,
     use_case: Arc<dyn SetWatermarkUseCase>,
-    watermark_svc: Arc<dyn WatermarkService>,
+    metadata_query_svc: Arc<dyn MetadataQueryService>,
 }
 
 impl SetWatermarkUseCaseHarness {
@@ -80,17 +80,16 @@ impl SetWatermarkUseCaseHarness {
 
         let catalog = dill::CatalogBuilder::new_chained(base_harness.catalog())
             .add::<SetWatermarkUseCaseImpl>()
-            .add::<WatermarkServiceImpl>()
+            .add::<SetWatermarkPlannerImpl>()
+            .add::<SetWatermarkExecutorImpl>()
             .add::<RemoteAliasesRegistryImpl>()
+            .add::<MetadataQueryServiceImpl>()
             .build();
-
-        let use_case = catalog.get_one().unwrap();
-        let watermark_svc = catalog.get_one().unwrap();
 
         Self {
             base_harness,
-            use_case,
-            watermark_svc,
+            use_case: catalog.get_one().unwrap(),
+            metadata_query_svc: catalog.get_one().unwrap(),
         }
     }
 
@@ -98,7 +97,7 @@ impl SetWatermarkUseCaseHarness {
         &self,
         created_result: &CreateDatasetResult,
     ) -> Option<DateTime<Utc>> {
-        self.watermark_svc
+        self.metadata_query_svc
             .try_get_current_watermark(ResolvedDataset::from(created_result))
             .await
             .unwrap()

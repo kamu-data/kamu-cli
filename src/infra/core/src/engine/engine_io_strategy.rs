@@ -142,7 +142,10 @@ impl EngineIoStrategy for EngineIoStrategyLocalVolume {
             };
 
             let schema_file = {
-                let name = format!("schema-{}", input.dataset_handle.id.as_multibase());
+                // FIXME: The .parquet extension is currently necessary for DataFusion to
+                // respect the single-file output
+                // See: https://github.com/apache/datafusion/issues/13323
+                let name = format!("schema-{}.parquet", input.dataset_handle.id.as_multibase());
                 let host_path = host_in_dir.join(&name);
                 let container_path = container_in_dir.join(&name);
                 write_schema_file(&input.schema, &host_path).await?;
@@ -309,7 +312,10 @@ impl EngineIoStrategy for EngineIoStrategyRemoteProxy {
             };
 
             let schema_file = {
-                let name = format!("schema-{}", input.dataset_handle.id.as_multibase());
+                // FIXME: The .parquet extension is currently necessary for DataFusion to
+                // respect the single-file output
+                // See: https://github.com/apache/datafusion/issues/13323
+                let name = format!("schema-{}.parquet", input.dataset_handle.id.as_multibase());
                 let host_path = host_in_dir.join(&name);
                 let container_path = container_in_dir.join(&name);
                 write_schema_file(&input.schema, &host_path).await?;
@@ -357,6 +363,14 @@ impl EngineIoStrategy for EngineIoStrategyRemoteProxy {
 // TODO: Remove in favor of passing serialized schema
 async fn write_schema_file(schema: &SchemaRef, path: &Path) -> Result<(), InternalError> {
     use datafusion::prelude::*;
+
+    // FIXME: The  extension is currently necessary for DataFusion to
+    // respect the single-file output
+    // See: https://github.com/apache/datafusion/issues/13323
+    assert!(
+        path.extension().is_some(),
+        "Ouput file name must have an extension"
+    );
 
     let ctx = SessionContext::new();
     let df = ctx

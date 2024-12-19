@@ -18,14 +18,13 @@ use crate::utils::{check_logged_account_id_match, check_logged_account_name_matc
 
 pub struct AccountsMut;
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 #[Object]
 impl AccountsMut {
     /// Returns a mutable account by its id
     async fn by_id(&self, ctx: &Context<'_>, account_id: AccountID) -> Result<Option<AccountMut>> {
-        let authentication_service = from_catalog::<dyn AuthenticationService>(ctx).unwrap();
         check_logged_account_id_match(ctx, &account_id)?;
+
+        let authentication_service = from_catalog_n!(ctx, dyn AuthenticationService);
 
         let account_maybe = authentication_service.account_by_id(&account_id).await?;
         Ok(account_maybe.map(AccountMut::new))
@@ -37,8 +36,9 @@ impl AccountsMut {
         ctx: &Context<'_>,
         account_name: AccountName,
     ) -> Result<Option<AccountMut>> {
-        let authentication_service = from_catalog::<dyn AuthenticationService>(ctx).unwrap();
         check_logged_account_name_match(ctx, &account_name)?;
+
+        let authentication_service = from_catalog_n!(ctx, dyn AuthenticationService);
 
         let account_maybe = authentication_service
             .account_by_name(&account_name)
@@ -46,3 +46,5 @@ impl AccountsMut {
         Ok(account_maybe.map(AccountMut::new))
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

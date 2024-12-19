@@ -7,5 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod test_postgres_dataset_dependency_repository;
 mod test_postgres_dataset_entry_repository;
 mod test_postgres_dataset_env_var_repository;

@@ -33,7 +33,7 @@ async-trait = "0.1"
 arrow = { version = "53", default-features = false }
 arrow-json = { version = "53", default-features = false }
 arrow-digest = { version = "53", default-features = false }
-datafusion = { version = "42", default-features = false, features = [
+datafusion = { version = "43", default-features = false, features = [
     "parquet",
     "serde",
 ] }
@@ -41,7 +41,7 @@ digest = "0.10"
 hex = "0.4"
 sha3 = "0.10"
 tracing = { version = "0.1", default-features = false }
-thiserror = { version = "1", default-features = false }
+thiserror = { version = "2", default-features = false, features = ["std"] }
 url = "2"
 serde = { version = "1", default-features = false }
 serde_json = { version = "1" }

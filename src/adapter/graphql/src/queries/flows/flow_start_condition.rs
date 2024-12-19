@@ -35,8 +35,7 @@ impl FlowStartCondition {
             }),
             fs::FlowStartCondition::Throttling(t) => Self::Throttling((*t).into()),
             fs::FlowStartCondition::Batching(b) => {
-                let dataset_changes_service =
-                    from_catalog::<dyn DatasetChangesService>(ctx).unwrap();
+                let dataset_changes_service = from_catalog_n!(ctx, dyn DatasetChangesService);
 
                 // Start from zero increment
                 let mut total_increment = DatasetIntervalIncrement::default();

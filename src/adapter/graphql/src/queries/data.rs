@@ -42,12 +42,12 @@ impl DataQueries {
             "Query",
         );
 
+        let query_svc = from_catalog_n!(ctx, dyn domain::QueryService);
+
         // TODO: Default to JsonSoA format once implemented
         let data_format = data_format.unwrap_or(DataBatchFormat::Json);
         let schema_format = schema_format.unwrap_or(DataSchemaFormat::Parquet);
         let limit = limit.unwrap_or(Self::DEFAULT_QUERY_LIMIT);
-
-        let query_svc = from_catalog::<dyn domain::QueryService>(ctx).unwrap();
 
         let query_result = match query_dialect {
             QueryDialect::SqlDataFusion => {
@@ -88,7 +88,7 @@ impl DataQueries {
 
     /// Lists engines known to the system and recommended for use
     async fn known_engines(&self, ctx: &Context<'_>) -> Result<Vec<EngineDesc>> {
-        let query_svc = from_catalog::<dyn domain::QueryService>(ctx).unwrap();
+        let query_svc = from_catalog_n!(ctx, dyn domain::QueryService);
         Ok(query_svc
             .get_known_engines()
             .await?

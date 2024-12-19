@@ -10,20 +10,17 @@
 use std::sync::Arc;
 
 use dill::Catalog;
-use kamu::{
-    TransformElaborationServiceImpl,
-    TransformExecutionServiceImpl,
-    TransformRequestPlannerImpl,
-};
+use kamu::{TransformElaborationServiceImpl, TransformExecutorImpl, TransformRequestPlannerImpl};
 use kamu_core::{
-    CompactionService,
+    CompactionExecutor,
+    CompactionPlanner,
     CreateDatasetResult,
     DatasetRegistry,
     EngineProvisioner,
     ResolvedDataset,
     TransformElaboration,
     TransformElaborationService,
-    TransformExecutionService,
+    TransformExecutor,
     TransformOptions,
     TransformRequestPlanner,
     TransformResult,
@@ -36,14 +33,15 @@ use time_source::SystemTimeSource;
 pub struct TransformTestHelper {
     transform_request_planner: Arc<dyn TransformRequestPlanner>,
     transform_elab_svc: Arc<dyn TransformElaborationService>,
-    transform_exec_svc: Arc<dyn TransformExecutionService>,
+    transform_executor: Arc<dyn TransformExecutor>,
 }
 
 impl TransformTestHelper {
     pub fn build(
         dataset_registry: Arc<dyn DatasetRegistry>,
         system_time_source: Arc<dyn SystemTimeSource>,
-        compaction_svc: Arc<dyn CompactionService>,
+        compaction_planner: Arc<dyn CompactionPlanner>,
+        compaction_executor: Arc<dyn CompactionExecutor>,
         engine_provisioner: Arc<dyn EngineProvisioner>,
     ) -> Self {
         Self {
@@ -52,10 +50,11 @@ impl TransformTestHelper {
                 system_time_source.clone(),
             )),
             transform_elab_svc: Arc::new(TransformElaborationServiceImpl::new(
-                compaction_svc,
+                compaction_planner,
+                compaction_executor,
                 system_time_source,
             )),
-            transform_exec_svc: Arc::new(TransformExecutionServiceImpl::new(engine_provisioner)),
+            transform_executor: Arc::new(TransformExecutorImpl::new(engine_provisioner)),
         }
     }
 
@@ -63,7 +62,7 @@ impl TransformTestHelper {
         Self {
             transform_request_planner: catalog.get_one().unwrap(),
             transform_elab_svc: catalog.get_one().unwrap(),
-            transform_exec_svc: catalog.get_one().unwrap(),
+            transform_executor: catalog.get_one().unwrap(),
         }
     }
 
@@ -91,7 +90,7 @@ impl TransformTestHelper {
             TransformElaboration::UpToDate => return TransformResult::UpToDate,
         };
 
-        self.transform_exec_svc
+        self.transform_executor
             .execute_transform(deriv_target, plan, None)
             .await
             .1
@@ -110,7 +109,7 @@ impl TransformTestHelper {
             .await
             .map_err(VerifyTransformError::Plan)?;
 
-        self.transform_exec_svc
+        self.transform_executor
             .execute_verify_transform(deriv_target, verify_plan, None)
             .await
             .map_err(VerifyTransformError::Execute)

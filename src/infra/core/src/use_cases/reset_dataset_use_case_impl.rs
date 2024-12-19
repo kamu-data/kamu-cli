@@ -11,7 +11,14 @@ use std::sync::Arc;
 
 use dill::{component, interface};
 use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer};
-use kamu_core::{DatasetRegistry, ResetDatasetUseCase, ResetError, ResetService};
+use kamu_core::{
+    DatasetRegistry,
+    ResetDatasetUseCase,
+    ResetError,
+    ResetExecutor,
+    ResetPlanner,
+    ResetResult,
+};
 use opendatafabric::{DatasetHandle, Multihash};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -19,19 +26,22 @@ use opendatafabric::{DatasetHandle, Multihash};
 #[component(pub)]
 #[interface(dyn ResetDatasetUseCase)]
 pub struct ResetDatasetUseCaseImpl {
-    reset_service: Arc<dyn ResetService>,
+    reset_planner: Arc<dyn ResetPlanner>,
+    reset_executor: Arc<dyn ResetExecutor>,
     dataset_registry: Arc<dyn DatasetRegistry>,
     dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
 }
 
 impl ResetDatasetUseCaseImpl {
     pub fn new(
-        reset_service: Arc<dyn ResetService>,
+        reset_planner: Arc<dyn ResetPlanner>,
+        reset_executor: Arc<dyn ResetExecutor>,
         dataset_registry: Arc<dyn DatasetRegistry>,
         dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
     ) -> Self {
         Self {
-            reset_service,
+            reset_planner,
+            reset_executor,
             dataset_registry,
             dataset_action_authorizer,
         }
@@ -51,19 +61,25 @@ impl ResetDatasetUseCase for ResetDatasetUseCaseImpl {
         dataset_handle: &DatasetHandle,
         maybe_new_head: Option<&Multihash>,
         maybe_old_head: Option<&Multihash>,
-    ) -> Result<Multihash, ResetError> {
+    ) -> Result<ResetResult, ResetError> {
         // Permission check
         self.dataset_action_authorizer
             .check_action_allowed(dataset_handle, DatasetAction::Write)
             .await?;
 
         // Resolve dataset
-        let resolved_dataset = self.dataset_registry.get_dataset_by_handle(dataset_handle);
+        let target = self.dataset_registry.get_dataset_by_handle(dataset_handle);
 
-        // Actual action
-        self.reset_service
-            .reset_dataset(resolved_dataset, maybe_new_head, maybe_old_head)
-            .await
+        // Make a plan
+        let reset_plan = self
+            .reset_planner
+            .plan_reset(target.clone(), maybe_new_head, maybe_old_head)
+            .await?;
+
+        // Execute the plan
+        let reset_result = self.reset_executor.execute(target, reset_plan).await?;
+
+        Ok(reset_result)
     }
 }
 

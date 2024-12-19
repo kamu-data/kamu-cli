@@ -26,7 +26,8 @@ use crate::OutputConfig;
 pub struct IngestCommand {
     data_format_reg: Arc<dyn DataFormatRegistry>,
     dataset_registry: Arc<dyn DatasetRegistry>,
-    push_ingest_svc: Arc<dyn PushIngestService>,
+    push_ingest_planner: Arc<dyn PushIngestPlanner>,
+    push_ingest_executor: Arc<dyn PushIngestExecutor>,
     output_config: Arc<OutputConfig>,
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
     dataset_ref: DatasetRef,
@@ -42,7 +43,8 @@ impl IngestCommand {
     pub fn new<I, S>(
         data_format_reg: Arc<dyn DataFormatRegistry>,
         dataset_registry: Arc<dyn DatasetRegistry>,
-        push_ingest_svc: Arc<dyn PushIngestService>,
+        push_ingest_planner: Arc<dyn PushIngestPlanner>,
+        push_ingest_executor: Arc<dyn PushIngestExecutor>,
         output_config: Arc<OutputConfig>,
         remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
         dataset_ref: DatasetRef,
@@ -60,7 +62,8 @@ impl IngestCommand {
         Self {
             data_format_reg,
             dataset_registry,
-            push_ingest_svc,
+            push_ingest_planner,
+            push_ingest_executor,
             output_config,
             remote_alias_reg,
             dataset_ref,
@@ -191,20 +194,25 @@ impl Command for IngestCommand {
 
         let mut updated = 0;
         for url in urls {
-            let result = self
-                .push_ingest_svc
-                .ingest_from_url(
-                    self.dataset_registry.get_dataset_by_handle(&dataset_handle),
+            let target = self.dataset_registry.get_dataset_by_handle(&dataset_handle);
+            let plan = self
+                .push_ingest_planner
+                .plan_ingest(
+                    target.clone(),
                     self.source_name.as_deref(),
-                    url,
                     PushIngestOpts {
                         media_type: self.get_media_type()?,
                         source_event_time,
                         auto_create_push_source: false,
                         schema_inference: SchemaInferenceOpts::default(),
                     },
-                    listener.clone(),
                 )
+                .await
+                .map_err(CLIError::failure)?;
+
+            let result = self
+                .push_ingest_executor
+                .ingest_from_url(target, plan, url, listener.clone())
                 .await
                 .map_err(CLIError::failure)?;
 

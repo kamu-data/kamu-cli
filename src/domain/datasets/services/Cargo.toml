@@ -37,8 +37,12 @@ async-trait = { version = "0.1", default-features = false }
 chrono = { version = "0.4", default-features = false }
 dill = "0.9"
 futures = { version = "0.3", default-features = false }
+petgraph = { version = "0.6", default-features = false, features = [
+    "stable_graph",
+] }
 secrecy = "0.10"
 tokio = { version = "1", default-features = false }
+tokio-stream = { version = "0.1", default-features = false }
 tracing = { version = "0.1", default-features = false }
 uuid = { version = "1", default-features = false }
 
@@ -49,7 +53,10 @@ kamu-accounts = { workspace = true, features = ["testing"] }
 kamu-accounts-inmem = { workspace = true }
 kamu-core = { workspace = true, features = ["testing"] }
 kamu-datasets = { workspace = true, features = ["testing"] }
+kamu-datasets-inmem = { workspace = true }
 
+indoc = "2"
 mockall = "0.13"
+oop = "0.0.2"
 pretty_assertions = { version = "1" }
 test-log = { version = "0.2", features = ["trace"] }

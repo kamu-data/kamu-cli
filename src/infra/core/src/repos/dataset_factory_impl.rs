@@ -220,7 +220,7 @@ impl DatasetFactoryImpl {
     }
 
     async fn resolve_ipns_dnslink(&self, domain: &str) -> Result<String, InternalError> {
-        let r = trust_dns_resolver::TokioAsyncResolver::tokio_from_system_conf().int_err()?;
+        let r = hickory_resolver::TokioAsyncResolver::tokio_from_system_conf().int_err()?;
         let query = format!("_dnslink.{domain}");
         let result = r.txt_lookup(&query).await.int_err()?;
 

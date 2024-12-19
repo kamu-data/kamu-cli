@@ -45,7 +45,7 @@ rand = "0.8"
 reusable = "0.1"
 serde = "1"
 serde_with = { version = "3", default-features = false }
-thiserror = { version = "1", default-features = false }
+thiserror = { version = "2", default-features = false, features = ["std"] }
 uuid = { version = "1", default-features = false, features = ["v4"] }
 
 # Optional

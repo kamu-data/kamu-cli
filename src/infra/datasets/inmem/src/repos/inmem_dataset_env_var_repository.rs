@@ -13,6 +13,7 @@ use std::sync::{Arc, Mutex};
 
 use database_common::PaginationOpts;
 use dill::*;
+use internal_error::InternalError;
 use opendatafabric::DatasetID;
 use uuid::Uuid;
 
@@ -47,6 +48,7 @@ impl State {
 
 #[component(pub)]
 #[interface(dyn DatasetEnvVarRepository)]
+#[interface(dyn DatasetEntryRemovalListener)]
 #[scope(Singleton)]
 impl InMemoryDatasetEnvVarRepository {
     pub fn new() -> Self {
@@ -226,5 +228,24 @@ impl DatasetEnvVarRepository for InMemoryDatasetEnvVarRepository {
                 dataset_env_var_key: dataset_env_var_id.to_string(),
             },
         ));
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait::async_trait]
+impl DatasetEntryRemovalListener for InMemoryDatasetEnvVarRepository {
+    async fn on_dataset_entry_removed(&self, dataset_id: &DatasetID) -> Result<(), InternalError> {
+        let mut guard = self.state.lock().unwrap();
+
+        if let Some(env_var_ids) = guard.dataset_env_var_ids_by_dataset_id.remove(dataset_id) {
+            for env_var_id in env_var_ids {
+                if let Some(env_var) = guard.dataset_env_vars_by_ids.remove(&env_var_id) {
+                    guard.dataset_env_var_ids_by_keys.remove(&env_var.key);
+                }
+            }
+        }
+
+        Ok(())
     }
 }
