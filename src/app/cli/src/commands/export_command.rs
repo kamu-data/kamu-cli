@@ -21,7 +21,7 @@ pub struct ExportCommand {
     export_service: Arc<dyn ExportService>,
     query_service: Arc<dyn QueryService>,
     dataset_ref: DatasetRef,
-    output_path: PathBuf,
+    output_path: Option<PathBuf>,
     output_format: String,
     partition_size: Option<usize>,
     quiet: bool,
@@ -32,7 +32,7 @@ impl ExportCommand {
         export_service: Arc<dyn ExportService>,
         query_service: Arc<dyn QueryService>,
         dataset_ref: DatasetRef,
-        output_path: PathBuf,
+        output_path: Option<PathBuf>,
         output_format: String,
         partition_size: Option<usize>,
         quiet: bool,
@@ -72,9 +72,18 @@ impl Command for ExportCommand {
             .await
             .map_err(CLIError::failure)?;
 
+        let mut default_path: PathBuf = PathBuf::new();
+        default_path.push(self.dataset_ref.to_string());
+        default_path.push(""); // ensure trailing slash to have it as a dir
+
+        let output_path = match self.output_path {
+            Some(ref path) => path,
+            None => &default_path,
+        };
+
         let rows_exported = self
             .export_service
-            .export_to_fs(df, &self.output_path, format, self.partition_size)
+            .export_to_fs(df, output_path, format, self.partition_size)
             .await?;
 
         if !self.quiet {
