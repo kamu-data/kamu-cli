@@ -11,6 +11,10 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Unreleased]
+### Added
+- New `kamu system decode` command that can decode an arbitrary block file for debugging
+
 ## [0.213.1] - 2024-12-18
 ### Fixed
 - Removed all occurrences of `DataWriterMetadataState` from telemetry spans (too much pressure)

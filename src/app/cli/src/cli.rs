@@ -1266,6 +1266,7 @@ pub enum SystemSubCommand {
     ApiServer(SystemApiServer),
     Compact(SystemCompact),
     DebugToken(SystemDebugToken),
+    Decode(SystemDecode),
     Diagnose(SystemDiagnose),
     E2e(SystemE2e),
     GenerateToken(SystemGenerateToken),
@@ -1391,6 +1392,20 @@ pub struct SystemDebugToken {
     /// Access token
     #[arg()]
     pub token: String,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Decode a manifest file
+#[derive(Debug, clap::Args)]
+pub struct SystemDecode {
+    /// Manifest reference (path, or URL)
+    #[arg()]
+    pub manifest: Option<String>,
+
+    /// Read manifests from standard input
+    #[arg(long)]
+    pub stdin: bool,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -453,6 +453,9 @@ pub fn get_command(
             cli::SystemSubCommand::DebugToken(sc) => {
                 Box::new(DebugTokenCommand::new(cli_catalog.get_one()?, sc.token))
             }
+            cli::SystemSubCommand::Decode(sc) => {
+                Box::new(SystemDecodeCommand::new(sc.manifest, sc.stdin))
+            }
             cli::SystemSubCommand::E2e(sc) => Box::new(SystemE2ECommand::new(
                 sc.action,
                 sc.dataset,

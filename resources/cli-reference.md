@@ -1119,6 +1119,7 @@ Command group for system-level functionality
 * `api-server` — Run HTTP + GraphQL server
 * `compact` — Compact a dataset
 * `debug-token` — Validate a Kamu token
+* `decode` — Decode a manifest file
 * `diagnose` — Run basic system diagnose check
 * `generate-token` — Generate a platform token from a known secret for debugging
 * `gc` — Runs garbage collection to clean up cached and unreachable objects in the workspace
@@ -1235,6 +1236,22 @@ Validate a Kamu token
 **Arguments:**
 
 * `<TOKEN>` — Access token
+
+
+
+## `kamu system decode`
+
+Decode a manifest file
+
+**Usage:** `kamu system decode [OPTIONS] [MANIFEST]`
+
+**Arguments:**
+
+* `<MANIFEST>` — Manifest reference (path, or URL)
+
+**Options:**
+
+* `--stdin` — Read manifests from standard input
 
 
 
