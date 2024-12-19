@@ -83,7 +83,7 @@ async fn test_rebac_properties_added() {
                 .get_dataset_properties(&public_dataset_id)
                 .await,
             Ok(DatasetProperties {
-                allows_anonymous_read: false,
+                allows_anonymous_read: true,
                 allows_public_read: true
             })
         );
@@ -129,7 +129,7 @@ async fn test_rebac_properties_deleted() {
                 .get_dataset_properties(&dataset_id)
                 .await,
             Ok(DatasetProperties {
-                allows_anonymous_read: false,
+                allows_anonymous_read: true,
                 allows_public_read: true
             })
         );

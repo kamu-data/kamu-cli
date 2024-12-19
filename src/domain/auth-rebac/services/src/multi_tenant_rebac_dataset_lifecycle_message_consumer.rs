@@ -57,7 +57,7 @@ impl MultiTenantRebacDatasetLifecycleMessageConsumer {
         for (name, value) in [
             DatasetPropertyName::allows_public_read(allows),
             // TODO: Private Datasets: Read from a specific environment's config
-            DatasetPropertyName::allows_anonymous_read(false),
+            DatasetPropertyName::allows_anonymous_read(allows),
         ] {
             self.rebac_service
                 .set_dataset_property(&message.dataset_id, name, &value)

@@ -131,21 +131,16 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
             is_e2e_testing,
         );
 
-        if workspace_svc.is_in_workspace() {
-            // TODO: Private Datasets: recheck after merge
-            //         // NOTE: Register DatasetEntryIndexer in DI, since it is referenced by other
-            //         //       components (via InitOnStartup)
-            //         // TODO: PERF: Do not register InitOnStartup-components if we are not inside the
-            //         //       workspace
-            //         base_catalog_builder.add_builder(
-            //             kamu_datasets_services::DatasetEntryIndexer::builder()
-            //                 .with_is_in_workspace(workspace_svc.is_in_workspace()),
-            //         );
-            //         // The indexer has no other interfaces
-            //         base_catalog_builder
-            //             .bind::<dyn InitOnStartup, kamu_datasets_services::DatasetEntryIndexer>();
+        // TODO: Use SQLite database in single-tenant
+        //       https://github.com/kamu-data/kamu-cli/issues/981
+        //
+        //       After implementing this ticket, we need to use "is_init_command"
+        //       not "init_multi_tenant_workspace" here
+        let is_indexing_needed = init_multi_tenant_workspace || workspace_svc.is_in_workspace();
+        if is_indexing_needed {
             base_catalog_builder.add::<kamu_datasets_services::DatasetEntryIndexer>();
             base_catalog_builder.add::<kamu_datasets_services::DependencyGraphIndexer>();
+            base_catalog_builder.add::<kamu_auth_rebac_services::RebacIndexer>();
         }
 
         base_catalog_builder.add_value(JwtAuthenticationConfig::load_from_env());
@@ -485,14 +480,14 @@ pub fn configure_base_catalog(
     b.add::<odf_server::AccessTokenRegistryService>();
     b.add::<odf_server::CLIAccessTokenStore>();
 
-    kamu_auth_rebac_services::register_dependencies(&mut b, tenancy_config);
-
     kamu_adapter_auth_oso_rebac::register_dependencies(&mut b);
 
     b.add::<DatabaseTransactionRunner>();
 
+    b.add::<kamu_auth_rebac_services::RebacServiceImpl>();
+
     if tenancy_config == TenancyConfig::MultiTenant {
-        b.add::<MultiTenantRebacDatasetLifecycleMessageConsumer>();
+        b.add::<kamu_auth_rebac_services::MultiTenantRebacDatasetLifecycleMessageConsumer>();
     }
 
     b.add::<kamu_datasets_services::DatasetEntryServiceImpl>();

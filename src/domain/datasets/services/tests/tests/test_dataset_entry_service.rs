@@ -210,7 +210,7 @@ impl DatasetEntryServiceHarness {
             let mut b = CatalogBuilder::new();
 
             b.add::<DatasetEntryServiceImpl>();
-            b.add_builder(DatasetEntryIndexer::builder().with_is_in_workspace(true));
+            b.add::<DatasetEntryIndexer>();
 
             b.add_value(mock_dataset_entry_repository);
             b.bind::<dyn DatasetEntryRepository, MockDatasetEntryRepository>();

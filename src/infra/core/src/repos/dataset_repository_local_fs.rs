@@ -465,6 +465,11 @@ impl DatasetStorageStrategy for DatasetSingleTenantStorageStrategy {
 
     fn get_all_datasets(&self) -> DatasetHandleStream<'_> {
         Box::pin(async_stream::try_stream! {
+            // While creating a workspace, the directory has not yet been created
+            if !self.root.exists() {
+                return;
+            }
+
             let read_dataset_dir = std::fs::read_dir(&self.root).int_err()?;
 
             for r_dataset_dir in read_dataset_dir {
@@ -749,6 +754,11 @@ impl DatasetStorageStrategy for DatasetMultiTenantStorageStrategy {
 
     fn get_all_datasets(&self) -> DatasetHandleStream<'_> {
         Box::pin(async_stream::try_stream! {
+            // While creating a workspace, the directory has not yet been created
+            if !self.root.exists() {
+                return;
+            }
+
             let read_account_dir = std::fs::read_dir(&self.root).int_err()?;
 
             for r_account_dir in read_account_dir {
