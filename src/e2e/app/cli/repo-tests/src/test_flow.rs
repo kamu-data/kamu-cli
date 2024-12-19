@@ -115,7 +115,7 @@ pub async fn test_gql_dataset_all_flows_paused(mut kamu_api_server_client: KamuA
                   datasets {
                     byId(datasetId: $datasetId) {
                       flows {
-                        configs {
+                        triggers {
                           allPaused
                           __typename
                         }
@@ -140,8 +140,8 @@ pub async fn test_gql_dataset_all_flows_paused(mut kamu_api_server_client: KamuA
                       "__typename": "Dataset",
                       "flows": {
                         "__typename": "DatasetFlows",
-                        "configs": {
-                          "__typename": "DatasetFlowConfigs",
+                        "triggers": {
+                          "__typename": "DatasetFlowTriggers",
                           "allPaused": true
                         }
                       }
@@ -417,7 +417,7 @@ pub async fn test_gql_dataset_trigger_flow(mut kamu_api_server_client: KamuApiSe
                       __typename
                     }
                     ... on FlowStartConditionBatching {
-                      activeTransformRule {
+                      activeBatchingRule {
                         minRecordsToAwait
                         maxBatchingInterval {
                           ...TimeDeltaData
@@ -441,17 +441,6 @@ pub async fn test_gql_dataset_trigger_flow(mut kamu_api_server_client: KamuApiSe
                   }
                   configSnapshot {
                     ... on FlowConfigurationIngest {
-                      schedule {
-                        ... on TimeDelta {
-                          ...TimeDeltaData
-                          __typename
-                        }
-                        ... on Cron5ComponentExpression {
-                          cron5ComponentExpression
-                          __typename
-                        }
-                        __typename
-                      }
                       fetchUncacheable
                       __typename
                     }
@@ -1469,7 +1458,7 @@ fn get_dataset_list_flows_query(dataset_id: &odf::DatasetID) -> String {
               __typename
             }
             ... on FlowStartConditionBatching {
-              activeTransformRule {
+              activeBatchingRule {
                 minRecordsToAwait
                 maxBatchingInterval {
                   ...TimeDeltaData
@@ -1493,17 +1482,6 @@ fn get_dataset_list_flows_query(dataset_id: &odf::DatasetID) -> String {
           }
           configSnapshot {
             ... on FlowConfigurationIngest {
-              schedule {
-                ... on TimeDelta {
-                  ...TimeDeltaData
-                  __typename
-                }
-                ... on Cron5ComponentExpression {
-                  cron5ComponentExpression
-                  __typename
-                }
-                __typename
-              }
               fetchUncacheable
               __typename
             }

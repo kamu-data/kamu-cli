@@ -9,6 +9,7 @@
 
 mod test_flow_agent_impl;
 mod test_flow_configuration_service_impl;
+mod test_flow_trigger_service_impl;
 
 mod utils;
 pub(crate) use utils::*;

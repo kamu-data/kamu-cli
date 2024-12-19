@@ -8,22 +8,21 @@
 // by the Apache License, Version 2.0.
 
 use chrono::Utc;
-use fs::FlowConfigurationService;
 use kamu_accounts::Account;
 use kamu_core::DatasetOwnershipService;
-use kamu_flow_system as fs;
+use kamu_flow_system::FlowTriggerService;
 use opendatafabric::DatasetID;
 
 use crate::prelude::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct AccountFlowConfigsMut {
+pub struct AccountFlowTriggersMut {
     account: Account,
 }
 
 #[Object]
-impl AccountFlowConfigsMut {
+impl AccountFlowTriggersMut {
     #[graphql(skip)]
     pub fn new(account: Account) -> Self {
         Self { account }
@@ -40,11 +39,11 @@ impl AccountFlowConfigsMut {
     }
 
     async fn resume_account_dataset_flows(&self, ctx: &Context<'_>) -> Result<bool> {
-        let flow_config_service = from_catalog_n!(ctx, dyn FlowConfigurationService);
+        let flow_trigger_service = from_catalog_n!(ctx, dyn FlowTriggerService);
 
         let account_dataset_ids = self.get_account_dataset_ids(ctx).await?;
         for dataset_id in &account_dataset_ids {
-            flow_config_service
+            flow_trigger_service
                 .resume_dataset_flows(Utc::now(), dataset_id, None)
                 .await
                 .int_err()?;
@@ -54,11 +53,11 @@ impl AccountFlowConfigsMut {
     }
 
     async fn pause_account_dataset_flows(&self, ctx: &Context<'_>) -> Result<bool> {
-        let flow_config_service = from_catalog_n!(ctx, dyn FlowConfigurationService);
+        let flow_trigger_service = from_catalog_n!(ctx, dyn FlowTriggerService);
 
         let account_dataset_ids = self.get_account_dataset_ids(ctx).await?;
         for dataset_id in &account_dataset_ids {
-            flow_config_service
+            flow_trigger_service
                 .pause_dataset_flows(Utc::now(), dataset_id, None)
                 .await
                 .int_err()?;

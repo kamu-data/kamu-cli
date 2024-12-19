@@ -39,7 +39,7 @@ sqlx = { version = "0.8", default-features = false, features = [
     "postgres",
     "chrono"
 ] }
-
+tracing = { version = "0.1", default-features = false }
 
 [dev-dependencies]
 database-common-macros = { workspace = true }

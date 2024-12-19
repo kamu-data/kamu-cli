@@ -11,7 +11,7 @@ use chrono::{DateTime, Duration, Utc};
 use kamu_task_system::TaskID;
 use serde::{Deserialize, Serialize};
 
-use crate::TransformRule;
+use crate::BatchingRule;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -55,7 +55,7 @@ pub struct FlowStartConditionThrottling {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FlowStartConditionBatching {
-    pub active_transform_rule: TransformRule,
+    pub active_batching_rule: BatchingRule,
     pub batching_deadline: DateTime<Utc>,
 }
 

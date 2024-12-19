@@ -9,3 +9,4 @@
 
 mod test_sqlite_flow_configuration_event_store;
 mod test_sqlite_flow_event_store;
+mod test_sqlite_flow_trigger_event_store;

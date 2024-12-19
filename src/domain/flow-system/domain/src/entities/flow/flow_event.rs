@@ -22,6 +22,8 @@ pub enum FlowEvent {
     Initiated(FlowEventInitiated),
     /// Start condition updated
     StartConditionUpdated(FlowEventStartConditionUpdated),
+    /// Config snapshot modified
+    ConfigSnapshotModified(FlowConfigSnapshotModified),
     /// Secondary trigger added
     TriggerAdded(FlowEventTriggerAdded),
     /// Scheduled for activation at a particular time
@@ -41,6 +43,7 @@ impl FlowEvent {
         match self {
             FlowEvent::Initiated(_) => "FlowEventInitiated",
             FlowEvent::StartConditionUpdated(_) => "FlowEventStartConditionUpdated",
+            FlowEvent::ConfigSnapshotModified(_) => "FlowEventConfigSnapshotModified",
             FlowEvent::TriggerAdded(_) => "FlowEventTriggerAdded",
             FlowEvent::ScheduledForActivation(_) => "FlowEventScheduledForActivation",
             FlowEvent::TaskScheduled(_) => "FlowEventTaskScheduled",
@@ -58,8 +61,8 @@ pub struct FlowEventInitiated {
     pub event_time: DateTime<Utc>,
     pub flow_id: FlowID,
     pub flow_key: FlowKey,
-    pub trigger: FlowTrigger,
-    pub config_snapshot: Option<FlowConfigurationSnapshot>,
+    pub trigger: FlowTriggerType,
+    pub config_snapshot: Option<FlowConfigurationRule>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -78,7 +81,16 @@ pub struct FlowEventStartConditionUpdated {
 pub struct FlowEventTriggerAdded {
     pub event_time: DateTime<Utc>,
     pub flow_id: FlowID,
-    pub trigger: FlowTrigger,
+    pub trigger: FlowTriggerType,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FlowConfigSnapshotModified {
+    pub event_time: DateTime<Utc>,
+    pub flow_id: FlowID,
+    pub config_snapshot: FlowConfigurationRule,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -133,6 +145,7 @@ impl FlowEvent {
         match self {
             FlowEvent::Initiated(e) => e.flow_id,
             FlowEvent::StartConditionUpdated(e) => e.flow_id,
+            FlowEvent::ConfigSnapshotModified(e) => e.flow_id,
             FlowEvent::TriggerAdded(e) => e.flow_id,
             FlowEvent::ScheduledForActivation(e) => e.flow_id,
             FlowEvent::TaskScheduled(e) => e.flow_id,
@@ -146,6 +159,7 @@ impl FlowEvent {
         match self {
             FlowEvent::Initiated(e) => e.event_time,
             FlowEvent::StartConditionUpdated(e) => e.event_time,
+            FlowEvent::ConfigSnapshotModified(e) => e.event_time,
             FlowEvent::TriggerAdded(e) => e.event_time,
             FlowEvent::ScheduledForActivation(e) => e.event_time,
             FlowEvent::TaskScheduled(e) => e.event_time,
@@ -159,6 +173,7 @@ impl FlowEvent {
         match self {
             FlowEvent::Initiated(_) => Some(FlowStatus::Waiting),
             FlowEvent::StartConditionUpdated(_)
+            | FlowEvent::ConfigSnapshotModified(_)
             | FlowEvent::TriggerAdded(_)
             | FlowEvent::ScheduledForActivation(_)
             | FlowEvent::TaskScheduled(_) => None,
@@ -173,6 +188,9 @@ impl_enum_with_variants!(FlowEvent);
 impl_enum_variant!(FlowEvent::Initiated(FlowEventInitiated));
 impl_enum_variant!(FlowEvent::StartConditionUpdated(
     FlowEventStartConditionUpdated
+));
+impl_enum_variant!(FlowEvent::ConfigSnapshotModified(
+    FlowConfigSnapshotModified
 ));
 impl_enum_variant!(FlowEvent::TriggerAdded(FlowEventTriggerAdded));
 impl_enum_variant!(FlowEvent::ScheduledForActivation(
