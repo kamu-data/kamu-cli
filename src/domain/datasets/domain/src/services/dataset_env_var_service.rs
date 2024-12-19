@@ -17,20 +17,19 @@ use crate::{
     DatasetEnvVarValue,
     DeleteDatasetEnvVarError,
     GetDatasetEnvVarError,
-    ModifyDatasetEnvVarError,
-    SaveDatasetEnvVarError,
+    UpsertDatasetEnvVarStatus,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 pub trait DatasetEnvVarService: Sync + Send {
-    async fn create_dataset_env_var(
+    async fn upsert_dataset_env_var(
         &self,
         dataset_env_var_key: &str,
         dataset_env_var_value: &DatasetEnvVarValue,
         dataset_id: &DatasetID,
-    ) -> Result<DatasetEnvVar, SaveDatasetEnvVarError>;
+    ) -> Result<DatasetEnvVarUpsertResult, InternalError>;
 
     async fn get_dataset_env_var_by_id(
         &self,
@@ -52,12 +51,6 @@ pub trait DatasetEnvVarService: Sync + Send {
         &self,
         dataset_env_var_id: &Uuid,
     ) -> Result<(), DeleteDatasetEnvVarError>;
-
-    async fn modify_dataset_env_var(
-        &self,
-        dataset_env_var_id: &Uuid,
-        dataset_env_var_new_value: &DatasetEnvVarValue,
-    ) -> Result<(), ModifyDatasetEnvVarError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -65,6 +58,11 @@ pub trait DatasetEnvVarService: Sync + Send {
 pub struct DatasetEnvVarListing {
     pub list: Vec<DatasetEnvVar>,
     pub total_count: usize,
+}
+
+pub struct DatasetEnvVarUpsertResult {
+    pub dataset_env_var: DatasetEnvVar,
+    pub status: UpsertDatasetEnvVarStatus,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -19,10 +19,10 @@ use crate::DatasetEnvVar;
 
 #[async_trait::async_trait]
 pub trait DatasetEnvVarRepository: Send + Sync {
-    async fn save_dataset_env_var(
+    async fn upsert_dataset_env_var(
         &self,
         dataset_env_var: &DatasetEnvVar,
-    ) -> Result<(), SaveDatasetEnvVarError>;
+    ) -> Result<UpsertDatasetEnvVarResult, InternalError>;
 
     async fn get_all_dataset_env_vars_count_by_dataset_id(
         &self,
@@ -50,31 +50,6 @@ pub trait DatasetEnvVarRepository: Send + Sync {
         &self,
         dataset_env_var_id: &Uuid,
     ) -> Result<(), DeleteDatasetEnvVarError>;
-
-    async fn modify_dataset_env_var(
-        &self,
-        dataset_env_var_id: &Uuid,
-        new_value: Vec<u8>,
-        secret_nonce: Option<Vec<u8>>,
-    ) -> Result<(), ModifyDatasetEnvVarError>;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Error, Debug)]
-pub enum SaveDatasetEnvVarError {
-    #[error(transparent)]
-    Duplicate(SaveDatasetEnvVarErrorDuplicate),
-
-    #[error(transparent)]
-    Internal(#[from] InternalError),
-}
-
-#[derive(Error, Debug)]
-#[error("Dataset env var not saved, duplicate {dataset_env_var_key} for dataset {dataset_id}")]
-pub struct SaveDatasetEnvVarErrorDuplicate {
-    pub dataset_env_var_key: String,
-    pub dataset_id: DatasetID,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -107,13 +82,15 @@ pub enum DeleteDatasetEnvVarError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Error, Debug)]
-pub enum ModifyDatasetEnvVarError {
-    #[error(transparent)]
-    NotFound(DatasetEnvVarNotFoundError),
-
-    #[error(transparent)]
-    Internal(#[from] InternalError),
+#[derive(Debug)]
+pub struct UpsertDatasetEnvVarResult {
+    pub id: Uuid,
+    pub status: UpsertDatasetEnvVarStatus,
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+#[derive(Debug, PartialEq, Eq)]
+pub enum UpsertDatasetEnvVarStatus {
+    Created,
+    Updated,
+    UpToDate,
+}

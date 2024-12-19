@@ -51,7 +51,7 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = sqlite,
-    fixture = dataset_env_var_repo::test_modify_dataset_env_vars,
+    fixture = dataset_env_var_repo::test_delete_all_dataset_env_vars,
     harness = SqliteDatasetEnvVarRepositoryHarness
 );
 
@@ -59,7 +59,7 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = sqlite,
-    fixture = dataset_env_var_repo::test_delete_all_dataset_env_vars,
+    fixture = dataset_env_var_repo::test_upsert_dataset_env_vars,
     harness = SqliteDatasetEnvVarRepositoryHarness
 );
 
