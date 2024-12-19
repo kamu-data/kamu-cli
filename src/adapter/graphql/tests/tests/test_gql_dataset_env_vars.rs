@@ -41,7 +41,7 @@ async fn test_create_and_get_dataset_env_var() {
     let harness = DatasetEnvVarsHarness::new().await;
     let created_dataset = harness.create_dataset().await;
 
-    let mutation_code = DatasetEnvVarsHarness::create_dataset_env(
+    let mutation_code = DatasetEnvVarsHarness::upsert_dataset_env(
         created_dataset.dataset_handle.id.to_string().as_str(),
         "foo",
         "foo_value",
@@ -63,8 +63,8 @@ async fn test_create_and_get_dataset_env_var() {
             "datasets": {
                 "byId": {
                     "envVars": {
-                        "saveEnvVariable": {
-                            "message": "Success"
+                        "upsertEnvVariable": {
+                            "message": "Created"
                         }
                     }
                 }
@@ -147,7 +147,7 @@ async fn test_delete_dataset_env_var() {
     let harness = DatasetEnvVarsHarness::new().await;
     let created_dataset = harness.create_dataset().await;
 
-    let mutation_code = DatasetEnvVarsHarness::create_dataset_env(
+    let mutation_code = DatasetEnvVarsHarness::upsert_dataset_env(
         created_dataset.dataset_handle.id.to_string().as_str(),
         "foo",
         "foo_value",
@@ -169,8 +169,8 @@ async fn test_delete_dataset_env_var() {
             "datasets": {
                 "byId": {
                     "envVars": {
-                        "saveEnvVariable": {
-                            "message": "Success"
+                        "upsertEnvVariable": {
+                            "message": "Created"
                         }
                     }
                 }
@@ -227,7 +227,7 @@ async fn test_modify_dataset_env_var() {
     let harness = DatasetEnvVarsHarness::new().await;
     let created_dataset = harness.create_dataset().await;
 
-    let mutation_code = DatasetEnvVarsHarness::create_dataset_env(
+    let mutation_code = DatasetEnvVarsHarness::upsert_dataset_env(
         created_dataset.dataset_handle.id.to_string().as_str(),
         "foo",
         "foo_value",
@@ -249,8 +249,8 @@ async fn test_modify_dataset_env_var() {
             "datasets": {
                 "byId": {
                     "envVars": {
-                        "saveEnvVariable": {
-                            "message": "Success"
+                        "upsertEnvVariable": {
+                            "message": "Created"
                         }
                     }
                 }
@@ -258,23 +258,9 @@ async fn test_modify_dataset_env_var() {
         })
     );
 
-    let query_code = DatasetEnvVarsHarness::get_dataset_env_vars_with_id(
+    let mutation_code = DatasetEnvVarsHarness::upsert_dataset_env(
         created_dataset.dataset_handle.id.to_string().as_str(),
-    );
-    let res = schema
-        .execute(
-            async_graphql::Request::new(query_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
-        .await;
-    let json = serde_json::to_string(&res.data).unwrap();
-    let json = serde_json::from_str::<serde_json::Value>(&json).unwrap();
-    let created_dataset_env_var_id =
-        json["datasets"]["byId"]["envVars"]["listEnvVariables"]["nodes"][0]["id"].clone();
-
-    let mutation_code = DatasetEnvVarsHarness::modify_dataset_env(
-        created_dataset.dataset_handle.id.to_string().as_str(),
-        &created_dataset_env_var_id.to_string(),
+        "foo",
         "new_foo_value",
         false,
     );
@@ -292,8 +278,8 @@ async fn test_modify_dataset_env_var() {
             "datasets": {
                 "byId": {
                     "envVars": {
-                        "modifyEnvVariable": {
-                            "message": "Success"
+                        "upsertEnvVariable": {
+                            "message": "Updated"
                         }
                     }
                 }
@@ -465,7 +451,7 @@ impl DatasetEnvVarsHarness {
         .replace("<dataset_env_var_id>", dataset_env_var_id)
     }
 
-    fn create_dataset_env(
+    fn upsert_dataset_env(
         dataset_id: &str,
         env_var_key: &str,
         env_var_value: &str,
@@ -477,7 +463,7 @@ impl DatasetEnvVarsHarness {
                 datasets {
                     byId(datasetId: "<dataset_id>") {
                         envVars {
-                            saveEnvVariable(key: "<env_var_key>", value: "<env_var_value>", isSecret: <is_secret>) {
+                            upsertEnvVariable(key: "<env_var_key>", value: "<env_var_value>", isSecret: <is_secret>) {
                                 message
                             }
                         }
@@ -510,32 +496,5 @@ impl DatasetEnvVarsHarness {
         )
         .replace("<dataset_id>", dataset_id)
         .replace("<env_var_id>", env_var_id)
-    }
-
-    fn modify_dataset_env(
-        dataset_id: &str,
-        env_var_id: &str,
-        new_value: &str,
-        is_secret: bool,
-    ) -> String {
-        indoc!(
-            r#"
-            mutation {
-                datasets {
-                    byId(datasetId: "<dataset_id>") {
-                        envVars {
-                            modifyEnvVariable(id: <env_var_id>, newValue: "<env_var_value>", isSecret: <is_secret>) {
-                                message
-                            }
-                        }
-                    }
-                }
-            }
-            "#
-        )
-        .replace("<dataset_id>", dataset_id)
-        .replace("<env_var_id>", env_var_id)
-        .replace("<env_var_value>", new_value)
-        .replace("<is_secret>", if is_secret { "true" } else { "false" })
     }
 }

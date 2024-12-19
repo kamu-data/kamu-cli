@@ -14,11 +14,10 @@ use kamu_datasets::{
     DatasetEnvVar,
     DatasetEnvVarListing,
     DatasetEnvVarService,
+    DatasetEnvVarUpsertResult,
     DatasetEnvVarValue,
     DeleteDatasetEnvVarError,
     GetDatasetEnvVarError,
-    ModifyDatasetEnvVarError,
-    SaveDatasetEnvVarError,
 };
 use opendatafabric::DatasetID;
 use uuid::Uuid;
@@ -41,12 +40,12 @@ impl DatasetEnvVarServiceNull {
 
 #[async_trait::async_trait]
 impl DatasetEnvVarService for DatasetEnvVarServiceNull {
-    async fn create_dataset_env_var(
+    async fn upsert_dataset_env_var(
         &self,
         _dataset_env_var_key: &str,
         _dataset_env_var_value: &DatasetEnvVarValue,
         _dataset_id: &DatasetID,
-    ) -> Result<DatasetEnvVar, SaveDatasetEnvVarError> {
+    ) -> Result<DatasetEnvVarUpsertResult, InternalError> {
         unreachable!()
     }
 
@@ -79,14 +78,6 @@ impl DatasetEnvVarService for DatasetEnvVarServiceNull {
         &self,
         _dataset_env_var_id: &Uuid,
     ) -> Result<(), DeleteDatasetEnvVarError> {
-        unreachable!()
-    }
-
-    async fn modify_dataset_env_var(
-        &self,
-        _dataset_env_var_id: &Uuid,
-        _dataset_env_var_new_value: &DatasetEnvVarValue,
-    ) -> Result<(), ModifyDatasetEnvVarError> {
         unreachable!()
     }
 }
