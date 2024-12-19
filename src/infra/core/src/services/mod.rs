@@ -25,7 +25,6 @@ pub use transform::*;
 pub use watermark::*;
 
 mod dataset_changes_service_impl;
-mod dataset_ownership_service_inmem;
 mod dataset_registry_repo_bridge;
 mod metadata_query_service_impl;
 mod provenance_service_impl;
@@ -36,7 +35,6 @@ mod query_service_impl;
 mod verification_service_impl;
 
 pub use dataset_changes_service_impl::*;
-pub use dataset_ownership_service_inmem::*;
 pub use dataset_registry_repo_bridge::*;
 pub use metadata_query_service_impl::*;
 pub use provenance_service_impl::*;

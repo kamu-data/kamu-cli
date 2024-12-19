@@ -15,10 +15,10 @@ use opendatafabric as odf;
 // TODO: Private Datasets: replace with DatasetEntry-related service
 #[async_trait::async_trait]
 pub trait DatasetOwnershipService: Sync + Send {
-    async fn get_dataset_owners(
+    async fn get_dataset_owner(
         &self,
         dataset_id: &odf::DatasetID,
-    ) -> Result<Vec<odf::AccountID>, InternalError>;
+    ) -> Result<odf::AccountID, InternalError>;
 
     async fn get_owned_datasets(
         &self,

@@ -57,6 +57,12 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
         snapshot: DatasetSnapshot,
         options: CreateDatasetUseCaseOptions,
     ) -> Result<CreateDatasetResult, CreateDatasetFromSnapshotError> {
+        let logged_account_id = match self.current_account_subject.as_ref() {
+            CurrentAccountSubject::Anonymous(_) => {
+                panic!("Anonymous account cannot create dataset");
+            }
+            CurrentAccountSubject::Logged(l) => l.account_id.clone(),
+        };
         let dataset_name = snapshot.name.dataset_name.clone();
         let CreateDatasetFromSnapshotResult {
             create_dataset_result,
@@ -71,12 +77,7 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
                 MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
                 DatasetLifecycleMessage::created(
                     create_dataset_result.dataset_handle.id.clone(),
-                    match self.current_account_subject.as_ref() {
-                        CurrentAccountSubject::Anonymous(_) => {
-                            panic!("Anonymous account cannot create dataset");
-                        }
-                        CurrentAccountSubject::Logged(l) => l.account_id.clone(),
-                    },
+                    logged_account_id,
                     options.dataset_visibility,
                     dataset_name,
                 ),

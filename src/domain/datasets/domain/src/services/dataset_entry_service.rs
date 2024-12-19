@@ -22,6 +22,8 @@ pub trait DatasetEntryService: Sync + Send {
     // TODO: Private Datasets: extract to DatasetEntryRegistry?
     fn all_entries(&self) -> DatasetEntryStream;
 
+    fn entries_owned_by(&self, owner_id: &odf::AccountID) -> DatasetEntryStream;
+
     async fn list_all_entries(
         &self,
         pagination: PaginationOpts,

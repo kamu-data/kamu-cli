@@ -10,7 +10,7 @@
 use std::sync::{Arc, RwLock};
 
 use chrono::{DateTime, TimeZone, Utc};
-use dill::{Catalog, CatalogBuilder, Component};
+use dill::{CatalogBuilder, Component};
 use init_on_startup::InitOnStartup;
 use kamu::{DatasetRepositoryWriter, MockDatasetRepositoryWriter};
 use kamu_accounts::{Account, AccountRepository, CurrentAccountSubject};
@@ -195,7 +195,6 @@ async fn test_indexes_datasets_correctly() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct DatasetEntryServiceHarness {
-    _catalog: Catalog,
     outbox: Arc<dyn Outbox>,
     dataset_entry_indexer: Arc<DatasetEntryIndexer>,
     account_repo: Arc<dyn AccountRepository>,
@@ -252,7 +251,6 @@ impl DatasetEntryServiceHarness {
             outbox: catalog.get_one().unwrap(),
             dataset_entry_indexer: catalog.get_one().unwrap(),
             account_repo: catalog.get_one().unwrap(),
-            _catalog: catalog,
         }
     }
 

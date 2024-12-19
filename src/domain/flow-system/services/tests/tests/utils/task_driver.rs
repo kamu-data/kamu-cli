@@ -25,6 +25,7 @@ pub(crate) struct TaskDriver {
     args: TaskDriverArgs,
 }
 
+#[derive(Debug)]
 pub(crate) struct TaskDriverArgs {
     pub(crate) task_id: TaskID,
     pub(crate) task_metadata: TaskMetadata,
@@ -53,14 +54,14 @@ impl TaskDriver {
         let start_time = self.time_source.now();
 
         self.time_source.sleep(self.args.run_since_start).await;
-        while !(self.task_exists().await) {
+        while !self.task_exists().await {
             yield_now().await;
         }
 
         self.ensure_task_matches_logical_plan().await;
 
-        // Note: we can omit transaction, since this is a test-only abstraction
-        // with assumed immediate delivery
+        // Note: We can omit transaction, since this is a test-only abstraction
+        //       with assumed immediate delivery
         self.outbox
             .post_message(
                 MESSAGE_PRODUCER_KAMU_TASK_AGENT,
@@ -76,8 +77,8 @@ impl TaskDriver {
         if let Some((finish_in, with_outcome)) = self.args.finish_in_with {
             self.time_source.sleep(finish_in).await;
 
-            // Note: we can omit transaction, since this is a test-only abstraction
-            // with assummed immediate delivery
+            // Note: We can omit transaction, since this is a test-only abstraction
+            //       with assumed immediate delivery
             self.outbox
                 .post_message(
                     MESSAGE_PRODUCER_KAMU_TASK_AGENT,
@@ -105,11 +106,15 @@ impl TaskDriver {
             .await
             .expect("Task does not exist yet");
 
-        assert_eq!(self.args.expected_logical_plan, task.logical_plan);
+        pretty_assertions::assert_eq!(self.args.expected_logical_plan, task.logical_plan);
+
         match &task.logical_plan {
             LogicalPlan::UpdateDataset(ud) => {
                 assert!(self.args.dataset_id.is_some());
-                assert_eq!(&ud.dataset_id, self.args.dataset_id.as_ref().unwrap());
+                pretty_assertions::assert_eq!(
+                    self.args.dataset_id.as_ref().unwrap(),
+                    &ud.dataset_id,
+                );
             }
             LogicalPlan::Probe(_) => assert!(self.args.dataset_id.is_none()),
             LogicalPlan::HardCompactDataset(_) | LogicalPlan::ResetDataset(_) => (),
