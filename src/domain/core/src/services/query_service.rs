@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::backtrace::Backtrace;
 use std::collections::BTreeMap;
 
 use datafusion::arrow;
@@ -258,7 +259,7 @@ impl DatasetBlockNotFoundError {
 pub struct DataFusionError {
     #[from]
     pub source: datafusion::error::DataFusionError,
-    pub backtrace: std::backtrace::Backtrace,
+    pub backtrace: Backtrace,
 }
 
 impl From<datafusion::error::DataFusionError> for QueryError {

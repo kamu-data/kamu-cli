@@ -7,9 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::fmt::Debug;
 use std::str::FromStr;
 
+use kamu::domain::ExportFormat;
 use opendatafabric as odf;
+use strum::IntoEnumIterator;
 use url::Url;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -117,6 +120,23 @@ pub(crate) fn log_filter(s: &str) -> Result<String, String> {
         }?;
     }
     Ok(s.to_string())
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) fn export_format(format: &str) -> Result<ExportFormat, String> {
+    match format {
+        "parquet" => Ok(ExportFormat::Parquet),
+        "ndjson" => Ok(ExportFormat::NdJson),
+        "csv" => Ok(ExportFormat::Csv),
+        _ => {
+            let supported_formats = ExportFormat::iter()
+                .map(|f| format!("'{f}'"))
+                .collect::<Vec<_>>()
+                .join(", ");
+            Err(format!("Supported formats: {supported_formats}"))
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
