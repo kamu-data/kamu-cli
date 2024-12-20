@@ -535,9 +535,6 @@ pub fn configure_server_catalog(base_catalog: &Catalog) -> CatalogBuilder {
 
     b.add::<DatasetChangesServiceImpl>();
 
-    b.add::<DatasetOwnershipServiceInMemory>();
-    b.add::<DatasetOwnershipServiceInMemoryStateInitializer>();
-
     kamu_task_system_services::register_dependencies(&mut b);
 
     b.add_value(kamu_flow_system_inmem::domain::FlowAgentConfig::new(

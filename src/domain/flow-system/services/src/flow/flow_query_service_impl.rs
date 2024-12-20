@@ -15,7 +15,7 @@ use database_common::PaginationOpts;
 use dill::{component, interface, Catalog};
 use futures::TryStreamExt;
 use internal_error::ResultIntoInternal;
-use kamu_core::DatasetOwnershipService;
+use kamu_datasets::DatasetOwnershipService;
 use kamu_flow_system::*;
 use opendatafabric::{AccountID, DatasetID};
 

@@ -8,27 +8,26 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::InternalError;
-use opendatafabric::{AccountID, DatasetID};
+use opendatafabric as odf;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// TODO: Private Datasets: replace with DatasetEntry-related service
 #[async_trait::async_trait]
 pub trait DatasetOwnershipService: Sync + Send {
-    async fn get_dataset_owners(
+    async fn get_dataset_owner(
         &self,
-        dataset_id: &DatasetID,
-    ) -> Result<Vec<AccountID>, InternalError>;
+        dataset_id: &odf::DatasetID,
+    ) -> Result<odf::AccountID, InternalError>;
 
     async fn get_owned_datasets(
         &self,
-        account_id: &AccountID,
-    ) -> Result<Vec<DatasetID>, InternalError>;
+        account_id: &odf::AccountID,
+    ) -> Result<Vec<odf::DatasetID>, InternalError>;
 
     async fn is_dataset_owned_by(
         &self,
-        dataset_id: &DatasetID,
-        account_id: &AccountID,
+        dataset_id: &odf::DatasetID,
+        account_id: &odf::AccountID,
     ) -> Result<bool, InternalError>;
 }
 

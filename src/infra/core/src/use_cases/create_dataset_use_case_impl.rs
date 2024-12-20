@@ -57,6 +57,12 @@ impl CreateDatasetUseCase for CreateDatasetUseCaseImpl {
         seed_block: MetadataBlockTyped<Seed>,
         options: CreateDatasetUseCaseOptions,
     ) -> Result<CreateDatasetResult, CreateDatasetError> {
+        let logged_account_id = match self.current_account_subject.as_ref() {
+            CurrentAccountSubject::Anonymous(_) => {
+                panic!("Anonymous account cannot create dataset");
+            }
+            CurrentAccountSubject::Logged(l) => l.account_id.clone(),
+        };
         let create_result = self
             .dataset_repo_writer
             .create_dataset(dataset_alias, seed_block)
@@ -67,12 +73,7 @@ impl CreateDatasetUseCase for CreateDatasetUseCaseImpl {
                 MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
                 DatasetLifecycleMessage::created(
                     create_result.dataset_handle.id.clone(),
-                    match self.current_account_subject.as_ref() {
-                        CurrentAccountSubject::Anonymous(_) => {
-                            panic!("Anonymous account cannot create dataset");
-                        }
-                        CurrentAccountSubject::Logged(l) => l.account_id.clone(),
-                    },
+                    logged_account_id,
                     options.dataset_visibility,
                     dataset_alias.dataset_name.clone(),
                 ),

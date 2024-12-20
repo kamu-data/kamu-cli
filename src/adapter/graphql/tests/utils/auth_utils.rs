@@ -17,12 +17,6 @@ use kamu_adapter_graphql::ANONYMOUS_ACCESS_FORBIDDEN_MESSAGE;
 pub async fn authentication_catalogs(
     base_catalog: &dill::Catalog,
 ) -> (dill::Catalog, dill::Catalog) {
-    let catalog_anonymous = dill::CatalogBuilder::new_chained(base_catalog)
-        .add_value(CurrentAccountSubject::anonymous(
-            AnonymousAccountReason::NoAuthenticationProvided,
-        ))
-        .build();
-
     let current_account_subject = CurrentAccountSubject::new_test();
     let mut predefined_accounts_config = PredefinedAccountsConfig::new();
 
@@ -36,12 +30,20 @@ pub async fn authentication_catalogs(
         panic!()
     }
 
-    let catalog_authorized = dill::CatalogBuilder::new_chained(base_catalog)
+    let base_auth_catalog = dill::CatalogBuilder::new_chained(base_catalog)
         .add::<LoginPasswordAuthProvider>()
         .add::<PredefinedAccountsRegistrator>()
         .add::<InMemoryAccountRepository>()
+        .add_value(predefined_accounts_config.clone())
+        .build();
+
+    let catalog_anonymous = dill::CatalogBuilder::new_chained(&base_auth_catalog)
+        .add_value(CurrentAccountSubject::anonymous(
+            AnonymousAccountReason::NoAuthenticationProvided,
+        ))
+        .build();
+    let catalog_authorized = dill::CatalogBuilder::new_chained(&base_auth_catalog)
         .add_value(current_account_subject)
-        .add_value(predefined_accounts_config)
         .build();
 
     init_on_startup::run_startup_jobs(&catalog_authorized)

@@ -12,7 +12,8 @@ use std::sync::Arc;
 use chrono::{DateTime, Utc};
 use dill::component;
 use internal_error::InternalError;
-use kamu_core::{DatasetChangesService, DatasetOwnershipService, DependencyGraphService};
+use kamu_core::{DatasetChangesService, DependencyGraphService};
+use kamu_datasets::DatasetOwnershipService;
 use kamu_flow_system::*;
 use messaging_outbox::{Outbox, OutboxExt};
 use time_source::SystemTimeSource;
@@ -221,35 +222,33 @@ impl FlowSchedulingHelper {
             }
 
             DownstreamDependencyTriggerType::TriggerOwnHardCompaction => {
-                let dataset_owner_account_ids = self
+                let owner_account_id = self
                     .dataset_ownership_service
-                    .get_dataset_owners(&fk_dataset.dataset_id)
+                    .get_dataset_owner(&fk_dataset.dataset_id)
                     .await?;
 
                 for dependent_dataset_id in dependent_dataset_ids {
-                    for owner_account_id in &dataset_owner_account_ids {
-                        if self
-                            .dataset_ownership_service
-                            .is_dataset_owned_by(&dependent_dataset_id, owner_account_id)
-                            .await?
-                        {
-                            plans.push(DownstreamDependencyFlowPlan {
-                                flow_key: FlowKeyDataset::new(
-                                    dependent_dataset_id.clone(),
-                                    DatasetFlowType::HardCompaction,
-                                )
-                                .into(),
-                                flow_trigger_context: FlowTriggerContext::Unconditional,
-                                // Currently we trigger Hard compaction recursively only in keep
-                                // metadata only mode
-                                maybe_config_snapshot: Some(FlowConfigurationSnapshot::Compaction(
-                                    CompactionRule::MetadataOnly(CompactionRuleMetadataOnly {
-                                        recursive: true,
-                                    }),
-                                )),
-                            });
-                            break;
-                        }
+                    let owned = self
+                        .dataset_ownership_service
+                        .is_dataset_owned_by(&dependent_dataset_id, &owner_account_id)
+                        .await?;
+
+                    if owned {
+                        plans.push(DownstreamDependencyFlowPlan {
+                            flow_key: FlowKeyDataset::new(
+                                dependent_dataset_id,
+                                DatasetFlowType::HardCompaction,
+                            )
+                            .into(),
+                            flow_trigger_context: FlowTriggerContext::Unconditional,
+                            // Currently we trigger Hard compaction recursively only in keep
+                            // metadata only mode
+                            maybe_config_snapshot: Some(FlowConfigurationSnapshot::Compaction(
+                                CompactionRule::MetadataOnly(CompactionRuleMetadataOnly {
+                                    recursive: true,
+                                }),
+                            )),
+                        });
                     }
                 }
             }
