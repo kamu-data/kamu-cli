@@ -26,7 +26,7 @@ pub(crate) enum FlowStartCondition {
 impl FlowStartCondition {
     pub async fn create_from_raw_flow_data(
         start_condition: &fs::FlowStartCondition,
-        matching_triggers: &[fs::FlowTrigger],
+        matching_triggers: &[fs::FlowTriggerType],
         ctx: &Context<'_>,
     ) -> Result<Self, InternalError> {
         Ok(match start_condition {
@@ -45,7 +45,7 @@ impl FlowStartCondition {
 
                 // For each dataset trigger, add accumulated changes since trigger first fired
                 for trigger in matching_triggers {
-                    if let fs::FlowTrigger::InputDatasetFlow(dataset_trigger) = trigger
+                    if let fs::FlowTriggerType::InputDatasetFlow(dataset_trigger) = trigger
                         && let fs::FlowResult::DatasetUpdate(dataset_update) =
                             &dataset_trigger.flow_result
                         && let fs::FlowResultDatasetUpdate::Changed(update_result) = dataset_update
@@ -62,7 +62,7 @@ impl FlowStartCondition {
 
                 // Finally, present the full picture from condition + computed view results
                 Self::Batching(FlowStartConditionBatching {
-                    active_transform_rule: b.active_transform_rule.into(),
+                    active_batching_rule: b.active_batching_rule.into(),
                     batching_deadline: b.batching_deadline,
                     accumulated_records_count: total_increment.num_records,
                     watermark_modified: total_increment.updated_watermark.is_some(),
@@ -99,7 +99,7 @@ impl From<fs::FlowStartConditionThrottling> for FlowStartConditionThrottling {
 
 #[derive(SimpleObject)]
 pub(crate) struct FlowStartConditionBatching {
-    pub active_transform_rule: FlowConfigurationTransform,
+    pub active_batching_rule: FlowTriggerBatchingRule,
     pub batching_deadline: DateTime<Utc>,
     pub accumulated_records_count: u64,
     pub watermark_modified: bool,

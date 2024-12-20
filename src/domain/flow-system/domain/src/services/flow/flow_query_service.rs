@@ -17,7 +17,7 @@ use tokio_stream::Stream;
 use crate::{
     AccountFlowFilters,
     DatasetFlowFilters,
-    FlowConfigurationSnapshot,
+    FlowConfigurationRule,
     FlowID,
     FlowKey,
     FlowState,
@@ -89,7 +89,7 @@ pub trait FlowQueryService: Sync + Send {
         trigger_time: DateTime<Utc>,
         flow_key: FlowKey,
         initiator_account_id: AccountID,
-        flow_run_snapshots_maybe: Option<FlowConfigurationSnapshot>,
+        flow_run_snapshot_maybe: Option<FlowConfigurationRule>,
     ) -> Result<FlowState, RequestFlowError>;
 
     /// Attempts to cancel the tasks already scheduled for the given flow

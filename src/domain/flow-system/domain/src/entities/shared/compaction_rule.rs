@@ -18,6 +18,18 @@ pub enum CompactionRule {
     MetadataOnly(CompactionRuleMetadataOnly),
 }
 
+impl From<CompactionRuleFull> for CompactionRule {
+    fn from(value: CompactionRuleFull) -> Self {
+        Self::Full(value)
+    }
+}
+
+impl From<CompactionRuleMetadataOnly> for CompactionRule {
+    fn from(value: CompactionRuleMetadataOnly) -> Self {
+        Self::MetadataOnly(value)
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CompactionRuleFull {
     max_slice_size: u64,

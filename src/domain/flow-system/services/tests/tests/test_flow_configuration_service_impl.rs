@@ -11,8 +11,6 @@ use std::assert_matches::assert_matches;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use chrono::{Duration, Utc};
-use database_common_macros::transactional_method1;
 use dill::*;
 use futures::TryStreamExt;
 use kamu::testing::MetadataFactory;
@@ -35,291 +33,62 @@ use super::FlowConfigTestListener;
 #[test_log::test(tokio::test)]
 async fn test_visibility() {
     let harness = FlowConfigurationHarness::new();
-    assert!(harness.list_enabled_configurations().await.is_empty());
-
-    let gc_schedule: Schedule = Duration::minutes(30).into();
-    harness
-        .set_system_flow_schedule(SystemFlowType::GC, gc_schedule.clone())
-        .await
-        .unwrap();
+    assert!(harness.list_active_configurations().await.is_empty());
 
     let foo_id = harness.create_root_dataset("foo").await;
     let bar_id = harness.create_root_dataset("bar").await;
 
-    let foo_ingest_schedule: Schedule = Duration::days(1).into();
+    let foo_ingest_config = FlowConfigurationRule::IngestRule(IngestRule {
+        fetch_uncacheable: false,
+    });
     harness
-        .set_dataset_flow_schedule(
+        .set_dataset_flow_config(
             foo_id.clone(),
             DatasetFlowType::Ingest,
-            foo_ingest_schedule.clone(),
+            foo_ingest_config.clone(),
         )
         .await;
 
-    let foo_compaction_schedule: Schedule = Duration::weeks(1).into();
+    let foo_compaction_config = FlowConfigurationRule::CompactionRule(CompactionRule::Full(
+        CompactionRuleFull::new_checked(2, 3, false).unwrap(),
+    ));
     harness
-        .set_dataset_flow_schedule(
+        .set_dataset_flow_config(
             foo_id.clone(),
             DatasetFlowType::HardCompaction,
-            foo_compaction_schedule.clone(),
+            foo_compaction_config.clone(),
         )
         .await;
 
-    let bar_ingest_schedule: Schedule = Duration::hours(3).into();
+    let bar_compaction_config = FlowConfigurationRule::CompactionRule(CompactionRule::Full(
+        CompactionRuleFull::new_checked(3, 4, false).unwrap(),
+    ));
     harness
-        .set_dataset_flow_schedule(
+        .set_dataset_flow_config(
             bar_id.clone(),
-            DatasetFlowType::Ingest,
-            bar_ingest_schedule.clone(),
+            DatasetFlowType::HardCompaction,
+            bar_compaction_config.clone(),
         )
         .await;
 
-    let configs = harness.list_enabled_configurations().await;
-    assert_eq!(4, configs.len());
+    let configs = harness.list_active_configurations().await;
+    assert_eq!(3, configs.len());
 
-    harness.expect_system_flow_schedule(&configs, SystemFlowType::GC, &gc_schedule);
-
-    for (dataset_id, dataset_flow_type, schedule) in [
-        (
-            foo_id.clone(),
-            DatasetFlowType::Ingest,
-            &foo_ingest_schedule,
-        ),
+    for (dataset_id, dataset_flow_type, config) in [
+        (foo_id.clone(), DatasetFlowType::Ingest, &foo_ingest_config),
         (
             foo_id,
             DatasetFlowType::HardCompaction,
-            &foo_compaction_schedule,
+            &foo_compaction_config,
         ),
-        (bar_id, DatasetFlowType::Ingest, &bar_ingest_schedule),
-    ] {
-        harness.expect_dataset_flow_schedule(&configs, dataset_id, dataset_flow_type, schedule);
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test(tokio::test)]
-async fn test_pause_resume_individual_dataset_flows() {
-    let harness = FlowConfigurationHarness::new();
-    assert!(harness.list_enabled_configurations().await.is_empty());
-    assert_eq!(0, harness.configuration_events_count());
-
-    // Make a dataset and configure daily ingestion schedule
-    let foo_id = harness.create_root_dataset("foo").await;
-    let foo_ingest_schedule: Schedule = Duration::days(1).into();
-    harness
-        .set_dataset_flow_schedule(
-            foo_id.clone(),
-            DatasetFlowType::Ingest,
-            foo_ingest_schedule.clone(),
-        )
-        .await;
-
-    // It should be visible in the list of enabled configs and produced 1 config
-    // event
-    let configs = harness.list_enabled_configurations().await;
-    assert_eq!(1, configs.len());
-    harness.expect_dataset_flow_schedule(
-        &configs,
-        foo_id.clone(),
-        DatasetFlowType::Ingest,
-        &foo_ingest_schedule,
-    );
-    assert_eq!(1, harness.configuration_events_count());
-
-    // Now, pause this flow configuration
-    harness
-        .pause_dataset_flow(foo_id.clone(), DatasetFlowType::Ingest)
-        .await;
-
-    // It should disappear from the list of enabled configs, and produce 1 more
-    // event
-    let configs = harness.list_enabled_configurations().await;
-    assert_eq!(0, configs.len());
-    assert_eq!(2, harness.configuration_events_count());
-
-    // Still, we should see it's state as paused in the repository directly
-    let flow_config_state = harness
-        .get_dataset_flow_config_from_store(foo_id.clone(), DatasetFlowType::Ingest)
-        .await;
-    assert_eq!(
-        flow_config_state.status,
-        FlowConfigurationStatus::PausedTemporarily
-    );
-    assert_eq!(
-        flow_config_state.rule,
-        FlowConfigurationRule::Schedule(foo_ingest_schedule.clone())
-    );
-
-    // Now, resume the configuration
-    harness
-        .resume_dataset_flow(foo_id.clone(), DatasetFlowType::Ingest)
-        .await;
-
-    // It should be visible in the list of active configs again, and produce
-    // another event yet
-    let configs = harness.list_enabled_configurations().await;
-    assert_eq!(1, configs.len());
-    harness.expect_dataset_flow_schedule(
-        &configs,
-        foo_id,
-        DatasetFlowType::Ingest,
-        &foo_ingest_schedule,
-    );
-    assert_eq!(3, harness.configuration_events_count());
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test(tokio::test)]
-async fn test_pause_resume_all_dataset_flows() {
-    let harness = FlowConfigurationHarness::new();
-    assert!(harness.list_enabled_configurations().await.is_empty());
-    assert_eq!(0, harness.configuration_events_count());
-
-    // Make a dataset and configure ingestion and compaction schedule
-    let foo_id = harness.create_root_dataset("foo").await;
-    let foo_ingest_schedule: Schedule = Duration::days(1).into();
-    harness
-        .set_dataset_flow_schedule(
-            foo_id.clone(),
-            DatasetFlowType::Ingest,
-            foo_ingest_schedule.clone(),
-        )
-        .await;
-    let foo_compaction_schedule: Schedule = Duration::weeks(1).into();
-    harness
-        .set_dataset_flow_schedule(
-            foo_id.clone(),
+        (
+            bar_id,
             DatasetFlowType::HardCompaction,
-            foo_compaction_schedule.clone(),
-        )
-        .await;
-
-    // Both should be visible in the list of enabled configs, 2 events expected
-    let configs = harness.list_enabled_configurations().await;
-    assert_eq!(2, configs.len());
-    harness.expect_dataset_flow_schedule(
-        &configs,
-        foo_id.clone(),
-        DatasetFlowType::Ingest,
-        &foo_ingest_schedule,
-    );
-    harness.expect_dataset_flow_schedule(
-        &configs,
-        foo_id.clone(),
-        DatasetFlowType::HardCompaction,
-        &foo_compaction_schedule,
-    );
-    assert_eq!(2, harness.configuration_events_count());
-
-    // Now, pause all flows of this dataset
-    harness.pause_all_dataset_flows(foo_id.clone()).await;
-
-    // Both should disappear from the list of enabled configs,
-    // and both should produce events
-    let configs = harness.list_enabled_configurations().await;
-    assert_eq!(0, configs.len());
-    assert_eq!(4, harness.configuration_events_count());
-
-    // Still, we should see their state as paused in the repository directly
-
-    let flow_config_ingest_state = harness
-        .get_dataset_flow_config_from_store(foo_id.clone(), DatasetFlowType::Ingest)
-        .await;
-    assert_eq!(
-        flow_config_ingest_state.status,
-        FlowConfigurationStatus::PausedTemporarily
-    );
-    assert_eq!(
-        flow_config_ingest_state.rule,
-        FlowConfigurationRule::Schedule(foo_ingest_schedule.clone())
-    );
-
-    let flow_config_compaction_state = harness
-        .get_dataset_flow_config_from_store(foo_id.clone(), DatasetFlowType::HardCompaction)
-        .await;
-    assert_eq!(
-        flow_config_compaction_state.status,
-        FlowConfigurationStatus::PausedTemporarily
-    );
-    assert_eq!(
-        flow_config_compaction_state.rule,
-        FlowConfigurationRule::Schedule(foo_compaction_schedule.clone())
-    );
-
-    // Now, resume all configurations
-    harness.resume_all_dataset_flows(foo_id.clone()).await;
-
-    // They should be visible in the list of active configs again, and again, we
-    // should get 2 extra events
-    let configs = harness.list_enabled_configurations().await;
-    assert_eq!(2, configs.len());
-    harness.expect_dataset_flow_schedule(
-        &configs,
-        foo_id.clone(),
-        DatasetFlowType::Ingest,
-        &foo_ingest_schedule,
-    );
-    harness.expect_dataset_flow_schedule(
-        &configs,
-        foo_id.clone(),
-        DatasetFlowType::HardCompaction,
-        &foo_compaction_schedule,
-    );
-    assert_eq!(6, harness.configuration_events_count());
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test(tokio::test)]
-async fn test_pause_resume_individual_system_flows() {
-    let harness = FlowConfigurationHarness::new();
-    assert!(harness.list_enabled_configurations().await.is_empty());
-    assert_eq!(0, harness.configuration_events_count());
-
-    // Configure GC schedule
-    let gc_schedule: Schedule = Duration::minutes(30).into();
-    harness
-        .set_system_flow_schedule(SystemFlowType::GC, gc_schedule.clone())
-        .await
-        .unwrap();
-
-    // It should be visible in the list of enabled configs, and create 1 event
-    let configs = harness.list_enabled_configurations().await;
-    assert_eq!(1, configs.len());
-    harness.expect_system_flow_schedule(&configs, SystemFlowType::GC, &gc_schedule);
-    assert_eq!(1, harness.configuration_events_count());
-
-    // Now, pause this flow configuration
-    harness.pause_system_flow(SystemFlowType::GC).await;
-
-    // It should disappear from the list of enabled configs, and create 1 more event
-    let configs = harness.list_enabled_configurations().await;
-    assert_eq!(0, configs.len());
-    assert_eq!(2, harness.configuration_events_count());
-
-    // Still, we should see it's state as paused in the repository directly
-    let flow_config_state = harness
-        .get_system_flow_config_from_store(SystemFlowType::GC)
-        .await;
-    assert_eq!(
-        flow_config_state.status,
-        FlowConfigurationStatus::PausedTemporarily
-    );
-    assert_eq!(
-        flow_config_state.rule,
-        FlowConfigurationRule::Schedule(gc_schedule.clone())
-    );
-
-    // Now, resume the configuration
-    harness.resume_system_flow(SystemFlowType::GC).await;
-
-    // It should be visible in the list of active configs again, and create
-    // another event yet
-    let configs = harness.list_enabled_configurations().await;
-    assert_eq!(1, configs.len());
-    harness.expect_system_flow_schedule(&configs, SystemFlowType::GC, &gc_schedule);
-    assert_eq!(3, harness.configuration_events_count());
+            &bar_compaction_config,
+        ),
+    ] {
+        harness.expect_dataset_flow_config(&configs, dataset_id, dataset_flow_type, config);
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -327,51 +96,53 @@ async fn test_pause_resume_individual_system_flows() {
 #[test_log::test(tokio::test)]
 async fn test_modify() {
     let harness = FlowConfigurationHarness::new();
-    assert!(harness.list_enabled_configurations().await.is_empty());
+    assert!(harness.list_active_configurations().await.is_empty());
     assert_eq!(0, harness.configuration_events_count());
 
-    // Make a dataset and configure daily ingestion schedule
+    // Make a dataset and configure compaction config
     let foo_id = harness.create_root_dataset("foo").await;
-    let foo_ingest_schedule: Schedule = Duration::days(1).into();
+    let foo_compaction_config = FlowConfigurationRule::CompactionRule(CompactionRule::Full(
+        CompactionRuleFull::new_checked(1, 2, false).unwrap(),
+    ));
     harness
-        .set_dataset_flow_schedule(
+        .set_dataset_flow_config(
             foo_id.clone(),
-            DatasetFlowType::Ingest,
-            foo_ingest_schedule.clone(),
+            DatasetFlowType::HardCompaction,
+            foo_compaction_config.clone(),
         )
         .await;
 
-    // It should be visible in the list of enabled configs
-    let configs = harness.list_enabled_configurations().await;
+    // It should be visible in the list of configs
+    let configs = harness.list_active_configurations().await;
     assert_eq!(1, configs.len());
-    harness.expect_dataset_flow_schedule(
+    harness.expect_dataset_flow_config(
         &configs,
         foo_id.clone(),
-        DatasetFlowType::Ingest,
-        &foo_ingest_schedule,
+        DatasetFlowType::HardCompaction,
+        &foo_compaction_config,
     );
-    assert_eq!(1, harness.configuration_events_count());
 
-    // Now make the schedule weekly
-    let foo_ingest_schedule_2: Schedule = Duration::weeks(1).into();
+    // Now make the config with different parameters
+    let foo_compaction_config_2 = FlowConfigurationRule::CompactionRule(CompactionRule::Full(
+        CompactionRuleFull::new_checked(2, 3, false).unwrap(),
+    ));
     harness
-        .set_dataset_flow_schedule(
+        .set_dataset_flow_config(
             foo_id.clone(),
-            DatasetFlowType::Ingest,
-            foo_ingest_schedule_2.clone(),
+            DatasetFlowType::HardCompaction,
+            foo_compaction_config_2.clone(),
         )
         .await;
 
     // Observe the updated config
-    let configs = harness.list_enabled_configurations().await;
+    let configs = harness.list_active_configurations().await;
     assert_eq!(1, configs.len());
-    harness.expect_dataset_flow_schedule(
+    harness.expect_dataset_flow_config(
         &configs,
         foo_id.clone(),
-        DatasetFlowType::Ingest,
-        &foo_ingest_schedule_2,
+        DatasetFlowType::HardCompaction,
+        &foo_compaction_config_2,
     );
-    assert_eq!(2, harness.configuration_events_count());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -379,34 +150,36 @@ async fn test_modify() {
 #[test_log::test(tokio::test)]
 async fn test_dataset_deleted() {
     let harness = FlowConfigurationHarness::new();
-    assert!(harness.list_enabled_configurations().await.is_empty());
+    assert!(harness.list_active_configurations().await.is_empty());
 
-    // Make a dataset and configure daily ingestion schedule
+    // Make a dataset and configure ingest rule
     let foo_id = harness.create_root_dataset("foo").await;
-    let foo_ingest_schedule: Schedule = Duration::days(1).into();
+    let foo_ingest_config = FlowConfigurationRule::IngestRule(IngestRule {
+        fetch_uncacheable: true,
+    });
     harness
-        .set_dataset_flow_schedule(
+        .set_dataset_flow_config(
             foo_id.clone(),
             DatasetFlowType::Ingest,
-            foo_ingest_schedule.clone(),
+            foo_ingest_config.clone(),
         )
         .await;
 
-    // It should be visible in the list of enabled configs
-    let configs = harness.list_enabled_configurations().await;
+    // It should be visible in the list of configs
+    let configs = harness.list_active_configurations().await;
     assert_eq!(1, configs.len());
-    harness.expect_dataset_flow_schedule(
+    harness.expect_dataset_flow_config(
         &configs,
         foo_id.clone(),
         DatasetFlowType::Ingest,
-        &foo_ingest_schedule,
+        &foo_ingest_config,
     );
 
     // Now, delete the dataset
     harness.delete_dataset(&foo_id).await;
 
-    // The dataset should not be visible in the list of enabled configs
-    let configs = harness.list_enabled_configurations().await;
+    // The dataset should not be visible in the list of configs
+    let configs = harness.list_active_configurations().await;
     assert_eq!(0, configs.len());
 
     // Still, we should see it's state as permanently stopped in the repository
@@ -414,17 +187,14 @@ async fn test_dataset_deleted() {
         .get_dataset_flow_config_from_store(foo_id, DatasetFlowType::Ingest)
         .await;
     assert_eq!(
-        flow_config_state.status,
-        FlowConfigurationStatus::StoppedPermanently
-    );
-    assert_eq!(
         flow_config_state.rule,
-        FlowConfigurationRule::Schedule(foo_ingest_schedule)
+        FlowConfigurationRule::IngestRule(IngestRule {
+            fetch_uncacheable: true,
+        })
     );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 struct FlowConfigurationHarness {
     _tmp_dir: tempfile::TempDir,
     catalog: Catalog,
@@ -492,10 +262,10 @@ impl FlowConfigurationHarness {
         }
     }
 
-    async fn list_enabled_configurations(&self) -> HashMap<FlowKey, FlowConfigurationState> {
+    async fn list_active_configurations(&self) -> HashMap<FlowKey, FlowConfigurationState> {
         let active_configs: Vec<_> = self
             .flow_configuration_service
-            .list_enabled_configurations()
+            .list_active_configurations()
             .try_collect::<Vec<_>>()
             .await
             .unwrap();
@@ -507,113 +277,36 @@ impl FlowConfigurationHarness {
         res
     }
 
-    #[transactional_method1(flow_configuration_service: Arc<dyn FlowConfigurationService>)]
-    async fn set_system_flow_schedule(
-        &self,
-        system_flow_type: SystemFlowType,
-        schedule: Schedule,
-    ) -> Result<(), SetFlowConfigurationError> {
-        flow_configuration_service
-            .set_configuration(
-                Utc::now(),
-                system_flow_type.into(),
-                false,
-                FlowConfigurationRule::Schedule(schedule),
-            )
-            .await?;
-        Ok(())
-    }
-
-    async fn set_dataset_flow_schedule(
+    async fn set_dataset_flow_config(
         &self,
         dataset_id: DatasetID,
         dataset_flow_type: DatasetFlowType,
-        schedule: Schedule,
+        configuration_rule: FlowConfigurationRule,
     ) {
         self.flow_configuration_service
             .set_configuration(
-                Utc::now(),
                 FlowKeyDataset::new(dataset_id, dataset_flow_type).into(),
-                false,
-                FlowConfigurationRule::Schedule(schedule),
+                configuration_rule,
             )
             .await
             .unwrap();
     }
 
-    fn expect_system_flow_schedule(
+    fn expect_dataset_flow_config(
         &self,
-        enabled_configurations: &HashMap<FlowKey, FlowConfigurationState>,
-        system_flow_type: SystemFlowType,
-        expected_schedule: &Schedule,
-    ) {
-        assert_matches!(
-            enabled_configurations.get(&(system_flow_type.into())),
-            Some(FlowConfigurationState {
-                status: FlowConfigurationStatus::Active,
-                rule: FlowConfigurationRule::Schedule(actual_schedule),
-                ..
-            }) if actual_schedule == expected_schedule
-        );
-    }
-
-    fn expect_dataset_flow_schedule(
-        &self,
-        enabled_configurations: &HashMap<FlowKey, FlowConfigurationState>,
+        configurations: &HashMap<FlowKey, FlowConfigurationState>,
         dataset_id: DatasetID,
         dataset_flow_type: DatasetFlowType,
-        expected_schedule: &Schedule,
+        expected_rule: &FlowConfigurationRule,
     ) {
         assert_matches!(
-            enabled_configurations.get(&(FlowKeyDataset::new(dataset_id, dataset_flow_type).into())),
+            configurations.get(&(FlowKeyDataset::new(dataset_id, dataset_flow_type).into())),
             Some(FlowConfigurationState {
                 status: FlowConfigurationStatus::Active,
-                rule: FlowConfigurationRule::Schedule(actual_schedule),
+                rule: actual_rule,
                 ..
-            }) if actual_schedule == expected_schedule
+            }) if actual_rule == expected_rule
         );
-    }
-
-    async fn pause_dataset_flow(&self, dataset_id: DatasetID, dataset_flow_type: DatasetFlowType) {
-        self.flow_configuration_service
-            .pause_dataset_flows(Utc::now(), &dataset_id, Some(dataset_flow_type))
-            .await
-            .unwrap();
-    }
-
-    async fn pause_all_dataset_flows(&self, dataset_id: DatasetID) {
-        self.flow_configuration_service
-            .pause_dataset_flows(Utc::now(), &dataset_id, None)
-            .await
-            .unwrap();
-    }
-
-    async fn pause_system_flow(&self, system_flow_type: SystemFlowType) {
-        self.flow_configuration_service
-            .pause_system_flows(Utc::now(), Some(system_flow_type))
-            .await
-            .unwrap();
-    }
-
-    async fn resume_dataset_flow(&self, dataset_id: DatasetID, dataset_flow_type: DatasetFlowType) {
-        self.flow_configuration_service
-            .resume_dataset_flows(Utc::now(), &dataset_id, Some(dataset_flow_type))
-            .await
-            .unwrap();
-    }
-
-    async fn resume_all_dataset_flows(&self, dataset_id: DatasetID) {
-        self.flow_configuration_service
-            .resume_dataset_flows(Utc::now(), &dataset_id, None)
-            .await
-            .unwrap();
-    }
-
-    async fn resume_system_flow(&self, system_flow_type: SystemFlowType) {
-        self.flow_configuration_service
-            .resume_system_flows(Utc::now(), Some(system_flow_type))
-            .await
-            .unwrap();
     }
 
     async fn get_dataset_flow_config_from_store(
@@ -622,18 +315,6 @@ impl FlowConfigurationHarness {
         dataset_flow_type: DatasetFlowType,
     ) -> FlowConfigurationState {
         let flow_key: FlowKey = FlowKeyDataset::new(dataset_id, dataset_flow_type).into();
-        let flow_configuration =
-            FlowConfiguration::load(flow_key, self.flow_configuration_event_store.as_ref())
-                .await
-                .unwrap();
-        flow_configuration.into()
-    }
-
-    async fn get_system_flow_config_from_store(
-        &self,
-        system_flow_type: SystemFlowType,
-    ) -> FlowConfigurationState {
-        let flow_key: FlowKey = FlowKey::System(FlowKeySystem::new(system_flow_type));
         let flow_configuration =
             FlowConfiguration::load(flow_key, self.flow_configuration_event_store.as_ref())
                 .await

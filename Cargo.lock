@@ -6304,6 +6304,7 @@ dependencies = [
  "sqlx",
  "test-group",
  "test-log",
+ "tracing",
 ]
 
 [[package]]
@@ -6377,6 +6378,7 @@ dependencies = [
  "sqlx",
  "test-group",
  "test-log",
+ "tracing",
 ]
 
 [[package]]

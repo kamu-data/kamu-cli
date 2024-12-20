@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                SELECT DISTINCT dataset_id\n                    FROM flow_trigger_events\n                    WHERE\n                        dataset_id IS NOT NULL AND\n                        event_type = 'FlowTriggerEventCreated'\n                    ORDER BY dataset_id\n                    LIMIT $1 OFFSET $2\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "dataset_id",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "6271354ad84c601d8f8929626be2b1d2c276ae3f54891473b2bfb47078f45dd8"
+}
