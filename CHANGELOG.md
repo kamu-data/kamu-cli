@@ -15,6 +15,8 @@ Recommendation: for ease of reading, use the following order:
 ### Added
 - New `kamu system decode` command that can decode an arbitrary block file for debugging
 - `export` command for bulk data exporting
+### Changed
+- `sql` command now allows to export query command results to file(s)
 
 ## [0.213.1] - 2024-12-18
 ### Fixed
