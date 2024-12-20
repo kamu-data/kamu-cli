@@ -10,7 +10,7 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use kamu::domain::{ExportFormat, ExportService, QueryService};
+use kamu::domain::{ExportFormat, ExportOptions, ExportService, QueryService};
 use opendatafabric::DatasetRef;
 
 use crate::{CLIError, Command};
@@ -67,9 +67,13 @@ impl Command for ExportCommand {
             None => &default_path,
         };
 
+        let options = ExportOptions {
+            format: self.output_format.clone(),
+            records_per_file: self.records_per_file,
+        };
         let rows_exported = self
             .export_service
-            .export_to_fs(df, output_path, &self.output_format, self.records_per_file)
+            .export_to_fs(df, output_path, options)
             .await?;
 
         if !self.quiet {

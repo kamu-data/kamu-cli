@@ -15,7 +15,7 @@ use datafusion::dataframe::{DataFrame, DataFrameWriteOptions};
 use datafusion::logical_expr::Partitioning;
 use dill::{component, interface};
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
-use kamu_core::{ExportError, ExportFormat, ExportService};
+use kamu_core::{ExportError, ExportFormat, ExportOptions, ExportService};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -54,8 +54,7 @@ impl ExportService for ExportServiceImpl {
         &self,
         df: DataFrame,
         path: &Path,
-        format: &ExportFormat,
-        records_per_file: Option<usize>,
+        options: ExportOptions,
     ) -> Result<u64, ExportError> {
         let (mut session_state, plan) = df.into_parts();
 
@@ -71,7 +70,7 @@ impl ExportService for ExportServiceImpl {
             .execution
             .target_partitions = 1;
 
-        if let Some(partition_size) = records_per_file {
+        if let Some(partition_size) = options.records_per_file {
             session_state
                 .config_mut()
                 .options_mut()
@@ -85,7 +84,7 @@ impl ExportService for ExportServiceImpl {
 
         let path_str = path.as_os_str().to_str().unwrap();
 
-        let result = match format {
+        let result = match &options.format {
             ExportFormat::Parquet => {
                 export_df
                     .write_parquet(path_str, DataFrameWriteOptions::new(), None)

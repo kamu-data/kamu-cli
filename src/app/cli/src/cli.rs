@@ -397,9 +397,9 @@ pub struct Export {
     #[arg(long, value_parser = parsers::export_format)]
     pub output_format: ExportFormat,
 
-    /// Number of records per file, if stored into a directory. Default is 5m.
-    /// It's a soft limit. For a sake of export performance real number of
-    /// records may be slightly different.
+    /// Number of records per file, if stored into a directory.
+    /// It's a soft limit. For the sake of export performance the actual number
+    /// of records may be slightly different.
     #[arg(long)]
     pub records_per_file: Option<usize>,
 }
@@ -1275,8 +1275,8 @@ pub struct Sql {
     #[arg(long)]
     pub output_path: Option<PathBuf>,
 
-    /// Number of records per file, if stored into a directory. Default is 5m.
-    /// It's a soft limit. For a sake of export performance real number of
+    /// Number of records per file, if stored into a directory.
+    /// It's a soft limit. For the sake of export performance the actual number
     /// records may be slightly different.
     #[arg(long)]
     pub records_per_file: Option<usize>,

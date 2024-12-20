@@ -25,8 +25,7 @@ pub trait ExportService: Send + Sync {
         &self,
         df: DataFrame,
         path: &Path,
-        format: &ExportFormat,
-        records_per_file: Option<usize>,
+        options: ExportOptions,
     ) -> Result<u64, ExportError>;
 }
 
@@ -42,6 +41,22 @@ pub enum ExportFormat {
 
     #[strum(to_string = "ndjson")]
     NdJson,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct ExportOptions {
+    pub format: ExportFormat,
+    pub records_per_file: Option<usize>,
+}
+
+impl Default for ExportOptions {
+    fn default() -> Self {
+        Self {
+            format: ExportFormat::Parquet,
+            records_per_file: None,
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

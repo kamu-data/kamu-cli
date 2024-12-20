@@ -12,6 +12,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use container_runtime::ContainerRuntime;
+use domain::ExportOptions;
 use internal_error::*;
 use itertools::Itertools;
 use kamu::domain::{ExportFormat, ExportService, QueryOptions, QueryService};
@@ -206,9 +207,13 @@ impl SqlShellCommand {
                     .await
                     .map_err(CLIError::failure)?;
 
+                let options = ExportOptions {
+                    format,
+                    records_per_file: self.records_per_file,
+                };
                 let rows_exported = self
                     .export_service
-                    .export_to_fs(res.df, output_path, &format, self.records_per_file)
+                    .export_to_fs(res.df, output_path, options)
                     .await?;
                 eprintln!("Exported {rows_exported} rows");
             }

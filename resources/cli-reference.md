@@ -269,7 +269,7 @@ Exports a dataset
 
 * `--output-path <OUTPUT_PATH>` — Export destination. Dafault is `<current workdir>/<dataset name>`
 * `--output-format <OUTPUT_FORMAT>` — Output format
-* `--records-per-file <RECORDS_PER_FILE>` — Number of records per file, if stored into a directory. Default is 5m. It's a soft limit. For a sake of export performance real number of records may be slightly different
+* `--records-per-file <RECORDS_PER_FILE>` — Number of records per file, if stored into a directory. It's a soft limit. For the sake of export performance the actual number of records may be slightly different
 
 This command exports a dataset to a file or set of files of a given format.
 
@@ -1106,7 +1106,7 @@ Executes an SQL query or drops you into an SQL shell
 * `-c`, `--command <CMD>` — SQL command to run
 * `--script <FILE>` — SQL script file to execute
 * `--output-path <OUTPUT_PATH>` — When set, result will be stored to a given path instead of being printed to stdout
-* `--records-per-file <RECORDS_PER_FILE>` — Number of records per file, if stored into a directory. Default is 5m. It's a soft limit. For a sake of export performance real number of records may be slightly different
+* `--records-per-file <RECORDS_PER_FILE>` — Number of records per file, if stored into a directory. It's a soft limit. For the sake of export performance the actual number records may be slightly different
 
 SQL shell allows you to explore data of all dataset in your workspace using one of the supported data processing engines. This can be a great way to prepare and test a query that you cal later turn into derivative dataset.
 
