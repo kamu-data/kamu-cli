@@ -23,6 +23,7 @@ Recommendation: for ease of reading, use the following order:
   - OSO: added resource storage for access speed
   - E2E: Using the correct account in multi-tenant mode
     - And also the possibility of set it up
+  - `DatasetOwnershipService`: moved to the `kamu-dataset` crate area & implemented via `DatasetEntryServiceImpl`
 
 ## [0.213.1] - 2024-12-18
 ### Fixed
