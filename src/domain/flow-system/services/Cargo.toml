@@ -26,11 +26,12 @@ database-common = { workspace = true }
 database-common-macros = { workspace = true }
 init-on-startup = { workspace = true }
 internal-error = { workspace = true }
-messaging-outbox = { workspace = true }
 kamu-accounts = { workspace = true }
 kamu-core = { workspace = true }
+kamu-datasets = { workspace = true }
 kamu-flow-system = { workspace = true }
 kamu-task-system = { workspace = true }
+messaging-outbox = { workspace = true }
 observability = { workspace = true, default-features = false }
 opendatafabric = { workspace = true }
 time-source = { workspace = true }

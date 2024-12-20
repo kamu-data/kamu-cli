@@ -23,7 +23,6 @@ pub use transform::*;
 pub use watermark::*;
 
 pub mod dataset_changes_service;
-pub mod dataset_ownership_service;
 pub mod dataset_registry;
 pub mod dependency_graph_service;
 pub mod engine_provisioner;
@@ -43,7 +42,6 @@ pub mod sync_service;
 pub mod verification_service;
 
 pub use dataset_changes_service::*;
-pub use dataset_ownership_service::*;
 pub use dataset_registry::*;
 pub use dependency_graph_service::*;
 pub use engine_provisioner::*;

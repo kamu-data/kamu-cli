@@ -10,7 +10,7 @@
 use chrono::Utc;
 use fs::FlowConfigurationService;
 use kamu_accounts::Account;
-use kamu_core::DatasetOwnershipService;
+use kamu_datasets::DatasetOwnershipService;
 use kamu_flow_system as fs;
 use opendatafabric::DatasetID;
 

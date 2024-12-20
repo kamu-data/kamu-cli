@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_core::DatasetOwnershipService;
+use kamu_datasets::DatasetOwnershipService;
 use opendatafabric as odf;
 
 use crate::prelude::*;

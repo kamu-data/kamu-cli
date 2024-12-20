@@ -22,7 +22,6 @@ use kamu_core::{
     DatasetLifecycleMessageDeleted,
     DatasetLifecycleMessageRenamed,
     DatasetNotFoundError,
-    DatasetOwnershipService,
     DatasetRegistry,
     DatasetRepository,
     GetDatasetError,

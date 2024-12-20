@@ -5356,10 +5356,8 @@ async fn test_list_all_flow_initiators() {
     let foo = AccountConfig::from_name(AccountName::new_unchecked("foo"));
     let bar = AccountConfig::from_name(AccountName::new_unchecked("bar"));
 
-    let subject_foo =
-        CurrentAccountSubject::logged(foo.get_id(), foo.account_name.clone(), false);
-    let subject_bar =
-        CurrentAccountSubject::logged(bar.get_id(), bar.account_name.clone(), false);
+    let subject_foo = CurrentAccountSubject::logged(foo.get_id(), foo.account_name.clone(), false);
+    let subject_bar = CurrentAccountSubject::logged(bar.get_id(), bar.account_name.clone(), false);
 
     let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
         predefined_accounts: vec![foo, bar],
@@ -5374,7 +5372,7 @@ async fn test_list_all_flow_initiators() {
                 dataset_name: DatasetName::new_unchecked("foo"),
                 account_name: Some(subject_foo.account_name().clone()),
             },
-            subject_foo.clone()
+            subject_foo.clone(),
         )
         .await;
     let foo_id = foo_create_result.dataset_handle.id;
@@ -5398,7 +5396,7 @@ async fn test_list_all_flow_initiators() {
                 dataset_name: DatasetName::new_unchecked("bar"),
                 account_name: Some(subject_bar.account_name().clone()),
             },
-            subject_bar
+            subject_bar,
         )
         .await;
     let bar_id = bar_create_result.dataset_handle.id;
@@ -5517,10 +5515,8 @@ async fn test_list_all_datasets_with_flow() {
     let foo = AccountConfig::from_name(AccountName::new_unchecked("foo"));
     let bar = AccountConfig::from_name(AccountName::new_unchecked("bar"));
 
-    let subject_foo =
-        CurrentAccountSubject::logged(foo.get_id(), foo.account_name.clone(), false);
-    let subject_bar =
-        CurrentAccountSubject::logged(bar.get_id(), bar.account_name.clone(), false);
+    let subject_foo = CurrentAccountSubject::logged(foo.get_id(), foo.account_name.clone(), false);
+    let subject_bar = CurrentAccountSubject::logged(bar.get_id(), bar.account_name.clone(), false);
 
     let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
         predefined_accounts: vec![foo, bar],
@@ -5535,7 +5531,7 @@ async fn test_list_all_datasets_with_flow() {
                 dataset_name: DatasetName::new_unchecked("foo"),
                 account_name: Some(subject_foo.account_name().clone()),
             },
-            subject_foo.clone()
+            subject_foo.clone(),
         )
         .await;
     let foo_id = foo_create_result.dataset_handle.id;
@@ -5547,7 +5543,7 @@ async fn test_list_all_datasets_with_flow() {
                 account_name: Some(subject_foo.account_name().clone()),
             },
             vec![foo_id.clone()],
-            subject_foo.clone()
+            subject_foo.clone(),
         )
         .await;
 
@@ -5570,7 +5566,7 @@ async fn test_list_all_datasets_with_flow() {
                 dataset_name: DatasetName::new_unchecked("bar"),
                 account_name: Some(subject_bar.account_name().clone()),
             },
-            subject_bar
+            subject_bar,
         )
         .await;
     let bar_id = bar_create_result.dataset_handle.id;
