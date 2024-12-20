@@ -141,7 +141,7 @@ jobs:
 
       - name: Install cargo tools
         run: |
-          cargo binstall cargo-nextest -y --force
+          cargo binstall cargo-nextest -y --force --github-token ${{ secrets.GITHUB_TOKEN }}
 
       - name: Configure runtime
         if: matrix.container-runtime != ''
