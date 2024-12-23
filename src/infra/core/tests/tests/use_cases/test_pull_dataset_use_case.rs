@@ -13,9 +13,11 @@ use std::sync::Arc;
 
 use kamu::testing::*;
 use kamu::*;
-use kamu_core::auth::{DatasetAction, DummyOdfServerAccessTokenResolver};
+use kamu_core::auth::DatasetAction;
 use kamu_core::*;
-use opendatafabric::*;
+use odf_dataset::{CreateDatasetResult, DummyOdfServerAccessTokenResolver};
+use odf_dataset_impl::{DatasetFactoryImpl, IpfsGateway};
+use odf_metadata::*;
 use tempfile::TempDir;
 use url::Url;
 

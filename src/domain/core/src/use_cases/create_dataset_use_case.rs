@@ -7,27 +7,23 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use opendatafabric::{DatasetAlias, MetadataBlockTyped, Seed};
-
-use crate::{CreateDatasetError, CreateDatasetResult, DatasetVisibility};
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 pub trait CreateDatasetUseCase: Send + Sync {
     async fn execute(
         &self,
-        dataset_alias: &DatasetAlias,
-        seed_block: MetadataBlockTyped<Seed>,
+        dataset_alias: &odf::DatasetAlias,
+        seed_block: odf::MetadataBlockTyped<odf::metadata::Seed>,
         options: CreateDatasetUseCaseOptions,
-    ) -> Result<CreateDatasetResult, CreateDatasetError>;
+    ) -> Result<odf::CreateDatasetResult, odf::dataset::CreateDatasetError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Copy, Clone, Default)]
 pub struct CreateDatasetUseCaseOptions {
-    pub dataset_visibility: DatasetVisibility,
+    pub dataset_visibility: odf::DatasetVisibility,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -10,7 +10,6 @@
 use std::fmt::Display;
 
 use internal_error::InternalError;
-use opendatafabric::{AccountID, AccountName};
 use thiserror::Error;
 
 use crate::Account;
@@ -23,33 +22,33 @@ pub trait AccountRepository: Send + Sync {
 
     async fn get_account_by_id(
         &self,
-        account_id: &AccountID,
+        account_id: &odf::AccountID,
     ) -> Result<Account, GetAccountByIdError>;
 
     async fn get_accounts_by_ids(
         &self,
-        account_ids: Vec<AccountID>,
+        account_ids: Vec<odf::AccountID>,
     ) -> Result<Vec<Account>, GetAccountByIdError>;
 
     async fn get_account_by_name(
         &self,
-        account_name: &AccountName,
+        account_name: &odf::AccountName,
     ) -> Result<Account, GetAccountByNameError>;
 
     async fn find_account_id_by_provider_identity_key(
         &self,
         provider_identity_key: &str,
-    ) -> Result<Option<AccountID>, FindAccountIdByProviderIdentityKeyError>;
+    ) -> Result<Option<odf::AccountID>, FindAccountIdByProviderIdentityKeyError>;
 
     async fn find_account_id_by_email(
         &self,
         email: &str,
-    ) -> Result<Option<AccountID>, FindAccountIdByEmailError>;
+    ) -> Result<Option<odf::AccountID>, FindAccountIdByEmailError>;
 
     async fn find_account_id_by_name(
         &self,
-        account_name: &AccountName,
-    ) -> Result<Option<AccountID>, FindAccountIdByNameError>;
+        account_name: &odf::AccountName,
+    ) -> Result<Option<odf::AccountID>, FindAccountIdByNameError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -106,7 +105,7 @@ pub enum GetAccountByIdError {
 #[derive(Error, Debug)]
 #[error("Account not found by ID: '{account_id}'")]
 pub struct AccountNotFoundByIdError {
-    pub account_id: AccountID,
+    pub account_id: odf::AccountID,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -123,7 +122,7 @@ pub enum GetAccountByNameError {
 #[derive(Error, Debug)]
 #[error("Account not found by name: '{account_name}'")]
 pub struct AccountNotFoundByNameError {
-    pub account_name: AccountName,
+    pub account_name: odf::AccountName,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

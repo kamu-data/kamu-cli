@@ -13,7 +13,6 @@ use kamu_accounts::{
     DEFAULT_ACCOUNT_ID,
     DEFAULT_ACCOUNT_NAME,
 };
-use opendatafabric as odf;
 use tokio::sync::OnceCell;
 
 use super::AccountFlows;

@@ -13,16 +13,14 @@ use database_common_macros::transactional_handler;
 use dill::Catalog;
 use http_common::*;
 use kamu_accounts::{Account, AuthenticationService, CurrentAccountSubject};
-use opendatafabric::{AccountID, AccountName};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct AccountResponse {
-    pub id: AccountID,
-
-    pub account_name: AccountName,
+    pub id: odf::AccountID,
+    pub account_name: odf::AccountName,
 }
 
 impl From<Account> for AccountResponse {

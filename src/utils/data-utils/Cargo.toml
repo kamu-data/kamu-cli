@@ -27,7 +27,7 @@ testing = ["dep:pretty_assertions"]
 
 
 [dependencies]
-opendatafabric = { workspace = true }
+odf-metadata = { workspace = true }
 
 async-trait = "0.1"
 arrow = { version = "53", default-features = false }

@@ -9,7 +9,6 @@
 
 use database_common::PaginationOpts;
 use event_sourcing::EventStore;
-use opendatafabric::DatasetID;
 
 use crate::*;
 
@@ -21,7 +20,7 @@ pub trait FlowConfigurationEventStore: EventStore<FlowConfigurationState> {
     async fn list_dataset_ids(
         &self,
         pagination: &PaginationOpts,
-    ) -> Result<Vec<DatasetID>, InternalError>;
+    ) -> Result<Vec<odf::DatasetID>, InternalError>;
 
     async fn all_dataset_ids_count(&self) -> Result<usize, InternalError>;
 }

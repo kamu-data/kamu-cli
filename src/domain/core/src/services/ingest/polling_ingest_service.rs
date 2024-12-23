@@ -16,7 +16,6 @@ use chrono::{DateTime, Utc};
 use container_runtime::ImagePullError;
 use internal_error::{BoxedError, InternalError};
 use kamu_datasets::{DatasetEnvVar, FindDatasetEnvVarError};
-use opendatafabric::*;
 use thiserror::Error;
 
 use crate::engine::{normalize_logs, EngineError, ProcessError};
@@ -84,8 +83,8 @@ pub enum PollingIngestResult {
         uncacheable: bool,
     },
     Updated {
-        old_head: Multihash,
-        new_head: Multihash,
+        old_head: odf::Multihash,
+        new_head: odf::Multihash,
         has_more: bool,
         uncacheable: bool,
     },
@@ -133,7 +132,10 @@ pub struct NullPollingIngestListener;
 impl PollingIngestListener for NullPollingIngestListener {}
 
 pub trait PollingIngestMultiListener: Send + Sync {
-    fn begin_ingest(&self, _dataset: &DatasetHandle) -> Option<Arc<dyn PollingIngestListener>> {
+    fn begin_ingest(
+        &self,
+        _dataset: &odf::DatasetHandle,
+    ) -> Option<Arc<dyn PollingIngestListener>> {
         None
     }
 }
@@ -301,7 +303,7 @@ pub enum PollingIngestError {
     CommitError(
         #[from]
         #[backtrace]
-        CommitError,
+        odf::dataset::CommitError,
     ),
 
     #[error(transparent)]

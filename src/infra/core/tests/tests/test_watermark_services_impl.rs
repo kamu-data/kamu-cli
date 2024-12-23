@@ -28,7 +28,7 @@ use kamu_core::{
     SetWatermarkResult,
     TenancyConfig,
 };
-use opendatafabric::{DatasetAlias, DatasetName};
+use odf_metadata::{DatasetAlias, DatasetName};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

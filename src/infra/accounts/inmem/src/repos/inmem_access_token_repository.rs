@@ -16,7 +16,7 @@ use database_common::PaginationOpts;
 use dill::*;
 use internal_error::ErrorIntoInternal;
 use kamu_accounts::AccessToken;
-use opendatafabric::AccountID;
+use odf_metadata::AccountID;
 use uuid::Uuid;
 
 use crate::domain::*;

@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use kamu_core::{DatasetChangesService, DatasetIntervalIncrement, GetIncrementError};
-use opendatafabric::{DatasetID, Multihash};
+use odf_metadata::{DatasetID, Multihash};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

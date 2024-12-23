@@ -11,25 +11,24 @@ use std::sync::Arc;
 
 use dill::{component, interface};
 use kamu_accounts::CurrentAccountSubject;
-use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer};
+use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer, DatasetActionUnauthorizedError};
 use kamu_core::{
     DatasetLifecycleMessage,
     DatasetRegistry,
-    GetDatasetError,
-    RenameDatasetError,
     RenameDatasetUseCase,
     MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
 };
 use messaging_outbox::{Outbox, OutboxExt};
-use opendatafabric::{DatasetName, DatasetRef};
+use odf_dataset::{GetDatasetError, RenameDatasetError};
+use odf_metadata::{DatasetName, DatasetRef};
 
-use crate::DatasetRepositoryWriter;
+use crate::DatasetStorageUnitWriter;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct RenameDatasetUseCaseImpl {
     dataset_registry: Arc<dyn DatasetRegistry>,
-    dataset_repo_writer: Arc<dyn DatasetRepositoryWriter>,
+    dataset_storage_unit_writer: Arc<dyn DatasetStorageUnitWriter>,
     dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
     outbox: Arc<dyn Outbox>,
     current_account_subject: Arc<CurrentAccountSubject>,
@@ -40,14 +39,14 @@ pub struct RenameDatasetUseCaseImpl {
 impl RenameDatasetUseCaseImpl {
     pub fn new(
         dataset_registry: Arc<dyn DatasetRegistry>,
-        dataset_repo_writer: Arc<dyn DatasetRepositoryWriter>,
+        dataset_storage_unit_writer: Arc<dyn DatasetStorageUnitWriter>,
         dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
         outbox: Arc<dyn Outbox>,
         current_account_subject: Arc<CurrentAccountSubject>,
     ) -> Self {
         Self {
             dataset_registry,
-            dataset_repo_writer,
+            dataset_storage_unit_writer,
             dataset_action_authorizer,
             outbox,
             current_account_subject,
@@ -86,11 +85,15 @@ impl RenameDatasetUseCase for RenameDatasetUseCaseImpl {
 
         self.dataset_action_authorizer
             .check_action_allowed(&dataset_handle, DatasetAction::Write)
-            .await?;
+            .await
+            .map_err(|e| match e {
+                DatasetActionUnauthorizedError::Access(e) => RenameDatasetError::Access(e),
+                DatasetActionUnauthorizedError::Internal(e) => RenameDatasetError::Internal(e),
+            })?;
 
         let old_name = dataset_handle.alias.dataset_name.clone();
 
-        self.dataset_repo_writer
+        self.dataset_storage_unit_writer
             .rename_dataset(&dataset_handle, new_name)
             .await?;
 

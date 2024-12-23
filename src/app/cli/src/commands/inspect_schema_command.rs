@@ -12,7 +12,6 @@ use std::sync::Arc;
 use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::parquet::schema::types::Type;
 use kamu::domain::*;
-use opendatafabric::*;
 
 use super::{CLIError, Command};
 
@@ -30,7 +29,7 @@ pub enum SchemaOutputFormat {
 
 pub struct InspectSchemaCommand {
     query_svc: Arc<dyn QueryService>,
-    dataset_ref: DatasetRef,
+    dataset_ref: odf::DatasetRef,
     output_format: Option<SchemaOutputFormat>,
     from_data_file: bool,
 }
@@ -38,7 +37,7 @@ pub struct InspectSchemaCommand {
 impl InspectSchemaCommand {
     pub fn new(
         query_svc: Arc<dyn QueryService>,
-        dataset_ref: DatasetRef,
+        dataset_ref: odf::DatasetRef,
         output_format: Option<SchemaOutputFormat>,
         from_data_file: bool,
     ) -> Self {

@@ -8,30 +8,32 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::InternalError;
-use opendatafabric::{AccountName, DatasetHandle, DatasetID, DatasetRef};
 use thiserror::Error;
 
-use crate::{DatasetHandleStream, GetDatasetError, ResolvedDataset};
+use crate::ResolvedDataset;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 pub trait DatasetRegistry: Send + Sync {
-    fn all_dataset_handles(&self) -> DatasetHandleStream<'_>;
+    fn all_dataset_handles(&self) -> odf::dataset::DatasetHandleStream<'_>;
 
-    fn all_dataset_handles_by_owner(&self, owner_name: &AccountName) -> DatasetHandleStream<'_>;
+    fn all_dataset_handles_by_owner(
+        &self,
+        owner_name: &odf::AccountName,
+    ) -> odf::dataset::DatasetHandleStream<'_>;
 
     async fn resolve_dataset_handle_by_ref(
         &self,
-        dataset_ref: &DatasetRef,
-    ) -> Result<DatasetHandle, GetDatasetError>;
+        dataset_ref: &odf::DatasetRef,
+    ) -> Result<odf::DatasetHandle, odf::dataset::GetDatasetError>;
 
     async fn resolve_multiple_dataset_handles_by_ids(
         &self,
-        dataset_ids: Vec<DatasetID>,
+        dataset_ids: Vec<odf::DatasetID>,
     ) -> Result<DatasetHandlesResolution, GetMultipleDatasetsError>;
 
-    fn get_dataset_by_handle(&self, dataset_handle: &DatasetHandle) -> ResolvedDataset;
+    fn get_dataset_by_handle(&self, dataset_handle: &odf::DatasetHandle) -> ResolvedDataset;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -42,13 +44,13 @@ pub trait DatasetRegistry: Send + Sync {
 pub trait DatasetRegistryExt: DatasetRegistry {
     async fn try_resolve_dataset_handle_by_ref(
         &self,
-        dataset_ref: &DatasetRef,
-    ) -> Result<Option<DatasetHandle>, InternalError>;
+        dataset_ref: &odf::DatasetRef,
+    ) -> Result<Option<odf::DatasetHandle>, InternalError>;
 
     async fn get_dataset_by_ref(
         &self,
-        dataset_ref: &DatasetRef,
-    ) -> Result<ResolvedDataset, GetDatasetError>;
+        dataset_ref: &odf::DatasetRef,
+    ) -> Result<ResolvedDataset, odf::dataset::GetDatasetError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -61,19 +63,19 @@ where
 {
     async fn try_resolve_dataset_handle_by_ref(
         &self,
-        dataset_ref: &DatasetRef,
-    ) -> Result<Option<DatasetHandle>, InternalError> {
+        dataset_ref: &odf::DatasetRef,
+    ) -> Result<Option<odf::DatasetHandle>, InternalError> {
         match self.resolve_dataset_handle_by_ref(dataset_ref).await {
             Ok(hdl) => Ok(Some(hdl)),
-            Err(GetDatasetError::NotFound(_)) => Ok(None),
-            Err(GetDatasetError::Internal(e)) => Err(e),
+            Err(odf::dataset::GetDatasetError::NotFound(_)) => Ok(None),
+            Err(odf::dataset::GetDatasetError::Internal(e)) => Err(e),
         }
     }
 
     async fn get_dataset_by_ref(
         &self,
-        dataset_ref: &DatasetRef,
-    ) -> Result<ResolvedDataset, GetDatasetError> {
+        dataset_ref: &odf::DatasetRef,
+    ) -> Result<ResolvedDataset, odf::dataset::GetDatasetError> {
         let dataset_handle = self.resolve_dataset_handle_by_ref(dataset_ref).await?;
         let dataset = self.get_dataset_by_handle(&dataset_handle);
         Ok(dataset)
@@ -84,8 +86,8 @@ where
 
 #[derive(Default)]
 pub struct DatasetHandlesResolution {
-    pub resolved_handles: Vec<DatasetHandle>,
-    pub unresolved_datasets: Vec<(DatasetID, GetDatasetError)>,
+    pub resolved_handles: Vec<odf::DatasetHandle>,
+    pub unresolved_datasets: Vec<(odf::DatasetID, odf::dataset::GetDatasetError)>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

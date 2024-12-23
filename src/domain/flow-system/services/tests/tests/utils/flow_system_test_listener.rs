@@ -25,7 +25,6 @@ use messaging_outbox::{
     MessageConsumerT,
     MessageDeliveryMechanism,
 };
-use opendatafabric::DatasetID;
 use time_source::FakeSystemTimeSource;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -41,7 +40,7 @@ type FlowSnapshot = (DateTime<Utc>, HashMap<FlowKey, Vec<FlowState>>);
 #[derive(Default)]
 struct FlowSystemTestListenerState {
     snapshots: Vec<FlowSnapshot>,
-    dataset_display_names: HashMap<DatasetID, String>,
+    dataset_display_names: HashMap<odf::DatasetID, String>,
 }
 
 #[component(pub)]
@@ -93,7 +92,7 @@ impl FlowSystemTestListener {
         state.snapshots.push((update_time, flow_states_map));
     }
 
-    pub(crate) fn define_dataset_display_name(&self, id: DatasetID, display_name: String) {
+    pub(crate) fn define_dataset_display_name(&self, id: odf::DatasetID, display_name: String) {
         let mut state = self.state.lock().unwrap();
         state.dataset_display_names.insert(id, display_name);
     }

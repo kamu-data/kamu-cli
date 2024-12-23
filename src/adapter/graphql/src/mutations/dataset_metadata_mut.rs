@@ -7,13 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_core::{
-    self as domain,
-    CommitDatasetEventUseCase,
-    MetadataChainExt,
-    SearchSetAttachmentsVisitor,
-};
-use opendatafabric as odf;
+use kamu_core::CommitDatasetEventUseCase;
+use odf::dataset::MetadataChainExt as _;
 
 use super::{CommitResultAppendError, CommitResultSuccess, NoChanges};
 use crate::mutations::MetadataChainMut;
@@ -50,12 +45,12 @@ impl DatasetMetadataMut {
 
         let old_attachments = resolved_dataset
             .as_metadata_chain()
-            .accept_one(SearchSetAttachmentsVisitor::new())
+            .accept_one(odf::dataset::SearchSetAttachmentsVisitor::new())
             .await
             .int_err()?
             .into_event()
             .map(|e| {
-                let odf::Attachments::Embedded(at) = e.attachments;
+                let odf::metadata::Attachments::Embedded(at) = e.attachments;
 
                 at
             });
@@ -65,21 +60,21 @@ impl DatasetMetadataMut {
         let new_attachments = match (content, old_attachments) {
             (None, None) => None,
             (None, Some(old)) if old.items.is_empty() => None,
-            (None, Some(old)) => Some(odf::AttachmentsEmbedded {
+            (None, Some(old)) => Some(odf::metadata::AttachmentsEmbedded {
                 items: old
                     .items
                     .into_iter()
                     .filter(|a| !a.path.to_lowercase().starts_with("readme."))
                     .collect(),
             }),
-            (Some(content), None) => Some(odf::AttachmentsEmbedded {
-                items: vec![odf::AttachmentEmbedded {
+            (Some(content), None) => Some(odf::metadata::AttachmentsEmbedded {
+                items: vec![odf::metadata::AttachmentEmbedded {
                     path: "README.md".to_string(),
                     content,
                 }],
             }),
             (Some(content), Some(old)) => {
-                let mut new = odf::AttachmentsEmbedded {
+                let mut new = odf::metadata::AttachmentsEmbedded {
                     items: old
                         .items
                         .iter()
@@ -87,7 +82,7 @@ impl DatasetMetadataMut {
                         .cloned()
                         .collect(),
                 };
-                new.items.push(odf::AttachmentEmbedded {
+                new.items.push(odf::metadata::AttachmentEmbedded {
                     path: "README.md".to_string(),
                     content,
                 });
@@ -103,7 +98,7 @@ impl DatasetMetadataMut {
             return Ok(UpdateReadmeResult::NoChanges(NoChanges));
         };
 
-        let event = odf::SetAttachments {
+        let event = odf::metadata::SetAttachments {
             attachments: new_attachments.into(),
         };
 
@@ -113,7 +108,7 @@ impl DatasetMetadataMut {
             .execute(
                 &self.dataset_handle,
                 event.into(),
-                domain::CommitOpts::default(),
+                odf::dataset::CommitOpts::default(),
             )
             .await
         {
@@ -121,20 +116,20 @@ impl DatasetMetadataMut {
                 old_head: result.old_head.map(Into::into),
                 new_head: result.new_head.into(),
             }),
-            Err(domain::CommitError::ObjectNotFound(e)) => {
+            Err(odf::dataset::CommitError::ObjectNotFound(e)) => {
                 UpdateReadmeResult::AppendError(CommitResultAppendError {
                     message: format!("Event is referencing a non-existent object {}", e.hash),
                 })
             }
-            Err(domain::CommitError::MetadataAppendError(e)) => {
+            Err(odf::dataset::CommitError::MetadataAppendError(e)) => {
                 UpdateReadmeResult::AppendError(CommitResultAppendError {
                     message: e.to_string(),
                 })
             }
-            Err(domain::CommitError::Access(_)) => {
+            Err(odf::dataset::CommitError::Access(_)) => {
                 return Err(make_dataset_access_error(&self.dataset_handle))
             }
-            Err(e @ domain::CommitError::Internal(_)) => return Err(e.int_err().into()),
+            Err(e @ odf::dataset::CommitError::Internal(_)) => return Err(e.int_err().into()),
         };
 
         Ok(result)

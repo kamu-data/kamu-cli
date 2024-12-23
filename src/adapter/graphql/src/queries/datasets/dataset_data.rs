@@ -7,8 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_core::{self as domain, GetSummaryOpts, QueryError};
-use opendatafabric as odf;
+use kamu_core::{self as domain, QueryError};
 
 use crate::prelude::*;
 use crate::utils::get_dataset;
@@ -33,7 +32,7 @@ impl DatasetData {
     async fn num_records_total(&self, ctx: &Context<'_>) -> Result<u64> {
         let resolved_dataset = get_dataset(ctx, &self.dataset_handle)?;
         let summary = resolved_dataset
-            .get_summary(GetSummaryOpts::default())
+            .get_summary(odf::dataset::GetSummaryOpts::default())
             .await
             .int_err()?;
         Ok(summary.num_records)
@@ -45,7 +44,7 @@ impl DatasetData {
     async fn estimated_size(&self, ctx: &Context<'_>) -> Result<u64> {
         let resolved_dataset = get_dataset(ctx, &self.dataset_handle)?;
         let summary = resolved_dataset
-            .get_summary(GetSummaryOpts::default())
+            .get_summary(odf::dataset::GetSummaryOpts::default())
             .await
             .int_err()?;
         Ok(summary.data_size)

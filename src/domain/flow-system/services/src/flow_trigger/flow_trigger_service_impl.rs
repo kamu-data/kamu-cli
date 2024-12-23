@@ -22,7 +22,6 @@ use messaging_outbox::{
     Outbox,
     OutboxExt,
 };
-use opendatafabric::DatasetID;
 use time_source::SystemTimeSource;
 
 use crate::{
@@ -80,7 +79,7 @@ impl FlowTriggerServiceImpl {
     }
 
     fn get_dataset_flow_keys(
-        dataset_id: &DatasetID,
+        dataset_id: &odf::DatasetID,
         maybe_dataset_flow_type: Option<DatasetFlowType>,
     ) -> Vec<FlowKey> {
         if let Some(dataset_flow_type) = maybe_dataset_flow_type {
@@ -258,7 +257,7 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
     async fn pause_dataset_flows(
         &self,
         request_time: DateTime<Utc>,
-        dataset_id: &DatasetID,
+        dataset_id: &odf::DatasetID,
         maybe_dataset_flow_type: Option<DatasetFlowType>,
     ) -> Result<(), InternalError> {
         let flow_keys = Self::get_dataset_flow_keys(dataset_id, maybe_dataset_flow_type);
@@ -291,7 +290,7 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
     async fn resume_dataset_flows(
         &self,
         request_time: DateTime<Utc>,
-        dataset_id: &DatasetID,
+        dataset_id: &odf::DatasetID,
         maybe_dataset_flow_type: Option<DatasetFlowType>,
     ) -> Result<(), InternalError> {
         let flow_keys = Self::get_dataset_flow_keys(dataset_id, maybe_dataset_flow_type);
@@ -324,7 +323,7 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
     #[tracing::instrument(level = "info", skip_all, fields(?dataset_ids))]
     async fn find_triggers_by_datasets(
         &self,
-        dataset_ids: Vec<DatasetID>,
+        dataset_ids: Vec<odf::DatasetID>,
     ) -> FlowTriggerStateStream {
         Box::pin(async_stream::try_stream! {
             for dataset_flow_type in DatasetFlowType::all() {

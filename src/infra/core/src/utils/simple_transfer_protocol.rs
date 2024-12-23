@@ -13,13 +13,33 @@ use std::sync::{Arc, Mutex};
 use dill::{component, Catalog};
 use futures::{stream, Future, StreamExt, TryStreamExt};
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
-use kamu_core::sync_service::DatasetNotFoundError;
 use kamu_core::utils::metadata_chain_comparator::*;
 use kamu_core::*;
 use odf::{AsTypedBlock, IntoDataStreamBlock};
-use opendatafabric as odf;
-
-use crate::*;
+use odf_dataset::{
+    AppendError,
+    AppendOpts,
+    AppendValidation,
+    AppendValidationError,
+    BlockRef,
+    Dataset,
+    DatasetVisibility,
+    HashedMetadataBlock,
+    IterBlocksError,
+    MetadataChain,
+    MetadataChainExt,
+    SetChainRefError,
+    SetRefOpts,
+};
+use odf_dataset_impl::MetadataChainImpl;
+use odf_metadata as odf;
+use odf_storage::{GetError, GetRefError, InsertError, InsertOpts};
+use odf_storage_impl::{
+    MetadataBlockRepositoryImpl,
+    NamedObjectRepositoryInMemory,
+    ObjectRepositoryInMemory,
+    ReferenceRepositoryImpl,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -217,7 +237,7 @@ impl SimpleTransferProtocol {
     ) -> Result<odf::Multihash, SyncError> {
         match src_chain.resolve_ref(&BlockRef::Head).await {
             Ok(head) => Ok(head),
-            Err(GetRefError::NotFound(_)) => Err(DatasetNotFoundError {
+            Err(GetRefError::NotFound(_)) => Err(DatasetAnyRefUnresolvedError {
                 dataset_ref: src_ref.clone(),
             }
             .into()),
@@ -550,10 +570,10 @@ impl SimpleTransferProtocol {
             .await
         {
             Ok(()) => Ok(()),
-            Err(SetRefError::CASFailed(e)) => Err(SyncError::UpdatedConcurrently(e.into())),
-            Err(SetRefError::Access(e)) => Err(SyncError::Access(e)),
-            Err(SetRefError::Internal(e)) => Err(SyncError::Internal(e)),
-            Err(SetRefError::BlockNotFound(e)) => Err(SyncError::Internal(e.int_err())),
+            Err(SetChainRefError::CASFailed(e)) => Err(SyncError::UpdatedConcurrently(e.into())),
+            Err(SetChainRefError::Access(e)) => Err(SyncError::Access(e)),
+            Err(SetChainRefError::Internal(e)) => Err(SyncError::Internal(e)),
+            Err(SetChainRefError::BlockNotFound(e)) => Err(SyncError::Internal(e.int_err())),
         }?;
 
         Ok(())

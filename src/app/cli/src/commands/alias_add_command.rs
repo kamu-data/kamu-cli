@@ -10,7 +10,6 @@
 use std::sync::Arc;
 
 use kamu::domain::*;
-use opendatafabric::*;
 
 use super::{CLIError, Command};
 
@@ -18,8 +17,8 @@ pub struct AliasAddCommand {
     dataset_registry: Arc<dyn DatasetRegistry>,
     remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
-    dataset_ref: DatasetRef,
-    alias: DatasetRefRemote,
+    dataset_ref: odf::DatasetRef,
+    alias: odf::DatasetRefRemote,
     pull: bool,
     push: bool,
 }
@@ -29,8 +28,8 @@ impl AliasAddCommand {
         dataset_registry: Arc<dyn DatasetRegistry>,
         remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
         remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
-        dataset: DatasetRef,
-        alias: DatasetRefRemote,
+        dataset: odf::DatasetRef,
+        alias: odf::DatasetRefRemote,
         pull: bool,
         push: bool,
     ) -> Self {
@@ -55,7 +54,7 @@ impl Command for AliasAddCommand {
             ));
         }
 
-        if let DatasetRefRemote::Alias(alias) = &self.alias {
+        if let odf::DatasetRefRemote::Alias(alias) = &self.alias {
             self.remote_repo_reg
                 .get_repository(&alias.repo_name)
                 .map_err(CLIError::failure)?;

@@ -9,43 +9,25 @@
 
 use chrono::{DateTime, Utc};
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
-use opendatafabric as odf;
 
-use super::{
-    AcceptVisitorError,
-    BlockRef,
-    MetadataChainExt,
-    ResolvedDataset,
-    WriterSourceEventVisitor,
-};
-use crate::{
-    GenericCallbackVisitor,
-    MetadataChainVisitorExtInfallible,
-    MetadataVisitorDecision,
-    PushSourceNotFoundError,
-    SearchAddDataVisitor,
-    SearchSeedVisitor,
-    SearchSetDataSchemaVisitor,
-    SearchSetVocabVisitor,
-    SearchSourceStateVisitor,
-};
+use crate::{PushSourceNotFoundError, ResolvedDataset, WriterSourceEventVisitor};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Contains a projection of the metadata needed for [`DataWriter`] to function
 #[derive(Debug, Clone)]
 pub struct DataWriterMetadataState {
-    pub block_ref: BlockRef,
+    pub block_ref: odf::BlockRef,
     pub head: odf::Multihash,
-    pub schema: Option<odf::SetDataSchema>,
+    pub schema: Option<odf::metadata::SetDataSchema>,
     pub source_event: Option<odf::MetadataEvent>,
-    pub merge_strategy: odf::MergeStrategy,
-    pub vocab: odf::DatasetVocabulary,
+    pub merge_strategy: odf::metadata::MergeStrategy,
+    pub vocab: odf::metadata::DatasetVocabulary,
     pub data_slices: Vec<odf::Multihash>,
     pub prev_offset: Option<u64>,
     pub prev_checkpoint: Option<odf::Multihash>,
     pub prev_watermark: Option<DateTime<Utc>>,
-    pub prev_source_state: Option<odf::SourceState>,
+    pub prev_source_state: Option<odf::metadata::SourceState>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -64,25 +46,31 @@ impl DataWriterMetadataState {
     )]
     pub async fn build(
         target: ResolvedDataset,
-        block_ref: &BlockRef,
+        block_ref: &odf::BlockRef,
         source_name: Option<&str>,
     ) -> Result<Self, ScanMetadataError> {
         // TODO: PERF: Full metadata scan below - this is expensive and should be
         //       improved using skip lists.
+
+        use odf::dataset::MetadataChainVisitorExtInfallible;
 
         let head = target
             .as_metadata_chain()
             .resolve_ref(block_ref)
             .await
             .int_err()?;
-        let mut seed_visitor = SearchSeedVisitor::new().adapt_err();
-        let mut set_vocab_visitor = SearchSetVocabVisitor::new().adapt_err();
-        let mut set_data_schema_visitor = SearchSetDataSchemaVisitor::new().adapt_err();
-        let mut prev_source_state_visitor = SearchSourceStateVisitor::new(source_name).adapt_err();
-        let mut add_data_visitor = SearchAddDataVisitor::new().adapt_err();
-        let mut add_data_collection_visitor = GenericCallbackVisitor::new(
+        let mut seed_visitor = odf::dataset::SearchSeedVisitor::new().adapt_err();
+        let mut set_vocab_visitor = odf::dataset::SearchSetVocabVisitor::new().adapt_err();
+        let mut set_data_schema_visitor =
+            odf::dataset::SearchSetDataSchemaVisitor::new().adapt_err();
+        let mut prev_source_state_visitor =
+            odf::dataset::SearchSourceStateVisitor::new(source_name).adapt_err();
+        let mut add_data_visitor = odf::dataset::SearchAddDataVisitor::new().adapt_err();
+        let mut add_data_collection_visitor = odf::dataset::GenericCallbackVisitor::new(
             Vec::new(),
-            MetadataVisitorDecision::NextOfType(odf::MetadataEventTypeFlags::ADD_DATA),
+            odf::dataset::MetadataVisitorDecision::NextOfType(
+                odf::metadata::MetadataEventTypeFlags::ADD_DATA,
+            ),
             |state, _, block| {
                 let odf::MetadataEvent::AddData(e) = &block.event else {
                     unreachable!()
@@ -92,12 +80,15 @@ impl DataWriterMetadataState {
                     state.push(output_data.physical_hash.clone());
                 }
 
-                MetadataVisitorDecision::NextOfType(odf::MetadataEventTypeFlags::ADD_DATA)
+                odf::dataset::MetadataVisitorDecision::NextOfType(
+                    odf::metadata::MetadataEventTypeFlags::ADD_DATA,
+                )
             },
         )
         .adapt_err();
         let mut source_event_visitor = WriterSourceEventVisitor::new(source_name);
 
+        use odf::dataset::MetadataChainExt;
         target
             .as_metadata_chain()
             .accept_by_hash(
@@ -173,11 +164,11 @@ pub enum ScanMetadataError {
     ),
 }
 
-impl From<AcceptVisitorError<ScanMetadataError>> for ScanMetadataError {
-    fn from(v: AcceptVisitorError<ScanMetadataError>) -> Self {
+impl From<odf::dataset::AcceptVisitorError<ScanMetadataError>> for ScanMetadataError {
+    fn from(v: odf::dataset::AcceptVisitorError<ScanMetadataError>) -> Self {
         match v {
-            AcceptVisitorError::Visitor(err) => err,
-            AcceptVisitorError::Traversal(err) => Self::Internal(err.int_err()),
+            odf::dataset::AcceptVisitorError::Visitor(err) => err,
+            odf::dataset::AcceptVisitorError::Traversal(err) => Self::Internal(err.int_err()),
         }
     }
 }

@@ -14,13 +14,13 @@ use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use dill::{CatalogBuilder, Component};
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu::domain::auth::DatasetAction;
-use kamu::domain::{CreateDatasetUseCase, DatasetRepository};
-use kamu::testing::{MetadataFactory, MockDatasetActionAuthorizer};
+use kamu::domain::CreateDatasetUseCase;
+use kamu::testing::MockDatasetActionAuthorizer;
 use kamu::{
     CreateDatasetUseCaseImpl,
-    DatasetRegistryRepoBridge,
-    DatasetRepositoryLocalFs,
-    DatasetRepositoryWriter,
+    DatasetRegistrySoloUnitBridge,
+    DatasetStorageUnitLocalFs,
+    DatasetStorageUnitWriter,
 };
 use kamu_accounts::testing::MockAuthenticationService;
 use kamu_accounts::*;
@@ -29,7 +29,7 @@ use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
 use kamu_datasets_services::DependencyGraphServiceImpl;
 use messaging_outbox::DummyOutboxImpl;
 use mockall::predicate::{eq, function};
-use opendatafabric::{DatasetAlias, DatasetHandle, DatasetKind, DatasetName, DatasetRef};
+use odf_storage_impl::testing::MetadataFactory;
 use time_source::SystemTimeSourceDefault;
 use url::Url;
 
@@ -233,12 +233,12 @@ impl ServerHarness {
                 .bind::<dyn kamu::domain::auth::DatasetActionAuthorizer, MockDatasetActionAuthorizer>()
                 .add_value(TenancyConfig::SingleTenant)
                 .add_builder(
-                    DatasetRepositoryLocalFs::builder()
+                    DatasetStorageUnitLocalFs::builder()
                         .with_root(datasets_dir),
                 )
-                .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-                .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
-                .add::<DatasetRegistryRepoBridge>()
+                .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
+                .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
+                .add::<DatasetRegistrySoloUnitBridge>()
                 .add::<CreateDatasetUseCaseImpl>()
                 .add::<DatabaseTransactionRunner>();
 
@@ -257,8 +257,10 @@ impl ServerHarness {
         create_dataset
             .execute(
                 &Self::dataset_alias(),
-                MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build())
-                    .build_typed(),
+                MetadataFactory::metadata_block(
+                    MetadataFactory::seed(odf::DatasetKind::Root).build(),
+                )
+                .build_typed(),
                 Default::default(),
             )
             .await
@@ -281,7 +283,9 @@ impl ServerHarness {
             .layer(
                 tower::ServiceBuilder::new()
                     .layer(axum::Extension(catalog_test))
-                    .layer(axum::Extension(DatasetRef::from_str("mydataset").unwrap()))
+                    .layer(axum::Extension(
+                        odf::DatasetRef::from_str("mydataset").unwrap(),
+                    ))
                     .layer(kamu_adapter_http::DatasetAuthorizationLayer::new(
                         |request| {
                             if !request.method().is_safe() || request.uri().path() == "/bar" {
@@ -314,7 +318,7 @@ impl ServerHarness {
         mock_dataset_action_authorizer
             .expect_check_action_allowed()
             .with(
-                function(|dh: &DatasetHandle| dh.alias == ServerHarness::dataset_alias()),
+                function(|dh: &odf::DatasetHandle| dh.alias == ServerHarness::dataset_alias()),
                 eq(action),
             )
             .returning(move |dh, action| {
@@ -371,7 +375,7 @@ impl ServerHarness {
         http::StatusCode::OK
     }
 
-    fn dataset_alias() -> DatasetAlias {
-        DatasetAlias::new(None, DatasetName::new_unchecked("mydataset"))
+    fn dataset_alias() -> odf::DatasetAlias {
+        odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("mydataset"))
     }
 }

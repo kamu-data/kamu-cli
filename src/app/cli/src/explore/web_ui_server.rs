@@ -27,7 +27,6 @@ use kamu_accounts::{
 };
 use kamu_accounts_services::PasswordLoginCredentials;
 use kamu_adapter_http::FileUploadLimitConfig;
-use opendatafabric::AccountName;
 use rust_embed::RustEmbed;
 use serde::Serialize;
 use url::Url;
@@ -73,7 +72,7 @@ impl WebUIServer {
     pub async fn new(
         server_catalog: Catalog,
         tenancy_config: TenancyConfig,
-        current_account_name: AccountName,
+        current_account_name: odf::AccountName,
         predefined_accounts_config: Arc<PredefinedAccountsConfig>,
         file_upload_limit_config: Arc<FileUploadLimitConfig>,
         enable_dataset_env_vars_management: bool,

@@ -14,11 +14,9 @@ use datafusion::arrow;
 use datafusion::parquet::schema::types::Type;
 use datafusion::prelude::{DataFrame, SessionContext};
 use internal_error::InternalError;
-use opendatafabric::*;
 use thiserror::Error;
 
 use crate::auth::DatasetActionUnauthorizedError;
-use crate::*;
 
 // TODO: Support different engines and query dialects
 #[cfg_attr(feature = "testing", mockall::automock)]
@@ -43,7 +41,7 @@ pub trait QueryService: Send + Sync {
     /// ```
     async fn tail(
         &self,
-        dataset_ref: &DatasetRef,
+        dataset_ref: &odf::DatasetRef,
         skip: u64,
         limit: u64,
     ) -> Result<DataFrame, QueryError>;
@@ -61,21 +59,21 @@ pub trait QueryService: Send + Sync {
     /// already defined by this moment, `None` otherwise
     async fn get_schema(
         &self,
-        dataset_ref: &DatasetRef,
+        dataset_ref: &odf::DatasetRef,
     ) -> Result<Option<arrow::datatypes::SchemaRef>, QueryError>;
 
     /// Returns parquet schema of the last data file in a given dataset, if any
     /// files were written, `None` otherwise
     async fn get_schema_parquet_file(
         &self,
-        dataset_ref: &DatasetRef,
+        dataset_ref: &odf::DatasetRef,
     ) -> Result<Option<Type>, QueryError>;
 
     // TODO: Introduce additional options that could be used to narrow down the
     // number of files we collect to construct the dataframe.
     //
     /// Returns a [DataFrame] representing the contents of an entire dataset
-    async fn get_data(&self, dataset_ref: &DatasetRef) -> Result<DataFrame, QueryError>;
+    async fn get_data(&self, dataset_ref: &odf::DatasetRef) -> Result<DataFrame, QueryError>;
 
     /// Lists engines known to the system and recommended for use
     async fn get_known_engines(&self) -> Result<Vec<EngineDesc>, InternalError>;
@@ -91,7 +89,7 @@ pub struct QueryOptions {
     /// provided the table names in the query will be treated as dataset
     /// references and resolved as normally in the context of the calling
     /// user.
-    pub input_datasets: BTreeMap<DatasetID, QueryOptionsDataset>,
+    pub input_datasets: BTreeMap<odf::DatasetID, QueryOptionsDataset>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -103,7 +101,7 @@ pub struct QueryOptionsDataset {
     /// execution. This is used to achieve full reproducibility of queries
     /// as no matter what updates happen in the datasets - the query will
     /// only consider a specific subset of the data ledger.
-    pub block_hash: Option<Multihash>,
+    pub block_hash: Option<odf::Multihash>,
     /// Hints that can help the system to minimize metadata scanning. Be extra
     /// careful that your hints don't influence the actual result of the
     /// query, as they are not inlcuded in the [`QueryState`] and thus can
@@ -135,7 +133,7 @@ pub struct QueryResponse {
 #[derive(Debug, Clone)]
 pub struct QueryState {
     /// State of the input datasets used in the query
-    pub input_datasets: BTreeMap<DatasetID, QueryStateDataset>,
+    pub input_datasets: BTreeMap<odf::DatasetID, QueryStateDataset>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -144,7 +142,7 @@ pub struct QueryStateDataset {
     pub alias: String,
     /// Last block hash that was considered during the
     /// query planning
-    pub block_hash: Multihash,
+    pub block_hash: odf::Multihash,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -181,7 +179,7 @@ pub enum CreateSessionError {
     Access(
         #[from]
         #[backtrace]
-        AccessError,
+        odf::metadata::AccessError,
     ),
     #[error(transparent)]
     Internal(
@@ -197,7 +195,7 @@ pub enum QueryError {
     DatasetNotFound(
         #[from]
         #[backtrace]
-        DatasetNotFoundError,
+        odf::dataset::DatasetNotFoundError,
     ),
     #[error(transparent)]
     DatasetBlockNotFound(
@@ -221,7 +219,7 @@ pub enum QueryError {
     Access(
         #[from]
         #[backtrace]
-        AccessError,
+        odf::metadata::AccessError,
     ),
     #[error(transparent)]
     Internal(
@@ -238,12 +236,12 @@ pub enum QueryError {
 #[derive(Error, Clone, PartialEq, Eq, Debug)]
 #[error("Dataset {dataset_id} does not have a block {block_hash}")]
 pub struct DatasetBlockNotFoundError {
-    pub dataset_id: DatasetID,
-    pub block_hash: Multihash,
+    pub dataset_id: odf::DatasetID,
+    pub block_hash: odf::Multihash,
 }
 
 impl DatasetBlockNotFoundError {
-    pub fn new(dataset_id: DatasetID, block_hash: Multihash) -> Self {
+    pub fn new(dataset_id: odf::DatasetID, block_hash: odf::Multihash) -> Self {
         Self {
             dataset_id,
             block_hash,
@@ -277,16 +275,16 @@ impl From<datafusion::error::DataFusionError> for QueryError {
 #[derive(Error, Clone, PartialEq, Eq, Debug)]
 #[error("Dataset schema is not yet available: {dataset_ref}")]
 pub struct DatasetSchemaNotAvailableError {
-    pub dataset_ref: DatasetRef,
+    pub dataset_ref: odf::DatasetRef,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl From<GetDatasetError> for QueryError {
-    fn from(v: GetDatasetError) -> Self {
+impl From<odf::dataset::GetDatasetError> for QueryError {
+    fn from(v: odf::dataset::GetDatasetError) -> Self {
         match v {
-            GetDatasetError::NotFound(e) => Self::DatasetNotFound(e),
-            GetDatasetError::Internal(e) => Self::Internal(e),
+            odf::dataset::GetDatasetError::NotFound(e) => Self::DatasetNotFound(e),
+            odf::dataset::GetDatasetError::Internal(e) => Self::Internal(e),
         }
     }
 }

@@ -13,7 +13,6 @@ use futures::{StreamExt, TryStreamExt};
 use internal_error::ResultIntoInternal;
 use kamu::domain::*;
 use kamu::utils::datasets_filtering::filter_datasets_by_local_pattern;
-use opendatafabric::*;
 
 use super::{BatchError, CLIError, Command};
 use crate::output::OutputConfig;
@@ -29,7 +28,7 @@ pub struct VerifyCommand {
     dependency_graph_service: Arc<dyn DependencyGraphService>,
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
     output_config: Arc<OutputConfig>,
-    refs: Vec<DatasetRefPattern>,
+    refs: Vec<odf::DatasetRefPattern>,
     recursive: bool,
     integrity: bool,
 }
@@ -51,7 +50,7 @@ impl VerifyCommand {
         integrity: bool,
     ) -> Self
     where
-        I: Iterator<Item = DatasetRefPattern>,
+        I: Iterator<Item = odf::DatasetRefPattern>,
     {
         Self {
             verify_dataset_use_case,
@@ -179,8 +178,8 @@ impl VerifyCommand {
     //   with a list of missed remote dependencies
     async fn detect_remote_datasets(
         &self,
-        dataset_handles: Vec<DatasetHandle>,
-    ) -> (Vec<DatasetHandle>, Vec<RemoteRefDependency>) {
+        dataset_handles: Vec<odf::DatasetHandle>,
+    ) -> (Vec<odf::DatasetHandle>, Vec<RemoteRefDependency>) {
         let mut result = vec![];
         let mut missed_dependencies = vec![];
 
@@ -200,7 +199,7 @@ impl VerifyCommand {
 
             let resolved_dataset = self.dataset_registry.get_dataset_by_handle(&hdl);
             let summary = resolved_dataset
-                .get_summary(GetSummaryOpts::default())
+                .get_summary(odf::dataset::GetSummaryOpts::default())
                 .await
                 .unwrap();
 
@@ -209,7 +208,7 @@ impl VerifyCommand {
             for dependency in summary.dependencies {
                 if self
                     .dataset_registry
-                    .resolve_dataset_handle_by_ref(&DatasetRef::ID(dependency.clone()))
+                    .resolve_dataset_handle_by_ref(&odf::DatasetRef::ID(dependency.clone()))
                     .await
                     .is_err()
                 {

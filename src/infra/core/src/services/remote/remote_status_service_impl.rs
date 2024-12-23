@@ -18,19 +18,17 @@ use kamu_core::utils::metadata_chain_comparator::{
     NullCompareChainsListener,
 };
 use kamu_core::{
-    BlockRef,
-    DatasetFactory,
     DatasetPushStatuses,
     DatasetRegistry,
-    GetRefError,
-    MetadataChain,
     PushStatus,
     RemoteAliasKind,
     RemoteAliasesRegistry,
     RemoteStatusService,
     StatusCheckError,
 };
-use opendatafabric::{DatasetHandle, DatasetRefRemote, Multihash};
+use odf_dataset::{BlockRef, DatasetFactory, MetadataChain};
+use odf_metadata as odf;
+use odf_storage::GetRefError;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -58,8 +56,8 @@ impl RemoteStatusServiceImpl {
     async fn status(
         &self,
         lhs_chain: &dyn MetadataChain,
-        lhs_head: &Multihash,
-        alias: &DatasetRefRemote,
+        lhs_head: &odf::Multihash,
+        alias: &odf::DatasetRefRemote,
     ) -> Result<CompareChainsResult, StatusCheckError> {
         let url = alias.url().ok_or(StatusCheckError::Internal(
             "Couldn't figure out remote dataset location".int_err(),
@@ -97,7 +95,7 @@ impl RemoteStatusService for RemoteStatusServiceImpl {
     #[tracing::instrument(level = "debug", skip_all, fields(%dataset_handle))]
     async fn check_remotes_status(
         &self,
-        dataset_handle: &DatasetHandle,
+        dataset_handle: &odf::DatasetHandle,
     ) -> Result<DatasetPushStatuses, InternalError> {
         let lhs_ds = self.dataset_registry.get_dataset_by_handle(dataset_handle);
         let lhs_chain = lhs_ds.as_metadata_chain();
@@ -108,7 +106,7 @@ impl RemoteStatusService for RemoteStatusServiceImpl {
             .get_remote_aliases(dataset_handle)
             .await
             .int_err()?;
-        let push_aliases: Vec<&DatasetRefRemote> =
+        let push_aliases: Vec<&odf::DatasetRefRemote> =
             aliases.get_by_kind(RemoteAliasKind::Push).collect();
 
         tracing::debug!(?push_aliases, "Fetched dataset remote push aliases");

@@ -11,15 +11,14 @@ use std::sync::Arc;
 
 use futures::StreamExt;
 use kamu::domain::*;
-use opendatafabric::*;
 
 use super::{CLIError, Command};
 
 pub struct AliasDeleteCommand {
     dataset_registry: Arc<dyn DatasetRegistry>,
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
-    maybe_dataset_ref: Option<DatasetRef>,
-    maybe_alias: Option<DatasetRefRemote>,
+    maybe_dataset_ref: Option<odf::DatasetRef>,
+    maybe_alias: Option<odf::DatasetRefRemote>,
     all: bool,
     pull: bool,
     push: bool,
@@ -29,8 +28,8 @@ impl AliasDeleteCommand {
     pub fn new(
         dataset_registry: Arc<dyn DatasetRegistry>,
         remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
-        maybe_dataset_ref: Option<DatasetRef>,
-        maybe_alias: Option<DatasetRefRemote>,
+        maybe_dataset_ref: Option<odf::DatasetRef>,
+        maybe_alias: Option<odf::DatasetRefRemote>,
         all: bool,
         pull: bool,
         push: bool,

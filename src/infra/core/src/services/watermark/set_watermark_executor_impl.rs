@@ -11,6 +11,7 @@ use dill::*;
 use internal_error::ErrorIntoInternal;
 use kamu_core::*;
 use kamu_ingest_datafusion::DataWriterDataFusion;
+use odf_dataset::{AppendError, AppendValidationError, CommitError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

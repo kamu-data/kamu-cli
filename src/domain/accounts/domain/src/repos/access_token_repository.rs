@@ -10,7 +10,6 @@
 use chrono::{DateTime, Utc};
 use database_common::PaginationOpts;
 use internal_error::InternalError;
-use opendatafabric::AccountID;
 use thiserror::Error;
 use uuid::Uuid;
 
@@ -29,13 +28,13 @@ pub trait AccessTokenRepository: Send + Sync {
 
     async fn get_access_tokens_by_account_id(
         &self,
-        account_id: &AccountID,
+        account_id: &odf::AccountID,
         pagination: &PaginationOpts,
     ) -> Result<Vec<AccessToken>, GetAccessTokenError>;
 
     async fn get_access_tokens_count_by_account_id(
         &self,
-        account_id: &AccountID,
+        account_id: &odf::AccountID,
     ) -> Result<usize, GetAccessTokenError>;
 
     async fn mark_revoked(

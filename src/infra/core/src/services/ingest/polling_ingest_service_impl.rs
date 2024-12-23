@@ -17,8 +17,8 @@ use internal_error::{InternalError, ResultIntoInternal};
 use kamu_core::ingest::*;
 use kamu_core::*;
 use kamu_ingest_datafusion::DataWriterDataFusion;
-use opendatafabric::serde::yaml::Manifest;
-use opendatafabric::*;
+use odf_metadata::serde::yaml::Manifest;
+use odf_metadata::*;
 use random_names::get_random_name;
 use time_source::SystemTimeSource;
 
@@ -387,7 +387,7 @@ impl PollingIngestServiceImpl {
         fetch_step: &FetchStep,
         source_state: Option<&PollingSourceState>,
     ) -> PathBuf {
-        use opendatafabric::serde::flatbuffers::{
+        use odf_metadata::serde::flatbuffers::{
             FlatbuffersEnumSerializable,
             FlatbuffersSerializable,
         };

@@ -11,7 +11,6 @@ use std::fmt::Display;
 
 use internal_error::InternalError;
 use mockall::predicate::{always, eq};
-use opendatafabric::{AccountID, AccountName};
 use thiserror::Error;
 
 use crate::{
@@ -52,35 +51,35 @@ mockall::mock! {
 
         async fn account_by_id(
             &self,
-            account_id: &AccountID,
+            account_id: &odf::AccountID,
         ) -> Result<Option<Account>, InternalError>;
 
         async fn accounts_by_ids(
             &self,
-            account_ids: Vec<AccountID>,
+            account_ids: Vec<odf::AccountID>,
         ) -> Result<Vec<Account>, InternalError>;
 
         async fn account_by_name(
             &self,
-            account_name: &AccountName,
+            account_name: &odf::AccountName,
         ) -> Result<Option<Account>, InternalError>;
 
         async fn find_account_id_by_name(
             &self,
-            account_name: &AccountName,
-        ) -> Result<Option<AccountID>, InternalError>;
+            account_name: &odf::AccountName,
+        ) -> Result<Option<odf::AccountID>, InternalError>;
 
         async fn find_account_name_by_id(
             &self,
-            account_id: &AccountID,
-        ) -> Result<Option<AccountName>, InternalError>;
+            account_id: &odf::AccountID,
+        ) -> Result<Option<odf::AccountName>, InternalError>;
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl MockAuthenticationService {
-    pub fn with_custom_account(account_id: AccountID, account_name: AccountName) -> Self {
+    pub fn with_custom_account(account_id: odf::AccountID, account_name: odf::AccountName) -> Self {
         let account_name_clone = account_name.clone();
         let mut mock_authentication_service = MockAuthenticationService::new();
         mock_authentication_service

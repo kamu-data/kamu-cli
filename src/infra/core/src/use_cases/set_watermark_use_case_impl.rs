@@ -13,7 +13,7 @@ use chrono::{DateTime, Utc};
 use dill::{component, interface};
 use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer};
 use kamu_core::*;
-use opendatafabric::DatasetHandle;
+use odf_metadata::DatasetHandle;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

@@ -11,7 +11,14 @@ use chrono::{DateTime, Utc};
 use dill::*;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_core::*;
-use opendatafabric::{self as odf, AsTypedBlock};
+use odf_dataset::{
+    MetadataChainExt,
+    SearchAddDataVisitor,
+    SearchSetPollingSourceVisitor,
+    SearchSetTransformVisitor,
+    TryStreamExtExt,
+};
+use odf_metadata::{self as odf, AsTypedBlock};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

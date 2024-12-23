@@ -13,7 +13,7 @@ use std::sync::Arc;
 use chrono::{DateTime, SubsecRound, TimeZone as _, Utc};
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_core::*;
-use opendatafabric::*;
+use odf_metadata::*;
 
 use super::*;
 use crate::PollingSourceState;

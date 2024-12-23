@@ -1,0 +1,33 @@
+[package]
+name = "test-utils"
+description = "Common utilities that are used by tests"
+version = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+authors = { workspace = true }
+readme = { workspace = true }
+license-file = { workspace = true }
+keywords = { workspace = true }
+include = { workspace = true }
+edition = { workspace = true }
+publish = { workspace = true }
+
+
+[lints]
+workspace = true
+
+
+[lib]
+doctest = false
+
+
+[dependencies]
+container-runtime = { workspace = true }
+
+axum = "0.7"
+rand = "0.8"
+tempfile = "3"
+tokio = { version = "1", default-features = false }
+tower = "0.5"
+tower-http = { version = "0.6", features = ["fs", "trace"] }
+url = { version = "2", default-features = false }

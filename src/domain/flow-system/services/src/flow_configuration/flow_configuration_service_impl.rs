@@ -14,7 +14,6 @@ use dill::*;
 use kamu_core::DatasetLifecycleMessage;
 use kamu_flow_system::*;
 use messaging_outbox::{MessageConsumer, MessageConsumerT};
-use opendatafabric::DatasetID;
 use time_source::SystemTimeSource;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -61,7 +60,7 @@ impl FlowConfigurationService for FlowConfigurationServiceImpl {
     #[tracing::instrument(level = "info", skip_all, fields(?dataset_ids))]
     async fn find_configurations_by_datasets(
         &self,
-        dataset_ids: Vec<DatasetID>,
+        dataset_ids: Vec<odf::DatasetID>,
     ) -> FlowConfigurationStateStream {
         Box::pin(async_stream::try_stream! {
             for dataset_flow_type in DatasetFlowType::all() {

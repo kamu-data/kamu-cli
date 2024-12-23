@@ -10,10 +10,12 @@
 use std::sync::Arc;
 
 use chrono::Utc;
-use kamu::testing::{BaseRepoHarness, MetadataFactory};
+use kamu::testing::BaseRepoHarness;
 use kamu::DatasetChangesServiceImpl;
-use kamu_core::{CommitOpts, DatasetChangesService, DatasetIntervalIncrement, TenancyConfig};
-use opendatafabric::{Checkpoint, DatasetAlias, DatasetID, DatasetName, MetadataEvent, Multihash};
+use kamu_core::{DatasetChangesService, DatasetIntervalIncrement, TenancyConfig};
+use odf_dataset::CommitOpts;
+use odf_metadata::{Checkpoint, DatasetAlias, DatasetID, DatasetName, MetadataEvent, Multihash};
+use odf_storage_impl::testing::MetadataFactory;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

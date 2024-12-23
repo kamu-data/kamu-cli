@@ -14,12 +14,10 @@ use std::sync::Arc;
 
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use dill::CatalogBuilder;
-use kamu::testing::{BaseRepoHarness, DummySmartTransferProtocolClient, MetadataFactory};
+use kamu::testing::{BaseRepoHarness, DummySmartTransferProtocolClient};
 use kamu::utils::ipfs_wrapper::IpfsClient;
 use kamu::utils::simple_transfer_protocol::SimpleTransferProtocol;
 use kamu::{
-    DatasetFactoryImpl,
-    IpfsGateway,
     RemoteAliasesRegistryImpl,
     RemoteReposDir,
     RemoteRepositoryRegistryImpl,
@@ -27,10 +25,19 @@ use kamu::{
     SyncRequestBuilder,
     SyncServiceImpl,
 };
-use kamu_core::auth::DummyOdfServerAccessTokenResolver;
 use kamu_core::utils::metadata_chain_comparator::CompareChainsResult;
 use kamu_core::*;
-use opendatafabric::*;
+use odf_dataset::{
+    AppendOpts,
+    BlockRef,
+    CreateDatasetResult,
+    DatasetVisibility,
+    DummyOdfServerAccessTokenResolver,
+    SetRefOpts,
+};
+use odf_dataset_impl::{DatasetFactoryImpl, IpfsGateway};
+use odf_metadata::*;
+use odf_storage_impl::testing::MetadataFactory;
 use url::Url;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -275,7 +282,7 @@ impl RemoteStatusTestHarness {
             MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build())
                 .build_typed();
 
-        self.dataset_repo_writer()
+        self.dataset_storage_unit_writer()
             .create_dataset(&local_alias, seed_block)
             .await
             .unwrap()

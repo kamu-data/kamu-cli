@@ -7,8 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu::domain;
-
 use crate::prelude::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -19,20 +17,20 @@ pub enum DatasetVisibility {
     Public,
 }
 
-impl From<domain::DatasetVisibility> for DatasetVisibility {
-    fn from(value: domain::DatasetVisibility) -> Self {
+impl From<odf::DatasetVisibility> for DatasetVisibility {
+    fn from(value: odf::DatasetVisibility) -> Self {
         match value {
-            domain::DatasetVisibility::Private => Self::Private,
-            domain::DatasetVisibility::Public => Self::Public,
+            odf::DatasetVisibility::Private => Self::Private,
+            odf::DatasetVisibility::Public => Self::Public,
         }
     }
 }
 
-impl From<DatasetVisibility> for domain::DatasetVisibility {
+impl From<DatasetVisibility> for odf::DatasetVisibility {
     fn from(value: DatasetVisibility) -> Self {
         match value {
-            DatasetVisibility::Private => domain::DatasetVisibility::Private,
-            DatasetVisibility::Public => domain::DatasetVisibility::Public,
+            DatasetVisibility::Private => odf::DatasetVisibility::Private,
+            DatasetVisibility::Public => odf::DatasetVisibility::Public,
         }
     }
 }

@@ -15,7 +15,6 @@ use aes_gcm::{Aes256Gcm, AesGcm, Key};
 use chrono::{DateTime, Utc};
 use internal_error::{BoxedError, ErrorIntoInternal, InternalError};
 use merge::Merge;
-use opendatafabric::DatasetID;
 use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
@@ -35,7 +34,7 @@ pub struct DatasetEnvVar {
     pub value: Vec<u8>,
     pub secret_nonce: Option<Vec<u8>>,
     pub created_at: DateTime<Utc>,
-    pub dataset_id: DatasetID,
+    pub dataset_id: odf::DatasetID,
 }
 
 impl DatasetEnvVar {
@@ -43,7 +42,7 @@ impl DatasetEnvVar {
         dataset_env_var_key: &str,
         creation_date: DateTime<Utc>,
         dataset_env_var_value: &DatasetEnvVarValue,
-        dataset_id: &DatasetID,
+        dataset_id: &odf::DatasetID,
         encryption_key: &str,
     ) -> Result<Self, DatasetEnvVarEncryptionError> {
         let dataset_env_var_id = Uuid::new_v4();
@@ -151,7 +150,7 @@ pub struct DatasetEnvVarRowModel {
     pub value: Vec<u8>,
     pub secret_nonce: Option<Vec<u8>>,
     pub created_at: DateTime<Utc>,
-    pub dataset_id: DatasetID,
+    pub dataset_id: odf::DatasetID,
 }
 
 #[cfg(feature = "sqlx")]
@@ -279,7 +278,6 @@ impl DatasetEnvVarsConfig {
 #[cfg(test)]
 mod tests {
     use chrono::Utc;
-    use opendatafabric::DatasetID;
     use secrecy::SecretString;
 
     use crate::{DatasetEnvVar, SAMPLE_DATASET_ENV_VAR_ENCRYPTION_KEY};
@@ -291,7 +289,7 @@ mod tests {
             "foo_key",
             Utc::now(),
             &crate::DatasetEnvVarValue::Secret(SecretString::from(secret_value.to_string())),
-            &DatasetID::new_seeded_ed25519(b"foo"),
+            &odf::DatasetID::new_seeded_ed25519(b"foo"),
             SAMPLE_DATASET_ENV_VAR_ENCRYPTION_KEY,
         )
         .unwrap();
@@ -309,7 +307,7 @@ mod tests {
             "foo_key",
             Utc::now(),
             &crate::DatasetEnvVarValue::Regular(value.to_string()),
-            &DatasetID::new_seeded_ed25519(b"foo"),
+            &odf::DatasetID::new_seeded_ed25519(b"foo"),
             SAMPLE_DATASET_ENV_VAR_ENCRYPTION_KEY,
         )
         .unwrap();

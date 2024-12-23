@@ -13,7 +13,7 @@ use std::sync::Arc;
 use kamu::testing::MockDatasetActionAuthorizer;
 use kamu::*;
 use kamu_core::*;
-use opendatafabric::{DatasetAlias, DatasetName};
+use odf_metadata::{DatasetAlias, DatasetName};
 
 use crate::tests::use_cases::*;
 

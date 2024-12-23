@@ -12,7 +12,7 @@ use std::collections::HashSet;
 use database_common::PaginationOpts;
 use futures::TryStreamExt;
 use kamu_accounts::AuthenticationService;
-use {kamu_flow_system as fs, opendatafabric as odf};
+use kamu_flow_system as fs;
 
 use crate::mutations::{check_if_flow_belongs_to_dataset, FlowInDatasetError, FlowNotFound};
 use crate::prelude::*;

@@ -9,8 +9,6 @@
 
 use std::sync::Arc;
 
-use opendatafabric as odf;
-
 use super::{CompactionExecutionError, CompactionPlan, CompactionPlanningError};
 use crate::CompactionResult;
 

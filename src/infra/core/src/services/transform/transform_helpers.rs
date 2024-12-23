@@ -11,33 +11,27 @@ use chrono::{DateTime, Utc};
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_core::engine::TransformRequestInputExt;
 use kamu_core::{
-    BlockRef,
-    Dataset,
     InputSchemaNotDefinedError,
     InvalidInputIntervalError,
-    IterBlocksError,
-    MetadataChainExt,
     ResolvedDataset,
     ResolvedDatasetsMap,
-    SearchExecuteTransformVisitor,
-    SearchSetDataSchemaVisitor,
-    SearchSetTransformVisitor,
-    SearchSetVocabVisitor,
     TransformElaborateError,
     TransformNotDefinedError,
     TransformPlanError,
     TransformPreliminaryRequestExt,
     VerifyTransformPlanError,
 };
-use opendatafabric::{
-    DatasetVocabulary,
-    ExecuteTransform,
-    ExecuteTransformInput,
-    IntoDataStreamBlock,
-    SetDataSchema,
-    TransformInput,
-    Watermark,
+use odf_dataset::{
+    BlockRef,
+    Dataset,
+    IterBlocksError,
+    MetadataChainExt,
+    SearchExecuteTransformVisitor,
+    SearchSetDataSchemaVisitor,
+    SearchSetTransformVisitor,
+    SearchSetVocabVisitor,
 };
+use odf_metadata::{self as odf, IntoDataStreamBlock};
 use random_names::get_random_name;
 use thiserror::Error;
 
@@ -81,7 +75,7 @@ pub async fn build_preliminary_request_ext(
             set_data_schema_visitor
                 .into_event()
                 .as_ref()
-                .map(SetDataSchema::schema_as_arrow)
+                .map(odf::SetDataSchema::schema_as_arrow)
                 .transpose() // Option<Result<SchemaRef, E>> -> Result<Option<SchemaRef>, E>
                 .int_err()?,
             set_vocab_visitor.into_event(),
@@ -96,7 +90,7 @@ pub async fn build_preliminary_request_ext(
 
     // Prepare inputs
     use itertools::Itertools;
-    let input_states: Vec<(TransformInput, Option<ExecuteTransformInput>)> =
+    let input_states: Vec<(odf::TransformInput, Option<odf::ExecuteTransformInput>)> =
         if let Some(query) = &prev_query {
             source
                 .inputs
@@ -117,7 +111,9 @@ pub async fn build_preliminary_request_ext(
         transform: source.transform,
         system_time,
         schema,
-        prev_offset: prev_query.as_ref().and_then(ExecuteTransform::last_offset),
+        prev_offset: prev_query
+            .as_ref()
+            .and_then(odf::ExecuteTransform::last_offset),
         vocab: set_vocab.unwrap_or_default().into(),
         input_states,
         prev_checkpoint: prev_query.and_then(|q| q.new_checkpoint.map(|c| c.physical_hash)),
@@ -127,9 +123,9 @@ pub async fn build_preliminary_request_ext(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) async fn get_transform_input_from_query_input(
-    query_input: ExecuteTransformInput,
+    query_input: odf::ExecuteTransformInput,
     alias: String,
-    vocab_hint: Option<DatasetVocabulary>,
+    vocab_hint: Option<odf::DatasetVocabulary>,
     datasets_map: &ResolvedDatasetsMap,
 ) -> Result<TransformRequestInputExt, GetTransformInputError> {
     let resolved_input = datasets_map.get_by_id(&query_input.dataset_id);
@@ -183,7 +179,7 @@ pub(crate) async fn get_transform_input_from_query_input(
         }
 
         if let Some(wm) = block.event.new_watermark {
-            explicit_watermarks.push(Watermark {
+            explicit_watermarks.push(odf::Watermark {
                 system_time: *block.system_time,
                 event_time: *wm,
             });
@@ -218,7 +214,7 @@ pub(crate) async fn get_transform_input_from_query_input(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // TODO: Avoid iterating through output chain multiple times
-async fn get_vocab(dataset: &dyn Dataset) -> Result<DatasetVocabulary, InternalError> {
+async fn get_vocab(dataset: &dyn Dataset) -> Result<odf::DatasetVocabulary, InternalError> {
     Ok(dataset
         .as_metadata_chain()
         .accept_one(SearchSetVocabVisitor::new())

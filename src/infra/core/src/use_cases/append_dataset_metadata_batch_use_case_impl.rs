@@ -14,17 +14,19 @@ use dill::{component, interface};
 use internal_error::ResultIntoInternal;
 use kamu_core::{
     AppendDatasetMetadataBatchUseCase,
+    DatasetLifecycleMessage,
+    MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
+};
+use messaging_outbox::{Outbox, OutboxExt};
+use odf_dataset::{
     AppendError,
     AppendOpts,
     BlockRef,
     Dataset,
-    DatasetLifecycleMessage,
     GetSummaryOpts,
     HashedMetadataBlock,
     SetRefOpts,
-    MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
 };
-use messaging_outbox::{Outbox, OutboxExt};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -63,12 +65,12 @@ impl AppendDatasetMetadataBatchUseCase for AppendDatasetMetadataBatchUseCaseImpl
 
         let metadata_chain = dataset.as_metadata_chain();
 
-        let mut new_upstream_ids: Vec<opendatafabric::DatasetID> = vec![];
+        let mut new_upstream_ids: Vec<odf_metadata::DatasetID> = vec![];
 
         for (hash, block) in new_blocks {
             tracing::debug!(sequence_numer = %block.sequence_number, hash = %hash, "Appending block");
 
-            if let opendatafabric::MetadataEvent::SetTransform(transform) = &block.event {
+            if let odf_metadata::MetadataEvent::SetTransform(transform) = &block.event {
                 // Collect only the latest upstream dataset IDs
                 new_upstream_ids.clear();
                 for new_input in &transform.inputs {

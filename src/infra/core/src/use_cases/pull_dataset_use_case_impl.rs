@@ -19,7 +19,7 @@ use kamu_core::auth::{
     DatasetActionUnauthorizedError,
 };
 use kamu_core::*;
-use opendatafabric::{DatasetHandle, DatasetRefAny};
+use odf_metadata::{DatasetHandle, DatasetRefAny};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

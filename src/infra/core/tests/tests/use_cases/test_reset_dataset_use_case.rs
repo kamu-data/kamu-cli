@@ -10,10 +10,12 @@
 use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
-use kamu::testing::{MetadataFactory, MockDatasetActionAuthorizer};
+use kamu::testing::MockDatasetActionAuthorizer;
 use kamu::*;
 use kamu_core::*;
-use opendatafabric::*;
+use odf_dataset::CommitOpts;
+use odf_metadata::*;
+use odf_storage_impl::testing::MetadataFactory;
 
 use super::{BaseUseCaseHarness, BaseUseCaseHarnessOptions};
 

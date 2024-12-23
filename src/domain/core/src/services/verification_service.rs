@@ -11,7 +11,6 @@ use std::fmt::Display;
 use std::sync::Arc;
 
 use internal_error::{ErrorIntoInternal, InternalError};
-use opendatafabric::*;
 use thiserror::Error;
 
 use crate::*;
@@ -42,7 +41,7 @@ pub trait VerificationService: Send + Sync {
 #[derive(Clone, Debug)]
 pub struct VerificationRequest<TTarget> {
     pub target: TTarget,
-    pub block_range: (Option<Multihash>, Option<Multihash>),
+    pub block_range: (Option<odf::Multihash>, Option<odf::Multihash>),
     pub options: VerificationOptions,
 }
 
@@ -51,12 +50,12 @@ pub struct VerificationRequest<TTarget> {
 #[derive(Debug)]
 pub struct VerificationResult {
     /// Handle of the dataset, if were able to resolve the requested reference
-    pub dataset_handle: Option<DatasetHandle>,
+    pub dataset_handle: Option<odf::DatasetHandle>,
     pub outcome: Result<(), VerificationError>,
 }
 
 impl VerificationResult {
-    pub fn err(dataset_handle: DatasetHandle, e: impl Into<VerificationError>) -> Self {
+    pub fn err(dataset_handle: odf::DatasetHandle, e: impl Into<VerificationError>) -> Self {
         Self {
             dataset_handle: Some(dataset_handle),
             outcome: Err(e.into()),
@@ -128,7 +127,7 @@ pub trait VerificationListener: Send + Sync {
 
     fn begin_block(
         &self,
-        _block_hash: &Multihash,
+        _block_hash: &odf::Multihash,
         _block_index: usize,
         _num_blocks: usize,
         _phase: VerificationPhase,
@@ -136,7 +135,7 @@ pub trait VerificationListener: Send + Sync {
     }
     fn end_block(
         &self,
-        _block_hash: &Multihash,
+        _block_hash: &odf::Multihash,
         _block_index: usize,
         _num_blocks: usize,
         _phase: VerificationPhase,
@@ -154,7 +153,7 @@ impl VerificationListener for NullVerificationListener {}
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub trait VerificationMultiListener: Send + Sync {
-    fn begin_verify(&self, _dataset: &DatasetHandle) -> Option<Arc<dyn VerificationListener>> {
+    fn begin_verify(&self, _dataset: &odf::DatasetHandle) -> Option<Arc<dyn VerificationListener>> {
         None
     }
 }
@@ -172,37 +171,37 @@ pub enum VerificationError {
     DatasetNotFound(
         #[from]
         #[backtrace]
-        DatasetNotFoundError,
+        odf::dataset::DatasetNotFoundError,
     ),
     #[error(transparent)]
     RefNotFound(
         #[from]
         #[backtrace]
-        RefNotFoundError,
+        odf::storage::RefNotFoundError,
     ),
     #[error(transparent)]
     BlockNotFound(
         #[from]
         #[backtrace]
-        BlockNotFoundError,
+        odf::storage::BlockNotFoundError,
     ),
     #[error(transparent)]
     BlockVersion(
         #[from]
         #[backtrace]
-        BlockVersionError,
+        odf::storage::BlockVersionError,
     ),
     #[error(transparent)]
     BlockMalformed(
         #[from]
         #[backtrace]
-        BlockMalformedError,
+        odf::storage::BlockMalformedError,
     ),
     #[error(transparent)]
     InvalidInterval(
         #[from]
         #[backtrace]
-        InvalidIntervalError,
+        odf::dataset::InvalidIntervalError,
     ),
     #[error("Data doesn't match metadata")]
     DataDoesNotMatchMetadata(
@@ -232,7 +231,7 @@ pub enum VerificationError {
     Access(
         #[from]
         #[backtrace]
-        AccessError,
+        odf::AccessError,
     ),
     #[error(transparent)]
     Internal(
@@ -242,35 +241,39 @@ pub enum VerificationError {
     ),
 }
 
-impl From<GetDatasetError> for VerificationError {
-    fn from(v: GetDatasetError) -> Self {
+impl From<odf::dataset::GetDatasetError> for VerificationError {
+    fn from(v: odf::dataset::GetDatasetError) -> Self {
         match v {
-            GetDatasetError::NotFound(e) => VerificationError::DatasetNotFound(e),
-            GetDatasetError::Internal(e) => VerificationError::Internal(e),
+            odf::dataset::GetDatasetError::NotFound(e) => VerificationError::DatasetNotFound(e),
+            odf::dataset::GetDatasetError::Internal(e) => VerificationError::Internal(e),
         }
     }
 }
 
-impl From<GetRefError> for VerificationError {
-    fn from(v: GetRefError) -> Self {
+impl From<odf::storage::GetRefError> for VerificationError {
+    fn from(v: odf::storage::GetRefError) -> Self {
         match v {
-            GetRefError::NotFound(e) => VerificationError::RefNotFound(e),
-            GetRefError::Access(e) => VerificationError::Internal(e.int_err()),
-            GetRefError::Internal(e) => VerificationError::Internal(e),
+            odf::storage::GetRefError::NotFound(e) => VerificationError::RefNotFound(e),
+            odf::storage::GetRefError::Access(e) => VerificationError::Internal(e.int_err()),
+            odf::storage::GetRefError::Internal(e) => VerificationError::Internal(e),
         }
     }
 }
 
-impl From<IterBlocksError> for VerificationError {
-    fn from(v: IterBlocksError) -> Self {
+impl From<odf::dataset::IterBlocksError> for VerificationError {
+    fn from(v: odf::dataset::IterBlocksError) -> Self {
         match v {
-            IterBlocksError::RefNotFound(e) => VerificationError::RefNotFound(e),
-            IterBlocksError::BlockNotFound(e) => VerificationError::BlockNotFound(e),
-            IterBlocksError::BlockVersion(e) => VerificationError::BlockVersion(e),
-            IterBlocksError::BlockMalformed(e) => VerificationError::BlockMalformed(e),
-            IterBlocksError::InvalidInterval(e) => VerificationError::InvalidInterval(e),
-            IterBlocksError::Access(e) => VerificationError::Internal(e.int_err()),
-            IterBlocksError::Internal(e) => VerificationError::Internal(e),
+            odf::dataset::IterBlocksError::RefNotFound(e) => VerificationError::RefNotFound(e),
+            odf::dataset::IterBlocksError::BlockNotFound(e) => VerificationError::BlockNotFound(e),
+            odf::dataset::IterBlocksError::BlockVersion(e) => VerificationError::BlockVersion(e),
+            odf::dataset::IterBlocksError::BlockMalformed(e) => {
+                VerificationError::BlockMalformed(e)
+            }
+            odf::dataset::IterBlocksError::InvalidInterval(e) => {
+                VerificationError::InvalidInterval(e)
+            }
+            odf::dataset::IterBlocksError::Access(e) => VerificationError::Internal(e.int_err()),
+            odf::dataset::IterBlocksError::Internal(e) => VerificationError::Internal(e),
         }
     }
 }
@@ -284,14 +287,14 @@ impl From<auth::DatasetActionUnauthorizedError> for VerificationError {
     }
 }
 
-impl From<GetBlockError> for VerificationError {
-    fn from(v: GetBlockError) -> Self {
+impl From<odf::storage::GetBlockError> for VerificationError {
+    fn from(v: odf::storage::GetBlockError) -> Self {
         match v {
-            GetBlockError::NotFound(e) => Self::BlockNotFound(e),
-            GetBlockError::BlockVersion(e) => Self::BlockVersion(e),
-            GetBlockError::BlockMalformed(e) => Self::BlockMalformed(e),
-            GetBlockError::Access(e) => Self::Internal(e.int_err()),
-            GetBlockError::Internal(e) => Self::Internal(e),
+            odf::storage::GetBlockError::NotFound(e) => Self::BlockNotFound(e),
+            odf::storage::GetBlockError::BlockVersion(e) => Self::BlockVersion(e),
+            odf::storage::GetBlockError::BlockMalformed(e) => Self::BlockMalformed(e),
+            odf::storage::GetBlockError::Access(e) => Self::Internal(e.int_err()),
+            odf::storage::GetBlockError::Internal(e) => Self::Internal(e),
         }
     }
 }
@@ -305,18 +308,18 @@ pub enum DataVerificationError {
         actual: u64,
     },
     PhysicalHashMismatch {
-        expected: Multihash,
-        actual: Multihash,
+        expected: odf::Multihash,
+        actual: odf::Multihash,
     },
     LogicalHashMismatch {
-        expected: Multihash,
-        actual: Multihash,
+        expected: odf::Multihash,
+        actual: odf::Multihash,
     },
 }
 
 #[derive(Error, Debug)]
 pub struct DataDoesNotMatchMetadata {
-    pub block_hash: Multihash,
+    pub block_hash: odf::Multihash,
     pub error: DataVerificationError,
 }
 
@@ -346,9 +349,9 @@ impl Display for DataDoesNotMatchMetadata {
 
 #[derive(Error, Debug)]
 pub struct DataNotReproducible {
-    pub block_hash: Multihash,
-    pub expected_event: Box<MetadataEvent>,
-    pub actual_event: Box<MetadataEvent>,
+    pub block_hash: odf::Multihash,
+    pub expected_event: Box<odf::MetadataEvent>,
+    pub actual_event: Box<odf::MetadataEvent>,
 }
 
 impl Display for DataNotReproducible {
@@ -370,14 +373,14 @@ pub enum CheckpointVerificationError {
         actual: u64,
     },
     PhysicalHashMismatch {
-        expected: Multihash,
-        actual: Multihash,
+        expected: odf::Multihash,
+        actual: odf::Multihash,
     },
 }
 
 #[derive(Error, Debug)]
 pub struct CheckpointDoesNotMatchMetadata {
-    pub block_hash: Multihash,
+    pub block_hash: odf::Multihash,
     pub error: CheckpointVerificationError,
 }
 

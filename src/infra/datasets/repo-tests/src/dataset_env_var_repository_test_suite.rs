@@ -23,7 +23,7 @@ use kamu_datasets::{
     ModifyDatasetEnvVarError,
     SAMPLE_DATASET_ENV_VAR_ENCRYPTION_KEY,
 };
-use opendatafabric::DatasetID;
+use odf_metadata::DatasetID;
 use secrecy::SecretString;
 use uuid::Uuid;
 

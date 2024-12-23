@@ -12,15 +12,9 @@ use std::sync::Arc;
 
 use futures::{future, StreamExt, TryStreamExt};
 use internal_error::InternalError;
-use kamu_core::{
-    DatasetRegistry,
-    GetDatasetError,
-    SearchError,
-    SearchOptions,
-    SearchService,
-    TenancyConfig,
-};
-use opendatafabric::{
+use kamu_core::{DatasetRegistry, SearchError, SearchOptions, SearchService, TenancyConfig};
+use odf_dataset::GetDatasetError;
+use odf_metadata::{
     AccountName,
     DatasetAliasRemote,
     DatasetHandle,

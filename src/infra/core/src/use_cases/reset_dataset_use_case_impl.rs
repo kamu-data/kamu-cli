@@ -19,7 +19,7 @@ use kamu_core::{
     ResetPlanner,
     ResetResult,
 };
-use opendatafabric::{DatasetHandle, Multihash};
+use odf_metadata as odf;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -58,9 +58,9 @@ impl ResetDatasetUseCase for ResetDatasetUseCaseImpl {
     )]
     async fn execute(
         &self,
-        dataset_handle: &DatasetHandle,
-        maybe_new_head: Option<&Multihash>,
-        maybe_old_head: Option<&Multihash>,
+        dataset_handle: &odf::DatasetHandle,
+        maybe_new_head: Option<&odf::Multihash>,
+        maybe_old_head: Option<&odf::Multihash>,
     ) -> Result<ResetResult, ResetError> {
         // Permission check
         self.dataset_action_authorizer

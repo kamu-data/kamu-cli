@@ -12,7 +12,7 @@ use database_common::PaginationOpts;
 use dill::Catalog;
 use futures::TryStreamExt;
 use kamu_flow_system::*;
-use opendatafabric::DatasetID;
+use odf::DatasetID;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

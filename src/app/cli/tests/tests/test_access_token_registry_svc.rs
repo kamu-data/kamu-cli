@@ -12,9 +12,9 @@
 use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
-use kamu::domain::auth::OdfServerAccessTokenResolver;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_cli::odf_server::*;
+use odf::dataset::OdfServerAccessTokenResolver;
 use url::Url;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

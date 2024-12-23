@@ -19,7 +19,7 @@ use kamu_cli_e2e_common::{
 };
 use kamu_cli_puppet::extensions::KamuCliPuppetExt;
 use kamu_cli_puppet::KamuCliPuppet;
-use opendatafabric::*;
+use odf_metadata::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

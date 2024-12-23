@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use database_common::PaginationOpts;
-use opendatafabric::AccountID;
 use uuid::Uuid;
 
 use crate::{
@@ -32,7 +31,7 @@ pub trait AccessTokenService: Sync + Send {
     async fn create_access_token(
         &self,
         token_name: &str,
-        account_id: &AccountID,
+        account_id: &odf::AccountID,
     ) -> Result<KamuAccessToken, CreateAccessTokenError>;
 
     async fn find_account_by_active_token_id(
@@ -45,7 +44,7 @@ pub trait AccessTokenService: Sync + Send {
 
     async fn get_access_tokens_by_account_id(
         &self,
-        account_id: &AccountID,
+        account_id: &odf::AccountID,
         pagination: &PaginationOpts,
     ) -> Result<AccessTokenListing, GetAccessTokenError>;
 

@@ -9,8 +9,6 @@
 
 use std::sync::Arc;
 
-use opendatafabric::DatasetHandle;
-
 use super::{TransformElaborateError, TransformExecuteError, TransformResult};
 use crate::EngineProvisioningListener;
 
@@ -35,7 +33,7 @@ impl TransformListener for NullTransformListener {}
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub trait TransformMultiListener: Send + Sync {
-    fn begin_transform(&self, _dataset: &DatasetHandle) -> Option<Arc<dyn TransformListener>> {
+    fn begin_transform(&self, _dataset: &odf::DatasetHandle) -> Option<Arc<dyn TransformListener>> {
         None
     }
 }

@@ -28,7 +28,7 @@ use kamu_accounts_services::{
     PredefinedAccountsRegistrator,
 };
 use kamu_core::{DatasetOwnershipService, TenancyConfig};
-use opendatafabric::{AccountID, AccountName, DatasetAlias, DatasetID, DatasetName};
+use odf_metadata::{AccountID, AccountName, DatasetAlias, DatasetID, DatasetName};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

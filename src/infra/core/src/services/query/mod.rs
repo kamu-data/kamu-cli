@@ -28,7 +28,13 @@ use datafusion::prelude::*;
 use futures::stream::{self, StreamExt, TryStreamExt};
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_core::*;
-use opendatafabric::*;
+use odf_dataset::{
+    BlockRef,
+    MetadataChainExt,
+    MetadataVisitorDecision,
+    SearchSetDataSchemaVisitor,
+};
+use odf_metadata as odf;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Catalog
@@ -256,7 +262,7 @@ pub(crate) struct KamuTable {
     session_config: Arc<SessionConfig>,
     table_options: Arc<TableOptions>,
     resolved_dataset: ResolvedDataset,
-    as_of: Option<Multihash>,
+    as_of: Option<odf::Multihash>,
     hints: Option<DatasetQueryHints>,
     cache: Mutex<TableCache>,
 }
@@ -272,7 +278,7 @@ impl KamuTable {
         session_config: Arc<SessionConfig>,
         table_options: Arc<TableOptions>,
         resolved_dataset: ResolvedDataset,
-        as_of: Option<Multihash>,
+        as_of: Option<odf::Multihash>,
         hints: Option<DatasetQueryHints>,
     ) -> Self {
         Self {
@@ -382,8 +388,8 @@ impl KamuTable {
 
     async fn collect_data_file_hashes(
         &self,
-        as_of: Option<&Multihash>,
-    ) -> Result<Vec<Multihash>, InternalError> {
+        as_of: Option<&odf::Multihash>,
+    ) -> Result<Vec<odf::Multihash>, InternalError> {
         let hash = if let Some(hash) = as_of {
             hash.clone()
         } else {
@@ -398,11 +404,11 @@ impl KamuTable {
 
         let last_records_to_consider = self.hints.as_ref().and_then(|o| o.last_records_to_consider);
 
-        type Flag = MetadataEventTypeFlags;
+        type Flag = odf::MetadataEventTypeFlags;
         type Decision = MetadataVisitorDecision;
 
         struct DataSliceCollectorVisitorState {
-            files: Vec<Multihash>,
+            files: Vec<odf::Multihash>,
             num_records: u64,
             last_records_to_consider: Option<u64>,
         }
@@ -420,8 +426,8 @@ impl KamuTable {
                 Decision::NextOfType(Flag::DATA_BLOCK),
                 |state, _hash, block| {
                     let new_data = match &block.event {
-                        MetadataEvent::AddData(e) => e.new_data.as_ref(),
-                        MetadataEvent::ExecuteTransform(e) => e.new_data.as_ref(),
+                        odf::MetadataEvent::AddData(e) => e.new_data.as_ref(),
+                        odf::MetadataEvent::ExecuteTransform(e) => e.new_data.as_ref(),
                         _ => unreachable!(),
                     };
                     let Some(slice) = new_data else {

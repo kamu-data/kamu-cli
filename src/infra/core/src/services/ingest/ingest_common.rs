@@ -14,7 +14,7 @@ use datafusion::prelude::*;
 use internal_error::*;
 use kamu_core::engine::*;
 use kamu_core::{ObjectStoreRegistry, *};
-use opendatafabric::*;
+use odf_metadata::*;
 
 use crate::engine::*;
 

@@ -11,7 +11,7 @@ use std::assert_matches::assert_matches;
 
 use dill::Catalog;
 use kamu_accounts::*;
-use opendatafabric::{AccountID, AccountName};
+use odf_metadata::{AccountID, AccountName};
 
 use crate::make_test_account;
 

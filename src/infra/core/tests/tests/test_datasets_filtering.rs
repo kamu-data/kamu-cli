@@ -18,7 +18,7 @@ use kamu::utils::datasets_filtering::{
 };
 use kamu_accounts::DEFAULT_ACCOUNT_NAME;
 use kamu_core::TenancyConfig;
-use opendatafabric::*;
+use odf_metadata::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

@@ -13,7 +13,7 @@ use std::sync::Arc;
 use criterion::{criterion_group, criterion_main, Criterion};
 use datafusion::dataframe::DataFrameWriteOptions;
 use datafusion::prelude::*;
-use opendatafabric as odf;
+use odf_metadata as odf;
 use rand::{Rng, SeedableRng};
 
 async fn setup(tempdir: &Path, num_rows: usize) -> String {

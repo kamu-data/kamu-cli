@@ -14,7 +14,7 @@ use std::sync::{Arc, Mutex};
 use database_common::PaginationOpts;
 use dill::*;
 use internal_error::InternalError;
-use opendatafabric::DatasetID;
+use odf_metadata::DatasetID;
 use uuid::Uuid;
 
 use crate::domain::*;

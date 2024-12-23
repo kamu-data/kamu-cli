@@ -9,8 +9,9 @@
 
 use std::sync::Arc;
 
-use kamu_core::{Dataset, SyncError, SyncListener, SyncResult};
-use opendatafabric as odf;
+use kamu_core::{SyncError, SyncListener, SyncResult};
+use odf_dataset::Dataset;
+use odf_metadata as odf;
 use url::Url;
 
 use crate::utils::smart_transfer_protocol::{SmartTransferProtocolClient, TransferOptions};

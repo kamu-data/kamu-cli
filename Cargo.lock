@@ -1324,6 +1324,7 @@ name = "async-utils"
 version = "0.215.0"
 dependencies = [
  "async-trait",
+ "tokio",
 ]
 
 [[package]]
@@ -3965,6 +3966,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "28dea519a9695b9977216879a3ebfddf92f1c08c05d984f8996aecd6ecdc811d"
 
 [[package]]
+name = "file-utils"
+version = "0.215.0"
+
+[[package]]
 name = "filetime"
 version = "0.2.25"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4631,6 +4636,9 @@ dependencies = [
  "http 1.2.0",
  "internal-error",
  "kamu-core",
+ "odf-dataset",
+ "odf-metadata",
+ "odf-storage",
  "serde",
  "serde_json",
  "strum",
@@ -5242,6 +5250,7 @@ dependencies = [
  "async-recursion",
  "async-stream",
  "async-trait",
+ "async-utils",
  "aws-config",
  "aws-credential-types",
  "aws-sdk-s3",
@@ -5261,6 +5270,7 @@ dependencies = [
  "datafusion-functions-json",
  "digest 0.10.7",
  "dill",
+ "file-utils",
  "filetime",
  "flatbuffers",
  "flate2",
@@ -5291,8 +5301,12 @@ dependencies = [
  "mockall",
  "nanoid",
  "object_store",
+ "odf-dataset",
+ "odf-dataset-impl",
+ "odf-metadata",
+ "odf-storage",
+ "odf-storage-impl",
  "oop",
- "opendatafabric",
  "pin-project",
  "pretty_assertions",
  "rand",
@@ -5301,6 +5315,7 @@ dependencies = [
  "reqwest",
  "ringbuf",
  "rumqttc",
+ "s3-utils",
  "serde",
  "serde_json",
  "serde_with",
@@ -5309,6 +5324,7 @@ dependencies = [
  "tempfile",
  "test-group",
  "test-log",
+ "test-utils",
  "testing_logger",
  "thiserror 2.0.9",
  "time-source",
@@ -5336,7 +5352,7 @@ dependencies = [
  "lazy_static",
  "merge",
  "mockall",
- "opendatafabric",
+ "odf",
  "rand",
  "random-names",
  "reusable",
@@ -5359,7 +5375,7 @@ dependencies = [
  "internal-error",
  "kamu-accounts",
  "kamu-accounts-repo-tests",
- "opendatafabric",
+ "odf-metadata",
  "test-group",
  "test-log",
  "tokio",
@@ -5378,7 +5394,7 @@ dependencies = [
  "internal-error",
  "kamu-accounts",
  "kamu-accounts-repo-tests",
- "opendatafabric",
+ "odf-metadata",
  "sqlx",
  "test-group",
  "test-log",
@@ -5398,7 +5414,7 @@ dependencies = [
  "internal-error",
  "kamu-accounts",
  "kamu-accounts-repo-tests",
- "opendatafabric",
+ "odf-metadata",
  "sqlx",
  "test-group",
  "test-log",
@@ -5416,7 +5432,7 @@ dependencies = [
  "dill",
  "kamu-accounts",
  "kamu-adapter-oauth",
- "opendatafabric",
+ "odf-metadata",
  "password-hash",
  "rand",
  "uuid",
@@ -5436,7 +5452,7 @@ dependencies = [
  "jsonwebtoken",
  "kamu-accounts",
  "kamu-accounts-inmem",
- "opendatafabric",
+ "odf",
  "password-hash",
  "serde",
  "serde_json",
@@ -5459,7 +5475,7 @@ dependencies = [
  "internal-error",
  "kamu-accounts",
  "kamu-accounts-repo-tests",
- "opendatafabric",
+ "odf-metadata",
  "sqlx",
  "test-group",
  "test-log",
@@ -5478,7 +5494,8 @@ dependencies = [
  "kamu-accounts",
  "kamu-core",
  "messaging-outbox",
- "opendatafabric",
+ "odf",
+ "odf-storage-impl",
  "oso",
  "oso-derive",
  "tempfile",
@@ -5527,6 +5544,7 @@ dependencies = [
  "datafusion",
  "dill",
  "event-sourcing",
+ "file-utils",
  "futures",
  "indoc 2.0.5",
  "init-on-startup",
@@ -5548,7 +5566,8 @@ dependencies = [
  "kamu-task-system-services",
  "messaging-outbox",
  "mockall",
- "opendatafabric",
+ "odf",
+ "odf-storage-impl",
  "pretty_assertions",
  "secrecy",
  "serde",
@@ -5603,11 +5622,14 @@ dependencies = [
  "kamu-ingest-datafusion",
  "messaging-outbox",
  "mockall",
- "opendatafabric",
+ "odf",
+ "odf-dataset-impl",
+ "odf-storage-impl",
  "paste",
  "pretty_assertions",
  "rand",
  "reqwest",
+ "s3-utils",
  "serde",
  "serde_json",
  "serde_with",
@@ -5616,6 +5638,7 @@ dependencies = [
  "tempfile",
  "test-group",
  "test-log",
+ "test-utils",
  "thiserror 2.0.9",
  "time-source",
  "tokio",
@@ -5640,7 +5663,7 @@ dependencies = [
  "http 1.2.0",
  "internal-error",
  "kamu-accounts",
- "opendatafabric",
+ "odf",
  "reqwest",
  "serde",
  "serde_json",
@@ -5667,7 +5690,8 @@ dependencies = [
  "kamu-accounts",
  "kamu-core",
  "messaging-outbox",
- "opendatafabric",
+ "odf",
+ "odf-storage-impl",
  "pretty_assertions",
  "reqwest",
  "tempfile",
@@ -5688,7 +5712,7 @@ version = "0.215.0"
 dependencies = [
  "async-trait",
  "internal-error",
- "opendatafabric",
+ "odf",
  "sqlx",
  "strum",
  "thiserror 2.0.9",
@@ -5744,7 +5768,7 @@ dependencies = [
  "kamu-auth-rebac-inmem",
  "kamu-core",
  "messaging-outbox",
- "opendatafabric",
+ "odf",
  "serde_json",
  "test-log",
  "tokio",
@@ -5791,6 +5815,7 @@ dependencies = [
  "dill",
  "dirs",
  "duration-string",
+ "file-utils",
  "fs_extra",
  "futures",
  "glob",
@@ -5848,7 +5873,9 @@ dependencies = [
  "minus",
  "num-format",
  "observability",
- "opendatafabric",
+ "odf",
+ "odf-dataset-impl",
+ "odf-storage-impl",
  "pretty_assertions",
  "prettytable-rs",
  "prometheus",
@@ -5907,7 +5934,9 @@ dependencies = [
  "kamu-core",
  "kamu-flow-system",
  "lazy_static",
- "opendatafabric",
+ "odf-dataset",
+ "odf-metadata",
+ "odf-storage",
  "pretty_assertions",
  "regex",
  "reqwest",
@@ -5982,12 +6011,16 @@ dependencies = [
  "kamu-cli-e2e-common",
  "kamu-cli-puppet",
  "kamu-flow-system",
- "opendatafabric",
+ "odf-dataset",
+ "odf-metadata",
+ "odf-storage",
+ "odf-storage-impl",
  "paste",
  "pretty_assertions",
  "reqwest",
  "serde_json",
  "tempfile",
+ "test-utils",
  "url",
 ]
 
@@ -6014,7 +6047,7 @@ dependencies = [
  "datafusion",
  "indoc 2.0.5",
  "kamu-data-utils",
- "opendatafabric",
+ "odf-metadata",
  "pretty_assertions",
  "serde",
  "serde_json",
@@ -6028,20 +6061,21 @@ name = "kamu-core"
 version = "0.215.0"
 dependencies = [
  "async-trait",
+ "async-utils",
  "bytes",
  "chrono",
  "container-runtime",
  "datafusion",
  "dill",
+ "file-utils",
  "futures",
  "http 1.2.0",
  "internal-error",
- "kamu-accounts",
  "kamu-datasets",
  "messaging-outbox",
  "mockall",
  "object_store",
- "opendatafabric",
+ "odf",
  "pathdiff",
  "pin-project",
  "serde",
@@ -6067,7 +6101,7 @@ dependencies = [
  "digest 0.10.7",
  "hex",
  "indoc 2.0.5",
- "opendatafabric",
+ "odf-metadata",
  "pretty_assertions",
  "serde",
  "serde_json",
@@ -6110,7 +6144,7 @@ dependencies = [
  "internal-error",
  "merge",
  "mockall",
- "opendatafabric",
+ "odf",
  "secrecy",
  "serde",
  "serde_with",
@@ -6133,7 +6167,7 @@ dependencies = [
  "kamu-accounts-inmem",
  "kamu-datasets",
  "kamu-datasets-repo-tests",
- "opendatafabric",
+ "odf-metadata",
  "test-group",
  "test-log",
  "tokio",
@@ -6155,7 +6189,7 @@ dependencies = [
  "kamu-accounts-postgres",
  "kamu-datasets",
  "kamu-datasets-repo-tests",
- "opendatafabric",
+ "odf-metadata",
  "sqlx",
  "test-group",
  "test-log",
@@ -6173,7 +6207,7 @@ dependencies = [
  "itertools 0.13.0",
  "kamu-accounts",
  "kamu-datasets",
- "opendatafabric",
+ "odf-metadata",
  "secrecy",
  "uuid",
 ]
@@ -6199,8 +6233,9 @@ dependencies = [
  "kamu-datasets-inmem",
  "messaging-outbox",
  "mockall",
+ "odf",
+ "odf-storage-impl",
  "oop",
- "opendatafabric",
  "petgraph",
  "pretty_assertions",
  "secrecy",
@@ -6226,7 +6261,7 @@ dependencies = [
  "kamu-accounts-sqlite",
  "kamu-datasets",
  "kamu-datasets-repo-tests",
- "opendatafabric",
+ "odf-metadata",
  "sqlx",
  "test-group",
  "test-log",
@@ -6250,7 +6285,7 @@ dependencies = [
  "kamu-task-system",
  "lazy_static",
  "messaging-outbox",
- "opendatafabric",
+ "odf",
  "serde",
  "serde_with",
  "sqlx",
@@ -6271,7 +6306,7 @@ dependencies = [
  "futures",
  "kamu-flow-system",
  "kamu-flow-system-repo-tests",
- "opendatafabric",
+ "odf",
  "test-group",
  "test-log",
  "tokio",
@@ -6293,7 +6328,7 @@ dependencies = [
  "internal-error",
  "kamu-flow-system",
  "kamu-flow-system-repo-tests",
- "opendatafabric",
+ "odf",
  "serde_json",
  "sqlx",
  "test-group",
@@ -6311,7 +6346,7 @@ dependencies = [
  "futures",
  "kamu-flow-system",
  "kamu-task-system",
- "opendatafabric",
+ "odf",
 ]
 
 [[package]]
@@ -6344,7 +6379,8 @@ dependencies = [
  "messaging-outbox",
  "mockall",
  "observability",
- "opendatafabric",
+ "odf",
+ "odf-storage-impl",
  "pretty_assertions",
  "tempfile",
  "test-log",
@@ -6367,7 +6403,7 @@ dependencies = [
  "internal-error",
  "kamu-flow-system",
  "kamu-flow-system-repo-tests",
- "opendatafabric",
+ "odf",
  "serde_json",
  "sqlx",
  "test-group",
@@ -6383,6 +6419,7 @@ dependencies = [
  "chrono",
  "criterion",
  "datafusion",
+ "file-utils",
  "futures",
  "geo-types",
  "geojson",
@@ -6391,7 +6428,9 @@ dependencies = [
  "internal-error",
  "kamu-core",
  "kamu-data-utils",
- "opendatafabric",
+ "odf-dataset",
+ "odf-metadata",
+ "odf-storage",
  "pretty_assertions",
  "rand",
  "serde",
@@ -6500,7 +6539,7 @@ dependencies = [
  "internal-error",
  "kamu-core",
  "messaging-outbox",
- "opendatafabric",
+ "odf",
  "serde",
  "sqlx",
  "thiserror 2.0.9",
@@ -6518,7 +6557,7 @@ dependencies = [
  "futures",
  "kamu-task-system",
  "kamu-task-system-repo-tests",
- "opendatafabric",
+ "odf-metadata",
  "test-group",
  "test-log",
  "tokio",
@@ -6537,7 +6576,7 @@ dependencies = [
  "internal-error",
  "kamu-task-system",
  "kamu-task-system-repo-tests",
- "opendatafabric",
+ "odf-metadata",
  "serde_json",
  "sqlx",
  "test-group",
@@ -6553,7 +6592,7 @@ dependencies = [
  "dill",
  "futures",
  "kamu-task-system",
- "opendatafabric",
+ "odf-metadata",
 ]
 
 [[package]]
@@ -6579,6 +6618,8 @@ dependencies = [
  "messaging-outbox",
  "mockall",
  "observability",
+ "odf",
+ "odf-dataset-impl",
  "serde_json",
  "tempfile",
  "test-log",
@@ -6601,7 +6642,7 @@ dependencies = [
  "internal-error",
  "kamu-task-system",
  "kamu-task-system-repo-tests",
- "opendatafabric",
+ "odf-metadata",
  "serde_json",
  "sqlx",
  "test-group",
@@ -7523,6 +7564,150 @@ dependencies = [
 ]
 
 [[package]]
+name = "odf"
+version = "0.215.0"
+dependencies = [
+ "odf-dataset",
+ "odf-metadata",
+ "odf-storage",
+]
+
+[[package]]
+name = "odf-dataset"
+version = "0.215.0"
+dependencies = [
+ "async-trait",
+ "async-utils",
+ "chrono",
+ "dill",
+ "file-utils",
+ "futures",
+ "internal-error",
+ "mockall",
+ "odf-metadata",
+ "odf-storage",
+ "pin-project",
+ "serde",
+ "serde_with",
+ "thiserror 2.0.9",
+ "tokio-stream",
+ "url",
+]
+
+[[package]]
+name = "odf-dataset-impl"
+version = "0.215.0"
+dependencies = [
+ "async-stream",
+ "async-trait",
+ "chrono",
+ "dill",
+ "file-utils",
+ "hickory-resolver",
+ "http 1.2.0",
+ "internal-error",
+ "kamu-data-utils",
+ "mockall",
+ "odf-dataset",
+ "odf-metadata",
+ "odf-storage",
+ "odf-storage-impl",
+ "regex",
+ "reqwest",
+ "s3-utils",
+ "serde_yaml",
+ "tempfile",
+ "test-log",
+ "thiserror 2.0.9",
+ "tokio",
+ "tokio-stream",
+ "tracing",
+ "url",
+]
+
+[[package]]
+name = "odf-metadata"
+version = "0.215.0"
+dependencies = [
+ "arrow",
+ "base64 0.22.1",
+ "bitflags 2.6.0",
+ "chrono",
+ "digest 0.10.7",
+ "ed25519-dalek",
+ "enum-variants",
+ "flatbuffers",
+ "indoc 2.0.5",
+ "internal-error",
+ "like",
+ "multiformats",
+ "prost",
+ "serde",
+ "serde_json",
+ "serde_with",
+ "serde_yaml",
+ "sha3",
+ "sqlx",
+ "thiserror 2.0.9",
+ "tonic",
+ "url",
+ "utoipa",
+]
+
+[[package]]
+name = "odf-storage"
+version = "0.215.0"
+dependencies = [
+ "async-trait",
+ "async-utils",
+ "bytes",
+ "chrono",
+ "http 1.2.0",
+ "internal-error",
+ "odf-metadata",
+ "thiserror 2.0.9",
+ "url",
+]
+
+[[package]]
+name = "odf-storage-impl"
+version = "0.215.0"
+dependencies = [
+ "async-stream",
+ "async-trait",
+ "async-utils",
+ "aws-sdk-s3",
+ "bytes",
+ "chrono",
+ "dashmap",
+ "datafusion",
+ "digest 0.10.7",
+ "futures",
+ "http 1.2.0",
+ "internal-error",
+ "kamu-data-utils",
+ "mockall",
+ "odf-metadata",
+ "odf-storage",
+ "pretty_assertions",
+ "rand",
+ "random-names",
+ "reqwest",
+ "s3-utils",
+ "sha3",
+ "tempfile",
+ "test-group",
+ "test-log",
+ "test-utils",
+ "thiserror 2.0.9",
+ "tokio",
+ "tokio-stream",
+ "tokio-util",
+ "tracing",
+ "url",
+]
+
+[[package]]
 name = "once_cell"
 version = "1.20.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7562,35 +7747,6 @@ name = "opaque-debug"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c08d65885ee38876c4f86fa503fb49d7b507c2b62552df7c70b2fce627e06381"
-
-[[package]]
-name = "opendatafabric"
-version = "0.215.0"
-dependencies = [
- "arrow",
- "base64 0.22.1",
- "bitflags 2.6.0",
- "chrono",
- "digest 0.10.7",
- "ed25519-dalek",
- "enum-variants",
- "flatbuffers",
- "indoc 2.0.5",
- "internal-error",
- "like",
- "multiformats",
- "prost",
- "serde",
- "serde_json",
- "serde_with",
- "serde_yaml",
- "sha3",
- "sqlx",
- "thiserror 2.0.9",
- "tonic",
- "url",
- "utoipa",
-]
 
 [[package]]
 name = "openssl-probe"
@@ -9087,6 +9243,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f3cb5ba0dc43242ce17de99c180e96db90b235b8a9fdc9543c96d2209116bd9f"
 
 [[package]]
+name = "s3-utils"
+version = "0.215.0"
+dependencies = [
+ "async-utils",
+ "aws-config",
+ "aws-sdk-s3",
+ "aws-smithy-types",
+ "internal-error",
+ "reqwest",
+ "tokio-util",
+ "tracing",
+ "url",
+]
+
+[[package]]
 name = "same-file"
 version = "1.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -10032,6 +10203,20 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.92",
+]
+
+[[package]]
+name = "test-utils"
+version = "0.215.0"
+dependencies = [
+ "axum",
+ "container-runtime",
+ "rand",
+ "tempfile",
+ "tokio",
+ "tower 0.5.2",
+ "tower-http",
+ "url",
 ]
 
 [[package]]

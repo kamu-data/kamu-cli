@@ -14,7 +14,8 @@ use chrono::{DateTime, TimeDelta, Utc};
 use kamu::testing::MockDatasetActionAuthorizer;
 use kamu::*;
 use kamu_core::*;
-use opendatafabric::*;
+use odf_dataset::CreateDatasetResult;
+use odf_metadata::*;
 
 use super::{BaseUseCaseHarness, BaseUseCaseHarnessOptions};
 

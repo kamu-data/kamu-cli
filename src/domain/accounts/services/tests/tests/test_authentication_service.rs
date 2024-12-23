@@ -13,7 +13,6 @@ use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use kamu_accounts::*;
 use kamu_accounts_inmem::{InMemoryAccessTokenRepository, InMemoryAccountRepository};
 use kamu_accounts_services::{AccessTokenServiceImpl, AuthenticationServiceImpl};
-use opendatafabric::{AccountID, AccountName};
 use time_source::{SystemTimeSource, SystemTimeSourceStub};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -141,7 +140,7 @@ impl AuthenticationProvider for DummyAuthenticationProviderA {
         "method-A"
     }
 
-    fn generate_id(&self, _: &AccountName) -> AccountID {
+    fn generate_id(&self, _: &odf::AccountName) -> odf::AccountID {
         DEFAULT_ACCOUNT_ID.clone()
     }
 
@@ -166,7 +165,7 @@ impl AuthenticationProvider for DummyAuthenticationProviderB {
         "method-B"
     }
 
-    fn generate_id(&self, _: &AccountName) -> AccountID {
+    fn generate_id(&self, _: &odf::AccountName) -> odf::AccountID {
         DEFAULT_ACCOUNT_ID.clone()
     }
 

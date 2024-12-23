@@ -9,7 +9,7 @@
 
 use dill::Catalog;
 use kamu_accounts::{AccountRepository, PasswordHashRepository, PROVIDER_PASSWORD};
-use opendatafabric::AccountName;
+use odf_metadata::AccountName;
 
 use crate::{generate_salt, make_password_hash, make_test_account};
 

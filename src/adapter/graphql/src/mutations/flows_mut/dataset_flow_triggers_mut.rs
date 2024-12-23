@@ -9,7 +9,6 @@
 
 use chrono::Utc;
 use kamu_flow_system::{FlowKeyDataset, FlowTriggerRule, FlowTriggerService, SetFlowTriggerError};
-use opendatafabric as odf;
 
 use super::{
     ensure_expected_dataset_kind,

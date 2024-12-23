@@ -23,7 +23,8 @@ use dill::*;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer};
 use kamu_core::*;
-use opendatafabric::*;
+use odf_dataset::{BlockRef, MetadataChainExt, SearchSetDataSchemaVisitor, SearchSetVocabVisitor};
+use odf_metadata as odf;
 
 use crate::services::query::*;
 use crate::utils::docker_images;
@@ -177,7 +178,7 @@ impl QueryServiceImpl {
                 }
                 if table.0.len() == 1 {
                     let alias = table.0.pop().unwrap().value;
-                    let Ok(dataset_ref) = DatasetRef::try_from(&alias) else {
+                    let Ok(dataset_ref) = odf::DatasetRef::try_from(&alias) else {
                         tracing::warn!(alias, "Ignoring table with invalid alias");
                         continue;
                     };
@@ -211,7 +212,7 @@ impl QueryServiceImpl {
 
     async fn single_dataset(
         &self,
-        dataset_ref: &DatasetRef,
+        dataset_ref: &odf::DatasetRef,
         last_records_to_consider: Option<u64>,
     ) -> Result<(ResolvedDataset, DataFrame), QueryError> {
         let resolved_dataset = self.resolve_dataset(dataset_ref).await?;
@@ -243,7 +244,7 @@ impl QueryServiceImpl {
     #[tracing::instrument(level = "debug", skip_all)]
     async fn get_schema_impl(
         &self,
-        dataset_ref: &DatasetRef,
+        dataset_ref: &odf::DatasetRef,
     ) -> Result<Option<arrow::datatypes::SchemaRef>, QueryError> {
         let resolved_dataset = self.resolve_dataset(dataset_ref).await?;
 
@@ -264,7 +265,7 @@ impl QueryServiceImpl {
     async fn get_schema_parquet_impl(
         &self,
         session_context: &SessionContext,
-        dataset_ref: &DatasetRef,
+        dataset_ref: &odf::DatasetRef,
     ) -> Result<Option<Type>, QueryError> {
         let resolved_dataset = self.resolve_dataset(dataset_ref).await?;
 
@@ -309,7 +310,7 @@ impl QueryServiceImpl {
 
     async fn resolve_dataset(
         &self,
-        dataset_ref: &DatasetRef,
+        dataset_ref: &odf::DatasetRef,
     ) -> Result<ResolvedDataset, QueryError> {
         let dataset_handle = self
             .dataset_registry
@@ -341,7 +342,7 @@ impl QueryService for QueryServiceImpl {
     )]
     async fn tail(
         &self,
-        dataset_ref: &DatasetRef,
+        dataset_ref: &odf::DatasetRef,
         skip: u64,
         limit: u64,
     ) -> Result<DataFrame, QueryError> {
@@ -356,7 +357,7 @@ impl QueryService for QueryServiceImpl {
             })?;
         }
 
-        let vocab: DatasetVocabulary = resolved_dataset
+        let vocab: odf::DatasetVocabulary = resolved_dataset
             .as_metadata_chain()
             .accept_one(SearchSetVocabVisitor::new())
             .await
@@ -421,7 +422,7 @@ impl QueryService for QueryServiceImpl {
     #[tracing::instrument(level = "info", skip_all, fields(%dataset_ref))]
     async fn get_schema(
         &self,
-        dataset_ref: &DatasetRef,
+        dataset_ref: &odf::DatasetRef,
     ) -> Result<Option<arrow::datatypes::SchemaRef>, QueryError> {
         self.get_schema_impl(dataset_ref).await
     }
@@ -429,14 +430,14 @@ impl QueryService for QueryServiceImpl {
     #[tracing::instrument(level = "info", skip_all, fields(%dataset_ref))]
     async fn get_schema_parquet_file(
         &self,
-        dataset_ref: &DatasetRef,
+        dataset_ref: &odf::DatasetRef,
     ) -> Result<Option<Type>, QueryError> {
         let ctx = self.session_context(QueryOptions::default()).await?;
         self.get_schema_parquet_impl(&ctx, dataset_ref).await
     }
 
     #[tracing::instrument(level = "info", skip_all, fields(%dataset_ref))]
-    async fn get_data(&self, dataset_ref: &DatasetRef) -> Result<DataFrame, QueryError> {
+    async fn get_data(&self, dataset_ref: &odf::DatasetRef) -> Result<DataFrame, QueryError> {
         // TODO: PERF: Limit push-down opportunity
         let (_dataset, df) = self.single_dataset(dataset_ref, None).await?;
         Ok(df)

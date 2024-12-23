@@ -14,7 +14,15 @@ use engine::{TransformRequestExt, TransformResponseExt};
 use internal_error::ResultIntoInternal;
 use kamu_core::*;
 use kamu_ingest_datafusion::DataWriterDataFusion;
-use opendatafabric::{EnumWithVariants, ExecuteTransform, SetDataSchema, Transform};
+use odf_dataset::{
+    AppendError,
+    AppendValidationError,
+    CheckpointRef,
+    CommitError,
+    CommitOpts,
+    ExecuteTransformParams,
+};
+use odf_metadata::{EnumWithVariants, ExecuteTransform, SetDataSchema, Transform};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

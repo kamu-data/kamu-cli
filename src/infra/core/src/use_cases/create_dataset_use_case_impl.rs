@@ -12,17 +12,16 @@ use std::sync::Arc;
 use dill::{component, interface};
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::{
-    CreateDatasetError,
-    CreateDatasetResult,
     CreateDatasetUseCase,
     CreateDatasetUseCaseOptions,
     DatasetLifecycleMessage,
     MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
 };
 use messaging_outbox::{Outbox, OutboxExt};
-use opendatafabric::{DatasetAlias, MetadataBlockTyped, Seed};
+use odf_dataset::{CreateDatasetError, CreateDatasetResult};
+use odf_metadata::{DatasetAlias, MetadataBlockTyped, Seed};
 
-use crate::DatasetRepositoryWriter;
+use crate::DatasetStorageUnitWriter;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -30,19 +29,19 @@ use crate::DatasetRepositoryWriter;
 #[interface(dyn CreateDatasetUseCase)]
 pub struct CreateDatasetUseCaseImpl {
     current_account_subject: Arc<CurrentAccountSubject>,
-    dataset_repo_writer: Arc<dyn DatasetRepositoryWriter>,
+    dataset_storage_unit_writer: Arc<dyn DatasetStorageUnitWriter>,
     outbox: Arc<dyn Outbox>,
 }
 
 impl CreateDatasetUseCaseImpl {
     pub fn new(
         current_account_subject: Arc<CurrentAccountSubject>,
-        dataset_repo_writer: Arc<dyn DatasetRepositoryWriter>,
+        dataset_storage_unit_writer: Arc<dyn DatasetStorageUnitWriter>,
         outbox: Arc<dyn Outbox>,
     ) -> Self {
         Self {
             current_account_subject,
-            dataset_repo_writer,
+            dataset_storage_unit_writer,
             outbox,
         }
     }
@@ -58,7 +57,7 @@ impl CreateDatasetUseCase for CreateDatasetUseCaseImpl {
         options: CreateDatasetUseCaseOptions,
     ) -> Result<CreateDatasetResult, CreateDatasetError> {
         let create_result = self
-            .dataset_repo_writer
+            .dataset_storage_unit_writer
             .create_dataset(dataset_alias, seed_block)
             .await?;
 

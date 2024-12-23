@@ -12,7 +12,6 @@ use std::sync::Arc;
 
 use ::serde::{Deserialize, Serialize};
 use internal_error::InternalError;
-use opendatafabric::*;
 use thiserror::Error;
 
 use crate::*;
@@ -108,7 +107,7 @@ pub struct PullTransformItem {
 pub struct PullSyncItem {
     pub depth: i32,
     pub local_target: PullLocalTarget,
-    pub remote_ref: DatasetRefRemote,
+    pub remote_ref: odf::DatasetRefRemote,
     pub maybe_original_request: Option<PullRequest>,
     pub sync_request: Box<SyncRequest>,
 }
@@ -117,34 +116,34 @@ pub struct PullSyncItem {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PullLocalTarget {
-    Existing(DatasetHandle),
-    ToCreate(DatasetAlias),
+    Existing(odf::DatasetHandle),
+    ToCreate(odf::DatasetAlias),
 }
 
 impl PullLocalTarget {
-    pub fn existing(hdl: DatasetHandle) -> Self {
+    pub fn existing(hdl: odf::DatasetHandle) -> Self {
         Self::Existing(hdl)
     }
 
-    pub fn to_create(alias: DatasetAlias) -> Self {
+    pub fn to_create(alias: odf::DatasetAlias) -> Self {
         Self::ToCreate(alias)
     }
 
-    pub fn alias(&self) -> &DatasetAlias {
+    pub fn alias(&self) -> &odf::DatasetAlias {
         match self {
             Self::Existing(hdl) => &hdl.alias,
             Self::ToCreate(alias) => alias,
         }
     }
 
-    pub fn as_local_ref(&self) -> DatasetRef {
+    pub fn as_local_ref(&self) -> odf::DatasetRef {
         match self {
             Self::Existing(hdl) => hdl.as_local_ref(),
             Self::ToCreate(alias) => alias.as_local_ref(),
         }
     }
 
-    pub fn as_any_ref(&self) -> DatasetRefAny {
+    pub fn as_any_ref(&self) -> odf::DatasetRefAny {
         match self {
             Self::Existing(hdl) => hdl.as_any_ref(),
             Self::ToCreate(alias) => alias.as_any_ref(),
@@ -156,29 +155,35 @@ impl PullLocalTarget {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PullRequest {
-    Local(DatasetRef),
+    Local(odf::DatasetRef),
     Remote(PullRequestRemote),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PullRequestRemote {
-    pub remote_ref: DatasetRefRemote,
-    pub maybe_local_alias: Option<DatasetAlias>,
+    pub remote_ref: odf::DatasetRefRemote,
+    pub maybe_local_alias: Option<odf::DatasetAlias>,
 }
 
 impl PullRequest {
-    pub fn local(dataset_ref: DatasetRef) -> Self {
+    pub fn local(dataset_ref: odf::DatasetRef) -> Self {
         Self::Local(dataset_ref)
     }
 
-    pub fn remote(remote_ref: DatasetRefRemote, maybe_local_alias: Option<DatasetAlias>) -> Self {
+    pub fn remote(
+        remote_ref: odf::DatasetRefRemote,
+        maybe_local_alias: Option<odf::DatasetAlias>,
+    ) -> Self {
         Self::Remote(PullRequestRemote {
             remote_ref,
             maybe_local_alias,
         })
     }
 
-    pub fn from_any_ref(dataset_ref: &DatasetRefAny, is_repo: impl Fn(&RepoName) -> bool) -> Self {
+    pub fn from_any_ref(
+        dataset_ref: &odf::DatasetRefAny,
+        is_repo: impl Fn(&odf::RepoName) -> bool,
+    ) -> Self {
         // Single-tenant workspace => treat all repo-like references as repos.
         // Multi-tenant workspace => treat all repo-like references as accounts, use
         // repo:// for repos
@@ -188,7 +193,7 @@ impl PullRequest {
         }
     }
 
-    pub fn local_ref(&self) -> Option<Cow<DatasetRef>> {
+    pub fn local_ref(&self) -> Option<Cow<odf::DatasetRef>> {
         match self {
             PullRequest::Local(local_ref) => Some(Cow::Borrowed(local_ref)),
             PullRequest::Remote(remote) => remote
@@ -198,7 +203,7 @@ impl PullRequest {
         }
     }
 
-    pub fn remote_ref(&self) -> Option<&DatasetRefRemote> {
+    pub fn remote_ref(&self) -> Option<&odf::DatasetRefRemote> {
         match self {
             PullRequest::Local(_) => None,
             PullRequest::Remote(remote) => Some(&remote.remote_ref),
@@ -209,26 +214,26 @@ impl PullRequest {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub trait PullItemCommon {
-    fn try_get_written_handle(&self) -> Option<&DatasetHandle>;
-    fn get_read_handles(&self) -> Vec<&DatasetHandle>;
+    fn try_get_written_handle(&self) -> Option<&odf::DatasetHandle>;
+    fn get_read_handles(&self) -> Vec<&odf::DatasetHandle>;
 }
 
 impl PullItemCommon for PullIngestItem {
-    fn try_get_written_handle(&self) -> Option<&DatasetHandle> {
+    fn try_get_written_handle(&self) -> Option<&odf::DatasetHandle> {
         Some(self.target.get_handle())
     }
 
-    fn get_read_handles(&self) -> Vec<&DatasetHandle> {
+    fn get_read_handles(&self) -> Vec<&odf::DatasetHandle> {
         vec![]
     }
 }
 
 impl PullItemCommon for PullTransformItem {
-    fn try_get_written_handle(&self) -> Option<&DatasetHandle> {
+    fn try_get_written_handle(&self) -> Option<&odf::DatasetHandle> {
         Some(self.target.get_handle())
     }
 
-    fn get_read_handles(&self) -> Vec<&DatasetHandle> {
+    fn get_read_handles(&self) -> Vec<&odf::DatasetHandle> {
         let mut read_handles = Vec::new();
         for hdl in self.plan.datasets_map.iterate_all_handles() {
             if hdl != self.target.get_handle() {
@@ -240,14 +245,14 @@ impl PullItemCommon for PullTransformItem {
 }
 
 impl PullItemCommon for PullSyncItem {
-    fn try_get_written_handle(&self) -> Option<&DatasetHandle> {
+    fn try_get_written_handle(&self) -> Option<&odf::DatasetHandle> {
         match &self.local_target {
             PullLocalTarget::Existing(hdl) => Some(hdl),
             PullLocalTarget::ToCreate(_) => None,
         }
     }
 
-    fn get_read_handles(&self) -> Vec<&DatasetHandle> {
+    fn get_read_handles(&self) -> Vec<&odf::DatasetHandle> {
         vec![]
     }
 }
@@ -260,9 +265,9 @@ pub struct PullResponse {
     /// recursive dependencies.
     pub maybe_original_request: Option<PullRequest>,
     /// Local dataset handle, if resolved
-    pub maybe_local_ref: Option<DatasetRef>,
+    pub maybe_local_ref: Option<odf::DatasetRef>,
     /// Destination reference, if resolved
-    pub maybe_remote_ref: Option<DatasetRefRemote>,
+    pub maybe_remote_ref: Option<odf::DatasetRefRemote>,
     /// Result of the push operation
     pub result: Result<PullResult, PullError>,
 }
@@ -316,8 +321,8 @@ pub trait PullMultiListener: Send + Sync {
 pub enum PullResult {
     UpToDate(PullResultUpToDate),
     Updated {
-        old_head: Option<Multihash>,
-        new_head: Multihash,
+        old_head: Option<odf::Multihash>,
+        new_head: odf::Multihash,
     },
 }
 
@@ -388,7 +393,7 @@ pub enum PullError {
     NotFound(
         #[from]
         #[backtrace]
-        DatasetNotFoundError,
+        odf::dataset::DatasetNotFoundError,
     ),
 
     #[error("Cannot choose between multiple pull aliases")]
@@ -429,7 +434,7 @@ pub enum PullError {
     Access(
         #[from]
         #[backtrace]
-        AccessError,
+        odf::metadata::AccessError,
     ),
 
     #[error(transparent)]

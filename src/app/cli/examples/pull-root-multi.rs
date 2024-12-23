@@ -15,7 +15,7 @@ use kamu::domain::*;
 use kamu::*;
 use kamu_cli::commands::*;
 use kamu_cli::output::OutputConfig;
-use opendatafabric::*;
+use odf_metadata::*;
 
 #[tokio::main]
 async fn main() {

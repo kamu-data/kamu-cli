@@ -17,9 +17,9 @@ use container_runtime::ContainerRuntime;
 use indoc::indoc;
 use kamu::domain::*;
 use kamu::ingest::*;
-use kamu::utils::docker_images::BUSYBOX;
+use kamu::utils::docker_images;
 use kamu_datasets_services::DatasetKeyValueServiceSysEnv;
-use opendatafabric::*;
+use odf_metadata::*;
 use url::Url;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -842,7 +842,7 @@ async fn test_fetch_container_ok() {
     let target_path = harness.temp_dir.path().join("fetched.bin");
 
     let fetch_step = FetchStep::Container(FetchStepContainer {
-        image: BUSYBOX.to_owned(),
+        image: docker_images::BUSYBOX.to_owned(),
         command: Some(vec!["printf".to_owned()]),
         args: Some(vec![CSV_BATCH_OUTPUT.to_owned()]),
         env: None,
@@ -888,7 +888,7 @@ async fn test_fetch_container_env_vars() {
     let target_path = harness.temp_dir.path().join("fetched.bin");
 
     let fetch_step = FetchStep::Container(FetchStepContainer {
-        image: BUSYBOX.to_owned(),
+        image: docker_images::BUSYBOX.to_owned(),
         command: Some(vec!["sh".to_owned()]),
         args: Some(vec!["-c".to_owned(), "env | grep KAMU_TEST".to_owned()]),
         env: Some(vec![
@@ -959,7 +959,7 @@ async fn test_fetch_container_args_templating() {
     let target_path = harness.temp_dir.path().join("fetched.bin");
 
     let fetch_step = FetchStep::Container(FetchStepContainer {
-        image: BUSYBOX.to_owned(),
+        image: docker_images::BUSYBOX.to_owned(),
         command: Some(vec!["sh".to_owned()]),
         args: Some(vec!["-c".to_owned(), "echo ${{ env.VAR }}".to_owned()]),
         env: None,
@@ -1006,7 +1006,7 @@ async fn test_fetch_container_batch_size_default() {
     let target_path = harness.temp_dir.path().join("fetched.bin");
 
     let fetch_step = FetchStep::Container(FetchStepContainer {
-        image: BUSYBOX.to_owned(),
+        image: docker_images::BUSYBOX.to_owned(),
         command: Some(vec!["sh".to_owned()]),
         args: Some(vec![
             "-c".to_owned(),
@@ -1050,7 +1050,7 @@ async fn test_fetch_container_batch_size_set() {
 
     let custom_batch_size = 40_000;
     let fetch_step = FetchStep::Container(FetchStepContainer {
-        image: BUSYBOX.to_owned(),
+        image: docker_images::BUSYBOX.to_owned(),
         command: Some(vec!["sh".to_owned()]),
         args: Some(vec![
             "-c".to_owned(),
@@ -1094,7 +1094,7 @@ async fn test_fetch_container_batch_size_invalid_format() {
 
     let invalid_format_batch_size = "-42";
     let fetch_step = FetchStep::Container(FetchStepContainer {
-        image: BUSYBOX.to_owned(),
+        image: docker_images::BUSYBOX.to_owned(),
         command: Some(vec!["sh".to_owned()]),
         args: Some(vec![
             "-c".to_owned(),
@@ -1136,7 +1136,7 @@ async fn test_fetch_container_has_more_no_data() {
     let target_path = harness.temp_dir.path().join("fetched.bin");
 
     let fetch_step = FetchStep::Container(FetchStepContainer {
-        image: BUSYBOX.to_owned(),
+        image: docker_images::BUSYBOX.to_owned(),
         command: Some(vec!["true".to_owned()]),
         args: None,
         env: None,
@@ -1171,7 +1171,7 @@ async fn test_fetch_container_has_more_data_is_less_than_a_batch() {
 
     let custom_batch_size = 150;
     let fetch_step = FetchStep::Container(FetchStepContainer {
-        image: BUSYBOX.to_owned(),
+        image: docker_images::BUSYBOX.to_owned(),
         command: Some(vec!["sh".to_owned()]),
         args: Some(vec!["-c".to_owned(), HAS_MORE_TESTER_SCRIPT.to_owned()]),
         env: Some(vec![
@@ -1237,7 +1237,7 @@ async fn test_fetch_container_has_more_data_is_more_than_a_batch() {
     */
     let prev_source_state = {
         let fetch_step_1 = FetchStep::Container(FetchStepContainer {
-            image: BUSYBOX.to_owned(),
+            image: docker_images::BUSYBOX.to_owned(),
             command: Some(vec!["sh".to_owned()]),
             args: Some(vec!["-c".to_owned(), HAS_MORE_TESTER_SCRIPT.to_owned()]),
             env: Some(vec![
@@ -1293,7 +1293,7 @@ async fn test_fetch_container_has_more_data_is_more_than_a_batch() {
     */
     let prev_source_state = {
         let fetch_step_2 = FetchStep::Container(FetchStepContainer {
-            image: BUSYBOX.to_owned(),
+            image: docker_images::BUSYBOX.to_owned(),
             command: Some(vec!["sh".to_owned()]),
             args: Some(vec!["-c".to_owned(), HAS_MORE_TESTER_SCRIPT.to_owned()]),
             env: Some(vec![
@@ -1348,7 +1348,7 @@ async fn test_fetch_container_has_more_data_is_more_than_a_batch() {
     */
     let prev_source_state = {
         let fetch_step_3 = FetchStep::Container(FetchStepContainer {
-            image: BUSYBOX.to_owned(),
+            image: docker_images::BUSYBOX.to_owned(),
             command: Some(vec!["sh".to_owned()]),
             args: Some(vec!["-c".to_owned(), HAS_MORE_TESTER_SCRIPT.to_owned()]),
             env: Some(vec![
@@ -1399,7 +1399,7 @@ async fn test_fetch_container_has_more_data_is_more_than_a_batch() {
     //    data
     {
         let fetch_step_4 = FetchStep::Container(FetchStepContainer {
-            image: BUSYBOX.to_owned(),
+            image: docker_images::BUSYBOX.to_owned(),
             command: Some(vec!["sh".to_owned()]),
             args: Some(vec!["-c".to_owned(), HAS_MORE_TESTER_SCRIPT.to_owned()]),
             env: Some(vec![

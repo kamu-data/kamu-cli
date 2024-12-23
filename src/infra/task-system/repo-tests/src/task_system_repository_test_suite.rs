@@ -14,7 +14,7 @@ use database_common::PaginationOpts;
 use dill::Catalog;
 use futures::TryStreamExt;
 use kamu_task_system::*;
-use opendatafabric::DatasetID;
+use odf_metadata::DatasetID;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

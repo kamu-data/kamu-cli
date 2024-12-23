@@ -14,7 +14,7 @@ use chrono::DateTime;
 use datafusion::prelude::SessionContext;
 use indoc::indoc;
 use kamu_ingest_datafusion::*;
-use opendatafabric::*;
+use odf_metadata::*;
 
 use super::test_reader_common;
 

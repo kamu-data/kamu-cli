@@ -17,7 +17,9 @@ use kamu::domain::*;
 use kamu::testing::*;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
-use opendatafabric::*;
+use odf_dataset::{CreateDatasetResult, DatasetStorageUnit};
+use odf_metadata::*;
+use odf_storage_impl::testing::MetadataFactory;
 use tempfile::TempDir;
 use time_source::{SystemTimeSource, SystemTimeSourceStub};
 use tokio::io::AsyncRead;
@@ -766,7 +768,7 @@ async fn test_ingest_sql_case_sensitivity() {
 struct IngestTestHarness {
     temp_dir: TempDir,
     dataset_registry: Arc<dyn DatasetRegistry>,
-    dataset_repo_writer: Arc<dyn DatasetRepositoryWriter>,
+    dataset_storage_unit_writer: Arc<dyn DatasetStorageUnitWriter>,
     push_ingest_planner: Arc<dyn PushIngestPlanner>,
     push_ingest_executor: Arc<dyn PushIngestExecutor>,
     ctx: SessionContext,
@@ -788,10 +790,10 @@ impl IngestTestHarness {
             .add_value(CurrentAccountSubject::new_test())
             .add::<kamu_core::auth::AlwaysHappyDatasetActionAuthorizer>()
             .add_value(TenancyConfig::SingleTenant)
-            .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
-            .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-            .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
-            .add::<DatasetRegistryRepoBridge>()
+            .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
+            .bind::<dyn DatasetStorageUnit, DatasetStorageUnitLocalFs>()
+            .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
+            .add::<DatasetRegistrySoloUnitBridge>()
             .add_value(SystemTimeSourceStub::new_set(
                 Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap(),
             ))
@@ -807,7 +809,7 @@ impl IngestTestHarness {
         Self {
             temp_dir,
             dataset_registry: catalog.get_one().unwrap(),
-            dataset_repo_writer: catalog.get_one().unwrap(),
+            dataset_storage_unit_writer: catalog.get_one().unwrap(),
             push_ingest_planner: catalog.get_one().unwrap(),
             push_ingest_executor: catalog.get_one().unwrap(),
             ctx: SessionContext::new_with_config(SessionConfig::new().with_target_partitions(1)),
@@ -815,7 +817,7 @@ impl IngestTestHarness {
     }
 
     async fn create_dataset(&self, dataset_snapshot: DatasetSnapshot) -> CreateDatasetResult {
-        self.dataset_repo_writer
+        self.dataset_storage_unit_writer
             .create_dataset_from_snapshot(dataset_snapshot)
             .await
             .unwrap()

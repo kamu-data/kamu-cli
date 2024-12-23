@@ -23,7 +23,19 @@ use kamu::testing::*;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_datasets_services::DatasetKeyValueServiceSysEnv;
-use opendatafabric::*;
+use odf::AsTypedBlock;
+use odf_dataset::{
+    BlockRef,
+    CommitOpts,
+    CreateDatasetResult,
+    Dataset,
+    DatasetStorageUnit,
+    MetadataChainExt,
+    SetRefOpts,
+};
+use odf_metadata as odf;
+use odf_storage::InsertOpts;
+use odf_storage_impl::testing::MetadataFactory;
 use time_source::{SystemTimeSource, SystemTimeSourceStub};
 
 use crate::TransformTestHelper;
@@ -47,7 +59,7 @@ impl DatasetHelper {
         self.dataset.as_metadata_chain().iter_blocks().count().await
     }
 
-    async fn data_slice_path(&self, data_slice: &DataSlice) -> PathBuf {
+    async fn data_slice_path(&self, data_slice: &odf::DataSlice) -> PathBuf {
         kamu_data_utils::data::local_url::into_local_path(
             self.dataset
                 .as_data_repo()
@@ -57,7 +69,7 @@ impl DatasetHelper {
         .unwrap()
     }
 
-    async fn checkpoint_path(&self, checkpoint: &Checkpoint) -> PathBuf {
+    async fn checkpoint_path(&self, checkpoint: &odf::Checkpoint) -> PathBuf {
         kamu_data_utils::data::local_url::into_local_path(
             self.dataset
                 .as_checkpoint_repo()
@@ -90,7 +102,7 @@ impl DatasetHelper {
             .get_block(&old_head)
             .await
             .unwrap()
-            .into_typed::<ExecuteTransform>()
+            .into_typed::<odf::ExecuteTransform>()
             .unwrap();
 
         let orig_slice = orig_block.event.new_data.as_ref().unwrap();
@@ -143,7 +155,7 @@ impl DatasetHelper {
         };
 
         // Compute new hashes
-        let new_slice = DataSlice {
+        let new_slice = odf::DataSlice {
             logical_hash: kamu_data_utils::data::hash::get_parquet_logical_hash(&tmp_path).unwrap(),
             physical_hash: kamu_data_utils::data::hash::get_file_physical_hash(&tmp_path).unwrap(),
             offset_interval: orig_slice.offset_interval.clone(),
@@ -179,9 +191,9 @@ impl DatasetHelper {
         let new_head = self
             .dataset
             .commit_event(
-                ExecuteTransform {
+                odf::ExecuteTransform {
                     new_data: Some(new_slice.clone()),
-                    new_checkpoint: Some(Checkpoint {
+                    new_checkpoint: Some(odf::Checkpoint {
                         physical_hash: new_checkpoint_hash,
                         size: 16,
                     }),
@@ -217,7 +229,7 @@ impl DatasetHelper {
 
 struct TestHarness {
     tempdir: tempfile::TempDir,
-    dataset_repo_writer: Arc<dyn DatasetRepositoryWriter>,
+    dataset_storage_unit_writer: Arc<dyn DatasetStorageUnitWriter>,
     ingest_svc: Arc<dyn PollingIngestService>,
     push_ingest_planner: Arc<dyn PushIngestPlanner>,
     push_ingest_executor: Arc<dyn PushIngestExecutor>,
@@ -243,10 +255,10 @@ impl TestHarness {
             .add::<kamu_core::auth::AlwaysHappyDatasetActionAuthorizer>()
             .add_value(CurrentAccountSubject::new_test())
             .add_value(TenancyConfig::SingleTenant)
-            .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
-            .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-            .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
-            .add::<DatasetRegistryRepoBridge>()
+            .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
+            .bind::<dyn DatasetStorageUnit, DatasetStorageUnitLocalFs>()
+            .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
+            .add::<DatasetRegistrySoloUnitBridge>()
             .add_value(EngineProvisionerLocalConfig::default())
             .add::<EngineProvisionerLocal>()
             .add_value(ObjectStoreRegistryImpl::new(vec![Arc::new(
@@ -274,7 +286,7 @@ impl TestHarness {
 
         Self {
             tempdir,
-            dataset_repo_writer: catalog.get_one().unwrap(),
+            dataset_storage_unit_writer: catalog.get_one().unwrap(),
             ingest_svc: catalog.get_one().unwrap(),
             push_ingest_planner: catalog.get_one().unwrap(),
             push_ingest_executor: catalog.get_one().unwrap(),
@@ -294,7 +306,7 @@ impl TestHarness {
 
 // TODO: Remove `test_retractions` flag once RisingWave can handle them without
 // crashing
-async fn test_transform_common(transform: Transform, test_retractions: bool) {
+async fn test_transform_common(transform: odf::Transform, test_retractions: bool) {
     let harness = TestHarness::new();
 
     ///////////////////////////////////////////////////////////////////////////
@@ -317,20 +329,20 @@ async fn test_transform_common(transform: Transform, test_retractions: bool) {
 
     let root_snapshot = MetadataFactory::dataset_snapshot()
         .name("root")
-        .kind(DatasetKind::Root)
+        .kind(odf::DatasetKind::Root)
         .push_event(
             // TODO: Simplify using push sources
             MetadataFactory::set_polling_source()
                 .fetch_file(&src_path)
-                .read(ReadStep::Csv(ReadStepCsv {
+                .read(odf::ReadStep::Csv(odf::ReadStepCsv {
                     header: Some(true),
                     schema: Some(vec![
                         "city STRING".to_string(),
                         "population INT".to_string(),
                     ]),
-                    ..ReadStepCsv::default()
+                    ..odf::ReadStepCsv::default()
                 }))
-                .merge(MergeStrategySnapshot {
+                .merge(odf::MergeStrategySnapshot {
                     primary_key: vec!["city".to_string()],
                     compare_columns: None,
                 })
@@ -341,7 +353,7 @@ async fn test_transform_common(transform: Transform, test_retractions: bool) {
     let root_alias = root_snapshot.name.clone();
 
     let root_created = harness
-        .dataset_repo_writer
+        .dataset_storage_unit_writer
         .create_dataset_from_snapshot(root_snapshot)
         .await
         .unwrap()
@@ -368,7 +380,7 @@ async fn test_transform_common(transform: Transform, test_retractions: bool) {
 
     let deriv_snapshot = MetadataFactory::dataset_snapshot()
         .name("deriv")
-        .kind(DatasetKind::Derivative)
+        .kind(odf::DatasetKind::Derivative)
         .push_event(
             MetadataFactory::set_transform()
                 .inputs_from_refs([&root_alias.dataset_name])
@@ -378,7 +390,7 @@ async fn test_transform_common(transform: Transform, test_retractions: bool) {
         .build();
 
     let deriv_created = harness
-        .dataset_repo_writer
+        .dataset_storage_unit_writer
         .create_dataset_from_snapshot(deriv_snapshot)
         .await
         .unwrap()
@@ -700,11 +712,11 @@ async fn test_transform_empty_inputs() {
     ///////////////////////////////////////////////////////////////////////////
 
     let root = harness
-        .dataset_repo_writer
+        .dataset_storage_unit_writer
         .create_dataset_from_snapshot(
             MetadataFactory::dataset_snapshot()
                 .name("root")
-                .kind(DatasetKind::Root)
+                .kind(odf::DatasetKind::Root)
                 .build(),
         )
         .await
@@ -717,7 +729,7 @@ async fn test_transform_empty_inputs() {
 
     let deriv_snapshot = MetadataFactory::dataset_snapshot()
         .name("deriv")
-        .kind(DatasetKind::Derivative)
+        .kind(odf::DatasetKind::Derivative)
         .push_event(
             MetadataFactory::set_transform()
                 .inputs_from_refs([&root.dataset_handle.alias])
@@ -732,7 +744,7 @@ async fn test_transform_empty_inputs() {
         .build();
 
     let deriv = harness
-        .dataset_repo_writer
+        .dataset_storage_unit_writer
         .create_dataset_from_snapshot(deriv_snapshot)
         .await
         .unwrap()
@@ -756,7 +768,7 @@ async fn test_transform_empty_inputs() {
     root.dataset
         .commit_event(
             MetadataFactory::add_push_source()
-                .read(ReadStepNdJson {
+                .read(odf::ReadStepNdJson {
                     schema: Some(vec![
                         "city STRING".to_string(),
                         "population INT".to_string(),

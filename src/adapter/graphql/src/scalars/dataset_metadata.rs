@@ -10,7 +10,6 @@
 use std::convert::Into;
 
 use async_graphql::*;
-use kamu_core::services::remote_status_service;
 use kamu_core::utils::metadata_chain_comparator as comp;
 use kamu_core::StatusCheckError;
 
@@ -31,8 +30,8 @@ pub struct DatasetPushStatuses {
     pub statuses: Vec<DatasetPushStatus>,
 }
 
-impl From<remote_status_service::DatasetPushStatuses> for DatasetPushStatuses {
-    fn from(value: remote_status_service::DatasetPushStatuses) -> Self {
+impl From<kamu_core::DatasetPushStatuses> for DatasetPushStatuses {
+    fn from(value: kamu_core::DatasetPushStatuses) -> Self {
         let statuses: Vec<DatasetPushStatus> = value
             .statuses
             .into_iter()

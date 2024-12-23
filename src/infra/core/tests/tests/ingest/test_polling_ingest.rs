@@ -20,7 +20,9 @@ use kamu::testing::*;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_datasets_services::DatasetKeyValueServiceSysEnv;
-use opendatafabric::*;
+use odf_dataset::{BlockRef, CreateDatasetResult, DatasetStorageUnit};
+use odf_metadata::*;
+use odf_storage_impl::testing::MetadataFactory;
 use tempfile::TempDir;
 use time_source::{SystemTimeSource, SystemTimeSourceStub};
 
@@ -1202,7 +1204,7 @@ async fn test_ingest_polling_preprocess_with_flink() {
 struct IngestTestHarness {
     temp_dir: TempDir,
     dataset_registry: Arc<dyn DatasetRegistry>,
-    dataset_repo_writer: Arc<dyn DatasetRepositoryWriter>,
+    dataset_storage_unit_writer: Arc<dyn DatasetStorageUnitWriter>,
     ingest_svc: Arc<dyn PollingIngestService>,
     time_source: Arc<SystemTimeSourceStub>,
     ctx: SessionContext,
@@ -1227,10 +1229,10 @@ impl IngestTestHarness {
             .add::<ObjectStoreBuilderLocalFs>()
             .add_value(CurrentAccountSubject::new_test())
             .add_value(TenancyConfig::SingleTenant)
-            .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
-            .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-            .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
-            .add::<DatasetRegistryRepoBridge>()
+            .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
+            .bind::<dyn DatasetStorageUnit, DatasetStorageUnitLocalFs>()
+            .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
+            .add::<DatasetRegistrySoloUnitBridge>()
             .add_value(EngineProvisionerLocalConfig::default())
             .add::<EngineProvisionerLocal>()
             .add_value(SystemTimeSourceStub::new_set(
@@ -1244,14 +1246,15 @@ impl IngestTestHarness {
             .build();
 
         let dataset_registry = catalog.get_one::<dyn DatasetRegistry>().unwrap();
-        let dataset_repo_writer = catalog.get_one::<dyn DatasetRepositoryWriter>().unwrap();
+        let dataset_storage_unit_writer =
+            catalog.get_one::<dyn DatasetStorageUnitWriter>().unwrap();
         let ingest_svc = catalog.get_one::<dyn PollingIngestService>().unwrap();
         let time_source = catalog.get_one::<SystemTimeSourceStub>().unwrap();
 
         Self {
             temp_dir,
             dataset_registry,
-            dataset_repo_writer,
+            dataset_storage_unit_writer,
             ingest_svc,
             time_source,
             ctx: SessionContext::new_with_config(SessionConfig::new().with_target_partitions(1)),
@@ -1259,7 +1262,7 @@ impl IngestTestHarness {
     }
 
     async fn create_dataset(&self, dataset_snapshot: DatasetSnapshot) -> CreateDatasetResult {
-        self.dataset_repo_writer
+        self.dataset_storage_unit_writer
             .create_dataset_from_snapshot(dataset_snapshot)
             .await
             .unwrap()

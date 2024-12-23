@@ -8,8 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use futures::{StreamExt, TryStreamExt};
-use kamu_core::{self as domain, MetadataChainExt};
-use opendatafabric as odf;
+use odf::dataset::MetadataChainExt as _;
 
 use crate::prelude::*;
 use crate::queries::Account;
@@ -50,7 +49,7 @@ impl MetadataChain {
             name: "head".to_owned(),
             block_hash: resolved_dataset
                 .as_metadata_chain()
-                .resolve_ref(&domain::BlockRef::Head)
+                .resolve_ref(&odf::BlockRef::Head)
                 .await
                 .int_err()?
                 .into(),
@@ -84,7 +83,7 @@ impl MetadataChain {
         hash: Multihash,
         format: MetadataManifestFormat,
     ) -> Result<Option<String>> {
-        use odf::serde::MetadataBlockSerializer;
+        use odf::metadata::serde::MetadataBlockSerializer;
 
         let resolved_dataset = get_dataset(ctx, &self.dataset_handle)?;
         match resolved_dataset
@@ -95,7 +94,7 @@ impl MetadataChain {
             None => Ok(None),
             Some(block) => match format {
                 MetadataManifestFormat::Yaml => {
-                    let ser = odf::serde::yaml::YamlMetadataBlockSerializer;
+                    let ser = odf::metadata::serde::yaml::YamlMetadataBlockSerializer;
                     let buffer = ser.write_manifest(&block).int_err()?;
                     let content = std::str::from_utf8(&buffer).int_err()?;
                     Ok(Some(content.to_string()))
@@ -121,7 +120,7 @@ impl MetadataChain {
 
         let chain = resolved_dataset.as_metadata_chain();
 
-        let head = chain.resolve_ref(&domain::BlockRef::Head).await.int_err()?;
+        let head = chain.resolve_ref(&odf::BlockRef::Head).await.int_err()?;
         let total_count =
             usize::try_from(chain.get_block(&head).await.int_err()?.sequence_number).unwrap() + 1;
 

@@ -14,9 +14,8 @@ use dill::{Catalog, CatalogBuilder};
 use kamu_auth_rebac::{PropertyName, RebacService};
 use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 use kamu_auth_rebac_services::{MultiTenantRebacDatasetLifecycleMessageConsumer, RebacServiceImpl};
-use kamu_core::{DatasetLifecycleMessage, DatasetVisibility};
+use kamu_core::DatasetLifecycleMessage;
 use messaging_outbox::{consume_deserialized_message, ConsumerFilter, Message};
-use opendatafabric::{AccountID, DatasetID, DatasetName};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -28,9 +27,9 @@ type Harness = MultiTenantRebacDatasetLifecycleMessageConsumerHarness;
 async fn test_rebac_properties_added() {
     let harness = Harness::new();
 
-    let (_, public_dataset_id) = DatasetID::new_generated_ed25519();
-    let (_, private_dataset_id) = DatasetID::new_generated_ed25519();
-    let (_, owner_id) = AccountID::new_generated_ed25519();
+    let (_, public_dataset_id) = odf::DatasetID::new_generated_ed25519();
+    let (_, private_dataset_id) = odf::DatasetID::new_generated_ed25519();
+    let (_, owner_id) = odf::AccountID::new_generated_ed25519();
 
     // Pre-checks
     {
@@ -58,16 +57,16 @@ async fn test_rebac_properties_added() {
             .consume_message(DatasetLifecycleMessage::created(
                 public_dataset_id.clone(),
                 owner_id.clone(),
-                DatasetVisibility::Public,
-                DatasetName::new_unchecked("public-dataset"),
+                odf::DatasetVisibility::Public,
+                odf::DatasetName::new_unchecked("public-dataset"),
             ))
             .await;
         harness
             .consume_message(DatasetLifecycleMessage::created(
                 private_dataset_id.clone(),
                 owner_id,
-                DatasetVisibility::Private,
-                DatasetName::new_unchecked("private-dataset"),
+                odf::DatasetVisibility::Private,
+                odf::DatasetName::new_unchecked("private-dataset"),
             ))
             .await;
     }
@@ -99,8 +98,8 @@ async fn test_rebac_properties_added() {
 async fn test_rebac_properties_deleted() {
     let harness = Harness::new();
 
-    let (_, dataset_id) = DatasetID::new_generated_ed25519();
-    let (_, owner_id) = AccountID::new_generated_ed25519();
+    let (_, dataset_id) = odf::DatasetID::new_generated_ed25519();
+    let (_, owner_id) = odf::AccountID::new_generated_ed25519();
 
     // Simulate creation
     {
@@ -108,8 +107,8 @@ async fn test_rebac_properties_deleted() {
             .consume_message(DatasetLifecycleMessage::created(
                 dataset_id.clone(),
                 owner_id.clone(),
-                DatasetVisibility::Public,
-                DatasetName::new_unchecked("public-dataset"),
+                odf::DatasetVisibility::Public,
+                odf::DatasetName::new_unchecked("public-dataset"),
             ))
             .await;
     }

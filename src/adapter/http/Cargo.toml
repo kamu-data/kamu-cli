@@ -37,7 +37,8 @@ kamu = { workspace = true }
 kamu-accounts = { workspace = true }
 kamu-core = { workspace = true, features = ["utoipa"] }
 kamu-data-utils = { workspace = true }
-opendatafabric = { workspace = true, features = ["utoipa"] }
+odf = { workspace = true, features = ["utoipa"] }
+s3-utils = { workspace = true }
 time-source = { workspace = true }
 
 aws-sdk-s3 = { version = "1" }
@@ -111,6 +112,9 @@ kamu-datasets-services = { workspace = true }
 kamu-datasets-inmem = { workspace = true }
 kamu-ingest-datafusion = { workspace = true }
 messaging-outbox = { workspace = true }
+odf-dataset-impl = { workspace = true, features = ["testing"] }
+odf-storage-impl = { workspace = true, features = ["testing"] }
+test-utils = { workspace = true }
 
 fs_extra = "1.3"                                                    # Recursive folder copy
 paste = "1"

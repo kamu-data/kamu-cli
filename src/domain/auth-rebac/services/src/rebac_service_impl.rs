@@ -33,7 +33,6 @@ use kamu_auth_rebac::{
     SubjectEntityRelationsError,
     UnsetEntityPropertyError,
 };
-use opendatafabric::{AccountID, DatasetID};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -53,7 +52,7 @@ impl RebacServiceImpl {
 impl RebacService for RebacServiceImpl {
     async fn set_account_property(
         &self,
-        account_id: &AccountID,
+        account_id: &odf::AccountID,
         property_name: AccountPropertyName,
         property_value: &PropertyValue,
     ) -> Result<(), SetEntityPropertyError> {
@@ -67,7 +66,7 @@ impl RebacService for RebacServiceImpl {
 
     async fn unset_account_property(
         &self,
-        account_id: &AccountID,
+        account_id: &odf::AccountID,
         property_name: AccountPropertyName,
     ) -> Result<(), UnsetEntityPropertyError> {
         use futures::FutureExt;
@@ -83,7 +82,7 @@ impl RebacService for RebacServiceImpl {
 
     async fn get_account_properties(
         &self,
-        account_id: &AccountID,
+        account_id: &odf::AccountID,
     ) -> Result<Vec<(PropertyName, PropertyValue)>, GetEntityPropertiesError> {
         let account_id = account_id.as_did_str().to_stack_string();
         let account_entity = Entity::new_account(account_id.as_str());
@@ -98,7 +97,7 @@ impl RebacService for RebacServiceImpl {
 
     async fn set_dataset_property(
         &self,
-        dataset_id: &DatasetID,
+        dataset_id: &odf::DatasetID,
         property_name: DatasetPropertyName,
         property_value: &PropertyValue,
     ) -> Result<(), SetEntityPropertyError> {
@@ -112,7 +111,7 @@ impl RebacService for RebacServiceImpl {
 
     async fn unset_dataset_property(
         &self,
-        dataset_id: &DatasetID,
+        dataset_id: &odf::DatasetID,
         property_name: DatasetPropertyName,
     ) -> Result<(), UnsetEntityPropertyError> {
         use futures::FutureExt;
@@ -128,7 +127,7 @@ impl RebacService for RebacServiceImpl {
 
     async fn delete_dataset_properties(
         &self,
-        dataset_id: &DatasetID,
+        dataset_id: &odf::DatasetID,
     ) -> Result<(), DeletePropertiesError> {
         let dataset_id = dataset_id.as_did_str().to_stack_string();
         let dataset_id_entity = Entity::new_dataset(dataset_id.as_str());
@@ -148,7 +147,7 @@ impl RebacService for RebacServiceImpl {
 
     async fn get_dataset_properties(
         &self,
-        dataset_id: &DatasetID,
+        dataset_id: &odf::DatasetID,
     ) -> Result<Vec<(PropertyName, PropertyValue)>, GetEntityPropertiesError> {
         let dataset_id = dataset_id.as_did_str().to_stack_string();
         let dataset_id_entity = Entity::new_dataset(dataset_id.as_str());
@@ -163,9 +162,9 @@ impl RebacService for RebacServiceImpl {
 
     async fn insert_account_dataset_relation(
         &self,
-        account_id: &AccountID,
+        account_id: &odf::AccountID,
         relationship: AccountToDatasetRelation,
-        dataset_id: &DatasetID,
+        dataset_id: &odf::DatasetID,
     ) -> Result<(), InsertRelationError> {
         use futures::FutureExt;
 
@@ -195,9 +194,9 @@ impl RebacService for RebacServiceImpl {
 
     async fn delete_account_dataset_relation(
         &self,
-        account_id: &AccountID,
+        account_id: &odf::AccountID,
         relationship: AccountToDatasetRelation,
-        dataset_id: &DatasetID,
+        dataset_id: &odf::DatasetID,
     ) -> Result<(), DeleteRelationError> {
         let account_id = account_id.as_did_str().to_stack_string();
         let account_entity = Entity::new_account(account_id.as_str());
@@ -224,7 +223,7 @@ impl RebacService for RebacServiceImpl {
 
     async fn get_account_dataset_relations(
         &self,
-        account_id: &AccountID,
+        account_id: &odf::AccountID,
     ) -> Result<Vec<EntityWithRelation>, SubjectEntityRelationsError> {
         let account_id = account_id.as_did_str().to_stack_string();
         let account_entity = Entity::new_account(account_id.as_str());

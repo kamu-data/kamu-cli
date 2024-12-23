@@ -10,7 +10,7 @@
 use argon2::Argon2;
 use chrono::{SubsecRound, Utc};
 use kamu_accounts::{Account, AccountType};
-use opendatafabric::{AccountID, AccountName};
+use odf_metadata::{AccountID, AccountName};
 use password_hash::rand_core::OsRng;
 use password_hash::{PasswordHash, PasswordHasher, SaltString};
 

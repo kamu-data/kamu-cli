@@ -9,11 +9,17 @@
 
 use std::assert_matches::assert_matches;
 
-use kamu::testing::MetadataFactory;
-use kamu::*;
 use kamu_core::utils::metadata_chain_comparator::*;
-use kamu_core::*;
-use opendatafabric::*;
+use odf_dataset::{AppendOpts, BlockRef, MetadataChain};
+use odf_dataset_impl::MetadataChainImpl;
+use odf_metadata as odf;
+use odf_storage_impl::testing::MetadataFactory;
+use odf_storage_impl::{
+    MetadataBlockRepositoryImpl,
+    NamedObjectRepositoryInMemory,
+    ObjectRepositoryInMemory,
+    ReferenceRepositoryImpl,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -24,7 +30,7 @@ fn init_chain() -> impl MetadataChain {
     MetadataChainImpl::new(meta_block_repo, ref_repo)
 }
 
-async fn push_block(chain: &dyn MetadataChain, block: MetadataBlock) -> Multihash {
+async fn push_block(chain: &dyn MetadataChain, block: odf::MetadataBlock) -> odf::Multihash {
     chain.append(block, AppendOpts::default()).await.unwrap()
 }
 
@@ -57,7 +63,8 @@ async fn test_same_seed_only() {
     let rhs_chain = init_chain();
 
     let block_seed =
-        MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build()).build();
+        MetadataFactory::metadata_block(MetadataFactory::seed(odf::DatasetKind::Root).build())
+            .build();
     push_block(&lhs_chain, block_seed.clone()).await;
     push_block(&rhs_chain, block_seed).await;
 
@@ -75,9 +82,11 @@ async fn test_different_seeds() {
     let rhs_chain = init_chain();
 
     let lhs_block_seed =
-        MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build()).build();
+        MetadataFactory::metadata_block(MetadataFactory::seed(odf::DatasetKind::Root).build())
+            .build();
     let rhs_block_seed =
-        MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build()).build();
+        MetadataFactory::metadata_block(MetadataFactory::seed(odf::DatasetKind::Root).build())
+            .build();
     push_block(&lhs_chain, lhs_block_seed).await;
     push_block(&rhs_chain, rhs_block_seed).await;
 
@@ -96,7 +105,8 @@ async fn test_seed_only_in_first() {
     let rhs_chain = init_chain();
 
     let lhs_block_seed =
-        MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build()).build();
+        MetadataFactory::metadata_block(MetadataFactory::seed(odf::DatasetKind::Root).build())
+            .build();
     push_block(&lhs_chain, lhs_block_seed).await;
 
     assert_matches!(
@@ -114,7 +124,8 @@ async fn test_equal_multiple_blocks() {
     let rhs_chain = init_chain();
 
     let block_seed =
-        MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build()).build();
+        MetadataFactory::metadata_block(MetadataFactory::seed(odf::DatasetKind::Root).build())
+            .build();
     let seed_hash = push_block(&lhs_chain, block_seed.clone()).await;
     push_block(&rhs_chain, block_seed).await;
 
@@ -160,7 +171,8 @@ async fn test_one_ahead_another() {
     let rhs_chain = init_chain();
 
     let block_seed =
-        MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build()).build();
+        MetadataFactory::metadata_block(MetadataFactory::seed(odf::DatasetKind::Root).build())
+            .build();
 
     let seed_hash = push_block(&lhs_chain, block_seed.clone()).await;
     push_block(&rhs_chain, block_seed).await;
@@ -213,7 +225,8 @@ async fn test_equal_length_divergence() {
     let rhs_chain = init_chain();
 
     let block_seed =
-        MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build()).build();
+        MetadataFactory::metadata_block(MetadataFactory::seed(odf::DatasetKind::Root).build())
+            .build();
 
     let seed_hash = push_block(&lhs_chain, block_seed.clone()).await;
     push_block(&rhs_chain, block_seed).await;
@@ -266,7 +279,8 @@ async fn test_different_length_divergence() {
     let rhs_chain = init_chain();
 
     let block_seed =
-        MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build()).build();
+        MetadataFactory::metadata_block(MetadataFactory::seed(odf::DatasetKind::Root).build())
+            .build();
 
     let seed_hash = push_block(&lhs_chain, block_seed.clone()).await;
     push_block(&rhs_chain, block_seed).await;

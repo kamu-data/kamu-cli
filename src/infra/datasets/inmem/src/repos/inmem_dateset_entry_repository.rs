@@ -14,7 +14,7 @@ use database_common::PaginationOpts;
 use dill::*;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_datasets::*;
-use opendatafabric::{AccountID, DatasetID, DatasetName};
+use odf_metadata::{AccountID, DatasetID, DatasetName};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

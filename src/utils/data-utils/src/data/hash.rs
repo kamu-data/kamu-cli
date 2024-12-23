@@ -12,7 +12,7 @@ use std::path::Path;
 use arrow::array::RecordBatch;
 use arrow::datatypes::Schema;
 use datafusion::arrow::record_batch::RecordBatchReader;
-use opendatafabric::{Multicodec, Multihash};
+use odf_metadata::{Multicodec, Multihash};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

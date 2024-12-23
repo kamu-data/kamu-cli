@@ -9,7 +9,6 @@
 
 use kamu_core::{CompactionResult, PullResult, PullResultUpToDate};
 use kamu_task_system::{self as ts, ResetDatasetTaskError, UpdateDatasetTaskError};
-use opendatafabric::{DatasetID, Multihash};
 use serde::{Deserialize, Serialize};
 use ts::TaskError;
 
@@ -64,7 +63,7 @@ pub enum FlowError {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FlowInputDatasetCompactedError {
-    pub dataset_id: DatasetID,
+    pub dataset_id: odf::DatasetID,
 }
 
 impl From<&TaskError> for FlowError {
@@ -93,8 +92,8 @@ pub enum FlowResultDatasetUpdate {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FlowResultDatasetUpdateChanged {
-    pub old_head: Option<Multihash>,
-    pub new_head: Multihash,
+    pub old_head: Option<odf::Multihash>,
+    pub new_head: odf::Multihash,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -104,14 +103,14 @@ pub struct FlowResultDatasetUpdateUpToDate {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FlowResultDatasetCompact {
-    pub new_head: Multihash,
+    pub new_head: odf::Multihash,
     pub old_num_blocks: usize,
     pub new_num_blocks: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FlowResultDatasetReset {
-    pub new_head: Multihash,
+    pub new_head: odf::Multihash,
 }
 
 impl From<ts::TaskResult> for FlowResult {

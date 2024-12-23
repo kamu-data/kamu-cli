@@ -15,16 +15,12 @@ use dill::{component, interface, meta, Catalog};
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_accounts::{AccountRepository, CurrentAccountSubject};
 use kamu_core::{
-    DatasetHandleStream,
     DatasetHandlesResolution,
     DatasetLifecycleMessage,
     DatasetLifecycleMessageCreated,
     DatasetLifecycleMessageDeleted,
     DatasetLifecycleMessageRenamed,
-    DatasetNotFoundError,
     DatasetRegistry,
-    DatasetRepository,
-    GetDatasetError,
     GetMultipleDatasetsError,
     ResolvedDataset,
     TenancyConfig,
@@ -37,7 +33,6 @@ use messaging_outbox::{
     MessageConsumerT,
     MessageDeliveryMechanism,
 };
-use opendatafabric as odf;
 use time_source::SystemTimeSource;
 
 use crate::MESSAGE_CONSUMER_KAMU_DATASET_ENTRY_SERVICE;
@@ -47,7 +42,7 @@ use crate::MESSAGE_CONSUMER_KAMU_DATASET_ENTRY_SERVICE;
 pub struct DatasetEntryServiceImpl {
     time_source: Arc<dyn SystemTimeSource>,
     dataset_entry_repo: Arc<dyn DatasetEntryRepository>,
-    dataset_repo: Arc<dyn DatasetRepository>,
+    dataset_storage_unit: Arc<dyn odf::DatasetStorageUnit>,
     account_repo: Arc<dyn AccountRepository>,
     current_account_subject: Arc<CurrentAccountSubject>,
     tenancy_config: Arc<TenancyConfig>,
@@ -80,7 +75,7 @@ impl DatasetEntryServiceImpl {
     pub fn new(
         time_source: Arc<dyn SystemTimeSource>,
         dataset_entry_repo: Arc<dyn DatasetEntryRepository>,
-        dataset_repo: Arc<dyn DatasetRepository>,
+        dataset_storage_unit: Arc<dyn odf::DatasetStorageUnit>,
         account_repo: Arc<dyn AccountRepository>,
         current_account_subject: Arc<CurrentAccountSubject>,
         tenancy_config: Arc<TenancyConfig>,
@@ -88,7 +83,7 @@ impl DatasetEntryServiceImpl {
         Self {
             time_source,
             dataset_entry_repo,
-            dataset_repo,
+            dataset_storage_unit,
             account_repo,
             current_account_subject,
             tenancy_config,
@@ -370,7 +365,7 @@ impl DatasetEntryService for DatasetEntryServiceImpl {
 #[async_trait::async_trait]
 impl DatasetRegistry for DatasetEntryServiceImpl {
     #[tracing::instrument(level = "debug", skip_all)]
-    fn all_dataset_handles(&self) -> DatasetHandleStream {
+    fn all_dataset_handles(&self) -> odf::dataset::DatasetHandleStream {
         EntityPageStreamer::default().into_stream(
             || async { Ok(()) },
             |_, pagination| self.list_all_dataset_handles(pagination),
@@ -378,7 +373,10 @@ impl DatasetRegistry for DatasetEntryServiceImpl {
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(%owner_name))]
-    fn all_dataset_handles_by_owner(&self, owner_name: &odf::AccountName) -> DatasetHandleStream {
+    fn all_dataset_handles_by_owner(
+        &self,
+        owner_name: &odf::AccountName,
+    ) -> odf::dataset::DatasetHandleStream {
         let owner_name = owner_name.clone();
 
         EntityPageStreamer::default().into_stream(
@@ -399,7 +397,7 @@ impl DatasetRegistry for DatasetEntryServiceImpl {
     async fn resolve_dataset_handle_by_ref(
         &self,
         dataset_ref: &odf::DatasetRef,
-    ) -> Result<odf::DatasetHandle, GetDatasetError> {
+    ) -> Result<odf::DatasetHandle, odf::dataset::GetDatasetError> {
         match dataset_ref {
             odf::DatasetRef::Handle(h) => Ok(h.clone()),
             odf::DatasetRef::Alias(alias) => {
@@ -413,12 +411,14 @@ impl DatasetRegistry for DatasetEntryServiceImpl {
                 {
                     Ok(entry) => Ok(odf::DatasetHandle::new(entry.id.clone(), alias.clone())),
                     Err(GetDatasetEntryByNameError::NotFound(_)) => {
-                        Err(GetDatasetError::NotFound(DatasetNotFoundError {
-                            dataset_ref: dataset_ref.clone(),
-                        }))
+                        Err(odf::dataset::GetDatasetError::NotFound(
+                            odf::dataset::DatasetNotFoundError {
+                                dataset_ref: dataset_ref.clone(),
+                            },
+                        ))
                     }
                     Err(GetDatasetEntryByNameError::Internal(e)) => {
-                        Err(GetDatasetError::Internal(e))
+                        Err(odf::dataset::GetDatasetError::Internal(e))
                     }
                 }
             }
@@ -430,12 +430,14 @@ impl DatasetRegistry for DatasetEntryServiceImpl {
                         self.make_alias(owner_name, entry.name.clone()),
                     ))
                 }
-                Err(GetDatasetEntryError::NotFound(_)) => {
-                    Err(GetDatasetError::NotFound(DatasetNotFoundError {
+                Err(GetDatasetEntryError::NotFound(_)) => Err(
+                    odf::dataset::GetDatasetError::NotFound(odf::dataset::DatasetNotFoundError {
                         dataset_ref: dataset_ref.clone(),
-                    }))
+                    }),
+                ),
+                Err(GetDatasetEntryError::Internal(e)) => {
+                    Err(odf::dataset::GetDatasetError::Internal(e))
                 }
-                Err(GetDatasetEntryError::Internal(e)) => Err(GetDatasetError::Internal(e)),
             },
         }
     }
@@ -468,7 +470,7 @@ impl DatasetRegistry for DatasetEntryServiceImpl {
             .map(|id| {
                 (
                     id.clone(),
-                    GetDatasetError::NotFound(DatasetNotFoundError {
+                    odf::dataset::GetDatasetError::NotFound(odf::dataset::DatasetNotFoundError {
                         dataset_ref: id.into_local_ref(),
                     }),
                 )
@@ -484,7 +486,9 @@ impl DatasetRegistry for DatasetEntryServiceImpl {
     // Note: in future we will be resolving storage repository,
     // but for now we have just a single one
     fn get_dataset_by_handle(&self, dataset_handle: &odf::DatasetHandle) -> ResolvedDataset {
-        let dataset = self.dataset_repo.get_dataset_by_handle(dataset_handle);
+        let dataset = self
+            .dataset_storage_unit
+            .get_stored_dataset_by_handle(dataset_handle);
         ResolvedDataset::new(dataset, dataset_handle.clone())
     }
 }

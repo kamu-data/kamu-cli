@@ -15,8 +15,6 @@ use dill::*;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::auth::*;
-use kamu_core::AccessError;
-use opendatafabric::DatasetHandle;
 use oso::Oso;
 
 use crate::dataset_resource::*;
@@ -55,7 +53,7 @@ impl OsoDatasetAuthorizer {
         }
     }
 
-    fn dataset_resource(&self, dataset_handle: &DatasetHandle) -> DatasetResource {
+    fn dataset_resource(&self, dataset_handle: &odf::DatasetHandle) -> DatasetResource {
         let dataset_alias = &dataset_handle.alias;
         let creator = dataset_alias.account_name.as_ref().map_or_else(
             || {
@@ -79,7 +77,7 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
     #[tracing::instrument(level = "debug", skip_all, fields(%dataset_handle, ?action))]
     async fn check_action_allowed(
         &self,
-        dataset_handle: &DatasetHandle,
+        dataset_handle: &odf::DatasetHandle,
         action: DatasetAction,
     ) -> Result<(), DatasetActionUnauthorizedError> {
         let actor = self.actor();
@@ -94,7 +92,7 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
                     Ok(())
                 } else {
                     Err(DatasetActionUnauthorizedError::Access(
-                        AccessError::Forbidden(
+                        odf::AccessError::Forbidden(
                             DatasetActionNotEnoughPermissionsError {
                                 action,
                                 dataset_ref: dataset_handle.as_local_ref(),
@@ -109,7 +107,10 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(%dataset_handle))]
-    async fn get_allowed_actions(&self, dataset_handle: &DatasetHandle) -> HashSet<DatasetAction> {
+    async fn get_allowed_actions(
+        &self,
+        dataset_handle: &odf::DatasetHandle,
+    ) -> HashSet<DatasetAction> {
         let actor = self.actor();
         let dataset_resource = self.dataset_resource(dataset_handle);
 
@@ -130,9 +131,9 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
     #[tracing::instrument(level = "debug", skip_all, fields(dataset_handles=?dataset_handles, action=%action))]
     async fn filter_datasets_allowing(
         &self,
-        dataset_handles: Vec<DatasetHandle>,
+        dataset_handles: Vec<odf::DatasetHandle>,
         action: DatasetAction,
-    ) -> Result<Vec<DatasetHandle>, InternalError> {
+    ) -> Result<Vec<odf::DatasetHandle>, InternalError> {
         let mut matched_dataset_handles = Vec::new();
         for hdl in dataset_handles {
             let is_allowed = self
@@ -154,7 +155,7 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
     #[tracing::instrument(level = "debug", skip_all, fields(dataset_handles=?dataset_handles, action=%action))]
     async fn classify_datasets_by_allowance(
         &self,
-        dataset_handles: Vec<DatasetHandle>,
+        dataset_handles: Vec<odf::DatasetHandle>,
         action: DatasetAction,
     ) -> Result<ClassifyByAllowanceResponse, InternalError> {
         let mut matched_dataset_handles = Vec::with_capacity(dataset_handles.len());
@@ -175,7 +176,7 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
                 let dataset_ref = hdl.as_local_ref();
                 unmatched_results.push((
                     hdl,
-                    DatasetActionUnauthorizedError::Access(AccessError::Forbidden(
+                    DatasetActionUnauthorizedError::Access(odf::AccessError::Forbidden(
                         DatasetActionNotEnoughPermissionsError {
                             action,
                             dataset_ref,

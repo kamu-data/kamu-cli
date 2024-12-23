@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::InternalError;
-use opendatafabric::AccountName;
 use thiserror::Error;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -17,13 +16,13 @@ use thiserror::Error;
 pub trait PasswordHashRepository: Send + Sync {
     async fn save_password_hash(
         &self,
-        account_name: &AccountName,
+        account_name: &odf::AccountName,
         password_hash: String,
     ) -> Result<(), SavePasswordHashError>;
 
     async fn find_password_hash_by_account_name(
         &self,
-        account_name: &AccountName,
+        account_name: &odf::AccountName,
     ) -> Result<Option<String>, FindPasswordHashError>;
 }
 

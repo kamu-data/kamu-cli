@@ -14,7 +14,6 @@ use bytes::Bytes;
 use dill::*;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_core::{CacheDir, MediaType, ServerUrlConfig};
-use opendatafabric::AccountID;
 use thiserror::Error;
 use tokio::io::AsyncRead;
 use uuid::Uuid;
@@ -73,7 +72,7 @@ impl UploadServiceLocal {
 impl UploadService for UploadServiceLocal {
     async fn make_upload_context(
         &self,
-        owner_account_id: &AccountID,
+        owner_account_id: &odf::AccountID,
         file_name: String,
         content_type: Option<MediaType>,
         content_length: usize,
@@ -128,7 +127,7 @@ impl UploadService for UploadServiceLocal {
 
     async fn upload_reference_size(
         &self,
-        owner_account_id: &AccountID,
+        owner_account_id: &odf::AccountID,
         upload_id: &str,
         file_name: &str,
     ) -> Result<usize, UploadTokenIntoStreamError> {
@@ -147,7 +146,7 @@ impl UploadService for UploadServiceLocal {
 
     async fn upload_reference_into_stream(
         &self,
-        owner_account_id: &AccountID,
+        owner_account_id: &odf::AccountID,
         upload_id: &str,
         file_name: &str,
     ) -> Result<Box<dyn AsyncRead + Send + Unpin>, UploadTokenIntoStreamError> {

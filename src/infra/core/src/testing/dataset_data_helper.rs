@@ -14,8 +14,14 @@ use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::common::DFSchema;
 use datafusion::prelude::*;
 use futures::TryStreamExt;
-use kamu_core::*;
-use opendatafabric::*;
+use odf_dataset::{
+    BlockRef,
+    Dataset,
+    MetadataChainExt,
+    SearchSetDataSchemaVisitor,
+    TryStreamExtExt,
+};
+use odf_metadata::{self as odf, AsTypedBlock, IntoDataStreamBlock};
 
 pub struct DatasetDataHelper {
     dataset: Arc<dyn Dataset>,
@@ -43,7 +49,9 @@ impl DatasetDataHelper {
             .unwrap()
     }
 
-    pub async fn get_last_block_typed<T: VariantOf<MetadataEvent>>(&self) -> MetadataBlockTyped<T> {
+    pub async fn get_last_block_typed<T: odf::VariantOf<odf::MetadataEvent>>(
+        &self,
+    ) -> odf::MetadataBlockTyped<T> {
         let hash = self
             .dataset
             .as_metadata_chain()
@@ -61,7 +69,7 @@ impl DatasetDataHelper {
             .expect("Last block is not a data block")
     }
 
-    pub async fn get_last_data_block(&self) -> MetadataBlockDataStream {
+    pub async fn get_last_data_block(&self) -> odf::MetadataBlockDataStream {
         let hash = self
             .dataset
             .as_metadata_chain()
@@ -119,7 +127,9 @@ impl DatasetDataHelper {
             .unwrap()
     }
 
-    pub async fn get_last_set_data_schema_block(&self) -> MetadataBlockTyped<SetDataSchema> {
+    pub async fn get_last_set_data_schema_block(
+        &self,
+    ) -> odf::MetadataBlockTyped<odf::SetDataSchema> {
         self.dataset
             .as_metadata_chain()
             .accept_one(SearchSetDataSchemaVisitor::new())

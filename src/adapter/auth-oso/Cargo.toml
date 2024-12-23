@@ -23,7 +23,7 @@ doctest = false
 [dependencies]
 internal-error = { workspace = true }
 messaging-outbox = { workspace = true }
-opendatafabric = { workspace = true }
+odf = { workspace = true }
 kamu-accounts = { workspace = true }
 kamu-core = { workspace = true }
 
@@ -35,6 +35,7 @@ tracing = { version = "0.1", default-features = false }
 
 [dev-dependencies]
 kamu = { workspace = true, features = ["testing"] }
+odf-storage-impl = { workspace = true, features = ["testing"]}
 time-source = { workspace = true }
 
 tempfile = "3"

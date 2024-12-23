@@ -11,20 +11,20 @@ use datafusion::logical_expr::SortExpr;
 use datafusion::prelude::*;
 use internal_error::*;
 use kamu_data_utils::data::dataframe_ext::DataFrameExt;
-use opendatafabric as odf;
+use odf_metadata as odf;
 
 use crate::*;
 
 /// Ledger merge strategy.
 ///
-/// See [`opendatafabric::MergeStrategyLedger`] for details.
+/// See [`odf_metadata::MergeStrategyLedger`] for details.
 pub struct MergeStrategyLedger {
     vocab: odf::DatasetVocabulary,
     primary_key: Vec<String>,
 }
 
 impl MergeStrategyLedger {
-    pub fn new(vocab: odf::DatasetVocabulary, cfg: opendatafabric::MergeStrategyLedger) -> Self {
+    pub fn new(vocab: odf::DatasetVocabulary, cfg: odf_metadata::MergeStrategyLedger) -> Self {
         Self {
             vocab,
             primary_key: cfg.primary_key,

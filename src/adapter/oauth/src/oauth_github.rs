@@ -12,7 +12,6 @@ use std::sync::Arc;
 use dill::*;
 use internal_error::ResultIntoInternal;
 use kamu_accounts::*;
-use opendatafabric::{AccountID, AccountName};
 use serde::Deserialize;
 use thiserror::Error;
 
@@ -111,9 +110,9 @@ impl AuthenticationProvider for OAuthGithub {
         PROVIDER_GITHUB
     }
 
-    fn generate_id(&self, _: &AccountName) -> AccountID {
+    fn generate_id(&self, _: &odf::AccountName) -> odf::AccountID {
         // For GitHub, generate a random DID, regardless of the name
-        AccountID::new_generated_ed25519().1
+        odf::AccountID::new_generated_ed25519().1
     }
 
     async fn login(
@@ -151,7 +150,7 @@ impl AuthenticationProvider for OAuthGithub {
 
         // Extract matching fields
         Ok(ProviderLoginResponse {
-            account_name: AccountName::new_unchecked(&github_account_info.login),
+            account_name: odf::AccountName::new_unchecked(&github_account_info.login),
             account_type: AccountType::User,
             email: github_account_info.email,
             display_name: github_account_info
@@ -242,9 +241,9 @@ impl AuthenticationProvider for DummyOAuthGithub {
         PROVIDER_GITHUB
     }
 
-    fn generate_id(&self, _account_name: &AccountName) -> AccountID {
+    fn generate_id(&self, _account_name: &odf::AccountName) -> odf::AccountID {
         // Random
-        AccountID::new_generated_ed25519().1
+        odf::AccountID::new_generated_ed25519().1
     }
 
     async fn login(
@@ -254,7 +253,7 @@ impl AuthenticationProvider for DummyOAuthGithub {
         let account = "e2e-user".to_string();
 
         Ok(ProviderLoginResponse {
-            account_name: AccountName::new_unchecked(&account),
+            account_name: odf::AccountName::new_unchecked(&account),
             account_type: AccountType::User,
             email: Some("e2e-user@example.com".into()),
             display_name: account.clone(),

@@ -19,7 +19,11 @@ use kamu::utils::simple_transfer_protocol::SimpleTransferProtocol;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
 use messaging_outbox::DummyOutboxImpl;
-use opendatafabric::*;
+use odf_dataset::{DatasetStorageUnit, DummyOdfServerAccessTokenResolver};
+use odf_dataset_impl::{DatasetFactoryImpl, IpfsGateway};
+use odf_metadata::*;
+use odf_storage_impl::testing::MetadataFactory;
+use test_utils::{HttpFileServer, LocalS3Server};
 use time_source::SystemTimeSourceDefault;
 use url::Url;
 
@@ -32,8 +36,8 @@ const FILE_DATA_ARRAY_SIZE: usize = 32;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 async fn assert_in_sync(
-    dataset_repo_lhs: &DatasetRepositoryLocalFs,
-    dataset_repo_rhs: &DatasetRepositoryLocalFs,
+    dataset_repo_lhs: &DatasetStorageUnitLocalFs,
+    dataset_repo_rhs: &DatasetStorageUnitLocalFs,
     lhs: impl Into<DatasetRef>,
     rhs: impl Into<DatasetRef>,
 ) {
@@ -75,13 +79,13 @@ async fn do_test_sync(
         .add_value(ipfs_client.clone())
         .add_value(CurrentAccountSubject::new_test())
         .add_value(TenancyConfig::SingleTenant)
-        .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir_foo))
-        .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-        .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
-        .add::<DatasetRegistryRepoBridge>()
+        .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir_foo))
+        .bind::<dyn DatasetStorageUnit, DatasetStorageUnitLocalFs>()
+        .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
+        .add::<DatasetRegistrySoloUnitBridge>()
         .add_value(RemoteReposDir::new(tmp_workspace_dir_foo.join("repos")))
         .add::<RemoteRepositoryRegistryImpl>()
-        .add::<auth::DummyOdfServerAccessTokenResolver>()
+        .add::<DummyOdfServerAccessTokenResolver>()
         .add::<DatasetFactoryImpl>()
         .add::<SyncServiceImpl>()
         .add::<SyncRequestBuilder>()
@@ -97,13 +101,13 @@ async fn do_test_sync(
         .add_value(ipfs_client.clone())
         .add_value(CurrentAccountSubject::new_test())
         .add_value(TenancyConfig::SingleTenant)
-        .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir_bar))
-        .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-        .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
-        .add::<DatasetRegistryRepoBridge>()
+        .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir_bar))
+        .bind::<dyn DatasetStorageUnit, DatasetStorageUnitLocalFs>()
+        .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
+        .add::<DatasetRegistrySoloUnitBridge>()
         .add_value(RemoteReposDir::new(tmp_workspace_dir_bar.join("repos")))
         .add::<RemoteRepositoryRegistryImpl>()
-        .add::<auth::DummyOdfServerAccessTokenResolver>()
+        .add::<DummyOdfServerAccessTokenResolver>()
         .add::<DatasetFactoryImpl>()
         .add::<SyncServiceImpl>()
         .add::<SyncRequestBuilder>()
@@ -115,12 +119,12 @@ async fn do_test_sync(
 
     let sync_svc_foo = catalog_foo.get_one::<dyn SyncService>().unwrap();
     let sync_request_builder_foo = catalog_foo.get_one::<SyncRequestBuilder>().unwrap();
-    let dataset_repo_foo = catalog_foo.get_one::<DatasetRepositoryLocalFs>().unwrap();
+    let storage_unit_foo = catalog_foo.get_one::<DatasetStorageUnitLocalFs>().unwrap();
     let dataset_registry_foo = catalog_foo.get_one::<dyn DatasetRegistry>().unwrap();
 
     let sync_svc_bar = catalog_bar.get_one::<dyn SyncService>().unwrap();
     let sync_request_builder_bar = catalog_bar.get_one::<SyncRequestBuilder>().unwrap();
-    let dataset_repo_bar = catalog_bar.get_one::<DatasetRepositoryLocalFs>().unwrap();
+    let storage_unit_bar = catalog_bar.get_one::<DatasetStorageUnitLocalFs>().unwrap();
     let dataset_registry_bar = catalog_bar.get_one::<dyn DatasetRegistry>().unwrap();
 
     // Dataset does not exist locally / remotely
@@ -145,7 +149,7 @@ async fn do_test_sync(
         .push_event(MetadataFactory::set_data_schema().build())
         .build();
 
-    let b1 = dataset_repo_foo
+    let b1 = storage_unit_foo
         .create_dataset_from_snapshot(snapshot)
         .await
         .unwrap()
@@ -203,8 +207,8 @@ async fn do_test_sync(
     );
 
     assert_in_sync(
-        &dataset_repo_foo,
-        &dataset_repo_bar,
+        &storage_unit_foo,
+        &storage_unit_bar,
         &dataset_alias_foo,
         &dataset_alias_bar,
     )
@@ -289,8 +293,8 @@ async fn do_test_sync(
     );
 
     assert_in_sync(
-        &dataset_repo_foo,
-        &dataset_repo_bar,
+        &storage_unit_foo,
+        &storage_unit_bar,
         &dataset_alias_foo,
         &dataset_alias_bar,
     )
@@ -324,8 +328,8 @@ async fn do_test_sync(
     assert_matches!(sync_result, SyncResult::UpToDate);
 
     assert_in_sync(
-        &dataset_repo_foo,
-        &dataset_repo_bar,
+        &storage_unit_foo,
+        &storage_unit_bar,
         &dataset_alias_foo,
         &dataset_alias_bar,
     )

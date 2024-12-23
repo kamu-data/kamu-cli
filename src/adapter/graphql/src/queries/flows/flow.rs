@@ -9,8 +9,7 @@
 
 use chrono::{DateTime, Utc};
 use kamu_core::{DatasetChangesService, DatasetRegistry, DatasetRegistryExt, MetadataQueryService};
-use kamu_flow_system::FlowResultDatasetUpdate;
-use {kamu_flow_system as fs, opendatafabric as odf};
+use kamu_flow_system as fs;
 
 use super::{
     FlowConfigurationSnapshot,
@@ -329,7 +328,7 @@ impl FlowDescriptionUpdateResult {
                     | fs::FlowResult::DatasetCompact(_)
                     | fs::FlowResult::DatasetReset(_) => Ok(None),
                     fs::FlowResult::DatasetUpdate(update) => match update {
-                        FlowResultDatasetUpdate::Changed(update_result) => {
+                        fs::FlowResultDatasetUpdate::Changed(update_result) => {
                             let increment = dataset_changes_service
                                 .get_increment_between(
                                     dataset_id,
@@ -345,7 +344,7 @@ impl FlowDescriptionUpdateResult {
                                 updated_watermark: increment.updated_watermark,
                             })))
                         }
-                        FlowResultDatasetUpdate::UpToDate(up_to_date_result) => {
+                        fs::FlowResultDatasetUpdate::UpToDate(up_to_date_result) => {
                             Ok(Some(Self::UpToDate(FlowDescriptionUpdateResultUpToDate {
                                 uncacheable: up_to_date_result.uncacheable,
                             })))

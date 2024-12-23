@@ -10,7 +10,6 @@
 use std::sync::Arc;
 
 use internal_error::InternalError;
-use opendatafabric::*;
 use thiserror::Error;
 use tokio::io::AsyncRead;
 
@@ -53,8 +52,8 @@ pub trait PushIngestExecutor: Send + Sync {
 pub enum PushIngestResult {
     UpToDate,
     Updated {
-        old_head: Multihash,
-        new_head: Multihash,
+        old_head: odf::Multihash,
+        new_head: odf::Multihash,
         num_blocks: usize,
     },
 }
@@ -144,14 +143,14 @@ pub enum PushIngestError {
     CommitError(
         #[from]
         #[backtrace]
-        CommitError,
+        odf::dataset::CommitError,
     ),
 
     #[error(transparent)]
     Access(
         #[from]
         #[backtrace]
-        AccessError,
+        odf::metadata::AccessError,
     ),
 
     #[error(transparent)]

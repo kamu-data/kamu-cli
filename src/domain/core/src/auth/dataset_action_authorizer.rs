@@ -12,10 +12,7 @@ use std::str::FromStr;
 
 use dill::*;
 use internal_error::{ErrorIntoInternal, InternalError};
-use opendatafabric::{DatasetHandle, DatasetRef};
 use thiserror::Error;
-
-use crate::AccessError;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -23,13 +20,13 @@ use crate::AccessError;
 pub trait DatasetActionAuthorizer: Sync + Send {
     async fn check_action_allowed(
         &self,
-        dataset_handle: &DatasetHandle,
+        dataset_handle: &odf::DatasetHandle,
         action: DatasetAction,
     ) -> Result<(), DatasetActionUnauthorizedError>;
 
     async fn is_action_allowed(
         &self,
-        dataset_handle: &DatasetHandle,
+        dataset_handle: &odf::DatasetHandle,
         action: DatasetAction,
     ) -> Result<bool, InternalError> {
         match self.check_action_allowed(dataset_handle, action).await {
@@ -39,17 +36,20 @@ pub trait DatasetActionAuthorizer: Sync + Send {
         }
     }
 
-    async fn get_allowed_actions(&self, dataset_handle: &DatasetHandle) -> HashSet<DatasetAction>;
+    async fn get_allowed_actions(
+        &self,
+        dataset_handle: &odf::DatasetHandle,
+    ) -> HashSet<DatasetAction>;
 
     async fn filter_datasets_allowing(
         &self,
-        dataset_handles: Vec<DatasetHandle>,
+        dataset_handles: Vec<odf::DatasetHandle>,
         action: DatasetAction,
-    ) -> Result<Vec<DatasetHandle>, InternalError>;
+    ) -> Result<Vec<odf::DatasetHandle>, InternalError>;
 
     async fn classify_datasets_by_allowance(
         &self,
-        dataset_handles: Vec<DatasetHandle>,
+        dataset_handles: Vec<odf::DatasetHandle>,
         action: DatasetAction,
     ) -> Result<ClassifyByAllowanceResponse, InternalError>;
 }
@@ -90,7 +90,7 @@ impl std::fmt::Display for DatasetAction {
 #[derive(Debug, Error)]
 pub enum DatasetActionUnauthorizedError {
     #[error(transparent)]
-    Access(AccessError),
+    Access(odf::AccessError),
 
     #[error(transparent)]
     Internal(InternalError),
@@ -100,15 +100,15 @@ pub enum DatasetActionUnauthorizedError {
 #[error("User has no '{action}' permission in dataset '{dataset_ref}'")]
 pub struct DatasetActionNotEnoughPermissionsError {
     pub action: DatasetAction,
-    pub dataset_ref: DatasetRef,
+    pub dataset_ref: odf::DatasetRef,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug)]
 pub struct ClassifyByAllowanceResponse {
-    pub authorized_handles: Vec<DatasetHandle>,
-    pub unauthorized_handles_with_errors: Vec<(DatasetHandle, DatasetActionUnauthorizedError)>,
+    pub authorized_handles: Vec<odf::DatasetHandle>,
+    pub unauthorized_handles_with_errors: Vec<(odf::DatasetHandle, DatasetActionUnauthorizedError)>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -127,28 +127,31 @@ impl AlwaysHappyDatasetActionAuthorizer {
 impl DatasetActionAuthorizer for AlwaysHappyDatasetActionAuthorizer {
     async fn check_action_allowed(
         &self,
-        _dataset_handle: &DatasetHandle,
+        _dataset_handle: &odf::DatasetHandle,
         _action: DatasetAction,
     ) -> Result<(), DatasetActionUnauthorizedError> {
         // Ignore rules
         Ok(())
     }
 
-    async fn get_allowed_actions(&self, _dataset_handle: &DatasetHandle) -> HashSet<DatasetAction> {
+    async fn get_allowed_actions(
+        &self,
+        _dataset_handle: &odf::DatasetHandle,
+    ) -> HashSet<DatasetAction> {
         HashSet::from([DatasetAction::Read, DatasetAction::Write])
     }
 
     async fn filter_datasets_allowing(
         &self,
-        dataset_handles: Vec<DatasetHandle>,
+        dataset_handles: Vec<odf::DatasetHandle>,
         _action: DatasetAction,
-    ) -> Result<Vec<DatasetHandle>, InternalError> {
+    ) -> Result<Vec<odf::DatasetHandle>, InternalError> {
         Ok(dataset_handles)
     }
 
     async fn classify_datasets_by_allowance(
         &self,
-        dataset_handles: Vec<DatasetHandle>,
+        dataset_handles: Vec<odf::DatasetHandle>,
         _action: DatasetAction,
     ) -> Result<ClassifyByAllowanceResponse, InternalError> {
         Ok(ClassifyByAllowanceResponse {

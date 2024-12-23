@@ -11,21 +11,19 @@ use std::sync::Arc;
 
 use dill::{component, interface};
 use internal_error::ResultIntoInternal;
-use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer};
+use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer, DatasetActionUnauthorizedError};
 use kamu_core::{
-    DanglingReferenceError,
     DatasetLifecycleMessage,
     DatasetRegistry,
-    DeleteDatasetError,
     DeleteDatasetUseCase,
     DependencyGraphService,
-    GetDatasetError,
     MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
 };
 use messaging_outbox::{Outbox, OutboxExt};
-use opendatafabric::{DatasetHandle, DatasetRef};
+use odf_dataset::{DanglingReferenceError, DeleteDatasetError, GetDatasetError};
+use odf_metadata::{DatasetHandle, DatasetRef};
 
-use crate::DatasetRepositoryWriter;
+use crate::DatasetStorageUnitWriter;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -33,7 +31,7 @@ use crate::DatasetRepositoryWriter;
 #[interface(dyn DeleteDatasetUseCase)]
 pub struct DeleteDatasetUseCaseImpl {
     dataset_registry: Arc<dyn DatasetRegistry>,
-    dataset_repo_writer: Arc<dyn DatasetRepositoryWriter>,
+    dataset_storage_unit_writer: Arc<dyn DatasetStorageUnitWriter>,
     dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
     dependency_graph_service: Arc<dyn DependencyGraphService>,
     outbox: Arc<dyn Outbox>,
@@ -42,14 +40,14 @@ pub struct DeleteDatasetUseCaseImpl {
 impl DeleteDatasetUseCaseImpl {
     pub fn new(
         dataset_registry: Arc<dyn DatasetRegistry>,
-        dataset_repo_writer: Arc<dyn DatasetRepositoryWriter>,
+        dataset_storage_unit_writer: Arc<dyn DatasetStorageUnitWriter>,
         dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
         dependency_graph_service: Arc<dyn DependencyGraphService>,
         outbox: Arc<dyn Outbox>,
     ) -> Self {
         Self {
             dataset_registry,
-            dataset_repo_writer,
+            dataset_storage_unit_writer,
             dataset_action_authorizer,
             dependency_graph_service,
             outbox,
@@ -126,13 +124,17 @@ impl DeleteDatasetUseCase for DeleteDatasetUseCaseImpl {
         // Permission check
         self.dataset_action_authorizer
             .check_action_allowed(dataset_handle, DatasetAction::Write)
-            .await?;
+            .await
+            .map_err(|e| match e {
+                DatasetActionUnauthorizedError::Access(e) => DeleteDatasetError::Access(e),
+                DatasetActionUnauthorizedError::Internal(e) => DeleteDatasetError::Internal(e),
+            })?;
 
         // Validate against dangling ref
         self.ensure_no_dangling_references(dataset_handle).await?;
 
         // Do actual delete
-        self.dataset_repo_writer
+        self.dataset_storage_unit_writer
             .delete_dataset(dataset_handle)
             .await?;
 

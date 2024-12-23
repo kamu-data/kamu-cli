@@ -11,7 +11,6 @@
 
 use chrono::{DateTime, Utc};
 use jsonwebtoken::TokenData;
-use opendatafabric::{AccountID, Multihash};
 use rand::{self, Rng};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -57,7 +56,7 @@ impl KamuAccessToken {
             prefix: ACCESS_TOKEN_PREFIX.to_string(),
             id: token_id,
             random_bytes: random_token_bytes,
-            random_bytes_hash: Multihash::from_digest_sha3_256(&random_token_bytes)
+            random_bytes_hash: odf::Multihash::from_digest_sha3_256(&random_token_bytes)
                 .digest()
                 .try_into()
                 .unwrap(),
@@ -99,7 +98,7 @@ impl KamuAccessToken {
                     id: token_id,
                     prefix: token_prefix.to_string(),
                     random_bytes: token_body,
-                    random_bytes_hash: Multihash::from_digest_sha3_256(&token_body)
+                    random_bytes_hash: odf::Multihash::from_digest_sha3_256(&token_body)
                         .digest()
                         .try_into()
                         .unwrap(),
@@ -122,7 +121,7 @@ pub struct AccessToken {
     pub token_hash: [u8; 32],
     pub created_at: DateTime<Utc>,
     pub revoked_at: Option<DateTime<Utc>>,
-    pub account_id: AccountID,
+    pub account_id: odf::AccountID,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -169,7 +168,7 @@ pub struct AccessTokenRowModel {
     pub token_hash: Vec<u8>,
     pub created_at: DateTime<Utc>,
     pub revoked_at: Option<DateTime<Utc>>,
-    pub account_id: AccountID,
+    pub account_id: odf::AccountID,
 }
 
 #[cfg(feature = "sqlx")]

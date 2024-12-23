@@ -9,6 +9,3 @@
 
 mod dataset_action_authorizer;
 pub use dataset_action_authorizer::*;
-
-mod odf_server_access_token_resolver;
-pub use odf_server_access_token_resolver::*;

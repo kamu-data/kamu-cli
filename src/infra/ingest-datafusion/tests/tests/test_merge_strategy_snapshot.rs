@@ -17,7 +17,7 @@ use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::prelude::*;
 use kamu_data_utils::data::dataframe_ext::*;
 use kamu_ingest_datafusion::*;
-use opendatafabric as odf;
+use odf_metadata as odf;
 
 use crate::utils::*;
 

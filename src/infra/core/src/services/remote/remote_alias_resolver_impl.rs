@@ -10,11 +10,11 @@
 use std::str::FromStr;
 use std::sync::Arc;
 
-use auth::OdfServerAccessTokenResolver;
 use dill::*;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_core::*;
-use opendatafabric::{self as odf, DatasetHandle};
+use odf_dataset::OdfServerAccessTokenResolver;
+use odf_metadata::{self as odf, DatasetHandle};
 use url::Url;
 
 use crate::UrlExt;

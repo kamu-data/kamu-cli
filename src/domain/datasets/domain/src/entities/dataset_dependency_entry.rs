@@ -7,14 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use opendatafabric::DatasetID;
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, sqlx::FromRow)]
 pub struct DatasetDependencyEntryRowModel {
-    pub downstream_dataset_id: DatasetID,
-    pub upstream_dataset_id: DatasetID,
+    pub downstream_dataset_id: odf::DatasetID,
+    pub upstream_dataset_id: odf::DatasetID,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

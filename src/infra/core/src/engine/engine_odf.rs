@@ -14,12 +14,15 @@ use std::sync::Arc;
 
 use container_runtime::*;
 use datafusion::config::{ParquetOptions, TableParquetOptions};
+use file_utils::OwnedFile;
 use internal_error::ResultIntoInternal;
 use kamu_core::engine::*;
 use kamu_core::*;
 use odf::engine::{EngineGrpcClient, ExecuteRawQueryError, ExecuteTransformError};
 use odf::TransformResponseSuccess;
-use opendatafabric::{self as odf};
+use odf_dataset::Dataset;
+use odf_metadata as odf;
+use odf_storage::ObjectRepositoryProtocol;
 
 use super::engine_container::{EngineContainer, LogsConfig};
 use super::engine_io_strategy::*;

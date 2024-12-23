@@ -14,7 +14,6 @@ use kamu_datasets::{
     ModifyDatasetEnvVarError,
     SaveDatasetEnvVarError,
 };
-use opendatafabric as odf;
 use secrecy::SecretString;
 
 use crate::prelude::*;

@@ -10,11 +10,10 @@
 use std::sync::Arc;
 
 use internal_error::{ErrorIntoInternal, InternalError};
-use opendatafabric as odf;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::{AccessError, CompactionListener, CompactionPlan, ResolvedDataset, SetRefError};
+use crate::{CompactionListener, CompactionPlan, ResolvedDataset};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -49,7 +48,7 @@ pub enum CompactionExecutionError {
     Access(
         #[from]
         #[backtrace]
-        AccessError,
+        odf::AccessError,
     ),
 
     #[error(transparent)]
@@ -58,11 +57,11 @@ pub enum CompactionExecutionError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl From<SetRefError> for CompactionExecutionError {
-    fn from(v: SetRefError) -> Self {
+impl From<odf::dataset::SetChainRefError> for CompactionExecutionError {
+    fn from(v: odf::dataset::SetChainRefError) -> Self {
         match v {
-            SetRefError::Access(e) => Self::Access(e),
-            SetRefError::Internal(e) => Self::Internal(e),
+            odf::dataset::SetChainRefError::Access(e) => Self::Access(e),
+            odf::dataset::SetChainRefError::Internal(e) => Self::Internal(e),
             _ => Self::Internal(v.int_err()),
         }
     }

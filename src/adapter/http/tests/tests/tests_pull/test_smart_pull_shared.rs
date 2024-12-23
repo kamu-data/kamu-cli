@@ -9,7 +9,6 @@
 
 use kamu::domain::*;
 use kamu::testing::DatasetTestHelper;
-use opendatafabric::*;
 
 use crate::harness::{await_client_server_flow, ClientSideHarness, ServerSideHarness};
 use crate::tests::tests_pull::scenarios::*;
@@ -26,7 +25,7 @@ pub(crate) async fn test_smart_pull_new_dataset<TServerHarness: ServerSideHarnes
     let client_handle = async {
         let pull_result = scenario
             .client_harness
-            .pull_dataset_result(DatasetRefAny::from(scenario.server_dataset_ref), false)
+            .pull_dataset_result(odf::DatasetRefAny::from(scenario.server_dataset_ref), false)
             .await;
 
         assert_eq!(
@@ -59,7 +58,7 @@ pub(crate) async fn test_smart_pull_new_empty_dataset<TServerHarness: ServerSide
     let client_handle = async {
         let pull_result = scenario
             .client_harness
-            .pull_dataset_result(DatasetRefAny::from(scenario.server_dataset_ref), false)
+            .pull_dataset_result(odf::DatasetRefAny::from(scenario.server_dataset_ref), false)
             .await;
 
         assert_eq!(
@@ -94,7 +93,7 @@ pub(crate) async fn test_smart_pull_existing_up_to_date_dataset<
     let client_handle = async {
         let pull_result = scenario
             .client_harness
-            .pull_dataset_result(DatasetRefAny::from(scenario.server_dataset_ref), false)
+            .pull_dataset_result(odf::DatasetRefAny::from(scenario.server_dataset_ref), false)
             .await;
 
         assert_eq!(PullResult::UpToDate(PullResultUpToDate::Sync), pull_result);
@@ -121,7 +120,7 @@ pub(crate) async fn test_smart_pull_existing_evolved_dataset<TServerHarness: Ser
     let client_handle = async {
         let pull_result = scenario
             .client_harness
-            .pull_dataset_result(DatasetRefAny::from(scenario.server_dataset_ref), false)
+            .pull_dataset_result(odf::DatasetRefAny::from(scenario.server_dataset_ref), false)
             .await;
 
         assert_eq!(
@@ -155,7 +154,7 @@ pub(crate) async fn test_smart_pull_existing_diverged_dataset<TServerHarness: Se
         let pull_result = scenario
             .client_harness
             .pull_dataset_result(
-                DatasetRefAny::from(scenario.server_dataset_ref),
+                odf::DatasetRefAny::from(scenario.server_dataset_ref),
                 true, /* diverged! */
             )
             .await;
@@ -198,7 +197,7 @@ pub(crate) async fn test_smart_pull_existing_advanced_dataset_fails<
     let client_handle = async {
         let pull_responses = scenario
             .client_harness
-            .pull_datasets(DatasetRefAny::from(scenario.server_dataset_ref), false)
+            .pull_datasets(odf::DatasetRefAny::from(scenario.server_dataset_ref), false)
             .await;
 
         // TODO: try expecting better error message
@@ -226,7 +225,7 @@ pub(crate) async fn test_smart_pull_aborted_read_of_new_reread_succeeds<
     let client_handle = async {
         let pull_result = scenario
             .client_harness
-            .pull_dataset_result(DatasetRefAny::from(scenario.server_dataset_ref), false)
+            .pull_dataset_result(odf::DatasetRefAny::from(scenario.server_dataset_ref), false)
             .await;
 
         assert_eq!(
@@ -264,7 +263,7 @@ pub(crate) async fn test_smart_pull_aborted_read_of_existing_evolved_dataset_rer
     let client_handle = async {
         let pull_result = scenario
             .client_harness
-            .pull_dataset_result(DatasetRefAny::from(scenario.server_dataset_ref), false)
+            .pull_dataset_result(odf::DatasetRefAny::from(scenario.server_dataset_ref), false)
             .await;
 
         assert_eq!(

@@ -12,14 +12,12 @@ use indoc::indoc;
 use kamu::domain::*;
 use kamu::testing::DatasetDataHelper;
 use kamu::*;
-use kamu_accounts::DUMMY_ACCESS_TOKEN;
 use kamu_adapter_http::{
     FileUploadLimitConfig,
     UploadServiceLocal,
     UploadToken,
     UploadTokenBase64Json,
 };
-use opendatafabric::{MergeStrategy, *};
 use serde_json::json;
 use url::Url;
 use uuid::Uuid;
@@ -99,9 +97,9 @@ async fn test_data_push_ingest_handler() {
         create_result
             .dataset
             .commit_event(
-                AddPushSource {
+                odf::metadata::AddPushSource {
                     source_name: "source2".to_string(),
-                    read: ReadStepNdJson {
+                    read: odf::metadata::ReadStepNdJson {
                         schema: Some(vec![
                             "event_time TIMESTAMP".to_owned(),
                             "city STRING".to_owned(),
@@ -111,12 +109,12 @@ async fn test_data_push_ingest_handler() {
                     }
                     .into(),
                     preprocess: Some(
-                        TransformSql {
+                        odf::metadata::TransformSql {
                             engine: "datafusion".to_string(),
                             version: None,
                             temporal_tables: None,
                             query: None,
-                            queries: Some(vec![SqlQueryStep {
+                            queries: Some(vec![odf::metadata::SqlQueryStep {
                                 query: "select event_time, city, population + 1 as population \
                                         from input"
                                     .to_string(),
@@ -125,14 +123,16 @@ async fn test_data_push_ingest_handler() {
                         }
                         .into(),
                     ),
-                    merge: MergeStrategy::Ledger(MergeStrategyLedger {
-                        primary_key: vec!["event_time".to_owned(), "city".to_owned()],
-                    }),
+                    merge: odf::metadata::MergeStrategy::Ledger(
+                        odf::metadata::MergeStrategyLedger {
+                            primary_key: vec!["event_time".to_owned(), "city".to_owned()],
+                        },
+                    ),
                 }
                 .into(),
-                CommitOpts {
+                odf::dataset::CommitOpts {
                     system_time: Some(harness.system_time),
-                    ..CommitOpts::default()
+                    ..odf::dataset::CommitOpts::default()
                 },
             )
             .await
@@ -317,7 +317,7 @@ async fn test_data_push_ingest_upload_token_no_initial_source() {
         let res = cl
             .execute(
                 cl.post(&ingest_url)
-                    .bearer_auth(DUMMY_ACCESS_TOKEN)
+                    .bearer_auth(odf::dataset::DUMMY_ODF_ACCESS_TOKEN)
                     .build()
                     .unwrap(),
             )
@@ -405,7 +405,7 @@ async fn test_data_push_ingest_upload_token_with_initial_source() {
         let res = cl
             .execute(
                 cl.post(&ingest_url)
-                    .bearer_auth(DUMMY_ACCESS_TOKEN)
+                    .bearer_auth(odf::dataset::DUMMY_ODF_ACCESS_TOKEN)
                     .build()
                     .unwrap(),
             )
@@ -484,7 +484,7 @@ async fn test_data_push_ingest_upload_content_type_not_specified() {
 
         cl.execute(
             cl.post(&ingest_url)
-                .bearer_auth(DUMMY_ACCESS_TOKEN)
+                .bearer_auth(odf::dataset::DUMMY_ODF_ACCESS_TOKEN)
                 .build()
                 .unwrap(),
         )
@@ -572,7 +572,7 @@ async fn test_data_push_ingest_upload_token_actual_file_different_size() {
         let res = cl
             .execute(
                 cl.post(&ingest_url)
-                    .bearer_auth(DUMMY_ACCESS_TOKEN)
+                    .bearer_auth(odf::dataset::DUMMY_ODF_ACCESS_TOKEN)
                     .build()
                     .unwrap(),
             )
@@ -625,24 +625,24 @@ impl DataIngestHarness {
         }
     }
 
-    fn server_account_id(&self) -> &AccountID {
+    fn server_account_id(&self) -> &odf::AccountID {
         &(self.server_harness.server_account().id)
     }
 
-    async fn create_population_dataset(&self, with_schema: bool) -> CreateDatasetResult {
+    async fn create_population_dataset(&self, with_schema: bool) -> odf::CreateDatasetResult {
         self.server_harness
             .cli_create_dataset_from_snapshot_use_case()
             .execute(
-                DatasetSnapshot {
-                    name: DatasetAlias::new(
+                odf::DatasetSnapshot {
+                    name: odf::DatasetAlias::new(
                         self.server_harness.operating_account_name(),
-                        DatasetName::new_unchecked("population"),
+                        odf::DatasetName::new_unchecked("population"),
                     ),
-                    kind: DatasetKind::Root,
+                    kind: odf::DatasetKind::Root,
                     metadata: if with_schema {
-                        vec![AddPushSource {
+                        vec![odf::metadata::AddPushSource {
                             source_name: "source1".to_string(),
-                            read: ReadStepNdJson {
+                            read: odf::metadata::ReadStepNdJson {
                                 schema: Some(vec![
                                     "event_time TIMESTAMP".to_owned(),
                                     "city STRING".to_owned(),
@@ -652,9 +652,11 @@ impl DataIngestHarness {
                             }
                             .into(),
                             preprocess: None,
-                            merge: MergeStrategy::Ledger(MergeStrategyLedger {
-                                primary_key: vec!["event_time".to_owned(), "city".to_owned()],
-                            }),
+                            merge: odf::metadata::MergeStrategy::Ledger(
+                                odf::metadata::MergeStrategyLedger {
+                                    primary_key: vec!["event_time".to_owned(), "city".to_owned()],
+                                },
+                            ),
                         }
                         .into()]
                     } else {
@@ -667,7 +669,7 @@ impl DataIngestHarness {
             .unwrap()
     }
 
-    fn dataset_http_url(&self, alias: &DatasetAlias) -> Url {
+    fn dataset_http_url(&self, alias: &odf::DatasetAlias) -> Url {
         self.server_harness.dataset_url_with_scheme(alias, "http")
     }
 

@@ -10,7 +10,6 @@
 use std::sync::Arc;
 
 use kamu::domain::*;
-use opendatafabric::RepoName;
 
 use super::{CLIError, Command};
 use crate::Interact;
@@ -20,7 +19,7 @@ use crate::Interact;
 pub struct RepositoryDeleteCommand {
     interact: Arc<Interact>,
     remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
-    names: Vec<RepoName>,
+    names: Vec<odf::RepoName>,
     all: bool,
 }
 
@@ -32,7 +31,7 @@ impl RepositoryDeleteCommand {
         all: bool,
     ) -> Self
     where
-        I: IntoIterator<Item = RepoName>,
+        I: IntoIterator<Item = odf::RepoName>,
     {
         Self {
             interact,
