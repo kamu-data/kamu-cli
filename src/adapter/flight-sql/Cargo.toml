@@ -22,20 +22,26 @@ doctest = false
 
 
 [dependencies]
+kamu-core = { workspace = true }
+time-source = { workspace = true }
+
 arrow-flight = { version = "53", features = ["flight-sql-experimental"] }
 async-trait = { version = "0.1", default-features = false }
 base64 = { version = "0.22", default-features = false }
-dashmap = { version = "6", default-features = false }
+chrono = { version = "0.4", default-features = false }
 datafusion = { version = "43", default-features = false }
+dill = { version = "0.10", default-features = false }
 futures = "0.3"
 like = { version = "0.3", default-features = false }
 prost = { version = "0.13", default-features = false }
+tokio = { version = "1", default-features = false, features = [] }
 tonic = { version = "0.12", default-features = false }
 tracing = { version = "0.1", default-features = false }
 uuid = { version = "1", default-features = false }
 
 
 [dev-dependencies]
+kamu-core = { workspace = true, features = ["testing"] }
 kamu-data-utils = { workspace = true, features = ["testing"] }
 
 indoc = "2"
