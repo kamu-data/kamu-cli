@@ -36,7 +36,6 @@ use kamu_adapter_http::{
     UploadTokenBase64Json,
 };
 use kamu_core::{MediaType, TenancyConfig};
-use opendatafabric::{AccountID, AccountName};
 use serde_json::json;
 use time_source::SystemTimeSourceDefault;
 
@@ -49,7 +48,7 @@ struct Harness {
     cache_dir: PathBuf,
     api_server: TestAPIServer,
     authentication_service: Arc<AuthenticationServiceImpl>,
-    another_account_id: AccountID,
+    another_account_id: odf::AccountID,
 }
 
 impl Harness {
@@ -70,7 +69,7 @@ impl Harness {
             let mut predefined_account_configs = PredefinedAccountsConfig::single_tenant();
             predefined_account_configs
                 .predefined
-                .push(AccountConfig::from_name(AccountName::new_unchecked(
+                .push(AccountConfig::from_name(odf::AccountName::new_unchecked(
                     ANOTHER_ACCOUNT_NAME,
                 )));
 
@@ -104,7 +103,7 @@ impl Harness {
             cache_dir,
             api_server,
             authentication_service,
-            another_account_id: AccountID::new_seeded_ed25519(ANOTHER_ACCOUNT_NAME.as_bytes()),
+            another_account_id: odf::AccountID::new_seeded_ed25519(ANOTHER_ACCOUNT_NAME.as_bytes()),
         }
     }
 
@@ -112,7 +111,7 @@ impl Harness {
         self.api_server.local_addr().to_string()
     }
 
-    fn make_access_token(&self, account_id: &AccountID) -> String {
+    fn make_access_token(&self, account_id: &odf::AccountID) -> String {
         self.authentication_service
             .make_access_token(account_id, 60)
             .unwrap()

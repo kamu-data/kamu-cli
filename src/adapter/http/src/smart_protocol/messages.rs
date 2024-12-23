@@ -8,8 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
-use kamu_core::DatasetVisibility;
-use opendatafabric::{DatasetAlias, DatasetID, Multihash};
 use serde::{Deserialize, Serialize};
 use url::Url;
 
@@ -24,8 +22,8 @@ pub const SMART_TRANSFER_PROTOCOL_VERSION: i32 = 1;
 /// Initial dataset pull request message
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct DatasetPullRequest {
-    pub begin_after: Option<Multihash>,
-    pub stop_at: Option<Multihash>,
+    pub begin_after: Option<odf::Multihash>,
+    pub stop_at: Option<odf::Multihash>,
     pub force_update_if_diverged: bool,
 }
 
@@ -56,8 +54,8 @@ pub enum DatasetPullRequestError {
 /// Error: pulling a range that is not a valid chain interval
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct DatasetPullInvalidIntervalError {
-    pub head: Multihash,
-    pub tail: Multihash,
+    pub head: odf::Multihash,
+    pub tail: odf::Multihash,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -113,10 +111,10 @@ pub enum ObjectPullStrategy {
 /// Initial dataset push request message
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct DatasetPushRequest {
-    pub current_head: Option<Multihash>,
+    pub current_head: Option<odf::Multihash>,
     pub transfer_plan: TransferPlan,
     pub force_update_if_diverged: bool,
-    pub visibility_for_created_dataset: DatasetVisibility,
+    pub visibility_for_created_dataset: odf::DatasetVisibility,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -145,8 +143,8 @@ pub enum DatasetPushRequestError {
 /// of date.
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct DatasetPushInvalidHeadError {
-    pub actual_head: Option<Multihash>,
-    pub expected_head: Option<Multihash>,
+    pub actual_head: Option<odf::Multihash>,
+    pub expected_head: Option<odf::Multihash>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -201,7 +199,7 @@ pub enum DatasetPushObjectsTransferError {
 // Dataset with such id already exists with different alias
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct DatasetPushObjectsTransferRefCollisionError {
-    pub dataset_id: DatasetID,
+    pub dataset_id: odf::DatasetID,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -209,7 +207,7 @@ pub struct DatasetPushObjectsTransferRefCollisionError {
 // Dataset with such id already exists
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct DatasetPushObjectsTransferNameCollisionError {
-    pub dataset_alias: DatasetAlias,
+    pub dataset_alias: odf::DatasetAlias,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -301,7 +299,7 @@ pub struct TransferPlan {
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct ObjectFileReference {
     pub object_type: ObjectType,
-    pub physical_hash: Multihash,
+    pub physical_hash: odf::Multihash,
     pub size: u64,
 }
 

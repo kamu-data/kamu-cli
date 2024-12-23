@@ -17,31 +17,28 @@ use datafusion::arrow::array::*;
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use datafusion::arrow::record_batch::RecordBatch;
 use dill::{Catalog, Component};
+use file_utils::OwnedFile;
 use kamu::domain::*;
-use kamu::testing::{
-    LocalS3Server,
-    MetadataFactory,
-    MockDatasetActionAuthorizer,
-    ParquetWriterHelper,
-};
-use kamu::utils::s3_context::S3Context;
+use kamu::testing::{MockDatasetActionAuthorizer, ParquetWriterHelper};
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_ingest_datafusion::DataWriterDataFusion;
-use opendatafabric::*;
+use odf::metadata::testing::MetadataFactory;
+use s3_utils::S3Context;
 use tempfile::TempDir;
+use test_utils::LocalS3Server;
 use time_source::SystemTimeSourceDefault;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-async fn create_test_dataset(catalog: &dill::Catalog, tempdir: &Path) -> CreateDatasetResult {
-    let dataset_repo_writer = catalog.get_one::<dyn DatasetRepositoryWriter>().unwrap();
-    let dataset_alias = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
+async fn create_test_dataset(catalog: &dill::Catalog, tempdir: &Path) -> odf::CreateDatasetResult {
+    let dataset_storage_unit_writer = catalog.get_one::<dyn DatasetStorageUnitWriter>().unwrap();
+    let dataset_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
 
-    let create_result = dataset_repo_writer
+    let create_result = dataset_storage_unit_writer
         .create_dataset(
             &dataset_alias,
-            MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build())
+            MetadataFactory::metadata_block(MetadataFactory::seed(odf::DatasetKind::Root).build())
                 .build_typed(),
         )
         .await
@@ -62,7 +59,7 @@ async fn create_test_dataset(catalog: &dill::Catalog, tempdir: &Path) -> CreateD
                 .schema(&schema)
                 .build()
                 .into(),
-            CommitOpts::default(),
+            odf::dataset::CommitOpts::default(),
         )
         .await
         .unwrap();
@@ -91,10 +88,10 @@ async fn create_test_dataset(catalog: &dill::Catalog, tempdir: &Path) -> CreateD
 
         dataset
             .commit_add_data(
-                AddDataParams {
+                odf::dataset::AddDataParams {
                     prev_checkpoint: None,
                     prev_offset,
-                    new_offset_interval: Some(OffsetInterval {
+                    new_offset_interval: Some(odf::metadata::OffsetInterval {
                         start: start_offset,
                         end: end_offset,
                     }),
@@ -103,7 +100,7 @@ async fn create_test_dataset(catalog: &dill::Catalog, tempdir: &Path) -> CreateD
                 },
                 Some(OwnedFile::new(tmp_data_path.clone())),
                 None,
-                CommitOpts::default(),
+                odf::dataset::CommitOpts::default(),
             )
             .await
             .unwrap();
@@ -127,10 +124,10 @@ fn create_catalog_with_local_workspace(
         .add::<DidGeneratorDefault>()
         .add::<SystemTimeSourceDefault>()
         .add_value(TenancyConfig::SingleTenant)
-        .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
-        .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-        .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
-        .add::<DatasetRegistryRepoBridge>()
+        .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
+        .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
+        .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
+        .add::<DatasetRegistrySoloUnitBridge>()
         .add::<QueryServiceImpl>()
         .add::<ObjectStoreRegistryImpl>()
         .add::<ObjectStoreBuilderLocalFs>()
@@ -153,10 +150,10 @@ async fn create_catalog_with_s3_workspace(
         .add::<DidGeneratorDefault>()
         .add::<SystemTimeSourceDefault>()
         .add_value(TenancyConfig::SingleTenant)
-        .add_builder(DatasetRepositoryS3::builder().with_s3_context(s3_context.clone()))
-        .bind::<dyn DatasetRepository, DatasetRepositoryS3>()
-        .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryS3>()
-        .add::<DatasetRegistryRepoBridge>()
+        .add_builder(DatasetStorageUnitS3::builder().with_s3_context(s3_context.clone()))
+        .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitS3>()
+        .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitS3>()
+        .add::<DatasetRegistrySoloUnitBridge>()
         .add::<QueryServiceImpl>()
         .add::<ObjectStoreRegistryImpl>()
         .add::<ObjectStoreBuilderLocalFs>()
@@ -175,7 +172,7 @@ async fn test_dataset_parquet_schema(catalog: &Catalog, tempdir: &TempDir) {
         .await
         .dataset_handle
         .alias;
-    let dataset_ref = DatasetRef::from(dataset_alias);
+    let dataset_ref = odf::DatasetRef::from(dataset_alias);
 
     let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
     let schema = query_svc
@@ -185,7 +182,7 @@ async fn test_dataset_parquet_schema(catalog: &Catalog, tempdir: &TempDir) {
     assert!(schema.is_some());
 
     let mut buf = Vec::new();
-    kamu_data_utils::schema::format::write_schema_parquet_json(&mut buf, &schema.unwrap()).unwrap();
+    odf::utils::schema::format::write_schema_parquet_json(&mut buf, &schema.unwrap()).unwrap();
     let schema_content = String::from_utf8(buf).unwrap();
     let data_schema_json =
         serde_json::from_str::<serde_json::Value>(schema_content.as_str()).unwrap();
@@ -214,14 +211,13 @@ async fn test_dataset_arrow_schema(catalog: &Catalog, tempdir: &TempDir) {
         .await
         .dataset_handle
         .alias;
-    let dataset_ref = DatasetRef::from(dataset_alias);
+    let dataset_ref = odf::DatasetRef::from(dataset_alias);
 
     let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
     let schema_ref = query_svc.get_schema(&dataset_ref).await.unwrap().unwrap();
 
     let mut buf = Vec::new();
-    kamu_data_utils::schema::format::write_schema_arrow_json(&mut buf, schema_ref.as_ref())
-        .unwrap();
+    odf::utils::schema::format::write_schema_arrow_json(&mut buf, schema_ref.as_ref()).unwrap();
 
     let schema_content = String::from_utf8(buf).unwrap();
     let data_schema_json =
@@ -310,7 +306,7 @@ async fn test_dataset_schema_unauthorized_common(catalog: dill::Catalog, tempdir
         .await
         .dataset_handle
         .alias;
-    let dataset_ref = DatasetRef::from(dataset_alias);
+    let dataset_ref = odf::DatasetRef::from(dataset_alias);
 
     let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
     let result = query_svc.get_schema(&dataset_ref).await;
@@ -342,13 +338,13 @@ async fn test_dataset_tail_common(catalog: dill::Catalog, tempdir: &TempDir) {
         .await
         .dataset_handle
         .alias;
-    let dataset_ref = DatasetRef::from(dataset_alias);
+    let dataset_ref = odf::DatasetRef::from(dataset_alias);
 
     // Within last block
     let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
     let df = query_svc.tail(&dataset_ref, 1, 1).await.unwrap();
 
-    kamu_data_utils::testing::assert_data_eq(
+    odf::utils::testing::assert_data_eq(
         df,
         indoc::indoc!(
             r#"
@@ -365,7 +361,7 @@ async fn test_dataset_tail_common(catalog: dill::Catalog, tempdir: &TempDir) {
     // Crosses block boundary
     let df = query_svc.tail(&dataset_ref, 1, 2).await.unwrap();
 
-    kamu_data_utils::testing::assert_data_eq(
+    odf::utils::testing::assert_data_eq(
         df,
         indoc::indoc!(
             r#"
@@ -414,14 +410,14 @@ async fn test_dataset_tail_empty_dataset() {
         MockDatasetActionAuthorizer::new().expect_check_read_a_dataset(2, true),
     );
 
-    let dataset_repo_writer = catalog.get_one::<dyn DatasetRepositoryWriter>().unwrap();
-    dataset_repo_writer
+    let dataset_storage_unit_writer = catalog.get_one::<dyn DatasetStorageUnitWriter>().unwrap();
+    dataset_storage_unit_writer
         .create_dataset(
             &"foo".try_into().unwrap(),
-            MetadataBlockTyped {
+            odf::MetadataBlockTyped {
                 system_time: Utc::now(),
                 prev_block_hash: None,
-                event: MetadataFactory::seed(DatasetKind::Root).build(),
+                event: MetadataFactory::seed(odf::DatasetKind::Root).build(),
                 sequence_number: 0,
             },
         )
@@ -479,7 +475,7 @@ async fn test_dataset_sql_authorized_common(catalog: dill::Catalog, tempdir: &Te
         .await
         .unwrap();
 
-    kamu_data_utils::testing::assert_data_eq(
+    odf::utils::testing::assert_data_eq(
         res.df,
         indoc::indoc!(
             r#"
@@ -622,7 +618,7 @@ async fn test_sql_statement_by_alias() {
         .await
         .unwrap();
 
-    kamu_data_utils::testing::assert_data_eq(
+    odf::utils::testing::assert_data_eq(
         result.df,
         indoc::indoc!(
             r#"
@@ -663,7 +659,7 @@ async fn test_sql_statement_alias_not_found() {
             statement.as_str(),
             QueryOptions {
                 input_datasets: BTreeMap::from([(
-                    DatasetID::new_seeded_ed25519(b"does-not-exist"),
+                    odf::DatasetID::new_seeded_ed25519(b"does-not-exist"),
                     QueryOptionsDataset {
                         alias: dataset_alias.to_string(),
                         ..Default::default()
@@ -675,9 +671,9 @@ async fn test_sql_statement_alias_not_found() {
 
     assert_matches!(
         result,
-        Err(QueryError::DatasetNotFound(DatasetNotFoundError {
+        Err(QueryError::DatasetNotFound(odf::dataset::DatasetNotFoundError {
             dataset_ref,
-        })) if dataset_ref == DatasetID::new_seeded_ed25519(b"does-not-exist").as_local_ref()
+        })) if dataset_ref == odf::DatasetID::new_seeded_ed25519(b"does-not-exist").as_local_ref()
     );
 }
 
@@ -694,15 +690,15 @@ async fn test_sql_statement_with_state_simple() {
         MockDatasetActionAuthorizer::allowing(),
     );
 
-    let dataset_repo_writer = catalog.get_one::<dyn DatasetRepositoryWriter>().unwrap();
+    let dataset_storage_unit_writer = catalog.get_one::<dyn DatasetStorageUnitWriter>().unwrap();
     let ctx = SessionContext::new();
 
     // Dataset init
-    let foo_alias = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
-    let foo_create = dataset_repo_writer
+    let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let foo_create = dataset_storage_unit_writer
         .create_dataset(
             &foo_alias,
-            MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build())
+            MetadataFactory::metadata_block(MetadataFactory::seed(odf::DatasetKind::Root).build())
                 .build_typed(),
         )
         .await
@@ -712,7 +708,7 @@ async fn test_sql_statement_with_state_simple() {
     let mut writer = DataWriterDataFusion::from_metadata_chain(
         ctx.clone(),
         ResolvedDataset::from(&foo_create),
-        &BlockRef::Head,
+        &odf::BlockRef::Head,
         None,
     )
     .await
@@ -766,7 +762,7 @@ async fn test_sql_statement_with_state_simple() {
         .await
         .unwrap();
 
-    kamu_data_utils::testing::assert_data_eq(
+    odf::utils::testing::assert_data_eq(
         res.df,
         indoc::indoc!(
             r#"
@@ -790,7 +786,7 @@ async fn test_sql_statement_with_state_simple() {
                 block_hash: foo_create
                     .dataset
                     .as_metadata_chain()
-                    .resolve_ref(&BlockRef::Head)
+                    .resolve_ref(&odf::BlockRef::Head)
                     .await
                     .unwrap()
             }
@@ -861,7 +857,7 @@ async fn test_sql_statement_with_state_simple() {
         .await
         .unwrap();
 
-    kamu_data_utils::testing::assert_data_eq(
+    odf::utils::testing::assert_data_eq(
         res.df,
         indoc::indoc!(
             r#"
@@ -894,7 +890,7 @@ async fn test_sql_statement_with_state_simple() {
         .await
         .unwrap();
 
-    kamu_data_utils::testing::assert_data_eq(
+    odf::utils::testing::assert_data_eq(
         res.df,
         indoc::indoc!(
             r#"
@@ -923,16 +919,18 @@ async fn test_sql_statement_with_state_cte() {
         MockDatasetActionAuthorizer::allowing(),
     );
 
-    let dataset_repo_writer = catalog.get_one::<dyn DatasetRepositoryWriter>().unwrap();
+    let dataset_storage_unit_writer = catalog.get_one::<dyn DatasetStorageUnitWriter>().unwrap();
     let ctx = SessionContext::new();
 
     // Dataset `foo`
-    let foo_alias = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
-    let foo_created = dataset_repo_writer
+    let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let foo_created = dataset_storage_unit_writer
         .create_dataset(
             &foo_alias,
             MetadataFactory::metadata_block(
-                MetadataFactory::seed(DatasetKind::Root).id_random().build(),
+                MetadataFactory::seed(odf::DatasetKind::Root)
+                    .id_random()
+                    .build(),
             )
             .build_typed(),
         )
@@ -943,7 +941,7 @@ async fn test_sql_statement_with_state_cte() {
     let mut writer_foo = DataWriterDataFusion::from_metadata_chain(
         ctx.clone(),
         ResolvedDataset::from(&foo_created),
-        &BlockRef::Head,
+        &odf::BlockRef::Head,
         None,
     )
     .await
@@ -979,12 +977,14 @@ async fn test_sql_statement_with_state_cte() {
         .unwrap();
 
     // Dataset `bar`
-    let bar_alias = DatasetAlias::new(None, DatasetName::new_unchecked("bar"));
-    let bar_created = dataset_repo_writer
+    let bar_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
+    let bar_created = dataset_storage_unit_writer
         .create_dataset(
             &bar_alias,
             MetadataFactory::metadata_block(
-                MetadataFactory::seed(DatasetKind::Root).id_random().build(),
+                MetadataFactory::seed(odf::DatasetKind::Root)
+                    .id_random()
+                    .build(),
             )
             .build_typed(),
         )
@@ -995,7 +995,7 @@ async fn test_sql_statement_with_state_cte() {
     let mut writer_bar = DataWriterDataFusion::from_metadata_chain(
         ctx.clone(),
         ResolvedDataset::from(&bar_created),
-        &BlockRef::Head,
+        &odf::BlockRef::Head,
         None,
     )
     .await
@@ -1054,7 +1054,7 @@ async fn test_sql_statement_with_state_cte() {
         .await
         .unwrap();
 
-    kamu_data_utils::testing::assert_data_eq(
+    odf::utils::testing::assert_data_eq(
         res.df,
         indoc::indoc!(
             r#"
@@ -1080,7 +1080,7 @@ async fn test_sql_statement_with_state_cte() {
                     block_hash: foo_created
                         .dataset
                         .as_metadata_chain()
-                        .resolve_ref(&BlockRef::Head)
+                        .resolve_ref(&odf::BlockRef::Head)
                         .await
                         .unwrap()
                 }
@@ -1092,7 +1092,7 @@ async fn test_sql_statement_with_state_cte() {
                     block_hash: bar_created
                         .dataset
                         .as_metadata_chain()
-                        .resolve_ref(&BlockRef::Head)
+                        .resolve_ref(&odf::BlockRef::Head)
                         .await
                         .unwrap()
                 }
@@ -1183,7 +1183,7 @@ async fn test_sql_statement_with_state_cte() {
         .await
         .unwrap();
 
-    kamu_data_utils::testing::assert_data_eq(
+    odf::utils::testing::assert_data_eq(
         res2.df,
         indoc::indoc!(
             r#"
@@ -1239,7 +1239,7 @@ async fn test_sql_statement_with_state_cte() {
         .await
         .unwrap();
 
-    kamu_data_utils::testing::assert_data_eq(
+    odf::utils::testing::assert_data_eq(
         res2.df,
         indoc::indoc!(
             r#"
@@ -1310,7 +1310,7 @@ async fn test_sql_statement_with_state_cte() {
         .await
         .unwrap();
 
-    kamu_data_utils::testing::assert_data_eq(
+    odf::utils::testing::assert_data_eq(
         res2.df,
         indoc::indoc!(
             r#"

@@ -17,9 +17,8 @@ use http_common::*;
 use internal_error::ResultIntoInternal;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::*;
-use opendatafabric::serde::flatbuffers::FlatbuffersMetadataBlockSerializer;
-use opendatafabric::serde::MetadataBlockSerializer;
-use opendatafabric::{DatasetRef, Multihash};
+use odf::metadata::serde::flatbuffers::FlatbuffersMetadataBlockSerializer;
+use odf::metadata::serde::MetadataBlockSerializer;
 use url::Url;
 
 use crate::smart_protocol::messages::SMART_TRANSFER_PROTOCOL_VERSION;
@@ -40,7 +39,7 @@ pub struct RefFromPath {
 pub struct BlockHashFromPath {
     /// Hash of the block
     #[param(value_type = String)]
-    block_hash: Multihash,
+    block_hash: odf::Multihash,
 }
 
 #[derive(serde::Deserialize, utoipa::IntoParams)]
@@ -48,7 +47,7 @@ pub struct BlockHashFromPath {
 pub struct PhysicalHashFromPath {
     /// Physical hash of the block
     #[param(value_type = String)]
-    physical_hash: Multihash,
+    physical_hash: odf::Multihash,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -66,17 +65,17 @@ pub struct PhysicalHashFromPath {
     )
 )]
 pub async fn dataset_refs_handler(
-    axum::extract::Extension(dataset): axum::extract::Extension<Arc<dyn Dataset>>,
+    axum::extract::Extension(dataset): axum::extract::Extension<Arc<dyn odf::Dataset>>,
     axum::extract::Path(ref_param): axum::extract::Path<RefFromPath>,
 ) -> Result<String, ApiError> {
-    let block_ref = match BlockRef::from_str(ref_param.reference.as_str()) {
+    let block_ref = match odf::BlockRef::from_str(ref_param.reference.as_str()) {
         Ok(block_ref) => Ok(block_ref),
         Err(e) => Err(ApiError::not_found(e)),
     }?;
 
     match dataset.as_metadata_chain().resolve_ref(&block_ref).await {
         Ok(hash) => Ok(hash.to_string()),
-        Err(e @ GetRefError::NotFound(_)) => Err(ApiError::not_found(e)),
+        Err(e @ odf::storage::GetRefError::NotFound(_)) => Err(ApiError::not_found(e)),
         Err(e) => Err(e.api_err()),
     }
 }
@@ -96,16 +95,16 @@ pub async fn dataset_refs_handler(
     )
 )]
 pub async fn dataset_blocks_handler(
-    axum::extract::Extension(dataset): axum::extract::Extension<Arc<dyn Dataset>>,
+    axum::extract::Extension(dataset): axum::extract::Extension<Arc<dyn odf::Dataset>>,
     axum::extract::Path(hash_param): axum::extract::Path<BlockHashFromPath>,
 ) -> Result<Vec<u8>, ApiError> {
-    let block: opendatafabric::MetadataBlock = match dataset
+    let block: odf::MetadataBlock = match dataset
         .as_metadata_chain()
         .get_block(&hash_param.block_hash)
         .await
     {
         Ok(block) => Ok(block),
-        Err(e @ GetBlockError::NotFound(_)) => Err(ApiError::not_found(e)),
+        Err(e @ odf::storage::GetBlockError::NotFound(_)) => Err(ApiError::not_found(e)),
         Err(e) => Err(e.api_err()),
     }?;
 
@@ -132,7 +131,7 @@ pub async fn dataset_blocks_handler(
     )
 )]
 pub async fn dataset_data_get_handler(
-    axum::extract::Extension(dataset): axum::extract::Extension<Arc<dyn Dataset>>,
+    axum::extract::Extension(dataset): axum::extract::Extension<Arc<dyn odf::Dataset>>,
     axum::extract::Path(hash_param): axum::extract::Path<PhysicalHashFromPath>,
 ) -> Result<impl IntoResponse, ApiError> {
     dataset_get_object_common(dataset.as_data_repo(), &hash_param.physical_hash).await
@@ -153,7 +152,7 @@ pub async fn dataset_data_get_handler(
     )
 )]
 pub async fn dataset_checkpoints_get_handler(
-    axum::extract::Extension(dataset): axum::extract::Extension<Arc<dyn Dataset>>,
+    axum::extract::Extension(dataset): axum::extract::Extension<Arc<dyn odf::Dataset>>,
     axum::extract::Path(hash_param): axum::extract::Path<PhysicalHashFromPath>,
 ) -> Result<impl IntoResponse, ApiError> {
     dataset_get_object_common(dataset.as_checkpoint_repo(), &hash_param.physical_hash).await
@@ -162,12 +161,12 @@ pub async fn dataset_checkpoints_get_handler(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 async fn dataset_get_object_common(
-    object_repository: &dyn ObjectRepository,
-    physical_hash: &Multihash,
+    object_repository: &dyn odf::storage::ObjectRepository,
+    physical_hash: &odf::Multihash,
 ) -> Result<impl IntoResponse, ApiError> {
     let stream = match object_repository.get_stream(physical_hash).await {
         Ok(stream) => Ok(stream),
-        Err(e @ GetError::NotFound(_)) => Err(ApiError::not_found(e)),
+        Err(e @ odf::storage::GetError::NotFound(_)) => Err(ApiError::not_found(e)),
         Err(e) => Err(e.api_err()),
     }?;
 
@@ -192,7 +191,7 @@ async fn dataset_get_object_common(
     )
 )]
 pub async fn dataset_data_put_handler(
-    axum::extract::Extension(dataset): axum::extract::Extension<Arc<dyn Dataset>>,
+    axum::extract::Extension(dataset): axum::extract::Extension<Arc<dyn odf::Dataset>>,
     axum::extract::Path(hash_param): axum::extract::Path<PhysicalHashFromPath>,
     TypedHeader(content_length): TypedHeader<headers::ContentLength>,
     body: axum::body::Body,
@@ -222,7 +221,7 @@ pub async fn dataset_data_put_handler(
     )
 )]
 pub async fn dataset_checkpoints_put_handler(
-    axum::extract::Extension(dataset): axum::extract::Extension<Arc<dyn Dataset>>,
+    axum::extract::Extension(dataset): axum::extract::Extension<Arc<dyn odf::Dataset>>,
     axum::extract::Path(hash_param): axum::extract::Path<PhysicalHashFromPath>,
     TypedHeader(content_length): TypedHeader<headers::ContentLength>,
     body: axum::body::Body,
@@ -239,8 +238,8 @@ pub async fn dataset_checkpoints_put_handler(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 async fn dataset_put_object_common(
-    object_repository: &dyn ObjectRepository,
-    physical_hash: Multihash,
+    object_repository: &dyn odf::storage::ObjectRepository,
+    physical_hash: odf::Multihash,
     content_length: u64,
     body: axum::body::Body,
 ) -> Result<(), ApiError> {
@@ -249,7 +248,7 @@ async fn dataset_put_object_common(
     object_repository
         .insert_stream(
             src,
-            InsertOpts {
+            odf::storage::InsertOpts {
                 precomputed_hash: None,
                 expected_hash: Some(&physical_hash),
                 size_hint: Some(content_length),
@@ -277,7 +276,7 @@ async fn dataset_put_object_common(
 )]
 pub async fn dataset_push_ws_upgrade_handler(
     ws: axum::extract::ws::WebSocketUpgrade,
-    axum::extract::Extension(dataset_ref): axum::extract::Extension<DatasetRef>,
+    axum::extract::Extension(dataset_ref): axum::extract::Extension<odf::DatasetRef>,
     axum::extract::Extension(catalog): axum::extract::Extension<dill::Catalog>,
     uri: axum::extract::OriginalUri,
     TypedHeader(OdfSmtpVersion(version_header)): OdfSmtpVersionTyped,
@@ -299,7 +298,7 @@ pub async fn dataset_push_ws_upgrade_handler(
             .transactional_with(|dataset_registry: Arc<dyn DatasetRegistry>| async move {
                 match dataset_registry.get_dataset_by_ref(&dataset_ref).await {
                     Ok(resolved_dataset) => Ok(Some((*resolved_dataset).clone())),
-                    Err(GetDatasetError::NotFound(_)) => {
+                    Err(odf::dataset::GetDatasetError::NotFound(_)) => {
                         // Make sure account in dataset ref being created and token account match
                         let CurrentAccountSubject::Logged(acc) = current_account_subject.as_ref()
                         else {
@@ -347,7 +346,7 @@ pub async fn dataset_push_ws_upgrade_handler(
 )]
 pub async fn dataset_pull_ws_upgrade_handler(
     ws: axum::extract::ws::WebSocketUpgrade,
-    axum::extract::Extension(dataset): axum::extract::Extension<Arc<dyn Dataset>>,
+    axum::extract::Extension(dataset): axum::extract::Extension<Arc<dyn odf::Dataset>>,
     axum::extract::Extension(catalog): axum::extract::Extension<dill::Catalog>,
     uri: axum::extract::OriginalUri,
     TypedHeader(OdfSmtpVersion(version_header)): OdfSmtpVersionTyped,

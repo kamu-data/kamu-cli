@@ -13,7 +13,6 @@ use datafusion::arrow::array::StringArray;
 use datafusion::prelude::{SessionContext, *};
 use indoc::indoc;
 use kamu_ingest_datafusion::*;
-use opendatafabric::*;
 
 use super::test_reader_common;
 
@@ -27,7 +26,7 @@ async fn test_read_shapefile_with_schema() {
     test_reader_common::test_reader_success(
         ReaderEsriShapefile::new(
             SessionContext::new(),
-            ReadStepEsriShapefile {
+            odf::metadata::ReadStepEsriShapefile {
                 schema: Some(vec![
                     "iso string not null".to_string(),
                     "name_0 string not null".to_string(),
@@ -100,7 +99,7 @@ async fn test_read_shapefile_infer_schema() {
     test_reader_common::test_reader(
         ReaderEsriShapefile::new(
             SessionContext::new(),
-            ReadStepEsriShapefile {
+            odf::metadata::ReadStepEsriShapefile {
                 schema: None,
                 sub_path: None,
             },
@@ -113,7 +112,7 @@ async fn test_read_shapefile_infer_schema() {
         },
         |res| async {
             let df = res.unwrap();
-            kamu_data_utils::testing::assert_schema_eq(
+            odf::utils::testing::assert_schema_eq(
                 df.schema(),
                 indoc!(
                     r#"
@@ -150,7 +149,7 @@ async fn test_read_shapefile_with_subpath_exists() {
     test_reader_common::test_reader(
         ReaderEsriShapefile::new(
             SessionContext::new(),
-            ReadStepEsriShapefile {
+            odf::metadata::ReadStepEsriShapefile {
                 schema: None,
                 sub_path: Some("gg870xt4706.shp".to_string()),
             },
@@ -178,7 +177,7 @@ async fn test_read_shapefile_with_subpath_missing() {
     test_reader_common::test_reader(
         ReaderEsriShapefile::new(
             SessionContext::new(),
-            ReadStepEsriShapefile {
+            odf::metadata::ReadStepEsriShapefile {
                 schema: None,
                 sub_path: Some("invalid.shp".to_string()),
             },
@@ -206,7 +205,7 @@ async fn test_read_shapefile_geom() {
     test_reader_common::test_reader(
         ReaderEsriShapefile::new(
             SessionContext::new(),
-        ReadStepEsriShapefile {
+        odf::metadata::ReadStepEsriShapefile {
                 schema: Some(vec![
                     "geometry string not null".to_string(),
                     "name_1 string not null".to_string(),

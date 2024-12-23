@@ -19,38 +19,42 @@ use kamu::utils::simple_transfer_protocol::SimpleTransferProtocol;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
 use messaging_outbox::DummyOutboxImpl;
-use opendatafabric::*;
+use odf::dataset::{DatasetFactoryImpl, IpfsGateway};
+use odf::metadata::testing::MetadataFactory;
 use time_source::SystemTimeSourceDefault;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 macro_rules! n {
     ($s:expr) => {
-        DatasetAlias::new(None, DatasetName::try_from($s).unwrap())
+        odf::DatasetAlias::new(None, odf::DatasetName::try_from($s).unwrap())
     };
 }
 
 macro_rules! mn {
     ($s:expr) => {
-        DatasetAlias::try_from($s).unwrap()
+        odf::DatasetAlias::try_from($s).unwrap()
     };
 }
 
 macro_rules! rl {
     ($s:expr) => {
-        DatasetRef::Alias(DatasetAlias::new(None, DatasetName::try_from($s).unwrap()))
+        odf::DatasetRef::Alias(odf::DatasetAlias::new(
+            None,
+            odf::DatasetName::try_from($s).unwrap(),
+        ))
     };
 }
 
 macro_rules! rr {
     ($s:expr) => {
-        DatasetRefRemote::try_from($s).unwrap()
+        odf::DatasetRefRemote::try_from($s).unwrap()
     };
 }
 
 macro_rules! ar {
     ($s:expr) => {
-        DatasetRefAny::try_from($s).unwrap()
+        odf::DatasetRefAny::try_from($s).unwrap()
     };
 }
 
@@ -93,20 +97,20 @@ macro_rules! refs {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 async fn create_graph(
-    dataset_repo_writer: &dyn DatasetRepositoryWriter,
-    datasets: Vec<(DatasetAlias, Vec<DatasetAlias>)>,
+    dataset_storage_unit_writer: &dyn DatasetStorageUnitWriter,
+    datasets: Vec<(odf::DatasetAlias, Vec<odf::DatasetAlias>)>,
 ) {
     for (dataset_alias, deps) in datasets {
-        dataset_repo_writer
+        dataset_storage_unit_writer
             .create_dataset_from_snapshot(
                 MetadataFactory::dataset_snapshot()
                     .name(dataset_alias)
                     .kind(if deps.is_empty() {
-                        DatasetKind::Root
+                        odf::DatasetKind::Root
                     } else {
-                        DatasetKind::Derivative
+                        odf::DatasetKind::Derivative
                     })
-                    .push_event::<MetadataEvent>(if deps.is_empty() {
+                    .push_event::<odf::MetadataEvent>(if deps.is_empty() {
                         MetadataFactory::set_polling_source().build().into()
                     } else {
                         MetadataFactory::set_transform()
@@ -129,12 +133,12 @@ async fn create_graph(
 async fn create_graph_remote(
     remote_repo_name: &str,
     harness: &PullTestHarness,
-    datasets: Vec<(DatasetAlias, Vec<DatasetAlias>)>,
-    to_import: Vec<DatasetAlias>,
+    datasets: Vec<(odf::DatasetAlias, Vec<odf::DatasetAlias>)>,
+    to_import: Vec<odf::DatasetAlias>,
 ) -> tempfile::TempDir {
     let tmp_repo_dir = tempfile::tempdir().unwrap();
 
-    let remote_dataset_repo = DatasetRepositoryLocalFs::new(
+    let remote_dataset_repo = DatasetStorageUnitLocalFs::new(
         tmp_repo_dir.path().to_owned(),
         Arc::new(CurrentAccountSubject::new_test()),
         Arc::new(TenancyConfig::SingleTenant),
@@ -144,7 +148,7 @@ async fn create_graph_remote(
 
     create_graph(&remote_dataset_repo, datasets).await;
 
-    let tmp_repo_name = RepoName::new_unchecked(remote_repo_name);
+    let tmp_repo_name = odf::RepoName::new_unchecked(remote_repo_name);
 
     harness
         .remote_repo_reg
@@ -187,7 +191,7 @@ async fn test_pull_batching_chain() {
 
     // A - B - C
     create_graph(
-        harness.dataset_repo_writer(),
+        harness.dataset_storage_unit_writer(),
         vec![
             (n!("a"), names![]),
             (n!("b"), names!["a"]),
@@ -242,7 +246,7 @@ async fn test_pull_batching_chain_multi_tenant() {
 
     // XA - YB - ZC
     create_graph(
-        harness.dataset_repo_writer(),
+        harness.dataset_storage_unit_writer(),
         vec![
             (mn!("x/a"), mnames![]),
             (mn!("y/b"), mnames!["x/a"]),
@@ -301,7 +305,7 @@ async fn test_pull_batching_complex() {
     //         /
     // B - - -/
     create_graph(
-        harness.dataset_repo_writer(),
+        harness.dataset_storage_unit_writer(),
         vec![
             (n!("a"), names![]),
             (n!("b"), names![]),
@@ -373,7 +377,7 @@ async fn test_pull_batching_complex_with_remote() {
     )
     .await;
     create_graph(
-        harness.dataset_repo_writer(),
+        harness.dataset_storage_unit_writer(),
         vec![
             (n!("c"), names![]),
             (n!("d"), names![]),
@@ -388,7 +392,7 @@ async fn test_pull_batching_complex_with_remote() {
         .get_remote_aliases(&rl!("e"))
         .await
         .add(
-            &DatasetRefRemote::try_from("kamu.dev/e").unwrap(),
+            &odf::DatasetRefRemote::try_from("kamu.dev/e").unwrap(),
             RemoteAliasKind::Pull,
         )
         .await
@@ -678,7 +682,7 @@ impl PullTestHarness {
             .add::<SyncServiceImpl>()
             .add::<SyncRequestBuilder>()
             .add::<DatasetFactoryImpl>()
-            .add::<auth::DummyOdfServerAccessTokenResolver>()
+            .add::<odf::dataset::DummyOdfServerAccessTokenResolver>()
             .add::<DummySmartTransferProtocolClient>()
             .add::<SimpleTransferProtocol>()
             .add::<CreateDatasetUseCaseImpl>()
@@ -707,7 +711,7 @@ impl PullTestHarness {
 
     async fn pull(
         &self,
-        refs: Vec<DatasetRefAny>,
+        refs: Vec<odf::DatasetRefAny>,
         options: PullOptions,
     ) -> Result<Vec<Vec<PullJob>>, Vec<PullResponse>> {
         let requests: Vec<_> = refs
@@ -761,7 +765,7 @@ impl PullTestHarness {
         Ok(self.collect_calls())
     }
 
-    async fn get_remote_aliases(&self, dataset_ref: &DatasetRef) -> Box<dyn RemoteAliases> {
+    async fn get_remote_aliases(&self, dataset_ref: &odf::DatasetRef) -> Box<dyn RemoteAliases> {
         let hdl = self
             .dataset_registry()
             .resolve_dataset_handle_by_ref(dataset_ref)
@@ -778,51 +782,51 @@ impl PullTestHarness {
 
 #[derive(Debug, Clone, Eq)]
 enum PullJob {
-    Ingest(DatasetRefAny),
-    Transform(DatasetRefAny),
-    Sync((DatasetRefAny, DatasetRefAny)),
+    Ingest(odf::DatasetRefAny),
+    Transform(odf::DatasetRefAny),
+    Sync((odf::DatasetRefAny, odf::DatasetRefAny)),
 }
 
 impl PullJob {
-    fn cmp_ref(lhs: &DatasetRefAny, rhs: &DatasetRefAny) -> bool {
+    fn cmp_ref(lhs: &odf::DatasetRefAny, rhs: &odf::DatasetRefAny) -> bool {
         #[allow(clippy::type_complexity)]
         fn tuplify(
-            v: &DatasetRefAny,
+            v: &odf::DatasetRefAny,
         ) -> (
-            Option<&DatasetID>,
+            Option<&odf::DatasetID>,
             Option<&url::Url>,
             Option<&str>,
             Option<&str>,
-            Option<&DatasetName>,
+            Option<&odf::DatasetName>,
         ) {
             match v {
-                DatasetRefAny::ID(_, id) => (Some(id), None, None, None, None),
-                DatasetRefAny::Url(url) => (None, Some(url), None, None, None),
-                DatasetRefAny::LocalAlias(a, n) => {
+                odf::DatasetRefAny::ID(_, id) => (Some(id), None, None, None, None),
+                odf::DatasetRefAny::Url(url) => (None, Some(url), None, None, None),
+                odf::DatasetRefAny::LocalAlias(a, n) => {
                     (None, None, None, a.as_ref().map(AsRef::as_ref), Some(n))
                 }
-                DatasetRefAny::RemoteAlias(r, a, n) => (
+                odf::DatasetRefAny::RemoteAlias(r, a, n) => (
                     None,
                     None,
                     Some(r.as_ref()),
                     a.as_ref().map(AsRef::as_ref),
                     Some(n),
                 ),
-                DatasetRefAny::AmbiguousAlias(ra, n) => {
+                odf::DatasetRefAny::AmbiguousAlias(ra, n) => {
                     (None, None, Some(ra.as_ref()), None, Some(n))
                 }
-                DatasetRefAny::LocalHandle(h) => (
+                odf::DatasetRefAny::LocalHandle(h) => (
                     None,
                     None,
                     None,
-                    h.alias.account_name.as_ref().map(AccountName::as_str),
+                    h.alias.account_name.as_ref().map(odf::AccountName::as_str),
                     Some(&h.alias.dataset_name),
                 ),
-                DatasetRefAny::RemoteHandle(h) => (
+                odf::DatasetRefAny::RemoteHandle(h) => (
                     None,
                     None,
                     Some(h.alias.repo_name.as_str()),
-                    h.alias.account_name.as_ref().map(AccountName::as_str),
+                    h.alias.account_name.as_ref().map(odf::AccountName::as_str),
                     Some(&h.alias.dataset_name),
                 ),
             }

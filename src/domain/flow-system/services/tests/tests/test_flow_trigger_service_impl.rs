@@ -15,7 +15,6 @@ use chrono::{Duration, Utc};
 use database_common_macros::transactional_method1;
 use dill::*;
 use futures::TryStreamExt;
-use kamu::testing::MetadataFactory;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::*;
@@ -25,7 +24,7 @@ use kamu_flow_system::*;
 use kamu_flow_system_inmem::*;
 use kamu_flow_system_services::*;
 use messaging_outbox::{register_message_dispatcher, Outbox, OutboxImmediateImpl};
-use opendatafabric::*;
+use odf::metadata::testing::MetadataFactory;
 use time_source::SystemTimeSourceDefault;
 
 use super::FlowTriggerTestListener;
@@ -378,10 +377,10 @@ impl FlowTriggerHarness {
             .add::<InMemoryFlowTriggerEventStore>()
             .add::<SystemTimeSourceDefault>()
             .add_value(TenancyConfig::SingleTenant)
-            .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
-            .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-            .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
-            .add::<DatasetRegistryRepoBridge>()
+            .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
+            .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
+            .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
+            .add::<DatasetRegistrySoloUnitBridge>()
             .add_value(CurrentAccountSubject::new_test())
             .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
             .add::<DependencyGraphServiceImpl>()
@@ -451,7 +450,7 @@ impl FlowTriggerHarness {
 
     async fn set_dataset_flow_trigger(
         &self,
-        dataset_id: DatasetID,
+        dataset_id: odf::DatasetID,
         dataset_flow_type: DatasetFlowType,
         trigger_rule: FlowTriggerRule,
     ) {
@@ -469,7 +468,7 @@ impl FlowTriggerHarness {
     fn expect_dataset_flow_trigger(
         &self,
         triggers: &HashMap<FlowKey, FlowTriggerState>,
-        dataset_id: DatasetID,
+        dataset_id: odf::DatasetID,
         dataset_flow_type: DatasetFlowType,
         expected_rule: &FlowTriggerRule,
     ) {
@@ -501,7 +500,7 @@ impl FlowTriggerHarness {
 
     async fn get_dataset_flow_trigger_from_store(
         &self,
-        dataset_id: DatasetID,
+        dataset_id: odf::DatasetID,
         dataset_flow_type: DatasetFlowType,
     ) -> FlowTriggerState {
         let flow_key: FlowKey = FlowKeyDataset::new(dataset_id, dataset_flow_type).into();
@@ -522,7 +521,7 @@ impl FlowTriggerHarness {
         flow_trigger.into()
     }
 
-    async fn create_root_dataset(&self, dataset_name: &str) -> DatasetID {
+    async fn create_root_dataset(&self, dataset_name: &str) -> odf::DatasetID {
         let create_dataset_from_snapshot = self
             .catalog
             .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
@@ -532,7 +531,7 @@ impl FlowTriggerHarness {
             .execute(
                 MetadataFactory::dataset_snapshot()
                     .name(dataset_name)
-                    .kind(DatasetKind::Root)
+                    .kind(odf::DatasetKind::Root)
                     .push_event(MetadataFactory::set_polling_source().build())
                     .build(),
                 Default::default(),
@@ -543,7 +542,7 @@ impl FlowTriggerHarness {
         result.dataset_handle.id
     }
 
-    async fn delete_dataset(&self, dataset_id: &DatasetID) {
+    async fn delete_dataset(&self, dataset_id: &odf::DatasetID) {
         // Do the actual deletion
         let delete_dataset = self.catalog.get_one::<dyn DeleteDatasetUseCase>().unwrap();
         delete_dataset
@@ -552,14 +551,18 @@ impl FlowTriggerHarness {
             .unwrap();
     }
 
-    async fn pause_dataset_flow(&self, dataset_id: DatasetID, dataset_flow_type: DatasetFlowType) {
+    async fn pause_dataset_flow(
+        &self,
+        dataset_id: odf::DatasetID,
+        dataset_flow_type: DatasetFlowType,
+    ) {
         self.flow_trigger_service
             .pause_dataset_flows(Utc::now(), &dataset_id, Some(dataset_flow_type))
             .await
             .unwrap();
     }
 
-    async fn pause_all_dataset_flows(&self, dataset_id: DatasetID) {
+    async fn pause_all_dataset_flows(&self, dataset_id: odf::DatasetID) {
         self.flow_trigger_service
             .pause_dataset_flows(Utc::now(), &dataset_id, None)
             .await
@@ -573,14 +576,18 @@ impl FlowTriggerHarness {
             .unwrap();
     }
 
-    async fn resume_dataset_flow(&self, dataset_id: DatasetID, dataset_flow_type: DatasetFlowType) {
+    async fn resume_dataset_flow(
+        &self,
+        dataset_id: odf::DatasetID,
+        dataset_flow_type: DatasetFlowType,
+    ) {
         self.flow_trigger_service
             .resume_dataset_flows(Utc::now(), &dataset_id, Some(dataset_flow_type))
             .await
             .unwrap();
     }
 
-    async fn resume_all_dataset_flows(&self, dataset_id: DatasetID) {
+    async fn resume_all_dataset_flows(&self, dataset_id: odf::DatasetID) {
         self.flow_trigger_service
             .resume_dataset_flows(Utc::now(), &dataset_id, None)
             .await

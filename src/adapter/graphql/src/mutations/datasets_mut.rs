@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use kamu_core::{self as domain, CreateDatasetUseCaseOptions, DatasetRegistryExt};
-use opendatafabric as odf;
 
 use crate::mutations::DatasetMut;
 use crate::prelude::*;
@@ -77,26 +76,28 @@ impl DatasetsMut {
         //       https://github.com/kamu-data/kamu-cli/issues/780
         dataset_visibility: Option<DatasetVisibility>,
     ) -> Result<CreateDatasetFromSnapshotResult> {
-        use odf::serde::DatasetSnapshotDeserializer;
+        use odf::metadata::serde::DatasetSnapshotDeserializer;
 
         let snapshot = match snapshot_format {
             MetadataManifestFormat::Yaml => {
-                let de = odf::serde::yaml::YamlDatasetSnapshotDeserializer;
+                let de = odf::metadata::serde::yaml::YamlDatasetSnapshotDeserializer;
                 match de.read_manifest(snapshot.as_bytes()) {
                     Ok(snapshot) => snapshot,
-                    Err(e @ odf::serde::Error::SerdeError { .. }) => {
+                    Err(e @ odf::metadata::serde::Error::SerdeError { .. }) => {
                         return Ok(CreateDatasetFromSnapshotResult::Malformed(
                             MetadataManifestMalformed {
                                 message: e.to_string(),
                             },
                         ));
                     }
-                    Err(odf::serde::Error::UnsupportedVersion(e)) => {
+                    Err(odf::metadata::serde::Error::UnsupportedVersion(e)) => {
                         return Ok(CreateDatasetFromSnapshotResult::UnsupportedVersion(
                             e.into(),
                         ))
                     }
-                    Err(e @ odf::serde::Error::IoError { .. }) => return Err(e.int_err().into()),
+                    Err(e @ odf::metadata::serde::Error::IoError { .. }) => {
+                        return Err(e.int_err().into())
+                    }
                 }
             }
         };
@@ -119,7 +120,7 @@ impl DatasetsMut {
         &self,
         ctx: &Context<'_>,
         snapshot: odf::DatasetSnapshot,
-        dataset_visibility: domain::DatasetVisibility,
+        dataset_visibility: odf::DatasetVisibility,
     ) -> Result<CreateDatasetFromSnapshotResult> {
         let create_from_snapshot =
             from_catalog_n!(ctx, dyn domain::CreateDatasetFromSnapshotUseCase);
@@ -131,21 +132,21 @@ impl DatasetsMut {
                 let dataset = Dataset::from_ref(ctx, &result.dataset_handle.as_local_ref()).await?;
                 CreateDatasetFromSnapshotResult::Success(CreateDatasetResultSuccess { dataset })
             }
-            Err(domain::CreateDatasetFromSnapshotError::NameCollision(e)) => {
+            Err(odf::dataset::CreateDatasetFromSnapshotError::NameCollision(e)) => {
                 CreateDatasetFromSnapshotResult::NameCollision(CreateDatasetResultNameCollision {
                     account_name: e.alias.account_name.map(Into::into),
                     dataset_name: e.alias.dataset_name.into(),
                 })
             }
-            Err(domain::CreateDatasetFromSnapshotError::RefCollision(e)) => {
+            Err(odf::dataset::CreateDatasetFromSnapshotError::RefCollision(e)) => {
                 return Err(e.int_err().into())
             }
-            Err(domain::CreateDatasetFromSnapshotError::InvalidSnapshot(e)) => {
+            Err(odf::dataset::CreateDatasetFromSnapshotError::InvalidSnapshot(e)) => {
                 CreateDatasetFromSnapshotResult::InvalidSnapshot(
                     CreateDatasetResultInvalidSnapshot { message: e.reason },
                 )
             }
-            Err(domain::CreateDatasetFromSnapshotError::MissingInputs(e)) => {
+            Err(odf::dataset::CreateDatasetFromSnapshotError::MissingInputs(e)) => {
                 CreateDatasetFromSnapshotResult::MissingInputs(CreateDatasetResultMissingInputs {
                     missing_inputs: e
                         .missing_inputs
@@ -154,7 +155,7 @@ impl DatasetsMut {
                         .collect(),
                 })
             }
-            Err(domain::CreateDatasetFromSnapshotError::Internal(e)) => return Err(e.into()),
+            Err(odf::dataset::CreateDatasetFromSnapshotError::Internal(e)) => return Err(e.into()),
         };
 
         Ok(result)

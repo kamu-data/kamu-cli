@@ -9,7 +9,6 @@
 
 use std::assert_matches::assert_matches;
 
-use kamu::domain::DatasetVisibility;
 use kamu_cli_e2e_common::{
     CreateDatasetResponse,
     GetDatasetVisibilityError,
@@ -31,7 +30,7 @@ pub async fn test_only_dataset_owner_can_change_dataset_visibility(
         .dataset()
         .create_dataset_with_visibility(
             &DATASET_ROOT_PLAYER_SCORES_SNAPSHOT,
-            DatasetVisibility::Public,
+            odf::DatasetVisibility::Public,
         )
         .await;
 
@@ -41,31 +40,31 @@ pub async fn test_only_dataset_owner_can_change_dataset_visibility(
     assert_matches!(
         not_owner_client
             .dataset()
-            .set_visibility(&dataset_id, DatasetVisibility::Private)
+            .set_visibility(&dataset_id, odf::DatasetVisibility::Private)
             .await,
         Err(SetDatasetVisibilityError::Forbidden)
     );
 
     assert_matches!(
         owner_client.dataset().get_visibility(&dataset_id).await,
-        Ok(DatasetVisibility::Public)
+        Ok(odf::DatasetVisibility::Public)
     );
     assert_matches!(
         not_owner_client.dataset().get_visibility(&dataset_id).await,
-        Ok(DatasetVisibility::Public)
+        Ok(odf::DatasetVisibility::Public)
     );
 
     assert_matches!(
         owner_client
             .dataset()
-            .set_visibility(&dataset_id, DatasetVisibility::Private)
+            .set_visibility(&dataset_id, odf::DatasetVisibility::Private)
             .await,
         Ok(_)
     );
 
     assert_matches!(
         owner_client.dataset().get_visibility(&dataset_id).await,
-        Ok(DatasetVisibility::Private)
+        Ok(odf::DatasetVisibility::Private)
     );
     assert_matches!(
         not_owner_client.dataset().get_visibility(&dataset_id).await,
@@ -90,7 +89,7 @@ pub async fn test_admin_can_change_visibility_of_any_dataset(
         .dataset()
         .create_dataset_with_visibility(
             &DATASET_ROOT_PLAYER_SCORES_SNAPSHOT,
-            DatasetVisibility::Private,
+            odf::DatasetVisibility::Private,
         )
         .await;
     let CreateDatasetResponse {
@@ -100,7 +99,7 @@ pub async fn test_admin_can_change_visibility_of_any_dataset(
         .dataset()
         .create_dataset_with_visibility(
             &DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT,
-            DatasetVisibility::Public,
+            odf::DatasetVisibility::Public,
         )
         .await;
 
@@ -109,34 +108,34 @@ pub async fn test_admin_can_change_visibility_of_any_dataset(
             .dataset()
             .get_visibility(&private_dataset_id)
             .await,
-        Ok(DatasetVisibility::Private)
+        Ok(odf::DatasetVisibility::Private)
     );
     assert_matches!(
         owner_client
             .dataset()
             .get_visibility(&private_dataset_id)
             .await,
-        Ok(DatasetVisibility::Private)
+        Ok(odf::DatasetVisibility::Private)
     );
     assert_matches!(
         admin_client
             .dataset()
             .get_visibility(&public_dataset_id)
             .await,
-        Ok(DatasetVisibility::Public)
+        Ok(odf::DatasetVisibility::Public)
     );
     assert_matches!(
         owner_client
             .dataset()
             .get_visibility(&public_dataset_id)
             .await,
-        Ok(DatasetVisibility::Public)
+        Ok(odf::DatasetVisibility::Public)
     );
 
     assert_matches!(
         admin_client
             .dataset()
-            .set_visibility(&private_dataset_id, DatasetVisibility::Public)
+            .set_visibility(&private_dataset_id, odf::DatasetVisibility::Public)
             .await,
         Ok(_)
     );
@@ -145,7 +144,7 @@ pub async fn test_admin_can_change_visibility_of_any_dataset(
     assert_matches!(
         admin_client
             .dataset()
-            .set_visibility(&public_dataset_id, DatasetVisibility::Private)
+            .set_visibility(&public_dataset_id, odf::DatasetVisibility::Private)
             .await,
         Ok(_)
     );
@@ -156,28 +155,28 @@ pub async fn test_admin_can_change_visibility_of_any_dataset(
             .dataset()
             .get_visibility(&before_private_now_public_dataset)
             .await,
-        Ok(DatasetVisibility::Public)
+        Ok(odf::DatasetVisibility::Public)
     );
     assert_matches!(
         owner_client
             .dataset()
             .get_visibility(&before_private_now_public_dataset)
             .await,
-        Ok(DatasetVisibility::Public)
+        Ok(odf::DatasetVisibility::Public)
     );
     assert_matches!(
         admin_client
             .dataset()
             .get_visibility(&before_public_now_private_dataset)
             .await,
-        Ok(DatasetVisibility::Private)
+        Ok(odf::DatasetVisibility::Private)
     );
     assert_matches!(
         owner_client
             .dataset()
             .get_visibility(&before_public_now_private_dataset)
             .await,
-        Ok(DatasetVisibility::Private)
+        Ok(odf::DatasetVisibility::Private)
     );
 }
 

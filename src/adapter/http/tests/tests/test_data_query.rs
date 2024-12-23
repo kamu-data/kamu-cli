@@ -15,11 +15,10 @@ use datafusion::arrow::datatypes::*;
 use datafusion::prelude::*;
 use ed25519_dalek::Signer;
 use kamu::domain::*;
-use kamu::testing::MetadataFactory;
 use kamu::*;
 use kamu_adapter_http::data::query_types::IdentityConfig;
 use kamu_ingest_datafusion::DataWriterDataFusion;
-use opendatafabric::*;
+use odf::metadata::testing::MetadataFactory;
 use serde_json::json;
 
 use crate::harness::*;
@@ -31,9 +30,9 @@ struct Harness {
     run_info_dir: tempfile::TempDir,
     server_harness: ServerSideLocalFsHarness,
     root_url: url::Url,
-    dataset_handle: DatasetHandle,
+    dataset_handle: odf::DatasetHandle,
     dataset_url: url::Url,
-    private_key: PrivateKey,
+    private_key: odf::metadata::PrivateKey,
 }
 
 impl Harness {
@@ -41,7 +40,7 @@ impl Harness {
         // TODO: Need access to these from harness level
         let run_info_dir = tempfile::tempdir().unwrap();
 
-        let private_key: PrivateKey =
+        let private_key: odf::metadata::PrivateKey =
             ed25519_dalek::SigningKey::from_bytes(&[123; ed25519_dalek::SECRET_KEY_LENGTH]).into();
 
         let identity_config = IdentityConfig {
@@ -66,38 +65,42 @@ impl Harness {
         let system_time = Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap();
         server_harness.system_time_source().set(system_time);
 
-        let alias = DatasetAlias::new(
+        let alias = odf::DatasetAlias::new(
             server_harness.operating_account_name(),
-            DatasetName::new_unchecked("population"),
+            odf::DatasetName::new_unchecked("population"),
         );
         let create_result = server_harness
             .cli_create_dataset_use_case()
             .execute(
                 &alias,
-                MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build())
-                    .system_time(system_time)
-                    .build_typed(),
+                MetadataFactory::metadata_block(
+                    MetadataFactory::seed(odf::DatasetKind::Root).build(),
+                )
+                .system_time(system_time)
+                .build_typed(),
                 Default::default(),
             )
             .await
             .unwrap();
 
         for event in [
-            SetAttachments {
-                attachments: Attachments::Embedded(AttachmentsEmbedded {
-                    items: vec![AttachmentEmbedded {
-                        path: "README.md".to_string(),
-                        content: "Blah".to_string(),
-                    }],
-                }),
+            odf::metadata::SetAttachments {
+                attachments: odf::metadata::Attachments::Embedded(
+                    odf::metadata::AttachmentsEmbedded {
+                        items: vec![odf::metadata::AttachmentEmbedded {
+                            path: "README.md".to_string(),
+                            content: "Blah".to_string(),
+                        }],
+                    },
+                ),
             }
             .into(),
-            SetInfo {
+            odf::metadata::SetInfo {
                 description: Some("Test dataset".to_string()),
                 keywords: Some(vec!["foo".to_string(), "bar".to_string()]),
             }
             .into(),
-            SetLicense {
+            odf::metadata::SetLicense {
                 short_name: "apache-2.0".to_string(),
                 name: "apache-2.0".to_string(),
                 spdx_id: None,
@@ -109,7 +112,7 @@ impl Harness {
                 .dataset
                 .commit_event(
                     event,
-                    CommitOpts {
+                    odf::dataset::CommitOpts {
                         system_time: Some(system_time),
                         ..Default::default()
                     },
@@ -122,7 +125,7 @@ impl Harness {
         let mut writer = DataWriterDataFusion::from_metadata_chain(
             ctx.clone(),
             ResolvedDataset::from(&create_result),
-            &BlockRef::Head,
+            &odf::BlockRef::Head,
             None,
         )
         .await
@@ -485,7 +488,7 @@ async fn test_data_query_handler() {
         // Verify the commitment
         pretty_assertions::assert_eq!(
             response["commitment"]["inputHash"].as_str().unwrap(),
-            Multihash::from_digest_sha3_256(
+            odf::Multihash::from_digest_sha3_256(
                 canonical_json::to_string(&response["input"])
                     .unwrap()
                     .as_bytes()
@@ -494,7 +497,7 @@ async fn test_data_query_handler() {
         );
         pretty_assertions::assert_eq!(
             response["commitment"]["outputHash"].as_str().unwrap(),
-            Multihash::from_digest_sha3_256(
+            odf::Multihash::from_digest_sha3_256(
                 canonical_json::to_string(&response["output"])
                     .unwrap()
                     .as_bytes()
@@ -503,7 +506,7 @@ async fn test_data_query_handler() {
         );
         pretty_assertions::assert_eq!(
             response["commitment"]["subQueriesHash"].as_str().unwrap(),
-            Multihash::from_digest_sha3_256(
+            odf::Multihash::from_digest_sha3_256(
                 canonical_json::to_string(&response["subQueries"])
                     .unwrap()
                     .as_bytes()
@@ -511,11 +514,15 @@ async fn test_data_query_handler() {
             .to_string()
         );
 
-        let signature =
-            Signature::from_multibase(response["proof"]["proofValue"].as_str().unwrap()).unwrap();
+        let signature = odf::metadata::Signature::from_multibase(
+            response["proof"]["proofValue"].as_str().unwrap(),
+        )
+        .unwrap();
 
-        let did = DidKey::from_did_str(response["proof"]["verificationMethod"].as_str().unwrap())
-            .unwrap();
+        let did = odf::metadata::DidKey::from_did_str(
+            response["proof"]["verificationMethod"].as_str().unwrap(),
+        )
+        .unwrap();
 
         let commitment = canonical_json::to_string(&response["commitment"]).unwrap();
 
@@ -527,7 +534,7 @@ async fn test_data_query_handler() {
             .json(&json!({
                 "query": query,
                 "datasets": [{
-                    "id": DatasetID::new_seeded_ed25519(b"does-not-exist"),
+                    "id": odf::DatasetID::new_seeded_ed25519(b"does-not-exist"),
                     "alias": harness.dataset_handle.alias,
                 }],
             }))
@@ -545,7 +552,7 @@ async fn test_data_query_handler() {
                 "datasets": [{
                     "id": harness.dataset_handle.id,
                     "alias": harness.dataset_handle.alias,
-                    "blockHash": Multihash::from_digest_sha3_256(b"does-not-exist"),
+                    "blockHash": odf::Multihash::from_digest_sha3_256(b"does-not-exist"),
                 }],
             }))
             .send()
@@ -733,7 +740,7 @@ async fn test_data_verify_handler() {
         invalid_request["commitment"]["outputHash"] =
             "f1620ff7f5beaf16900218a3ac4aae82cdccf764816986c7c739c716cf7dc03112a2d".into();
         let c = canonical_json::to_string(&invalid_request["commitment"]).unwrap();
-        let sig: Signature = harness.private_key.sign(c.as_bytes()).into();
+        let sig: odf::metadata::Signature = harness.private_key.sign(c.as_bytes()).into();
         invalid_request["proof"]["proofValue"] = sig.to_string().into();
 
         let res = cl
@@ -762,11 +769,11 @@ async fn test_data_verify_handler() {
         // Cannot reproduce the query: Dataset is missing
         // (dataset stays the same, but we fake the output hash and the signature)
         let mut invalid_request = request.clone();
-        invalid_request["input"]["datasets"][0]["id"] = DatasetID::new_seeded_ed25519(b"foo")
+        invalid_request["input"]["datasets"][0]["id"] = odf::DatasetID::new_seeded_ed25519(b"foo")
             .as_did_str()
             .to_string()
             .into();
-        invalid_request["commitment"]["inputHash"] = Multihash::from_digest_sha3_256(
+        invalid_request["commitment"]["inputHash"] = odf::Multihash::from_digest_sha3_256(
             canonical_json::to_string(&invalid_request["input"])
                 .unwrap()
                 .as_bytes(),
@@ -776,7 +783,7 @@ async fn test_data_verify_handler() {
         .into();
 
         let c = canonical_json::to_string(&invalid_request["commitment"]).unwrap();
-        let sig: Signature = harness.private_key.sign(c.as_bytes()).into();
+        let sig: odf::metadata::Signature = harness.private_key.sign(c.as_bytes()).into();
         invalid_request["proof"]["proofValue"] = sig.to_string().into();
 
         let res = cl
@@ -805,11 +812,11 @@ async fn test_data_verify_handler() {
         // (dataset stays the same, but we fake the output hash and the signature)
         let mut invalid_request = request.clone();
         invalid_request["input"]["datasets"][0]["blockHash"] =
-            Multihash::from_digest_sha3_256(b"foo")
+            odf::Multihash::from_digest_sha3_256(b"foo")
                 .as_multibase()
                 .to_string()
                 .into();
-        invalid_request["commitment"]["inputHash"] = Multihash::from_digest_sha3_256(
+        invalid_request["commitment"]["inputHash"] = odf::Multihash::from_digest_sha3_256(
             canonical_json::to_string(&invalid_request["input"])
                 .unwrap()
                 .as_bytes(),
@@ -819,7 +826,7 @@ async fn test_data_verify_handler() {
         .into();
 
         let c = canonical_json::to_string(&invalid_request["commitment"]).unwrap();
-        let sig: Signature = harness.private_key.sign(c.as_bytes()).into();
+        let sig: odf::metadata::Signature = harness.private_key.sign(c.as_bytes()).into();
         invalid_request["proof"]["proofValue"] = sig.to_string().into();
 
         let res = cl
@@ -994,7 +1001,7 @@ async fn test_data_query_handler_dataset_does_not_exist_bad_alias() {
             .json(&json!({
                 "query": query,
                 "datasets": [{
-                    "id": DatasetID::new_seeded_ed25519(b"does-not-exist"),
+                    "id": odf::DatasetID::new_seeded_ed25519(b"does-not-exist"),
                     "alias": harness.dataset_handle.alias,
                 }]
             }))

@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_accounts::DUMMY_ACCESS_TOKEN;
 use kamu_core::{RunInfoDir, TenancyConfig};
 use serde_json::json;
 
@@ -50,7 +49,10 @@ async fn test_get_account_info() {
 
         let res = cl
             .get(format!("{}accounts/me", harness.root_url))
-            .header("Authorization", format!("Bearer {DUMMY_ACCESS_TOKEN}"))
+            .header(
+                "Authorization",
+                format!("Bearer {}", odf::dataset::DUMMY_ODF_ACCESS_TOKEN),
+            )
             .send()
             .await
             .unwrap();

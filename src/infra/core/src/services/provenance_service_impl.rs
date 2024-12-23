@@ -15,7 +15,6 @@ use std::sync::Arc;
 use dill::*;
 use internal_error::ResultIntoInternal;
 use kamu_core::*;
-use opendatafabric::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -40,7 +39,7 @@ impl ProvenanceServiceImpl {
     #[async_recursion::async_recursion]
     async fn visit_upstream_dependencies_rec(
         &self,
-        dataset_handle: &DatasetHandle,
+        dataset_handle: &odf::DatasetHandle,
         visitor: &mut dyn LineageVisitor,
     ) -> Result<(), GetLineageError> {
         self.dataset_action_authorizer
@@ -50,7 +49,7 @@ impl ProvenanceServiceImpl {
         let resolved_dataset = self.dataset_registry.get_dataset_by_handle(dataset_handle);
 
         let summary = resolved_dataset
-            .get_summary(GetSummaryOpts::default())
+            .get_summary(odf::dataset::GetSummaryOpts::default())
             .await
             .int_err()?;
 
@@ -92,7 +91,7 @@ impl ProvenanceServiceImpl {
 impl ProvenanceService for ProvenanceServiceImpl {
     async fn get_dataset_lineage(
         &self,
-        dataset_ref: &DatasetRef,
+        dataset_ref: &odf::DatasetRef,
         visitor: &mut dyn LineageVisitor,
         _options: LineageOptions,
     ) -> Result<(), GetLineageError> {
@@ -109,7 +108,7 @@ impl ProvenanceService for ProvenanceServiceImpl {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct DotVisitor<W: Write, S: DotStyle = DefaultStyle> {
-    visited: HashSet<DatasetID>,
+    visited: HashSet<odf::DatasetID>,
     writer: W,
     _style: PhantomData<S>,
 }
@@ -150,10 +149,10 @@ impl<W: Write + Send, S: DotStyle + Send> LineageVisitor for DotVisitor<W, S> {
 
         match dataset {
             NodeInfo::Local { alias, kind, .. } => match kind {
-                DatasetKind::Root => {
+                odf::DatasetKind::Root => {
                     writeln!(self.writer, "\"{}\" [{}];", alias, S::root_style())
                 }
-                DatasetKind::Derivative => {
+                odf::DatasetKind::Derivative => {
                     writeln!(self.writer, "\"{}\" [{}];", alias, S::derivative_style())
                 }
             },

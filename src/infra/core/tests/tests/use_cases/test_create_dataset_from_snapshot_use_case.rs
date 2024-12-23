@@ -10,11 +10,10 @@
 use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
-use kamu::testing::MetadataFactory;
 use kamu::CreateDatasetFromSnapshotUseCaseImpl;
 use kamu_core::CreateDatasetFromSnapshotUseCase;
 use messaging_outbox::MockOutbox;
-use opendatafabric::{DatasetAlias, DatasetKind, DatasetName};
+use odf::metadata::testing::MetadataFactory;
 
 use crate::tests::use_cases::*;
 
@@ -22,7 +21,7 @@ use crate::tests::use_cases::*;
 
 #[tokio::test]
 async fn test_create_root_dataset_from_snapshot() {
-    let alias_foo = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
 
     // Expect only DatasetCreated message for "foo"
     let mut mock_outbox = MockOutbox::new();
@@ -32,7 +31,7 @@ async fn test_create_root_dataset_from_snapshot() {
 
     let snapshot = MetadataFactory::dataset_snapshot()
         .name(alias_foo.clone())
-        .kind(DatasetKind::Root)
+        .kind(odf::DatasetKind::Root)
         .push_event(MetadataFactory::set_polling_source().build())
         .build();
 
@@ -47,8 +46,8 @@ async fn test_create_root_dataset_from_snapshot() {
 
 #[tokio::test]
 async fn test_create_derived_dataset_from_snapshot() {
-    let alias_foo = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
-    let alias_bar = DatasetAlias::new(None, DatasetName::new_unchecked("bar"));
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
 
     // Expect DatasetCreated messages for "foo" and "bar"
     // Expect DatasetDependenciesUpdated message for "bar"
@@ -60,13 +59,13 @@ async fn test_create_derived_dataset_from_snapshot() {
 
     let snapshot_root = MetadataFactory::dataset_snapshot()
         .name(alias_foo.clone())
-        .kind(DatasetKind::Root)
+        .kind(odf::DatasetKind::Root)
         .push_event(MetadataFactory::set_polling_source().build())
         .build();
 
     let snapshot_derived = MetadataFactory::dataset_snapshot()
         .name(alias_bar.clone())
-        .kind(DatasetKind::Derivative)
+        .kind(odf::DatasetKind::Derivative)
         .push_event(
             MetadataFactory::set_transform()
                 .inputs_from_refs(vec![alias_foo.as_local_ref()])

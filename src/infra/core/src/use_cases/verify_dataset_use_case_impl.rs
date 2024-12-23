@@ -20,7 +20,6 @@ use kamu_core::{
     VerificationService,
     VerifyDatasetUseCase,
 };
-use opendatafabric::DatasetHandle;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -56,7 +55,7 @@ impl VerifyDatasetUseCase for VerifyDatasetUseCaseImpl {
     )]
     async fn execute(
         &self,
-        request: VerificationRequest<DatasetHandle>,
+        request: VerificationRequest<odf::DatasetHandle>,
         maybe_listener: Option<Arc<dyn VerificationListener>>,
     ) -> VerificationResult {
         // Permission check
@@ -94,7 +93,7 @@ impl VerifyDatasetUseCase for VerifyDatasetUseCaseImpl {
     )]
     async fn execute_multi(
         &self,
-        requests: Vec<VerificationRequest<DatasetHandle>>,
+        requests: Vec<VerificationRequest<odf::DatasetHandle>>,
         maybe_multi_listener: Option<Arc<dyn VerificationMultiListener>>,
     ) -> Vec<VerificationResult> {
         let mut verification_results = Vec::new();

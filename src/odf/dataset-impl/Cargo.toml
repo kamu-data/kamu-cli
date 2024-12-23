@@ -1,0 +1,67 @@
+[package]
+name = "opendatafabric-dataset-impl"
+description = "Open Data Fabric based dataset implementation"
+version = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+authors = { workspace = true }
+readme = { workspace = true }
+license-file = { workspace = true }
+keywords = { workspace = true }
+include = { workspace = true }
+edition = { workspace = true }
+publish = { workspace = true }
+
+
+[lints]
+workspace = true
+
+
+[lib]
+doctest = false
+
+
+[features]
+default = ["lfs"]
+lfs = ["dep:odf-storage-lfs"]
+http = ["dep:odf-storage-http"]
+s3 = ["dep:odf-storage-s3"]
+testing = ["dep:mockall"]
+
+
+[dependencies]
+internal-error = { workspace = true }
+file-utils = { workspace = true }
+odf-dataset = { workspace = true }
+odf-data-utils = { workspace = true }
+odf-metadata = { workspace = true }
+odf-storage = { workspace = true }
+odf-storage-http = { optional = true, workspace = true }
+odf-storage-lfs = { optional = true, workspace = true }
+odf-storage-s3 = { optional = true, workspace = true }
+s3-utils = { workspace = true }
+
+async-stream = "0.3"
+async-trait = "0.1"
+chrono = { version = "0.4", default-features = false}
+dill = { version = "0.11", default-features = false }
+http = { version = "1", default-features = false }
+hickory-resolver = "0.24"
+mockall = { optional = true, version = "0.13", default-features = false }
+regex = { version = "1", default-features = false }
+reqwest = { version = "0.12", default-features = false }
+thiserror = { version = "2", default-features = false }
+tokio = { version = "1", default-features = false }
+tokio-stream = { version = "0.1", default-features = false }
+tracing = "0.1"
+serde_yaml = "0.9"
+url = { version = "2", default-features = false }
+
+
+[dev-dependencies]
+odf = { workspace = true, features = ["arrow", "lfs", "testing"]}
+
+mockall = { version = "0.13", default-features = false }
+tempfile = "3"
+thiserror = { version = "2", default-features = false }
+test-log = { version = "0.2", features = ["trace"] }

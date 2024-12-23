@@ -14,14 +14,7 @@ use dill::{component, interface};
 use internal_error::ResultIntoInternal;
 use kamu_core::{
     AppendDatasetMetadataBatchUseCase,
-    AppendError,
-    AppendOpts,
-    BlockRef,
-    Dataset,
     DatasetLifecycleMessage,
-    GetSummaryOpts,
-    HashedMetadataBlock,
-    SetRefOpts,
     MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
 };
 use messaging_outbox::{Outbox, OutboxExt};
@@ -50,10 +43,10 @@ impl AppendDatasetMetadataBatchUseCase for AppendDatasetMetadataBatchUseCaseImpl
     )]
     async fn execute(
         &self,
-        dataset: &dyn Dataset,
-        new_blocks: VecDeque<HashedMetadataBlock>,
+        dataset: &dyn odf::Dataset,
+        new_blocks: VecDeque<odf::dataset::HashedMetadataBlock>,
         force_update_if_diverged: bool,
-    ) -> Result<(), AppendError> {
+    ) -> Result<(), odf::dataset::AppendError> {
         if new_blocks.is_empty() {
             return Ok(());
         }
@@ -63,12 +56,12 @@ impl AppendDatasetMetadataBatchUseCase for AppendDatasetMetadataBatchUseCaseImpl
 
         let metadata_chain = dataset.as_metadata_chain();
 
-        let mut new_upstream_ids: Vec<opendatafabric::DatasetID> = vec![];
+        let mut new_upstream_ids: Vec<odf::DatasetID> = vec![];
 
         for (hash, block) in new_blocks {
             tracing::debug!(sequence_numer = %block.sequence_number, hash = %hash, "Appending block");
 
-            if let opendatafabric::MetadataEvent::SetTransform(transform) = &block.event {
+            if let odf::MetadataEvent::SetTransform(transform) = &block.event {
                 // Collect only the latest upstream dataset IDs
                 new_upstream_ids.clear();
                 for new_input in &transform.inputs {
@@ -85,10 +78,10 @@ impl AppendDatasetMetadataBatchUseCase for AppendDatasetMetadataBatchUseCaseImpl
             metadata_chain
                 .append(
                     block,
-                    AppendOpts {
+                    odf::dataset::AppendOpts {
                         update_ref: None,
                         expected_hash: Some(&hash),
-                        ..AppendOpts::default()
+                        ..odf::dataset::AppendOpts::default()
                     },
                 )
                 .await?;
@@ -96,9 +89,9 @@ impl AppendDatasetMetadataBatchUseCase for AppendDatasetMetadataBatchUseCaseImpl
 
         metadata_chain
             .set_ref(
-                &BlockRef::Head,
+                &odf::BlockRef::Head,
                 &new_head,
-                SetRefOpts {
+                odf::dataset::SetRefOpts {
                     validate_block_present: false,
                     check_ref_is: if force_update_if_diverged {
                         None
@@ -111,7 +104,7 @@ impl AppendDatasetMetadataBatchUseCase for AppendDatasetMetadataBatchUseCaseImpl
 
         if !new_upstream_ids.is_empty() {
             let summary = dataset
-                .get_summary(GetSummaryOpts::default())
+                .get_summary(odf::dataset::GetSummaryOpts::default())
                 .await
                 .int_err()?;
 

@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use event_sourcing::LoadError;
-use kamu_core::DatasetNotFoundError;
 use tokio_stream::Stream;
 
 use crate::*;
@@ -73,7 +72,7 @@ pub enum CancelTaskError {
 #[derive(thiserror::Error, Debug)]
 pub enum ListTasksByDatasetError {
     #[error(transparent)]
-    DatasetNotFound(#[from] DatasetNotFoundError),
+    DatasetNotFound(#[from] odf::dataset::DatasetNotFoundError),
     #[error(transparent)]
     Internal(#[from] InternalError),
 }

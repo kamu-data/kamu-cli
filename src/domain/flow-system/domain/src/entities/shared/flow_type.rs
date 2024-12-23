@@ -30,12 +30,12 @@ impl DatasetFlowType {
         ]
     }
 
-    pub fn dataset_kind_restriction(&self) -> Option<opendatafabric::DatasetKind> {
+    pub fn dataset_kind_restriction(&self) -> Option<odf::DatasetKind> {
         match self {
             DatasetFlowType::Ingest | DatasetFlowType::HardCompaction => {
-                Some(opendatafabric::DatasetKind::Root)
+                Some(odf::DatasetKind::Root)
             }
-            DatasetFlowType::ExecuteTransform => Some(opendatafabric::DatasetKind::Derivative),
+            DatasetFlowType::ExecuteTransform => Some(odf::DatasetKind::Derivative),
             DatasetFlowType::Reset => None,
         }
     }

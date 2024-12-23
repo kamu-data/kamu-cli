@@ -17,7 +17,6 @@
 #![allow(clippy::pedantic)]
 
 use chrono::{DateTime, Utc};
-use opendatafabric as odf;
 
 use crate::prelude::*;
 use crate::queries::Dataset;
@@ -37,8 +36,8 @@ pub struct AddData {
     pub new_source_state: Option<SourceState>,
 }
 
-impl From<odf::AddData> for AddData {
-    fn from(v: odf::AddData) -> Self {
+impl From<odf::metadata::AddData> for AddData {
+    fn from(v: odf::metadata::AddData) -> Self {
         Self {
             prev_checkpoint: v.prev_checkpoint.map(Into::into),
             prev_offset: v.prev_offset.map(Into::into),
@@ -63,8 +62,8 @@ pub struct AddPushSource {
     pub merge: MergeStrategy,
 }
 
-impl From<odf::AddPushSource> for AddPushSource {
-    fn from(v: odf::AddPushSource) -> Self {
+impl From<odf::metadata::AddPushSource> for AddPushSource {
+    fn from(v: odf::metadata::AddPushSource) -> Self {
         Self {
             source_name: v.source_name.into(),
             read: v.read.into(),
@@ -85,8 +84,8 @@ pub struct AttachmentEmbedded {
     pub content: String,
 }
 
-impl From<odf::AttachmentEmbedded> for AttachmentEmbedded {
-    fn from(v: odf::AttachmentEmbedded) -> Self {
+impl From<odf::metadata::AttachmentEmbedded> for AttachmentEmbedded {
+    fn from(v: odf::metadata::AttachmentEmbedded) -> Self {
         Self {
             path: v.path.into(),
             content: v.content.into(),
@@ -104,10 +103,10 @@ pub enum Attachments {
     Embedded(AttachmentsEmbedded),
 }
 
-impl From<odf::Attachments> for Attachments {
-    fn from(v: odf::Attachments) -> Self {
+impl From<odf::metadata::Attachments> for Attachments {
+    fn from(v: odf::metadata::Attachments) -> Self {
         match v {
-            odf::Attachments::Embedded(v) => Self::Embedded(v.into()),
+            odf::metadata::Attachments::Embedded(v) => Self::Embedded(v.into()),
         }
     }
 }
@@ -117,8 +116,8 @@ pub struct AttachmentsEmbedded {
     pub items: Vec<AttachmentEmbedded>,
 }
 
-impl From<odf::AttachmentsEmbedded> for AttachmentsEmbedded {
-    fn from(v: odf::AttachmentsEmbedded) -> Self {
+impl From<odf::metadata::AttachmentsEmbedded> for AttachmentsEmbedded {
+    fn from(v: odf::metadata::AttachmentsEmbedded) -> Self {
         Self {
             items: v.items.into_iter().map(Into::into).collect(),
         }
@@ -180,20 +179,20 @@ pub enum DatasetKind {
     Derivative,
 }
 
-impl From<odf::DatasetKind> for DatasetKind {
-    fn from(v: odf::DatasetKind) -> Self {
+impl From<odf::metadata::DatasetKind> for DatasetKind {
+    fn from(v: odf::metadata::DatasetKind) -> Self {
         match v {
-            odf::DatasetKind::Root => Self::Root,
-            odf::DatasetKind::Derivative => Self::Derivative,
+            odf::metadata::DatasetKind::Root => Self::Root,
+            odf::metadata::DatasetKind::Derivative => Self::Derivative,
         }
     }
 }
 
-impl Into<odf::DatasetKind> for DatasetKind {
-    fn into(self) -> odf::DatasetKind {
+impl Into<odf::metadata::DatasetKind> for DatasetKind {
+    fn into(self) -> odf::metadata::DatasetKind {
         match self {
-            Self::Root => odf::DatasetKind::Root,
-            Self::Derivative => odf::DatasetKind::Derivative,
+            Self::Root => odf::metadata::DatasetKind::Root,
+            Self::Derivative => odf::metadata::DatasetKind::Derivative,
         }
     }
 }
@@ -210,8 +209,8 @@ pub struct DatasetSnapshot {
     pub metadata: Vec<MetadataEvent>,
 }
 
-impl From<odf::DatasetSnapshot> for DatasetSnapshot {
-    fn from(v: odf::DatasetSnapshot) -> Self {
+impl From<odf::metadata::DatasetSnapshot> for DatasetSnapshot {
+    fn from(v: odf::metadata::DatasetSnapshot) -> Self {
         Self {
             name: v.name.into(),
             kind: v.kind.into(),
@@ -233,8 +232,8 @@ pub struct DatasetVocabulary {
     pub event_time_column: String,
 }
 
-impl From<odf::DatasetVocabulary> for DatasetVocabulary {
-    fn from(v: odf::DatasetVocabulary) -> Self {
+impl From<odf::metadata::DatasetVocabulary> for DatasetVocabulary {
+    fn from(v: odf::metadata::DatasetVocabulary) -> Self {
         Self {
             offset_column: v.offset_column.into(),
             operation_type_column: v.operation_type_column.into(),
@@ -254,8 +253,8 @@ pub struct DisablePollingSource {
     pub _dummy: Option<String>,
 }
 
-impl From<odf::DisablePollingSource> for DisablePollingSource {
-    fn from(v: odf::DisablePollingSource) -> Self {
+impl From<odf::metadata::DisablePollingSource> for DisablePollingSource {
+    fn from(v: odf::metadata::DisablePollingSource) -> Self {
         Self { _dummy: None }
     }
 }
@@ -270,8 +269,8 @@ pub struct DisablePushSource {
     pub source_name: String,
 }
 
-impl From<odf::DisablePushSource> for DisablePushSource {
-    fn from(v: odf::DisablePushSource) -> Self {
+impl From<odf::metadata::DisablePushSource> for DisablePushSource {
+    fn from(v: odf::metadata::DisablePushSource) -> Self {
         Self {
             source_name: v.source_name.into(),
         }
@@ -289,8 +288,8 @@ pub struct EnvVar {
     pub value: Option<String>,
 }
 
-impl From<odf::EnvVar> for EnvVar {
-    fn from(v: odf::EnvVar) -> Self {
+impl From<odf::metadata::EnvVar> for EnvVar {
+    fn from(v: odf::metadata::EnvVar) -> Self {
         Self {
             name: v.name.into(),
             value: v.value.map(Into::into),
@@ -310,12 +309,12 @@ pub enum EventTimeSource {
     FromSystemTime(EventTimeSourceFromSystemTime),
 }
 
-impl From<odf::EventTimeSource> for EventTimeSource {
-    fn from(v: odf::EventTimeSource) -> Self {
+impl From<odf::metadata::EventTimeSource> for EventTimeSource {
+    fn from(v: odf::metadata::EventTimeSource) -> Self {
         match v {
-            odf::EventTimeSource::FromMetadata(v) => Self::FromMetadata(v.into()),
-            odf::EventTimeSource::FromPath(v) => Self::FromPath(v.into()),
-            odf::EventTimeSource::FromSystemTime(v) => Self::FromSystemTime(v.into()),
+            odf::metadata::EventTimeSource::FromMetadata(v) => Self::FromMetadata(v.into()),
+            odf::metadata::EventTimeSource::FromPath(v) => Self::FromPath(v.into()),
+            odf::metadata::EventTimeSource::FromSystemTime(v) => Self::FromSystemTime(v.into()),
         }
     }
 }
@@ -325,8 +324,8 @@ pub struct EventTimeSourceFromMetadata {
     pub _dummy: Option<String>,
 }
 
-impl From<odf::EventTimeSourceFromMetadata> for EventTimeSourceFromMetadata {
-    fn from(v: odf::EventTimeSourceFromMetadata) -> Self {
+impl From<odf::metadata::EventTimeSourceFromMetadata> for EventTimeSourceFromMetadata {
+    fn from(v: odf::metadata::EventTimeSourceFromMetadata) -> Self {
         Self { _dummy: None }
     }
 }
@@ -337,8 +336,8 @@ pub struct EventTimeSourceFromPath {
     pub timestamp_format: Option<String>,
 }
 
-impl From<odf::EventTimeSourceFromPath> for EventTimeSourceFromPath {
-    fn from(v: odf::EventTimeSourceFromPath) -> Self {
+impl From<odf::metadata::EventTimeSourceFromPath> for EventTimeSourceFromPath {
+    fn from(v: odf::metadata::EventTimeSourceFromPath) -> Self {
         Self {
             pattern: v.pattern.into(),
             timestamp_format: v.timestamp_format.map(Into::into),
@@ -351,8 +350,8 @@ pub struct EventTimeSourceFromSystemTime {
     pub _dummy: Option<String>,
 }
 
-impl From<odf::EventTimeSourceFromSystemTime> for EventTimeSourceFromSystemTime {
-    fn from(v: odf::EventTimeSourceFromSystemTime) -> Self {
+impl From<odf::metadata::EventTimeSourceFromSystemTime> for EventTimeSourceFromSystemTime {
+    fn from(v: odf::metadata::EventTimeSourceFromSystemTime) -> Self {
         Self { _dummy: None }
     }
 }
@@ -372,8 +371,8 @@ pub struct ExecuteTransform {
     pub new_watermark: Option<DateTime<Utc>>,
 }
 
-impl From<odf::ExecuteTransform> for ExecuteTransform {
-    fn from(v: odf::ExecuteTransform) -> Self {
+impl From<odf::metadata::ExecuteTransform> for ExecuteTransform {
+    fn from(v: odf::metadata::ExecuteTransform) -> Self {
         Self {
             query_inputs: v.query_inputs.into_iter().map(Into::into).collect(),
             prev_checkpoint: v.prev_checkpoint.map(Into::into),
@@ -399,8 +398,8 @@ pub struct ExecuteTransformInput {
     pub new_offset: Option<u64>,
 }
 
-impl From<odf::ExecuteTransformInput> for ExecuteTransformInput {
-    fn from(v: odf::ExecuteTransformInput) -> Self {
+impl From<odf::metadata::ExecuteTransformInput> for ExecuteTransformInput {
+    fn from(v: odf::metadata::ExecuteTransformInput) -> Self {
         Self {
             dataset_id: v.dataset_id.into(),
             prev_block_hash: v.prev_block_hash.map(Into::into),
@@ -425,14 +424,14 @@ pub enum FetchStep {
     EthereumLogs(FetchStepEthereumLogs),
 }
 
-impl From<odf::FetchStep> for FetchStep {
-    fn from(v: odf::FetchStep) -> Self {
+impl From<odf::metadata::FetchStep> for FetchStep {
+    fn from(v: odf::metadata::FetchStep) -> Self {
         match v {
-            odf::FetchStep::Url(v) => Self::Url(v.into()),
-            odf::FetchStep::FilesGlob(v) => Self::FilesGlob(v.into()),
-            odf::FetchStep::Container(v) => Self::Container(v.into()),
-            odf::FetchStep::Mqtt(v) => Self::Mqtt(v.into()),
-            odf::FetchStep::EthereumLogs(v) => Self::EthereumLogs(v.into()),
+            odf::metadata::FetchStep::Url(v) => Self::Url(v.into()),
+            odf::metadata::FetchStep::FilesGlob(v) => Self::FilesGlob(v.into()),
+            odf::metadata::FetchStep::Container(v) => Self::Container(v.into()),
+            odf::metadata::FetchStep::Mqtt(v) => Self::Mqtt(v.into()),
+            odf::metadata::FetchStep::EthereumLogs(v) => Self::EthereumLogs(v.into()),
         }
     }
 }
@@ -445,8 +444,8 @@ pub struct FetchStepUrl {
     pub headers: Option<Vec<RequestHeader>>,
 }
 
-impl From<odf::FetchStepUrl> for FetchStepUrl {
-    fn from(v: odf::FetchStepUrl) -> Self {
+impl From<odf::metadata::FetchStepUrl> for FetchStepUrl {
+    fn from(v: odf::metadata::FetchStepUrl) -> Self {
         Self {
             url: v.url.into(),
             event_time: v.event_time.map(Into::into),
@@ -464,8 +463,8 @@ pub struct FetchStepFilesGlob {
     pub order: Option<SourceOrdering>,
 }
 
-impl From<odf::FetchStepFilesGlob> for FetchStepFilesGlob {
-    fn from(v: odf::FetchStepFilesGlob) -> Self {
+impl From<odf::metadata::FetchStepFilesGlob> for FetchStepFilesGlob {
+    fn from(v: odf::metadata::FetchStepFilesGlob) -> Self {
         Self {
             path: v.path.into(),
             event_time: v.event_time.map(Into::into),
@@ -483,8 +482,8 @@ pub struct FetchStepContainer {
     pub env: Option<Vec<EnvVar>>,
 }
 
-impl From<odf::FetchStepContainer> for FetchStepContainer {
-    fn from(v: odf::FetchStepContainer) -> Self {
+impl From<odf::metadata::FetchStepContainer> for FetchStepContainer {
+    fn from(v: odf::metadata::FetchStepContainer) -> Self {
         Self {
             image: v.image.into(),
             command: v.command.map(|v| v.into_iter().map(Into::into).collect()),
@@ -503,8 +502,8 @@ pub struct FetchStepMqtt {
     pub topics: Vec<MqttTopicSubscription>,
 }
 
-impl From<odf::FetchStepMqtt> for FetchStepMqtt {
-    fn from(v: odf::FetchStepMqtt) -> Self {
+impl From<odf::metadata::FetchStepMqtt> for FetchStepMqtt {
+    fn from(v: odf::metadata::FetchStepMqtt) -> Self {
         Self {
             host: v.host.into(),
             port: v.port.into(),
@@ -523,8 +522,8 @@ pub struct FetchStepEthereumLogs {
     pub signature: Option<String>,
 }
 
-impl From<odf::FetchStepEthereumLogs> for FetchStepEthereumLogs {
-    fn from(v: odf::FetchStepEthereumLogs) -> Self {
+impl From<odf::metadata::FetchStepEthereumLogs> for FetchStepEthereumLogs {
+    fn from(v: odf::metadata::FetchStepEthereumLogs) -> Self {
         Self {
             chain_id: v.chain_id.map(Into::into),
             node_url: v.node_url.map(Into::into),
@@ -540,20 +539,20 @@ pub enum SourceOrdering {
     ByName,
 }
 
-impl From<odf::SourceOrdering> for SourceOrdering {
-    fn from(v: odf::SourceOrdering) -> Self {
+impl From<odf::metadata::SourceOrdering> for SourceOrdering {
+    fn from(v: odf::metadata::SourceOrdering) -> Self {
         match v {
-            odf::SourceOrdering::ByEventTime => Self::ByEventTime,
-            odf::SourceOrdering::ByName => Self::ByName,
+            odf::metadata::SourceOrdering::ByEventTime => Self::ByEventTime,
+            odf::metadata::SourceOrdering::ByName => Self::ByName,
         }
     }
 }
 
-impl Into<odf::SourceOrdering> for SourceOrdering {
-    fn into(self) -> odf::SourceOrdering {
+impl Into<odf::metadata::SourceOrdering> for SourceOrdering {
+    fn into(self) -> odf::metadata::SourceOrdering {
         match self {
-            Self::ByEventTime => odf::SourceOrdering::ByEventTime,
-            Self::ByName => odf::SourceOrdering::ByName,
+            Self::ByEventTime => odf::metadata::SourceOrdering::ByEventTime,
+            Self::ByName => odf::metadata::SourceOrdering::ByName,
         }
     }
 }
@@ -570,12 +569,12 @@ pub enum MergeStrategy {
     Snapshot(MergeStrategySnapshot),
 }
 
-impl From<odf::MergeStrategy> for MergeStrategy {
-    fn from(v: odf::MergeStrategy) -> Self {
+impl From<odf::metadata::MergeStrategy> for MergeStrategy {
+    fn from(v: odf::metadata::MergeStrategy) -> Self {
         match v {
-            odf::MergeStrategy::Append(v) => Self::Append(v.into()),
-            odf::MergeStrategy::Ledger(v) => Self::Ledger(v.into()),
-            odf::MergeStrategy::Snapshot(v) => Self::Snapshot(v.into()),
+            odf::metadata::MergeStrategy::Append(v) => Self::Append(v.into()),
+            odf::metadata::MergeStrategy::Ledger(v) => Self::Ledger(v.into()),
+            odf::metadata::MergeStrategy::Snapshot(v) => Self::Snapshot(v.into()),
         }
     }
 }
@@ -585,8 +584,8 @@ pub struct MergeStrategyAppend {
     pub _dummy: Option<String>,
 }
 
-impl From<odf::MergeStrategyAppend> for MergeStrategyAppend {
-    fn from(v: odf::MergeStrategyAppend) -> Self {
+impl From<odf::metadata::MergeStrategyAppend> for MergeStrategyAppend {
+    fn from(v: odf::metadata::MergeStrategyAppend) -> Self {
         Self { _dummy: None }
     }
 }
@@ -596,8 +595,8 @@ pub struct MergeStrategyLedger {
     pub primary_key: Vec<String>,
 }
 
-impl From<odf::MergeStrategyLedger> for MergeStrategyLedger {
-    fn from(v: odf::MergeStrategyLedger) -> Self {
+impl From<odf::metadata::MergeStrategyLedger> for MergeStrategyLedger {
+    fn from(v: odf::metadata::MergeStrategyLedger) -> Self {
         Self {
             primary_key: v.primary_key.into_iter().map(Into::into).collect(),
         }
@@ -610,8 +609,8 @@ pub struct MergeStrategySnapshot {
     pub compare_columns: Option<Vec<String>>,
 }
 
-impl From<odf::MergeStrategySnapshot> for MergeStrategySnapshot {
-    fn from(v: odf::MergeStrategySnapshot) -> Self {
+impl From<odf::metadata::MergeStrategySnapshot> for MergeStrategySnapshot {
+    fn from(v: odf::metadata::MergeStrategySnapshot) -> Self {
         Self {
             primary_key: v.primary_key.into_iter().map(Into::into).collect(),
             compare_columns: v
@@ -634,8 +633,8 @@ pub struct MetadataBlock {
     pub event: MetadataEvent,
 }
 
-impl From<odf::MetadataBlock> for MetadataBlock {
-    fn from(v: odf::MetadataBlock) -> Self {
+impl From<odf::metadata::MetadataBlock> for MetadataBlock {
+    fn from(v: odf::metadata::MetadataBlock) -> Self {
         Self {
             system_time: v.system_time.into(),
             prev_block_hash: v.prev_block_hash.map(Into::into),
@@ -667,22 +666,24 @@ pub enum MetadataEvent {
     DisablePollingSource(DisablePollingSource),
 }
 
-impl From<odf::MetadataEvent> for MetadataEvent {
-    fn from(v: odf::MetadataEvent) -> Self {
+impl From<odf::metadata::MetadataEvent> for MetadataEvent {
+    fn from(v: odf::metadata::MetadataEvent) -> Self {
         match v {
-            odf::MetadataEvent::AddData(v) => Self::AddData(v.into()),
-            odf::MetadataEvent::ExecuteTransform(v) => Self::ExecuteTransform(v.into()),
-            odf::MetadataEvent::Seed(v) => Self::Seed(v.into()),
-            odf::MetadataEvent::SetPollingSource(v) => Self::SetPollingSource(v.into()),
-            odf::MetadataEvent::SetTransform(v) => Self::SetTransform(v.into()),
-            odf::MetadataEvent::SetVocab(v) => Self::SetVocab(v.into()),
-            odf::MetadataEvent::SetAttachments(v) => Self::SetAttachments(v.into()),
-            odf::MetadataEvent::SetInfo(v) => Self::SetInfo(v.into()),
-            odf::MetadataEvent::SetLicense(v) => Self::SetLicense(v.into()),
-            odf::MetadataEvent::SetDataSchema(v) => Self::SetDataSchema(v.into()),
-            odf::MetadataEvent::AddPushSource(v) => Self::AddPushSource(v.into()),
-            odf::MetadataEvent::DisablePushSource(v) => Self::DisablePushSource(v.into()),
-            odf::MetadataEvent::DisablePollingSource(v) => Self::DisablePollingSource(v.into()),
+            odf::metadata::MetadataEvent::AddData(v) => Self::AddData(v.into()),
+            odf::metadata::MetadataEvent::ExecuteTransform(v) => Self::ExecuteTransform(v.into()),
+            odf::metadata::MetadataEvent::Seed(v) => Self::Seed(v.into()),
+            odf::metadata::MetadataEvent::SetPollingSource(v) => Self::SetPollingSource(v.into()),
+            odf::metadata::MetadataEvent::SetTransform(v) => Self::SetTransform(v.into()),
+            odf::metadata::MetadataEvent::SetVocab(v) => Self::SetVocab(v.into()),
+            odf::metadata::MetadataEvent::SetAttachments(v) => Self::SetAttachments(v.into()),
+            odf::metadata::MetadataEvent::SetInfo(v) => Self::SetInfo(v.into()),
+            odf::metadata::MetadataEvent::SetLicense(v) => Self::SetLicense(v.into()),
+            odf::metadata::MetadataEvent::SetDataSchema(v) => Self::SetDataSchema(v.into()),
+            odf::metadata::MetadataEvent::AddPushSource(v) => Self::AddPushSource(v.into()),
+            odf::metadata::MetadataEvent::DisablePushSource(v) => Self::DisablePushSource(v.into()),
+            odf::metadata::MetadataEvent::DisablePollingSource(v) => {
+                Self::DisablePollingSource(v.into())
+            }
         }
     }
 }
@@ -699,22 +700,22 @@ pub enum MqttQos {
     ExactlyOnce,
 }
 
-impl From<odf::MqttQos> for MqttQos {
-    fn from(v: odf::MqttQos) -> Self {
+impl From<odf::metadata::MqttQos> for MqttQos {
+    fn from(v: odf::metadata::MqttQos) -> Self {
         match v {
-            odf::MqttQos::AtMostOnce => Self::AtMostOnce,
-            odf::MqttQos::AtLeastOnce => Self::AtLeastOnce,
-            odf::MqttQos::ExactlyOnce => Self::ExactlyOnce,
+            odf::metadata::MqttQos::AtMostOnce => Self::AtMostOnce,
+            odf::metadata::MqttQos::AtLeastOnce => Self::AtLeastOnce,
+            odf::metadata::MqttQos::ExactlyOnce => Self::ExactlyOnce,
         }
     }
 }
 
-impl Into<odf::MqttQos> for MqttQos {
-    fn into(self) -> odf::MqttQos {
+impl Into<odf::metadata::MqttQos> for MqttQos {
+    fn into(self) -> odf::metadata::MqttQos {
         match self {
-            Self::AtMostOnce => odf::MqttQos::AtMostOnce,
-            Self::AtLeastOnce => odf::MqttQos::AtLeastOnce,
-            Self::ExactlyOnce => odf::MqttQos::ExactlyOnce,
+            Self::AtMostOnce => odf::metadata::MqttQos::AtMostOnce,
+            Self::AtLeastOnce => odf::metadata::MqttQos::AtLeastOnce,
+            Self::ExactlyOnce => odf::metadata::MqttQos::ExactlyOnce,
         }
     }
 }
@@ -730,8 +731,8 @@ pub struct MqttTopicSubscription {
     pub qos: Option<MqttQos>,
 }
 
-impl From<odf::MqttTopicSubscription> for MqttTopicSubscription {
-    fn from(v: odf::MqttTopicSubscription) -> Self {
+impl From<odf::metadata::MqttTopicSubscription> for MqttTopicSubscription {
+    fn from(v: odf::metadata::MqttTopicSubscription) -> Self {
         Self {
             path: v.path.into(),
             qos: v.qos.map(Into::into),
@@ -750,8 +751,8 @@ pub struct OffsetInterval {
     pub end: u64,
 }
 
-impl From<odf::OffsetInterval> for OffsetInterval {
-    fn from(v: odf::OffsetInterval) -> Self {
+impl From<odf::metadata::OffsetInterval> for OffsetInterval {
+    fn from(v: odf::metadata::OffsetInterval) -> Self {
         Self {
             start: v.start.into(),
             end: v.end.into(),
@@ -770,11 +771,11 @@ pub enum PrepStep {
     Pipe(PrepStepPipe),
 }
 
-impl From<odf::PrepStep> for PrepStep {
-    fn from(v: odf::PrepStep) -> Self {
+impl From<odf::metadata::PrepStep> for PrepStep {
+    fn from(v: odf::metadata::PrepStep) -> Self {
         match v {
-            odf::PrepStep::Decompress(v) => Self::Decompress(v.into()),
-            odf::PrepStep::Pipe(v) => Self::Pipe(v.into()),
+            odf::metadata::PrepStep::Decompress(v) => Self::Decompress(v.into()),
+            odf::metadata::PrepStep::Pipe(v) => Self::Pipe(v.into()),
         }
     }
 }
@@ -785,8 +786,8 @@ pub struct PrepStepDecompress {
     pub sub_path: Option<String>,
 }
 
-impl From<odf::PrepStepDecompress> for PrepStepDecompress {
-    fn from(v: odf::PrepStepDecompress) -> Self {
+impl From<odf::metadata::PrepStepDecompress> for PrepStepDecompress {
+    fn from(v: odf::metadata::PrepStepDecompress) -> Self {
         Self {
             format: v.format.into(),
             sub_path: v.sub_path.map(Into::into),
@@ -799,8 +800,8 @@ pub struct PrepStepPipe {
     pub command: Vec<String>,
 }
 
-impl From<odf::PrepStepPipe> for PrepStepPipe {
-    fn from(v: odf::PrepStepPipe) -> Self {
+impl From<odf::metadata::PrepStepPipe> for PrepStepPipe {
+    fn from(v: odf::metadata::PrepStepPipe) -> Self {
         Self {
             command: v.command.into_iter().map(Into::into).collect(),
         }
@@ -813,20 +814,20 @@ pub enum CompressionFormat {
     Zip,
 }
 
-impl From<odf::CompressionFormat> for CompressionFormat {
-    fn from(v: odf::CompressionFormat) -> Self {
+impl From<odf::metadata::CompressionFormat> for CompressionFormat {
+    fn from(v: odf::metadata::CompressionFormat) -> Self {
         match v {
-            odf::CompressionFormat::Gzip => Self::Gzip,
-            odf::CompressionFormat::Zip => Self::Zip,
+            odf::metadata::CompressionFormat::Gzip => Self::Gzip,
+            odf::metadata::CompressionFormat::Zip => Self::Zip,
         }
     }
 }
 
-impl Into<odf::CompressionFormat> for CompressionFormat {
-    fn into(self) -> odf::CompressionFormat {
+impl Into<odf::metadata::CompressionFormat> for CompressionFormat {
+    fn into(self) -> odf::metadata::CompressionFormat {
         match self {
-            Self::Gzip => odf::CompressionFormat::Gzip,
-            Self::Zip => odf::CompressionFormat::Zip,
+            Self::Gzip => odf::metadata::CompressionFormat::Gzip,
+            Self::Zip => odf::metadata::CompressionFormat::Zip,
         }
     }
 }
@@ -843,8 +844,8 @@ pub struct RawQueryRequest {
     pub output_data_path: OSPath,
 }
 
-impl From<odf::RawQueryRequest> for RawQueryRequest {
-    fn from(v: odf::RawQueryRequest) -> Self {
+impl From<odf::metadata::RawQueryRequest> for RawQueryRequest {
+    fn from(v: odf::metadata::RawQueryRequest) -> Self {
         Self {
             input_data_paths: v.input_data_paths.into_iter().map(Into::into).collect(),
             transform: v.transform.into(),
@@ -866,13 +867,13 @@ pub enum RawQueryResponse {
     InternalError(RawQueryResponseInternalError),
 }
 
-impl From<odf::RawQueryResponse> for RawQueryResponse {
-    fn from(v: odf::RawQueryResponse) -> Self {
+impl From<odf::metadata::RawQueryResponse> for RawQueryResponse {
+    fn from(v: odf::metadata::RawQueryResponse) -> Self {
         match v {
-            odf::RawQueryResponse::Progress(v) => Self::Progress(v.into()),
-            odf::RawQueryResponse::Success(v) => Self::Success(v.into()),
-            odf::RawQueryResponse::InvalidQuery(v) => Self::InvalidQuery(v.into()),
-            odf::RawQueryResponse::InternalError(v) => Self::InternalError(v.into()),
+            odf::metadata::RawQueryResponse::Progress(v) => Self::Progress(v.into()),
+            odf::metadata::RawQueryResponse::Success(v) => Self::Success(v.into()),
+            odf::metadata::RawQueryResponse::InvalidQuery(v) => Self::InvalidQuery(v.into()),
+            odf::metadata::RawQueryResponse::InternalError(v) => Self::InternalError(v.into()),
         }
     }
 }
@@ -882,8 +883,8 @@ pub struct RawQueryResponseProgress {
     pub _dummy: Option<String>,
 }
 
-impl From<odf::RawQueryResponseProgress> for RawQueryResponseProgress {
-    fn from(v: odf::RawQueryResponseProgress) -> Self {
+impl From<odf::metadata::RawQueryResponseProgress> for RawQueryResponseProgress {
+    fn from(v: odf::metadata::RawQueryResponseProgress) -> Self {
         Self { _dummy: None }
     }
 }
@@ -893,8 +894,8 @@ pub struct RawQueryResponseSuccess {
     pub num_records: u64,
 }
 
-impl From<odf::RawQueryResponseSuccess> for RawQueryResponseSuccess {
-    fn from(v: odf::RawQueryResponseSuccess) -> Self {
+impl From<odf::metadata::RawQueryResponseSuccess> for RawQueryResponseSuccess {
+    fn from(v: odf::metadata::RawQueryResponseSuccess) -> Self {
         Self {
             num_records: v.num_records.into(),
         }
@@ -906,8 +907,8 @@ pub struct RawQueryResponseInvalidQuery {
     pub message: String,
 }
 
-impl From<odf::RawQueryResponseInvalidQuery> for RawQueryResponseInvalidQuery {
-    fn from(v: odf::RawQueryResponseInvalidQuery) -> Self {
+impl From<odf::metadata::RawQueryResponseInvalidQuery> for RawQueryResponseInvalidQuery {
+    fn from(v: odf::metadata::RawQueryResponseInvalidQuery) -> Self {
         Self {
             message: v.message.into(),
         }
@@ -920,8 +921,8 @@ pub struct RawQueryResponseInternalError {
     pub backtrace: Option<String>,
 }
 
-impl From<odf::RawQueryResponseInternalError> for RawQueryResponseInternalError {
-    fn from(v: odf::RawQueryResponseInternalError) -> Self {
+impl From<odf::metadata::RawQueryResponseInternalError> for RawQueryResponseInternalError {
+    fn from(v: odf::metadata::RawQueryResponseInternalError) -> Self {
         Self {
             message: v.message.into(),
             backtrace: v.backtrace.map(Into::into),
@@ -945,16 +946,16 @@ pub enum ReadStep {
     NdGeoJson(ReadStepNdGeoJson),
 }
 
-impl From<odf::ReadStep> for ReadStep {
-    fn from(v: odf::ReadStep) -> Self {
+impl From<odf::metadata::ReadStep> for ReadStep {
+    fn from(v: odf::metadata::ReadStep) -> Self {
         match v {
-            odf::ReadStep::Csv(v) => Self::Csv(v.into()),
-            odf::ReadStep::GeoJson(v) => Self::GeoJson(v.into()),
-            odf::ReadStep::EsriShapefile(v) => Self::EsriShapefile(v.into()),
-            odf::ReadStep::Parquet(v) => Self::Parquet(v.into()),
-            odf::ReadStep::Json(v) => Self::Json(v.into()),
-            odf::ReadStep::NdJson(v) => Self::NdJson(v.into()),
-            odf::ReadStep::NdGeoJson(v) => Self::NdGeoJson(v.into()),
+            odf::metadata::ReadStep::Csv(v) => Self::Csv(v.into()),
+            odf::metadata::ReadStep::GeoJson(v) => Self::GeoJson(v.into()),
+            odf::metadata::ReadStep::EsriShapefile(v) => Self::EsriShapefile(v.into()),
+            odf::metadata::ReadStep::Parquet(v) => Self::Parquet(v.into()),
+            odf::metadata::ReadStep::Json(v) => Self::Json(v.into()),
+            odf::metadata::ReadStep::NdJson(v) => Self::NdJson(v.into()),
+            odf::metadata::ReadStep::NdGeoJson(v) => Self::NdGeoJson(v.into()),
         }
     }
 }
@@ -973,8 +974,8 @@ pub struct ReadStepCsv {
     pub timestamp_format: Option<String>,
 }
 
-impl From<odf::ReadStepCsv> for ReadStepCsv {
-    fn from(v: odf::ReadStepCsv) -> Self {
+impl From<odf::metadata::ReadStepCsv> for ReadStepCsv {
+    fn from(v: odf::metadata::ReadStepCsv) -> Self {
         Self {
             schema: v.schema.map(|v| v.into_iter().map(Into::into).collect()),
             separator: v.separator.map(Into::into),
@@ -995,8 +996,8 @@ pub struct ReadStepGeoJson {
     pub schema: Option<Vec<String>>,
 }
 
-impl From<odf::ReadStepGeoJson> for ReadStepGeoJson {
-    fn from(v: odf::ReadStepGeoJson) -> Self {
+impl From<odf::metadata::ReadStepGeoJson> for ReadStepGeoJson {
+    fn from(v: odf::metadata::ReadStepGeoJson) -> Self {
         Self {
             schema: v.schema.map(|v| v.into_iter().map(Into::into).collect()),
         }
@@ -1009,8 +1010,8 @@ pub struct ReadStepEsriShapefile {
     pub sub_path: Option<String>,
 }
 
-impl From<odf::ReadStepEsriShapefile> for ReadStepEsriShapefile {
-    fn from(v: odf::ReadStepEsriShapefile) -> Self {
+impl From<odf::metadata::ReadStepEsriShapefile> for ReadStepEsriShapefile {
+    fn from(v: odf::metadata::ReadStepEsriShapefile) -> Self {
         Self {
             schema: v.schema.map(|v| v.into_iter().map(Into::into).collect()),
             sub_path: v.sub_path.map(Into::into),
@@ -1023,8 +1024,8 @@ pub struct ReadStepParquet {
     pub schema: Option<Vec<String>>,
 }
 
-impl From<odf::ReadStepParquet> for ReadStepParquet {
-    fn from(v: odf::ReadStepParquet) -> Self {
+impl From<odf::metadata::ReadStepParquet> for ReadStepParquet {
+    fn from(v: odf::metadata::ReadStepParquet) -> Self {
         Self {
             schema: v.schema.map(|v| v.into_iter().map(Into::into).collect()),
         }
@@ -1040,8 +1041,8 @@ pub struct ReadStepJson {
     pub timestamp_format: Option<String>,
 }
 
-impl From<odf::ReadStepJson> for ReadStepJson {
-    fn from(v: odf::ReadStepJson) -> Self {
+impl From<odf::metadata::ReadStepJson> for ReadStepJson {
+    fn from(v: odf::metadata::ReadStepJson) -> Self {
         Self {
             sub_path: v.sub_path.map(Into::into),
             schema: v.schema.map(|v| v.into_iter().map(Into::into).collect()),
@@ -1060,8 +1061,8 @@ pub struct ReadStepNdJson {
     pub timestamp_format: Option<String>,
 }
 
-impl From<odf::ReadStepNdJson> for ReadStepNdJson {
-    fn from(v: odf::ReadStepNdJson) -> Self {
+impl From<odf::metadata::ReadStepNdJson> for ReadStepNdJson {
+    fn from(v: odf::metadata::ReadStepNdJson) -> Self {
         Self {
             schema: v.schema.map(|v| v.into_iter().map(Into::into).collect()),
             date_format: v.date_format.map(Into::into),
@@ -1076,8 +1077,8 @@ pub struct ReadStepNdGeoJson {
     pub schema: Option<Vec<String>>,
 }
 
-impl From<odf::ReadStepNdGeoJson> for ReadStepNdGeoJson {
-    fn from(v: odf::ReadStepNdGeoJson) -> Self {
+impl From<odf::metadata::ReadStepNdGeoJson> for ReadStepNdGeoJson {
+    fn from(v: odf::metadata::ReadStepNdGeoJson) -> Self {
         Self {
             schema: v.schema.map(|v| v.into_iter().map(Into::into).collect()),
         }
@@ -1095,8 +1096,8 @@ pub struct RequestHeader {
     pub value: String,
 }
 
-impl From<odf::RequestHeader> for RequestHeader {
-    fn from(v: odf::RequestHeader) -> Self {
+impl From<odf::metadata::RequestHeader> for RequestHeader {
+    fn from(v: odf::metadata::RequestHeader) -> Self {
         Self {
             name: v.name.into(),
             value: v.value.into(),
@@ -1115,8 +1116,8 @@ pub struct Seed {
     pub dataset_kind: DatasetKind,
 }
 
-impl From<odf::Seed> for Seed {
-    fn from(v: odf::Seed) -> Self {
+impl From<odf::metadata::Seed> for Seed {
+    fn from(v: odf::metadata::Seed) -> Self {
         Self {
             dataset_id: v.dataset_id.into(),
             dataset_kind: v.dataset_kind.into(),
@@ -1134,8 +1135,8 @@ pub struct SetAttachments {
     pub attachments: Attachments,
 }
 
-impl From<odf::SetAttachments> for SetAttachments {
-    fn from(v: odf::SetAttachments) -> Self {
+impl From<odf::metadata::SetAttachments> for SetAttachments {
+    fn from(v: odf::metadata::SetAttachments) -> Self {
         Self {
             attachments: v.attachments.into(),
         }
@@ -1152,8 +1153,8 @@ pub struct SetDataSchema {
     pub schema: DataSchema,
 }
 
-impl From<odf::SetDataSchema> for SetDataSchema {
-    fn from(v: odf::SetDataSchema) -> Self {
+impl From<odf::metadata::SetDataSchema> for SetDataSchema {
+    fn from(v: odf::metadata::SetDataSchema) -> Self {
         // TODO: Error handling?
         // TODO: Externalize format decision?
         let arrow_schema = v.schema_as_arrow().unwrap();
@@ -1173,8 +1174,8 @@ pub struct SetInfo {
     pub keywords: Option<Vec<String>>,
 }
 
-impl From<odf::SetInfo> for SetInfo {
-    fn from(v: odf::SetInfo) -> Self {
+impl From<odf::metadata::SetInfo> for SetInfo {
+    fn from(v: odf::metadata::SetInfo) -> Self {
         Self {
             description: v.description.map(Into::into),
             keywords: v.keywords.map(|v| v.into_iter().map(Into::into).collect()),
@@ -1195,8 +1196,8 @@ pub struct SetLicense {
     pub website_url: String,
 }
 
-impl From<odf::SetLicense> for SetLicense {
-    fn from(v: odf::SetLicense) -> Self {
+impl From<odf::metadata::SetLicense> for SetLicense {
+    fn from(v: odf::metadata::SetLicense) -> Self {
         Self {
             short_name: v.short_name.into(),
             name: v.name.into(),
@@ -1220,8 +1221,8 @@ pub struct SetPollingSource {
     pub merge: MergeStrategy,
 }
 
-impl From<odf::SetPollingSource> for SetPollingSource {
-    fn from(v: odf::SetPollingSource) -> Self {
+impl From<odf::metadata::SetPollingSource> for SetPollingSource {
+    fn from(v: odf::metadata::SetPollingSource) -> Self {
         Self {
             fetch: v.fetch.into(),
             prepare: v.prepare.map(|v| v.into_iter().map(Into::into).collect()),
@@ -1243,8 +1244,8 @@ pub struct SetTransform {
     pub transform: Transform,
 }
 
-impl From<odf::SetTransform> for SetTransform {
-    fn from(v: odf::SetTransform) -> Self {
+impl From<odf::metadata::SetTransform> for SetTransform {
+    fn from(v: odf::metadata::SetTransform) -> Self {
         Self {
             inputs: v.inputs.into_iter().map(Into::into).collect(),
             transform: v.transform.into(),
@@ -1265,8 +1266,8 @@ pub struct SetVocab {
     pub event_time_column: Option<String>,
 }
 
-impl From<odf::SetVocab> for SetVocab {
-    fn from(v: odf::SetVocab) -> Self {
+impl From<odf::metadata::SetVocab> for SetVocab {
+    fn from(v: odf::metadata::SetVocab) -> Self {
         Self {
             offset_column: v.offset_column.map(Into::into),
             operation_type_column: v.operation_type_column.map(Into::into),
@@ -1286,10 +1287,10 @@ pub enum SourceCaching {
     Forever(SourceCachingForever),
 }
 
-impl From<odf::SourceCaching> for SourceCaching {
-    fn from(v: odf::SourceCaching) -> Self {
+impl From<odf::metadata::SourceCaching> for SourceCaching {
+    fn from(v: odf::metadata::SourceCaching) -> Self {
         match v {
-            odf::SourceCaching::Forever(v) => Self::Forever(v.into()),
+            odf::metadata::SourceCaching::Forever(v) => Self::Forever(v.into()),
         }
     }
 }
@@ -1299,8 +1300,8 @@ pub struct SourceCachingForever {
     pub _dummy: Option<String>,
 }
 
-impl From<odf::SourceCachingForever> for SourceCachingForever {
-    fn from(v: odf::SourceCachingForever) -> Self {
+impl From<odf::metadata::SourceCachingForever> for SourceCachingForever {
+    fn from(v: odf::metadata::SourceCachingForever) -> Self {
         Self { _dummy: None }
     }
 }
@@ -1317,8 +1318,8 @@ pub struct SourceState {
     pub value: String,
 }
 
-impl From<odf::SourceState> for SourceState {
-    fn from(v: odf::SourceState) -> Self {
+impl From<odf::metadata::SourceState> for SourceState {
+    fn from(v: odf::metadata::SourceState) -> Self {
         Self {
             source_name: v.source_name.into(),
             kind: v.kind.into(),
@@ -1338,8 +1339,8 @@ pub struct SqlQueryStep {
     pub query: String,
 }
 
-impl From<odf::SqlQueryStep> for SqlQueryStep {
-    fn from(v: odf::SqlQueryStep) -> Self {
+impl From<odf::metadata::SqlQueryStep> for SqlQueryStep {
+    fn from(v: odf::metadata::SqlQueryStep) -> Self {
         Self {
             alias: v.alias.map(Into::into),
             query: v.query.into(),
@@ -1358,8 +1359,8 @@ pub struct TemporalTable {
     pub primary_key: Vec<String>,
 }
 
-impl From<odf::TemporalTable> for TemporalTable {
-    fn from(v: odf::TemporalTable) -> Self {
+impl From<odf::metadata::TemporalTable> for TemporalTable {
+    fn from(v: odf::metadata::TemporalTable) -> Self {
         Self {
             name: v.name.into(),
             primary_key: v.primary_key.into_iter().map(Into::into).collect(),
@@ -1377,10 +1378,10 @@ pub enum Transform {
     Sql(TransformSql),
 }
 
-impl From<odf::Transform> for Transform {
-    fn from(v: odf::Transform) -> Self {
+impl From<odf::metadata::Transform> for Transform {
+    fn from(v: odf::metadata::Transform) -> Self {
         match v {
-            odf::Transform::Sql(v) => Self::Sql(v.into()),
+            odf::metadata::Transform::Sql(v) => Self::Sql(v.into()),
         }
     }
 }
@@ -1393,8 +1394,8 @@ pub struct TransformSql {
     pub temporal_tables: Option<Vec<TemporalTable>>,
 }
 
-impl From<odf::TransformSql> for TransformSql {
-    fn from(v: odf::TransformSql) -> Self {
+impl From<odf::metadata::TransformSql> for TransformSql {
+    fn from(v: odf::metadata::TransformSql) -> Self {
         let queries = if let Some(query) = v.query {
             vec![SqlQueryStep { alias: None, query }]
         } else {
@@ -1431,8 +1432,8 @@ impl TransformInput {
     }
 }
 
-impl From<odf::TransformInput> for TransformInput {
-    fn from(v: odf::TransformInput) -> Self {
+impl From<odf::metadata::TransformInput> for TransformInput {
+    fn from(v: odf::metadata::TransformInput) -> Self {
         Self {
             dataset_ref: v.dataset_ref.into(),
             alias: v.alias.unwrap(),
@@ -1459,8 +1460,8 @@ pub struct TransformRequest {
     pub new_data_path: OSPath,
 }
 
-impl From<odf::TransformRequest> for TransformRequest {
-    fn from(v: odf::TransformRequest) -> Self {
+impl From<odf::metadata::TransformRequest> for TransformRequest {
+    fn from(v: odf::metadata::TransformRequest) -> Self {
         Self {
             dataset_id: v.dataset_id.into(),
             dataset_alias: v.dataset_alias.into(),
@@ -1493,8 +1494,8 @@ pub struct TransformRequestInput {
     pub explicit_watermarks: Vec<Watermark>,
 }
 
-impl From<odf::TransformRequestInput> for TransformRequestInput {
-    fn from(v: odf::TransformRequestInput) -> Self {
+impl From<odf::metadata::TransformRequestInput> for TransformRequestInput {
+    fn from(v: odf::metadata::TransformRequestInput) -> Self {
         Self {
             dataset_id: v.dataset_id.into(),
             dataset_alias: v.dataset_alias.into(),
@@ -1521,13 +1522,13 @@ pub enum TransformResponse {
     InternalError(TransformResponseInternalError),
 }
 
-impl From<odf::TransformResponse> for TransformResponse {
-    fn from(v: odf::TransformResponse) -> Self {
+impl From<odf::metadata::TransformResponse> for TransformResponse {
+    fn from(v: odf::metadata::TransformResponse) -> Self {
         match v {
-            odf::TransformResponse::Progress(v) => Self::Progress(v.into()),
-            odf::TransformResponse::Success(v) => Self::Success(v.into()),
-            odf::TransformResponse::InvalidQuery(v) => Self::InvalidQuery(v.into()),
-            odf::TransformResponse::InternalError(v) => Self::InternalError(v.into()),
+            odf::metadata::TransformResponse::Progress(v) => Self::Progress(v.into()),
+            odf::metadata::TransformResponse::Success(v) => Self::Success(v.into()),
+            odf::metadata::TransformResponse::InvalidQuery(v) => Self::InvalidQuery(v.into()),
+            odf::metadata::TransformResponse::InternalError(v) => Self::InternalError(v.into()),
         }
     }
 }
@@ -1537,8 +1538,8 @@ pub struct TransformResponseProgress {
     pub _dummy: Option<String>,
 }
 
-impl From<odf::TransformResponseProgress> for TransformResponseProgress {
-    fn from(v: odf::TransformResponseProgress) -> Self {
+impl From<odf::metadata::TransformResponseProgress> for TransformResponseProgress {
+    fn from(v: odf::metadata::TransformResponseProgress) -> Self {
         Self { _dummy: None }
     }
 }
@@ -1549,8 +1550,8 @@ pub struct TransformResponseSuccess {
     pub new_watermark: Option<DateTime<Utc>>,
 }
 
-impl From<odf::TransformResponseSuccess> for TransformResponseSuccess {
-    fn from(v: odf::TransformResponseSuccess) -> Self {
+impl From<odf::metadata::TransformResponseSuccess> for TransformResponseSuccess {
+    fn from(v: odf::metadata::TransformResponseSuccess) -> Self {
         Self {
             new_offset_interval: v.new_offset_interval.map(Into::into),
             new_watermark: v.new_watermark.map(Into::into),
@@ -1563,8 +1564,8 @@ pub struct TransformResponseInvalidQuery {
     pub message: String,
 }
 
-impl From<odf::TransformResponseInvalidQuery> for TransformResponseInvalidQuery {
-    fn from(v: odf::TransformResponseInvalidQuery) -> Self {
+impl From<odf::metadata::TransformResponseInvalidQuery> for TransformResponseInvalidQuery {
+    fn from(v: odf::metadata::TransformResponseInvalidQuery) -> Self {
         Self {
             message: v.message.into(),
         }
@@ -1577,8 +1578,8 @@ pub struct TransformResponseInternalError {
     pub backtrace: Option<String>,
 }
 
-impl From<odf::TransformResponseInternalError> for TransformResponseInternalError {
-    fn from(v: odf::TransformResponseInternalError) -> Self {
+impl From<odf::metadata::TransformResponseInternalError> for TransformResponseInternalError {
+    fn from(v: odf::metadata::TransformResponseInternalError) -> Self {
         Self {
             message: v.message.into(),
             backtrace: v.backtrace.map(Into::into),
@@ -1597,8 +1598,8 @@ pub struct Watermark {
     pub event_time: DateTime<Utc>,
 }
 
-impl From<odf::Watermark> for Watermark {
-    fn from(v: odf::Watermark) -> Self {
+impl From<odf::metadata::Watermark> for Watermark {
+    fn from(v: odf::metadata::Watermark) -> Self {
         Self {
             system_time: v.system_time.into(),
             event_time: v.event_time.into(),

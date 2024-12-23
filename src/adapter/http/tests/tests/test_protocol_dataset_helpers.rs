@@ -12,14 +12,13 @@ use std::sync::Arc;
 
 use axum_extra::TypedHeader;
 use headers::Header;
-use kamu::domain::Dataset;
-use kamu::testing::{MetadataFactory, TEST_BUCKET_NAME};
 use kamu_accounts::DUMMY_ACCESS_TOKEN;
 use kamu_adapter_http::smart_protocol::messages::{self, SMART_TRANSFER_PROTOCOL_VERSION};
 use kamu_adapter_http::smart_protocol::protocol_dataset_helper::*;
 use kamu_adapter_http::{BearerHeader, OdfSmtpVersion};
 use kamu_core::TenancyConfig;
-use opendatafabric::{DatasetID, DatasetKind, Multihash};
+use odf::metadata::testing::MetadataFactory;
+use test_utils::TEST_BUCKET_NAME;
 use url::Url;
 
 use crate::harness::{
@@ -84,7 +83,7 @@ async fn test_object_url_local_fs() {
         test_case.dataset.as_ref(),
         &messages::ObjectFileReference {
             object_type: messages::ObjectType::DataSlice,
-            physical_hash: Multihash::from_digest_sha3_256(b"new-slice"),
+            physical_hash: odf::Multihash::from_digest_sha3_256(b"new-slice"),
             size: 12345,
         },
         &test_case.dataset_url,
@@ -97,7 +96,7 @@ async fn test_object_url_local_fs() {
         test_case.dataset.as_ref(),
         &messages::ObjectFileReference {
             object_type: messages::ObjectType::Checkpoint,
-            physical_hash: Multihash::from_digest_sha3_256(b"new-checkpoint"),
+            physical_hash: odf::Multihash::from_digest_sha3_256(b"new-checkpoint"),
             size: 321,
         },
         &test_case.dataset_url,
@@ -303,7 +302,7 @@ async fn test_pull_object_url_s3() {
         test_case.dataset.as_ref(),
         &messages::ObjectFileReference {
             object_type: messages::ObjectType::DataSlice,
-            physical_hash: Multihash::from_digest_sha3_256(b"new-slice"),
+            physical_hash: odf::Multihash::from_digest_sha3_256(b"new-slice"),
             size: 12345,
         },
         &test_case.dataset_url,
@@ -316,7 +315,7 @@ async fn test_pull_object_url_s3() {
         test_case.dataset.as_ref(),
         &messages::ObjectFileReference {
             object_type: messages::ObjectType::Checkpoint,
-            physical_hash: Multihash::from_digest_sha3_256(b"new-checkpoint"),
+            physical_hash: odf::Multihash::from_digest_sha3_256(b"new-checkpoint"),
             size: 321,
         },
         &test_case.dataset_url,
@@ -457,8 +456,8 @@ async fn test_pull_object_url_s3() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct TestCase {
-    pub dataset: Arc<dyn Dataset>,
-    pub dataset_id: DatasetID,
+    pub dataset: Arc<dyn odf::Dataset>,
+    pub dataset_id: odf::DatasetID,
     pub dataset_url: Url,
     pub object_file_references: Vec<messages::ObjectFileReference>,
     pub bearer_header: BearerHeader,
@@ -481,7 +480,7 @@ async fn create_test_case(server_harness: &dyn ServerSideHarness) -> TestCase {
         .execute(
             MetadataFactory::dataset_snapshot()
                 .name("foo")
-                .kind(DatasetKind::Root)
+                .kind(odf::DatasetKind::Root)
                 .push_event(MetadataFactory::set_polling_source().build())
                 .push_event(MetadataFactory::set_data_schema().build())
                 .build(),

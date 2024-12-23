@@ -14,7 +14,6 @@ use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::prelude::*;
 use internal_error::*;
 use kamu_core::ingest::ReadError;
-use opendatafabric::*;
 
 use crate::*;
 
@@ -26,7 +25,10 @@ pub struct ReaderParquet {
 }
 
 impl ReaderParquet {
-    pub async fn new(ctx: SessionContext, conf: ReadStepParquet) -> Result<Self, ReadError> {
+    pub async fn new(
+        ctx: SessionContext,
+        conf: odf::metadata::ReadStepParquet,
+    ) -> Result<Self, ReadError> {
         Ok(Self {
             schema: super::from_ddl_schema(&ctx, conf.schema.as_ref())
                 .await?

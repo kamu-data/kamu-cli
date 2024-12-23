@@ -14,20 +14,16 @@ use std::sync::Arc;
 use criterion::{criterion_group, criterion_main, Criterion};
 use dill::*;
 use kamu::domain::*;
-use kamu::testing::{
-    DatasetTestHelper,
-    DummySmartTransferProtocolClient,
-    HttpFileServer,
-    MetadataFactory,
-};
+use kamu::testing::{DatasetTestHelper, DummySmartTransferProtocolClient};
 use kamu::utils::ipfs_wrapper::IpfsClient;
-use kamu::utils::simple_transfer_protocol::ENV_VAR_SIMPLE_PROTOCOL_MAX_PARALLEL_TRANSFERS;
+use kamu::utils::simple_transfer_protocol::{
+    SimpleTransferProtocol,
+    ENV_VAR_SIMPLE_PROTOCOL_MAX_PARALLEL_TRANSFERS,
+};
 use kamu::{
-    DatasetFactoryImpl,
-    DatasetRegistryRepoBridge,
-    DatasetRepositoryLocalFs,
-    DatasetRepositoryWriter,
-    IpfsGateway,
+    DatasetRegistrySoloUnitBridge,
+    DatasetStorageUnitLocalFs,
+    DatasetStorageUnitWriter,
     RemoteReposDir,
     RemoteRepositoryRegistryImpl,
     SyncRequestBuilder,
@@ -36,7 +32,9 @@ use kamu::{
 use kamu_accounts::CurrentAccountSubject;
 use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
 use kamu_datasets_services::DependencyGraphServiceImpl;
-use opendatafabric::*;
+use odf::dataset::{DatasetFactoryImpl, IpfsGateway};
+use odf::metadata::testing::MetadataFactory;
+use test_utils::HttpFileServer;
 use time_source::SystemTimeSourceDefault;
 use url::Url;
 
@@ -49,7 +47,7 @@ const AMOUNT_OF_BLOCKS_TO_APPEND: usize = 70;
 
 async fn setup_dataset(
     tmp_workspace_dir: &Path,
-    dataset_alias: &DatasetAlias,
+    dataset_alias: &odf::DatasetAlias,
     ipfs: Option<(IpfsGateway, IpfsClient)>,
 ) -> (
     Arc<dyn SyncService>,
@@ -71,19 +69,20 @@ async fn setup_dataset(
         .add_value(ipfs_client)
         .add_value(CurrentAccountSubject::new_test())
         .add_value(TenancyConfig::SingleTenant)
-        .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
-        .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-        .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
-        .add::<DatasetRegistryRepoBridge>()
+        .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
+        .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
+        .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
+        .add::<DatasetRegistrySoloUnitBridge>()
         .add_value(RemoteReposDir::new(repos_dir))
         .add::<RemoteRepositoryRegistryImpl>()
-        .add::<auth::DummyOdfServerAccessTokenResolver>()
+        .add::<odf::dataset::DummyOdfServerAccessTokenResolver>()
         .add::<DatasetFactoryImpl>()
         .add::<SyncServiceImpl>()
         .add::<SyncRequestBuilder>()
         .add::<SystemTimeSourceDefault>()
         .add::<DummySmartTransferProtocolClient>()
         .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
+        .add::<SimpleTransferProtocol>()
         .build();
 
     init_on_startup::run_startup_jobs(&catalog).await.unwrap();
@@ -91,16 +90,16 @@ async fn setup_dataset(
     let sync_svc = catalog.get_one::<dyn SyncService>().unwrap();
     let sync_request_builder = catalog.get_one::<SyncRequestBuilder>().unwrap();
     let dataset_registry = catalog.get_one::<dyn DatasetRegistry>().unwrap();
-    let dataset_repo_writer = catalog.get_one::<dyn DatasetRepositoryWriter>().unwrap();
+    let dataset_storage_unit_writer = catalog.get_one::<dyn DatasetStorageUnitWriter>().unwrap();
 
     // Add dataset
     let snapshot = MetadataFactory::dataset_snapshot()
         .name(dataset_alias.clone())
-        .kind(DatasetKind::Root)
+        .kind(odf::DatasetKind::Root)
         .push_event(MetadataFactory::set_data_schema().build())
         .build();
 
-    let _ = dataset_repo_writer
+    let _ = dataset_storage_unit_writer
         .create_dataset_from_snapshot(snapshot)
         .await
         .unwrap()
@@ -120,7 +119,7 @@ async fn setup_dataset(
 async fn append_data_to_dataset(
     block_amount: usize,
     dataset_registry: &dyn DatasetRegistry,
-    dataset_ref: &DatasetAlias,
+    dataset_ref: &odf::DatasetAlias,
 ) {
     for _ in 1..block_amount {
         let _ = DatasetTestHelper::append_random_data(
@@ -135,9 +134,9 @@ async fn append_data_to_dataset(
 async fn do_test_sync(
     sync_svc: Arc<dyn SyncService>,
     sync_request_builder: Arc<SyncRequestBuilder>,
-    dataset_alias: &DatasetAlias,
-    pull_repo_url: &DatasetRefRemote,
-    push_repo_url: &DatasetRefRemote,
+    dataset_alias: &odf::DatasetAlias,
+    pull_repo_url: &odf::DatasetRefRemote,
+    push_repo_url: &odf::DatasetRefRemote,
     dataset_registry: Arc<dyn DatasetRegistry>,
 ) {
     let _push_res = sync_svc
@@ -172,7 +171,7 @@ async fn do_test_sync(
     .await;
 }
 
-async fn build_temp_dirs(rt: &tokio::runtime::Runtime) -> (DatasetAlias, Url, Url) {
+async fn build_temp_dirs(rt: &tokio::runtime::Runtime) -> (odf::DatasetAlias, Url, Url) {
     let tmp_repo_dir = tempfile::tempdir().unwrap();
 
     // to perform multithreading operation (initialization server) rt.enter method
@@ -182,7 +181,7 @@ async fn build_temp_dirs(rt: &tokio::runtime::Runtime) -> (DatasetAlias, Url, Ur
     let pull_repo_url = Url::from_str(&format!("http://{}/", server.local_addr())).unwrap();
     let push_repo_url = Url::from_directory_path(tmp_repo_dir.path()).unwrap();
 
-    let dataset_alias = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
+    let dataset_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     rt.spawn(server.run());
 
     (dataset_alias, pull_repo_url, push_repo_url)
@@ -213,8 +212,8 @@ fn bench_with_1_parallel(c: &mut Criterion) {
                 sync_service_impl.clone(),
                 sync_request_builder.clone(),
                 &dataset_alias,
-                &DatasetRefRemote::from(&pull_repo_url),
-                &DatasetRefRemote::from(&push_repo_url),
+                &odf::DatasetRefRemote::from(&pull_repo_url),
+                &odf::DatasetRefRemote::from(&push_repo_url),
                 dataset_registry.clone(),
             ));
         });
@@ -229,7 +228,7 @@ fn bench_with_10_parallels(c: &mut Criterion) {
 
     let (dataset_alias, pull_repo_url, push_repo_url) = rt.block_on(build_temp_dirs(&rt));
 
-    let (sync_service_impl, sync_request_builder, dataset_repo) = rt.block_on(setup_dataset(
+    let (sync_service_impl, sync_request_builder, storage_unit) = rt.block_on(setup_dataset(
         tmp_workspace_dir.path(),
         &dataset_alias,
         None,
@@ -244,9 +243,9 @@ fn bench_with_10_parallels(c: &mut Criterion) {
                 sync_service_impl.clone(),
                 sync_request_builder.clone(),
                 &dataset_alias,
-                &DatasetRefRemote::from(&pull_repo_url),
-                &DatasetRefRemote::from(&push_repo_url),
-                dataset_repo.clone(),
+                &odf::DatasetRefRemote::from(&pull_repo_url),
+                &odf::DatasetRefRemote::from(&push_repo_url),
+                storage_unit.clone(),
             ));
         });
     });

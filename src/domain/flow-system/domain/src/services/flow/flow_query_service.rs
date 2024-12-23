@@ -11,7 +11,6 @@ use chrono::{DateTime, Utc};
 use database_common::PaginationOpts;
 use event_sourcing::LoadError;
 use internal_error::{ErrorIntoInternal, InternalError};
-use opendatafabric::{AccountID, DatasetID};
 use tokio_stream::Stream;
 
 use crate::{
@@ -33,7 +32,7 @@ pub trait FlowQueryService: Sync + Send {
     /// Applies specified filters/pagination
     async fn list_all_flows_by_dataset(
         &self,
-        dataset_id: &DatasetID,
+        dataset_id: &odf::DatasetID,
         filters: DatasetFlowFilters,
         pagination: PaginationOpts,
     ) -> Result<FlowStateListing, ListFlowsByDatasetError>;
@@ -43,7 +42,7 @@ pub trait FlowQueryService: Sync + Send {
     /// Applies specified filters/pagination
     async fn list_all_flow_initiators_by_dataset(
         &self,
-        dataset_id: &DatasetID,
+        dataset_id: &odf::DatasetID,
     ) -> Result<FlowInitiatorListing, ListFlowsByDatasetError>;
 
     /// Returns datasets with flows associated with a given account
@@ -51,7 +50,7 @@ pub trait FlowQueryService: Sync + Send {
     /// Applies specified pagination
     async fn list_all_datasets_with_flow_by_account(
         &self,
-        account_id: &AccountID,
+        account_id: &odf::AccountID,
     ) -> Result<FlowDatasetListing, ListFlowsByDatasetError>;
 
     /// Returns states of flows associated with a given account
@@ -59,7 +58,7 @@ pub trait FlowQueryService: Sync + Send {
     /// Applies specified pagination
     async fn list_all_flows_by_account(
         &self,
-        account_id: &AccountID,
+        account_id: &odf::AccountID,
         filters: AccountFlowFilters,
         pagination: PaginationOpts,
     ) -> Result<FlowStateListing, ListFlowsByDatasetError>;
@@ -88,7 +87,7 @@ pub trait FlowQueryService: Sync + Send {
         &self,
         trigger_time: DateTime<Utc>,
         flow_key: FlowKey,
-        initiator_account_id: AccountID,
+        initiator_account_id: odf::AccountID,
         flow_run_snapshot_maybe: Option<FlowConfigurationRule>,
     ) -> Result<FlowState, RequestFlowError>;
 
@@ -116,7 +115,7 @@ pub struct FlowInitiatorListing<'a> {
 }
 
 pub type InitiatorsStream<'a> =
-    std::pin::Pin<Box<dyn Stream<Item = Result<AccountID, InternalError>> + Send + 'a>>;
+    std::pin::Pin<Box<dyn Stream<Item = Result<odf::AccountID, InternalError>> + Send + 'a>>;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -125,7 +124,7 @@ pub struct FlowDatasetListing<'a> {
 }
 
 pub type DatasetsStream<'a> =
-    std::pin::Pin<Box<dyn Stream<Item = Result<DatasetID, InternalError>> + Send + 'a>>;
+    std::pin::Pin<Box<dyn Stream<Item = Result<odf::DatasetID, InternalError>> + Send + 'a>>;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

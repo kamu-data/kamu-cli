@@ -13,8 +13,7 @@ use std::sync::{Arc, Mutex};
 use dill::*;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_accounts::CurrentAccountSubject;
-use opendatafabric::serde::yaml::Manifest;
-use opendatafabric::AccountName;
+use odf::metadata::serde::yaml::Manifest;
 use url::Url;
 
 use crate::odf_server::models::*;
@@ -32,7 +31,7 @@ pub struct AccessTokenRegistryService {
 }
 
 #[component(pub)]
-#[interface(dyn kamu::domain::auth::OdfServerAccessTokenResolver)]
+#[interface(dyn odf::dataset::OdfServerAccessTokenResolver)]
 impl AccessTokenRegistryService {
     pub fn new(
         storage: Arc<dyn AccessTokenStore>,
@@ -54,7 +53,7 @@ impl AccessTokenRegistryService {
         }
     }
 
-    fn account_name(&self) -> &AccountName {
+    fn account_name(&self) -> &odf::AccountName {
         match self.current_account_subject.as_ref() {
             CurrentAccountSubject::Logged(l) => &l.account_name,
             CurrentAccountSubject::Anonymous(_) => panic!("Anonymous current account unexpected"),
@@ -256,7 +255,7 @@ impl AccessTokenRegistryService {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl kamu::domain::auth::OdfServerAccessTokenResolver for AccessTokenRegistryService {
+impl odf::dataset::OdfServerAccessTokenResolver for AccessTokenRegistryService {
     fn resolve_odf_dataset_access_token(&self, odf_dataset_http_url: &Url) -> Option<String> {
         assert!(!odf_dataset_http_url.scheme().starts_with("odf+"));
 

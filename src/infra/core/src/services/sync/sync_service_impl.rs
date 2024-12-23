@@ -12,10 +12,8 @@ use std::sync::Arc;
 
 use dill::*;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
-use kamu_core::services::sync_service::DatasetNotFoundError;
 use kamu_core::utils::metadata_chain_comparator::*;
 use kamu_core::*;
-use opendatafabric::*;
 use url::Url;
 
 use crate::resolve_remote_dataset_url;
@@ -33,7 +31,7 @@ use crate::utils::smart_transfer_protocol::{
 
 pub struct SyncServiceImpl {
     remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
-    dataset_factory: Arc<dyn DatasetFactory>,
+    dataset_factory: Arc<dyn odf::dataset::DatasetFactory>,
     smart_transfer_protocol: Arc<dyn SmartTransferProtocolClient>,
     simple_transfer_protocol: Arc<SimpleTransferProtocol>,
     ipfs_client: Arc<IpfsClient>,
@@ -46,7 +44,7 @@ pub struct SyncServiceImpl {
 impl SyncServiceImpl {
     pub fn new(
         remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
-        dataset_factory: Arc<dyn DatasetFactory>,
+        dataset_factory: Arc<dyn odf::dataset::DatasetFactory>,
         smart_transfer_protocol: Arc<dyn SmartTransferProtocolClient>,
         simple_transfer_protocol: Arc<SimpleTransferProtocol>,
         ipfs_client: Arc<IpfsClient>,
@@ -72,9 +70,9 @@ impl SyncServiceImpl {
         let trust_source_hashes = opts.trust_source.unwrap_or(src_is_local);
 
         let validation = if opts.trust_source.unwrap_or(src_is_local) {
-            AppendValidation::None
+            odf::dataset::AppendValidation::None
         } else {
-            AppendValidation::Full
+            odf::dataset::AppendValidation::Full
         };
 
         let src_dataset = match &src {
@@ -165,13 +163,13 @@ impl SyncServiceImpl {
         let maybe_dst_head = match self.dataset_factory.get_dataset(&http_dst_url, false).await {
             Ok(http_dst_dataset_view) => match http_dst_dataset_view
                 .as_metadata_chain()
-                .resolve_ref(&BlockRef::Head)
+                .resolve_ref(&odf::BlockRef::Head)
                 .await
             {
                 Ok(head) => Ok(Some(head)),
-                Err(GetRefError::NotFound(_)) => Ok(None),
-                Err(GetRefError::Access(e)) => Err(SyncError::Access(e)),
-                Err(GetRefError::Internal(e)) => Err(SyncError::Internal(e)),
+                Err(odf::storage::GetRefError::NotFound(_)) => Ok(None),
+                Err(odf::storage::GetRefError::Access(e)) => Err(SyncError::Access(e)),
+                Err(odf::storage::GetRefError::Internal(e)) => Err(SyncError::Internal(e)),
             },
             Err(e) => Err(e.into()),
         }?;
@@ -201,7 +199,7 @@ impl SyncServiceImpl {
     #[tracing::instrument(level = "debug", skip_all, fields(%dst_url, ?opts))]
     async fn sync_to_ipfs(
         &self,
-        src_dataset: Arc<dyn Dataset>,
+        src_dataset: Arc<dyn odf::Dataset>,
         dst_url: &Url,
         opts: SyncOptions,
     ) -> Result<SyncResult, SyncError> {
@@ -224,7 +222,7 @@ impl SyncServiceImpl {
         // Resolve and compare heads
         let src_head = src_dataset
             .as_metadata_chain()
-            .resolve_ref(&BlockRef::Head)
+            .resolve_ref(&odf::BlockRef::Head)
             .await
             .int_err()?;
 
@@ -244,7 +242,7 @@ impl SyncServiceImpl {
                     tracing::info!(%old_cid, "Attempting to read remote head");
                     let dst_http_url = resolve_remote_dataset_url(
                         self.remote_repo_reg.as_ref(),
-                        &DatasetRefRemote::from(dst_url),
+                        &odf::DatasetRefRemote::from(dst_url),
                     )?;
                     let dst_dataset = self
                         .dataset_factory
@@ -252,7 +250,7 @@ impl SyncServiceImpl {
                         .await?;
                     match dst_dataset
                         .as_metadata_chain()
-                        .resolve_ref(&BlockRef::Head)
+                        .resolve_ref(&odf::BlockRef::Head)
                         .await
                     {
                         Ok(dst_head) => {
@@ -267,9 +265,9 @@ impl SyncServiceImpl {
 
                             Ok((Some(old_cid), Some(dst_head), Some(chains_comparison)))
                         }
-                        Err(GetRefError::NotFound(_)) => Ok((None, None, None)),
-                        Err(GetRefError::Access(e)) => Err(SyncError::Access(e)),
-                        Err(GetRefError::Internal(e)) => Err(SyncError::Internal(e)),
+                        Err(odf::storage::GetRefError::NotFound(_)) => Ok((None, None, None)),
+                        Err(odf::storage::GetRefError::Access(e)) => Err(SyncError::Access(e)),
+                        Err(odf::storage::GetRefError::Internal(e)) => Err(SyncError::Internal(e)),
                     }
                 }
             }?;
@@ -277,7 +275,7 @@ impl SyncServiceImpl {
         tracing::info!(?src_head, ?dst_head, "Resolved heads");
 
         if !opts.create_if_not_exists && dst_head.is_none() {
-            return Err(DatasetNotFoundError::new(dst_url).into());
+            return Err(DatasetAnyRefUnresolvedError::new(dst_url).into());
         }
 
         match chains_comparison {
@@ -343,25 +341,27 @@ impl SyncServiceImpl {
                     .iter_blocks_interval(&src_head, None, false);
 
                 while let Some((_, _)) = block_stream.try_next().await.map_err(|e| match e {
-                    IterBlocksError::RefNotFound(e) => SyncError::Internal(e.int_err()),
-                    IterBlocksError::BlockNotFound(e) => CorruptedSourceError {
+                    odf::dataset::IterBlocksError::RefNotFound(e) => {
+                        SyncError::Internal(e.int_err())
+                    }
+                    odf::dataset::IterBlocksError::BlockNotFound(e) => CorruptedSourceError {
                         message: "Source metadata chain is broken".to_owned(),
                         source: Some(e.into()),
                     }
                     .into(),
-                    IterBlocksError::BlockVersion(e) => CorruptedSourceError {
+                    odf::dataset::IterBlocksError::BlockVersion(e) => CorruptedSourceError {
                         message: "Source metadata chain is broken".to_owned(),
                         source: Some(e.into()),
                     }
                     .into(),
-                    IterBlocksError::BlockMalformed(e) => CorruptedSourceError {
+                    odf::dataset::IterBlocksError::BlockMalformed(e) => CorruptedSourceError {
                         message: "Source metadata chain is broken".to_owned(),
                         source: Some(e.into()),
                     }
                     .into(),
-                    IterBlocksError::InvalidInterval(_) => unreachable!(),
-                    IterBlocksError::Access(e) => SyncError::Access(e),
-                    IterBlocksError::Internal(e) => SyncError::Internal(e),
+                    odf::dataset::IterBlocksError::InvalidInterval(_) => unreachable!(),
+                    odf::dataset::IterBlocksError::Access(e) => SyncError::Access(e),
+                    odf::dataset::IterBlocksError::Internal(e) => SyncError::Internal(e),
                 })? {
                     num_blocks += 1;
                 }
@@ -395,7 +395,7 @@ impl SyncServiceImpl {
         })
     }
 
-    async fn add_to_ipfs(&self, src_dataset: &dyn Dataset) -> Result<String, IpfsAddError> {
+    async fn add_to_ipfs(&self, src_dataset: &dyn odf::Dataset) -> Result<String, IpfsAddError> {
         let source_url = src_dataset.get_storage_internal_url();
         let source_path = source_url.to_file_path().map_err(|_| {
             IpfsAddError::UnsupportedIpfsStorageType({
@@ -429,7 +429,7 @@ impl SyncServiceImpl {
         match (&src, &dst) {
             // * -> ipfs
             (_, SyncRef::Remote(dst_remote)) if dst_remote.url.scheme() == "ipfs" => {
-                Err(UnsupportedProtocolError {
+                Err(odf::dataset::UnsupportedProtocolError {
                     url: dst_remote.url.as_ref().clone(),
                     message: Some(
                         concat!(
@@ -447,7 +447,7 @@ impl SyncServiceImpl {
             (SyncRef::Remote(_), SyncRef::Remote(dst_remote))
                 if dst_remote.url.scheme() == "ipns" =>
             {
-                Err(UnsupportedProtocolError {
+                Err(odf::dataset::UnsupportedProtocolError {
                     url: dst_remote.url.as_ref().clone(),
                     message: Some(
                         concat!(
@@ -469,7 +469,7 @@ impl SyncServiceImpl {
                         self.sync_to_ipfs((**src_dataset).clone(), dst_remote.url.as_ref(), opts)
                             .await
                     }
-                    _ => Err(UnsupportedProtocolError {
+                    _ => Err(odf::dataset::UnsupportedProtocolError {
                         url: dst_remote.url.as_ref().clone(),
                         message: Some(
                             concat!(
@@ -486,7 +486,7 @@ impl SyncServiceImpl {
             (SyncRef::Remote(src_remote), SyncRef::Remote(dst_remote))
                 if src_remote.url.is_odf_protocol() && dst_remote.url.is_odf_protocol() =>
             {
-                Err(UnsupportedProtocolError {
+                Err(odf::dataset::UnsupportedProtocolError {
                     url: dst_remote.url.as_ref().clone(),
                     message: Some(
                         concat!(

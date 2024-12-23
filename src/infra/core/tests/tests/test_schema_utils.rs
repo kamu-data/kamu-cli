@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use datafusion::parquet::basic::{ConvertedType, LogicalType, Repetition, Type as PhysicalType};
 use datafusion::parquet::schema::types::Type;
-use kamu_data_utils::schema::format::write_schema_parquet_json;
+use odf::utils::schema::format::write_schema_parquet_json;
 
 #[test]
 fn test_write_schema_parquet_json_escaping() {

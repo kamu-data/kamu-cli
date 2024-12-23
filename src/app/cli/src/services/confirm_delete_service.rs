@@ -11,9 +11,9 @@ use std::sync::Arc;
 
 use kamu::domain::utils::metadata_chain_comparator::CompareChainsResult;
 use kamu::domain::{PushStatus, RemoteStatusService};
-use opendatafabric::DatasetHandle;
 
 use crate::{CLIError, Interact};
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct ConfirmDeleteService {
@@ -31,7 +31,10 @@ impl ConfirmDeleteService {
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(?dataset_handles))]
-    pub async fn confirm_delete(&self, dataset_handles: &[DatasetHandle]) -> Result<(), CLIError> {
+    pub async fn confirm_delete(
+        &self,
+        dataset_handles: &[odf::DatasetHandle],
+    ) -> Result<(), CLIError> {
         for hdl in dataset_handles {
             let statuses = self.push_status_service.check_remotes_status(hdl).await?;
 

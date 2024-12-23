@@ -8,8 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::prelude::*;
-use kamu_core::{self as domain, MetadataChainExt, SearchSeedVisitor, ServerUrlConfig};
-use opendatafabric as odf;
+use kamu_core::ServerUrlConfig;
 
 use crate::prelude::*;
 use crate::queries::*;
@@ -35,7 +34,7 @@ impl Dataset {
 
     #[graphql(skip)]
     pub async fn from_ref(ctx: &Context<'_>, dataset_ref: &odf::DatasetRef) -> Result<Dataset> {
-        let dataset_registry = from_catalog_n!(ctx, dyn domain::DatasetRegistry);
+        let dataset_registry = from_catalog_n!(ctx, dyn kamu_core::DatasetRegistry);
 
         // TODO: Should we resolve reference at this point or allow unresolved and fail
         //       later?
@@ -78,7 +77,7 @@ impl Dataset {
     async fn kind(&self, ctx: &Context<'_>) -> Result<DatasetKind> {
         let resolved_dataset = get_dataset(ctx, &self.dataset_handle)?;
         let summary = resolved_dataset
-            .get_summary(domain::GetSummaryOpts::default())
+            .get_summary(odf::dataset::GetSummaryOpts::default())
             .await
             .int_err()?;
         Ok(summary.kind.into())
@@ -132,9 +131,10 @@ impl Dataset {
     async fn created_at(&self, ctx: &Context<'_>) -> Result<DateTime<Utc>> {
         let resolved_dataset = get_dataset(ctx, &self.dataset_handle)?;
 
+        use odf::dataset::MetadataChainExt as _;
         Ok(resolved_dataset
             .as_metadata_chain()
-            .accept_one(SearchSeedVisitor::new())
+            .accept_one(odf::dataset::SearchSeedVisitor::new())
             .await
             .int_err()?
             .into_block()
@@ -146,9 +146,10 @@ impl Dataset {
     async fn last_updated_at(&self, ctx: &Context<'_>) -> Result<DateTime<Utc>> {
         let resolved_dataset = get_dataset(ctx, &self.dataset_handle)?;
 
+        use odf::dataset::MetadataChainExt as __;
         Ok(resolved_dataset
             .as_metadata_chain()
-            .get_block_by_ref(&domain::BlockRef::Head)
+            .get_block_by_ref(&odf::BlockRef::Head)
             .await?
             .system_time)
     }

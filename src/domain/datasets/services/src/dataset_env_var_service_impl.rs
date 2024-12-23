@@ -23,7 +23,6 @@ use kamu_datasets::{
     DeleteDatasetEnvVarError,
     GetDatasetEnvVarError,
 };
-use opendatafabric::DatasetID;
 use secrecy::{ExposeSecret, SecretString};
 use time_source::SystemTimeSource;
 use uuid::Uuid;
@@ -69,7 +68,7 @@ impl DatasetEnvVarService for DatasetEnvVarServiceImpl {
         &self,
         dataset_env_var_key: &str,
         dataset_env_var_value: &DatasetEnvVarValue,
-        dataset_id: &DatasetID,
+        dataset_id: &odf::DatasetID,
     ) -> Result<DatasetEnvVarUpsertResult, InternalError> {
         let mut dataset_env_var = DatasetEnvVar::new(
             dataset_env_var_key,
@@ -112,7 +111,7 @@ impl DatasetEnvVarService for DatasetEnvVarServiceImpl {
 
     async fn get_all_dataset_env_vars_by_dataset_id(
         &self,
-        dataset_id: &DatasetID,
+        dataset_id: &odf::DatasetID,
         pagination: Option<PaginationOpts>,
     ) -> Result<DatasetEnvVarListing, GetDatasetEnvVarError> {
         let total_count = self

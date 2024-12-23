@@ -7,10 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu::domain::*;
-use kamu::testing::MetadataFactory;
-use kamu::DatasetLayout;
-use opendatafabric::*;
+use odf::dataset::DatasetLayout;
+use odf::metadata::testing::MetadataFactory;
 
 use crate::harness::{make_dataset_ref, ClientSideHarness, ServerSideHarness};
 
@@ -21,9 +19,9 @@ pub(crate) struct SmartPushNewEmptyDatasetScenario<TServerHarness: ServerSideHar
     pub server_harness: TServerHarness,
     pub server_dataset_layout: DatasetLayout,
     pub client_dataset_layout: DatasetLayout,
-    pub server_dataset_ref: DatasetRefRemote,
-    pub client_dataset_ref: DatasetRef,
-    pub client_create_result: CreateDatasetResult,
+    pub server_dataset_ref: odf::DatasetRefRemote,
+    pub client_dataset_ref: odf::DatasetRef,
+    pub client_create_result: odf::CreateDatasetResult,
 }
 
 impl<TServerHarness: ServerSideHarness> SmartPushNewEmptyDatasetScenario<TServerHarness> {
@@ -38,11 +36,11 @@ impl<TServerHarness: ServerSideHarness> SmartPushNewEmptyDatasetScenario<TServer
             .create_dataset_from_snapshot()
             .execute(
                 MetadataFactory::dataset_snapshot()
-                    .name(DatasetAlias::new(
+                    .name(odf::DatasetAlias::new(
                         client_account_name.clone(),
-                        DatasetName::new_unchecked("foo"),
+                        odf::DatasetName::new_unchecked("foo"),
                     ))
-                    .kind(DatasetKind::Root)
+                    .kind(odf::DatasetKind::Root)
                     .build(),
                 Default::default(),
             )
@@ -52,18 +50,18 @@ impl<TServerHarness: ServerSideHarness> SmartPushNewEmptyDatasetScenario<TServer
         let client_dataset_layout =
             client_harness.dataset_layout(&client_create_result.dataset_handle.id, "foo");
 
-        let foo_name = DatasetName::new_unchecked("foo");
+        let foo_name = odf::DatasetName::new_unchecked("foo");
 
-        let server_dataset_layout = server_harness.dataset_layout(&DatasetHandle::new(
+        let server_dataset_layout = server_harness.dataset_layout(&odf::DatasetHandle::new(
             client_create_result.dataset_handle.id.clone(),
-            DatasetAlias::new(server_account_name.clone(), foo_name.clone()),
+            odf::DatasetAlias::new(server_account_name.clone(), foo_name.clone()),
         ));
 
         let client_dataset_ref = make_dataset_ref(client_account_name.as_ref(), "foo");
 
-        let server_alias = DatasetAlias::new(server_account_name, foo_name.clone());
+        let server_alias = odf::DatasetAlias::new(server_account_name, foo_name.clone());
         let server_odf_url = server_harness.dataset_url(&server_alias);
-        let server_dataset_ref = DatasetRefRemote::from(&server_odf_url);
+        let server_dataset_ref = odf::DatasetRefRemote::from(&server_odf_url);
 
         Self {
             client_harness,

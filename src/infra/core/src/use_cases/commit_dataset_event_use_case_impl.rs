@@ -10,18 +10,14 @@
 use std::sync::Arc;
 
 use dill::{component, interface};
-use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer};
+use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer, DatasetActionUnauthorizedError};
 use kamu_core::{
     CommitDatasetEventUseCase,
-    CommitError,
-    CommitOpts,
-    CommitResult,
     DatasetLifecycleMessage,
     DatasetRegistry,
     MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
 };
 use messaging_outbox::{Outbox, OutboxExt};
-use opendatafabric::{DatasetHandle, MetadataEvent};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -57,13 +53,19 @@ impl CommitDatasetEventUseCase for CommitDatasetEventUseCaseImpl {
     )]
     async fn execute(
         &self,
-        dataset_handle: &DatasetHandle,
-        event: MetadataEvent,
-        opts: CommitOpts<'_>,
-    ) -> Result<CommitResult, CommitError> {
+        dataset_handle: &odf::DatasetHandle,
+        event: odf::MetadataEvent,
+        opts: odf::dataset::CommitOpts<'_>,
+    ) -> Result<odf::dataset::CommitResult, odf::dataset::CommitError> {
         self.dataset_action_authorizer
             .check_action_allowed(&dataset_handle.id, DatasetAction::Write)
-            .await?;
+            .await
+            .map_err(|e| match e {
+                DatasetActionUnauthorizedError::Access(e) => odf::dataset::CommitError::Access(e),
+                DatasetActionUnauthorizedError::Internal(e) => {
+                    odf::dataset::CommitError::Internal(e)
+                }
+            })?;
 
         let resolved_dataset = self.dataset_registry.get_dataset_by_handle(dataset_handle);
 

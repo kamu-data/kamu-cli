@@ -17,7 +17,6 @@ use internal_error::*;
 use jsonwebtoken::errors::ErrorKind;
 use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
 use kamu_accounts::*;
-use opendatafabric::{AccountID, AccountName};
 use time_source::SystemTimeSource;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -88,7 +87,7 @@ impl AuthenticationServiceImpl {
 
     pub fn make_access_token(
         &self,
-        account_id: &AccountID,
+        account_id: &odf::AccountID,
         expiration_time_sec: usize,
     ) -> Result<String, InternalError> {
         let current_time = self.time_source.now();
@@ -140,7 +139,7 @@ impl AuthenticationServiceImpl {
 
         match decoded_access_token {
             AccessTokenType::JWTToken(token_data) => {
-                let account_id = AccountID::from_did_str(&token_data.claims.sub)
+                let account_id = odf::AccountID::from_did_str(&token_data.claims.sub)
                     .map_err(|e| GetAccountInfoError::Internal(e.int_err()))?;
 
                 match self.account_by_id(&account_id).await {
@@ -244,7 +243,7 @@ impl AuthenticationService for AuthenticationServiceImpl {
 
     async fn account_by_id(
         &self,
-        account_id: &AccountID,
+        account_id: &odf::AccountID,
     ) -> Result<Option<Account>, InternalError> {
         match self.account_repository.get_account_by_id(account_id).await {
             Ok(account) => Ok(Some(account.clone())),
@@ -255,7 +254,7 @@ impl AuthenticationService for AuthenticationServiceImpl {
 
     async fn accounts_by_ids(
         &self,
-        account_ids: Vec<AccountID>,
+        account_ids: Vec<odf::AccountID>,
     ) -> Result<Vec<Account>, InternalError> {
         self.account_repository
             .get_accounts_by_ids(account_ids)
@@ -265,7 +264,7 @@ impl AuthenticationService for AuthenticationServiceImpl {
 
     async fn account_by_name(
         &self,
-        account_name: &AccountName,
+        account_name: &odf::AccountName,
     ) -> Result<Option<Account>, InternalError> {
         match self
             .account_repository
@@ -280,8 +279,8 @@ impl AuthenticationService for AuthenticationServiceImpl {
 
     async fn find_account_id_by_name(
         &self,
-        account_name: &AccountName,
-    ) -> Result<Option<AccountID>, InternalError> {
+        account_name: &odf::AccountName,
+    ) -> Result<Option<odf::AccountID>, InternalError> {
         match self
             .account_repository
             .find_account_id_by_name(account_name)
@@ -294,8 +293,8 @@ impl AuthenticationService for AuthenticationServiceImpl {
 
     async fn find_account_name_by_id(
         &self,
-        account_id: &AccountID,
-    ) -> Result<Option<AccountName>, InternalError> {
+        account_id: &odf::AccountID,
+    ) -> Result<Option<odf::AccountName>, InternalError> {
         match self.account_repository.get_account_by_id(account_id).await {
             Ok(account) => Ok(Some(account.account_name.clone())),
             Err(GetAccountByIdError::NotFound(_)) => Ok(None),

@@ -17,7 +17,6 @@ use std::sync::Arc;
 
 use internal_error::ResultIntoInternal;
 use kamu_core::*;
-use opendatafabric::*;
 use thiserror::Error;
 
 const BUFFER_SIZE: usize = 8096;
@@ -31,7 +30,7 @@ impl PrepService {
 
     pub fn prepare(
         &self,
-        prep_steps: &[PrepStep],
+        prep_steps: &[odf::metadata::PrepStep],
         src_path: &Path,
         target_path: &Path,
         run_info_dir: &Path,
@@ -41,7 +40,7 @@ impl PrepService {
 
         for step in prep_steps {
             stream = match step {
-                PrepStep::Pipe(p) => Box::new(
+                odf::metadata::PrepStep::Pipe(p) => Box::new(
                     PipeStream::new(p.command.clone(), stream, stderr_file_path.clone()).map_err(
                         |e| {
                             PollingIngestError::PipeError({
@@ -50,11 +49,13 @@ impl PrepService {
                         },
                     )?,
                 ),
-                PrepStep::Decompress(dc) => match dc.format {
-                    CompressionFormat::Zip => {
+                odf::metadata::PrepStep::Decompress(dc) => match dc.format {
+                    odf::metadata::CompressionFormat::Zip => {
                         Box::new(DecompressZipStream::new(stream, dc.sub_path.clone()))
                     }
-                    CompressionFormat::Gzip => Box::new(DecompressGzipStream::new(stream)),
+                    odf::metadata::CompressionFormat::Gzip => {
+                        Box::new(DecompressGzipStream::new(stream))
+                    }
                 },
             };
         }

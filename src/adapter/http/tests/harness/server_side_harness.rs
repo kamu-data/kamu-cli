@@ -24,11 +24,10 @@ use kamu::domain::{
     CreateDatasetUseCase,
 };
 use kamu::testing::MockDatasetActionAuthorizer;
-use kamu::DatasetLayout;
 use kamu_accounts::testing::MockAuthenticationService;
 use kamu_accounts::{Account, AccountType, CurrentAccountSubject, PROVIDER_PASSWORD};
 use kamu_core::{CompactionExecutor, CompactionPlanner, DatasetRegistry, TenancyConfig};
-use opendatafabric::{AccountID, AccountName, DatasetAlias, DatasetHandle};
+use odf::dataset::DatasetLayout;
 use reqwest::Url;
 use time_source::SystemTimeSourceStub;
 
@@ -40,7 +39,7 @@ pub(crate) const SERVER_ACCOUNT_NAME: &str = "kamu-server";
 
 #[async_trait::async_trait]
 pub(crate) trait ServerSideHarness {
-    fn operating_account_name(&self) -> Option<AccountName>;
+    fn operating_account_name(&self) -> Option<odf::AccountName>;
 
     fn cli_dataset_registry(&self) -> Arc<dyn DatasetRegistry>;
 
@@ -56,11 +55,11 @@ pub(crate) trait ServerSideHarness {
 
     fn cli_compaction_executor(&self) -> Arc<dyn CompactionExecutor>;
 
-    fn dataset_layout(&self, dataset_handle: &DatasetHandle) -> DatasetLayout;
+    fn dataset_layout(&self, dataset_handle: &odf::DatasetHandle) -> DatasetLayout;
 
-    fn dataset_url_with_scheme(&self, dataset_alias: &DatasetAlias, scheme: &str) -> Url;
+    fn dataset_url_with_scheme(&self, dataset_alias: &odf::DatasetAlias, scheme: &str) -> Url;
 
-    fn dataset_url(&self, dataset_alias: &DatasetAlias) -> Url {
+    fn dataset_url(&self, dataset_alias: &odf::DatasetAlias) -> Url {
         self.dataset_url_with_scheme(dataset_alias, "odf+http")
     }
 
@@ -84,13 +83,16 @@ pub(crate) struct ServerSideHarnessOptions {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) fn server_authentication_mock(account: &Account) -> MockAuthenticationService {
-    MockAuthenticationService::resolving_token(kamu_accounts::DUMMY_ACCESS_TOKEN, account.clone())
+    MockAuthenticationService::resolving_token(
+        odf::dataset::DUMMY_ODF_ACCESS_TOKEN,
+        account.clone(),
+    )
 }
 
 pub(crate) fn make_server_account() -> Account {
     Account {
-        id: AccountID::new_seeded_ed25519(SERVER_ACCOUNT_NAME.as_bytes()),
-        account_name: AccountName::new_unchecked(SERVER_ACCOUNT_NAME),
+        id: odf::AccountID::new_seeded_ed25519(SERVER_ACCOUNT_NAME.as_bytes()),
+        account_name: odf::AccountName::new_unchecked(SERVER_ACCOUNT_NAME),
         account_type: AccountType::User,
         display_name: SERVER_ACCOUNT_NAME.to_string(),
         email: None,
@@ -109,8 +111,8 @@ pub(crate) fn create_cli_user_catalog(base_catalog: &dill::Catalog) -> dill::Cat
 
     dill::CatalogBuilder::new_chained(base_catalog)
         .add_value(CurrentAccountSubject::logged(
-            AccountID::new_seeded_ed25519(SERVER_ACCOUNT_NAME.as_bytes()),
-            AccountName::new_unchecked(SERVER_ACCOUNT_NAME),
+            odf::AccountID::new_seeded_ed25519(SERVER_ACCOUNT_NAME.as_bytes()),
+            odf::AccountName::new_unchecked(SERVER_ACCOUNT_NAME),
             is_admin,
         ))
         .add::<AlwaysHappyDatasetActionAuthorizer>()

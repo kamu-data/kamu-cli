@@ -7,19 +7,15 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use opendatafabric::{DatasetName, DatasetRef};
-
-use crate::RenameDatasetError;
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 pub trait RenameDatasetUseCase: Send + Sync {
     async fn execute(
         &self,
-        dataset_ref: &DatasetRef,
-        new_name: &DatasetName,
-    ) -> Result<(), RenameDatasetError>;
+        dataset_ref: &odf::DatasetRef,
+        new_name: &odf::DatasetName,
+    ) -> Result<(), odf::dataset::RenameDatasetError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

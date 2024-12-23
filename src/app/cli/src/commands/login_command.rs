@@ -12,7 +12,6 @@ use std::sync::Arc;
 use console::style as s;
 use kamu::domain::{AddRepoError, RemoteRepositoryRegistry};
 use kamu::UrlExt;
-use opendatafabric::RepoName;
 use url::Url;
 
 use crate::{odf_server, CLIError, Command, OutputConfig};
@@ -28,7 +27,7 @@ pub struct LoginCommand {
     server: Option<Url>,
     access_token: Option<String>,
     check: bool,
-    repo_name: Option<RepoName>,
+    repo_name: Option<odf::RepoName>,
     skip_add_repo: bool,
 }
 
@@ -42,7 +41,7 @@ impl LoginCommand {
         server: Option<Url>,
         access_token: Option<String>,
         check: bool,
-        repo_name: Option<RepoName>,
+        repo_name: Option<odf::RepoName>,
         skip_add_repo: bool,
     ) -> Self {
         Self {
@@ -90,7 +89,7 @@ impl LoginCommand {
 
     fn add_repository(&self, frontend_url: &Url, backend_url: &Url) -> Result<(), CLIError> {
         let repo_name = self.repo_name.clone().unwrap_or(
-            RepoName::try_from(frontend_url.host_str().unwrap()).map_err(CLIError::failure)?,
+            odf::RepoName::try_from(frontend_url.host_str().unwrap()).map_err(CLIError::failure)?,
         );
         match self.remote_repo_reg.add_repository(
             &repo_name,

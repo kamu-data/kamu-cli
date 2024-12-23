@@ -11,7 +11,6 @@ use std::path::PathBuf;
 
 use clap::{ArgAction, Parser};
 use kamu::domain::ExportFormat;
-use opendatafabric::{self as odf};
 
 use crate::cli_value_parser::{self as parsers};
 use crate::{

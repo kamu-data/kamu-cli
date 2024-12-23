@@ -10,7 +10,6 @@
 use std::sync::Arc;
 
 use kamu::domain::*;
-use opendatafabric::*;
 
 use super::{CLIError, Command};
 
@@ -18,19 +17,19 @@ use super::{CLIError, Command};
 
 pub struct RenameCommand {
     rename_dataset: Arc<dyn RenameDatasetUseCase>,
-    dataset_ref: DatasetRef,
-    new_name: DatasetName,
+    dataset_ref: odf::DatasetRef,
+    new_name: odf::DatasetName,
 }
 
 impl RenameCommand {
     pub fn new<N>(
         rename_dataset: Arc<dyn RenameDatasetUseCase>,
-        dataset_ref: DatasetRef,
+        dataset_ref: odf::DatasetRef,
         new_name: N,
     ) -> Self
     where
-        N: TryInto<DatasetName>,
-        <N as TryInto<DatasetName>>::Error: std::fmt::Debug,
+        N: TryInto<odf::DatasetName>,
+        <N as TryInto<odf::DatasetName>>::Error: std::fmt::Debug,
     {
         Self {
             rename_dataset,
@@ -51,9 +50,9 @@ impl Command for RenameCommand {
             .await
         {
             Ok(_) => Ok(()),
-            Err(RenameDatasetError::NotFound(e)) => Err(CLIError::failure(e)),
-            Err(RenameDatasetError::NameCollision(e)) => Err(CLIError::failure(e)),
-            Err(RenameDatasetError::Access(e)) => Err(CLIError::failure(e)),
+            Err(odf::dataset::RenameDatasetError::NotFound(e)) => Err(CLIError::failure(e)),
+            Err(odf::dataset::RenameDatasetError::NameCollision(e)) => Err(CLIError::failure(e)),
+            Err(odf::dataset::RenameDatasetError::Access(e)) => Err(CLIError::failure(e)),
             Err(e) => Err(CLIError::critical(e)),
         }?;
 

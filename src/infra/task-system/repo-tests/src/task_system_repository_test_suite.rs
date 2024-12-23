@@ -14,7 +14,6 @@ use database_common::PaginationOpts;
 use dill::Catalog;
 use futures::TryStreamExt;
 use kamu_task_system::*;
-use opendatafabric::DatasetID;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -34,7 +33,7 @@ pub async fn test_event_store_empty(catalog: &Catalog) {
 
     let tasks: Vec<_> = event_store
         .get_tasks_by_dataset(
-            &DatasetID::new_seeded_ed25519(b"foo"),
+            &odf::DatasetID::new_seeded_ed25519(b"foo"),
             PaginationOpts {
                 limit: 100,
                 offset: 0,
@@ -54,7 +53,7 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
 
     let task_id_1 = event_store.new_task_id().await.unwrap();
     let task_id_2 = event_store.new_task_id().await.unwrap();
-    let dataset_id = DatasetID::new_seeded_ed25519(b"foo");
+    let dataset_id = odf::DatasetID::new_seeded_ed25519(b"foo");
 
     let event_1 = TaskEventCreated {
         event_time: Utc::now(),
@@ -132,7 +131,7 @@ pub async fn test_event_store_get_events_with_windowing(catalog: &Catalog) {
     let event_store = catalog.get_one::<dyn TaskEventStore>().unwrap();
 
     let task_id = event_store.new_task_id().await.unwrap();
-    let dataset_id = DatasetID::new_seeded_ed25519(b"foo");
+    let dataset_id = odf::DatasetID::new_seeded_ed25519(b"foo");
 
     let event_1 = TaskEventCreated {
         event_time: Utc::now(),
@@ -230,7 +229,7 @@ pub async fn test_event_store_get_events_by_tasks(catalog: &Catalog) {
 
     let task_id_1 = event_store.new_task_id().await.unwrap();
     let task_id_2 = event_store.new_task_id().await.unwrap();
-    let dataset_id = DatasetID::new_seeded_ed25519(b"foo");
+    let dataset_id = odf::DatasetID::new_seeded_ed25519(b"foo");
 
     let event_1_1 = TaskEventCreated {
         event_time: Utc::now(),
@@ -343,8 +342,8 @@ pub async fn test_event_store_get_dataset_tasks(catalog: &Catalog) {
     let task_id_1_2 = event_store.new_task_id().await.unwrap();
     let task_id_2_2 = event_store.new_task_id().await.unwrap();
 
-    let dataset_id_foo = DatasetID::new_seeded_ed25519(b"foo");
-    let dataset_id_bar = DatasetID::new_seeded_ed25519(b"bar");
+    let dataset_id_foo = odf::DatasetID::new_seeded_ed25519(b"foo");
+    let dataset_id_bar = odf::DatasetID::new_seeded_ed25519(b"bar");
 
     let event_1_1 = TaskEventCreated {
         event_time: Utc::now(),

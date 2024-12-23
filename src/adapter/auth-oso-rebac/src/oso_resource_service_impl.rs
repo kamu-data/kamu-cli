@@ -21,7 +21,6 @@ use kamu_datasets::{
     DatasetEntryRepository,
     GetDatasetEntryError,
 };
-use opendatafabric as odf;
 use thiserror::Error;
 use tokio::sync::RwLock;
 

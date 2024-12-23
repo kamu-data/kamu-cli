@@ -16,7 +16,9 @@ use kamu::utils::simple_transfer_protocol::SimpleTransferProtocol;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
 use messaging_outbox::DummyOutboxImpl;
-use opendatafabric::*;
+use odf::dataset::{DatasetFactoryImpl, IpfsGateway};
+use odf::metadata::testing::MetadataFactory;
+use test_utils::LocalS3Server;
 use time_source::SystemTimeSourceDefault;
 use url::Url;
 
@@ -24,9 +26,9 @@ use url::Url;
 
 // Create repo/bar dataset in a repo and check it appears in searches
 async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
-    let dataset_local_alias = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
-    let repo_name = RepoName::new_unchecked("repo");
-    let dataset_remote_alias = DatasetAliasRemote::try_from("repo/bar").unwrap();
+    let dataset_local_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let repo_name = odf::RepoName::new_unchecked("repo");
+    let dataset_remote_alias = odf::DatasetAliasRemote::try_from("repo/bar").unwrap();
     let datasets_dir = tmp_workspace_dir.join("datasets");
     std::fs::create_dir(&datasets_dir).unwrap();
 
@@ -35,16 +37,16 @@ async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
         .add::<SystemTimeSourceDefault>()
         .add_value(CurrentAccountSubject::new_test())
         .add_value(TenancyConfig::SingleTenant)
-        .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
-        .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-        .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
-        .add::<DatasetRegistryRepoBridge>()
+        .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
+        .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
+        .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
+        .add::<DatasetRegistrySoloUnitBridge>()
         .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
         .add_value(RemoteRepositoryRegistryImpl::create(tmp_workspace_dir.join("repos")).unwrap())
         .bind::<dyn RemoteRepositoryRegistry, RemoteRepositoryRegistryImpl>()
         .add_value(IpfsGateway::default())
         .add_value(kamu::utils::ipfs_wrapper::IpfsClient::default())
-        .add::<auth::DummyOdfServerAccessTokenResolver>()
+        .add::<odf::dataset::DummyOdfServerAccessTokenResolver>()
         .add::<DatasetFactoryImpl>()
         .add::<SyncServiceImpl>()
         .add::<SyncRequestBuilder>()
@@ -56,7 +58,7 @@ async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
         .build();
 
     let remote_repo_reg = catalog.get_one::<dyn RemoteRepositoryRegistry>().unwrap();
-    let dataset_repo_writer = catalog.get_one::<dyn DatasetRepositoryWriter>().unwrap();
+    let dataset_storage_unit_writer = catalog.get_one::<dyn DatasetStorageUnitWriter>().unwrap();
     let sync_svc = catalog.get_one::<dyn SyncService>().unwrap();
     let sync_request_builder = catalog.get_one::<SyncRequestBuilder>().unwrap();
     let search_svc = catalog.get_one::<dyn SearchService>().unwrap();
@@ -67,11 +69,11 @@ async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
         .unwrap();
 
     // Add and sync dataset
-    dataset_repo_writer
+    dataset_storage_unit_writer
         .create_dataset_from_snapshot(
             MetadataFactory::dataset_snapshot()
                 .name(dataset_local_alias.clone())
-                .kind(DatasetKind::Root)
+                .kind(odf::DatasetKind::Root)
                 .push_event(MetadataFactory::set_polling_source().build())
                 .build(),
         )

@@ -10,7 +10,6 @@
 use std::sync::Arc;
 
 use kamu::domain::*;
-use opendatafabric::*;
 
 use super::{CLIError, Command};
 use crate::Interact;
@@ -21,8 +20,8 @@ pub struct ResetCommand {
     interact: Arc<Interact>,
     dataset_registry: Arc<dyn DatasetRegistry>,
     reset_dataset_use_case: Arc<dyn ResetDatasetUseCase>,
-    dataset_ref: DatasetRef,
-    block_hash: Multihash,
+    dataset_ref: odf::DatasetRef,
+    block_hash: odf::Multihash,
 }
 
 impl ResetCommand {
@@ -30,8 +29,8 @@ impl ResetCommand {
         interact: Arc<Interact>,
         dataset_registry: Arc<dyn DatasetRegistry>,
         reset_dataset_use_case: Arc<dyn ResetDatasetUseCase>,
-        dataset_ref: DatasetRef,
-        block_hash: Multihash,
+        dataset_ref: odf::DatasetRef,
+        block_hash: odf::Multihash,
     ) -> Self {
         Self {
             interact,

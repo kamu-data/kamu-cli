@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use kamu_core::*;
-use opendatafabric::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -24,7 +23,7 @@ mockall::mock! {
         async fn build_transform_verification_plan(
             &self,
             target: ResolvedDataset,
-            block_range: (Option<Multihash>, Option<Multihash>),
+            block_range: (Option<odf::Multihash>, Option<odf::Multihash>),
         ) -> Result<VerifyTransformOperation, VerifyTransformPlanError>;
     }
 }

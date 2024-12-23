@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use kamu_datasets::{DatasetEntryService, DatasetEntryServiceExt};
-use opendatafabric as odf;
 
 use crate::prelude::*;
 use crate::utils;

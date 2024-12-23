@@ -13,14 +13,12 @@ use async_graphql::*;
 use chrono::Utc;
 use dill::Component;
 use indoc::indoc;
-use kamu::testing::MetadataFactory;
 use kamu::*;
 use kamu_core::*;
 use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
 use kamu_datasets_services::DependencyGraphServiceImpl;
 use messaging_outbox::DummyOutboxImpl;
-use opendatafabric::serde::yaml::YamlMetadataEventSerializer;
-use opendatafabric::*;
+use odf::metadata::testing::MetadataFactory;
 use time_source::SystemTimeSourceDefault;
 
 use crate::utils::{authentication_catalogs, expect_anonymous_access_error};
@@ -39,10 +37,10 @@ async fn test_metadata_chain_events() {
     let create_result = create_dataset
         .execute(
             &"foo".try_into().unwrap(),
-            MetadataBlockTyped {
+            odf::MetadataBlockTyped {
                 system_time: Utc::now(),
                 prev_block_hash: None,
-                event: MetadataFactory::seed(DatasetKind::Root).build(),
+                event: MetadataFactory::seed(odf::DatasetKind::Root).build(),
                 sequence_number: 0,
             },
             Default::default(),
@@ -54,7 +52,7 @@ async fn test_metadata_chain_events() {
         .dataset
         .commit_event(
             MetadataFactory::set_data_schema().build().into(),
-            CommitOpts::default(),
+            odf::dataset::CommitOpts::default(),
         )
         .await
         .unwrap();
@@ -68,9 +66,9 @@ async fn test_metadata_chain_events() {
                 .some_new_source_state()
                 .build()
                 .into(),
-            CommitOpts {
+            odf::dataset::CommitOpts {
                 check_object_refs: false, // Cheating a little
-                ..CommitOpts::default()
+                ..odf::dataset::CommitOpts::default()
             },
         )
         .await
@@ -187,7 +185,7 @@ async fn metadata_chain_append_event() {
         .execute(
             MetadataFactory::dataset_snapshot()
                 .name("foo")
-                .kind(DatasetKind::Root)
+                .kind(odf::DatasetKind::Root)
                 .build(),
             Default::default(),
         )
@@ -196,9 +194,10 @@ async fn metadata_chain_append_event() {
 
     let event = MetadataFactory::set_polling_source().build();
 
+    use odf::metadata::serde::yaml::YamlMetadataEventSerializer;
     let event_yaml = String::from_utf8_lossy(
         &YamlMetadataEventSerializer
-            .write_manifest(&MetadataEvent::SetPollingSource(event))
+            .write_manifest(&odf::MetadataEvent::SetPollingSource(event))
             .unwrap(),
     )
     .to_string();
@@ -272,7 +271,7 @@ async fn metadata_update_readme_new() {
         .execute(
             MetadataFactory::dataset_snapshot()
                 .name("foo")
-                .kind(DatasetKind::Root)
+                .kind(odf::DatasetKind::Root)
                 .build(),
             Default::default(),
         )
@@ -341,9 +340,9 @@ async fn metadata_update_readme_new() {
 
     assert_attachments_eq(
         dataset.clone(),
-        SetAttachments {
-            attachments: Attachments::Embedded(AttachmentsEmbedded {
-                items: vec![AttachmentEmbedded {
+        odf::metadata::SetAttachments {
+            attachments: odf::metadata::Attachments::Embedded(odf::metadata::AttachmentsEmbedded {
+                items: vec![odf::metadata::AttachmentEmbedded {
                     path: "README.md".to_string(),
                     content: "new readme".to_string(),
                 }],
@@ -384,8 +383,10 @@ async fn metadata_update_readme_new() {
 
     assert_attachments_eq(
         dataset.clone(),
-        SetAttachments {
-            attachments: Attachments::Embedded(AttachmentsEmbedded { items: vec![] }),
+        odf::metadata::SetAttachments {
+            attachments: odf::metadata::Attachments::Embedded(odf::metadata::AttachmentsEmbedded {
+                items: vec![],
+            }),
         },
     )
     .await;
@@ -427,22 +428,24 @@ async fn metadata_update_readme_new() {
     create_result
         .dataset
         .commit_event(
-            SetAttachments {
-                attachments: Attachments::Embedded(AttachmentsEmbedded {
-                    items: vec![
-                        AttachmentEmbedded {
-                            path: "LICENSE.md".to_string(),
-                            content: "my license".to_string(),
-                        },
-                        AttachmentEmbedded {
-                            path: "README.md".to_string(),
-                            content: "my readme".to_string(),
-                        },
-                    ],
-                }),
+            odf::metadata::SetAttachments {
+                attachments: odf::metadata::Attachments::Embedded(
+                    odf::metadata::AttachmentsEmbedded {
+                        items: vec![
+                            odf::metadata::AttachmentEmbedded {
+                                path: "LICENSE.md".to_string(),
+                                content: "my license".to_string(),
+                            },
+                            odf::metadata::AttachmentEmbedded {
+                                path: "README.md".to_string(),
+                                content: "my readme".to_string(),
+                            },
+                        ],
+                    },
+                ),
             }
             .into(),
-            CommitOpts::default(),
+            odf::dataset::CommitOpts::default(),
         )
         .await
         .unwrap();
@@ -475,14 +478,14 @@ async fn metadata_update_readme_new() {
 
     assert_attachments_eq(
         dataset.clone(),
-        SetAttachments {
-            attachments: Attachments::Embedded(AttachmentsEmbedded {
+        odf::metadata::SetAttachments {
+            attachments: odf::metadata::Attachments::Embedded(odf::metadata::AttachmentsEmbedded {
                 items: vec![
-                    AttachmentEmbedded {
+                    odf::metadata::AttachmentEmbedded {
                         path: "LICENSE.md".to_string(),
                         content: "my license".to_string(),
                     },
-                    AttachmentEmbedded {
+                    odf::metadata::AttachmentEmbedded {
                         path: "README.md".to_string(),
                         content: "new readme".to_string(),
                     },
@@ -495,7 +498,13 @@ async fn metadata_update_readme_new() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-async fn assert_attachments_eq(dataset: Arc<dyn Dataset>, expected: SetAttachments) {
+async fn assert_attachments_eq(
+    dataset: Arc<dyn odf::Dataset>,
+    expected: odf::metadata::SetAttachments,
+) {
+    use odf::dataset::{MetadataChainExt as _, TryStreamExtExt as _};
+    use odf::metadata::EnumWithVariants;
+
     let actual = dataset
         .as_metadata_chain()
         .iter_blocks()
@@ -505,7 +514,7 @@ async fn assert_attachments_eq(dataset: Arc<dyn Dataset>, expected: SetAttachmen
         .unwrap()
         .1
         .event
-        .into_variant::<SetAttachments>()
+        .into_variant::<odf::metadata::SetAttachments>()
         .unwrap();
 
     assert_eq!(actual, expected);
@@ -537,10 +546,10 @@ impl GraphQLMetadataChainHarness {
                 .add::<DependencyGraphServiceImpl>()
                 .add::<InMemoryDatasetDependencyRepository>()
                 .add_value(tenancy_config)
-                .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
-                .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-                .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
-                .add::<DatasetRegistryRepoBridge>()
+                .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
+                .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
+                .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
+                .add::<DatasetRegistrySoloUnitBridge>()
                 .add::<auth::AlwaysHappyDatasetActionAuthorizer>();
 
             database_common::NoOpDatabasePlugin::init_database_components(&mut b);

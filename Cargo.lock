@@ -1373,6 +1373,7 @@ name = "async-utils"
 version = "0.218.0"
 dependencies = [
  "async-trait",
+ "tokio",
 ]
 
 [[package]]
@@ -4058,6 +4059,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "28dea519a9695b9977216879a3ebfddf92f1c08c05d984f8996aecd6ecdc811d"
 
 [[package]]
+name = "file-utils"
+version = "0.218.0"
+
+[[package]]
 name = "filetime"
 version = "0.2.25"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4724,6 +4729,7 @@ dependencies = [
  "http 1.2.0",
  "internal-error",
  "kamu-core",
+ "opendatafabric",
  "serde",
  "serde_json",
  "strum",
@@ -5333,6 +5339,7 @@ dependencies = [
  "async-recursion",
  "async-stream",
  "async-trait",
+ "async-utils",
  "aws-config",
  "aws-credential-types",
  "aws-sdk-s3",
@@ -5351,6 +5358,7 @@ dependencies = [
  "datafusion-functions-json",
  "digest 0.10.7",
  "dill",
+ "file-utils",
  "filetime",
  "flatbuffers",
  "flate2",
@@ -5367,7 +5375,6 @@ dependencies = [
  "kamu",
  "kamu-accounts",
  "kamu-core",
- "kamu-data-utils",
  "kamu-datasets",
  "kamu-datasets-inmem",
  "kamu-datasets-services",
@@ -5389,6 +5396,7 @@ dependencies = [
  "reqwest",
  "ringbuf",
  "rumqttc",
+ "s3-utils",
  "serde",
  "serde_json",
  "serde_with",
@@ -5397,6 +5405,7 @@ dependencies = [
  "tempfile",
  "test-group",
  "test-log",
+ "test-utils",
  "testing_logger",
  "thiserror 2.0.11",
  "time-source",
@@ -5613,9 +5622,9 @@ dependencies = [
  "indoc 2.0.5",
  "kamu-accounts",
  "kamu-core",
- "kamu-data-utils",
  "like",
  "mockall",
+ "opendatafabric",
  "prost",
  "rand",
  "test-log",
@@ -5640,6 +5649,7 @@ dependencies = [
  "datafusion",
  "dill",
  "event-sourcing",
+ "file-utils",
  "futures",
  "indoc 2.0.5",
  "init-on-startup",
@@ -5652,7 +5662,6 @@ dependencies = [
  "kamu-auth-rebac-inmem",
  "kamu-auth-rebac-services",
  "kamu-core",
- "kamu-data-utils",
  "kamu-datasets",
  "kamu-datasets-inmem",
  "kamu-datasets-services",
@@ -5713,7 +5722,6 @@ dependencies = [
  "kamu-accounts-inmem",
  "kamu-accounts-services",
  "kamu-core",
- "kamu-data-utils",
  "kamu-datasets-inmem",
  "kamu-datasets-services",
  "kamu-ingest-datafusion",
@@ -5724,6 +5732,7 @@ dependencies = [
  "pretty_assertions",
  "rand",
  "reqwest",
+ "s3-utils",
  "serde",
  "serde_json",
  "serde_with",
@@ -5732,6 +5741,7 @@ dependencies = [
  "tempfile",
  "test-group",
  "test-log",
+ "test-utils",
  "thiserror 2.0.11",
  "time-source",
  "tokio",
@@ -5912,6 +5922,7 @@ dependencies = [
  "dill",
  "dirs 6.0.0",
  "duration-string",
+ "file-utils",
  "fs_extra",
  "futures",
  "glob",
@@ -5942,7 +5953,6 @@ dependencies = [
  "kamu-auth-rebac-services",
  "kamu-auth-rebac-sqlite",
  "kamu-cli-puppet",
- "kamu-data-utils",
  "kamu-datafusion-cli",
  "kamu-datasets",
  "kamu-datasets-inmem",
@@ -6110,6 +6120,7 @@ dependencies = [
  "reqwest",
  "serde_json",
  "tempfile",
+ "test-utils",
  "url",
 ]
 
@@ -6135,7 +6146,6 @@ dependencies = [
  "chrono",
  "datafusion",
  "indoc 2.0.5",
- "kamu-data-utils",
  "opendatafabric",
  "pretty_assertions",
  "serde",
@@ -6151,15 +6161,16 @@ version = "0.218.0"
 dependencies = [
  "async-stream",
  "async-trait",
+ "async-utils",
  "bytes",
  "chrono",
  "container-runtime",
  "datafusion",
  "dill",
+ "file-utils",
  "futures",
  "http 1.2.0",
  "internal-error",
- "kamu-accounts",
  "kamu-datasets",
  "messaging-outbox",
  "mockall",
@@ -6177,30 +6188,6 @@ dependencies = [
  "tracing",
  "url",
  "utoipa",
-]
-
-[[package]]
-name = "kamu-data-utils"
-version = "0.218.0"
-dependencies = [
- "arrow",
- "arrow-digest",
- "arrow-json",
- "async-trait",
- "datafusion",
- "digest 0.10.7",
- "hex",
- "indoc 2.0.5",
- "opendatafabric",
- "pretty_assertions",
- "serde",
- "serde_json",
- "sha3",
- "test-log",
- "thiserror 2.0.11",
- "tokio",
- "tracing",
- "url",
 ]
 
 [[package]]
@@ -6511,6 +6498,7 @@ dependencies = [
  "chrono",
  "criterion",
  "datafusion",
+ "file-utils",
  "futures",
  "geo-types",
  "geojson",
@@ -6518,7 +6506,6 @@ dependencies = [
  "indoc 2.0.5",
  "internal-error",
  "kamu-core",
- "kamu-data-utils",
  "opendatafabric",
  "pretty_assertions",
  "rand",
@@ -6707,6 +6694,7 @@ dependencies = [
  "messaging-outbox",
  "mockall",
  "observability",
+ "opendatafabric",
  "serde_json",
  "tempfile",
  "test-log",
@@ -7705,10 +7693,106 @@ checksum = "c08d65885ee38876c4f86fa503fb49d7b507c2b62552df7c70b2fce627e06381"
 name = "opendatafabric"
 version = "0.218.0"
 dependencies = [
+ "opendatafabric-data-utils",
+ "opendatafabric-dataset",
+ "opendatafabric-dataset-impl",
+ "opendatafabric-metadata",
+ "opendatafabric-storage",
+ "opendatafabric-storage-http",
+ "opendatafabric-storage-inmem",
+ "opendatafabric-storage-lfs",
+ "opendatafabric-storage-s3",
+]
+
+[[package]]
+name = "opendatafabric-data-utils"
+version = "0.218.0"
+dependencies = [
+ "arrow",
+ "arrow-digest",
+ "arrow-json",
+ "async-trait",
+ "datafusion",
+ "digest 0.10.7",
+ "hex",
+ "indoc 2.0.5",
+ "opendatafabric-metadata",
+ "pretty_assertions",
+ "serde",
+ "serde_json",
+ "sha3",
+ "test-log",
+ "thiserror 2.0.11",
+ "tokio",
+ "tracing",
+ "url",
+]
+
+[[package]]
+name = "opendatafabric-dataset"
+version = "0.218.0"
+dependencies = [
+ "async-trait",
+ "async-utils",
+ "chrono",
+ "dill",
+ "file-utils",
+ "futures",
+ "internal-error",
+ "mockall",
+ "opendatafabric-metadata",
+ "opendatafabric-storage",
+ "pin-project",
+ "serde",
+ "serde_with",
+ "thiserror 2.0.11",
+ "tokio-stream",
+ "url",
+]
+
+[[package]]
+name = "opendatafabric-dataset-impl"
+version = "0.218.0"
+dependencies = [
+ "async-stream",
+ "async-trait",
+ "chrono",
+ "dill",
+ "file-utils",
+ "hickory-resolver",
+ "http 1.2.0",
+ "internal-error",
+ "mockall",
+ "opendatafabric",
+ "opendatafabric-data-utils",
+ "opendatafabric-dataset",
+ "opendatafabric-metadata",
+ "opendatafabric-storage",
+ "opendatafabric-storage-http",
+ "opendatafabric-storage-lfs",
+ "opendatafabric-storage-s3",
+ "regex",
+ "reqwest",
+ "s3-utils",
+ "serde_yaml",
+ "tempfile",
+ "test-log",
+ "thiserror 2.0.11",
+ "tokio",
+ "tokio-stream",
+ "tracing",
+ "url",
+]
+
+[[package]]
+name = "opendatafabric-metadata"
+version = "0.218.0"
+dependencies = [
  "arrow",
  "base64 0.22.1",
  "bitflags 2.8.0",
  "chrono",
+ "datafusion",
  "digest 0.10.7",
  "ed25519-dalek",
  "enum-variants",
@@ -7718,6 +7802,7 @@ dependencies = [
  "like",
  "multiformats",
  "prost",
+ "rand",
  "serde",
  "serde_json",
  "serde_with",
@@ -7728,6 +7813,110 @@ dependencies = [
  "tonic",
  "url",
  "utoipa",
+]
+
+[[package]]
+name = "opendatafabric-storage"
+version = "0.218.0"
+dependencies = [
+ "async-trait",
+ "async-utils",
+ "bytes",
+ "chrono",
+ "dashmap",
+ "http 1.2.0",
+ "internal-error",
+ "mockall",
+ "opendatafabric-metadata",
+ "opendatafabric-storage-lfs",
+ "pretty_assertions",
+ "random-names",
+ "tempfile",
+ "thiserror 2.0.11",
+ "tokio",
+ "url",
+]
+
+[[package]]
+name = "opendatafabric-storage-http"
+version = "0.218.0"
+dependencies = [
+ "async-trait",
+ "async-utils",
+ "bytes",
+ "futures",
+ "http 1.2.0",
+ "internal-error",
+ "opendatafabric-metadata",
+ "opendatafabric-storage",
+ "reqwest",
+ "tempfile",
+ "test-log",
+ "test-utils",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "url",
+]
+
+[[package]]
+name = "opendatafabric-storage-inmem"
+version = "0.218.0"
+dependencies = [
+ "async-trait",
+ "async-utils",
+ "bytes",
+ "internal-error",
+ "opendatafabric-metadata",
+ "opendatafabric-storage",
+ "sha3",
+ "tokio",
+ "tracing",
+ "url",
+]
+
+[[package]]
+name = "opendatafabric-storage-lfs"
+version = "0.218.0"
+dependencies = [
+ "async-trait",
+ "async-utils",
+ "bytes",
+ "digest 0.10.7",
+ "internal-error",
+ "opendatafabric-data-utils",
+ "opendatafabric-metadata",
+ "opendatafabric-storage",
+ "sha3",
+ "tempfile",
+ "tokio",
+ "tracing",
+ "url",
+]
+
+[[package]]
+name = "opendatafabric-storage-s3"
+version = "0.218.0"
+dependencies = [
+ "async-trait",
+ "async-utils",
+ "aws-sdk-s3",
+ "bytes",
+ "chrono",
+ "digest 0.10.7",
+ "http 1.2.0",
+ "internal-error",
+ "opendatafabric-metadata",
+ "opendatafabric-storage",
+ "rand",
+ "s3-utils",
+ "sha3",
+ "test-group",
+ "test-log",
+ "test-utils",
+ "tokio",
+ "tracing",
+ "url",
 ]
 
 [[package]]
@@ -9339,6 +9528,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f3cb5ba0dc43242ce17de99c180e96db90b235b8a9fdc9543c96d2209116bd9f"
 
 [[package]]
+name = "s3-utils"
+version = "0.218.0"
+dependencies = [
+ "async-utils",
+ "aws-config",
+ "aws-sdk-s3",
+ "aws-smithy-types",
+ "internal-error",
+ "reqwest",
+ "tokio-util",
+ "tracing",
+ "url",
+]
+
+[[package]]
 name = "same-file"
 version = "1.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -10310,6 +10514,20 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.96",
+]
+
+[[package]]
+name = "test-utils"
+version = "0.218.0"
+dependencies = [
+ "axum",
+ "container-runtime",
+ "rand",
+ "tempfile",
+ "tokio",
+ "tower 0.5.2",
+ "tower-http",
+ "url",
 ]
 
 [[package]]

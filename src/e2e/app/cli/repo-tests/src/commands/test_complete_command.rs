@@ -9,7 +9,6 @@
 
 use kamu_cli_puppet::extensions::KamuCliPuppetExt;
 use kamu_cli_puppet::KamuCliPuppet;
-use opendatafabric::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -30,9 +29,9 @@ pub async fn test_complete_config(kamu: KamuCliPuppet) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_complete_dataset_name(kamu: KamuCliPuppet) {
-    kamu.add_dataset(DatasetSnapshot {
+    kamu.add_dataset(odf::DatasetSnapshot {
         name: "foo.bar".try_into().unwrap(),
-        kind: DatasetKind::Root,
+        kind: odf::DatasetKind::Root,
         metadata: vec![],
     })
     .await;

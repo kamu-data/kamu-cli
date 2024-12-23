@@ -36,7 +36,6 @@ use kamu_flow_system_services::{
 };
 use kamu_task_system_inmem::domain::{TaskProgressMessage, MESSAGE_PRODUCER_KAMU_TASK_AGENT};
 use messaging_outbox::{register_message_dispatcher, Outbox, OutboxDispatchingImpl};
-use opendatafabric as odf;
 use time_source::{SystemTimeSource, SystemTimeSourceDefault, SystemTimeSourceStub};
 use tracing::{warn, Instrument};
 
@@ -389,12 +388,12 @@ pub fn configure_base_catalog(
     b.add::<DidGeneratorDefault>();
 
     b.add_builder(
-        DatasetRepositoryLocalFs::builder().with_root(workspace_layout.datasets_dir.clone()),
+        DatasetStorageUnitLocalFs::builder().with_root(workspace_layout.datasets_dir.clone()),
     );
-    b.bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>();
-    b.bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>();
+    b.bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>();
+    b.bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>();
 
-    b.add::<DatasetFactoryImpl>();
+    b.add::<odf::dataset::DatasetFactoryImpl>();
 
     b.add::<RemoteRepositoryRegistryImpl>();
 
@@ -734,7 +733,7 @@ pub fn register_config_in_catalog(
 
     let ipfs_conf = config.protocol.as_ref().unwrap().ipfs.as_ref().unwrap();
 
-    catalog_builder.add_value(IpfsGateway {
+    catalog_builder.add_value(odf::dataset::IpfsGateway {
         url: ipfs_conf.http_gateway.clone().unwrap(),
         pre_resolve_dnslink: ipfs_conf.pre_resolve_dnslink.unwrap(),
     });

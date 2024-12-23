@@ -9,11 +9,11 @@
 
 use std::path::{Path, PathBuf};
 
+use file_utils::OwnedFile;
 use kamu_core::*;
-use opendatafabric::*;
+use odf::dataset::DatasetLayout;
 
 use super::ParquetWriterHelper;
-use crate::DatasetLayout;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -82,9 +82,9 @@ impl DatasetTestHelper {
 
     pub async fn append_random_data(
         dataset_registry: &dyn DatasetRegistry,
-        dataset_ref: impl Into<DatasetRef>,
+        dataset_ref: impl Into<odf::DatasetRef>,
         data_size: usize,
-    ) -> Multihash {
+    ) -> odf::Multihash {
         let tmp_dir = tempfile::tempdir().unwrap();
 
         let resolved_dataset = dataset_registry
@@ -92,11 +92,13 @@ impl DatasetTestHelper {
             .await
             .unwrap();
 
+        use odf::dataset::{MetadataChainExt, TryStreamExtExt};
+
         let prev_data = resolved_dataset
             .as_metadata_chain()
             .iter_blocks()
             .filter_map_ok(|(_, b)| match b.event {
-                MetadataEvent::AddData(e) => Some(e),
+                odf::MetadataEvent::AddData(e) => Some(e),
                 _ => None,
             })
             .try_first()
@@ -114,18 +116,20 @@ impl DatasetTestHelper {
             .and_then(|e| e.new_checkpoint.as_ref())
             .map(|c| c.physical_hash.clone());
 
-        let prev_offset = prev_data.as_ref().and_then(AddData::last_offset);
+        let prev_offset = prev_data
+            .as_ref()
+            .and_then(odf::metadata::AddData::last_offset);
 
         let num_records = 10;
         let start = prev_offset.map_or(0, |v| v + 1);
-        let new_offset_interval = OffsetInterval {
+        let new_offset_interval = odf::metadata::OffsetInterval {
             start,
             end: start + num_records - 1,
         };
 
         resolved_dataset
             .commit_add_data(
-                AddDataParams {
+                odf::dataset::AddDataParams {
                     prev_checkpoint,
                     prev_offset,
                     new_offset_interval: Some(new_offset_interval),
@@ -133,8 +137,10 @@ impl DatasetTestHelper {
                     new_source_state: None,
                 },
                 Some(OwnedFile::new(data_path)),
-                Some(CheckpointRef::New(OwnedFile::new(checkpoint_path))),
-                CommitOpts::default(),
+                Some(odf::dataset::CheckpointRef::New(OwnedFile::new(
+                    checkpoint_path,
+                ))),
+                odf::dataset::CommitOpts::default(),
             )
             .await
             .unwrap()

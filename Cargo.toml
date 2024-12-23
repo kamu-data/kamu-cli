@@ -3,13 +3,13 @@ members = [
     # Utils
     "src/utils/async-utils",
     "src/utils/container-runtime",
-    "src/utils/data-utils",
     "src/utils/database-common",
     "src/utils/database-common-macros",
     "src/utils/datafusion-cli",
     "src/utils/enum-variants",
     "src/utils/event-sourcing",
     "src/utils/event-sourcing-macros",
+    "src/utils/file-utils",
     "src/utils/http-common",
     "src/utils/init-on-startup",
     "src/utils/internal-error",
@@ -19,15 +19,27 @@ members = [
     "src/utils/observability",
     "src/utils/random-names",
     "src/utils/repo-tools",
+    "src/utils/s3-utils",
+    "src/utils/test-utils",
     "src/utils/time-source",
     "src/utils/tracing-perfetto",
+    # ODF
+    "src/odf/odf",
+    "src/odf/metadata",
+    "src/odf/data-utils",
+    "src/odf/dataset",
+    "src/odf/dataset-impl",
+    "src/odf/storage",
+    "src/odf/storage-http",
+    "src/odf/storage-inmem",
+    "src/odf/storage-lfs",
+    "src/odf/storage-s3",
     # Domain
     "src/domain/accounts/domain",
     "src/domain/auth-rebac/domain",
     "src/domain/core",
     "src/domain/datasets/domain",
     "src/domain/flow-system/domain",
-    "src/domain/opendatafabric",
     "src/domain/task-system/domain",
     # Domain service layer
     "src/domain/accounts/services",
@@ -102,16 +114,18 @@ database-common-macros = { version = "0.218.0", path = "src/utils/database-commo
 enum-variants = { version = "0.218.0", path = "src/utils/enum-variants", default-features = false }
 event-sourcing = { version = "0.218.0", path = "src/utils/event-sourcing", default-features = false }
 event-sourcing-macros = { version = "0.218.0", path = "src/utils/event-sourcing-macros", default-features = false }
+file-utils = { version = "0.218.0", path = "src/utils/file-utils", default-features = false }
 http-common = { version = "0.218.0", path = "src/utils/http-common", default-features = false }
 init-on-startup = { version = "0.218.0", path = "src/utils/init-on-startup", default-features = false }
 internal-error = { version = "0.218.0", path = "src/utils/internal-error", default-features = false }
 kamu-cli-puppet = { version = "0.218.0", path = "src/utils/kamu-cli-puppet", default-features = false }
-kamu-data-utils = { version = "0.218.0", path = "src/utils/data-utils", default-features = false }
 kamu-datafusion-cli = { version = "0.218.0", path = "src/utils/datafusion-cli", default-features = false }
 messaging-outbox = { version = "0.218.0", path = "src/utils/messaging-outbox", default-features = false }
 multiformats = { version = "0.218.0", path = "src/utils/multiformats", default-features = false }
 observability = { version = "0.218.0", path = "src/utils/observability", default-features = false }
 random-names = { version = "0.218.0", path = "src/utils/random-names", default-features = false }
+s3-utils = { version = "0.218.0", path = "src/utils/s3-utils", default-features = false }
+test-utils = { version = "0.218.0", path = "src/utils/test-utils", default-features = false }
 time-source = { version = "0.218.0", path = "src/utils/time-source", default-features = false }
 tracing-perfetto = { version = "0.218.0", path = "src/utils/tracing-perfetto", default-features = false }
 
@@ -122,7 +136,18 @@ kamu-core = { version = "0.218.0", path = "src/domain/core", default-features = 
 kamu-datasets = { version = "0.218.0", path = "src/domain/datasets/domain", default-features = false }
 kamu-flow-system = { version = "0.218.0", path = "src/domain/flow-system/domain", default-features = false }
 kamu-task-system = { version = "0.218.0", path = "src/domain/task-system/domain", default-features = false }
-opendatafabric = { version = "0.218.0", path = "src/domain/opendatafabric", default-features = false }
+
+## Open Data Fabric
+odf = { version = "0.218.0", path = "src/odf/odf", default-features = false, package="opendatafabric" }
+odf-metadata = { version = "0.218.0", path = "src/odf/metadata", default-features = false, package = "opendatafabric-metadata"}
+odf-dataset = { version = "0.218.0", path = "src/odf/dataset", default-features = false, package="opendatafabric-dataset" }
+odf-data-utils = { version = "0.218.0", path = "src/odf/data-utils", default-features = false, package="opendatafabric-data-utils" }
+odf-dataset-impl = { version = "0.218.0", path = "src/odf/dataset-impl", default-features = false, package="opendatafabric-dataset-impl" }
+odf-storage = { version = "0.218.0", path = "src/odf/storage", default-features = false, package="opendatafabric-storage" }
+odf-storage-http = { version = "0.218.0", path = "src/odf/storage-http", default-features = false, package="opendatafabric-storage-http" }
+odf-storage-inmem = { version = "0.218.0", path = "src/odf/storage-inmem", default-features = false, package="opendatafabric-storage-inmem" }
+odf-storage-lfs = { version = "0.218.0", path = "src/odf/storage-lfs", default-features = false, package="opendatafabric-storage-lfs" }
+odf-storage-s3 = { version = "0.218.0", path = "src/odf/storage-s3", default-features = false, package="opendatafabric-storage-s3" }
 
 # Domain service layer
 kamu-accounts-services = { version = "0.218.0", path = "src/domain/accounts/services", default-features = false }
@@ -244,7 +269,7 @@ debug = 2
 # We don't emit info for dependencies as this significantly increases binary size.
 # See: https://doc.rust-lang.org/cargo/reference/profiles.html#debug
 [profile.release.package]
-opendatafabric = { debug = 1 }
+opendatafabric-metadata = { debug = 1 }
 kamu = { debug = 1 }
 kamu-cli = { debug = 1 }
 

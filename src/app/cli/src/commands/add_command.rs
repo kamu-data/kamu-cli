@@ -11,7 +11,6 @@ use std::collections::{HashSet, LinkedList};
 use std::sync::Arc;
 
 use kamu::domain::*;
-use opendatafabric::*;
 
 use super::{BatchError, CLIError, Command};
 use crate::{ConfirmDeleteService, OutputConfig};
@@ -24,11 +23,11 @@ pub struct AddCommand {
     create_dataset_from_snapshot: Arc<dyn CreateDatasetFromSnapshotUseCase>,
     delete_dataset: Arc<dyn DeleteDatasetUseCase>,
     snapshot_refs: Vec<String>,
-    name: Option<DatasetAlias>,
+    name: Option<odf::DatasetAlias>,
     recursive: bool,
     replace: bool,
     stdin: bool,
-    dataset_visibility: DatasetVisibility,
+    dataset_visibility: odf::DatasetVisibility,
     output_config: Arc<OutputConfig>,
     tenancy_config: TenancyConfig,
     confirm_delete_service: Arc<ConfirmDeleteService>,
@@ -41,11 +40,11 @@ impl AddCommand {
         create_dataset_from_snapshot: Arc<dyn CreateDatasetFromSnapshotUseCase>,
         delete_dataset: Arc<dyn DeleteDatasetUseCase>,
         snapshot_refs_iter: I,
-        name: Option<DatasetAlias>,
+        name: Option<odf::DatasetAlias>,
         recursive: bool,
         replace: bool,
         stdin: bool,
-        dataset_visibility: DatasetVisibility,
+        dataset_visibility: odf::DatasetVisibility,
         output_config: Arc<OutputConfig>,
         tenancy_config: TenancyConfig,
         confirm_delete_service: Arc<ConfirmDeleteService>,
@@ -71,7 +70,7 @@ impl AddCommand {
         }
     }
 
-    async fn load_specific(&self) -> Vec<(String, Result<DatasetSnapshot, ResourceError>)> {
+    async fn load_specific(&self) -> Vec<(String, Result<odf::DatasetSnapshot, ResourceError>)> {
         let mut res = Vec::new();
         for r in &self.snapshot_refs {
             let load = self.resource_loader.load_dataset_snapshot_from_ref(r).await;
@@ -80,7 +79,7 @@ impl AddCommand {
         res
     }
 
-    async fn load_recursive(&self) -> Vec<(String, Result<DatasetSnapshot, ResourceError>)> {
+    async fn load_recursive(&self) -> Vec<(String, Result<odf::DatasetSnapshot, ResourceError>)> {
         let files_iter = self
             .snapshot_refs
             .iter()
@@ -106,8 +105,8 @@ impl AddCommand {
         res
     }
 
-    fn load_stdin(&self) -> Vec<(String, Result<DatasetSnapshot, ResourceError>)> {
-        match opendatafabric::serde::yaml::YamlDatasetSnapshotDeserializer
+    fn load_stdin(&self) -> Vec<(String, Result<odf::DatasetSnapshot, ResourceError>)> {
+        match odf::metadata::serde::yaml::YamlDatasetSnapshotDeserializer
             .read_manifests(std::io::stdin())
         {
             Ok(v) => v
@@ -149,11 +148,11 @@ impl AddCommand {
 
     pub async fn create_datasets_from_snapshots(
         &self,
-        snapshots: Vec<DatasetSnapshot>,
+        snapshots: Vec<odf::DatasetSnapshot>,
         create_options: CreateDatasetUseCaseOptions,
     ) -> Vec<(
-        DatasetAlias,
-        Result<CreateDatasetResult, CreateDatasetFromSnapshotError>,
+        odf::DatasetAlias,
+        Result<odf::CreateDatasetResult, odf::dataset::CreateDatasetFromSnapshotError>,
     )> {
         let snapshots_ordered =
             self.sort_snapshots_in_dependency_order(snapshots.into_iter().collect());
@@ -174,21 +173,22 @@ impl AddCommand {
     #[allow(clippy::linkedlist)]
     fn sort_snapshots_in_dependency_order(
         &self,
-        mut snapshots: LinkedList<DatasetSnapshot>,
-    ) -> Vec<DatasetSnapshot> {
+        mut snapshots: LinkedList<odf::DatasetSnapshot>,
+    ) -> Vec<odf::DatasetSnapshot> {
         let mut ordered = Vec::with_capacity(snapshots.len());
-        let mut pending: HashSet<DatasetRef> =
+        let mut pending: HashSet<odf::DatasetRef> =
             snapshots.iter().map(|s| s.name.clone().into()).collect();
-        let mut added: HashSet<DatasetAlias> = HashSet::new();
+        let mut added: HashSet<odf::DatasetAlias> = HashSet::new();
 
         // TODO: cycle detection
         while !snapshots.is_empty() {
             let snapshot = snapshots.pop_front().unwrap();
 
+            use odf::metadata::EnumWithVariants;
             let transform = snapshot
                 .metadata
                 .iter()
-                .find_map(|e| e.as_variant::<SetTransform>());
+                .find_map(|e| e.as_variant::<odf::metadata::SetTransform>());
 
             let has_pending_deps = if let Some(transform) = transform {
                 transform.inputs.iter().any(|input| {
@@ -322,7 +322,7 @@ impl Command for AddCommand {
                         eprintln!("{}: {}", console::style("Added").green(), id);
                     }
                 }
-                Err(CreateDatasetFromSnapshotError::NameCollision(_)) => {
+                Err(odf::dataset::CreateDatasetFromSnapshotError::NameCollision(_)) => {
                     if !self.output_config.quiet {
                         eprintln!(
                             "{}: {}: Already exists",

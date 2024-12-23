@@ -170,11 +170,11 @@ impl TaskRunnerImpl {
                 TaskResetDatasetResult { reset_result },
             ))),
             Err(err) => match err {
-                ResetExecutionError::SetReferenceFailed(SetRefError::BlockNotFound(_)) => {
-                    Ok(TaskOutcome::Failed(TaskError::ResetDatasetError(
-                        ResetDatasetTaskError::ResetHeadNotFound,
-                    )))
-                }
+                ResetExecutionError::SetReferenceFailed(
+                    odf::dataset::SetChainRefError::BlockNotFound(_),
+                ) => Ok(TaskOutcome::Failed(TaskError::ResetDatasetError(
+                    ResetDatasetTaskError::ResetHeadNotFound,
+                ))),
                 err => {
                     tracing::error!(
                         error = ?err,

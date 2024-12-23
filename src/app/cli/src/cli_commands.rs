@@ -11,7 +11,6 @@ use clap::CommandFactory as _;
 use dill::Catalog;
 use kamu::domain::TenancyConfig;
 use kamu_accounts::CurrentAccountSubject;
-use opendatafabric::*;
 
 use crate::commands::*;
 use crate::{accounts, cli, odf_server, WorkspaceService};
@@ -560,13 +559,13 @@ pub fn command_needs_server_components(args: &cli::Cli) -> bool {
 
 fn validate_dataset_ref(
     catalog: &dill::Catalog,
-    dataset_ref: DatasetRef,
-) -> Result<DatasetRef, CLIError> {
-    if let DatasetRef::Alias(ref alias) = dataset_ref {
+    dataset_ref: odf::DatasetRef,
+) -> Result<odf::DatasetRef, CLIError> {
+    if let odf::DatasetRef::Alias(ref alias) = dataset_ref {
         let workspace_svc = catalog.get_one::<WorkspaceService>()?;
         if !workspace_svc.is_multi_tenant_workspace() && alias.is_multi_tenant() {
             return Err(MultiTenantRefUnexpectedError {
-                dataset_ref_pattern: DatasetRefPattern::Ref(dataset_ref),
+                dataset_ref_pattern: odf::DatasetRefPattern::Ref(dataset_ref),
             }
             .into());
         }
@@ -576,22 +575,22 @@ fn validate_dataset_ref(
 
 fn validate_dataset_ref_pattern(
     catalog: &dill::Catalog,
-    dataset_ref_pattern: DatasetRefPattern,
-) -> Result<DatasetRefPattern, CLIError> {
+    dataset_ref_pattern: odf::DatasetRefPattern,
+) -> Result<odf::DatasetRefPattern, CLIError> {
     match dataset_ref_pattern {
-        DatasetRefPattern::Ref(dsr) => {
+        odf::DatasetRefPattern::Ref(dsr) => {
             let valid_ref = validate_dataset_ref(catalog, dsr)?;
-            Ok(DatasetRefPattern::Ref(valid_ref))
+            Ok(odf::DatasetRefPattern::Ref(valid_ref))
         }
-        DatasetRefPattern::Pattern(drp) => {
+        odf::DatasetRefPattern::Pattern(drp) => {
             let workspace_svc = catalog.get_one::<WorkspaceService>()?;
             if !workspace_svc.is_multi_tenant_workspace() && drp.account_name.is_some() {
                 return Err(MultiTenantRefUnexpectedError {
-                    dataset_ref_pattern: DatasetRefPattern::Pattern(drp),
+                    dataset_ref_pattern: odf::DatasetRefPattern::Pattern(drp),
                 }
                 .into());
             }
-            Ok(DatasetRefPattern::Pattern(drp))
+            Ok(odf::DatasetRefPattern::Pattern(drp))
         }
     }
 }
@@ -599,9 +598,9 @@ fn validate_dataset_ref_pattern(
 fn validate_many_dataset_refs<I>(
     catalog: &dill::Catalog,
     dataset_refs: I,
-) -> Result<Vec<DatasetRef>, CLIError>
+) -> Result<Vec<odf::DatasetRef>, CLIError>
 where
-    I: IntoIterator<Item = DatasetRef>,
+    I: IntoIterator<Item = odf::DatasetRef>,
 {
     let mut result_refs = Vec::new();
     for dataset_ref in dataset_refs {
@@ -614,9 +613,9 @@ where
 fn validate_many_dataset_patterns<I>(
     catalog: &dill::Catalog,
     dataset_ref_patterns: I,
-) -> Result<Vec<DatasetRefPattern>, CLIError>
+) -> Result<Vec<odf::DatasetRefPattern>, CLIError>
 where
-    I: IntoIterator<Item = DatasetRefPattern>,
+    I: IntoIterator<Item = odf::DatasetRefPattern>,
 {
     dataset_ref_patterns
         .into_iter()

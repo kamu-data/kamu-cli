@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::Utc;
-use {kamu_flow_system as fs, opendatafabric as odf};
+use kamu_flow_system as fs;
 
 use super::{
     check_if_flow_belongs_to_dataset,

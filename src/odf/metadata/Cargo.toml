@@ -1,0 +1,82 @@
+[package]
+name = "opendatafabric-metadata"
+description = "Implements core conecpts of Open Data Fabric protocol specification"
+version = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+authors = { workspace = true }
+readme = { workspace = true }
+license-file = { workspace = true }
+keywords = { workspace = true }
+include = { workspace = true }
+edition = { workspace = true }
+publish = { workspace = true }
+
+
+[lints]
+workspace = true
+
+
+[lib]
+doctest = false
+
+
+[features]
+default = ["arrow"]
+arrow = ["dep:arrow"]
+sqlx = ["dep:sqlx"]
+sqlx-mysql = ["sqlx", "sqlx/mysql"]
+sqlx-postgres = ["sqlx", "sqlx/postgres"]
+sqlx-sqlite = ["sqlx", "sqlx/sqlite"]
+utoipa = ["multiformats/utoipa", "dep:utoipa", "dep:serde_json"]
+testing = ["dep:datafusion", "dep:rand"]
+
+
+[dependencies]
+enum-variants = { workspace = true }
+internal-error = { workspace = true }
+multiformats = { workspace = true }
+
+chrono = { version = "0.4", features = ["serde"] }
+digest = "0.10"
+thiserror = { version = "2", default-features = false, features = ["std"] }
+bitflags = { version = "2", default-features = false }
+
+datafusion = { optional = true, version = "44", default-features = false }
+rand = { optional = true, version = "0.8", default-features =  false }
+
+like = { version = "0.3", default-features = false }
+sha3 = "0.10"
+url = "2"
+
+# Crypto
+ed25519-dalek = { version = "2", default-features = false, features = [
+    "std",
+    "fast",
+    "zeroize",
+    "rand_core",
+] }
+
+# Serialization
+base64 = { version = "0.22", default-features = false, features = ["std"] }
+flatbuffers = "24"
+serde = { version = "1", features = ["derive"] }
+serde_with = "3"
+serde_yaml = "0.9"
+
+# gRPC
+prost = "0.13"
+tonic = "0.12"
+
+# Optional
+arrow = { optional = true, version = "53", default-features = false, features = [
+    "ipc",
+] }
+sqlx = { optional = true, version = "0.8", default-features = false }
+utoipa = { optional = true, version = "=5.3.0", default-features = false, features = [
+] }
+serde_json = { optional = true, version = "1", default-features = false }
+
+
+[dev-dependencies]
+indoc = "2"

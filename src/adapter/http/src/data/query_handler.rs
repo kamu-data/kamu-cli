@@ -14,7 +14,6 @@ use dill::Catalog;
 use http_common::*;
 use internal_error::*;
 use kamu_core::*;
-use opendatafabric as odf;
 
 use super::query_types::{QueryResponse, *};
 

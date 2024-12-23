@@ -14,7 +14,6 @@ use kamu::{TransformElaborationServiceImpl, TransformExecutorImpl, TransformRequ
 use kamu_core::{
     CompactionExecutor,
     CompactionPlanner,
-    CreateDatasetResult,
     DatasetRegistry,
     EngineProvisioner,
     ResolvedDataset,
@@ -66,7 +65,7 @@ impl TransformTestHelper {
         }
     }
 
-    pub async fn transform_dataset(&self, derived: &CreateDatasetResult) -> TransformResult {
+    pub async fn transform_dataset(&self, derived: &odf::CreateDatasetResult) -> TransformResult {
         let deriv_target = ResolvedDataset::from(derived);
 
         let plan = self
@@ -99,7 +98,7 @@ impl TransformTestHelper {
 
     pub async fn verify_transform(
         &self,
-        derived: &CreateDatasetResult,
+        derived: &odf::CreateDatasetResult,
     ) -> Result<(), VerifyTransformError> {
         let deriv_target = ResolvedDataset::from(derived);
 

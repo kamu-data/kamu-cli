@@ -10,7 +10,6 @@
 use dill::*;
 use internal_error::ResultIntoInternal;
 use kamu_core::*;
-use opendatafabric as odf;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -33,12 +32,13 @@ impl ResetPlanner for ResetPlannerImpl {
         maybe_new_head: Option<&odf::Multihash>,
         maybe_old_head: Option<&odf::Multihash>,
     ) -> Result<ResetPlan, ResetPlanningError> {
+        use odf::dataset::MetadataChainExt;
         let new_head = if let Some(new_head) = maybe_new_head {
             new_head
         } else {
             &target
                 .as_metadata_chain()
-                .accept_one(SearchSeedVisitor::new())
+                .accept_one(odf::dataset::SearchSeedVisitor::new())
                 .await
                 .int_err()?
                 .into_hashed_block()
@@ -49,7 +49,7 @@ impl ResetPlanner for ResetPlannerImpl {
         if let Some(old_head) = maybe_old_head
             && let Some(current_head) = target
                 .as_metadata_chain()
-                .try_get_ref(&BlockRef::Head)
+                .try_get_ref(&odf::BlockRef::Head)
                 .await?
             && old_head != &current_head
         {

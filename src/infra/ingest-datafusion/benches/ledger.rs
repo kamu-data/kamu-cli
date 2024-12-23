@@ -13,7 +13,6 @@ use std::sync::Arc;
 use criterion::{criterion_group, criterion_main, Criterion};
 use datafusion::dataframe::DataFrameWriteOptions;
 use datafusion::prelude::*;
-use opendatafabric as odf;
 use rand::{Rng, SeedableRng};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -161,8 +160,8 @@ async fn merge(prev_path: &str, new_path: &str, expected_rows: usize) {
     let new = ctx.table("new").await.unwrap();
 
     let res = MergeStrategyLedger::new(
-        odf::DatasetVocabulary::default(),
-        odf::MergeStrategyLedger {
+        odf::metadata::DatasetVocabulary::default(),
+        odf::metadata::MergeStrategyLedger {
             primary_key: vec!["pk1".to_string(), "pk2".to_string()],
         },
     )

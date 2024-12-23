@@ -13,7 +13,6 @@ use std::sync::Arc;
 use kamu::testing::MockDatasetActionAuthorizer;
 use kamu::*;
 use kamu_core::*;
-use opendatafabric::{DatasetAlias, DatasetID, DatasetName};
 
 use crate::tests::use_cases::*;
 
@@ -21,8 +20,8 @@ use crate::tests::use_cases::*;
 
 #[tokio::test]
 async fn test_compact_dataset_success() {
-    let alias_foo = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
-    let (_, dataset_id_foo) = DatasetID::new_generated_ed25519();
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
     let harness = CompactUseCaseHarness::new(
         MockDatasetActionAuthorizer::new().expect_check_write_dataset(&dataset_id_foo, 1, true),
@@ -41,10 +40,10 @@ async fn test_compact_dataset_success() {
 
 #[tokio::test]
 async fn test_compact_multiple_datasets_success() {
-    let alias_foo = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
-    let alias_bar = DatasetAlias::new(None, DatasetName::new_unchecked("bar"));
-    let (_, dataset_id_foo) = DatasetID::new_generated_ed25519();
-    let (_, dataset_id_bar) = DatasetID::new_generated_ed25519();
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
+    let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
+    let (_, dataset_id_bar) = odf::DatasetID::new_generated_ed25519();
 
     let harness = CompactUseCaseHarness::new(
         MockDatasetActionAuthorizer::new()
@@ -86,8 +85,8 @@ async fn test_compact_multiple_datasets_success() {
 
 #[tokio::test]
 async fn test_compact_dataset_unauthorized() {
-    let alias_foo = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
-    let (_, dataset_id_foo) = DatasetID::new_generated_ed25519();
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
     let harness = CompactUseCaseHarness::new(
         MockDatasetActionAuthorizer::new().expect_check_write_dataset(&dataset_id_foo, 1, false),
@@ -106,10 +105,10 @@ async fn test_compact_dataset_unauthorized() {
 
 #[tokio::test]
 async fn test_compact_dataset_mixed_authorization_outcome() {
-    let alias_foo = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
-    let alias_bar = DatasetAlias::new(None, DatasetName::new_unchecked("bar"));
-    let (_, dataset_id_foo) = DatasetID::new_generated_ed25519();
-    let (_, dataset_id_bar) = DatasetID::new_generated_ed25519();
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
+    let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
+    let (_, dataset_id_bar) = odf::DatasetID::new_generated_ed25519();
 
     let harness = CompactUseCaseHarness::new(
         MockDatasetActionAuthorizer::new()

@@ -16,10 +16,9 @@ use futures::TryStreamExt;
 use indoc::indoc;
 use kamu::domain::engine::*;
 use kamu::domain::*;
-use kamu::testing::*;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
-use opendatafabric::*;
+use odf::metadata::testing::MetadataFactory;
 use tempfile::TempDir;
 use time_source::SystemTimeSourceDefault;
 
@@ -30,7 +29,7 @@ use crate::mock_engine_provisioner;
 struct TransformTestHarness {
     _tempdir: TempDir,
     dataset_registry: Arc<dyn DatasetRegistry>,
-    dataset_repo_writer: Arc<dyn DatasetRepositoryWriter>,
+    dataset_storage_unit_writer: Arc<dyn DatasetStorageUnitWriter>,
     transform_request_planner: Arc<dyn TransformRequestPlanner>,
     transform_elab_svc: Arc<dyn TransformElaborationService>,
     transform_executor: Arc<dyn TransformExecutor>,
@@ -55,10 +54,10 @@ impl TransformTestHarness {
             .add_value(RunInfoDir::new(run_info_dir))
             .add_value(CurrentAccountSubject::new_test())
             .add_value(TenancyConfig::SingleTenant)
-            .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
-            .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-            .add::<DatasetRegistryRepoBridge>()
-            .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
+            .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
+            .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
+            .add::<DatasetRegistrySoloUnitBridge>()
+            .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
             .add::<SystemTimeSourceDefault>()
             .add::<ObjectStoreRegistryImpl>()
             .add::<ObjectStoreBuilderLocalFs>()
@@ -78,7 +77,7 @@ impl TransformTestHarness {
         Self {
             _tempdir: tempdir,
             dataset_registry: catalog.get_one().unwrap(),
-            dataset_repo_writer: catalog.get_one().unwrap(),
+            dataset_storage_unit_writer: catalog.get_one().unwrap(),
             compaction_planner: catalog.get_one().unwrap(),
             compaction_executor: catalog.get_one().unwrap(),
             push_ingest_planner: catalog.get_one().unwrap(),
@@ -93,15 +92,15 @@ impl TransformTestHarness {
         Self::new_custom(EngineProvisionerNull)
     }
 
-    pub async fn new_root(&self, name: &str) -> DatasetHandle {
+    pub async fn new_root(&self, name: &str) -> odf::DatasetHandle {
         let snap = MetadataFactory::dataset_snapshot()
             .name(name)
-            .kind(DatasetKind::Root)
+            .kind(odf::DatasetKind::Root)
             .push_event(MetadataFactory::set_data_schema().build())
             .build();
 
         let create_result = self
-            .dataset_repo_writer
+            .dataset_storage_unit_writer
             .create_dataset_from_snapshot(snap)
             .await
             .unwrap()
@@ -112,20 +111,20 @@ impl TransformTestHarness {
     async fn new_deriv(
         &self,
         name: &str,
-        inputs: &[DatasetAlias],
-    ) -> (CreateDatasetResult, SetTransform) {
+        inputs: &[odf::DatasetAlias],
+    ) -> (odf::CreateDatasetResult, odf::metadata::SetTransform) {
         let transform = MetadataFactory::set_transform()
             .inputs_from_refs(inputs)
             .build();
         let snap = MetadataFactory::dataset_snapshot()
             .name(name)
-            .kind(DatasetKind::Derivative)
+            .kind(odf::DatasetKind::Derivative)
             .push_event(transform.clone())
             .push_event(MetadataFactory::set_data_schema().build())
             .build();
 
         let create_result = self
-            .dataset_repo_writer
+            .dataset_storage_unit_writer
             .create_dataset_from_snapshot(snap)
             .await
             .unwrap()
@@ -135,9 +134,9 @@ impl TransformTestHarness {
 
     pub async fn append_block(
         &self,
-        dataset_ref: impl Into<DatasetRef>,
-        block: MetadataBlock,
-    ) -> Multihash {
+        dataset_ref: impl Into<odf::DatasetRef>,
+        block: odf::MetadataBlock,
+    ) -> odf::Multihash {
         let resolved_dataset = self
             .dataset_registry
             .get_dataset_by_ref(&dataset_ref.into())
@@ -145,7 +144,7 @@ impl TransformTestHarness {
             .unwrap();
         resolved_dataset
             .as_metadata_chain()
-            .append(block, AppendOpts::default())
+            .append(block, odf::dataset::AppendOpts::default())
             .await
             .unwrap()
     }
@@ -153,9 +152,15 @@ impl TransformTestHarness {
     // TODO: Simplify using writer
     pub async fn append_data_block(
         &self,
-        alias: &DatasetAlias,
+        alias: &odf::DatasetAlias,
         records: u64,
-    ) -> (Multihash, MetadataBlockTyped<AddData>) {
+    ) -> (
+        odf::Multihash,
+        odf::MetadataBlockTyped<odf::metadata::AddData>,
+    ) {
+        use odf::dataset::{MetadataChainExt, TryStreamExtExt};
+        use odf::metadata::{AsTypedBlock, EnumWithVariants};
+
         let resolved_dataset = self
             .dataset_registry
             .get_dataset_by_ref(&alias.as_local_ref())
@@ -164,14 +169,14 @@ impl TransformTestHarness {
         let chain = resolved_dataset.as_metadata_chain();
         let offset = chain
             .iter_blocks()
-            .filter_map_ok(|(_, b)| b.event.into_variant::<AddData>())
+            .filter_map_ok(|(_, b)| b.event.into_variant::<odf::metadata::AddData>())
             .map_ok(|e| e.new_data.unwrap().offset_interval.end + 1)
             .try_first()
             .await
             .unwrap()
             .unwrap_or(0);
 
-        let prev_head = chain.resolve_ref(&BlockRef::Head).await.unwrap();
+        let prev_head = chain.resolve_ref(&odf::BlockRef::Head).await.unwrap();
         let prev_block = chain.get_block(&prev_head).await.unwrap();
 
         let block = MetadataFactory::metadata_block(
@@ -184,13 +189,16 @@ impl TransformTestHarness {
         .build();
 
         let block_hash = chain
-            .append(block.clone(), AppendOpts::default())
+            .append(block.clone(), odf::dataset::AppendOpts::default())
             .await
             .unwrap();
-        (block_hash, block.into_typed::<AddData>().unwrap())
+        (
+            block_hash,
+            block.into_typed::<odf::metadata::AddData>().unwrap(),
+        )
     }
 
-    async fn ingest_data(&self, data_str: String, dataset_created: &CreateDatasetResult) {
+    async fn ingest_data(&self, data_str: String, dataset_created: &odf::CreateDatasetResult) {
         let data = std::io::Cursor::new(data_str);
 
         let target = ResolvedDataset::from(dataset_created);
@@ -209,7 +217,7 @@ impl TransformTestHarness {
 
     async fn elaborate_transform(
         &self,
-        deriv_dataset: &CreateDatasetResult,
+        deriv_dataset: &odf::CreateDatasetResult,
         options: TransformOptions,
     ) -> Result<TransformElaboration, TransformElaborateError> {
         let target = ResolvedDataset::from(deriv_dataset);
@@ -228,7 +236,7 @@ impl TransformTestHarness {
 
     async fn transform(
         &self,
-        deriv_dataset: &CreateDatasetResult,
+        deriv_dataset: &odf::CreateDatasetResult,
         options: TransformOptions,
     ) -> Result<TransformResult, TransformError> {
         let target = ResolvedDataset::from(deriv_dataset);
@@ -247,7 +255,7 @@ impl TransformTestHarness {
         }
     }
 
-    async fn compact(&self, dataset: &CreateDatasetResult) {
+    async fn compact(&self, dataset: &odf::CreateDatasetResult) {
         let compaction_plan = self
             .compaction_planner
             .plan_compaction(
@@ -295,14 +303,14 @@ async fn test_get_next_operation() {
         inputs == vec![TransformRequestInputExt {
             dataset_handle: foo.clone(),
             alias: foo.alias.dataset_name.to_string(),
-            vocab: DatasetVocabulary::default(),
+            vocab: odf::metadata::DatasetVocabulary::default(),
             prev_block_hash: None,
             new_block_hash: Some(foo_head),
             prev_offset: None,
             new_offset: Some(9),
             data_slices: vec![foo_slice.physical_hash.clone()],
             schema: MetadataFactory::set_data_schema().build().schema_as_arrow().unwrap(),
-            explicit_watermarks: vec![Watermark {
+            explicit_watermarks: vec![odf::metadata::Watermark {
                 system_time: foo_block.system_time,
                 event_time: Utc.with_ymd_and_hms(2020, 1, 1, 10, 0, 0).unwrap(),
             }],
@@ -318,13 +326,13 @@ async fn test_get_verification_plan_one_to_one() {
 
     // Create root dataset
     let t0 = Utc.with_ymd_and_hms(2020, 1, 1, 11, 0, 0).unwrap();
-    let root_alias = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
+    let root_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let root_create_result = harness
-        .dataset_repo_writer
+        .dataset_storage_unit_writer
         .create_dataset(
             &root_alias,
             MetadataFactory::metadata_block(
-                MetadataFactory::seed(DatasetKind::Root)
+                MetadataFactory::seed(odf::DatasetKind::Root)
                     .id_from(root_alias.dataset_name.as_str())
                     .build(),
             )
@@ -338,9 +346,9 @@ async fn test_get_verification_plan_one_to_one() {
         .dataset
         .commit_event(
             MetadataFactory::set_data_schema().build().into(),
-            CommitOpts {
+            odf::dataset::CommitOpts {
                 system_time: Some(t0),
-                ..CommitOpts::default()
+                ..odf::dataset::CommitOpts::default()
             },
         )
         .await
@@ -351,13 +359,13 @@ async fn test_get_verification_plan_one_to_one() {
     let root_initial_sequence_number = 1;
 
     // Create derivative
-    let deriv_alias = DatasetAlias::new(None, DatasetName::new_unchecked("bar"));
+    let deriv_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
     let deriv_create_result = harness
-        .dataset_repo_writer
+        .dataset_storage_unit_writer
         .create_dataset(
             &deriv_alias,
             MetadataFactory::metadata_block(
-                MetadataFactory::seed(DatasetKind::Derivative)
+                MetadataFactory::seed(odf::DatasetKind::Derivative)
                     .id_from(deriv_alias.dataset_name.as_str())
                     .build(),
             )
@@ -374,9 +382,9 @@ async fn test_get_verification_plan_one_to_one() {
                 .inputs_from_aliases_and_seeded_ids([&root_alias.dataset_name])
                 .build()
                 .into(),
-            CommitOpts {
+            odf::dataset::CommitOpts {
                 system_time: Some(t0),
-                ..CommitOpts::default()
+                ..odf::dataset::CommitOpts::default()
             },
         )
         .await
@@ -386,9 +394,9 @@ async fn test_get_verification_plan_one_to_one() {
         .dataset
         .commit_event(
             MetadataFactory::set_data_schema().build().into(),
-            CommitOpts {
+            odf::dataset::CommitOpts {
                 system_time: Some(t0),
-                ..CommitOpts::default()
+                ..odf::dataset::CommitOpts::default()
             },
         )
         .await
@@ -403,13 +411,13 @@ async fn test_get_verification_plan_one_to_one() {
     let root_head_t1 = harness
         .append_block(
             &root_hdl,
-            MetadataFactory::metadata_block(AddData {
+            MetadataFactory::metadata_block(odf::metadata::AddData {
                 prev_checkpoint: None,
                 prev_offset: None,
-                new_data: Some(DataSlice {
-                    logical_hash: Multihash::from_digest_sha3_256(b"foo"),
-                    physical_hash: Multihash::from_digest_sha3_256(b"bar"),
-                    offset_interval: OffsetInterval { start: 0, end: 99 },
+                new_data: Some(odf::DataSlice {
+                    logical_hash: odf::Multihash::from_digest_sha3_256(b"foo"),
+                    physical_hash: odf::Multihash::from_digest_sha3_256(b"bar"),
+                    offset_interval: odf::metadata::OffsetInterval { start: 0, end: 99 },
                     size: 10,
                 }),
                 new_checkpoint: None,
@@ -422,7 +430,7 @@ async fn test_get_verification_plan_one_to_one() {
         )
         .await;
 
-    let root_head_t1_path = kamu_data_utils::data::local_url::into_local_path(
+    let root_head_t1_path = odf::utils::data::local_url::into_local_path(
         root_create_result
             .dataset
             .as_data_repo()
@@ -449,8 +457,8 @@ async fn test_get_verification_plan_one_to_one() {
     let deriv_head_t2 = harness
         .append_block(
             deriv_hdl,
-            MetadataFactory::metadata_block(ExecuteTransform {
-                query_inputs: vec![ExecuteTransformInput {
+            MetadataFactory::metadata_block(odf::metadata::ExecuteTransform {
+                query_inputs: vec![odf::metadata::ExecuteTransformInput {
                     dataset_id: root_hdl.id.clone(),
                     prev_block_hash: None,
                     new_block_hash: Some(root_head_t1.clone()),
@@ -459,10 +467,10 @@ async fn test_get_verification_plan_one_to_one() {
                 }],
                 prev_checkpoint: None,
                 prev_offset: None,
-                new_data: Some(DataSlice {
-                    logical_hash: Multihash::from_digest_sha3_256(b"foo"),
-                    physical_hash: Multihash::from_digest_sha3_256(b"bar"),
-                    offset_interval: OffsetInterval { start: 0, end: 99 },
+                new_data: Some(odf::DataSlice {
+                    logical_hash: odf::Multihash::from_digest_sha3_256(b"foo"),
+                    physical_hash: odf::Multihash::from_digest_sha3_256(b"bar"),
+                    offset_interval: odf::metadata::OffsetInterval { start: 0, end: 99 },
                     size: 10,
                 }),
                 new_checkpoint: None,
@@ -479,13 +487,13 @@ async fn test_get_verification_plan_one_to_one() {
     let root_head_t3 = harness
         .append_block(
             &root_hdl,
-            MetadataFactory::metadata_block(AddData {
+            MetadataFactory::metadata_block(odf::metadata::AddData {
                 prev_checkpoint: None,
                 prev_offset: Some(99),
-                new_data: Some(DataSlice {
-                    logical_hash: Multihash::from_digest_sha3_256(b"foo"),
-                    physical_hash: Multihash::from_digest_sha3_256(b"bar"),
-                    offset_interval: OffsetInterval {
+                new_data: Some(odf::DataSlice {
+                    logical_hash: odf::Multihash::from_digest_sha3_256(b"foo"),
+                    physical_hash: odf::Multihash::from_digest_sha3_256(b"bar"),
+                    offset_interval: odf::metadata::OffsetInterval {
                         start: 100,
                         end: 109,
                     },
@@ -500,7 +508,7 @@ async fn test_get_verification_plan_one_to_one() {
             .build(),
         )
         .await;
-    let root_head_t3_path = kamu_data_utils::data::local_url::into_local_path(
+    let root_head_t3_path = odf::utils::data::local_url::into_local_path(
         root_create_result
             .dataset
             .as_data_repo()
@@ -526,8 +534,8 @@ async fn test_get_verification_plan_one_to_one() {
     let deriv_head_t4 = harness
         .append_block(
             deriv_hdl,
-            MetadataFactory::metadata_block(ExecuteTransform {
-                query_inputs: vec![ExecuteTransformInput {
+            MetadataFactory::metadata_block(odf::metadata::ExecuteTransform {
+                query_inputs: vec![odf::metadata::ExecuteTransformInput {
                     dataset_id: root_hdl.id.clone(),
                     prev_block_hash: Some(root_head_t1.clone()),
                     new_block_hash: Some(root_head_t3.clone()),
@@ -536,10 +544,10 @@ async fn test_get_verification_plan_one_to_one() {
                 }],
                 prev_checkpoint: None,
                 prev_offset: Some(99),
-                new_data: Some(DataSlice {
-                    logical_hash: Multihash::from_digest_sha3_256(b"foo"),
-                    physical_hash: Multihash::from_digest_sha3_256(b"bar"),
-                    offset_interval: OffsetInterval {
+                new_data: Some(odf::DataSlice {
+                    logical_hash: odf::Multihash::from_digest_sha3_256(b"foo"),
+                    physical_hash: odf::Multihash::from_digest_sha3_256(b"bar"),
+                    offset_interval: odf::metadata::OffsetInterval {
                         start: 100,
                         end: 109,
                     },
@@ -559,7 +567,7 @@ async fn test_get_verification_plan_one_to_one() {
     let root_head_t5 = harness
         .append_block(
             &root_hdl,
-            MetadataFactory::metadata_block(AddData {
+            MetadataFactory::metadata_block(odf::metadata::AddData {
                 prev_checkpoint: None,
                 prev_offset: Some(109),
                 new_data: None,
@@ -589,8 +597,8 @@ async fn test_get_verification_plan_one_to_one() {
     let deriv_head_t6 = harness
         .append_block(
             deriv_hdl,
-            MetadataFactory::metadata_block(ExecuteTransform {
-                query_inputs: vec![ExecuteTransformInput {
+            MetadataFactory::metadata_block(odf::metadata::ExecuteTransform {
+                query_inputs: vec![odf::metadata::ExecuteTransformInput {
                     dataset_id: root_hdl.id.clone(),
                     prev_block_hash: Some(root_head_t3.clone()),
                     new_block_hash: Some(root_head_t5.clone()),
@@ -599,10 +607,10 @@ async fn test_get_verification_plan_one_to_one() {
                 }],
                 prev_checkpoint: None,
                 prev_offset: Some(109),
-                new_data: Some(DataSlice {
-                    logical_hash: Multihash::from_digest_sha3_256(b"foo"),
-                    physical_hash: Multihash::from_digest_sha3_256(b"bar"),
-                    offset_interval: OffsetInterval {
+                new_data: Some(odf::DataSlice {
+                    logical_hash: odf::Multihash::from_digest_sha3_256(b"foo"),
+                    physical_hash: odf::Multihash::from_digest_sha3_256(b"bar"),
+                    offset_interval: odf::metadata::OffsetInterval {
                         start: 110,
                         end: 119,
                     },
@@ -660,17 +668,17 @@ async fn test_transform_with_compaction_retry() {
     let harness = TransformTestHarness::new_custom(
         mock_engine_provisioner::MockEngineProvisioner::new().always_provision_engine(),
     );
-    let root_alias = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
+    let root_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
 
     let foo_created_result = harness
-        .dataset_repo_writer
+        .dataset_storage_unit_writer
         .create_dataset_from_snapshot(
             MetadataFactory::dataset_snapshot()
                 .name(root_alias)
-                .kind(DatasetKind::Root)
+                .kind(odf::DatasetKind::Root)
                 .push_event(
                     MetadataFactory::add_push_source()
-                        .read(ReadStepCsv {
+                        .read(odf::metadata::ReadStepCsv {
                             header: Some(true),
                             schema: Some(
                                 ["date TIMESTAMP", "city STRING", "population BIGINT"]
@@ -678,14 +686,14 @@ async fn test_transform_with_compaction_retry() {
                                     .map(|s| (*s).to_string())
                                     .collect(),
                             ),
-                            ..ReadStepCsv::default()
+                            ..odf::metadata::ReadStepCsv::default()
                         })
-                        .merge(MergeStrategyLedger {
+                        .merge(odf::metadata::MergeStrategyLedger {
                             primary_key: vec!["date".to_string(), "city".to_string()],
                         })
                         .build(),
                 )
-                .push_event(SetVocab {
+                .push_event(odf::metadata::SetVocab {
                     event_time_column: Some("date".to_string()),
                     ..Default::default()
                 })

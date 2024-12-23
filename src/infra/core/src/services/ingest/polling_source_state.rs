@@ -11,8 +11,7 @@ use std::path::{Path, PathBuf};
 
 use chrono::{DateTime, SecondsFormat, Utc};
 use internal_error::{InternalError, ResultIntoInternal};
-use opendatafabric::serde::yaml::{datetime_rfc3339, datetime_rfc3339_opt, SourceStateDef};
-use opendatafabric::SourceState;
+use odf::metadata::serde::yaml::{datetime_rfc3339, datetime_rfc3339_opt, SourceStateDef};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_with::skip_serializing_none;
 
@@ -25,10 +24,12 @@ pub enum PollingSourceState {
 }
 
 impl PollingSourceState {
-    pub fn from_source_state(source_state: &SourceState) -> Result<Option<Self>, InternalError> {
-        if source_state.kind == SourceState::KIND_ETAG {
+    pub fn from_source_state(
+        source_state: &odf::metadata::SourceState,
+    ) -> Result<Option<Self>, InternalError> {
+        if source_state.kind == odf::metadata::SourceState::KIND_ETAG {
             Ok(Some(Self::ETag(source_state.value.clone())))
-        } else if source_state.kind == SourceState::KIND_LAST_MODIFIED {
+        } else if source_state.kind == odf::metadata::SourceState::KIND_LAST_MODIFIED {
             let dt = DateTime::parse_from_rfc3339(&source_state.value)
                 .map(Into::into)
                 .int_err()?;
@@ -39,7 +40,7 @@ impl PollingSourceState {
         }
     }
 
-    pub fn try_from_source_state(source_state: &SourceState) -> Option<Self> {
+    pub fn try_from_source_state(source_state: &odf::metadata::SourceState) -> Option<Self> {
         match Self::from_source_state(source_state) {
             Ok(v) => v,
             Err(error) => {
@@ -53,16 +54,19 @@ impl PollingSourceState {
         }
     }
 
-    pub fn to_source_state(&self) -> SourceState {
+    pub fn to_source_state(&self) -> odf::metadata::SourceState {
         let (kind, value) = match self {
-            Self::ETag(etag) => (SourceState::KIND_ETAG.to_owned(), etag.clone()),
+            Self::ETag(etag) => (
+                odf::metadata::SourceState::KIND_ETAG.to_owned(),
+                etag.clone(),
+            ),
             Self::LastModified(last_modified) => (
-                SourceState::KIND_LAST_MODIFIED.to_owned(),
+                odf::metadata::SourceState::KIND_LAST_MODIFIED.to_owned(),
                 last_modified.to_rfc3339_opts(SecondsFormat::AutoSi, true),
             ),
         };
-        SourceState {
-            source_name: SourceState::DEFAULT_SOURCE_NAME.to_string(),
+        odf::metadata::SourceState {
+            source_name: odf::metadata::SourceState::DEFAULT_SOURCE_NAME.to_string(),
             kind,
             value,
         }

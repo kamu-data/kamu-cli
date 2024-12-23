@@ -12,11 +12,9 @@ use std::sync::Arc;
 use dill::*;
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_core::*;
-use opendatafabric::*;
+use s3_utils::S3Context;
 use serde_json::json;
 use url::Url;
-
-use crate::utils::s3_context::S3Context;
 
 pub struct SearchServiceImpl {
     remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
@@ -33,7 +31,7 @@ impl SearchServiceImpl {
         &self,
         url: &Url,
         query: Option<&str>,
-        repo_name: &RepoName,
+        repo_name: &odf::RepoName,
     ) -> Result<Vec<SearchResultDataset>, SearchError> {
         let mut datasets = Vec::new();
 
@@ -47,10 +45,10 @@ impl SearchServiceImpl {
                 if query.is_empty() || file_name.contains(query) {
                     datasets.push(SearchResultDataset {
                         id: None,
-                        alias: DatasetAliasRemote::new(
+                        alias: odf::DatasetAliasRemote::new(
                             repo_name.clone(),
                             None,
-                            DatasetName::try_from(file_name).int_err()?,
+                            odf::DatasetName::try_from(file_name).int_err()?,
                         ),
                         kind: None,
                         num_blocks: None,
@@ -68,7 +66,7 @@ impl SearchServiceImpl {
         &self,
         url: &Url,
         query: Option<&str>,
-        repo_name: &RepoName,
+        repo_name: &odf::RepoName,
     ) -> Result<Vec<SearchResultDataset>, SearchError> {
         let mut datasets = Vec::new();
 
@@ -83,12 +81,12 @@ impl SearchServiceImpl {
                 prefix.pop();
             }
 
-            let name = DatasetName::try_from(prefix).int_err()?;
+            let name = odf::DatasetName::try_from(prefix).int_err()?;
 
             if query.is_empty() || name.contains(query) {
                 datasets.push(SearchResultDataset {
                     id: None,
-                    alias: DatasetAliasRemote::new(repo_name.clone(), None, name),
+                    alias: odf::DatasetAliasRemote::new(repo_name.clone(), None, name),
                     kind: None,
                     num_blocks: None,
                     num_records: None,
@@ -105,7 +103,7 @@ impl SearchServiceImpl {
         &self,
         url: &Url,
         query: Option<&str>,
-        repo_name: &RepoName,
+        repo_name: &odf::RepoName,
     ) -> Result<Vec<SearchResultDataset>, SearchError> {
         let gql_query = r#"
             {
@@ -170,7 +168,11 @@ impl SearchServiceImpl {
             let ds: GqlDataset = serde_json::from_value(node.clone()).int_err()?;
             datasets.push(SearchResultDataset {
                 id: Some(ds.id),
-                alias: DatasetAliasRemote::new(repo_name.clone(), ds.owner.account_name, ds.name),
+                alias: odf::DatasetAliasRemote::new(
+                    repo_name.clone(),
+                    ds.owner.account_name,
+                    ds.name,
+                ),
                 kind: Some(ds.kind),
                 num_blocks: Some(ds.metadata.chain.blocks.total_count),
                 num_records: Some(ds.data.num_records_total),
@@ -187,13 +189,13 @@ impl SearchServiceImpl {
         &self,
         url: &Url,
         query: Option<&str>,
-        repo_name: &RepoName,
+        repo_name: &odf::RepoName,
     ) -> Result<Vec<SearchResultDataset>, SearchError> {
         match url.scheme() {
             "file" => self.search_in_repo_localfs(url, query, repo_name),
             "s3" | "s3+http" | "s3+https" => self.search_in_repo_s3(url, query, repo_name).await,
             "odf+http" | "odf+https" => self.search_in_repo_odf(url, query, repo_name).await,
-            _ => Err(UnsupportedProtocolError {
+            _ => Err(odf::dataset::UnsupportedProtocolError {
                 message: None,
                 url: url.clone(),
             }
@@ -204,7 +206,7 @@ impl SearchServiceImpl {
     async fn search_in_repo(
         &self,
         query: Option<&str>,
-        repo_name: &RepoName,
+        repo_name: &odf::RepoName,
     ) -> Result<SearchResult, SearchError> {
         let repo = self.remote_repo_reg.get_repository(repo_name)?;
 
@@ -246,11 +248,11 @@ impl SearchService for SearchServiceImpl {
 #[derive(::serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct GqlDataset {
-    id: DatasetID,
-    name: DatasetName,
+    id: odf::DatasetID,
+    name: odf::DatasetName,
     owner: GqlAccount,
     #[serde(with = "DatasetKindDef")]
-    kind: DatasetKind,
+    kind: odf::DatasetKind,
     metadata: GqlMetadata,
     data: GqlData,
 }
@@ -258,7 +260,7 @@ struct GqlDataset {
 #[derive(::serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct GqlAccount {
-    account_name: Option<AccountName>,
+    account_name: Option<odf::AccountName>,
 }
 
 #[derive(::serde::Deserialize)]
@@ -287,7 +289,7 @@ struct GqlData {
 }
 
 #[derive(::serde::Deserialize)]
-#[serde(remote = "DatasetKind", rename_all = "SCREAMING_SNAKE_CASE")]
+#[serde(remote = "odf::DatasetKind", rename_all = "SCREAMING_SNAKE_CASE")]
 enum DatasetKindDef {
     Root,
     Derivative,

@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::InternalError;
-use opendatafabric::DatasetID;
 use thiserror::Error;
 use tokio_stream::Stream;
 
@@ -19,27 +18,27 @@ pub trait DependencyGraphService: Sync + Send {
     /// Iterates over 1st level of dataset's downstream dependencies
     async fn get_downstream_dependencies(
         &self,
-        dataset_id: &DatasetID,
+        dataset_id: &odf::DatasetID,
     ) -> Result<DatasetIDStream, GetDependenciesError>;
 
     /// Iterates over 1st level of dataset's upstream dependencies
     async fn get_upstream_dependencies(
         &self,
-        dataset_id: &DatasetID,
+        dataset_id: &odf::DatasetID,
     ) -> Result<DatasetIDStream, GetDependenciesError>;
 
     /// Iterates over all levels of dataset's upstream dependencies
     /// and return reversed result including passed parameters
     async fn get_recursive_upstream_dependencies(
         &self,
-        dataset_ids: Vec<DatasetID>,
+        dataset_ids: Vec<odf::DatasetID>,
     ) -> Result<DatasetIDStream, GetDependenciesError>;
 
     /// Iterates over all levels of dataset's downstream dependencies
     /// and return result including passed parameters
     async fn get_recursive_downstream_dependencies(
         &self,
-        dataset_ids: Vec<DatasetID>,
+        dataset_ids: Vec<odf::DatasetID>,
     ) -> Result<DatasetIDStream, GetDependenciesError>;
 
     /// Given a set of dataset IDs this will sort them in depth-first or
@@ -48,14 +47,14 @@ pub trait DependencyGraphService: Sync + Send {
     /// versa
     async fn in_dependency_order(
         &self,
-        dataset_ids: Vec<DatasetID>,
+        dataset_ids: Vec<odf::DatasetID>,
         order: DependencyOrder,
-    ) -> Result<Vec<DatasetID>, GetDependenciesError>;
+    ) -> Result<Vec<odf::DatasetID>, GetDependenciesError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub type DatasetIDStream<'a> = std::pin::Pin<Box<dyn Stream<Item = DatasetID> + Send + 'a>>;
+pub type DatasetIDStream<'a> = std::pin::Pin<Box<dyn Stream<Item = odf::DatasetID> + Send + 'a>>;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -81,7 +80,7 @@ pub enum GetDependenciesError {
 #[derive(Error, Debug)]
 #[error("Dataset {dataset_id} not found")]
 pub struct DatasetNodeNotFoundError {
-    pub dataset_id: DatasetID,
+    pub dataset_id: odf::DatasetID,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -11,28 +11,20 @@ use async_graphql::value;
 use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use dill::Component;
 use indoc::indoc;
-use kamu::testing::MetadataFactory;
 use kamu::{
     CreateDatasetFromSnapshotUseCaseImpl,
-    DatasetRegistryRepoBridge,
-    DatasetRepositoryLocalFs,
-    DatasetRepositoryWriter,
+    DatasetRegistrySoloUnitBridge,
+    DatasetStorageUnitLocalFs,
+    DatasetStorageUnitWriter,
     MetadataQueryServiceImpl,
 };
-use kamu_core::{
-    auth,
-    CreateDatasetFromSnapshotUseCase,
-    CreateDatasetResult,
-    DatasetRepository,
-    DidGeneratorDefault,
-    TenancyConfig,
-};
+use kamu_core::{auth, CreateDatasetFromSnapshotUseCase, DidGeneratorDefault, TenancyConfig};
 use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
 use kamu_datasets_services::DependencyGraphServiceImpl;
 use kamu_flow_system_inmem::InMemoryFlowConfigurationEventStore;
 use kamu_flow_system_services::FlowConfigurationServiceImpl;
 use messaging_outbox::DummyOutboxImpl;
-use opendatafabric::*;
+use odf::metadata::testing::MetadataFactory;
 use time_source::SystemTimeSourceDefault;
 
 use crate::utils::{authentication_catalogs, expect_anonymous_access_error};
@@ -584,10 +576,10 @@ impl FlowConfigHarness {
             b.add::<DummyOutboxImpl>()
                 .add::<DidGeneratorDefault>()
                 .add_value(TenancyConfig::SingleTenant)
-                .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
-                .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-                .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
-                .add::<DatasetRegistryRepoBridge>()
+                .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
+                .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
+                .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
+                .add::<DatasetRegistrySoloUnitBridge>()
                 .add::<MetadataQueryServiceImpl>()
                 .add::<CreateDatasetFromSnapshotUseCaseImpl>()
                 .add::<SystemTimeSourceDefault>()
@@ -614,7 +606,7 @@ impl FlowConfigHarness {
         }
     }
 
-    async fn create_root_dataset(&self) -> CreateDatasetResult {
+    async fn create_root_dataset(&self) -> odf::CreateDatasetResult {
         let create_dataset_from_snapshot = self
             .catalog_authorized
             .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
@@ -623,7 +615,7 @@ impl FlowConfigHarness {
         create_dataset_from_snapshot
             .execute(
                 MetadataFactory::dataset_snapshot()
-                    .kind(DatasetKind::Root)
+                    .kind(odf::DatasetKind::Root)
                     .name("foo")
                     .push_event(MetadataFactory::set_polling_source().build())
                     .build(),
@@ -633,7 +625,7 @@ impl FlowConfigHarness {
             .unwrap()
     }
 
-    async fn create_derived_dataset(&self) -> CreateDatasetResult {
+    async fn create_derived_dataset(&self) -> odf::CreateDatasetResult {
         let create_dataset_from_snapshot = self
             .catalog_authorized
             .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
@@ -643,7 +635,7 @@ impl FlowConfigHarness {
             .execute(
                 MetadataFactory::dataset_snapshot()
                     .name("bar")
-                    .kind(DatasetKind::Derivative)
+                    .kind(odf::DatasetKind::Derivative)
                     .push_event(
                         MetadataFactory::set_transform()
                             .inputs_from_refs(["foo"])
@@ -657,7 +649,7 @@ impl FlowConfigHarness {
     }
 
     fn set_ingest_config_mutation(
-        id: &DatasetID,
+        id: &odf::DatasetID,
         dataset_flow_type: &str,
         fetch_uncacheable: bool,
     ) -> String {
@@ -706,7 +698,7 @@ impl FlowConfigHarness {
     }
 
     fn set_config_compaction_full_mutation(
-        id: &DatasetID,
+        id: &odf::DatasetID,
         dataset_flow_type: &str,
         max_slice_size: u64,
         max_slice_records: u64,
@@ -772,7 +764,7 @@ impl FlowConfigHarness {
     }
 
     fn set_config_compaction_metadata_only_mutation(
-        id: &DatasetID,
+        id: &odf::DatasetID,
         dataset_flow_type: &str,
         recursive: bool,
     ) -> String {

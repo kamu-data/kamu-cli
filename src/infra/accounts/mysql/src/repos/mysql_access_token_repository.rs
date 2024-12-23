@@ -11,7 +11,6 @@ use chrono::{DateTime, Utc};
 use database_common::{PaginationOpts, TransactionRef, TransactionRefT};
 use dill::{component, interface};
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
-use opendatafabric::AccountID;
 use sqlx::MySqlConnection;
 use uuid::Uuid;
 
@@ -116,7 +115,7 @@ impl AccessTokenRepository for MySqlAccessTokenRepository {
 
     async fn get_access_tokens_count_by_account_id(
         &self,
-        account_id: &AccountID,
+        account_id: &odf::AccountID,
     ) -> Result<usize, GetAccessTokenError> {
         let mut tr = self.transaction.lock().await;
 
@@ -140,7 +139,7 @@ impl AccessTokenRepository for MySqlAccessTokenRepository {
 
     async fn get_access_tokens_by_account_id(
         &self,
-        account_id: &AccountID,
+        account_id: &odf::AccountID,
         pagination: &PaginationOpts,
     ) -> Result<Vec<AccessToken>, GetAccessTokenError> {
         let mut tr = self.transaction.lock().await;

@@ -12,7 +12,7 @@ use std::process::Stdio;
 use std::time::Duration;
 
 use container_runtime::*;
-use kamu::utils::docker_images;
+use test_utils::test_docker_images;
 
 // TODO: Implement caching headers in `HttpFileServer` so we could get rid of
 // this class
@@ -25,7 +25,7 @@ pub struct HttpServer {
 }
 
 impl HttpServer {
-    pub const IMAGE: &'static str = docker_images::HTTPD;
+    pub const IMAGE: &'static str = test_docker_images::HTTPD;
 
     pub async fn new(server_dir: &Path) -> Self {
         let container_runtime = ContainerRuntime::default();

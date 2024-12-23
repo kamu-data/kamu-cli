@@ -23,7 +23,6 @@ use kamu_accounts::{
     KamuAccessToken,
     RevokeTokenError,
 };
-use opendatafabric::AccountID;
 use time_source::SystemTimeSource;
 use uuid::Uuid;
 
@@ -64,7 +63,7 @@ impl AccessTokenService for AccessTokenServiceImpl {
     async fn create_access_token(
         &self,
         token_name: &str,
-        account_id: &AccountID,
+        account_id: &odf::AccountID,
     ) -> Result<KamuAccessToken, CreateAccessTokenError> {
         let kamu_access_token = KamuAccessToken::new();
 
@@ -94,7 +93,7 @@ impl AccessTokenService for AccessTokenServiceImpl {
 
     async fn get_access_tokens_by_account_id(
         &self,
-        account_id: &AccountID,
+        account_id: &odf::AccountID,
         pagination: &PaginationOpts,
     ) -> Result<AccessTokenListing, GetAccessTokenError> {
         let total_count = self

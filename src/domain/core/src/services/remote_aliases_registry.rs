@@ -8,18 +8,18 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::InternalError;
-use opendatafabric::{AccountName, DatasetHandle, DatasetName, DatasetPushTarget, RepoName};
 use thiserror::Error;
 
 use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[cfg_attr(feature = "testing", mockall::automock)]
 #[async_trait::async_trait]
 pub trait RemoteAliasesRegistry: Send + Sync {
     async fn get_remote_aliases(
         &self,
-        dataset_handle: &DatasetHandle,
+        dataset_handle: &odf::DatasetHandle,
     ) -> Result<Box<dyn RemoteAliases>, GetAliasesError>;
 }
 
@@ -46,8 +46,8 @@ pub trait RemoteAliasResolver: Send + Sync {
     // try to resolve via repository registry
     async fn resolve_push_target(
         &self,
-        dataset_handle: &DatasetHandle,
-        dataset_push_target_maybe: Option<DatasetPushTarget>,
+        dataset_handle: &odf::DatasetHandle,
+        dataset_push_target_maybe: Option<odf::DatasetPushTarget>,
     ) -> Result<RemoteTarget, ResolveAliasError>;
 }
 
@@ -56,17 +56,17 @@ pub trait RemoteAliasResolver: Send + Sync {
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct RemoteTarget {
     pub url: url::Url,
-    pub repo_name: Option<RepoName>,
-    pub dataset_name: Option<DatasetName>,
-    pub account_name: Option<AccountName>,
+    pub repo_name: Option<odf::RepoName>,
+    pub dataset_name: Option<odf::DatasetName>,
+    pub account_name: Option<odf::AccountName>,
 }
 
 impl RemoteTarget {
     pub fn new(
         url: url::Url,
-        repo_name: Option<RepoName>,
-        dataset_name: Option<DatasetName>,
-        account_name: Option<AccountName>,
+        repo_name: Option<odf::RepoName>,
+        dataset_name: Option<odf::DatasetName>,
+        account_name: Option<odf::AccountName>,
     ) -> Self {
         Self {
             url,

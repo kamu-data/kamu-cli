@@ -9,7 +9,6 @@
 
 use database_common::PaginationOpts;
 use kamu_datasets::{DatasetEnvVarService, GetDatasetEnvVarError};
-use opendatafabric as odf;
 
 use super::ViewDatasetEnvVar;
 use crate::prelude::*;

@@ -14,7 +14,6 @@ use std::sync::Arc;
 
 use kamu::domain::*;
 use kamu::{DotStyle, DotVisitor};
-use opendatafabric::*;
 
 use super::{CLIError, Command};
 use crate::{OutputConfig, WorkspaceLayout};
@@ -35,7 +34,7 @@ pub struct InspectLineageCommand {
     dataset_registry: Arc<dyn DatasetRegistry>,
     provenance_svc: Arc<dyn ProvenanceService>,
     workspace_layout: Arc<WorkspaceLayout>,
-    dataset_refs: Vec<DatasetRef>,
+    dataset_refs: Vec<odf::DatasetRef>,
     browse: bool,
     output_format: Option<LineageOutputFormat>,
     output_config: Arc<OutputConfig>,
@@ -52,7 +51,7 @@ impl InspectLineageCommand {
         output_config: Arc<OutputConfig>,
     ) -> Self
     where
-        I: IntoIterator<Item = DatasetRef>,
+        I: IntoIterator<Item = odf::DatasetRef>,
     {
         Self {
             dataset_registry,
@@ -150,12 +149,12 @@ impl LineageVisitor for ShellVisitor {
     fn enter(&mut self, dataset: &NodeInfo<'_>) -> bool {
         let fmt = match dataset {
             NodeInfo::Local { alias, kind, .. } => match kind {
-                DatasetKind::Root => format!(
+                odf::DatasetKind::Root => format!(
                     "{}{}",
                     console::style(alias).bold(),
                     console::style(": Root").dim(),
                 ),
-                DatasetKind::Derivative => format!(
+                odf::DatasetKind::Derivative => format!(
                     "{}{}",
                     console::style(alias).bold(),
                     console::style(": Derivative").dim(),
@@ -225,7 +224,7 @@ impl LineageVisitor for ShellVisitor {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct CsvVisitor {
-    visited: HashSet<DatasetAlias>,
+    visited: HashSet<odf::DatasetAlias>,
 }
 
 impl CsvVisitor {

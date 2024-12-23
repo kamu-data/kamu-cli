@@ -12,7 +12,6 @@ use std::sync::Arc;
 use datafusion::arrow::array::{RecordBatch, StringArray, UInt64Array};
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use kamu::domain::*;
-use opendatafabric::*;
 
 use super::{CLIError, Command};
 use crate::output::*;
@@ -21,7 +20,7 @@ pub struct SearchCommand {
     search_svc: Arc<dyn SearchService>,
     output_config: Arc<OutputConfig>,
     query: Option<String>,
-    repository_names: Vec<RepoName>,
+    repository_names: Vec<odf::RepoName>,
 }
 
 impl SearchCommand {
@@ -33,7 +32,7 @@ impl SearchCommand {
     ) -> Self
     where
         S: Into<String>,
-        I: IntoIterator<Item = RepoName>,
+        I: IntoIterator<Item = odf::RepoName>,
     {
         Self {
             search_svc,

@@ -15,7 +15,6 @@ use database_common_macros::transactional_handler;
 use dill::Catalog;
 use http_common::*;
 use kamu_core::QueryError;
-use opendatafabric as odf;
 
 use super::{query_handler, query_types as query};
 use crate::data::verify_types::{

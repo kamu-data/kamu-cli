@@ -14,7 +14,6 @@ use chrono::{DateTime, TimeDelta, Utc};
 use kamu::testing::MockDatasetActionAuthorizer;
 use kamu::*;
 use kamu_core::*;
-use opendatafabric::*;
 
 use super::{BaseUseCaseHarness, BaseUseCaseHarnessOptions};
 
@@ -22,8 +21,8 @@ use super::{BaseUseCaseHarness, BaseUseCaseHarnessOptions};
 
 #[tokio::test]
 async fn test_set_watermark_success() {
-    let alias_foo = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
-    let (_, dataset_id_foo) = DatasetID::new_generated_ed25519();
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
     let harness = SetWatermarkUseCaseHarness::new(
         MockDatasetActionAuthorizer::new().expect_check_write_dataset(&dataset_id_foo, 1, true),
@@ -47,8 +46,8 @@ async fn test_set_watermark_success() {
 
 #[tokio::test]
 async fn test_set_watermark_unauthorized() {
-    let alias_foo = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
-    let (_, dataset_id_foo) = DatasetID::new_generated_ed25519();
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
     let harness = SetWatermarkUseCaseHarness::new(
         MockDatasetActionAuthorizer::new().expect_check_write_dataset(&dataset_id_foo, 1, false),
@@ -104,7 +103,7 @@ impl SetWatermarkUseCaseHarness {
 
     async fn current_watermark(
         &self,
-        created_result: &CreateDatasetResult,
+        created_result: &odf::CreateDatasetResult,
     ) -> Option<DateTime<Utc>> {
         self.metadata_query_svc
             .try_get_current_watermark(ResolvedDataset::from(created_result))

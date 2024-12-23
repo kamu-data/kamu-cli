@@ -51,7 +51,7 @@ uuid = { version = "1", default-features = false }
 [dev-dependencies]
 kamu-accounts = { workspace = true, features = ["testing"] }
 kamu-core = { workspace = true, features = ["testing"] }
-kamu-data-utils = { workspace = true, features = ["testing"] }
+odf = { workspace = true, features = ["arrow", "testing"] }
 
 indoc = "2"
 mockall = { version = "0.13", default-features = false }

@@ -19,17 +19,16 @@ use kamu_cli_e2e_common::{
 };
 use kamu_cli_puppet::extensions::KamuCliPuppetExt;
 use kamu_cli_puppet::KamuCliPuppet;
-use opendatafabric::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_push_ingest_from_file_ledger(kamu: KamuCliPuppet) {
-    kamu.add_dataset(DatasetSnapshot {
+    kamu.add_dataset(odf::DatasetSnapshot {
         name: "population".try_into().unwrap(),
-        kind: DatasetKind::Root,
-        metadata: vec![AddPushSource {
-            source_name: SourceState::DEFAULT_SOURCE_NAME.to_string(),
-            read: ReadStepNdJson {
+        kind: odf::DatasetKind::Root,
+        metadata: vec![odf::metadata::AddPushSource {
+            source_name: odf::metadata::SourceState::DEFAULT_SOURCE_NAME.to_string(),
+            read: odf::metadata::ReadStepNdJson {
                 schema: Some(vec![
                     "event_time TIMESTAMP".to_owned(),
                     "city STRING".to_owned(),
@@ -39,7 +38,7 @@ pub async fn test_push_ingest_from_file_ledger(kamu: KamuCliPuppet) {
             }
             .into(),
             preprocess: None,
-            merge: MergeStrategyLedger {
+            merge: odf::metadata::MergeStrategyLedger {
                 primary_key: vec!["event_time".to_owned(), "city".to_owned()],
             }
             .into(),
@@ -72,7 +71,7 @@ pub async fn test_push_ingest_from_file_ledger(kamu: KamuCliPuppet) {
     .success();
 
     kamu.assert_last_data_slice(
-        &DatasetAlias::new(None, DatasetName::new_unchecked("population")),
+        &odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("population")),
         indoc!(
             r#"
             message arrow_schema {
@@ -103,12 +102,12 @@ pub async fn test_push_ingest_from_file_ledger(kamu: KamuCliPuppet) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_push_ingest_from_file_snapshot_with_event_time(kamu: KamuCliPuppet) {
-    kamu.add_dataset(DatasetSnapshot {
+    kamu.add_dataset(odf::DatasetSnapshot {
         name: "population".try_into().unwrap(),
-        kind: DatasetKind::Root,
-        metadata: vec![AddPushSource {
-            source_name: SourceState::DEFAULT_SOURCE_NAME.to_string(),
-            read: ReadStepNdJson {
+        kind: odf::DatasetKind::Root,
+        metadata: vec![odf::metadata::AddPushSource {
+            source_name: odf::metadata::SourceState::DEFAULT_SOURCE_NAME.to_string(),
+            read: odf::metadata::ReadStepNdJson {
                 schema: Some(vec![
                     "city STRING".to_owned(),
                     "population BIGINT".to_owned(),
@@ -117,7 +116,7 @@ pub async fn test_push_ingest_from_file_snapshot_with_event_time(kamu: KamuCliPu
             }
             .into(),
             preprocess: None,
-            merge: MergeStrategySnapshot {
+            merge: odf::metadata::MergeStrategySnapshot {
                 primary_key: vec!["city".to_owned()],
                 compare_columns: None,
             }
@@ -154,7 +153,7 @@ pub async fn test_push_ingest_from_file_snapshot_with_event_time(kamu: KamuCliPu
     .success();
 
     kamu.assert_last_data_slice(
-        &DatasetAlias::new(None, DatasetName::new_unchecked("population")),
+        &odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("population")),
         indoc!(
             r#"
             message arrow_schema {

@@ -26,7 +26,7 @@ database-common = { workspace = true }
 init-on-startup = { workspace = true }
 internal-error = { workspace = true }
 kamu-accounts = { workspace = true }
-opendatafabric = { workspace = true }
+odf = { workspace = true }
 time-source = { workspace = true }
 
 argon2 = { version = "0.5" }

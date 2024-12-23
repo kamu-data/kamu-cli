@@ -13,7 +13,6 @@ use std::sync::Arc;
 use criterion::{criterion_group, criterion_main, Criterion};
 use datafusion::dataframe::DataFrameWriteOptions;
 use datafusion::prelude::*;
-use opendatafabric as odf;
 use rand::{Rng, SeedableRng};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -57,7 +56,7 @@ async fn setup(
 
     for i in 0..orig_rows {
         offset.append_value(i as u64);
-        op.append_value(odf::OperationType::Append as u8);
+        op.append_value(odf::metadata::OperationType::Append as u8);
     }
 
     // |------------------------- buffer --------------------------|
@@ -177,8 +176,8 @@ async fn merge_snapshot(prev_path: &str, new_path: &str, expected_rows: usize) {
     let new = ctx.table("new").await.unwrap();
 
     let res = MergeStrategySnapshot::new(
-        odf::DatasetVocabulary::default(),
-        odf::MergeStrategySnapshot {
+        odf::metadata::DatasetVocabulary::default(),
+        odf::metadata::MergeStrategySnapshot {
             primary_key: vec!["pk1".to_string(), "pk2".to_string()],
             compare_columns: Some(vec!["cmp1".to_string(), "cmp2".to_string()]),
         },

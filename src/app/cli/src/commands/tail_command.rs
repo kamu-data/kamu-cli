@@ -12,7 +12,6 @@ use std::sync::Arc;
 use datafusion::arrow::array::{Int32Array, UInt8Array};
 use datafusion::arrow::datatypes::DataType;
 use kamu::domain::QueryService;
-use opendatafabric::*;
 
 use super::{CLIError, Command};
 use crate::output::*;
@@ -21,7 +20,7 @@ use crate::output::*;
 
 pub struct TailCommand {
     query_svc: Arc<dyn QueryService>,
-    dataset_ref: DatasetRef,
+    dataset_ref: odf::DatasetRef,
     skip: u64,
     limit: u64,
     output_cfg: Arc<OutputConfig>,
@@ -30,7 +29,7 @@ pub struct TailCommand {
 impl TailCommand {
     pub fn new(
         query_svc: Arc<dyn QueryService>,
-        dataset_ref: DatasetRef,
+        dataset_ref: odf::DatasetRef,
         skip: u64,
         limit: u64,
         output_cfg: Arc<OutputConfig>,
@@ -61,27 +60,27 @@ impl Command for TailCommand {
                 // only positionally
                 ColumnFormat::default(),
                 ColumnFormat::default().with_value_fmt(|array, row, _| {
-                    let err = Err(InvalidOperationType(0));
+                    let err = Err(odf::metadata::InvalidOperationType(0));
                     let op = match array.data_type() {
                         DataType::UInt8 => array
                             .as_any()
                             .downcast_ref::<UInt8Array>()
                             .map(|a| a.value(row))
-                            .map_or(err, OperationType::try_from),
+                            .map_or(err, odf::metadata::OperationType::try_from),
                         // Compatibility fallback
                         DataType::Int32 => array
                             .as_any()
                             .downcast_ref::<Int32Array>()
                             .and_then(|a| u8::try_from(a.value(row)).ok())
-                            .map(OperationType::try_from)
+                            .map(odf::metadata::OperationType::try_from)
                             .unwrap_or(err),
                         _ => err,
                     };
                     match op {
-                        Ok(OperationType::Append) => "+A",
-                        Ok(OperationType::Retract) => "-R",
-                        Ok(OperationType::CorrectFrom) => "-C",
-                        Ok(OperationType::CorrectTo) => "+C",
+                        Ok(odf::metadata::OperationType::Append) => "+A",
+                        Ok(odf::metadata::OperationType::Retract) => "-R",
+                        Ok(odf::metadata::OperationType::CorrectFrom) => "-C",
+                        Ok(odf::metadata::OperationType::CorrectTo) => "+C",
                         _ => "??",
                     }
                     .to_string()

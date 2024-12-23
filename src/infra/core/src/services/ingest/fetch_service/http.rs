@@ -14,7 +14,6 @@ use ::http::{header, HeaderMap, HeaderName, HeaderValue, StatusCode};
 use chrono::{DateTime, Utc};
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_core::*;
-use opendatafabric::*;
 use url::Url;
 
 use super::*;
@@ -27,8 +26,8 @@ impl FetchService {
     pub(super) async fn fetch_http(
         &self,
         url: Url,
-        headers: Vec<RequestHeader>,
-        event_time_source: Option<&EventTimeSource>,
+        headers: Vec<odf::metadata::RequestHeader>,
+        event_time_source: Option<&odf::metadata::EventTimeSource>,
         prev_source_state: Option<&PollingSourceState>,
         target_path: &Path,
         system_time: &DateTime<Utc>,
@@ -132,9 +131,9 @@ impl FetchService {
         file.flush().await.int_err()?;
 
         let source_event_time = match event_time_source {
-            None | Some(EventTimeSource::FromMetadata(_)) => last_modified_time,
-            Some(EventTimeSource::FromSystemTime(_)) => Some(*system_time),
-            Some(EventTimeSource::FromPath(_)) => {
+            None | Some(odf::metadata::EventTimeSource::FromMetadata(_)) => last_modified_time,
+            Some(odf::metadata::EventTimeSource::FromSystemTime(_)) => Some(*system_time),
+            Some(odf::metadata::EventTimeSource::FromPath(_)) => {
                 return Err(EventTimeSourceError::incompatible(
                     "Url source does not support fromPath event time source",
                 )

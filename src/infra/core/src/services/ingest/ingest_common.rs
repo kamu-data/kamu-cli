@@ -14,7 +14,6 @@ use datafusion::prelude::*;
 use internal_error::*;
 use kamu_core::engine::*;
 use kamu_core::{ObjectStoreRegistry, *};
-use opendatafabric::*;
 
 use crate::engine::*;
 
@@ -25,7 +24,7 @@ pub(crate) async fn preprocess(
     operation_id: &str,
     engine_provisioner: &dyn EngineProvisioner,
     ctx: &SessionContext,
-    transform: &Transform,
+    transform: &odf::metadata::Transform,
     input_data: DataFrame,
     maybe_listener: Option<Arc<dyn EngineProvisioningListener>>,
 ) -> Result<Option<DataFrame>, EngineError> {
@@ -59,8 +58,8 @@ pub(crate) async fn preprocess(
 /// - Coerce event time column's type, if present, into a timestamp
 pub fn preprocess_default(
     df: DataFrame,
-    read_step: &ReadStep,
-    vocab: &DatasetVocabulary,
+    read_step: &odf::metadata::ReadStep,
+    vocab: &odf::metadata::DatasetVocabulary,
     opts: &SchemaInferenceOpts,
 ) -> Result<DataFrame, datafusion::error::DataFusionError> {
     let df = if read_step.schema().is_none() && opts.rename_on_conflict_with_system_column {

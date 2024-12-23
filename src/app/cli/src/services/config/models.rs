@@ -16,7 +16,6 @@ use kamu::utils::docker_images;
 use kamu_accounts::*;
 use kamu_datasets::DatasetEnvVarsConfig;
 use merge::Merge;
-use opendatafabric::{self as odf, PrivateKey};
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 use url::Url;
@@ -809,7 +808,7 @@ pub struct IdentityConfig {
     /// - base64-encodes them
     /// - converts default base64 encoding to base64url and removes padding
     /// - prepends a multibase prefix
-    pub private_key: Option<odf::PrivateKey>,
+    pub private_key: Option<odf::metadata::PrivateKey>,
 }
 
 impl IdentityConfig {
@@ -819,7 +818,7 @@ impl IdentityConfig {
 
     fn sample() -> Self {
         Self {
-            private_key: Some(PrivateKey::from_bytes(&[0; 32])),
+            private_key: Some(odf::metadata::PrivateKey::from_bytes(&[0; 32])),
         }
     }
 

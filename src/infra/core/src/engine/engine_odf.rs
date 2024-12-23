@@ -14,12 +14,11 @@ use std::sync::Arc;
 
 use container_runtime::*;
 use datafusion::config::{ParquetOptions, TableParquetOptions};
+use file_utils::OwnedFile;
 use internal_error::ResultIntoInternal;
 use kamu_core::engine::*;
 use kamu_core::*;
-use odf::engine::{EngineGrpcClient, ExecuteRawQueryError, ExecuteTransformError};
-use odf::TransformResponseSuccess;
-use opendatafabric::{self as odf};
+use odf::metadata::engine::{EngineGrpcClient, ExecuteRawQueryError, ExecuteTransformError};
 
 use super::engine_container::{EngineContainer, LogsConfig};
 use super::engine_io_strategy::*;
@@ -50,7 +49,8 @@ impl ODFEngine {
     // TODO: Currently we are always proxying remote inputs, but in future we should
     // have a capabilities mechanism for engines to declare that they can work
     // with some remote storages directly without us needing to proxy data.
-    fn get_io_strategy(&self, target_dataset: &dyn Dataset) -> Arc<dyn EngineIoStrategy> {
+    fn get_io_strategy(&self, target_dataset: &dyn odf::Dataset) -> Arc<dyn EngineIoStrategy> {
+        use odf::storage::ObjectRepositoryProtocol;
         match target_dataset.as_data_repo().protocol() {
             ObjectRepositoryProtocol::LocalFs { .. } => Arc::new(EngineIoStrategyLocalVolume {}),
             ObjectRepositoryProtocol::Memory
@@ -64,8 +64,8 @@ impl ODFEngine {
         &self,
         engine_container: &EngineContainer,
         engine_client: &mut EngineGrpcClient,
-        request: odf::RawQueryRequest,
-    ) -> Result<odf::RawQueryResponseSuccess, EngineError> {
+        request: odf::metadata::RawQueryRequest,
+    ) -> Result<odf::metadata::RawQueryResponseSuccess, EngineError> {
         tracing::info!(?request, "Performing engine operation");
 
         let output_data_path = request.output_data_path.clone();
@@ -115,8 +115,8 @@ impl ODFEngine {
         &self,
         engine_container: &EngineContainer,
         engine_client: &mut EngineGrpcClient,
-        request: odf::TransformRequest,
-    ) -> Result<odf::TransformResponseSuccess, EngineError> {
+        request: odf::metadata::TransformRequest,
+    ) -> Result<odf::metadata::TransformResponseSuccess, EngineError> {
         tracing::info!(?request, "Performing engine operation");
 
         let new_checkpoint_path = request.new_checkpoint_path.clone();
@@ -165,7 +165,7 @@ impl ODFEngine {
 
     pub fn materialize_response(
         &self,
-        engine_response: TransformResponseSuccess,
+        engine_response: odf::metadata::TransformResponseSuccess,
         new_data_path: PathBuf,
         new_checkpoint_path: PathBuf,
     ) -> Result<TransformResponseExt, EngineError> {
@@ -299,7 +299,7 @@ impl Engine for ODFEngine {
             .await
             .int_err()?;
 
-        let materialized_request = odf::RawQueryRequest {
+        let materialized_request = odf::metadata::RawQueryRequest {
             input_data_paths: vec![container_input_data_path],
             transform: request.transform,
             output_data_path: container_output_data_path.clone(),

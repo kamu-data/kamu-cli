@@ -10,7 +10,6 @@
 use database_common::{PaginationOpts, TransactionRef, TransactionRefT};
 use dill::{component, interface};
 use internal_error::{InternalError, ResultIntoInternal};
-use opendatafabric::DatasetID;
 use uuid::Uuid;
 
 use crate::domain::*;
@@ -85,7 +84,7 @@ impl DatasetEnvVarRepository for PostgresDatasetEnvVarRepository {
 
     async fn get_all_dataset_env_vars_by_dataset_id(
         &self,
-        dataset_id: &DatasetID,
+        dataset_id: &odf::DatasetID,
         pagination: &PaginationOpts,
     ) -> Result<Vec<DatasetEnvVar>, GetDatasetEnvVarError> {
         let mut tr = self.transaction.lock().await;
@@ -119,7 +118,7 @@ impl DatasetEnvVarRepository for PostgresDatasetEnvVarRepository {
 
     async fn get_all_dataset_env_vars_count_by_dataset_id(
         &self,
-        dataset_id: &DatasetID,
+        dataset_id: &odf::DatasetID,
     ) -> Result<usize, GetDatasetEnvVarError> {
         let mut tr = self.transaction.lock().await;
 
@@ -144,7 +143,7 @@ impl DatasetEnvVarRepository for PostgresDatasetEnvVarRepository {
     async fn get_dataset_env_var_by_key_and_dataset_id(
         &self,
         dataset_env_var_key: &str,
-        dataset_id: &DatasetID,
+        dataset_id: &odf::DatasetID,
     ) -> Result<DatasetEnvVar, GetDatasetEnvVarError> {
         let mut tr = self.transaction.lock().await;
 

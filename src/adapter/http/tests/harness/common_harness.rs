@@ -15,9 +15,11 @@ use std::{fs, io};
 use datafusion::arrow::array::{Array, RecordBatch, UInt64Array};
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use kamu::domain::*;
-use kamu::testing::{AddDataBuilder, MetadataFactory, ParquetWriterHelper};
-use kamu::{DatasetLayout, ObjectRepositoryLocalFSSha3};
-use opendatafabric::{AccountName, DatasetAlias, DatasetRef, MetadataEvent, Multihash};
+use kamu::testing::ParquetWriterHelper;
+use odf::dataset::DatasetLayout;
+use odf::metadata::testing::{AddDataBuilder, MetadataFactory};
+use odf::storage::lfs::ObjectRepositoryLocalFSSha3;
+use odf::storage::ObjectRepository as _;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -46,7 +48,7 @@ pub(crate) fn copy_dataset_files(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) async fn write_dataset_alias(dataset_layout: &DatasetLayout, alias: &DatasetAlias) {
+pub(crate) async fn write_dataset_alias(dataset_layout: &DatasetLayout, alias: &odf::DatasetAlias) {
     if !dataset_layout.info_dir.is_dir() {
         std::fs::create_dir_all(dataset_layout.info_dir.clone()).unwrap();
     }
@@ -68,7 +70,7 @@ pub(crate) async fn write_dataset_alias(dataset_layout: &DatasetLayout, alias: &
 pub(crate) async fn create_random_data(
     dataset_layout: &DatasetLayout,
     prev_offset: Option<u64>,
-    prev_checkpoint: Option<Multihash>,
+    prev_checkpoint: Option<odf::Multihash>,
 ) -> AddDataBuilder {
     let (d_hash, d_size) = create_random_parquet_file(
         &dataset_layout.data_dir,
@@ -90,7 +92,7 @@ pub(crate) async fn create_random_data(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-async fn create_random_file(root: &Path) -> (Multihash, usize) {
+async fn create_random_file(root: &Path) -> (odf::Multihash, usize) {
     use rand::RngCore;
 
     let mut data = [0u8; 32];
@@ -100,7 +102,7 @@ async fn create_random_file(root: &Path) -> (Multihash, usize) {
 
     let repo = ObjectRepositoryLocalFSSha3::new(root);
     let hash = repo
-        .insert_bytes(&data, InsertOpts::default())
+        .insert_bytes(&data, odf::storage::InsertOpts::default())
         .await
         .unwrap()
         .hash;
@@ -114,7 +116,7 @@ async fn create_random_parquet_file(
     root: &Path,
     num_records: usize,
     start_offset: u64,
-) -> (Multihash, usize) {
+) -> (odf::Multihash, usize) {
     use rand::RngCore;
 
     let schema = Arc::new(Schema::new(vec![
@@ -143,7 +145,7 @@ async fn create_random_parquet_file(
 
     let repo = ObjectRepositoryLocalFSSha3::new(root);
     let hash = repo
-        .insert_file_move(&tmp_data_path, InsertOpts::default())
+        .insert_file_move(&tmp_data_path, odf::storage::InsertOpts::default())
         .await
         .unwrap()
         .hash;
@@ -155,10 +157,10 @@ async fn create_random_parquet_file(
 
 pub(crate) async fn commit_add_data_event(
     dataset_registry: &dyn DatasetRegistry,
-    dataset_ref: &DatasetRef,
+    dataset_ref: &odf::DatasetRef,
     dataset_layout: &DatasetLayout,
-    prev_data_block_hash: Option<Multihash>,
-) -> CommitResult {
+    prev_data_block_hash: Option<odf::Multihash>,
+) -> odf::dataset::CommitResult {
     let resolved_dataset = dataset_registry
         .get_dataset_by_ref(dataset_ref)
         .await
@@ -171,7 +173,7 @@ pub(crate) async fn commit_add_data_event(
             .await
             .unwrap();
         match prev_data_block.event {
-            opendatafabric::MetadataEvent::AddData(add_data) => (
+            odf::MetadataEvent::AddData(add_data) => (
                 Some(add_data.new_data.unwrap().offset_interval.end),
                 Some(add_data.new_checkpoint.unwrap().physical_hash),
             ),
@@ -186,7 +188,10 @@ pub(crate) async fn commit_add_data_event(
         .build();
 
     resolved_dataset
-        .commit_event(MetadataEvent::AddData(random_data), CommitOpts::default())
+        .commit_event(
+            odf::MetadataEvent::AddData(random_data),
+            odf::dataset::CommitOpts::default(),
+        )
         .await
         .unwrap()
 }
@@ -194,14 +199,14 @@ pub(crate) async fn commit_add_data_event(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) fn make_dataset_ref(
-    account_name: Option<&AccountName>,
+    account_name: Option<&odf::AccountName>,
     dataset_name: &str,
-) -> DatasetRef {
+) -> odf::DatasetRef {
     match account_name {
         Some(account_name) => {
-            DatasetRef::from_str(format!("{account_name}/{dataset_name}").as_str()).unwrap()
+            odf::DatasetRef::from_str(format!("{account_name}/{dataset_name}").as_str()).unwrap()
         }
-        None => DatasetRef::from_str(dataset_name).unwrap(),
+        None => odf::DatasetRef::from_str(dataset_name).unwrap(),
     }
 }
 

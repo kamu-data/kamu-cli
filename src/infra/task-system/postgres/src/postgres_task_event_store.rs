@@ -11,7 +11,6 @@ use database_common::{PaginationOpts, TransactionRef, TransactionRefT};
 use dill::*;
 use futures::TryStreamExt;
 use kamu_task_system::*;
-use opendatafabric::DatasetID;
 use sqlx::{FromRow, Postgres, QueryBuilder};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -377,7 +376,7 @@ impl TaskEventStore for PostgresTaskEventStore {
     /// reverse chronological order based on creation time
     fn get_tasks_by_dataset(
         &self,
-        dataset_id: &DatasetID,
+        dataset_id: &odf::DatasetID,
         pagination: PaginationOpts,
     ) -> TaskIDStream {
         let dataset_id = dataset_id.to_string();
@@ -416,7 +415,7 @@ impl TaskEventStore for PostgresTaskEventStore {
     /// Returns total number of tasks associated with the specified dataset
     async fn get_count_tasks_by_dataset(
         &self,
-        dataset_id: &DatasetID,
+        dataset_id: &odf::DatasetID,
     ) -> Result<usize, InternalError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;

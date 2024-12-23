@@ -7,29 +7,17 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use opendatafabric::{
-    AddPushSource,
-    MergeStrategy,
-    MergeStrategyAppend,
-    MetadataEvent,
-    MetadataEventTypeFlags as Flag,
-    SetPollingSource,
-};
+use odf::dataset::MetadataVisitorDecision as Decision;
+use odf::metadata::MetadataEventTypeFlags as Flag;
 
-use crate::{
-    HashedMetadataBlockRef,
-    MetadataChainVisitor,
-    MetadataVisitorDecision as Decision,
-    ScanMetadataError,
-    SourceNotFoundError,
-};
+use crate::{ScanMetadataError, SourceNotFoundError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct WriterSourceEventVisitor<'a> {
     maybe_source_name: Option<&'a str>,
     next_block_flags: Flag,
-    maybe_source_event: Option<MetadataEvent>,
+    maybe_source_event: Option<odf::MetadataEvent>,
 }
 
 impl<'a> WriterSourceEventVisitor<'a> {
@@ -50,16 +38,18 @@ impl<'a> WriterSourceEventVisitor<'a> {
 
     pub fn get_source_event_and_merge_strategy(
         self,
-    ) -> Result<(Option<MetadataEvent>, MergeStrategy), ScanMetadataError> {
+    ) -> Result<(Option<odf::MetadataEvent>, odf::metadata::MergeStrategy), ScanMetadataError> {
         let merge_strategy = match (&self.maybe_source_event, self.maybe_source_name) {
             // Source found
             (Some(e), _) => match e {
-                MetadataEvent::SetPollingSource(e) => Ok(e.merge.clone()),
-                MetadataEvent::AddPushSource(e) => Ok(e.merge.clone()),
+                odf::MetadataEvent::SetPollingSource(e) => Ok(e.merge.clone()),
+                odf::MetadataEvent::AddPushSource(e) => Ok(e.merge.clone()),
                 _ => unreachable!(),
             },
             // No source defined - assuming append strategy
-            (None, None) => Ok(MergeStrategy::Append(MergeStrategyAppend {})),
+            (None, None) => Ok(odf::metadata::MergeStrategy::Append(
+                odf::metadata::MergeStrategyAppend {},
+            )),
             // Source expected but not found
             (None, Some(source)) => Err(SourceNotFoundError::new(
                 Some(source),
@@ -70,7 +60,10 @@ impl<'a> WriterSourceEventVisitor<'a> {
         Ok((self.maybe_source_event, merge_strategy))
     }
 
-    fn handle_set_polling_source(&mut self, e: &SetPollingSource) -> Result<(), ScanMetadataError> {
+    fn handle_set_polling_source(
+        &mut self,
+        e: &odf::metadata::SetPollingSource,
+    ) -> Result<(), ScanMetadataError> {
         if self.maybe_source_name.is_some() {
             return Err(SourceNotFoundError::new(
                 self.maybe_source_name,
@@ -84,7 +77,10 @@ impl<'a> WriterSourceEventVisitor<'a> {
         Ok(())
     }
 
-    fn handle_add_push_source(&mut self, e: &AddPushSource) -> Result<(), ScanMetadataError> {
+    fn handle_add_push_source(
+        &mut self,
+        e: &odf::metadata::AddPushSource,
+    ) -> Result<(), ScanMetadataError> {
         if self.maybe_source_event.is_none() {
             if self.maybe_source_name.is_none()
                 || self.maybe_source_name == Some(e.source_name.as_str())
@@ -107,41 +103,45 @@ impl<'a> WriterSourceEventVisitor<'a> {
     }
 }
 
-impl MetadataChainVisitor for WriterSourceEventVisitor<'_> {
+impl odf::dataset::MetadataChainVisitor for WriterSourceEventVisitor<'_> {
     type Error = ScanMetadataError;
 
     fn initial_decision(&self) -> Decision {
         Decision::NextOfType(self.next_block_flags)
     }
 
-    fn visit(&mut self, (_, block): HashedMetadataBlockRef) -> Result<Decision, Self::Error> {
+    fn visit(
+        &mut self,
+        (_, block): odf::dataset::HashedMetadataBlockRef,
+    ) -> Result<Decision, Self::Error> {
         match &block.event {
-            MetadataEvent::SetPollingSource(e) => {
+            odf::MetadataEvent::SetPollingSource(e) => {
                 self.handle_set_polling_source(e)?;
 
                 if self.maybe_source_name.is_none() {
                     self.next_block_flags -= Flag::SET_POLLING_SOURCE;
                 }
             }
-            MetadataEvent::AddPushSource(e) => {
+            odf::MetadataEvent::AddPushSource(e) => {
                 self.handle_add_push_source(e)?;
 
                 if self.maybe_source_name.is_some() && self.maybe_source_event.is_some() {
                     self.next_block_flags -= Flag::ADD_PUSH_SOURCE;
                 }
             }
-            MetadataEvent::DisablePollingSource(_) | MetadataEvent::DisablePushSource(_) => {
+            odf::MetadataEvent::DisablePollingSource(_)
+            | odf::MetadataEvent::DisablePushSource(_) => {
                 unimplemented!("Disabling sources is not yet fully supported")
             }
-            MetadataEvent::Seed(_)
-            | MetadataEvent::AddData(_)
-            | MetadataEvent::ExecuteTransform(_)
-            | MetadataEvent::SetVocab(_)
-            | MetadataEvent::SetDataSchema(_)
-            | MetadataEvent::SetTransform(_)
-            | MetadataEvent::SetAttachments(_)
-            | MetadataEvent::SetInfo(_)
-            | MetadataEvent::SetLicense(_) => {
+            odf::MetadataEvent::Seed(_)
+            | odf::MetadataEvent::AddData(_)
+            | odf::MetadataEvent::ExecuteTransform(_)
+            | odf::MetadataEvent::SetVocab(_)
+            | odf::MetadataEvent::SetDataSchema(_)
+            | odf::MetadataEvent::SetTransform(_)
+            | odf::MetadataEvent::SetAttachments(_)
+            | odf::MetadataEvent::SetInfo(_)
+            | odf::MetadataEvent::SetLicense(_) => {
                 unreachable!()
             }
         }

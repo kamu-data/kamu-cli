@@ -22,12 +22,8 @@ use kamu_accounts_inmem::InMemoryAccountRepository;
 use kamu_accounts_services::{LoginPasswordAuthProvider, PredefinedAccountsRegistrator};
 use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer, DatasetActionUnauthorizedError};
-use kamu_core::testing::MockDatasetRepository;
 use kamu_core::{
-    AccessError,
     DatasetLifecycleMessage,
-    DatasetRepository,
-    DatasetVisibility,
     TenancyConfig,
     MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
 };
@@ -40,7 +36,6 @@ use messaging_outbox::{
     OutboxExt,
     OutboxImmediateImpl,
 };
-use opendatafabric as odf;
 use time_source::SystemTimeSourceDefault;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -104,7 +99,7 @@ async fn test_guest_can_read_but_not_write_public_dataset() {
     assert_matches!(
         write_result,
         Err(DatasetActionUnauthorizedError::Access(
-            AccessError::Forbidden(_)
+            odf::AccessError::Forbidden(_)
         ))
     );
     assert_matches!(
@@ -155,8 +150,8 @@ impl DatasetAuthorizerHarness {
                     OutboxImmediateImpl::builder()
                         .with_consumer_filter(ConsumerFilter::AllConsumers),
                 )
-                .add_value(MockDatasetRepository::new())
-                .bind::<dyn DatasetRepository, MockDatasetRepository>()
+                .add_value(odf::dataset::MockDatasetStorageUnit::new())
+                .bind::<dyn odf::DatasetStorageUnit, odf::dataset::MockDatasetStorageUnit>()
                 .add_value(tenancy_config)
                 .add::<DatasetEntryServiceImpl>()
                 .add::<InMemoryDatasetEntryRepository>()
@@ -191,17 +186,19 @@ impl DatasetAuthorizerHarness {
     }
 
     async fn create_public_dataset(&self, alias: odf::DatasetAlias) -> odf::DatasetID {
-        self.create_dataset(alias, DatasetVisibility::Public).await
+        self.create_dataset(alias, odf::DatasetVisibility::Public)
+            .await
     }
 
     async fn create_private_dataset(&self, alias: odf::DatasetAlias) -> odf::DatasetID {
-        self.create_dataset(alias, DatasetVisibility::Private).await
+        self.create_dataset(alias, odf::DatasetVisibility::Private)
+            .await
     }
 
     async fn create_dataset(
         &self,
         alias: odf::DatasetAlias,
-        visibility: DatasetVisibility,
+        visibility: odf::DatasetVisibility,
     ) -> odf::DatasetID {
         let dataset_id = dataset_id(&alias);
 

@@ -20,13 +20,10 @@ use kamu::domain::{
     CompactionPlanner,
     CreateDatasetFromSnapshotUseCase,
     CreateDatasetUseCase,
-    DatasetRepository,
     ObjectStoreBuilder,
     RunInfoDir,
     ServerUrlConfig,
 };
-use kamu::testing::LocalS3Server;
-use kamu::utils::s3_context::S3Context;
 use kamu::{
     AppendDatasetMetadataBatchUseCaseImpl,
     CommitDatasetEventUseCaseImpl,
@@ -34,10 +31,9 @@ use kamu::{
     CompactionPlannerImpl,
     CreateDatasetFromSnapshotUseCaseImpl,
     CreateDatasetUseCaseImpl,
-    DatasetLayout,
-    DatasetRegistryRepoBridge,
-    DatasetRepositoryS3,
-    DatasetRepositoryWriter,
+    DatasetRegistrySoloUnitBridge,
+    DatasetStorageUnitS3,
+    DatasetStorageUnitWriter,
     ObjectStoreBuilderLocalFs,
     ObjectStoreBuilderS3,
     ObjectStoreRegistryImpl,
@@ -48,7 +44,9 @@ use kamu_core::{DatasetRegistry, DidGeneratorDefault, TenancyConfig};
 use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
 use kamu_datasets_services::DependencyGraphServiceImpl;
 use messaging_outbox::DummyOutboxImpl;
-use opendatafabric::{AccountName, DatasetAlias, DatasetHandle};
+use odf::dataset::DatasetLayout;
+use s3_utils::S3Context;
+use test_utils::LocalS3Server;
 use time_source::{SystemTimeSource, SystemTimeSourceStub};
 use url::Url;
 
@@ -104,10 +102,10 @@ impl ServerSideS3Harness {
                 .add::<DependencyGraphServiceImpl>()
                 .add::<InMemoryDatasetDependencyRepository>()
                 .add_value(options.tenancy_config)
-                .add_builder(DatasetRepositoryS3::builder().with_s3_context(s3_context.clone()))
-                .bind::<dyn DatasetRepository, DatasetRepositoryS3>()
-                .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryS3>()
-                .add::<DatasetRegistryRepoBridge>()
+                .add_builder(DatasetStorageUnitS3::builder().with_s3_context(s3_context.clone()))
+                .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitS3>()
+                .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitS3>()
+                .add::<DatasetRegistrySoloUnitBridge>()
                 .add_value(server_authentication_mock(&account))
                 .bind::<dyn AuthenticationService, MockAuthenticationService>()
                 .add_value(ServerUrlConfig::new_test(Some(&base_url_rest)))
@@ -151,9 +149,11 @@ impl ServerSideS3Harness {
 
 #[async_trait::async_trait]
 impl ServerSideHarness for ServerSideS3Harness {
-    fn operating_account_name(&self) -> Option<AccountName> {
+    fn operating_account_name(&self) -> Option<odf::AccountName> {
         match self.options.tenancy_config {
-            TenancyConfig::MultiTenant => Some(AccountName::new_unchecked(SERVER_ACCOUNT_NAME)),
+            TenancyConfig::MultiTenant => {
+                Some(odf::AccountName::new_unchecked(SERVER_ACCOUNT_NAME))
+            }
             TenancyConfig::SingleTenant => None,
         }
     }
@@ -194,7 +194,7 @@ impl ServerSideHarness for ServerSideS3Harness {
         cli_catalog.get_one::<dyn CompactionExecutor>().unwrap()
     }
 
-    fn dataset_url_with_scheme(&self, dataset_alias: &DatasetAlias, scheme: &str) -> Url {
+    fn dataset_url_with_scheme(&self, dataset_alias: &odf::DatasetAlias, scheme: &str) -> Url {
         let api_server_address = self.api_server_addr();
         Url::from_str(
             match self.options.tenancy_config {
@@ -223,7 +223,7 @@ impl ServerSideHarness for ServerSideS3Harness {
         self.account.clone()
     }
 
-    fn dataset_layout(&self, dataset_handle: &DatasetHandle) -> DatasetLayout {
+    fn dataset_layout(&self, dataset_handle: &odf::DatasetHandle) -> DatasetLayout {
         DatasetLayout::new(
             self.internal_bucket_folder_path()
                 .join(dataset_handle.id.as_multibase().to_stack_string())

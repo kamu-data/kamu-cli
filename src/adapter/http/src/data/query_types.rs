@@ -14,7 +14,6 @@ use http_common::{ApiError, IntoApiError};
 use internal_error::*;
 use kamu::domain;
 use kamu_core::{DataFusionError, QueryError};
-use opendatafabric as odf;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -36,12 +35,12 @@ pub struct IdentityConfig {
     /// ```sh
     /// ssh-keygen -t ed25519 -C "coo@abc.com"
     /// ```
-    pub private_key: odf::PrivateKey,
+    pub private_key: odf::metadata::PrivateKey,
 }
 
 impl IdentityConfig {
-    pub fn did(&self) -> odf::DidKey {
-        odf::DidKey::new_ed25519(&self.private_key.verifying_key())
+    pub fn did(&self) -> odf::metadata::DidKey {
+        odf::metadata::DidKey::new_ed25519(&self.private_key.verifying_key())
     }
 }
 
@@ -361,10 +360,10 @@ pub struct Proof {
     pub r#type: ProofType,
 
     /// DID (public key) of the node performing the computation
-    pub verification_method: odf::DidKey,
+    pub verification_method: odf::metadata::DidKey,
 
     /// Signature: `multibase(sign(canonicalize(commitment)))`
-    pub proof_value: odf::Signature,
+    pub proof_value: odf::metadata::Signature,
 }
 
 #[derive(
@@ -433,7 +432,7 @@ pub(crate) fn serialize_data(
     record_batches: &[datafusion::arrow::array::RecordBatch],
     format: DataFormat,
 ) -> Result<String, InternalError> {
-    use kamu_data_utils::data::format::*;
+    use odf::utils::data::format::*;
 
     let mut buf = Vec::new();
 
@@ -499,7 +498,7 @@ impl Schema {
 
 impl serde::Serialize for Schema {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        use kamu_data_utils::schema::{convert, format};
+        use odf::utils::schema::{convert, format};
 
         match self.format {
             SchemaFormat::ArrowJson => self.schema.serialize(serializer),

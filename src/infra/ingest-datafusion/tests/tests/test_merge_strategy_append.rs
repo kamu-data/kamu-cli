@@ -14,13 +14,12 @@ use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::prelude::*;
 use kamu_ingest_datafusion::*;
-use opendatafabric as odf;
 
 use crate::utils::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-type Op = odf::OperationType;
+type Op = odf::metadata::OperationType;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -110,7 +109,7 @@ where
     S: Into<String>,
 {
     let ctx = SessionContext::new();
-    let strat = MergeStrategyAppend::new(odf::DatasetVocabulary {
+    let strat = MergeStrategyAppend::new(odf::metadata::DatasetVocabulary {
         event_time_column: "year".to_string(),
         ..Default::default()
     });

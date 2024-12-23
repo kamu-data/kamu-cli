@@ -8,11 +8,9 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::InternalError;
-use opendatafabric::{DatasetHandle, DatasetRefRemote};
 use thiserror::Error;
 
 use crate::utils::metadata_chain_comparator::CompareChainsResult;
-use crate::AccessError;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -21,7 +19,7 @@ pub trait RemoteStatusService: Send + Sync {
     /// Returns sync status of all push remotes connected with a given dataset
     async fn check_remotes_status(
         &self,
-        dataset_handle: &DatasetHandle,
+        dataset_handle: &odf::DatasetHandle,
     ) -> Result<DatasetPushStatuses, InternalError>;
 }
 
@@ -29,7 +27,7 @@ pub trait RemoteStatusService: Send + Sync {
 
 #[derive(Debug)]
 pub struct PushStatus {
-    pub remote: DatasetRefRemote,
+    pub remote: odf::DatasetRefRemote,
     pub check_result: Result<CompareChainsResult, StatusCheckError>,
 }
 
@@ -45,7 +43,7 @@ pub enum StatusCheckError {
     Access(
         #[from]
         #[backtrace]
-        AccessError,
+        odf::AccessError,
     ),
     #[error("Remote dataset not found")]
     RemoteDatasetNotFound,

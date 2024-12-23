@@ -11,6 +11,22 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Unreleased]
+### Changed
+- Massive crates restructuring around Open Data Fabric code:
+  - `src/odf` concentrates large number of related crates now, preparing for future separation in different Git repo
+  - old `opendatafabric` crate becamse `odf-metadata`
+  - low-level repository implementations became `odf-storage[-...]` crates
+  - specific storage technologies are gated via features (`lfs`, `s3`, `http`)
+  - `DatasetFactory`, `Dataset`, `DatasetSummary`, `DatasetLayout`, `BlockRef`, 
+      `MetadataChain` and visiting logic now are residents of `odf-dataset`
+  - `kamu-data-utils` became `odf-data-utils`
+  - multiple utility libraries introduced, shared both via ODF and main Kamu code 
+    (`async-utils`, `file-utils`, `s3-utils`, `test-utils`)
+  - `DatasetRepository` still stays in Kamu core, renamed to `DatasetStorageUnit` to better match it's current purpose
+  - import statements pointing at ODF code have been cleaned all over the code base (use `odf` meta-crate only outside `src/odf`)
+
+
 ## [0.218.0] - 2029-01-17
 ### Changed
 - Private Datasets:

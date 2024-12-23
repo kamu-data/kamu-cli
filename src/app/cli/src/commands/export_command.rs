@@ -11,7 +11,6 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use kamu::domain::{ExportFormat, ExportOptions, ExportService, QueryService};
-use opendatafabric::DatasetRef;
 
 use crate::{CLIError, Command};
 
@@ -20,7 +19,7 @@ use crate::{CLIError, Command};
 pub struct ExportCommand {
     export_service: Arc<dyn ExportService>,
     query_service: Arc<dyn QueryService>,
-    dataset_ref: DatasetRef,
+    dataset_ref: odf::DatasetRef,
     output_path: Option<PathBuf>,
     output_format: ExportFormat,
     records_per_file: Option<usize>,
@@ -31,7 +30,7 @@ impl ExportCommand {
     pub fn new(
         export_service: Arc<dyn ExportService>,
         query_service: Arc<dyn QueryService>,
-        dataset_ref: DatasetRef,
+        dataset_ref: odf::DatasetRef,
         output_path: Option<PathBuf>,
         output_format: ExportFormat,
         records_per_file: Option<usize>,

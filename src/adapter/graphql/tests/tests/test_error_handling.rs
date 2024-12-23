@@ -9,9 +9,9 @@
 
 use dill::Component;
 use indoc::indoc;
-use kamu::{DatasetRegistryRepoBridge, DatasetRepositoryLocalFs};
+use kamu::{DatasetRegistrySoloUnitBridge, DatasetStorageUnitLocalFs};
 use kamu_accounts::CurrentAccountSubject;
-use kamu_core::{DatasetRepository, TenancyConfig};
+use kamu_core::TenancyConfig;
 use time_source::SystemTimeSourceDefault;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -66,9 +66,11 @@ async fn test_internal_error() {
         .add::<SystemTimeSourceDefault>()
         .add_value(CurrentAccountSubject::new_test())
         .add_value(TenancyConfig::SingleTenant)
-        .add_builder(DatasetRepositoryLocalFs::builder().with_root(tempdir.path().join("datasets")))
-        .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-        .add::<DatasetRegistryRepoBridge>()
+        .add_builder(
+            DatasetStorageUnitLocalFs::builder().with_root(tempdir.path().join("datasets")),
+        )
+        .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
+        .add::<DatasetRegistrySoloUnitBridge>()
         .build();
 
     let schema = kamu_adapter_graphql::schema_quiet();

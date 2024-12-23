@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use kamu_core::{DatasetChangesService, DatasetIntervalIncrement, GetIncrementError};
-use opendatafabric::{DatasetID, Multihash};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -20,16 +19,16 @@ mockall::mock! {
         #[allow(clippy::ref_option_ref)]
         async fn get_increment_between<'a>(
             &'a self,
-            dataset_id: &'a DatasetID,
-            old_head: Option<&'a Multihash>,
-            new_head: &'a Multihash,
+            dataset_id: &'a odf::DatasetID,
+            old_head: Option<&'a odf::Multihash>,
+            new_head: &'a odf::Multihash,
         ) -> Result<DatasetIntervalIncrement, GetIncrementError>;
 
         #[allow(clippy::ref_option_ref)]
         async fn get_increment_since<'a>(
             &'a self,
-            dataset_id: &'a DatasetID,
-            old_head: Option<&'a Multihash>,
+            dataset_id: &'a odf::DatasetID,
+            old_head: Option<&'a odf::Multihash>,
         ) -> Result<DatasetIntervalIncrement, GetIncrementError>;
     }
 }

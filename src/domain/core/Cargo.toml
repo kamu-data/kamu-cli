@@ -30,12 +30,13 @@ oso = ["dep:oso"]
 
 
 [dependencies]
-kamu-accounts = { workspace = true }
-kamu-datasets = { workspace = true }
+async-utils = { workspace = true }
 container-runtime = { workspace = true }
-messaging-outbox = { workspace = true }
+file-utils = { workspace = true }
 internal-error = { workspace = true }
-opendatafabric = { workspace = true }
+kamu-datasets = { workspace = true }
+messaging-outbox = { workspace = true }
+odf = { workspace = true }
 
 async-stream = { version = "0.3", default-features = false }
 async-trait = { version = "0.1", default-features = false }

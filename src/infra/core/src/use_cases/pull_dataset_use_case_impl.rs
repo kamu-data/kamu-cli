@@ -19,7 +19,6 @@ use kamu_core::auth::{
     DatasetActionUnauthorizedError,
 };
 use kamu_core::*;
-use opendatafabric::{DatasetHandle, DatasetRefAny};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -286,7 +285,7 @@ impl PullDatasetUseCaseImpl {
         }
 
         let mut unauthorized_handles_to_errors: HashMap<
-            DatasetHandle,
+            odf::DatasetHandle,
             DatasetActionUnauthorizedError,
         > = unauthorized_handles_with_errors.into_iter().collect();
 
@@ -313,7 +312,7 @@ impl PullDatasetUseCaseImpl {
                     maybe_local_ref: reading_job
                         .as_common_item()
                         .try_get_written_handle()
-                        .map(DatasetHandle::as_local_ref),
+                        .map(odf::DatasetHandle::as_local_ref),
                     maybe_remote_ref: None,
                     maybe_original_request: reading_job.into_original_pull_request(),
                     result: Err(error),
@@ -580,13 +579,16 @@ impl PullMultiListener for ListenerMultiAdapter {
 }
 
 impl PollingIngestMultiListener for ListenerMultiAdapter {
-    fn begin_ingest(&self, _dataset: &DatasetHandle) -> Option<Arc<dyn PollingIngestListener>> {
+    fn begin_ingest(
+        &self,
+        _dataset: &odf::DatasetHandle,
+    ) -> Option<Arc<dyn PollingIngestListener>> {
         self.0.clone().get_ingest_listener()
     }
 }
 
 impl TransformMultiListener for ListenerMultiAdapter {
-    fn begin_transform(&self, _dataset: &DatasetHandle) -> Option<Arc<dyn TransformListener>> {
+    fn begin_transform(&self, _dataset: &odf::DatasetHandle) -> Option<Arc<dyn TransformListener>> {
         self.0.clone().get_transform_listener()
     }
 }
@@ -594,8 +596,8 @@ impl TransformMultiListener for ListenerMultiAdapter {
 impl SyncMultiListener for ListenerMultiAdapter {
     fn begin_sync(
         &self,
-        _src: &DatasetRefAny,
-        _dst: &DatasetRefAny,
+        _src: &odf::DatasetRefAny,
+        _dst: &odf::DatasetRefAny,
     ) -> Option<Arc<dyn SyncListener>> {
         self.0.clone().get_sync_listener()
     }

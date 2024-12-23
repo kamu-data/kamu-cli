@@ -11,7 +11,6 @@ use std::fmt::Debug;
 use std::str::FromStr;
 
 use kamu::domain::ExportFormat;
-use opendatafabric as odf;
 use strum::IntoEnumIterator;
 use url::Url;
 
@@ -193,11 +192,11 @@ pub enum DatasetVisibility {
     Public,
 }
 
-impl From<DatasetVisibility> for kamu::domain::DatasetVisibility {
+impl From<DatasetVisibility> for odf::DatasetVisibility {
     fn from(value: DatasetVisibility) -> Self {
         match value {
-            DatasetVisibility::Private => kamu::domain::DatasetVisibility::Private,
-            DatasetVisibility::Public => kamu::domain::DatasetVisibility::Public,
+            DatasetVisibility::Private => odf::DatasetVisibility::Private,
+            DatasetVisibility::Public => odf::DatasetVisibility::Public,
         }
     }
 }

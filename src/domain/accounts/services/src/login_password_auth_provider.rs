@@ -13,7 +13,6 @@ use std::sync::Arc;
 use argon2::Argon2;
 use dill::*;
 use internal_error::{InternalError, ResultIntoInternal};
-use opendatafabric::{AccountID, AccountName};
 use password_hash::rand_core::OsRng;
 use password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, SaltString};
 use serde::{Deserialize, Serialize};
@@ -38,7 +37,7 @@ impl LoginPasswordAuthProvider {
 
     pub async fn save_password(
         &self,
-        account_name: &AccountName,
+        account_name: &odf::AccountName,
         password: String,
     ) -> Result<(), InternalError> {
         // Generate password hash: this is a compute-intensive operation, so spawn a
@@ -79,9 +78,9 @@ impl AuthenticationProvider for LoginPasswordAuthProvider {
         PROVIDER_PASSWORD
     }
 
-    fn generate_id(&self, account_name: &AccountName) -> AccountID {
+    fn generate_id(&self, account_name: &odf::AccountName) -> odf::AccountID {
         // For passwords, use an ID based on name
-        AccountID::new_seeded_ed25519(account_name.as_bytes())
+        odf::AccountID::new_seeded_ed25519(account_name.as_bytes())
     }
 
     async fn login(
@@ -98,7 +97,8 @@ impl AuthenticationProvider for LoginPasswordAuthProvider {
                 })?;
 
         // Extract account name
-        let account_name = AccountName::from_str(&password_login_credentials.login).int_err()?;
+        let account_name =
+            odf::AccountName::from_str(&password_login_credentials.login).int_err()?;
 
         // Locate password hash associated with this account name
         let password_hash = match self

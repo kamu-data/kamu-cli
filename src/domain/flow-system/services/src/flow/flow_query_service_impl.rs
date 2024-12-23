@@ -17,7 +17,6 @@ use futures::TryStreamExt;
 use internal_error::ResultIntoInternal;
 use kamu_datasets::{DatasetEntryService, DatasetEntryServiceExt};
 use kamu_flow_system::*;
-use opendatafabric::{AccountID, DatasetID};
 
 use crate::{FlowAbortHelper, FlowSchedulingHelper};
 
@@ -58,7 +57,7 @@ impl FlowQueryService for FlowQueryServiceImpl {
     #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id, ?filters, ?pagination))]
     async fn list_all_flows_by_dataset(
         &self,
-        dataset_id: &DatasetID,
+        dataset_id: &odf::DatasetID,
         filters: DatasetFlowFilters,
         pagination: PaginationOpts,
     ) -> Result<FlowStateListing, ListFlowsByDatasetError> {
@@ -86,7 +85,7 @@ impl FlowQueryService for FlowQueryServiceImpl {
     #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id))]
     async fn list_all_flow_initiators_by_dataset(
         &self,
-        dataset_id: &DatasetID,
+        dataset_id: &odf::DatasetID,
     ) -> Result<FlowInitiatorListing, ListFlowsByDatasetError> {
         Ok(FlowInitiatorListing {
             matched_stream: self
@@ -101,7 +100,7 @@ impl FlowQueryService for FlowQueryServiceImpl {
     #[tracing::instrument(level = "debug", skip_all, fields(%account_id, ?filters, ?pagination))]
     async fn list_all_flows_by_account(
         &self,
-        account_id: &AccountID,
+        account_id: &odf::AccountID,
         filters: AccountFlowFilters,
         pagination: PaginationOpts,
     ) -> Result<FlowStateListing, ListFlowsByDatasetError> {
@@ -120,7 +119,7 @@ impl FlowQueryService for FlowQueryServiceImpl {
             owned_dataset_ids
         };
 
-        let account_dataset_ids: HashSet<DatasetID> = HashSet::from_iter(filtered_dataset_ids);
+        let account_dataset_ids: HashSet<odf::DatasetID> = HashSet::from_iter(filtered_dataset_ids);
 
         let dataset_flow_filters = DatasetFlowFilters {
             by_flow_status: filters.by_flow_status,
@@ -151,7 +150,7 @@ impl FlowQueryService for FlowQueryServiceImpl {
     #[tracing::instrument(level = "debug", skip_all, fields(%account_id))]
     async fn list_all_datasets_with_flow_by_account(
         &self,
-        account_id: &AccountID,
+        account_id: &odf::AccountID,
     ) -> Result<FlowDatasetListing, ListFlowsByDatasetError> {
         let owned_dataset_ids = self
             .dataset_entry_service
@@ -247,7 +246,7 @@ impl FlowQueryService for FlowQueryServiceImpl {
         &self,
         trigger_time: DateTime<Utc>,
         flow_key: FlowKey,
-        initiator_account_id: AccountID,
+        initiator_account_id: odf::AccountID,
         config_snapshot_maybe: Option<FlowConfigurationRule>,
     ) -> Result<FlowState, RequestFlowError> {
         let activation_time = self.agent_config.round_time(trigger_time)?;

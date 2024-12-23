@@ -13,19 +13,13 @@ use dill::*;
 use futures::TryStreamExt;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_core::{
-    BlockRef,
     DatasetChangesService,
     DatasetIntervalIncrement,
     DatasetRegistry,
     DatasetRegistryExt,
-    GetDatasetError,
     GetIncrementError,
-    GetRefError,
-    MetadataChainExt,
     ResolvedDataset,
-    SearchSingleDataBlockVisitor,
 };
-use opendatafabric::{DataSlice, DatasetID, MetadataEvent, Multihash};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -44,30 +38,30 @@ impl DatasetChangesServiceImpl {
 
     async fn resolve_dataset_by_id(
         &self,
-        dataset_id: &DatasetID,
+        dataset_id: &odf::DatasetID,
     ) -> Result<ResolvedDataset, GetIncrementError> {
         self.dataset_registry
             .get_dataset_by_ref(&dataset_id.as_local_ref())
             .await
             .map_err(|e| match e {
-                GetDatasetError::NotFound(e) => GetIncrementError::DatasetNotFound(e),
-                GetDatasetError::Internal(e) => GetIncrementError::Internal(e),
+                odf::dataset::GetDatasetError::NotFound(e) => GetIncrementError::DatasetNotFound(e),
+                odf::dataset::GetDatasetError::Internal(e) => GetIncrementError::Internal(e),
             })
     }
 
     async fn resolve_dataset_head(
         &self,
         resolved_dataset: &ResolvedDataset,
-    ) -> Result<Multihash, GetIncrementError> {
+    ) -> Result<odf::Multihash, GetIncrementError> {
         resolved_dataset
             .as_metadata_chain()
             .as_reference_repo()
-            .get(&BlockRef::Head)
+            .get(odf::BlockRef::Head.as_str())
             .await
             .map_err(|e| match e {
-                GetRefError::Access(e) => GetIncrementError::Access(e),
-                GetRefError::NotFound(e) => GetIncrementError::RefNotFound(e),
-                GetRefError::Internal(e) => GetIncrementError::Internal(e),
+                odf::storage::GetRefError::Access(e) => GetIncrementError::Access(e),
+                odf::storage::GetRefError::NotFound(e) => GetIncrementError::RefNotFound(e),
+                odf::storage::GetRefError::Internal(e) => GetIncrementError::Internal(e),
             })
     }
 
@@ -75,8 +69,8 @@ impl DatasetChangesServiceImpl {
     async fn make_increment_from_interval(
         &self,
         resolved_dataset: &ResolvedDataset,
-        old_head: Option<&Multihash>,
-        new_head: &Multihash,
+        old_head: Option<&odf::Multihash>,
+        new_head: &odf::Multihash,
     ) -> Result<DatasetIntervalIncrement, InternalError> {
         // Analysis outputs
         let mut num_blocks = 0;
@@ -97,15 +91,15 @@ impl DatasetChangesServiceImpl {
 
             // Count added records in data blocks
             num_records += match &block.event {
-                MetadataEvent::AddData(add_data) => add_data
+                odf::MetadataEvent::AddData(add_data) => add_data
                     .new_data
                     .as_ref()
-                    .map(DataSlice::num_records)
+                    .map(odf::DataSlice::num_records)
                     .unwrap_or_default(),
-                MetadataEvent::ExecuteTransform(execute_transform) => execute_transform
+                odf::MetadataEvent::ExecuteTransform(execute_transform) => execute_transform
                     .new_data
                     .as_ref()
-                    .map(DataSlice::num_records)
+                    .map(odf::DataSlice::num_records)
                     .unwrap_or_default(),
                 _ => 0,
             };
@@ -114,8 +108,8 @@ impl DatasetChangesServiceImpl {
             if updated_watermark.is_none() {
                 // Extract watermark of this block, if present
                 let block_watermark = match &block.event {
-                    MetadataEvent::AddData(add_data) => add_data.new_watermark,
-                    MetadataEvent::ExecuteTransform(execute_transform) => {
+                    odf::MetadataEvent::AddData(add_data) => add_data.new_watermark,
+                    odf::MetadataEvent::ExecuteTransform(execute_transform) => {
                         execute_transform.new_watermark
                     }
                     _ => None,
@@ -148,9 +142,13 @@ impl DatasetChangesServiceImpl {
             // Did we have any head before?
             if let Some(old_head) = &old_head {
                 // Yes, so try locating the previous watermark containing node
+                use odf::dataset::MetadataChainExt;
                 let previous_nearest_watermark = resolved_dataset
                     .as_metadata_chain()
-                    .accept_one_by_hash(old_head, SearchSingleDataBlockVisitor::next())
+                    .accept_one_by_hash(
+                        old_head,
+                        odf::dataset::SearchSingleDataBlockVisitor::next(),
+                    )
                     .await
                     .int_err()?
                     .into_event()
@@ -193,9 +191,9 @@ impl DatasetChangesServiceImpl {
 impl DatasetChangesService for DatasetChangesServiceImpl {
     async fn get_increment_between<'a>(
         &'a self,
-        dataset_id: &'a DatasetID,
-        old_head: Option<&'a Multihash>,
-        new_head: &'a Multihash,
+        dataset_id: &'a odf::DatasetID,
+        old_head: Option<&'a odf::Multihash>,
+        new_head: &'a odf::Multihash,
     ) -> Result<DatasetIntervalIncrement, GetIncrementError> {
         let resolved_dataset = self.resolve_dataset_by_id(dataset_id).await?;
 
@@ -209,8 +207,8 @@ impl DatasetChangesService for DatasetChangesServiceImpl {
 
     async fn get_increment_since<'a>(
         &'a self,
-        dataset_id: &'a DatasetID,
-        old_head: Option<&'a Multihash>,
+        dataset_id: &'a odf::DatasetID,
+        old_head: Option<&'a odf::Multihash>,
     ) -> Result<DatasetIntervalIncrement, GetIncrementError> {
         let resolved_dataset = self.resolve_dataset_by_id(dataset_id).await?;
         let current_head = self.resolve_dataset_head(&resolved_dataset).await?;

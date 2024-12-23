@@ -8,11 +8,10 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::InternalError;
-use opendatafabric as odf;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::{ResetPlan, ResolvedDataset, SetRefError};
+use crate::{ResetPlan, ResolvedDataset};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -37,7 +36,7 @@ pub struct ResetResult {
 #[derive(Debug, Error)]
 pub enum ResetExecutionError {
     #[error(transparent)]
-    SetReferenceFailed(#[from] SetRefError),
+    SetReferenceFailed(#[from] odf::dataset::SetChainRefError),
 
     #[error(transparent)]
     Internal(#[from] InternalError),

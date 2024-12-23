@@ -14,7 +14,6 @@ use chrono::DateTime;
 use datafusion::prelude::SessionContext;
 use indoc::indoc;
 use kamu_ingest_datafusion::*;
-use opendatafabric::*;
 
 use super::test_reader_common;
 
@@ -27,17 +26,17 @@ fn write_test_data(path: impl AsRef<Path>) {
 
     let schema = Arc::new(Schema::new(vec![
         Field::new(
-            DatasetVocabulary::DEFAULT_OFFSET_COLUMN_NAME,
+            odf::metadata::DatasetVocabulary::DEFAULT_OFFSET_COLUMN_NAME,
             DataType::UInt64,
             false,
         ),
         Field::new(
-            DatasetVocabulary::DEFAULT_SYSTEM_TIME_COLUMN_NAME,
+            odf::metadata::DatasetVocabulary::DEFAULT_SYSTEM_TIME_COLUMN_NAME,
             DataType::Timestamp(TimeUnit::Millisecond, Some("UTC".into())),
             false,
         ),
         Field::new(
-            DatasetVocabulary::DEFAULT_EVENT_TIME_COLUMN_NAME,
+            odf::metadata::DatasetVocabulary::DEFAULT_EVENT_TIME_COLUMN_NAME,
             DataType::Timestamp(TimeUnit::Millisecond, Some("UTC".into())),
             false,
         ),
@@ -93,9 +92,12 @@ fn write_test_data(path: impl AsRef<Path>) {
 #[test_log::test(tokio::test)]
 async fn test_read_parquet() {
     test_reader_common::test_reader_success(
-        ReaderParquet::new(SessionContext::new(), ReadStepParquet { schema: None })
-            .await
-            .unwrap(),
+        ReaderParquet::new(
+            SessionContext::new(),
+            odf::metadata::ReadStepParquet { schema: None },
+        )
+        .await
+        .unwrap(),
         |path| async {
             write_test_data(path);
         },
@@ -133,7 +135,7 @@ async fn test_read_parquet_schema_coercion() {
     test_reader_common::test_reader_success(
         ReaderParquet::new(
             SessionContext::new(),
-            ReadStepParquet {
+            odf::metadata::ReadStepParquet {
                 schema: Some(vec![
                     "event_time string not null".to_string(),
                     "city string not null".to_string(),

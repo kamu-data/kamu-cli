@@ -14,7 +14,6 @@
 use dill::Catalog;
 use http_common::{ApiError, IntoApiError};
 use kamu_accounts::{AnonymousAccountReason, CurrentAccountSubject};
-use opendatafabric::AccountID;
 use thiserror::Error;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -86,7 +85,9 @@ impl IntoApiError for AnonymousAccessError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn ensure_authenticated_account(catalog: &Catalog) -> Result<AccountID, AnonymousAccessError> {
+pub fn ensure_authenticated_account(
+    catalog: &Catalog,
+) -> Result<odf::AccountID, AnonymousAccessError> {
     let current_account_subject = catalog.get_one::<CurrentAccountSubject>().unwrap();
 
     match current_account_subject.as_ref() {

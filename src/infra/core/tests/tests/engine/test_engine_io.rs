@@ -15,11 +15,11 @@ use container_runtime::ContainerRuntime;
 use dill::Component;
 use indoc::indoc;
 use kamu::domain::*;
-use kamu::testing::*;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_datasets_services::DatasetKeyValueServiceSysEnv;
-use opendatafabric::*;
+use odf::metadata::testing::MetadataFactory;
+use test_utils::LocalS3Server;
 use time_source::SystemTimeSourceDefault;
 
 use crate::TransformTestHelper;
@@ -27,13 +27,13 @@ use crate::TransformTestHelper;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 async fn test_engine_io_common<
-    TDatasetRepo: DatasetRepository + DatasetRepositoryWriter + 'static,
+    TDatasetStorageUnit: odf::DatasetStorageUnit + DatasetStorageUnitWriter + 'static,
 >(
     object_stores: Vec<Arc<dyn ObjectStoreBuilder>>,
-    dataset_repo: Arc<TDatasetRepo>,
+    storage_unit: Arc<TDatasetStorageUnit>,
     run_info_dir: &Path,
     cache_dir: &Path,
-    transform: Transform,
+    transform: odf::metadata::Transform,
 ) {
     let run_info_dir = Arc::new(RunInfoDir::new(run_info_dir.to_path_buf()));
     let cache_dir = Arc::new(CacheDir::new(cache_dir.to_path_buf()));
@@ -67,7 +67,7 @@ async fn test_engine_io_common<
     );
 
     let transform_helper = TransformTestHelper::build(
-        Arc::new(DatasetRegistryRepoBridge::new(dataset_repo.clone())),
+        Arc::new(DatasetRegistrySoloUnitBridge::new(storage_unit.clone())),
         time_source.clone(),
         Arc::new(CompactionPlannerImpl {}),
         Arc::new(CompactionExecutorImpl::new(
@@ -98,19 +98,19 @@ async fn test_engine_io_common<
 
     let root_snapshot = MetadataFactory::dataset_snapshot()
         .name("root")
-        .kind(DatasetKind::Root)
+        .kind(odf::DatasetKind::Root)
         .push_event(
             MetadataFactory::set_polling_source()
                 .fetch_file(&src_path)
-                .read(ReadStepCsv {
+                .read(odf::metadata::ReadStepCsv {
                     header: Some(true),
                     schema: Some(vec![
                         "city STRING".to_string(),
                         "population INT".to_string(),
                     ]),
-                    ..ReadStepCsv::default()
+                    ..odf::metadata::ReadStepCsv::default()
                 })
-                .merge(MergeStrategySnapshot {
+                .merge(odf::metadata::MergeStrategySnapshot {
                     primary_key: vec!["city".to_string()],
                     compare_columns: None,
                 })
@@ -120,7 +120,7 @@ async fn test_engine_io_common<
 
     let root_alias = root_snapshot.name.clone();
 
-    let root_created = dataset_repo
+    let root_created = storage_unit
         .create_dataset_from_snapshot(root_snapshot)
         .await
         .unwrap()
@@ -129,7 +129,7 @@ async fn test_engine_io_common<
     let root_target = ResolvedDataset::from(&root_created);
 
     let root_metadata_state =
-        DataWriterMetadataState::build(root_target.clone(), &BlockRef::Head, None)
+        DataWriterMetadataState::build(root_target.clone(), &odf::BlockRef::Head, None)
             .await
             .unwrap();
 
@@ -149,7 +149,7 @@ async fn test_engine_io_common<
 
     let deriv_snapshot = MetadataFactory::dataset_snapshot()
         .name("deriv")
-        .kind(DatasetKind::Derivative)
+        .kind(odf::DatasetKind::Derivative)
         .push_event(
             MetadataFactory::set_transform()
                 .inputs_from_refs([&root_alias.dataset_name])
@@ -158,7 +158,7 @@ async fn test_engine_io_common<
         )
         .build();
 
-    let deriv_created = dataset_repo
+    let deriv_created = storage_unit
         .create_dataset_from_snapshot(deriv_snapshot)
         .await
         .unwrap()
@@ -169,6 +169,7 @@ async fn test_engine_io_common<
         v => panic!("Unexpected result: {v:?}"),
     };
 
+    use odf::metadata::IntoDataStreamBlock;
     let block = deriv_created
         .dataset
         .as_metadata_chain()
@@ -180,7 +181,7 @@ async fn test_engine_io_common<
 
     assert_eq!(
         block.event.new_data.unwrap().offset_interval,
-        OffsetInterval { start: 0, end: 2 }
+        odf::metadata::OffsetInterval { start: 0, end: 2 }
     );
 
     ///////////////////////////////////////////////////////////////////////////
@@ -203,7 +204,7 @@ async fn test_engine_io_common<
     .unwrap();
 
     let root_metadata_state =
-        DataWriterMetadataState::build(root_target.clone(), &BlockRef::Head, None)
+        DataWriterMetadataState::build(root_target.clone(), &odf::BlockRef::Head, None)
             .await
             .unwrap();
 
@@ -233,7 +234,7 @@ async fn test_engine_io_common<
 
     assert_eq!(
         block.event.new_data.unwrap().offset_interval,
-        OffsetInterval { start: 3, end: 4 }
+        odf::metadata::OffsetInterval { start: 3, end: 4 }
     );
 
     ///////////////////////////////////////////////////////////////////////////
@@ -264,15 +265,15 @@ async fn test_engine_io_local_file_mount() {
         .add::<DatasetKeyValueServiceSysEnv>()
         .add_value(CurrentAccountSubject::new_test())
         .add_value(TenancyConfig::SingleTenant)
-        .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
-        .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+        .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
+        .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
         .build();
 
-    let dataset_repo = catalog.get_one::<DatasetRepositoryLocalFs>().unwrap();
+    let storage_unit = catalog.get_one::<DatasetStorageUnitLocalFs>().unwrap();
 
     test_engine_io_common(
         vec![Arc::new(ObjectStoreBuilderLocalFs::new())],
-        dataset_repo,
+        storage_unit,
         &run_info_dir,
         &cache_dir,
         MetadataFactory::transform()
@@ -297,7 +298,7 @@ async fn test_engine_io_s3_to_local_file_mount_proxy() {
     std::fs::create_dir(&run_info_dir).unwrap();
     std::fs::create_dir(&cache_dir).unwrap();
 
-    let s3_context = kamu::utils::s3_context::S3Context::from_url(&s3.url).await;
+    let s3_context = s3_utils::S3Context::from_url(&s3.url).await;
 
     let catalog = dill::CatalogBuilder::new()
         .add::<DidGeneratorDefault>()
@@ -305,11 +306,11 @@ async fn test_engine_io_s3_to_local_file_mount_proxy() {
         .add::<kamu_core::auth::AlwaysHappyDatasetActionAuthorizer>()
         .add_value(CurrentAccountSubject::new_test())
         .add_value(TenancyConfig::SingleTenant)
-        .add_builder(DatasetRepositoryS3::builder().with_s3_context(s3_context.clone()))
-        .bind::<dyn DatasetRepository, DatasetRepositoryS3>()
+        .add_builder(DatasetStorageUnitS3::builder().with_s3_context(s3_context.clone()))
+        .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitS3>()
         .build();
 
-    let dataset_repo = catalog.get_one::<DatasetRepositoryS3>().unwrap();
+    let storage_unit = catalog.get_one::<DatasetStorageUnitS3>().unwrap();
 
     test_engine_io_common(
         vec![
@@ -318,7 +319,7 @@ async fn test_engine_io_s3_to_local_file_mount_proxy() {
             // will use the IO proxying
             Arc::new(ObjectStoreBuilderS3::new(s3_context, true)),
         ],
-        dataset_repo,
+        storage_unit,
         &run_info_dir,
         &cache_dir,
         MetadataFactory::transform()

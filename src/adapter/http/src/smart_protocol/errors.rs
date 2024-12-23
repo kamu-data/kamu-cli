@@ -10,7 +10,6 @@
 use std::fmt::{self, Display};
 
 use internal_error::{BoxedError, InternalError};
-use kamu_core::{InvalidIntervalError, NameCollisionError, RefCASError, RefCollisionError};
 use thiserror::Error;
 
 use super::phases::*;
@@ -149,7 +148,7 @@ pub enum PullClientError {
     WriteFailed(PullWriteError),
 
     #[error(transparent)]
-    InvalidInterval(InvalidIntervalError),
+    InvalidInterval(odf::dataset::InvalidIntervalError),
 
     #[error(transparent)]
     Internal(
@@ -170,10 +169,10 @@ pub enum PushServerError {
     WriteFailed(PushWriteError),
 
     #[error(transparent)]
-    RefCollision(RefCollisionError),
+    RefCollision(odf::dataset::RefCollisionError),
 
     #[error(transparent)]
-    NameCollision(NameCollisionError),
+    NameCollision(odf::dataset::NameCollisionError),
 
     #[error(transparent)]
     Internal(PhaseInternalError),
@@ -190,13 +189,13 @@ pub enum PushClientError {
     WriteFailed(PushWriteError),
 
     #[error(transparent)]
-    InvalidHead(RefCASError),
+    InvalidHead(odf::dataset::RefCASError),
 
     #[error(transparent)]
-    RefCollision(RefCollisionError),
+    RefCollision(odf::dataset::RefCollisionError),
 
     #[error(transparent)]
-    NameCollision(NameCollisionError),
+    NameCollision(odf::dataset::NameCollisionError),
 
     #[error(transparent)]
     Internal(

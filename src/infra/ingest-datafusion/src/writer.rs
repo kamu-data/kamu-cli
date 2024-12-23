@@ -20,11 +20,10 @@ use datafusion::config::{ParquetColumnOptions, ParquetOptions, TableParquetOptio
 use datafusion::dataframe::DataFrameWriteOptions;
 use datafusion::functions_aggregate::min_max::{max, min};
 use datafusion::prelude::*;
+use file_utils::OwnedFile;
 use internal_error::*;
 use kamu_core::ingest::*;
 use kamu_core::*;
-use odf::{AsTypedBlock, DatasetVocabulary};
-use opendatafabric as odf;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -47,7 +46,7 @@ impl DataWriterDataFusion {
     pub async fn from_metadata_chain(
         ctx: SessionContext,
         target: ResolvedDataset,
-        block_ref: &BlockRef,
+        block_ref: &odf::BlockRef,
         source_name: Option<&str>,
     ) -> Result<Self, ScanMetadataError> {
         let metadata_state =
@@ -76,11 +75,11 @@ impl DataWriterDataFusion {
         self.meta.prev_offset
     }
 
-    pub fn prev_source_state(&self) -> Option<&odf::SourceState> {
+    pub fn prev_source_state(&self) -> Option<&odf::metadata::SourceState> {
         self.meta.prev_source_state.as_ref()
     }
 
-    pub fn vocab(&self) -> &odf::DatasetVocabulary {
+    pub fn vocab(&self) -> &odf::metadata::DatasetVocabulary {
         &self.meta.vocab
     }
 
@@ -487,7 +486,7 @@ impl DataWriterDataFusion {
         &self,
         path: &Path,
         prev_watermark: Option<DateTime<Utc>>,
-    ) -> Result<(odf::OffsetInterval, Option<DateTime<Utc>>), InternalError> {
+    ) -> Result<(odf::metadata::OffsetInterval, Option<DateTime<Utc>>), InternalError> {
         use datafusion::arrow::array::*;
 
         let df = self
@@ -542,7 +541,7 @@ impl DataWriterDataFusion {
             .unwrap()
             .value(0);
 
-        let offset_interval = odf::OffsetInterval {
+        let offset_interval = odf::metadata::OffsetInterval {
             start: u64::try_from(offset_min).unwrap(),
             end: u64::try_from(offset_max).unwrap(),
         };
@@ -580,17 +579,19 @@ impl DataWriterDataFusion {
     }
 
     fn merge_strategy_for(
-        conf: odf::MergeStrategy,
-        vocab: &DatasetVocabulary,
+        conf: odf::metadata::MergeStrategy,
+        vocab: &odf::metadata::DatasetVocabulary,
     ) -> Arc<dyn MergeStrategy> {
         use crate::merge_strategies::*;
 
         match conf {
-            odf::MergeStrategy::Append(_cfg) => Arc::new(MergeStrategyAppend::new(vocab.clone())),
-            odf::MergeStrategy::Ledger(cfg) => {
+            odf::metadata::MergeStrategy::Append(_cfg) => {
+                Arc::new(MergeStrategyAppend::new(vocab.clone()))
+            }
+            odf::metadata::MergeStrategy::Ledger(cfg) => {
                 Arc::new(MergeStrategyLedger::new(vocab.clone(), cfg))
             }
-            odf::MergeStrategy::Snapshot(cfg) => {
+            odf::metadata::MergeStrategy::Snapshot(cfg) => {
                 Arc::new(MergeStrategySnapshot::new(vocab.clone(), cfg))
             }
         }
@@ -625,7 +626,7 @@ impl DataWriter for DataWriterDataFusion {
             return Err(EmptyCommitError {}.into());
         }
 
-        let add_data = AddDataParams {
+        let add_data = odf::dataset::AddDataParams {
             prev_checkpoint: self.meta.prev_checkpoint.clone(),
             prev_offset: self.meta.prev_offset,
             new_offset_interval: None,
@@ -700,7 +701,7 @@ impl DataWriter for DataWriterDataFusion {
             if data_file.is_none() {
                 // Empty result - carry watermark and propagate source state
                 (
-                    AddDataParams {
+                    odf::dataset::AddDataParams {
                         prev_checkpoint,
                         prev_offset,
                         new_offset_interval: None,
@@ -719,7 +720,7 @@ impl DataWriter for DataWriterDataFusion {
                     .await?;
 
                 (
-                    AddDataParams {
+                    odf::dataset::AddDataParams {
                         prev_checkpoint,
                         prev_offset,
                         new_offset_interval: Some(new_offset_interval),
@@ -732,7 +733,7 @@ impl DataWriter for DataWriterDataFusion {
             }
         } else {
             // TODO: Should watermark be advanced by the source event time?
-            let add_data = AddDataParams {
+            let add_data = odf::dataset::AddDataParams {
                 prev_checkpoint: self.meta.prev_checkpoint.clone(),
                 prev_offset: self.meta.prev_offset,
                 new_offset_interval: None,
@@ -773,7 +774,10 @@ impl DataWriter for DataWriterDataFusion {
     }
 
     #[tracing::instrument(level = "info", skip_all)]
-    async fn commit(&mut self, staged: StageDataResult) -> Result<WriteDataResult, CommitError> {
+    async fn commit(
+        &mut self,
+        staged: StageDataResult,
+    ) -> Result<WriteDataResult, odf::dataset::CommitError> {
         assert!(staged.new_schema.is_some() || staged.add_data.is_some());
 
         let old_head = self.meta.head.clone();
@@ -784,8 +788,8 @@ impl DataWriter for DataWriterDataFusion {
             let commit_schema_result = self
                 .target
                 .commit_event(
-                    odf::SetDataSchema::new(&new_schema).into(),
-                    CommitOpts {
+                    odf::metadata::SetDataSchema::new(&new_schema).into(),
+                    odf::dataset::CommitOpts {
                         block_ref: &self.meta.block_ref,
                         system_time: Some(staged.system_time),
                         prev_block_hash: Some(Some(&self.meta.head)),
@@ -797,7 +801,7 @@ impl DataWriter for DataWriterDataFusion {
 
             // Update state
             self.meta.head = commit_schema_result.new_head;
-            self.meta.schema = Some(odf::SetDataSchema::new(new_schema.as_ref()));
+            self.meta.schema = Some(odf::metadata::SetDataSchema::new(new_schema.as_ref()));
         }
 
         // Commit `AddData` event
@@ -808,7 +812,7 @@ impl DataWriter for DataWriterDataFusion {
                     add_data,
                     staged.data_file,
                     None,
-                    CommitOpts {
+                    odf::dataset::CommitOpts {
                         block_ref: &self.meta.block_ref,
                         system_time: Some(staged.system_time),
                         prev_block_hash: Some(Some(&self.meta.head)),
@@ -819,13 +823,14 @@ impl DataWriter for DataWriterDataFusion {
                 .await?;
 
             // Update state for the next append
+            use odf::metadata::AsTypedBlock;
             let new_block = self
                 .target
                 .as_metadata_chain()
                 .get_block(&commit_data_result.new_head)
                 .await
                 .int_err()?
-                .into_typed::<odf::AddData>()
+                .into_typed::<odf::metadata::AddData>()
                 .unwrap();
 
             self.meta.head = commit_data_result.new_head;

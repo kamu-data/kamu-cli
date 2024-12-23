@@ -12,17 +12,14 @@ use std::sync::Arc;
 use dill::{component, interface};
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::{
-    CreateDatasetError,
-    CreateDatasetResult,
     CreateDatasetUseCase,
     CreateDatasetUseCaseOptions,
     DatasetLifecycleMessage,
     MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
 };
 use messaging_outbox::{Outbox, OutboxExt};
-use opendatafabric::{DatasetAlias, MetadataBlockTyped, Seed};
 
-use crate::DatasetRepositoryWriter;
+use crate::DatasetStorageUnitWriter;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -30,19 +27,19 @@ use crate::DatasetRepositoryWriter;
 #[interface(dyn CreateDatasetUseCase)]
 pub struct CreateDatasetUseCaseImpl {
     current_account_subject: Arc<CurrentAccountSubject>,
-    dataset_repo_writer: Arc<dyn DatasetRepositoryWriter>,
+    dataset_storage_unit_writer: Arc<dyn DatasetStorageUnitWriter>,
     outbox: Arc<dyn Outbox>,
 }
 
 impl CreateDatasetUseCaseImpl {
     pub fn new(
         current_account_subject: Arc<CurrentAccountSubject>,
-        dataset_repo_writer: Arc<dyn DatasetRepositoryWriter>,
+        dataset_storage_unit_writer: Arc<dyn DatasetStorageUnitWriter>,
         outbox: Arc<dyn Outbox>,
     ) -> Self {
         Self {
             current_account_subject,
-            dataset_repo_writer,
+            dataset_storage_unit_writer,
             outbox,
         }
     }
@@ -53,10 +50,10 @@ impl CreateDatasetUseCase for CreateDatasetUseCaseImpl {
     #[tracing::instrument(level = "info", skip_all, fields(dataset_alias, ?seed_block, ?options))]
     async fn execute(
         &self,
-        dataset_alias: &DatasetAlias,
-        seed_block: MetadataBlockTyped<Seed>,
+        dataset_alias: &odf::DatasetAlias,
+        seed_block: odf::MetadataBlockTyped<odf::metadata::Seed>,
         options: CreateDatasetUseCaseOptions,
-    ) -> Result<CreateDatasetResult, CreateDatasetError> {
+    ) -> Result<odf::CreateDatasetResult, odf::dataset::CreateDatasetError> {
         let logged_account_id = match self.current_account_subject.as_ref() {
             CurrentAccountSubject::Anonymous(_) => {
                 panic!("Anonymous account cannot create dataset");
@@ -64,7 +61,7 @@ impl CreateDatasetUseCase for CreateDatasetUseCaseImpl {
             CurrentAccountSubject::Logged(l) => l.account_id.clone(),
         };
         let create_result = self
-            .dataset_repo_writer
+            .dataset_storage_unit_writer
             .create_dataset(dataset_alias, seed_block)
             .await?;
 

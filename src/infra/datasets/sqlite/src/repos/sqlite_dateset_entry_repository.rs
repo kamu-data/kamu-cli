@@ -14,7 +14,6 @@ use database_common::{PaginationOpts, TransactionRef, TransactionRefT};
 use dill::{component, interface};
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_datasets::*;
-use opendatafabric::{AccountID, DatasetID, DatasetName};
 use sqlx::Row;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -62,7 +61,7 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
 
     async fn dataset_entries_count_by_owner_id(
         &self,
-        owner_id: &AccountID,
+        owner_id: &odf::AccountID,
     ) -> Result<usize, InternalError> {
         let stack_owner_id = owner_id.as_did_str().to_stack_string();
         let owner_id_as_str = stack_owner_id.as_str();
@@ -124,7 +123,7 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
 
     async fn get_dataset_entry(
         &self,
-        dataset_id: &DatasetID,
+        dataset_id: &odf::DatasetID,
     ) -> Result<DatasetEntry, GetDatasetEntryError> {
         let mut tr = self.transaction.lock().await;
 
@@ -158,7 +157,7 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
 
     async fn get_multiple_dataset_entries(
         &self,
-        dataset_ids: &[DatasetID],
+        dataset_ids: &[odf::DatasetID],
     ) -> Result<DatasetEntriesResolution, GetMultipleDatasetEntriesError> {
         let mut tr = self.transaction.lock().await;
 
@@ -201,7 +200,7 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
                 DatasetEntry::new(
                     row.get_unchecked("id"),
                     row.get_unchecked("owner_id"),
-                    DatasetName::new_unchecked(&row.get::<String, &str>("name")),
+                    odf::DatasetName::new_unchecked(&row.get::<String, &str>("name")),
                     row.get_unchecked("created_at"),
                 )
             })
@@ -227,8 +226,8 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
 
     async fn get_dataset_entry_by_owner_and_name(
         &self,
-        owner_id: &AccountID,
-        name: &DatasetName,
+        owner_id: &odf::AccountID,
+        name: &odf::DatasetName,
     ) -> Result<DatasetEntry, GetDatasetEntryByNameError> {
         let mut tr = self.transaction.lock().await;
 
@@ -265,7 +264,7 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
 
     async fn get_dataset_entries_by_owner_id<'a>(
         &'a self,
-        owner_id: &AccountID,
+        owner_id: &odf::AccountID,
         pagination: PaginationOpts,
     ) -> DatasetEntryStream<'a> {
         let stack_owner_id = owner_id.as_did_str().to_stack_string();
@@ -348,8 +347,8 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
 
     async fn update_dataset_entry_name(
         &self,
-        dataset_id: &DatasetID,
-        new_name: &DatasetName,
+        dataset_id: &odf::DatasetID,
+        new_name: &odf::DatasetName,
     ) -> Result<(), UpdateDatasetEntryNameError> {
         let mut tr = self.transaction.lock().await;
 
@@ -386,7 +385,7 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
 
     async fn delete_dataset_entry(
         &self,
-        dataset_id: &DatasetID,
+        dataset_id: &odf::DatasetID,
     ) -> Result<(), DeleteEntryDatasetError> {
         {
             let mut tr = self.transaction.lock().await;

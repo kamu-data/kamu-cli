@@ -10,7 +10,6 @@
 use chrono::{DateTime, Utc};
 use datafusion::arrow::datatypes::SchemaRef;
 use internal_error::InternalError;
-use opendatafabric::*;
 use thiserror::Error;
 
 use crate::engine::TransformRequestExt;
@@ -28,7 +27,7 @@ pub trait TransformRequestPlanner: Send + Sync {
     async fn build_transform_verification_plan(
         &self,
         target: ResolvedDataset,
-        block_range: (Option<Multihash>, Option<Multihash>),
+        block_range: (Option<odf::Multihash>, Option<odf::Multihash>),
     ) -> Result<VerifyTransformOperation, VerifyTransformPlanError>;
 }
 
@@ -50,13 +49,13 @@ pub struct TransformPreliminaryRequestExt {
     /// Randomly assigned value that identifies this specific engine operation
     pub operation_id: String,
     /// Identifies the output dataset
-    pub dataset_handle: DatasetHandle,
+    pub dataset_handle: odf::DatasetHandle,
     /// Block reference to advance upon commit
-    pub block_ref: BlockRef,
+    pub block_ref: odf::BlockRef,
     /// Current head (for concurrency control)
-    pub head: Multihash,
+    pub head: odf::Multihash,
     /// Transformation that will be applied to produce new data
-    pub transform: Transform,
+    pub transform: odf::metadata::Transform,
     /// System time to use for new records
     pub system_time: DateTime<Utc>,
     /// Expected data schema (if already defined)
@@ -64,11 +63,14 @@ pub struct TransformPreliminaryRequestExt {
     /// Preceding record offset, if any
     pub prev_offset: Option<u64>,
     /// State of inputs
-    pub input_states: Vec<(TransformInput, Option<ExecuteTransformInput>)>,
+    pub input_states: Vec<(
+        odf::metadata::TransformInput,
+        Option<odf::metadata::ExecuteTransformInput>,
+    )>,
     /// Output dataset's vocabulary
-    pub vocab: DatasetVocabulary,
+    pub vocab: odf::metadata::DatasetVocabulary,
     /// Previous checkpoint, if any
-    pub prev_checkpoint: Option<Multihash>,
+    pub prev_checkpoint: Option<odf::Multihash>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -76,8 +78,8 @@ pub struct TransformPreliminaryRequestExt {
 #[derive(Debug)]
 pub struct VerifyTransformStep {
     pub request: TransformRequestExt,
-    pub expected_block: MetadataBlock,
-    pub expected_hash: Multihash,
+    pub expected_block: odf::MetadataBlock,
+    pub expected_hash: odf::Multihash,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -125,37 +127,37 @@ pub enum VerifyTransformPlanError {
     DatasetNotFound(
         #[from]
         #[backtrace]
-        DatasetNotFoundError,
+        odf::dataset::DatasetNotFoundError,
     ),
     #[error(transparent)]
     RefNotFound(
         #[from]
         #[backtrace]
-        RefNotFoundError,
+        odf::storage::RefNotFoundError,
     ),
     #[error(transparent)]
     BlockNotFound(
         #[from]
         #[backtrace]
-        BlockNotFoundError,
+        odf::storage::BlockNotFoundError,
     ),
     #[error(transparent)]
     BlockVersion(
         #[from]
         #[backtrace]
-        BlockVersionError,
+        odf::storage::BlockVersionError,
     ),
     #[error(transparent)]
     BlockMalformed(
         #[from]
         #[backtrace]
-        BlockMalformedError,
+        odf::storage::BlockMalformedError,
     ),
     #[error(transparent)]
     InvalidInterval(
         #[from]
         #[backtrace]
-        InvalidIntervalError,
+        odf::dataset::InvalidIntervalError,
     ),
     #[error(transparent)]
     InputSchemaNotDefined(
@@ -173,7 +175,7 @@ pub enum VerifyTransformPlanError {
     Access(
         #[from]
         #[backtrace]
-        AccessError,
+        odf::AccessError,
     ),
     #[error(transparent)]
     Internal(
@@ -185,37 +187,37 @@ pub enum VerifyTransformPlanError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl From<GetDatasetError> for VerifyTransformPlanError {
-    fn from(v: GetDatasetError) -> Self {
+impl From<odf::dataset::GetDatasetError> for VerifyTransformPlanError {
+    fn from(v: odf::dataset::GetDatasetError) -> Self {
         match v {
-            GetDatasetError::NotFound(e) => Self::DatasetNotFound(e),
-            GetDatasetError::Internal(e) => Self::Internal(e),
+            odf::dataset::GetDatasetError::NotFound(e) => Self::DatasetNotFound(e),
+            odf::dataset::GetDatasetError::Internal(e) => Self::Internal(e),
         }
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl From<GetRefError> for VerifyTransformPlanError {
-    fn from(v: GetRefError) -> Self {
+impl From<odf::storage::GetRefError> for VerifyTransformPlanError {
+    fn from(v: odf::storage::GetRefError) -> Self {
         match v {
-            GetRefError::NotFound(e) => Self::RefNotFound(e),
-            GetRefError::Access(e) => Self::Access(e),
-            GetRefError::Internal(e) => Self::Internal(e),
+            odf::storage::GetRefError::NotFound(e) => Self::RefNotFound(e),
+            odf::storage::GetRefError::Access(e) => Self::Access(e),
+            odf::storage::GetRefError::Internal(e) => Self::Internal(e),
         }
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl From<GetBlockError> for VerifyTransformPlanError {
-    fn from(v: GetBlockError) -> Self {
+impl From<odf::storage::GetBlockError> for VerifyTransformPlanError {
+    fn from(v: odf::storage::GetBlockError) -> Self {
         match v {
-            GetBlockError::NotFound(e) => Self::BlockNotFound(e),
-            GetBlockError::BlockVersion(e) => Self::BlockVersion(e),
-            GetBlockError::BlockMalformed(e) => Self::BlockMalformed(e),
-            GetBlockError::Access(e) => Self::Access(e),
-            GetBlockError::Internal(e) => Self::Internal(e),
+            odf::storage::GetBlockError::NotFound(e) => Self::BlockNotFound(e),
+            odf::storage::GetBlockError::BlockVersion(e) => Self::BlockVersion(e),
+            odf::storage::GetBlockError::BlockMalformed(e) => Self::BlockMalformed(e),
+            odf::storage::GetBlockError::Access(e) => Self::Access(e),
+            odf::storage::GetBlockError::Internal(e) => Self::Internal(e),
         }
     }
 }

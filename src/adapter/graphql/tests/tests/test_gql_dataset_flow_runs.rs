@@ -15,11 +15,11 @@ use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use dill::Component;
 use futures::TryStreamExt;
 use indoc::indoc;
-use kamu::testing::{MetadataFactory, MockDatasetChangesService};
+use kamu::testing::MockDatasetChangesService;
 use kamu::{
     CreateDatasetFromSnapshotUseCaseImpl,
-    DatasetRepositoryLocalFs,
-    DatasetRepositoryWriter,
+    DatasetStorageUnitLocalFs,
+    DatasetStorageUnitWriter,
     MetadataQueryServiceImpl,
 };
 use kamu_accounts::{
@@ -35,11 +35,9 @@ use kamu_core::{
     auth,
     CompactionResult,
     CreateDatasetFromSnapshotUseCase,
-    CreateDatasetResult,
     DatasetChangesService,
     DatasetIntervalIncrement,
     DatasetLifecycleMessage,
-    DatasetRepository,
     DidGeneratorDefault,
     PullResult,
     ResetResult,
@@ -73,7 +71,7 @@ use kamu_task_system::{self as ts, TaskMetadata};
 use kamu_task_system_inmem::InMemoryTaskEventStore;
 use kamu_task_system_services::TaskSchedulerImpl;
 use messaging_outbox::{register_message_dispatcher, Outbox, OutboxExt, OutboxImmediateImpl};
-use opendatafabric::{AccountID, DatasetID, DatasetKind, Multihash};
+use odf::metadata::testing::MetadataFactory;
 use time_source::SystemTimeSourceDefault;
 
 use crate::utils::{authentication_catalogs, expect_anonymous_access_error};
@@ -348,8 +346,8 @@ async fn test_trigger_ingest_root_dataset() {
             ts::TaskOutcome::Success(ts::TaskResult::UpdateDatasetResult(
                 ts::TaskUpdateDatasetResult {
                     pull_result: PullResult::Updated {
-                        old_head: Some(Multihash::from_digest_sha3_256(b"old-slice")),
-                        new_head: Multihash::from_digest_sha3_256(b"new-slice"),
+                        old_head: Some(odf::Multihash::from_digest_sha3_256(b"old-slice")),
+                        new_head: odf::Multihash::from_digest_sha3_256(b"new-slice"),
                     },
                 },
             )),
@@ -604,8 +602,8 @@ async fn test_trigger_reset_root_dataset_flow_with_invalid_head() {
 
     let create_root_result = harness.create_root_dataset().await;
 
-    let new_invalid_head = Multihash::from_digest_sha3_256(b"new_invalid_head");
-    let old_invalid_head = Multihash::from_digest_sha3_256(b"old_invalid_head");
+    let new_invalid_head = odf::Multihash::from_digest_sha3_256(b"new_invalid_head");
+    let old_invalid_head = odf::Multihash::from_digest_sha3_256(b"old_invalid_head");
 
     let mutation_code = FlowRunsHarness::trigger_reset_flow_mutation(
         &create_root_result.dataset_handle.id,
@@ -822,8 +820,8 @@ async fn test_trigger_execute_transform_derived_dataset() {
             ts::TaskOutcome::Success(ts::TaskResult::UpdateDatasetResult(
                 ts::TaskUpdateDatasetResult {
                     pull_result: PullResult::Updated {
-                        old_head: Some(Multihash::from_digest_sha3_256(b"old-slice")),
-                        new_head: Multihash::from_digest_sha3_256(b"new-slice"),
+                        old_head: Some(odf::Multihash::from_digest_sha3_256(b"old-slice")),
+                        new_head: odf::Multihash::from_digest_sha3_256(b"new-slice"),
                     },
                 },
             )),
@@ -1167,7 +1165,7 @@ async fn test_trigger_compaction_root_dataset() {
 
     let complete_time = Utc::now().duration_round(Duration::seconds(1)).unwrap();
 
-    let new_head = Multihash::from_digest_sha3_256(b"new-slice");
+    let new_head = odf::Multihash::from_digest_sha3_256(b"new-slice");
     harness
         .mimic_task_completed(
             flow_task_id,
@@ -1176,7 +1174,7 @@ async fn test_trigger_compaction_root_dataset() {
             ts::TaskOutcome::Success(ts::TaskResult::CompactionDatasetResult(
                 ts::TaskCompactionDatasetResult {
                     compaction_result: CompactionResult::Success {
-                        old_head: Multihash::from_digest_sha3_256(b"old-slice"),
+                        old_head: odf::Multihash::from_digest_sha3_256(b"old-slice"),
                         new_head: new_head.clone(),
                         old_num_blocks: 5,
                         new_num_blocks: 4,
@@ -2414,7 +2412,7 @@ async fn test_cancel_already_succeeded_flow() {
         dataset_changes_mock: None,
     })
     .await;
-    let create_result: CreateDatasetResult = harness.create_root_dataset().await;
+    let create_result: odf::CreateDatasetResult = harness.create_root_dataset().await;
 
     let mutation_code =
         FlowRunsHarness::trigger_flow_mutation(&create_result.dataset_handle.id, "INGEST");
@@ -2492,7 +2490,7 @@ async fn test_history_of_completed_flow() {
     })
     .await;
 
-    let create_result: CreateDatasetResult = harness.create_root_dataset().await;
+    let create_result: odf::CreateDatasetResult = harness.create_root_dataset().await;
 
     let mutation_code =
         FlowRunsHarness::trigger_flow_mutation(&create_result.dataset_handle.id, "INGEST");
@@ -2684,7 +2682,7 @@ async fn test_execute_transfrom_flow_error_after_compaction() {
         .await;
     let complete_time = Utc::now().duration_round(Duration::seconds(1)).unwrap();
 
-    let new_head = Multihash::from_digest_sha3_256(b"new-slice");
+    let new_head = odf::Multihash::from_digest_sha3_256(b"new-slice");
     harness
         .mimic_task_completed(
             flow_task_id,
@@ -2693,7 +2691,7 @@ async fn test_execute_transfrom_flow_error_after_compaction() {
             ts::TaskOutcome::Success(ts::TaskResult::CompactionDatasetResult(
                 ts::TaskCompactionDatasetResult {
                     compaction_result: CompactionResult::Success {
-                        old_head: Multihash::from_digest_sha3_256(b"old-slice"),
+                        old_head: odf::Multihash::from_digest_sha3_256(b"old-slice"),
                         new_head: new_head.clone(),
                         old_num_blocks: 5,
                         new_num_blocks: 4,
@@ -3116,9 +3114,9 @@ impl FlowRunsHarness {
             .bind::<dyn Outbox, OutboxImmediateImpl>()
             .add::<DidGeneratorDefault>()
             .add_value(TenancyConfig::SingleTenant)
-            .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
-            .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-            .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
+            .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
+            .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
+            .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
             .add::<MetadataQueryServiceImpl>()
             .add::<CreateDatasetFromSnapshotUseCaseImpl>()
             .add_value(dataset_changes_mock)
@@ -3178,7 +3176,7 @@ impl FlowRunsHarness {
         }
     }
 
-    fn logged_account_id(&self) -> AccountID {
+    fn logged_account_id(&self) -> odf::AccountID {
         Self::logged_account_from_catalog(&self.catalog_authorized).account_id
     }
 
@@ -3191,7 +3189,7 @@ impl FlowRunsHarness {
         }
     }
 
-    async fn create_root_dataset(&self) -> CreateDatasetResult {
+    async fn create_root_dataset(&self) -> odf::CreateDatasetResult {
         let create_dataset_from_snapshot = self
             .catalog_authorized
             .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
@@ -3200,7 +3198,7 @@ impl FlowRunsHarness {
         create_dataset_from_snapshot
             .execute(
                 MetadataFactory::dataset_snapshot()
-                    .kind(DatasetKind::Root)
+                    .kind(odf::DatasetKind::Root)
                     .name("foo")
                     .push_event(MetadataFactory::set_polling_source().build())
                     .build(),
@@ -3210,7 +3208,7 @@ impl FlowRunsHarness {
             .unwrap()
     }
 
-    async fn create_root_dataset_no_source(&self) -> CreateDatasetResult {
+    async fn create_root_dataset_no_source(&self) -> odf::CreateDatasetResult {
         let create_dataset_from_snapshot = self
             .catalog_authorized
             .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
@@ -3219,7 +3217,7 @@ impl FlowRunsHarness {
         create_dataset_from_snapshot
             .execute(
                 MetadataFactory::dataset_snapshot()
-                    .kind(DatasetKind::Root)
+                    .kind(odf::DatasetKind::Root)
                     .name("foo")
                     .build(),
                 Default::default(),
@@ -3228,7 +3226,7 @@ impl FlowRunsHarness {
             .unwrap()
     }
 
-    async fn create_derived_dataset(&self) -> CreateDatasetResult {
+    async fn create_derived_dataset(&self) -> odf::CreateDatasetResult {
         let create_dataset_from_snapshot = self
             .catalog_authorized
             .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
@@ -3238,7 +3236,7 @@ impl FlowRunsHarness {
             .execute(
                 MetadataFactory::dataset_snapshot()
                     .name("bar")
-                    .kind(DatasetKind::Derivative)
+                    .kind(odf::DatasetKind::Derivative)
                     .push_event(
                         MetadataFactory::set_transform()
                             .inputs_from_refs(["foo"])
@@ -3251,7 +3249,7 @@ impl FlowRunsHarness {
             .unwrap()
     }
 
-    async fn create_derived_dataset_no_transform(&self) -> CreateDatasetResult {
+    async fn create_derived_dataset_no_transform(&self) -> odf::CreateDatasetResult {
         let create_dataset_from_snapshot = self
             .catalog_authorized
             .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
@@ -3261,7 +3259,7 @@ impl FlowRunsHarness {
             .execute(
                 MetadataFactory::dataset_snapshot()
                     .name("bar")
-                    .kind(DatasetKind::Derivative)
+                    .kind(odf::DatasetKind::Derivative)
                     .build(),
                 Default::default(),
             )
@@ -3365,7 +3363,7 @@ impl FlowRunsHarness {
             .unwrap()
     }
 
-    fn list_flows_query(id: &DatasetID) -> String {
+    fn list_flows_query(id: &odf::DatasetID) -> String {
         indoc!(
             r#"
             {
@@ -3564,7 +3562,7 @@ impl FlowRunsHarness {
             .replace("<id>", &id.to_string())
     }
 
-    fn flow_history_query(id: &DatasetID, flow_id: &str) -> String {
+    fn flow_history_query(id: &odf::DatasetID, flow_id: &str) -> String {
         // Note: avoid extracting time-based properties in test
         indoc!(
             r#"
@@ -3618,7 +3616,7 @@ impl FlowRunsHarness {
         .replace("<flowId>", flow_id)
     }
 
-    fn trigger_flow_mutation(id: &DatasetID, dataset_flow_type: &str) -> String {
+    fn trigger_flow_mutation(id: &odf::DatasetID, dataset_flow_type: &str) -> String {
         indoc!(
             r#"
             mutation {
@@ -3672,9 +3670,9 @@ impl FlowRunsHarness {
     }
 
     fn trigger_reset_flow_mutation(
-        id: &DatasetID,
-        new_head_hash: &Multihash,
-        old_head_hash: &Multihash,
+        id: &odf::DatasetID,
+        new_head_hash: &odf::Multihash,
+        old_head_hash: &odf::Multihash,
         recursive: bool,
         dataset_flow_type: &str,
     ) -> String {
@@ -3745,7 +3743,7 @@ impl FlowRunsHarness {
     }
 
     fn trigger_flow_with_compaction_config_mutation(
-        id: &DatasetID,
+        id: &odf::DatasetID,
         dataset_flow_type: &str,
         max_slice_records: u64,
         max_slice_size: u64,
@@ -3815,7 +3813,7 @@ impl FlowRunsHarness {
         .replace("<recursive>", if recursive { "true" } else { "false" })
     }
 
-    fn cancel_scheduled_tasks_mutation(id: &DatasetID, flow_id: &str) -> String {
+    fn cancel_scheduled_tasks_mutation(id: &odf::DatasetID, flow_id: &str) -> String {
         indoc!(
             r#"
             mutation {

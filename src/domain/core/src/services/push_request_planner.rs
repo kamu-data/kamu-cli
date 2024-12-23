@@ -8,12 +8,10 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::InternalError;
-use opendatafabric::*;
 use thiserror::Error;
 
 use super::sync_service::*;
 use super::{RemoteTarget, RepositoryNotFoundError};
-use crate::{DatasetNotFoundError, GetDatasetError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Service
@@ -23,8 +21,8 @@ use crate::{DatasetNotFoundError, GetDatasetError};
 pub trait PushRequestPlanner: Send + Sync {
     async fn collect_plan(
         &self,
-        dataset_handles: &[DatasetHandle],
-        push_target: Option<&DatasetPushTarget>,
+        dataset_handles: &[odf::DatasetHandle],
+        push_target: Option<&odf::DatasetPushTarget>,
     ) -> (Vec<PushItem>, Vec<PushResponse>);
 }
 
@@ -32,9 +30,9 @@ pub trait PushRequestPlanner: Send + Sync {
 
 #[derive(Debug, Eq, PartialEq)]
 pub struct PushItem {
-    pub local_handle: DatasetHandle,
+    pub local_handle: odf::DatasetHandle,
     pub remote_target: RemoteTarget,
-    pub push_target: Option<DatasetPushTarget>,
+    pub push_target: Option<odf::DatasetPushTarget>,
 }
 
 impl PushItem {
@@ -51,9 +49,9 @@ impl PushItem {
 
 pub struct PushResponse {
     /// Local dataset handle, if resolved
-    pub local_handle: Option<DatasetHandle>,
+    pub local_handle: Option<odf::DatasetHandle>,
     /// Destination reference, if resolved
-    pub target: Option<DatasetPushTarget>,
+    pub target: Option<odf::DatasetPushTarget>,
     /// Result of the push operation
     pub result: Result<SyncResult, PushError>,
 }
@@ -96,7 +94,7 @@ pub struct PushMultiOptions {
     /// Sync options
     pub sync_options: SyncOptions,
     /// Destination reference, if resolved
-    pub remote_target: Option<DatasetPushTarget>,
+    pub remote_target: Option<odf::DatasetPushTarget>,
 }
 
 impl Default for PushMultiOptions {
@@ -121,7 +119,7 @@ pub enum PushError {
     SourceNotFound(
         #[from]
         #[backtrace]
-        DatasetNotFoundError,
+        odf::dataset::DatasetNotFoundError,
     ),
     #[error("Destination is not specified and there is no associated push alias")]
     NoTarget,
@@ -147,11 +145,11 @@ pub enum PushError {
     ),
 }
 
-impl From<GetDatasetError> for PushError {
-    fn from(v: GetDatasetError) -> Self {
+impl From<odf::dataset::GetDatasetError> for PushError {
+    fn from(v: odf::dataset::GetDatasetError) -> Self {
         match v {
-            GetDatasetError::NotFound(e) => e.into(),
-            GetDatasetError::Internal(e) => e.into(),
+            odf::dataset::GetDatasetError::NotFound(e) => e.into(),
+            odf::dataset::GetDatasetError::Internal(e) => e.into(),
         }
     }
 }

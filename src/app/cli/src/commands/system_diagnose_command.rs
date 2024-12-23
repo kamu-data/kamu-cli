@@ -15,12 +15,12 @@ use std::sync::Arc;
 
 use console::style;
 use container_runtime::{ContainerRuntime, RunArgs};
+use file_utils::OwnedFile;
 use futures::TryStreamExt;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu::domain::engine::normalize_logs;
 use kamu::domain::{
     DatasetRegistry,
-    OwnedFile,
     VerificationOptions,
     VerificationRequest,
     VerifyDatasetUseCase,

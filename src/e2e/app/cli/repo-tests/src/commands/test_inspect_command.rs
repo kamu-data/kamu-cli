@@ -16,8 +16,6 @@ use kamu_cli_e2e_common::{
 };
 use kamu_cli_puppet::extensions::KamuCliPuppetExt;
 use kamu_cli_puppet::KamuCliPuppet;
-use odf::EnumWithVariants;
-use opendatafabric as odf;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -74,6 +72,8 @@ pub async fn test_inspect_query(kamu: KamuCliPuppet) {
     .await
     .success();
 
+    use odf::metadata::EnumWithVariants;
+
     let leaderboard_transform_block_hash = kamu
         .list_blocks(&DATASET_DERIVATIVE_LEADERBOARD_NAME)
         .await
@@ -82,7 +82,7 @@ pub async fn test_inspect_query(kamu: KamuCliPuppet) {
             if block
                 .block
                 .event
-                .as_variant::<odf::SetTransform>()
+                .as_variant::<odf::metadata::SetTransform>()
                 .is_some()
             {
                 Some(block.block_hash)

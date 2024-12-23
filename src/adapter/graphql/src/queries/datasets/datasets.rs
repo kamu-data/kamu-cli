@@ -12,7 +12,6 @@ use kamu_core::{
     DatasetRegistryExt,
     {self as domain},
 };
-use opendatafabric as odf;
 
 use crate::prelude::*;
 use crate::queries::*;

@@ -23,7 +23,7 @@ doctest = false
 
 [dependencies]
 database-common = { workspace = true }
-opendatafabric = { workspace = true }
+odf = { workspace = true }
 kamu-accounts = { workspace = true }
 kamu-adapter-oauth = { workspace = true }
 

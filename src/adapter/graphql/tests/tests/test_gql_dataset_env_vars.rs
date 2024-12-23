@@ -11,26 +11,18 @@ use async_graphql::value;
 use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use dill::Component;
 use indoc::indoc;
-use kamu::testing::MetadataFactory;
 use kamu::{
     CreateDatasetFromSnapshotUseCaseImpl,
-    DatasetRegistryRepoBridge,
-    DatasetRepositoryLocalFs,
-    DatasetRepositoryWriter,
+    DatasetRegistrySoloUnitBridge,
+    DatasetStorageUnitLocalFs,
+    DatasetStorageUnitWriter,
 };
-use kamu_core::{
-    auth,
-    CreateDatasetFromSnapshotUseCase,
-    CreateDatasetResult,
-    DatasetRepository,
-    DidGeneratorDefault,
-    TenancyConfig,
-};
+use kamu_core::{auth, CreateDatasetFromSnapshotUseCase, DidGeneratorDefault, TenancyConfig};
 use kamu_datasets::DatasetEnvVarsConfig;
 use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEnvVarRepository};
 use kamu_datasets_services::{DatasetEnvVarServiceImpl, DependencyGraphServiceImpl};
 use messaging_outbox::DummyOutboxImpl;
-use opendatafabric::DatasetKind;
+use odf::metadata::testing::MetadataFactory;
 use time_source::SystemTimeSourceDefault;
 
 use crate::utils::authentication_catalogs;
@@ -340,10 +332,10 @@ impl DatasetEnvVarsHarness {
                 .add::<DidGeneratorDefault>()
                 .add_value(DatasetEnvVarsConfig::sample())
                 .add_value(TenancyConfig::SingleTenant)
-                .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
-                .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-                .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
-                .add::<DatasetRegistryRepoBridge>()
+                .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
+                .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
+                .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
+                .add::<DatasetRegistrySoloUnitBridge>()
                 .add::<CreateDatasetFromSnapshotUseCaseImpl>()
                 .add::<SystemTimeSourceDefault>()
                 .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
@@ -367,7 +359,7 @@ impl DatasetEnvVarsHarness {
         }
     }
 
-    async fn create_dataset(&self) -> CreateDatasetResult {
+    async fn create_dataset(&self) -> odf::CreateDatasetResult {
         let create_dataset_from_snapshot = self
             .catalog_authorized
             .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
@@ -376,7 +368,7 @@ impl DatasetEnvVarsHarness {
         create_dataset_from_snapshot
             .execute(
                 MetadataFactory::dataset_snapshot()
-                    .kind(DatasetKind::Root)
+                    .kind(odf::DatasetKind::Root)
                     .name("foo")
                     .push_event(MetadataFactory::set_polling_source().build())
                     .build(),

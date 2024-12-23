@@ -13,7 +13,6 @@ use chrono::{DateTime, Utc};
 use dill::*;
 use internal_error::ResultIntoInternal;
 use kamu_core::*;
-use opendatafabric as odf;
 use time_source::SystemTimeSource;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -61,7 +60,7 @@ impl SetWatermarkPlanner for SetWatermarkPlannerImpl {
         }
 
         let summary = target
-            .get_summary(GetSummaryOpts::default())
+            .get_summary(odf::dataset::GetSummaryOpts::default())
             .await
             .int_err()?;
 
@@ -69,9 +68,10 @@ impl SetWatermarkPlanner for SetWatermarkPlannerImpl {
             return Err(SetWatermarkPlanningError::IsDerivative);
         }
 
-        let metadata_state = DataWriterMetadataState::build(target.clone(), &BlockRef::Head, None)
-            .await
-            .int_err()?;
+        let metadata_state =
+            DataWriterMetadataState::build(target.clone(), &odf::BlockRef::Head, None)
+                .await
+                .int_err()?;
 
         Ok(SetWatermarkPlan {
             system_time: self.system_time_source.now(),

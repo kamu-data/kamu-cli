@@ -57,8 +57,10 @@ impl SetWatermarkExecutor for SetWatermarkExecutorImpl {
             }),
             Err(
                 WriteWatermarkError::EmptyCommit(_)
-                | WriteWatermarkError::CommitError(CommitError::MetadataAppendError(
-                    AppendError::InvalidBlock(AppendValidationError::WatermarkIsNotMonotonic),
+                | WriteWatermarkError::CommitError(odf::dataset::CommitError::MetadataAppendError(
+                    odf::dataset::AppendError::InvalidBlock(
+                        odf::dataset::AppendValidationError::WatermarkIsNotMonotonic,
+                    ),
                 )),
             ) => Ok(SetWatermarkResult::UpToDate),
             Err(e) => Err(e.int_err().into()),

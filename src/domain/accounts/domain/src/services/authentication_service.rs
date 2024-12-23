@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::{BoxedError, InternalError};
-use opendatafabric::{AccountID, AccountName};
 use thiserror::Error;
 
 use super::{InvalidCredentialsError, RejectedCredentialsError};
@@ -28,28 +27,30 @@ pub trait AuthenticationService: Sync + Send {
 
     async fn account_by_token(&self, access_token: String) -> Result<Account, GetAccountInfoError>;
 
-    async fn account_by_id(&self, account_id: &AccountID)
-        -> Result<Option<Account>, InternalError>;
+    async fn account_by_id(
+        &self,
+        account_id: &odf::AccountID,
+    ) -> Result<Option<Account>, InternalError>;
 
     async fn accounts_by_ids(
         &self,
-        account_ids: Vec<AccountID>,
+        account_ids: Vec<odf::AccountID>,
     ) -> Result<Vec<Account>, InternalError>;
 
     async fn account_by_name(
         &self,
-        account_name: &AccountName,
+        account_name: &odf::AccountName,
     ) -> Result<Option<Account>, InternalError>;
 
     async fn find_account_id_by_name(
         &self,
-        account_name: &AccountName,
-    ) -> Result<Option<AccountID>, InternalError>;
+        account_name: &odf::AccountName,
+    ) -> Result<Option<odf::AccountID>, InternalError>;
 
     async fn find_account_name_by_id(
         &self,
-        account_id: &AccountID,
-    ) -> Result<Option<AccountName>, InternalError>;
+        account_id: &odf::AccountID,
+    ) -> Result<Option<odf::AccountName>, InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -57,8 +58,8 @@ pub trait AuthenticationService: Sync + Send {
 #[derive(Debug, Clone)]
 pub struct LoginResponse {
     pub access_token: String,
-    pub account_id: AccountID,
-    pub account_name: AccountName,
+    pub account_id: odf::AccountID,
+    pub account_name: odf::AccountName,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

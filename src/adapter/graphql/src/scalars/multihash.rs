@@ -9,8 +9,6 @@
 
 use std::ops::Deref;
 
-use opendatafabric as odf;
-
 use crate::prelude::*;
 
 #[derive(Debug, Clone, PartialEq, Eq)]

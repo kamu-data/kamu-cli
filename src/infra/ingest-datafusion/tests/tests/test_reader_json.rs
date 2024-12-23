@@ -10,7 +10,6 @@
 use datafusion::prelude::SessionContext;
 use indoc::indoc;
 use kamu_ingest_datafusion::*;
-use opendatafabric::*;
 
 use super::test_reader_common;
 
@@ -24,7 +23,7 @@ async fn test_read_json_object() {
     test_reader_common::test_reader_success_textual(
         ReaderJson::new(
             SessionContext::new(),
-            ReadStepJson {
+            odf::metadata::ReadStepJson {
                 sub_path: Some("result.cities".to_string()),
                 schema: Some(vec![
                     "city string not null".to_string(),
@@ -82,7 +81,7 @@ async fn test_read_json_array() {
     test_reader_common::test_reader_success_textual(
         ReaderJson::new(
             SessionContext::new(),
-            ReadStepJson {
+            odf::metadata::ReadStepJson {
                 sub_path: None,
                 schema: Some(vec![
                     "city string not null".to_string(),

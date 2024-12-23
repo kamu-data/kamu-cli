@@ -15,7 +15,6 @@ use kamu_cli_e2e_common::{
 };
 use kamu_cli_puppet::extensions::{KamuCliPuppetExt, RepoRecord};
 use kamu_cli_puppet::KamuCliPuppet;
-use opendatafabric as odf;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // test_login_logout_password

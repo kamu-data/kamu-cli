@@ -9,18 +9,16 @@
 
 use std::collections::VecDeque;
 
-use crate::{AppendError, Dataset, HashedMetadataBlock};
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 pub trait AppendDatasetMetadataBatchUseCase: Send + Sync {
     async fn execute(
         &self,
-        dataset: &dyn Dataset,
-        new_blocks: VecDeque<HashedMetadataBlock>,
+        dataset: &dyn odf::Dataset,
+        new_blocks: VecDeque<odf::dataset::HashedMetadataBlock>,
         force_update_if_diverged: bool,
-    ) -> Result<(), AppendError>;
+    ) -> Result<(), odf::dataset::AppendError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

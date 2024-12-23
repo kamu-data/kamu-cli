@@ -11,27 +11,19 @@ use async_graphql::value;
 use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use dill::Component;
 use indoc::indoc;
-use kamu::testing::MetadataFactory;
 use kamu::{
     CreateDatasetFromSnapshotUseCaseImpl,
-    DatasetRegistryRepoBridge,
-    DatasetRepositoryLocalFs,
-    DatasetRepositoryWriter,
+    DatasetRegistrySoloUnitBridge,
+    DatasetStorageUnitLocalFs,
+    DatasetStorageUnitWriter,
     MetadataQueryServiceImpl,
 };
-use kamu_core::{
-    auth,
-    CreateDatasetFromSnapshotUseCase,
-    CreateDatasetResult,
-    DatasetRepository,
-    DidGeneratorDefault,
-    TenancyConfig,
-};
+use kamu_core::{auth, CreateDatasetFromSnapshotUseCase, DidGeneratorDefault, TenancyConfig};
 use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
 use kamu_flow_system_inmem::{InMemoryFlowConfigurationEventStore, InMemoryFlowTriggerEventStore};
 use kamu_flow_system_services::FlowTriggerServiceImpl;
 use messaging_outbox::DummyOutboxImpl;
-use opendatafabric::*;
+use odf::metadata::testing::MetadataFactory;
 use time_source::SystemTimeSourceDefault;
 
 use crate::utils::{authentication_catalogs, expect_anonymous_access_error};
@@ -655,7 +647,7 @@ async fn test_pause_resume_dataset_flows() {
     async fn check_flow_config_status(
         harness: &FlowTriggerHarness,
         schema: &kamu_adapter_graphql::Schema,
-        dataset_id: &DatasetID,
+        dataset_id: &odf::DatasetID,
         dataset_flow_type: &str,
         expect_paused: bool,
     ) {
@@ -687,7 +679,7 @@ async fn test_pause_resume_dataset_flows() {
     async fn check_dataset_all_configs_status(
         harness: &FlowTriggerHarness,
         schema: &kamu_adapter_graphql::Schema,
-        dataset_id: &DatasetID,
+        dataset_id: &odf::DatasetID,
         expect_paused: bool,
     ) {
         let query = FlowTriggerHarness::all_paused_trigger_query(dataset_id);
@@ -1066,10 +1058,10 @@ impl FlowTriggerHarness {
             b.add::<DummyOutboxImpl>()
                 .add::<DidGeneratorDefault>()
                 .add_value(TenancyConfig::SingleTenant)
-                .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
-                .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-                .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
-                .add::<DatasetRegistryRepoBridge>()
+                .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
+                .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
+                .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
+                .add::<DatasetRegistrySoloUnitBridge>()
                 .add::<MetadataQueryServiceImpl>()
                 .add::<CreateDatasetFromSnapshotUseCaseImpl>()
                 .add::<SystemTimeSourceDefault>()
@@ -1096,7 +1088,7 @@ impl FlowTriggerHarness {
         }
     }
 
-    async fn create_root_dataset(&self) -> CreateDatasetResult {
+    async fn create_root_dataset(&self) -> odf::CreateDatasetResult {
         let create_dataset_from_snapshot = self
             .catalog_authorized
             .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
@@ -1105,7 +1097,7 @@ impl FlowTriggerHarness {
         create_dataset_from_snapshot
             .execute(
                 MetadataFactory::dataset_snapshot()
-                    .kind(DatasetKind::Root)
+                    .kind(odf::DatasetKind::Root)
                     .name("foo")
                     .push_event(MetadataFactory::set_polling_source().build())
                     .build(),
@@ -1115,7 +1107,7 @@ impl FlowTriggerHarness {
             .unwrap()
     }
 
-    async fn create_root_dataset_no_source(&self) -> CreateDatasetResult {
+    async fn create_root_dataset_no_source(&self) -> odf::CreateDatasetResult {
         let create_dataset_from_snapshot = self
             .catalog_authorized
             .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
@@ -1124,7 +1116,7 @@ impl FlowTriggerHarness {
         create_dataset_from_snapshot
             .execute(
                 MetadataFactory::dataset_snapshot()
-                    .kind(DatasetKind::Root)
+                    .kind(odf::DatasetKind::Root)
                     .name("foo")
                     .build(),
                 Default::default(),
@@ -1133,7 +1125,7 @@ impl FlowTriggerHarness {
             .unwrap()
     }
 
-    async fn create_derived_dataset(&self) -> CreateDatasetResult {
+    async fn create_derived_dataset(&self) -> odf::CreateDatasetResult {
         let create_dataset_from_snapshot = self
             .catalog_authorized
             .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
@@ -1143,7 +1135,7 @@ impl FlowTriggerHarness {
             .execute(
                 MetadataFactory::dataset_snapshot()
                     .name("bar")
-                    .kind(DatasetKind::Derivative)
+                    .kind(odf::DatasetKind::Derivative)
                     .push_event(
                         MetadataFactory::set_transform()
                             .inputs_from_refs(["foo"])
@@ -1156,7 +1148,7 @@ impl FlowTriggerHarness {
             .unwrap()
     }
 
-    async fn create_derived_dataset_no_transform(&self) -> CreateDatasetResult {
+    async fn create_derived_dataset_no_transform(&self) -> odf::CreateDatasetResult {
         let create_dataset_from_snapshot = self
             .catalog_authorized
             .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
@@ -1166,7 +1158,7 @@ impl FlowTriggerHarness {
             .execute(
                 MetadataFactory::dataset_snapshot()
                     .name("bar")
-                    .kind(DatasetKind::Derivative)
+                    .kind(odf::DatasetKind::Derivative)
                     .build(),
                 Default::default(),
             )
@@ -1185,7 +1177,7 @@ impl FlowTriggerHarness {
     }
 
     fn set_time_delta_trigger_mutation(
-        id: &DatasetID,
+        id: &odf::DatasetID,
         dataset_flow_type: &str,
         paused: bool,
         every: u64,
@@ -1241,7 +1233,7 @@ impl FlowTriggerHarness {
     }
 
     fn set_cron_trigger_mutation(
-        id: &DatasetID,
+        id: &odf::DatasetID,
         dataset_flow_type: &str,
         paused: bool,
         cron_expression: &str,
@@ -1294,7 +1286,7 @@ impl FlowTriggerHarness {
     }
 
     fn set_trigger_batching_mutation(
-        id: &DatasetID,
+        id: &odf::DatasetID,
         dataset_flow_type: &str,
         paused: bool,
         min_records_to_await: u64,
@@ -1356,7 +1348,7 @@ impl FlowTriggerHarness {
         .replace("<minRecordsToAwait>", &min_records_to_await.to_string())
     }
 
-    fn quick_flow_trigger_query(id: &DatasetID, dataset_flow_type: &str) -> String {
+    fn quick_flow_trigger_query(id: &odf::DatasetID, dataset_flow_type: &str) -> String {
         indoc!(
             r#"
             {
@@ -1379,7 +1371,7 @@ impl FlowTriggerHarness {
         .replace("<dataset_flow_type>", dataset_flow_type)
     }
 
-    fn all_paused_trigger_query(id: &DatasetID) -> String {
+    fn all_paused_trigger_query(id: &odf::DatasetID) -> String {
         indoc!(
             r#"
             {
@@ -1398,7 +1390,7 @@ impl FlowTriggerHarness {
         .replace("<id>", &id.to_string())
     }
 
-    fn pause_flows_of_type_mutation(id: &DatasetID, dataset_flow_type: &str) -> String {
+    fn pause_flows_of_type_mutation(id: &odf::DatasetID, dataset_flow_type: &str) -> String {
         indoc!(
             r#"
             mutation {
@@ -1420,7 +1412,7 @@ impl FlowTriggerHarness {
         .replace("<dataset_flow_type>", dataset_flow_type)
     }
 
-    fn resume_flows_of_type_mutation(id: &DatasetID, dataset_flow_type: &str) -> String {
+    fn resume_flows_of_type_mutation(id: &odf::DatasetID, dataset_flow_type: &str) -> String {
         indoc!(
             r#"
             mutation {
@@ -1442,7 +1434,7 @@ impl FlowTriggerHarness {
         .replace("<dataset_flow_type>", dataset_flow_type)
     }
 
-    fn pause_all_flows_mutation(id: &DatasetID) -> String {
+    fn pause_all_flows_mutation(id: &odf::DatasetID) -> String {
         indoc!(
             r#"
             mutation {
@@ -1461,7 +1453,7 @@ impl FlowTriggerHarness {
         .replace("<id>", &id.to_string())
     }
 
-    fn resume_all_flows_mutation(id: &DatasetID) -> String {
+    fn resume_all_flows_mutation(id: &odf::DatasetID) -> String {
         indoc!(
             r#"
             mutation {

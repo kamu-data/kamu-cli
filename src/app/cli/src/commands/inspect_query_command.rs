@@ -14,7 +14,6 @@ use chrono::SecondsFormat;
 use console::style;
 use futures::TryStreamExt;
 use kamu::domain::*;
-use opendatafabric::*;
 
 use super::{CLIError, Command};
 use crate::{OutputConfig, WritePager};
@@ -22,7 +21,7 @@ use crate::{OutputConfig, WritePager};
 pub struct InspectQueryCommand {
     dataset_registry: Arc<dyn DatasetRegistry>,
     dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
-    dataset_ref: DatasetRef,
+    dataset_ref: odf::DatasetRef,
     output_config: Arc<OutputConfig>,
 }
 
@@ -30,7 +29,7 @@ impl InspectQueryCommand {
     pub fn new(
         dataset_registry: Arc<dyn DatasetRegistry>,
         dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
-        dataset_ref: DatasetRef,
+        dataset_ref: odf::DatasetRef,
         output_config: Arc<OutputConfig>,
     ) -> Self {
         Self {
@@ -44,14 +43,18 @@ impl InspectQueryCommand {
     async fn render(
         &self,
         output: &mut impl Write,
-        dataset_handle: &DatasetHandle,
+        dataset_handle: &odf::DatasetHandle,
     ) -> Result<(), CLIError> {
         let resolved_dataset = self.dataset_registry.get_dataset_by_handle(dataset_handle);
 
+        use odf::dataset::MetadataChainExt as _;
         let mut blocks = resolved_dataset.as_metadata_chain().iter_blocks();
         while let Some((block_hash, block)) = blocks.try_next().await? {
             match &block.event {
-                MetadataEvent::SetTransform(SetTransform { inputs, transform }) => {
+                odf::MetadataEvent::SetTransform(odf::metadata::SetTransform {
+                    inputs,
+                    transform,
+                }) => {
                     self.render_transform(
                         output,
                         dataset_handle,
@@ -61,7 +64,7 @@ impl InspectQueryCommand {
                         transform,
                     )?;
                 }
-                MetadataEvent::SetPollingSource(SetPollingSource {
+                odf::MetadataEvent::SetPollingSource(odf::metadata::SetPollingSource {
                     preprocess: Some(transform),
                     ..
                 }) => {
@@ -84,11 +87,11 @@ impl InspectQueryCommand {
     fn render_transform(
         &self,
         output: &mut impl Write,
-        dataset_handle: &DatasetHandle,
-        block_hash: &Multihash,
-        block: &MetadataBlock,
-        inputs: &Vec<TransformInput>,
-        transform: &Transform,
+        dataset_handle: &odf::DatasetHandle,
+        block_hash: &odf::Multihash,
+        block: &odf::MetadataBlock,
+        inputs: &Vec<odf::metadata::TransformInput>,
+        transform: &odf::metadata::Transform,
     ) -> Result<(), std::io::Error> {
         writeln!(
             output,
@@ -118,7 +121,7 @@ impl InspectQueryCommand {
         }
 
         match transform {
-            Transform::Sql(tr) => {
+            odf::metadata::Transform::Sql(tr) => {
                 writeln!(
                     output,
                     "{} {} ({:?})",

@@ -30,7 +30,7 @@ pub(crate) async fn test_smart_push_new_dataset<TServerHarness: ServerSideHarnes
                 scenario.client_dataset_ref,
                 scenario.server_dataset_ref.try_into().unwrap(),
                 false,
-                DatasetVisibility::Private,
+                odf::DatasetVisibility::Private,
             )
             .await;
 
@@ -69,7 +69,7 @@ pub(crate) async fn test_smart_push_new_dataset_as_public<TServerHarness: Server
                 scenario.client_dataset_ref,
                 scenario.server_dataset_ref.try_into().unwrap(),
                 false,
-                DatasetVisibility::Public,
+                odf::DatasetVisibility::Public,
             )
             .await;
 
@@ -109,7 +109,7 @@ pub(crate) async fn test_smart_push_new_empty_dataset<TServerHarness: ServerSide
                 scenario.client_dataset_ref,
                 scenario.server_dataset_ref.try_into().unwrap(),
                 false,
-                DatasetVisibility::Private,
+                odf::DatasetVisibility::Private,
             )
             .await;
 
@@ -150,7 +150,7 @@ pub(crate) async fn test_smart_push_existing_up_to_date_dataset<
                 scenario.client_dataset_ref,
                 scenario.server_dataset_ref.try_into().unwrap(),
                 false,
-                DatasetVisibility::Private,
+                odf::DatasetVisibility::Private,
             )
             .await;
 
@@ -183,7 +183,7 @@ pub(crate) async fn test_smart_push_existing_evolved_dataset<TServerHarness: Ser
                 scenario.client_dataset_ref,
                 scenario.server_dataset_ref.try_into().unwrap(),
                 false,
-                DatasetVisibility::Private,
+                odf::DatasetVisibility::Private,
             )
             .await;
 
@@ -223,7 +223,7 @@ pub(crate) async fn test_smart_push_existing_diverged_dataset<TServerHarness: Se
                 scenario.client_dataset_ref,
                 scenario.server_dataset_ref.try_into().unwrap(),
                 true, /* diverged! */
-                DatasetVisibility::Private,
+                odf::DatasetVisibility::Private,
             )
             .await;
 
@@ -272,7 +272,7 @@ pub(crate) async fn test_smart_push_existing_dataset_fails_as_server_advanced<
                 scenario.client_dataset_ref,
                 scenario.server_dataset_ref.try_into().unwrap(),
                 false,
-                DatasetVisibility::Private,
+                odf::DatasetVisibility::Private,
             )
             .await;
 
@@ -302,7 +302,7 @@ pub(crate) async fn test_smart_push_aborted_write_of_new_rewrite_succeeds<
                 scenario.client_dataset_ref,
                 scenario.server_dataset_ref.try_into().unwrap(),
                 false,
-                DatasetVisibility::Private,
+                odf::DatasetVisibility::Private,
             )
             .await;
 
@@ -344,7 +344,7 @@ pub(crate) async fn test_smart_push_aborted_write_of_updated_rewrite_succeeds<
                 scenario.client_dataset_ref,
                 scenario.server_dataset_ref.try_into().unwrap(),
                 false,
-                DatasetVisibility::Private,
+                odf::DatasetVisibility::Private,
             )
             .await;
 
@@ -384,7 +384,7 @@ pub(crate) async fn test_smart_push_via_repo_ref<TServerHarness: ServerSideHarne
                 scenario.client_dataset_ref,
                 scenario.server_dataset_ref,
                 false,
-                DatasetVisibility::Private,
+                odf::DatasetVisibility::Private,
             )
             .await;
 

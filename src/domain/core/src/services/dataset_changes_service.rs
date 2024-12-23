@@ -9,10 +9,7 @@
 
 use chrono::{DateTime, Utc};
 use internal_error::InternalError;
-use opendatafabric::{DatasetID, Multihash};
 use thiserror::Error;
-
-use crate::{AccessError, DatasetNotFoundError, RefNotFoundError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -21,17 +18,17 @@ pub trait DatasetChangesService: Sync + Send {
     /// Computes incremental stats between two given blocks of the dataset
     async fn get_increment_between<'a>(
         &'a self,
-        dataset_id: &'a DatasetID,
-        old_head: Option<&'a Multihash>,
-        new_head: &'a Multihash,
+        dataset_id: &'a odf::DatasetID,
+        old_head: Option<&'a odf::Multihash>,
+        new_head: &'a odf::Multihash,
     ) -> Result<DatasetIntervalIncrement, GetIncrementError>;
 
     /// Computes incremental stats between the given block and the current head
     /// of the dataset
     async fn get_increment_since<'a>(
         &'a self,
-        dataset_id: &'a DatasetID,
-        old_head: Option<&'a Multihash>,
+        dataset_id: &'a odf::DatasetID,
+        old_head: Option<&'a odf::Multihash>,
     ) -> Result<DatasetIntervalIncrement, GetIncrementError>;
 }
 
@@ -63,13 +60,13 @@ impl std::ops::AddAssign for DatasetIntervalIncrement {
 #[derive(Error, Debug)]
 pub enum GetIncrementError {
     #[error(transparent)]
-    DatasetNotFound(DatasetNotFoundError),
+    DatasetNotFound(odf::dataset::DatasetNotFoundError),
 
     #[error(transparent)]
-    RefNotFound(RefNotFoundError),
+    RefNotFound(odf::storage::RefNotFoundError),
 
     #[error(transparent)]
-    Access(AccessError),
+    Access(odf::AccessError),
 
     #[error(transparent)]
     Internal(InternalError),

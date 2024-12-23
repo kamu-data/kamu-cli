@@ -13,7 +13,6 @@ use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::prelude::*;
 use internal_error::*;
 use kamu_core::ingest::ReadError;
-use opendatafabric::*;
 
 use crate::*;
 
@@ -30,10 +29,10 @@ impl ReaderNdGeoJson {
     // all data.
     pub async fn new(
         ctx: SessionContext,
-        conf: ReadStepNdGeoJson,
+        conf: odf::metadata::ReadStepNdGeoJson,
         temp_path: impl Into<PathBuf>,
     ) -> Result<Self, ReadError> {
-        let inner_conf = ReadStepNdJson {
+        let inner_conf = odf::metadata::ReadStepNdJson {
             schema: conf.schema,
             date_format: None,
             encoding: None,

@@ -27,8 +27,7 @@ enum-variants = { workspace = true }
 event-sourcing = { workspace = true }
 internal-error = { workspace = true }
 messaging-outbox = { workspace = true }
-opendatafabric = { workspace = true }
-kamu-accounts = { workspace = true }
+odf = { workspace = true }
 kamu-core = { workspace = true }
 kamu-task-system = { workspace = true }
 
@@ -50,3 +49,4 @@ serde_with = { version = "3", default-features = false, features = [
 
 
 [dev-dependencies]
+kamu-accounts = { workspace = true }

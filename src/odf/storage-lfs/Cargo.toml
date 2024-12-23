@@ -1,0 +1,44 @@
+[package]
+name = "opendatafabric-storage-lfs"
+description = "Local file system based implementation of storage facilities for Open Data Fabric based datasets"
+version = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+authors = { workspace = true }
+readme = { workspace = true }
+license-file = { workspace = true }
+keywords = { workspace = true }
+include = { workspace = true }
+edition = { workspace = true }
+publish = { workspace = true }
+
+
+[lints]
+workspace = true
+
+
+[lib]
+doctest = false
+
+
+[dependencies]
+async-utils = { workspace = true }
+internal-error = { workspace = true }
+odf-metadata = { workspace = true }
+odf-storage = { workspace = true }
+odf-data-utils = { workspace = true }
+
+async-trait = "0.1"
+bytes = { version = "1", default-features = false }
+digest = "0.10"
+
+sha3 = "0.10"
+tokio = { version = "1", default-features = false, features = [ "fs" ] }
+tracing = "0.1"
+url = { version = "2", default-features = false }
+
+
+[dev-dependencies]
+odf-storage = { workspace = true, features = [ "testing" ] }
+
+tempfile = "3"

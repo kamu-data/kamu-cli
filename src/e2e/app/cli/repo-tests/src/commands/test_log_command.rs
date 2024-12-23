@@ -20,28 +20,12 @@ use kamu_cli_e2e_common::{
 };
 use kamu_cli_puppet::extensions::KamuCliPuppetExt;
 use kamu_cli_puppet::KamuCliPuppet;
-use opendatafabric::{
-    AddData,
-    AddPushSource,
-    DatasetKind,
-    EnumWithVariants,
-    MergeStrategy,
-    MergeStrategyLedger,
-    MetadataEvent,
-    OffsetInterval,
-    ReadStep,
-    ReadStepNdJson,
-    SetDataSchema,
-    SetTransform,
-    SetVocab,
-    SqlQueryStep,
-    Transform,
-    TransformSql,
-};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_log(kamu: KamuCliPuppet) {
+    use odf::metadata::EnumWithVariants;
+
     kamu.execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
         .await
         .success();
@@ -77,8 +61,8 @@ pub async fn test_log(kamu: KamuCliPuppet) {
 
             assert_matches!(
                 block.event,
-                MetadataEvent::Seed(event)
-                    if event.dataset_kind == DatasetKind::Root
+                odf::MetadataEvent::Seed(event)
+                    if event.dataset_kind == odf::DatasetKind::Root
             );
         }
         {
@@ -86,10 +70,13 @@ pub async fn test_log(kamu: KamuCliPuppet) {
 
             pretty_assertions::assert_eq!(1, block.sequence_number);
 
-            let actual_push_source = block.event.as_variant::<AddPushSource>().unwrap();
-            let expected_push_source = AddPushSource {
+            let actual_push_source = block
+                .event
+                .as_variant::<odf::metadata::AddPushSource>()
+                .unwrap();
+            let expected_push_source = odf::metadata::AddPushSource {
                 source_name: "default".to_string(),
-                read: ReadStep::NdJson(ReadStepNdJson {
+                read: odf::metadata::ReadStep::NdJson(odf::metadata::ReadStepNdJson {
                     schema: Some(vec![
                         "match_time TIMESTAMP".into(),
                         "match_id BIGINT".into(),
@@ -101,7 +88,7 @@ pub async fn test_log(kamu: KamuCliPuppet) {
                     timestamp_format: None,
                 }),
                 preprocess: None,
-                merge: MergeStrategy::Ledger(MergeStrategyLedger {
+                merge: odf::metadata::MergeStrategy::Ledger(odf::metadata::MergeStrategyLedger {
                     primary_key: vec!["match_id".into(), "player_id".into()],
                 }),
             };
@@ -113,8 +100,8 @@ pub async fn test_log(kamu: KamuCliPuppet) {
 
             pretty_assertions::assert_eq!(2, block.sequence_number);
 
-            let actual_set_vocab = block.event.as_variant::<SetVocab>().unwrap();
-            let expected_set_vocab = SetVocab {
+            let actual_set_vocab = block.event.as_variant::<odf::metadata::SetVocab>().unwrap();
+            let expected_set_vocab = odf::metadata::SetVocab {
                 offset_column: None,
                 operation_type_column: None,
                 system_time_column: None,
@@ -128,8 +115,11 @@ pub async fn test_log(kamu: KamuCliPuppet) {
 
             pretty_assertions::assert_eq!(3, block.sequence_number);
 
-            let actual_set_data_schema = block.event.as_variant::<SetDataSchema>().unwrap();
-            let expected_set_data_schema = SetDataSchema {
+            let actual_set_data_schema = block
+                .event
+                .as_variant::<odf::metadata::SetDataSchema>()
+                .unwrap();
+            let expected_set_data_schema = odf::metadata::SetDataSchema {
                 schema: vec![
                     12, 0, 0, 0, 8, 0, 8, 0, 0, 0, 4, 0, 8, 0, 0, 0, 4, 0, 0, 0, 7, 0, 0, 0, 124,
                     1, 0, 0, 60, 1, 0, 0, 244, 0, 0, 0, 180, 0, 0, 0, 108, 0, 0, 0, 56, 0, 0, 0, 4,
@@ -162,7 +152,7 @@ pub async fn test_log(kamu: KamuCliPuppet) {
 
             pretty_assertions::assert_eq!(4, block.sequence_number);
 
-            let actual_add_data = block.event.as_variant::<AddData>().unwrap();
+            let actual_add_data = block.event.as_variant::<odf::metadata::AddData>().unwrap();
 
             pretty_assertions::assert_eq!(None, actual_add_data.prev_checkpoint);
             pretty_assertions::assert_eq!(None, actual_add_data.prev_offset);
@@ -170,7 +160,7 @@ pub async fn test_log(kamu: KamuCliPuppet) {
             let actual_new_data = actual_add_data.new_data.as_ref().unwrap();
 
             pretty_assertions::assert_eq!(
-                OffsetInterval { start: 0, end: 1 },
+                odf::metadata::OffsetInterval { start: 0, end: 1 },
                 actual_new_data.offset_interval
             );
             pretty_assertions::assert_eq!(1693, actual_new_data.size);
@@ -187,7 +177,7 @@ pub async fn test_log(kamu: KamuCliPuppet) {
 
             pretty_assertions::assert_eq!(5, block.sequence_number);
 
-            let actual_add_data = block.event.as_variant::<AddData>().unwrap();
+            let actual_add_data = block.event.as_variant::<odf::metadata::AddData>().unwrap();
 
             pretty_assertions::assert_eq!(None, actual_add_data.prev_checkpoint);
             pretty_assertions::assert_eq!(Some(1), actual_add_data.prev_offset);
@@ -195,7 +185,7 @@ pub async fn test_log(kamu: KamuCliPuppet) {
             let actual_new_data = actual_add_data.new_data.as_ref().unwrap();
 
             pretty_assertions::assert_eq!(
-                OffsetInterval { start: 2, end: 3 },
+                odf::metadata::OffsetInterval { start: 2, end: 3 },
                 actual_new_data.offset_interval
             );
             pretty_assertions::assert_eq!(1709, actual_new_data.size);
@@ -233,8 +223,8 @@ pub async fn test_log(kamu: KamuCliPuppet) {
 
             assert_matches!(
                 block.event,
-                MetadataEvent::Seed(event)
-                    if event.dataset_kind == DatasetKind::Derivative
+                odf::MetadataEvent::Seed(event)
+                    if event.dataset_kind == odf::DatasetKind::Derivative
             );
         }
         {
@@ -242,7 +232,10 @@ pub async fn test_log(kamu: KamuCliPuppet) {
 
             pretty_assertions::assert_eq!(1, block.sequence_number);
 
-            let actual_set_transform = block.event.as_variant::<SetTransform>().unwrap();
+            let actual_set_transform = block
+                .event
+                .as_variant::<odf::metadata::SetTransform>()
+                .unwrap();
 
             pretty_assertions::assert_eq!(1, actual_set_transform.inputs.len());
             pretty_assertions::assert_eq!(
@@ -250,11 +243,11 @@ pub async fn test_log(kamu: KamuCliPuppet) {
                 actual_set_transform.inputs[0].alias
             );
 
-            let expected_transform = Transform::Sql(TransformSql {
+            let expected_transform = odf::metadata::Transform::Sql(odf::metadata::TransformSql {
                 engine: "datafusion".into(),
                 version: None,
                 query: None,
-                queries: Some(vec![SqlQueryStep {
+                queries: Some(vec![odf::metadata::SqlQueryStep {
                     alias: None,
                     query: indoc::indoc!(
                         r#"
@@ -278,8 +271,8 @@ pub async fn test_log(kamu: KamuCliPuppet) {
 
             pretty_assertions::assert_eq!(2, block.sequence_number);
 
-            let actual_set_vocab = block.event.as_variant::<SetVocab>().unwrap();
-            let expected_set_vocab = SetVocab {
+            let actual_set_vocab = block.event.as_variant::<odf::metadata::SetVocab>().unwrap();
+            let expected_set_vocab = odf::metadata::SetVocab {
                 offset_column: None,
                 operation_type_column: None,
                 system_time_column: None,

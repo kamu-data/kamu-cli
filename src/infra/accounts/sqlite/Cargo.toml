@@ -25,7 +25,7 @@ doctest = false
 database-common = { workspace = true }
 internal-error = { workspace = true }
 kamu-accounts = { workspace = true, features = ["sqlx"] }
-opendatafabric = { workspace = true, features = ["sqlx-sqlite"] }
+odf = { workspace = true, features = ["sqlx-sqlite"] }
 
 async-stream = { version = "0.3", default-features = false }
 async-trait = { version = "0.1", default-features = false }

@@ -30,7 +30,7 @@ testing = []
 [dependencies]
 database-common = { workspace = true }
 internal-error = { workspace = true }
-opendatafabric = { workspace = true }
+odf = { workspace = true }
 random-names = { workspace = true }
 
 async-trait = { version = "0.1", default-features = false }

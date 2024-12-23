@@ -9,9 +9,8 @@
 
 use std::assert_matches::assert_matches;
 
-use kamu::domain::{AccessError, PushError, SyncError};
-use kamu_core::{DatasetVisibility, TenancyConfig};
-use opendatafabric::{AccountName, DatasetAlias, DatasetRefRemote};
+use kamu::domain::{PushError, SyncError};
+use kamu_core::TenancyConfig;
 
 use crate::harness::{
     await_client_server_flow,
@@ -52,7 +51,7 @@ async fn test_smart_push_new_dataset_unauthenticated() {
                 scenario.client_dataset_ref,
                 scenario.server_dataset_ref.try_into().unwrap(),
                 false,
-                DatasetVisibility::Private,
+                odf::DatasetVisibility::Private,
             )
             .await;
 
@@ -61,7 +60,7 @@ async fn test_smart_push_new_dataset_unauthenticated() {
             Ok(_) => panic!(),
             Err(e) => assert_matches!(
                 e,
-                PushError::SyncError(SyncError::Access(AccessError::Unauthorized(_))),
+                PushError::SyncError(SyncError::Access(odf::AccessError::Unauthorized(_))),
             ),
         }
     };
@@ -87,12 +86,12 @@ async fn test_smart_push_new_dataset_wrong_user() {
     )
     .await;
 
-    let wrong_server_alias = DatasetAlias::new(
-        Some(AccountName::new_unchecked("bad-account")),
+    let wrong_server_alias = odf::DatasetAlias::new(
+        Some(odf::AccountName::new_unchecked("bad-account")),
         scenario.dataset_name,
     );
     let wrong_server_odf_url = scenario.server_harness.dataset_url(&wrong_server_alias);
-    let wrong_server_dataset_ref = DatasetRefRemote::from(&wrong_server_odf_url);
+    let wrong_server_dataset_ref = odf::DatasetRefRemote::from(&wrong_server_odf_url);
 
     let api_server_handle = scenario.server_harness.api_server_run();
 
@@ -103,7 +102,7 @@ async fn test_smart_push_new_dataset_wrong_user() {
                 scenario.client_dataset_ref,
                 wrong_server_dataset_ref.try_into().unwrap(),
                 false,
-                DatasetVisibility::Private,
+                odf::DatasetVisibility::Private,
             )
             .await;
 
@@ -112,7 +111,7 @@ async fn test_smart_push_new_dataset_wrong_user() {
             Ok(_) => panic!(),
             Err(e) => assert_matches!(
                 e,
-                PushError::SyncError(SyncError::Access(AccessError::Forbidden(_)))
+                PushError::SyncError(SyncError::Access(odf::AccessError::Forbidden(_)))
             ),
         }
     };
@@ -147,7 +146,7 @@ async fn test_smart_push_existing_dataset_unauthenticated() {
                 scenario.client_dataset_ref,
                 scenario.server_dataset_ref.try_into().unwrap(),
                 false,
-                DatasetVisibility::Private,
+                odf::DatasetVisibility::Private,
             )
             .await;
 
@@ -156,7 +155,7 @@ async fn test_smart_push_existing_dataset_unauthenticated() {
             Ok(_) => panic!(),
             Err(e) => assert_matches!(
                 e,
-                PushError::SyncError(SyncError::Access(AccessError::Unauthorized(_)))
+                PushError::SyncError(SyncError::Access(odf::AccessError::Unauthorized(_)))
             ),
         }
     };
@@ -191,7 +190,7 @@ async fn test_smart_push_existing_dataset_unauthorized() {
                 scenario.client_dataset_ref,
                 scenario.server_dataset_ref.try_into().unwrap(),
                 false,
-                DatasetVisibility::Private,
+                odf::DatasetVisibility::Private,
             )
             .await;
 
@@ -200,7 +199,7 @@ async fn test_smart_push_existing_dataset_unauthorized() {
             Ok(_) => panic!(),
             Err(e) => assert_matches!(
                 e,
-                PushError::SyncError(SyncError::Access(AccessError::Forbidden(_)))
+                PushError::SyncError(SyncError::Access(odf::AccessError::Forbidden(_)))
             ),
         }
     };
@@ -235,7 +234,7 @@ async fn test_smart_push_existing_ref_collision() {
                 scenario.client_dataset_ref,
                 scenario.server_dataset_ref.try_into().unwrap(),
                 false,
-                DatasetVisibility::Private,
+                odf::DatasetVisibility::Private,
             )
             .await;
 

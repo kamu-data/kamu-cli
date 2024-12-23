@@ -9,7 +9,6 @@
 
 use chrono::{DateTime, Utc};
 use merge::Merge;
-use opendatafabric::{AccountID, AccountName};
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
@@ -60,7 +59,10 @@ impl PredefinedAccountsConfig {
         }
     }
 
-    pub fn find_account_config_by_name(&self, account_name: &AccountName) -> Option<AccountConfig> {
+    pub fn find_account_config_by_name(
+        &self,
+        account_name: &odf::AccountName,
+    ) -> Option<AccountConfig> {
         for account_config in &self.predefined {
             if account_config.account_name == *account_name {
                 return Some(account_config.clone());
@@ -78,8 +80,8 @@ impl PredefinedAccountsConfig {
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct AccountConfig {
     // 'id' is auto-derived from `account_name` if omitted
-    id: Option<AccountID>,
-    pub account_name: AccountName,
+    id: Option<odf::AccountID>,
+    pub account_name: odf::AccountName,
     pub password: Option<String>,
     pub email: Option<String>,
     // 'display_name' is auto-derived from `account_name` if omitted
@@ -98,7 +100,7 @@ pub struct AccountConfig {
 }
 
 impl AccountConfig {
-    pub fn from_name(account_name: AccountName) -> Self {
+    pub fn from_name(account_name: odf::AccountName) -> Self {
         Self {
             id: None,
             account_name,
@@ -124,11 +126,11 @@ impl AccountConfig {
         self
     }
 
-    pub fn get_id(&self) -> AccountID {
+    pub fn get_id(&self) -> odf::AccountID {
         if let Some(id) = &self.id {
             id.clone()
         } else {
-            AccountID::new_seeded_ed25519(self.account_name.as_bytes())
+            odf::AccountID::new_seeded_ed25519(self.account_name.as_bytes())
         }
     }
 

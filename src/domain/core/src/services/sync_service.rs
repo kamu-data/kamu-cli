@@ -10,7 +10,6 @@
 use std::sync::Arc;
 
 use internal_error::{BoxedError, InternalError};
-use opendatafabric::*;
 use thiserror::Error;
 use url::Url;
 
@@ -46,7 +45,7 @@ pub struct SyncRequest {
 #[derive(Debug, Clone)]
 pub enum SyncRef {
     Local(ResolvedDataset),
-    LocalNew(DatasetAlias),
+    LocalNew(odf::DatasetAlias),
     Remote(SyncRefRemote),
 }
 
@@ -59,16 +58,16 @@ impl SyncRef {
     }
 
     // If remote, refers to resolved repository URL
-    pub fn as_internal_any_ref(&self) -> DatasetRefAny {
+    pub fn as_internal_any_ref(&self) -> odf::DatasetRefAny {
         match self {
             Self::Local(local_ref) => local_ref.get_handle().as_any_ref(),
             Self::LocalNew(alias) => alias.as_any_ref(),
-            Self::Remote(remote_ref) => DatasetRefAny::Url(remote_ref.url.clone()),
+            Self::Remote(remote_ref) => odf::DatasetRefAny::Url(remote_ref.url.clone()),
         }
     }
 
     // If remote, returns the original unresolved ref
-    pub fn as_user_friendly_any_ref(&self) -> DatasetRefAny {
+    pub fn as_user_friendly_any_ref(&self) -> odf::DatasetRefAny {
         match self {
             Self::Local(local_ref) => local_ref.get_handle().as_any_ref(),
             Self::LocalNew(alias) => alias.as_any_ref(),
@@ -80,8 +79,8 @@ impl SyncRef {
 #[derive(Clone)]
 pub struct SyncRefRemote {
     pub url: Arc<Url>,
-    pub dataset: Arc<dyn Dataset>,
-    pub original_remote_ref: DatasetRefRemote,
+    pub dataset: Arc<dyn odf::Dataset>,
+    pub original_remote_ref: odf::DatasetRefRemote,
 }
 
 impl std::fmt::Debug for SyncRefRemote {
@@ -109,7 +108,7 @@ pub struct SyncOptions {
     pub force: bool,
 
     /// Dataset visibility, in case of initial pushing
-    pub dataset_visibility: DatasetVisibility,
+    pub dataset_visibility: odf::DatasetVisibility,
 }
 
 impl Default for SyncOptions {
@@ -118,7 +117,7 @@ impl Default for SyncOptions {
             trust_source: None,
             create_if_not_exists: true,
             force: false,
-            dataset_visibility: DatasetVisibility::Private,
+            dataset_visibility: odf::DatasetVisibility::Private,
         }
     }
 }
@@ -129,8 +128,8 @@ impl Default for SyncOptions {
 pub enum SyncResult {
     UpToDate,
     Updated {
-        old_head: Option<Multihash>,
-        new_head: Multihash,
+        old_head: Option<odf::Multihash>,
+        new_head: odf::Multihash,
         num_blocks: u64,
     },
 }
@@ -195,8 +194,8 @@ impl SyncListener for NullSyncListener {}
 pub trait SyncMultiListener: Send + Sync {
     fn begin_sync(
         &self,
-        _src: &DatasetRefAny,
-        _dst: &DatasetRefAny,
+        _src: &odf::DatasetRefAny,
+        _dst: &odf::DatasetRefAny,
     ) -> Option<Arc<dyn SyncListener>> {
         None
     }
@@ -212,13 +211,13 @@ impl SyncMultiListener for NullSyncMultiListener {}
 #[derive(Debug, Error)]
 pub enum SyncError {
     #[error(transparent)]
-    DatasetNotFound(#[from] DatasetNotFoundError),
+    DatasetNotFound(#[from] DatasetAnyRefUnresolvedError),
     #[error(transparent)]
-    RefCollision(#[from] RefCollisionError),
+    RefCollision(#[from] odf::dataset::RefCollisionError),
     #[error(transparent)]
-    CreateDatasetFailed(#[from] CreateDatasetError),
+    CreateDatasetFailed(#[from] odf::dataset::CreateDatasetError),
     #[error(transparent)]
-    UnsupportedProtocol(#[from] UnsupportedProtocolError),
+    UnsupportedProtocol(#[from] odf::dataset::UnsupportedProtocolError),
     #[error(transparent)]
     UnsupportedIpfsStorageType(#[from] UnsupportedIpfsStorageTypeError),
     #[error(transparent)]
@@ -236,13 +235,13 @@ pub enum SyncError {
     DestinationAhead(#[from] DestinationAheadError),
     #[error(transparent)]
     Corrupted(#[from] CorruptedSourceError),
-    #[error("Dataset was updated concurrently")]
+    #[error("odf::Dataset was updated concurrently")]
     UpdatedConcurrently(#[source] BoxedError),
     #[error(transparent)]
     Access(
         #[from]
         #[backtrace]
-        AccessError,
+        odf::metadata::AccessError,
     ),
     #[error(transparent)]
     Internal(
@@ -270,13 +269,13 @@ pub enum IpfsAddError {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Clone, Eq, PartialEq, Debug)]
-#[error("Dataset {dataset_ref} not found")]
-pub struct DatasetNotFoundError {
-    pub dataset_ref: DatasetRefAny,
+#[error("odf::Dataset {dataset_ref} not found")]
+pub struct DatasetAnyRefUnresolvedError {
+    pub dataset_ref: odf::DatasetRefAny,
 }
 
-impl DatasetNotFoundError {
-    pub fn new(r: impl Into<DatasetRefAny>) -> Self {
+impl DatasetAnyRefUnresolvedError {
+    pub fn new(r: impl Into<odf::DatasetRefAny>) -> Self {
         Self {
             dataset_ref: r.into(),
         }
@@ -287,8 +286,8 @@ impl DatasetNotFoundError {
 
 #[derive(Error, Clone, Eq, PartialEq, Debug)]
 pub struct DatasetsDivergedError {
-    pub src_head: Multihash,
-    pub dst_head: Multihash,
+    pub src_head: odf::Multihash,
+    pub dst_head: odf::Multihash,
     pub detail: Option<DatasetsDivergedErrorDetail>,
 }
 
@@ -328,8 +327,8 @@ pub struct DatasetsDivergedErrorDetail {
     "Destination head {dst_head} is ahead of source head {src_head} by {dst_ahead_size} blocks"
 )]
 pub struct DestinationAheadError {
-    pub src_head: Multihash,
-    pub dst_head: Multihash,
+    pub src_head: odf::Multihash,
+    pub dst_head: odf::Multihash,
     pub dst_ahead_size: usize,
 }
 
@@ -345,13 +344,15 @@ pub struct CorruptedSourceError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl From<GetDatasetError> for SyncError {
-    fn from(v: GetDatasetError) -> Self {
+impl From<odf::dataset::GetDatasetError> for SyncError {
+    fn from(v: odf::dataset::GetDatasetError) -> Self {
         match v {
-            GetDatasetError::NotFound(e) => Self::DatasetNotFound(DatasetNotFoundError {
-                dataset_ref: e.dataset_ref.into(),
-            }),
-            GetDatasetError::Internal(e) => Self::Internal(e),
+            odf::dataset::GetDatasetError::NotFound(e) => {
+                Self::DatasetNotFound(DatasetAnyRefUnresolvedError {
+                    dataset_ref: e.dataset_ref.into(),
+                })
+            }
+            odf::dataset::GetDatasetError::Internal(e) => Self::Internal(e),
         }
     }
 }
@@ -365,11 +366,11 @@ impl From<GetRepoError> for SyncError {
     }
 }
 
-impl From<BuildDatasetError> for SyncError {
-    fn from(v: BuildDatasetError) -> Self {
+impl From<odf::dataset::BuildDatasetError> for SyncError {
+    fn from(v: odf::dataset::BuildDatasetError) -> Self {
         match v {
-            BuildDatasetError::UnsupportedProtocol(e) => Self::UnsupportedProtocol(e),
-            BuildDatasetError::Internal(e) => Self::Internal(e),
+            odf::dataset::BuildDatasetError::UnsupportedProtocol(e) => Self::UnsupportedProtocol(e),
+            odf::dataset::BuildDatasetError::Internal(e) => Self::Internal(e),
         }
     }
 }
@@ -396,7 +397,7 @@ impl From<IpfsAddError> for SyncError {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
-#[error("Dataset storage type '{}' is unsupported for IPFS operations", url.scheme())]
+#[error("odf::Dataset storage type '{}' is unsupported for IPFS operations", url.scheme())]
 pub struct UnsupportedIpfsStorageTypeError {
     pub url: Url,
 }

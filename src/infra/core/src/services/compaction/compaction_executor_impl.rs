@@ -13,9 +13,9 @@ use std::sync::Arc;
 
 use datafusion::prelude::*;
 use dill::{component, interface};
+use file_utils::OwnedFile;
 use internal_error::ResultIntoInternal;
 use kamu_core::*;
-use opendatafabric as odf;
 use random_names::get_random_name;
 use time_source::SystemTimeSource;
 use url::Url;
@@ -125,8 +125,8 @@ impl CompactionExecutorImpl {
                     let commit_result = target
                         .commit_event(
                             block.event,
-                            CommitOpts {
-                                block_ref: &BlockRef::Head,
+                            odf::dataset::CommitOpts {
+                                block_ref: &odf::BlockRef::Head,
                                 system_time: Some(self.time_source.now()),
                                 prev_block_hash: Some(Some(&current_head)),
                                 check_object_refs: false,
@@ -138,12 +138,12 @@ impl CompactionExecutorImpl {
                     current_head = commit_result.new_head;
                 }
                 CompactionDataSliceBatch::CompactedBatch(data_slice_batch_info) => {
-                    let new_offset_interval = odf::OffsetInterval {
+                    let new_offset_interval = odf::metadata::OffsetInterval {
                         start: data_slice_batch_info.lower_bound.start_offset,
                         end: data_slice_batch_info.upper_bound.end_offset,
                     };
 
-                    let add_data_params = AddDataParams {
+                    let add_data_params = odf::dataset::AddDataParams {
                         prev_checkpoint: data_slice_batch_info.lower_bound.prev_checkpoint.clone(),
                         prev_offset: data_slice_batch_info.lower_bound.prev_offset,
                         new_offset_interval: Some(new_offset_interval),
@@ -157,7 +157,7 @@ impl CompactionExecutorImpl {
                         .upper_bound
                         .new_checkpoint
                         .clone()
-                        .map(|r| CheckpointRef::Existed(r.physical_hash));
+                        .map(|r| odf::dataset::CheckpointRef::Existed(r.physical_hash));
 
                     let commit_result = target
                         .commit_add_data(
@@ -166,8 +166,8 @@ impl CompactionExecutorImpl {
                                 "File path for the compacted chunk should be defined",
                             ))),
                             new_checkpoint_ref,
-                            CommitOpts {
-                                block_ref: &BlockRef::Head,
+                            odf::dataset::CommitOpts {
+                                block_ref: &odf::BlockRef::Head,
                                 system_time: Some(self.time_source.now()),
                                 prev_block_hash: Some(Some(&current_head)),
                                 check_object_refs: false,
@@ -223,9 +223,9 @@ impl CompactionExecutor for CompactionExecutorImpl {
         target
             .as_metadata_chain()
             .set_ref(
-                &BlockRef::Head,
+                &odf::BlockRef::Head,
                 &new_head,
-                SetRefOpts {
+                odf::dataset::SetRefOpts {
                     validate_block_present: true,
                     check_ref_is: None,
                 },

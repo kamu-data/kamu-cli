@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use kamu_flow_system::{FlowKeyDataset, FlowTriggerService};
-use opendatafabric as odf;
 
 use crate::prelude::*;
 use crate::utils::check_dataset_read_access;

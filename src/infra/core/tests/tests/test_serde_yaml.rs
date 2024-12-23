@@ -9,9 +9,7 @@
 
 use chrono::prelude::*;
 use indoc::indoc;
-use kamu::domain::DatasetSummary;
-use opendatafabric::serde::yaml::Manifest;
-use opendatafabric::*;
+use odf::metadata::serde::yaml::Manifest;
 
 #[test]
 fn serde_dataset_summary() {
@@ -33,21 +31,21 @@ fn serde_dataset_summary() {
         "
     );
 
-    let actual: Manifest<DatasetSummary> = serde_yaml::from_str(data).unwrap();
+    let actual: Manifest<odf::DatasetSummary> = serde_yaml::from_str(data).unwrap();
 
     let expected = Manifest {
         kind: "DatasetSummary".to_owned(),
         version: 1,
-        content: DatasetSummary {
-            id: DatasetID::new_seeded_ed25519(b"boop"),
-            kind: DatasetKind::Root,
-            last_block_hash: Multihash::from_multibase(
+        content: odf::DatasetSummary {
+            id: odf::DatasetID::new_seeded_ed25519(b"boop"),
+            kind: odf::DatasetKind::Root,
+            last_block_hash: odf::Multihash::from_multibase(
                 "zW1mJtUjH235JZ4BBpJBousTNHaDXer4r4QzSdsqTfKENrr",
             )
             .unwrap(),
             dependencies: vec![
-                DatasetID::new_seeded_ed25519(b"foo"),
-                DatasetID::new_seeded_ed25519(b"bar"),
+                odf::DatasetID::new_seeded_ed25519(b"foo"),
+                odf::DatasetID::new_seeded_ed25519(b"bar"),
             ],
             last_pulled: Some(Utc.with_ymd_and_hms(2020, 1, 1, 12, 0, 0).unwrap()),
             num_records: 100,

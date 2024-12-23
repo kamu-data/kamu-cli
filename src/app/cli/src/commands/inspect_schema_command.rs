@@ -12,7 +12,6 @@ use std::sync::Arc;
 use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::parquet::schema::types::Type;
 use kamu::domain::*;
-use opendatafabric::*;
 
 use super::{CLIError, Command};
 
@@ -30,7 +29,7 @@ pub enum SchemaOutputFormat {
 
 pub struct InspectSchemaCommand {
     query_svc: Arc<dyn QueryService>,
-    dataset_ref: DatasetRef,
+    dataset_ref: odf::DatasetRef,
     output_format: Option<SchemaOutputFormat>,
     from_data_file: bool,
 }
@@ -38,7 +37,7 @@ pub struct InspectSchemaCommand {
 impl InspectSchemaCommand {
     pub fn new(
         query_svc: Arc<dyn QueryService>,
-        dataset_ref: DatasetRef,
+        dataset_ref: odf::DatasetRef,
         output_format: Option<SchemaOutputFormat>,
         from_data_file: bool,
     ) -> Self {
@@ -144,7 +143,7 @@ impl InspectSchemaCommand {
             };
 
             Ok(Some(
-                kamu_data_utils::schema::convert::parquet_schema_to_arrow_schema(Arc::new(
+                odf::utils::schema::convert::parquet_schema_to_arrow_schema(Arc::new(
                     parquet_schema,
                 )),
             ))
@@ -163,7 +162,7 @@ impl InspectSchemaCommand {
             };
 
             Ok(Some(
-                kamu_data_utils::schema::convert::arrow_schema_to_parquet_schema(&arrow_schema),
+                odf::utils::schema::convert::arrow_schema_to_parquet_schema(&arrow_schema),
             ))
         } else {
             let schema = self
@@ -190,7 +189,7 @@ impl Command for InspectSchemaCommand {
             }
             Some(SchemaOutputFormat::Parquet) => {
                 if let Some(schema) = self.get_parquet_schema().await? {
-                    kamu_data_utils::schema::format::write_schema_parquet(
+                    odf::utils::schema::format::write_schema_parquet(
                         &mut std::io::stdout(),
                         &schema,
                     )?;
@@ -200,7 +199,7 @@ impl Command for InspectSchemaCommand {
             }
             Some(SchemaOutputFormat::ParquetJson) => {
                 if let Some(schema) = self.get_parquet_schema().await? {
-                    kamu_data_utils::schema::format::write_schema_parquet_json(
+                    odf::utils::schema::format::write_schema_parquet_json(
                         &mut std::io::stdout(),
                         &schema,
                     )?;
@@ -210,7 +209,7 @@ impl Command for InspectSchemaCommand {
             }
             Some(SchemaOutputFormat::ArrowJson) => {
                 if let Some(schema) = self.get_arrow_schema().await? {
-                    kamu_data_utils::schema::format::write_schema_arrow_json(
+                    odf::utils::schema::format::write_schema_arrow_json(
                         &mut std::io::stdout(),
                         schema.as_ref(),
                     )?;

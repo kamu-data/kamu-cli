@@ -18,10 +18,8 @@ use kamu_core::auth::{
     DatasetActionNotEnoughPermissionsError,
     DatasetActionUnauthorizedError,
 };
-use kamu_core::AccessError;
 use mockall::predicate::{always, eq, function};
 use mockall::Predicate;
-use opendatafabric as odf;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -66,7 +64,7 @@ impl MockDatasetActionAuthorizer {
         dataset_ref: odf::DatasetRef,
         action: DatasetAction,
     ) -> DatasetActionUnauthorizedError {
-        DatasetActionUnauthorizedError::Access(AccessError::Forbidden(
+        DatasetActionUnauthorizedError::Access(odf::AccessError::Forbidden(
             DatasetActionNotEnoughPermissionsError {
                 action,
                 dataset_ref,

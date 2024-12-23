@@ -17,9 +17,8 @@ use container_runtime::ContainerRuntime;
 use indoc::indoc;
 use kamu::domain::*;
 use kamu::ingest::*;
-use kamu::utils::docker_images::BUSYBOX;
+use kamu::utils::docker_images;
 use kamu_datasets_services::DatasetKeyValueServiceSysEnv;
-use opendatafabric::*;
 use url::Url;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -33,7 +32,7 @@ async fn test_fetch_url_file() {
     let src_path = harness.temp_dir.path().join("data.csv");
     let target_path = harness.temp_dir.path().join("fetched.bin");
 
-    let fetch_step = FetchStep::Url(FetchStepUrl {
+    let fetch_step = odf::metadata::FetchStep::Url(odf::metadata::FetchStepUrl {
         url: Url::from_file_path(&src_path).unwrap().as_str().to_owned(),
         event_time: None,
         cache: None,
@@ -127,7 +126,7 @@ async fn test_fetch_url_http_unreachable() {
     let harness = FetchTestHarness::new();
     let target_path = harness.temp_dir.path().join("fetched.bin");
 
-    let fetch_step = FetchStep::Url(FetchStepUrl {
+    let fetch_step = odf::metadata::FetchStep::Url(odf::metadata::FetchStepUrl {
         url: format!("http://localhost:{}/data.csv", 123),
         event_time: None,
         cache: None,
@@ -162,7 +161,7 @@ async fn test_fetch_url_http_not_found() {
     let server_path = harness.temp_dir.path().join("srv");
     let http_server = crate::utils::HttpServer::new(&server_path).await;
 
-    let fetch_step = FetchStep::Url(FetchStepUrl {
+    let fetch_step = odf::metadata::FetchStep::Url(odf::metadata::FetchStepUrl {
         url: format!("http://localhost:{}/data.csv", http_server.host_port),
         event_time: None,
         cache: None,
@@ -203,7 +202,7 @@ async fn test_fetch_url_http_ok() {
 
     let http_server = crate::utils::HttpServer::new(&server_dir).await;
 
-    let fetch_step = FetchStep::Url(FetchStepUrl {
+    let fetch_step = odf::metadata::FetchStep::Url(odf::metadata::FetchStepUrl {
         url: format!("http://localhost:{}/data.csv", http_server.host_port),
         event_time: None,
         cache: None,
@@ -319,7 +318,7 @@ async fn test_fetch_url_http_env_interpolation() {
 
     let http_server = crate::utils::HttpServer::new(&server_dir).await;
 
-    let fetch_step = FetchStep::Url(FetchStepUrl {
+    let fetch_step = odf::metadata::FetchStep::Url(odf::metadata::FetchStepUrl {
         url: format!(
             "http://localhost:{}/${{{{ env.KAMU_TEST }}}}",
             http_server.host_port
@@ -395,7 +394,7 @@ async fn test_fetch_url_http_env_interpolation_with_default() {
 
     let http_server = crate::utils::HttpServer::new(&server_dir).await;
 
-    let fetch_step = FetchStep::Url(FetchStepUrl {
+    let fetch_step = odf::metadata::FetchStep::Url(odf::metadata::FetchStepUrl {
         url: format!(
             "http://localhost:{}/${{{{ env.KAMU_TEST || 'data.csv' }}}}",
             http_server.host_port
@@ -457,7 +456,7 @@ async fn test_fetch_url_ftp_ok() {
 
     let ftp_server = crate::utils::FtpServer::new(&server_dir).await;
 
-    let fetch_step = FetchStep::Url(FetchStepUrl {
+    let fetch_step = odf::metadata::FetchStep::Url(odf::metadata::FetchStepUrl {
         url: format!("ftp://foo:bar@localhost:{}/data.csv", ftp_server.host_port),
         event_time: None,
         cache: None,
@@ -507,7 +506,7 @@ async fn test_fetch_files_glob() {
     let src_path_1 = harness.temp_dir.path().join("data-2020-10-01.csv");
     let target_path = harness.temp_dir.path().join("fetched.bin");
 
-    let fetch_step = FetchStep::FilesGlob(FetchStepFilesGlob {
+    let fetch_step = odf::metadata::FetchStep::FilesGlob(odf::metadata::FetchStepFilesGlob {
         path: harness
             .temp_dir
             .path()
@@ -515,10 +514,12 @@ async fn test_fetch_files_glob() {
             .to_str()
             .unwrap()
             .to_owned(),
-        event_time: Some(EventTimeSource::FromPath(EventTimeSourceFromPath {
-            pattern: r"data-(\d+-\d+-\d+)\.csv".to_owned(),
-            timestamp_format: Some("%Y-%m-%d".to_owned()),
-        })),
+        event_time: Some(odf::metadata::EventTimeSource::FromPath(
+            odf::metadata::EventTimeSourceFromPath {
+                pattern: r"data-(\d+-\d+-\d+)\.csv".to_owned(),
+                timestamp_format: Some("%Y-%m-%d".to_owned()),
+            },
+        )),
         cache: None,
         order: None,
     });
@@ -727,12 +728,12 @@ async fn test_fetch_mqtt_empty() {
 
     let broker = crate::MqttBroker::new().await;
 
-    let fetch_step = FetchStep::Mqtt(FetchStepMqtt {
+    let fetch_step = odf::metadata::FetchStep::Mqtt(odf::metadata::FetchStepMqtt {
         host: "localhost".to_string(),
         port: i32::from(broker.host_port),
         username: None,
         password: None,
-        topics: vec![MqttTopicSubscription {
+        topics: vec![odf::metadata::MqttTopicSubscription {
             path: "test-topic".to_string(),
             qos: None,
         }],
@@ -791,12 +792,12 @@ async fn test_fetch_mqtt_one_record() {
     }
 
     // Read retained event
-    let fetch_step = FetchStep::Mqtt(FetchStepMqtt {
+    let fetch_step = odf::metadata::FetchStep::Mqtt(odf::metadata::FetchStepMqtt {
         host: "localhost".to_string(),
         port: i32::from(broker.host_port),
         username: None,
         password: None,
-        topics: vec![MqttTopicSubscription {
+        topics: vec![odf::metadata::MqttTopicSubscription {
             path: topic.to_string(),
             qos: None,
         }],
@@ -841,8 +842,8 @@ async fn test_fetch_container_ok() {
 
     let target_path = harness.temp_dir.path().join("fetched.bin");
 
-    let fetch_step = FetchStep::Container(FetchStepContainer {
-        image: BUSYBOX.to_owned(),
+    let fetch_step = odf::metadata::FetchStep::Container(odf::metadata::FetchStepContainer {
+        image: docker_images::BUSYBOX.to_owned(),
         command: Some(vec!["printf".to_owned()]),
         args: Some(vec![CSV_BATCH_OUTPUT.to_owned()]),
         env: None,
@@ -887,20 +888,20 @@ async fn test_fetch_container_env_vars() {
 
     let target_path = harness.temp_dir.path().join("fetched.bin");
 
-    let fetch_step = FetchStep::Container(FetchStepContainer {
-        image: BUSYBOX.to_owned(),
+    let fetch_step = odf::metadata::FetchStep::Container(odf::metadata::FetchStepContainer {
+        image: docker_images::BUSYBOX.to_owned(),
         command: Some(vec!["sh".to_owned()]),
         args: Some(vec!["-c".to_owned(), "env | grep KAMU_TEST".to_owned()]),
         env: Some(vec![
-            EnvVar {
+            odf::metadata::EnvVar {
                 name: "KAMU_TEST_EXPLICIT".to_owned(),
                 value: Some("VAL".to_owned()),
             },
-            EnvVar {
+            odf::metadata::EnvVar {
                 name: "KAMU_TEST_TEMPLATED".to_owned(),
                 value: Some("tpl_${{ env.KAMU_TEST_PROPAGATED }}".to_owned()),
             },
-            EnvVar {
+            odf::metadata::EnvVar {
                 name: "KAMU_TEST_PROPAGATED".to_owned(),
                 value: None,
             },
@@ -922,7 +923,7 @@ async fn test_fetch_container_env_vars() {
                     "KAMU_TEST_PROPAGATED",
                     Utc::now(),
                     &kamu_datasets::DatasetEnvVarValue::Regular("foobar".to_owned()),
-                    &DatasetID::new_seeded_ed25519(b"doesnt-matter"),
+                    &odf::DatasetID::new_seeded_ed25519(b"doesnt-matter"),
                     "",
                 )
                 .unwrap(),
@@ -958,8 +959,8 @@ async fn test_fetch_container_args_templating() {
 
     let target_path = harness.temp_dir.path().join("fetched.bin");
 
-    let fetch_step = FetchStep::Container(FetchStepContainer {
-        image: BUSYBOX.to_owned(),
+    let fetch_step = odf::metadata::FetchStep::Container(odf::metadata::FetchStepContainer {
+        image: docker_images::BUSYBOX.to_owned(),
         command: Some(vec!["sh".to_owned()]),
         args: Some(vec!["-c".to_owned(), "echo ${{ env.VAR }}".to_owned()]),
         env: None,
@@ -980,7 +981,7 @@ async fn test_fetch_container_args_templating() {
                     "VAR",
                     Utc::now(),
                     &kamu_datasets::DatasetEnvVarValue::Regular("foobar".to_owned()),
-                    &DatasetID::new_seeded_ed25519(b"doesnt-matter"),
+                    &odf::DatasetID::new_seeded_ed25519(b"doesnt-matter"),
                     "",
                 )
                 .unwrap(),
@@ -1005,8 +1006,8 @@ async fn test_fetch_container_batch_size_default() {
 
     let target_path = harness.temp_dir.path().join("fetched.bin");
 
-    let fetch_step = FetchStep::Container(FetchStepContainer {
-        image: BUSYBOX.to_owned(),
+    let fetch_step = odf::metadata::FetchStep::Container(odf::metadata::FetchStepContainer {
+        image: docker_images::BUSYBOX.to_owned(),
         command: Some(vec!["sh".to_owned()]),
         args: Some(vec![
             "-c".to_owned(),
@@ -1049,14 +1050,14 @@ async fn test_fetch_container_batch_size_set() {
     let target_path = harness.temp_dir.path().join("fetched.bin");
 
     let custom_batch_size = 40_000;
-    let fetch_step = FetchStep::Container(FetchStepContainer {
-        image: BUSYBOX.to_owned(),
+    let fetch_step = odf::metadata::FetchStep::Container(odf::metadata::FetchStepContainer {
+        image: docker_images::BUSYBOX.to_owned(),
         command: Some(vec!["sh".to_owned()]),
         args: Some(vec![
             "-c".to_owned(),
             "env | grep ODF_BATCH_SIZE".to_owned(),
         ]),
-        env: Some(vec![EnvVar {
+        env: Some(vec![odf::metadata::EnvVar {
             name: ODF_BATCH_SIZE.to_owned(),
             value: Some(custom_batch_size.to_string()),
         }]),
@@ -1093,14 +1094,14 @@ async fn test_fetch_container_batch_size_invalid_format() {
     let target_path = harness.temp_dir.path().join("fetched.bin");
 
     let invalid_format_batch_size = "-42";
-    let fetch_step = FetchStep::Container(FetchStepContainer {
-        image: BUSYBOX.to_owned(),
+    let fetch_step = odf::metadata::FetchStep::Container(odf::metadata::FetchStepContainer {
+        image: docker_images::BUSYBOX.to_owned(),
         command: Some(vec!["sh".to_owned()]),
         args: Some(vec![
             "-c".to_owned(),
             format!("env | grep -q {ODF_BATCH_SIZE}={invalid_format_batch_size}"),
         ]),
-        env: Some(vec![EnvVar {
+        env: Some(vec![odf::metadata::EnvVar {
             name: ODF_BATCH_SIZE.to_owned(),
             value: Some(invalid_format_batch_size.to_string()),
         }]),
@@ -1135,8 +1136,8 @@ async fn test_fetch_container_has_more_no_data() {
 
     let target_path = harness.temp_dir.path().join("fetched.bin");
 
-    let fetch_step = FetchStep::Container(FetchStepContainer {
-        image: BUSYBOX.to_owned(),
+    let fetch_step = odf::metadata::FetchStep::Container(odf::metadata::FetchStepContainer {
+        image: docker_images::BUSYBOX.to_owned(),
         command: Some(vec!["true".to_owned()]),
         args: None,
         env: None,
@@ -1170,16 +1171,16 @@ async fn test_fetch_container_has_more_data_is_less_than_a_batch() {
     let target_path = harness.temp_dir.path().join("fetched.bin");
 
     let custom_batch_size = 150;
-    let fetch_step = FetchStep::Container(FetchStepContainer {
-        image: BUSYBOX.to_owned(),
+    let fetch_step = odf::metadata::FetchStep::Container(odf::metadata::FetchStepContainer {
+        image: docker_images::BUSYBOX.to_owned(),
         command: Some(vec!["sh".to_owned()]),
         args: Some(vec!["-c".to_owned(), HAS_MORE_TESTER_SCRIPT.to_owned()]),
         env: Some(vec![
-            EnvVar {
+            odf::metadata::EnvVar {
                 name: ODF_BATCH_SIZE.to_owned(),
                 value: Some(custom_batch_size.to_string()),
             },
-            EnvVar {
+            odf::metadata::EnvVar {
                 name: "ROWS_COUNT".to_owned(),
                 value: Some(100.to_string()),
             },
@@ -1224,7 +1225,7 @@ async fn test_fetch_container_has_more_data_is_more_than_a_batch() {
     let target_path = harness.temp_dir.path().join("fetched.bin");
 
     let custom_batch_size = 40;
-    let env_100_rows_count = EnvVar {
+    let env_100_rows_count = odf::metadata::EnvVar {
         name: "ROWS_COUNT".to_owned(),
         value: Some(100.to_string()),
     };
@@ -1236,12 +1237,12 @@ async fn test_fetch_container_has_more_data_is_more_than_a_batch() {
                            40 / 100
     */
     let prev_source_state = {
-        let fetch_step_1 = FetchStep::Container(FetchStepContainer {
-            image: BUSYBOX.to_owned(),
+        let fetch_step_1 = odf::metadata::FetchStep::Container(odf::metadata::FetchStepContainer {
+            image: docker_images::BUSYBOX.to_owned(),
             command: Some(vec!["sh".to_owned()]),
             args: Some(vec!["-c".to_owned(), HAS_MORE_TESTER_SCRIPT.to_owned()]),
             env: Some(vec![
-                EnvVar {
+                odf::metadata::EnvVar {
                     name: ODF_BATCH_SIZE.to_owned(),
                     value: Some(custom_batch_size.to_string()),
                 },
@@ -1292,12 +1293,12 @@ async fn test_fetch_container_has_more_data_is_more_than_a_batch() {
                             80 / 100
     */
     let prev_source_state = {
-        let fetch_step_2 = FetchStep::Container(FetchStepContainer {
-            image: BUSYBOX.to_owned(),
+        let fetch_step_2 = odf::metadata::FetchStep::Container(odf::metadata::FetchStepContainer {
+            image: docker_images::BUSYBOX.to_owned(),
             command: Some(vec!["sh".to_owned()]),
             args: Some(vec!["-c".to_owned(), HAS_MORE_TESTER_SCRIPT.to_owned()]),
             env: Some(vec![
-                EnvVar {
+                odf::metadata::EnvVar {
                     name: ODF_BATCH_SIZE.to_owned(),
                     value: Some(custom_batch_size.to_string()),
                 },
@@ -1347,12 +1348,12 @@ async fn test_fetch_container_has_more_data_is_more_than_a_batch() {
                                                        100 / 100
     */
     let prev_source_state = {
-        let fetch_step_3 = FetchStep::Container(FetchStepContainer {
-            image: BUSYBOX.to_owned(),
+        let fetch_step_3 = odf::metadata::FetchStep::Container(odf::metadata::FetchStepContainer {
+            image: docker_images::BUSYBOX.to_owned(),
             command: Some(vec!["sh".to_owned()]),
             args: Some(vec!["-c".to_owned(), HAS_MORE_TESTER_SCRIPT.to_owned()]),
             env: Some(vec![
-                EnvVar {
+                odf::metadata::EnvVar {
                     name: ODF_BATCH_SIZE.to_owned(),
                     value: Some(custom_batch_size.to_string()),
                 },
@@ -1398,12 +1399,12 @@ async fn test_fetch_container_has_more_data_is_more_than_a_batch() {
     // 4) Try to ingest the next 40 rows from the exhausted source, but have no new
     //    data
     {
-        let fetch_step_4 = FetchStep::Container(FetchStepContainer {
-            image: BUSYBOX.to_owned(),
+        let fetch_step_4 = odf::metadata::FetchStep::Container(odf::metadata::FetchStepContainer {
+            image: docker_images::BUSYBOX.to_owned(),
             command: Some(vec!["sh".to_owned()]),
             args: Some(vec!["-c".to_owned(), HAS_MORE_TESTER_SCRIPT.to_owned()]),
             env: Some(vec![
-                EnvVar {
+                odf::metadata::EnvVar {
                     name: ODF_BATCH_SIZE.to_owned(),
                     value: Some(custom_batch_size.to_string()),
                 },
@@ -1520,9 +1521,9 @@ const HAS_MORE_TESTER_SCRIPT: &str = indoc! {r#"
 // Utils: helpers
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn mock_dataset_handle() -> DatasetHandle {
-    DatasetHandle {
-        id: DatasetID::new_seeded_ed25519(b"foo"),
+fn mock_dataset_handle() -> odf::DatasetHandle {
+    odf::DatasetHandle {
+        id: odf::DatasetID::new_seeded_ed25519(b"foo"),
         alias: "foo".try_into().unwrap(),
     }
 }

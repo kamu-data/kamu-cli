@@ -12,7 +12,6 @@ use database_common::PaginationOpts;
 use dill::Catalog;
 use futures::TryStreamExt;
 use kamu_flow_system::*;
-use opendatafabric::DatasetID;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -26,7 +25,7 @@ pub async fn test_event_store_empty(catalog: &Catalog) {
     assert_eq!(0, num_events);
 
     let flow_key = FlowKey::dataset(
-        DatasetID::new_seeded_ed25519(b"foo"),
+        odf::DatasetID::new_seeded_ed25519(b"foo"),
         DatasetFlowType::Ingest,
     );
     let events: Vec<_> = event_store
@@ -55,7 +54,7 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
         .get_one::<dyn FlowConfigurationEventStore>()
         .unwrap();
 
-    let dataset_id_1 = DatasetID::new_seeded_ed25519(b"foo");
+    let dataset_id_1 = odf::DatasetID::new_seeded_ed25519(b"foo");
     let flow_key_1 = FlowKey::dataset(dataset_id_1.clone(), DatasetFlowType::Ingest);
 
     let event_1_1 = FlowConfigurationEventCreated {
@@ -86,7 +85,7 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
 
     assert_eq!(2, num_events);
 
-    let dataset_id_2 = DatasetID::new_seeded_ed25519(b"bar");
+    let dataset_id_2 = odf::DatasetID::new_seeded_ed25519(b"bar");
     let flow_key_2 = FlowKey::dataset(dataset_id_2.clone(), DatasetFlowType::Ingest);
 
     let event_2 = FlowConfigurationEventCreated {
@@ -176,7 +175,7 @@ pub async fn test_event_store_get_events_with_windowing(catalog: &Catalog) {
         .unwrap();
 
     let flow_key = FlowKey::dataset(
-        DatasetID::new_seeded_ed25519(b"foo"),
+        odf::DatasetID::new_seeded_ed25519(b"foo"),
         DatasetFlowType::Ingest,
     );
 

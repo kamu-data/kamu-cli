@@ -13,7 +13,6 @@ use dill::*;
 use engine::{TransformRequestExt, TransformRequestInputExt};
 use internal_error::ResultIntoInternal;
 use kamu_core::*;
-use opendatafabric::{ExecuteTransformInput, TransformInput};
 use time_source::SystemTimeSource;
 
 use super::get_transform_input_from_query_input;
@@ -89,8 +88,8 @@ impl TransformElaborationServiceImpl {
 
     async fn get_transform_input(
         &self,
-        input_decl: TransformInput,
-        input_state: Option<ExecuteTransformInput>,
+        input_decl: odf::metadata::TransformInput,
+        input_state: Option<odf::metadata::ExecuteTransformInput>,
         datasets_map: &ResolvedDatasetsMap,
     ) -> Result<TransformRequestInputExt, TransformElaborateError> {
         let dataset_id = input_decl.dataset_ref.id().unwrap();
@@ -105,14 +104,19 @@ impl TransformElaborationServiceImpl {
         let last_processed_block = input_state.as_ref().and_then(|i| i.last_block_hash());
         let last_processed_offset = input_state
             .as_ref()
-            .and_then(ExecuteTransformInput::last_offset);
+            .and_then(odf::metadata::ExecuteTransformInput::last_offset);
 
         // Determine unprocessed block and offset range
-        let last_unprocessed_block = input_chain.resolve_ref(&BlockRef::Head).await.int_err()?;
+        let last_unprocessed_block = input_chain
+            .resolve_ref(&odf::BlockRef::Head)
+            .await
+            .int_err()?;
+
+        use odf::dataset::MetadataChainExt;
         let last_unprocessed_offset = input_chain
             .accept_one_by_hash(
                 &last_unprocessed_block,
-                SearchSingleDataBlockVisitor::next(),
+                odf::dataset::SearchSingleDataBlockVisitor::next(),
             )
             .await
             .int_err()?
@@ -120,7 +124,7 @@ impl TransformElaborationServiceImpl {
             .and_then(|event| event.last_offset())
             .or(last_processed_offset);
 
-        let query_input = ExecuteTransformInput {
+        let query_input = odf::metadata::ExecuteTransformInput {
             dataset_id: dataset_id.clone(),
             prev_block_hash: last_processed_block.cloned(),
             new_block_hash: if Some(&last_unprocessed_block) != last_processed_block {

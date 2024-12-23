@@ -13,14 +13,14 @@ use std::sync::Arc;
 use dill::Component;
 use futures::{future, StreamExt};
 use internal_error::ResultIntoInternal;
-use kamu::testing::{BaseRepoHarness, MetadataFactory};
+use kamu::testing::BaseRepoHarness;
 use kamu::*;
 use kamu_core::*;
 use kamu_datasets::{DatasetDependencies, DatasetDependencyRepository};
 use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
 use kamu_datasets_services::DependencyGraphServiceImpl;
 use messaging_outbox::{register_message_dispatcher, Outbox, OutboxImmediateImpl};
-use opendatafabric::*;
+use odf::metadata::testing::MetadataFactory;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -141,8 +141,8 @@ async fn test_service_new_datasets() {
             None,
             "test-deriv",
             vec![
-                DatasetAlias::new(None, DatasetName::new_unchecked("foo")),
-                DatasetAlias::new(None, DatasetName::new_unchecked("test-root")),
+                odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo")),
+                odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("test-root")),
             ],
         )
         .await;
@@ -183,8 +183,8 @@ async fn test_service_derived_dataset_modifies_links() {
             None,
             "test-deriv",
             vec![
-                DatasetAlias::new(None, DatasetName::new_unchecked("bar")),
-                DatasetAlias::new(None, DatasetName::new_unchecked("baz")),
+                odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar")),
+                odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("baz")),
             ],
         )
         .await;
@@ -207,7 +207,10 @@ async fn test_service_derived_dataset_modifies_links() {
         .modify_derived_dataset(
             None,
             "test-deriv",
-            vec![DatasetAlias::new(None, DatasetName::new_unchecked("bar"))],
+            vec![odf::DatasetAlias::new(
+                None,
+                odf::DatasetName::new_unchecked("bar"),
+            )],
         )
         .await;
 
@@ -231,8 +234,8 @@ async fn test_service_derived_dataset_modifies_links() {
             None,
             "test-deriv",
             vec![
-                DatasetAlias::new(None, DatasetName::new_unchecked("bar")),
-                DatasetAlias::new(None, DatasetName::new_unchecked("baz")),
+                odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar")),
+                odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("baz")),
             ],
         )
         .await;
@@ -278,7 +281,8 @@ async fn test_service_dataset_deleted() {
         .unwrap();
     delete_dataset
         .execute_via_ref(
-            &DatasetAlias::new(None, DatasetName::new_unchecked("foo-bar-foo-baz")).as_local_ref(),
+            &odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo-bar-foo-baz"))
+                .as_local_ref(),
         )
         .await
         .unwrap();
@@ -460,8 +464,8 @@ async fn test_get_recursive_downstream_dependencies() {
             None,
             "test-derive-multiple-bar-baz",
             vec![
-                DatasetAlias::new(None, DatasetName::new_unchecked("test-root-bar")),
-                DatasetAlias::new(None, DatasetName::new_unchecked("test-root-baz")),
+                odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("test-root-bar")),
+                odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("test-root-baz")),
             ],
         )
         .await;
@@ -836,8 +840,8 @@ impl DependencyGraphHarness {
         res
     }
 
-    async fn dataset_id_by_name(&self, dataset_name: &str) -> DatasetID {
-        let dataset_alias = DatasetAlias::try_from(dataset_name).unwrap();
+    async fn dataset_id_by_name(&self, dataset_name: &str) -> odf::DatasetID {
+        let dataset_alias = odf::DatasetAlias::try_from(dataset_name).unwrap();
         let dataset_hdl = self
             .dataset_registry()
             .resolve_dataset_handle_by_ref(&dataset_alias.as_local_ref())
@@ -846,7 +850,7 @@ impl DependencyGraphHarness {
         dataset_hdl.id
     }
 
-    async fn dataset_alias_by_id(&self, dataset_id: &DatasetID) -> DatasetAlias {
+    async fn dataset_alias_by_id(&self, dataset_id: &odf::DatasetID) -> odf::DatasetAlias {
         let dataset_ref = dataset_id.as_local_ref();
         let dataset_hdl = self
             .dataset_registry()
@@ -861,11 +865,11 @@ impl DependencyGraphHarness {
     }
 
     async fn create_multi_tenant_graph(&self) {
-        let alice = AccountName::new_unchecked("alice");
-        let bob = AccountName::new_unchecked("bob");
-        let eve: AccountName = AccountName::new_unchecked("eve");
+        let alice = odf::AccountName::new_unchecked("alice");
+        let bob = odf::AccountName::new_unchecked("bob");
+        let eve: odf::AccountName = odf::AccountName::new_unchecked("eve");
 
-        let mut dataset_accounts: HashMap<&'static str, AccountName> = HashMap::new();
+        let mut dataset_accounts: HashMap<&'static str, odf::AccountName> = HashMap::new();
         dataset_accounts.insert("foo", alice.clone());
         dataset_accounts.insert("bar", alice.clone());
         dataset_accounts.insert("baz", bob.clone());
@@ -877,7 +881,7 @@ impl DependencyGraphHarness {
             .await;
     }
 
-    async fn create_graph(&self, account_getter: impl Fn(&str) -> Option<AccountName>) {
+    async fn create_graph(&self, account_getter: impl Fn(&str) -> Option<odf::AccountName>) {
         self.create_root_dataset(account_getter("foo"), "foo").await;
         self.create_root_dataset(account_getter("bar"), "bar").await;
         self.create_root_dataset(account_getter("baz"), "baz").await;
@@ -886,8 +890,14 @@ impl DependencyGraphHarness {
             account_getter("foo-bar"),
             "foo-bar",
             vec![
-                DatasetAlias::new(account_getter("foo"), DatasetName::new_unchecked("foo")),
-                DatasetAlias::new(account_getter("bar"), DatasetName::new_unchecked("bar")),
+                odf::DatasetAlias::new(
+                    account_getter("foo"),
+                    odf::DatasetName::new_unchecked("foo"),
+                ),
+                odf::DatasetAlias::new(
+                    account_getter("bar"),
+                    odf::DatasetName::new_unchecked("bar"),
+                ),
             ],
         )
         .await;
@@ -896,8 +906,14 @@ impl DependencyGraphHarness {
             account_getter("foo-baz"),
             "foo-baz",
             vec![
-                DatasetAlias::new(account_getter("foo"), DatasetName::new_unchecked("foo")),
-                DatasetAlias::new(account_getter("baz"), DatasetName::new_unchecked("baz")),
+                odf::DatasetAlias::new(
+                    account_getter("foo"),
+                    odf::DatasetName::new_unchecked("foo"),
+                ),
+                odf::DatasetAlias::new(
+                    account_getter("baz"),
+                    odf::DatasetName::new_unchecked("baz"),
+                ),
             ],
         )
         .await;
@@ -906,20 +922,24 @@ impl DependencyGraphHarness {
             account_getter("foo-bar-foo-baz"),
             "foo-bar-foo-baz",
             vec![
-                DatasetAlias::new(
+                odf::DatasetAlias::new(
                     account_getter("foo-bar"),
-                    DatasetName::new_unchecked("foo-bar"),
+                    odf::DatasetName::new_unchecked("foo-bar"),
                 ),
-                DatasetAlias::new(
+                odf::DatasetAlias::new(
                     account_getter("foo-baz"),
-                    DatasetName::new_unchecked("foo-baz"),
+                    odf::DatasetName::new_unchecked("foo-baz"),
                 ),
             ],
         )
         .await;
     }
 
-    async fn create_root_dataset(&self, account_name: Option<AccountName>, dataset_name: &str) {
+    async fn create_root_dataset(
+        &self,
+        account_name: Option<odf::AccountName>,
+        dataset_name: &str,
+    ) {
         let create_dataset_from_snapshot = self
             .catalog
             .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
@@ -928,11 +948,11 @@ impl DependencyGraphHarness {
         create_dataset_from_snapshot
             .execute(
                 MetadataFactory::dataset_snapshot()
-                    .name(DatasetAlias::new(
+                    .name(odf::DatasetAlias::new(
                         account_name,
-                        DatasetName::new_unchecked(dataset_name),
+                        odf::DatasetName::new_unchecked(dataset_name),
                     ))
-                    .kind(DatasetKind::Root)
+                    .kind(odf::DatasetKind::Root)
                     .push_event(MetadataFactory::set_polling_source().build())
                     .build(),
                 Default::default(),
@@ -943,9 +963,9 @@ impl DependencyGraphHarness {
 
     async fn create_derived_dataset(
         &self,
-        account_name: Option<AccountName>,
+        account_name: Option<odf::AccountName>,
         dataset_name: &str,
-        input_aliases: Vec<DatasetAlias>,
+        input_aliases: Vec<odf::DatasetAlias>,
     ) {
         let create_dataset_from_snapshot = self
             .catalog
@@ -955,11 +975,11 @@ impl DependencyGraphHarness {
         create_dataset_from_snapshot
             .execute(
                 MetadataFactory::dataset_snapshot()
-                    .name(DatasetAlias::new(
+                    .name(odf::DatasetAlias::new(
                         account_name,
-                        DatasetName::new_unchecked(dataset_name),
+                        odf::DatasetName::new_unchecked(dataset_name),
                     ))
-                    .kind(DatasetKind::Derivative)
+                    .kind(odf::DatasetKind::Derivative)
                     .push_event(
                         MetadataFactory::set_transform()
                             .inputs_from_refs(input_aliases)
@@ -974,12 +994,12 @@ impl DependencyGraphHarness {
 
     async fn modify_derived_dataset(
         &self,
-        account_name: Option<AccountName>,
+        account_name: Option<odf::AccountName>,
         dataset_name: &str,
-        input_aliases: Vec<DatasetAlias>,
+        input_aliases: Vec<odf::DatasetAlias>,
     ) {
         let dataset_alias =
-            DatasetAlias::new(account_name, DatasetName::new_unchecked(dataset_name));
+            odf::DatasetAlias::new(account_name, odf::DatasetName::new_unchecked(dataset_name));
 
         let dataset_handle = self
             .dataset_registry()
@@ -1003,7 +1023,7 @@ impl DependencyGraphHarness {
         commit_dataset_event
             .execute(
                 &dataset_handle,
-                MetadataEvent::SetTransform(
+                odf::MetadataEvent::SetTransform(
                     MetadataFactory::set_transform()
                         .inputs_from_refs_and_aliases(id_aliases)
                         .build(),
@@ -1049,9 +1069,9 @@ async fn create_large_dataset_graph() -> DependencyGraphHarness {
         .create_derived_dataset(
             None,
             "test-derive-foo-foo",
-            vec![DatasetAlias::new(
+            vec![odf::DatasetAlias::new(
                 None,
-                DatasetName::new_unchecked("test-root-foo"),
+                odf::DatasetName::new_unchecked("test-root-foo"),
             )],
         )
         .await;
@@ -1059,9 +1079,9 @@ async fn create_large_dataset_graph() -> DependencyGraphHarness {
         .create_derived_dataset(
             None,
             "test-derive-foo-bar",
-            vec![DatasetAlias::new(
+            vec![odf::DatasetAlias::new(
                 None,
-                DatasetName::new_unchecked("test-root-foo"),
+                odf::DatasetName::new_unchecked("test-root-foo"),
             )],
         )
         .await;
@@ -1069,9 +1089,9 @@ async fn create_large_dataset_graph() -> DependencyGraphHarness {
         .create_derived_dataset(
             None,
             "test-derive-foo-baz",
-            vec![DatasetAlias::new(
+            vec![odf::DatasetAlias::new(
                 None,
-                DatasetName::new_unchecked("test-root-foo"),
+                odf::DatasetName::new_unchecked("test-root-foo"),
             )],
         )
         .await;
@@ -1079,9 +1099,9 @@ async fn create_large_dataset_graph() -> DependencyGraphHarness {
         .create_derived_dataset(
             None,
             "test-derive-bar-bar",
-            vec![DatasetAlias::new(
+            vec![odf::DatasetAlias::new(
                 None,
-                DatasetName::new_unchecked("test-root-bar"),
+                odf::DatasetName::new_unchecked("test-root-bar"),
             )],
         )
         .await;
@@ -1089,9 +1109,9 @@ async fn create_large_dataset_graph() -> DependencyGraphHarness {
         .create_derived_dataset(
             None,
             "test-derive-bar-baz",
-            vec![DatasetAlias::new(
+            vec![odf::DatasetAlias::new(
                 None,
-                DatasetName::new_unchecked("test-root-bar"),
+                odf::DatasetName::new_unchecked("test-root-bar"),
             )],
         )
         .await;
@@ -1099,9 +1119,9 @@ async fn create_large_dataset_graph() -> DependencyGraphHarness {
         .create_derived_dataset(
             None,
             "test-derive-baz-baz",
-            vec![DatasetAlias::new(
+            vec![odf::DatasetAlias::new(
                 None,
-                DatasetName::new_unchecked("test-root-baz"),
+                odf::DatasetName::new_unchecked("test-root-baz"),
             )],
         )
         .await;
@@ -1109,9 +1129,9 @@ async fn create_large_dataset_graph() -> DependencyGraphHarness {
         .create_derived_dataset(
             None,
             "test-derive-foo-foo-foo",
-            vec![DatasetAlias::new(
+            vec![odf::DatasetAlias::new(
                 None,
-                DatasetName::new_unchecked("test-derive-foo-foo"),
+                odf::DatasetName::new_unchecked("test-derive-foo-foo"),
             )],
         )
         .await;
@@ -1119,9 +1139,9 @@ async fn create_large_dataset_graph() -> DependencyGraphHarness {
         .create_derived_dataset(
             None,
             "test-derive-foo-foo-bar",
-            vec![DatasetAlias::new(
+            vec![odf::DatasetAlias::new(
                 None,
-                DatasetName::new_unchecked("test-derive-foo-foo"),
+                odf::DatasetName::new_unchecked("test-derive-foo-foo"),
             )],
         )
         .await;
@@ -1129,9 +1149,9 @@ async fn create_large_dataset_graph() -> DependencyGraphHarness {
         .create_derived_dataset(
             None,
             "test-derive-baz-baz-foo",
-            vec![DatasetAlias::new(
+            vec![odf::DatasetAlias::new(
                 None,
-                DatasetName::new_unchecked("test-derive-baz-baz"),
+                odf::DatasetName::new_unchecked("test-derive-baz-baz"),
             )],
         )
         .await;
@@ -1139,9 +1159,9 @@ async fn create_large_dataset_graph() -> DependencyGraphHarness {
         .create_derived_dataset(
             None,
             "test-derive-foo-foo-foo-bar",
-            vec![DatasetAlias::new(
+            vec![odf::DatasetAlias::new(
                 None,
-                DatasetName::new_unchecked("test-derive-foo-foo-foo"),
+                odf::DatasetName::new_unchecked("test-derive-foo-foo-foo"),
             )],
         )
         .await;
@@ -1149,9 +1169,9 @@ async fn create_large_dataset_graph() -> DependencyGraphHarness {
         .create_derived_dataset(
             None,
             "test-derive-foo-foo-foo-baz",
-            vec![DatasetAlias::new(
+            vec![odf::DatasetAlias::new(
                 None,
-                DatasetName::new_unchecked("test-derive-foo-foo-foo"),
+                odf::DatasetName::new_unchecked("test-derive-foo-foo-foo"),
             )],
         )
         .await;
@@ -1159,9 +1179,9 @@ async fn create_large_dataset_graph() -> DependencyGraphHarness {
         .create_derived_dataset(
             None,
             "test-derive-baz-baz-foo-bar",
-            vec![DatasetAlias::new(
+            vec![odf::DatasetAlias::new(
                 None,
-                DatasetName::new_unchecked("test-derive-baz-baz-foo"),
+                odf::DatasetName::new_unchecked("test-derive-baz-baz-foo"),
             )],
         )
         .await;
@@ -1169,9 +1189,9 @@ async fn create_large_dataset_graph() -> DependencyGraphHarness {
         .create_derived_dataset(
             None,
             "test-derive-foo-foo-foo-bar-foo",
-            vec![DatasetAlias::new(
+            vec![odf::DatasetAlias::new(
                 None,
-                DatasetName::new_unchecked("test-derive-foo-foo-foo-bar"),
+                odf::DatasetName::new_unchecked("test-derive-foo-foo-foo-bar"),
             )],
         )
         .await;
@@ -1179,9 +1199,9 @@ async fn create_large_dataset_graph() -> DependencyGraphHarness {
         .create_derived_dataset(
             None,
             "test-derive-foo-foo-foo-bar-foo-bar",
-            vec![DatasetAlias::new(
+            vec![odf::DatasetAlias::new(
                 None,
-                DatasetName::new_unchecked("test-derive-foo-foo-foo-bar-foo"),
+                odf::DatasetName::new_unchecked("test-derive-foo-foo-foo-bar-foo"),
             )],
         )
         .await;

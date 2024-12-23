@@ -16,8 +16,7 @@ use database_common::DatabaseTransactionRunner;
 use futures::Future;
 use internal_error::InternalError;
 use kamu_accounts::CurrentAccountSubject;
-use kamu_core::{DatasetRegistry, GetDatasetError};
-use opendatafabric::DatasetRef;
+use kamu_core::DatasetRegistry;
 use tower::{Layer, Service};
 
 use crate::axum_utils::*;
@@ -105,7 +104,7 @@ where
 
             let dataset_ref = request
                 .extensions()
-                .get::<DatasetRef>()
+                .get::<odf::DatasetRef>()
                 .expect("Dataset ref not found in http server extensions");
 
             let action = dataset_action_query(&request);
@@ -152,8 +151,10 @@ where
 
                                 Ok(CheckResult::Proceed)
                             }
-                            Err(GetDatasetError::NotFound(_)) => Ok(CheckResult::Proceed),
-                            Err(GetDatasetError::Internal(_)) => {
+                            Err(odf::dataset::GetDatasetError::NotFound(_)) => {
+                                Ok(CheckResult::Proceed)
+                            }
+                            Err(odf::dataset::GetDatasetError::Internal(_)) => {
                                 Ok(CheckResult::ErrorResponse(internal_server_error_response()))
                             }
                         }

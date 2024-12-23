@@ -13,7 +13,6 @@ use std::sync::Arc;
 use chrono::{DateTime, SubsecRound, TimeZone as _, Utc};
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_core::*;
-use opendatafabric::*;
 
 use super::*;
 use crate::PollingSourceState;
@@ -22,14 +21,14 @@ use crate::PollingSourceState;
 
 impl FetchService {
     pub(super) fn fetch_files_glob(
-        fglob: &FetchStepFilesGlob,
+        fglob: &odf::metadata::FetchStepFilesGlob,
         prev_source_state: Option<&PollingSourceState>,
         target_path: &Path,
         system_time: &DateTime<Utc>,
         listener: &Arc<dyn FetchProgressListener>,
     ) -> Result<FetchResult, PollingIngestError> {
         match &fglob.order {
-            None | Some(SourceOrdering::ByName) => (),
+            None | Some(odf::metadata::SourceOrdering::ByName) => (),
             Some(ord) => panic!("Files glob source can only be ordered by name, found: {ord:?}"),
         }
 
@@ -76,11 +75,11 @@ impl FetchService {
         let (first_filename, first_path) = matched_files.pop().unwrap();
 
         let source_event_time = match &fglob.event_time {
-            None | Some(EventTimeSource::FromSystemTime(_)) => Some(*system_time),
-            Some(EventTimeSource::FromPath(src)) => {
+            None | Some(odf::metadata::EventTimeSource::FromSystemTime(_)) => Some(*system_time),
+            Some(odf::metadata::EventTimeSource::FromPath(src)) => {
                 Some(Self::extract_event_time_from_path(&first_filename, src)?)
             }
-            Some(EventTimeSource::FromMetadata(_)) => {
+            Some(odf::metadata::EventTimeSource::FromMetadata(_)) => {
                 return Err(EventTimeSourceError::incompatible(
                     "Files glob source does not support extracting event time fromMetadata, you \
                      should use fromPath instead",
@@ -108,7 +107,7 @@ impl FetchService {
     // TODO: Resolve symlinks
     pub(crate) fn fetch_file(
         path: &Path,
-        event_time_source: Option<&EventTimeSource>,
+        event_time_source: Option<&odf::metadata::EventTimeSource>,
         prev_source_state: Option<&PollingSourceState>,
         _target_path: &Path,
         system_time: &DateTime<Utc>,
@@ -136,9 +135,9 @@ impl FetchService {
         }
 
         let source_event_time = match event_time_source {
-            None | Some(EventTimeSource::FromMetadata(_)) => Some(mod_time),
-            Some(EventTimeSource::FromSystemTime(_)) => Some(*system_time),
-            Some(EventTimeSource::FromPath(_)) => {
+            None | Some(odf::metadata::EventTimeSource::FromMetadata(_)) => Some(mod_time),
+            Some(odf::metadata::EventTimeSource::FromSystemTime(_)) => Some(*system_time),
+            Some(odf::metadata::EventTimeSource::FromPath(_)) => {
                 return Err(EventTimeSourceError::incompatible(
                     "File source does not supports fromPath event time source",
                 )
@@ -156,7 +155,7 @@ impl FetchService {
 
     fn extract_event_time_from_path(
         filename: &str,
-        src: &EventTimeSourceFromPath,
+        src: &odf::metadata::EventTimeSourceFromPath,
     ) -> Result<DateTime<Utc>, PollingIngestError> {
         let time_re = regex::Regex::new(&src.pattern).int_err()?;
 

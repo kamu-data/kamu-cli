@@ -14,9 +14,8 @@ use std::path::PathBuf;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use datafusion::prelude::{ParquetReadOptions, SessionContext};
-use opendatafabric as odf;
-use opendatafabric::serde::yaml::{YamlDatasetSnapshotSerializer, YamlMetadataBlockDeserializer};
-use opendatafabric::serde::{DatasetSnapshotSerializer, MetadataBlockDeserializer};
+use odf::metadata::serde::yaml::{YamlDatasetSnapshotSerializer, YamlMetadataBlockDeserializer};
+use odf::metadata::serde::{DatasetSnapshotSerializer, MetadataBlockDeserializer};
 use serde::Deserialize;
 
 use crate::{ExecuteCommandResult, KamuCliPuppet};
@@ -308,8 +307,8 @@ impl KamuCliPuppetExt for KamuCliPuppet {
             .await
             .unwrap();
 
-        kamu_data_utils::testing::assert_data_eq(df.clone(), expected_data).await;
-        kamu_data_utils::testing::assert_schema_eq(df.schema(), expected_schema);
+        odf::utils::testing::assert_data_eq(df.clone(), expected_data).await;
+        odf::utils::testing::assert_schema_eq(df.schema(), expected_schema);
     }
 
     async fn ingest_data(&self, dataset_name: &odf::DatasetName, data: &str) {

@@ -81,7 +81,7 @@ impl ApiError {
     }
 
     pub fn new_unauthorized() -> Self {
-        AccessError::Unauthorized("Unauthorized access".into()).api_err()
+        odf::AccessError::Unauthorized("Unauthorized access".into()).api_err()
     }
 
     pub fn new_unauthorized_from(source: impl std::error::Error + Send + Sync + 'static) -> Self {
@@ -89,7 +89,7 @@ impl ApiError {
     }
 
     pub fn new_forbidden() -> Self {
-        AccessError::Forbidden("Forbidden access".into()).api_err()
+        odf::AccessError::Forbidden("Forbidden access".into()).api_err()
     }
 
     pub fn bad_request(source: impl std::error::Error + Send + Sync + 'static) -> Self {
@@ -201,7 +201,7 @@ where
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 enum ApiErrorCategory<'a> {
-    Access(&'a AccessError),
+    Access(&'a odf::AccessError),
     Internal(&'a InternalError),
     Other,
 }
@@ -220,12 +220,12 @@ where
 {
     fn api_err(self) -> ApiError {
         match self.categorize() {
-            ApiErrorCategory::Access(AccessError::Unauthorized(_)) => {
+            ApiErrorCategory::Access(odf::AccessError::Unauthorized(_)) => {
                 ApiError::new(self, http::StatusCode::UNAUTHORIZED)
             }
-            ApiErrorCategory::Access(AccessError::Forbidden(_) | AccessError::ReadOnly(_)) => {
-                ApiError::new(self, http::StatusCode::FORBIDDEN)
-            }
+            ApiErrorCategory::Access(
+                odf::AccessError::Forbidden(_) | odf::AccessError::ReadOnly(_),
+            ) => ApiError::new(self, http::StatusCode::FORBIDDEN),
             ApiErrorCategory::Internal(_e) => {
                 ApiError::new(self, http::StatusCode::INTERNAL_SERVER_ERROR)
             }
@@ -246,7 +246,7 @@ impl ApiErrorCategorizable for InternalError {
     }
 }
 
-impl ApiErrorCategorizable for AccessError {
+impl ApiErrorCategorizable for odf::AccessError {
     fn categorize(&self) -> ApiErrorCategory<'_> {
         ApiErrorCategory::Access(self)
     }
@@ -262,7 +262,7 @@ impl ApiErrorCategorizable for PushIngestError {
     }
 }
 
-impl ApiErrorCategorizable for GetDatasetError {
+impl ApiErrorCategorizable for odf::dataset::GetDatasetError {
     fn categorize(&self) -> ApiErrorCategory<'_> {
         match &self {
             Self::Internal(e) => ApiErrorCategory::Internal(e),
@@ -271,17 +271,7 @@ impl ApiErrorCategorizable for GetDatasetError {
     }
 }
 
-impl ApiErrorCategorizable for GetRefError {
-    fn categorize(&self) -> ApiErrorCategory<'_> {
-        match &self {
-            Self::Access(e) => ApiErrorCategory::Access(e),
-            Self::Internal(e) => ApiErrorCategory::Internal(e),
-            _ => ApiErrorCategory::Other,
-        }
-    }
-}
-
-impl ApiErrorCategorizable for GetBlockError {
+impl ApiErrorCategorizable for odf::storage::GetRefError {
     fn categorize(&self) -> ApiErrorCategory<'_> {
         match &self {
             Self::Access(e) => ApiErrorCategory::Access(e),
@@ -291,7 +281,7 @@ impl ApiErrorCategorizable for GetBlockError {
     }
 }
 
-impl ApiErrorCategorizable for GetError {
+impl ApiErrorCategorizable for odf::storage::GetBlockError {
     fn categorize(&self) -> ApiErrorCategory<'_> {
         match &self {
             Self::Access(e) => ApiErrorCategory::Access(e),
@@ -301,7 +291,17 @@ impl ApiErrorCategorizable for GetError {
     }
 }
 
-impl ApiErrorCategorizable for InsertError {
+impl ApiErrorCategorizable for odf::storage::GetError {
+    fn categorize(&self) -> ApiErrorCategory<'_> {
+        match &self {
+            Self::Access(e) => ApiErrorCategory::Access(e),
+            Self::Internal(e) => ApiErrorCategory::Internal(e),
+            _ => ApiErrorCategory::Other,
+        }
+    }
+}
+
+impl ApiErrorCategorizable for odf::storage::InsertError {
     fn categorize(&self) -> ApiErrorCategory<'_> {
         match &self {
             Self::Access(e) => ApiErrorCategory::Access(e),

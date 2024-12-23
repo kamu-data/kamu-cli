@@ -14,7 +14,6 @@ use std::sync::Arc;
 use internal_error::ResultIntoInternal;
 use kamu_core::*;
 use kamu_datasets::DatasetEnvVar;
-use opendatafabric::*;
 
 use super::*;
 
@@ -23,8 +22,8 @@ use super::*;
 impl FetchService {
     pub(crate) async fn fetch_mqtt(
         &self,
-        dataset_handle: &DatasetHandle,
-        fetch: &FetchStepMqtt,
+        dataset_handle: &odf::DatasetHandle,
+        fetch: &odf::metadata::FetchStepMqtt,
         target_path: &Path,
         dataset_env_vars: &HashMap<String, DatasetEnvVar>,
         listener: &Arc<dyn FetchProgressListener>,
@@ -54,9 +53,9 @@ impl FetchService {
                 rumqttc::SubscribeFilter::new(
                     s.path,
                     match s.qos {
-                        None | Some(MqttQos::AtMostOnce) => QoS::AtMostOnce,
-                        Some(MqttQos::AtLeastOnce) => QoS::AtLeastOnce,
-                        Some(MqttQos::ExactlyOnce) => QoS::ExactlyOnce,
+                        None | Some(odf::metadata::MqttQos::AtMostOnce) => QoS::AtMostOnce,
+                        Some(odf::metadata::MqttQos::AtLeastOnce) => QoS::AtLeastOnce,
+                        Some(odf::metadata::MqttQos::ExactlyOnce) => QoS::ExactlyOnce,
                     },
                 )
             }))

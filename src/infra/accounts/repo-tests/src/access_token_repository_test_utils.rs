@@ -7,13 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 use chrono::{SubsecRound, Utc};
 use kamu_accounts::AccessToken;
-use opendatafabric::AccountID;
 use rand::Rng;
 use uuid::Uuid;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) fn make_test_access_token(
     name: &str,
@@ -26,7 +25,7 @@ pub(crate) fn make_test_access_token(
         token_hash: token_hash_maybe.unwrap_or(generate_random_bytes()),
         created_at: Utc::now().round_subsecs(6),
         revoked_at: None,
-        account_id: AccountID::new_seeded_ed25519(account_name.as_bytes()),
+        account_id: odf::AccountID::new_seeded_ed25519(account_name.as_bytes()),
     }
 }
 

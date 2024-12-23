@@ -12,8 +12,6 @@
 use std::path::PathBuf;
 
 use internal_error::{InternalError, ResultIntoInternal};
-use kamu_core::ObjectRepository;
-use opendatafabric::Multihash;
 use tempfile::{tempdir, TempDir};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -36,8 +34,8 @@ enum ObjectState {
 
 impl CachedObject {
     pub async fn from(
-        object_hash: &Multihash,
-        object_repository: &dyn ObjectRepository,
+        object_hash: &odf::Multihash,
+        object_repository: &dyn odf::storage::ObjectRepository,
     ) -> Result<Self, InternalError> {
         let object_file_url = object_repository.get_internal_url(object_hash).await;
         if let Ok(local_path) = object_file_url.to_file_path() {
@@ -79,22 +77,18 @@ impl CachedObject {
 
     pub async fn logical_hash(
         &self,
-    ) -> Result<Multihash, datafusion::parquet::errors::ParquetError> {
+    ) -> Result<odf::Multihash, datafusion::parquet::errors::ParquetError> {
         let path = self.storage_path().clone();
-        tokio::task::spawn_blocking(move || {
-            kamu_data_utils::data::hash::get_parquet_logical_hash(&path)
-        })
-        .await
-        .unwrap()
+        tokio::task::spawn_blocking(move || odf::utils::data::hash::get_parquet_logical_hash(&path))
+            .await
+            .unwrap()
     }
 
-    pub async fn physical_hash(&self) -> Result<Multihash, std::io::Error> {
+    pub async fn physical_hash(&self) -> Result<odf::Multihash, std::io::Error> {
         let path = self.storage_path().clone();
-        tokio::task::spawn_blocking(move || {
-            kamu_data_utils::data::hash::get_file_physical_hash(&path)
-        })
-        .await
-        .unwrap()
+        tokio::task::spawn_blocking(move || odf::utils::data::hash::get_file_physical_hash(&path))
+            .await
+            .unwrap()
     }
 
     pub fn storage_path(&self) -> &PathBuf {

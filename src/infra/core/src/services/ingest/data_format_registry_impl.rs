@@ -13,7 +13,7 @@ use std::sync::Arc;
 use datafusion::prelude::SessionContext;
 use kamu_core::ingest::*;
 use kamu_ingest_datafusion::*;
-use opendatafabric::*;
+use odf::metadata::ReadStep;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -145,6 +145,7 @@ impl DataFormatRegistry for DataFormatRegistryImpl {
         schema: Option<Vec<String>>,
         media_type: &MediaType,
     ) -> Result<ReadStep, UnsupportedMediaTypeError> {
+        use odf::metadata::*;
         match MediaTypeRef(media_type.0.as_str()) {
             MediaType::CSV => Ok(ReadStepCsv {
                 // Assuming header is present if we don't have any previous schema.

@@ -18,8 +18,7 @@ use axum::response::Response;
 use axum::RequestExt;
 use database_common::DatabaseTransactionRunner;
 use internal_error::InternalError;
-use kamu_core::{DatasetRegistry, DatasetRegistryExt, GetDatasetError, ResolvedDataset};
-use opendatafabric::DatasetRef;
+use kamu_core::{DatasetRegistry, DatasetRegistryExt, ResolvedDataset};
 use tower::{Layer, Service};
 
 use crate::axum_utils::*;
@@ -50,7 +49,7 @@ where
 
 impl<IdExt, Extractor, DatasetOptPred> DatasetResolverLayer<IdExt, Extractor, DatasetOptPred>
 where
-    IdExt: Fn(Extractor) -> DatasetRef,
+    IdExt: Fn(Extractor) -> odf::DatasetRef,
     DatasetOptPred: Fn(&http::Request<Body>) -> bool,
 {
     pub fn new(identity_extractor: IdExt, dataset_optionality_predicate: DatasetOptPred) -> Self {
@@ -104,7 +103,7 @@ impl<Svc, IdExt, Extractor, DatasetOptPred> Service<http::Request<Body>>
     for DatasetResolverMiddleware<Svc, IdExt, Extractor, DatasetOptPred>
 where
     IdExt: Send + Clone + 'static,
-    IdExt: Fn(Extractor) -> DatasetRef,
+    IdExt: Fn(Extractor) -> odf::DatasetRef,
     Extractor: FromRequestParts<()> + Send + 'static,
     <Extractor as FromRequestParts<()>>::Rejection: std::fmt::Debug,
     DatasetOptPred: Send + Clone + 'static,
@@ -160,7 +159,7 @@ where
                                 Ok(resolved_dataset) => {
                                     Ok(CheckResult::CheckedDataset(resolved_dataset))
                                 }
-                                Err(GetDatasetError::NotFound(err)) => {
+                                Err(odf::dataset::GetDatasetError::NotFound(err)) => {
                                     tracing::warn!("Dataset not found: {:?}", err);
                                     Ok(CheckResult::ErrorResponse(not_found_response()))
                                 }

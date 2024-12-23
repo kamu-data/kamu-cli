@@ -15,7 +15,6 @@ use datafusion::datasource::file_format::file_compression_type::FileCompressionT
 use datafusion::prelude::*;
 use internal_error::*;
 use kamu_core::ingest::ReadError;
-use opendatafabric::*;
 
 use crate::*;
 
@@ -24,13 +23,16 @@ use crate::*;
 pub struct ReaderNdJson {
     ctx: SessionContext,
     schema: Option<SchemaRef>,
-    conf: ReadStepNdJson,
+    conf: odf::metadata::ReadStepNdJson,
 }
 
 impl ReaderNdJson {
     const DEFAULT_INFER_SCHEMA_ROWS: usize = 1000;
 
-    pub async fn new(ctx: SessionContext, conf: ReadStepNdJson) -> Result<Self, ReadError> {
+    pub async fn new(
+        ctx: SessionContext,
+        conf: odf::metadata::ReadStepNdJson,
+    ) -> Result<Self, ReadError> {
         Ok(Self {
             schema: super::from_ddl_schema(&ctx, conf.schema.as_ref())
                 .await?
