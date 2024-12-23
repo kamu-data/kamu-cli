@@ -11,7 +11,7 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## [Unreleased]
+## [0.214.0] - 2024-12-23
 ### Added
 - New `kamu system decode` command that can decode an arbitrary block file for debugging
 - `export` command for bulk data exporting
