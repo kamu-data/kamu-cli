@@ -26,6 +26,7 @@ Recommendation: for ease of reading, use the following order:
   - `DatasetOwnershipService`: moved to the `kamu-dataset` crate area & implemented via `DatasetEntryServiceImpl`
   - GQL, `DatasetMetadata.currentUpstreamDependencies`: indication if datasets not found/not accessed
   - GQL, `DatasetMetadata.currentDownstreamDependencies`: exclude datasets that cannot be accessed
+  - E2E: added the ability to create an account using CLI
 
 ## [0.213.1] - 2024-12-18
 ### Fixed
