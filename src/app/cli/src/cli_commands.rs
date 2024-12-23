@@ -49,23 +49,31 @@ pub fn get_command(
         cli::Command::Complete(c) => {
             let in_workspace =
                 workspace_svc.is_in_workspace() && !workspace_svc.is_upgrade_needed()?;
+            let predefined_accounts =
+                cli_catalog.get_one::<kamu_accounts::PredefinedAccountsConfig>()?;
+
+            let (dataset_registry, remote_repo_reg, remote_alias_reg, current_account) =
+                if in_workspace {
+                    (
+                        Some(cli_catalog.get_one()?),
+                        Some(cli_catalog.get_one()?),
+                        Some(cli_catalog.get_one()?),
+                        Some(accounts::AccountService::current_account_indication(
+                            args.account,
+                            tenancy_config,
+                            &predefined_accounts,
+                        )),
+                    )
+                } else {
+                    (None, None, None, None)
+                };
 
             Box::new(CompleteCommand::new(
-                if in_workspace {
-                    Some(cli_catalog.get_one()?)
-                } else {
-                    None
-                },
-                if in_workspace {
-                    Some(cli_catalog.get_one()?)
-                } else {
-                    None
-                },
-                if in_workspace {
-                    Some(cli_catalog.get_one()?)
-                } else {
-                    None
-                },
+                dataset_registry,
+                remote_repo_reg,
+                remote_alias_reg,
+                cli_catalog.get_one()?,
+                current_account,
                 cli_catalog.get_one()?,
                 cli::Cli::command(),
                 c.input,

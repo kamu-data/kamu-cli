@@ -292,7 +292,7 @@ impl DatasetEntryServiceImpl {
         })
     }
 
-    async fn list_all_dataset_handles_by_owner_name(
+    async fn list_all_dataset_handles_by_owner_id(
         &self,
         owner_id: &odf::AccountID,
         pagination: PaginationOpts,
@@ -308,6 +308,22 @@ impl DatasetEntryServiceImpl {
                 .entries_as_handles(dataset_entry_listing.list)
                 .await
                 .int_err()?,
+        })
+    }
+
+    #[expect(clippy::unused_async)]
+    async fn list_all_potentially_related_dataset_handles_by_owner_id(
+        &self,
+        _owner_id: &odf::AccountID,
+        _pagination: PaginationOpts,
+    ) -> Result<EntityPageListing<odf::DatasetHandle>, InternalError> {
+        // TODO: Private Datasets: Relations: make a query of datasets that have
+        //       any relationships.
+        //       Controversial point: this query requires referring to another domain
+        //       (ReBAC).
+        Ok(EntityPageListing {
+            total_count: 0,
+            list: vec![],
         })
     }
 
@@ -423,7 +439,27 @@ impl DatasetRegistry for DatasetEntryServiceImpl {
                 Ok(Arc::new(owner_id))
             },
             move |owner_id, pagination| async move {
-                self.list_all_dataset_handles_by_owner_name(&owner_id, pagination)
+                self.list_all_dataset_handles_by_owner_id(&owner_id, pagination)
+                    .await
+            },
+        )
+    }
+
+    fn all_potentially_related_dataset_handles_by_owner(
+        &self,
+        owner_name: &odf::AccountName,
+    ) -> DatasetHandleStream<'_> {
+        let owner_name = owner_name.clone();
+
+        EntityPageStreamer::default().into_stream(
+            move || async move {
+                let owner_id = self
+                    .resolve_account_id_by_maybe_name(Some(&owner_name))
+                    .await?;
+                Ok(Arc::new(owner_id))
+            },
+            move |owner_id, pagination| async move {
+                self.list_all_potentially_related_dataset_handles_by_owner_id(&owner_id, pagination)
                     .await
             },
         )

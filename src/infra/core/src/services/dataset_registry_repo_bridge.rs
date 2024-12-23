@@ -19,7 +19,7 @@ use kamu_core::{
     GetMultipleDatasetsError,
     ResolvedDataset,
 };
-use opendatafabric::{AccountName, DatasetHandle, DatasetID, DatasetRef};
+use opendatafabric as odf;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -41,14 +41,25 @@ impl DatasetRegistry for DatasetRegistryRepoBridge {
         self.dataset_repo.all_dataset_handles()
     }
 
-    fn all_dataset_handles_by_owner(&self, owner_name: &AccountName) -> DatasetHandleStream<'_> {
+    fn all_dataset_handles_by_owner(
+        &self,
+        owner_name: &odf::AccountName,
+    ) -> DatasetHandleStream<'_> {
         self.dataset_repo.all_dataset_handles_by_owner(owner_name)
+    }
+
+    fn all_potentially_related_dataset_handles_by_owner(
+        &self,
+        _owner_name: &odf::AccountName,
+    ) -> DatasetHandleStream<'_> {
+        // TODO: Private Datasets: implement
+        todo!()
     }
 
     async fn resolve_dataset_handle_by_ref(
         &self,
-        dataset_ref: &DatasetRef,
-    ) -> Result<DatasetHandle, GetDatasetError> {
+        dataset_ref: &odf::DatasetRef,
+    ) -> Result<odf::DatasetHandle, GetDatasetError> {
         self.dataset_repo
             .resolve_dataset_handle_by_ref(dataset_ref)
             .await
@@ -56,7 +67,7 @@ impl DatasetRegistry for DatasetRegistryRepoBridge {
 
     async fn resolve_multiple_dataset_handles_by_ids(
         &self,
-        dataset_ids: Vec<DatasetID>,
+        dataset_ids: Vec<odf::DatasetID>,
     ) -> Result<DatasetHandlesResolution, GetMultipleDatasetsError> {
         let mut res: DatasetHandlesResolution = Default::default();
 
@@ -72,7 +83,7 @@ impl DatasetRegistry for DatasetRegistryRepoBridge {
         Ok(res)
     }
 
-    fn get_dataset_by_handle(&self, dataset_handle: &DatasetHandle) -> ResolvedDataset {
+    fn get_dataset_by_handle(&self, dataset_handle: &odf::DatasetHandle) -> ResolvedDataset {
         let dataset = self.dataset_repo.get_dataset_by_handle(dataset_handle);
         ResolvedDataset::new(dataset, dataset_handle.clone())
     }
