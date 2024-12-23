@@ -162,7 +162,7 @@ impl DatasetMut {
         &self,
         ctx: &Context<'_>,
         visibility: DatasetVisibilityInput,
-    ) -> Result<SetDatasetPropertyResultSuccess> {
+    ) -> Result<SetDatasetPropertyResult> {
         ensure_account_owns_dataset(ctx, &self.dataset_handle).await?;
 
         let rebac_svc = from_catalog_n!(ctx, dyn kamu_auth_rebac::RebacService);
@@ -186,7 +186,7 @@ impl DatasetMut {
                 .int_err()?;
         }
 
-        Ok(SetDatasetPropertyResultSuccess::default())
+        Ok(SetDatasetPropertyResultSuccess::default().into())
     }
 }
 

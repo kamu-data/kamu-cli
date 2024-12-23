@@ -725,7 +725,7 @@ type DatasetMut {
 	"""
 	Set visibility for the dataset
 	"""
-	setVisibility(visibility: DatasetVisibilityInput!): SetDatasetPropertyResultSuccess!
+	setVisibility(visibility: DatasetVisibilityInput!): SetDatasetPropertyResult!
 }
 
 scalar DatasetName
@@ -1758,7 +1758,11 @@ type SetDataSchema {
 	schema: DataSchema!
 }
 
-type SetDatasetPropertyResultSuccess {
+interface SetDatasetPropertyResult {
+	message: String!
+}
+
+type SetDatasetPropertyResultSuccess implements SetDatasetPropertyResult {
 	dummy: String
 	message: String!
 }
