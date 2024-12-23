@@ -29,7 +29,7 @@ opendatafabric = { workspace = true, features = ["sqlx-postgres"] }
 
 async-stream = "0.3"
 async-trait = { version = "0.1", default-features = false }
-dill = "0.9"
+dill = "0.10"
 futures = "0.3"
 sqlx = { version = "0.8", default-features = false, features = [
     "runtime-tokio-rustls",
