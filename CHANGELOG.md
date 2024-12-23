@@ -11,6 +11,10 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Unreleased]
+### Fixed
+- GQL: datasets/createEmpty returns alias prefixed with account name
+
 ## [0.215.0] - 2024-12-27
 ### Added
 - New entity `FlowTrigger` which is now responsible for flow activation and schedules
