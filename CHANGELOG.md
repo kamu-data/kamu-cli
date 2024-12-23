@@ -17,6 +17,7 @@ Recommendation: for ease of reading, use the following order:
 - `export` command for bulk data exporting
 ### Changed
 - `sql` command now allows to export query command results to file(s)
+- FlightSQL session state management improvements
 
 ## [0.213.1] - 2024-12-18
 ### Fixed

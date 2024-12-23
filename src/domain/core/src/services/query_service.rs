@@ -21,6 +21,7 @@ use crate::auth::DatasetActionUnauthorizedError;
 use crate::*;
 
 // TODO: Support different engines and query dialects
+#[cfg_attr(feature = "testing", mockall::automock)]
 #[async_trait::async_trait]
 pub trait QueryService: Send + Sync {
     /// Creates an SQL session for the current user

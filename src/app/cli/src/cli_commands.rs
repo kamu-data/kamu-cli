@@ -399,9 +399,9 @@ pub fn get_command(
                     cfg_if::cfg_if! {
                         if #[cfg(feature = "flight-sql")] {
                             Box::new(SqlServerFlightSqlCommand::new(
+                                cli_catalog.clone(),
                                 sc.address,
                                 sc.port,
-                                cli_catalog.get_one()?,
                             ))
                         } else {
                             return Err(CLIError::usage_error("Kamu was compiled without Flight SQL support"))

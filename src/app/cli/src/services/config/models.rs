@@ -451,16 +451,24 @@ pub struct ProtocolConfig {
     /// IPFS configuration
     #[merge(strategy = merge_recursive)]
     pub ipfs: Option<IpfsConfig>,
+
+    /// FlightSQL configuration
+    #[merge(strategy = merge_recursive)]
+    pub flight_sql: Option<FlightSqlConfig>,
 }
 
 impl ProtocolConfig {
     pub fn new() -> Self {
-        Self { ipfs: None }
+        Self {
+            ipfs: None,
+            flight_sql: None,
+        }
     }
 
     fn sample() -> Self {
         Self {
             ipfs: Some(IpfsConfig::sample()),
+            flight_sql: Some(FlightSqlConfig::sample()),
         }
     }
 }
@@ -469,6 +477,7 @@ impl Default for ProtocolConfig {
     fn default() -> Self {
         Self {
             ipfs: Some(IpfsConfig::default()),
+            flight_sql: Some(FlightSqlConfig::default()),
         }
     }
 }
@@ -509,6 +518,50 @@ impl Default for IpfsConfig {
         Self {
             http_gateway: Some(Url::parse("http://localhost:8080").unwrap()),
             pre_resolve_dnslink: Some(true),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Merge, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct FlightSqlConfig {
+    /// Time after which FlightSQL client session will be forgotten and client
+    /// will have to re-authroize
+    pub session_expiration_timeout: Option<DurationString>,
+
+    /// Time after which FlightSQL session context will be released to free the
+    /// resources
+    pub session_inactivity_timeout: Option<DurationString>,
+}
+
+impl FlightSqlConfig {
+    pub fn new() -> Self {
+        Self {
+            session_expiration_timeout: None,
+            session_inactivity_timeout: None,
+        }
+    }
+
+    fn sample() -> Self {
+        Self { ..Self::default() }
+    }
+
+    pub fn to_system(&self) -> kamu_adapter_flight_sql::SessionCachingConfig {
+        kamu_adapter_flight_sql::SessionCachingConfig {
+            session_expiration_timeout: self.session_expiration_timeout.unwrap().into(),
+            session_inactivity_timeout: self.session_inactivity_timeout.unwrap().into(),
+        }
+    }
+}
+
+impl Default for FlightSqlConfig {
+    fn default() -> Self {
+        Self {
+            session_expiration_timeout: Some(DurationString::from_string("5m".to_owned()).unwrap()),
+            session_inactivity_timeout: Some(DurationString::from_string("5s".to_owned()).unwrap()),
         }
     }
 }
