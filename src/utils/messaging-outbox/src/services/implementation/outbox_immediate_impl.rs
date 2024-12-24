@@ -59,7 +59,7 @@ impl Outbox for OutboxImmediateImpl {
             let dispatch_result = dispatcher
                 .dispatch_message(&self.catalog, self.consumer_filter, &content_json, version)
                 .await;
-            if let Err(e) = dispatch_result {
+            if let Err(e) = &dispatch_result {
                 tracing::error!(
                     error = ?e,
                     error_msg = %e,
@@ -67,6 +67,7 @@ impl Outbox for OutboxImmediateImpl {
                     ?content_json,
                     "Immediate outbox message dispatching failed"
                 );
+                return dispatch_result;
             }
         }
 
