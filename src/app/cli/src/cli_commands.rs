@@ -31,29 +31,40 @@ pub fn get_command(
     };
 
     let command: Box<dyn Command> = match args.command {
-        cli::Command::Add(c) => Box::new(AddCommand::new(
-            cli_catalog.get_one()?,
-            cli_catalog.get_one()?,
-            cli_catalog.get_one()?,
-            cli_catalog.get_one()?,
-            c.manifest,
-            c.name,
-            c.recursive,
-            c.replace,
-            c.stdin,
-            c.visibility.into(),
-            cli_catalog.get_one()?,
-            tenancy_config,
-            cli_catalog.get_one()?,
-        )),
-        cli::Command::Complete(c) => {
-            let in_workspace =
-                workspace_svc.is_in_workspace() && !workspace_svc.is_upgrade_needed()?;
+        cli::Command::Add(c) => {
             let predefined_accounts =
                 cli_catalog.get_one::<kamu_accounts::PredefinedAccountsConfig>()?;
 
+            Box::new(AddCommand::new(
+                cli_catalog.get_one()?,
+                cli_catalog.get_one()?,
+                cli_catalog.get_one()?,
+                cli_catalog.get_one()?,
+                c.manifest,
+                c.name,
+                c.recursive,
+                c.replace,
+                c.stdin,
+                c.visibility.into(),
+                cli_catalog.get_one()?,
+                tenancy_config,
+                cli_catalog.get_one()?,
+                accounts::AccountService::current_account_indication(
+                    args.account,
+                    tenancy_config,
+                    &predefined_accounts,
+                ),
+            ))
+        }
+        cli::Command::Complete(c) => {
+            let in_workspace =
+                workspace_svc.is_in_workspace() && !workspace_svc.is_upgrade_needed()?;
+
             let (dataset_registry, remote_repo_reg, remote_alias_reg, current_account) =
                 if in_workspace {
+                    let predefined_accounts =
+                        cli_catalog.get_one::<kamu_accounts::PredefinedAccountsConfig>()?;
+
                     (
                         Some(cli_catalog.get_one()?),
                         Some(cli_catalog.get_one()?),

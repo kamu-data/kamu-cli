@@ -27,6 +27,9 @@ Recommendation: for ease of reading, use the following order:
   - GQL, `DatasetMetadata.currentUpstreamDependencies`: indication if datasets not found/not accessed
   - GQL, `DatasetMetadata.currentDownstreamDependencies`: exclude datasets that cannot be accessed
   - E2E: added the ability to create an account using CLI
+### Fixed
+- `kamu add --replace`: fixing a potential bug with the ability to delete 
+    another user's dataset with the same name
 
 ## [0.213.1] - 2024-12-18
 ### Fixed
