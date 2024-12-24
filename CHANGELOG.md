@@ -13,7 +13,7 @@ Recommendation: for ease of reading, use the following order:
 
 ## [Unreleased]
 ### Fixed
-- GQL: datasets/createEmpty returns alias prefixed with account name
+- GraphQL: in a multi-tenant workspace, `datasets.createEmpty` and `datasets.createFromSnapshot` mutations now return dataset aliases prefixed with account name.
 
 ## [0.215.0] - 2024-12-27
 ### Added
