@@ -260,7 +260,20 @@ async fn dataset_create_empty() {
 
 #[test_log::test(tokio::test)]
 async fn dataset_create_from_snapshot() {
-    let harness = GraphQLDatasetsHarness::new(TenancyConfig::MultiTenant).await;
+    let mut mock_authentication_service = MockAuthenticationService::built_in();
+    mock_authentication_service
+        .expect_account_by_name()
+        .returning(|_| {
+            Ok(Some(Account::test(
+                AccountID::new(DidOdf::new_seeded_ed25519(&[1, 2, 3])),
+                "kamu",
+            )))
+        });
+    let harness = GraphQLDatasetsHarness::new_custom_authentication(
+        mock_authentication_service,
+        TenancyConfig::MultiTenant,
+    )
+    .await;
 
     let snapshot = MetadataFactory::dataset_snapshot()
         .name("foo")
