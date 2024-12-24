@@ -21,7 +21,6 @@ use kamu_cli_e2e_common::{
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_2,
     DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
     E2E_USER_ACCOUNT_NAME,
-    E2E_USER_ACCOUNT_NAME_STR,
 };
 use kamu_cli_puppet::extensions::{KamuCliPuppetExt, RepoAlias};
 use kamu_cli_puppet::KamuCliPuppet;
@@ -607,9 +606,7 @@ async fn test_smart_pull_as(
 
     kamu_api_server_client
         .dataset()
-        .create_player_scores_dataset_with_data(Some(odf::AccountName::new_unchecked(
-            E2E_USER_ACCOUNT_NAME_STR,
-        )))
+        .create_player_scores_dataset_with_data()
         .await;
 
     {

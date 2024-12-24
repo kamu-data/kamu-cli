@@ -29,9 +29,9 @@ use opendatafabric as odf;
 pub async fn test_gql_get_dataset_list_flows(mut kamu_api_server_client: KamuApiServerClient) {
     kamu_api_server_client.auth().login_as_kamu().await;
 
-    let CreateDatasetResponse { dataset_id } = kamu_api_server_client
+    let CreateDatasetResponse { dataset_id, .. } = kamu_api_server_client
         .dataset()
-        .create_player_scores_dataset_with_data(None)
+        .create_player_scores_dataset_with_data()
         .await;
 
     // The query is almost identical to kamu-web-ui, for ease of later edits.
@@ -100,9 +100,9 @@ pub async fn test_gql_get_dataset_list_flows(mut kamu_api_server_client: KamuApi
 pub async fn test_gql_dataset_all_flows_paused(mut kamu_api_server_client: KamuApiServerClient) {
     kamu_api_server_client.auth().login_as_kamu().await;
 
-    let CreateDatasetResponse { dataset_id } = kamu_api_server_client
+    let CreateDatasetResponse { dataset_id, .. } = kamu_api_server_client
         .dataset()
-        .create_player_scores_dataset_with_data(None)
+        .create_player_scores_dataset_with_data()
         .await;
 
     // The query is almost identical to kamu-web-ui, for ease of later edits.
@@ -159,9 +159,9 @@ pub async fn test_gql_dataset_all_flows_paused(mut kamu_api_server_client: KamuA
 pub async fn test_gql_dataset_flows_initiators(mut kamu_api_server_client: KamuApiServerClient) {
     kamu_api_server_client.auth().login_as_kamu().await;
 
-    let CreateDatasetResponse { dataset_id } = kamu_api_server_client
+    let CreateDatasetResponse { dataset_id, .. } = kamu_api_server_client
         .dataset()
-        .create_player_scores_dataset_with_data(None)
+        .create_player_scores_dataset_with_data()
         .await;
 
     // The query is almost identical to kamu-web-ui, for ease of later edits.
@@ -242,11 +242,12 @@ pub async fn test_gql_dataset_trigger_flow(mut kamu_api_server_client: KamuApiSe
 
     kamu_api_server_client
         .dataset()
-        .create_player_scores_dataset_with_data(None)
+        .create_player_scores_dataset_with_data()
         .await;
 
     let CreateDatasetResponse {
         dataset_id: derivative_dataset_id,
+        ..
     } = kamu_api_server_client.dataset().create_leaderboard().await;
 
     // The query is almost identical to kamu-web-ui, for ease of later edits.
@@ -788,6 +789,7 @@ pub async fn test_trigger_flow_ingest(mut kamu_api_server_client: KamuApiServerC
 
     let CreateDatasetResponse {
         dataset_id: root_dataset_id,
+        ..
     } = kamu_api_server_client
         .dataset()
         .create_dataset(&root_dataset_snapshot)
@@ -905,6 +907,7 @@ pub async fn test_trigger_flow_ingest_no_polling_source(
 
     let CreateDatasetResponse {
         dataset_id: root_dataset_id,
+        ..
     } = kamu_api_server_client
         .dataset()
         .create_dataset(&root_dataset_snapshot)
@@ -927,10 +930,11 @@ pub async fn test_trigger_flow_execute_transform(mut kamu_api_server_client: Kam
 
     kamu_api_server_client
         .dataset()
-        .create_player_scores_dataset_with_data(None)
+        .create_player_scores_dataset_with_data()
         .await;
     let CreateDatasetResponse {
         dataset_id: derivative_dataset_id,
+        ..
     } = kamu_api_server_client.dataset().create_leaderboard().await;
 
     pretty_assertions::assert_eq!(
@@ -990,6 +994,7 @@ pub async fn test_trigger_flow_execute_transform_no_set_transform(
 
     let CreateDatasetResponse {
         dataset_id: derivative_dataset_id,
+        ..
     } = kamu_api_server_client
         .dataset()
         .create_dataset(&derivative_dataset_snapshot)
@@ -1012,6 +1017,7 @@ pub async fn test_trigger_flow_hard_compaction(mut kamu_api_server_client: KamuA
 
     let CreateDatasetResponse {
         dataset_id: root_dataset_id,
+        ..
     } = kamu_api_server_client
         .dataset()
         .create_player_scores_dataset()
@@ -1125,6 +1131,7 @@ pub async fn test_trigger_flow_reset(mut kamu_api_server_client: KamuApiServerCl
 
     let CreateDatasetResponse {
         dataset_id: root_dataset_id,
+        ..
     } = kamu_api_server_client
         .dataset()
         .create_player_scores_dataset()

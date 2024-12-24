@@ -44,7 +44,7 @@ pub async fn test_datasets_by_id(mut kamu_api_server_client: KamuApiServerClient
     );
     // <--
 
-    let CreateDatasetResponse { dataset_id } = kamu_api_server_client
+    let CreateDatasetResponse { dataset_id, .. } = kamu_api_server_client
         .dataset()
         .create_player_scores_dataset()
         .await;
