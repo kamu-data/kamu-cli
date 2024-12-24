@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::prelude::*;
+use kamu_core::auth::{ClassifyByAllowanceResponse, DatasetAction};
 use kamu_core::{
     self as domain,
     MetadataChainExt,
@@ -22,8 +23,6 @@ use crate::prelude::*;
 use crate::queries::*;
 use crate::scalars::DatasetPushStatuses;
 use crate::utils::get_dataset;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -81,31 +80,50 @@ impl DatasetMetadata {
         }
     }
 
+    // TODO: Private Datasets: tests
     /// Current upstream dependencies of a dataset
-    async fn current_upstream_dependencies(&self, ctx: &Context<'_>) -> Result<Vec<Dataset>> {
-        let (dependency_graph_service, dataset_registry) = from_catalog_n!(
+    async fn current_upstream_dependencies(
+        &self,
+        ctx: &Context<'_>,
+    ) -> Result<Vec<UpstreamDatasetResult>> {
+        let (dependency_graph_service, dataset_registry, dataset_action_authorizer) = from_catalog_n!(
             ctx,
             dyn domain::DependencyGraphService,
-            dyn domain::DatasetRegistry
+            dyn domain::DatasetRegistry,
+            dyn kamu_core::auth::DatasetActionAuthorizer
         );
 
-        use tokio_stream::StreamExt;
-        let upstream_dataset_ids: Vec<_> = dependency_graph_service
+        use futures::{StreamExt, TryStreamExt};
+
+        let upstream_dataset_handles = dependency_graph_service
             .get_upstream_dependencies(&self.dataset_handle.id)
             .await
             .int_err()?
-            .collect()
-            .await;
+            .then(|upstream_dataset_id| {
+                let dataset_registry = dataset_registry.clone();
+                async move {
+                    dataset_registry
+                        .resolve_dataset_handle_by_ref(&upstream_dataset_id.as_local_ref())
+                        .await
+                        .int_err()
+                }
+            })
+            .try_collect::<Vec<_>>()
+            .await?;
 
-        let mut upstream = Vec::with_capacity(upstream_dataset_ids.len());
-        for upstream_dataset_id in upstream_dataset_ids {
-            let hdl = dataset_registry
-                .resolve_dataset_handle_by_ref(&upstream_dataset_id.as_local_ref())
-                .await
-                .int_err()?;
+        let upstream_dataset_handles_len = upstream_dataset_handles.len();
+        let ClassifyByAllowanceResponse {
+            authorized_handles,
+            unauthorized_handles_with_errors,
+        } = dataset_action_authorizer
+            .classify_datasets_by_allowance(upstream_dataset_handles, DatasetAction::Read)
+            .await?;
+
+        let mut upstream = Vec::with_capacity(upstream_dataset_handles_len);
+        for hdl in authorized_handles {
             let maybe_account = Account::from_dataset_alias(ctx, &hdl.alias).await?;
             if let Some(account) = maybe_account {
-                upstream.push(Dataset::new(account, hdl));
+                upstream.push(UpstreamDatasetResult::found(Dataset::new(account, hdl)));
             } else {
                 tracing::warn!(
                     "Skipped upstream dataset '{}' with unresolved account",
@@ -114,28 +132,51 @@ impl DatasetMetadata {
             }
         }
 
+        upstream.extend(
+            unauthorized_handles_with_errors
+                .into_iter()
+                .map(|(hdl, _)| UpstreamDatasetResult::not_found(hdl)),
+        );
+
         Ok(upstream)
     }
 
     // TODO: Convert to collection
+    // TODO: Private Datasets: tests
     /// Current downstream dependencies of a dataset
     async fn current_downstream_dependencies(&self, ctx: &Context<'_>) -> Result<Vec<Dataset>> {
-        let (dependency_graph_service, dataset_registry) = from_catalog_n!(
+        let (dependency_graph_service, dataset_registry, dataset_action_authorizer) = from_catalog_n!(
             ctx,
             dyn domain::DependencyGraphService,
-            dyn domain::DatasetRegistry
+            dyn domain::DatasetRegistry,
+            dyn kamu_core::auth::DatasetActionAuthorizer
         );
 
-        use tokio_stream::StreamExt;
-        let downstream_dataset_ids: Vec<_> = dependency_graph_service
+        use futures::{StreamExt, TryStreamExt};
+
+        let downstream_dataset_handles = dependency_graph_service
             .get_downstream_dependencies(&self.dataset_handle.id)
             .await
             .int_err()?
-            .collect()
-            .await;
+            .then(|upstream_dataset_id| {
+                let dataset_registry = dataset_registry.clone();
+                async move {
+                    dataset_registry
+                        .resolve_dataset_handle_by_ref(&upstream_dataset_id.as_local_ref())
+                        .await
+                        .int_err()
+                }
+            })
+            .try_collect::<Vec<_>>()
+            .await?;
 
-        let mut downstream = Vec::with_capacity(downstream_dataset_ids.len());
-        for downstream_dataset_id in downstream_dataset_ids {
+        let authorized_downstream_dataset_ids = dataset_action_authorizer
+            .classify_datasets_by_allowance(downstream_dataset_handles, DatasetAction::Read)
+            .await?
+            .authorized_handles;
+
+        let mut downstream = Vec::with_capacity(authorized_downstream_dataset_ids.len());
+        for downstream_dataset_id in authorized_downstream_dataset_ids {
             let hdl = dataset_registry
                 .resolve_dataset_handle_by_ref(&downstream_dataset_id.as_local_ref())
                 .await
@@ -280,6 +321,55 @@ impl DatasetMetadata {
             .int_err()?
             .into_event()
             .map(Into::into))
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Interface, Debug, Clone)]
+#[graphql(field(name = "message", ty = "String"))]
+enum UpstreamDatasetResult {
+    Found(UpstreamDatasetResultFound),
+    NotFound(UpstreamDatasetResultNotFound),
+}
+
+impl UpstreamDatasetResult {
+    pub fn found(dataset: Dataset) -> Self {
+        Self::Found(UpstreamDatasetResultFound { dataset })
+    }
+
+    pub fn not_found(dataset_handle: odf::DatasetHandle) -> Self {
+        Self::NotFound(UpstreamDatasetResultNotFound {
+            dataset_id: dataset_handle.id.into(),
+            dataset_alias: dataset_handle.alias.into(),
+        })
+    }
+}
+
+#[derive(SimpleObject, Debug, Clone)]
+#[graphql(complex)]
+pub struct UpstreamDatasetResultFound {
+    pub dataset: Dataset,
+}
+
+#[ComplexObject]
+impl UpstreamDatasetResultFound {
+    async fn message(&self) -> String {
+        "Found".to_string()
+    }
+}
+
+#[derive(SimpleObject, Debug, Clone)]
+#[graphql(complex)]
+pub struct UpstreamDatasetResultNotFound {
+    pub dataset_id: DatasetID,
+    pub dataset_alias: DatasetAlias,
+}
+
+#[ComplexObject]
+impl UpstreamDatasetResultNotFound {
+    async fn message(&self) -> String {
+        "Not found".to_string()
     }
 }
 

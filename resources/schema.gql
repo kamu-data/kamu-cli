@@ -646,7 +646,7 @@ type DatasetMetadata {
 	"""
 	Current upstream dependencies of a dataset
 	"""
-	currentUpstreamDependencies: [Dataset!]!
+	currentUpstreamDependencies: [UpstreamDatasetResult!]!
 	"""
 	Current downstream dependencies of a dataset
 	"""
@@ -725,7 +725,7 @@ type DatasetMut {
 	"""
 	Set visibility for the dataset
 	"""
-	setVisibility(visibility: DatasetVisibilityInput!): SetDatasetPropertyResult!
+	setVisibility(visibility: DatasetVisibilityInput!): SetDatasetVisibilityResult!
 }
 
 scalar DatasetName
@@ -1758,11 +1758,11 @@ type SetDataSchema {
 	schema: DataSchema!
 }
 
-interface SetDatasetPropertyResult {
+interface SetDatasetVisibilityResult {
 	message: String!
 }
 
-type SetDatasetPropertyResultSuccess implements SetDatasetPropertyResult {
+type SetDatasetVisibilityResultSuccess implements SetDatasetVisibilityResult {
 	dummy: String
 	message: String!
 }
@@ -1993,6 +1993,21 @@ type TriggerFlowSuccess implements TriggerFlowResult {
 }
 
 interface UpdateReadmeResult {
+	message: String!
+}
+
+interface UpstreamDatasetResult {
+	message: String!
+}
+
+type UpstreamDatasetResultFound implements UpstreamDatasetResult {
+	dataset: Dataset!
+	message: String!
+}
+
+type UpstreamDatasetResultNotFound implements UpstreamDatasetResult {
+	datasetId: DatasetID!
+	datasetAlias: DatasetAlias!
 	message: String!
 }
 

@@ -162,7 +162,7 @@ impl DatasetMut {
         &self,
         ctx: &Context<'_>,
         visibility: DatasetVisibilityInput,
-    ) -> Result<SetDatasetPropertyResult> {
+    ) -> Result<SetDatasetVisibilityResult> {
         ensure_account_owns_dataset(ctx, &self.dataset_handle).await?;
 
         let rebac_svc = from_catalog_n!(ctx, dyn kamu_auth_rebac::RebacService);
@@ -186,7 +186,7 @@ impl DatasetMut {
                 .int_err()?;
         }
 
-        Ok(SetDatasetPropertyResultSuccess::default().into())
+        Ok(SetDatasetVisibilityResultSuccess::default().into())
     }
 }
 
@@ -292,20 +292,20 @@ pub enum DatasetVisibilityInput {
 
 #[derive(Interface, Debug)]
 #[graphql(field(name = "message", ty = "String"))]
-pub enum SetDatasetPropertyResult {
-    Success(SetDatasetPropertyResultSuccess),
+pub enum SetDatasetVisibilityResult {
+    Success(SetDatasetVisibilityResultSuccess),
 }
 
 #[derive(SimpleObject, Debug, Default)]
 #[graphql(complex)]
-pub struct SetDatasetPropertyResultSuccess {
+pub struct SetDatasetVisibilityResultSuccess {
     _dummy: Option<String>,
 }
 
 #[ComplexObject]
-impl SetDatasetPropertyResultSuccess {
+impl SetDatasetVisibilityResultSuccess {
     async fn message(&self) -> String {
-        "Updated".to_string()
+        "Success".to_string()
     }
 }
 

@@ -24,6 +24,8 @@ Recommendation: for ease of reading, use the following order:
   - E2E: Using the correct account in multi-tenant mode
     - And also the possibility of set it up
   - `DatasetOwnershipService`: moved to the `kamu-dataset` crate area & implemented via `DatasetEntryServiceImpl`
+  - GQL, `DatasetMetadata.currentUpstreamDependencies`: indication if datasets not found/not accessed
+  - GQL, `DatasetMetadata.currentDownstreamDependencies`: exclude datasets that cannot be accessed
 
 ## [0.213.1] - 2024-12-18
 ### Fixed
