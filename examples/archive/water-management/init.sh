@@ -4,6 +4,7 @@ set -e
 KAMU_NODE_URL="odf+https://node.demo.kamu.dev/"
 
 kamu init --multi-tenant --exists-ok
+cp -f .kamuconfig .kamu/
 
 kamu --account rijkswaterstaat.nl pull "${KAMU_NODE_URL}rijkswaterstaat.nl/stations"
 kamu --account rijkswaterstaat.nl pull "${KAMU_NODE_URL}rijkswaterstaat.nl/measurements.boven-rijn"

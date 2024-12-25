@@ -1,7 +1,9 @@
 IMAGE_PLATFORMS = linux/amd64,linux/arm64
 IMAGE_REPO = ghcr.io/kamu-data
 KAMU_VERSION = $(shell cargo metadata --format-version 1 | jq -r '.packages[] | select( .name == "kamu") | .version')
-DEMO_VERSION = 0.16.6
+
+# Keep in sync with versions of Jupyter and Minio in docker-compose.yml
+DEMO_VERSION = 0.17.0
 
 #########################################################################################
 

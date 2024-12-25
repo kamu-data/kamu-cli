@@ -1,0 +1,14 @@
+kind: CLIConfig
+version: 1
+content:
+  users:
+    predefined:
+      - accountName: kamu
+        isAdmin: true
+        avatarUrl: https://avatars.githubusercontent.com/u/50896974?s=200&v=4
+      - accountName: acme.fishing.co
+        accountType: Organization
+        avatarUrl: https://cdn-icons-png.flaticon.com/512/1090/1090630.png
+      - accountName: globalfishingwatch.org
+        accountType: Organization
+        avatarUrl: https://cdn-icons-png.flaticon.com/512/744/744480.png
