@@ -23,7 +23,7 @@ use crate::AccessError;
 pub trait DatasetActionAuthorizer: Sync + Send {
     async fn check_action_allowed(
         &self,
-        // TODO: Private Datasets: use odf::DatasetID, here and below
+        // TODO: Private Datasets: migrate to use odf::DatasetID, here and below
         dataset_handle: &odf::DatasetHandle,
         action: DatasetAction,
     ) -> Result<(), DatasetActionUnauthorizedError>;
@@ -60,6 +60,15 @@ pub trait DatasetActionAuthorizer: Sync + Send {
         dataset_handles: Vec<odf::DatasetHandle>,
         action: DatasetAction,
     ) -> Result<ClassifyByAllowanceResponse, InternalError>;
+
+    // TODO: Private Datasets: tests
+    // TODO: Private Datasets: use classify_datasets_by_allowance() name
+    //       after migration
+    async fn classify_dataset_ids_by_allowance(
+        &self,
+        dataset_ids: Vec<odf::DatasetID>,
+        action: DatasetAction,
+    ) -> Result<ClassifyByAllowanceIdsResponse, InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -144,6 +153,16 @@ pub struct ClassifyByAllowanceResponse {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// TODO: Private Datasets: use classify_datasets_by_allowance() name
+//       after migration
+#[derive(Debug)]
+pub struct ClassifyByAllowanceIdsResponse {
+    pub authorized_ids: Vec<odf::DatasetID>,
+    pub unauthorized_ids_with_errors: Vec<(odf::DatasetID, DatasetActionUnauthorizedError)>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[component(pub)]
 #[interface(dyn DatasetActionAuthorizer)]
 pub struct AlwaysHappyDatasetActionAuthorizer {}
@@ -188,6 +207,17 @@ impl DatasetActionAuthorizer for AlwaysHappyDatasetActionAuthorizer {
         Ok(ClassifyByAllowanceResponse {
             authorized_handles: dataset_handles,
             unauthorized_handles_with_errors: vec![],
+        })
+    }
+
+    async fn classify_dataset_ids_by_allowance(
+        &self,
+        dataset_ids: Vec<odf::DatasetID>,
+        _action: DatasetAction,
+    ) -> Result<ClassifyByAllowanceIdsResponse, InternalError> {
+        Ok(ClassifyByAllowanceIdsResponse {
+            authorized_ids: dataset_ids,
+            unauthorized_ids_with_errors: vec![],
         })
     }
 }

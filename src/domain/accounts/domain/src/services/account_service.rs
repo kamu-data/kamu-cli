@@ -7,14 +7,18 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashMap;
+
 use database_common::{EntityPageListing, PaginationOpts};
 use internal_error::InternalError;
+use opendatafabric as odf;
 use thiserror::Error;
 
 use crate::{Account, AccountPageStream};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// TODO: Private Datasets: merge with AuthenticationService?
 // TODO: Private Datasets: tests
 #[async_trait::async_trait]
 pub trait AccountService: Sync + Send {
@@ -25,6 +29,11 @@ pub trait AccountService: Sync + Send {
         &self,
         pagination: PaginationOpts,
     ) -> Result<EntityPageListing<Account>, ListAccountError>;
+
+    async fn get_account_map(
+        &self,
+        account_ids: Vec<odf::AccountID>,
+    ) -> Result<HashMap<odf::AccountID, Account>, GetAccountMapError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -33,6 +42,14 @@ pub trait AccountService: Sync + Send {
 
 #[derive(Debug, Error)]
 pub enum ListAccountError {
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Error)]
+pub enum GetAccountMapError {
     #[error(transparent)]
     Internal(#[from] InternalError),
 }
