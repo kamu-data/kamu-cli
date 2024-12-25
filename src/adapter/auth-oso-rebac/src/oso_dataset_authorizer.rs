@@ -235,6 +235,50 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
             unauthorized_handles_with_errors: unmatched_results,
         })
     }
+
+    async fn classify_dataset_ids_by_allowance(
+        &self,
+        dataset_ids: Vec<odf::DatasetID>,
+        action: DatasetAction,
+    ) -> Result<ClassifyByAllowanceIdsResponse, InternalError> {
+        let user_actor = self.user_actor().await?;
+        let mut authorized_ids = Vec::with_capacity(dataset_ids.len());
+        let mut unauthorized_ids_with_errors = Vec::new();
+
+        let dataset_resources_resolution = self
+            .oso_resource_service
+            .get_multiple_dataset_resources(&dataset_ids)
+            .await
+            .int_err()?;
+
+        for (dataset_id, dataset_resource) in dataset_resources_resolution.resolved_resources {
+            let is_allowed = self
+                .kamu_auth_oso
+                .is_allowed(user_actor.clone(), action, dataset_resource)
+                .int_err()?;
+
+            if is_allowed {
+                authorized_ids.push(dataset_id);
+            } else {
+                let dataset_ref = dataset_id.as_local_ref();
+                unauthorized_ids_with_errors.push((
+                    dataset_id,
+                    DatasetActionUnauthorizedError::Access(AccessError::Forbidden(
+                        DatasetActionNotEnoughPermissionsError {
+                            action,
+                            dataset_ref,
+                        }
+                        .into(),
+                    )),
+                ));
+            }
+        }
+
+        Ok(ClassifyByAllowanceIdsResponse {
+            authorized_ids,
+            unauthorized_ids_with_errors,
+        })
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

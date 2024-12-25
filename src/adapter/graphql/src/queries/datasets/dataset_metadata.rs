@@ -7,8 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashSet;
+
 use chrono::prelude::*;
-use kamu_core::auth::{ClassifyByAllowanceResponse, DatasetAction};
+use kamu_accounts::AccountService;
+use kamu_core::auth::{ClassifyByAllowanceIdsResponse, DatasetAction};
 use kamu_core::{
     self as domain,
     MetadataChainExt,
@@ -17,6 +20,7 @@ use kamu_core::{
     SearchSetLicenseVisitor,
     SearchSetVocabVisitor,
 };
+use kamu_datasets::DatasetEntriesResolution;
 use opendatafabric as odf;
 
 use crate::prelude::*;
@@ -85,114 +89,181 @@ impl DatasetMetadata {
     async fn current_upstream_dependencies(
         &self,
         ctx: &Context<'_>,
-    ) -> Result<Vec<UpstreamDatasetResult>> {
-        let (dependency_graph_service, dataset_registry, dataset_action_authorizer) = from_catalog_n!(
+    ) -> Result<Vec<DependencyDatasetResult>> {
+        let (
+            dependency_graph_service,
+            dataset_action_authorizer,
+            dataset_entry_repository,
+            account_service,
+        ) = from_catalog_n!(
             ctx,
             dyn domain::DependencyGraphService,
-            dyn domain::DatasetRegistry,
-            dyn kamu_core::auth::DatasetActionAuthorizer
+            dyn kamu_core::auth::DatasetActionAuthorizer,
+            dyn kamu_datasets::DatasetEntryRepository,
+            dyn AccountService
         );
 
-        use futures::{StreamExt, TryStreamExt};
+        use tokio_stream::StreamExt;
 
-        let upstream_dataset_handles = dependency_graph_service
+        // TODO: PERF: chunk the stream
+        let upstream_dependency_ids = dependency_graph_service
             .get_upstream_dependencies(&self.dataset_handle.id)
             .await
             .int_err()?
-            .then(|upstream_dataset_id| {
-                let dataset_registry = dataset_registry.clone();
-                async move {
-                    dataset_registry
-                        .resolve_dataset_handle_by_ref(&upstream_dataset_id.as_local_ref())
-                        .await
-                        .int_err()
-                }
-            })
-            .try_collect::<Vec<_>>()
-            .await?;
+            .collect::<Vec<_>>()
+            .await;
 
-        let upstream_dataset_handles_len = upstream_dataset_handles.len();
-        let ClassifyByAllowanceResponse {
-            authorized_handles,
-            unauthorized_handles_with_errors,
+        let mut upstream_dependencies = Vec::with_capacity(upstream_dependency_ids.len());
+
+        let ClassifyByAllowanceIdsResponse {
+            authorized_ids,
+            unauthorized_ids_with_errors,
         } = dataset_action_authorizer
-            .classify_datasets_by_allowance(upstream_dataset_handles, DatasetAction::Read)
+            .classify_dataset_ids_by_allowance(upstream_dependency_ids, DatasetAction::Read)
             .await?;
 
-        let mut upstream = Vec::with_capacity(upstream_dataset_handles_len);
-        for hdl in authorized_handles {
-            let maybe_account = Account::from_dataset_alias(ctx, &hdl.alias).await?;
+        upstream_dependencies.extend(unauthorized_ids_with_errors.into_iter().map(
+            |(not_found_dataset_id, _)| DependencyDatasetResult::not_found(not_found_dataset_id),
+        ));
+
+        let DatasetEntriesResolution {
+            resolved_entries,
+            unresolved_entries,
+        } = dataset_entry_repository
+            .get_multiple_dataset_entries(&authorized_ids)
+            .await
+            .int_err()?;
+
+        upstream_dependencies.extend(
+            unresolved_entries
+                .into_iter()
+                .map(DependencyDatasetResult::not_found),
+        );
+
+        let owner_ids = resolved_entries
+            .iter()
+            .fold(HashSet::new(), |mut acc, entry| {
+                acc.insert(entry.owner_id.clone());
+                acc
+            });
+        let account_map = account_service
+            .get_account_map(owner_ids.into_iter().collect())
+            .await
+            .int_err()?;
+
+        for dataset_entry in resolved_entries {
+            let maybe_account = account_map.get(&dataset_entry.owner_id);
+
             if let Some(account) = maybe_account {
-                upstream.push(UpstreamDatasetResult::found(Dataset::new(account, hdl)));
+                let dataset_handle = odf::DatasetHandle {
+                    id: dataset_entry.id,
+                    alias: odf::DatasetAlias::new(
+                        Some(account.account_name.clone()),
+                        dataset_entry.name,
+                    ),
+                };
+                let dataset = Dataset::new(Account::from_account(account.clone()), dataset_handle);
+
+                upstream_dependencies.push(DependencyDatasetResult::found(dataset));
             } else {
                 tracing::warn!(
-                    "Skipped upstream dataset '{}' with unresolved account",
-                    hdl.alias
+                    "Upstream owner's account not found for dataset: {:?}",
+                    &dataset_entry
                 );
+                upstream_dependencies.push(DependencyDatasetResult::not_found(dataset_entry.id));
             }
         }
 
-        upstream.extend(
-            unauthorized_handles_with_errors
-                .into_iter()
-                .map(|(hdl, _)| UpstreamDatasetResult::not_found(hdl)),
-        );
-
-        Ok(upstream)
+        Ok(upstream_dependencies)
     }
 
     // TODO: Convert to collection
     // TODO: Private Datasets: tests
     /// Current downstream dependencies of a dataset
-    async fn current_downstream_dependencies(&self, ctx: &Context<'_>) -> Result<Vec<Dataset>> {
-        let (dependency_graph_service, dataset_registry, dataset_action_authorizer) = from_catalog_n!(
+    async fn current_downstream_dependencies(
+        &self,
+        ctx: &Context<'_>,
+    ) -> Result<Vec<DependencyDatasetResult>> {
+        let (
+            dependency_graph_service,
+            dataset_action_authorizer,
+            dataset_entry_repository,
+            account_service,
+        ) = from_catalog_n!(
             ctx,
             dyn domain::DependencyGraphService,
-            dyn domain::DatasetRegistry,
-            dyn kamu_core::auth::DatasetActionAuthorizer
+            dyn kamu_core::auth::DatasetActionAuthorizer,
+            dyn kamu_datasets::DatasetEntryRepository,
+            dyn AccountService
         );
 
-        use futures::{StreamExt, TryStreamExt};
+        use tokio_stream::StreamExt;
 
-        let downstream_dataset_handles = dependency_graph_service
+        // TODO: PERF: chunk the stream
+        let downstream_dependency_ids = dependency_graph_service
             .get_downstream_dependencies(&self.dataset_handle.id)
             .await
             .int_err()?
-            .then(|upstream_dataset_id| {
-                let dataset_registry = dataset_registry.clone();
-                async move {
-                    dataset_registry
-                        .resolve_dataset_handle_by_ref(&upstream_dataset_id.as_local_ref())
-                        .await
-                        .int_err()
-                }
-            })
-            .try_collect::<Vec<_>>()
-            .await?;
+            .collect::<Vec<_>>()
+            .await;
 
-        let authorized_downstream_dataset_ids = dataset_action_authorizer
-            .classify_datasets_by_allowance(downstream_dataset_handles, DatasetAction::Read)
+        let mut downstream_dependencies = Vec::with_capacity(downstream_dependency_ids.len());
+
+        // Cut off datasets that we don't have access to
+        let authorized_ids = dataset_action_authorizer
+            .classify_dataset_ids_by_allowance(downstream_dependency_ids, DatasetAction::Read)
             .await?
-            .authorized_handles;
+            .authorized_ids;
 
-        let mut downstream = Vec::with_capacity(authorized_downstream_dataset_ids.len());
-        for downstream_dataset_id in authorized_downstream_dataset_ids {
-            let hdl = dataset_registry
-                .resolve_dataset_handle_by_ref(&downstream_dataset_id.as_local_ref())
-                .await
-                .int_err()?;
-            let maybe_account = Account::from_dataset_alias(ctx, &hdl.alias).await?;
+        let DatasetEntriesResolution {
+            resolved_entries,
+            unresolved_entries,
+        } = dataset_entry_repository
+            .get_multiple_dataset_entries(&authorized_ids)
+            .await
+            .int_err()?;
+
+        downstream_dependencies.extend(
+            unresolved_entries
+                .into_iter()
+                .map(DependencyDatasetResult::not_found),
+        );
+
+        let owner_ids = resolved_entries
+            .iter()
+            .fold(HashSet::new(), |mut acc, entry| {
+                acc.insert(entry.owner_id.clone());
+                acc
+            });
+        let account_map = account_service
+            .get_account_map(owner_ids.into_iter().collect())
+            .await
+            .int_err()?;
+
+        for dataset_entry in resolved_entries {
+            let maybe_account = account_map.get(&dataset_entry.owner_id);
+
             if let Some(account) = maybe_account {
-                downstream.push(Dataset::new(account, hdl));
+                let dataset_handle = odf::DatasetHandle {
+                    id: dataset_entry.id,
+                    alias: odf::DatasetAlias::new(
+                        Some(account.account_name.clone()),
+                        dataset_entry.name,
+                    ),
+                };
+                let dataset = Dataset::new(Account::from_account(account.clone()), dataset_handle);
+
+                downstream_dependencies.push(DependencyDatasetResult::found(dataset));
             } else {
                 tracing::warn!(
-                    "Skipped downstream dataset '{}' with unresolved account",
-                    hdl.alias
+                    "Downstream owner's account not found for dataset: {:?}",
+                    &dataset_entry
                 );
+                downstream_dependencies.push(DependencyDatasetResult::not_found(dataset_entry.id));
             }
         }
 
-        Ok(downstream)
+        Ok(downstream_dependencies)
     }
 
     /// Current polling source used by the root dataset
@@ -328,32 +399,31 @@ impl DatasetMetadata {
 
 #[derive(Interface, Debug, Clone)]
 #[graphql(field(name = "message", ty = "String"))]
-enum UpstreamDatasetResult {
-    Found(UpstreamDatasetResultFound),
-    NotFound(UpstreamDatasetResultNotFound),
+enum DependencyDatasetResult {
+    Found(DependencyDatasetResultFound),
+    NotFound(DependencyDatasetResultNotFound),
 }
 
-impl UpstreamDatasetResult {
+impl DependencyDatasetResult {
     pub fn found(dataset: Dataset) -> Self {
-        Self::Found(UpstreamDatasetResultFound { dataset })
+        Self::Found(DependencyDatasetResultFound { dataset })
     }
 
-    pub fn not_found(dataset_handle: odf::DatasetHandle) -> Self {
-        Self::NotFound(UpstreamDatasetResultNotFound {
-            dataset_id: dataset_handle.id.into(),
-            dataset_alias: dataset_handle.alias.into(),
+    pub fn not_found(dataset_id: odf::DatasetID) -> Self {
+        Self::NotFound(DependencyDatasetResultNotFound {
+            dataset_id: dataset_id.into(),
         })
     }
 }
 
 #[derive(SimpleObject, Debug, Clone)]
 #[graphql(complex)]
-pub struct UpstreamDatasetResultFound {
+pub struct DependencyDatasetResultFound {
     pub dataset: Dataset,
 }
 
 #[ComplexObject]
-impl UpstreamDatasetResultFound {
+impl DependencyDatasetResultFound {
     async fn message(&self) -> String {
         "Found".to_string()
     }
@@ -361,13 +431,12 @@ impl UpstreamDatasetResultFound {
 
 #[derive(SimpleObject, Debug, Clone)]
 #[graphql(complex)]
-pub struct UpstreamDatasetResultNotFound {
+pub struct DependencyDatasetResultNotFound {
     pub dataset_id: DatasetID,
-    pub dataset_alias: DatasetAlias,
 }
 
 #[ComplexObject]
-impl UpstreamDatasetResultNotFound {
+impl DependencyDatasetResultNotFound {
     async fn message(&self) -> String {
         "Not found".to_string()
     }

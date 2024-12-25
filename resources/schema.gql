@@ -646,11 +646,11 @@ type DatasetMetadata {
 	"""
 	Current upstream dependencies of a dataset
 	"""
-	currentUpstreamDependencies: [UpstreamDatasetResult!]!
+	currentUpstreamDependencies: [DependencyDatasetResult!]!
 	"""
 	Current downstream dependencies of a dataset
 	"""
-	currentDownstreamDependencies: [Dataset!]!
+	currentDownstreamDependencies: [DependencyDatasetResult!]!
 	"""
 	Current polling source used by the root dataset
 	"""
@@ -846,6 +846,20 @@ type DeleteResultDanglingReference implements DeleteResult {
 
 type DeleteResultSuccess implements DeleteResult {
 	deletedDataset: DatasetAlias!
+	message: String!
+}
+
+interface DependencyDatasetResult {
+	message: String!
+}
+
+type DependencyDatasetResultFound implements DependencyDatasetResult {
+	dataset: Dataset!
+	message: String!
+}
+
+type DependencyDatasetResultNotFound implements DependencyDatasetResult {
+	datasetId: DatasetID!
 	message: String!
 }
 
@@ -1993,21 +2007,6 @@ type TriggerFlowSuccess implements TriggerFlowResult {
 }
 
 interface UpdateReadmeResult {
-	message: String!
-}
-
-interface UpstreamDatasetResult {
-	message: String!
-}
-
-type UpstreamDatasetResultFound implements UpstreamDatasetResult {
-	dataset: Dataset!
-	message: String!
-}
-
-type UpstreamDatasetResultNotFound implements UpstreamDatasetResult {
-	datasetId: DatasetID!
-	datasetAlias: DatasetAlias!
 	message: String!
 }
 

@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use database_common::{EntityPageListing, EntityPageStreamer, PaginationOpts};
@@ -17,8 +18,11 @@ use kamu_accounts::{
     AccountPageStream,
     AccountRepository,
     AccountService,
+    GetAccountByIdError,
+    GetAccountMapError,
     ListAccountError,
 };
+use opendatafabric as odf;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -66,6 +70,30 @@ impl AccountService for AccountServiceImpl {
             list: entries,
             total_count,
         })
+    }
+
+    async fn get_account_map(
+        &self,
+        account_ids: Vec<odf::AccountID>,
+    ) -> Result<HashMap<odf::AccountID, Account>, GetAccountMapError> {
+        let account_map = match self.account_repo.get_accounts_by_ids(account_ids).await {
+            Ok(accounts) => {
+                let map = accounts
+                    .into_iter()
+                    .fold(HashMap::new(), |mut acc, account| {
+                        acc.insert(account.id.clone(), account);
+                        acc
+                    });
+                Ok(map)
+            }
+            Err(err) => match err {
+                GetAccountByIdError::NotFound(_) => Ok(HashMap::new()),
+                e => Err(e),
+            },
+        }
+        .int_err()?;
+
+        Ok(account_map)
     }
 }
 

@@ -11,7 +11,7 @@ use std::collections::HashSet;
 
 use internal_error::InternalError;
 use kamu_core::auth::{
-    self,
+    ClassifyByAllowanceIdsResponse,
     ClassifyByAllowanceResponse,
     DatasetAction,
     DatasetActionAuthorizer,
@@ -21,7 +21,7 @@ use kamu_core::auth::{
 use kamu_core::AccessError;
 use mockall::predicate::{always, eq, function};
 use mockall::Predicate;
-use opendatafabric::{DatasetAlias, DatasetHandle};
+use opendatafabric as odf;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -32,32 +32,38 @@ mockall::mock! {
     impl DatasetActionAuthorizer for DatasetActionAuthorizer {
         async fn check_action_allowed(
             &self,
-            dataset_handle: &DatasetHandle,
+            dataset_handle: &odf::DatasetHandle,
             action: DatasetAction,
         ) -> Result<(), DatasetActionUnauthorizedError>;
 
         async fn get_allowed_actions(
             &self,
-            dataset_handle: &DatasetHandle,
+            dataset_handle: &odf::DatasetHandle,
         ) -> Result<HashSet<DatasetAction>, InternalError>;
 
         async fn filter_datasets_allowing(
             &self,
-            dataset_handles: Vec<DatasetHandle>,
+            dataset_handles: Vec<odf::DatasetHandle>,
             action: DatasetAction,
-        ) -> Result<Vec<DatasetHandle>, InternalError>;
+        ) -> Result<Vec<odf::DatasetHandle>, InternalError>;
 
         async fn classify_datasets_by_allowance(
             &self,
-            dataset_handles: Vec<DatasetHandle>,
+            dataset_handles: Vec<odf::DatasetHandle>,
             action: DatasetAction,
         ) -> Result<ClassifyByAllowanceResponse, InternalError>;
+
+        async fn classify_dataset_ids_by_allowance(
+            &self,
+            dataset_ids: Vec<odf::DatasetID>,
+            action: DatasetAction,
+        ) -> Result<ClassifyByAllowanceIdsResponse, InternalError>;
     }
 }
 
 impl MockDatasetActionAuthorizer {
     pub fn denying_error(
-        dataset_handle: &DatasetHandle,
+        dataset_handle: &odf::DatasetHandle,
         action: DatasetAction,
     ) -> DatasetActionUnauthorizedError {
         DatasetActionUnauthorizedError::Access(AccessError::Forbidden(
@@ -87,13 +93,13 @@ impl MockDatasetActionAuthorizer {
 
     pub fn expect_check_read_dataset(
         self,
-        dataset_alias: &DatasetAlias,
+        dataset_alias: &odf::DatasetAlias,
         times: usize,
         success: bool,
     ) -> Self {
         let dataset_alias = dataset_alias.clone();
         self.expect_check_action_allowed_internal(
-            function(move |dh: &DatasetHandle| dh.alias == dataset_alias),
+            function(move |dh: &odf::DatasetHandle| dh.alias == dataset_alias),
             DatasetAction::Read,
             times,
             success,
@@ -102,13 +108,13 @@ impl MockDatasetActionAuthorizer {
 
     pub fn expect_check_write_dataset(
         self,
-        dataset_alias: &DatasetAlias,
+        dataset_alias: &odf::DatasetAlias,
         times: usize,
         success: bool,
     ) -> Self {
         let dataset_alias = dataset_alias.clone();
         self.expect_check_action_allowed_internal(
-            function(move |dh: &DatasetHandle| dh.alias == dataset_alias),
+            function(move |dh: &odf::DatasetHandle| dh.alias == dataset_alias),
             DatasetAction::Write,
             times,
             success,
@@ -126,12 +132,12 @@ impl MockDatasetActionAuthorizer {
     fn expect_check_action_allowed_internal<P>(
         mut self,
         dataset_handle_predicate: P,
-        action: auth::DatasetAction,
+        action: DatasetAction,
         times: usize,
         success: bool,
     ) -> Self
     where
-        P: Predicate<DatasetHandle> + Sync + Send + 'static,
+        P: Predicate<odf::DatasetHandle> + Sync + Send + 'static,
     {
         if times > 0 {
             self.expect_check_action_allowed()
@@ -155,9 +161,9 @@ impl MockDatasetActionAuthorizer {
 
     pub fn make_expect_classify_datasets_by_allowance(
         mut self,
-        action: auth::DatasetAction,
+        action: DatasetAction,
         times: usize,
-        authorized: HashSet<DatasetAlias>,
+        authorized: HashSet<odf::DatasetAlias>,
     ) -> Self {
         self.expect_classify_datasets_by_allowance()
             .with(always(), eq(action))
