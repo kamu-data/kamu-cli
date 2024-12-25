@@ -8,24 +8,21 @@
 // by the Apache License, Version 2.0.
 
 mod api_server;
-pub use api_server::*;
-
-mod livy_server_impl;
-pub use livy_server_impl::*;
-
-mod notebook_server_impl;
-pub use notebook_server_impl::*;
-
+mod flight_sql_service_factory;
+mod notebook_server_factory;
+mod spark_livy_server_factory;
 mod sql_shell_impl;
-pub use sql_shell_impl::*;
-
+mod trace_server;
 mod ui_configuration;
-pub(crate) use ui_configuration::*;
-
 #[cfg(feature = "web-ui")]
 mod web_ui_server;
+
+pub use api_server::*;
+pub use flight_sql_service_factory::*;
+pub use notebook_server_factory::*;
+pub use spark_livy_server_factory::*;
+pub use sql_shell_impl::*;
+pub use trace_server::*;
+pub(crate) use ui_configuration::*;
 #[cfg(feature = "web-ui")]
 pub use web_ui_server::*;
-
-mod trace_server;
-pub use trace_server::*;

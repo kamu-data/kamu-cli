@@ -560,7 +560,7 @@ impl FlightSqlConfig {
 impl Default for FlightSqlConfig {
     fn default() -> Self {
         Self {
-            session_expiration_timeout: Some(DurationString::from_string("5m".to_owned()).unwrap()),
+            session_expiration_timeout: Some(DurationString::from_string("30m".to_owned()).unwrap()),
             session_inactivity_timeout: Some(DurationString::from_string("5s".to_owned()).unwrap()),
         }
     }

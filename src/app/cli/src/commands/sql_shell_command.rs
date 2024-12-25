@@ -97,13 +97,13 @@ impl SqlShellCommand {
             self.engine_prov_config.spark_image.clone(),
         );
 
-        let spinner = if self.output_config.verbosity_level == 0 && !self.output_config.quiet {
-            let mut pull_progress = PullImageProgress::new("container");
-            sql_shell
-                .ensure_images(&mut pull_progress)
-                .await
-                .int_err()?;
+        let mut pull_progress = PullImageProgress::new(self.output_config.clone(), "container");
+        sql_shell
+            .ensure_images(&mut pull_progress)
+            .await
+            .int_err()?;
 
+        let spinner = if self.output_config.verbosity_level == 0 && !self.output_config.quiet {
             let s = indicatif::ProgressBar::new_spinner();
             let style = indicatif::ProgressStyle::default_spinner()
                 .template("{spinner:.cyan} {msg}")

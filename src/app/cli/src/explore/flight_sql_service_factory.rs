@@ -1,0 +1,84 @@
+// Copyright Kamu Data, Inc. and contributors. All rights reserved.
+//
+// Use of this software is governed by the Business Source License
+// included in the LICENSE file.
+//
+// As of the Change Date specified in that file, in accordance with
+// the Business Source License, use of this software will be governed
+// by the Apache License, Version 2.0.
+
+use std::future::Future;
+use std::net::{IpAddr, SocketAddr};
+use std::pin::Pin;
+
+use arrow_flight::flight_service_server::FlightServiceServer;
+
+use crate::CLIError;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[dill::component]
+pub struct FlightSqlServiceFactory {
+    catalog: dill::Catalog,
+}
+
+impl FlightSqlServiceFactory {
+    pub async fn start(
+        &self,
+        address: Option<IpAddr>,
+        port: Option<u16>,
+    ) -> Result<FlightSqlService, CLIError> {
+        let listener = tokio::net::TcpListener::bind((
+            address.unwrap_or("127.0.0.1".parse().unwrap()),
+            port.unwrap_or(0),
+        ))
+        .await
+        .unwrap();
+
+        let address = listener.local_addr().unwrap();
+
+        // This catalog will be attached to every request by the middleware layer
+        let catalog = self.catalog.clone();
+
+        let server_future = tonic::transport::Server::builder()
+            .layer(observability::tonic::grpc_layer())
+            .layer(tonic::service::interceptor(
+                move |mut req: tonic::Request<()>| {
+                    req.extensions_mut().insert(catalog.clone());
+                    Ok(req)
+                },
+            ))
+            .add_service(FlightServiceServer::new(
+                kamu_adapter_flight_sql::KamuFlightSqlService::builder()
+                    .with_server_name(crate::BINARY_NAME, crate::VERSION)
+                    .build(),
+            ))
+            .serve_with_incoming(tokio_stream::wrappers::TcpListenerStream::new(listener));
+
+        tracing::info!("FlightSQL is listening on {:?}", address);
+
+        Ok(FlightSqlService {
+            address,
+            server_future: Box::pin(server_future),
+        })
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct FlightSqlService {
+    address: SocketAddr,
+    server_future: Pin<Box<dyn Future<Output = Result<(), tonic::transport::Error>>>>,
+}
+
+impl FlightSqlService {
+    pub fn local_addr(&self) -> &SocketAddr {
+        &self.address
+    }
+
+    pub async fn wait(self) -> Result<(), tonic::transport::Error> {
+        self.server_future.await
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

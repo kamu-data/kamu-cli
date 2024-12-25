@@ -32,6 +32,7 @@ pub struct RunArgs {
     pub tty: bool,
     pub user: Option<String>,
     pub volumes: Vec<VolumeSpec>,
+    pub extra_hosts: Vec<ExtraHostSpec>,
     pub work_dir: Option<PathBuf>,
 }
 
@@ -61,6 +62,14 @@ pub enum VolumeAccess {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExtraHostSpec {
+    pub source: String,
+    pub dest: String,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 impl Default for RunArgs {
     fn default() -> Self {
         Self {
@@ -83,6 +92,7 @@ impl Default for RunArgs {
             tty: false,
             user: None,
             volumes: Vec::new(),
+            extra_hosts: Vec::new(),
             work_dir: None,
         }
     }
@@ -112,6 +122,19 @@ where
             source: val.0.into(),
             dest: val.1.into(),
             access: val.2,
+        }
+    }
+}
+
+impl<S1, S2> From<(S1, S2)> for ExtraHostSpec
+where
+    S1: Into<String>,
+    S2: Into<String>,
+{
+    fn from(val: (S1, S2)) -> Self {
+        ExtraHostSpec {
+            source: val.0.into(),
+            dest: val.1.into(),
         }
     }
 }

@@ -814,6 +814,10 @@ pub struct Notebook {
     #[arg(long)]
     pub http_port: Option<u16>,
 
+    /// Engine type to use for the notebook
+    #[arg(long, value_name = "ENG", value_enum)]
+    pub engine: Option<SqlShellEngine>,
+
     /// Propagate or set an environment variable in the notebook (e.g. `-e VAR`
     /// or `-e VAR=foo`)
     #[arg(long, short = 'e', value_name = "VAR")]
@@ -1287,24 +1291,28 @@ pub enum SqlSubCommand {
     Server(SqlServer),
 }
 
-/// Run JDBC server only
+/// Run SQL server
 #[derive(Debug, clap::Args)]
 pub struct SqlServer {
-    /// Expose JDBC server on specific network interface
+    /// Expose server on specific network interface
     #[arg(long)]
     pub address: Option<std::net::IpAddr>,
 
-    /// Expose JDBC server on specific port
+    /// Expose server on specific port
     #[arg(long)]
     pub port: Option<u16>,
 
-    /// Run Livy server instead of Spark JDBC
+    /// Engine type to use for this server.
+    ///
+    /// Currently `datafusion` engine will expose Flight SQL endpoint, while
+    /// `spark` engine will expose either JDBC (default) or Livy endpoint (if
+    /// `--livy` flag is set).
+    #[arg(long, value_name = "ENG", value_enum)]
+    pub engine: Option<SqlShellEngine>,
+
+    /// Run Livy server instead of JDBC
     #[arg(long)]
     pub livy: bool,
-
-    /// Run Flight SQL server instead of Spark JDBC
-    #[arg(long)]
-    pub flight_sql: bool,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

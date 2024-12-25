@@ -263,8 +263,10 @@ pub fn get_command(
             cli_catalog.get_one()?,
             cli_catalog.get_one()?,
             cli_catalog.get_one()?,
+            cli_catalog.get_one()?,
             c.address,
             c.http_port,
+            c.engine,
             c.env.unwrap_or_default(),
         )),
         cli::Command::Pull(c) => {
@@ -385,39 +387,18 @@ pub fn get_command(
                 c.output_path,
                 c.records_per_file,
             )),
-            Some(cli::SqlSubCommand::Server(sc)) => {
-                if sc.livy {
-                    Box::new(SqlServerLivyCommand::new(
-                        cli_catalog.get_one()?,
-                        cli_catalog.get_one()?,
-                        cli_catalog.get_one()?,
-                        cli_catalog.get_one()?,
-                        sc.address,
-                        sc.port,
-                    ))
-                } else if sc.flight_sql {
-                    cfg_if::cfg_if! {
-                        if #[cfg(feature = "flight-sql")] {
-                            Box::new(SqlServerFlightSqlCommand::new(
-                                cli_catalog.clone(),
-                                sc.address,
-                                sc.port,
-                            ))
-                        } else {
-                            return Err(CLIError::usage_error("Kamu was compiled without Flight SQL support"))
-                        }
-                    }
-                } else {
-                    Box::new(SqlServerCommand::new(
-                        cli_catalog.get_one()?,
-                        cli_catalog.get_one()?,
-                        cli_catalog.get_one()?,
-                        cli_catalog.get_one()?,
-                        sc.address,
-                        sc.port,
-                    ))
-                }
-            }
+            Some(cli::SqlSubCommand::Server(sc)) => Box::new(SqlServerCommand::new(
+                cli_catalog.get_one()?,
+                cli_catalog.get_one()?,
+                cli_catalog.get_one()?,
+                cli_catalog.get_one()?,
+                cli_catalog.get_one()?,
+                cli_catalog.get_one()?,
+                sc.address,
+                sc.port,
+                sc.engine,
+                sc.livy,
+            )),
         },
         cli::Command::System(c) => match c.subcommand {
             cli::SystemSubCommand::ApiServer(sc) => match sc.subcommand {

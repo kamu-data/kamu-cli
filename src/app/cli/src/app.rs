@@ -528,6 +528,10 @@ pub fn configure_cli_catalog(
     b.add::<odf_server::LoginService>();
     b.add::<ConfirmDeleteService>();
 
+    b.add::<crate::explore::FlightSqlServiceFactory>();
+    b.add::<crate::explore::SparkLivyServerFactory>();
+    b.add::<crate::explore::NotebookServerFactory>();
+
     b
 }
 

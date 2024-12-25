@@ -29,9 +29,8 @@ doctest = false
 
 
 [features]
-default = ["flight-sql", "ingest-evm", "ingest-mqtt", "query-extensions-json"]
+default = ["ingest-evm", "ingest-mqtt", "query-extensions-json"]
 
-flight-sql = ["dep:kamu-adapter-flight-sql"]
 ingest-evm = ["kamu/ingest-evm"]
 ingest-ftp = ["kamu/ingest-ftp"]
 ingest-mqtt = ["kamu/ingest-mqtt"]
@@ -55,7 +54,7 @@ kamu = { workspace = true }
 kamu-data-utils = { workspace = true }
 
 kamu-adapter-auth-oso = { workspace = true }
-kamu-adapter-flight-sql = { optional = true, workspace = true }
+kamu-adapter-flight-sql = { workspace = true }
 kamu-adapter-graphql = { workspace = true }
 kamu-adapter-http = { workspace = true, features = [
     "e2e",

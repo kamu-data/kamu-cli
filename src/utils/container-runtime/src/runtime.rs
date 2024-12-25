@@ -192,6 +192,10 @@ impl ContainerRuntime {
 
             cmd.arg(volume);
         });
+        args.extra_hosts.into_iter().for_each(|h| {
+            cmd.arg("--add-host");
+            cmd.arg(format!("{}:{}", h.source, h.dest));
+        });
         args.user.map(|v| cmd.arg(format!("--user={v}")));
         args.work_dir
             .map(|v| cmd.arg(format!("--workdir={}", v.display())));
@@ -481,6 +485,11 @@ impl ContainerRuntime {
 
             tokio::time::sleep(Self::TICK_INTERVAL).await;
         }
+    }
+
+    pub fn get_random_free_port(&self) -> Result<u16, std::io::Error> {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0")?;
+        Ok(listener.local_addr()?.port())
     }
 
     pub fn format_host_path(path: PathBuf) -> String {

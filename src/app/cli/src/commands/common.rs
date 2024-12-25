@@ -7,21 +7,25 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use kamu::domain::PullImageListener;
 
+use crate::OutputConfig;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct PullImageProgress {
+    output_config: Arc<OutputConfig>,
     image_purpose: &'static str,
     progress_bar: Mutex<Option<indicatif::ProgressBar>>,
 }
 
 impl PullImageProgress {
-    pub fn new(image_purpose: &'static str) -> Self {
+    pub fn new(output_config: Arc<OutputConfig>, image_purpose: &'static str) -> Self {
         Self {
+            output_config,
             image_purpose,
             progress_bar: Mutex::new(None),
         }
@@ -30,6 +34,13 @@ impl PullImageProgress {
 
 impl PullImageListener for PullImageProgress {
     fn begin(&self, image: &str) {
+        if !self.output_config.is_tty
+            || self.output_config.verbosity_level != 0
+            || self.output_config.quiet
+        {
+            return;
+        }
+
         let s = indicatif::ProgressBar::new_spinner();
         let style = indicatif::ProgressStyle::default_spinner()
             .template("{spinner:.cyan} {msg}")

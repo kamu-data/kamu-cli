@@ -42,9 +42,6 @@ mod reset_command;
 mod search_command;
 mod set_watermark_command;
 mod sql_server_command;
-#[cfg(feature = "flight-sql")]
-mod sql_server_flightsql_command;
-mod sql_server_livy_command;
 mod sql_shell_command;
 mod system_api_server_gql_query_command;
 mod system_api_server_gql_schema_command;
@@ -95,9 +92,6 @@ pub use reset_command::*;
 pub use search_command::*;
 pub use set_watermark_command::*;
 pub use sql_server_command::*;
-#[cfg(feature = "flight-sql")]
-pub use sql_server_flightsql_command::*;
-pub use sql_server_livy_command::*;
 pub use sql_shell_command::*;
 pub use system_api_server_gql_query_command::*;
 pub use system_api_server_gql_schema_command::*;
