@@ -126,18 +126,57 @@ where
         let allow_anonymous = self.allow_anonymous;
 
         Box::pin(async move {
-            // Disallow fully unauthorized access - anonymous users have to go through
-            // handshare procedure
-            let Some(token) = Self::extract_bearer_token(&request) else {
-                let (service, method) = Self::extract_service_method(&request);
+            let base_catalog = request
+                .extensions()
+                .get::<dill::Catalog>()
+                .expect("Catalog not found in request extensions");
 
-                // Only handshake endpoint can be accessed without a token
-                if allow_anonymous
+            let token = Self::extract_bearer_token(&request);
+            let (service, method) = Self::extract_service_method(&request);
+
+            let subject = match &token {
+                None if allow_anonymous
                     && service == "arrow.flight.protocol.FlightService"
-                    && method == "Handshake"
+                    && method == "Handshake" =>
                 {
-                    return inner.call(request).await;
-                } else {
+                    CurrentAccountSubject::anonymous(
+                        AnonymousAccountReason::NoAuthenticationProvided,
+                    )
+                }
+                Some(token) if allow_anonymous && token.starts_with("anon_") => {
+                    // TODO: SEC: Anonymous session tokens have to be validated
+                    CurrentAccountSubject::anonymous(
+                        AnonymousAccountReason::NoAuthenticationProvided,
+                    )
+                }
+                Some(token) => {
+                    match Self::get_account_by_token(base_catalog, token.clone()).await {
+                        Ok(account) => CurrentAccountSubject::logged(
+                            account.id,
+                            account.account_name,
+                            account.is_admin,
+                        ),
+                        Err(e @ GetAccountInfoError::AccessToken(_)) => {
+                            tracing::warn!("{e}");
+                            return Ok(Status::unauthenticated(e.to_string()).into_http());
+                        }
+                        Err(e @ GetAccountInfoError::AccountUnresolved) => {
+                            tracing::warn!("{e}");
+                            return Ok(Status::unauthenticated(e.to_string()).into_http());
+                        }
+                        Err(e @ GetAccountInfoError::Internal(_)) => {
+                            tracing::error!(
+                                error = ?e,
+                                error_msg = %e,
+                                "Internal error during authentication",
+                            );
+                            return Ok(Status::internal("Internal error").into_http());
+                        }
+                    }
+                }
+                _ => {
+                    // Disallow fully unauthorized access - anonymous users have to go through
+                    // handshare procedure
                     return Ok(Status::unauthenticated(
                         "Unauthenticated access is not allowed. Provide a bearer token or use \
                          basic auth and handshake endpoint to login as anonymous.",
@@ -146,46 +185,14 @@ where
                 }
             };
 
-            let base_catalog = request
-                .extensions()
-                .get::<dill::Catalog>()
-                .expect("Catalog not found in request extensions");
+            let session_id = token.map(SessionId);
 
-            // TODO: SEC: Anonymous session tokens have to be validated
-            let subject = if allow_anonymous && token.starts_with("anon_") {
-                CurrentAccountSubject::anonymous(AnonymousAccountReason::NoAuthenticationProvided)
-            } else {
-                match Self::get_account_by_token(base_catalog, token.clone()).await {
-                    Ok(account) => CurrentAccountSubject::logged(
-                        account.id,
-                        account.account_name,
-                        account.is_admin,
-                    ),
-                    Err(e @ GetAccountInfoError::AccessToken(_)) => {
-                        tracing::warn!("{e}");
-                        return Ok(Status::unauthenticated(e.to_string()).into_http());
-                    }
-                    Err(e @ GetAccountInfoError::AccountUnresolved) => {
-                        tracing::warn!("{e}");
-                        return Ok(Status::unauthenticated(e.to_string()).into_http());
-                    }
-                    Err(e @ GetAccountInfoError::Internal(_)) => {
-                        tracing::error!(
-                            error = ?e,
-                            error_msg = %e,
-                            "Internal error during authentication",
-                        );
-                        return Ok(Status::internal("Internal error").into_http());
-                    }
-                }
-            };
-
-            let session_id = SessionId(token.clone());
-
-            tracing::debug!(?subject, %session_id, "Authenticated request");
+            tracing::debug!(?subject, ?session_id, "Authenticated request");
 
             let mut derived_catalog_builder = dill::CatalogBuilder::new_chained(base_catalog);
-            derived_catalog_builder.add_value(session_id);
+            if let Some(session_id) = session_id {
+                derived_catalog_builder.add_value(session_id);
+            }
             derived_catalog_builder.add_value(subject);
 
             let derived_catalog = derived_catalog_builder.build();

@@ -51,9 +51,7 @@ impl FlightSqlServiceFactory {
             ))
             .layer(AuthenticationLayer::new(true))
             .add_service(FlightServiceServer::new(
-                kamu_adapter_flight_sql::KamuFlightSqlService::builder()
-                    .with_server_name(crate::BINARY_NAME, crate::VERSION)
-                    .build(),
+                kamu_adapter_flight_sql::KamuFlightSqlServiceWrapper,
             ))
             .serve_with_incoming(tokio_stream::wrappers::TcpListenerStream::new(listener));
 

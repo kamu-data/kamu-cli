@@ -79,7 +79,13 @@ async fn run_server() -> FlightServer {
         .add_value(query_svc)
         .bind::<dyn QueryService, MockQueryService>()
         .add::<SessionManagerSingleton>()
-        .add::<SessionManagerSingletonState>();
+        .add::<SessionManagerSingletonState>()
+        .add_value(
+            kamu_adapter_flight_sql::sql_info::default_sql_info()
+                .build()
+                .unwrap(),
+        )
+        .add::<KamuFlightSqlService>();
 
     database_common::NoOpDatabasePlugin::init_database_components(&mut b);
 
@@ -95,9 +101,7 @@ async fn run_server() -> FlightServer {
             Ok(req)
         }))
         .layer(AuthenticationLayer::new(true))
-        .add_service(FlightServiceServer::new(
-            KamuFlightSqlService::builder().build(),
-        ))
+        .add_service(FlightServiceServer::new(KamuFlightSqlServiceWrapper))
         .serve_with_incoming(tokio_stream::wrappers::TcpListenerStream::new(listener));
 
     let task = tokio::task::spawn(service);

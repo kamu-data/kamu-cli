@@ -28,11 +28,18 @@ pub struct SessionAuthAnonymous {}
 #[async_trait::async_trait]
 impl SessionAuth for SessionAuthAnonymous {
     async fn auth_basic(&self, username: &str, password: &str) -> Result<SessionToken, Status> {
-        if username != "anonymous" || !password.is_empty() {
-            return Err(Status::unauthenticated(
-                "Basic auth is only supported for 'anonymous' accounts with no password. \
-                 Authenticated users should use Bearer token auth mechanism.",
-            ));
+        match (username, password) {
+            ("anonymous", "") => {}
+            // Some libraries have bugs that prevent using empty password
+            ("anonymous", "anonymous") => {}
+            // Deprecated: preserving compatibility with old credentials
+            ("kamu", "kamu") => {}
+            _ => {
+                return Err(Status::unauthenticated(
+                    "Basic auth is only supported for 'anonymous' accounts with no password. \
+                     Authenticated users should use Bearer token auth mechanism.",
+                ))
+            }
         }
 
         let mut random_token_bytes = [0_u8; ANON_SESSION_TOKEN_BYTES_LENGTH];

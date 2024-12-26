@@ -167,10 +167,11 @@ impl SessionManagerCaching {
 
                 // Re-schedule to updated time
                 accessed_cas = session.accessed;
-                inactive_in = inactivity_timeout
-                    - (std::cmp::max(timer.now(), session.accessed) - session.accessed)
+                inactive_in = inactivity_timeout.saturating_sub(
+                    (std::cmp::max(timer.now(), session.accessed) - session.accessed)
                         .to_std()
-                        .unwrap();
+                        .unwrap(),
+                );
             }
         });
     }

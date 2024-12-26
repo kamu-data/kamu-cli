@@ -479,10 +479,15 @@ pub fn configure_base_catalog(
 
     b.add::<RebacServiceImpl>();
 
-    // TODO: Unstub FlightSQL authentication
     b.add::<kamu_adapter_flight_sql::SessionAuthAnonymous>();
     b.add::<kamu_adapter_flight_sql::SessionManagerCaching>();
     b.add::<kamu_adapter_flight_sql::SessionManagerCachingState>();
+    b.add_value(
+        kamu_adapter_flight_sql::sql_info::default_sql_info()
+            .build()
+            .unwrap(),
+    );
+    b.add::<kamu_adapter_flight_sql::KamuFlightSqlService>();
 
     if tenancy_config == TenancyConfig::MultiTenant {
         b.add::<MultiTenantRebacDatasetLifecycleMessageConsumer>();
