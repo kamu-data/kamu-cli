@@ -853,13 +853,13 @@ interface DependencyDatasetResult {
 	message: String!
 }
 
-type DependencyDatasetResultFound implements DependencyDatasetResult {
+type DependencyDatasetResultAccessible implements DependencyDatasetResult {
 	dataset: Dataset!
 	message: String!
 }
 
-type DependencyDatasetResultNotFound implements DependencyDatasetResult {
-	datasetId: DatasetID!
+type DependencyDatasetResultNotAccessible implements DependencyDatasetResult {
+	id: DatasetID!
 	message: String!
 }
 
