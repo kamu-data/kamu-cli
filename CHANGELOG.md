@@ -11,6 +11,13 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Unreleased]
+### Changed
+- Flight SQL protocol now fully support authentication (anonymous and bearer token)
+- The `kamu notebook` command uses new image based on latest Jupyter and new [`kamu-client-python`](https://github.com/kamu-data/kamu-client-python) library
+- The `kamu sql server` command interface changed to use `--engine datafusion/spark`, removing the `--flight-sql` flag
+- Examples in `example/flightsql/python` were updated to new auth and showcasing `kamu` Python library
+
 ## [0.215.1] - 2024-12-30
 ### Fixed
 - GraphQL: in a multi-tenant workspace, `datasets.createEmpty` and `datasets.createFromSnapshot` mutations now return dataset aliases prefixed with account name.

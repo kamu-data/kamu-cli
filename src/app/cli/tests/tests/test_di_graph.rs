@@ -66,6 +66,7 @@ fn test_di_cli_graph_validates(tenancy_config: TenancyConfig) {
     cli_catalog_builder.add_value(CurrentAccountSubject::new_test());
     cli_catalog_builder.add_value(JwtAuthenticationConfig::default());
     cli_catalog_builder.add_value(GithubAuthenticationConfig::default());
+    cli_catalog_builder.add_value(kamu_adapter_flight_sql::SessionId(String::new()));
 
     let validate_result = cli_catalog_builder.validate();
 
@@ -99,6 +100,7 @@ fn test_di_server_graph_validates(tenancy_config: TenancyConfig) {
     cli_catalog_builder.add_value(GithubAuthenticationConfig::default());
     cli_catalog_builder.add_value(ServerUrlConfig::new_test(None));
     cli_catalog_builder.add_value(AccessToken::new("some-test-token"));
+    cli_catalog_builder.add_value(kamu_adapter_flight_sql::SessionId(String::new()));
 
     // TODO: We should ensure this test covers parameters requested by commands and
     // types needed for GQL/HTTP adapter that are currently being constructed

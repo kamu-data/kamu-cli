@@ -73,7 +73,7 @@ impl NotebookServerFactory {
                 ("KAMU_CLIENT_URL", client_url.as_str()),
             ])
             .work_dir("/opt/workdir")
-            .map(network, move |c, network| c.network(network))
+            .map(network, container_runtime::ContainerRunCommand::network)
             .extra_host(("host.docker.internal", "host-gateway"))
             .map_or(
                 address,

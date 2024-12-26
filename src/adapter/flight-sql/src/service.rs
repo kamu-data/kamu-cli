@@ -1175,7 +1175,7 @@ impl FlightSqlService for KamuFlightSqlService {
         // See: https://github.com/apache/arrow-rs/issues/6516
         if request.get_ref().r#type == CLOSE_SESSION {
             self.do_action_close_session(request).await?;
-            return Ok(Response::new(Box::pin(futures::stream::empty())));
+            Ok(Response::new(Box::pin(futures::stream::empty())))
         } else {
             Err(Status::invalid_argument(format!(
                 "do_action: The defined request is invalid: {:?}",

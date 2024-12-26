@@ -29,11 +29,9 @@ pub struct SessionAuthAnonymous {}
 impl SessionAuth for SessionAuthAnonymous {
     async fn auth_basic(&self, username: &str, password: &str) -> Result<SessionToken, Status> {
         match (username, password) {
-            ("anonymous", "") => {}
             // Some libraries have bugs that prevent using empty password
-            ("anonymous", "anonymous") => {}
-            // Deprecated: preserving compatibility with old credentials
-            ("kamu", "kamu") => {}
+            // kamu/kamu is deprecated - preserving compatibility with old credentials
+            ("anonymous", "" | "anonymous") | ("kamu", "kamu") => {}
             _ => {
                 return Err(Status::unauthenticated(
                     "Basic auth is only supported for 'anonymous' accounts with no password. \
