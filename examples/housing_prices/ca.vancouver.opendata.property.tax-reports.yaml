@@ -84,4 +84,4 @@ content:
           - REPORT_YEAR
           - PID
     - kind: SetVocab
-      eventTimeColumn: report_year
+      eventTimeColumn: REPORT_YEAR
