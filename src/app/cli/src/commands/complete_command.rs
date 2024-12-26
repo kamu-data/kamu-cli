@@ -12,19 +12,24 @@ use std::sync::Arc;
 use std::{fs, path};
 
 use chrono::prelude::*;
-use futures::TryStreamExt;
 use glob;
-use internal_error::ResultIntoInternal;
+use internal_error::{InternalError, ResultIntoInternal};
+use kamu::domain::auth::{DatasetAction, DatasetActionAuthorizerExt};
 use kamu::domain::*;
 
 use super::{CLIError, Command};
+use crate::accounts;
 use crate::config::ConfigService;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct CompleteCommand {
     dataset_registry: Option<Arc<dyn DatasetRegistry>>,
     remote_repo_reg: Option<Arc<dyn RemoteRepositoryRegistry>>,
     remote_alias_reg: Option<Arc<dyn RemoteAliasesRegistry>>,
     config_service: Arc<ConfigService>,
+    dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
+    current_account: Option<accounts::CurrentAccountIndication>,
     cli: clap::Command,
     input: String,
     current: usize,
@@ -38,6 +43,8 @@ impl CompleteCommand {
         remote_repo_reg: Option<Arc<dyn RemoteRepositoryRegistry>>,
         remote_alias_reg: Option<Arc<dyn RemoteAliasesRegistry>>,
         config_service: Arc<ConfigService>,
+        current_account: Option<accounts::CurrentAccountIndication>,
+        dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
         cli: clap::Command,
         input: S,
         current: usize,
@@ -50,6 +57,8 @@ impl CompleteCommand {
             remote_repo_reg,
             remote_alias_reg,
             config_service,
+            current_account,
+            dataset_action_authorizer,
             cli,
             input: input.into(),
             current,
@@ -73,15 +82,33 @@ impl CompleteCommand {
         }
     }
 
-    async fn complete_dataset(&self, output: &mut impl Write, prefix: &str) {
-        if let Some(registry) = self.dataset_registry.as_ref() {
-            let mut datasets = registry.all_dataset_handles();
-            while let Some(dataset_handle) = datasets.try_next().await.unwrap() {
-                if dataset_handle.alias.dataset_name.starts_with(prefix) {
-                    writeln!(output, "{}", dataset_handle.alias).unwrap();
-                }
+    async fn complete_dataset(
+        &self,
+        output: &mut impl Write,
+        prefix: &str,
+    ) -> Result<(), InternalError> {
+        let (Some(dataset_registry), Some(current_account)) =
+            (&self.dataset_registry, &self.current_account)
+        else {
+            // We are outside the workspace
+            return Ok(());
+        };
+
+        use futures::stream::TryStreamExt;
+
+        let handle_streams = dataset_registry
+            .all_owned_and_potentially_related_dataset_handles(&current_account.account_name);
+        let mut stream = self
+            .dataset_action_authorizer
+            .filtered_datasets_stream(handle_streams, DatasetAction::Read);
+
+        while let Some(dataset_handle) = stream.try_next().await? {
+            if dataset_handle.alias.dataset_name.starts_with(prefix) {
+                writeln!(output, "{}", dataset_handle.alias).unwrap();
             }
         }
+
+        Ok(())
     }
 
     fn complete_repository(&self, output: &mut impl Write, prefix: &str) {
@@ -94,25 +121,47 @@ impl CompleteCommand {
         }
     }
 
-    async fn complete_alias(&self, output: &mut impl Write, prefix: &str) {
-        if let Some(registry) = self.dataset_registry.as_ref() {
-            if let Some(reg) = self.remote_alias_reg.as_ref() {
-                let mut datasets = registry.all_dataset_handles();
-                while let Some(hdl) = datasets.try_next().await.unwrap() {
-                    let aliases = reg.get_remote_aliases(&hdl).await.unwrap();
-                    for alias in aliases.get_by_kind(RemoteAliasKind::Pull) {
-                        if alias.to_string().starts_with(prefix) {
-                            writeln!(output, "{alias}").unwrap();
-                        }
-                    }
-                    for alias in aliases.get_by_kind(RemoteAliasKind::Push) {
-                        if alias.to_string().starts_with(prefix) {
-                            writeln!(output, "{alias}").unwrap();
-                        }
-                    }
+    async fn complete_alias(
+        &self,
+        output: &mut impl Write,
+        prefix: &str,
+    ) -> Result<(), InternalError> {
+        let (Some(dataset_registry), Some(remote_aliases_registry), Some(current_account)) = (
+            &self.dataset_registry,
+            &self.remote_alias_reg,
+            &self.current_account,
+        ) else {
+            // We are outside the workspace
+            return Ok(());
+        };
+
+        let handle_streams = dataset_registry
+            .all_owned_and_potentially_related_dataset_handles(&current_account.account_name);
+        let mut stream = self
+            .dataset_action_authorizer
+            .filtered_datasets_stream(handle_streams, DatasetAction::Read);
+
+        use futures::TryStreamExt;
+
+        while let Some(dataset_handle) = stream.try_next().await? {
+            let aliases = remote_aliases_registry
+                .get_remote_aliases(&dataset_handle)
+                .await
+                .int_err()?;
+
+            for alias in aliases.get_by_kind(RemoteAliasKind::Pull) {
+                if alias.to_string().starts_with(prefix) {
+                    writeln!(output, "{alias}").int_err()?;
+                }
+            }
+            for alias in aliases.get_by_kind(RemoteAliasKind::Push) {
+                if alias.to_string().starts_with(prefix) {
+                    writeln!(output, "{alias}").int_err()?;
                 }
             }
         }
+
+        Ok(())
     }
 
     fn complete_config_key(&self, output: &mut impl Write, prefix: &str) {
@@ -221,9 +270,9 @@ impl CompleteCommand {
         // Complete positionals
         for pos in last_cmd.get_positionals() {
             match pos.get_id().as_str() {
-                "alias" => self.complete_alias(output, to_complete).await,
+                "alias" => self.complete_alias(output, to_complete).await.int_err()?,
                 "cfgkey" => self.complete_config_key(output, to_complete),
-                "dataset" => self.complete_dataset(output, to_complete).await,
+                "dataset" => self.complete_dataset(output, to_complete).await.int_err()?,
                 "file" | "manifest" => self.complete_path(output, to_complete),
                 "repository" => self.complete_repository(output, to_complete),
                 _ => (),

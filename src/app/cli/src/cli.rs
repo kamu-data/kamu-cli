@@ -1405,7 +1405,10 @@ pub struct SystemDiagnose {}
 #[derive(Debug, clap::Args)]
 #[command(hide = true)]
 pub struct SystemE2e {
-    #[arg(long, value_name = "ACT", value_parser = ["get-last-data-block-path"])]
+    #[arg()]
+    pub arguments: Option<Vec<String>>,
+
+    #[arg(long, value_name = "ACT", value_parser = ["get-last-data-block-path", "account-add"])]
     pub action: String,
 
     /// Local dataset reference

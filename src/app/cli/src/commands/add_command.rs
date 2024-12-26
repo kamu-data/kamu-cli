@@ -277,10 +277,12 @@ impl Command for AddCommand {
         // Delete existing datasets if we are replacing
         if self.replace {
             let mut already_exist = Vec::new();
-            for s in &snapshots {
+            for snapshot in &snapshots {
+                let dataset_alias = snapshot.name.clone();
+
                 if let Some(hdl) = self
                     .dataset_registry
-                    .try_resolve_dataset_handle_by_ref(&s.name.as_local_ref())
+                    .try_resolve_dataset_handle_by_ref(&dataset_alias.into_local_ref())
                     .await?
                 {
                     already_exist.push(hdl);
@@ -292,8 +294,6 @@ impl Command for AddCommand {
                     .confirm_delete(&already_exist)
                     .await?;
 
-                // TODO: Private Datasets: delete permissions should be checked in multi-tenant
-                //                         scenario
                 for hdl in already_exist {
                     self.delete_dataset.execute_via_handle(&hdl).await?;
                 }
