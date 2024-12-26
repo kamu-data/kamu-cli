@@ -480,11 +480,7 @@ pub fn configure_base_catalog(
     b.add::<RebacServiceImpl>();
 
     // TODO: Unstub FlightSQL authentication
-    b.add_builder(
-        kamu_adapter_flight_sql::SessionAuthBasicPredefined::builder()
-            .with_accounts_passwords([("kamu".to_string(), "kamu".to_string())].into()),
-    );
-    b.bind::<dyn kamu_adapter_flight_sql::SessionAuth, kamu_adapter_flight_sql::SessionAuthBasicPredefined>();
+    b.add::<kamu_adapter_flight_sql::SessionAuthAnonymous>();
     b.add::<kamu_adapter_flight_sql::SessionManagerCaching>();
     b.add::<kamu_adapter_flight_sql::SessionManagerCachingState>();
 
@@ -504,6 +500,10 @@ pub fn configure_base_catalog(
     b.bind::<dyn Outbox, OutboxDispatchingImpl>();
     b.add::<messaging_outbox::OutboxAgent>();
     b.add::<messaging_outbox::OutboxAgentMetrics>();
+
+    b.add::<crate::explore::FlightSqlServiceFactory>();
+    b.add::<crate::explore::SparkLivyServerFactory>();
+    b.add::<crate::explore::NotebookServerFactory>();
 
     register_message_dispatcher::<DatasetLifecycleMessage>(
         &mut b,
@@ -527,10 +527,6 @@ pub fn configure_cli_catalog(
     );
     b.add::<odf_server::LoginService>();
     b.add::<ConfirmDeleteService>();
-
-    b.add::<crate::explore::FlightSqlServiceFactory>();
-    b.add::<crate::explore::SparkLivyServerFactory>();
-    b.add::<crate::explore::NotebookServerFactory>();
 
     b
 }

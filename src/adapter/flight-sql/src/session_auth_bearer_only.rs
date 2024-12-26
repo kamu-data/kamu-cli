@@ -9,14 +9,23 @@
 
 use tonic::Status;
 
-use crate::SessionToken;
+use crate::{SessionAuth, SessionToken};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Simplified trait that some session managers can delegate authentication to
+/// Rejects all basic auth attempts, requiring that users auth via bearer tokens
+#[dill::component]
+#[dill::interface(dyn SessionAuth)]
+pub struct SessionAuthBearerOnly {}
+
 #[async_trait::async_trait]
-pub trait SessionAuth: Send + Sync {
-    async fn auth_basic(&self, username: &str, password: &str) -> Result<SessionToken, Status>;
+impl SessionAuth for SessionAuthBearerOnly {
+    async fn auth_basic(&self, _username: &str, _password: &str) -> Result<SessionToken, Status> {
+        Err(Status::unauthenticated(
+            "Basic auth and anonymous access are not supported by this server. Users must \
+             authenticate via Bearer token auth mechanism.",
+        ))
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

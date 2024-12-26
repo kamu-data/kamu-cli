@@ -388,8 +388,8 @@ pub fn get_command(
                 c.records_per_file,
             )),
             Some(cli::SqlSubCommand::Server(sc)) => Box::new(SqlServerCommand::new(
-                cli_catalog.get_one()?,
-                cli_catalog.get_one()?,
+                base_catalog.get_one()?,
+                base_catalog.get_one()?,
                 cli_catalog.get_one()?,
                 cli_catalog.get_one()?,
                 cli_catalog.get_one()?,

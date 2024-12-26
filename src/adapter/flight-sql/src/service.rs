@@ -73,11 +73,13 @@ use tonic::codegen::tokio_stream::Stream;
 use tonic::metadata::MetadataValue;
 use tonic::{Request, Response, Status, Streaming};
 
-use crate::{KamuFlightSqlServiceBuilder, PlanToken, SessionManager, SessionToken};
+use crate::{KamuFlightSqlServiceBuilder, PlanId, SessionAuth, SessionManager};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 const TABLE_TYPES: [&str; 2] = ["TABLE", "VIEW"];
+
+const CLOSE_SESSION: &str = "CloseSession";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // KamuFlightSqlService
@@ -107,33 +109,20 @@ impl KamuFlightSqlService {
             return Err(Status::internal("Catalog extension is not configured"));
         };
 
-        catalog
-            .get_one()
-            .map_err(|_| Status::internal("Injection error"))
+        catalog.get_one().map_err(internal_error)
     }
 
-    fn get_token<T>(&self, req: &Request<T>) -> Result<SessionToken, Status> {
-        let auth = req
-            .metadata()
-            .get("authorization")
-            .ok_or_else(|| Status::internal("No authorization header!"))?
-            .to_str()
-            .map_err(|e| Status::internal(format!("Error parsing header: {e}")))?
-            .to_string();
-
-        let Some(session_token) = auth.strip_prefix("Bearer ") else {
-            return Err(Status::internal("Invalid auth header!"));
+    fn get_session_auth<T>(
+        &self,
+        req: &Request<T>,
+    ) -> Result<Option<Arc<dyn SessionAuth>>, Status> {
+        let Some(catalog) = req.extensions().get::<dill::Catalog>() else {
+            return Err(Status::internal("Catalog extension is not configured"));
         };
 
-        Ok(SessionToken::from(session_token))
-    }
-
-    async fn get_ctx<T>(&self, req: &Request<T>) -> Result<Arc<SessionContext>, Status> {
-        let session_token = self.get_token(req)?;
-
-        self.get_session_manager(req)?
-            .get_context(&session_token.to_string())
-            .await
+        catalog
+            .get::<dill::specs::Maybe<dill::specs::OneOf<dyn SessionAuth>>>()
+            .map_err(internal_error)
     }
 
     fn get_sql_info(
@@ -638,6 +627,11 @@ impl KamuFlightSqlService {
         let stream = futures::stream::iter(flights.into_iter().map(Ok));
         Ok(Response::new(Box::pin(stream)))
     }
+
+    #[tracing::instrument(level = "debug", skip_all)]
+    async fn do_action_close_session(&self, request: Request<Action>) -> Result<(), Status> {
+        self.get_session_manager(&request)?.close_session().await
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -657,7 +651,14 @@ impl FlightSqlService for KamuFlightSqlService {
         Response<Pin<Box<dyn Stream<Item = Result<HandshakeResponse, Status>> + Send>>>,
         Status,
     > {
+        use base64::engine::{GeneralPurpose, GeneralPurposeConfig};
         use base64::Engine;
+
+        let Some(session_auth) = self.get_session_auth(&request)? else {
+            return Err(Status::invalid_argument(
+                "Basic auth is not supported by this server",
+            ));
+        };
 
         let basic = "Basic ";
         let authorization = request
@@ -672,7 +673,12 @@ impl FlightSqlService for KamuFlightSqlService {
             )))?;
         }
         let base64 = &authorization[basic.len()..];
-        let bytes = base64::engine::general_purpose::STANDARD
+        let b64engine = GeneralPurpose::new(
+            &base64::alphabet::STANDARD,
+            GeneralPurposeConfig::new()
+                .with_decode_padding_mode(base64::engine::DecodePaddingMode::Indifferent),
+        );
+        let bytes = b64engine
             .decode(base64)
             .map_err(|_| Status::invalid_argument("authorization not parsable"))?;
         let str = String::from_utf8(bytes)
@@ -684,10 +690,7 @@ impl FlightSqlService for KamuFlightSqlService {
         let username = parts[0];
         let password = parts[1];
 
-        let session_token = self
-            .get_session_manager(&request)?
-            .auth_basic(username, password)
-            .await?;
+        let session_token = session_auth.auth_basic(username, password).await?;
 
         let result = HandshakeResponse {
             protocol_version: 0,
@@ -733,7 +736,7 @@ impl FlightSqlService for KamuFlightSqlService {
         query: CommandStatementQuery,
         request: Request<FlightDescriptor>,
     ) -> Result<Response<FlightInfo>, Status> {
-        let ctx = self.get_ctx(&request).await?;
+        let ctx = self.get_session_manager(&request)?.get_context().await?;
         let plan = Self::prepare_statement(&query.query, &ctx).await?;
         let df = ctx
             .execute_logical_plan(plan)
@@ -754,18 +757,16 @@ impl FlightSqlService for KamuFlightSqlService {
         query: CommandPreparedStatementQuery,
         request: Request<FlightDescriptor>,
     ) -> Result<Response<FlightInfo>, Status> {
-        let session_token = self.get_token(&request)?;
-
-        let plan_token = PlanToken::from_utf8(query.prepared_statement_handle.to_vec())
-            .map_err(|e| Status::internal(format!("Error decoding handle: {e}")))?;
+        let plan_id = PlanId(
+            String::from_utf8(query.prepared_statement_handle.to_vec())
+                .map_err(|e| Status::internal(format!("Error decoding handle: {e}")))?,
+        );
 
         let session_manager = self.get_session_manager(&request)?;
 
-        let plan = session_manager
-            .get_plan(&session_token, &plan_token)
-            .await?;
+        let plan = session_manager.get_plan(&plan_id).await?;
 
-        let ctx = session_manager.get_context(&session_token).await?;
+        let ctx = session_manager.get_context().await?;
 
         let df = ctx
             .execute_logical_plan(plan)
@@ -782,7 +783,7 @@ impl FlightSqlService for KamuFlightSqlService {
         query: CommandGetCatalogs,
         request: Request<FlightDescriptor>,
     ) -> Result<Response<FlightInfo>, Status> {
-        let ctx = self.get_ctx(&request).await?;
+        let ctx = self.get_session_manager(&request)?.get_context().await?;
         let data = self.get_catalogs(&ctx, &query, true)?;
         self.record_batch_to_flight_info(&data, &query.as_any(), true)
     }
@@ -793,7 +794,7 @@ impl FlightSqlService for KamuFlightSqlService {
         query: CommandGetDbSchemas,
         request: Request<FlightDescriptor>,
     ) -> Result<Response<FlightInfo>, Status> {
-        let ctx = self.get_ctx(&request).await?;
+        let ctx = self.get_session_manager(&request)?.get_context().await?;
         let data = self.get_schemas(&ctx, &query, true)?;
         self.record_batch_to_flight_info(&data, &query.as_any(), true)
     }
@@ -804,7 +805,7 @@ impl FlightSqlService for KamuFlightSqlService {
         query: CommandGetTables,
         request: Request<FlightDescriptor>,
     ) -> Result<Response<FlightInfo>, Status> {
-        let ctx = self.get_ctx(&request).await?;
+        let ctx = self.get_session_manager(&request)?.get_context().await?;
         let data = self.get_tables(ctx, &query, true).await?;
         self.record_batch_to_flight_info(&data, &query.as_any(), true)
     }
@@ -815,7 +816,7 @@ impl FlightSqlService for KamuFlightSqlService {
         query: CommandGetTableTypes,
         request: Request<FlightDescriptor>,
     ) -> Result<Response<FlightInfo>, Status> {
-        let _ctx = self.get_ctx(&request).await?;
+        let _ctx = self.get_session_manager(&request)?.get_context().await?;
         let data = self.get_table_types(true)?;
         self.record_batch_to_flight_info(&data, &query.as_any(), true)
     }
@@ -826,7 +827,7 @@ impl FlightSqlService for KamuFlightSqlService {
         query: CommandGetSqlInfo,
         request: Request<FlightDescriptor>,
     ) -> Result<Response<FlightInfo>, Status> {
-        let _ctx = self.get_ctx(&request).await?;
+        let _ctx = self.get_session_manager(&request)?.get_context().await?;
         let data = self.get_sql_info(&query, true)?;
         self.record_batch_to_flight_info(&data, &query.as_any(), true)
     }
@@ -837,7 +838,7 @@ impl FlightSqlService for KamuFlightSqlService {
         query: CommandGetPrimaryKeys,
         request: Request<FlightDescriptor>,
     ) -> Result<Response<FlightInfo>, Status> {
-        let ctx = self.get_ctx(&request).await?;
+        let ctx = self.get_session_manager(&request)?.get_context().await?;
         let data = self.get_primary_keys(&ctx, &query, true)?;
         self.record_batch_to_flight_info(&data, &query.as_any(), true)
     }
@@ -848,7 +849,7 @@ impl FlightSqlService for KamuFlightSqlService {
         query: CommandGetExportedKeys,
         request: Request<FlightDescriptor>,
     ) -> Result<Response<FlightInfo>, Status> {
-        let ctx = self.get_ctx(&request).await?;
+        let ctx = self.get_session_manager(&request)?.get_context().await?;
         let data = self.get_exported_keys(&ctx, &query, true)?;
         self.record_batch_to_flight_info(&data, &query.as_any(), true)
     }
@@ -859,7 +860,7 @@ impl FlightSqlService for KamuFlightSqlService {
         query: CommandGetImportedKeys,
         request: Request<FlightDescriptor>,
     ) -> Result<Response<FlightInfo>, Status> {
-        let ctx = self.get_ctx(&request).await?;
+        let ctx = self.get_session_manager(&request)?.get_context().await?;
         let data = self.get_imported_keys(&ctx, &query, true)?;
         self.record_batch_to_flight_info(&data, &query.as_any(), true)
     }
@@ -893,7 +894,7 @@ impl FlightSqlService for KamuFlightSqlService {
         ticket: TicketStatementQuery,
         request: Request<Ticket>,
     ) -> Result<Response<<Self as FlightService>::DoGetStream>, Status> {
-        let ctx = self.get_ctx(&request).await?;
+        let ctx = self.get_session_manager(&request)?.get_context().await?;
 
         let query = CommandStatementQuery::decode(ticket.statement_handle)
             .map_err(|e| Status::internal(format!("Invalid ticket: {e}")))?;
@@ -915,18 +916,16 @@ impl FlightSqlService for KamuFlightSqlService {
         query: CommandPreparedStatementQuery,
         request: Request<Ticket>,
     ) -> Result<Response<<Self as FlightService>::DoGetStream>, Status> {
-        let session_token = self.get_token(&request)?;
-
-        let plan_token = PlanToken::from_utf8(query.prepared_statement_handle.into())
-            .map_err(|e| Status::internal(format!("Error decoding handle: {e}")))?;
+        let plan_id = PlanId(
+            String::from_utf8(query.prepared_statement_handle.to_vec())
+                .map_err(|e| Status::internal(format!("Error decoding handle: {e}")))?,
+        );
 
         let session_manager = self.get_session_manager(&request)?;
 
-        let plan = session_manager
-            .get_plan(&session_token, &plan_token)
-            .await?;
+        let plan = session_manager.get_plan(&plan_id).await?;
 
-        let ctx = session_manager.get_context(&session_token).await?;
+        let ctx = session_manager.get_context().await?;
 
         let df = ctx
             .execute_logical_plan(plan)
@@ -942,7 +941,7 @@ impl FlightSqlService for KamuFlightSqlService {
         query: CommandGetCatalogs,
         request: Request<Ticket>,
     ) -> Result<Response<<Self as FlightService>::DoGetStream>, Status> {
-        let ctx = self.get_ctx(&request).await?;
+        let ctx = self.get_session_manager(&request)?.get_context().await?;
         let data = self.get_catalogs(&ctx, &query, false)?;
         self.record_batch_to_stream(data)
     }
@@ -953,7 +952,7 @@ impl FlightSqlService for KamuFlightSqlService {
         query: CommandGetDbSchemas,
         request: Request<Ticket>,
     ) -> Result<Response<<Self as FlightService>::DoGetStream>, Status> {
-        let ctx = self.get_ctx(&request).await?;
+        let ctx = self.get_session_manager(&request)?.get_context().await?;
         let data = self.get_schemas(&ctx, &query, false)?;
         self.record_batch_to_stream(data)
     }
@@ -964,7 +963,7 @@ impl FlightSqlService for KamuFlightSqlService {
         query: CommandGetTables,
         request: Request<Ticket>,
     ) -> Result<Response<<Self as FlightService>::DoGetStream>, Status> {
-        let ctx = self.get_ctx(&request).await?;
+        let ctx = self.get_session_manager(&request)?.get_context().await?;
         let data = self.get_tables(ctx, &query, false).await?;
         self.record_batch_to_stream(data)
     }
@@ -975,7 +974,7 @@ impl FlightSqlService for KamuFlightSqlService {
         query: CommandGetTableTypes,
         request: Request<Ticket>,
     ) -> Result<Response<<Self as FlightService>::DoGetStream>, Status> {
-        let _ctx = self.get_ctx(&request).await?;
+        let _ctx = self.get_session_manager(&request)?.get_context().await?;
         let data = self.get_table_types(false)?;
         self.record_batch_to_stream(data)
     }
@@ -986,7 +985,7 @@ impl FlightSqlService for KamuFlightSqlService {
         query: CommandGetSqlInfo,
         request: Request<Ticket>,
     ) -> Result<Response<<Self as FlightService>::DoGetStream>, Status> {
-        let _ctx = self.get_ctx(&request).await?;
+        let _ctx = self.get_session_manager(&request)?.get_context().await?;
         let data = self.get_sql_info(&query, false)?;
         self.record_batch_to_stream(data)
     }
@@ -997,7 +996,7 @@ impl FlightSqlService for KamuFlightSqlService {
         query: CommandGetPrimaryKeys,
         request: Request<Ticket>,
     ) -> Result<Response<<Self as FlightService>::DoGetStream>, Status> {
-        let ctx = self.get_ctx(&request).await?;
+        let ctx = self.get_session_manager(&request)?.get_context().await?;
         let data = self.get_primary_keys(&ctx, &query, false)?;
         self.record_batch_to_stream(data)
     }
@@ -1008,7 +1007,7 @@ impl FlightSqlService for KamuFlightSqlService {
         query: CommandGetExportedKeys,
         request: Request<Ticket>,
     ) -> Result<Response<<Self as FlightService>::DoGetStream>, Status> {
-        let ctx = self.get_ctx(&request).await?;
+        let ctx = self.get_session_manager(&request)?.get_context().await?;
         let data = self.get_exported_keys(&ctx, &query, false)?;
         self.record_batch_to_stream(data)
     }
@@ -1019,7 +1018,7 @@ impl FlightSqlService for KamuFlightSqlService {
         query: CommandGetImportedKeys,
         request: Request<Ticket>,
     ) -> Result<Response<<Self as FlightService>::DoGetStream>, Status> {
-        let ctx = self.get_ctx(&request).await?;
+        let ctx = self.get_session_manager(&request)?.get_context().await?;
         let data = self.get_imported_keys(&ctx, &query, false)?;
         self.record_batch_to_stream(data)
     }
@@ -1070,13 +1069,12 @@ impl FlightSqlService for KamuFlightSqlService {
         query: ActionCreatePreparedStatementRequest,
         request: Request<Action>,
     ) -> Result<ActionCreatePreparedStatementResult, Status> {
-        let session_token = self.get_token(&request)?;
         let session_manager = self.get_session_manager(&request)?;
-        let ctx = session_manager.get_context(&session_token).await?;
+        let ctx = session_manager.get_context().await?;
 
         let plan = Self::prepare_statement(&query.query, &ctx).await?;
         let schema_bytes = self.df_schema_to_arrow(plan.schema())?;
-        let plan_token = session_manager.cache_plan(&session_token, plan).await?;
+        let plan_token = session_manager.cache_plan(plan).await?;
 
         tracing::debug!(%plan_token, "Prepared statement");
 
@@ -1094,13 +1092,13 @@ impl FlightSqlService for KamuFlightSqlService {
         query: ActionClosePreparedStatementRequest,
         request: Request<Action>,
     ) -> Result<(), Status> {
-        let session_token = self.get_token(&request)?;
-
-        let plan_token = PlanToken::from_utf8(query.prepared_statement_handle.into())
-            .map_err(|e| Status::internal(format!("Error decoding handle: {e}")))?;
+        let plan_id = PlanId(
+            String::from_utf8(query.prepared_statement_handle.to_vec())
+                .map_err(|e| Status::internal(format!("Error decoding handle: {e}")))?,
+        );
 
         self.get_session_manager(&request)?
-            .remove_plan(&session_token, &plan_token)
+            .remove_plan(&plan_id)
             .await?;
 
         Ok(())
@@ -1196,6 +1194,34 @@ impl FlightSqlService for KamuFlightSqlService {
     /// GetSqlInfo.
     #[tracing::instrument(level = "debug", skip_all, fields(%id, ?result))]
     async fn register_sql_info(&self, id: i32, result: &SqlInfo) {}
+
+    async fn do_action_fallback(
+        &self,
+        request: Request<Action>,
+    ) -> Result<Response<<Self as FlightService>::DoActionStream>, Status> {
+        // TODO: Base interface should handle CloseSession action
+        // See: https://github.com/apache/arrow-rs/issues/6516
+        if request.get_ref().r#type == CLOSE_SESSION {
+            self.do_action_close_session(request).await?;
+            return Ok(Response::new(Box::pin(futures::stream::empty())));
+        } else {
+            Err(Status::invalid_argument(format!(
+                "do_action: The defined request is invalid: {:?}",
+                request.get_ref().r#type
+            )))
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) fn internal_error<E: std::error::Error>(error: E) -> Status {
+    tracing::warn!(
+        error = ?error,
+        error_msg = %error,
+        "Internal error",
+    );
+    Status::internal("Internal error")
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

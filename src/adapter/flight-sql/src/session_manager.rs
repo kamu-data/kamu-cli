@@ -13,22 +13,16 @@ use datafusion::logical_expr::LogicalPlan;
 use datafusion::prelude::SessionContext;
 use tonic::Status;
 
-use crate::{PlanToken, SessionToken};
+use crate::PlanId;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Responsible for managing the state associated with the client session.
 #[async_trait::async_trait]
 pub trait SessionManager: Send + Sync {
-    /// Called during the handshake stage to authenticate the client.
-    ///
-    /// Returns a bearer token by which the client is associated with its
-    /// session in all subsequent calls.
-    async fn auth_basic(&self, username: &str, password: &str) -> Result<SessionToken, Status>;
-
     /// Can be used to free the client session resources and state when
     /// connection is gracefully closed.
-    async fn end_session(&self, token: &SessionToken) -> Result<(), Status>;
+    async fn close_session(&self) -> Result<(), Status>;
 
     /// Called on every operation to get the session context for the client.
     /// Token argument represents the token returned at the authentication
@@ -37,26 +31,17 @@ pub trait SessionManager: Send + Sync {
     /// Note that the session token should be treated as untrusted - it's the
     /// job of session manager implementation to verify it before returning
     /// the context.
-    async fn get_context(&self, token: &SessionToken) -> Result<Arc<SessionContext>, Status>;
+    async fn get_context(&self) -> Result<Arc<SessionContext>, Status>;
 
     /// Called to cache the logical plan of a prepared statement
-    async fn cache_plan(
-        &self,
-        token: &SessionToken,
-        plan: LogicalPlan,
-    ) -> Result<PlanToken, Status>;
+    async fn cache_plan(&self, plan: LogicalPlan) -> Result<PlanId, Status>;
 
     /// Called to retrieve the previously cached logical plan of a prepared
     /// statement
-    async fn get_plan(
-        &self,
-        token: &SessionToken,
-        plan_token: &PlanToken,
-    ) -> Result<LogicalPlan, Status>;
+    async fn get_plan(&self, plan_id: &PlanId) -> Result<LogicalPlan, Status>;
 
     /// Called to clean up the previously cached logical plan
-    async fn remove_plan(&self, token: &SessionToken, plan_token: &PlanToken)
-        -> Result<(), Status>;
+    async fn remove_plan(&self, plan_id: &PlanId) -> Result<(), Status>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

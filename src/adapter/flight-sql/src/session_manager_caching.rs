@@ -13,24 +13,27 @@ use std::sync::{Arc, Mutex};
 use chrono::{DateTime, Utc};
 use datafusion::logical_expr::LogicalPlan;
 use datafusion::prelude::SessionContext;
+use kamu_accounts::CurrentAccountSubject;
 use kamu_core::QueryService;
 use time_source::SystemTimeSource;
 use tonic::Status;
 
-use crate::{PlanToken, SessionAuth, SessionManager, SessionToken};
+use crate::{internal_error, PlanId, SessionId, SessionManager};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone)]
 pub struct SessionCachingConfig {
-    pub session_expiration_timeout: std::time::Duration,
-    pub session_inactivity_timeout: std::time::Duration,
+    pub authed_session_expiration_timeout: std::time::Duration,
+    pub authed_session_inactivity_timeout: std::time::Duration,
+    pub anon_session_expiration_timeout: std::time::Duration,
+    pub anon_session_inactivity_timeout: std::time::Duration,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct SessionManagerCachingState {
-    sessions: Mutex<HashMap<SessionToken, Session>>,
+    sessions: Mutex<HashMap<SessionId, Session>>,
 }
 
 #[dill::component(pub)]
@@ -45,7 +48,7 @@ impl SessionManagerCachingState {
 
 struct Session {
     ctx: Option<Arc<SessionContext>>,
-    plans: HashMap<PlanToken, LogicalPlan>,
+    plans: HashMap<PlanId, LogicalPlan>,
     created: DateTime<Utc>,
     accessed: DateTime<Utc>,
 }
@@ -60,38 +63,66 @@ struct Session {
 #[dill::component(pub)]
 #[dill::interface(dyn SessionManager)]
 pub struct SessionManagerCaching {
+    subject: Arc<CurrentAccountSubject>,
+    session_id: SessionId,
     conf: Arc<SessionCachingConfig>,
     timer: Arc<dyn SystemTimeSource>,
-    auth: dill::Lazy<Arc<dyn SessionAuth>>,
     query_svc: dill::Lazy<Arc<dyn QueryService>>,
     state: Arc<SessionManagerCachingState>,
 }
 
 impl SessionManagerCaching {
-    async fn create_context(&self) -> Result<Arc<SessionContext>, Status> {
-        let query_svc = self
-            .query_svc
-            .get()
-            .map_err(|_| Status::internal("Injection error"))?;
+    fn get_or_create_session<F, R>(&self, fun: F) -> Result<R, Status>
+    where
+        F: FnOnce(&mut Session) -> Result<R, Status>,
+    {
+        let mut sessions = self.state.sessions.lock().unwrap();
 
-        let ctx = query_svc
-            .create_session()
-            .await
-            .map_err(|e| Status::internal(e.to_string()))?;
+        let session = if let Some(session) = sessions.get_mut(&self.session_id) {
+            session
+        } else {
+            tracing::debug!("Creating new FlightSQL session");
+            let now = self.timer.now();
+
+            let session = Session {
+                ctx: None,
+                plans: HashMap::new(),
+                created: now,
+                accessed: now,
+            };
+
+            sessions.insert(self.session_id.clone(), session);
+
+            self.schedule_expiration();
+
+            sessions.get_mut(&self.session_id).unwrap()
+        };
+
+        fun(session)
+    }
+
+    async fn create_context(&self) -> Result<Arc<SessionContext>, Status> {
+        let query_svc = self.query_svc.get().map_err(internal_error)?;
+
+        let ctx = query_svc.create_session().await.map_err(internal_error)?;
 
         Ok(Arc::new(ctx))
     }
 
-    fn schedule_expiration(&self, token: SessionToken) {
-        let expires_in = self.conf.session_expiration_timeout;
+    fn schedule_expiration(&self) {
+        let session_id = self.session_id.clone();
+        let expires_in = match self.subject.as_ref() {
+            CurrentAccountSubject::Anonymous(_) => self.conf.anon_session_expiration_timeout,
+            CurrentAccountSubject::Logged(_) => self.conf.authed_session_expiration_timeout,
+        };
         let state = Arc::clone(&self.state);
 
         tokio::task::spawn(async move {
             tokio::time::sleep(expires_in).await;
             let mut sessions = state.sessions.lock().unwrap();
-            if let Some(session) = sessions.remove(&token) {
+            if let Some(session) = sessions.remove(&session_id) {
                 tracing::debug!(
-                    token,
+                    %session_id,
                     created_at = %session.created,
                     "Expiring FlightSQL session",
                 );
@@ -99,9 +130,13 @@ impl SessionManagerCaching {
         });
     }
 
-    fn schedule_inactivity(&self, token: SessionToken, for_accessed_at: DateTime<Utc>) {
+    fn schedule_inactivity(&self, for_accessed_at: DateTime<Utc>) {
+        let session_id = self.session_id.clone();
         let timer = self.timer.clone();
-        let inactivity_timeout = self.conf.session_inactivity_timeout;
+        let inactivity_timeout = match self.subject.as_ref() {
+            CurrentAccountSubject::Anonymous(_) => self.conf.anon_session_inactivity_timeout,
+            CurrentAccountSubject::Logged(_) => self.conf.authed_session_inactivity_timeout,
+        };
         let state = Arc::clone(&self.state);
 
         tokio::task::spawn(async move {
@@ -112,7 +147,7 @@ impl SessionManagerCaching {
                 tokio::time::sleep(inactive_in).await;
 
                 let mut sessions = state.sessions.lock().unwrap();
-                let Some(session) = sessions.get_mut(&token) else {
+                let Some(session) = sessions.get_mut(&session_id) else {
                     // Session expired
                     break;
                 };
@@ -120,7 +155,7 @@ impl SessionManagerCaching {
                 if session.accessed == accessed_cas {
                     // Session was not accessed since this timer was scheduled - release the context
                     tracing::debug!(
-                        token,
+                        %session_id,
                         created_at = %session.created,
                         accessed_at = %session.accessed,
                         ?inactivity_timeout,
@@ -132,8 +167,10 @@ impl SessionManagerCaching {
 
                 // Re-schedule to updated time
                 accessed_cas = session.accessed;
-                inactive_in =
-                    inactivity_timeout - (timer.now() - session.accessed).to_std().unwrap();
+                inactive_in = inactivity_timeout
+                    - (std::cmp::max(timer.now(), session.accessed) - session.accessed)
+                        .to_std()
+                        .unwrap();
             }
         });
     }
@@ -141,135 +178,83 @@ impl SessionManagerCaching {
 
 #[async_trait::async_trait]
 impl SessionManager for SessionManagerCaching {
-    async fn auth_basic(&self, username: &str, password: &str) -> Result<SessionToken, Status> {
-        self.auth
-            .get()
-            .map_err(|_| Status::internal("Injection error"))?
-            .auth_basic(username, password)
-            .await?;
-
-        let now = self.timer.now();
-        let token = SessionToken::from(uuid::Uuid::new_v4());
-
-        tracing::debug!(token, "Creating new FlightSQL session");
-
-        let session = Session {
-            ctx: Some(self.create_context().await?),
-            plans: HashMap::new(),
-            created: now,
-            accessed: now,
-        };
-
+    async fn close_session(&self) -> Result<(), Status> {
         let mut sessions = self.state.sessions.lock().unwrap();
-        sessions.insert(token.clone(), session);
-
-        self.schedule_inactivity(token.clone(), now);
-        self.schedule_expiration(token.clone());
-
-        Ok(token)
-    }
-
-    async fn end_session(&self, token: &SessionToken) -> Result<(), Status> {
-        let mut sessions = self.state.sessions.lock().unwrap();
-        sessions.remove(token);
+        if sessions.remove(&self.session_id).is_some() {
+            tracing::debug!(
+                session_id = %self.session_id,
+                "Closed FlightSQL session context"
+            );
+        }
         Ok(())
     }
 
-    async fn get_context(&self, token: &SessionToken) -> Result<Arc<SessionContext>, Status> {
+    async fn get_context(&self) -> Result<Arc<SessionContext>, Status> {
         // Try to get existing context
-        {
-            let mut sessions = self.state.sessions.lock().unwrap();
-
-            let Some(session) = sessions.get_mut(token) else {
-                return Err(Status::unauthenticated("Invalid token"));
-            };
-
+        if let Some(ctx) = self.get_or_create_session(|session| {
             if let Some(ctx) = &session.ctx {
-                tracing::debug!(token, "Reusing FlightSQL session context");
-
                 // The inactivity timer will reschedule itself
                 session.accessed = self.timer.now();
-                return Ok(Arc::clone(ctx));
+                Ok(Some(Arc::clone(ctx)))
+            } else {
+                Ok(None)
             }
+        })? {
+            tracing::debug!(
+                session_id = %self.session_id,
+                "Reusing FlightSQL session context"
+            );
+            return Ok(ctx);
         }
 
         // Session was inactive - re-create the context
-        tracing::debug!(token, "Re-creating suspended FlightSQL session context");
+        tracing::debug!(
+            session_id = %self.session_id,
+            "Creating FlightSQL session context"
+        );
 
-        let ctx = self.create_context().await?;
+        let new_ctx = self.create_context().await?;
 
-        {
-            let mut sessions = self.state.sessions.lock().unwrap();
-
-            let Some(session) = sessions.get_mut(token) else {
-                return Err(Status::unauthenticated("Invalid token"));
-            };
-
-            session.accessed = self.timer.now();
-
+        self.get_or_create_session(move |session| {
             if let Some(ctx) = &session.ctx {
                 // Oops, another thread created the context already - reuse the existing one
                 Ok(Arc::clone(ctx))
             } else {
                 // Insert new context into the session
-                session.ctx = Some(Arc::clone(&ctx));
+                session.ctx = Some(Arc::clone(&new_ctx));
 
                 // Schedule inactivity timer
-                self.schedule_inactivity(token.clone(), session.accessed);
+                self.schedule_inactivity(session.accessed);
 
-                Ok(ctx)
+                Ok(new_ctx)
             }
-        }
+        })
     }
 
-    async fn cache_plan(
-        &self,
-        token: &SessionToken,
-        plan: LogicalPlan,
-    ) -> Result<PlanToken, Status> {
-        let mut sessions = self.state.sessions.lock().unwrap();
+    async fn cache_plan(&self, plan: LogicalPlan) -> Result<PlanId, Status> {
+        let plan_id = PlanId(uuid::Uuid::new_v4().to_string());
 
-        let Some(session) = sessions.get_mut(token) else {
-            return Err(Status::unauthenticated("Invalid token"));
-        };
-
-        let plan_token = PlanToken::from(uuid::Uuid::new_v4());
-        session.plans.insert(plan_token.clone(), plan);
-
-        Ok(plan_token)
+        self.get_or_create_session(move |session| {
+            session.plans.insert(plan_id.clone(), plan);
+            Ok(plan_id)
+        })
     }
 
-    async fn get_plan(
-        &self,
-        token: &SessionToken,
-        plan_token: &PlanToken,
-    ) -> Result<LogicalPlan, Status> {
-        let sessions = self.state.sessions.lock().unwrap();
-
-        let Some(session) = sessions.get(token) else {
-            return Err(Status::unauthenticated("Invalid token"));
-        };
-
-        let Some(plan) = session.plans.get(plan_token) else {
-            return Err(Status::unauthenticated("Invalid plan token"));
-        };
-
-        Ok(plan.clone())
+    async fn get_plan(&self, plan_id: &PlanId) -> Result<LogicalPlan, Status> {
+        self.get_or_create_session(move |session| {
+            if let Some(plan) = session.plans.get(plan_id) {
+                Ok(plan.clone())
+            } else {
+                Err(Status::unauthenticated("Invalid plan token"))
+            }
+        })
     }
 
-    async fn remove_plan(
-        &self,
-        token: &SessionToken,
-        plan_token: &PlanToken,
-    ) -> Result<(), Status> {
-        let mut sessions = self.state.sessions.lock().unwrap();
-
-        let Some(session) = sessions.get_mut(token) else {
-            return Err(Status::unauthenticated("Invalid token"));
-        };
-
-        session.plans.remove(plan_token);
-        Ok(())
+    async fn remove_plan(&self, plan_id: &PlanId) -> Result<(), Status> {
+        self.get_or_create_session(move |session| {
+            session.plans.remove(plan_id);
+            Ok(())
+        })
     }
 }
 

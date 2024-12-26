@@ -15,7 +15,7 @@ use datafusion::prelude::SessionContext;
 use kamu_core::QueryService;
 use tonic::Status;
 
-use crate::{PlanToken, SessionAuth, SessionManager, SessionToken};
+use crate::{internal_error, PlanId, SessionManager};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -26,7 +26,6 @@ use crate::{PlanToken, SessionAuth, SessionManager, SessionToken};
 #[dill::component]
 #[dill::interface(dyn SessionManager)]
 pub struct SessionManagerSingleton {
-    auth: dill::Lazy<Arc<dyn SessionAuth>>,
     query_svc: dill::Lazy<Arc<dyn QueryService>>,
     state: Arc<SessionManagerSingletonState>,
 }
@@ -47,44 +46,18 @@ impl SessionManagerSingletonState {
 
 struct Inner {
     ctx: Arc<SessionContext>,
-    plans: HashMap<PlanToken, LogicalPlan>,
-}
-
-impl SessionManagerSingleton {
-    const DUMMY_TOKEN: &'static str = "singleton-token";
-
-    fn check_token(&self, token: &SessionToken) -> Result<(), Status> {
-        if token == Self::DUMMY_TOKEN {
-            Ok(())
-        } else {
-            Err(Status::unauthenticated("Invalid token"))
-        }
-    }
+    plans: HashMap<PlanId, LogicalPlan>,
 }
 
 #[async_trait::async_trait]
 impl SessionManager for SessionManagerSingleton {
-    async fn auth_basic(&self, username: &str, password: &str) -> Result<SessionToken, Status> {
-        self.auth
-            .get()
-            .map_err(|_| Status::internal("Injection error"))?
-            .auth_basic(username, password)
-            .await?;
-
-        Ok(SessionToken::from(Self::DUMMY_TOKEN))
-    }
-
-    async fn end_session(&self, token: &SessionToken) -> Result<(), Status> {
-        self.check_token(token)?;
-
+    async fn close_session(&self) -> Result<(), Status> {
         let mut state = self.state.inner.lock().unwrap();
         state.take();
         Ok(())
     }
 
-    async fn get_context(&self, token: &SessionToken) -> Result<Arc<SessionContext>, Status> {
-        self.check_token(token)?;
-
+    async fn get_context(&self) -> Result<Arc<SessionContext>, Status> {
         {
             let state = self.state.inner.lock().unwrap();
             if let Some(state) = &(*state) {
@@ -92,10 +65,7 @@ impl SessionManager for SessionManagerSingleton {
             }
         }
 
-        let query_svc = self
-            .query_svc
-            .get()
-            .map_err(|_| Status::internal("Injection error"))?;
+        let query_svc = self.query_svc.get().map_err(internal_error)?;
 
         let ctx = query_svc
             .create_session()
@@ -112,56 +82,38 @@ impl SessionManager for SessionManagerSingleton {
         Ok(ctx)
     }
 
-    async fn cache_plan(
-        &self,
-        token: &SessionToken,
-        plan: LogicalPlan,
-    ) -> Result<PlanToken, Status> {
-        self.check_token(token)?;
-
+    async fn cache_plan(&self, plan: LogicalPlan) -> Result<PlanId, Status> {
         let mut state = self.state.inner.lock().unwrap();
         let Some(s) = &mut (*state) else {
             return Err(Status::internal("Invalid state"));
         };
 
-        let plan_token = PlanToken::from(uuid::Uuid::new_v4());
+        let plan_token = PlanId(uuid::Uuid::new_v4().to_string());
         s.plans.insert(plan_token.clone(), plan);
 
         Ok(plan_token)
     }
 
-    async fn get_plan(
-        &self,
-        token: &SessionToken,
-        plan_token: &PlanToken,
-    ) -> Result<LogicalPlan, Status> {
-        self.check_token(token)?;
-
+    async fn get_plan(&self, plan_id: &PlanId) -> Result<LogicalPlan, Status> {
         let mut state = self.state.inner.lock().unwrap();
         let Some(s) = &mut (*state) else {
             return Err(Status::internal("Invalid state"));
         };
 
-        let Some(plan) = s.plans.get(plan_token) else {
+        let Some(plan) = s.plans.get(plan_id) else {
             return Err(Status::internal("No such plan"));
         };
 
         Ok(plan.clone())
     }
 
-    async fn remove_plan(
-        &self,
-        token: &SessionToken,
-        plan_token: &PlanToken,
-    ) -> Result<(), Status> {
-        self.check_token(token)?;
-
+    async fn remove_plan(&self, plan_id: &PlanId) -> Result<(), Status> {
         let mut state = self.state.inner.lock().unwrap();
         let Some(s) = &mut (*state) else {
             return Err(Status::internal("Invalid state"));
         };
 
-        s.plans.remove(plan_token);
+        s.plans.remove(plan_id);
         Ok(())
     }
 }
