@@ -42,7 +42,7 @@ impl ViewAccessToken {
         self.token.created_at
     }
 
-    /// Date of token revokation
+    /// Date of token revocation
     async fn revoked_at(&self) -> Option<DateTime<Utc>> {
         self.token.revoked_at
     }
