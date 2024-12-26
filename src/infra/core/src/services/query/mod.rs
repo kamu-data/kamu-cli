@@ -25,8 +25,9 @@ use datafusion::execution::options::ReadOptions;
 use datafusion::logical_expr::LogicalPlan;
 use datafusion::physical_plan::ExecutionPlan;
 use datafusion::prelude::*;
-use futures::stream::{self, StreamExt, TryStreamExt};
+use futures::stream::{self, StreamExt};
 use internal_error::{InternalError, ResultIntoInternal};
+use kamu_core::auth::DatasetActionAuthorizerExt;
 use kamu_core::*;
 use opendatafabric::*;
 
@@ -160,25 +161,22 @@ impl KamuSchema {
                 );
             }
         } else {
+            // TODO: Private Datasets: PERF: find a way to narrow down the number of records
+            //       to filter, e.g.:
+            //       - Anonymous: get all the public
+            //       - Logged: all owned datasets and datasets with relations
             // TODO: PERF: Scanning all datasets is not just super expensive - it may not be
             // possible at the public node scale. We need to patch DataFusion to support
             // unbounded catalogs.
-            let all_dataset_handles: Vec<_> = self
-                .inner
-                .dataset_registry
-                .all_dataset_handles()
-                .try_collect()
-                .await
-                .int_err()?;
-
-            let readable_dataset_handles = self
+            let mut readable_dataset_handles_stream = self
                 .inner
                 .dataset_action_authorizer
-                .filter_datasets_allowing(all_dataset_handles, DatasetAction::Read)
-                .await
-                .int_err()?;
+                .filtered_datasets_stream(
+                    self.inner.dataset_registry.all_dataset_handles(),
+                    DatasetAction::Read,
+                );
 
-            for hdl in readable_dataset_handles {
+            while let Some(Ok(hdl)) = readable_dataset_handles_stream.next().await {
                 let resolved_dataset = self.inner.dataset_registry.get_dataset_by_handle(&hdl);
 
                 tables.insert(
