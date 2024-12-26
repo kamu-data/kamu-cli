@@ -28,13 +28,21 @@ Recommendation: for ease of reading, use the following order:
   - GQL, `DatasetMetadata.currentDownstreamDependencies`: exclude datasets that cannot be accessed
   - E2E: added the ability to create an account using CLI
 
+## [0.214.0] - 2024-12-23
+### Added
+- New `kamu system decode` command that can decode an arbitrary block file for debugging
+- `export` command for bulk data exporting
+### Changed
+- `sql` command now allows to export query command results to file(s)
+- FlightSQL session state management improvements
+
 ## [0.213.1] - 2024-12-18
 ### Fixed
 - Removed all occurrences of `DataWriterMetadataState` from telemetry spans (too much pressure)
 
 ## [0.213.0] - 2024-12-18
 ### Added
-- kamu-adapter-graphql: added macros (`from_catalog_n!()` & `unsafe_from_catalog_n!()`) 
+- kamu-adapter-graphql: added macros (`from_catalog_n!()` & `unsafe_from_catalog_n!()`)
    that simplify the extraction of components from the DI catalog
 - database-common: the logic for pagination of data processing is generalized in `EntityPageStreamer`
 ### Changed
@@ -102,7 +110,7 @@ Introduced `DatasetRegistry` abstraction, encapsulating listing and resolution o
 ## [0.207.2] - 2024-11-15
 ### Fixed
 - E2E: revision of st/mt tests:
-  - In cases where temporary workspaces are created, 
+  - In cases where temporary workspaces are created,
      test variants for both single-tenant and multi-tenant have been added
   - New combinations activated
   - Certain duplicate tests have been removed
@@ -136,7 +144,7 @@ Introduced `DatasetRegistry` abstraction, encapsulating listing and resolution o
   ```json
   { "message": "Incompatible client version" }
   ```
-- GQL: The `DataQueryResultSuccess` type is extended to the optional `datasets` field, 
+- GQL: The `DataQueryResultSuccess` type is extended to the optional `datasets` field,
    which contains information about the datasets participating in the query. Affected API:
   - `GQL DataQueries`: the field will be filled
   - `GQL DatasetData`: field will be empty because we already know which dataset is involved
@@ -209,7 +217,7 @@ Introduced `DatasetRegistry` abstraction, encapsulating listing and resolution o
 - Updated our crate dependencies so they can be built in isolation
 ### Fixed
 - `--yes / -y` flag: fixed when working from a TTY
-- CI: Fixes `kamu-base-with-data-mt` image builds 
+- CI: Fixes `kamu-base-with-data-mt` image builds
 
 ## [0.204.4] - 2024-09-30
 ### Changed
@@ -220,7 +228,7 @@ Introduced `DatasetRegistry` abstraction, encapsulating listing and resolution o
   - Fixed argument parsing error in `kamu system compact` command
 - Simplified organization of startup initialization code over different components
 ### Fixed
-- Broken catalog issue for server and transactional modes  
+- Broken catalog issue for server and transactional modes
   - Added several E2E tests (happy paths) covering the Flows tab in the UI
 - Corrected behavior of `MySqlAccountRepository::get_accounts_by_ids()`, for the case of empty IDs collection
 
@@ -247,7 +255,7 @@ Introduced `DatasetRegistry` abstraction, encapsulating listing and resolution o
 ## [0.203.1] - 2024-09-24
 ### Added
 - Added database migration & scripting to create an application user with restricted permissions
-- `kamu delete` command will respect dependency graph ordering allowing to delete multiple datasets without encountering dangling reference 
+- `kamu delete` command will respect dependency graph ordering allowing to delete multiple datasets without encountering dangling reference
 
 ## [0.203.0] - 2024-09-22
 ### Added
@@ -312,22 +320,22 @@ Introduced `DatasetRegistry` abstraction, encapsulating listing and resolution o
 
 ## [0.199.1] - 2024-09-06
 ### Fixed
-- Fixed crash when a derived dataset is manually forced to update while an existing flow 
+- Fixed crash when a derived dataset is manually forced to update while an existing flow
   for this dataset is already waiting for a batching condition
 
 ## [0.199.0] - 2024-09-06
 ### Added
-- Persistency has been enabled for Task and Flow domains. 
+- Persistency has been enabled for Task and Flow domains.
   Both `TaskExecutor` and `FlowExecutor` now fully support transactional processing mode,
   and save state in Postgres or Sqlite database.
 - Tasks now support attaching metadata properties. Storing task->flow association as this type of metadata.
 - Flows and Tasks now properly recover the unfinished requests after server restart
 ### Changed
-- Simplified database schema for flow configurations and minimized number of migrations 
+- Simplified database schema for flow configurations and minimized number of migrations
    (breaking change of the database schema)
 - Introduced `pre_run()` phase in flow executor, task executor & outbox processor to avoid startup races
 - Explicit in-memory task queue has been eliminated and replaced with event store queries
-- Get Data Panel: use SmTP for pull & push links 
+- Get Data Panel: use SmTP for pull & push links
 - GQL api method `setConfigCompaction` allows to set `metadataOnly` configuration for both root and derived datasets
 - GQL api `triggerFlow` allows to trigger `HARD_COMPACTION` flow in `metadataOnly` mode for both root and derived datasets
 
@@ -342,13 +350,13 @@ Introduced `DatasetRegistry` abstraction, encapsulating listing and resolution o
   - Dataset schema will be defined upon first ingest, even if no records were returned by the source
   - Schema will also be defined for derivative datasets even if no records produced by the transformation
   - Above ensures that datasets that for a long time don't produce any data will not block data pipelines
-- Smart Transfer Protocol: 
+- Smart Transfer Protocol:
   - Use `CreateDatasetUseCase` in case of creation at the time of the dataset pulling
   - Now requires the `x-odf-smtp-version` header, which is used to compare client and server versions to prevent issues with outdated clients
 
 ## [0.198.1] - 2024-08-28
 ### Added
-- Private Datasets, ReBAC integration: 
+- Private Datasets, ReBAC integration:
   - ReBAC properties update based on `DatasetLifecycleMessage`'s:
   - `kamu add`: added hidden `--visibility private|public` argument, assumed to be used in multi-tenant case
   - GQL: `DatasetsMut`:
@@ -386,7 +394,7 @@ Introduced `DatasetRegistry` abstraction, encapsulating listing and resolution o
 
 ## [0.196.0] - 2024-08-19
 ### Added
-- The `/ingest` endpoint will try to infer the media type of file by extension if not specified explicitly during upload. 
+- The `/ingest` endpoint will try to infer the media type of file by extension if not specified explicitly during upload.
    This resolves the problem with `415 Unsupported Media Type` errors when uploading `.ndjson` files from the Web UI.
 - Private Datasets, preparation work:
   - Added SQLite-specific implementation of ReBAC repository
@@ -412,7 +420,7 @@ Introduced `DatasetRegistry` abstraction, encapsulating listing and resolution o
 - Reliable transaction-based internal cross-domain message passing component (`MessageOutbox`), replacing `EventBus`
   - Metadata-driven producer/consumer annotations
   - Immediate and transaction-backed message delivery
-  - Background transactional message processor, respecting client idempotence 
+  - Background transactional message processor, respecting client idempotence
 - Persistent storage for flow configuration events
 ### Changed
 - Upgraded to `datafusion v41` (#713)
@@ -450,7 +458,7 @@ Introduced `DatasetRegistry` abstraction, encapsulating listing and resolution o
 - `kamu --no-color` to disable color output in the terminal.
 ### Changed
 - New recursive flag for `CompactionConditionFull` input to trigger
-  Hard compaction with keep metadata only mode for each derived dataset 
+  Hard compaction with keep metadata only mode for each derived dataset
 - E2E: Reorganized work with tests that call `kamu-cli`:
   - Added `kamu-cli-puppet` crate to allow `kamu-cli` to be run as a separate process from tests
   - Removed past `kamu-cli` wrapper that ran in-process.
@@ -473,7 +481,7 @@ Introduced `DatasetRegistry` abstraction, encapsulating listing and resolution o
 ## [0.191.3] - 2024-07-22
 ### Fixed
 - Script for api server database migration issue with passwords includes
-  specific symbols 
+  specific symbols
 
 ## [0.191.2] - 2024-07-18
 ### Fixed
@@ -500,7 +508,7 @@ Introduced `DatasetRegistry` abstraction, encapsulating listing and resolution o
 ## [0.190.0] - 2024-07-09
 ### Added
 - New repository `DatasetEnvVars` to work with dataset secrets
-- Now is possible to set new `DatasetEnvVars` configuration to `storage` 
+- Now is possible to set new `DatasetEnvVars` configuration to `storage`
   and manage it via GQL api
 - New Gql APIs to manage dataset env vars
   - `listEnvVariables` to fetch list of env vars by dataset
@@ -558,7 +566,7 @@ Introduced `DatasetRegistry` abstraction, encapsulating listing and resolution o
 
 ## [0.188.5] - 2024-06-26
 ### Added
-- `kamu system api-server`: Added the option of overriding the base URL in the API with `--external-address`. 
+- `kamu system api-server`: Added the option of overriding the base URL in the API with `--external-address`.
   Can be handy when launching inside a container
 
 ## [0.188.4] - 2024-06-25
@@ -567,7 +575,7 @@ Introduced `DatasetRegistry` abstraction, encapsulating listing and resolution o
 
 ## [0.188.3] - 2024-06-24
 ### Fixed
-- Fixed support of  ingestion via file upload in `kamu ui` mode 
+- Fixed support of  ingestion via file upload in `kamu ui` mode
   and `kamu system api-server` mode with custom HTTP port
 - Fixed launching `kamu ui` mode (related to transactions management)
 
@@ -626,10 +634,10 @@ Introduced `DatasetRegistry` abstraction, encapsulating listing and resolution o
 ### Fixed
 - JSON formatter now properly supports `Decimal` types
 - Stabilized startup using connection to databases
-  - Added HTTP middleware that wraps each request into a separate transaction 
+  - Added HTTP middleware that wraps each request into a separate transaction
   - Also added wrapping for some commands, in particular `kamu system generate-token`
   - The structure of services that required lazy access to databases was reorganized:
-     - Extracted `PredefinedAccountsRegistrator` & `DatasetOwnershipServiceInMemoryStateInitializer` 
+     - Extracted `PredefinedAccountsRegistrator` & `DatasetOwnershipServiceInMemoryStateInitializer`
 - Fixed potential crash when attempting to rollback a transaction if the connection fails to establish
 
 ## [0.185.1] - 2024-06-07
@@ -640,12 +648,12 @@ Introduced `DatasetRegistry` abstraction, encapsulating listing and resolution o
 ### Added
 - New `--reset-derivatives-on-diverged-input` flag to `kamu pull` command, which will trigger
   compaction for derived dataset if transformation fails due to root dataset compaction and retry transformation
-- Initial support for ingestion via file uploads, with local FS and S3-based storage for temporary files  
+- Initial support for ingestion via file uploads, with local FS and S3-based storage for temporary files
 ### Changed
-- `AddPushSource` event may omit specifying a schema. In this case, the very first push ingestion invocation 
+- `AddPushSource` event may omit specifying a schema. In this case, the very first push ingestion invocation
   would try to make a best-effort auto-inference of the data schema.
 ### Fixed
-- Fixed issue with smart protocol transfer operations upon empty datasets  
+- Fixed issue with smart protocol transfer operations upon empty datasets
 
 ## [0.184.0] - 2024-05-28
 ### Changed
@@ -667,7 +675,7 @@ Introduced `DatasetRegistry` abstraction, encapsulating listing and resolution o
 - Added support of `--all` flag to the `kamu delete` command
 - Made recursive deletion dataset with provided `%` pattern
 ### Changed
-- `HardCompaction` configuration now is one of `Full` or `KeepMetadataOnly` variants. In case of 
+- `HardCompaction` configuration now is one of `Full` or `KeepMetadataOnly` variants. In case of
   `KeepMetadataOnly` variant required to provide `recursive` value which will trigger downstream
   dependencies compaction
 
@@ -721,7 +729,7 @@ Introduced `DatasetRegistry` abstraction, encapsulating listing and resolution o
     - based on account name for CLI mode
     - auto-registered randomly on first GitHub login
   - account ID resolutions are no longer mocked
-- REST API to login remotely using password and GitHub methods  
+- REST API to login remotely using password and GitHub methods
 ### Fixed
 - Compaction datasets stored in an S3 bucket
 
@@ -744,7 +752,7 @@ Introduced `DatasetRegistry` abstraction, encapsulating listing and resolution o
 
 ## [0.176.2] - 2024-04-16
 ### Fixed
-- Fix the instant run of `ExecuteTransform` flow after the successful finish of `HardCompaction` flow 
+- Fix the instant run of `ExecuteTransform` flow after the successful finish of `HardCompaction` flow
 - Extend `FlowFailed` error type to indicate when `ExecuteTransform` failed due to `HardCompaction` of root dataset
 
 ## [0.176.1] - 2024-04-16
@@ -849,7 +857,7 @@ Introduced `DatasetRegistry` abstraction, encapsulating listing and resolution o
 
 ## [0.165.0] - 2024-03-12
 ### Updated
-- Extended flow history: 
+- Extended flow history:
    - start condition update event now holds a snapshot of the start condition
    - input dataset trigger now returns a queryable Dataset object instead of simply identifier
    - dependent dataset flows should not be launched after Up-To-Date input flow
@@ -992,7 +1000,7 @@ Introduced `DatasetRegistry` abstraction, encapsulating listing and resolution o
 - Improved output reporting of `kamu logout` command
 ### Fixed
 - `kamu login` and `kamu logout` commands properly handle platform URLs without an explicit schema (`https://` attached by default)
-- Flow configuration API no longer crashes on specific input combinations when interval expressed in smaller time units 
+- Flow configuration API no longer crashes on specific input combinations when interval expressed in smaller time units
    exceed minimal boundary that forms a bigger time unit
 - Fixed runtime crashes related to background execution of automatically scheduled tasks
 
@@ -1059,7 +1067,7 @@ Introduced `DatasetRegistry` abstraction, encapsulating listing and resolution o
   - a batching condition for dependent flows, such as executing transforms
 ### Changed
 - Changed logic in `SimpleTransferProtocol` now block data and checkpoint downloading/uploading
-  in parallel. Default parallel tasks is 10, but it could be changed by changing 
+  in parallel. Default parallel tasks is 10, but it could be changed by changing
   `SIMPLE_PROTOCOL_MAX_PARALLEL_TRANSFERS` environment variable
 
 ## [0.149.0] - 2023-12-23
@@ -1070,7 +1078,7 @@ Introduced `DatasetRegistry` abstraction, encapsulating listing and resolution o
 - Applied `event-bus` component to inform consumers of dataset removal, dependency changes,
   task completions
 - Added in-memory dataset dependency graph instead of continuous rescanning of all datasets:
-   - the initial dependencies are computed on demand on first request 
+   - the initial dependencies are computed on demand on first request
    - using `petgraph` project to represent dataset dependencies in the form of directed acyclic graph
    - further events like new/removed dependency or dataset removal update the graph
    - simplified GraphQL APIs and dataset removal check using new dependency graph
@@ -1409,7 +1417,7 @@ Introduced `DatasetRegistry` abstraction, encapsulating listing and resolution o
   I.e., run API server in one Kamu workspace directory, where you intend to push `my-dataset`to:
    `kamu system api-server --http-port=35433`
   and push from the Kamu workspace directory, where `my-dataset` is stored:
-   `kamu push my-dataset --to odf+http://localhost::35433/my-dataset`  
+   `kamu push my-dataset --to odf+http://localhost::35433/my-dataset`
 ### Changed
 - Upgraded to latest `datafusion` and `arrow`
 - Updated to multi-tenant references and aliases in accordance with ODF spec
@@ -1513,7 +1521,7 @@ Introduced `DatasetRegistry` abstraction, encapsulating listing and resolution o
   JOIN portfolio FOR SYSTEM_TIME AS OF t.event_time AS p
   WHERE t.symbol = p.symbol
   ```
-- We recommend using `FOR SYSTEM_TIME AS OF` join syntax as replacement for old `LATERAL TABLE` joins 
+- We recommend using `FOR SYSTEM_TIME AS OF` join syntax as replacement for old `LATERAL TABLE` joins
 - Determinism of Flink computation should be improved
 
 ## [0.106.0] - 2023-01-19

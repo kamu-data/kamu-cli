@@ -10,7 +10,8 @@
 use std::path::PathBuf;
 
 use clap::{ArgAction, Parser};
-use opendatafabric as odf;
+use kamu::domain::ExportFormat;
+use opendatafabric::{self as odf};
 
 use crate::cli_value_parser::{self as parsers};
 use crate::{
@@ -83,6 +84,7 @@ pub enum Command {
     Completions(Completions),
     Config(Config),
     Delete(Delete),
+    Export(Export),
     Ingest(Ingest),
     Init(Init),
     Inspect(Inspect),
@@ -366,6 +368,40 @@ pub struct Delete {
     /// Local dataset reference(s)
     #[arg(value_parser = parsers::dataset_ref_pattern)]
     pub dataset: Vec<odf::DatasetRefPattern>,
+}
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Exports a dataset
+#[derive(Debug, clap::Args)]
+#[command(after_help = r#"
+This command exports a dataset to a file or set of files of a given format.
+
+Output path may be either file or directory.
+When a path contains extention, and no trailing separator, it is considered as a file.
+In all other cases a path is considered as a directory. Examples:
+ - `export/dataset.csv` is a file path
+ - `export/dataset.csv/` is a directory path
+ - `export/dataset/` is a directory path
+ - `export/dataset` is a directory path
+"#)]
+pub struct Export {
+    /// Local dataset reference
+    #[arg(index = 1, value_parser = parsers::dataset_ref)]
+    pub dataset: odf::DatasetRef,
+
+    /// Export destination. Dafault is `<current workdir>/<dataset name>`
+    #[arg(long)]
+    pub output_path: Option<PathBuf>,
+
+    /// Output format
+    #[arg(long, value_parser = parsers::export_format)]
+    pub output_format: ExportFormat,
+
+    /// Number of records per file, if stored into a directory.
+    /// It's a soft limit. For the sake of export performance the actual number
+    /// of records may be slightly different.
+    #[arg(long)]
+    pub records_per_file: Option<usize>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1180,6 +1216,14 @@ pub struct Search {
 #[command(after_help = r#"
 SQL shell allows you to explore data of all dataset in your workspace using one of the supported data processing engines. This can be a great way to prepare and test a query that you cal later turn into derivative dataset.
 
+Output path may be either file or directory.
+When a path contains extention, and no trailing separator, it is considered as a file.
+In all other cases a path is considered as a directory. Examples:
+ - `export/dataset.csv` is a file path
+ - `export/dataset.csv/` is a directory path
+ - `export/dataset/` is a directory path
+ - `export/dataset` is a directory path
+
 **Examples:**
 
 Drop into SQL shell:
@@ -1225,6 +1269,17 @@ pub struct Sql {
     /// SQL script file to execute
     #[arg(long, value_name = "FILE")]
     pub script: Option<PathBuf>,
+
+    /// When set, result will be stored to a given path instead of being printed
+    /// to stdout.
+    #[arg(long)]
+    pub output_path: Option<PathBuf>,
+
+    /// Number of records per file, if stored into a directory.
+    /// It's a soft limit. For the sake of export performance the actual number
+    /// records may be slightly different.
+    #[arg(long)]
+    pub records_per_file: Option<usize>,
 }
 
 #[derive(Debug, clap::Subcommand)]
@@ -1266,6 +1321,7 @@ pub enum SystemSubCommand {
     ApiServer(SystemApiServer),
     Compact(SystemCompact),
     DebugToken(SystemDebugToken),
+    Decode(SystemDecode),
     Diagnose(SystemDiagnose),
     E2e(SystemE2e),
     GenerateToken(SystemGenerateToken),
@@ -1391,6 +1447,20 @@ pub struct SystemDebugToken {
     /// Access token
     #[arg()]
     pub token: String,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Decode a manifest file
+#[derive(Debug, clap::Args)]
+pub struct SystemDecode {
+    /// Manifest reference (path, or URL)
+    #[arg()]
+    pub manifest: Option<String>,
+
+    /// Read manifests from standard input
+    #[arg(long)]
+    pub stdin: bool,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

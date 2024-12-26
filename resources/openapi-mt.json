@@ -818,7 +818,7 @@
     },
     "termsOfService": "https://docs.kamu.dev/terms-of-service/",
     "title": "Kamu REST API",
-    "version": "0.213.1"
+    "version": "0.214.0"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -1091,10 +1091,7 @@
             "name": "contentType",
             "required": false,
             "schema": {
-              "type": [
-                "string",
-                "null"
-              ]
+              "type": "string"
             }
           }
         ],
@@ -1367,10 +1364,7 @@
             "name": "include",
             "required": false,
             "schema": {
-              "type": [
-                "string",
-                "null"
-              ]
+              "type": "string"
             }
           }
         ],
@@ -1825,10 +1819,7 @@
             "name": "sourceName",
             "required": false,
             "schema": {
-              "type": [
-                "string",
-                "null"
-              ]
+              "type": "string"
             }
           },
           {
@@ -1836,10 +1827,7 @@
             "name": "uploadToken",
             "required": false,
             "schema": {
-              "type": [
-                "string",
-                "null"
-              ]
+              "type": "string"
             }
           },
           {
@@ -1909,10 +1897,7 @@
             "name": "include",
             "required": false,
             "schema": {
-              "type": [
-                "string",
-                "null"
-              ]
+              "type": "string"
             }
           },
           {

@@ -172,7 +172,7 @@ datafusion = { version = "43", default-features = false, features = [
     "unicode_expressions",
     "compression",
 ] }
-dill = "0.9"
+dill = "0.10"
 dirs = "5"
 fs_extra = "1.3"
 futures = "0.3"
@@ -193,6 +193,8 @@ tokio-util = { version = "0.7", default-features = false, features = ["io"] }
 url = "2"
 urlencoding = "2"
 whoami = "1.5"
+lazy_static = "1"
+strum = { version = "0.26", features = ["derive"] }
 
 
 [target.'cfg(unix)'.dependencies]

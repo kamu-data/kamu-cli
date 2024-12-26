@@ -155,7 +155,6 @@ impl DatasetMetadata {
 
         for dataset_entry in resolved_entries {
             let maybe_account = account_map.get(&dataset_entry.owner_id);
-
             if let Some(account) = maybe_account {
                 let dataset_handle = odf::DatasetHandle {
                     id: dataset_entry.id,
@@ -245,7 +244,6 @@ impl DatasetMetadata {
 
         for dataset_entry in resolved_entries {
             let maybe_account = account_map.get(&dataset_entry.owner_id);
-
             if let Some(account) = maybe_account {
                 let dataset_handle = odf::DatasetHandle {
                     id: dataset_entry.id,

@@ -34,7 +34,7 @@ messaging-outbox = { workspace = true }
 opendatafabric = { workspace = true }
 
 async-trait = "0.1"
-dill = "0.9"
+dill = "0.10"
 futures = "0.3"
 tracing = { version = "0.1", default-features = false }
 

@@ -7,8 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::sync::Arc;
-
 use arrow_flight::sql::metadata::SqlInfoDataBuilder;
 use arrow_flight::sql::{
     SqlInfo,
@@ -18,12 +16,11 @@ use arrow_flight::sql::{
     SupportedSqlGrammar,
 };
 
-use crate::{KamuFlightSqlService, SessionFactory};
+use crate::KamuFlightSqlService;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct KamuFlightSqlServiceBuilder {
-    session_factory: Option<Arc<dyn SessionFactory>>,
     sql_info: SqlInfoDataBuilder,
 }
 
@@ -33,28 +30,17 @@ impl KamuFlightSqlServiceBuilder {
     pub fn new() -> Self {
         let sql_info = Self::default_sql_info();
 
-        Self {
-            session_factory: None,
-            sql_info,
-        }
+        Self { sql_info }
     }
 
     pub fn build(self) -> KamuFlightSqlService {
-        KamuFlightSqlService::new(
-            self.session_factory.unwrap(),
-            self.sql_info.build().unwrap(),
-        )
+        KamuFlightSqlService::new(self.sql_info.build().unwrap())
     }
 
     pub fn with_server_name(mut self, name: &str, version: &str) -> Self {
         self.sql_info.append(SqlInfo::FlightSqlServerName, name);
         self.sql_info
             .append(SqlInfo::FlightSqlServerVersion, version);
-        self
-    }
-
-    pub fn with_session_factory(mut self, session_factory: Arc<dyn SessionFactory>) -> Self {
-        self.session_factory = Some(session_factory);
         self
     }
 

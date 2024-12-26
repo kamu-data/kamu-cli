@@ -27,7 +27,7 @@ kamu-accounts = { workspace = true }
 opendatafabric = { workspace = true }
 
 async-trait = "0.1"
-dill = "0.9"
+dill = "0.10"
 http = "1"
 reqwest = { version = "0.12", default-features = false, features = [
     "rustls-tls",

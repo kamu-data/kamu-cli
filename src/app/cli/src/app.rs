@@ -438,6 +438,8 @@ pub fn configure_base_catalog(
 
     b.add::<QueryServiceImpl>();
 
+    b.add::<ExportServiceImpl>();
+
     b.add::<ObjectStoreRegistryImpl>();
 
     b.add::<ObjectStoreBuilderLocalFs>();
@@ -485,6 +487,15 @@ pub fn configure_base_catalog(
     b.add::<DatabaseTransactionRunner>();
 
     b.add::<kamu_auth_rebac_services::RebacServiceImpl>();
+
+    // TODO: Unstub FlightSQL authentication
+    b.add_builder(
+        kamu_adapter_flight_sql::SessionAuthBasicPredefined::builder()
+            .with_accounts_passwords([("kamu".to_string(), "kamu".to_string())].into()),
+    );
+    b.bind::<dyn kamu_adapter_flight_sql::SessionAuth, kamu_adapter_flight_sql::SessionAuthBasicPredefined>();
+    b.add::<kamu_adapter_flight_sql::SessionManagerCaching>();
+    b.add::<kamu_adapter_flight_sql::SessionManagerCachingState>();
 
     if tenancy_config == TenancyConfig::MultiTenant {
         b.add::<kamu_auth_rebac_services::MultiTenantRebacDatasetLifecycleMessageConsumer>();
@@ -705,6 +716,17 @@ pub fn register_config_in_catalog(
         pre_resolve_dnslink: ipfs_conf.pre_resolve_dnslink.unwrap(),
     });
     catalog_builder.add_value(kamu::utils::ipfs_wrapper::IpfsClient::default());
+
+    catalog_builder.add_value(
+        config
+            .protocol
+            .as_ref()
+            .unwrap()
+            .flight_sql
+            .as_ref()
+            .unwrap()
+            .to_system(),
+    );
 
     if tenancy_config == TenancyConfig::MultiTenant {
         let mut implicit_user_config = PredefinedAccountsConfig::new();

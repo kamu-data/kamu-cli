@@ -30,7 +30,7 @@ opendatafabric = { workspace = true, features = ["sqlx-sqlite"] }
 async-stream = { version = "0.3", default-features = false }
 async-trait = { version = "0.1", default-features = false }
 chrono = { version = "0.4", default-features = false }
-dill = "0.9"
+dill = "0.10"
 futures = { version = "0.3", default-features = false }
 sqlx = { version = "0.8", default-features = false, features = [
     "runtime-tokio-rustls",

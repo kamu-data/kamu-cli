@@ -103,6 +103,15 @@ pub fn get_command(
             c.all,
             c.recursive,
         )),
+        cli::Command::Export(c) => Box::new(ExportCommand::new(
+            cli_catalog.get_one()?,
+            cli_catalog.get_one()?,
+            c.dataset,
+            c.output_path,
+            c.output_format,
+            c.records_per_file,
+            args.quiet,
+        )),
         cli::Command::Ingest(c) => Box::new(IngestCommand::new(
             cli_catalog.get_one()?,
             cli_catalog.get_one()?,
@@ -369,9 +378,12 @@ pub fn get_command(
                 cli_catalog.get_one()?,
                 cli_catalog.get_one()?,
                 cli_catalog.get_one()?,
+                cli_catalog.get_one()?,
                 c.command,
                 c.url,
                 c.engine,
+                c.output_path,
+                c.records_per_file,
             )),
             Some(cli::SqlSubCommand::Server(sc)) => {
                 if sc.livy {
@@ -387,9 +399,9 @@ pub fn get_command(
                     cfg_if::cfg_if! {
                         if #[cfg(feature = "flight-sql")] {
                             Box::new(SqlServerFlightSqlCommand::new(
+                                cli_catalog.clone(),
                                 sc.address,
                                 sc.port,
-                                cli_catalog.get_one()?,
                             ))
                         } else {
                             return Err(CLIError::usage_error("Kamu was compiled without Flight SQL support"))
@@ -452,6 +464,9 @@ pub fn get_command(
             )),
             cli::SystemSubCommand::DebugToken(sc) => {
                 Box::new(DebugTokenCommand::new(cli_catalog.get_one()?, sc.token))
+            }
+            cli::SystemSubCommand::Decode(sc) => {
+                Box::new(SystemDecodeCommand::new(sc.manifest, sc.stdin))
             }
             cli::SystemSubCommand::E2e(sc) => Box::new(SystemE2ECommand::new(
                 sc.action,
