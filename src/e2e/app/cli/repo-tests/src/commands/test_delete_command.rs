@@ -7,16 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_cli_e2e_common::{
-    KamuApiServerClient,
-    KamuApiServerClientExt,
-    DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR,
-    DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
-    DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_2,
-    DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_3,
-    DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_4,
-    DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
-};
+use kamu_cli_e2e_common::*;
 use kamu_cli_puppet::extensions::KamuCliPuppetExt;
 use kamu_cli_puppet::KamuCliPuppet;
 use opendatafabric as odf;
@@ -176,10 +167,10 @@ pub async fn test_delete_dataset_all(kamu: KamuCliPuppet) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_delete_warning(mut kamu_node_api_client: KamuApiServerClient) {
-    let kamu: KamuCliPuppet = KamuCliPuppet::new_workspace_tmp(true).await;
+    let kamu = KamuCliPuppet::new_workspace_tmp_multi_tenant().await;
 
     let ds_name_str = "player-scores";
-    let ds_name: odf::DatasetName = odf::DatasetName::new_unchecked(ds_name_str);
+    let ds_name = odf::DatasetName::new_unchecked(ds_name_str);
 
     kamu.execute_with_input(
         ["add", "--stdin", "--name", ds_name_str],

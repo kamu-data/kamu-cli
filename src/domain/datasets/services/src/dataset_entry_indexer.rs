@@ -93,7 +93,7 @@ impl DatasetEntryIndexer {
                 .get(&dataset_handle.alias.account_name)
                 .cloned()
             else {
-                tracing::debug!(dataset_handle=%dataset_handle, "Skipped indexing dataset due to unresolved owner");
+                tracing::warn!(dataset_handle=%dataset_handle, "Skipped indexing dataset due to unresolved owner");
                 continue;
             };
 

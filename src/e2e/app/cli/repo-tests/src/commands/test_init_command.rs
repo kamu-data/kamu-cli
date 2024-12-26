@@ -83,7 +83,7 @@ pub async fn test_init_exist_ok_mt(mut kamu: KamuCliPuppet) {
         .unwrap();
 
     // Verify that the database has not been overwritten
-    pretty_assertions::assert_eq!(modified_new, modified_old);
+    pretty_assertions::assert_eq!(modified_old, modified_new);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

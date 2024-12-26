@@ -8,11 +8,11 @@
 // by the Apache License, Version 2.0.
 
 use std::collections::{HashMap, HashSet};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use database_common::{EntityPageListing, EntityPageStreamer, PaginationOpts};
 use dill::{component, interface, meta, Catalog};
-use internal_error::{InternalError, ResultIntoInternal};
+use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_accounts::{AccountRepository, CurrentAccountSubject};
 use kamu_core::{
     DatasetHandleStream,
@@ -39,6 +39,7 @@ use messaging_outbox::{
 };
 use opendatafabric as odf;
 use time_source::SystemTimeSource;
+use tokio::sync::RwLock;
 
 use crate::MESSAGE_CONSUMER_KAMU_DATASET_ENTRY_SERVICE;
 
@@ -51,7 +52,7 @@ pub struct DatasetEntryServiceImpl {
     account_repo: Arc<dyn AccountRepository>,
     current_account_subject: Arc<CurrentAccountSubject>,
     tenancy_config: Arc<TenancyConfig>,
-    accounts_cache: Arc<Mutex<AccountsCache>>,
+    accounts_cache: Arc<RwLock<AccountsCache>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -67,6 +68,7 @@ struct AccountsCache {
 #[component(pub)]
 #[interface(dyn DatasetEntryService)]
 #[interface(dyn DatasetRegistry)]
+#[interface(dyn DatasetOwnershipService)]
 #[interface(dyn MessageConsumer)]
 #[interface(dyn MessageConsumerT<DatasetLifecycleMessage>)]
 #[meta(MessageConsumerMeta {
@@ -158,11 +160,14 @@ impl DatasetEntryServiceImpl {
     ) -> Result<Vec<odf::DatasetHandle>, ListDatasetEntriesError> {
         // Select which accounts haven't been processed yet
         let first_seen_account_ids = {
-            let accounts_cache = self.accounts_cache.lock().unwrap();
+            let readable_accounts_cache = self.accounts_cache.read().await;
 
             let mut first_seen_account_ids = HashSet::new();
             for entry in &entries {
-                if !accounts_cache.id2names.contains_key(&entry.owner_id) {
+                if !readable_accounts_cache
+                    .id2names
+                    .contains_key(&entry.owner_id)
+                {
                     first_seen_account_ids.insert(entry.owner_id.clone());
                 }
             }
@@ -179,12 +184,12 @@ impl DatasetEntryServiceImpl {
                 .await
                 .int_err()?;
 
-            let mut accounts_cache = self.accounts_cache.lock().unwrap();
+            let mut writable_accounts_cache = self.accounts_cache.write().await;
             for account in accounts {
-                accounts_cache
+                writable_accounts_cache
                     .id2names
                     .insert(account.id.clone(), account.account_name.clone());
-                accounts_cache
+                writable_accounts_cache
                     .names2ids
                     .insert(account.account_name, account.id);
             }
@@ -192,10 +197,10 @@ impl DatasetEntryServiceImpl {
 
         // Convert the entries to handles
         let mut handles = Vec::new();
-        let accounts_cache = self.accounts_cache.lock().unwrap();
+        let readable_accounts_cache = self.accounts_cache.read().await;
         for entry in &entries {
             // By now we should now the account name
-            let maybe_owner_name = accounts_cache.id2names.get(&entry.owner_id);
+            let maybe_owner_name = readable_accounts_cache.id2names.get(&entry.owner_id);
             if let Some(owner_name) = maybe_owner_name {
                 // Form DatasetHandle
                 handles.push(odf::DatasetHandle::new(
@@ -214,8 +219,8 @@ impl DatasetEntryServiceImpl {
         account_id: &odf::AccountID,
     ) -> Result<odf::AccountName, InternalError> {
         let maybe_cached_name = {
-            let accounts_cache = self.accounts_cache.lock().unwrap();
-            accounts_cache.id2names.get(account_id).cloned()
+            let readable_accounts_cache = self.accounts_cache.read().await;
+            readable_accounts_cache.id2names.get(account_id).cloned()
         };
 
         if let Some(name) = maybe_cached_name {
@@ -227,11 +232,11 @@ impl DatasetEntryServiceImpl {
                 .await
                 .int_err()?;
 
-            let mut accounts_cache = self.accounts_cache.lock().unwrap();
-            accounts_cache
+            let mut writable_accounts_cache = self.accounts_cache.write().await;
+            writable_accounts_cache
                 .id2names
                 .insert(account_id.clone(), account.account_name.clone());
-            accounts_cache
+            writable_accounts_cache
                 .names2ids
                 .insert(account.account_name.clone(), account_id.clone());
 
@@ -247,8 +252,8 @@ impl DatasetEntryServiceImpl {
             .unwrap_or_else(|| self.current_account_subject.account_name_or_default());
 
         let maybe_cached_id = {
-            let accounts_cache = self.accounts_cache.lock().unwrap();
-            accounts_cache.names2ids.get(account_name).cloned()
+            let readable_accounts_cache = self.accounts_cache.read().await;
+            readable_accounts_cache.names2ids.get(account_name).cloned()
         };
 
         if let Some(id) = maybe_cached_id {
@@ -260,11 +265,11 @@ impl DatasetEntryServiceImpl {
                 .await
                 .int_err()?;
 
-            let mut accounts_cache = self.accounts_cache.lock().unwrap();
-            accounts_cache
+            let mut writable_accounts_cache = self.accounts_cache.write().await;
+            writable_accounts_cache
                 .id2names
                 .insert(account.id.clone(), account_name.clone());
-            accounts_cache
+            writable_accounts_cache
                 .names2ids
                 .insert(account_name.clone(), account.id.clone());
 
@@ -322,16 +327,44 @@ impl DatasetEntryServiceImpl {
 
 #[async_trait::async_trait]
 impl DatasetEntryService for DatasetEntryServiceImpl {
+    fn all_entries(&self) -> DatasetEntryStream {
+        EntityPageStreamer::default().into_stream(
+            || async { Ok(()) },
+            |_, pagination| {
+                let list_fut = self.list_all_entries(pagination);
+                async { list_fut.await.int_err() }
+            },
+        )
+    }
+
+    fn entries_owned_by(&self, owner_id: &odf::AccountID) -> DatasetEntryStream {
+        let owner_id = owner_id.clone();
+
+        EntityPageStreamer::default().into_stream(
+            || async { Ok(Arc::new(owner_id)) },
+            move |owner_id, pagination| async move {
+                self.list_entries_owned_by(&owner_id, pagination)
+                    .await
+                    .int_err()
+            },
+        )
+    }
+
     async fn list_all_entries(
         &self,
         pagination: PaginationOpts,
     ) -> Result<EntityPageListing<DatasetEntry>, ListDatasetEntriesError> {
         use futures::TryStreamExt;
 
-        let total_count = self.dataset_entry_repo.dataset_entries_count().await?;
+        let total_count = self
+            .dataset_entry_repo
+            .dataset_entries_count()
+            .await
+            .int_err()?;
         let entries = self
             .dataset_entry_repo
             .get_dataset_entries(pagination)
+            .await
             .try_collect()
             .await?;
 
@@ -355,6 +388,7 @@ impl DatasetEntryService for DatasetEntryServiceImpl {
         let entries = self
             .dataset_entry_repo
             .get_dataset_entries_by_owner_id(owner_id, pagination)
+            .await
             .try_collect()
             .await?;
 
@@ -486,6 +520,57 @@ impl DatasetRegistry for DatasetEntryServiceImpl {
     fn get_dataset_by_handle(&self, dataset_handle: &odf::DatasetHandle) -> ResolvedDataset {
         let dataset = self.dataset_repo.get_dataset_by_handle(dataset_handle);
         ResolvedDataset::new(dataset, dataset_handle.clone())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait::async_trait]
+impl DatasetOwnershipService for DatasetEntryServiceImpl {
+    async fn get_dataset_owner(
+        &self,
+        dataset_id: &odf::DatasetID,
+    ) -> Result<odf::AccountID, InternalError> {
+        let dataset_entry = self
+            .dataset_entry_repo
+            .get_dataset_entry(dataset_id)
+            .await
+            .int_err()?;
+
+        Ok(dataset_entry.owner_id)
+    }
+
+    async fn get_owned_datasets(
+        &self,
+        account_id: &odf::AccountID,
+    ) -> Result<Vec<odf::DatasetID>, InternalError> {
+        use futures::TryStreamExt;
+
+        let owned_dataset_ids = self
+            .entries_owned_by(account_id)
+            .try_collect::<Vec<_>>()
+            .await?
+            .into_iter()
+            .map(|dataset_entry| dataset_entry.id)
+            .collect::<Vec<_>>();
+
+        Ok(owned_dataset_ids)
+    }
+
+    async fn is_dataset_owned_by(
+        &self,
+        dataset_id: &odf::DatasetID,
+        account_id: &odf::AccountID,
+    ) -> Result<bool, InternalError> {
+        let get_res = self.dataset_entry_repo.get_dataset_entry(dataset_id).await;
+
+        match get_res {
+            Ok(dataset_entry) => Ok(dataset_entry.owner_id == *account_id),
+            Err(err) => match err {
+                GetDatasetEntryError::NotFound(_) => Ok(false),
+                unexpected_error => Err(unexpected_error.int_err()),
+            },
+        }
     }
 }
 

@@ -46,7 +46,7 @@ impl AccountService {
                         default_account_name
                     } else {
                         // Use account as username, when there is no data
-                        account.clone()
+                        account
                     },
                     true,
                 )

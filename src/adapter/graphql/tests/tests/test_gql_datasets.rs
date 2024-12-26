@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use async_graphql::*;
 use database_common::NoOpDatabasePlugin;
 use dill::Component;
 use indoc::indoc;
@@ -15,6 +14,8 @@ use kamu::testing::MetadataFactory;
 use kamu::*;
 use kamu_accounts::testing::MockAuthenticationService;
 use kamu_accounts::*;
+use kamu_auth_rebac_inmem::InMemoryRebacRepository;
+use kamu_auth_rebac_services::{MultiTenantRebacDatasetLifecycleMessageConsumer, RebacServiceImpl};
 use kamu_core::*;
 use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
 use kamu_datasets_services::DependencyGraphServiceImpl;
@@ -28,9 +29,101 @@ use time_source::SystemTimeSourceDefault;
 use crate::utils::{authentication_catalogs, expect_anonymous_access_error};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Implementations
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+macro_rules! test_dataset_create_empty_without_visibility {
+    ($tenancy_config:expr) => {
+        let harness = GraphQLDatasetsHarness::new($tenancy_config).await;
+
+        let request_code = indoc::indoc!(
+            r#"
+            mutation {
+              datasets {
+                createEmpty(datasetKind: ROOT, datasetAlias: "foo") {
+                  ... on CreateDatasetResultSuccess {
+                    dataset {
+                      name
+                      alias
+                    }
+                  }
+                }
+              }
+            }
+            "#
+        );
+
+        expect_anonymous_access_error(harness.execute_anonymous_query(request_code).await);
+
+        let res = harness.execute_authorized_query(request_code).await;
+
+        assert!(res.is_ok(), "{res:?}");
+        pretty_assertions::assert_eq!(
+            async_graphql::value!({
+                "datasets": {
+                    "createEmpty": {
+                        "dataset": {
+                            "name": "foo",
+                            "alias": "foo",
+                        }
+                    }
+                }
+            }),
+            res.data,
+        );
+    };
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+macro_rules! test_dataset_create_empty_public {
+    ($tenancy_config:expr) => {
+        let harness = GraphQLDatasetsHarness::new($tenancy_config).await;
+
+        let request_code = indoc::indoc!(
+            r#"
+            mutation {
+              datasets {
+                createEmpty(datasetKind: ROOT, datasetAlias: "foo", datasetVisibility: PUBLIC) {
+                  ... on CreateDatasetResultSuccess {
+                    dataset {
+                      name
+                      alias
+                    }
+                  }
+                }
+              }
+            }
+            "#
+        );
+
+        expect_anonymous_access_error(harness.execute_anonymous_query(request_code).await);
+
+        let res = harness.execute_authorized_query(request_code).await;
+
+        assert!(res.is_ok(), "{res:?}");
+        pretty_assertions::assert_eq!(
+            async_graphql::value!({
+                "datasets": {
+                    "createEmpty": {
+                        "dataset": {
+                            "name": "foo",
+                            "alias": "foo",
+                        }
+                    }
+                }
+            }),
+            res.data,
+        );
+    };
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Tests
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn dataset_by_id_does_not_exist() {
+async fn test_dataset_by_id_does_not_exist() {
     let harness = GraphQLDatasetsHarness::new(TenancyConfig::SingleTenant).await;
     let res = harness.execute_anonymous_query(indoc!(
             r#"
@@ -44,21 +137,22 @@ async fn dataset_by_id_does_not_exist() {
             "#
         ))
         .await;
+
     assert!(res.is_ok(), "{res:?}");
-    assert_eq!(
-        res.data,
-        value!({
+    pretty_assertions::assert_eq!(
+        async_graphql::value!({
             "datasets": {
                 "byId": null,
             }
-        })
+        }),
+        res.data,
     );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn dataset_by_id() {
+async fn test_dataset_by_id() {
     let harness = GraphQLDatasetsHarness::new(TenancyConfig::SingleTenant).await;
 
     let foo_result = harness
@@ -84,23 +178,24 @@ async fn dataset_by_id() {
             ),
         )
         .await;
+
     assert!(res.is_ok(), "{res:?}");
-    assert_eq!(
-        res.data,
-        value!({
+    pretty_assertions::assert_eq!(
+        async_graphql::value!({
             "datasets": {
                 "byId": {
                     "name": "foo",
                 }
             }
-        })
+        }),
+        res.data,
     );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn dataset_by_account_and_name_case_insensitive() {
+async fn test_dataset_by_account_and_name_case_insensitive() {
     let account_name = AccountName::new_unchecked("KaMu");
 
     let mut mock_authentication_service = MockAuthenticationService::new();
@@ -139,10 +234,10 @@ async fn dataset_by_account_and_name_case_insensitive() {
             .replace("<name>", "FoO"),
         )
         .await;
+
     assert!(res.is_ok(), "{res:?}");
-    assert_eq!(
-        res.data,
-        value!({
+    pretty_assertions::assert_eq!(
+        async_graphql::value!({
             "datasets": {
                 "byOwnerAndName": {
                     "name": "Foo",
@@ -151,14 +246,15 @@ async fn dataset_by_account_and_name_case_insensitive() {
                     }
                 }
             }
-        })
+        }),
+        res.data,
     );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn dataset_by_account_id() {
+async fn test_dataset_by_account_id() {
     let mut mock_authentication_service = MockAuthenticationService::new();
     mock_authentication_service
         .expect_find_account_name_by_id()
@@ -193,10 +289,10 @@ async fn dataset_by_account_id() {
             .replace("<accountId>", DEFAULT_ACCOUNT_ID.to_string().as_str()),
         )
         .await;
+
     assert!(res.is_ok(), "{res:?}");
-    assert_eq!(
-        res.data,
-        value!({
+    pretty_assertions::assert_eq!(
+        async_graphql::value!({
             "datasets": {
                 "byAccountId": {
                     "nodes": [
@@ -210,56 +306,43 @@ async fn dataset_by_account_id() {
 
                 }
             }
-        })
-    );
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test(tokio::test)]
-async fn dataset_create_empty() {
-    let harness = GraphQLDatasetsHarness::new(TenancyConfig::SingleTenant).await;
-
-    let request_code = indoc::indoc!(
-        r#"
-        mutation {
-            datasets {
-                createEmpty (datasetKind: ROOT, datasetAlias: "foo") {
-                    ... on CreateDatasetResultSuccess {
-                        dataset {
-                            name
-                            alias
-                        }
-                    }
-                }
-            }
-        }
-        "#
-    );
-
-    expect_anonymous_access_error(harness.execute_anonymous_query(request_code).await);
-
-    let res = harness.execute_authorized_query(request_code).await;
-    assert!(res.is_ok(), "{res:?}");
-    assert_eq!(
+        }),
         res.data,
-        value!({
-            "datasets": {
-                "createEmpty": {
-                    "dataset": {
-                        "name": "foo",
-                        "alias": "foo",
-                    }
-                }
-            }
-        })
     );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn dataset_create_from_snapshot() {
+async fn test_dataset_create_empty_without_visibility_st() {
+    test_dataset_create_empty_without_visibility!(TenancyConfig::SingleTenant);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_dataset_create_empty_without_visibility_mt() {
+    test_dataset_create_empty_without_visibility!(TenancyConfig::MultiTenant);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_dataset_create_empty_public_st() {
+    test_dataset_create_empty_public!(TenancyConfig::SingleTenant);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_dataset_create_empty_public_mt() {
+    test_dataset_create_empty_public!(TenancyConfig::MultiTenant);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_dataset_create_from_snapshot() {
     let harness = GraphQLDatasetsHarness::new(TenancyConfig::MultiTenant).await;
 
     let snapshot = MetadataFactory::dataset_snapshot()
@@ -296,10 +379,10 @@ async fn dataset_create_from_snapshot() {
     expect_anonymous_access_error(harness.execute_anonymous_query(request_code.clone()).await);
 
     let res = harness.execute_authorized_query(request_code).await;
+
     assert!(res.is_ok(), "{res:?}");
-    assert_eq!(
-        res.data,
-        value!({
+    pretty_assertions::assert_eq!(
+        async_graphql::value!({
             "datasets": {
                 "createFromSnapshot": {
                     "dataset": {
@@ -308,14 +391,15 @@ async fn dataset_create_from_snapshot() {
                     }
                 }
             }
-        })
+        }),
+        res.data,
     );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn dataset_create_from_snapshot_malformed() {
+async fn test_dataset_create_from_snapshot_malformed() {
     let harness = GraphQLDatasetsHarness::new(TenancyConfig::SingleTenant).await;
 
     let res = harness
@@ -333,23 +417,24 @@ async fn dataset_create_from_snapshot_malformed() {
         "#
         ))
         .await;
+
     assert!(res.is_ok(), "{res:?}");
-    assert_eq!(
-        res.data,
-        value!({
+    pretty_assertions::assert_eq!(
+        async_graphql::value!({
             "datasets": {
                 "createFromSnapshot": {
                     "__typename": "MetadataManifestMalformed",
                 }
             }
-        })
+        }),
+        res.data,
     );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn dataset_rename_success() {
+async fn test_dataset_rename_success() {
     let harness = GraphQLDatasetsHarness::new(TenancyConfig::SingleTenant).await;
 
     let foo_result = harness
@@ -380,10 +465,10 @@ async fn dataset_rename_success() {
     expect_anonymous_access_error(harness.execute_anonymous_query(request_code.clone()).await);
 
     let res = harness.execute_authorized_query(request_code).await;
+
     assert!(res.is_ok(), "{res:?}");
-    assert_eq!(
-        res.data,
-        value!({
+    pretty_assertions::assert_eq!(
+        async_graphql::value!({
             "datasets": {
                 "byId": {
                     "rename": {
@@ -394,14 +479,15 @@ async fn dataset_rename_success() {
                     }
                 }
             }
-        })
+        }),
+        res.data,
     );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn dataset_rename_no_changes() {
+async fn test_dataset_rename_no_changes() {
     let harness = GraphQLDatasetsHarness::new(TenancyConfig::SingleTenant).await;
 
     let foo_result = harness
@@ -431,10 +517,10 @@ async fn dataset_rename_no_changes() {
             .replace("<newName>", "foo"),
         )
         .await;
+
     assert!(res.is_ok(), "{res:?}");
-    assert_eq!(
-        res.data,
-        value!({
+    pretty_assertions::assert_eq!(
+        async_graphql::value!({
             "datasets": {
                 "byId": {
                     "rename": {
@@ -444,14 +530,15 @@ async fn dataset_rename_no_changes() {
                     }
                 }
             }
-        })
+        }),
+        res.data,
     );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn dataset_rename_name_collision() {
+async fn test_dataset_rename_name_collision() {
     let harness = GraphQLDatasetsHarness::new(TenancyConfig::SingleTenant).await;
 
     let foo_result = harness
@@ -484,10 +571,10 @@ async fn dataset_rename_name_collision() {
             .replace("<newName>", "bar"),
         )
         .await;
+
     assert!(res.is_ok(), "{res:?}");
-    assert_eq!(
-        res.data,
-        value!({
+    pretty_assertions::assert_eq!(
+        async_graphql::value!({
             "datasets": {
                 "byId": {
                     "rename": {
@@ -497,14 +584,15 @@ async fn dataset_rename_name_collision() {
                     }
                 }
             }
-        })
+        }),
+        res.data,
     );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn dataset_delete_success() {
+async fn test_dataset_delete_success() {
     let harness = GraphQLDatasetsHarness::new(TenancyConfig::SingleTenant).await;
 
     let foo_result = harness
@@ -533,10 +621,10 @@ async fn dataset_delete_success() {
     expect_anonymous_access_error(harness.execute_anonymous_query(request_code.clone()).await);
 
     let res = harness.execute_authorized_query(request_code).await;
+
     assert!(res.is_ok(), "{res:?}");
-    assert_eq!(
-        res.data,
-        value!({
+    pretty_assertions::assert_eq!(
+        async_graphql::value!({
             "datasets": {
                 "byId": {
                     "delete": {
@@ -546,14 +634,15 @@ async fn dataset_delete_success() {
                     }
                 }
             }
-        })
+        }),
+        res.data,
     );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn dataset_delete_dangling_ref() {
+async fn test_dataset_delete_dangling_ref() {
     let harness = GraphQLDatasetsHarness::new(TenancyConfig::SingleTenant).await;
 
     let foo_result = harness
@@ -589,10 +678,10 @@ async fn dataset_delete_dangling_ref() {
             .replace("<id>", &foo_result.dataset_handle.id.to_string()),
         )
         .await;
+
     assert!(res.is_ok(), "{res:?}");
-    assert_eq!(
-        res.data,
-        value!({
+    pretty_assertions::assert_eq!(
+        async_graphql::value!({
             "datasets": {
                 "byId": {
                     "delete": {
@@ -603,14 +692,15 @@ async fn dataset_delete_dangling_ref() {
                     }
                 }
             }
-        })
+        }),
+        res.data,
     );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn dataset_view_permissions() {
+async fn test_dataset_view_permissions() {
     let harness = GraphQLDatasetsHarness::new(TenancyConfig::SingleTenant).await;
 
     let foo_result = harness
@@ -637,10 +727,10 @@ async fn dataset_view_permissions() {
     .replace("<id>", &foo_result.dataset_handle.id.to_string());
 
     let res = harness.execute_authorized_query(request_code).await;
+
     assert!(res.is_ok(), "{res:?}");
-    assert_eq!(
-        res.data,
-        value!({
+    pretty_assertions::assert_eq!(
+        async_graphql::value!({
             "datasets": {
                 "byId": {
                     "permissions": {
@@ -652,10 +742,13 @@ async fn dataset_view_permissions() {
                     }
                 }
             }
-        })
+        }),
+        res.data,
     );
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Harness
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct GraphQLDatasetsHarness {
@@ -682,7 +775,7 @@ impl GraphQLDatasetsHarness {
 
             b.add::<SystemTimeSourceDefault>()
                 .add_builder(
-                    messaging_outbox::OutboxImmediateImpl::builder()
+                    OutboxImmediateImpl::builder()
                         .with_consumer_filter(messaging_outbox::ConsumerFilter::AllConsumers),
                 )
                 .bind::<dyn Outbox, OutboxImmediateImpl>()
@@ -698,7 +791,13 @@ impl GraphQLDatasetsHarness {
                 .add::<DatasetRegistryRepoBridge>()
                 .add_value(mock_authentication_service)
                 .bind::<dyn AuthenticationService, MockAuthenticationService>()
-                .add::<auth::AlwaysHappyDatasetActionAuthorizer>();
+                .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
+                .add::<RebacServiceImpl>()
+                .add::<InMemoryRebacRepository>();
+
+            if tenancy_config == TenancyConfig::MultiTenant {
+                b.add::<MultiTenantRebacDatasetLifecycleMessageConsumer>();
+            }
 
             NoOpDatabasePlugin::init_database_components(&mut b);
 

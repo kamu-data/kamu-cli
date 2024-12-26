@@ -61,14 +61,11 @@ impl BaseRepoHarness {
             .add::<SystemTimeSourceDefault>()
             .build();
 
-        let dataset_registry = catalog.get_one().unwrap();
-        let dataset_repo_writer = catalog.get_one().unwrap();
-
         Self {
             temp_dir,
+            dataset_registry: catalog.get_one().unwrap(),
+            dataset_repo_writer: catalog.get_one().unwrap(),
             catalog,
-            dataset_registry,
-            dataset_repo_writer,
         }
     }
 

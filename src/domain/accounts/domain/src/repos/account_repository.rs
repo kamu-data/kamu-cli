@@ -9,6 +9,7 @@
 
 use std::fmt::Display;
 
+use database_common::{EntityPageStream, PaginationOpts};
 use internal_error::InternalError;
 use opendatafabric::{AccountID, AccountName};
 use thiserror::Error;
@@ -19,7 +20,13 @@ use crate::Account;
 
 #[async_trait::async_trait]
 pub trait AccountRepository: Send + Sync {
+    // TODO: Private Datasets: tests
+    async fn accounts_count(&self) -> Result<usize, AccountsCountError>;
+
     async fn create_account(&self, account: &Account) -> Result<(), CreateAccountError>;
+
+    // TODO: Private Datasets: tests
+    async fn get_accounts(&self, pagination: PaginationOpts) -> AccountPageStream;
 
     async fn get_account_by_id(
         &self,
@@ -50,6 +57,20 @@ pub trait AccountRepository: Send + Sync {
         &self,
         account_name: &AccountName,
     ) -> Result<Option<AccountID>, FindAccountIdByNameError>;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub type AccountPageStream<'a> = EntityPageStream<'a, Account>;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Errors
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum AccountsCountError {
+    #[error(transparent)]
+    Internal(#[from] InternalError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -90,6 +111,14 @@ impl Display for CreateAccountDuplicateField {
             },
         )
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum GetAccountsError {
+    #[error(transparent)]
+    Internal(#[from] InternalError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

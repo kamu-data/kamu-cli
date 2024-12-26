@@ -22,6 +22,7 @@ use kamu_auth_rebac::{
     GetEntityPropertiesError,
     GetRelationsBetweenEntitiesError,
     InsertEntitiesRelationError,
+    PropertiesCountError,
     PropertyName,
     PropertyValue,
     RebacRepository,
@@ -77,6 +78,14 @@ impl InMemoryRebacRepository {
 
 #[async_trait::async_trait]
 impl RebacRepository for InMemoryRebacRepository {
+    async fn properties_count(&self) -> Result<usize, PropertiesCountError> {
+        let readable_state = self.state.read().await;
+
+        let count = readable_state.entities_properties_map.len();
+
+        Ok(count)
+    }
+
     async fn set_entity_property(
         &self,
         entity: &Entity,
@@ -155,6 +164,34 @@ impl RebacRepository for InMemoryRebacRepository {
             .collect();
 
         Ok(properties)
+    }
+
+    async fn get_entity_properties_by_ids(
+        &self,
+        entities: &[Entity],
+    ) -> Result<Vec<(Entity, PropertyName, PropertyValue)>, GetEntityPropertiesError> {
+        let entities_set = entities.iter().cloned().collect::<HashSet<_>>();
+
+        let readable_state = self.state.read().await;
+
+        let entities_properties = readable_state
+            .entities_properties_map
+            .iter()
+            .filter(|(entity, _)| entities_set.contains(entity))
+            .map(|(entity, entity_properties)| {
+                entity_properties
+                    .iter()
+                    .map(|(property_name, property_value)| {
+                        (entity.clone(), *property_name, property_value.clone())
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .fold(Vec::new(), |mut acc, entity_properties| {
+                acc.extend(entity_properties);
+                acc
+            });
+
+        Ok(entities_properties)
     }
 
     async fn insert_entities_relation(

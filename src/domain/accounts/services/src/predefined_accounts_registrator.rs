@@ -49,18 +49,7 @@ impl PredefinedAccountsRegistrator {
         &self,
         account_config: &AccountConfig,
     ) -> Result<(), InternalError> {
-        let account = Account {
-            id: account_config.get_id(),
-            account_name: account_config.account_name.clone(),
-            email: account_config.email.clone(),
-            display_name: account_config.get_display_name(),
-            account_type: account_config.account_type,
-            avatar_url: account_config.avatar_url.clone(),
-            registered_at: account_config.registered_at,
-            is_admin: account_config.is_admin,
-            provider: account_config.provider.clone(),
-            provider_identity_key: account_config.account_name.to_string(),
-        };
+        let account = account_config.into();
 
         self.account_repository
             .create_account(&account)

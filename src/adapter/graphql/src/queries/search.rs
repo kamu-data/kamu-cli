@@ -13,6 +13,7 @@ use kamu_core::{self as domain, TryStreamExtExt};
 
 use crate::prelude::*;
 use crate::queries::{Account, Dataset};
+use crate::utils::from_catalog_n;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Search
@@ -41,6 +42,10 @@ impl Search {
         let page = page.unwrap_or(0);
         let per_page = per_page.unwrap_or(Self::DEFAULT_RESULTS_PER_PAGE);
 
+        // TODO: Private Datasets: PERF: find a way to narrow down the number of records
+        //       to filter, e.g.:
+        //       - Anonymous: get all the public
+        //       - Logged: all owned datasets and datasets with relations
         let filtered_dataset_handles: Vec<_> = dataset_registry
             .all_dataset_handles()
             .filter_ok(|hdl| hdl.alias.dataset_name.contains(&query))

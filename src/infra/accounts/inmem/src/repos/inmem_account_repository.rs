@@ -10,6 +10,7 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
+use database_common::PaginationOpts;
 use dill::*;
 use opendatafabric::{AccountID, AccountName};
 
@@ -60,6 +61,14 @@ impl InMemoryAccountRepository {
 
 #[async_trait::async_trait]
 impl AccountRepository for InMemoryAccountRepository {
+    async fn accounts_count(&self) -> Result<usize, AccountsCountError> {
+        let readable_state = self.state.lock().unwrap();
+
+        let accounts_count = readable_state.accounts_by_id.len();
+
+        Ok(accounts_count)
+    }
+
     async fn create_account(&self, account: &Account) -> Result<(), CreateAccountError> {
         let mut guard = self.state.lock().unwrap();
         if guard.accounts_by_id.contains_key(&account.id) {
@@ -103,6 +112,23 @@ impl AccountRepository for InMemoryAccountRepository {
             .insert(account.provider_identity_key.clone(), account.id.clone());
 
         Ok(())
+    }
+
+    async fn get_accounts(&self, pagination: PaginationOpts) -> AccountPageStream {
+        let dataset_entries_page = {
+            let readable_state = self.state.lock().unwrap();
+
+            readable_state
+                .accounts_by_id
+                .values()
+                .skip(pagination.offset)
+                .take(pagination.limit)
+                .cloned()
+                .map(Ok)
+                .collect::<Vec<_>>()
+        };
+
+        Box::pin(futures::stream::iter(dataset_entries_page))
     }
 
     async fn get_account_by_id(

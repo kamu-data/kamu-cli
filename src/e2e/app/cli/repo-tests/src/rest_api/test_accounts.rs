@@ -10,13 +10,7 @@
 use std::assert_matches::assert_matches;
 
 use kamu_accounts::{DEFAULT_ACCOUNT_ID, DEFAULT_ACCOUNT_NAME};
-use kamu_cli_e2e_common::{
-    AccountMeError,
-    KamuApiServerClient,
-    KamuApiServerClientExt,
-    E2E_USER_ACCOUNT_NAME_STR,
-};
-use opendatafabric as odf;
+use kamu_cli_e2e_common::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -38,7 +32,7 @@ pub async fn test_accounts_me_e2e_user(mut kamu_api_server_client: KamuApiServer
     assert_matches!(
         kamu_api_server_client.account().me().await,
         Ok(response)
-            if response.account_name == odf::AccountName::new_unchecked(E2E_USER_ACCOUNT_NAME_STR)
+            if response.account_name == *E2E_USER_ACCOUNT_NAME
     );
 }
 

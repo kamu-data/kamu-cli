@@ -773,7 +773,6 @@ impl DependencyGraphHarness {
             .dependency_graph_service
             .get_recursive_upstream_dependencies(dataset_ids)
             .await
-            .int_err()
             .unwrap()
             .collect()
             .await;

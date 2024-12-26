@@ -8,13 +8,14 @@
 // by the Apache License, Version 2.0.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use database_common::PaginationOpts;
 use dill::*;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_datasets::*;
 use opendatafabric::{AccountID, DatasetID, DatasetName};
+use tokio::sync::RwLock;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -39,7 +40,7 @@ impl State {
 
 pub struct InMemoryDatasetEntryRepository {
     listeners: Vec<Arc<dyn DatasetEntryRemovalListener>>,
-    state: Arc<Mutex<State>>,
+    state: Arc<RwLock<State>>,
 }
 
 #[component(pub)]
@@ -49,7 +50,7 @@ impl InMemoryDatasetEntryRepository {
     pub fn new(listeners: Vec<Arc<dyn DatasetEntryRemovalListener>>) -> Self {
         Self {
             listeners,
-            state: Arc::new(Mutex::new(State::new())),
+            state: Arc::new(RwLock::new(State::new())),
         }
     }
 }
@@ -58,23 +59,32 @@ impl InMemoryDatasetEntryRepository {
 
 #[async_trait::async_trait]
 impl DatasetEntryRepository for InMemoryDatasetEntryRepository {
-    async fn dataset_entries_count(&self) -> Result<usize, InternalError> {
-        let readable_state = self.state.lock().unwrap();
-        Ok(readable_state.rows.len())
+    async fn dataset_entries_count(&self) -> Result<usize, DatasetEntriesCountError> {
+        let readable_state = self.state.read().await;
+
+        let dataset_entries_count = readable_state.rows.len();
+
+        Ok(dataset_entries_count)
     }
 
     async fn dataset_entries_count_by_owner_id(
         &self,
         owner_id: &AccountID,
     ) -> Result<usize, InternalError> {
-        let readable_state = self.state.lock().unwrap();
-        let owner_entires = readable_state.rows_by_owner.get(owner_id);
-        Ok(owner_entires.map_or(0, BTreeSet::len))
+        let readable_state = self.state.read().await;
+
+        let owner_entries = readable_state.rows_by_owner.get(owner_id);
+
+        Ok(owner_entries.map_or(0, BTreeSet::len))
     }
 
-    fn get_dataset_entries(&self, pagination: PaginationOpts) -> DatasetEntryStream {
-        let dataset_entries_page: Vec<_> = {
-            let readable_state = self.state.lock().unwrap();
+    async fn get_dataset_entries<'a>(
+        &'a self,
+        pagination: PaginationOpts,
+    ) -> DatasetEntryStream<'a> {
+        let dataset_entries_page = {
+            let readable_state = self.state.read().await;
+
             readable_state
                 .rows_by_name
                 .values()
@@ -82,7 +92,7 @@ impl DatasetEntryRepository for InMemoryDatasetEntryRepository {
                 .take(pagination.limit)
                 .cloned()
                 .map(Ok)
-                .collect()
+                .collect::<Vec<_>>()
         };
 
         Box::pin(futures::stream::iter(dataset_entries_page))
@@ -92,7 +102,7 @@ impl DatasetEntryRepository for InMemoryDatasetEntryRepository {
         &self,
         dataset_id: &DatasetID,
     ) -> Result<DatasetEntry, GetDatasetEntryError> {
-        let readable_state = self.state.lock().unwrap();
+        let readable_state = self.state.read().await;
 
         let maybe_dataset_entry = readable_state.rows.get(dataset_id);
 
@@ -107,7 +117,7 @@ impl DatasetEntryRepository for InMemoryDatasetEntryRepository {
         &self,
         dataset_ids: &[DatasetID],
     ) -> Result<DatasetEntriesResolution, GetMultipleDatasetEntriesError> {
-        let readable_state = self.state.lock().unwrap();
+        let readable_state = self.state.read().await;
 
         let mut resolution = DatasetEntriesResolution::default();
 
@@ -128,7 +138,7 @@ impl DatasetEntryRepository for InMemoryDatasetEntryRepository {
         owner_id: &AccountID,
         name: &DatasetName,
     ) -> Result<DatasetEntry, GetDatasetEntryByNameError> {
-        let readable_state = self.state.lock().unwrap();
+        let readable_state = self.state.read().await;
 
         let maybe_dataset_entry = readable_state
             .rows
@@ -144,13 +154,14 @@ impl DatasetEntryRepository for InMemoryDatasetEntryRepository {
         Ok(dataset_entry.clone())
     }
 
-    fn get_dataset_entries_by_owner_id(
-        &self,
+    async fn get_dataset_entries_by_owner_id<'a>(
+        &'a self,
         owner_id: &AccountID,
         pagination: PaginationOpts,
-    ) -> DatasetEntryStream<'_> {
-        let dataset_entries_page: Vec<_> = {
-            let readable_state = self.state.lock().unwrap();
+    ) -> DatasetEntryStream<'a> {
+        let dataset_entries_page = {
+            let readable_state = self.state.read().await;
+
             if let Some(dataset_ids) = readable_state.rows_by_owner.get(owner_id) {
                 dataset_ids
                     .iter()
@@ -159,7 +170,7 @@ impl DatasetEntryRepository for InMemoryDatasetEntryRepository {
                     .map(|dataset_id| readable_state.rows.get(dataset_id).unwrap())
                     .cloned()
                     .map(Ok)
-                    .collect()
+                    .collect::<Vec<_>>()
             } else {
                 vec![]
             }
@@ -172,7 +183,7 @@ impl DatasetEntryRepository for InMemoryDatasetEntryRepository {
         &self,
         dataset_entry: &DatasetEntry,
     ) -> Result<(), SaveDatasetEntryError> {
-        let mut writable_state = self.state.lock().unwrap();
+        let mut writable_state = self.state.write().await;
 
         for row in writable_state.rows.values() {
             if row.id == dataset_entry.id {
@@ -208,7 +219,7 @@ impl DatasetEntryRepository for InMemoryDatasetEntryRepository {
         dataset_id: &DatasetID,
         new_name: &DatasetName,
     ) -> Result<(), UpdateDatasetEntryNameError> {
-        let mut writable_state = self.state.lock().unwrap();
+        let mut writable_state = self.state.write().await;
 
         let maybe_dataset_entry = writable_state.rows.get(dataset_id);
 
@@ -251,7 +262,7 @@ impl DatasetEntryRepository for InMemoryDatasetEntryRepository {
         dataset_id: &DatasetID,
     ) -> Result<(), DeleteEntryDatasetError> {
         {
-            let mut writable_state = self.state.lock().unwrap();
+            let mut writable_state = self.state.write().await;
 
             let maybe_removed_entry = writable_state.rows.remove(dataset_id);
             if let Some(removed_entry) = maybe_removed_entry {

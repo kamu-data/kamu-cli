@@ -9,7 +9,7 @@
 
 use futures::StreamExt;
 use kamu_accounts::Account as AccountEntity;
-use kamu_core::DatasetOwnershipService;
+use kamu_datasets::DatasetOwnershipService;
 use kamu_flow_system::FlowConfigurationService;
 
 use crate::prelude::*;

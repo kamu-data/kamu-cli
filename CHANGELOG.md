@@ -11,6 +11,23 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Unreleased]
+### Changed
+- Private Datasets:
+  - OSO: using user actors / dateset resources that come from the database
+    - Thus, any access check relies on real entities
+  - GQL, added `Dataset.visibility()` to get the current visibility value
+  - GQL, added `DatasetMut.setVisibility()` to be able to change the dataset visibility after it has been created
+  - Deletion of previously created (and unused) ReBAC-properties and reindexing
+  - OSO: updating the schema to use identifiers instead of names
+  - OSO: added resource storage for access speed
+  - E2E: Using the correct account in multi-tenant mode
+    - And also the possibility of set it up
+  - `DatasetOwnershipService`: moved to the `kamu-dataset` crate area & implemented via `DatasetEntryServiceImpl`
+  - GQL, `DatasetMetadata.currentUpstreamDependencies`: indication if datasets not found/not accessed
+  - GQL, `DatasetMetadata.currentDownstreamDependencies`: exclude datasets that cannot be accessed
+  - E2E: added the ability to create an account using CLI
+
 ## [0.214.0] - 2024-12-23
 ### Added
 - New `kamu system decode` command that can decode an arbitrary block file for debugging
