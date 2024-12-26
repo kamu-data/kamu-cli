@@ -9,9 +9,11 @@
 
 use std::sync::Arc;
 
-use internal_error::ResultIntoInternal;
+use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu::domain::{DatasetRegistry, DatasetRegistryExt, MetadataChainExt};
-use opendatafabric::DatasetRef;
+use kamu_accounts::{AccountConfig, AccountRepository, PROVIDER_PASSWORD};
+use kamu_accounts_services::LoginPasswordAuthProvider;
+use opendatafabric as odf;
 
 use super::{CLIError, Command};
 
@@ -19,23 +21,32 @@ use super::{CLIError, Command};
 
 pub struct SystemE2ECommand {
     action: String,
-    dataset_ref: Option<DatasetRef>,
+    arguments: Vec<String>,
+    dataset_ref: Option<odf::DatasetRef>,
     dataset_registry: Arc<dyn DatasetRegistry>,
+    account_repo: Arc<dyn AccountRepository>,
+    login_password_auth_provider: Arc<LoginPasswordAuthProvider>,
 }
 
 impl SystemE2ECommand {
     pub fn new<S>(
         action: S,
-        dataset_ref: Option<DatasetRef>,
+        arguments: Vec<String>,
+        dataset_ref: Option<odf::DatasetRef>,
         dataset_registry: Arc<dyn DatasetRegistry>,
+        account_repo: Arc<dyn AccountRepository>,
+        login_password_auth_provider: Arc<LoginPasswordAuthProvider>,
     ) -> Self
     where
         S: Into<String>,
     {
         Self {
             action: action.into(),
+            arguments,
             dataset_ref,
             dataset_registry,
+            account_repo,
+            login_password_auth_provider,
         }
     }
 }
@@ -75,6 +86,29 @@ impl Command for SystemE2ECommand {
                     kamu_data_utils::data::local_url::into_local_path(internal_url).int_err()?;
 
                 println!("{}", path.display());
+            }
+            "account-add" => {
+                if self.arguments.is_empty() {
+                    return Err("Account names have not been provided".int_err().into());
+                };
+
+                for account_name in &self.arguments {
+                    eprint!("Add {account_name}... ");
+
+                    let account_config =
+                        AccountConfig::from_name(odf::AccountName::new_unchecked(account_name));
+                    let account = (&account_config).into();
+
+                    self.account_repo.create_account(&account).await.int_err()?;
+
+                    if account_config.provider == PROVIDER_PASSWORD {
+                        self.login_password_auth_provider
+                            .save_password(&account.account_name, account_config.get_password())
+                            .await?;
+                    }
+
+                    eprintln!("{}", console::style("Done").green());
+                }
             }
             unexpected_action => panic!("Unexpected action: '{unexpected_action}'"),
         }
