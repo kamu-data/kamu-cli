@@ -123,7 +123,9 @@ impl DatasetMetadata {
             .await?;
 
         upstream_dependencies.extend(unauthorized_ids_with_errors.into_iter().map(
-            |(not_found_dataset_id, _)| DependencyDatasetResult::not_found(not_found_dataset_id),
+            |(unauthorized_dataset_id, _)| {
+                DependencyDatasetResult::not_accessible(unauthorized_dataset_id)
+            },
         ));
 
         let DatasetEntriesResolution {
@@ -137,7 +139,7 @@ impl DatasetMetadata {
         upstream_dependencies.extend(
             unresolved_entries
                 .into_iter()
-                .map(DependencyDatasetResult::not_found),
+                .map(DependencyDatasetResult::not_accessible),
         );
 
         let owner_ids = resolved_entries
@@ -164,13 +166,14 @@ impl DatasetMetadata {
                 };
                 let dataset = Dataset::new(Account::from_account(account.clone()), dataset_handle);
 
-                upstream_dependencies.push(DependencyDatasetResult::found(dataset));
+                upstream_dependencies.push(DependencyDatasetResult::accessible(dataset));
             } else {
                 tracing::warn!(
                     "Upstream owner's account not found for dataset: {:?}",
                     &dataset_entry
                 );
-                upstream_dependencies.push(DependencyDatasetResult::not_found(dataset_entry.id));
+                upstream_dependencies
+                    .push(DependencyDatasetResult::not_accessible(dataset_entry.id));
             }
         }
 
@@ -226,7 +229,7 @@ impl DatasetMetadata {
         downstream_dependencies.extend(
             unresolved_entries
                 .into_iter()
-                .map(DependencyDatasetResult::not_found),
+                .map(DependencyDatasetResult::not_accessible),
         );
 
         let owner_ids = resolved_entries
@@ -253,13 +256,14 @@ impl DatasetMetadata {
                 };
                 let dataset = Dataset::new(Account::from_account(account.clone()), dataset_handle);
 
-                downstream_dependencies.push(DependencyDatasetResult::found(dataset));
+                downstream_dependencies.push(DependencyDatasetResult::accessible(dataset));
             } else {
                 tracing::warn!(
                     "Downstream owner's account not found for dataset: {:?}",
                     &dataset_entry
                 );
-                downstream_dependencies.push(DependencyDatasetResult::not_found(dataset_entry.id));
+                downstream_dependencies
+                    .push(DependencyDatasetResult::not_accessible(dataset_entry.id));
             }
         }
 
@@ -400,30 +404,30 @@ impl DatasetMetadata {
 #[derive(Interface, Debug, Clone)]
 #[graphql(field(name = "message", ty = "String"))]
 enum DependencyDatasetResult {
-    Found(DependencyDatasetResultFound),
-    NotFound(DependencyDatasetResultNotFound),
+    Accessible(DependencyDatasetResultAccessible),
+    NotAccessible(DependencyDatasetResultNotAccessible),
 }
 
 impl DependencyDatasetResult {
-    pub fn found(dataset: Dataset) -> Self {
-        Self::Found(DependencyDatasetResultFound { dataset })
+    pub fn accessible(dataset: Dataset) -> Self {
+        Self::Accessible(DependencyDatasetResultAccessible { dataset })
     }
 
-    pub fn not_found(dataset_id: odf::DatasetID) -> Self {
-        Self::NotFound(DependencyDatasetResultNotFound {
-            dataset_id: dataset_id.into(),
+    pub fn not_accessible(dataset_id: odf::DatasetID) -> Self {
+        Self::NotAccessible(DependencyDatasetResultNotAccessible {
+            id: dataset_id.into(),
         })
     }
 }
 
 #[derive(SimpleObject, Debug, Clone)]
 #[graphql(complex)]
-pub struct DependencyDatasetResultFound {
+pub struct DependencyDatasetResultAccessible {
     pub dataset: Dataset,
 }
 
 #[ComplexObject]
-impl DependencyDatasetResultFound {
+impl DependencyDatasetResultAccessible {
     async fn message(&self) -> String {
         "Found".to_string()
     }
@@ -431,14 +435,14 @@ impl DependencyDatasetResultFound {
 
 #[derive(SimpleObject, Debug, Clone)]
 #[graphql(complex)]
-pub struct DependencyDatasetResultNotFound {
-    pub dataset_id: DatasetID,
+pub struct DependencyDatasetResultNotAccessible {
+    pub id: DatasetID,
 }
 
 #[ComplexObject]
-impl DependencyDatasetResultNotFound {
+impl DependencyDatasetResultNotAccessible {
     async fn message(&self) -> String {
-        "Not found".to_string()
+        "Not Accessible".to_string()
     }
 }
 
