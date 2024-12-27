@@ -52,7 +52,6 @@ use arrow_flight::{
     HandshakeResponse,
     Ticket,
 };
-use internal_error::{InternalError, ResultIntoInternal};
 use tonic::codegen::tokio_stream::Stream;
 use tonic::{Request, Response, Status, Streaming};
 
@@ -77,15 +76,51 @@ impl KamuFlightSqlServiceWrapper {
             return Err(Status::internal("Catalog extension is not configured"));
         };
 
-        let transaction_runner = database_common::DatabaseTransactionRunner::new(catalog);
+        // TODO: Eventually method should look like this:
+        //
+        // ```
+        // let transaction_runner = database_common::DatabaseTransactionRunner::new(catalog);
+        // transaction_runner
+        //     .transactional(|tx_catalog: dill::Catalog| async move {
+        //         let inner: Arc<KamuFlightSqlService> = tx_catalog.get_one().int_err()?;
+        //         Ok(f(request, inner).await)
+        //     })
+        //     .await
+        //     .map_err(internal_error::<InternalError>)?
+        // ```
+        //
+        // We want it to open and close DB transaction for the duration of the handler.
+        //
+        // Currently, however, because the contruction of `datafusion::SessionContext`
+        // is expensive we cache it in memory for a short period of time. Because the
+        // context holds on to core objects it also holds on to the DB transaction, thus
+        // transactions outlive the duration of the handler which would violate the
+        // transaction manager contract. So instead...
 
-        transaction_runner
-            .transactional(|tx_catalog: dill::Catalog| async move {
-                let inner: Arc<KamuFlightSqlService> = tx_catalog.get_one().int_err()?;
-                Ok(f(request, inner).await)
-            })
-            .await
-            .map_err(internal_error::<InternalError>)?
+        // We extract transaction manager
+        let db_transaction_manager = catalog
+            .get_one::<dyn database_common::DatabaseTransactionManager>()
+            .unwrap();
+
+        // Create a transaction
+        let transaction_ref = db_transaction_manager.make_transaction_ref().await.map_err(|e| {
+            tracing::error!(error = %e, error_dbg = ?e, "Failed to open database transaction for FlightSQL session");
+            Status::internal("could not start database transaction")
+        })?;
+
+        // Attach transaction to the new chained catalog.
+        //
+        // Transaction will therefore live for as long as `SessionContext` holds on to
+        // it. The DB connection will be returned to the pool when session expires.
+        //
+        // In this approach transaction manager never gets a chance to COMMIT, and the
+        // transaction will be automatically rolled back when it's dropped, but that's
+        // OK because all these interactions are read-only.
+        let session_catalog = catalog.builder_chained().add_value(transaction_ref).build();
+
+        let inner: Arc<KamuFlightSqlService> = session_catalog.get_one().map_err(internal_error)?;
+
+        f(request, inner).await
     }
 }
 

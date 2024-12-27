@@ -25,7 +25,6 @@ doctest = false
 kamu-accounts = { workspace = true }
 kamu-core = { workspace = true }
 database-common = { workspace = true }
-internal-error = { workspace = true }
 time-source = { workspace = true }
 
 arrow-flight = { version = "53", features = ["flight-sql-experimental"] }

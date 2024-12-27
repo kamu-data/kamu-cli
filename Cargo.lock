@@ -5506,7 +5506,6 @@ dependencies = [
  "http 1.2.0",
  "http-body 1.0.1",
  "indoc 2.0.5",
- "internal-error",
  "kamu-accounts",
  "kamu-core",
  "kamu-data-utils",
