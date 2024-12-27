@@ -28,7 +28,7 @@ opendatafabric = { workspace = true }
 internal-error = { workspace = true }
 
 async-trait = { version = "0.1", default-features = false }
-dill = "0.9"
+dill = "0.10"
 futures = { version = "0.3", default-features = false }
 tokio-stream = { version = "0.1", default-features = false }
 uuid = { version = "1", default-features = false }

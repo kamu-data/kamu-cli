@@ -39,7 +39,7 @@ opendatafabric = { workspace = true }
 async-trait = { version = "0.1", default-features = false }
 bytes = { version = "1", default-features = false }
 chrono = { version = "0.4", default-features = false }
-dill = "0.9"
+dill = "0.10"
 futures = { version = "0.3", default-features = false }
 http = { version = "1" }
 pathdiff = { version = "0.2", default-features = false }
@@ -49,6 +49,7 @@ tokio = { version = "1", default-features = false }
 tokio-stream = { version = "0.1", default-features = false }
 tracing = "0.1"
 url = { version = "2", default-features = false, features = ["serde"] }
+strum = { version = "0.26", features = ["derive"] }
 
 # TODO: Avoid this dependency or depend on sub-crates
 datafusion = { version = "43", default-features = false, features = [

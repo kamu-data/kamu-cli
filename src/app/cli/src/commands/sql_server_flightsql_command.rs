@@ -8,36 +8,27 @@
 // by the Apache License, Version 2.0.
 
 use std::net::IpAddr;
-use std::sync::Arc;
 
 use arrow_flight::flight_service_server::FlightServiceServer;
 use console::style as s;
-use datafusion::prelude::SessionContext;
 use internal_error::*;
-use kamu::domain::QueryService;
-use kamu_adapter_flight_sql::{SessionFactory, Token};
 use tokio::net::TcpListener;
 use tonic::transport::Server;
-use tonic::Status;
 
 use super::{CLIError, Command};
 
 pub struct SqlServerFlightSqlCommand {
+    catalog: dill::Catalog,
     address: Option<IpAddr>,
     port: Option<u16>,
-    query_svc: Arc<dyn QueryService>,
 }
 
 impl SqlServerFlightSqlCommand {
-    pub fn new(
-        address: Option<IpAddr>,
-        port: Option<u16>,
-        query_svc: Arc<dyn QueryService>,
-    ) -> Self {
+    pub fn new(catalog: dill::Catalog, address: Option<IpAddr>, port: Option<u16>) -> Self {
         Self {
+            catalog,
             address,
             port,
-            query_svc,
         }
     }
 }
@@ -45,19 +36,13 @@ impl SqlServerFlightSqlCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for SqlServerFlightSqlCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
-        let kamu_service = kamu_adapter_flight_sql::KamuFlightSqlService::builder()
-            .with_server_name(crate::BINARY_NAME, crate::VERSION)
-            .with_session_factory(Arc::new(SessionFactoryImpl {
-                query_svc: self.query_svc.clone(),
-            }))
-            .build();
-
         let listener = TcpListener::bind((
             self.address.unwrap_or("127.0.0.1".parse().unwrap()),
             self.port.unwrap_or(0),
         ))
         .await
         .unwrap();
+
         let addr = listener.local_addr().unwrap();
         tracing::info!("Listening on {addr:?}");
 
@@ -82,31 +67,25 @@ impl Command for SqlServerFlightSqlCommand {
         );
         eprintln!("{}", s("Use Ctrl+C to stop the server").yellow());
 
+        // This catalog will be attached to every request by the middleware layer
+        let catalog = self.catalog.clone();
+
         Server::builder()
-            .add_service(FlightServiceServer::new(kamu_service))
+            .layer(tonic::service::interceptor(
+                move |mut req: tonic::Request<()>| {
+                    req.extensions_mut().insert(catalog.clone());
+                    Ok(req)
+                },
+            ))
+            .add_service(FlightServiceServer::new(
+                kamu_adapter_flight_sql::KamuFlightSqlService::builder()
+                    .with_server_name(crate::BINARY_NAME, crate::VERSION)
+                    .build(),
+            ))
             .serve_with_incoming(tokio_stream::wrappers::TcpListenerStream::new(listener))
             .await
             .int_err()?;
 
         Ok(())
-    }
-}
-
-struct SessionFactoryImpl {
-    query_svc: Arc<dyn QueryService>,
-}
-
-#[async_trait::async_trait]
-impl SessionFactory for SessionFactoryImpl {
-    async fn authenticate(&self, username: &str, password: &str) -> Result<Token, Status> {
-        if username == "kamu" && password == "kamu" {
-            Ok(Token::new())
-        } else {
-            Err(Status::unauthenticated("Invalid credentials!"))
-        }
-    }
-
-    async fn get_context(&self, _token: &Token) -> Result<Arc<SessionContext>, Status> {
-        Ok(Arc::new(self.query_svc.create_session().await.unwrap()))
     }
 }

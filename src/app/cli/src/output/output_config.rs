@@ -66,38 +66,52 @@ impl OutputConfig {
             OutputFormat::JsonAoA => Box::new(JsonArrayOfArraysWriter::new(std::io::stdout())),
             OutputFormat::NdJson => Box::new(JsonLineDelimitedWriter::new(std::io::stdout())),
             OutputFormat::Table => Box::new(TableWriter::new(schema, fmt, std::io::stdout())),
+            OutputFormat::Parquet => {
+                unimplemented!("Parquet format is applicable for data export only")
+            }
         }
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, Copy, clap::ValueEnum)]
+#[derive(strum::Display, Debug, Clone, Copy, PartialEq, clap::ValueEnum)]
 pub enum OutputFormat {
     /// Comma-separated values
     #[clap(name = "csv")]
+    #[strum(to_string = "csv")]
     Csv,
 
     /// Array of Structures format
     #[clap(name = "json")]
+    #[strum(to_string = "json")]
     Json,
 
     /// One Json object per line - easily splittable format
     #[clap(name = "ndjson")]
+    #[strum(to_string = "ndjson")]
     NdJson,
 
     /// Structure of arrays - more compact and efficient format for encoding
     /// entire dataframe
     #[clap(name = "json-soa")]
+    #[strum(to_string = "json-soa")]
     JsonSoA,
 
     /// Array of arrays - compact and efficient and preserves column order
     #[clap(name = "json-aoa")]
+    #[strum(to_string = "json-aoa")]
     JsonAoA,
 
     /// A pretty human-readable table
     #[clap(name = "table")]
+    #[strum(to_string = "table")]
     Table,
+
+    /// Parquet columnar storage. Only available when exporting to file(s)
+    #[clap(name = "parquet")]
+    #[strum(to_string = "parquet")]
+    Parquet,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -9,48 +9,20 @@
 
 use std::assert_matches::assert_matches;
 use std::net::SocketAddr;
-use std::sync::Arc;
 
 use arrow_flight::flight_service_server::FlightServiceServer;
 use arrow_flight::sql::client::FlightSqlServiceClient;
 use datafusion::prelude::*;
+use dill::Component;
 use futures::TryStreamExt;
 use indoc::indoc;
 use kamu_adapter_flight_sql::*;
+use kamu_core::{MockQueryService, QueryService};
 use tokio::net::TcpListener;
+use tonic::service::interceptor;
 use tonic::transport::{Channel, Server};
-use tonic::Status;
 
-struct TestSessionFactory;
-
-#[async_trait::async_trait]
-impl SessionFactory for TestSessionFactory {
-    async fn authenticate(&self, username: &str, password: &str) -> Result<Token, Status> {
-        if username == "admin" && password == "password" {
-            Ok("<token>".to_string())
-        } else {
-            Err(Status::unauthenticated("Invalid credentials!"))
-        }
-    }
-
-    async fn get_context(&self, _token: &Token) -> Result<Arc<SessionContext>, Status> {
-        let cfg = SessionConfig::new()
-            .with_information_schema(true)
-            .with_default_catalog_and_schema("test", "public");
-        let ctx = SessionContext::new_with_config(cfg);
-
-        ctx.sql(indoc!(
-            "
-            create table test (id int not null, name string not null)
-            as values (1, 'a'), (2, 'b')
-            ",
-        ))
-        .await
-        .unwrap();
-
-        Ok(Arc::new(ctx))
-    }
-}
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct FlightServer {
     addr: SocketAddr,
@@ -63,15 +35,51 @@ impl Drop for FlightServer {
     }
 }
 
-async fn run_server(service: KamuFlightSqlService) -> FlightServer {
-    let svc = FlightServiceServer::new(service);
+async fn run_server() -> FlightServer {
+    let ctx = SessionContext::new_with_config(
+        SessionConfig::new()
+            .with_information_schema(true)
+            .with_default_catalog_and_schema("test", "public"),
+    );
+
+    ctx.sql(indoc!(
+        "
+        create table test (id int not null, name string not null)
+        as values (1, 'a'), (2, 'b')
+        ",
+    ))
+    .await
+    .unwrap();
+
+    let mut query_svc: kamu_core::MockQueryService = kamu_core::MockQueryService::new();
+    query_svc
+        .expect_create_session()
+        .return_once(move || Ok(ctx));
+
+    let catalog = dill::Catalog::builder()
+        .add_builder(
+            SessionAuthBasicPredefined::builder()
+                .with_accounts_passwords([("admin".to_string(), "password".to_string())].into()),
+        )
+        .bind::<dyn SessionAuth, SessionAuthBasicPredefined>()
+        .add_value(query_svc)
+        .bind::<dyn QueryService, MockQueryService>()
+        .add::<SessionManagerSingleton>()
+        .add::<SessionManagerSingletonState>()
+        .build();
 
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr = listener.local_addr().unwrap();
     tracing::info!("Listening on {addr:?}");
 
     let service = Server::builder()
-        .add_service(svc)
+        .layer(interceptor(move |mut req: tonic::Request<()>| {
+            req.extensions_mut().insert(catalog.clone());
+            Ok(req)
+        }))
+        .add_service(FlightServiceServer::new(
+            KamuFlightSqlService::builder().build(),
+        ))
         .serve_with_incoming(tokio_stream::wrappers::TcpListenerStream::new(listener));
 
     let task = tokio::task::spawn(service);
@@ -93,23 +101,17 @@ async fn get_client(addr: &SocketAddr) -> FlightSqlServiceClient<Channel> {
 
 #[test_log::test(tokio::test)]
 async fn test_auth_error() {
-    let service = KamuFlightSqlService::builder()
-        .with_session_factory(Arc::new(TestSessionFactory))
-        .build();
-
-    let server = run_server(service).await;
+    let server = run_server().await;
     let mut client = get_client(&server.addr).await;
 
     assert_matches!(client.handshake("admin", "zzz").await, Err(_));
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[test_log::test(tokio::test)]
 async fn test_statement() {
-    let service = KamuFlightSqlService::builder()
-        .with_session_factory(Arc::new(TestSessionFactory))
-        .build();
-
-    let server = run_server(service).await;
+    let server = run_server().await;
 
     let mut client = get_client(&server.addr).await;
     client.handshake("admin", "password").await.unwrap();

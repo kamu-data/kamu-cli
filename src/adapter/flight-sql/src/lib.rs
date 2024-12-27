@@ -11,8 +11,17 @@
 
 mod service;
 mod service_builder;
-mod session_factory;
+mod session_auth;
+mod session_manager;
+mod session_manager_caching;
+mod session_manager_singleton;
 
 pub use service::*;
 pub use service_builder::*;
-pub use session_factory::*;
+pub use session_auth::*;
+pub use session_manager::*;
+pub use session_manager_caching::*;
+pub use session_manager_singleton::*;
+
+pub type SessionToken = String;
+pub type PlanToken = String;

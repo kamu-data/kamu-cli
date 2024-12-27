@@ -28,7 +28,7 @@ aws-config = "1"
 aws-credential-types = "1"
 aws-sdk-secretsmanager = "1"
 chrono = { version = "0.4", default-features = false }
-dill = "0.9"
+dill = "0.10"
 futures = { version = "0.3", default-features = false }
 hex = "0.4"
 hmac = "0.12"

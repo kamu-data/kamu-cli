@@ -27,7 +27,7 @@ kamu-task-system = { workspace = true }
 opendatafabric = { workspace = true }
 
 chrono = { version = "0.4", default-features = false }
-dill = "0.9"
+dill = "0.10"
 futures = "0.3"
 
 

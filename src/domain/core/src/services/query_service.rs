@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::backtrace::Backtrace;
 use std::collections::BTreeMap;
 
 use datafusion::arrow;
@@ -20,6 +21,7 @@ use crate::auth::DatasetActionUnauthorizedError;
 use crate::*;
 
 // TODO: Support different engines and query dialects
+#[cfg_attr(feature = "testing", mockall::automock)]
 #[async_trait::async_trait]
 pub trait QueryService: Send + Sync {
     /// Creates an SQL session for the current user
@@ -258,7 +260,7 @@ impl DatasetBlockNotFoundError {
 pub struct DataFusionError {
     #[from]
     pub source: datafusion::error::DataFusionError,
-    pub backtrace: std::backtrace::Backtrace,
+    pub backtrace: Backtrace,
 }
 
 impl From<datafusion::error::DataFusionError> for QueryError {
