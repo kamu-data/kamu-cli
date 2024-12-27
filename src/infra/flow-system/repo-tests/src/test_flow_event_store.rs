@@ -17,7 +17,6 @@ use dill::Catalog;
 use futures::TryStreamExt;
 use kamu_flow_system::*;
 use kamu_task_system::{TaskError, TaskID, TaskOutcome, TaskResult};
-use odf::{AccountID, DatasetID};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -188,8 +187,8 @@ pub async fn test_dataset_flow_filter_by_initiator(catalog: &Catalog) {
 
     let foo_cases = make_dataset_test_case(flow_event_store.clone()).await;
 
-    let wasya_filter = HashSet::from_iter([AccountID::new_seeded_ed25519(b"wasya")]);
-    let petya_filter = HashSet::from_iter([AccountID::new_seeded_ed25519(b"petya")]);
+    let wasya_filter = HashSet::from_iter([odf::AccountID::new_seeded_ed25519(b"wasya")]);
+    let petya_filter = HashSet::from_iter([odf::AccountID::new_seeded_ed25519(b"petya")]);
 
     let cases = vec![
         (
@@ -248,11 +247,11 @@ pub async fn test_dataset_flow_filter_by_initiator_with_multiple_variants(catalo
     let foo_cases = make_dataset_test_case(flow_event_store.clone()).await;
 
     let wasya_patya_filter = HashSet::from_iter([
-        AccountID::new_seeded_ed25519(b"wasya"),
-        AccountID::new_seeded_ed25519(b"petya"),
+        odf::AccountID::new_seeded_ed25519(b"wasya"),
+        odf::AccountID::new_seeded_ed25519(b"petya"),
     ]);
     let mut wasya_patya_unrelated_filter = wasya_patya_filter.clone();
-    wasya_patya_unrelated_filter.insert(AccountID::new_seeded_ed25519(b"unrelated_user"));
+    wasya_patya_unrelated_filter.insert(odf::AccountID::new_seeded_ed25519(b"unrelated_user"));
 
     let cases = vec![
         (
@@ -304,7 +303,7 @@ pub async fn test_dataset_flow_filter_combinations(catalog: &Catalog) {
     let flow_event_store = catalog.get_one::<dyn FlowEventStore>().unwrap();
 
     let foo_cases = make_dataset_test_case(flow_event_store.clone()).await;
-    let petya_filter = HashSet::from_iter([AccountID::new_seeded_ed25519(b"petya")]);
+    let petya_filter = HashSet::from_iter([odf::AccountID::new_seeded_ed25519(b"petya")]);
 
     let cases = vec![
         (
@@ -387,7 +386,7 @@ pub async fn test_dataset_flow_filter_by_datasets(catalog: &Catalog) {
                 foo_cases.ingest_flow_ids.flow_id_waiting,
             ],
         ),
-        (vec![DatasetID::new_seeded_ed25519(b"wrong")], vec![]),
+        (vec![odf::DatasetID::new_seeded_ed25519(b"wrong")], vec![]),
     ];
 
     for (dataset_ids, expected_flow_ids) in cases {
@@ -431,7 +430,7 @@ pub async fn test_dataset_flow_filter_by_datasets_and_status(catalog: &Catalog) 
                 foo_cases.ingest_flow_ids.flow_id_waiting,
             ],
         ),
-        (vec![DatasetID::new_seeded_ed25519(b"wrong")], vec![]),
+        (vec![odf::DatasetID::new_seeded_ed25519(b"wrong")], vec![]),
     ];
 
     for (dataset_ids, expected_flow_ids) in cases {
@@ -491,7 +490,7 @@ pub async fn test_dataset_flow_filter_by_datasets_with_pagination(catalog: &Cata
             },
         ),
         (
-            vec![DatasetID::new_seeded_ed25519(b"wrong")],
+            vec![odf::DatasetID::new_seeded_ed25519(b"wrong")],
             vec![],
             PaginationOpts {
                 offset: 0,
@@ -657,8 +656,8 @@ pub async fn test_dataset_get_flow_initiators(catalog: &Catalog) {
     assert_eq!(
         res,
         HashSet::from([
-            AccountID::new_seeded_ed25519(b"petya"),
-            AccountID::new_seeded_ed25519(b"wasya"),
+            odf::AccountID::new_seeded_ed25519(b"petya"),
+            odf::AccountID::new_seeded_ed25519(b"wasya"),
         ])
     );
 }
@@ -774,9 +773,9 @@ pub async fn test_system_flows_filtered_by_initiator(catalog: &Catalog) {
 
     let system_case = make_system_test_case(flow_event_store.clone()).await;
 
-    let wasya_filter = HashSet::from_iter([AccountID::new_seeded_ed25519(b"wasya")]);
+    let wasya_filter = HashSet::from_iter([odf::AccountID::new_seeded_ed25519(b"wasya")]);
     let unrelated_user_filter =
-        HashSet::from_iter([AccountID::new_seeded_ed25519(b"unrelated-user")]);
+        HashSet::from_iter([odf::AccountID::new_seeded_ed25519(b"unrelated-user")]);
 
     let cases = vec![
         (
@@ -823,7 +822,7 @@ pub async fn test_system_flows_complex_filter(catalog: &Catalog) {
     let flow_event_store = catalog.get_one::<dyn FlowEventStore>().unwrap();
 
     let system_case = make_system_test_case(flow_event_store.clone()).await;
-    let petya_filter = HashSet::from_iter([AccountID::new_seeded_ed25519(b"petya")]);
+    let petya_filter = HashSet::from_iter([odf::AccountID::new_seeded_ed25519(b"petya")]);
 
     let cases = vec![
         (
@@ -1162,7 +1161,7 @@ const EMPTY_STATS: FlowRunStats = FlowRunStats {
 pub async fn test_dataset_flow_run_stats(catalog: &Catalog) {
     let flow_event_store = catalog.get_one::<dyn FlowEventStore>().unwrap();
 
-    let (_, dataset_id) = DatasetID::new_generated_ed25519();
+    let (_, dataset_id) = odf::DatasetID::new_generated_ed25519();
 
     // No stats initially
     let stats = flow_event_store
@@ -1421,7 +1420,7 @@ pub async fn test_system_flow_run_stats(catalog: &Catalog) {
 pub async fn test_pending_flow_dataset_single_type_crud(catalog: &Catalog) {
     let flow_event_store = catalog.get_one::<dyn FlowEventStore>().unwrap();
 
-    let (_, dataset_id) = DatasetID::new_generated_ed25519();
+    let (_, dataset_id) = odf::DatasetID::new_generated_ed25519();
 
     let flow_key = FlowKey::dataset(dataset_id.clone(), DatasetFlowType::Ingest);
 
@@ -1481,7 +1480,7 @@ pub async fn test_pending_flow_dataset_single_type_crud(catalog: &Catalog) {
 pub async fn test_pending_flow_dataset_multiple_types_crud(catalog: &Catalog) {
     let flow_event_store = catalog.get_one::<dyn FlowEventStore>().unwrap();
 
-    let (_, dataset_id) = DatasetID::new_generated_ed25519();
+    let (_, dataset_id) = odf::DatasetID::new_generated_ed25519();
 
     let flow_key_ingest = FlowKey::dataset(dataset_id.clone(), DatasetFlowType::Ingest);
     let flow_key_compact = FlowKey::dataset(dataset_id.clone(), DatasetFlowType::HardCompaction);
@@ -1585,8 +1584,8 @@ pub async fn test_pending_flow_dataset_multiple_types_crud(catalog: &Catalog) {
 pub async fn test_pending_flow_multiple_datasets_crud(catalog: &Catalog) {
     let flow_event_store = catalog.get_one::<dyn FlowEventStore>().unwrap();
 
-    let dataset_foo_id = DatasetID::new_seeded_ed25519(b"foo");
-    let dataset_bar_id = DatasetID::new_seeded_ed25519(b"bar");
+    let dataset_foo_id = odf::DatasetID::new_seeded_ed25519(b"foo");
+    let dataset_bar_id = odf::DatasetID::new_seeded_ed25519(b"bar");
 
     let flow_key_foo_ingest = FlowKey::dataset(dataset_foo_id.clone(), DatasetFlowType::Ingest);
     let flow_key_bar_ingest = FlowKey::dataset(dataset_bar_id.clone(), DatasetFlowType::Ingest);
@@ -1756,7 +1755,7 @@ pub async fn test_event_store_concurrent_modification(catalog: &Catalog) {
     let event_store = catalog.get_one::<dyn FlowEventStore>().unwrap();
 
     let flow_id = event_store.new_flow_id().await.unwrap();
-    let dataset_id = DatasetID::new_seeded_ed25519(b"foo");
+    let dataset_id = odf::DatasetID::new_seeded_ed25519(b"foo");
     let flow_key = FlowKey::dataset(dataset_id.clone(), DatasetFlowType::Ingest);
 
     // Nothing stored yet, but prev stored event id sent => CM
@@ -1848,7 +1847,7 @@ pub async fn test_flow_activation_visibility_at_different_stages_through_success
     let event_store = catalog.get_one::<dyn FlowEventStore>().unwrap();
 
     let flow_id = event_store.new_flow_id().await.unwrap();
-    let dataset_id = DatasetID::new_seeded_ed25519(b"foo");
+    let dataset_id = odf::DatasetID::new_seeded_ed25519(b"foo");
     let flow_key = FlowKey::dataset(dataset_id, DatasetFlowType::Ingest);
 
     let start_moment = Utc::now().trunc_subsecs(6);
@@ -1996,7 +1995,7 @@ pub async fn test_flow_activation_visibility_when_aborted_before_activation(cata
     let event_store = catalog.get_one::<dyn FlowEventStore>().unwrap();
 
     let flow_id = event_store.new_flow_id().await.unwrap();
-    let dataset_id = DatasetID::new_seeded_ed25519(b"foo");
+    let dataset_id = odf::DatasetID::new_seeded_ed25519(b"foo");
     let flow_key = FlowKey::dataset(dataset_id, DatasetFlowType::Ingest);
 
     let start_moment = Utc::now().trunc_subsecs(6);
@@ -2077,9 +2076,9 @@ pub async fn test_flow_activation_visibility_when_aborted_before_activation(cata
 pub async fn test_flow_activation_multiple_flows(catalog: &Catalog) {
     let event_store = catalog.get_one::<dyn FlowEventStore>().unwrap();
 
-    let dataset_id_foo = DatasetID::new_seeded_ed25519(b"foo");
-    let dataset_id_bar = DatasetID::new_seeded_ed25519(b"bar");
-    let dataset_id_baz = DatasetID::new_seeded_ed25519(b"baz");
+    let dataset_id_foo = odf::DatasetID::new_seeded_ed25519(b"foo");
+    let dataset_id_bar = odf::DatasetID::new_seeded_ed25519(b"bar");
+    let dataset_id_baz = odf::DatasetID::new_seeded_ed25519(b"baz");
 
     let flow_id_foo = event_store.new_flow_id().await.unwrap();
     let flow_id_bar = event_store.new_flow_id().await.unwrap();
@@ -2219,7 +2218,7 @@ pub async fn test_flow_activation_multiple_flows(catalog: &Catalog) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct DatasetTestCase {
-    dataset_id: DatasetID,
+    dataset_id: odf::DatasetID,
     ingest_flow_ids: TestFlowIDs,
     compaction_flow_ids: TestFlowIDs,
 }
@@ -2235,7 +2234,7 @@ struct TestFlowIDs {
 }
 
 async fn make_dataset_test_case(flow_event_store: Arc<dyn FlowEventStore>) -> DatasetTestCase {
-    let (_, dataset_id) = DatasetID::new_generated_ed25519();
+    let (_, dataset_id) = odf::DatasetID::new_generated_ed25519();
 
     DatasetTestCase {
         dataset_id: dataset_id.clone(),
@@ -2261,7 +2260,7 @@ async fn make_system_test_case(flow_event_store: Arc<dyn FlowEventStore>) -> Sys
 }
 
 async fn make_dataset_test_flows(
-    dataset_id: &DatasetID,
+    dataset_id: &odf::DatasetID,
     dataset_flow_type: DatasetFlowType,
     flow_event_store: Arc<dyn FlowEventStore>,
 ) -> TestFlowIDs {
@@ -2269,12 +2268,12 @@ async fn make_dataset_test_flows(
 
     let wasya_manual_trigger = FlowTriggerType::Manual(FlowTriggerManual {
         trigger_time: Utc::now(),
-        initiator_account_id: AccountID::new_seeded_ed25519(b"wasya"),
+        initiator_account_id: odf::AccountID::new_seeded_ed25519(b"wasya"),
     });
 
     let petya_manual_trigger = FlowTriggerType::Manual(FlowTriggerManual {
         trigger_time: Utc::now(),
-        initiator_account_id: AccountID::new_seeded_ed25519(b"petya"),
+        initiator_account_id: odf::AccountID::new_seeded_ed25519(b"petya"),
     });
 
     let automatic_trigger = FlowTriggerType::AutoPolling(FlowTriggerAutoPolling {
@@ -2321,12 +2320,12 @@ async fn make_system_test_flows(
 
     let wasya_manual_trigger = FlowTriggerType::Manual(FlowTriggerManual {
         trigger_time: Utc::now(),
-        initiator_account_id: AccountID::new_seeded_ed25519(b"wasya"),
+        initiator_account_id: odf::AccountID::new_seeded_ed25519(b"wasya"),
     });
 
     let petya_manual_trigger = FlowTriggerType::Manual(FlowTriggerManual {
         trigger_time: Utc::now(),
-        initiator_account_id: AccountID::new_seeded_ed25519(b"petya"),
+        initiator_account_id: odf::AccountID::new_seeded_ed25519(b"petya"),
     });
 
     let automatic_trigger = FlowTriggerType::AutoPolling(FlowTriggerAutoPolling {
@@ -2389,7 +2388,7 @@ async fn assert_dataset_flow_expectations(
 
 async fn assert_multiple_dataset_flow_expectations(
     flow_event_store: Arc<dyn FlowEventStore>,
-    dataset_ids: Vec<DatasetID>,
+    dataset_ids: Vec<odf::DatasetID>,
     filters: DatasetFlowFilters,
     pagination: PaginationOpts,
     expected_flow_ids: Vec<FlowID>,
@@ -2447,12 +2446,12 @@ async fn assert_all_flow_expectations(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct DatasetFlowGenerator<'a> {
-    dataset_id: &'a DatasetID,
+    dataset_id: &'a odf::DatasetID,
     flow_event_store: Arc<dyn FlowEventStore>,
 }
 
 impl<'a> DatasetFlowGenerator<'a> {
-    fn new(dataset_id: &'a DatasetID, flow_event_store: Arc<dyn FlowEventStore>) -> Self {
+    fn new(dataset_id: &'a odf::DatasetID, flow_event_store: Arc<dyn FlowEventStore>) -> Self {
         Self {
             dataset_id,
             flow_event_store,
