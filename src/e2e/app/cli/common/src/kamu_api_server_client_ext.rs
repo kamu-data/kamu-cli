@@ -26,7 +26,7 @@ use kamu_adapter_http::{LoginRequestBody, PlatformFileUploadQuery, UploadContext
 use kamu_core::BlockRef;
 use kamu_flow_system::{DatasetFlowType, FlowID};
 use lazy_static::lazy_static;
-use opendatafabric as odf;
+use opendatafabric::{self as odf, DatasetAlias};
 use reqwest::{Method, StatusCode, Url};
 use thiserror::Error;
 use tokio_retry::strategy::FixedInterval;
@@ -155,6 +155,7 @@ pub const E2E_USER_ACCOUNT_NAME_STR: &str = "e2e-user";
 
 pub struct CreateDatasetResponse {
     pub dataset_id: odf::DatasetID,
+    pub dataset_alias: DatasetAlias,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -439,9 +440,12 @@ impl DatasetApi<'_> {
         pretty_assertions::assert_eq!(Some("Success"), create_response_node["message"].as_str());
 
         let dataset_id_as_str = create_response_node["dataset"]["id"].as_str().unwrap();
+        let alias_str = create_response_node["dataset"]["alias"].as_str().unwrap();
+        let dataset_alias = alias_str.parse().unwrap();
 
         CreateDatasetResponse {
             dataset_id: odf::DatasetID::from_did_str(dataset_id_as_str).unwrap(),
+            dataset_alias,
         }
     }
 
@@ -458,6 +462,7 @@ impl DatasetApi<'_> {
                           ... on CreateDatasetResultSuccess {
                             dataset {
                               id
+                              alias
                             }
                           }
                         }
@@ -475,9 +480,12 @@ impl DatasetApi<'_> {
         pretty_assertions::assert_eq!(Some("Success"), create_response_node["message"].as_str());
 
         let dataset_id_as_str = create_response_node["dataset"]["id"].as_str().unwrap();
+        let alias_str = create_response_node["dataset"]["alias"].as_str().unwrap();
+        let dataset_alias = alias_str.parse().unwrap();
 
         CreateDatasetResponse {
             dataset_id: odf::DatasetID::from_did_str(dataset_id_as_str).unwrap(),
+            dataset_alias,
         }
     }
 
@@ -486,19 +494,11 @@ impl DatasetApi<'_> {
             .await
     }
 
-    pub async fn create_player_scores_dataset_with_data(
-        &self,
-        account_name_maybe: Option<odf::AccountName>,
-    ) -> CreateDatasetResponse {
+    pub async fn create_player_scores_dataset_with_data(&self) -> CreateDatasetResponse {
         let create_response = self.create_player_scores_dataset().await;
 
-        // TODO: Use the alias from the reply, after fixing the bug:
-        //       https://github.com/kamu-data/kamu-cli/issues/891
-        let dataset_alias =
-            odf::DatasetAlias::new(account_name_maybe, DATASET_ROOT_PLAYER_NAME.clone());
-
         self.ingest_data(
-            &dataset_alias,
+            &create_response.dataset_alias,
             RequestBody::NdJson(DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1.into()),
         )
         .await;

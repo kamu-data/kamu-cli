@@ -904,12 +904,12 @@ impl DatasetStorageStrategy for DatasetMultiTenantStorageStrategy {
         &self,
         raw_alias: &DatasetAlias,
     ) -> Result<DatasetAlias, ResolveDatasetError> {
-        Ok(if let Some(account_name) = &raw_alias.account_name {
-            let (_, canonical_account_name) = self.resolve_account_dir(account_name).int_err()?;
-            DatasetAlias::new(Some(canonical_account_name), raw_alias.dataset_name.clone())
-        } else {
-            raw_alias.clone()
-        })
+        let account_name = self.effective_account_name(raw_alias);
+        let (_, canonical_account_name) = self.resolve_account_dir(account_name).int_err()?;
+        Ok(DatasetAlias::new(
+            Some(canonical_account_name),
+            raw_alias.dataset_name.clone(),
+        ))
     }
 }
 
