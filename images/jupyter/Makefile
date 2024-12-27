@@ -7,7 +7,7 @@ BASE_IMAGE:=quay.io/jupyter/minimal-notebook:2024-12-09
 .PHONY: requirements
 requirements:
 	make requirements-platform PLATFORM=linux/amd64
-	# make requirements-platform PLATFORM=linux/arm64
+	make requirements-platform PLATFORM=linux/arm64
 
 
 .PHONY: requirements-platform
