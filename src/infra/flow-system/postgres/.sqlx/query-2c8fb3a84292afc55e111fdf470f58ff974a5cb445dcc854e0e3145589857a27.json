@@ -1,0 +1,30 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                SELECT event_id, event_payload\n                FROM flow_trigger_events\n                WHERE system_flow_type = ($1::text)::system_flow_type\n                    AND (cast($2 as INT8) IS NULL or event_id > $2)\n                    AND (cast($3 as INT8) IS NULL or event_id <= $3)\n                ORDER BY event_id ASC\n                ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "event_id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "event_payload",
+        "type_info": "Jsonb"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "2c8fb3a84292afc55e111fdf470f58ff974a5cb445dcc854e0e3145589857a27"
+}

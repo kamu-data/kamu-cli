@@ -7,18 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use chrono::Utc;
 use kamu_flow_system::{
-    CompactionRule,
     CompactionRuleFull,
     CompactionRuleMetadataOnly,
     FlowConfigurationRule,
     FlowConfigurationService,
     FlowKeyDataset,
     IngestRule,
-    ScheduleCronError,
     SetFlowConfigurationError,
-    TransformRule,
 };
 use opendatafabric as odf;
 
@@ -46,14 +42,13 @@ impl DatasetFlowConfigsMut {
     }
 
     #[graphql(guard = "LoggedInGuard::new()")]
-    async fn set_config_ingest(
+    async fn set_config(
         &self,
         ctx: &Context<'_>,
         dataset_flow_type: DatasetFlowType,
-        paused: bool,
-        ingest: IngestConditionInput,
+        config_input: FlowConfigurationInput,
     ) -> Result<SetFlowConfigResult> {
-        let flow_run_config: FlowRunConfiguration = ingest.clone().into();
+        let flow_run_config: FlowRunConfiguration = config_input.clone().into();
         if let Err(err) = flow_run_config.check_type_compatible(dataset_flow_type) {
             return Ok(SetFlowConfigResult::TypeIsNotSupported(err));
         };
@@ -69,25 +64,25 @@ impl DatasetFlowConfigsMut {
             return Ok(SetFlowConfigResult::IncompatibleDatasetKind(e));
         }
 
-        ensure_scheduling_permission(ctx, &self.dataset_handle).await?;
+        let configuration_rule: FlowConfigurationRule = match config_input.try_into() {
+            Ok(rule) => rule,
+            Err(e) => return Ok(SetFlowConfigResult::FlowInvalidConfigInput(e)),
+        };
+
         if let Some(e) =
             ensure_flow_preconditions(ctx, &self.dataset_handle, dataset_flow_type, None).await?
         {
             return Ok(SetFlowConfigResult::PreconditionsNotMet(e));
         }
+        ensure_scheduling_permission(ctx, &self.dataset_handle).await?;
 
         let flow_config_service = from_catalog_n!(ctx, dyn FlowConfigurationService);
-        let configuration_rule: IngestRule = ingest
-            .try_into()
-            .map_err(|e: ScheduleCronError| GqlError::Gql(e.into()))?;
 
         let res = flow_config_service
             .set_configuration(
-                Utc::now(),
                 FlowKeyDataset::new(self.dataset_handle.id.clone(), dataset_flow_type.into())
                     .into(),
-                paused,
-                FlowConfigurationRule::IngestRule(configuration_rule),
+                configuration_rule,
             )
             .await
             .map_err(|e| match e {
@@ -97,181 +92,6 @@ impl DatasetFlowConfigsMut {
         Ok(SetFlowConfigResult::Success(SetFlowConfigSuccess {
             config: res.into(),
         }))
-    }
-
-    #[graphql(guard = "LoggedInGuard::new()")]
-    async fn set_config_transform(
-        &self,
-        ctx: &Context<'_>,
-        dataset_flow_type: DatasetFlowType,
-        paused: bool,
-        transform: TransformConditionInput,
-    ) -> Result<SetFlowTransformConfigResult> {
-        let flow_run_config: FlowRunConfiguration = transform.clone().into();
-        if let Err(err) = flow_run_config.check_type_compatible(dataset_flow_type) {
-            return Ok(SetFlowTransformConfigResult::TypeIsNotSupported(err));
-        };
-
-        let transform_rule = match TransformRule::new_checked(
-            transform.min_records_to_await,
-            transform.max_batching_interval.into(),
-        ) {
-            Ok(rule) => rule,
-            Err(e) => {
-                return Ok(SetFlowTransformConfigResult::InvalidTransformConfig(
-                    FlowInvalidTransformConfig {
-                        reason: e.to_string(),
-                    },
-                ))
-            }
-        };
-
-        if let Some(e) = ensure_expected_dataset_kind(
-            ctx,
-            &self.dataset_handle,
-            dataset_flow_type,
-            Some(&flow_run_config),
-        )
-        .await?
-        {
-            return Ok(SetFlowTransformConfigResult::IncompatibleDatasetKind(e));
-        }
-
-        ensure_scheduling_permission(ctx, &self.dataset_handle).await?;
-        if let Some(e) =
-            ensure_flow_preconditions(ctx, &self.dataset_handle, dataset_flow_type, None).await?
-        {
-            return Ok(SetFlowTransformConfigResult::PreconditionsNotMet(e));
-        }
-
-        let flow_config_service = from_catalog_n!(ctx, dyn FlowConfigurationService);
-
-        let res = flow_config_service
-            .set_configuration(
-                Utc::now(),
-                FlowKeyDataset::new(self.dataset_handle.id.clone(), dataset_flow_type.into())
-                    .into(),
-                paused,
-                FlowConfigurationRule::TransformRule(transform_rule),
-            )
-            .await
-            .map_err(|e| match e {
-                SetFlowConfigurationError::Internal(e) => GqlError::Internal(e),
-            })?;
-
-        Ok(SetFlowTransformConfigResult::Success(
-            SetFlowConfigSuccess { config: res.into() },
-        ))
-    }
-
-    #[graphql(guard = "LoggedInGuard::new()")]
-    async fn set_config_compaction(
-        &self,
-        ctx: &Context<'_>,
-        dataset_flow_type: DatasetFlowType,
-        compaction_args: CompactionConditionInput,
-    ) -> Result<SetFlowCompactionConfigResult> {
-        let flow_run_config: FlowRunConfiguration = compaction_args.clone().into();
-        if let Err(err) = flow_run_config.check_type_compatible(dataset_flow_type) {
-            return Ok(SetFlowCompactionConfigResult::TypeIsNotSupported(err));
-        };
-
-        let compaction_rule = match compaction_args {
-            CompactionConditionInput::Full(compaction_input) => {
-                match CompactionRuleFull::new_checked(
-                    compaction_input.max_slice_size,
-                    compaction_input.max_slice_records,
-                    compaction_input.recursive,
-                ) {
-                    Ok(rule) => CompactionRule::Full(rule),
-                    Err(e) => {
-                        return Ok(SetFlowCompactionConfigResult::InvalidCompactionConfig(
-                            FlowInvalidCompactionConfig {
-                                reason: e.to_string(),
-                            },
-                        ))
-                    }
-                }
-            }
-            CompactionConditionInput::MetadataOnly(compaction_input) => {
-                CompactionRule::MetadataOnly(CompactionRuleMetadataOnly {
-                    recursive: compaction_input.recursive,
-                })
-            }
-        };
-
-        if let Some(e) = ensure_expected_dataset_kind(
-            ctx,
-            &self.dataset_handle,
-            dataset_flow_type,
-            Some(&flow_run_config),
-        )
-        .await?
-        {
-            return Ok(SetFlowCompactionConfigResult::IncompatibleDatasetKind(e));
-        }
-        ensure_scheduling_permission(ctx, &self.dataset_handle).await?;
-
-        let flow_config_service = from_catalog_n!(ctx, dyn FlowConfigurationService);
-
-        let res = flow_config_service
-            .set_configuration(
-                Utc::now(),
-                FlowKeyDataset::new(self.dataset_handle.id.clone(), dataset_flow_type.into())
-                    .into(),
-                false,
-                FlowConfigurationRule::CompactionRule(compaction_rule),
-            )
-            .await
-            .map_err(|e| match e {
-                SetFlowConfigurationError::Internal(e) => GqlError::Internal(e),
-            })?;
-
-        Ok(SetFlowCompactionConfigResult::Success(
-            SetFlowConfigSuccess { config: res.into() },
-        ))
-    }
-
-    #[graphql(guard = "LoggedInGuard::new()")]
-    async fn pause_flows(
-        &self,
-        ctx: &Context<'_>,
-        dataset_flow_type: Option<DatasetFlowType>,
-    ) -> Result<bool> {
-        ensure_scheduling_permission(ctx, &self.dataset_handle).await?;
-
-        let flow_config_service = from_catalog_n!(ctx, dyn FlowConfigurationService);
-
-        flow_config_service
-            .pause_dataset_flows(
-                Utc::now(),
-                &self.dataset_handle.id,
-                dataset_flow_type.map(Into::into),
-            )
-            .await?;
-
-        Ok(true)
-    }
-
-    #[graphql(guard = "LoggedInGuard::new()")]
-    async fn resume_flows(
-        &self,
-        ctx: &Context<'_>,
-        dataset_flow_type: Option<DatasetFlowType>,
-    ) -> Result<bool> {
-        ensure_scheduling_permission(ctx, &self.dataset_handle).await?;
-
-        let flow_config_service = from_catalog_n!(ctx, dyn FlowConfigurationService);
-
-        flow_config_service
-            .resume_dataset_flows(
-                Utc::now(),
-                &self.dataset_handle.id,
-                dataset_flow_type.map(Into::into),
-            )
-            .await?;
-
-        Ok(true)
     }
 }
 
@@ -284,6 +104,7 @@ enum SetFlowConfigResult {
     IncompatibleDatasetKind(FlowIncompatibleDatasetKind),
     PreconditionsNotMet(FlowPreconditionsNotMet),
     TypeIsNotSupported(FlowTypeIsNotSupported),
+    FlowInvalidConfigInput(FlowInvalidConfigInputError),
 }
 
 #[derive(SimpleObject)]
@@ -311,47 +132,47 @@ impl FlowTypeIsNotSupported {
 
 #[derive(SimpleObject, Debug, Clone)]
 #[graphql(complex)]
-pub(crate) struct FlowInvalidTransformConfig {
+pub struct FlowInvalidConfigInputError {
     reason: String,
 }
 
 #[ComplexObject]
-impl FlowInvalidTransformConfig {
+impl FlowInvalidConfigInputError {
     pub async fn message(&self) -> String {
         self.reason.clone()
     }
-}
-
-#[derive(SimpleObject, Debug, Clone)]
-#[graphql(complex)]
-pub(crate) struct FlowInvalidCompactionConfig {
-    reason: String,
-}
-
-#[ComplexObject]
-impl FlowInvalidCompactionConfig {
-    pub async fn message(&self) -> String {
-        self.reason.clone()
-    }
-}
-
-#[derive(Interface)]
-#[graphql(field(name = "message", ty = "String"))]
-enum SetFlowCompactionConfigResult {
-    Success(SetFlowConfigSuccess),
-    IncompatibleDatasetKind(FlowIncompatibleDatasetKind),
-    InvalidCompactionConfig(FlowInvalidCompactionConfig),
-    TypeIsNotSupported(FlowTypeIsNotSupported),
-}
-
-#[derive(Interface)]
-#[graphql(field(name = "message", ty = "String"))]
-enum SetFlowTransformConfigResult {
-    Success(SetFlowConfigSuccess),
-    IncompatibleDatasetKind(FlowIncompatibleDatasetKind),
-    InvalidTransformConfig(FlowInvalidTransformConfig),
-    PreconditionsNotMet(FlowPreconditionsNotMet),
-    TypeIsNotSupported(FlowTypeIsNotSupported),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl TryFrom<FlowConfigurationInput> for FlowConfigurationRule {
+    type Error = FlowInvalidConfigInputError;
+
+    fn try_from(value: FlowConfigurationInput) -> std::result::Result<Self, Self::Error> {
+        match value {
+            FlowConfigurationInput::Ingest(ingest_input) => {
+                let ingest_rule: IngestRule = ingest_input.into();
+                Ok(Self::IngestRule(ingest_rule))
+            }
+            FlowConfigurationInput::Compaction(compaction_input) => match compaction_input {
+                CompactionConditionInput::Full(compaction_args) => CompactionRuleFull::new_checked(
+                    compaction_args.max_slice_size,
+                    compaction_args.max_slice_records,
+                    compaction_args.recursive,
+                )
+                .map_err(|err| Self::Error {
+                    reason: err.to_string(),
+                })
+                .map(|rule| Self::CompactionRule(rule.into())),
+                CompactionConditionInput::MetadataOnly(compaction_args) => {
+                    Ok(Self::CompactionRule(
+                        CompactionRuleMetadataOnly {
+                            recursive: compaction_args.recursive,
+                        }
+                        .into(),
+                    ))
+                }
+            },
+        }
+    }
+}

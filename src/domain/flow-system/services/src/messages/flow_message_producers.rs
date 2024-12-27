@@ -9,6 +9,9 @@
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub const MESSAGE_PRODUCER_KAMU_FLOW_TRIGGER_SERVICE: &str =
+    "dev.kamu.domain.flow-system.FlowTriggerService";
+
 pub const MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE: &str =
     "dev.kamu.domain.flow-system.FlowConfigurationService";
 

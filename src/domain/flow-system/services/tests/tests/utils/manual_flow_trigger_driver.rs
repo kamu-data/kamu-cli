@@ -13,7 +13,7 @@ use chrono::{DateTime, Duration, Utc};
 use database_common_macros::transactional_method1;
 use dill::Catalog;
 use kamu_accounts::DEFAULT_ACCOUNT_ID;
-use kamu_flow_system::{FlowKey, FlowQueryService, RequestFlowError};
+use kamu_flow_system::{FlowConfigurationRule, FlowKey, FlowQueryService, RequestFlowError};
 use opendatafabric::AccountID;
 use time_source::SystemTimeSource;
 
@@ -29,6 +29,7 @@ pub(crate) struct ManualFlowTriggerArgs {
     pub(crate) flow_key: FlowKey,
     pub(crate) run_since_start: Duration,
     pub(crate) initiator_id: Option<AccountID>,
+    pub(crate) flow_configuration_snapshot_maybe: Option<FlowConfigurationRule>,
 }
 
 impl ManualFlowTriggerDriver {
@@ -65,7 +66,7 @@ impl ManualFlowTriggerDriver {
                     .initiator_id
                     .clone()
                     .unwrap_or(DEFAULT_ACCOUNT_ID.clone()),
-                None,
+                self.args.flow_configuration_snapshot_maybe.clone(),
             )
             .await?;
         Ok(())

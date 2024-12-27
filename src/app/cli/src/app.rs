@@ -25,10 +25,15 @@ use kamu_adapter_http::{FileUploadLimitConfig, UploadServiceLocal};
 use kamu_adapter_oauth::GithubAuthenticationConfig;
 use kamu_auth_rebac_services::{MultiTenantRebacDatasetLifecycleMessageConsumer, RebacServiceImpl};
 use kamu_datasets::DatasetEnvVar;
-use kamu_flow_system_inmem::domain::{FlowConfigurationUpdatedMessage, FlowProgressMessage};
+use kamu_flow_system_inmem::domain::{
+    FlowConfigurationUpdatedMessage,
+    FlowProgressMessage,
+    FlowTriggerUpdatedMessage,
+};
 use kamu_flow_system_services::{
     MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE,
     MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE,
+    MESSAGE_PRODUCER_KAMU_FLOW_TRIGGER_SERVICE,
 };
 use kamu_task_system_inmem::domain::{TaskProgressMessage, MESSAGE_PRODUCER_KAMU_TASK_AGENT};
 use messaging_outbox::{register_message_dispatcher, Outbox, OutboxDispatchingImpl};
@@ -552,6 +557,10 @@ pub fn configure_server_catalog(base_catalog: &Catalog) -> CatalogBuilder {
     register_message_dispatcher::<FlowConfigurationUpdatedMessage>(
         &mut b,
         MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE,
+    );
+    register_message_dispatcher::<FlowTriggerUpdatedMessage>(
+        &mut b,
+        MESSAGE_PRODUCER_KAMU_FLOW_TRIGGER_SERVICE,
     );
 
     register_message_dispatcher::<TaskProgressMessage>(&mut b, MESSAGE_PRODUCER_KAMU_TASK_AGENT);

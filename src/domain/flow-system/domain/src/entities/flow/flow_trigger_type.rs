@@ -16,14 +16,14 @@ use crate::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum FlowTrigger {
+pub enum FlowTriggerType {
     Manual(FlowTriggerManual),
     AutoPolling(FlowTriggerAutoPolling),
     Push(FlowTriggerPush),
     InputDatasetFlow(FlowTriggerInputDatasetFlow),
 }
 
-impl FlowTrigger {
+impl FlowTriggerType {
     pub fn trigger_time(&self) -> DateTime<Utc> {
         match self {
             Self::Manual(t) => t.trigger_time,
@@ -34,7 +34,7 @@ impl FlowTrigger {
     }
 
     pub fn initiator_account_id(&self) -> Option<&AccountID> {
-        if let FlowTrigger::Manual(manual) = self {
+        if let Self::Manual(manual) = self {
             Some(&manual.initiator_account_id)
         } else {
             None
@@ -42,7 +42,7 @@ impl FlowTrigger {
     }
 
     pub fn push_source_name(&self) -> Option<String> {
-        if let FlowTrigger::Push(trigger_push) = self {
+        if let Self::Push(trigger_push) = self {
             trigger_push.source_name.clone()
         } else {
             None
@@ -50,20 +50,18 @@ impl FlowTrigger {
     }
 
     /// Checks if new trigger is unique compared to the existing triggers
-    pub fn is_unique_vs(&self, existing_triggers: &[FlowTrigger]) -> bool {
+    pub fn is_unique_vs(&self, existing_triggers: &[FlowTriggerType]) -> bool {
         // Try finding a similar existing trigger and abort early, when found
         for existing in existing_triggers {
             match (self, existing) {
-                (FlowTrigger::Manual(this), FlowTrigger::Manual(existing)) if this == existing => {
-                    return false
-                }
-                (FlowTrigger::AutoPolling(_), FlowTrigger::AutoPolling(_)) => return false,
-                (FlowTrigger::Push(this), FlowTrigger::Push(existing))
+                (Self::Manual(this), Self::Manual(existing)) if this == existing => return false,
+                (Self::AutoPolling(_), Self::AutoPolling(_)) => return false,
+                (Self::Push(this), Self::Push(existing))
                     if this.source_name == existing.source_name =>
                 {
                     return false
                 }
-                (FlowTrigger::InputDatasetFlow(this), FlowTrigger::InputDatasetFlow(existing)) => {
+                (Self::InputDatasetFlow(this), Self::InputDatasetFlow(existing)) => {
                     if this.is_same_key_as(existing) {
                         return false;
                     }
@@ -136,20 +134,20 @@ mod tests {
 
     lazy_static! {
         static ref TEST_DATASET_ID: DatasetID = DatasetID::new_seeded_ed25519(b"test");
-        static ref AUTO_POLLING_TRIGGER: FlowTrigger =
-            FlowTrigger::AutoPolling(FlowTriggerAutoPolling {
+        static ref AUTO_POLLING_TRIGGER: FlowTriggerType =
+            FlowTriggerType::AutoPolling(FlowTriggerAutoPolling {
                 trigger_time: Utc::now(),
             });
-        static ref MANUAL_TRIGGER: FlowTrigger = FlowTrigger::Manual(FlowTriggerManual {
+        static ref MANUAL_TRIGGER: FlowTriggerType = FlowTriggerType::Manual(FlowTriggerManual {
             trigger_time: Utc::now(),
             initiator_account_id: DEFAULT_ACCOUNT_ID.clone(),
         });
-        static ref PUSH_SOURCE_TRIGGER: FlowTrigger = FlowTrigger::Push(FlowTriggerPush {
+        static ref PUSH_SOURCE_TRIGGER: FlowTriggerType = FlowTriggerType::Push(FlowTriggerPush {
             trigger_time: Utc::now(),
             source_name: None
         });
-        static ref INPUT_DATASET_TRIGGER: FlowTrigger =
-            FlowTrigger::InputDatasetFlow(FlowTriggerInputDatasetFlow {
+        static ref INPUT_DATASET_TRIGGER: FlowTriggerType =
+            FlowTriggerType::InputDatasetFlow(FlowTriggerInputDatasetFlow {
                 trigger_time: Utc::now(),
                 dataset_id: TEST_DATASET_ID.clone(),
                 flow_type: DatasetFlowType::Ingest,
@@ -186,7 +184,7 @@ mod tests {
 
         let initiator_account_id = AccountID::new_seeded_ed25519(b"different");
         assert!(
-            MANUAL_TRIGGER.is_unique_vs(&[FlowTrigger::Manual(FlowTriggerManual {
+            MANUAL_TRIGGER.is_unique_vs(&[FlowTriggerType::Manual(FlowTriggerManual {
                 trigger_time: Utc::now(),
                 initiator_account_id,
             })])
@@ -205,7 +203,7 @@ mod tests {
         ]));
 
         assert!(
-            PUSH_SOURCE_TRIGGER.is_unique_vs(&[FlowTrigger::Push(FlowTriggerPush {
+            PUSH_SOURCE_TRIGGER.is_unique_vs(&[FlowTriggerType::Push(FlowTriggerPush {
                 trigger_time: Utc::now(),
                 source_name: Some("different".to_string())
             })])
@@ -225,7 +223,7 @@ mod tests {
 
         // Test unrelated flow for same dataset
         assert!(
-            INPUT_DATASET_TRIGGER.is_unique_vs(&[FlowTrigger::InputDatasetFlow(
+            INPUT_DATASET_TRIGGER.is_unique_vs(&[FlowTriggerType::InputDatasetFlow(
                 FlowTriggerInputDatasetFlow {
                     trigger_time: Utc::now(),
                     dataset_id: TEST_DATASET_ID.clone(),
@@ -238,7 +236,7 @@ mod tests {
 
         // Test same flow type for different dataset
         assert!(
-            INPUT_DATASET_TRIGGER.is_unique_vs(&[FlowTrigger::InputDatasetFlow(
+            INPUT_DATASET_TRIGGER.is_unique_vs(&[FlowTriggerType::InputDatasetFlow(
                 FlowTriggerInputDatasetFlow {
                     trigger_time: Utc::now(),
                     dataset_id: DatasetID::new_seeded_ed25519(b"different"),

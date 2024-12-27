@@ -8,25 +8,18 @@
 // by the Apache License, Version 2.0.
 
 use chrono::Utc;
-use database_common::{TransactionRef, TransactionRefT};
+use database_common::{
+    EventModel,
+    PaginationOpts,
+    ReturningEventModel,
+    TransactionRef,
+    TransactionRefT,
+};
 use dill::*;
 use futures::TryStreamExt;
 use kamu_flow_system::*;
 use opendatafabric::DatasetID;
-use sqlx::{FromRow, QueryBuilder, Sqlite};
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, sqlx::FromRow, PartialEq, Eq)]
-struct EventModel {
-    event_id: i64,
-    event_payload: sqlx::types::JsonValue,
-}
-
-#[derive(Debug, FromRow)]
-struct ReturningEventModel {
-    event_id: i64,
-}
+use sqlx::{QueryBuilder, Sqlite};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -243,31 +236,62 @@ impl EventStore<FlowConfigurationState> for SqliteFlowConfigurationEventStore {
 
 #[async_trait::async_trait]
 impl FlowConfigurationEventStore for SqliteFlowConfigurationEventStore {
-    fn list_all_dataset_ids(&self) -> FailableDatasetIDStream<'_> {
-        Box::pin(async_stream::stream! {
-            let mut tr = self.transaction.lock().await;
-            let connection_mut = tr.connection_mut().await?;
+    async fn list_dataset_ids(
+        &self,
+        pagination: &PaginationOpts,
+    ) -> Result<Vec<DatasetID>, InternalError> {
+        let mut tr = self.transaction.lock().await;
 
-            let mut query_stream = sqlx::query!(
-                r#"
+        let connection_mut = tr.connection_mut().await?;
+        let limit = i64::try_from(pagination.limit).unwrap();
+        let offset = i64::try_from(pagination.offset).unwrap();
+
+        let dataset_ids = sqlx::query!(
+            r#"
                 SELECT DISTINCT dataset_id
                     FROM flow_configuration_events
                     WHERE
                         dataset_id IS NOT NULL AND
                         event_type = 'FlowConfigurationEventCreated'
-                "#,
-            )
-            .try_map(|event_row| {
-                DatasetID::from_did_str(event_row.dataset_id.unwrap().as_str())
-                    .map_err(|e| sqlx::Error::Decode(Box::new(e)))
-            })
-            .fetch(connection_mut)
-            .map_err(ErrorIntoInternal::int_err);
+                    ORDER BY dataset_id
+                    LIMIT $1 OFFSET $2
+            "#,
+            limit,
+            offset,
+        )
+        .fetch_all(connection_mut)
+        .await
+        .int_err()?;
 
-            while let Some(dataset_id) = query_stream.try_next().await? {
-                yield Ok(dataset_id);
-            }
-        })
+        Ok(dataset_ids
+            .into_iter()
+            .map(|event_row| {
+                DatasetID::from_did_str(event_row.dataset_id.unwrap().as_str())
+                    .map_err(InternalError::new)
+            })
+            .collect::<Result<Vec<_>, InternalError>>()?)
+    }
+
+    #[tracing::instrument(level = "debug", skip_all)]
+    async fn all_dataset_ids_count(&self) -> Result<usize, InternalError> {
+        let mut tr = self.transaction.lock().await;
+
+        let connection_mut = tr.connection_mut().await?;
+
+        let dataset_ids_count = sqlx::query_scalar!(
+            r#"
+            SELECT COUNT(DISTINCT dataset_id)
+                FROM flow_configuration_events
+                WHERE
+                    dataset_id IS NOT NULL AND
+                    event_type = 'FlowConfigurationEventCreated'
+            "#,
+        )
+        .fetch_one(connection_mut)
+        .await
+        .int_err()?;
+
+        Ok(usize::try_from(dataset_ids_count).unwrap_or(0))
     }
 }
 

@@ -31,7 +31,11 @@ use kamu_core::*;
 use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
 use kamu_datasets_services::DependencyGraphServiceImpl;
 use kamu_flow_system::FlowAgentConfig;
-use kamu_flow_system_inmem::{InMemoryFlowConfigurationEventStore, InMemoryFlowEventStore};
+use kamu_flow_system_inmem::{
+    InMemoryFlowConfigurationEventStore,
+    InMemoryFlowEventStore,
+    InMemoryFlowTriggerEventStore,
+};
 use kamu_task_system_inmem::InMemoryTaskEventStore;
 use kamu_task_system_services::TaskSchedulerImpl;
 use messaging_outbox::{register_message_dispatcher, Outbox, OutboxImmediateImpl};
@@ -49,7 +53,7 @@ async fn test_list_account_flows() {
         DatasetAlias::new(Some(DEFAULT_ACCOUNT_NAME.clone()), foo_dataset_name.clone());
 
     let mock_dataset_action_authorizer = MockDatasetActionAuthorizer::allowing();
-    let harness = FlowConfigHarness::with_overrides(FlowRunsHarnessOverrides {
+    let harness = FlowTriggerHarness::with_overrides(FlowTriggerHarnessOverrides {
         mock_dataset_action_authorizer: Some(mock_dataset_action_authorizer),
         ..Default::default()
     })
@@ -59,7 +63,7 @@ async fn test_list_account_flows() {
     let schema = kamu_adapter_graphql::schema_quiet();
 
     let request_code =
-        FlowConfigHarness::trigger_flow_mutation(&create_result.dataset_handle.id, "INGEST");
+        FlowTriggerHarness::trigger_flow_mutation(&create_result.dataset_handle.id, "INGEST");
     let response = schema
         .execute(
             async_graphql::Request::new(request_code.clone())
@@ -70,7 +74,7 @@ async fn test_list_account_flows() {
     assert!(response.is_ok(), "{response:?}");
 
     // Should return list of flows for account
-    let request_code = FlowConfigHarness::list_flows_query(&DEFAULT_ACCOUNT_NAME);
+    let request_code = FlowTriggerHarness::list_flows_query(&DEFAULT_ACCOUNT_NAME);
     let response = schema
         .execute(
             async_graphql::Request::new(request_code.clone())
@@ -129,11 +133,12 @@ async fn test_list_account_flows() {
 #[test_log::test(tokio::test)]
 async fn test_list_datasets_with_flow() {
     let mock_dataset_action_authorizer = MockDatasetActionAuthorizer::allowing();
-    let harness = FlowConfigHarness::with_overrides(FlowRunsHarnessOverrides {
+    let harness = FlowTriggerHarness::with_overrides(FlowTriggerHarnessOverrides {
         mock_dataset_action_authorizer: Some(mock_dataset_action_authorizer),
         ..Default::default()
     })
     .await;
+
     let foo_dataset_name = DatasetName::new_unchecked("foo");
     let foo_dataset_alias =
         DatasetAlias::new(Some(DEFAULT_ACCOUNT_NAME.clone()), foo_dataset_name.clone());
@@ -146,8 +151,8 @@ async fn test_list_datasets_with_flow() {
     let _bar_create_result = harness.create_root_dataset(bar_dataset_alias).await;
 
     let ingest_mutation_code =
-        FlowConfigHarness::trigger_flow_mutation(&create_result.dataset_handle.id, "INGEST");
-    let compaction_mutation_code = FlowConfigHarness::trigger_flow_mutation(
+        FlowTriggerHarness::trigger_flow_mutation(&create_result.dataset_handle.id, "INGEST");
+    let compaction_mutation_code = FlowTriggerHarness::trigger_flow_mutation(
         &create_result.dataset_handle.id,
         "HARD_COMPACTION",
     );
@@ -239,15 +244,16 @@ async fn test_pause_resume_account_flows() {
     );
 
     let mock_dataset_action_authorizer = MockDatasetActionAuthorizer::allowing();
-    let harness = FlowConfigHarness::with_overrides(FlowRunsHarnessOverrides {
+    let harness = FlowTriggerHarness::with_overrides(FlowTriggerHarnessOverrides {
         mock_dataset_action_authorizer: Some(mock_dataset_action_authorizer),
         ..Default::default()
     })
     .await;
+
     let foo_create_result = harness.create_root_dataset(foo_dataset_alias).await;
 
     let request_code =
-        FlowConfigHarness::trigger_flow_mutation(&foo_create_result.dataset_handle.id, "INGEST");
+        FlowTriggerHarness::trigger_flow_mutation(&foo_create_result.dataset_handle.id, "INGEST");
     let response = schema
         .execute(
             async_graphql::Request::new(request_code.clone())
@@ -257,7 +263,7 @@ async fn test_pause_resume_account_flows() {
 
     assert!(response.is_ok(), "{response:?}");
 
-    let request_code = FlowConfigHarness::list_flows_query(&DEFAULT_ACCOUNT_NAME);
+    let request_code = FlowTriggerHarness::list_flows_query(&DEFAULT_ACCOUNT_NAME);
     let response = schema
         .execute(
             async_graphql::Request::new(request_code.clone())
@@ -311,13 +317,12 @@ async fn test_pause_resume_account_flows() {
         })
     );
 
-    let mutation_code = FlowConfigHarness::set_ingest_config_time_delta_mutation(
+    let mutation_code = FlowTriggerHarness::set_ingest_trigger_time_delta_mutation(
         &foo_create_result.dataset_handle.id,
         "INGEST",
         false,
         1,
         "DAYS",
-        false,
     );
     let response = schema
         .execute(
@@ -328,7 +333,7 @@ async fn test_pause_resume_account_flows() {
 
     assert!(response.is_ok(), "{response:?}");
 
-    let mutation_code = FlowConfigHarness::pause_account_flows(&DEFAULT_ACCOUNT_NAME);
+    let mutation_code = FlowTriggerHarness::pause_account_flows(&DEFAULT_ACCOUNT_NAME);
     let response = schema
         .execute(
             async_graphql::Request::new(mutation_code.clone())
@@ -343,7 +348,7 @@ async fn test_pause_resume_account_flows() {
             "accounts": {
                 "byName": {
                     "flows": {
-                        "configs": {
+                        "triggers": {
                             "pauseAccountDatasetFlows": true
                         }
                     }
@@ -353,7 +358,7 @@ async fn test_pause_resume_account_flows() {
     );
 
     let request_code =
-        FlowConfigHarness::all_paused_config_query(&foo_create_result.dataset_handle.id);
+        FlowTriggerHarness::all_paused_trigger_query(&foo_create_result.dataset_handle.id);
     let response = schema
         .execute(
             async_graphql::Request::new(request_code.clone())
@@ -368,7 +373,7 @@ async fn test_pause_resume_account_flows() {
             "datasets": {
                 "byId": {
                     "flows": {
-                        "configs": {
+                        "triggers": {
                             "allPaused": true
                         }
                     }
@@ -377,7 +382,7 @@ async fn test_pause_resume_account_flows() {
         })
     );
 
-    let mutation_code = FlowConfigHarness::resume_account_flows(&DEFAULT_ACCOUNT_NAME);
+    let mutation_code = FlowTriggerHarness::resume_account_flows(&DEFAULT_ACCOUNT_NAME);
     let response = schema
         .execute(
             async_graphql::Request::new(mutation_code.clone())
@@ -392,7 +397,7 @@ async fn test_pause_resume_account_flows() {
             "accounts": {
                 "byName": {
                     "flows": {
-                        "configs": {
+                        "triggers": {
                             "resumeAccountDatasetFlows": true
                         }
                     }
@@ -402,7 +407,7 @@ async fn test_pause_resume_account_flows() {
     );
 
     let request_code =
-        FlowConfigHarness::all_paused_config_query(&foo_create_result.dataset_handle.id);
+        FlowTriggerHarness::all_paused_trigger_query(&foo_create_result.dataset_handle.id);
     let response = schema
         .execute(
             async_graphql::Request::new(request_code.clone())
@@ -417,7 +422,7 @@ async fn test_pause_resume_account_flows() {
             "datasets": {
                 "byId": {
                     "flows": {
-                        "configs": {
+                        "triggers": {
                             "allPaused": false
                         }
                     }
@@ -430,7 +435,7 @@ async fn test_pause_resume_account_flows() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_account_configs_all_paused() {
+async fn test_account_triggers_all_paused() {
     let schema = kamu_adapter_graphql::schema_quiet();
 
     let foo_dataset_alias = DatasetAlias::new(
@@ -443,16 +448,17 @@ async fn test_account_configs_all_paused() {
     );
 
     let mock_dataset_action_authorizer = MockDatasetActionAuthorizer::allowing();
-    let harness = FlowConfigHarness::with_overrides(FlowRunsHarnessOverrides {
+    let harness = FlowTriggerHarness::with_overrides(FlowTriggerHarnessOverrides {
         mock_dataset_action_authorizer: Some(mock_dataset_action_authorizer),
         ..Default::default()
     })
     .await;
+
     let foo_create_result = harness.create_root_dataset(foo_dataset_alias).await;
     let bar_create_result = harness.create_root_dataset(bar_dataset_alias).await;
 
     let request_code =
-        FlowConfigHarness::trigger_flow_mutation(&foo_create_result.dataset_handle.id, "INGEST");
+        FlowTriggerHarness::trigger_flow_mutation(&foo_create_result.dataset_handle.id, "INGEST");
     let response = schema
         .execute(
             async_graphql::Request::new(request_code.clone())
@@ -462,7 +468,7 @@ async fn test_account_configs_all_paused() {
 
     assert!(response.is_ok(), "{response:?}");
 
-    let request_code = FlowConfigHarness::list_flows_query(&DEFAULT_ACCOUNT_NAME);
+    let request_code = FlowTriggerHarness::list_flows_query(&DEFAULT_ACCOUNT_NAME);
     let response = schema
         .execute(
             async_graphql::Request::new(request_code.clone())
@@ -516,13 +522,12 @@ async fn test_account_configs_all_paused() {
         })
     );
 
-    let mutation_code = FlowConfigHarness::set_ingest_config_time_delta_mutation(
+    let mutation_code = FlowTriggerHarness::set_ingest_trigger_time_delta_mutation(
         &bar_create_result.dataset_handle.id,
         "INGEST",
         false,
         1,
         "DAYS",
-        false,
     );
     let response = schema
         .execute(
@@ -533,7 +538,7 @@ async fn test_account_configs_all_paused() {
 
     assert!(response.is_ok(), "{response:?}");
 
-    let request_code = FlowConfigHarness::all_paused_account_configs_query(&DEFAULT_ACCOUNT_NAME);
+    let request_code = FlowTriggerHarness::all_paused_account_triggers_query(&DEFAULT_ACCOUNT_NAME);
     let response = schema
         .execute(
             async_graphql::Request::new(request_code.clone())
@@ -548,7 +553,7 @@ async fn test_account_configs_all_paused() {
             "accounts": {
                 "byName": {
                     "flows": {
-                        "configs": {
+                        "triggers": {
                             "allPaused": false
                         }
                     }
@@ -557,7 +562,7 @@ async fn test_account_configs_all_paused() {
         })
     );
 
-    let mutation_code = FlowConfigHarness::pause_account_flows(&DEFAULT_ACCOUNT_NAME);
+    let mutation_code = FlowTriggerHarness::pause_account_flows(&DEFAULT_ACCOUNT_NAME);
     let response = schema
         .execute(
             async_graphql::Request::new(mutation_code.clone())
@@ -572,7 +577,7 @@ async fn test_account_configs_all_paused() {
             "accounts": {
                 "byName": {
                     "flows": {
-                        "configs": {
+                        "triggers": {
                             "pauseAccountDatasetFlows": true
                         }
                     }
@@ -581,7 +586,7 @@ async fn test_account_configs_all_paused() {
         })
     );
 
-    let request_code = FlowConfigHarness::all_paused_account_configs_query(&DEFAULT_ACCOUNT_NAME);
+    let request_code = FlowTriggerHarness::all_paused_account_triggers_query(&DEFAULT_ACCOUNT_NAME);
     let response = schema
         .execute(
             async_graphql::Request::new(request_code.clone())
@@ -596,7 +601,7 @@ async fn test_account_configs_all_paused() {
             "accounts": {
                 "byName": {
                     "flows": {
-                        "configs": {
+                        "triggers": {
                             "allPaused": true
                         }
                     }
@@ -608,21 +613,21 @@ async fn test_account_configs_all_paused() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-struct FlowConfigHarness {
+#[derive(Default)]
+struct FlowTriggerHarnessOverrides {
+    dataset_changes_mock: Option<MockDatasetChangesService>,
+    mock_dataset_action_authorizer: Option<MockDatasetActionAuthorizer>,
+}
+
+struct FlowTriggerHarness {
     _tempdir: tempfile::TempDir,
     _catalog_base: dill::Catalog,
     _catalog_anonymous: dill::Catalog,
     catalog_authorized: dill::Catalog,
 }
 
-#[derive(Default)]
-struct FlowRunsHarnessOverrides {
-    dataset_changes_mock: Option<MockDatasetChangesService>,
-    mock_dataset_action_authorizer: Option<MockDatasetActionAuthorizer>,
-}
-
-impl FlowConfigHarness {
-    async fn with_overrides(overrides: FlowRunsHarnessOverrides) -> Self {
+impl FlowTriggerHarness {
+    async fn with_overrides(overrides: FlowTriggerHarnessOverrides) -> Self {
         let tempdir = tempfile::tempdir().unwrap();
         let datasets_dir = tempdir.path().join("datasets");
         std::fs::create_dir(&datasets_dir).unwrap();
@@ -658,6 +663,7 @@ impl FlowConfigHarness {
             .add::<DependencyGraphServiceImpl>()
             .add::<InMemoryDatasetDependencyRepository>()
             .add::<InMemoryFlowConfigurationEventStore>()
+            .add::<InMemoryFlowTriggerEventStore>()
             .add::<InMemoryFlowEventStore>()
             .add_value(FlowAgentConfig::new(
                 Duration::seconds(1),
@@ -832,7 +838,7 @@ impl FlowConfigHarness {
                                           __typename
                                           ... on FlowStartConditionBatching {
                                               accumulatedRecordsCount
-                                              activeTransformRule {
+                                              activeBatchingRule {
                                                   __typename
                                                   minRecordsToAwait
                                                   maxBatchingInterval {
@@ -929,7 +935,7 @@ impl FlowConfigHarness {
                 accounts {
                     byName (accountName: "<name>") {
                         flows {
-                            configs {
+                            triggers {
                                 pauseAccountDatasetFlows
                             }
                         }
@@ -948,7 +954,7 @@ impl FlowConfigHarness {
                 accounts {
                     byName (accountName: "<name>") {
                         flows {
-                            configs {
+                            triggers {
                                 resumeAccountDatasetFlows
                             }
                         }
@@ -960,14 +966,14 @@ impl FlowConfigHarness {
         .replace("<name>", account_name.as_ref())
     }
 
-    fn all_paused_config_query(id: &DatasetID) -> String {
+    fn all_paused_trigger_query(id: &DatasetID) -> String {
         indoc!(
             r#"
             {
                 datasets {
                     byId (datasetId: "<id>") {
                         flows {
-                            configs {
+                            triggers {
                                 allPaused
                             }
                         }
@@ -979,14 +985,14 @@ impl FlowConfigHarness {
         .replace("<id>", &id.to_string())
     }
 
-    fn all_paused_account_configs_query(account_name: &AccountName) -> String {
+    fn all_paused_account_triggers_query(account_name: &AccountName) -> String {
         indoc!(
             r#"
             {
                 accounts {
                     byName (name: "<account_name>") {
                         flows {
-                            configs {
+                            triggers {
                                 allPaused
                             }
                         }
@@ -998,13 +1004,12 @@ impl FlowConfigHarness {
         .replace("<account_name>", account_name)
     }
 
-    fn set_ingest_config_time_delta_mutation(
+    fn set_ingest_trigger_time_delta_mutation(
         id: &DatasetID,
         dataset_flow_type: &str,
         paused: bool,
         every: u64,
         unit: &str,
-        feach_uncacheable: bool,
     ) -> String {
         indoc!(
             r#"
@@ -1012,12 +1017,11 @@ impl FlowConfigHarness {
                 datasets {
                     byId (datasetId: "<id>") {
                         flows {
-                            configs {
-                                setConfigIngest (
+                            triggers {
+                                setTrigger (
                                     datasetFlowType: "<dataset_flow_type>",
                                     paused: <paused>,
-                                    ingest: {
-                                        fetchUncacheable: <feach_uncacheable>,
+                                    triggerInput: {
                                         schedule: {
                                             timeDelta: { every: <every>, unit: "<unit>" }
                                         }
@@ -1025,24 +1029,18 @@ impl FlowConfigHarness {
                                 ) {
                                     __typename,
                                     message
-                                    ... on SetFlowConfigSuccess {
-                                        config {
+                                    ... on SetFlowTriggerSuccess {
+                                        trigger {
                                             __typename
                                             paused
-                                            ingest {
-                                                fetchUncacheable
-                                                schedule {
-                                                    __typename
-                                                    ... on TimeDelta {
-                                                        every
-                                                        unit
-                                                    }
+                                            schedule {
+                                                __typename
+                                                ... on TimeDelta {
+                                                    every
+                                                    unit
                                                 }
                                             }
-                                            transform {
-                                                __typename
-                                            }
-                                            compaction {
+                                            batching {
                                                 __typename
                                             }
                                         }
@@ -1058,10 +1056,6 @@ impl FlowConfigHarness {
         .replace("<id>", &id.to_string())
         .replace("<dataset_flow_type>", dataset_flow_type)
         .replace("<paused>", if paused { "true" } else { "false" })
-        .replace(
-            "<feach_uncacheable>",
-            if feach_uncacheable { "true" } else { "false" },
-        )
         .replace("<every>", every.to_string().as_str())
         .replace("<unit>", unit)
     }

@@ -11,6 +11,12 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Unreleased]
+### Added
+- New entity `FlowTrigger` which is now responsible for flow activation and schedules
+### Changed
+- `DatasetFlowConfigsMut` now has only one method `setConfig` for all types of configurations
+
 ## [0.214.0] - 2024-12-23
 ### Added
 - New `kamu system decode` command that can decode an arbitrary block file for debugging

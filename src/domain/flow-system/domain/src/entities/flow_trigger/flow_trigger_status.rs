@@ -9,17 +9,22 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::*;
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum FlowConfigurationSnapshot {
-    Transform(TransformRule),
-    Compaction(CompactionRule),
-    Schedule(Schedule),
-    Ingest(IngestRule),
-    Reset(ResetRule),
+pub enum FlowTriggerStatus {
+    Active,
+    PausedTemporarily,
+    StoppedPermanently,
+}
+
+impl FlowTriggerStatus {
+    pub fn is_active(&self) -> bool {
+        match self {
+            Self::Active => true,
+            Self::PausedTemporarily | Self::StoppedPermanently => false,
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

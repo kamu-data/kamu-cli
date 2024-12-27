@@ -9,8 +9,10 @@
 
 mod flow;
 mod flow_configuration;
+mod flow_trigger;
 mod shared;
 
 pub use flow::*;
 pub use flow_configuration::*;
+pub use flow_trigger::*;
 pub use shared::*;
