@@ -259,8 +259,8 @@ pub fn get_command(
             None::<&str>,
         )),
         cli::Command::Notebook(c) => Box::new(NotebookCommand::new(
-            cli_catalog.get_one()?,
-            cli_catalog.get_one()?,
+            base_catalog.get_one()?,
+            base_catalog.get_one()?,
             cli_catalog.get_one()?,
             cli_catalog.get_one()?,
             cli_catalog.get_one()?,

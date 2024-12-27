@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::assert_matches::assert_matches;
 use std::future::Future;
 use std::net::{IpAddr, SocketAddr};
 use std::pin::Pin;
@@ -29,6 +30,13 @@ impl FlightSqlServiceFactory {
         address: Option<IpAddr>,
         port: Option<u16>,
     ) -> Result<FlightSqlService, CLIError> {
+        assert_matches!(
+            self.catalog
+                .get_one::<kamu_accounts::CurrentAccountSubject>(),
+            Err(dill::InjectionError::Unregistered(_)),
+            "FlightSqlServiceFactory must be constructed from the base catalog"
+        );
+
         let listener = tokio::net::TcpListener::bind((
             address.unwrap_or("127.0.0.1".parse().unwrap()),
             port.unwrap_or(0),
