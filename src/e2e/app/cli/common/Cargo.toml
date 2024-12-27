@@ -31,9 +31,7 @@ kamu-cli-puppet = { workspace = true, default-features = false, features = [
 ] }
 kamu-core = { workspace = true }
 kamu-flow-system = { workspace = true }
-odf-dataset = { workspace = true }
-odf-storage = { workspace = true }
-odf-metadata = { workspace = true }
+odf = { workspace = true }
 
 async-trait = "0.1"
 chrono = { version = "0.4", default-features = false, features = ["now"] }

@@ -10,7 +10,6 @@
 use kamu_cli_e2e_common::DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR;
 use kamu_cli_puppet::extensions::KamuCliPuppetExt;
 use kamu_cli_puppet::KamuCliPuppet;
-use odf_metadata as odf;
 use odf_storage_impl::testing::MetadataFactory;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -232,7 +231,7 @@ pub async fn test_add_with_circular_dependency(kamu: KamuCliPuppet) {
     // Manifest with lots of comments
     let snapshot = MetadataFactory::dataset_snapshot()
         .name("plain")
-        .kind(odf_metadata::DatasetKind::Derivative)
+        .kind(odf::DatasetKind::Derivative)
         .push_event(
             MetadataFactory::set_transform()
                 .inputs_from_refs(["plain"])

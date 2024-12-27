@@ -37,10 +37,8 @@ kamu-cli-puppet = { workspace = true, default-features = false, features = [
     "extensions",
 ] }
 kamu-flow-system = { workspace = true }
-odf-dataset = { workspace = true }
-odf-storage = { workspace = true }
+odf = { workspace = true }
 odf-storage-impl = { workspace = true, features = ["testing"] }
-odf-metadata = { workspace = true }
 test-utils = { workspace = true }
 
 chrono = { version = "0.4", default-features = false }

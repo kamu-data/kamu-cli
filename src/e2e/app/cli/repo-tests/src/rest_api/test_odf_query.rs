@@ -29,8 +29,6 @@ use kamu_cli_e2e_common::{
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
     E2E_USER_ACCOUNT_NAME,
 };
-use odf_dataset::BlockRef;
-use odf_metadata as odf;
 use serde_json::json;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -203,11 +201,11 @@ async fn test_dataset_metadata(
         odf::DatasetAlias::new(maybe_account_name, DATASET_ROOT_PLAYER_NAME.clone());
     let head_hash = kamu_api_server_client
         .odf_transfer()
-        .metadata_block_hash_by_ref(&dataset_alias, BlockRef::Head)
+        .metadata_block_hash_by_ref(&dataset_alias, odf::BlockRef::Head)
         .await
         .unwrap();
     let expected_refs = vec![MetadataOutputRef {
-        name: BlockRef::Head.as_str().into(),
+        name: odf::BlockRef::Head.as_str().into(),
         block_hash: head_hash,
     }];
 
@@ -236,7 +234,7 @@ async fn test_dataset_metadata(
                 schema: None,
                 schema_format: None,
                 seed: Some(
-                    odf::Seed {
+                    odf::metadata::Seed {
                         dataset_kind: odf::DatasetKind::Root,
                         dataset_id
                     }

@@ -25,8 +25,6 @@ use kamu_adapter_http::general::{AccountResponse, DatasetInfoResponse, NodeInfoR
 use kamu_adapter_http::{LoginRequestBody, PlatformFileUploadQuery, UploadContext};
 use kamu_flow_system::{DatasetFlowType, FlowID};
 use lazy_static::lazy_static;
-use odf_dataset::BlockRef;
-use odf_metadata as odf;
 use reqwest::{Method, StatusCode, Url};
 use thiserror::Error;
 use tokio_retry::strategy::FixedInterval;
@@ -611,19 +609,23 @@ impl DatasetApi<'_> {
                 let system_time_as_str = node["systemTime"].as_str().unwrap();
                 let sequence_number = node["sequenceNumber"].as_u64().unwrap();
                 let event = match node["event"]["__typename"].as_str().unwrap() {
-                    "AddData" => odf::MetadataEventTypeFlags::ADD_DATA,
-                    "ExecuteTransform" => odf::MetadataEventTypeFlags::EXECUTE_TRANSFORM,
-                    "Seed" => odf::MetadataEventTypeFlags::SEED,
-                    "SetPollingSource" => odf::MetadataEventTypeFlags::SET_POLLING_SOURCE,
-                    "SetTransform" => odf::MetadataEventTypeFlags::SET_TRANSFORM,
-                    "SetVocab" => odf::MetadataEventTypeFlags::SET_VOCAB,
-                    "SetAttachments" => odf::MetadataEventTypeFlags::SET_ATTACHMENTS,
-                    "SetInfo" => odf::MetadataEventTypeFlags::SET_INFO,
-                    "SetLicense" => odf::MetadataEventTypeFlags::SET_LICENSE,
-                    "SetDataSchema" => odf::MetadataEventTypeFlags::SET_DATA_SCHEMA,
-                    "AddPushSource" => odf::MetadataEventTypeFlags::ADD_PUSH_SOURCE,
-                    "DisablePushSource" => odf::MetadataEventTypeFlags::DISABLE_PUSH_SOURCE,
-                    "DisablePollingSource" => odf::MetadataEventTypeFlags::DISABLE_POLLING_SOURCE,
+                    "AddData" => odf::metadata::MetadataEventTypeFlags::ADD_DATA,
+                    "ExecuteTransform" => odf::metadata::MetadataEventTypeFlags::EXECUTE_TRANSFORM,
+                    "Seed" => odf::metadata::MetadataEventTypeFlags::SEED,
+                    "SetPollingSource" => odf::metadata::MetadataEventTypeFlags::SET_POLLING_SOURCE,
+                    "SetTransform" => odf::metadata::MetadataEventTypeFlags::SET_TRANSFORM,
+                    "SetVocab" => odf::metadata::MetadataEventTypeFlags::SET_VOCAB,
+                    "SetAttachments" => odf::metadata::MetadataEventTypeFlags::SET_ATTACHMENTS,
+                    "SetInfo" => odf::metadata::MetadataEventTypeFlags::SET_INFO,
+                    "SetLicense" => odf::metadata::MetadataEventTypeFlags::SET_LICENSE,
+                    "SetDataSchema" => odf::metadata::MetadataEventTypeFlags::SET_DATA_SCHEMA,
+                    "AddPushSource" => odf::metadata::MetadataEventTypeFlags::ADD_PUSH_SOURCE,
+                    "DisablePushSource" => {
+                        odf::metadata::MetadataEventTypeFlags::DISABLE_PUSH_SOURCE
+                    }
+                    "DisablePollingSource" => {
+                        odf::metadata::MetadataEventTypeFlags::DISABLE_POLLING_SOURCE
+                    }
                     unexpected_event => panic!("Unexpected event type: {unexpected_event}"),
                 };
 
@@ -658,7 +660,7 @@ pub struct DatasetBlock {
     pub prev_block_hash: Option<odf::Multihash>,
     pub system_time: DateTime<Utc>,
     pub sequence_number: u64,
-    pub event: odf::MetadataEventTypeFlags,
+    pub event: odf::metadata::MetadataEventTypeFlags,
 }
 
 #[derive(Debug)]
@@ -817,7 +819,7 @@ impl OdfTransferApi<'_> {
     pub async fn metadata_block_hash_by_ref(
         &self,
         dataset_alias: &odf::DatasetAlias,
-        block_ref: BlockRef,
+        block_ref: odf::BlockRef,
     ) -> Result<odf::Multihash, MetadataBlockHashByRefError> {
         let response = self
             .client
