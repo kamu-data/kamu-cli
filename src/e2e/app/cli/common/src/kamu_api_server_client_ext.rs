@@ -26,7 +26,7 @@ use kamu_adapter_http::{LoginRequestBody, PlatformFileUploadQuery, UploadContext
 use kamu_core::BlockRef;
 use kamu_flow_system::{DatasetFlowType, FlowID};
 use lazy_static::lazy_static;
-use opendatafabric::{self as odf, AccountName, DatasetAlias, DatasetName};
+use opendatafabric::{self as odf, DatasetAlias};
 use reqwest::{Method, StatusCode, Url};
 use thiserror::Error;
 use tokio_retry::strategy::FixedInterval;
@@ -377,17 +377,6 @@ pub struct DatasetApi<'a> {
 }
 
 impl DatasetApi<'_> {
-    fn get_alias(alias_str: &str) -> DatasetAlias {
-        if let Some((account, dataset)) = alias_str.split_once('/') {
-            DatasetAlias::new(
-                Some(AccountName::new_unchecked(account)),
-                DatasetName::new_unchecked(dataset),
-            )
-        } else {
-            DatasetAlias::new(None, DatasetName::new_unchecked(alias_str))
-        }
-    }
-
     pub fn get_endpoint(&self, dataset_alias: &odf::DatasetAlias) -> Url {
         let node_url = self.client.get_odf_node_url();
 
@@ -452,7 +441,7 @@ impl DatasetApi<'_> {
 
         let dataset_id_as_str = create_response_node["dataset"]["id"].as_str().unwrap();
         let alias_str = create_response_node["dataset"]["alias"].as_str().unwrap();
-        let dataset_alias = Self::get_alias(alias_str);
+        let dataset_alias = alias_str.parse().unwrap();
 
         CreateDatasetResponse {
             dataset_id: odf::DatasetID::from_did_str(dataset_id_as_str).unwrap(),
@@ -492,7 +481,7 @@ impl DatasetApi<'_> {
 
         let dataset_id_as_str = create_response_node["dataset"]["id"].as_str().unwrap();
         let alias_str = create_response_node["dataset"]["alias"].as_str().unwrap();
-        let dataset_alias = Self::get_alias(alias_str);
+        let dataset_alias = alias_str.parse().unwrap();
 
         CreateDatasetResponse {
             dataset_id: odf::DatasetID::from_did_str(dataset_id_as_str).unwrap(),
