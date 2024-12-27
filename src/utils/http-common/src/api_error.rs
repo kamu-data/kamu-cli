@@ -18,6 +18,9 @@
 
 use internal_error::InternalError;
 use kamu_core::*;
+use odf_dataset::GetDatasetError;
+use odf_metadata as odf;
+use odf_storage::{GetBlockError, GetError, GetRefError, InsertError};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -81,7 +84,7 @@ impl ApiError {
     }
 
     pub fn new_unauthorized() -> Self {
-        AccessError::Unauthorized("Unauthorized access".into()).api_err()
+        odf::AccessError::Unauthorized("Unauthorized access".into()).api_err()
     }
 
     pub fn new_unauthorized_from(source: impl std::error::Error + Send + Sync + 'static) -> Self {
@@ -89,7 +92,7 @@ impl ApiError {
     }
 
     pub fn new_forbidden() -> Self {
-        AccessError::Forbidden("Forbidden access".into()).api_err()
+        odf::AccessError::Forbidden("Forbidden access".into()).api_err()
     }
 
     pub fn bad_request(source: impl std::error::Error + Send + Sync + 'static) -> Self {
@@ -201,7 +204,7 @@ where
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 enum ApiErrorCategory<'a> {
-    Access(&'a AccessError),
+    Access(&'a odf::AccessError),
     Internal(&'a InternalError),
     Other,
 }
@@ -220,12 +223,12 @@ where
 {
     fn api_err(self) -> ApiError {
         match self.categorize() {
-            ApiErrorCategory::Access(AccessError::Unauthorized(_)) => {
+            ApiErrorCategory::Access(odf::AccessError::Unauthorized(_)) => {
                 ApiError::new(self, http::StatusCode::UNAUTHORIZED)
             }
-            ApiErrorCategory::Access(AccessError::Forbidden(_) | AccessError::ReadOnly(_)) => {
-                ApiError::new(self, http::StatusCode::FORBIDDEN)
-            }
+            ApiErrorCategory::Access(
+                odf::AccessError::Forbidden(_) | odf::AccessError::ReadOnly(_),
+            ) => ApiError::new(self, http::StatusCode::FORBIDDEN),
             ApiErrorCategory::Internal(_e) => {
                 ApiError::new(self, http::StatusCode::INTERNAL_SERVER_ERROR)
             }
@@ -246,7 +249,7 @@ impl ApiErrorCategorizable for InternalError {
     }
 }
 
-impl ApiErrorCategorizable for AccessError {
+impl ApiErrorCategorizable for odf::AccessError {
     fn categorize(&self) -> ApiErrorCategory<'_> {
         ApiErrorCategory::Access(self)
     }

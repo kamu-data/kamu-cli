@@ -17,28 +17,34 @@ use datafusion::arrow::array::*;
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use datafusion::arrow::record_batch::RecordBatch;
 use dill::{Catalog, Component};
+use file_utils::OwnedFile;
 use kamu::domain::*;
-use kamu::testing::{
-    LocalS3Server,
-    MetadataFactory,
-    MockDatasetActionAuthorizer,
-    ParquetWriterHelper,
-};
-use kamu::utils::s3_context::S3Context;
+use kamu::testing::{MockDatasetActionAuthorizer, ParquetWriterHelper};
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_ingest_datafusion::DataWriterDataFusion;
-use opendatafabric::*;
+use odf_dataset::{
+    AddDataParams,
+    BlockRef,
+    CommitOpts,
+    CreateDatasetResult,
+    DatasetNotFoundError,
+    DatasetStorageUnit,
+};
+use odf_metadata::*;
+use odf_storage_impl::testing::MetadataFactory;
+use s3_utils::S3Context;
 use tempfile::TempDir;
+use test_utils::LocalS3Server;
 use time_source::SystemTimeSourceDefault;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 async fn create_test_dataset(catalog: &dill::Catalog, tempdir: &Path) -> CreateDatasetResult {
-    let dataset_repo_writer = catalog.get_one::<dyn DatasetRepositoryWriter>().unwrap();
+    let dataset_storage_unit_writer = catalog.get_one::<dyn DatasetStorageUnitWriter>().unwrap();
     let dataset_alias = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
 
-    let create_result = dataset_repo_writer
+    let create_result = dataset_storage_unit_writer
         .create_dataset(
             &dataset_alias,
             MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build())
@@ -126,10 +132,10 @@ fn create_catalog_with_local_workspace(
     dill::CatalogBuilder::new()
         .add::<SystemTimeSourceDefault>()
         .add_value(TenancyConfig::SingleTenant)
-        .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
-        .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-        .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
-        .add::<DatasetRegistryRepoBridge>()
+        .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
+        .bind::<dyn DatasetStorageUnit, DatasetStorageUnitLocalFs>()
+        .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
+        .add::<DatasetRegistrySoloUnitBridge>()
         .add::<QueryServiceImpl>()
         .add::<ObjectStoreRegistryImpl>()
         .add::<ObjectStoreBuilderLocalFs>()
@@ -151,10 +157,10 @@ async fn create_catalog_with_s3_workspace(
     dill::CatalogBuilder::new()
         .add::<SystemTimeSourceDefault>()
         .add_value(TenancyConfig::SingleTenant)
-        .add_builder(DatasetRepositoryS3::builder().with_s3_context(s3_context.clone()))
-        .bind::<dyn DatasetRepository, DatasetRepositoryS3>()
-        .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryS3>()
-        .add::<DatasetRegistryRepoBridge>()
+        .add_builder(DatasetStorageUnitS3::builder().with_s3_context(s3_context.clone()))
+        .bind::<dyn DatasetStorageUnit, DatasetStorageUnitS3>()
+        .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitS3>()
+        .add::<DatasetRegistrySoloUnitBridge>()
         .add::<QueryServiceImpl>()
         .add::<ObjectStoreRegistryImpl>()
         .add::<ObjectStoreBuilderLocalFs>()
@@ -412,8 +418,8 @@ async fn test_dataset_tail_empty_dataset() {
         MockDatasetActionAuthorizer::new().expect_check_read_a_dataset(2, true),
     );
 
-    let dataset_repo_writer = catalog.get_one::<dyn DatasetRepositoryWriter>().unwrap();
-    dataset_repo_writer
+    let dataset_storage_unit_writer = catalog.get_one::<dyn DatasetStorageUnitWriter>().unwrap();
+    dataset_storage_unit_writer
         .create_dataset(
             &"foo".try_into().unwrap(),
             MetadataBlockTyped {
@@ -692,12 +698,12 @@ async fn test_sql_statement_with_state_simple() {
         MockDatasetActionAuthorizer::allowing(),
     );
 
-    let dataset_repo_writer = catalog.get_one::<dyn DatasetRepositoryWriter>().unwrap();
+    let dataset_storage_unit_writer = catalog.get_one::<dyn DatasetStorageUnitWriter>().unwrap();
     let ctx = SessionContext::new();
 
     // Dataset init
     let foo_alias = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
-    let foo_create = dataset_repo_writer
+    let foo_create = dataset_storage_unit_writer
         .create_dataset(
             &foo_alias,
             MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build())
@@ -921,12 +927,12 @@ async fn test_sql_statement_with_state_cte() {
         MockDatasetActionAuthorizer::allowing(),
     );
 
-    let dataset_repo_writer = catalog.get_one::<dyn DatasetRepositoryWriter>().unwrap();
+    let dataset_storage_unit_writer = catalog.get_one::<dyn DatasetStorageUnitWriter>().unwrap();
     let ctx = SessionContext::new();
 
     // Dataset `foo`
     let foo_alias = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
-    let foo_created = dataset_repo_writer
+    let foo_created = dataset_storage_unit_writer
         .create_dataset(
             &foo_alias,
             MetadataFactory::metadata_block(
@@ -978,7 +984,7 @@ async fn test_sql_statement_with_state_cte() {
 
     // Dataset `bar`
     let bar_alias = DatasetAlias::new(None, DatasetName::new_unchecked("bar"));
-    let bar_created = dataset_repo_writer
+    let bar_created = dataset_storage_unit_writer
         .create_dataset(
             &bar_alias,
             MetadataFactory::metadata_block(

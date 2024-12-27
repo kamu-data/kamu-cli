@@ -15,7 +15,6 @@ use kamu::testing::MockDatasetChangesService;
 use kamu_core::*;
 use kamu_flow_system::*;
 use kamu_task_system::*;
-use opendatafabric::*;
 
 use super::{
     FlowHarness,
@@ -35,8 +34,8 @@ async fn test_read_initial_config_and_queue_without_waiting() {
 
     // Create a "foo" root dataset, and configure ingestion schedule every 60ms
     let foo_create_result = harness
-        .create_root_dataset(DatasetAlias {
-            dataset_name: DatasetName::new_unchecked("foo"),
+        .create_root_dataset(odf::DatasetAlias {
+            dataset_name: odf::DatasetName::new_unchecked("foo"),
             account_name: None,
         })
         .await;
@@ -162,8 +161,8 @@ async fn test_read_initial_config_shouldnt_queue_in_recovery_case() {
 
     // Create a "foo" root dataset
     let foo_create_result = harness
-        .create_root_dataset(DatasetAlias {
-            dataset_name: DatasetName::new_unchecked("foo"),
+        .create_root_dataset(odf::DatasetAlias {
+            dataset_name: odf::DatasetName::new_unchecked("foo"),
             account_name: None,
         })
         .await;
@@ -305,8 +304,8 @@ async fn test_cron_config() {
 
     // Create a "foo" root dataset, configure ingestion cron schedule of every 5s
     let foo_create_result = harness
-        .create_root_dataset(DatasetAlias {
-            dataset_name: DatasetName::new_unchecked("foo"),
+        .create_root_dataset(odf::DatasetAlias {
+            dataset_name: odf::DatasetName::new_unchecked("foo"),
             account_name: None,
         })
         .await;
@@ -414,16 +413,16 @@ async fn test_manual_trigger() {
     let harness = FlowHarness::new().await;
 
     let foo_create_result = harness
-        .create_root_dataset(DatasetAlias {
-            dataset_name: DatasetName::new_unchecked("foo"),
+        .create_root_dataset(odf::DatasetAlias {
+            dataset_name: odf::DatasetName::new_unchecked("foo"),
             account_name: None,
         })
         .await;
     let foo_id = foo_create_result.dataset_handle.id;
 
     let bar_create_result = harness
-        .create_root_dataset(DatasetAlias {
-            dataset_name: DatasetName::new_unchecked("bar"),
+        .create_root_dataset(odf::DatasetAlias {
+            dataset_name: odf::DatasetName::new_unchecked("bar"),
             account_name: None,
         })
         .await;
@@ -626,16 +625,16 @@ async fn test_ingest_trigger_with_ingest_config() {
     let harness = FlowHarness::new().await;
 
     let foo_id = harness
-        .create_root_dataset(DatasetAlias {
-            dataset_name: DatasetName::new_unchecked("foo"),
+        .create_root_dataset(odf::DatasetAlias {
+            dataset_name: odf::DatasetName::new_unchecked("foo"),
             account_name: None,
         })
         .await
         .dataset_handle
         .id;
     let bar_id = harness
-        .create_root_dataset(DatasetAlias {
-            dataset_name: DatasetName::new_unchecked("bar"),
+        .create_root_dataset(odf::DatasetAlias {
+            dataset_name: odf::DatasetName::new_unchecked("bar"),
             account_name: None,
         })
         .await
@@ -845,16 +844,16 @@ async fn test_manual_trigger_compaction() {
     let harness = FlowHarness::new().await;
 
     let foo_create_result = harness
-        .create_root_dataset(DatasetAlias {
-            dataset_name: DatasetName::new_unchecked("foo"),
+        .create_root_dataset(odf::DatasetAlias {
+            dataset_name: odf::DatasetName::new_unchecked("foo"),
             account_name: None,
         })
         .await;
     let foo_id = foo_create_result.dataset_handle.id;
 
     let bar_create_result = harness
-        .create_root_dataset(DatasetAlias {
-            dataset_name: DatasetName::new_unchecked("bar"),
+        .create_root_dataset(odf::DatasetAlias {
+            dataset_name: odf::DatasetName::new_unchecked("bar"),
             account_name: None,
         })
         .await;
@@ -994,8 +993,8 @@ async fn test_manual_trigger_reset() {
     let harness = FlowHarness::new().await;
 
     let create_dataset_result = harness
-        .create_root_dataset(DatasetAlias {
-            dataset_name: DatasetName::new_unchecked("foo"),
+        .create_root_dataset(odf::DatasetAlias {
+            dataset_name: odf::DatasetName::new_unchecked("foo"),
             account_name: None,
         })
         .await;
@@ -1048,7 +1047,7 @@ async fn test_manual_trigger_reset() {
                     run_since_start: Duration::milliseconds(20),
                     finish_in_with: Some((Duration::milliseconds(90), TaskOutcome::Success(
                       TaskResult::ResetDatasetResult(TaskResetDatasetResult {
-                        reset_result: ResetResult { new_head: Multihash::from_digest_sha3_256(b"new-head") },
+                        reset_result: ResetResult { new_head: odf::Multihash::from_digest_sha3_256(b"new-head") },
                       })
                     ))),
                     expected_logical_plan: LogicalPlan::ResetDataset(LogicalPlanResetDataset {
@@ -1112,8 +1111,8 @@ async fn test_reset_trigger_keep_metadata_compaction_for_derivatives() {
     let harness = FlowHarness::new().await;
 
     let create_foo_result = harness
-        .create_root_dataset(DatasetAlias {
-            dataset_name: DatasetName::new_unchecked("foo"),
+        .create_root_dataset(odf::DatasetAlias {
+            dataset_name: odf::DatasetName::new_unchecked("foo"),
             account_name: None,
         })
         .await;
@@ -1127,8 +1126,8 @@ async fn test_reset_trigger_keep_metadata_compaction_for_derivatives() {
         .unwrap();
     let foo_bar_id = harness
         .create_derived_dataset(
-            DatasetAlias {
-                dataset_name: DatasetName::new_unchecked("foo.bar"),
+            odf::DatasetAlias {
+                dataset_name: odf::DatasetName::new_unchecked("foo.bar"),
                 account_name: None,
             },
             vec![create_foo_result.dataset_handle.id.clone()],
@@ -1136,8 +1135,8 @@ async fn test_reset_trigger_keep_metadata_compaction_for_derivatives() {
         .await;
     let foo_baz_id = harness
         .create_derived_dataset(
-            DatasetAlias {
-                dataset_name: DatasetName::new_unchecked("foo.baz"),
+            odf::DatasetAlias {
+                dataset_name: odf::DatasetName::new_unchecked("foo.baz"),
                 account_name: None,
             },
             vec![create_foo_result.dataset_handle.id.clone()],
@@ -1195,7 +1194,7 @@ async fn test_reset_trigger_keep_metadata_compaction_for_derivatives() {
               run_since_start: Duration::milliseconds(20),
               finish_in_with: Some((Duration::milliseconds(70), TaskOutcome::Success(
                 TaskResult::ResetDatasetResult(TaskResetDatasetResult {
-                  reset_result: ResetResult { new_head: Multihash::from_digest_sha3_256(b"new-head") }
+                  reset_result: ResetResult { new_head: odf::Multihash::from_digest_sha3_256(b"new-head") }
                 })
               ))),
               expected_logical_plan: LogicalPlan::ResetDataset(LogicalPlanResetDataset {
@@ -1218,8 +1217,8 @@ async fn test_reset_trigger_keep_metadata_compaction_for_derivatives() {
                   Duration::milliseconds(70),
                   TaskOutcome::Success(TaskResult::CompactionDatasetResult(TaskCompactionDatasetResult {
                     compaction_result: CompactionResult::Success {
-                      old_head: Multihash::from_digest_sha3_256(b"old-slice-2"),
-                      new_head: Multihash::from_digest_sha3_256(b"new-slice-2"),
+                      old_head: odf::Multihash::from_digest_sha3_256(b"old-slice-2"),
+                      new_head: odf::Multihash::from_digest_sha3_256(b"new-slice-2"),
                       old_num_blocks: 5,
                       new_num_blocks: 4,
                     }
@@ -1246,8 +1245,8 @@ async fn test_reset_trigger_keep_metadata_compaction_for_derivatives() {
                   Duration::milliseconds(40),
                   TaskOutcome::Success(TaskResult::CompactionDatasetResult(TaskCompactionDatasetResult {
                     compaction_result: CompactionResult::Success {
-                      old_head: Multihash::from_digest_sha3_256(b"old-slice-3"),
-                      new_head: Multihash::from_digest_sha3_256(b"new-slice-3"),
+                      old_head: odf::Multihash::from_digest_sha3_256(b"old-slice-3"),
+                      new_head: odf::Multihash::from_digest_sha3_256(b"new-slice-3"),
                       old_num_blocks: 8,
                       new_num_blocks: 3,
                     }
@@ -1350,8 +1349,8 @@ async fn test_manual_trigger_compaction_with_config() {
     let harness = FlowHarness::new().await;
 
     let foo_create_result = harness
-        .create_root_dataset(DatasetAlias {
-            dataset_name: DatasetName::new_unchecked("foo"),
+        .create_root_dataset(odf::DatasetAlias {
+            dataset_name: odf::DatasetName::new_unchecked("foo"),
             account_name: None,
         })
         .await;
@@ -1449,8 +1448,8 @@ async fn test_full_hard_compaction_trigger_keep_metadata_compaction_for_derivati
     let harness = FlowHarness::new().await;
 
     let foo_create_result = harness
-        .create_root_dataset(DatasetAlias {
-            dataset_name: DatasetName::new_unchecked("foo"),
+        .create_root_dataset(odf::DatasetAlias {
+            dataset_name: odf::DatasetName::new_unchecked("foo"),
             account_name: None,
         })
         .await;
@@ -1458,8 +1457,8 @@ async fn test_full_hard_compaction_trigger_keep_metadata_compaction_for_derivati
 
     let foo_bar_id = harness
         .create_derived_dataset(
-            DatasetAlias {
-                dataset_name: DatasetName::new_unchecked("foo.bar"),
+            odf::DatasetAlias {
+                dataset_name: odf::DatasetName::new_unchecked("foo.bar"),
                 account_name: None,
             },
             vec![foo_id.clone()],
@@ -1467,8 +1466,8 @@ async fn test_full_hard_compaction_trigger_keep_metadata_compaction_for_derivati
         .await;
     let foo_baz_id = harness
         .create_derived_dataset(
-            DatasetAlias {
-                dataset_name: DatasetName::new_unchecked("foo.baz"),
+            odf::DatasetAlias {
+                dataset_name: odf::DatasetName::new_unchecked("foo.baz"),
                 account_name: None,
             },
             vec![foo_id.clone()],
@@ -1521,8 +1520,8 @@ async fn test_full_hard_compaction_trigger_keep_metadata_compaction_for_derivati
                   Duration::milliseconds(70),
                   TaskOutcome::Success(TaskResult::CompactionDatasetResult(TaskCompactionDatasetResult {
                     compaction_result: CompactionResult::Success {
-                      old_head: Multihash::from_digest_sha3_256(b"old-slice"),
-                      new_head: Multihash::from_digest_sha3_256(b"new-slice"),
+                      old_head: odf::Multihash::from_digest_sha3_256(b"old-slice"),
+                      new_head: odf::Multihash::from_digest_sha3_256(b"new-slice"),
                       old_num_blocks: 5,
                       new_num_blocks: 4,
                     }
@@ -1549,8 +1548,8 @@ async fn test_full_hard_compaction_trigger_keep_metadata_compaction_for_derivati
                   Duration::milliseconds(70),
                   TaskOutcome::Success(TaskResult::CompactionDatasetResult(TaskCompactionDatasetResult {
                     compaction_result: CompactionResult::Success {
-                      old_head: Multihash::from_digest_sha3_256(b"old-slice-2"),
-                      new_head: Multihash::from_digest_sha3_256(b"new-slice-2"),
+                      old_head: odf::Multihash::from_digest_sha3_256(b"old-slice-2"),
+                      new_head: odf::Multihash::from_digest_sha3_256(b"new-slice-2"),
                       old_num_blocks: 5,
                       new_num_blocks: 4,
                     }
@@ -1577,8 +1576,8 @@ async fn test_full_hard_compaction_trigger_keep_metadata_compaction_for_derivati
                   Duration::milliseconds(40),
                   TaskOutcome::Success(TaskResult::CompactionDatasetResult(TaskCompactionDatasetResult {
                     compaction_result: CompactionResult::Success {
-                      old_head: Multihash::from_digest_sha3_256(b"old-slice-3"),
-                      new_head: Multihash::from_digest_sha3_256(b"new-slice-3"),
+                      old_head: odf::Multihash::from_digest_sha3_256(b"old-slice-3"),
+                      new_head: odf::Multihash::from_digest_sha3_256(b"new-slice-3"),
                       old_num_blocks: 8,
                       new_num_blocks: 3,
                     }
@@ -1678,8 +1677,8 @@ async fn test_manual_trigger_keep_metadata_only_with_recursive_compaction() {
     let harness = FlowHarness::new().await;
 
     let foo_create_result = harness
-        .create_root_dataset(DatasetAlias {
-            dataset_name: DatasetName::new_unchecked("foo"),
+        .create_root_dataset(odf::DatasetAlias {
+            dataset_name: odf::DatasetName::new_unchecked("foo"),
             account_name: None,
         })
         .await;
@@ -1687,8 +1686,8 @@ async fn test_manual_trigger_keep_metadata_only_with_recursive_compaction() {
 
     let foo_bar_id = harness
         .create_derived_dataset(
-            DatasetAlias {
-                dataset_name: DatasetName::new_unchecked("foo.bar"),
+            odf::DatasetAlias {
+                dataset_name: odf::DatasetName::new_unchecked("foo.bar"),
                 account_name: None,
             },
             vec![foo_id.clone()],
@@ -1696,8 +1695,8 @@ async fn test_manual_trigger_keep_metadata_only_with_recursive_compaction() {
         .await;
     let foo_bar_baz_id = harness
         .create_derived_dataset(
-            DatasetAlias {
-                dataset_name: DatasetName::new_unchecked("foo.bar.baz"),
+            odf::DatasetAlias {
+                dataset_name: odf::DatasetName::new_unchecked("foo.bar.baz"),
                 account_name: None,
             },
             vec![foo_bar_id.clone()],
@@ -1749,8 +1748,8 @@ async fn test_manual_trigger_keep_metadata_only_with_recursive_compaction() {
                     Duration::milliseconds(70),
                     TaskOutcome::Success(TaskResult::CompactionDatasetResult(TaskCompactionDatasetResult {
                       compaction_result: CompactionResult::Success {
-                        old_head: Multihash::from_digest_sha3_256(b"old-slice"),
-                        new_head: Multihash::from_digest_sha3_256(b"new-slice"),
+                        old_head: odf::Multihash::from_digest_sha3_256(b"old-slice"),
+                        new_head: odf::Multihash::from_digest_sha3_256(b"new-slice"),
                         old_num_blocks: 5,
                         new_num_blocks: 4,
                       }
@@ -1777,8 +1776,8 @@ async fn test_manual_trigger_keep_metadata_only_with_recursive_compaction() {
                     Duration::milliseconds(70),
                     TaskOutcome::Success(TaskResult::CompactionDatasetResult(TaskCompactionDatasetResult {
                       compaction_result: CompactionResult::Success {
-                        old_head: Multihash::from_digest_sha3_256(b"old-slice-2"),
-                        new_head: Multihash::from_digest_sha3_256(b"new-slice-2"),
+                        old_head: odf::Multihash::from_digest_sha3_256(b"old-slice-2"),
+                        new_head: odf::Multihash::from_digest_sha3_256(b"new-slice-2"),
                         old_num_blocks: 5,
                         new_num_blocks: 4,
                       }
@@ -1805,8 +1804,8 @@ async fn test_manual_trigger_keep_metadata_only_with_recursive_compaction() {
                     Duration::milliseconds(40),
                     TaskOutcome::Success(TaskResult::CompactionDatasetResult(TaskCompactionDatasetResult {
                       compaction_result: CompactionResult::Success {
-                        old_head: Multihash::from_digest_sha3_256(b"old-slice-3"),
-                        new_head: Multihash::from_digest_sha3_256(b"new-slice-3"),
+                        old_head: odf::Multihash::from_digest_sha3_256(b"old-slice-3"),
+                        new_head: odf::Multihash::from_digest_sha3_256(b"new-slice-3"),
                         old_num_blocks: 8,
                         new_num_blocks: 3,
                       }
@@ -1908,8 +1907,8 @@ async fn test_manual_trigger_keep_metadata_only_without_recursive_compaction() {
     let harness = FlowHarness::new().await;
 
     let foo_create_result = harness
-        .create_root_dataset(DatasetAlias {
-            dataset_name: DatasetName::new_unchecked("foo"),
+        .create_root_dataset(odf::DatasetAlias {
+            dataset_name: odf::DatasetName::new_unchecked("foo"),
             account_name: None,
         })
         .await;
@@ -1917,8 +1916,8 @@ async fn test_manual_trigger_keep_metadata_only_without_recursive_compaction() {
 
     let foo_bar_id = harness
         .create_derived_dataset(
-            DatasetAlias {
-                dataset_name: DatasetName::new_unchecked("foo.bar"),
+            odf::DatasetAlias {
+                dataset_name: odf::DatasetName::new_unchecked("foo.bar"),
                 account_name: None,
             },
             vec![foo_id.clone()],
@@ -1926,8 +1925,8 @@ async fn test_manual_trigger_keep_metadata_only_without_recursive_compaction() {
         .await;
     let foo_bar_baz_id = harness
         .create_derived_dataset(
-            DatasetAlias {
-                dataset_name: DatasetName::new_unchecked("foo.bar.baz"),
+            odf::DatasetAlias {
+                dataset_name: odf::DatasetName::new_unchecked("foo.bar.baz"),
                 account_name: None,
             },
             vec![foo_bar_id.clone()],
@@ -1979,8 +1978,8 @@ async fn test_manual_trigger_keep_metadata_only_without_recursive_compaction() {
                     Duration::milliseconds(70),
                     TaskOutcome::Success(TaskResult::CompactionDatasetResult(TaskCompactionDatasetResult {
                       compaction_result: CompactionResult::Success {
-                        old_head: Multihash::from_digest_sha3_256(b"old-slice"),
-                        new_head: Multihash::from_digest_sha3_256(b"new-slice"),
+                        old_head: odf::Multihash::from_digest_sha3_256(b"old-slice"),
+                        new_head: odf::Multihash::from_digest_sha3_256(b"new-slice"),
                         old_num_blocks: 5,
                         new_num_blocks: 4,
                       }
@@ -2033,8 +2032,8 @@ async fn test_manual_trigger_keep_metadata_only_without_recursive_compaction() {
 
 #[test_log::test(tokio::test)]
 async fn test_manual_trigger_keep_metadata_only_compaction_multiple_accounts() {
-    let wasya_account_name = AccountName::new_unchecked("wasya");
-    let petya_account_name = AccountName::new_unchecked("petya");
+    let wasya_account_name = odf::AccountName::new_unchecked("wasya");
+    let petya_account_name = odf::AccountName::new_unchecked("petya");
 
     let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
         tenancy_config: TenancyConfig::MultiTenant,
@@ -2044,8 +2043,8 @@ async fn test_manual_trigger_keep_metadata_only_compaction_multiple_accounts() {
     .await;
 
     let foo_create_result = harness
-        .create_root_dataset(DatasetAlias {
-            dataset_name: DatasetName::new_unchecked("foo"),
+        .create_root_dataset(odf::DatasetAlias {
+            dataset_name: odf::DatasetName::new_unchecked("foo"),
             account_name: Some(wasya_account_name.clone()),
         })
         .await;
@@ -2053,8 +2052,8 @@ async fn test_manual_trigger_keep_metadata_only_compaction_multiple_accounts() {
 
     let foo_bar_id = harness
         .create_derived_dataset(
-            DatasetAlias {
-                dataset_name: DatasetName::new_unchecked("foo.bar"),
+            odf::DatasetAlias {
+                dataset_name: odf::DatasetName::new_unchecked("foo.bar"),
                 account_name: Some(wasya_account_name.clone()),
             },
             vec![foo_id.clone()],
@@ -2062,8 +2061,8 @@ async fn test_manual_trigger_keep_metadata_only_compaction_multiple_accounts() {
         .await;
     let foo_baz_id = harness
         .create_derived_dataset(
-            DatasetAlias {
-                dataset_name: DatasetName::new_unchecked("foo.baz"),
+            odf::DatasetAlias {
+                dataset_name: odf::DatasetName::new_unchecked("foo.baz"),
                 account_name: Some(petya_account_name.clone()),
             },
             vec![foo_id.clone()],
@@ -2103,8 +2102,8 @@ async fn test_manual_trigger_keep_metadata_only_compaction_multiple_accounts() {
                 run_since_start: Duration::milliseconds(10),
                 finish_in_with: Some((Duration::milliseconds(70), TaskOutcome::Success(TaskResult::CompactionDatasetResult(TaskCompactionDatasetResult {
                   compaction_result: CompactionResult::Success {
-                    old_head: Multihash::from_digest_sha3_256(b"old-slice"),
-                    new_head: Multihash::from_digest_sha3_256(b"new-slice"),
+                    old_head: odf::Multihash::from_digest_sha3_256(b"old-slice"),
+                    new_head: odf::Multihash::from_digest_sha3_256(b"new-slice"),
                     old_num_blocks: 5,
                     new_num_blocks: 4,
                 }})))),
@@ -2134,8 +2133,8 @@ async fn test_manual_trigger_keep_metadata_only_compaction_multiple_accounts() {
                 // Send some PullResult with records to bypass batching condition
                 finish_in_with: Some((Duration::milliseconds(70), TaskOutcome::Success(TaskResult::CompactionDatasetResult(TaskCompactionDatasetResult {
                   compaction_result: CompactionResult::Success {
-                    old_head: Multihash::from_digest_sha3_256(b"old-slice"),
-                    new_head: Multihash::from_digest_sha3_256(b"new-slice"),
+                    old_head: odf::Multihash::from_digest_sha3_256(b"old-slice"),
+                    new_head: odf::Multihash::from_digest_sha3_256(b"new-slice"),
                     old_num_blocks: 5,
                     new_num_blocks: 4,
                 }})))),
@@ -2209,16 +2208,16 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
     let harness = FlowHarness::new().await;
 
     let foo_create_result = harness
-        .create_root_dataset(DatasetAlias {
-            dataset_name: DatasetName::new_unchecked("foo"),
+        .create_root_dataset(odf::DatasetAlias {
+            dataset_name: odf::DatasetName::new_unchecked("foo"),
             account_name: None,
         })
         .await;
     let foo_id = foo_create_result.dataset_handle.id;
 
     let bar_create_result = harness
-        .create_root_dataset(DatasetAlias {
-            dataset_name: DatasetName::new_unchecked("bar"),
+        .create_root_dataset(odf::DatasetAlias {
+            dataset_name: odf::DatasetName::new_unchecked("bar"),
             account_name: None,
         })
         .await;
@@ -2432,16 +2431,16 @@ async fn test_respect_last_success_time_when_schedule_resumes() {
     let harness = FlowHarness::new().await;
 
     let foo_create_result = harness
-        .create_root_dataset(DatasetAlias {
-            dataset_name: DatasetName::new_unchecked("foo"),
+        .create_root_dataset(odf::DatasetAlias {
+            dataset_name: odf::DatasetName::new_unchecked("foo"),
             account_name: None,
         })
         .await;
     let foo_id = foo_create_result.dataset_handle.id;
 
     let bar_create_result = harness
-        .create_root_dataset(DatasetAlias {
-            dataset_name: DatasetName::new_unchecked("bar"),
+        .create_root_dataset(odf::DatasetAlias {
+            dataset_name: odf::DatasetName::new_unchecked("bar"),
             account_name: None,
         })
         .await;
@@ -2657,16 +2656,16 @@ async fn test_dataset_deleted() {
     let harness = FlowHarness::new().await;
 
     let foo_create_result = harness
-        .create_root_dataset(DatasetAlias {
-            dataset_name: DatasetName::new_unchecked("foo"),
+        .create_root_dataset(odf::DatasetAlias {
+            dataset_name: odf::DatasetName::new_unchecked("foo"),
             account_name: None,
         })
         .await;
     let foo_id = foo_create_result.dataset_handle.id;
 
     let bar_create_result = harness
-        .create_root_dataset(DatasetAlias {
-            dataset_name: DatasetName::new_unchecked("bar"),
+        .create_root_dataset(odf::DatasetAlias {
+            dataset_name: odf::DatasetName::new_unchecked("bar"),
             account_name: None,
         })
         .await;
@@ -2837,24 +2836,24 @@ async fn test_task_completions_trigger_next_loop_on_success() {
     let harness = FlowHarness::new().await;
 
     let foo_create_result = harness
-        .create_root_dataset(DatasetAlias {
-            dataset_name: DatasetName::new_unchecked("foo"),
+        .create_root_dataset(odf::DatasetAlias {
+            dataset_name: odf::DatasetName::new_unchecked("foo"),
             account_name: None,
         })
         .await;
     let foo_id = foo_create_result.dataset_handle.id;
 
     let bar_create_result = harness
-        .create_root_dataset(DatasetAlias {
-            dataset_name: DatasetName::new_unchecked("bar"),
+        .create_root_dataset(odf::DatasetAlias {
+            dataset_name: odf::DatasetName::new_unchecked("bar"),
             account_name: None,
         })
         .await;
     let bar_id = bar_create_result.dataset_handle.id;
 
     let baz_create_result = harness
-        .create_root_dataset(DatasetAlias {
-            dataset_name: DatasetName::new_unchecked("baz"),
+        .create_root_dataset(odf::DatasetAlias {
+            dataset_name: odf::DatasetName::new_unchecked("baz"),
             account_name: None,
         })
         .await;
@@ -3059,8 +3058,8 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
     .await;
 
     let foo_create_result = harness
-        .create_root_dataset(DatasetAlias {
-            dataset_name: DatasetName::new_unchecked("foo"),
+        .create_root_dataset(odf::DatasetAlias {
+            dataset_name: odf::DatasetName::new_unchecked("foo"),
             account_name: None,
         })
         .await;
@@ -3068,8 +3067,8 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
 
     let bar_id = harness
         .create_derived_dataset(
-            DatasetAlias {
-                dataset_name: DatasetName::new_unchecked("bar"),
+            odf::DatasetAlias {
+                dataset_name: odf::DatasetName::new_unchecked("bar"),
                 account_name: None,
             },
             vec![foo_id.clone()],
@@ -3132,8 +3131,8 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
                 // Send some PullResult with records to bypass batching condition
                 finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
                   pull_result: PullResult::Updated {
-                    old_head: Some(Multihash::from_digest_sha3_256(b"old-slice")),
-                    new_head: Multihash::from_digest_sha3_256(b"new-slice"),
+                    old_head: Some(odf::Multihash::from_digest_sha3_256(b"old-slice")),
+                    new_head: odf::Multihash::from_digest_sha3_256(b"new-slice"),
                   },
                 })))),
                 expected_logical_plan: LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
@@ -3152,8 +3151,8 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
                 // Send some PullResult with records to bypass batching condition
                 finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
                   pull_result: PullResult::Updated {
-                    old_head: Some(Multihash::from_digest_sha3_256(b"new-slice")),
-                    new_head: Multihash::from_digest_sha3_256(b"newest-slice"),
+                    old_head: Some(odf::Multihash::from_digest_sha3_256(b"new-slice")),
+                    new_head: odf::Multihash::from_digest_sha3_256(b"newest-slice"),
                   },
                 })))),
                 expected_logical_plan: LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
@@ -3309,8 +3308,8 @@ async fn test_throttling_manual_triggers() {
 
     // Foo Flow
     let foo_create_result = harness
-        .create_root_dataset(DatasetAlias {
-            dataset_name: DatasetName::new_unchecked("foo"),
+        .create_root_dataset(odf::DatasetAlias {
+            dataset_name: odf::DatasetName::new_unchecked("foo"),
             account_name: None,
         })
         .await;
@@ -3446,16 +3445,16 @@ async fn test_throttling_derived_dataset_with_2_parents() {
     .await;
 
     let foo_create_result = harness
-        .create_root_dataset(DatasetAlias {
-            dataset_name: DatasetName::new_unchecked("foo"),
+        .create_root_dataset(odf::DatasetAlias {
+            dataset_name: odf::DatasetName::new_unchecked("foo"),
             account_name: None,
         })
         .await;
     let foo_id = foo_create_result.dataset_handle.id;
 
     let bar_create_result = harness
-        .create_root_dataset(DatasetAlias {
-            dataset_name: DatasetName::new_unchecked("bar"),
+        .create_root_dataset(odf::DatasetAlias {
+            dataset_name: odf::DatasetName::new_unchecked("bar"),
             account_name: None,
         })
         .await;
@@ -3463,8 +3462,8 @@ async fn test_throttling_derived_dataset_with_2_parents() {
 
     let baz_id = harness
         .create_derived_dataset(
-            DatasetAlias {
-                dataset_name: DatasetName::new_unchecked("baz"),
+            odf::DatasetAlias {
+                dataset_name: odf::DatasetName::new_unchecked("baz"),
                 account_name: None,
             },
             vec![foo_id.clone(), bar_id.clone()],
@@ -3522,8 +3521,8 @@ async fn test_throttling_derived_dataset_with_2_parents() {
             run_since_start: Duration::milliseconds(10),
             finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
                 pull_result: PullResult::Updated {
-                old_head: Some(Multihash::from_digest_sha3_256(b"foo-old-slice")),
-                new_head: Multihash::from_digest_sha3_256(b"foo-new-slice"),
+                old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-old-slice")),
+                new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
                 },
             })))),
             expected_logical_plan: LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
@@ -3541,8 +3540,8 @@ async fn test_throttling_derived_dataset_with_2_parents() {
             run_since_start: Duration::milliseconds(20),
             finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
                 pull_result: PullResult::Updated {
-                old_head: Some(Multihash::from_digest_sha3_256(b"bar-old-slice")),
-                new_head: Multihash::from_digest_sha3_256(b"fbar-new-slice"),
+                old_head: Some(odf::Multihash::from_digest_sha3_256(b"bar-old-slice")),
+                new_head: odf::Multihash::from_digest_sha3_256(b"fbar-new-slice"),
                 },
             })))),
             expected_logical_plan: LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
@@ -3574,8 +3573,8 @@ async fn test_throttling_derived_dataset_with_2_parents() {
             run_since_start: Duration::milliseconds(130),
             finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult{
                 pull_result: PullResult::Updated {
-                    old_head: Some(Multihash::from_digest_sha3_256(b"foo-new-slice")),
-                    new_head: Multihash::from_digest_sha3_256(b"foo-newest-slice"),
+                    old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-new-slice")),
+                    new_head: odf::Multihash::from_digest_sha3_256(b"foo-newest-slice"),
                 },
             })))),
             expected_logical_plan: LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
@@ -3607,8 +3606,8 @@ async fn test_throttling_derived_dataset_with_2_parents() {
             run_since_start: Duration::milliseconds(190),
             finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
                 pull_result: PullResult::Updated {
-                old_head: Some(Multihash::from_digest_sha3_256(b"bar-new-slice")),
-                new_head: Multihash::from_digest_sha3_256(b"bar-newest-slice"),
+                old_head: Some(odf::Multihash::from_digest_sha3_256(b"bar-new-slice")),
+                new_head: odf::Multihash::from_digest_sha3_256(b"bar-newest-slice"),
                 },
             })))),
             expected_logical_plan: LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
@@ -3928,8 +3927,8 @@ async fn test_batching_condition_records_reached() {
     .await;
 
     let foo_create_result = harness
-        .create_root_dataset(DatasetAlias {
-            dataset_name: DatasetName::new_unchecked("foo"),
+        .create_root_dataset(odf::DatasetAlias {
+            dataset_name: odf::DatasetName::new_unchecked("foo"),
             account_name: None,
         })
         .await;
@@ -3937,8 +3936,8 @@ async fn test_batching_condition_records_reached() {
 
     let bar_id = harness
         .create_derived_dataset(
-            DatasetAlias {
-                dataset_name: DatasetName::new_unchecked("bar"),
+            odf::DatasetAlias {
+                dataset_name: odf::DatasetName::new_unchecked("bar"),
                 account_name: None,
             },
             vec![foo_id.clone()],
@@ -3988,8 +3987,8 @@ async fn test_batching_condition_records_reached() {
             run_since_start: Duration::milliseconds(10),
             finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
                 pull_result: PullResult::Updated {
-                old_head: Some(Multihash::from_digest_sha3_256(b"foo-old-slice")),
-                new_head: Multihash::from_digest_sha3_256(b"foo-new-slice"),
+                old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-old-slice")),
+                new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
                 },
             })))),
             expected_logical_plan: LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
@@ -4007,8 +4006,8 @@ async fn test_batching_condition_records_reached() {
             run_since_start: Duration::milliseconds(20),
             finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
                 pull_result: PullResult::Updated {
-                old_head: Some(Multihash::from_digest_sha3_256(b"bar-old-slice")),
-                new_head: Multihash::from_digest_sha3_256(b"bar-new-slice"),
+                old_head: Some(odf::Multihash::from_digest_sha3_256(b"bar-old-slice")),
+                new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice"),
                 },
             })))),
             expected_logical_plan: LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
@@ -4026,8 +4025,8 @@ async fn test_batching_condition_records_reached() {
             run_since_start: Duration::milliseconds(80),
             finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult{
                 pull_result: PullResult::Updated {
-                old_head: Some(Multihash::from_digest_sha3_256(b"foo-new-slice")),
-                new_head: Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
+                old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-new-slice")),
+                new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
                 },
             })))),
             expected_logical_plan: LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
@@ -4045,8 +4044,8 @@ async fn test_batching_condition_records_reached() {
             run_since_start: Duration::milliseconds(150),
             finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult{
                 pull_result: PullResult::Updated {
-                old_head: Some(Multihash::from_digest_sha3_256(b"foo-new-slice-2")),
-                new_head: Multihash::from_digest_sha3_256(b"foo-new-slice-3"),
+                old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-new-slice-2")),
+                new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice-3"),
                 },
             })))),
             expected_logical_plan: LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
@@ -4064,8 +4063,8 @@ async fn test_batching_condition_records_reached() {
             run_since_start: Duration::milliseconds(170),
             finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult{
                 pull_result: PullResult::Updated {
-                old_head: Some(Multihash::from_digest_sha3_256(b"bar-new-slice")),
-                new_head: Multihash::from_digest_sha3_256(b"bar-new-slice-2"),
+                old_head: Some(odf::Multihash::from_digest_sha3_256(b"bar-new-slice")),
+                new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice-2"),
                 },
             })))),
             expected_logical_plan: LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
@@ -4250,8 +4249,8 @@ async fn test_batching_condition_timeout() {
     .await;
 
     let foo_create_result = harness
-        .create_root_dataset(DatasetAlias {
-            dataset_name: DatasetName::new_unchecked("foo"),
+        .create_root_dataset(odf::DatasetAlias {
+            dataset_name: odf::DatasetName::new_unchecked("foo"),
             account_name: None,
         })
         .await;
@@ -4259,8 +4258,8 @@ async fn test_batching_condition_timeout() {
 
     let bar_id = harness
         .create_derived_dataset(
-            DatasetAlias {
-                dataset_name: DatasetName::new_unchecked("bar"),
+            odf::DatasetAlias {
+                dataset_name: odf::DatasetName::new_unchecked("bar"),
                 account_name: None,
             },
             vec![foo_id.clone()],
@@ -4310,8 +4309,8 @@ async fn test_batching_condition_timeout() {
             run_since_start: Duration::milliseconds(10),
             finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
                 pull_result: PullResult::Updated {
-                old_head: Some(Multihash::from_digest_sha3_256(b"foo-old-slice")),
-                new_head: Multihash::from_digest_sha3_256(b"foo-new-slice"),
+                old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-old-slice")),
+                new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
                 },
             })))),
             expected_logical_plan: LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
@@ -4329,8 +4328,8 @@ async fn test_batching_condition_timeout() {
             run_since_start: Duration::milliseconds(20),
             finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
                 pull_result: PullResult::Updated {
-                old_head: Some(Multihash::from_digest_sha3_256(b"bar-old-slice")),
-                new_head: Multihash::from_digest_sha3_256(b"bar-new-slice"),
+                old_head: Some(odf::Multihash::from_digest_sha3_256(b"bar-old-slice")),
+                new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice"),
                 },
             })))),
             expected_logical_plan: LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
@@ -4348,8 +4347,8 @@ async fn test_batching_condition_timeout() {
             run_since_start: Duration::milliseconds(80),
             finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult{
                 pull_result: PullResult::Updated {
-                old_head: Some(Multihash::from_digest_sha3_256(b"foo-new-slice")),
-                new_head: Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
+                old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-new-slice")),
+                new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
                 },
             })))),
             expected_logical_plan: LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
@@ -4369,8 +4368,8 @@ async fn test_batching_condition_timeout() {
             run_since_start: Duration::milliseconds(250),
             finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult{
                 pull_result: PullResult::Updated {
-                old_head: Some(Multihash::from_digest_sha3_256(b"bar-new-slice")),
-                new_head: Multihash::from_digest_sha3_256(b"bar-new-slice-2"),
+                old_head: Some(odf::Multihash::from_digest_sha3_256(b"bar-new-slice")),
+                new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice-2"),
                 },
             })))),
             expected_logical_plan: LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
@@ -4523,8 +4522,8 @@ async fn test_batching_condition_watermark() {
     .await;
 
     let foo_create_result = harness
-        .create_root_dataset(DatasetAlias {
-            dataset_name: DatasetName::new_unchecked("foo"),
+        .create_root_dataset(odf::DatasetAlias {
+            dataset_name: odf::DatasetName::new_unchecked("foo"),
             account_name: None,
         })
         .await;
@@ -4532,8 +4531,8 @@ async fn test_batching_condition_watermark() {
 
     let bar_id = harness
         .create_derived_dataset(
-            DatasetAlias {
-                dataset_name: DatasetName::new_unchecked("bar"),
+            odf::DatasetAlias {
+                dataset_name: odf::DatasetName::new_unchecked("bar"),
                 account_name: None,
             },
             vec![foo_id.clone()],
@@ -4583,8 +4582,8 @@ async fn test_batching_condition_watermark() {
             run_since_start: Duration::milliseconds(10),
             finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
                 pull_result: PullResult::Updated {
-                old_head: Some(Multihash::from_digest_sha3_256(b"foo-old-slice")),
-                new_head: Multihash::from_digest_sha3_256(b"foo-new-slice"),
+                old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-old-slice")),
+                new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
                 },
             })))),
             expected_logical_plan: LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
@@ -4602,8 +4601,8 @@ async fn test_batching_condition_watermark() {
             run_since_start: Duration::milliseconds(20),
             finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
                 pull_result: PullResult::Updated {
-                old_head: Some(Multihash::from_digest_sha3_256(b"bar-old-slice")),
-                new_head: Multihash::from_digest_sha3_256(b"bar-new-slice"),
+                old_head: Some(odf::Multihash::from_digest_sha3_256(b"bar-old-slice")),
+                new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice"),
                 },
             })))),
             expected_logical_plan: LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
@@ -4621,8 +4620,8 @@ async fn test_batching_condition_watermark() {
             run_since_start: Duration::milliseconds(70),
             finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult{
                 pull_result: PullResult::Updated {
-                old_head: Some(Multihash::from_digest_sha3_256(b"foo-new-slice")),
-                new_head: Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
+                old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-new-slice")),
+                new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
                 },
             })))),
             expected_logical_plan: LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
@@ -4642,8 +4641,8 @@ async fn test_batching_condition_watermark() {
             run_since_start: Duration::milliseconds(290),
             finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult{
                 pull_result: PullResult::Updated {
-                old_head: Some(Multihash::from_digest_sha3_256(b"bar-new-slice")),
-                new_head: Multihash::from_digest_sha3_256(b"bar-new-slice-2"),
+                old_head: Some(odf::Multihash::from_digest_sha3_256(b"bar-new-slice")),
+                new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice-2"),
                 },
             })))),
             expected_logical_plan: LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
@@ -4845,16 +4844,16 @@ async fn test_batching_condition_with_2_inputs() {
     .await;
 
     let foo_create_result = harness
-        .create_root_dataset(DatasetAlias {
-            dataset_name: DatasetName::new_unchecked("foo"),
+        .create_root_dataset(odf::DatasetAlias {
+            dataset_name: odf::DatasetName::new_unchecked("foo"),
             account_name: None,
         })
         .await;
     let foo_id = foo_create_result.dataset_handle.id;
 
     let bar_create_result = harness
-        .create_root_dataset(DatasetAlias {
-            dataset_name: DatasetName::new_unchecked("bar"),
+        .create_root_dataset(odf::DatasetAlias {
+            dataset_name: odf::DatasetName::new_unchecked("bar"),
             account_name: None,
         })
         .await;
@@ -4862,8 +4861,8 @@ async fn test_batching_condition_with_2_inputs() {
 
     let baz_id = harness
         .create_derived_dataset(
-            DatasetAlias {
-                dataset_name: DatasetName::new_unchecked("baz"),
+            odf::DatasetAlias {
+                dataset_name: odf::DatasetName::new_unchecked("baz"),
                 account_name: None,
             },
             vec![foo_id.clone(), bar_id.clone()],
@@ -4923,8 +4922,8 @@ async fn test_batching_condition_with_2_inputs() {
             run_since_start: Duration::milliseconds(10),
             finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
                 pull_result: PullResult::Updated {
-                old_head: Some(Multihash::from_digest_sha3_256(b"foo-old-slice")),
-                new_head: Multihash::from_digest_sha3_256(b"foo-new-slice"),
+                old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-old-slice")),
+                new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
                 },
             })))),
             expected_logical_plan: LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
@@ -4942,8 +4941,8 @@ async fn test_batching_condition_with_2_inputs() {
             run_since_start: Duration::milliseconds(20),
             finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
                 pull_result: PullResult::Updated {
-                old_head: Some(Multihash::from_digest_sha3_256(b"bar-old-slice")),
-                new_head: Multihash::from_digest_sha3_256(b"bar-new-slice"),
+                old_head: Some(odf::Multihash::from_digest_sha3_256(b"bar-old-slice")),
+                new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice"),
                 },
             })))),
             expected_logical_plan: LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
@@ -4961,8 +4960,8 @@ async fn test_batching_condition_with_2_inputs() {
             run_since_start: Duration::milliseconds(30),
             finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult{
                 pull_result: PullResult::Updated {
-                old_head: Some(Multihash::from_digest_sha3_256(b"baz-old-slice")),
-                new_head: Multihash::from_digest_sha3_256(b"baz-new-slice"),
+                old_head: Some(odf::Multihash::from_digest_sha3_256(b"baz-old-slice")),
+                new_head: odf::Multihash::from_digest_sha3_256(b"baz-new-slice"),
                 },
             })))),
             expected_logical_plan: LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
@@ -4980,8 +4979,8 @@ async fn test_batching_condition_with_2_inputs() {
             run_since_start: Duration::milliseconds(110),
             finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
                 pull_result: PullResult::Updated {
-                old_head: Some(Multihash::from_digest_sha3_256(b"foo-new-slice")),
-                new_head: Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
+                old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-new-slice")),
+                new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
                 },
             })))),
             expected_logical_plan: LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
@@ -4999,8 +4998,8 @@ async fn test_batching_condition_with_2_inputs() {
             run_since_start: Duration::milliseconds(160),
             finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult{
                 pull_result: PullResult::Updated {
-                old_head: Some(Multihash::from_digest_sha3_256(b"bar-new-slice")),
-                new_head: Multihash::from_digest_sha3_256(b"bar-new-slice-2"),
+                old_head: Some(odf::Multihash::from_digest_sha3_256(b"bar-new-slice")),
+                new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice-2"),
                 },
             })))),
             expected_logical_plan: LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
@@ -5018,8 +5017,8 @@ async fn test_batching_condition_with_2_inputs() {
             run_since_start: Duration::milliseconds(210),
             finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
                 pull_result: PullResult::Updated {
-                old_head: Some(Multihash::from_digest_sha3_256(b"foo-new-slice")),
-                new_head: Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
+                old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-new-slice")),
+                new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
                 },
             })))),
             expected_logical_plan: LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
@@ -5037,8 +5036,8 @@ async fn test_batching_condition_with_2_inputs() {
             run_since_start: Duration::milliseconds(230),
             finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult{
                 pull_result: PullResult::Updated {
-                old_head: Some(Multihash::from_digest_sha3_256(b"baz-new-slice")),
-                new_head: Multihash::from_digest_sha3_256(b"baz-new-slice-2"),
+                old_head: Some(odf::Multihash::from_digest_sha3_256(b"baz-new-slice")),
+                new_head: odf::Multihash::from_digest_sha3_256(b"baz-new-slice-2"),
                 },
             })))),
             expected_logical_plan: LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
@@ -5322,8 +5321,8 @@ async fn test_batching_condition_with_2_inputs() {
 
 #[test_log::test(tokio::test)]
 async fn test_list_all_flow_initiators() {
-    let foo_account_name = AccountName::new_unchecked("foo");
-    let bar_account_name = AccountName::new_unchecked("bar");
+    let foo_account_name = odf::AccountName::new_unchecked("foo");
+    let bar_account_name = odf::AccountName::new_unchecked("bar");
 
     let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
         custom_account_names: vec![foo_account_name.clone(), bar_account_name.clone()],
@@ -5333,8 +5332,8 @@ async fn test_list_all_flow_initiators() {
     .await;
 
     let foo_create_result = harness
-        .create_root_dataset(DatasetAlias {
-            dataset_name: DatasetName::new_unchecked("foo"),
+        .create_root_dataset(odf::DatasetAlias {
+            dataset_name: odf::DatasetName::new_unchecked("foo"),
             account_name: Some(foo_account_name.clone()),
         })
         .await;
@@ -5354,8 +5353,8 @@ async fn test_list_all_flow_initiators() {
         .unwrap();
 
     let bar_create_result = harness
-        .create_root_dataset(DatasetAlias {
-            dataset_name: DatasetName::new_unchecked("bar"),
+        .create_root_dataset(odf::DatasetAlias {
+            dataset_name: odf::DatasetName::new_unchecked("bar"),
             account_name: Some(bar_account_name.clone()),
         })
         .await;
@@ -5474,8 +5473,8 @@ async fn test_list_all_flow_initiators() {
 
 #[test_log::test(tokio::test)]
 async fn test_list_all_datasets_with_flow() {
-    let foo_account_name = AccountName::new_unchecked("foo");
-    let bar_account_name = AccountName::new_unchecked("bar");
+    let foo_account_name = odf::AccountName::new_unchecked("foo");
+    let bar_account_name = odf::AccountName::new_unchecked("bar");
 
     let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
         custom_account_names: vec![foo_account_name.clone(), bar_account_name.clone()],
@@ -5485,8 +5484,8 @@ async fn test_list_all_datasets_with_flow() {
     .await;
 
     let foo_create_result = harness
-        .create_root_dataset(DatasetAlias {
-            dataset_name: DatasetName::new_unchecked("foo"),
+        .create_root_dataset(odf::DatasetAlias {
+            dataset_name: odf::DatasetName::new_unchecked("foo"),
             account_name: Some(foo_account_name.clone()),
         })
         .await;
@@ -5494,8 +5493,8 @@ async fn test_list_all_datasets_with_flow() {
 
     let _foo_bar_id = harness
         .create_derived_dataset(
-            DatasetAlias {
-                dataset_name: DatasetName::new_unchecked("foo.bar"),
+            odf::DatasetAlias {
+                dataset_name: odf::DatasetName::new_unchecked("foo.bar"),
                 account_name: Some(foo_account_name.clone()),
             },
             vec![foo_id.clone()],
@@ -5516,8 +5515,8 @@ async fn test_list_all_datasets_with_flow() {
         .unwrap();
 
     let bar_create_result = harness
-        .create_root_dataset(DatasetAlias {
-            dataset_name: DatasetName::new_unchecked("bar"),
+        .create_root_dataset(odf::DatasetAlias {
+            dataset_name: odf::DatasetName::new_unchecked("bar"),
             account_name: Some(bar_account_name.clone()),
         })
         .await;
@@ -5664,8 +5663,8 @@ async fn test_abort_flow_before_scheduling_tasks() {
 
     // Create a "foo" root dataset, and configure ingestion schedule every 100ns
     let foo_create_result = harness
-        .create_root_dataset(DatasetAlias {
-            dataset_name: DatasetName::new_unchecked("foo"),
+        .create_root_dataset(odf::DatasetAlias {
+            dataset_name: odf::DatasetName::new_unchecked("foo"),
             account_name: None,
         })
         .await;
@@ -5757,8 +5756,8 @@ async fn test_abort_flow_after_scheduling_still_waiting_for_executor() {
 
     // Create a "foo" root dataset, and configure ingestion schedule every 50ms
     let foo_create_result = harness
-        .create_root_dataset(DatasetAlias {
-            dataset_name: DatasetName::new_unchecked("foo"),
+        .create_root_dataset(odf::DatasetAlias {
+            dataset_name: odf::DatasetName::new_unchecked("foo"),
             account_name: None,
         })
         .await;
@@ -5855,8 +5854,8 @@ async fn test_abort_flow_after_task_running_has_started() {
 
     // Create a "foo" root dataset, and configure ingestion schedule every 50ms
     let foo_create_result = harness
-        .create_root_dataset(DatasetAlias {
-            dataset_name: DatasetName::new_unchecked("foo"),
+        .create_root_dataset(odf::DatasetAlias {
+            dataset_name: odf::DatasetName::new_unchecked("foo"),
             account_name: None,
         })
         .await;
@@ -5942,8 +5941,8 @@ async fn test_abort_flow_after_task_finishes() {
 
     // Create a "foo" root dataset, and configure ingestion schedule every 50ms
     let foo_create_result = harness
-        .create_root_dataset(DatasetAlias {
-            dataset_name: DatasetName::new_unchecked("foo"),
+        .create_root_dataset(odf::DatasetAlias {
+            dataset_name: odf::DatasetName::new_unchecked("foo"),
             account_name: None,
         })
         .await;
@@ -6059,8 +6058,8 @@ async fn test_respect_last_success_time_when_activate_configuration() {
     let harness = FlowHarness::new().await;
 
     let foo_create_result = harness
-        .create_root_dataset(DatasetAlias {
-            dataset_name: DatasetName::new_unchecked("foo"),
+        .create_root_dataset(odf::DatasetAlias {
+            dataset_name: odf::DatasetName::new_unchecked("foo"),
             account_name: None,
         })
         .await;
@@ -6068,8 +6067,8 @@ async fn test_respect_last_success_time_when_activate_configuration() {
 
     let bar_id = harness
         .create_derived_dataset(
-            DatasetAlias {
-                dataset_name: DatasetName::new_unchecked("bar"),
+            odf::DatasetAlias {
+                dataset_name: odf::DatasetName::new_unchecked("bar"),
                 account_name: None,
             },
             vec![foo_id.clone()],

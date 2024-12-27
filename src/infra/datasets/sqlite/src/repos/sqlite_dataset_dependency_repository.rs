@@ -11,7 +11,7 @@ use database_common::{TransactionRef, TransactionRefT};
 use dill::{component, interface};
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_datasets::*;
-use opendatafabric::DatasetID;
+use odf_metadata::DatasetID;
 use sqlx::{QueryBuilder, Sqlite};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

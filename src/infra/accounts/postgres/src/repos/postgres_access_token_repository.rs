@@ -11,7 +11,7 @@ use chrono::{DateTime, Utc};
 use database_common::{PaginationOpts, TransactionRef, TransactionRefT};
 use dill::{component, interface};
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
-use opendatafabric::AccountID;
+use odf_metadata::AccountID;
 use sqlx::PgConnection;
 use uuid::Uuid;
 

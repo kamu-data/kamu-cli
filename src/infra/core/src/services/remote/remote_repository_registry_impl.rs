@@ -14,8 +14,8 @@ use std::sync::Arc;
 
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_core::*;
-use opendatafabric::serde::yaml::Manifest;
-use opendatafabric::*;
+use odf_metadata::serde::yaml::Manifest;
+use odf_metadata::*;
 use url::Url;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

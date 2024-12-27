@@ -24,7 +24,7 @@ doctest = false
 [dependencies]
 database-common = { workspace = true }
 internal-error = { workspace = true }
-opendatafabric = { workspace = true, features = ["arrow"] }
+odf = { workspace = true, features = ["arrow"] }
 
 kamu = { workspace = true }
 kamu-accounts = { workspace = true }
@@ -61,6 +61,7 @@ uuid = { version = "1", default-features = false }
 [dev-dependencies]
 # TODO: Limit to mock or in-memory implementations only
 container-runtime = { workspace = true }
+file-utils = { workspace = true }
 init-on-startup = { workspace = true }
 kamu = { workspace = true, features = ["testing"] }
 kamu-accounts = { workspace = true, features = ["testing"] }
@@ -72,6 +73,7 @@ kamu-flow-system-inmem = { workspace = true }
 kamu-task-system-inmem = { workspace = true }
 kamu-task-system-services = { workspace = true }
 messaging-outbox = { workspace = true }
+odf-storage-impl = { workspace = true, features = ["testing"]}
 time-source = { workspace = true }
 
 indoc = "2"

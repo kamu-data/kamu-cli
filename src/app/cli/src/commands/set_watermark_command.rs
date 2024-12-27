@@ -11,7 +11,6 @@ use std::sync::Arc;
 
 use chrono::DateTime;
 use kamu::domain::*;
-use opendatafabric::*;
 
 use super::{CLIError, Command};
 
@@ -19,7 +18,7 @@ pub struct SetWatermarkCommand {
     dataset_registry: Arc<dyn DatasetRegistry>,
     set_watermark_use_case: Arc<dyn SetWatermarkUseCase>,
     tenancy_config: TenancyConfig,
-    refs: Vec<DatasetRefAnyPattern>,
+    refs: Vec<odf::DatasetRefAnyPattern>,
     all: bool,
     recursive: bool,
     watermark: String,
@@ -37,7 +36,7 @@ impl SetWatermarkCommand {
     ) -> Self
     where
         S: Into<String>,
-        I: IntoIterator<Item = DatasetRefAnyPattern>,
+        I: IntoIterator<Item = odf::DatasetRefAnyPattern>,
     {
         Self {
             dataset_registry,

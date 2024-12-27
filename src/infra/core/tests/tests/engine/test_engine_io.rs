@@ -15,11 +15,13 @@ use container_runtime::ContainerRuntime;
 use dill::Component;
 use indoc::indoc;
 use kamu::domain::*;
-use kamu::testing::*;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_datasets_services::DatasetKeyValueServiceSysEnv;
-use opendatafabric::*;
+use odf_dataset::{BlockRef, DatasetStorageUnit};
+use odf_metadata::*;
+use odf_storage_impl::testing::MetadataFactory;
+use test_utils::LocalS3Server;
 use time_source::SystemTimeSourceDefault;
 
 use crate::TransformTestHelper;
@@ -27,10 +29,10 @@ use crate::TransformTestHelper;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 async fn test_engine_io_common<
-    TDatasetRepo: DatasetRepository + DatasetRepositoryWriter + 'static,
+    TDatasetStorageUnit: DatasetStorageUnit + DatasetStorageUnitWriter + 'static,
 >(
     object_stores: Vec<Arc<dyn ObjectStoreBuilder>>,
-    dataset_repo: Arc<TDatasetRepo>,
+    storage_unit: Arc<TDatasetStorageUnit>,
     run_info_dir: &Path,
     cache_dir: &Path,
     transform: Transform,
@@ -67,7 +69,7 @@ async fn test_engine_io_common<
     );
 
     let transform_helper = TransformTestHelper::build(
-        Arc::new(DatasetRegistryRepoBridge::new(dataset_repo.clone())),
+        Arc::new(DatasetRegistrySoloUnitBridge::new(storage_unit.clone())),
         time_source.clone(),
         Arc::new(CompactionPlannerImpl {}),
         Arc::new(CompactionExecutorImpl::new(
@@ -120,7 +122,7 @@ async fn test_engine_io_common<
 
     let root_alias = root_snapshot.name.clone();
 
-    let root_created = dataset_repo
+    let root_created = storage_unit
         .create_dataset_from_snapshot(root_snapshot)
         .await
         .unwrap()
@@ -158,7 +160,7 @@ async fn test_engine_io_common<
         )
         .build();
 
-    let deriv_created = dataset_repo
+    let deriv_created = storage_unit
         .create_dataset_from_snapshot(deriv_snapshot)
         .await
         .unwrap()
@@ -263,15 +265,15 @@ async fn test_engine_io_local_file_mount() {
         .add::<DatasetKeyValueServiceSysEnv>()
         .add_value(CurrentAccountSubject::new_test())
         .add_value(TenancyConfig::SingleTenant)
-        .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
-        .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+        .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
+        .bind::<dyn DatasetStorageUnit, DatasetStorageUnitLocalFs>()
         .build();
 
-    let dataset_repo = catalog.get_one::<DatasetRepositoryLocalFs>().unwrap();
+    let storage_unit = catalog.get_one::<DatasetStorageUnitLocalFs>().unwrap();
 
     test_engine_io_common(
         vec![Arc::new(ObjectStoreBuilderLocalFs::new())],
-        dataset_repo,
+        storage_unit,
         &run_info_dir,
         &cache_dir,
         MetadataFactory::transform()
@@ -296,18 +298,18 @@ async fn test_engine_io_s3_to_local_file_mount_proxy() {
     std::fs::create_dir(&run_info_dir).unwrap();
     std::fs::create_dir(&cache_dir).unwrap();
 
-    let s3_context = kamu::utils::s3_context::S3Context::from_url(&s3.url).await;
+    let s3_context = s3_utils::S3Context::from_url(&s3.url).await;
 
     let catalog = dill::CatalogBuilder::new()
         .add::<SystemTimeSourceDefault>()
         .add::<kamu_core::auth::AlwaysHappyDatasetActionAuthorizer>()
         .add_value(CurrentAccountSubject::new_test())
         .add_value(TenancyConfig::SingleTenant)
-        .add_builder(DatasetRepositoryS3::builder().with_s3_context(s3_context.clone()))
-        .bind::<dyn DatasetRepository, DatasetRepositoryS3>()
+        .add_builder(DatasetStorageUnitS3::builder().with_s3_context(s3_context.clone()))
+        .bind::<dyn DatasetStorageUnit, DatasetStorageUnitS3>()
         .build();
 
-    let dataset_repo = catalog.get_one::<DatasetRepositoryS3>().unwrap();
+    let storage_unit = catalog.get_one::<DatasetStorageUnitS3>().unwrap();
 
     test_engine_io_common(
         vec![
@@ -316,7 +318,7 @@ async fn test_engine_io_s3_to_local_file_mount_proxy() {
             // will use the IO proxying
             Arc::new(ObjectStoreBuilderS3::new(s3_context, true)),
         ],
-        dataset_repo,
+        storage_unit,
         &run_info_dir,
         &cache_dir,
         MetadataFactory::transform()

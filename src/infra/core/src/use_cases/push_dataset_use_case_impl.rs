@@ -32,7 +32,7 @@ use kamu_core::{
     SyncRequest,
     SyncService,
 };
-use opendatafabric::{DatasetHandle, DatasetPushTarget};
+use odf_metadata::{DatasetHandle, DatasetPushTarget};
 
 use crate::SyncRequestBuilder;
 

@@ -8,15 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::prelude::*;
-use kamu_core::{
-    self as domain,
-    MetadataChainExt,
-    SearchSetAttachmentsVisitor,
-    SearchSetInfoVisitor,
-    SearchSetLicenseVisitor,
-    SearchSetVocabVisitor,
-};
-use opendatafabric as odf;
+use odf::dataset::MetadataChainExt as _;
 
 use crate::prelude::*;
 use crate::queries::*;
@@ -60,7 +52,7 @@ impl DatasetMetadata {
         ctx: &Context<'_>,
         format: Option<DataSchemaFormat>,
     ) -> Result<Option<DataSchema>> {
-        let query_svc = from_catalog_n!(ctx, dyn domain::QueryService);
+        let query_svc = from_catalog_n!(ctx, dyn kamu_core::QueryService);
 
         // TODO: Default to Arrow eventually
         let format = format.unwrap_or(DataSchemaFormat::Parquet);
@@ -83,8 +75,8 @@ impl DatasetMetadata {
     async fn current_upstream_dependencies(&self, ctx: &Context<'_>) -> Result<Vec<Dataset>> {
         let (dependency_graph_service, dataset_registry) = from_catalog_n!(
             ctx,
-            dyn domain::DependencyGraphService,
-            dyn domain::DatasetRegistry
+            dyn kamu_core::DependencyGraphService,
+            dyn kamu_core::DatasetRegistry
         );
 
         use tokio_stream::StreamExt;
@@ -120,8 +112,8 @@ impl DatasetMetadata {
     async fn current_downstream_dependencies(&self, ctx: &Context<'_>) -> Result<Vec<Dataset>> {
         let (dependency_graph_service, dataset_registry) = from_catalog_n!(
             ctx,
-            dyn domain::DependencyGraphService,
-            dyn domain::DatasetRegistry
+            dyn kamu_core::DependencyGraphService,
+            dyn kamu_core::DatasetRegistry
         );
 
         use tokio_stream::StreamExt;
@@ -156,8 +148,8 @@ impl DatasetMetadata {
     async fn current_polling_source(&self, ctx: &Context<'_>) -> Result<Option<SetPollingSource>> {
         let (dataset_registry, metadata_query_service) = from_catalog_n!(
             ctx,
-            dyn domain::DatasetRegistry,
-            dyn domain::MetadataQueryService
+            dyn kamu_core::DatasetRegistry,
+            dyn kamu_core::MetadataQueryService
         );
 
         let target = dataset_registry.get_dataset_by_handle(&self.dataset_handle);
@@ -173,8 +165,8 @@ impl DatasetMetadata {
     async fn current_push_sources(&self, ctx: &Context<'_>) -> Result<Vec<AddPushSource>> {
         let (metadata_query_service, dataset_registry) = from_catalog_n!(
             ctx,
-            dyn domain::MetadataQueryService,
-            dyn domain::DatasetRegistry
+            dyn kamu_core::MetadataQueryService,
+            dyn kamu_core::DatasetRegistry
         );
 
         let target = dataset_registry.get_dataset_by_handle(&self.dataset_handle);
@@ -193,7 +185,7 @@ impl DatasetMetadata {
 
     /// Sync statuses of push remotes
     async fn push_sync_statuses(&self, ctx: &Context<'_>) -> Result<DatasetPushStatuses> {
-        let service = from_catalog_n!(ctx, dyn domain::RemoteStatusService);
+        let service = from_catalog_n!(ctx, dyn kamu_core::RemoteStatusService);
         let statuses = service.check_remotes_status(&self.dataset_handle).await?;
 
         Ok(statuses.into())
@@ -204,7 +196,7 @@ impl DatasetMetadata {
         let (metadata_query_service, dataset_registry) = from_catalog_n!(
             ctx,
             dyn kamu_core::MetadataQueryService,
-            dyn domain::DatasetRegistry
+            dyn kamu_core::DatasetRegistry
         );
 
         let target = dataset_registry.get_dataset_by_handle(&self.dataset_handle);
@@ -219,7 +211,7 @@ impl DatasetMetadata {
 
         Ok(resolved_dataset
             .as_metadata_chain()
-            .accept_one(SearchSetInfoVisitor::new())
+            .accept_one(odf::dataset::SearchSetInfoVisitor::new())
             .await
             .int_err()?
             .into_event()
@@ -239,12 +231,12 @@ impl DatasetMetadata {
 
         Ok(resolved_dataset
             .as_metadata_chain()
-            .accept_one(SearchSetAttachmentsVisitor::new())
+            .accept_one(odf::dataset::SearchSetAttachmentsVisitor::new())
             .await
             .int_err()?
             .into_event()
             .and_then(|e| {
-                let odf::Attachments::Embedded(at) = e.attachments;
+                let odf::metadata::Attachments::Embedded(at) = e.attachments;
 
                 at.items
                     .into_iter()
@@ -260,7 +252,7 @@ impl DatasetMetadata {
 
         Ok(resolved_dataset
             .as_metadata_chain()
-            .accept_one(SearchSetLicenseVisitor::new())
+            .accept_one(odf::dataset::SearchSetLicenseVisitor::new())
             .await
             .int_err()?
             .into_event()
@@ -273,7 +265,7 @@ impl DatasetMetadata {
 
         Ok(resolved_dataset
             .as_metadata_chain()
-            .accept_one(SearchSetVocabVisitor::new())
+            .accept_one(odf::dataset::SearchSetVocabVisitor::new())
             .await
             .int_err()?
             .into_event()

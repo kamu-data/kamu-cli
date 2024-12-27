@@ -28,7 +28,7 @@ http-common = { workspace = true }
 internal-error = { workspace = true }
 kamu-accounts = { workspace = true }
 kamu-core = { workspace = true }
-opendatafabric = { workspace = true, default-features = false, features = ["arrow"] }
+odf = { workspace = true, default-features = false, features = ["arrow"] }
 
 axum = { version = "0.7", default-features = false, features = [] }
 chrono = { version = "0.4", default-features = false }
@@ -46,6 +46,7 @@ utoipa-axum = { version = "0.1", default-features = false, features = [] }
 kamu = { workspace = true, features = ["testing"] }
 messaging-outbox = { workspace = true }
 time-source = { workspace = true }
+odf-storage-impl = { workspace = true, features = ["testing"]}
 
 indoc = { version = "2" }
 pretty_assertions = { version = "1" }

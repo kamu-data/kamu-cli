@@ -14,7 +14,7 @@ use datafusion::prelude::*;
 use datafusion::sql::TableReference;
 use internal_error::*;
 use kamu_data_utils::data::dataframe_ext::*;
-use opendatafabric as odf;
+use odf_metadata as odf;
 
 use crate::*;
 

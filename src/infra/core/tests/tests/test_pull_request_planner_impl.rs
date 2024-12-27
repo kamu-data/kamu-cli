@@ -19,7 +19,10 @@ use kamu::utils::simple_transfer_protocol::SimpleTransferProtocol;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
 use messaging_outbox::DummyOutboxImpl;
-use opendatafabric::*;
+use odf_dataset::DummyOdfServerAccessTokenResolver;
+use odf_dataset_impl::{DatasetFactoryImpl, IpfsGateway};
+use odf_metadata::*;
+use odf_storage_impl::testing::MetadataFactory;
 use time_source::SystemTimeSourceDefault;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -93,11 +96,11 @@ macro_rules! refs {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 async fn create_graph(
-    dataset_repo_writer: &dyn DatasetRepositoryWriter,
+    dataset_storage_unit_writer: &dyn DatasetStorageUnitWriter,
     datasets: Vec<(DatasetAlias, Vec<DatasetAlias>)>,
 ) {
     for (dataset_alias, deps) in datasets {
-        dataset_repo_writer
+        dataset_storage_unit_writer
             .create_dataset_from_snapshot(
                 MetadataFactory::dataset_snapshot()
                     .name(dataset_alias)
@@ -134,7 +137,7 @@ async fn create_graph_remote(
 ) -> tempfile::TempDir {
     let tmp_repo_dir = tempfile::tempdir().unwrap();
 
-    let remote_dataset_repo = DatasetRepositoryLocalFs::new(
+    let remote_dataset_repo = DatasetStorageUnitLocalFs::new(
         tmp_repo_dir.path().to_owned(),
         Arc::new(CurrentAccountSubject::new_test()),
         Arc::new(TenancyConfig::SingleTenant),
@@ -186,7 +189,7 @@ async fn test_pull_batching_chain() {
 
     // A - B - C
     create_graph(
-        harness.dataset_repo_writer(),
+        harness.dataset_storage_unit_writer(),
         vec![
             (n!("a"), names![]),
             (n!("b"), names!["a"]),
@@ -241,7 +244,7 @@ async fn test_pull_batching_chain_multi_tenant() {
 
     // XA - YB - ZC
     create_graph(
-        harness.dataset_repo_writer(),
+        harness.dataset_storage_unit_writer(),
         vec![
             (mn!("x/a"), mnames![]),
             (mn!("y/b"), mnames!["x/a"]),
@@ -300,7 +303,7 @@ async fn test_pull_batching_complex() {
     //         /
     // B - - -/
     create_graph(
-        harness.dataset_repo_writer(),
+        harness.dataset_storage_unit_writer(),
         vec![
             (n!("a"), names![]),
             (n!("b"), names![]),
@@ -372,7 +375,7 @@ async fn test_pull_batching_complex_with_remote() {
     )
     .await;
     create_graph(
-        harness.dataset_repo_writer(),
+        harness.dataset_storage_unit_writer(),
         vec![
             (n!("c"), names![]),
             (n!("d"), names![]),
@@ -677,7 +680,7 @@ impl PullTestHarness {
             .add::<SyncServiceImpl>()
             .add::<SyncRequestBuilder>()
             .add::<DatasetFactoryImpl>()
-            .add::<auth::DummyOdfServerAccessTokenResolver>()
+            .add::<DummyOdfServerAccessTokenResolver>()
             .add::<DummySmartTransferProtocolClient>()
             .add::<SimpleTransferProtocol>()
             .add::<CreateDatasetUseCaseImpl>()

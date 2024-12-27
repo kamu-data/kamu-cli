@@ -9,9 +9,9 @@
 
 use chrono::prelude::*;
 use indoc::indoc;
-use kamu::domain::DatasetSummary;
-use opendatafabric::serde::yaml::Manifest;
-use opendatafabric::*;
+use odf_dataset::DatasetSummary;
+use odf_metadata::serde::yaml::Manifest;
+use odf_metadata::*;
 
 #[test]
 fn serde_dataset_summary() {

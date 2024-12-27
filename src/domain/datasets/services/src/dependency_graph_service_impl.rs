@@ -29,7 +29,6 @@ use messaging_outbox::{
     MessageConsumerT,
     MessageDeliveryMechanism,
 };
-use opendatafabric::DatasetID;
 use petgraph::stable_graph::{NodeIndex, StableDiGraph};
 use petgraph::visit::{depth_first_search, Bfs, DfsEvent, Reversed};
 use petgraph::Direction;
@@ -46,14 +45,14 @@ pub struct DependencyGraphServiceImpl {
 
 #[derive(Default)]
 struct State {
-    datasets_graph: StableDiGraph<DatasetID, ()>,
-    dataset_node_indices: HashMap<DatasetID, NodeIndex>,
+    datasets_graph: StableDiGraph<odf::DatasetID, ()>,
+    dataset_node_indices: HashMap<odf::DatasetID, NodeIndex>,
 }
 
 impl State {
     fn get_dataset_node(
         &self,
-        dataset_id: &DatasetID,
+        dataset_id: &odf::DatasetID,
     ) -> Result<NodeIndex, DatasetNodeNotFoundError> {
         match self.dataset_node_indices.get(dataset_id) {
             Some(index) => Ok(index.to_owned()),
@@ -63,7 +62,7 @@ impl State {
         }
     }
 
-    fn get_or_create_dataset_node(&mut self, dataset_id: &DatasetID) -> NodeIndex {
+    fn get_or_create_dataset_node(&mut self, dataset_id: &odf::DatasetID) -> NodeIndex {
         match self.dataset_node_indices.get(dataset_id) {
             Some(index) => index.to_owned(),
             None => {
@@ -146,8 +145,8 @@ impl DependencyGraphServiceImpl {
     fn add_dependency(
         &self,
         state: &mut State,
-        dataset_upstream_id: &DatasetID,
-        dataset_downstream_id: &DatasetID,
+        dataset_upstream_id: &odf::DatasetID,
+        dataset_downstream_id: &odf::DatasetID,
     ) {
         tracing::debug!(
             downstream = %dataset_downstream_id,
@@ -167,8 +166,8 @@ impl DependencyGraphServiceImpl {
     fn remove_dependency(
         &self,
         state: &mut State,
-        dataset_upstream_id: &DatasetID,
-        dataset_downstream_id: &DatasetID,
+        dataset_upstream_id: &odf::DatasetID,
+        dataset_downstream_id: &odf::DatasetID,
     ) {
         tracing::debug!(
             downstream = %dataset_downstream_id,
@@ -190,7 +189,7 @@ impl DependencyGraphServiceImpl {
 
     fn get_nodes_from_dataset_ids(
         &self,
-        dataset_ids: &[DatasetID],
+        dataset_ids: &[odf::DatasetID],
         state: &State,
     ) -> Result<Vec<NodeIndex>, GetDependenciesError> {
         dataset_ids
@@ -205,8 +204,8 @@ impl DependencyGraphServiceImpl {
 
     async fn run_recursive_reversed_breadth_first_search(
         &self,
-        dataset_ids: Vec<DatasetID>,
-    ) -> Result<Vec<DatasetID>, GetDependenciesError> {
+        dataset_ids: Vec<odf::DatasetID>,
+    ) -> Result<Vec<odf::DatasetID>, GetDependenciesError> {
         let state = self.state.read().await;
 
         tracing::debug!(
@@ -246,8 +245,8 @@ impl DependencyGraphServiceImpl {
 
     async fn run_recursive_depth_first_search(
         &self,
-        dataset_ids: Vec<DatasetID>,
-    ) -> Result<Vec<DatasetID>, GetDependenciesError> {
+        dataset_ids: Vec<odf::DatasetID>,
+    ) -> Result<Vec<odf::DatasetID>, GetDependenciesError> {
         let state = self.state.read().await;
 
         tracing::debug!(
@@ -283,7 +282,7 @@ impl DependencyGraphServiceImpl {
 impl DependencyGraphService for DependencyGraphServiceImpl {
     async fn get_recursive_upstream_dependencies(
         &self,
-        dataset_ids: Vec<DatasetID>,
+        dataset_ids: Vec<odf::DatasetID>,
     ) -> Result<DatasetIDStream, GetDependenciesError> {
         let result = self
             .run_recursive_reversed_breadth_first_search(dataset_ids)
@@ -294,7 +293,7 @@ impl DependencyGraphService for DependencyGraphServiceImpl {
 
     async fn get_recursive_downstream_dependencies(
         &self,
-        dataset_ids: Vec<DatasetID>,
+        dataset_ids: Vec<odf::DatasetID>,
     ) -> Result<DatasetIDStream, GetDependenciesError> {
         let result = self.run_recursive_depth_first_search(dataset_ids).await?;
 
@@ -305,7 +304,7 @@ impl DependencyGraphService for DependencyGraphServiceImpl {
     #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id))]
     async fn get_downstream_dependencies(
         &self,
-        dataset_id: &DatasetID,
+        dataset_id: &odf::DatasetID,
     ) -> Result<DatasetIDStream, GetDependenciesError> {
         let downstream_node_datasets: Vec<_> = {
             let state = self.state.read().await;
@@ -334,7 +333,7 @@ impl DependencyGraphService for DependencyGraphServiceImpl {
     #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id))]
     async fn get_upstream_dependencies(
         &self,
-        dataset_id: &DatasetID,
+        dataset_id: &odf::DatasetID,
     ) -> Result<DatasetIDStream, GetDependenciesError> {
         let upstream_node_datasets: Vec<_> = {
             let state = self.state.read().await;
@@ -362,9 +361,9 @@ impl DependencyGraphService for DependencyGraphServiceImpl {
     #[tracing::instrument(level = "debug", skip_all, fields(?dataset_ids, ?order))]
     async fn in_dependency_order(
         &self,
-        dataset_ids: Vec<DatasetID>,
+        dataset_ids: Vec<odf::DatasetID>,
         order: DependencyOrder,
-    ) -> Result<Vec<DatasetID>, GetDependenciesError> {
+    ) -> Result<Vec<odf::DatasetID>, GetDependenciesError> {
         let original_set: std::collections::HashSet<_> = dataset_ids.iter().cloned().collect();
 
         let mut result = match order {

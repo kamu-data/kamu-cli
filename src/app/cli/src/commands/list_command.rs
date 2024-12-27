@@ -15,7 +15,6 @@ use chrono_humanize::HumanTime;
 use futures::TryStreamExt;
 use internal_error::ResultIntoInternal;
 use kamu::domain::*;
-use opendatafabric::*;
 
 use super::{CLIError, Command};
 use crate::output::*;
@@ -74,8 +73,8 @@ impl ListCommand {
 
     async fn get_kind(
         &self,
-        handle: &DatasetHandle,
-        summary: &DatasetSummary,
+        handle: &odf::DatasetHandle,
+        summary: &odf::DatasetSummary,
     ) -> Result<String, CLIError> {
         let is_remote = self
             .remote_alias_reg
@@ -178,7 +177,7 @@ impl ListCommand {
         fields
     }
 
-    fn stream_datasets(&self) -> DatasetHandleStream {
+    fn stream_datasets(&self) -> odf::dataset::DatasetHandleStream {
         match self.tenancy_config {
             TenancyConfig::MultiTenant => match &self.related_account.target_account {
                 accounts::TargetAccountSelection::Current => self
@@ -187,7 +186,7 @@ impl ListCommand {
                 accounts::TargetAccountSelection::Specific {
                     account_name: user_name,
                 } => self.dataset_registry.all_dataset_handles_by_owner(
-                    &AccountName::from_str(user_name.as_str()).unwrap(),
+                    &odf::AccountName::from_str(user_name.as_str()).unwrap(),
                 ),
                 accounts::TargetAccountSelection::AllUsers => {
                     self.dataset_registry.all_dataset_handles()
@@ -209,6 +208,7 @@ impl Command for ListCommand {
         };
         use datafusion::arrow::datatypes::Schema;
         use datafusion::arrow::record_batch::RecordBatch;
+        use odf::dataset::MetadataChainExt;
 
         let show_owners = if self.tenancy_config == TenancyConfig::MultiTenant {
             self.current_account.is_explicit() || self.related_account.is_explicit()
@@ -247,10 +247,10 @@ impl Command for ListCommand {
             let resolved_dataset = self.dataset_registry.get_dataset_by_handle(hdl);
             let current_head = resolved_dataset
                 .as_metadata_chain()
-                .resolve_ref(&BlockRef::Head)
+                .resolve_ref(&odf::BlockRef::Head)
                 .await?;
             let summary = resolved_dataset
-                .get_summary(GetSummaryOpts::default())
+                .get_summary(odf::dataset::GetSummaryOpts::default())
                 .await?;
 
             name.push(hdl.alias.dataset_name.to_string());

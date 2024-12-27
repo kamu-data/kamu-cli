@@ -13,7 +13,8 @@ use std::sync::Arc;
 use dill::{component, interface};
 use internal_error::ResultIntoInternal;
 use kamu_core::*;
-use opendatafabric as odf;
+use odf_dataset::{BlockRef, GetSummaryOpts};
+use odf_metadata as odf;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

@@ -12,7 +12,6 @@ use database_common_macros::transactional_handler;
 use dill::Catalog;
 use http_common::{ApiError, ApiErrorResponse, IntoApiError, ResultIntoApiError};
 use kamu_core::TenancyConfig;
-use opendatafabric as odf;
 use serde::{Deserialize, Serialize};
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;

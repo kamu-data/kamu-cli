@@ -14,7 +14,7 @@ use database_common::{PaginationOpts, TransactionRef, TransactionRefT};
 use dill::{component, interface};
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_datasets::*;
-use opendatafabric::{AccountID, DatasetID, DatasetName};
+use odf_metadata::{AccountID, DatasetID, DatasetName};
 use sqlx::Row;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

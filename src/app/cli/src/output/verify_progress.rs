@@ -12,7 +12,6 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use kamu::domain::*;
-use opendatafabric::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -47,7 +46,7 @@ impl VerificationMultiProgress {
 impl VerificationMultiListener for VerificationMultiProgress {
     fn begin_verify(
         &self,
-        dataset_handle: &DatasetHandle,
+        dataset_handle: &odf::DatasetHandle,
     ) -> Option<Arc<dyn VerificationListener>> {
         Some(Arc::new(VerificationProgress::new(
             dataset_handle,
@@ -59,21 +58,24 @@ impl VerificationMultiListener for VerificationMultiProgress {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct VerificationProgress {
-    dataset_handle: DatasetHandle,
+    dataset_handle: odf::DatasetHandle,
     _multi_progress: Arc<indicatif::MultiProgress>,
     curr_progress: indicatif::ProgressBar,
     state: Mutex<VerificationState>,
 }
 
 struct VerificationState {
-    block_hash: Option<Multihash>,
+    block_hash: Option<odf::Multihash>,
     block_index: usize,
     num_blocks: usize,
     phase: VerificationPhase,
 }
 
 impl VerificationProgress {
-    fn new(dataset_handle: &DatasetHandle, multi_progress: Arc<indicatif::MultiProgress>) -> Self {
+    fn new(
+        dataset_handle: &odf::DatasetHandle,
+        multi_progress: Arc<indicatif::MultiProgress>,
+    ) -> Self {
         Self {
             dataset_handle: dataset_handle.clone(),
             curr_progress: multi_progress.add(Self::new_spinner("Initializing")),
@@ -103,7 +105,7 @@ impl VerificationProgress {
         step: usize,
         out_of: usize,
         msg: T,
-        block: Option<&Multihash>,
+        block: Option<&odf::Multihash>,
     ) -> String {
         let step_str = if out_of != 0 {
             format!("[{step}/{out_of}]")
@@ -131,7 +133,7 @@ impl VerificationProgress {
 
     fn save_state(
         &self,
-        block_hash: &Multihash,
+        block_hash: &odf::Multihash,
         block_index: usize,
         num_blocks: usize,
         phase: VerificationPhase,
@@ -192,7 +194,7 @@ impl VerificationListener for VerificationProgress {
 
     fn begin_block(
         &self,
-        block_hash: &Multihash,
+        block_hash: &odf::Multihash,
         block_index: usize,
         num_blocks: usize,
         phase: VerificationPhase,
@@ -221,7 +223,7 @@ impl VerificationListener for VerificationProgress {
 
     fn end_block(
         &self,
-        _block_hash: &Multihash,
+        _block_hash: &odf::Multihash,
         _block_index: usize,
         _num_blocks: usize,
         _phase: VerificationPhase,

@@ -11,9 +11,11 @@ use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
 use kamu::domain::*;
-use kamu::testing::{BaseRepoHarness, *};
+use kamu::testing::BaseRepoHarness;
 use kamu::*;
-use opendatafabric::*;
+use odf_dataset::{BlockRef, CommitOpts, DatasetSummary, GetSummaryOpts, SetChainRefError};
+use odf_metadata::*;
+use odf_storage_impl::testing::MetadataFactory;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -87,7 +89,7 @@ async fn test_reset_dataset_to_non_existing_block_fails() {
     assert_matches!(
         result,
         Err(ResetError::Execution(
-            ResetExecutionError::SetReferenceFailed(SetRefError::BlockNotFound(_))
+            ResetExecutionError::SetReferenceFailed(SetChainRefError::BlockNotFound(_))
         ))
     );
 }
@@ -199,7 +201,7 @@ impl ResetTestHarness {
         .build_typed();
 
         let create_result = self
-            .dataset_repo_writer()
+            .dataset_storage_unit_writer()
             .create_dataset(&DatasetAlias::new(None, dataset_name.clone()), seed_block)
             .await
             .unwrap();

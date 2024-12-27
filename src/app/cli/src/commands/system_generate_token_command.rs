@@ -11,7 +11,6 @@ use std::sync::Arc;
 
 use internal_error::*;
 use kamu_accounts_services::AuthenticationServiceImpl;
-use opendatafabric::AccountID;
 
 use crate::{CLIError, Command};
 
@@ -48,9 +47,9 @@ impl Command for GenerateTokenCommand {
 
     async fn run(&mut self) -> Result<(), CLIError> {
         let subject = if let Some(subject) = &self.subject {
-            AccountID::from_did_str(subject).int_err()?
+            odf::AccountID::from_did_str(subject).int_err()?
         } else if let Some(login) = &self.login {
-            AccountID::new_seeded_ed25519(login.as_bytes())
+            odf::AccountID::new_seeded_ed25519(login.as_bytes())
         } else {
             return Err(CLIError::usage_error("Specify --login or --subject"));
         };

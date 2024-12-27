@@ -12,9 +12,10 @@ use std::sync::Arc;
 
 use kamu::testing::MockDatasetActionAuthorizer;
 use kamu::RenameDatasetUseCaseImpl;
-use kamu_core::{GetDatasetError, RenameDatasetError, RenameDatasetUseCase};
+use kamu_core::RenameDatasetUseCase;
 use messaging_outbox::MockOutbox;
-use opendatafabric::{DatasetAlias, DatasetName};
+use odf_dataset::{GetDatasetError, RenameDatasetError};
+use odf_metadata::{DatasetAlias, DatasetName};
 
 use crate::tests::use_cases::*;
 

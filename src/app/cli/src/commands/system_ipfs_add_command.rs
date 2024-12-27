@@ -10,7 +10,6 @@
 use std::sync::Arc;
 
 use kamu::domain::*;
-use opendatafabric::*;
 
 use super::{CLIError, Command};
 
@@ -21,14 +20,14 @@ use super::{CLIError, Command};
 pub struct SystemIpfsAddCommand {
     dataset_registry: Arc<dyn DatasetRegistry>,
     sync_svc: Arc<dyn SyncService>,
-    dataset_ref: DatasetRef,
+    dataset_ref: odf::DatasetRef,
 }
 
 impl SystemIpfsAddCommand {
     pub fn new(
         dataset_registry: Arc<dyn DatasetRegistry>,
         sync_svc: Arc<dyn SyncService>,
-        dataset_ref: DatasetRef,
+        dataset_ref: odf::DatasetRef,
     ) -> Self {
         Self {
             dataset_registry,

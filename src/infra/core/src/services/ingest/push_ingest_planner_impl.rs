@@ -10,7 +10,8 @@
 use std::sync::Arc;
 
 use kamu_core::*;
-use opendatafabric as odf;
+use odf_dataset::{BlockRef, CommitOpts};
+use odf_metadata as odf;
 use random_names::get_random_name;
 use time_source::SystemTimeSource;
 
@@ -78,7 +79,7 @@ impl PushIngestPlannerImpl {
             source_name: String::from("auto"),
             read,
             preprocess: None,
-            merge: opendatafabric::MergeStrategy::Append(opendatafabric::MergeStrategyAppend {}),
+            merge: odf_metadata::MergeStrategy::Append(odf_metadata::MergeStrategyAppend {}),
         };
 
         let commit_result = target

@@ -11,13 +11,13 @@ use datafusion::logical_expr::SortExpr;
 use datafusion::prelude::*;
 use internal_error::*;
 use kamu_data_utils::data::dataframe_ext::DataFrameExt;
-use opendatafabric as odf;
+use odf_metadata as odf;
 
 use crate::*;
 
 /// Append merge strategy.
 ///
-/// See [`opendatafabric::MergeStrategy`] for details.
+/// See [`odf_metadata::MergeStrategy`] for details.
 pub struct MergeStrategyAppend {
     vocab: odf::DatasetVocabulary,
 }

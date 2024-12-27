@@ -10,7 +10,6 @@
 use chrono::{DateTime, Utc};
 use event_sourcing::TryLoadError;
 use internal_error::{ErrorIntoInternal, InternalError};
-use opendatafabric::DatasetID;
 use tokio_stream::Stream;
 
 use crate::*;
@@ -56,7 +55,7 @@ pub trait FlowTriggerService: Sync + Send {
     async fn pause_dataset_flows(
         &self,
         request_time: DateTime<Utc>,
-        dataset_id: &DatasetID,
+        dataset_id: &odf::DatasetID,
         maybe_dataset_flow_type: Option<DatasetFlowType>,
     ) -> Result<(), InternalError>;
 
@@ -73,7 +72,7 @@ pub trait FlowTriggerService: Sync + Send {
     async fn resume_dataset_flows(
         &self,
         request_time: DateTime<Utc>,
-        dataset_id: &DatasetID,
+        dataset_id: &odf::DatasetID,
         maybe_dataset_flow_type: Option<DatasetFlowType>,
     ) -> Result<(), InternalError>;
 
@@ -89,7 +88,7 @@ pub trait FlowTriggerService: Sync + Send {
     /// Find all triggers by dataset ids
     async fn find_triggers_by_datasets(
         &self,
-        dataset_ids: Vec<DatasetID>,
+        dataset_ids: Vec<odf::DatasetID>,
     ) -> FlowTriggerStateStream;
 }
 
@@ -104,7 +103,7 @@ pub trait FlowTriggerServiceExt {
 
     async fn try_get_flow_batching_rule(
         &self,
-        dataset_id: DatasetID,
+        dataset_id: odf::DatasetID,
         flow_type: DatasetFlowType,
     ) -> Result<Option<BatchingRule>, FindFlowTriggerError>;
 }
@@ -129,7 +128,7 @@ impl<T: FlowTriggerService + ?Sized> FlowTriggerServiceExt for T {
 
     async fn try_get_flow_batching_rule(
         &self,
-        dataset_id: DatasetID,
+        dataset_id: odf::DatasetID,
         flow_type: DatasetFlowType,
     ) -> Result<Option<BatchingRule>, FindFlowTriggerError> {
         let maybe_trigger = self

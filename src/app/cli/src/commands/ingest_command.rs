@@ -14,7 +14,6 @@ use std::time::Duration;
 use chrono::{DateTime, Utc};
 use internal_error::ResultIntoInternal;
 use kamu::domain::*;
-use opendatafabric::*;
 
 use super::{CLIError, Command};
 use crate::OutputConfig;
@@ -30,7 +29,7 @@ pub struct IngestCommand {
     push_ingest_executor: Arc<dyn PushIngestExecutor>,
     output_config: Arc<OutputConfig>,
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
-    dataset_ref: DatasetRef,
+    dataset_ref: odf::DatasetRef,
     files_refs: Vec<String>,
     source_name: Option<String>,
     event_time: Option<String>,
@@ -47,7 +46,7 @@ impl IngestCommand {
         push_ingest_executor: Arc<dyn PushIngestExecutor>,
         output_config: Arc<OutputConfig>,
         remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
-        dataset_ref: DatasetRef,
+        dataset_ref: odf::DatasetRef,
         files_refs: I,
         source_name: Option<impl Into<String>>,
         event_time: Option<impl Into<String>>,
@@ -86,7 +85,7 @@ impl IngestCommand {
 
     async fn ensure_valid_push_target(
         &self,
-        dataset_handle: &DatasetHandle,
+        dataset_handle: &odf::DatasetHandle,
     ) -> Result<(), CLIError> {
         let aliases = self
             .remote_alias_reg
@@ -107,11 +106,11 @@ impl IngestCommand {
 
         let resolved_dataset = self.dataset_registry.get_dataset_by_handle(dataset_handle);
         let dataset_kind = resolved_dataset
-            .get_summary(GetSummaryOpts::default())
+            .get_summary(odf::dataset::GetSummaryOpts::default())
             .await
             .int_err()?
             .kind;
-        if dataset_kind != DatasetKind::Root {
+        if dataset_kind != odf::DatasetKind::Root {
             return Err(CLIError::usage_error(
                 "Ingesting data available for root datasets only",
             ));
@@ -237,7 +236,7 @@ impl Command for IngestCommand {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) struct PushIngestProgress {
-    dataset_handle: DatasetHandle,
+    dataset_handle: odf::DatasetHandle,
     multi_progress: Arc<indicatif::MultiProgress>,
     state: Mutex<PushIngestProgressState>,
 }
@@ -249,7 +248,7 @@ struct PushIngestProgressState {
 
 impl PushIngestProgress {
     pub fn new(
-        dataset_handle: &DatasetHandle,
+        dataset_handle: &odf::DatasetHandle,
         multi_progress: Arc<indicatif::MultiProgress>,
     ) -> Self {
         Self {
@@ -278,7 +277,7 @@ impl PushIngestProgress {
     }
 
     fn spinner_message<T: std::fmt::Display>(
-        dataset_handle: &DatasetHandle,
+        dataset_handle: &odf::DatasetHandle,
         step: u32,
         msg: T,
     ) -> String {

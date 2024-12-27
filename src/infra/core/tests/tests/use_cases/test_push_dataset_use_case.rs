@@ -15,9 +15,11 @@ use kamu::testing::{DummySmartTransferProtocolClient, MockDatasetActionAuthorize
 use kamu::utils::ipfs_wrapper::IpfsClient;
 use kamu::utils::simple_transfer_protocol::SimpleTransferProtocol;
 use kamu::*;
-use kamu_core::auth::{DatasetAction, DummyOdfServerAccessTokenResolver};
+use kamu_core::auth::DatasetAction;
 use kamu_core::*;
-use opendatafabric::*;
+use odf_dataset::{CreateDatasetResult, DummyOdfServerAccessTokenResolver};
+use odf_dataset_impl::{DatasetFactoryImpl, IpfsGateway};
+use odf_metadata::*;
 use tempfile::TempDir;
 use url::Url;
 

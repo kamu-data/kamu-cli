@@ -10,7 +10,7 @@
 use database_common::{PaginationOpts, TransactionRef, TransactionRefT};
 use dill::{component, interface};
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
-use opendatafabric::DatasetID;
+use odf_metadata::DatasetID;
 use uuid::Uuid;
 
 use crate::domain::*;

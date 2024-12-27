@@ -11,7 +11,6 @@ use database_common::{PaginationOpts, TransactionRef, TransactionRefT};
 use dill::*;
 use futures::TryStreamExt;
 use kamu_flow_system::*;
-use opendatafabric::DatasetID;
 use sqlx::{FromRow, Postgres, QueryBuilder};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -228,7 +227,7 @@ impl FlowTriggerEventStore for PostgresFlowTriggerEventStore {
     async fn list_dataset_ids(
         &self,
         pagination: &PaginationOpts,
-    ) -> Result<Vec<DatasetID>, InternalError> {
+    ) -> Result<Vec<odf::DatasetID>, InternalError> {
         let mut tr = self.transaction.lock().await;
 
         let connection_mut = tr.connection_mut().await?;
@@ -255,7 +254,7 @@ impl FlowTriggerEventStore for PostgresFlowTriggerEventStore {
         Ok(dataset_ids
             .into_iter()
             .map(|event_row| {
-                DatasetID::from_did_str(event_row.dataset_id.unwrap().as_str())
+                odf::DatasetID::from_did_str(event_row.dataset_id.unwrap().as_str())
                     .map_err(InternalError::new)
             })
             .collect::<Result<Vec<_>, InternalError>>()?)

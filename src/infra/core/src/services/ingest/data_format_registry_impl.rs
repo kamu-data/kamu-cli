@@ -13,7 +13,7 @@ use std::sync::Arc;
 use datafusion::prelude::SessionContext;
 use kamu_core::ingest::*;
 use kamu_ingest_datafusion::*;
-use opendatafabric::*;
+use odf_metadata::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

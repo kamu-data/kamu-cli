@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::InternalError;
-use opendatafabric::{AccountID, DatasetID};
 use thiserror::Error;
 
 use crate::{
@@ -31,64 +30,64 @@ pub trait RebacService: Send + Sync {
     // Account
     async fn set_account_property(
         &self,
-        account_id: &AccountID,
+        account_id: &odf::AccountID,
         property_name: AccountPropertyName,
         property_value: &PropertyValue,
     ) -> Result<(), SetEntityPropertyError>;
 
     async fn unset_account_property(
         &self,
-        account_id: &AccountID,
+        account_id: &odf::AccountID,
         property_name: AccountPropertyName,
     ) -> Result<(), UnsetEntityPropertyError>;
 
     async fn get_account_properties(
         &self,
-        account_id: &AccountID,
+        account_id: &odf::AccountID,
     ) -> Result<Vec<(PropertyName, PropertyValue)>, GetEntityPropertiesError>;
 
     // Dataset
     async fn set_dataset_property(
         &self,
-        dataset_id: &DatasetID,
+        dataset_id: &odf::DatasetID,
         property_name: DatasetPropertyName,
         property_value: &PropertyValue,
     ) -> Result<(), SetEntityPropertyError>;
 
     async fn unset_dataset_property(
         &self,
-        dataset_id: &DatasetID,
+        dataset_id: &odf::DatasetID,
         property_name: DatasetPropertyName,
     ) -> Result<(), UnsetEntityPropertyError>;
 
     async fn delete_dataset_properties(
         &self,
-        dataset_id: &DatasetID,
+        dataset_id: &odf::DatasetID,
     ) -> Result<(), DeletePropertiesError>;
 
     async fn get_dataset_properties(
         &self,
-        dataset_id: &DatasetID,
+        dataset_id: &odf::DatasetID,
     ) -> Result<Vec<(PropertyName, PropertyValue)>, GetEntityPropertiesError>;
 
     // Relations
     async fn insert_account_dataset_relation(
         &self,
-        account_id: &AccountID,
+        account_id: &odf::AccountID,
         relationship: AccountToDatasetRelation,
-        dataset_id: &DatasetID,
+        dataset_id: &odf::DatasetID,
     ) -> Result<(), InsertRelationError>;
 
     async fn delete_account_dataset_relation(
         &self,
-        account_id: &AccountID,
+        account_id: &odf::AccountID,
         relationship: AccountToDatasetRelation,
-        dataset_id: &DatasetID,
+        dataset_id: &odf::DatasetID,
     ) -> Result<(), DeleteRelationError>;
 
     async fn get_account_dataset_relations(
         &self,
-        account_id: &AccountID,
+        account_id: &odf::AccountID,
     ) -> Result<Vec<EntityWithRelation>, SubjectEntityRelationsError>;
 }
 

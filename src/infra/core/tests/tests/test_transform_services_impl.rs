@@ -16,10 +16,19 @@ use futures::TryStreamExt;
 use indoc::indoc;
 use kamu::domain::engine::*;
 use kamu::domain::*;
-use kamu::testing::*;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
-use opendatafabric::*;
+use odf_dataset::{
+    AppendOpts,
+    BlockRef,
+    CommitOpts,
+    CreateDatasetResult,
+    DatasetStorageUnit,
+    MetadataChainExt,
+    TryStreamExtExt,
+};
+use odf_metadata::*;
+use odf_storage_impl::testing::MetadataFactory;
 use tempfile::TempDir;
 use time_source::SystemTimeSourceDefault;
 
@@ -30,7 +39,7 @@ use crate::mock_engine_provisioner;
 struct TransformTestHarness {
     _tempdir: TempDir,
     dataset_registry: Arc<dyn DatasetRegistry>,
-    dataset_repo_writer: Arc<dyn DatasetRepositoryWriter>,
+    dataset_storage_unit_writer: Arc<dyn DatasetStorageUnitWriter>,
     transform_request_planner: Arc<dyn TransformRequestPlanner>,
     transform_elab_svc: Arc<dyn TransformElaborationService>,
     transform_executor: Arc<dyn TransformExecutor>,
@@ -54,10 +63,10 @@ impl TransformTestHarness {
             .add_value(RunInfoDir::new(run_info_dir))
             .add_value(CurrentAccountSubject::new_test())
             .add_value(TenancyConfig::SingleTenant)
-            .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
-            .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-            .add::<DatasetRegistryRepoBridge>()
-            .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
+            .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
+            .bind::<dyn DatasetStorageUnit, DatasetStorageUnitLocalFs>()
+            .add::<DatasetRegistrySoloUnitBridge>()
+            .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
             .add::<SystemTimeSourceDefault>()
             .add::<ObjectStoreRegistryImpl>()
             .add::<ObjectStoreBuilderLocalFs>()
@@ -77,7 +86,7 @@ impl TransformTestHarness {
         Self {
             _tempdir: tempdir,
             dataset_registry: catalog.get_one().unwrap(),
-            dataset_repo_writer: catalog.get_one().unwrap(),
+            dataset_storage_unit_writer: catalog.get_one().unwrap(),
             compaction_planner: catalog.get_one().unwrap(),
             compaction_executor: catalog.get_one().unwrap(),
             push_ingest_planner: catalog.get_one().unwrap(),
@@ -100,7 +109,7 @@ impl TransformTestHarness {
             .build();
 
         let create_result = self
-            .dataset_repo_writer
+            .dataset_storage_unit_writer
             .create_dataset_from_snapshot(snap)
             .await
             .unwrap()
@@ -124,7 +133,7 @@ impl TransformTestHarness {
             .build();
 
         let create_result = self
-            .dataset_repo_writer
+            .dataset_storage_unit_writer
             .create_dataset_from_snapshot(snap)
             .await
             .unwrap()
@@ -319,7 +328,7 @@ async fn test_get_verification_plan_one_to_one() {
     let t0 = Utc.with_ymd_and_hms(2020, 1, 1, 11, 0, 0).unwrap();
     let root_alias = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
     let root_create_result = harness
-        .dataset_repo_writer
+        .dataset_storage_unit_writer
         .create_dataset(
             &root_alias,
             MetadataFactory::metadata_block(
@@ -352,7 +361,7 @@ async fn test_get_verification_plan_one_to_one() {
     // Create derivative
     let deriv_alias = DatasetAlias::new(None, DatasetName::new_unchecked("bar"));
     let deriv_create_result = harness
-        .dataset_repo_writer
+        .dataset_storage_unit_writer
         .create_dataset(
             &deriv_alias,
             MetadataFactory::metadata_block(
@@ -662,7 +671,7 @@ async fn test_transform_with_compaction_retry() {
     let root_alias = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
 
     let foo_created_result = harness
-        .dataset_repo_writer
+        .dataset_storage_unit_writer
         .create_dataset_from_snapshot(
             MetadataFactory::dataset_snapshot()
                 .name(root_alias)

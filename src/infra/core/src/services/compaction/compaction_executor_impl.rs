@@ -13,9 +13,11 @@ use std::sync::Arc;
 
 use datafusion::prelude::*;
 use dill::{component, interface};
+use file_utils::OwnedFile;
 use internal_error::ResultIntoInternal;
 use kamu_core::*;
-use opendatafabric as odf;
+use odf_dataset::{AddDataParams, BlockRef, CheckpointRef, CommitOpts, SetRefOpts};
+use odf_metadata as odf;
 use random_names::get_random_name;
 use time_source::SystemTimeSource;
 use url::Url;

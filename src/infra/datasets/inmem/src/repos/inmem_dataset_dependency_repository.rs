@@ -13,7 +13,7 @@ use std::sync::{Arc, Mutex};
 use dill::*;
 use internal_error::InternalError;
 use kamu_datasets::*;
-use opendatafabric::DatasetID;
+use odf_metadata::DatasetID;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

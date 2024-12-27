@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
-use opendatafabric as odf;
 
 use crate::prelude::*;
 use crate::queries::Account;
@@ -82,8 +81,8 @@ impl MetadataManifestUnsupportedVersion {
     }
 }
 
-impl From<odf::serde::UnsupportedVersionError> for MetadataManifestUnsupportedVersion {
-    fn from(e: odf::serde::UnsupportedVersionError) -> Self {
+impl From<odf::metadata::serde::UnsupportedVersionError> for MetadataManifestUnsupportedVersion {
+    fn from(e: odf::metadata::serde::UnsupportedVersionError) -> Self {
         Self {
             manifest_version: e.manifest_version,
             supported_version_from: e.supported_version_range.0 as i32,

@@ -13,7 +13,7 @@ use std::io::prelude::*;
 use indoc::indoc;
 use kamu::domain::PollingIngestError;
 use kamu::ingest::*;
-use opendatafabric::*;
+use odf_metadata::*;
 
 #[test]
 fn test_prep_pipe() {

@@ -12,11 +12,11 @@ use std::sync::Arc;
 use dill::*;
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_core::*;
-use opendatafabric::*;
+use odf_dataset::UnsupportedProtocolError;
+use odf_metadata::*;
+use s3_utils::S3Context;
 use serde_json::json;
 use url::Url;
-
-use crate::utils::s3_context::S3Context;
 
 pub struct SearchServiceImpl {
     remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,

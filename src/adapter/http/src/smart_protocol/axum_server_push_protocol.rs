@@ -16,17 +16,10 @@ use dill::Catalog;
 use internal_error::ErrorIntoInternal;
 use kamu_core::{
     AppendDatasetMetadataBatchUseCase,
-    BlockRef,
     CorruptedSourceError,
-    CreateDatasetError,
     CreateDatasetUseCase,
     CreateDatasetUseCaseOptions,
-    Dataset,
-    GetRefError,
-    HashedMetadataBlock,
-    RefCollisionError,
 };
-use opendatafabric::{AsTypedBlock, DatasetRef};
 use tracing::Instrument;
 use url::Url;
 
@@ -48,8 +41,8 @@ const MIN_UPLOAD_PROGRESS_PING_DELAY_SEC: u64 = 10;
 pub struct AxumServerPushProtocolInstance {
     socket: axum::extract::ws::WebSocket,
     catalog: Catalog,
-    dataset_ref: DatasetRef,
-    maybe_dataset: Option<Arc<dyn Dataset>>,
+    dataset_ref: odf::DatasetRef,
+    maybe_dataset: Option<Arc<dyn odf::Dataset>>,
     dataset_url: Url,
     maybe_bearer_header: Option<BearerHeader>,
 }
@@ -58,8 +51,8 @@ impl AxumServerPushProtocolInstance {
     pub fn new(
         socket: axum::extract::ws::WebSocket,
         catalog: Catalog,
-        dataset_ref: DatasetRef,
-        maybe_dataset: Option<Arc<dyn Dataset>>,
+        dataset_ref: odf::DatasetRef,
+        maybe_dataset: Option<Arc<dyn odf::Dataset>>,
         dataset_url: Url,
         maybe_bearer_header: Option<BearerHeader>,
     ) -> Self {
@@ -204,6 +197,7 @@ impl AxumServerPushProtocolInstance {
                     .alias()
                     .expect("Dataset ref is not an alias");
 
+                use odf::metadata::AsTypedBlock as _;
                 let (_, first_block) = new_blocks.pop_front().unwrap();
                 let seed_block = first_block
                     .into_typed()
@@ -240,12 +234,12 @@ impl AxumServerPushProtocolInstance {
                     Ok(create_result) => {
                         self.maybe_dataset = Some(create_result.dataset);
                     }
-                    Err(CreateDatasetError::RefCollision(err)) => {
-                        return Err(PushServerError::RefCollision(RefCollisionError {
-                            id: err.id,
-                        }));
+                    Err(odf::dataset::CreateDatasetError::RefCollision(err)) => {
+                        return Err(PushServerError::RefCollision(
+                            odf::dataset::RefCollisionError { id: err.id },
+                        ));
                     }
-                    Err(CreateDatasetError::NameCollision(err)) => {
+                    Err(odf::dataset::CreateDatasetError::NameCollision(err)) => {
                         return Err(PushServerError::NameCollision(err));
                     }
                     Err(e) => {
@@ -298,11 +292,11 @@ impl AxumServerPushProtocolInstance {
         let actual_head = if let Some(dataset) = self.maybe_dataset.as_ref() {
             match dataset
                 .as_metadata_chain()
-                .resolve_ref(&BlockRef::Head)
+                .resolve_ref(&odf::BlockRef::Head)
                 .await
             {
                 Ok(head) => Some(head),
-                Err(GetRefError::NotFound(_)) => None,
+                Err(odf::storage::GetRefError::NotFound(_)) => None,
                 Err(e) => {
                     return Err(PushServerError::Internal(
                         e.protocol_int_err(PushPhase::InitialRequest),
@@ -336,7 +330,7 @@ impl AxumServerPushProtocolInstance {
     async fn try_handle_push_metadata_request(
         &mut self,
         push_request: DatasetPushRequest,
-    ) -> Result<VecDeque<HashedMetadataBlock>, PushServerError> {
+    ) -> Result<VecDeque<odf::dataset::HashedMetadataBlock>, PushServerError> {
         let push_metadata_request =
             match axum_read_payload::<DatasetPushMetadataRequest>(&mut self.socket).await {
                 Ok(push_metadata_request) => Ok(push_metadata_request),
@@ -376,7 +370,7 @@ impl AxumServerPushProtocolInstance {
 
     async fn try_handle_push_objects_request(
         &mut self,
-        dataset: Arc<dyn Dataset>,
+        dataset: Arc<dyn odf::Dataset>,
     ) -> Result<bool, PushServerError> {
         let request = axum_read_payload::<DatasetPushObjectsTransferRequest>(&mut self.socket)
             .await
@@ -460,7 +454,7 @@ impl AxumServerPushProtocolInstance {
 
     async fn try_handle_push_complete(
         &mut self,
-        new_blocks: VecDeque<HashedMetadataBlock>,
+        new_blocks: VecDeque<odf::dataset::HashedMetadataBlock>,
         force_update_if_diverged: bool,
     ) -> Result<(), PushServerError> {
         axum_read_payload::<DatasetPushComplete>(&mut self.socket)

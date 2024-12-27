@@ -20,7 +20,6 @@
 pub use kamu_core as domain;
 
 mod engine;
-mod repos;
 mod services;
 #[cfg(any(feature = "testing", test))]
 pub mod testing;
@@ -28,12 +27,9 @@ mod use_cases;
 pub mod utils;
 
 pub use engine::*;
-pub use repos::*;
 pub use services::*;
 pub use use_cases::*;
 
 mod dataset_config;
-mod dataset_layout;
 
 pub use dataset_config::*;
-pub use dataset_layout::*;

@@ -21,7 +21,7 @@ use messaging_outbox::{
     MessageConsumerT,
     MessageDeliveryMechanism,
 };
-use opendatafabric::{AccountID, AccountName, DatasetID};
+use odf_metadata::{AccountID, AccountName, DatasetID};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

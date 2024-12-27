@@ -9,30 +9,28 @@
 
 use std::collections::HashMap;
 
-use opendatafabric::{DatasetHandle, DatasetID};
-
 use crate::ResolvedDataset;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Default)]
 pub struct ResolvedDatasetsMap {
-    resolved_datasets_by_id: HashMap<DatasetID, ResolvedDataset>,
+    resolved_datasets_by_id: HashMap<odf::DatasetID, ResolvedDataset>,
 }
 
 impl ResolvedDatasetsMap {
-    pub fn get_by_id(&self, id: &DatasetID) -> &ResolvedDataset {
+    pub fn get_by_id(&self, id: &odf::DatasetID) -> &ResolvedDataset {
         self.resolved_datasets_by_id
             .get(id)
             .expect("Dataset must be present")
     }
 
     #[inline]
-    pub fn get_by_handle(&self, handle: &DatasetHandle) -> &ResolvedDataset {
+    pub fn get_by_handle(&self, handle: &odf::DatasetHandle) -> &ResolvedDataset {
         self.get_by_id(&handle.id)
     }
 
-    pub fn iterate_all_handles(&self) -> impl Iterator<Item = &DatasetHandle> {
+    pub fn iterate_all_handles(&self) -> impl Iterator<Item = &odf::DatasetHandle> {
         self.resolved_datasets_by_id
             .values()
             .map(ResolvedDataset::get_handle)
@@ -50,8 +48,8 @@ impl ResolvedDatasetsMap {
 
     pub fn register_with(
         &mut self,
-        handle: &DatasetHandle,
-        dataset_fn: impl Fn(&DatasetHandle) -> ResolvedDataset,
+        handle: &odf::DatasetHandle,
+        dataset_fn: impl Fn(&odf::DatasetHandle) -> ResolvedDataset,
     ) {
         if !self.resolved_datasets_by_id.contains_key(&handle.id) {
             let resolved_dataset = dataset_fn(handle);

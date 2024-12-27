@@ -7,8 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_core::{self as domain, CommitDatasetEventUseCase};
-use opendatafabric as odf;
+use kamu_core::CommitDatasetEventUseCase;
 
 use crate::prelude::*;
 use crate::utils::make_dataset_access_error;
@@ -40,18 +39,20 @@ impl MetadataChainMut {
     ) -> Result<CommitResult> {
         let event = match event_format {
             MetadataManifestFormat::Yaml => {
-                let de = odf::serde::yaml::YamlMetadataEventDeserializer;
+                let de = odf::metadata::serde::yaml::YamlMetadataEventDeserializer;
                 match de.read_manifest(event.as_bytes()) {
                     Ok(event) => event,
-                    Err(e @ odf::serde::Error::SerdeError { .. }) => {
+                    Err(e @ odf::metadata::serde::Error::SerdeError { .. }) => {
                         return Ok(CommitResult::Malformed(MetadataManifestMalformed {
                             message: e.to_string(),
                         }))
                     }
-                    Err(odf::serde::Error::UnsupportedVersion(e)) => {
+                    Err(odf::metadata::serde::Error::UnsupportedVersion(e)) => {
                         return Ok(CommitResult::UnsupportedVersion(e.into()))
                     }
-                    Err(e @ odf::serde::Error::IoError { .. }) => return Err(e.int_err().into()),
+                    Err(e @ odf::metadata::serde::Error::IoError { .. }) => {
+                        return Err(e.int_err().into())
+                    }
                 }
             }
         };
@@ -59,27 +60,31 @@ impl MetadataChainMut {
         let commit_dataset_event = from_catalog_n!(ctx, dyn CommitDatasetEventUseCase);
 
         let result = match commit_dataset_event
-            .execute(&self.dataset_handle, event, domain::CommitOpts::default())
+            .execute(
+                &self.dataset_handle,
+                event,
+                odf::dataset::CommitOpts::default(),
+            )
             .await
         {
             Ok(result) => CommitResult::Success(CommitResultSuccess {
                 old_head: result.old_head.map(Into::into),
                 new_head: result.new_head.into(),
             }),
-            Err(domain::CommitError::ObjectNotFound(e)) => {
+            Err(odf::dataset::CommitError::ObjectNotFound(e)) => {
                 CommitResult::AppendError(CommitResultAppendError {
                     message: format!("Event is referencing a non-existent object {}", e.hash),
                 })
             }
-            Err(domain::CommitError::MetadataAppendError(e)) => {
+            Err(odf::dataset::CommitError::MetadataAppendError(e)) => {
                 CommitResult::AppendError(CommitResultAppendError {
                     message: e.to_string(),
                 })
             }
-            Err(domain::CommitError::Access(_)) => {
+            Err(odf::dataset::CommitError::Access(_)) => {
                 return Err(make_dataset_access_error(&self.dataset_handle))
             }
-            Err(e @ domain::CommitError::Internal(_)) => return Err(e.int_err().into()),
+            Err(e @ odf::dataset::CommitError::Internal(_)) => return Err(e.int_err().into()),
         };
 
         Ok(result)

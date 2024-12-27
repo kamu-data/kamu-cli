@@ -10,7 +10,6 @@
 use std::pin::Pin;
 
 use internal_error::InternalError;
-use opendatafabric::DatasetID;
 use thiserror::Error;
 use tokio_stream::Stream;
 
@@ -24,14 +23,14 @@ pub trait DatasetDependencyRepository: Send + Sync {
 
     async fn add_upstream_dependencies(
         &self,
-        downstream_dataset_id: &DatasetID,
-        new_upstream_dataset_ids: &[&DatasetID],
+        downstream_dataset_id: &odf::DatasetID,
+        new_upstream_dataset_ids: &[&odf::DatasetID],
     ) -> Result<(), AddDependenciesError>;
 
     async fn remove_upstream_dependencies(
         &self,
-        downstream_dataset_id: &DatasetID,
-        obsolete_upstream_dataset_ids: &[&DatasetID],
+        downstream_dataset_id: &odf::DatasetID,
+        obsolete_upstream_dataset_ids: &[&odf::DatasetID],
     ) -> Result<(), RemoveDependenciesError>;
 }
 
@@ -39,8 +38,8 @@ pub trait DatasetDependencyRepository: Send + Sync {
 
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct DatasetDependencies {
-    pub downstream_dataset_id: DatasetID,
-    pub upstream_dataset_ids: Vec<DatasetID>,
+    pub downstream_dataset_id: odf::DatasetID,
+    pub upstream_dataset_ids: Vec<odf::DatasetID>,
 }
 
 pub type DatasetDependenciesIDStream<'a> =
@@ -73,7 +72,7 @@ pub enum RemoveDependenciesError {
 #[derive(Error, Debug)]
 #[error("Upstream dependency duplicate for dataset '{downstream_dataset_id}'")]
 pub struct AddDependencyDuplicateError {
-    pub downstream_dataset_id: DatasetID,
+    pub downstream_dataset_id: odf::DatasetID,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -81,7 +80,7 @@ pub struct AddDependencyDuplicateError {
 #[derive(Error, Debug)]
 #[error("Upstream dependency not found for dataset '{downstream_dataset_id}'")]
 pub struct RemoveDependencyMissingError {
-    pub downstream_dataset_id: DatasetID,
+    pub downstream_dataset_id: odf::DatasetID,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

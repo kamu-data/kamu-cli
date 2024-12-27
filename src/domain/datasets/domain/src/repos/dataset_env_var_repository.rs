@@ -9,7 +9,6 @@
 
 use database_common::PaginationOpts;
 use internal_error::InternalError;
-use opendatafabric::DatasetID;
 use thiserror::Error;
 use uuid::Uuid;
 
@@ -26,12 +25,12 @@ pub trait DatasetEnvVarRepository: Send + Sync {
 
     async fn get_all_dataset_env_vars_count_by_dataset_id(
         &self,
-        dataset_id: &DatasetID,
+        dataset_id: &odf::DatasetID,
     ) -> Result<usize, GetDatasetEnvVarError>;
 
     async fn get_all_dataset_env_vars_by_dataset_id(
         &self,
-        dataset_id: &DatasetID,
+        dataset_id: &odf::DatasetID,
         pagination: &PaginationOpts,
     ) -> Result<Vec<DatasetEnvVar>, GetDatasetEnvVarError>;
 
@@ -43,7 +42,7 @@ pub trait DatasetEnvVarRepository: Send + Sync {
     async fn get_dataset_env_var_by_key_and_dataset_id(
         &self,
         dataset_env_var_key: &str,
-        dataset_id: &DatasetID,
+        dataset_id: &odf::DatasetID,
     ) -> Result<DatasetEnvVar, GetDatasetEnvVarError>;
 
     async fn delete_dataset_env_var(
@@ -74,7 +73,7 @@ pub enum SaveDatasetEnvVarError {
 #[error("Dataset env var not saved, duplicate {dataset_env_var_key} for dataset {dataset_id}")]
 pub struct SaveDatasetEnvVarErrorDuplicate {
     pub dataset_env_var_key: String,
-    pub dataset_id: DatasetID,
+    pub dataset_id: odf::DatasetID,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -15,7 +15,7 @@ use futures::TryStreamExt;
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_core::*;
 use kamu_datasets::DatasetEnvVar;
-use opendatafabric::*;
+use odf_metadata::*;
 
 use super::*;
 use crate::PollingSourceState;

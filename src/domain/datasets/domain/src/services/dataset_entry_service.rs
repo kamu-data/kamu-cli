@@ -9,7 +9,6 @@
 
 use database_common::{EntityPageListing, PaginationOpts};
 use internal_error::InternalError;
-use opendatafabric as odf;
 use thiserror::Error;
 
 use crate::DatasetEntry;

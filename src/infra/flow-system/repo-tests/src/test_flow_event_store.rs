@@ -17,7 +17,7 @@ use dill::Catalog;
 use futures::TryStreamExt;
 use kamu_flow_system::*;
 use kamu_task_system::{TaskError, TaskID, TaskOutcome, TaskResult};
-use opendatafabric::{AccountID, DatasetID};
+use odf::{AccountID, DatasetID};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

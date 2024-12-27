@@ -13,10 +13,17 @@ use dill::*;
 use futures::TryStreamExt;
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_core::*;
-use opendatafabric::*;
+use odf_dataset::{AppendError, AppendOpts, BlockRef, GetSummaryOpts, MetadataChain};
+use odf_dataset_impl::MetadataChainImpl;
+use odf_metadata as odf;
+use odf_storage_impl::{
+    MetadataBlockRepositoryImpl,
+    NamedObjectRepositoryInMemory,
+    ObjectRepositoryInMemory,
+    ReferenceRepositoryImpl,
+};
 
 use crate::utils::cached_object::CachedObject;
-use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -42,8 +49,8 @@ impl VerificationServiceImpl {
     async fn check_data_integrity(
         &self,
         resolved_dataset: &ResolvedDataset,
-        dataset_kind: DatasetKind,
-        block_range: (Option<Multihash>, Option<Multihash>),
+        dataset_kind: odf::DatasetKind,
+        block_range: (Option<odf::Multihash>, Option<odf::Multihash>),
         check_logical_hashes: bool,
         listener: Arc<dyn VerificationListener>,
     ) -> Result<(), VerificationError> {
@@ -107,7 +114,7 @@ impl VerificationServiceImpl {
                 if physical_hash_actual != output_slice.physical_hash {
                     // Root data files are non-reproducible by definition, so
                     // if physical hashes don't match - we can give up right away.
-                    if dataset_kind == DatasetKind::Root {
+                    if dataset_kind == odf::DatasetKind::Root {
                         return Err(VerificationError::DataDoesNotMatchMetadata(
                             DataDoesNotMatchMetadata {
                                 block_hash,
@@ -198,7 +205,7 @@ impl VerificationServiceImpl {
     async fn check_metadata_integrity(
         &self,
         resolved_dataset: &ResolvedDataset,
-        block_range: (Option<Multihash>, Option<Multihash>),
+        block_range: (Option<odf::Multihash>, Option<odf::Multihash>),
         listener: Arc<dyn VerificationListener>,
     ) -> Result<(), VerificationError> {
         let chain = resolved_dataset.as_metadata_chain();
@@ -292,7 +299,9 @@ impl VerificationService for VerificationServiceImpl {
                 .await?;
             }
 
-            if dataset_kind == DatasetKind::Derivative && request.options.replay_transformations {
+            if dataset_kind == odf::DatasetKind::Derivative
+                && request.options.replay_transformations
+            {
                 let plan = self
                     .transform_request_planner
                     .build_transform_verification_plan(

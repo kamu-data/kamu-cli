@@ -15,9 +15,8 @@ use aws_sdk_s3::types::ObjectCannedAcl;
 use bytes::Bytes;
 use dill::*;
 use internal_error::ErrorIntoInternal;
-use kamu::utils::s3_context::S3Context;
 use kamu_core::MediaType;
-use opendatafabric::AccountID;
+use s3_utils::S3Context;
 use tokio::io::AsyncRead;
 use uuid::Uuid;
 
@@ -49,7 +48,12 @@ impl UploadServiceS3 {
         }
     }
 
-    fn make_file_key(&self, account_id: &AccountID, upload_id: &str, file_name: &str) -> String {
+    fn make_file_key(
+        &self,
+        account_id: &odf::AccountID,
+        upload_id: &str,
+        file_name: &str,
+    ) -> String {
         format!("{}/{}/{}", account_id.as_multibase(), upload_id, file_name,)
     }
 }
@@ -58,7 +62,7 @@ impl UploadServiceS3 {
 impl UploadService for UploadServiceS3 {
     async fn make_upload_context(
         &self,
-        owner_account_id: &AccountID,
+        owner_account_id: &odf::AccountID,
         file_name: String,
         content_type: Option<MediaType>,
         content_length: usize,
@@ -111,7 +115,7 @@ impl UploadService for UploadServiceS3 {
 
     async fn upload_reference_size(
         &self,
-        owner_account_id: &AccountID,
+        owner_account_id: &odf::AccountID,
         upload_id: &str,
         file_name: &str,
     ) -> Result<usize, UploadTokenIntoStreamError> {
@@ -139,7 +143,7 @@ impl UploadService for UploadServiceS3 {
 
     async fn upload_reference_into_stream(
         &self,
-        owner_account_id: &AccountID,
+        owner_account_id: &odf::AccountID,
         upload_id: &str,
         file_name: &str,
     ) -> Result<Box<dyn AsyncRead + Send + Unpin>, UploadTokenIntoStreamError> {

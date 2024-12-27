@@ -1,0 +1,37 @@
+[package]
+name = "odf-storage"
+description = "Storage facilities for Open Data Fabric based dataset"
+version = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+authors = { workspace = true }
+readme = { workspace = true }
+license-file = { workspace = true }
+keywords = { workspace = true }
+include = { workspace = true }
+edition = { workspace = true }
+publish = { workspace = true }
+
+
+[lints]
+workspace = true
+
+
+[lib]
+doctest = false
+
+
+[dependencies]
+async-utils = { workspace = true }
+internal-error = { workspace = true }
+odf-metadata = { workspace = true }
+
+async-trait = { version = "0.1", default-features = false }
+bytes = { version = "1", default-features = false }
+chrono = { version = "0.4", features = ["serde"] }
+http = { version = "1" }
+thiserror = { version = "2", default-features = false, features = ["std"] }
+url = { version = "2", default-features = false }
+
+
+[dev-dependencies]

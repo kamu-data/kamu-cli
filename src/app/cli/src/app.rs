@@ -37,6 +37,7 @@ use kamu_flow_system_services::{
 };
 use kamu_task_system_inmem::domain::{TaskProgressMessage, MESSAGE_PRODUCER_KAMU_TASK_AGENT};
 use messaging_outbox::{register_message_dispatcher, Outbox, OutboxDispatchingImpl};
+use odf_dataset_impl::{DatasetFactoryImpl, IpfsGateway};
 use time_source::{SystemTimeSource, SystemTimeSourceDefault, SystemTimeSourceStub};
 use tracing::{warn, Instrument};
 
@@ -373,10 +374,10 @@ pub fn configure_base_catalog(
     }
 
     b.add_builder(
-        DatasetRepositoryLocalFs::builder().with_root(workspace_layout.datasets_dir.clone()),
+        DatasetStorageUnitLocalFs::builder().with_root(workspace_layout.datasets_dir.clone()),
     );
-    b.bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>();
-    b.bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>();
+    b.bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>();
+    b.bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>();
 
     b.add::<DatasetFactoryImpl>();
 
@@ -728,7 +729,7 @@ pub fn register_config_in_catalog(
     if tenancy_config == TenancyConfig::MultiTenant {
         let mut implicit_user_config = PredefinedAccountsConfig::new();
         implicit_user_config.predefined.push(
-            AccountConfig::from_name(opendatafabric::AccountName::new_unchecked(
+            AccountConfig::from_name(odf::AccountName::new_unchecked(
                 AccountService::default_account_name(TenancyConfig::MultiTenant).as_str(),
             ))
             .set_display_name(AccountService::default_user_name(

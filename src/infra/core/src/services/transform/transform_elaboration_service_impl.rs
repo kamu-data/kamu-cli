@@ -13,7 +13,8 @@ use dill::*;
 use engine::{TransformRequestExt, TransformRequestInputExt};
 use internal_error::ResultIntoInternal;
 use kamu_core::*;
-use opendatafabric::{ExecuteTransformInput, TransformInput};
+use odf_dataset::{BlockRef, MetadataChainExt, SearchSingleDataBlockVisitor};
+use odf_metadata as odf;
 use time_source::SystemTimeSource;
 
 use super::get_transform_input_from_query_input;
@@ -89,8 +90,8 @@ impl TransformElaborationServiceImpl {
 
     async fn get_transform_input(
         &self,
-        input_decl: TransformInput,
-        input_state: Option<ExecuteTransformInput>,
+        input_decl: odf::TransformInput,
+        input_state: Option<odf::ExecuteTransformInput>,
         datasets_map: &ResolvedDatasetsMap,
     ) -> Result<TransformRequestInputExt, TransformElaborateError> {
         let dataset_id = input_decl.dataset_ref.id().unwrap();
@@ -105,7 +106,7 @@ impl TransformElaborationServiceImpl {
         let last_processed_block = input_state.as_ref().and_then(|i| i.last_block_hash());
         let last_processed_offset = input_state
             .as_ref()
-            .and_then(ExecuteTransformInput::last_offset);
+            .and_then(odf::ExecuteTransformInput::last_offset);
 
         // Determine unprocessed block and offset range
         let last_unprocessed_block = input_chain.resolve_ref(&BlockRef::Head).await.int_err()?;
@@ -120,7 +121,7 @@ impl TransformElaborationServiceImpl {
             .and_then(|event| event.last_offset())
             .or(last_processed_offset);
 
-        let query_input = ExecuteTransformInput {
+        let query_input = odf::ExecuteTransformInput {
             dataset_id: dataset_id.clone(),
             prev_block_hash: last_processed_block.cloned(),
             new_block_hash: if Some(&last_unprocessed_block) != last_processed_block {

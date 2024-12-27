@@ -14,7 +14,7 @@ use ::http::{header, HeaderMap, HeaderName, HeaderValue, StatusCode};
 use chrono::{DateTime, Utc};
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_core::*;
-use opendatafabric::*;
+use odf_metadata::*;
 use url::Url;
 
 use super::*;

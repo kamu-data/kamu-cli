@@ -12,14 +12,13 @@ use std::collections::HashSet;
 use std::sync::Arc;
 
 use dill::{Catalog, Component};
-use kamu::testing::MetadataFactory;
-use kamu::{CreateDatasetUseCaseImpl, DatasetRepositoryLocalFs, DatasetRepositoryWriter};
+use kamu::{CreateDatasetUseCaseImpl, DatasetStorageUnitLocalFs, DatasetStorageUnitWriter};
 use kamu_accounts::CurrentAccountSubject;
 use kamu_adapter_auth_oso::{KamuAuthOso, OsoDatasetAuthorizer};
 use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer, DatasetActionUnauthorizedError};
-use kamu_core::{AccessError, CreateDatasetUseCase, DatasetRepository, TenancyConfig};
+use kamu_core::{CreateDatasetUseCase, TenancyConfig};
 use messaging_outbox::DummyOutboxImpl;
-use opendatafabric::{AccountID, AccountName, DatasetAlias, DatasetHandle, DatasetKind};
+use odf_storage_impl::testing::MetadataFactory;
 use tempfile::TempDir;
 use time_source::SystemTimeSourceDefault;
 
@@ -29,7 +28,7 @@ use time_source::SystemTimeSourceDefault;
 async fn test_owner_can_read_and_write() {
     let harness = DatasetAuthorizerHarness::new("john");
     let dataset_handle = harness
-        .create_dataset(&DatasetAlias::try_from("john/foo").unwrap())
+        .create_dataset(&odf::DatasetAlias::try_from("john/foo").unwrap())
         .await;
 
     let read_result = harness
@@ -62,7 +61,7 @@ async fn test_owner_can_read_and_write() {
 async fn test_guest_can_read_but_not_write() {
     let harness = DatasetAuthorizerHarness::new("kate");
     let dataset_handle = harness
-        .create_dataset(&DatasetAlias::try_from("john/foo").unwrap())
+        .create_dataset(&odf::DatasetAlias::try_from("john/foo").unwrap())
         .await;
 
     let read_result = harness
@@ -84,7 +83,7 @@ async fn test_guest_can_read_but_not_write() {
     assert_matches!(
         write_result,
         Err(DatasetActionUnauthorizedError::Access(
-            AccessError::Forbidden(_)
+            odf::AccessError::Forbidden(_)
         ))
     );
 
@@ -110,16 +109,16 @@ impl DatasetAuthorizerHarness {
             .add::<SystemTimeSourceDefault>()
             .add::<DummyOutboxImpl>()
             .add_value(CurrentAccountSubject::logged(
-                AccountID::new_seeded_ed25519(current_account_name.as_bytes()),
-                AccountName::new_unchecked(current_account_name),
+                odf::AccountID::new_seeded_ed25519(current_account_name.as_bytes()),
+                odf::AccountName::new_unchecked(current_account_name),
                 false,
             ))
             .add::<KamuAuthOso>()
             .add::<OsoDatasetAuthorizer>()
             .add_value(TenancyConfig::MultiTenant)
-            .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
-            .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-            .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
+            .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
+            .bind::<dyn odf::dataset::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
+            .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
             .add::<CreateDatasetUseCaseImpl>()
             .build();
 
@@ -132,14 +131,16 @@ impl DatasetAuthorizerHarness {
         }
     }
 
-    pub async fn create_dataset(&self, alias: &DatasetAlias) -> DatasetHandle {
+    pub async fn create_dataset(&self, alias: &odf::DatasetAlias) -> odf::DatasetHandle {
         let create_dataset = self.catalog.get_one::<dyn CreateDatasetUseCase>().unwrap();
 
         create_dataset
             .execute(
                 alias,
-                MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build())
-                    .build_typed(),
+                MetadataFactory::metadata_block(
+                    MetadataFactory::seed(odf::DatasetKind::Root).build(),
+                )
+                .build_typed(),
                 Default::default(),
             )
             .await

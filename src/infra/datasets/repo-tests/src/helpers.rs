@@ -13,7 +13,7 @@ use std::sync::Arc;
 use chrono::{SubsecRound, Utc};
 use kamu_accounts::{Account, AccountRepository, AccountType};
 use kamu_datasets::DatasetEntry;
-use opendatafabric::{AccountID, AccountName, DatasetID, DatasetName};
+use odf_metadata::{AccountID, AccountName, DatasetID, DatasetName};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

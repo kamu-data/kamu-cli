@@ -14,7 +14,7 @@ use chrono::{DateTime, Utc};
 use database_common::PaginationOpts;
 use dill::*;
 use kamu_flow_system::{BorrowedFlowKeyDataset, *};
-use opendatafabric::{AccountID, DatasetID};
+use odf::{AccountID, DatasetID};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

@@ -11,7 +11,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use dill::*;
-use opendatafabric::{AccountID, AccountName};
+use odf_metadata::{AccountID, AccountName};
 
 use crate::domain::*;
 

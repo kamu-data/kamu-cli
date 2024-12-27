@@ -11,7 +11,6 @@ use async_graphql::*;
 use database_common::NoOpDatabasePlugin;
 use dill::Component;
 use indoc::indoc;
-use kamu::testing::MetadataFactory;
 use kamu::*;
 use kamu_accounts::testing::MockAuthenticationService;
 use kamu_accounts::*;
@@ -20,9 +19,7 @@ use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
 use kamu_datasets_services::DependencyGraphServiceImpl;
 use messaging_outbox::{register_message_dispatcher, Outbox, OutboxImmediateImpl};
 use mockall::predicate::eq;
-use opendatafabric::serde::yaml::YamlDatasetSnapshotSerializer;
-use opendatafabric::serde::DatasetSnapshotSerializer;
-use opendatafabric::*;
+use odf_storage_impl::testing::MetadataFactory;
 use time_source::SystemTimeSourceDefault;
 
 use crate::utils::{authentication_catalogs, expect_anonymous_access_error};
@@ -62,7 +59,7 @@ async fn dataset_by_id() {
     let harness = GraphQLDatasetsHarness::new(TenancyConfig::SingleTenant).await;
 
     let foo_result = harness
-        .create_root_dataset(None, DatasetName::new_unchecked("foo"))
+        .create_root_dataset(None, odf::DatasetName::new_unchecked("foo"))
         .await;
 
     let res = harness
@@ -101,7 +98,7 @@ async fn dataset_by_id() {
 
 #[test_log::test(tokio::test)]
 async fn dataset_by_account_and_name_case_insensitive() {
-    let account_name = AccountName::new_unchecked("KaMu");
+    let account_name = odf::AccountName::new_unchecked("KaMu");
 
     let mut mock_authentication_service = MockAuthenticationService::new();
     mock_authentication_service
@@ -118,7 +115,7 @@ async fn dataset_by_account_and_name_case_insensitive() {
     harness
         .create_root_dataset(
             Some(account_name.clone()),
-            DatasetName::new_unchecked("Foo"),
+            odf::DatasetName::new_unchecked("Foo"),
         )
         .await;
 
@@ -171,7 +168,7 @@ async fn dataset_by_account_id() {
     )
     .await;
     harness
-        .create_root_dataset(None, DatasetName::new_unchecked("Foo"))
+        .create_root_dataset(None, odf::DatasetName::new_unchecked("Foo"))
         .await;
 
     let res = harness
@@ -264,9 +261,12 @@ async fn dataset_create_from_snapshot() {
 
     let snapshot = MetadataFactory::dataset_snapshot()
         .name("foo")
-        .kind(DatasetKind::Root)
+        .kind(odf::DatasetKind::Root)
         .push_event(MetadataFactory::set_polling_source().build())
         .build();
+
+    use odf::metadata::serde::yaml::YamlDatasetSnapshotSerializer;
+    use odf::metadata::serde::DatasetSnapshotSerializer;
 
     let snapshot_yaml = String::from_utf8_lossy(
         &YamlDatasetSnapshotSerializer
@@ -353,7 +353,7 @@ async fn dataset_rename_success() {
     let harness = GraphQLDatasetsHarness::new(TenancyConfig::SingleTenant).await;
 
     let foo_result = harness
-        .create_root_dataset(None, DatasetName::new_unchecked("foo"))
+        .create_root_dataset(None, odf::DatasetName::new_unchecked("foo"))
         .await;
 
     let request_code = indoc!(
@@ -405,7 +405,7 @@ async fn dataset_rename_no_changes() {
     let harness = GraphQLDatasetsHarness::new(TenancyConfig::SingleTenant).await;
 
     let foo_result = harness
-        .create_root_dataset(None, DatasetName::new_unchecked("foo"))
+        .create_root_dataset(None, odf::DatasetName::new_unchecked("foo"))
         .await;
 
     let res = harness
@@ -455,10 +455,10 @@ async fn dataset_rename_name_collision() {
     let harness = GraphQLDatasetsHarness::new(TenancyConfig::SingleTenant).await;
 
     let foo_result = harness
-        .create_root_dataset(None, DatasetName::new_unchecked("foo"))
+        .create_root_dataset(None, odf::DatasetName::new_unchecked("foo"))
         .await;
     let _bar_result = harness
-        .create_root_dataset(None, DatasetName::new_unchecked("bar"))
+        .create_root_dataset(None, odf::DatasetName::new_unchecked("bar"))
         .await;
 
     let res = harness
@@ -508,7 +508,7 @@ async fn dataset_delete_success() {
     let harness = GraphQLDatasetsHarness::new(TenancyConfig::SingleTenant).await;
 
     let foo_result = harness
-        .create_root_dataset(None, DatasetName::new_unchecked("foo"))
+        .create_root_dataset(None, odf::DatasetName::new_unchecked("foo"))
         .await;
 
     let request_code = indoc!(
@@ -557,11 +557,11 @@ async fn dataset_delete_dangling_ref() {
     let harness = GraphQLDatasetsHarness::new(TenancyConfig::SingleTenant).await;
 
     let foo_result = harness
-        .create_root_dataset(None, DatasetName::new_unchecked("foo"))
+        .create_root_dataset(None, odf::DatasetName::new_unchecked("foo"))
         .await;
     let _bar_result = harness
         .create_derived_dataset(
-            DatasetName::new_unchecked("bar"),
+            odf::DatasetName::new_unchecked("bar"),
             &foo_result.dataset_handle,
         )
         .await;
@@ -614,7 +614,7 @@ async fn dataset_view_permissions() {
     let harness = GraphQLDatasetsHarness::new(TenancyConfig::SingleTenant).await;
 
     let foo_result = harness
-        .create_root_dataset(None, DatasetName::new_unchecked("foo"))
+        .create_root_dataset(None, odf::DatasetName::new_unchecked("foo"))
         .await;
 
     let request_code = indoc!(
@@ -692,10 +692,10 @@ impl GraphQLDatasetsHarness {
                 .add::<DependencyGraphServiceImpl>()
                 .add::<InMemoryDatasetDependencyRepository>()
                 .add_value(tenancy_config)
-                .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
-                .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-                .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
-                .add::<DatasetRegistryRepoBridge>()
+                .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
+                .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
+                .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
+                .add::<DatasetRegistrySoloUnitBridge>()
                 .add_value(mock_authentication_service)
                 .bind::<dyn AuthenticationService, MockAuthenticationService>()
                 .add::<auth::AlwaysHappyDatasetActionAuthorizer>();
@@ -721,9 +721,9 @@ impl GraphQLDatasetsHarness {
 
     pub async fn create_root_dataset(
         &self,
-        account_name: Option<AccountName>,
-        name: DatasetName,
-    ) -> CreateDatasetResult {
+        account_name: Option<odf::AccountName>,
+        name: odf::DatasetName,
+    ) -> odf::CreateDatasetResult {
         let create_dataset = self
             .catalog_authorized
             .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
@@ -732,8 +732,8 @@ impl GraphQLDatasetsHarness {
         create_dataset
             .execute(
                 MetadataFactory::dataset_snapshot()
-                    .name(DatasetAlias::new(account_name, name))
-                    .kind(DatasetKind::Root)
+                    .name(odf::DatasetAlias::new(account_name, name))
+                    .kind(odf::DatasetKind::Root)
                     .push_event(MetadataFactory::set_polling_source().build())
                     .build(),
                 Default::default(),
@@ -744,9 +744,9 @@ impl GraphQLDatasetsHarness {
 
     pub async fn create_derived_dataset(
         &self,
-        name: DatasetName,
-        input_dataset: &DatasetHandle,
-    ) -> CreateDatasetResult {
+        name: odf::DatasetName,
+        input_dataset: &odf::DatasetHandle,
+    ) -> odf::CreateDatasetResult {
         let create_dataset = self
             .catalog_authorized
             .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
@@ -755,8 +755,8 @@ impl GraphQLDatasetsHarness {
         create_dataset
             .execute(
                 MetadataFactory::dataset_snapshot()
-                    .name(DatasetAlias::new(None, name))
-                    .kind(DatasetKind::Derivative)
+                    .name(odf::DatasetAlias::new(None, name))
+                    .kind(odf::DatasetKind::Derivative)
                     .push_event(
                         MetadataFactory::set_transform()
                             .inputs_from_refs(vec![input_dataset.alias.clone()])

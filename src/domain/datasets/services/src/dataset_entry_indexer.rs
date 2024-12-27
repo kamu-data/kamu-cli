@@ -19,11 +19,8 @@ use kamu_accounts::{
     DEFAULT_ACCOUNT_ID,
     JOB_KAMU_ACCOUNTS_PREDEFINED_ACCOUNTS_REGISTRATOR,
 };
-use kamu_core::DatasetRepository;
 use kamu_datasets::{DatasetEntry, DatasetEntryRepository};
 use messaging_outbox::JOB_MESSAGING_OUTBOX_STARTUP;
-use opendatafabric as odf;
-use opendatafabric::DatasetHandle;
 use time_source::SystemTimeSource;
 
 use crate::JOB_KAMU_DATASETS_DATASET_ENTRY_INDEXER;
@@ -33,7 +30,8 @@ use crate::JOB_KAMU_DATASETS_DATASET_ENTRY_INDEXER;
 pub struct DatasetEntryIndexer {
     dataset_entry_repo: Arc<dyn DatasetEntryRepository>,
     time_source: Arc<dyn SystemTimeSource>,
-    dataset_repo: Arc<dyn DatasetRepository>,
+    dataset_storage_unit: Arc<dyn odf::DatasetStorageUnit>, /* Note: potentially we will have
+                                                             * multiple */
     account_repository: Arc<dyn AccountRepository>,
 }
 
@@ -51,13 +49,13 @@ impl DatasetEntryIndexer {
     pub fn new(
         dataset_entry_repo: Arc<dyn DatasetEntryRepository>,
         time_source: Arc<dyn SystemTimeSource>,
-        dataset_repo: Arc<dyn DatasetRepository>,
+        dataset_storage_unit: Arc<dyn odf::DatasetStorageUnit>,
         account_repository: Arc<dyn AccountRepository>,
     ) -> Self {
         Self {
             dataset_entry_repo,
             time_source,
-            dataset_repo,
+            dataset_storage_unit,
             account_repository,
         }
     }
@@ -81,8 +79,8 @@ impl DatasetEntryIndexer {
         use futures::TryStreamExt;
 
         let dataset_handles: Vec<_> = self
-            .dataset_repo
-            .all_dataset_handles()
+            .dataset_storage_unit
+            .stored_dataset_handles()
             .try_collect()
             .await?;
 
@@ -121,7 +119,7 @@ impl DatasetEntryIndexer {
 
     async fn build_account_name_id_mapping(
         &self,
-        dataset_handles: &[DatasetHandle],
+        dataset_handles: &[odf::DatasetHandle],
     ) -> Result<HashMap<Option<odf::AccountName>, odf::AccountID>, InternalError> {
         let mut map = HashMap::new();
 

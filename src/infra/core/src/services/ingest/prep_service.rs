@@ -17,7 +17,7 @@ use std::sync::Arc;
 
 use internal_error::ResultIntoInternal;
 use kamu_core::*;
-use opendatafabric::*;
+use odf_metadata::*;
 use thiserror::Error;
 
 const BUFFER_SIZE: usize = 8096;

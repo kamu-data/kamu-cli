@@ -17,7 +17,7 @@ use internal_error::*;
 use kamu_core::engine::ProcessError;
 use kamu_core::*;
 use kamu_datasets::DatasetEnvVar;
-use opendatafabric::*;
+use odf_metadata::*;
 
 use super::*;
 use crate::PollingSourceState;

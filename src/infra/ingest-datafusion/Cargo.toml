@@ -22,10 +22,13 @@ doctest = false
 
 
 [dependencies]
+file-utils = { workspace = true }
 internal-error = { workspace = true }
-opendatafabric = { workspace = true, features = ["arrow"] }
 kamu-core = { workspace = true }
 kamu-data-utils = { workspace = true }
+odf-metadata = { workspace = true, features = ["arrow"] }
+odf-dataset = { workspace = true }
+odf-storage = { workspace = true }
 
 datafusion = { version = "43", default-features = false }
 geo-types = { version = "0.7", default-features = false, features = [] }

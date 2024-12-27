@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use kamu_core::{CompactionResult, PullResult, ResetResult};
-use opendatafabric as odf;
 use serde::{Deserialize, Serialize};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

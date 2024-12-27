@@ -9,7 +9,6 @@
 
 use database_common::PaginationOpts;
 use event_sourcing::EventStore;
-use opendatafabric::DatasetID;
 
 use crate::*;
 
@@ -35,7 +34,7 @@ pub trait TaskEventStore: EventStore<TaskState> {
     /// Note: no longer used, but might be used in future (admin view)
     fn get_tasks_by_dataset(
         &self,
-        dataset_id: &DatasetID,
+        dataset_id: &odf::DatasetID,
         pagination: PaginationOpts,
     ) -> TaskIDStream;
 
@@ -43,7 +42,7 @@ pub trait TaskEventStore: EventStore<TaskState> {
     /// Note: no longer used, but might be used in future (admin view)
     async fn get_count_tasks_by_dataset(
         &self,
-        dataset_id: &DatasetID,
+        dataset_id: &odf::DatasetID,
     ) -> Result<usize, InternalError>;
 }
 

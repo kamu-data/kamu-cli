@@ -12,7 +12,6 @@ use std::collections::BTreeSet;
 
 use chrono::{NaiveTime, SecondsFormat, Utc};
 use http_common::comma_separated::CommaSeparatedSet;
-use kamu::domain::BlockRef;
 use kamu_adapter_http::data::metadata_handler::{
     DatasetMetadataResponse,
     Include as MetadataInclude,
@@ -30,7 +29,8 @@ use kamu_cli_e2e_common::{
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
     E2E_USER_ACCOUNT_NAME,
 };
-use opendatafabric as odf;
+use odf_dataset::BlockRef;
+use odf_metadata as odf;
 use serde_json::json;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

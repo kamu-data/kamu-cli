@@ -14,7 +14,6 @@ use console::style as s;
 use futures::TryStreamExt;
 use kamu::domain::*;
 use kamu::utils::datasets_filtering::filter_datasets_by_local_pattern;
-use opendatafabric::*;
 
 use super::{BatchError, CLIError, Command};
 use crate::output::OutputConfig;
@@ -26,13 +25,13 @@ use crate::output::OutputConfig;
 pub struct PushCommand {
     push_dataset_use_case: Arc<dyn PushDatasetUseCase>,
     dataset_registry: Arc<dyn DatasetRegistry>,
-    refs: Vec<DatasetRefPattern>,
+    refs: Vec<odf::DatasetRefPattern>,
     all: bool,
     recursive: bool,
     add_aliases: bool,
     force: bool,
-    to: Option<DatasetPushTarget>,
-    dataset_visibility: DatasetVisibility,
+    to: Option<odf::DatasetPushTarget>,
+    dataset_visibility: odf::DatasetVisibility,
     output_config: Arc<OutputConfig>,
     tenancy_config: TenancyConfig,
 }
@@ -46,13 +45,13 @@ impl PushCommand {
         recursive: bool,
         add_aliases: bool,
         force: bool,
-        to: Option<DatasetPushTarget>,
-        dataset_visibility: DatasetVisibility,
+        to: Option<odf::DatasetPushTarget>,
+        dataset_visibility: odf::DatasetVisibility,
         output_config: Arc<OutputConfig>,
         tenancy_config: TenancyConfig,
     ) -> Self
     where
-        I: IntoIterator<Item = DatasetRefPattern>,
+        I: IntoIterator<Item = odf::DatasetRefPattern>,
     {
         Self {
             push_dataset_use_case,
@@ -91,8 +90,8 @@ impl PushCommand {
                 Ok(hdl) => dataset_handles.push(hdl),
                 Err(e) => {
                     let push_error = match e {
-                        GetDatasetError::NotFound(e) => PushError::SourceNotFound(e),
-                        GetDatasetError::Internal(e) => PushError::Internal(e),
+                        odf::dataset::GetDatasetError::NotFound(e) => PushError::SourceNotFound(e),
+                        odf::dataset::GetDatasetError::Internal(e) => PushError::Internal(e),
                     };
                     error_responses.push(PushResponse {
                         local_handle: None,
@@ -186,7 +185,7 @@ impl Command for PushCommand {
                 );
             }
             if up_to_date != 0 {
-                if self.dataset_visibility != DatasetVisibility::default() {
+                if self.dataset_visibility != odf::DatasetVisibility::default() {
                     eprintln!(
                         "{}",
                         s("Dataset(s) have already been pushed -- the visibility marker ignored")
@@ -242,8 +241,8 @@ impl PrettyPushProgress {
 impl SyncMultiListener for PrettyPushProgress {
     fn begin_sync(
         &self,
-        src: &DatasetRefAny,
-        dst: &DatasetRefAny,
+        src: &odf::DatasetRefAny,
+        dst: &odf::DatasetRefAny,
     ) -> Option<Arc<dyn SyncListener>> {
         Some(Arc::new(PrettySyncProgress::new(
             src.as_local_ref(|_| self.tenancy_config == TenancyConfig::SingleTenant)
@@ -257,8 +256,8 @@ impl SyncMultiListener for PrettyPushProgress {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct PrettySyncProgress {
-    local_ref: DatasetRef,
-    remote_ref: DatasetRefRemote,
+    local_ref: odf::DatasetRef,
+    remote_ref: odf::DatasetRefRemote,
     multi_progress: Arc<indicatif::MultiProgress>,
     state: Mutex<PrettySyncProgressState>,
 }
@@ -270,8 +269,8 @@ struct PrettySyncProgressState {
 
 impl PrettySyncProgress {
     fn new(
-        local_ref: DatasetRef,
-        remote_ref: DatasetRefRemote,
+        local_ref: odf::DatasetRef,
+        remote_ref: odf::DatasetRefRemote,
         multi_progress: Arc<indicatif::MultiProgress>,
     ) -> Self {
         Self {
@@ -286,8 +285,8 @@ impl PrettySyncProgress {
     }
 
     fn new_spinner(
-        local_ref: &DatasetRef,
-        remote_ref: &DatasetRefRemote,
+        local_ref: &odf::DatasetRef,
+        remote_ref: &odf::DatasetRefRemote,
     ) -> indicatif::ProgressBar {
         let spinner = indicatif::ProgressBar::hidden();
         let style = indicatif::ProgressStyle::default_spinner()

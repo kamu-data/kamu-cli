@@ -14,9 +14,9 @@ use datafusion::arrow::datatypes::SchemaRef;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_core::engine::*;
 use kamu_core::*;
-use opendatafabric::*;
-
-use crate::ObjectRepositoryLocalFSSha3;
+use odf_metadata as odf;
+use odf_storage::{InsertOpts, ObjectRepository};
+use odf_storage_impl::ObjectRepositoryLocalFSSha3;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -33,7 +33,7 @@ pub trait EngineIoStrategy: Send + Sync {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct MaterializedEngineRequest {
-    pub engine_request: TransformRequest,
+    pub engine_request: odf::TransformRequest,
     pub out_data_path: PathBuf,
     pub out_checkpoint_path: PathBuf,
     pub volumes: Vec<VolumeSpec>,
@@ -51,7 +51,7 @@ impl EngineIoStrategyLocalVolume {
     async fn materialize_object(
         &self,
         repo: &dyn ObjectRepository,
-        hash: &Multihash,
+        hash: &odf::Multihash,
         container_in_dir: &Path,
         volumes: &mut Vec<VolumeSpec>,
     ) -> Result<PathBuf, InternalError> {
@@ -65,7 +65,7 @@ impl EngineIoStrategyLocalVolume {
     async fn maybe_materialize_object(
         &self,
         repo: &dyn ObjectRepository,
-        hash: Option<&Multihash>,
+        hash: Option<&odf::Multihash>,
         container_in_dir: &Path,
         volumes: &mut Vec<VolumeSpec>,
     ) -> Result<Option<PathBuf>, InternalError> {
@@ -133,7 +133,7 @@ impl EngineIoStrategy for EngineIoStrategyLocalVolume {
             }
 
             let offset_interval = if let Some(new_offset) = input.new_offset {
-                Some(OffsetInterval {
+                Some(odf::OffsetInterval {
                     start: input.prev_offset.map_or(0, |v| v + 1),
                     end: new_offset,
                 })
@@ -154,7 +154,7 @@ impl EngineIoStrategy for EngineIoStrategyLocalVolume {
                 container_path
             };
 
-            query_inputs.push(TransformRequestInput {
+            query_inputs.push(odf::TransformRequestInput {
                 dataset_id: input.dataset_handle.id,
                 dataset_alias: input.dataset_handle.alias,
                 query_alias: input.alias,
@@ -166,7 +166,7 @@ impl EngineIoStrategy for EngineIoStrategyLocalVolume {
             });
         }
 
-        let engine_request = TransformRequest {
+        let engine_request = odf::TransformRequest {
             dataset_id: request.dataset_handle.id,
             dataset_alias: request.dataset_handle.alias,
             system_time: request.system_time,
@@ -201,7 +201,7 @@ impl EngineIoStrategyRemoteProxy {
     async fn materialize_object(
         &self,
         repo: &dyn ObjectRepository,
-        hash: &Multihash,
+        hash: &odf::Multihash,
         host_in_dir: &Path,
         container_in_dir: &Path,
         volumes: &mut Vec<VolumeSpec>,
@@ -231,7 +231,7 @@ impl EngineIoStrategyRemoteProxy {
     async fn maybe_materialize_object(
         &self,
         repo: &dyn ObjectRepository,
-        hash: Option<&Multihash>,
+        hash: Option<&odf::Multihash>,
         host_in_dir: &Path,
         container_in_dir: &Path,
         volumes: &mut Vec<VolumeSpec>,
@@ -303,7 +303,7 @@ impl EngineIoStrategy for EngineIoStrategyRemoteProxy {
             }
 
             let offset_interval = if let Some(new_offset) = input.new_offset {
-                Some(OffsetInterval {
+                Some(odf::OffsetInterval {
                     start: input.prev_offset.map_or(0, |v| v + 1),
                     end: new_offset,
                 })
@@ -324,7 +324,7 @@ impl EngineIoStrategy for EngineIoStrategyRemoteProxy {
                 container_path
             };
 
-            query_inputs.push(TransformRequestInput {
+            query_inputs.push(odf::TransformRequestInput {
                 dataset_id: input.dataset_handle.id,
                 dataset_alias: input.dataset_handle.alias,
                 query_alias: input.alias,
@@ -336,7 +336,7 @@ impl EngineIoStrategy for EngineIoStrategyRemoteProxy {
             });
         }
 
-        let engine_request = TransformRequest {
+        let engine_request = odf::TransformRequest {
             dataset_id: request.dataset_handle.id,
             dataset_alias: request.dataset_handle.alias,
             system_time: request.system_time,

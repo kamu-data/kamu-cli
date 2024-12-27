@@ -9,24 +9,20 @@
 
 use std::sync::Arc;
 
-use opendatafabric::{self as odf};
-
-use crate::{CreateDatasetResult, Dataset};
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Clone)]
 pub struct ResolvedDataset {
-    dataset: Arc<dyn Dataset>,
+    dataset: Arc<dyn odf::Dataset>,
     handle: odf::DatasetHandle,
 }
 
 impl ResolvedDataset {
-    pub fn new(dataset: Arc<dyn Dataset>, handle: odf::DatasetHandle) -> Self {
+    pub fn new(dataset: Arc<dyn odf::Dataset>, handle: odf::DatasetHandle) -> Self {
         Self { dataset, handle }
     }
 
-    pub fn from(create_dataset_result: &CreateDatasetResult) -> Self {
+    pub fn from(create_dataset_result: &odf::CreateDatasetResult) -> Self {
         Self {
             dataset: create_dataset_result.dataset.clone(),
             handle: create_dataset_result.dataset_handle.clone(),
@@ -57,7 +53,7 @@ impl ResolvedDataset {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl std::ops::Deref for ResolvedDataset {
-    type Target = Arc<dyn Dataset>;
+    type Target = Arc<dyn odf::Dataset>;
     fn deref(&self) -> &Self::Target {
         &self.dataset
     }

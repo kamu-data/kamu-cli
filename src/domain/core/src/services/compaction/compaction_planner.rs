@@ -11,12 +11,11 @@ use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
 use internal_error::{ErrorIntoInternal, InternalError};
-use opendatafabric as odf;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use url::Url;
 
-use crate::{AccessError, CompactionListener, GetRefError, IterBlocksError, ResolvedDataset};
+use crate::{CompactionListener, ResolvedDataset};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -91,7 +90,7 @@ pub struct CompactionDataSliceBatchInfo {
 
 #[derive(Debug, Default, Clone)]
 pub struct CompactionDataSliceBatchUpperBound {
-    pub new_source_state: Option<odf::SourceState>,
+    pub new_source_state: Option<odf::metadata::SourceState>,
     pub new_watermark: Option<DateTime<Utc>>,
     pub new_checkpoint: Option<odf::Checkpoint>,
     pub end_offset: u64,
@@ -119,7 +118,7 @@ pub enum CompactionPlanningError {
     Access(
         #[from]
         #[backtrace]
-        AccessError,
+        odf::AccessError,
     ),
 
     #[error(transparent)]
@@ -136,23 +135,23 @@ pub struct InvalidDatasetKindError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl From<GetRefError> for CompactionPlanningError {
-    fn from(v: GetRefError) -> Self {
+impl From<odf::storage::GetRefError> for CompactionPlanningError {
+    fn from(v: odf::storage::GetRefError) -> Self {
         match v {
-            GetRefError::NotFound(e) => Self::Internal(e.int_err()),
-            GetRefError::Access(e) => Self::Access(e),
-            GetRefError::Internal(e) => Self::Internal(e),
+            odf::storage::GetRefError::NotFound(e) => Self::Internal(e.int_err()),
+            odf::storage::GetRefError::Access(e) => Self::Access(e),
+            odf::storage::GetRefError::Internal(e) => Self::Internal(e),
         }
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl From<IterBlocksError> for CompactionPlanningError {
-    fn from(v: IterBlocksError) -> Self {
+impl From<odf::dataset::IterBlocksError> for CompactionPlanningError {
+    fn from(v: odf::dataset::IterBlocksError) -> Self {
         match v {
-            IterBlocksError::Access(e) => Self::Access(e),
-            IterBlocksError::Internal(e) => Self::Internal(e),
+            odf::dataset::IterBlocksError::Access(e) => Self::Access(e),
+            odf::dataset::IterBlocksError::Internal(e) => Self::Internal(e),
             _ => CompactionPlanningError::Internal(v.int_err()),
         }
     }

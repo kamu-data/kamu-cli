@@ -17,13 +17,12 @@ use kamu_accounts::{
     DEFAULT_ACCOUNT_NAME_STR,
 };
 use mockall::predicate::eq;
-use opendatafabric::{AccountID, AccountName};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
 async fn test_account_by_id() {
-    let invalid_account_id = AccountID::new_seeded_ed25519(b"I don't exist");
+    let invalid_account_id = odf::AccountID::new_seeded_ed25519(b"I don't exist");
 
     let mut mock_authentication_service = MockAuthenticationService::new();
     mock_authentication_service
@@ -107,7 +106,7 @@ async fn test_account_by_name() {
         .returning(|_| Ok(Some(Account::dummy())));
     mock_authentication_service
         .expect_account_by_name()
-        .with(eq(AccountName::new_unchecked("unknown")))
+        .with(eq(odf::AccountName::new_unchecked("unknown")))
         .returning(|_| Ok(None));
 
     let harness = GraphQLAccountsHarness::new(mock_authentication_service);

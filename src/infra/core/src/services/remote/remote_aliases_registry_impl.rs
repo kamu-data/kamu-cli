@@ -12,8 +12,10 @@ use std::sync::Arc;
 use dill::*;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_core::*;
-use opendatafabric::serde::yaml::Manifest;
-use opendatafabric::*;
+use odf_dataset::Dataset;
+use odf_metadata::serde::yaml::Manifest;
+use odf_metadata::*;
+use odf_storage::GetNamedError;
 use thiserror::Error;
 
 use crate::DatasetConfig;

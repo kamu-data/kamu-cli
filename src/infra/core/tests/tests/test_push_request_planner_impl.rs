@@ -10,11 +10,11 @@
 use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
-use auth::DummyOdfServerAccessTokenResolver;
 use kamu::testing::BaseRepoHarness;
 use kamu::*;
 use kamu_core::*;
-use opendatafabric::{
+use odf_dataset::DummyOdfServerAccessTokenResolver;
+use odf_metadata::{
     DatasetAlias,
     DatasetAliasRemote,
     DatasetName,

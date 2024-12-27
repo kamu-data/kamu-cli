@@ -16,7 +16,7 @@ use container_runtime::*;
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_core::*;
 use kamu_datasets::{DatasetEnvVar, DatasetKeyValueService};
-use opendatafabric::*;
+use odf_metadata::*;
 use url::Url;
 
 use super::*;

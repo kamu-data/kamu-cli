@@ -15,7 +15,7 @@ use datafusion::datasource::file_format::file_compression_type::FileCompressionT
 use datafusion::prelude::*;
 use internal_error::*;
 use kamu_core::ingest::ReadError;
-use opendatafabric::*;
+use odf_metadata::*;
 
 use crate::*;
 

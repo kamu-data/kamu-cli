@@ -11,7 +11,6 @@ use base64::Engine;
 use bytes::Bytes;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_core::MediaType;
-use opendatafabric::AccountID;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tokio::io::AsyncRead;
@@ -22,7 +21,7 @@ use tokio::io::AsyncRead;
 pub trait UploadService: Send + Sync {
     async fn make_upload_context(
         &self,
-        owner_account_id: &AccountID,
+        owner_account_id: &odf::AccountID,
         file_name: String,
         content_type: Option<MediaType>,
         content_length: usize,
@@ -30,14 +29,14 @@ pub trait UploadService: Send + Sync {
 
     async fn upload_reference_size(
         &self,
-        owner_account_id: &AccountID,
+        owner_account_id: &odf::AccountID,
         upload_id: &str,
         file_name: &str,
     ) -> Result<usize, UploadTokenIntoStreamError>;
 
     async fn upload_reference_into_stream(
         &self,
-        owner_account_id: &AccountID,
+        owner_account_id: &odf::AccountID,
         upload_id: &str,
         file_name: &str,
     ) -> Result<Box<dyn AsyncRead + Send + Unpin>, UploadTokenIntoStreamError>;
@@ -54,7 +53,7 @@ pub trait UploadService: Send + Sync {
         upload_token: &UploadToken,
     ) -> Result<Box<dyn AsyncRead + Send + Unpin>, UploadTokenIntoStreamError> {
         let owner_account_id =
-            AccountID::from_multibase_string(&upload_token.owner_account_id).int_err()?;
+            odf::AccountID::from_multibase_string(&upload_token.owner_account_id).int_err()?;
 
         let actual_data_size = self
             .upload_reference_size(

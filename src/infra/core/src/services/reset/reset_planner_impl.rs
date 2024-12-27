@@ -10,7 +10,8 @@
 use dill::*;
 use internal_error::ResultIntoInternal;
 use kamu_core::*;
-use opendatafabric as odf;
+use odf_dataset::{BlockRef, MetadataChainExt, SearchSeedVisitor};
+use odf_metadata as odf;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

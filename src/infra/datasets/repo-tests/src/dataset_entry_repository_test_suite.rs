@@ -23,7 +23,7 @@ use kamu_datasets::{
     SaveDatasetEntryError,
     UpdateDatasetEntryNameError,
 };
-use opendatafabric::{DatasetID, DatasetName};
+use odf_metadata::{DatasetID, DatasetName};
 
 use crate::helpers::*;
 

@@ -13,7 +13,6 @@ use std::sync::Arc;
 
 use dill::*;
 use futures::TryStreamExt;
-use kamu::testing::MetadataFactory;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::*;
@@ -23,7 +22,7 @@ use kamu_flow_system::*;
 use kamu_flow_system_inmem::*;
 use kamu_flow_system_services::*;
 use messaging_outbox::{register_message_dispatcher, Outbox, OutboxImmediateImpl};
-use opendatafabric::*;
+use odf_storage_impl::testing::MetadataFactory;
 use time_source::SystemTimeSourceDefault;
 
 use super::FlowConfigTestListener;
@@ -222,10 +221,10 @@ impl FlowConfigurationHarness {
             .add::<InMemoryFlowConfigurationEventStore>()
             .add::<SystemTimeSourceDefault>()
             .add_value(TenancyConfig::SingleTenant)
-            .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
-            .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-            .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
-            .add::<DatasetRegistryRepoBridge>()
+            .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
+            .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
+            .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
+            .add::<DatasetRegistrySoloUnitBridge>()
             .add_value(CurrentAccountSubject::new_test())
             .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
             .add::<DependencyGraphServiceImpl>()
@@ -279,7 +278,7 @@ impl FlowConfigurationHarness {
 
     async fn set_dataset_flow_config(
         &self,
-        dataset_id: DatasetID,
+        dataset_id: odf::DatasetID,
         dataset_flow_type: DatasetFlowType,
         configuration_rule: FlowConfigurationRule,
     ) {
@@ -295,7 +294,7 @@ impl FlowConfigurationHarness {
     fn expect_dataset_flow_config(
         &self,
         configurations: &HashMap<FlowKey, FlowConfigurationState>,
-        dataset_id: DatasetID,
+        dataset_id: odf::DatasetID,
         dataset_flow_type: DatasetFlowType,
         expected_rule: &FlowConfigurationRule,
     ) {
@@ -311,7 +310,7 @@ impl FlowConfigurationHarness {
 
     async fn get_dataset_flow_config_from_store(
         &self,
-        dataset_id: DatasetID,
+        dataset_id: odf::DatasetID,
         dataset_flow_type: DatasetFlowType,
     ) -> FlowConfigurationState {
         let flow_key: FlowKey = FlowKeyDataset::new(dataset_id, dataset_flow_type).into();
@@ -322,7 +321,7 @@ impl FlowConfigurationHarness {
         flow_configuration.into()
     }
 
-    async fn create_root_dataset(&self, dataset_name: &str) -> DatasetID {
+    async fn create_root_dataset(&self, dataset_name: &str) -> odf::DatasetID {
         let create_dataset_from_snapshot = self
             .catalog
             .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
@@ -332,7 +331,7 @@ impl FlowConfigurationHarness {
             .execute(
                 MetadataFactory::dataset_snapshot()
                     .name(dataset_name)
-                    .kind(DatasetKind::Root)
+                    .kind(odf::DatasetKind::Root)
                     .push_event(MetadataFactory::set_polling_source().build())
                     .build(),
                 Default::default(),
@@ -343,7 +342,7 @@ impl FlowConfigurationHarness {
         result.dataset_handle.id
     }
 
-    async fn delete_dataset(&self, dataset_id: &DatasetID) {
+    async fn delete_dataset(&self, dataset_id: &odf::DatasetID) {
         // Do the actual deletion
         let delete_dataset = self.catalog.get_one::<dyn DeleteDatasetUseCase>().unwrap();
         delete_dataset

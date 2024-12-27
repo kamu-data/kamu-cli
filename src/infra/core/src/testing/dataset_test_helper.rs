@@ -9,11 +9,13 @@
 
 use std::path::{Path, PathBuf};
 
+use file_utils::OwnedFile;
 use kamu_core::*;
-use opendatafabric::*;
+use odf_dataset::{AddDataParams, CheckpointRef, CommitOpts, MetadataChainExt, TryStreamExtExt};
+use odf_dataset_impl::DatasetLayout;
+use odf_metadata::*;
 
 use super::ParquetWriterHelper;
-use crate::DatasetLayout;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

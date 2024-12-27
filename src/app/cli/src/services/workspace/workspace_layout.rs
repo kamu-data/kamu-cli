@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu::domain::TenancyConfig;
-use opendatafabric::serde::yaml::Manifest;
+use odf::metadata::serde::yaml::Manifest;
 use serde::{Deserialize, Serialize};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

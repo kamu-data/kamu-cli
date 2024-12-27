@@ -12,24 +12,15 @@ use std::sync::Arc;
 
 use dill::{Catalog, Component};
 use kamu_accounts::CurrentAccountSubject;
-use kamu_core::{
-    CreateDatasetResult,
-    DatasetRegistry,
-    DatasetRegistryExt,
-    DatasetRepository,
-    GetDatasetError,
-    MetadataChainExt,
-    ResolvedDataset,
-    RunInfoDir,
-    TenancyConfig,
-};
-use opendatafabric::serde::flatbuffers::FlatbuffersMetadataBlockSerializer;
-use opendatafabric::serde::MetadataBlockSerializer;
-use opendatafabric::{DatasetAlias, DatasetKind, DatasetRef, MetadataBlock, Multicodec, Multihash};
+use kamu_core::{DatasetRegistry, DatasetRegistryExt, ResolvedDataset, RunInfoDir, TenancyConfig};
+use odf_dataset::{CreateDatasetResult, DatasetStorageUnit, GetDatasetError, MetadataChainExt};
+use odf_metadata::serde::flatbuffers::FlatbuffersMetadataBlockSerializer;
+use odf_metadata::serde::MetadataBlockSerializer;
+use odf_metadata::{DatasetAlias, DatasetKind, DatasetRef, MetadataBlock, Multicodec, Multihash};
+use odf_storage_impl::testing::MetadataFactory;
 use time_source::SystemTimeSourceDefault;
 
-use crate::testing::MetadataFactory;
-use crate::{DatasetRegistryRepoBridge, DatasetRepositoryLocalFs, DatasetRepositoryWriter};
+use crate::{DatasetRegistrySoloUnitBridge, DatasetStorageUnitLocalFs, DatasetStorageUnitWriter};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -37,7 +28,7 @@ pub struct BaseRepoHarness {
     temp_dir: tempfile::TempDir,
     catalog: Catalog,
     dataset_registry: Arc<dyn DatasetRegistry>,
-    dataset_repo_writer: Arc<dyn DatasetRepositoryWriter>,
+    dataset_storage_unit_writer: Arc<dyn DatasetStorageUnitWriter>,
 }
 
 impl BaseRepoHarness {
@@ -53,22 +44,22 @@ impl BaseRepoHarness {
         let catalog = dill::CatalogBuilder::new()
             .add_value(RunInfoDir::new(run_info_dir))
             .add_value(tenancy_config)
-            .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
-            .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-            .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
-            .add::<DatasetRegistryRepoBridge>()
+            .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
+            .bind::<dyn DatasetStorageUnit, DatasetStorageUnitLocalFs>()
+            .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
+            .add::<DatasetRegistrySoloUnitBridge>()
             .add_value(CurrentAccountSubject::new_test())
             .add::<SystemTimeSourceDefault>()
             .build();
 
         let dataset_registry = catalog.get_one().unwrap();
-        let dataset_repo_writer = catalog.get_one().unwrap();
+        let dataset_storage_unit_writer = catalog.get_one().unwrap();
 
         Self {
             temp_dir,
             catalog,
             dataset_registry,
-            dataset_repo_writer,
+            dataset_storage_unit_writer,
         }
     }
 
@@ -84,8 +75,8 @@ impl BaseRepoHarness {
         self.dataset_registry.as_ref()
     }
 
-    pub fn dataset_repo_writer(&self) -> &dyn DatasetRepositoryWriter {
-        self.dataset_repo_writer.as_ref()
+    pub fn dataset_storage_unit_writer(&self) -> &dyn DatasetStorageUnitWriter {
+        self.dataset_storage_unit_writer.as_ref()
     }
 
     pub async fn check_dataset_exists(&self, alias: &DatasetAlias) -> Result<(), GetDatasetError> {
@@ -103,7 +94,7 @@ impl BaseRepoHarness {
             .build();
 
         let result = self
-            .dataset_repo_writer
+            .dataset_storage_unit_writer
             .create_dataset_from_snapshot(snapshot)
             .await
             .unwrap();
@@ -116,7 +107,7 @@ impl BaseRepoHarness {
         alias: &DatasetAlias,
         input_dataset_refs: Vec<DatasetRef>,
     ) -> CreateDatasetResult {
-        self.dataset_repo_writer
+        self.dataset_storage_unit_writer
             .create_dataset_from_snapshot(
                 MetadataFactory::dataset_snapshot()
                     .name(alias.clone())

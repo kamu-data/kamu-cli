@@ -17,7 +17,6 @@ use futures::TryStreamExt;
 use kamu::domain::*;
 use kamu::utils::datasets_filtering::filter_datasets_by_any_pattern;
 use kamu_accounts::CurrentAccountSubject;
-use opendatafabric::*;
 
 use super::{BatchError, CLIError, Command};
 use crate::output::OutputConfig;
@@ -32,12 +31,12 @@ pub struct PullCommand {
     search_svc: Arc<dyn SearchService>,
     output_config: Arc<OutputConfig>,
     tenancy_config: TenancyConfig,
-    refs: Vec<DatasetRefAnyPattern>,
+    refs: Vec<odf::DatasetRefAnyPattern>,
     current_account_subject: Arc<CurrentAccountSubject>,
     all: bool,
     recursive: bool,
     fetch_uncacheable: bool,
-    as_name: Option<DatasetName>,
+    as_name: Option<odf::DatasetName>,
     add_aliases: bool,
     force: bool,
     reset_derivatives_on_diverged_input: bool,
@@ -55,13 +54,13 @@ impl PullCommand {
         all: bool,
         recursive: bool,
         fetch_uncacheable: bool,
-        as_name: Option<DatasetName>,
+        as_name: Option<odf::DatasetName>,
         add_aliases: bool,
         force: bool,
         reset_derivatives_on_diverged_input: bool,
     ) -> Self
     where
-        I: IntoIterator<Item = DatasetRefAnyPattern>,
+        I: IntoIterator<Item = odf::DatasetRefAnyPattern>,
     {
         Self {
             pull_dataset_use_case,
@@ -101,7 +100,7 @@ impl PullCommand {
             .execute_multi(
                 vec![PullRequest::remote(
                     remote_ref,
-                    Some(DatasetAlias::new(
+                    Some(odf::DatasetAlias::new(
                         match self.tenancy_config {
                             TenancyConfig::MultiTenant => {
                                 Some(self.current_account_subject.account_name().clone())
@@ -124,7 +123,7 @@ impl PullCommand {
     async fn pull_multi(
         &self,
         listener: Option<Arc<dyn PullMultiListener>>,
-        current_account_name: &AccountName,
+        current_account_name: &odf::AccountName,
     ) -> Result<Vec<PullResponse>, CLIError> {
         let dataset_any_refs: Vec<_> = if !self.all {
             filter_datasets_by_any_pattern(
@@ -328,7 +327,7 @@ impl PullMultiListener for PrettyPullProgress {
 impl PollingIngestMultiListener for PrettyPullProgress {
     fn begin_ingest(
         &self,
-        dataset_handle: &DatasetHandle,
+        dataset_handle: &odf::DatasetHandle,
     ) -> Option<Arc<dyn PollingIngestListener>> {
         Some(Arc::new(PrettyIngestProgress::new(
             dataset_handle,
@@ -341,7 +340,7 @@ impl PollingIngestMultiListener for PrettyPullProgress {
 impl TransformMultiListener for PrettyPullProgress {
     fn begin_transform(
         &self,
-        dataset_handle: &DatasetHandle,
+        dataset_handle: &odf::DatasetHandle,
     ) -> Option<Arc<dyn TransformListener>> {
         Some(Arc::new(PrettyTransformProgress::new(
             dataset_handle,
@@ -353,8 +352,8 @@ impl TransformMultiListener for PrettyPullProgress {
 impl SyncMultiListener for PrettyPullProgress {
     fn begin_sync(
         &self,
-        src: &DatasetRefAny,
-        dst: &DatasetRefAny,
+        src: &odf::DatasetRefAny,
+        dst: &odf::DatasetRefAny,
     ) -> Option<Arc<dyn SyncListener>> {
         Some(Arc::new(PrettySyncProgress::new(
             dst.as_local_ref(|_| self.tenancy_config == TenancyConfig::SingleTenant)
@@ -374,7 +373,7 @@ enum ProgressStyle {
 }
 
 pub struct PrettyIngestProgress {
-    dataset_handle: DatasetHandle,
+    dataset_handle: odf::DatasetHandle,
     multi_progress: Arc<indicatif::MultiProgress>,
     fetch_uncacheable: bool,
     state: Mutex<PrettyIngestProgressState>,
@@ -388,7 +387,7 @@ struct PrettyIngestProgressState {
 
 impl PrettyIngestProgress {
     pub fn new(
-        dataset_handle: &DatasetHandle,
+        dataset_handle: &odf::DatasetHandle,
         multi_progress: Arc<indicatif::MultiProgress>,
         fetch_uncacheable: bool,
     ) -> Self {
@@ -437,7 +436,7 @@ impl PrettyIngestProgress {
     }
 
     fn spinner_message<T: std::fmt::Display>(
-        dataset_handle: &DatasetHandle,
+        dataset_handle: &odf::DatasetHandle,
         step: u32,
         msg: T,
     ) -> String {
@@ -652,13 +651,16 @@ impl PullImageListener for PrettyIngestProgress {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct PrettyTransformProgress {
-    dataset_handle: DatasetHandle,
+    dataset_handle: odf::DatasetHandle,
     multi_progress: Arc<indicatif::MultiProgress>,
     curr_progress: Mutex<indicatif::ProgressBar>,
 }
 
 impl PrettyTransformProgress {
-    fn new(dataset_handle: &DatasetHandle, multi_progress: Arc<indicatif::MultiProgress>) -> Self {
+    fn new(
+        dataset_handle: &odf::DatasetHandle,
+        multi_progress: Arc<indicatif::MultiProgress>,
+    ) -> Self {
         Self {
             dataset_handle: dataset_handle.clone(),
             curr_progress: Mutex::new(multi_progress.add(Self::new_spinner(
@@ -680,7 +682,7 @@ impl PrettyTransformProgress {
     }
 
     fn spinner_message<T: std::fmt::Display>(
-        dataset_handle: &DatasetHandle,
+        dataset_handle: &odf::DatasetHandle,
         step: u32,
         msg: T,
     ) -> String {
@@ -796,8 +798,8 @@ impl PullImageListener for PrettyTransformProgress {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct PrettySyncProgress {
-    local_ref: DatasetRef,
-    remote_ref: DatasetRefRemote,
+    local_ref: odf::DatasetRef,
+    remote_ref: odf::DatasetRefRemote,
     multi_progress: Arc<indicatif::MultiProgress>,
     state: Mutex<PrettySyncProgressState>,
 }
@@ -809,8 +811,8 @@ struct PrettySyncProgressState {
 
 impl PrettySyncProgress {
     fn new(
-        local_ref: DatasetRef,
-        remote_ref: DatasetRefRemote,
+        local_ref: odf::DatasetRef,
+        remote_ref: odf::DatasetRefRemote,
         multi_progress: Arc<indicatif::MultiProgress>,
     ) -> Self {
         Self {
@@ -825,8 +827,8 @@ impl PrettySyncProgress {
     }
 
     fn new_spinner(
-        local_ref: &DatasetRef,
-        remote_ref: &DatasetRefRemote,
+        local_ref: &odf::DatasetRef,
+        remote_ref: &odf::DatasetRefRemote,
     ) -> indicatif::ProgressBar {
         let spinner = indicatif::ProgressBar::hidden();
         let style = indicatif::ProgressStyle::default_spinner()

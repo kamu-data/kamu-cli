@@ -22,7 +22,7 @@ use kamu_cli_e2e_common::{
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_3,
 };
 use kamu_flow_system::DatasetFlowType;
-use opendatafabric as odf;
+use odf_metadata as odf;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

@@ -13,7 +13,7 @@ use std::sync::Arc;
 use kamu::testing::MockDatasetActionAuthorizer;
 use kamu::*;
 use kamu_core::*;
-use opendatafabric::*;
+use odf_metadata::*;
 
 use super::{BaseUseCaseHarness, BaseUseCaseHarnessOptions};
 

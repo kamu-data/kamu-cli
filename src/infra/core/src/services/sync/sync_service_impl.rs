@@ -12,10 +12,18 @@ use std::sync::Arc;
 
 use dill::*;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
-use kamu_core::services::sync_service::DatasetNotFoundError;
 use kamu_core::utils::metadata_chain_comparator::*;
 use kamu_core::*;
-use opendatafabric::*;
+use odf_dataset::{
+    AppendValidation,
+    BlockRef,
+    Dataset,
+    DatasetFactory,
+    IterBlocksError,
+    UnsupportedProtocolError,
+};
+use odf_metadata as odf;
+use odf_storage::GetRefError;
 use url::Url;
 
 use crate::resolve_remote_dataset_url;
@@ -244,7 +252,7 @@ impl SyncServiceImpl {
                     tracing::info!(%old_cid, "Attempting to read remote head");
                     let dst_http_url = resolve_remote_dataset_url(
                         self.remote_repo_reg.as_ref(),
-                        &DatasetRefRemote::from(dst_url),
+                        &odf::DatasetRefRemote::from(dst_url),
                     )?;
                     let dst_dataset = self
                         .dataset_factory
@@ -277,7 +285,7 @@ impl SyncServiceImpl {
         tracing::info!(?src_head, ?dst_head, "Resolved heads");
 
         if !opts.create_if_not_exists && dst_head.is_none() {
-            return Err(DatasetNotFoundError::new(dst_url).into());
+            return Err(DatasetAnyRefUnresolvedError::new(dst_url).into());
         }
 
         match chains_comparison {

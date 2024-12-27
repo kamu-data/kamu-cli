@@ -13,16 +13,12 @@ use std::sync::Arc;
 use dill::Catalog;
 use kamu::testing::MockDatasetActionAuthorizer;
 use kamu::DeleteDatasetUseCaseImpl;
-use kamu_core::{
-    DatasetLifecycleMessage,
-    DeleteDatasetError,
-    DeleteDatasetUseCase,
-    GetDatasetError,
-};
+use kamu_core::{DatasetLifecycleMessage, DeleteDatasetUseCase};
 use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
 use kamu_datasets_services::{DependencyGraphIndexer, DependencyGraphServiceImpl};
 use messaging_outbox::{consume_deserialized_message, ConsumerFilter, Message, MockOutbox};
-use opendatafabric::{DatasetAlias, DatasetName};
+use odf_dataset::{DeleteDatasetError, GetDatasetError};
+use odf_metadata::{DatasetAlias, DatasetName};
 
 use crate::tests::use_cases::*;
 

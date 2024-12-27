@@ -14,7 +14,7 @@ use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::prelude::*;
 use internal_error::*;
 use kamu_core::ingest::ReadError;
-use opendatafabric::*;
+use odf_metadata::*;
 
 use crate::*;
 

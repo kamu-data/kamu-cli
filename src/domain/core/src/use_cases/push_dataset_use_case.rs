@@ -10,7 +10,6 @@
 use std::sync::Arc;
 
 use internal_error::InternalError;
-use opendatafabric::DatasetHandle;
 
 use crate::{PushMultiOptions, PushResponse, SyncMultiListener};
 
@@ -20,7 +19,7 @@ use crate::{PushMultiOptions, PushResponse, SyncMultiListener};
 pub trait PushDatasetUseCase: Send + Sync {
     async fn execute_multi(
         &self,
-        dataset_handles: Vec<DatasetHandle>,
+        dataset_handles: Vec<odf::DatasetHandle>,
         options: PushMultiOptions,
         sync_listener: Option<Arc<dyn SyncMultiListener>>,
     ) -> Result<Vec<PushResponse>, InternalError>;

@@ -10,7 +10,6 @@
 use std::backtrace::Backtrace;
 
 use internal_error::{BoxedError, InternalError};
-use opendatafabric::DatasetSnapshot;
 use thiserror::Error;
 
 #[async_trait::async_trait]
@@ -18,17 +17,17 @@ pub trait ResourceLoader: Send + Sync {
     async fn load_dataset_snapshot_from_path(
         &self,
         path: &std::path::Path,
-    ) -> Result<DatasetSnapshot, ResourceError>;
+    ) -> Result<odf::DatasetSnapshot, ResourceError>;
 
     async fn load_dataset_snapshot_from_url(
         &self,
         url: &url::Url,
-    ) -> Result<DatasetSnapshot, ResourceError>;
+    ) -> Result<odf::DatasetSnapshot, ResourceError>;
 
     async fn load_dataset_snapshot_from_ref(
         &self,
         sref: &str,
-    ) -> Result<DatasetSnapshot, ResourceError>;
+    ) -> Result<odf::DatasetSnapshot, ResourceError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -10,7 +10,6 @@
 use std::sync::Arc;
 
 use kamu_core::ServerUrlConfig;
-use opendatafabric as odf;
 
 use crate::prelude::*;
 use crate::queries::*;

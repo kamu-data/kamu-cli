@@ -11,7 +11,7 @@ use database_common::{PaginationOpts, TransactionRef, TransactionRefT};
 use dill::*;
 use futures::TryStreamExt;
 use kamu_task_system::*;
-use opendatafabric::DatasetID;
+use odf_metadata::DatasetID;
 use sqlx::{FromRow, Postgres, QueryBuilder};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

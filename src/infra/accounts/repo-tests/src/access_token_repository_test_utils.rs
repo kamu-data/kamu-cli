@@ -11,7 +11,7 @@
 
 use chrono::{SubsecRound, Utc};
 use kamu_accounts::AccessToken;
-use opendatafabric::AccountID;
+use odf_metadata::AccountID;
 use rand::Rng;
 use uuid::Uuid;
 

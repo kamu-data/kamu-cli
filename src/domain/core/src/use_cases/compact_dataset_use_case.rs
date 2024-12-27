@@ -10,12 +10,10 @@
 use std::sync::Arc;
 
 use internal_error::InternalError;
-use opendatafabric as odf;
 use thiserror::Error;
 
 use crate::auth::DatasetActionUnauthorizedError;
 use crate::{
-    AccessError,
     CompactionExecutionError,
     CompactionListener,
     CompactionMultiListener,
@@ -73,7 +71,7 @@ pub enum CompactionError {
     Access(
         #[from]
         #[backtrace]
-        AccessError,
+        odf::AccessError,
     ),
 
     #[error(transparent)]

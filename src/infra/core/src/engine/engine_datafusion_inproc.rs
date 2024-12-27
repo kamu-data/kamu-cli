@@ -13,7 +13,7 @@ use datafusion::prelude::*;
 use internal_error::*;
 use kamu_core::engine::*;
 use kamu_core::ResolvedDatasetsMap;
-use opendatafabric::*;
+use odf_metadata::*;
 
 /// An in-process engine using Apache Arrow Datafusion framework.
 ///

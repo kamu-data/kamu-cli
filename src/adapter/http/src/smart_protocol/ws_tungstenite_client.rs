@@ -16,8 +16,7 @@ use headers::Header;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu::utils::smart_transfer_protocol::{SmartTransferProtocolClient, TransferOptions};
 use kamu_core::*;
-use odf::AsTypedBlock;
-use opendatafabric as odf;
+use odf::metadata::AsTypedBlock as _;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use tokio::net::TcpStream;
@@ -37,7 +36,7 @@ use crate::OdfSmtpVersion;
 
 pub struct WsSmartTransferProtocolClient {
     catalog: Catalog,
-    dataset_credential_resolver: Arc<dyn auth::OdfServerAccessTokenResolver>,
+    dataset_credential_resolver: Arc<dyn odf::dataset::OdfServerAccessTokenResolver>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -47,7 +46,7 @@ pub struct WsSmartTransferProtocolClient {
 impl WsSmartTransferProtocolClient {
     pub fn new(
         catalog: Catalog,
-        dataset_credential_resolver: Arc<dyn auth::OdfServerAccessTokenResolver>,
+        dataset_credential_resolver: Arc<dyn odf::dataset::OdfServerAccessTokenResolver>,
     ) -> Self {
         Self {
             catalog,
@@ -103,10 +102,12 @@ impl WsSmartTransferProtocolClient {
             Err(DatasetPullRequestError::InvalidInterval(DatasetPullInvalidIntervalError {
                 head,
                 tail,
-            })) => Err(PullClientError::InvalidInterval(InvalidIntervalError {
-                head: head.clone(),
-                tail: tail.clone(),
-            })),
+            })) => Err(PullClientError::InvalidInterval(
+                odf::dataset::InvalidIntervalError {
+                    head: head.clone(),
+                    tail: tail.clone(),
+                },
+            )),
         }
     }
 
@@ -197,7 +198,7 @@ impl WsSmartTransferProtocolClient {
         transfer_plan: TransferPlan,
         dst_head: Option<&odf::Multihash>,
         force_update_if_diverged: bool,
-        visibility_for_created_dataset: DatasetVisibility,
+        visibility_for_created_dataset: odf::DatasetVisibility,
     ) -> Result<DatasetPushRequestAccepted, PushClientError> {
         let push_request_message = DatasetPushRequest {
             current_head: dst_head.cloned(),
@@ -234,10 +235,10 @@ impl WsSmartTransferProtocolClient {
                 ))))
             }
             Err(DatasetPushRequestError::InvalidHead(e)) => {
-                Err(PushClientError::InvalidHead(RefCASError {
+                Err(PushClientError::InvalidHead(odf::dataset::RefCASError {
                     actual: e.actual_head.clone(),
                     expected: e.expected_head.clone(),
-                    reference: BlockRef::Head,
+                    reference: odf::BlockRef::Head,
                 }))
             }
         }
@@ -246,7 +247,7 @@ impl WsSmartTransferProtocolClient {
     async fn push_send_metadata_request(
         &self,
         socket: &mut TungsteniteStream,
-        src_dataset: &dyn Dataset,
+        src_dataset: &dyn odf::Dataset,
         src_head: &odf::Multihash,
         dst_head: Option<&odf::Multihash>,
         force_update_if_diverged: bool,
@@ -320,10 +321,12 @@ impl WsSmartTransferProtocolClient {
                 })?
                 .map_err(|e| match e {
                     DatasetPushObjectsTransferError::RefCollision(err) => {
-                        PushClientError::RefCollision(RefCollisionError { id: err.dataset_id })
+                        PushClientError::RefCollision(odf::dataset::RefCollisionError {
+                            id: err.dataset_id,
+                        })
                     }
                     DatasetPushObjectsTransferError::NameCollision(err) => {
-                        PushClientError::NameCollision(NameCollisionError {
+                        PushClientError::NameCollision(odf::dataset::NameCollisionError {
                             alias: err.dataset_alias,
                         })
                     }
@@ -369,7 +372,7 @@ impl WsSmartTransferProtocolClient {
         &self,
         socket: &mut TungsteniteStream,
         push_objects_response: DatasetPushObjectsTransferAccepted,
-        src: Arc<dyn Dataset>,
+        src: Arc<dyn odf::Dataset>,
         transfer_options: TransferOptions,
     ) -> Result<(), SyncError> {
         let uploaded_files_counter = Arc::new(AtomicI32::new(0));
@@ -514,7 +517,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
     async fn pull_protocol_client_flow(
         &self,
         http_src_url: &Url,
-        dst: Option<Arc<dyn Dataset>>,
+        dst: Option<Arc<dyn odf::Dataset>>,
         dst_alias: Option<&odf::DatasetAlias>,
         listener: Arc<dyn SyncListener>,
         transfer_options: TransferOptions,
@@ -551,10 +554,12 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
                 if let TungsteniteError::Http(response) = &e {
                     match response.status() {
                         http::StatusCode::FORBIDDEN => {
-                            return Err(SyncError::Access(AccessError::Forbidden(Box::new(e))))
+                            return Err(SyncError::Access(odf::AccessError::Forbidden(Box::new(e))))
                         }
                         http::StatusCode::UNAUTHORIZED => {
-                            return Err(SyncError::Access(AccessError::Unauthorized(Box::new(e))))
+                            return Err(SyncError::Access(odf::AccessError::Unauthorized(
+                                Box::new(e),
+                            )))
                         }
                         http::StatusCode::BAD_REQUEST => {
                             if let Some(body) = response.body().as_ref()
@@ -567,9 +572,11 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
                         _ => {}
                     }
                     if response.status() == http::StatusCode::FORBIDDEN {
-                        return Err(SyncError::Access(AccessError::Forbidden(Box::new(e))));
+                        return Err(SyncError::Access(odf::AccessError::Forbidden(Box::new(e))));
                     } else if response.status() == http::StatusCode::UNAUTHORIZED {
-                        return Err(SyncError::Access(AccessError::Unauthorized(Box::new(e))));
+                        return Err(SyncError::Access(odf::AccessError::Unauthorized(Box::new(
+                            e,
+                        ))));
                     }
                 }
                 return Err(SyncError::Internal(e.int_err()));
@@ -577,11 +584,15 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
         };
 
         let dst_head = if let Some(dst) = &dst {
-            match dst.as_metadata_chain().resolve_ref(&BlockRef::Head).await {
+            match dst
+                .as_metadata_chain()
+                .resolve_ref(&odf::BlockRef::Head)
+                .await
+            {
                 Ok(head) => Ok(Some(head)),
-                Err(GetRefError::NotFound(_)) => Ok(None),
-                Err(GetRefError::Access(e)) => Err(SyncError::Access(e)),
-                Err(GetRefError::Internal(e)) => Err(SyncError::Internal(e)),
+                Err(odf::storage::GetRefError::NotFound(_)) => Ok(None),
+                Err(odf::storage::GetRefError::Access(e)) => Err(SyncError::Access(e)),
+                Err(odf::storage::GetRefError::Internal(e)) => Err(SyncError::Internal(e)),
             }?
         } else {
             None
@@ -717,7 +728,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
 
             let new_dst_head = dst
                 .as_metadata_chain()
-                .resolve_ref(&BlockRef::Head)
+                .resolve_ref(&odf::BlockRef::Head)
                 .await
                 .int_err()?;
 
@@ -745,7 +756,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
 
     async fn push_protocol_client_flow(
         &self,
-        src: Arc<dyn Dataset>,
+        src: Arc<dyn odf::Dataset>,
         http_dst_url: &Url,
         dst_head: Option<&odf::Multihash>,
         listener: Arc<dyn SyncListener>,
@@ -755,7 +766,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
 
         let src_head = src
             .as_metadata_chain()
-            .resolve_ref(&BlockRef::Head)
+            .resolve_ref(&odf::BlockRef::Head)
             .await
             .int_err()?;
 
@@ -803,10 +814,12 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
                 if let TungsteniteError::Http(response) = &e {
                     match response.status() {
                         http::StatusCode::FORBIDDEN => {
-                            return Err(SyncError::Access(AccessError::Forbidden(Box::new(e))))
+                            return Err(SyncError::Access(odf::AccessError::Forbidden(Box::new(e))))
                         }
                         http::StatusCode::UNAUTHORIZED => {
-                            return Err(SyncError::Access(AccessError::Unauthorized(Box::new(e))))
+                            return Err(SyncError::Access(odf::AccessError::Unauthorized(
+                                Box::new(e),
+                            )))
                         }
                         http::StatusCode::BAD_REQUEST => {
                             if let Some(body) = response.body().as_ref()
@@ -819,9 +832,11 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
                         _ => {}
                     }
                     if response.status() == http::StatusCode::FORBIDDEN {
-                        return Err(SyncError::Access(AccessError::Forbidden(Box::new(e))));
+                        return Err(SyncError::Access(odf::AccessError::Forbidden(Box::new(e))));
                     } else if response.status() == http::StatusCode::UNAUTHORIZED {
-                        return Err(SyncError::Access(AccessError::Unauthorized(Box::new(e))));
+                        return Err(SyncError::Access(odf::AccessError::Unauthorized(Box::new(
+                            e,
+                        ))));
                     }
                 }
                 return Err(SyncError::Internal(e.int_err()));

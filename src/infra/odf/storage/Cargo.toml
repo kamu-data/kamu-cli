@@ -1,0 +1,64 @@
+[package]
+name = "odf-storage-impl"
+description = "Implementations of storage facilities for Open Data Fabric based datasets"
+version = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+authors = { workspace = true }
+readme = { workspace = true }
+license-file = { workspace = true }
+keywords = { workspace = true }
+include = { workspace = true }
+edition = { workspace = true }
+publish = { workspace = true }
+
+
+[lints]
+workspace = true
+
+
+[lib]
+doctest = false
+
+[features]
+testing = ["dep:mockall", "dep:datafusion"]
+
+
+[dependencies]
+async-utils = { workspace = true }
+internal-error = { workspace = true }
+kamu-data-utils = { workspace = true }
+odf-storage = { workspace = true }
+odf-metadata = { workspace = true }
+random-names = { workspace = true }
+s3-utils = { workspace = true }
+
+async-stream = "0.3"
+async-trait = "0.1"
+aws-sdk-s3 = { version = "1" }
+bytes = { version = "1", default-features = false }
+chrono = { version = "0.4", default-features = false}
+dashmap = { version = "6", default-features = false }
+datafusion = { optional = true, version = "43", default-features = false }
+digest = "0.10"
+http = "1"
+futures = "0.3"
+mockall = { optional = true, version = "0.13", default-features = false }
+rand = "0.8"
+reqwest = { version = "0.12", default-features = false }
+sha3 = "0.10"
+tokio = { version = "1", default-features = false }
+tokio-util = { version = "0.7", default-features = false }
+tracing = "0.1"
+url = { version = "2", default-features = false }
+
+
+[dev-dependencies]
+mockall = { version = "0.13", default-features = false }
+pretty_assertions = { version = "1" }
+tempfile = "3"
+thiserror = { version = "2", default-features = false }
+test-log = { version = "0.2", features = ["trace"] }
+test-utils = { workspace = true }
+test-group = { version = "1" }
+tokio-stream = { version = "0.1", default-features = false }

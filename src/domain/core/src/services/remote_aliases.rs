@@ -9,7 +9,6 @@
 
 use async_trait::async_trait;
 use internal_error::InternalError;
-use opendatafabric::DatasetRefRemote;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RemoteAliasKind {
@@ -22,21 +21,21 @@ pub trait RemoteAliases: Send + Sync {
     fn get_by_kind<'a>(
         &'a self,
         kind: RemoteAliasKind,
-    ) -> Box<dyn Iterator<Item = &'a DatasetRefRemote> + 'a>;
+    ) -> Box<dyn Iterator<Item = &'a odf::DatasetRefRemote> + 'a>;
 
-    fn contains(&self, remote_ref: &DatasetRefRemote, kind: RemoteAliasKind) -> bool;
+    fn contains(&self, remote_ref: &odf::DatasetRefRemote, kind: RemoteAliasKind) -> bool;
 
     fn is_empty(&self, kind: RemoteAliasKind) -> bool;
 
     async fn add(
         &mut self,
-        remote_ref: &DatasetRefRemote,
+        remote_ref: &odf::DatasetRefRemote,
         kind: RemoteAliasKind,
     ) -> Result<bool, InternalError>;
 
     async fn delete(
         &mut self,
-        remote_ref: &DatasetRefRemote,
+        remote_ref: &odf::DatasetRefRemote,
         kind: RemoteAliasKind,
     ) -> Result<bool, InternalError>;
 

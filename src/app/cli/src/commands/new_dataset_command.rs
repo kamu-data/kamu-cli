@@ -11,12 +11,10 @@ use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
-use opendatafabric::DatasetName;
-
 use super::{CLIError, Command};
 
 pub struct NewDatasetCommand {
-    name: DatasetName,
+    name: odf::DatasetName,
     is_root: bool,
     is_derivative: bool,
     output_path: Option<PathBuf>,
@@ -24,7 +22,7 @@ pub struct NewDatasetCommand {
 
 impl NewDatasetCommand {
     pub fn new<P>(
-        name: DatasetName,
+        name: odf::DatasetName,
         is_root: bool,
         is_derivative: bool,
         output_path: Option<P>,

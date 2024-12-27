@@ -7,12 +7,15 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use opendatafabric::Multihash;
 use serde::{Deserialize, Serialize};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ResetRule {
-    pub new_head_hash: Option<Multihash>,
-    pub old_head_hash: Option<Multihash>,
+    pub new_head_hash: Option<odf::Multihash>,
+    pub old_head_hash: Option<odf::Multihash>,
     pub recursive: bool,
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

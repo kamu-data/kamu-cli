@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use opendatafabric::AccountName;
 use serde::{Deserialize, Serialize};
 use url::Url;
 
@@ -45,7 +44,7 @@ impl ServerAccessTokensRecord {
         }
     }
 
-    pub fn drop_account_token(&mut self, account_name: &AccountName) -> Option<AccessToken> {
+    pub fn drop_account_token(&mut self, account_name: &odf::AccountName) -> Option<AccessToken> {
         let maybe_position = self.token_position(account_name);
         if let Some(position) = maybe_position {
             Some(self.tokens.remove(position))
@@ -54,12 +53,12 @@ impl ServerAccessTokensRecord {
         }
     }
 
-    pub fn token_for_account(&self, account_name: &AccountName) -> Option<&AccessToken> {
+    pub fn token_for_account(&self, account_name: &odf::AccountName) -> Option<&AccessToken> {
         self.token_position(account_name)
             .map(|i| self.tokens.get(i).unwrap())
     }
 
-    fn token_position(&self, account_name: &AccountName) -> Option<usize> {
+    fn token_position(&self, account_name: &odf::AccountName) -> Option<usize> {
         // Note: linear search is fine for CLI scenarios, we don't expect long lists.
         // While storing a vector of records instead of map greatly simplifies
         // serialization
@@ -72,12 +71,12 @@ impl ServerAccessTokensRecord {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct AccessToken {
-    pub account_name: AccountName,
+    pub account_name: odf::AccountName,
     pub access_token: String,
 }
 
 impl AccessToken {
-    pub fn new(account_name: AccountName, access_token: String) -> Self {
+    pub fn new(account_name: odf::AccountName, access_token: String) -> Self {
         Self {
             account_name,
             access_token,

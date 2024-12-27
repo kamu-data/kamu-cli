@@ -16,7 +16,6 @@ use http::HeaderMap;
 use http_common::*;
 use internal_error::ErrorIntoInternal;
 use kamu_core::*;
-use opendatafabric::DatasetRef;
 use time_source::SystemTimeSource;
 use tokio::io::AsyncRead;
 
@@ -64,7 +63,7 @@ struct IngestTaskArguments {
 #[transactional_handler]
 pub async fn dataset_ingest_handler(
     Extension(catalog): Extension<Catalog>,
-    Extension(dataset_ref): Extension<DatasetRef>,
+    Extension(dataset_ref): Extension<odf::DatasetRef>,
     Query(params): Query<IngestParams>,
     headers: HeaderMap,
     body: axum::body::Body,

@@ -12,8 +12,8 @@ use std::path::Path;
 use dill::{component, interface};
 use internal_error::ResultIntoInternal;
 use kamu_core::*;
-use opendatafabric::serde::yaml::*;
-use opendatafabric::*;
+use odf_metadata::serde::yaml::*;
+use odf_metadata::*;
 use url::Url;
 
 #[component]

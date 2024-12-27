@@ -11,7 +11,6 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
 
-use auth::OdfServerAccessTokenResolver;
 use container_runtime::ContainerRuntime;
 use database_common::NoOpDatabasePlugin;
 use dill::Component;
@@ -25,15 +24,7 @@ use kamu_adapter_http::{OdfSmtpVersion, SmartTransferProtocolClientWs};
 use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
 use kamu_datasets_services::{DatasetKeyValueServiceSysEnv, DependencyGraphServiceImpl};
 use messaging_outbox::DummyOutboxImpl;
-use opendatafabric::{
-    AccountID,
-    AccountName,
-    DatasetID,
-    DatasetPushTarget,
-    DatasetRef,
-    DatasetRefAny,
-    RepoName,
-};
+use odf_dataset_impl::{DatasetFactoryImpl, DatasetLayout, IpfsGateway};
 use tempfile::TempDir;
 use time_source::SystemTimeSourceDefault;
 use tokio_tungstenite::connect_async;
@@ -52,7 +43,7 @@ pub(crate) struct ClientSideHarness {
     catalog: dill::Catalog,
     pull_dataset_use_case: Arc<dyn PullDatasetUseCase>,
     push_dataset_use_case: Arc<dyn PushDatasetUseCase>,
-    access_token_resover: Arc<dyn OdfServerAccessTokenResolver>,
+    access_token_resover: Arc<dyn odf::dataset::OdfServerAccessTokenResolver>,
     options: ClientSideHarnessOptions,
 }
 
@@ -85,28 +76,28 @@ impl ClientSideHarness {
         b.add::<InMemoryDatasetDependencyRepository>();
 
         b.add_value(CurrentAccountSubject::logged(
-            AccountID::new_seeded_ed25519(CLIENT_ACCOUNT_NAME.as_bytes()),
-            AccountName::new_unchecked(CLIENT_ACCOUNT_NAME),
+            odf::AccountID::new_seeded_ed25519(CLIENT_ACCOUNT_NAME.as_bytes()),
+            odf::AccountName::new_unchecked(CLIENT_ACCOUNT_NAME),
             false,
         ));
 
         b.add::<auth::AlwaysHappyDatasetActionAuthorizer>();
 
         if options.authenticated_remotely {
-            b.add::<auth::DummyOdfServerAccessTokenResolver>();
+            b.add::<odf::dataset::DummyOdfServerAccessTokenResolver>();
         } else {
-            b.add_value(kamu::testing::MockOdfServerAccessTokenResolver::empty());
-            b.bind::<dyn auth::OdfServerAccessTokenResolver, kamu::testing::MockOdfServerAccessTokenResolver>();
+            b.add_value(odf_dataset_impl::testing::MockOdfServerAccessTokenResolver::empty());
+            b.bind::<dyn odf::dataset::OdfServerAccessTokenResolver, odf_dataset_impl::testing::MockOdfServerAccessTokenResolver>();
         }
 
         b.add::<SystemTimeSourceDefault>();
 
         b.add_value(options.tenancy_config);
 
-        b.add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
-            .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-            .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
-            .add::<DatasetRegistryRepoBridge>();
+        b.add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
+            .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
+            .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
+            .add::<DatasetRegistrySoloUnitBridge>();
 
         b.add::<RemoteRepositoryRegistryImpl>();
 
@@ -163,7 +154,7 @@ impl ClientSideHarness {
         let pull_dataset_use_case = catalog.get_one::<dyn PullDatasetUseCase>().unwrap();
         let push_dataset_use_case = catalog.get_one::<dyn PushDatasetUseCase>().unwrap();
         let access_token_resover = catalog
-            .get_one::<dyn OdfServerAccessTokenResolver>()
+            .get_one::<dyn odf::dataset::OdfServerAccessTokenResolver>()
             .unwrap();
 
         Self {
@@ -176,11 +167,11 @@ impl ClientSideHarness {
         }
     }
 
-    pub fn operating_account_name(&self) -> Option<AccountName> {
+    pub fn operating_account_name(&self) -> Option<odf::AccountName> {
         if self.options.tenancy_config == TenancyConfig::MultiTenant
             && self.options.authenticated_remotely
         {
-            Some(AccountName::new_unchecked(CLIENT_ACCOUNT_NAME))
+            Some(odf::AccountName::new_unchecked(CLIENT_ACCOUNT_NAME))
         } else {
             None
         }
@@ -211,7 +202,7 @@ impl ClientSideHarness {
     }
 
     // TODO: accept alias or handle
-    pub fn dataset_layout(&self, dataset_id: &DatasetID, dataset_name: &str) -> DatasetLayout {
+    pub fn dataset_layout(&self, dataset_id: &odf::DatasetID, dataset_name: &str) -> DatasetLayout {
         let root_path = match self.options.tenancy_config {
             TenancyConfig::MultiTenant => self
                 .internal_datasets_folder_path()
@@ -224,7 +215,7 @@ impl ClientSideHarness {
 
     pub async fn pull_datasets(
         &self,
-        dataset_ref: DatasetRefAny,
+        dataset_ref: odf::DatasetRefAny,
         force: bool,
     ) -> Vec<PullResponse> {
         self.pull_dataset_use_case
@@ -246,7 +237,11 @@ impl ClientSideHarness {
             .unwrap()
     }
 
-    pub async fn pull_dataset_result(&self, dataset_ref: DatasetRefAny, force: bool) -> PullResult {
+    pub async fn pull_dataset_result(
+        &self,
+        dataset_ref: odf::DatasetRefAny,
+        force: bool,
+    ) -> PullResult {
         self.pull_datasets(dataset_ref, force)
             .await
             .first()
@@ -259,10 +254,10 @@ impl ClientSideHarness {
 
     pub async fn push_dataset(
         &self,
-        dataset_local_ref: DatasetRef,
-        dataset_remote_ref: DatasetPushTarget,
+        dataset_local_ref: odf::DatasetRef,
+        dataset_remote_ref: odf::DatasetPushTarget,
         force: bool,
-        dataset_visibility: DatasetVisibility,
+        dataset_visibility: odf::DatasetVisibility,
     ) -> Vec<PushResponse> {
         let dataset_handle = self
             .dataset_registry()
@@ -291,10 +286,10 @@ impl ClientSideHarness {
 
     pub async fn push_dataset_result(
         &self,
-        dataset_local_ref: DatasetRef,
-        dataset_remote_ref: DatasetPushTarget,
+        dataset_local_ref: odf::DatasetRef,
+        dataset_remote_ref: odf::DatasetPushTarget,
         force: bool,
-        dataset_visibility: DatasetVisibility,
+        dataset_visibility: odf::DatasetVisibility,
     ) -> SyncResult {
         let results = self
             .push_dataset(
@@ -316,7 +311,7 @@ impl ClientSideHarness {
 
     pub fn add_repository(
         &self,
-        repo_name: &RepoName,
+        repo_name: &odf::RepoName,
         base_url: &str,
     ) -> Result<(), InternalError> {
         let remote_repo_reg = self

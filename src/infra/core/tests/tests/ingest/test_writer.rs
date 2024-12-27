@@ -14,14 +14,15 @@ use chrono::{DateTime, TimeZone, Utc};
 use datafusion::prelude::*;
 use dill::Component;
 use indoc::indoc;
-use kamu::testing::MetadataFactory;
-use kamu::{DatasetRepositoryLocalFs, DatasetRepositoryWriter};
+use kamu::{DatasetStorageUnitLocalFs, DatasetStorageUnitWriter};
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::*;
 use kamu_data_utils::testing::{assert_arrow_schema_eq, assert_data_eq, assert_schema_eq};
 use kamu_ingest_datafusion::*;
 use odf::{AsTypedBlock, DatasetAlias};
-use opendatafabric as odf;
+use odf_dataset::{BlockRef, CommitOpts, DatasetStorageUnit, MetadataChainExt, TryStreamExtExt};
+use odf_metadata as odf;
+use odf_storage_impl::testing::MetadataFactory;
 use serde_json::json;
 use time_source::SystemTimeSourceDefault;
 
@@ -1222,13 +1223,13 @@ impl Harness {
             .add::<SystemTimeSourceDefault>()
             .add_value(CurrentAccountSubject::new_test())
             .add_value(TenancyConfig::SingleTenant)
-            .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
-            .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+            .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
+            .bind::<dyn DatasetStorageUnit, DatasetStorageUnitLocalFs>()
             .build();
 
-        let dataset_repo = catalog.get_one::<DatasetRepositoryLocalFs>().unwrap();
+        let storage_unit = catalog.get_one::<DatasetStorageUnitLocalFs>().unwrap();
 
-        let foo_created = dataset_repo
+        let foo_created = storage_unit
             .create_dataset(
                 &DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo")),
                 MetadataFactory::metadata_block(

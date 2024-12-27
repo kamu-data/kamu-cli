@@ -14,7 +14,7 @@ use database_common::{PaginationOpts, TransactionRef, TransactionRefT};
 use dill::*;
 use futures::TryStreamExt;
 use kamu_flow_system::*;
-use opendatafabric::{AccountID, DatasetID};
+use odf::{AccountID, DatasetID};
 use sqlx::{FromRow, Postgres, QueryBuilder};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -10,7 +10,7 @@
 use database_common::{TransactionRef, TransactionRefT};
 use dill::{component, interface};
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
-use opendatafabric::{AccountID, AccountName};
+use odf_metadata::{AccountID, AccountName};
 
 use crate::domain::*;
 

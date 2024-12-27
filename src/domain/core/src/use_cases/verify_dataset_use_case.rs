@@ -9,8 +9,6 @@
 
 use std::sync::Arc;
 
-use opendatafabric::DatasetHandle;
-
 use crate::{
     VerificationListener,
     VerificationMultiListener,
@@ -24,13 +22,13 @@ use crate::{
 pub trait VerifyDatasetUseCase: Send + Sync {
     async fn execute(
         &self,
-        request: VerificationRequest<DatasetHandle>,
+        request: VerificationRequest<odf::DatasetHandle>,
         maybe_listener: Option<Arc<dyn VerificationListener>>,
     ) -> VerificationResult;
 
     async fn execute_multi(
         &self,
-        requests: Vec<VerificationRequest<DatasetHandle>>,
+        requests: Vec<VerificationRequest<odf::DatasetHandle>>,
         maybe_multi_listener: Option<Arc<dyn VerificationMultiListener>>,
     ) -> Vec<VerificationResult>;
 }

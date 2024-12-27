@@ -13,7 +13,7 @@ use std::collections::BTreeMap;
 use database_common::PaginationOpts;
 use dill::*;
 use kamu_task_system::*;
-use opendatafabric::DatasetID;
+use odf_metadata::DatasetID;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

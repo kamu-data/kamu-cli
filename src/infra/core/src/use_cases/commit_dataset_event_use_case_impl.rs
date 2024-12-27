@@ -10,18 +10,16 @@
 use std::sync::Arc;
 
 use dill::{component, interface};
-use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer};
+use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer, DatasetActionUnauthorizedError};
 use kamu_core::{
     CommitDatasetEventUseCase,
-    CommitError,
-    CommitOpts,
-    CommitResult,
     DatasetLifecycleMessage,
     DatasetRegistry,
     MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
 };
 use messaging_outbox::{Outbox, OutboxExt};
-use opendatafabric::{DatasetHandle, MetadataEvent};
+use odf_dataset::{CommitError, CommitOpts, CommitResult};
+use odf_metadata::{DatasetHandle, MetadataEvent};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -63,7 +61,11 @@ impl CommitDatasetEventUseCase for CommitDatasetEventUseCaseImpl {
     ) -> Result<CommitResult, CommitError> {
         self.dataset_action_authorizer
             .check_action_allowed(dataset_handle, DatasetAction::Write)
-            .await?;
+            .await
+            .map_err(|e| match e {
+                DatasetActionUnauthorizedError::Access(e) => CommitError::Access(e),
+                DatasetActionUnauthorizedError::Internal(e) => CommitError::Internal(e),
+            })?;
 
         let resolved_dataset = self.dataset_registry.get_dataset_by_handle(dataset_handle);
 

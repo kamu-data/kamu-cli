@@ -24,6 +24,9 @@ doctest = false
 [dependencies]
 internal-error = { workspace = true }
 kamu-core = { workspace = true }
+odf-dataset = { workspace = true }
+odf-storage = { workspace = true }
+odf-metadata = { workspace = true }
 
 axum = { version = "0.7", default-features = false }
 http = { version = "1", default-features = false }

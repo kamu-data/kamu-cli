@@ -25,7 +25,6 @@ use datafusion_odata::error::ODataError;
 use dill::Catalog;
 use http_common::ApiError;
 use kamu_core::*;
-use opendatafabric::*;
 
 use crate::context::*;
 
@@ -69,7 +68,7 @@ pub async fn odata_service_handler_st(
 #[transactional_handler]
 pub async fn odata_service_handler_mt(
     Extension(catalog): Extension<Catalog>,
-    axum::extract::Path(account_name): axum::extract::Path<AccountName>,
+    axum::extract::Path(account_name): axum::extract::Path<odf::AccountName>,
 ) -> Result<axum::response::Response<String>, ApiError> {
     odata_service_handler_common(catalog, Some(account_name)).await
 }
@@ -111,7 +110,7 @@ pub async fn odata_metadata_handler_st(
 #[transactional_handler]
 pub async fn odata_metadata_handler_mt(
     Extension(catalog): Extension<Catalog>,
-    axum::extract::Path(account_name): axum::extract::Path<AccountName>,
+    axum::extract::Path(account_name): axum::extract::Path<odf::AccountName>,
 ) -> Result<axum::response::Response<String>, ApiError> {
     odata_metadata_handler_common(catalog, Some(account_name)).await
 }
@@ -161,7 +160,7 @@ pub async fn odata_collection_handler_st(
 pub async fn odata_collection_handler_mt(
     Extension(catalog): Extension<Catalog>,
     axum::extract::Path((account_name, collection_addr)): axum::extract::Path<(
-        AccountName,
+        odf::AccountName,
         String,
     )>,
     headers: axum::http::HeaderMap,
@@ -177,7 +176,7 @@ pub async fn odata_collection_handler_mt(
 
 pub async fn odata_service_handler_common(
     catalog: Catalog,
-    account_name: Option<AccountName>,
+    account_name: Option<odf::AccountName>,
 ) -> Result<axum::response::Response<String>, ApiError> {
     let ctx = ODataServiceContext::new(catalog, account_name);
     let response = datafusion_odata::handlers::odata_service_handler(Extension(Arc::new(ctx)))
@@ -191,7 +190,7 @@ pub async fn odata_service_handler_common(
 
 pub async fn odata_metadata_handler_common(
     catalog: Catalog,
-    account_name: Option<AccountName>,
+    account_name: Option<odf::AccountName>,
 ) -> Result<axum::response::Response<String>, ApiError> {
     let ctx = ODataServiceContext::new(catalog, account_name);
     let response = datafusion_odata::handlers::odata_metadata_handler(Extension(Arc::new(ctx)))
@@ -205,7 +204,7 @@ pub async fn odata_metadata_handler_common(
 
 pub async fn odata_collection_handler_common(
     catalog: Catalog,
-    account_name: Option<AccountName>,
+    account_name: Option<odf::AccountName>,
     collection_addr: String,
     headers: axum::http::HeaderMap,
     query: axum::extract::Query<QueryParamsRaw>,
@@ -214,18 +213,18 @@ pub async fn odata_collection_handler_common(
         return Err(ApiError::not_found_without_body());
     };
 
-    let Ok(dataset_name) = DatasetName::try_from(&addr.name) else {
+    let Ok(dataset_name) = odf::DatasetName::try_from(&addr.name) else {
         return Err(ApiError::not_found_without_body());
     };
 
     let registry: Arc<dyn DatasetRegistry> = catalog.get_one().unwrap();
 
     let dataset_handle = match registry
-        .resolve_dataset_handle_by_ref(&DatasetAlias::new(account_name, dataset_name).into())
+        .resolve_dataset_handle_by_ref(&odf::DatasetAlias::new(account_name, dataset_name).into())
         .await
     {
         Ok(hdl) => Ok(hdl),
-        Err(GetDatasetError::NotFound(_)) => {
+        Err(odf::dataset::GetDatasetError::NotFound(_)) => {
             return Err(ApiError::not_found_without_body());
         }
         Err(e) => Err(e),

@@ -12,7 +12,7 @@ use std::sync::Arc;
 use dill::{component, interface, meta};
 use init_on_startup::{InitOnStartup, InitOnStartupMeta};
 use internal_error::{InternalError, ResultIntoInternal};
-use kamu_core::{DatasetRegistry, GetSummaryOpts};
+use kamu_core::DatasetRegistry;
 use kamu_datasets::DatasetDependencyRepository;
 
 use crate::{
@@ -71,7 +71,7 @@ impl DependencyGraphIndexer {
             let summary = self
                 .dataset_registry
                 .get_dataset_by_handle(&dataset_handle)
-                .get_summary(GetSummaryOpts::default())
+                .get_summary(odf::dataset::GetSummaryOpts::default())
                 .instrument(span)
                 .await
                 .int_err()?;

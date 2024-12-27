@@ -12,7 +12,7 @@ use std::sync::Arc;
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use dill::*;
-use kamu::testing::{MetadataFactory, MockDatasetChangesService};
+use kamu::testing::MockDatasetChangesService;
 use kamu::*;
 use kamu_accounts::{
     AccountConfig,
@@ -38,7 +38,7 @@ use kamu_task_system::{TaskProgressMessage, MESSAGE_PRODUCER_KAMU_TASK_AGENT};
 use kamu_task_system_inmem::InMemoryTaskEventStore;
 use kamu_task_system_services::TaskSchedulerImpl;
 use messaging_outbox::{register_message_dispatcher, Outbox, OutboxImmediateImpl};
-use opendatafabric::*;
+use odf_storage_impl::testing::MetadataFactory;
 use time_source::{FakeSystemTimeSource, SystemTimeSource};
 use tokio::task::yield_now;
 
@@ -77,7 +77,7 @@ pub(crate) struct FlowHarnessOverrides {
     pub awaiting_step: Option<Duration>,
     pub mandatory_throttling_period: Option<Duration>,
     pub mock_dataset_changes: Option<MockDatasetChangesService>,
-    pub custom_account_names: Vec<AccountName>,
+    pub custom_account_names: Vec<odf::AccountName>,
     pub tenancy_config: TenancyConfig,
 }
 
@@ -154,10 +154,10 @@ impl FlowHarness {
             .add_value(fake_system_time_source.clone())
             .bind::<dyn SystemTimeSource, FakeSystemTimeSource>()
             .add_value(overrides.tenancy_config)
-            .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
-            .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-            .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
-            .add::<DatasetRegistryRepoBridge>()
+            .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
+            .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
+            .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
+            .add::<DatasetRegistrySoloUnitBridge>()
             .add_value(mock_dataset_changes)
             .bind::<dyn DatasetChangesService, MockDatasetChangesService>()
             .add_value(CurrentAccountSubject::new_test())
@@ -228,7 +228,10 @@ impl FlowHarness {
         }
     }
 
-    pub async fn create_root_dataset(&self, dataset_alias: DatasetAlias) -> CreateDatasetResult {
+    pub async fn create_root_dataset(
+        &self,
+        dataset_alias: odf::DatasetAlias,
+    ) -> odf::CreateDatasetResult {
         let create_dataset_from_snapshot = self
             .catalog
             .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
@@ -238,7 +241,7 @@ impl FlowHarness {
             .execute(
                 MetadataFactory::dataset_snapshot()
                     .name(dataset_alias)
-                    .kind(DatasetKind::Root)
+                    .kind(odf::DatasetKind::Root)
                     .push_event(MetadataFactory::set_polling_source().build())
                     .build(),
                 Default::default(),
@@ -249,9 +252,9 @@ impl FlowHarness {
 
     pub async fn create_derived_dataset(
         &self,
-        dataset_alias: DatasetAlias,
-        input_ids: Vec<DatasetID>,
-    ) -> DatasetID {
+        dataset_alias: odf::DatasetAlias,
+        input_ids: Vec<odf::DatasetID>,
+    ) -> odf::DatasetID {
         let create_dataset_from_snapshot = self
             .catalog
             .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
@@ -261,7 +264,7 @@ impl FlowHarness {
             .execute(
                 MetadataFactory::dataset_snapshot()
                     .name(dataset_alias)
-                    .kind(DatasetKind::Derivative)
+                    .kind(odf::DatasetKind::Derivative)
                     .push_event(
                         MetadataFactory::set_transform()
                             .inputs_from_refs(input_ids)
@@ -290,7 +293,7 @@ impl FlowHarness {
         self.flow_agent.run_initialization().await.unwrap();
     }
 
-    pub async fn delete_dataset(&self, dataset_id: &DatasetID) {
+    pub async fn delete_dataset(&self, dataset_id: &odf::DatasetID) {
         // Do the actual deletion
         let delete_dataset = self.catalog.get_one::<dyn DeleteDatasetUseCase>().unwrap();
         delete_dataset
@@ -302,7 +305,7 @@ impl FlowHarness {
     pub async fn set_dataset_flow_trigger(
         &self,
         request_time: DateTime<Utc>,
-        dataset_id: DatasetID,
+        dataset_id: odf::DatasetID,
         dataset_flow_type: DatasetFlowType,
         trigger_rule: FlowTriggerRule,
     ) {
@@ -319,7 +322,7 @@ impl FlowHarness {
 
     pub async fn set_dataset_flow_ingest(
         &self,
-        dataset_id: DatasetID,
+        dataset_id: odf::DatasetID,
         dataset_flow_type: DatasetFlowType,
         ingest_rule: IngestRule,
     ) {
@@ -334,7 +337,7 @@ impl FlowHarness {
 
     pub async fn set_dataset_flow_reset_rule(
         &self,
-        dataset_id: DatasetID,
+        dataset_id: odf::DatasetID,
         dataset_flow_type: DatasetFlowType,
         reset_rule: ResetRule,
     ) {
@@ -349,7 +352,7 @@ impl FlowHarness {
 
     pub async fn set_dataset_flow_compaction_rule(
         &self,
-        dataset_id: DatasetID,
+        dataset_id: odf::DatasetID,
         dataset_flow_type: DatasetFlowType,
         compaction_rule: CompactionRule,
     ) {
@@ -365,7 +368,7 @@ impl FlowHarness {
     pub async fn pause_dataset_flow(
         &self,
         request_time: DateTime<Utc>,
-        dataset_id: DatasetID,
+        dataset_id: odf::DatasetID,
         dataset_flow_type: DatasetFlowType,
     ) {
         let flow_key: FlowKey = FlowKeyDataset::new(dataset_id, dataset_flow_type).into();
@@ -385,7 +388,7 @@ impl FlowHarness {
     pub async fn resume_dataset_flow(
         &self,
         request_time: DateTime<Utc>,
-        dataset_id: DatasetID,
+        dataset_id: odf::DatasetID,
         dataset_flow_type: DatasetFlowType,
     ) {
         let flow_key: FlowKey = FlowKeyDataset::new(dataset_id, dataset_flow_type).into();

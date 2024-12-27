@@ -10,11 +10,11 @@
 use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
-use kamu::testing::MetadataFactory;
 use kamu::CreateDatasetFromSnapshotUseCaseImpl;
 use kamu_core::CreateDatasetFromSnapshotUseCase;
 use messaging_outbox::MockOutbox;
-use opendatafabric::{DatasetAlias, DatasetKind, DatasetName};
+use odf_metadata::{DatasetAlias, DatasetKind, DatasetName};
+use odf_storage_impl::testing::MetadataFactory;
 
 use crate::tests::use_cases::*;
 

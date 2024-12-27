@@ -20,11 +20,13 @@ use datafusion::config::{ParquetColumnOptions, ParquetOptions, TableParquetOptio
 use datafusion::dataframe::DataFrameWriteOptions;
 use datafusion::functions_aggregate::min_max::{max, min};
 use datafusion::prelude::*;
+use file_utils::OwnedFile;
 use internal_error::*;
 use kamu_core::ingest::*;
 use kamu_core::*;
 use odf::{AsTypedBlock, DatasetVocabulary};
-use opendatafabric as odf;
+use odf_dataset::{AddDataParams, BlockRef, CommitError, CommitOpts};
+use odf_metadata as odf;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

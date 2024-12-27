@@ -15,7 +15,7 @@ use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::prelude::*;
 use kamu_ingest_datafusion::*;
-use opendatafabric as odf;
+use odf_metadata as odf;
 
 use crate::utils::*;
 

@@ -45,6 +45,7 @@ async-utils = { workspace = true }
 container-runtime = { workspace = true }
 database-common = { workspace = true }
 database-common-macros = { workspace = true }
+file-utils = { workspace = true }
 http-common = { workspace = true }
 init-on-startup = { workspace = true }
 internal-error = { workspace = true }
@@ -63,7 +64,8 @@ kamu-adapter-http = { workspace = true, features = [
 kamu-adapter-oauth = { workspace = true }
 kamu-adapter-odata = { workspace = true }
 kamu-datafusion-cli = { workspace = true }
-opendatafabric = { workspace = true }
+odf = { workspace = true }
+odf-dataset-impl = { workspace = true }
 random-names = { workspace = true }
 
 kamu-flow-system-services = { workspace = true }
@@ -206,6 +208,7 @@ kamu = { workspace = true, features = ["testing"] }
 kamu-cli-puppet = { workspace = true, default-features = false, features = [
     "extensions",
 ] }
+odf-storage-impl = { workspace = true, features = ["testing"]}
 
 pretty_assertions = { version = "1" }
 test-group = { version = "1" }
