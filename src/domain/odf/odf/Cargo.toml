@@ -24,6 +24,9 @@ doctest = false
 [features]
 default = []
 arrow = ["odf-metadata/arrow"]
+sqlx-mysql = ["odf-metadata/sqlx-mysql"]
+sqlx-postgres = ["odf-metadata/sqlx-postgres"]
+sqlx-sqlite = ["odf-metadata/sqlx-sqlite"]
 testing = ["odf-dataset/testing"]
 utoipa = ["odf-metadata/utoipa"]
 

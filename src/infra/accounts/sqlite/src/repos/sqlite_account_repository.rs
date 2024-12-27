@@ -10,7 +10,6 @@
 use database_common::{TransactionRef, TransactionRefT};
 use dill::{component, interface};
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
-use odf_metadata::{AccountID, AccountName};
 use sqlx::Row;
 
 use crate::domain::*;
@@ -106,7 +105,7 @@ impl AccountRepository for SqliteAccountRepository {
 
     async fn get_account_by_id(
         &self,
-        account_id: &AccountID,
+        account_id: &odf::AccountID,
     ) -> Result<Account, GetAccountByIdError> {
         let mut tr = self.transaction.lock().await;
 
@@ -152,7 +151,7 @@ impl AccountRepository for SqliteAccountRepository {
 
     async fn get_accounts_by_ids(
         &self,
-        account_ids: Vec<AccountID>,
+        account_ids: Vec<odf::AccountID>,
     ) -> Result<Vec<Account>, GetAccountByIdError> {
         let mut tr = self.transaction.lock().await;
 
@@ -202,7 +201,7 @@ impl AccountRepository for SqliteAccountRepository {
             .into_iter()
             .map(|account_row| Account {
                 id: account_row.get_unchecked("id"),
-                account_name: AccountName::new_unchecked(
+                account_name: odf::AccountName::new_unchecked(
                     &account_row.get::<String, &str>("account_name"),
                 ),
                 email: account_row.get("email"),
@@ -219,7 +218,7 @@ impl AccountRepository for SqliteAccountRepository {
 
     async fn get_account_by_name(
         &self,
-        account_name: &AccountName,
+        account_name: &odf::AccountName,
     ) -> Result<Account, GetAccountByNameError> {
         let mut tr = self.transaction.lock().await;
 
@@ -268,7 +267,7 @@ impl AccountRepository for SqliteAccountRepository {
     async fn find_account_id_by_provider_identity_key(
         &self,
         provider_identity_key: &str,
-    ) -> Result<Option<AccountID>, FindAccountIdByProviderIdentityKeyError> {
+    ) -> Result<Option<odf::AccountID>, FindAccountIdByProviderIdentityKeyError> {
         let mut tr = self.transaction.lock().await;
 
         let connection_mut = tr
@@ -276,6 +275,7 @@ impl AccountRepository for SqliteAccountRepository {
             .await
             .map_err(FindAccountIdByProviderIdentityKeyError::Internal)?;
 
+        use odf::AccountID;
         let maybe_account_row = sqlx::query!(
             r#"
             SELECT id as "id: AccountID"
@@ -295,7 +295,7 @@ impl AccountRepository for SqliteAccountRepository {
     async fn find_account_id_by_email(
         &self,
         email: &str,
-    ) -> Result<Option<AccountID>, FindAccountIdByEmailError> {
+    ) -> Result<Option<odf::AccountID>, FindAccountIdByEmailError> {
         let mut tr = self.transaction.lock().await;
 
         let connection_mut = tr
@@ -303,6 +303,7 @@ impl AccountRepository for SqliteAccountRepository {
             .await
             .map_err(FindAccountIdByEmailError::Internal)?;
 
+        use odf::AccountID;
         let maybe_account_row = sqlx::query!(
             r#"
             SELECT id as "id: AccountID"
@@ -321,8 +322,8 @@ impl AccountRepository for SqliteAccountRepository {
 
     async fn find_account_id_by_name(
         &self,
-        account_name: &AccountName,
-    ) -> Result<Option<AccountID>, FindAccountIdByNameError> {
+        account_name: &odf::AccountName,
+    ) -> Result<Option<odf::AccountID>, FindAccountIdByNameError> {
         let mut tr = self.transaction.lock().await;
 
         let connection_mut = tr
@@ -330,6 +331,7 @@ impl AccountRepository for SqliteAccountRepository {
             .await
             .map_err(FindAccountIdByNameError::Internal)?;
 
+        use odf::AccountID;
         let account_name_str = account_name.to_string();
         let maybe_account_row = sqlx::query!(
             r#"
@@ -354,7 +356,7 @@ impl AccountRepository for SqliteAccountRepository {
 impl PasswordHashRepository for SqliteAccountRepository {
     async fn save_password_hash(
         &self,
-        account_name: &AccountName,
+        account_name: &odf::AccountName,
         password_hash: String,
     ) -> Result<(), SavePasswordHashError> {
         let mut tr = self.transaction.lock().await;
@@ -385,7 +387,7 @@ impl PasswordHashRepository for SqliteAccountRepository {
 
     async fn find_password_hash_by_account_name(
         &self,
-        account_name: &AccountName,
+        account_name: &odf::AccountName,
     ) -> Result<Option<String>, FindPasswordHashError> {
         let mut tr = self.transaction.lock().await;
 
