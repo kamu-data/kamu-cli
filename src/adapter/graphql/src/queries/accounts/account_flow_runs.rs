@@ -54,8 +54,8 @@ impl AccountFlowRuns {
                 by_flow_status: filters.by_status.map(Into::into),
                 by_dataset_ids: filters
                     .by_dataset_ids
-                    .iter()
-                    .map(|dataset_id| dataset_id.clone().into())
+                    .into_iter()
+                    .map(Into::into)
                     .collect::<HashSet<_>>(),
                 by_initiator: match filters.by_initiator {
                     Some(initiator_filter) => match initiator_filter {

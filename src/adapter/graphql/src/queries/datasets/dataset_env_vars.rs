@@ -13,7 +13,6 @@ use opendatafabric as odf;
 
 use super::ViewDatasetEnvVar;
 use crate::prelude::*;
-use crate::utils;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -35,8 +34,6 @@ impl DatasetEnvVars {
         ctx: &Context<'_>,
         dataset_env_var_id: DatasetEnvVarID,
     ) -> Result<String> {
-        utils::check_dataset_read_access(ctx, &self.dataset_handle).await?;
-
         let dataset_env_var_service = from_catalog_n!(ctx, dyn DatasetEnvVarService);
         let dataset_env_var = dataset_env_var_service
             .get_dataset_env_var_by_id(&dataset_env_var_id)
@@ -57,8 +54,6 @@ impl DatasetEnvVars {
         page: Option<usize>,
         per_page: Option<usize>,
     ) -> Result<ViewDatasetEnvVarConnection> {
-        utils::check_dataset_read_access(ctx, &self.dataset_handle).await?;
-
         let dataset_env_var_service = from_catalog_n!(ctx, dyn DatasetEnvVarService);
 
         let page = page.unwrap_or(0);

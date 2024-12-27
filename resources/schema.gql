@@ -2024,7 +2024,7 @@ type ViewAccessToken {
 	"""
 	createdAt: DateTime!
 	"""
-	Date of token revokation
+	Date of token revocation
 	"""
 	revokedAt: DateTime
 	"""
@@ -2043,7 +2043,7 @@ type ViewDatasetEnvVar {
 	"""
 	key: String!
 	"""
-	Non sercret value of dataset environment variable
+	Non secret value of dataset environment variable
 	"""
 	value: String
 	"""

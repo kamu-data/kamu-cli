@@ -49,12 +49,14 @@ pub(crate) async fn check_if_flow_belongs_to_dataset(
                 return Ok(Some(FlowInDatasetError::NotFound(FlowNotFound { flow_id })))
             }
         },
-        Err(e) => match e {
-            fs::GetFlowError::NotFound(_) => {
-                return Ok(Some(FlowInDatasetError::NotFound(FlowNotFound { flow_id })))
+        Err(e) => {
+            return match e {
+                fs::GetFlowError::NotFound(_) => {
+                    Ok(Some(FlowInDatasetError::NotFound(FlowNotFound { flow_id })))
+                }
+                fs::GetFlowError::Internal(e) => Err(GqlError::Internal(e)),
             }
-            fs::GetFlowError::Internal(e) => return Err(GqlError::Internal(e)),
-        },
+        }
     }
 
     Ok(None)

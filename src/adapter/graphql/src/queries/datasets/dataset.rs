@@ -13,7 +13,7 @@ use opendatafabric as odf;
 
 use crate::prelude::*;
 use crate::queries::*;
-use crate::utils::{ensure_dataset_env_vars_enabled, get_dataset};
+use crate::utils::{check_dataset_read_access, ensure_dataset_env_vars_enabled, get_dataset};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -38,15 +38,18 @@ impl Dataset {
         let dataset_registry = from_catalog_n!(ctx, dyn domain::DatasetRegistry);
 
         // TODO: Should we resolve reference at this point or allow unresolved and fail
-        // later?
-        let hdl = dataset_registry
+        //       later?
+        let handle = dataset_registry
             .resolve_dataset_handle_by_ref(dataset_ref)
             .await
             .int_err()?;
-        let account = Account::from_dataset_alias(ctx, &hdl.alias)
+
+        check_dataset_read_access(ctx, &handle).await?;
+
+        let account = Account::from_dataset_alias(ctx, &handle.alias)
             .await?
             .expect("Account must exist");
-        Ok(Dataset::new(account, hdl))
+        Ok(Dataset::new(account, handle))
     }
 
     /// Unique identifier of the dataset
@@ -112,7 +115,7 @@ impl Dataset {
     }
 
     /// Access to the environment variable of this dataset
-    #[allow(clippy::unused_async)]
+    #[expect(clippy::unused_async)]
     async fn env_vars(&self, ctx: &Context<'_>) -> Result<DatasetEnvVars> {
         ensure_dataset_env_vars_enabled(ctx)?;
 
