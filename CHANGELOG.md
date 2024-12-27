@@ -11,7 +11,7 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## [Unreleased]
+## [0.215.0] - 2024-12-27
 ### Added
 - New entity `FlowTrigger` which is now responsible for flow activation and schedules
 ### Changed
