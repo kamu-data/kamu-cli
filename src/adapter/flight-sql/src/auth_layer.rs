@@ -11,9 +11,6 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 
-// use axum::body::Body;
-// use axum::response::Response;
-// use axum::RequestExt;
 use database_common::DatabaseTransactionRunner;
 use futures::Future;
 use kamu_accounts::{
@@ -29,19 +26,20 @@ use tower::{Layer, Service};
 
 use crate::SessionId;
 
-// use crate::axum_utils::*;
-// use crate::{AccessToken, BearerHeader};
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct SessionAuthConfig {
+    pub allow_anonymous: bool,
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone)]
-pub struct AuthenticationLayer {
-    allow_anonymous: bool,
-}
+pub struct AuthenticationLayer {}
 
 impl AuthenticationLayer {
-    pub fn new(allow_anonymous: bool) -> Self {
-        Self { allow_anonymous }
+    pub fn new() -> Self {
+        Self {}
     }
 }
 
@@ -49,10 +47,7 @@ impl<Svc> Layer<Svc> for AuthenticationLayer {
     type Service = AuthenticationMiddleware<Svc>;
 
     fn layer(&self, inner: Svc) -> Self::Service {
-        AuthenticationMiddleware {
-            inner,
-            allow_anonymous: self.allow_anonymous,
-        }
+        AuthenticationMiddleware { inner }
     }
 }
 
@@ -61,7 +56,6 @@ impl<Svc> Layer<Svc> for AuthenticationLayer {
 #[derive(Debug, Clone)]
 pub struct AuthenticationMiddleware<Svc> {
     inner: Svc,
-    allow_anonymous: bool,
 }
 
 impl<Svc> AuthenticationMiddleware<Svc> {
@@ -123,7 +117,6 @@ where
         // Inspired by https://github.com/maxcountryman/axum-login/blob/5239b38b2698a3db3f92075b6ad430aea79c215a/axum-login/src/auth.rs
         // TODO: PERF: Is cloning a performance concern?
         let mut inner = self.inner.clone();
-        let allow_anonymous = self.allow_anonymous;
 
         Box::pin(async move {
             let base_catalog = request
@@ -131,11 +124,13 @@ where
                 .get::<dill::Catalog>()
                 .expect("Catalog not found in request extensions");
 
+            let conf: Arc<SessionAuthConfig> = base_catalog.get_one().unwrap();
+
             let token = Self::extract_bearer_token(&request);
             let (service, method) = Self::extract_service_method(&request);
 
             let subject = match &token {
-                None if allow_anonymous
+                None if conf.allow_anonymous
                     && service == "arrow.flight.protocol.FlightService"
                     && method == "Handshake" =>
                 {
@@ -143,7 +138,7 @@ where
                         AnonymousAccountReason::NoAuthenticationProvided,
                     )
                 }
-                Some(token) if allow_anonymous && token.starts_with("anon_") => {
+                Some(token) if conf.allow_anonymous && token.starts_with("anon_") => {
                     // TODO: SEC: Anonymous session tokens have to be validated
                     CurrentAccountSubject::anonymous(
                         AnonymousAccountReason::NoAuthenticationProvided,

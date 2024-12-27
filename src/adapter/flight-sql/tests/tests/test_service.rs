@@ -74,6 +74,9 @@ async fn run_server() -> FlightServer {
     let mut b = dill::Catalog::builder();
 
     b.add::<SessionAuthAnonymous>()
+        .add_value(SessionAuthConfig {
+            allow_anonymous: true,
+        })
         .add_value(mock_authentication_service)
         .bind::<dyn AuthenticationService, MockAuthenticationService>()
         .add_value(query_svc)
@@ -100,7 +103,7 @@ async fn run_server() -> FlightServer {
             req.extensions_mut().insert(catalog.clone());
             Ok(req)
         }))
-        .layer(AuthenticationLayer::new(true))
+        .layer(AuthenticationLayer::new())
         .add_service(FlightServiceServer::new(KamuFlightSqlServiceWrapper))
         .serve_with_incoming(tokio_stream::wrappers::TcpListenerStream::new(listener));
 

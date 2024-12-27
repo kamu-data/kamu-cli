@@ -563,7 +563,13 @@ impl FlightSqlConfig {
         Self { ..Self::default() }
     }
 
-    pub fn to_system(&self) -> kamu_adapter_flight_sql::SessionCachingConfig {
+    pub fn to_session_auth_config(&self) -> kamu_adapter_flight_sql::SessionAuthConfig {
+        kamu_adapter_flight_sql::SessionAuthConfig {
+            allow_anonymous: self.allow_anonymous.unwrap(),
+        }
+    }
+
+    pub fn to_session_caching_config(&self) -> kamu_adapter_flight_sql::SessionCachingConfig {
         kamu_adapter_flight_sql::SessionCachingConfig {
             authed_session_expiration_timeout: self
                 .authed_session_expiration_timeout

@@ -57,7 +57,7 @@ impl FlightSqlServiceFactory {
                     Ok(req)
                 },
             ))
-            .layer(AuthenticationLayer::new(true))
+            .layer(AuthenticationLayer::new())
             .add_service(FlightServiceServer::new(
                 kamu_adapter_flight_sql::KamuFlightSqlServiceWrapper,
             ))

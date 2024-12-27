@@ -719,16 +719,15 @@ pub fn register_config_in_catalog(
     });
     catalog_builder.add_value(kamu::utils::ipfs_wrapper::IpfsClient::default());
 
-    catalog_builder.add_value(
-        config
-            .protocol
-            .as_ref()
-            .unwrap()
-            .flight_sql
-            .as_ref()
-            .unwrap()
-            .to_system(),
-    );
+    let flight_sql_conf = config
+        .protocol
+        .as_ref()
+        .unwrap()
+        .flight_sql
+        .as_ref()
+        .unwrap();
+    catalog_builder.add_value(flight_sql_conf.to_session_auth_config());
+    catalog_builder.add_value(flight_sql_conf.to_session_caching_config());
 
     if tenancy_config == TenancyConfig::MultiTenant {
         let mut implicit_user_config = PredefinedAccountsConfig::new();

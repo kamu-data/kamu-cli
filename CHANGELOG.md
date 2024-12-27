@@ -14,6 +14,7 @@ Recommendation: for ease of reading, use the following order:
 ## [Unreleased]
 ### Changed
 - Flight SQL protocol now fully support authentication (anonymous and bearer token)
+- The `kamu notebook` command now defaults to `DataFusion` engine for speed, but you can switch to Spark with `--engine spark` argument
 - The `kamu notebook` command uses new image based on latest Jupyter and new [`kamu-client-python`](https://github.com/kamu-data/kamu-client-python) library
 - The `kamu sql server` command interface changed to use `--engine datafusion/spark`, removing the `--flight-sql` flag
 - Examples in `example/flightsql/python` were updated to new auth and showcasing `kamu` Python library
