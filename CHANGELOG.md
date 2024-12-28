@@ -11,6 +11,10 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [0.214.1] - 2024-12-28
+### Fixed
+- Transaction error on `/verify` REST endpoint
+
 ## [0.214.0] - 2024-12-23
 ### Added
 - New `kamu system decode` command that can decode an arbitrary block file for debugging
