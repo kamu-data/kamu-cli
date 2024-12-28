@@ -14,6 +14,11 @@ Recommendation: for ease of reading, use the following order:
 ## [Unreleased]
 ### Fixed
 - GraphQL: in a multi-tenant workspace, `datasets.createEmpty` and `datasets.createFromSnapshot` mutations now return dataset aliases prefixed with account name.
+- Fix DB transaction error in `/verify` REST endpoint (cherry-picked from `0.214.1`)
+
+## [0.214.1] - 2024-12-28 (HOT FIX)
+### Fixed
+- Transaction error on `/verify` REST endpoint
 
 ## [0.215.0] - 2024-12-27
 ### Added
