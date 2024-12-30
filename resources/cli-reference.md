@@ -1080,7 +1080,7 @@ Executes an SQL query or drops you into an SQL shell
 
 **Subcommands:**
 
-* `server` — Run SQL server
+* `server` — Runs an SQL engine in a server mode
 
 **Options:**
 
@@ -1149,7 +1149,7 @@ Note: Currently when connecting to a remote SQL kamu server you will need to man
 
 ## `kamu sql server`
 
-Run SQL server
+Runs an SQL engine in a server mode
 
 **Usage:** `kamu sql server [OPTIONS]`
 
@@ -1162,6 +1162,25 @@ Run SQL server
   Possible values: `datafusion`, `spark`
 
 * `--livy` — Run Livy server instead of JDBC
+
+**Examples:**
+
+By default runs the DataFusion engine exposing the FlightSQL protocol:
+
+    kamu sql server
+
+To customize interface and port:
+
+    kamu sql server --address 0.0.0.0 --port 50050
+
+To run with Spark engine:
+
+    kamu sql server --engine spark
+
+By default Spark runs with JDBC protocol, to instead run with Livy HTTP gateway:
+
+    kamu sql server --engine spark --livy
+
 
 
 

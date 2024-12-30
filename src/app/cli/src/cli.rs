@@ -1291,8 +1291,27 @@ pub enum SqlSubCommand {
     Server(SqlServer),
 }
 
-/// Run SQL server
+/// Runs an SQL engine in a server mode
 #[derive(Debug, clap::Args)]
+#[command(after_help = r#"
+**Examples:**
+
+By default runs the DataFusion engine exposing the FlightSQL protocol:
+
+    kamu sql server
+
+To customize interface and port:
+
+    kamu sql server --address 0.0.0.0 --port 50050
+
+To run with Spark engine:
+
+    kamu sql server --engine spark
+
+By default Spark runs with JDBC protocol, to instead run with Livy HTTP gateway:
+
+    kamu sql server --engine spark --livy
+"#)]
 pub struct SqlServer {
     /// Expose server on specific network interface
     #[arg(long)]
