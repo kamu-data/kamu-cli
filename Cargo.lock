@@ -6553,7 +6553,7 @@ dependencies = [
  "futures",
  "kamu-task-system",
  "kamu-task-system-repo-tests",
- "odf-metadata",
+ "odf",
  "test-group",
  "test-log",
  "tokio",
@@ -6572,7 +6572,7 @@ dependencies = [
  "internal-error",
  "kamu-task-system",
  "kamu-task-system-repo-tests",
- "odf-metadata",
+ "odf",
  "serde_json",
  "sqlx",
  "test-group",
@@ -6588,7 +6588,7 @@ dependencies = [
  "dill",
  "futures",
  "kamu-task-system",
- "odf-metadata",
+ "odf",
 ]
 
 [[package]]
@@ -6638,7 +6638,7 @@ dependencies = [
  "internal-error",
  "kamu-task-system",
  "kamu-task-system-repo-tests",
- "odf-metadata",
+ "odf",
  "serde_json",
  "sqlx",
  "test-group",
