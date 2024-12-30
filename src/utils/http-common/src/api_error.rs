@@ -18,9 +18,6 @@
 
 use internal_error::InternalError;
 use kamu_core::*;
-use odf_dataset::GetDatasetError;
-use odf_metadata as odf;
-use odf_storage::{GetBlockError, GetError, GetRefError, InsertError};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -265,7 +262,7 @@ impl ApiErrorCategorizable for PushIngestError {
     }
 }
 
-impl ApiErrorCategorizable for GetDatasetError {
+impl ApiErrorCategorizable for odf::dataset::GetDatasetError {
     fn categorize(&self) -> ApiErrorCategory<'_> {
         match &self {
             Self::Internal(e) => ApiErrorCategory::Internal(e),
@@ -274,17 +271,7 @@ impl ApiErrorCategorizable for GetDatasetError {
     }
 }
 
-impl ApiErrorCategorizable for GetRefError {
-    fn categorize(&self) -> ApiErrorCategory<'_> {
-        match &self {
-            Self::Access(e) => ApiErrorCategory::Access(e),
-            Self::Internal(e) => ApiErrorCategory::Internal(e),
-            _ => ApiErrorCategory::Other,
-        }
-    }
-}
-
-impl ApiErrorCategorizable for GetBlockError {
+impl ApiErrorCategorizable for odf::storage::GetRefError {
     fn categorize(&self) -> ApiErrorCategory<'_> {
         match &self {
             Self::Access(e) => ApiErrorCategory::Access(e),
@@ -294,7 +281,7 @@ impl ApiErrorCategorizable for GetBlockError {
     }
 }
 
-impl ApiErrorCategorizable for GetError {
+impl ApiErrorCategorizable for odf::storage::GetBlockError {
     fn categorize(&self) -> ApiErrorCategory<'_> {
         match &self {
             Self::Access(e) => ApiErrorCategory::Access(e),
@@ -304,7 +291,17 @@ impl ApiErrorCategorizable for GetError {
     }
 }
 
-impl ApiErrorCategorizable for InsertError {
+impl ApiErrorCategorizable for odf::storage::GetError {
+    fn categorize(&self) -> ApiErrorCategory<'_> {
+        match &self {
+            Self::Access(e) => ApiErrorCategory::Access(e),
+            Self::Internal(e) => ApiErrorCategory::Internal(e),
+            _ => ApiErrorCategory::Other,
+        }
+    }
+}
+
+impl ApiErrorCategorizable for odf::storage::InsertError {
     fn categorize(&self) -> ApiErrorCategory<'_> {
         match &self {
             Self::Access(e) => ApiErrorCategory::Access(e),
