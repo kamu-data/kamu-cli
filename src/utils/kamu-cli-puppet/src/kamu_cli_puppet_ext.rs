@@ -14,9 +14,8 @@ use std::path::PathBuf;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use datafusion::prelude::{ParquetReadOptions, SessionContext};
-use odf_metadata as odf;
-use odf_metadata::serde::yaml::{YamlDatasetSnapshotSerializer, YamlMetadataBlockDeserializer};
-use odf_metadata::serde::{DatasetSnapshotSerializer, MetadataBlockDeserializer};
+use odf::metadata::serde::yaml::{YamlDatasetSnapshotSerializer, YamlMetadataBlockDeserializer};
+use odf::metadata::serde::{DatasetSnapshotSerializer, MetadataBlockDeserializer};
 use serde::Deserialize;
 
 use crate::{ExecuteCommandResult, KamuCliPuppet};
