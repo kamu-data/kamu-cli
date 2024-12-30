@@ -456,7 +456,7 @@ async fn test_fetch_url_ftp_ok() {
 
     let ftp_server = crate::utils::FtpServer::new(&server_dir).await;
 
-    let fetch_step = odf::metadata::FetchStep::Url(FetchStepUrl {
+    let fetch_step = odf::metadata::FetchStep::Url(odf::metadata::FetchStepUrl {
         url: format!("ftp://foo:bar@localhost:{}/data.csv", ftp_server.host_port),
         event_time: None,
         cache: None,
