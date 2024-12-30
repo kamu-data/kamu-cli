@@ -13,10 +13,8 @@ use std::sync::Arc;
 use dill::{Catalog, Component};
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::{DatasetRegistry, DatasetRegistryExt, ResolvedDataset, RunInfoDir, TenancyConfig};
-use odf_dataset::{CreateDatasetResult, DatasetStorageUnit, GetDatasetError, MetadataChainExt};
-use odf_metadata::serde::flatbuffers::FlatbuffersMetadataBlockSerializer;
-use odf_metadata::serde::MetadataBlockSerializer;
-use odf_metadata::{DatasetAlias, DatasetKind, DatasetRef, MetadataBlock, Multicodec, Multihash};
+use odf::metadata::serde::flatbuffers::FlatbuffersMetadataBlockSerializer;
+use odf::metadata::serde::MetadataBlockSerializer;
 use odf_storage_impl::testing::MetadataFactory;
 use time_source::SystemTimeSourceDefault;
 
@@ -45,7 +43,7 @@ impl BaseRepoHarness {
             .add_value(RunInfoDir::new(run_info_dir))
             .add_value(tenancy_config)
             .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
-            .bind::<dyn DatasetStorageUnit, DatasetStorageUnitLocalFs>()
+            .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
             .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
             .add::<DatasetRegistrySoloUnitBridge>()
             .add_value(CurrentAccountSubject::new_test())
@@ -79,17 +77,20 @@ impl BaseRepoHarness {
         self.dataset_storage_unit_writer.as_ref()
     }
 
-    pub async fn check_dataset_exists(&self, alias: &DatasetAlias) -> Result<(), GetDatasetError> {
+    pub async fn check_dataset_exists(
+        &self,
+        alias: &odf::DatasetAlias,
+    ) -> Result<(), odf::dataset::GetDatasetError> {
         self.dataset_registry
             .get_dataset_by_ref(&alias.as_local_ref())
             .await?;
         Ok(())
     }
 
-    pub async fn create_root_dataset(&self, alias: &DatasetAlias) -> CreateDatasetResult {
+    pub async fn create_root_dataset(&self, alias: &odf::DatasetAlias) -> odf::CreateDatasetResult {
         let snapshot = MetadataFactory::dataset_snapshot()
             .name(alias.clone())
-            .kind(DatasetKind::Root)
+            .kind(odf::DatasetKind::Root)
             .push_event(MetadataFactory::set_polling_source().build())
             .build();
 
@@ -104,14 +105,14 @@ impl BaseRepoHarness {
 
     pub async fn create_derived_dataset(
         &self,
-        alias: &DatasetAlias,
-        input_dataset_refs: Vec<DatasetRef>,
-    ) -> CreateDatasetResult {
+        alias: &odf::DatasetAlias,
+        input_dataset_refs: Vec<odf::DatasetRef>,
+    ) -> odf::CreateDatasetResult {
         self.dataset_storage_unit_writer
             .create_dataset_from_snapshot(
                 MetadataFactory::dataset_snapshot()
                     .name(alias.clone())
-                    .kind(DatasetKind::Derivative)
+                    .kind(odf::DatasetKind::Derivative)
                     .push_event(
                         MetadataFactory::set_transform()
                             .inputs_from_refs(input_dataset_refs)
@@ -126,15 +127,19 @@ impl BaseRepoHarness {
 
     pub async fn num_blocks(&self, target: ResolvedDataset) -> usize {
         use futures::StreamExt;
+        use odf::dataset::MetadataChainExt;
         target.as_metadata_chain().iter_blocks().count().await
     }
 
-    pub fn hash_from_block(block: &MetadataBlock) -> Multihash {
+    pub fn hash_from_block(block: &odf::MetadataBlock) -> odf::Multihash {
         let block_data = FlatbuffersMetadataBlockSerializer
             .write_manifest(block)
             .unwrap();
 
-        Multihash::from_digest::<sha3::Sha3_256>(Multicodec::Sha3_256, &block_data)
+        odf::Multihash::from_digest::<sha3::Sha3_256>(
+            odf::metadata::Multicodec::Sha3_256,
+            &block_data,
+        )
     }
 }
 

@@ -13,9 +13,7 @@ use dill::*;
 use futures::TryStreamExt;
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_core::*;
-use odf_dataset::{AppendError, AppendOpts, BlockRef, GetSummaryOpts, MetadataChain};
 use odf_dataset_impl::MetadataChainImpl;
-use odf_metadata as odf;
 use odf_storage_impl::{
     MetadataBlockRepositoryImpl,
     NamedObjectRepositoryInMemory,
@@ -57,7 +55,7 @@ impl VerificationServiceImpl {
         let chain = resolved_dataset.as_metadata_chain();
 
         let head = match block_range.1 {
-            None => chain.resolve_ref(&BlockRef::Head).await?,
+            None => chain.resolve_ref(&odf::BlockRef::Head).await?,
             Some(hash) => hash,
         };
         let tail = block_range.0;
@@ -211,7 +209,7 @@ impl VerificationServiceImpl {
         let chain = resolved_dataset.as_metadata_chain();
 
         let head = match block_range.1 {
-            None => chain.resolve_ref(&BlockRef::Head).await?,
+            None => chain.resolve_ref(&odf::BlockRef::Head).await?,
             Some(hash) => hash,
         };
         let tail = block_range.0;
@@ -233,18 +231,21 @@ impl VerificationServiceImpl {
         );
 
         for (block_hash, block) in blocks.into_iter().rev() {
+            use odf::MetadataChain;
             match in_memory_chain
                 .append(
                     block,
-                    AppendOpts {
+                    odf::dataset::AppendOpts {
                         precomputed_hash: Some(&block_hash),
-                        ..AppendOpts::default()
+                        ..odf::dataset::AppendOpts::default()
                     },
                 )
                 .await
             {
                 Ok(_) => Ok(()),
-                Err(AppendError::RefNotFound(e)) => Err(VerificationError::RefNotFound(e)),
+                Err(odf::dataset::AppendError::RefNotFound(e)) => {
+                    Err(VerificationError::RefNotFound(e))
+                }
                 Err(e) => Err(VerificationError::Internal(e.int_err())),
             }?;
         }
@@ -272,7 +273,11 @@ impl VerificationService for VerificationServiceImpl {
         request: VerificationRequest<ResolvedDataset>,
         maybe_listener: Option<Arc<dyn VerificationListener>>,
     ) -> VerificationResult {
-        let dataset_kind = match request.target.get_summary(GetSummaryOpts::default()).await {
+        let dataset_kind = match request
+            .target
+            .get_summary(odf::dataset::GetSummaryOpts::default())
+            .await
+        {
             Ok(summary) => summary.kind,
             Err(e) => return VerificationResult::err(request.target.take_handle(), e.int_err()),
         };

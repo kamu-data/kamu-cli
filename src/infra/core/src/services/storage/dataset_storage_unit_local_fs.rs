@@ -15,10 +15,7 @@ use dill::*;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_accounts::{CurrentAccountSubject, DEFAULT_ACCOUNT_NAME_STR};
 use kamu_core::TenancyConfig;
-use odf_dataset::*;
 use odf_dataset_impl::{DatasetImpl, DatasetLayout, MetadataChainImpl};
-use odf_metadata as odf;
-use odf_storage::{GetNamedError, GetRefError};
 use odf_storage_impl::{
     MetadataBlockRepositoryCachingInMem,
     MetadataBlockRepositoryImpl,
@@ -65,7 +62,7 @@ impl DatasetStorageUnitLocalFs {
         }
     }
 
-    fn build_dataset(layout: DatasetLayout) -> Arc<dyn Dataset> {
+    fn build_dataset(layout: DatasetLayout) -> Arc<dyn odf::Dataset> {
         Arc::new(DatasetImpl::new(
             MetadataChainImpl::new(
                 MetadataBlockRepositoryCachingInMem::new(MetadataBlockRepositoryImpl::new(
@@ -85,7 +82,8 @@ impl DatasetStorageUnitLocalFs {
     pub async fn get_dataset_layout(
         &self,
         dataset_ref: &odf::DatasetRef,
-    ) -> Result<DatasetLayout, GetDatasetError> {
+    ) -> Result<DatasetLayout, odf::dataset::GetDatasetError> {
+        use odf::DatasetStorageUnit;
         let dataset_handle = self
             .resolve_stored_dataset_handle_by_ref(dataset_ref)
             .await?;
@@ -110,7 +108,7 @@ impl DatasetStorageUnitLocalFs {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait]
-impl DatasetStorageUnit for DatasetStorageUnitLocalFs {
+impl odf::DatasetStorageUnit for DatasetStorageUnitLocalFs {
     // TODO: PERF: Cache data and speed up lookups by ID
     //
     // TODO: CONCURRENCY: Since resolving ID to Name currently requires accessing
@@ -123,7 +121,7 @@ impl DatasetStorageUnit for DatasetStorageUnitLocalFs {
     async fn resolve_stored_dataset_handle_by_ref(
         &self,
         dataset_ref: &odf::DatasetRef,
-    ) -> Result<odf::DatasetHandle, GetDatasetError> {
+    ) -> Result<odf::DatasetHandle, odf::dataset::GetDatasetError> {
         // Anti-thrashing lock (see comment above)
         let _lock_guard = self.thrash_lock.lock().await;
 
@@ -134,37 +132,41 @@ impl DatasetStorageUnit for DatasetStorageUnitLocalFs {
                 .resolve_dataset_alias(alias)
                 .await
                 .map_err(|e| match e {
-                    ResolveDatasetError::Internal(e) => GetDatasetError::Internal(e),
-                    ResolveDatasetError::NotFound(e) => GetDatasetError::NotFound(e),
+                    ResolveDatasetError::Internal(e) => odf::dataset::GetDatasetError::Internal(e),
+                    ResolveDatasetError::NotFound(e) => odf::dataset::GetDatasetError::NotFound(e),
                 }),
             odf::DatasetRef::ID(id) => {
                 self.storage_strategy
                     .resolve_dataset_id(id)
                     .await
                     .map_err(|e| match e {
-                        ResolveDatasetError::Internal(e) => GetDatasetError::Internal(e),
-                        ResolveDatasetError::NotFound(e) => GetDatasetError::NotFound(e),
+                        ResolveDatasetError::Internal(e) => {
+                            odf::dataset::GetDatasetError::Internal(e)
+                        }
+                        ResolveDatasetError::NotFound(e) => {
+                            odf::dataset::GetDatasetError::NotFound(e)
+                        }
                     })
             }
         }
     }
 
     // TODO: PERF: Resolving handles currently involves reading summary files
-    fn stored_dataset_handles(&self) -> DatasetHandleStream<'_> {
+    fn stored_dataset_handles(&self) -> odf::dataset::DatasetHandleStream<'_> {
         self.storage_strategy.get_all_datasets()
     }
 
     fn stored_dataset_handles_by_owner(
         &self,
         account_name: &odf::AccountName,
-    ) -> DatasetHandleStream<'_> {
+    ) -> odf::dataset::DatasetHandleStream<'_> {
         self.storage_strategy.get_datasets_by_owner(account_name)
     }
 
     fn get_stored_dataset_by_handle(
         &self,
         dataset_handle: &odf::DatasetHandle,
-    ) -> Arc<dyn Dataset> {
+    ) -> Arc<dyn odf::Dataset> {
         let layout = DatasetLayout::new(self.storage_strategy.get_dataset_path(dataset_handle));
         Self::build_dataset(layout)
     }
@@ -178,9 +180,10 @@ impl DatasetStorageUnitWriter for DatasetStorageUnitLocalFs {
     async fn create_dataset(
         &self,
         dataset_alias: &odf::DatasetAlias,
-        seed_block: odf::MetadataBlockTyped<odf::Seed>,
-    ) -> Result<CreateDatasetResult, CreateDatasetError> {
+        seed_block: odf::MetadataBlockTyped<odf::metadata::Seed>,
+    ) -> Result<odf::CreateDatasetResult, odf::dataset::CreateDatasetError> {
         // Check if a dataset with the same alias can be resolved successfully
+        use odf::DatasetStorageUnit;
         let maybe_existing_dataset_handle = match self
             .resolve_stored_dataset_handle_by_ref(&dataset_alias.as_local_ref())
             .await
@@ -188,15 +191,15 @@ impl DatasetStorageUnitWriter for DatasetStorageUnitLocalFs {
             Ok(existing_handle) => Ok(Some(existing_handle)),
             // ToDo temporary fix, remove it on favor of
             // https://github.com/kamu-data/kamu-cli/issues/342
-            Err(GetDatasetError::NotFound(_)) => match self
+            Err(odf::dataset::GetDatasetError::NotFound(_)) => match self
                 .resolve_stored_dataset_handle_by_ref(&(seed_block.event.dataset_id.clone().into()))
                 .await
             {
                 Ok(existing_handle) => Ok(Some(existing_handle)),
-                Err(GetDatasetError::NotFound(_)) => Ok(None),
-                Err(GetDatasetError::Internal(e)) => Err(e),
+                Err(odf::dataset::GetDatasetError::NotFound(_)) => Ok(None),
+                Err(odf::dataset::GetDatasetError::Internal(e)) => Err(e),
             },
-            Err(GetDatasetError::Internal(e)) => Err(e),
+            Err(odf::dataset::GetDatasetError::Internal(e)) => Err(e),
         }?;
 
         // If so, there are 2 possibilities:
@@ -209,24 +212,28 @@ impl DatasetStorageUnitWriter for DatasetStorageUnitLocalFs {
 
             match existing_dataset
                 .as_metadata_chain()
-                .resolve_ref(&BlockRef::Head)
+                .resolve_ref(&odf::BlockRef::Head)
                 .await
             {
                 // Existing head
                 Ok(_) => {
-                    return Err(CreateDatasetError::NameCollision(NameCollisionError {
-                        alias: dataset_alias.clone(),
-                    }));
+                    return Err(odf::dataset::CreateDatasetError::NameCollision(
+                        odf::dataset::NameCollisionError {
+                            alias: dataset_alias.clone(),
+                        },
+                    ));
                 }
 
                 // No head, so continue creating
-                Err(GetRefError::NotFound(_)) => {}
+                Err(odf::storage::GetRefError::NotFound(_)) => {}
 
                 // Errors...
-                Err(GetRefError::Access(e)) => {
-                    return Err(CreateDatasetError::Internal(e.int_err()))
+                Err(odf::storage::GetRefError::Access(e)) => {
+                    return Err(odf::dataset::CreateDatasetError::Internal(e.int_err()))
                 }
-                Err(GetRefError::Internal(e)) => return Err(CreateDatasetError::Internal(e)),
+                Err(odf::storage::GetRefError::Internal(e)) => {
+                    return Err(odf::dataset::CreateDatasetError::Internal(e))
+                }
             }
         }
 
@@ -252,11 +259,11 @@ impl DatasetStorageUnitWriter for DatasetStorageUnitLocalFs {
             .as_metadata_chain()
             .append(
                 seed_block.into(),
-                AppendOpts {
+                odf::dataset::AppendOpts {
                     // We are using head ref CAS to detect previous existence of a dataset
                     // as atomically as possible
                     check_ref_is: Some(None),
-                    ..AppendOpts::default()
+                    ..odf::dataset::AppendOpts::default()
                 },
             )
             .await
@@ -264,10 +271,12 @@ impl DatasetStorageUnitWriter for DatasetStorageUnitLocalFs {
             Ok(head) => head,
             Err(err) => {
                 return Err(match err {
-                    AppendError::RefCASFailed(_) => {
-                        CreateDatasetError::RefCollision(RefCollisionError {
-                            id: dataset_handle.id,
-                        })
+                    odf::dataset::AppendError::RefCASFailed(_) => {
+                        odf::dataset::CreateDatasetError::RefCollision(
+                            odf::dataset::RefCollisionError {
+                                id: dataset_handle.id,
+                            },
+                        )
                     }
                     _ => err.int_err().into(),
                 })
@@ -285,7 +294,7 @@ impl DatasetStorageUnitWriter for DatasetStorageUnitLocalFs {
             "Created new dataset",
         );
 
-        Ok(CreateDatasetResult {
+        Ok(odf::CreateDatasetResult {
             dataset_handle,
             dataset,
             head,
@@ -296,7 +305,8 @@ impl DatasetStorageUnitWriter for DatasetStorageUnitLocalFs {
     async fn create_dataset_from_snapshot(
         &self,
         snapshot: odf::DatasetSnapshot,
-    ) -> Result<CreateDatasetFromSnapshotResult, CreateDatasetFromSnapshotError> {
+    ) -> Result<odf::CreateDatasetFromSnapshotResult, odf::dataset::CreateDatasetFromSnapshotError>
+    {
         create_dataset_from_snapshot_impl(self, snapshot, self.system_time_source.now()).await
     }
 
@@ -305,7 +315,7 @@ impl DatasetStorageUnitWriter for DatasetStorageUnitLocalFs {
         &self,
         dataset_handle: &odf::DatasetHandle,
         new_name: &odf::DatasetName,
-    ) -> Result<(), RenameDatasetError> {
+    ) -> Result<(), odf::dataset::RenameDatasetError> {
         let new_alias =
             odf::DatasetAlias::new(dataset_handle.alias.account_name.clone(), new_name.clone());
 
@@ -315,13 +325,17 @@ impl DatasetStorageUnitWriter for DatasetStorageUnitLocalFs {
             .resolve_dataset_alias(&new_alias)
             .await
         {
-            Ok(_) => Err(RenameDatasetError::NameCollision(NameCollisionError {
-                alias: odf::DatasetAlias::new(
-                    dataset_handle.alias.account_name.clone(),
-                    new_name.clone(),
-                ),
-            })),
-            Err(ResolveDatasetError::Internal(e)) => Err(RenameDatasetError::Internal(e)),
+            Ok(_) => Err(odf::dataset::RenameDatasetError::NameCollision(
+                odf::dataset::NameCollisionError {
+                    alias: odf::DatasetAlias::new(
+                        dataset_handle.alias.account_name.clone(),
+                        new_name.clone(),
+                    ),
+                },
+            )),
+            Err(ResolveDatasetError::Internal(e)) => {
+                Err(odf::dataset::RenameDatasetError::Internal(e))
+            }
             Err(ResolveDatasetError::NotFound(_)) => Ok(()),
         }?;
 
@@ -336,7 +350,7 @@ impl DatasetStorageUnitWriter for DatasetStorageUnitLocalFs {
     async fn delete_dataset(
         &self,
         dataset_handle: &odf::DatasetHandle,
-    ) -> Result<(), DeleteDatasetError> {
+    ) -> Result<(), odf::dataset::DeleteDatasetError> {
         // // Update repo info
         // let mut repo_info = self.read_repo_info().await?;
         // let index = repo_info
@@ -361,9 +375,12 @@ impl DatasetStorageUnitWriter for DatasetStorageUnitLocalFs {
 trait DatasetStorageStrategy: Sync + Send {
     fn get_dataset_path(&self, dataset_handle: &odf::DatasetHandle) -> PathBuf;
 
-    fn get_all_datasets(&self) -> DatasetHandleStream<'_>;
+    fn get_all_datasets(&self) -> odf::dataset::DatasetHandleStream<'_>;
 
-    fn get_datasets_by_owner(&self, account_name: &odf::AccountName) -> DatasetHandleStream<'_>;
+    fn get_datasets_by_owner(
+        &self,
+        account_name: &odf::AccountName,
+    ) -> odf::dataset::DatasetHandleStream<'_>;
 
     async fn resolve_dataset_alias(
         &self,
@@ -377,7 +394,7 @@ trait DatasetStorageStrategy: Sync + Send {
 
     async fn handle_dataset_created(
         &self,
-        dataset: &dyn Dataset,
+        dataset: &dyn odf::Dataset,
         dataset_alias: &odf::DatasetAlias,
     ) -> Result<(), InternalError>;
 
@@ -399,7 +416,7 @@ enum ResolveDatasetError {
     NotFound(
         #[from]
         #[backtrace]
-        DatasetNotFoundError,
+        odf::dataset::DatasetNotFoundError,
     ),
     #[error(transparent)]
     Internal(
@@ -433,16 +450,16 @@ impl DatasetSingleTenantStorageStrategy {
         &self,
         dataset_path: &PathBuf,
         dataset_alias: &odf::DatasetAlias,
-    ) -> Result<(DatasetSummary, odf::DatasetAlias), ResolveDatasetError> {
+    ) -> Result<(odf::dataset::DatasetSummary, odf::DatasetAlias), ResolveDatasetError> {
         let layout = DatasetLayout::new(dataset_path);
         let dataset = DatasetStorageUnitLocalFs::build_dataset(layout);
 
         let dataset_summary = dataset
-            .get_summary(GetSummaryOpts::default())
+            .get_summary(odf::dataset::GetSummaryOpts::default())
             .await
             .map_err(|e| {
-                if let GetSummaryError::EmptyDataset = e {
-                    ResolveDatasetError::NotFound(DatasetNotFoundError {
+                if let odf::dataset::GetSummaryError::EmptyDataset = e {
+                    ResolveDatasetError::NotFound(odf::dataset::DatasetNotFoundError {
                         dataset_ref: dataset_alias.as_local_ref(),
                     })
                 } else {
@@ -482,7 +499,7 @@ impl DatasetStorageStrategy for DatasetSingleTenantStorageStrategy {
         self.dataset_path_impl(&dataset_handle.alias)
     }
 
-    fn get_all_datasets(&self) -> DatasetHandleStream<'_> {
+    fn get_all_datasets(&self) -> odf::dataset::DatasetHandleStream<'_> {
         Box::pin(async_stream::try_stream! {
             let read_dataset_dir = std::fs::read_dir(&self.root).int_err()?;
 
@@ -504,7 +521,10 @@ impl DatasetStorageStrategy for DatasetSingleTenantStorageStrategy {
         })
     }
 
-    fn get_datasets_by_owner(&self, account_name: &odf::AccountName) -> DatasetHandleStream<'_> {
+    fn get_datasets_by_owner(
+        &self,
+        account_name: &odf::AccountName,
+    ) -> odf::dataset::DatasetHandleStream<'_> {
         if *account_name == DEFAULT_ACCOUNT_NAME_STR {
             self.get_all_datasets()
         } else {
@@ -538,9 +558,11 @@ impl DatasetStorageStrategy for DatasetSingleTenantStorageStrategy {
                         .await;
                 }
             }
-            return Err(ResolveDatasetError::NotFound(DatasetNotFoundError {
-                dataset_ref: dataset_alias.as_local_ref(),
-            }));
+            return Err(ResolveDatasetError::NotFound(
+                odf::dataset::DatasetNotFoundError {
+                    dataset_ref: dataset_alias.as_local_ref(),
+                },
+            ));
         }
 
         self.resolve_dataset_handle(&dataset_path, dataset_alias)
@@ -577,14 +599,16 @@ impl DatasetStorageStrategy for DatasetSingleTenantStorageStrategy {
             }
         }
 
-        Err(ResolveDatasetError::NotFound(DatasetNotFoundError {
-            dataset_ref: dataset_id.as_local_ref(),
-        }))
+        Err(ResolveDatasetError::NotFound(
+            odf::dataset::DatasetNotFoundError {
+                dataset_ref: dataset_id.as_local_ref(),
+            },
+        ))
     }
 
     async fn handle_dataset_created(
         &self,
-        _dataset: &dyn Dataset,
+        _dataset: &dyn odf::Dataset,
         _dataset_alias: &odf::DatasetAlias,
     ) -> Result<(), InternalError> {
         // No extra action required in single-tenant mode
@@ -664,19 +688,21 @@ impl DatasetMultiTenantStorageStrategy {
                 }
                 Ok(dataset_alias)
             }
-            Err(GetNamedError::Internal(e)) => Err(ResolveDatasetError::Internal(e)),
-            Err(GetNamedError::Access(e)) => Err(ResolveDatasetError::Internal(e.int_err())),
-            Err(GetNamedError::NotFound(_)) => {
-                Err(ResolveDatasetError::NotFound(DatasetNotFoundError {
-                    dataset_ref: dataset_id.as_local_ref(),
-                }))
+            Err(odf::storage::GetNamedError::Internal(e)) => Err(ResolveDatasetError::Internal(e)),
+            Err(odf::storage::GetNamedError::Access(e)) => {
+                Err(ResolveDatasetError::Internal(e.int_err()))
             }
+            Err(odf::storage::GetNamedError::NotFound(_)) => Err(ResolveDatasetError::NotFound(
+                odf::dataset::DatasetNotFoundError {
+                    dataset_ref: dataset_id.as_local_ref(),
+                },
+            )),
         }
     }
 
     async fn save_dataset_alias(
         &self,
-        dataset: &dyn Dataset,
+        dataset: &dyn odf::Dataset,
         dataset_alias: &odf::DatasetAlias,
     ) -> Result<(), InternalError> {
         dataset
@@ -692,7 +718,7 @@ impl DatasetMultiTenantStorageStrategy {
         &'s self,
         account_name: &'s odf::AccountName,
         account_dir_path: PathBuf,
-    ) -> DatasetHandleStream<'s> {
+    ) -> odf::dataset::DatasetHandleStream<'s> {
         Box::pin(async_stream::try_stream! {
             let read_dataset_dir = std::fs::read_dir(account_dir_path).int_err()?;
 
@@ -771,7 +797,7 @@ impl DatasetStorageStrategy for DatasetMultiTenantStorageStrategy {
             .join(dataset_handle.id.as_multibase().to_stack_string())
     }
 
-    fn get_all_datasets(&self) -> DatasetHandleStream<'_> {
+    fn get_all_datasets(&self) -> odf::dataset::DatasetHandleStream<'_> {
         Box::pin(async_stream::try_stream! {
             let read_account_dir = std::fs::read_dir(&self.root).int_err()?;
 
@@ -797,7 +823,10 @@ impl DatasetStorageStrategy for DatasetMultiTenantStorageStrategy {
         })
     }
 
-    fn get_datasets_by_owner(&self, account_name: &odf::AccountName) -> DatasetHandleStream<'_> {
+    fn get_datasets_by_owner(
+        &self,
+        account_name: &odf::AccountName,
+    ) -> odf::dataset::DatasetHandleStream<'_> {
         let account_name = account_name.clone();
         Box::pin(async_stream::try_stream! {
             let account_dir_path = self.root.join(account_name.clone());
@@ -823,7 +852,7 @@ impl DatasetStorageStrategy for DatasetMultiTenantStorageStrategy {
 
         if account_dataset_dir_path.is_dir() {
             let read_dataset_dir = std::fs::read_dir(account_dataset_dir_path).map_err(|_| {
-                ResolveDatasetError::NotFound(DatasetNotFoundError {
+                ResolveDatasetError::NotFound(odf::dataset::DatasetNotFoundError {
                     dataset_ref: dataset_alias.as_local_ref(),
                 })
             })?;
@@ -859,9 +888,11 @@ impl DatasetStorageStrategy for DatasetMultiTenantStorageStrategy {
             }
         }
 
-        Err(ResolveDatasetError::NotFound(DatasetNotFoundError {
-            dataset_ref: dataset_alias.as_local_ref(),
-        }))
+        Err(ResolveDatasetError::NotFound(
+            odf::dataset::DatasetNotFoundError {
+                dataset_ref: dataset_alias.as_local_ref(),
+            },
+        ))
     }
 
     async fn resolve_dataset_id(
@@ -898,14 +929,16 @@ impl DatasetStorageStrategy for DatasetMultiTenantStorageStrategy {
             }
         }
 
-        Err(ResolveDatasetError::NotFound(DatasetNotFoundError {
-            dataset_ref: dataset_id.as_local_ref(),
-        }))
+        Err(ResolveDatasetError::NotFound(
+            odf::dataset::DatasetNotFoundError {
+                dataset_ref: dataset_id.as_local_ref(),
+            },
+        ))
     }
 
     async fn handle_dataset_created(
         &self,
-        dataset: &dyn Dataset,
+        dataset: &dyn odf::Dataset,
         dataset_alias: &odf::DatasetAlias,
     ) -> Result<(), InternalError> {
         self.save_dataset_alias(dataset, dataset_alias).await

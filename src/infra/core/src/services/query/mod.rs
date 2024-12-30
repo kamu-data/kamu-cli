@@ -28,14 +28,6 @@ use datafusion::prelude::*;
 use futures::stream::{self, StreamExt, TryStreamExt};
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_core::*;
-use odf_dataset::{
-    BlockRef,
-    MetadataChainExt,
-    MetadataVisitorDecision,
-    SearchSetDataSchemaVisitor,
-};
-use odf_metadata as odf;
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Catalog
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -293,10 +285,11 @@ impl KamuTable {
 
     #[tracing::instrument(level="info", skip_all, fields(dataset = ?self.resolved_dataset))]
     async fn init_table_schema(&self) -> Result<SchemaRef, InternalError> {
+        use odf::dataset::MetadataChainExt;
         let maybe_set_data_schema = self
             .resolved_dataset
             .as_metadata_chain()
-            .accept_one(SearchSetDataSchemaVisitor::new())
+            .accept_one(odf::dataset::SearchSetDataSchemaVisitor::new())
             .await
             .int_err()?
             .into_event();
@@ -395,7 +388,7 @@ impl KamuTable {
         } else {
             self.resolved_dataset
                 .as_metadata_chain()
-                .resolve_ref(&BlockRef::Head)
+                .resolve_ref(&odf::BlockRef::Head)
                 .await
                 .int_err()?
         };
@@ -404,8 +397,8 @@ impl KamuTable {
 
         let last_records_to_consider = self.hints.as_ref().and_then(|o| o.last_records_to_consider);
 
-        type Flag = odf::MetadataEventTypeFlags;
-        type Decision = MetadataVisitorDecision;
+        type Flag = odf::metadata::MetadataEventTypeFlags;
+        type Decision = odf::dataset::MetadataVisitorDecision;
 
         struct DataSliceCollectorVisitorState {
             files: Vec<odf::Multihash>,
@@ -413,6 +406,7 @@ impl KamuTable {
             last_records_to_consider: Option<u64>,
         }
 
+        use odf::dataset::MetadataChainExt;
         let final_state = self
             .resolved_dataset
             .as_metadata_chain()

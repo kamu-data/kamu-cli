@@ -10,8 +10,6 @@
 use std::sync::Arc;
 
 use kamu_core::{SyncError, SyncListener, SyncResult};
-use odf_dataset::Dataset;
-use odf_metadata as odf;
 use url::Url;
 
 use crate::utils::smart_transfer_protocol::{SmartTransferProtocolClient, TransferOptions};
@@ -33,7 +31,7 @@ impl SmartTransferProtocolClient for DummySmartTransferProtocolClient {
     async fn pull_protocol_client_flow(
         &self,
         _http_src_url: &Url,
-        _dst: Option<Arc<dyn Dataset>>,
+        _dst: Option<Arc<dyn odf::Dataset>>,
         _dst_alias: Option<&odf::DatasetAlias>,
         _listener: Arc<dyn SyncListener>,
         _transfer_options: TransferOptions,
@@ -43,7 +41,7 @@ impl SmartTransferProtocolClient for DummySmartTransferProtocolClient {
 
     async fn push_protocol_client_flow(
         &self,
-        _src: Arc<dyn Dataset>,
+        _src: Arc<dyn odf::Dataset>,
         _http_dst_url: &Url,
         _dst_head: Option<&odf::Multihash>,
         _listener: Arc<dyn SyncListener>,

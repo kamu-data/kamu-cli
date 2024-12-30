@@ -9,6 +9,7 @@
 
 pub use odf_dataset::{
     BlockRef,
+    CreateDatasetFromSnapshotResult,
     CreateDatasetResult,
     Dataset,
     DatasetStorageUnit,

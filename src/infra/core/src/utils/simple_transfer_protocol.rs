@@ -15,25 +15,7 @@ use futures::{stream, Future, StreamExt, TryStreamExt};
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_core::utils::metadata_chain_comparator::*;
 use kamu_core::*;
-use odf::{AsTypedBlock, IntoDataStreamBlock};
-use odf_dataset::{
-    AppendError,
-    AppendOpts,
-    AppendValidation,
-    AppendValidationError,
-    BlockRef,
-    Dataset,
-    DatasetVisibility,
-    HashedMetadataBlock,
-    IterBlocksError,
-    MetadataChain,
-    MetadataChainExt,
-    SetChainRefError,
-    SetRefOpts,
-};
 use odf_dataset_impl::MetadataChainImpl;
-use odf_metadata as odf;
-use odf_storage::{GetError, GetRefError, InsertError, InsertOpts};
 use odf_storage_impl::{
     MetadataBlockRepositoryImpl,
     NamedObjectRepositoryInMemory,
@@ -52,7 +34,7 @@ const DEFAULT_SIMPLE_PROTOCOL_MAX_PARALLEL_TRANSFERS: usize = 10;
 #[derive(Debug, Eq, PartialEq)]
 pub struct SimpleProtocolTransferOptions {
     pub max_parallel_transfers: usize,
-    pub visibility_for_created_dataset: DatasetVisibility,
+    pub visibility_for_created_dataset: odf::DatasetVisibility,
 }
 
 impl Default for SimpleProtocolTransferOptions {
@@ -66,7 +48,7 @@ impl Default for SimpleProtocolTransferOptions {
             };
         Self {
             max_parallel_transfers,
-            visibility_for_created_dataset: DatasetVisibility::Private,
+            visibility_for_created_dataset: odf::DatasetVisibility::Private,
         }
     }
 }
@@ -89,10 +71,10 @@ impl SimpleTransferProtocol {
     pub async fn sync(
         &self,
         src_ref: &odf::DatasetRefAny,
-        src: Arc<dyn Dataset>,
-        maybe_dst: Option<Arc<dyn Dataset>>,
+        src: Arc<dyn odf::Dataset>,
+        maybe_dst: Option<Arc<dyn odf::Dataset>>,
         dst_alias: Option<&odf::DatasetAlias>,
-        validation: AppendValidation,
+        validation: odf::dataset::AppendValidation,
         trust_source_hashes: bool,
         force: bool,
         transfer_options: SimpleProtocolTransferOptions,
@@ -113,7 +95,7 @@ impl SimpleTransferProtocol {
             let dst_head = self.get_dest_head(dst_chain).await?;
             (dst_chain, dst_head)
         } else {
-            (&empty_chain as &dyn MetadataChain, None)
+            (&empty_chain as &dyn odf::MetadataChain, None)
         };
 
         tracing::info!(?src_head, ?dst_head, "Resolved heads");
@@ -168,6 +150,7 @@ impl SimpleTransferProtocol {
             CompareChainsResult::LhsBehind { .. } | CompareChainsResult::Divergence { .. } => {
                 // Load all source blocks from head to tail
                 assert!(force);
+                use odf::dataset::MetadataChainExt;
                 src_chain
                     .iter_blocks()
                     .try_collect()
@@ -183,6 +166,7 @@ impl SimpleTransferProtocol {
         let (dst, dst_head) = if let Some(dst) = maybe_dst {
             (dst, dst_head)
         } else {
+            use odf::metadata::AsTypedBlock;
             let (first_hash, first_block) = blocks.pop().unwrap();
             let seed_block = first_block
                 .into_typed()
@@ -233,59 +217,59 @@ impl SimpleTransferProtocol {
     async fn get_src_head(
         &self,
         src_ref: &odf::DatasetRefAny,
-        src_chain: &dyn MetadataChain,
+        src_chain: &dyn odf::MetadataChain,
     ) -> Result<odf::Multihash, SyncError> {
-        match src_chain.resolve_ref(&BlockRef::Head).await {
+        match src_chain.resolve_ref(&odf::BlockRef::Head).await {
             Ok(head) => Ok(head),
-            Err(GetRefError::NotFound(_)) => Err(DatasetAnyRefUnresolvedError {
+            Err(odf::storage::GetRefError::NotFound(_)) => Err(DatasetAnyRefUnresolvedError {
                 dataset_ref: src_ref.clone(),
             }
             .into()),
-            Err(GetRefError::Access(e)) => Err(SyncError::Access(e)),
-            Err(GetRefError::Internal(e)) => Err(SyncError::Internal(e)),
+            Err(odf::storage::GetRefError::Access(e)) => Err(SyncError::Access(e)),
+            Err(odf::storage::GetRefError::Internal(e)) => Err(SyncError::Internal(e)),
         }
     }
 
     async fn get_dest_head(
         &self,
-        dst_chain: &dyn MetadataChain,
+        dst_chain: &dyn odf::MetadataChain,
     ) -> Result<Option<odf::Multihash>, SyncError> {
-        match dst_chain.resolve_ref(&BlockRef::Head).await {
+        match dst_chain.resolve_ref(&odf::BlockRef::Head).await {
             Ok(h) => Ok(Some(h)),
-            Err(GetRefError::NotFound(_)) => Ok(None),
-            Err(GetRefError::Access(e)) => Err(SyncError::Access(e)),
-            Err(GetRefError::Internal(e)) => Err(SyncError::Internal(e)),
+            Err(odf::storage::GetRefError::NotFound(_)) => Ok(None),
+            Err(odf::storage::GetRefError::Access(e)) => Err(SyncError::Access(e)),
+            Err(odf::storage::GetRefError::Internal(e)) => Err(SyncError::Internal(e)),
         }
     }
 
-    fn map_block_iteration_error(e: IterBlocksError) -> SyncError {
+    fn map_block_iteration_error(e: odf::dataset::IterBlocksError) -> SyncError {
         match e {
-            IterBlocksError::RefNotFound(e) => SyncError::Internal(e.int_err()),
-            IterBlocksError::BlockNotFound(e) => CorruptedSourceError {
+            odf::dataset::IterBlocksError::RefNotFound(e) => SyncError::Internal(e.int_err()),
+            odf::dataset::IterBlocksError::BlockNotFound(e) => CorruptedSourceError {
                 message: "Source metadata chain is broken".to_owned(),
                 source: Some(e.into()),
             }
             .into(),
-            IterBlocksError::BlockVersion(e) => CorruptedSourceError {
+            odf::dataset::IterBlocksError::BlockVersion(e) => CorruptedSourceError {
                 message: "Source metadata chain is broken".to_owned(),
                 source: Some(e.into()),
             }
             .into(),
-            IterBlocksError::BlockMalformed(e) => CorruptedSourceError {
+            odf::dataset::IterBlocksError::BlockMalformed(e) => CorruptedSourceError {
                 message: "Source metadata chain is broken".to_owned(),
                 source: Some(e.into()),
             }
             .into(),
-            IterBlocksError::InvalidInterval(_) => unreachable!(),
-            IterBlocksError::Access(e) => SyncError::Access(e),
-            IterBlocksError::Internal(e) => SyncError::Internal(e),
+            odf::dataset::IterBlocksError::InvalidInterval(_) => unreachable!(),
+            odf::dataset::IterBlocksError::Access(e) => SyncError::Access(e),
+            odf::dataset::IterBlocksError::Internal(e) => SyncError::Internal(e),
         }
     }
 
     async fn download_block_data<'a>(
         &'a self,
-        src: &'a dyn Dataset,
-        dst: &'a dyn Dataset,
+        src: &'a dyn odf::Dataset,
+        dst: &'a dyn odf::Dataset,
         data_slice: &odf::DataSlice,
         trust_source_hashes: bool,
         listener: Arc<dyn SyncListener>,
@@ -299,20 +283,20 @@ impl SimpleTransferProtocol {
             .await
         {
             Ok(s) => Ok(s),
-            Err(GetError::NotFound(e)) => Err(CorruptedSourceError {
+            Err(odf::storage::GetError::NotFound(e)) => Err(CorruptedSourceError {
                 message: "Source data file is missing".to_owned(),
                 source: Some(e.into()),
             }
             .into()),
-            Err(GetError::Access(e)) => Err(SyncError::Access(e)),
-            Err(GetError::Internal(e)) => Err(SyncError::Internal(e)),
+            Err(odf::storage::GetError::Access(e)) => Err(SyncError::Access(e)),
+            Err(odf::storage::GetError::Internal(e)) => Err(SyncError::Internal(e)),
         }?;
 
         match dst
             .as_data_repo()
             .insert_stream(
                 stream,
-                InsertOpts {
+                odf::storage::InsertOpts {
                     precomputed_hash: if !trust_source_hashes {
                         None
                     } else {
@@ -325,7 +309,7 @@ impl SimpleTransferProtocol {
             .await
         {
             Ok(_) => Ok(()),
-            Err(InsertError::HashMismatch(e)) => Err(CorruptedSourceError {
+            Err(odf::storage::InsertError::HashMismatch(e)) => Err(CorruptedSourceError {
                 message: concat!(
                     "Data file hash declared by the source didn't match ",
                     "the computed - this may be an indication of hashing ",
@@ -335,8 +319,8 @@ impl SimpleTransferProtocol {
                 source: Some(e.into()),
             }
             .into()),
-            Err(InsertError::Access(e)) => Err(SyncError::Access(e)),
-            Err(InsertError::Internal(e)) => Err(SyncError::Internal(e)),
+            Err(odf::storage::InsertError::Access(e)) => Err(SyncError::Access(e)),
+            Err(odf::storage::InsertError::Internal(e)) => Err(SyncError::Internal(e)),
         }?;
 
         let mut stats = arc_stats.lock().unwrap();
@@ -355,8 +339,8 @@ impl SimpleTransferProtocol {
 
     async fn download_block_checkpoint<'a>(
         &'a self,
-        src: &'a dyn Dataset,
-        dst: &'a dyn Dataset,
+        src: &'a dyn odf::Dataset,
+        dst: &'a dyn odf::Dataset,
         checkpoint: &odf::Checkpoint,
         trust_source_hashes: bool,
         listener: Arc<dyn SyncListener>,
@@ -370,20 +354,20 @@ impl SimpleTransferProtocol {
             .await
         {
             Ok(s) => Ok(s),
-            Err(GetError::NotFound(e)) => Err(CorruptedSourceError {
+            Err(odf::storage::GetError::NotFound(e)) => Err(CorruptedSourceError {
                 message: "Source checkpoint file is missing".to_owned(),
                 source: Some(e.into()),
             }
             .into()),
-            Err(GetError::Access(e)) => Err(SyncError::Access(e)),
-            Err(GetError::Internal(e)) => Err(SyncError::Internal(e)),
+            Err(odf::storage::GetError::Access(e)) => Err(SyncError::Access(e)),
+            Err(odf::storage::GetError::Internal(e)) => Err(SyncError::Internal(e)),
         }?;
 
         match dst
             .as_checkpoint_repo()
             .insert_stream(
                 stream,
-                InsertOpts {
+                odf::storage::InsertOpts {
                     precomputed_hash: if !trust_source_hashes {
                         None
                     } else {
@@ -399,7 +383,7 @@ impl SimpleTransferProtocol {
             .await
         {
             Ok(_) => Ok(()),
-            Err(InsertError::HashMismatch(e)) => Err(CorruptedSourceError {
+            Err(odf::storage::InsertError::HashMismatch(e)) => Err(CorruptedSourceError {
                 message: concat!(
                     "Checkpoint file hash declared by the source didn't ",
                     "match the computed - this may be an indication of hashing ",
@@ -409,8 +393,8 @@ impl SimpleTransferProtocol {
                 source: Some(e.into()),
             }
             .into()),
-            Err(InsertError::Access(e)) => Err(SyncError::Access(e)),
-            Err(InsertError::Internal(e)) => Err(SyncError::Internal(e)),
+            Err(odf::storage::InsertError::Access(e)) => Err(SyncError::Access(e)),
+            Err(odf::storage::InsertError::Internal(e)) => Err(SyncError::Internal(e)),
         }?;
 
         let mut stats = arc_stats.lock().unwrap();
@@ -427,12 +411,12 @@ impl SimpleTransferProtocol {
 
     async fn synchronize_blocks<'a>(
         &'a self,
-        blocks: Vec<HashedMetadataBlock>,
-        src: &'a dyn Dataset,
-        dst: &'a dyn Dataset,
+        blocks: Vec<odf::dataset::HashedMetadataBlock>,
+        src: &'a dyn odf::Dataset,
+        dst: &'a dyn odf::Dataset,
         src_head: &'a odf::Multihash,
         dst_head: Option<&'a odf::Multihash>,
-        validation: AppendValidation,
+        validation: odf::dataset::AppendValidation,
         trust_source_hashes: bool,
         listener: Arc<dyn SyncListener>,
         transfer_options: SimpleProtocolTransferOptions,
@@ -441,6 +425,7 @@ impl SimpleTransferProtocol {
         // Update stats estimates based on metadata
         stats.dst_estimated.metadata_blocks_written += blocks.len() as u64;
 
+        use odf::metadata::IntoDataStreamBlock;
         for block in blocks.iter().filter_map(|(_, b)| b.as_data_stream_block()) {
             if let Some(data_slice) = block.event.new_data {
                 stats.src_estimated.data_slices_read += 1;
@@ -508,7 +493,7 @@ impl SimpleTransferProtocol {
                 .as_metadata_chain()
                 .append(
                     block,
-                    AppendOpts {
+                    odf::dataset::AppendOpts {
                         validation,
                         update_ref: None, // We will update head once, after sync is complete
                         precomputed_hash: if !trust_source_hashes {
@@ -523,9 +508,9 @@ impl SimpleTransferProtocol {
                 .await
             {
                 Ok(_) => Ok(()),
-                Err(AppendError::InvalidBlock(append_validation_error)) => {
+                Err(odf::dataset::AppendError::InvalidBlock(append_validation_error)) => {
                     let message = match append_validation_error {
-                        AppendValidationError::HashMismatch(ref e) => format!(
+                        odf::dataset::AppendValidationError::HashMismatch(ref e) => format!(
                             concat!(
                                 "Block hash declared by the source {} didn't match ",
                                 "the computed {} at block {} - this may be an indication ",
@@ -545,9 +530,12 @@ impl SimpleTransferProtocol {
                     }
                     .into())
                 }
-                Err(AppendError::RefNotFound(_) | AppendError::RefCASFailed(_)) => unreachable!(),
-                Err(AppendError::Access(e)) => Err(SyncError::Access(e)),
-                Err(AppendError::Internal(e)) => Err(SyncError::Internal(e)),
+                Err(
+                    odf::dataset::AppendError::RefNotFound(_)
+                    | odf::dataset::AppendError::RefCASFailed(_),
+                ) => unreachable!(),
+                Err(odf::dataset::AppendError::Access(e)) => Err(SyncError::Access(e)),
+                Err(odf::dataset::AppendError::Internal(e)) => Err(SyncError::Internal(e)),
             }?;
 
             stats.dst.metadata_blocks_written += 1;
@@ -560,9 +548,9 @@ impl SimpleTransferProtocol {
         match dst
             .as_metadata_chain()
             .set_ref(
-                &BlockRef::Head,
+                &odf::BlockRef::Head,
                 src_head,
-                SetRefOpts {
+                odf::dataset::SetRefOpts {
                     validate_block_present: false,
                     check_ref_is: Some(dst_head),
                 },
@@ -570,10 +558,14 @@ impl SimpleTransferProtocol {
             .await
         {
             Ok(()) => Ok(()),
-            Err(SetChainRefError::CASFailed(e)) => Err(SyncError::UpdatedConcurrently(e.into())),
-            Err(SetChainRefError::Access(e)) => Err(SyncError::Access(e)),
-            Err(SetChainRefError::Internal(e)) => Err(SyncError::Internal(e)),
-            Err(SetChainRefError::BlockNotFound(e)) => Err(SyncError::Internal(e.int_err())),
+            Err(odf::dataset::SetChainRefError::CASFailed(e)) => {
+                Err(SyncError::UpdatedConcurrently(e.into()))
+            }
+            Err(odf::dataset::SetChainRefError::Access(e)) => Err(SyncError::Access(e)),
+            Err(odf::dataset::SetChainRefError::Internal(e)) => Err(SyncError::Internal(e)),
+            Err(odf::dataset::SetChainRefError::BlockNotFound(e)) => {
+                Err(SyncError::Internal(e.int_err()))
+            }
         }?;
 
         Ok(())

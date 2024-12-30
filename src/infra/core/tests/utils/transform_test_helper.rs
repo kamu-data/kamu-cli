@@ -25,7 +25,6 @@ use kamu_core::{
     TransformResult,
     VerifyTransformError,
 };
-use odf_dataset::CreateDatasetResult;
 use time_source::SystemTimeSource;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -66,7 +65,7 @@ impl TransformTestHelper {
         }
     }
 
-    pub async fn transform_dataset(&self, derived: &CreateDatasetResult) -> TransformResult {
+    pub async fn transform_dataset(&self, derived: &odf::CreateDatasetResult) -> TransformResult {
         let deriv_target = ResolvedDataset::from(derived);
 
         let plan = self
@@ -99,7 +98,7 @@ impl TransformTestHelper {
 
     pub async fn verify_transform(
         &self,
-        derived: &CreateDatasetResult,
+        derived: &odf::CreateDatasetResult,
     ) -> Result<(), VerifyTransformError> {
         let deriv_target = ResolvedDataset::from(derived);
 

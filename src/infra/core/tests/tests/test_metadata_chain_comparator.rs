@@ -10,9 +10,7 @@
 use std::assert_matches::assert_matches;
 
 use kamu_core::utils::metadata_chain_comparator::*;
-use odf_dataset::{AppendOpts, BlockRef, MetadataChain};
 use odf_dataset_impl::MetadataChainImpl;
-use odf_metadata as odf;
 use odf_storage_impl::testing::MetadataFactory;
 use odf_storage_impl::{
     MetadataBlockRepositoryImpl,
@@ -23,23 +21,26 @@ use odf_storage_impl::{
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn init_chain() -> impl MetadataChain {
+fn init_chain() -> impl odf::MetadataChain {
     let meta_block_repo = MetadataBlockRepositoryImpl::new(ObjectRepositoryInMemory::new());
     let ref_repo = ReferenceRepositoryImpl::new(NamedObjectRepositoryInMemory::new());
 
     MetadataChainImpl::new(meta_block_repo, ref_repo)
 }
 
-async fn push_block(chain: &dyn MetadataChain, block: odf::MetadataBlock) -> odf::Multihash {
-    chain.append(block, AppendOpts::default()).await.unwrap()
+async fn push_block(chain: &dyn odf::MetadataChain, block: odf::MetadataBlock) -> odf::Multihash {
+    chain
+        .append(block, odf::dataset::AppendOpts::default())
+        .await
+        .unwrap()
 }
 
 async fn compare_chains(
-    lhs_chain: &dyn MetadataChain,
-    rhs_chain: &dyn MetadataChain,
+    lhs_chain: &dyn odf::MetadataChain,
+    rhs_chain: &dyn odf::MetadataChain,
 ) -> CompareChainsResult {
-    let lhs_head = lhs_chain.resolve_ref(&BlockRef::Head).await.unwrap();
-    let rhs_head = match rhs_chain.resolve_ref(&BlockRef::Head).await {
+    let lhs_head = lhs_chain.resolve_ref(&odf::BlockRef::Head).await.unwrap();
+    let rhs_head = match rhs_chain.resolve_ref(&odf::BlockRef::Head).await {
         Ok(h) => Some(h),
         Err(_) => None,
     };

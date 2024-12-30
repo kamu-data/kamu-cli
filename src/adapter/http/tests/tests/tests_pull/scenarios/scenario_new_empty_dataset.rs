@@ -20,7 +20,7 @@ pub(crate) struct SmartPullNewEmptyDatasetScenario<TServerHarness: ServerSideHar
     pub server_dataset_layout: DatasetLayout,
     pub client_dataset_layout: DatasetLayout,
     pub server_dataset_ref: odf::DatasetRefRemote,
-    pub server_create_result: odf::dataset::CreateDatasetResult,
+    pub server_create_result: odf::CreateDatasetResult,
 }
 
 impl<TServerHarness: ServerSideHarness> SmartPullNewEmptyDatasetScenario<TServerHarness> {

@@ -13,8 +13,6 @@ use std::sync::Arc;
 use dill::*;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_core::*;
-use odf_dataset::OdfServerAccessTokenResolver;
-use odf_metadata::{self as odf, DatasetHandle};
 use url::Url;
 
 use crate::UrlExt;
@@ -23,7 +21,7 @@ use crate::UrlExt;
 
 pub struct RemoteAliasResolverImpl {
     remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
-    access_token_resolver: Arc<dyn OdfServerAccessTokenResolver>,
+    access_token_resolver: Arc<dyn odf::dataset::OdfServerAccessTokenResolver>,
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
 }
 
@@ -32,7 +30,7 @@ pub struct RemoteAliasResolverImpl {
 impl RemoteAliasResolverImpl {
     pub fn new(
         remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
-        access_token_resolver: Arc<dyn OdfServerAccessTokenResolver>,
+        access_token_resolver: Arc<dyn odf::dataset::OdfServerAccessTokenResolver>,
         remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
     ) -> Self {
         Self {
@@ -44,7 +42,7 @@ impl RemoteAliasResolverImpl {
 
     async fn fetch_remote_url(
         &self,
-        dataset_handle: &DatasetHandle,
+        dataset_handle: &odf::DatasetHandle,
         remote_alias_kind: RemoteAliasKind,
     ) -> Result<Option<Url>, ResolveAliasError> {
         let remote_aliases = self
@@ -112,7 +110,7 @@ impl RemoteAliasResolver for RemoteAliasResolverImpl {
     #[tracing::instrument(level = "debug", skip_all, fields(dataset_handle, ?dataset_push_target_maybe))]
     async fn resolve_push_target(
         &self,
-        dataset_handle: &DatasetHandle,
+        dataset_handle: &odf::DatasetHandle,
         dataset_push_target_maybe: Option<odf::DatasetPushTarget>,
     ) -> Result<RemoteTarget, ResolveAliasError> {
         let (repo_name, mut account_name, dataset_name) = if let Some(dataset_push_target) =

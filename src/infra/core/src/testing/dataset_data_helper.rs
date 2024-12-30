@@ -14,31 +14,24 @@ use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::common::DFSchema;
 use datafusion::prelude::*;
 use futures::TryStreamExt;
-use odf_dataset::{
-    BlockRef,
-    Dataset,
-    MetadataChainExt,
-    SearchSetDataSchemaVisitor,
-    TryStreamExtExt,
-};
-use odf_metadata::{self as odf, AsTypedBlock, IntoDataStreamBlock};
 
 pub struct DatasetDataHelper {
-    dataset: Arc<dyn Dataset>,
+    dataset: Arc<dyn odf::Dataset>,
     ctx: SessionContext,
 }
 
 impl DatasetDataHelper {
-    pub fn new(dataset: Arc<dyn Dataset>) -> Self {
+    pub fn new(dataset: Arc<dyn odf::Dataset>) -> Self {
         let ctx = SessionContext::new_with_config(SessionConfig::new().with_target_partitions(1));
         Self { dataset, ctx }
     }
 
-    pub fn new_with_context(dataset: Arc<dyn Dataset>, ctx: SessionContext) -> Self {
+    pub fn new_with_context(dataset: Arc<dyn odf::Dataset>, ctx: SessionContext) -> Self {
         Self { dataset, ctx }
     }
 
     pub async fn data_slice_count(&self) -> usize {
+        use odf::dataset::{MetadataChainExt, TryStreamExtExt};
         self.dataset
             .as_metadata_chain()
             .iter_blocks()
@@ -49,13 +42,13 @@ impl DatasetDataHelper {
             .unwrap()
     }
 
-    pub async fn get_last_block_typed<T: odf::VariantOf<odf::MetadataEvent>>(
+    pub async fn get_last_block_typed<T: odf::metadata::VariantOf<odf::MetadataEvent>>(
         &self,
     ) -> odf::MetadataBlockTyped<T> {
         let hash = self
             .dataset
             .as_metadata_chain()
-            .resolve_ref(&BlockRef::Head)
+            .resolve_ref(&odf::BlockRef::Head)
             .await
             .unwrap();
         let block = self
@@ -64,16 +57,18 @@ impl DatasetDataHelper {
             .get_block(&hash)
             .await
             .unwrap();
+
+        use odf::metadata::AsTypedBlock;
         block
             .into_typed::<T>()
             .expect("Last block is not a data block")
     }
 
-    pub async fn get_last_data_block(&self) -> odf::MetadataBlockDataStream {
+    pub async fn get_last_data_block(&self) -> odf::metadata::MetadataBlockDataStream {
         let hash = self
             .dataset
             .as_metadata_chain()
-            .resolve_ref(&BlockRef::Head)
+            .resolve_ref(&odf::BlockRef::Head)
             .await
             .unwrap();
         let block = self
@@ -82,6 +77,8 @@ impl DatasetDataHelper {
             .get_block(&hash)
             .await
             .unwrap();
+
+        use odf::metadata::IntoDataStreamBlock;
         block
             .into_data_stream_block()
             .expect("Last block is not a data block")
@@ -116,9 +113,10 @@ impl DatasetDataHelper {
     }
 
     pub async fn get_latest_data_schema(&self) -> SchemaRef {
+        use odf::dataset::MetadataChainExt;
         self.dataset
             .as_metadata_chain()
-            .accept_one(SearchSetDataSchemaVisitor::new())
+            .accept_one(odf::dataset::SearchSetDataSchemaVisitor::new())
             .await
             .unwrap()
             .into_event()
@@ -129,10 +127,11 @@ impl DatasetDataHelper {
 
     pub async fn get_last_set_data_schema_block(
         &self,
-    ) -> odf::MetadataBlockTyped<odf::SetDataSchema> {
+    ) -> odf::MetadataBlockTyped<odf::metadata::SetDataSchema> {
+        use odf::dataset::MetadataChainExt;
         self.dataset
             .as_metadata_chain()
-            .accept_one(SearchSetDataSchemaVisitor::new())
+            .accept_one(odf::dataset::SearchSetDataSchemaVisitor::new())
             .await
             .unwrap()
             .into_block()

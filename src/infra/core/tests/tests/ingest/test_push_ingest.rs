@@ -17,8 +17,6 @@ use kamu::domain::*;
 use kamu::testing::*;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
-use odf_dataset::{CreateDatasetResult, DatasetStorageUnit};
-use odf_metadata::*;
 use odf_storage_impl::testing::MetadataFactory;
 use tempfile::TempDir;
 use time_source::{SystemTimeSource, SystemTimeSourceStub};
@@ -34,10 +32,10 @@ async fn test_ingest_push_url_stream() {
 
     let dataset_snapshot = MetadataFactory::dataset_snapshot()
         .name("foo.bar")
-        .kind(DatasetKind::Root)
+        .kind(odf::DatasetKind::Root)
         .push_event(
             MetadataFactory::add_push_source()
-                .read(ReadStepCsv {
+                .read(odf::metadata::ReadStepCsv {
                     header: Some(true),
                     schema: Some(
                         ["date TIMESTAMP", "city STRING", "population BIGINT"]
@@ -45,14 +43,14 @@ async fn test_ingest_push_url_stream() {
                             .map(|s| (*s).to_string())
                             .collect(),
                     ),
-                    ..ReadStepCsv::default()
+                    ..odf::metadata::ReadStepCsv::default()
                 })
-                .merge(MergeStrategyLedger {
+                .merge(odf::metadata::MergeStrategyLedger {
                     primary_key: vec!["date".to_string(), "city".to_string()],
                 })
                 .build(),
         )
-        .push_event(SetVocab {
+        .push_event(odf::metadata::SetVocab {
             event_time_column: Some("date".to_string()),
             ..Default::default()
         })
@@ -170,10 +168,10 @@ async fn test_ingest_push_media_type_override() {
 
     let dataset_snapshot = MetadataFactory::dataset_snapshot()
         .name("foo.bar")
-        .kind(DatasetKind::Root)
+        .kind(odf::DatasetKind::Root)
         .push_event(
             MetadataFactory::add_push_source()
-                .read(ReadStepNdJson {
+                .read(odf::metadata::ReadStepNdJson {
                     schema: Some(
                         ["date TIMESTAMP", "city STRING", "population BIGINT"]
                             .iter()
@@ -182,12 +180,12 @@ async fn test_ingest_push_media_type_override() {
                     ),
                     ..Default::default()
                 })
-                .merge(MergeStrategyLedger {
+                .merge(odf::metadata::MergeStrategyLedger {
                     primary_key: vec!["date".to_string(), "city".to_string()],
                 })
                 .build(),
         )
-        .push_event(SetVocab {
+        .push_event(odf::metadata::SetVocab {
             event_time_column: Some("date".to_string()),
             ..Default::default()
         })
@@ -359,10 +357,10 @@ async fn test_ingest_push_schema_stability() {
 
     let dataset_snapshot = MetadataFactory::dataset_snapshot()
         .name("foo.bar")
-        .kind(DatasetKind::Root)
+        .kind(odf::DatasetKind::Root)
         .push_event(
             MetadataFactory::add_push_source()
-                .read(ReadStepCsv {
+                .read(odf::metadata::ReadStepCsv {
                     header: Some(true),
                     schema: Some(
                         ["event_time TIMESTAMP", "city STRING", "population BIGINT"]
@@ -370,9 +368,9 @@ async fn test_ingest_push_schema_stability() {
                             .map(|s| (*s).to_string())
                             .collect(),
                     ),
-                    ..ReadStepCsv::default()
+                    ..odf::metadata::ReadStepCsv::default()
                 })
-                .merge(MergeStrategyAppend {})
+                .merge(odf::metadata::MergeStrategyAppend {})
                 .build(),
         )
         .build();
@@ -417,7 +415,7 @@ async fn test_ingest_push_schema_stability() {
     // To refresh use:
     // println!("{}", hex::encode(set_data_schema.schema.as_slice()));
 
-    let schema_prev = SetDataSchema {
+    let schema_prev = odf::metadata::SetDataSchema {
         schema: hex::decode(
             "0c00000008000800000004000800000004000000060000004401000004010000ac0000006c0000\
             003c00000004000000e4feffff10000000180000000000010214000000d4feffff4000000000000\
@@ -453,12 +451,12 @@ async fn test_ingest_inference_automatic_coercion_of_event_time_from_string() {
 
     let dataset_snapshot = MetadataFactory::dataset_snapshot()
         .name("foo.bar")
-        .kind(DatasetKind::Root)
+        .kind(odf::DatasetKind::Root)
         .push_event(
             // Note: not setting schema or adding a preprocess step to trigger inference
             MetadataFactory::add_push_source()
-                .read(ReadStepNdJson::default())
-                .merge(MergeStrategyAppend {})
+                .read(odf::metadata::ReadStepNdJson::default())
+                .merge(odf::metadata::MergeStrategyAppend {})
                 .build(),
         )
         .build();
@@ -528,12 +526,12 @@ async fn test_ingest_inference_automatic_coercion_of_event_time_from_unixtime() 
 
     let dataset_snapshot = MetadataFactory::dataset_snapshot()
         .name("foo.bar")
-        .kind(DatasetKind::Root)
+        .kind(odf::DatasetKind::Root)
         .push_event(
             // Note: not setting schema or adding a preprocess step to trigger inference
             MetadataFactory::add_push_source()
-                .read(ReadStepNdJson::default())
-                .merge(MergeStrategyAppend {})
+                .read(odf::metadata::ReadStepNdJson::default())
+                .merge(odf::metadata::MergeStrategyAppend {})
                 .build(),
         )
         .build();
@@ -603,12 +601,12 @@ async fn test_ingest_inference_automatic_renaming_of_conflicting_columns() {
 
     let dataset_snapshot = MetadataFactory::dataset_snapshot()
         .name("foo.bar")
-        .kind(DatasetKind::Root)
+        .kind(odf::DatasetKind::Root)
         .push_event(
             // Note: not setting schema or adding a preprocess step to trigger inference
             MetadataFactory::add_push_source()
-                .read(ReadStepNdJson::default())
-                .merge(MergeStrategyAppend {})
+                .read(odf::metadata::ReadStepNdJson::default())
+                .merge(odf::metadata::MergeStrategyAppend {})
                 .build(),
         )
         .build();
@@ -680,12 +678,12 @@ async fn test_ingest_sql_case_sensitivity() {
 
     let dataset_snapshot = MetadataFactory::dataset_snapshot()
         .name("foo.bar")
-        .kind(DatasetKind::Root)
+        .kind(odf::DatasetKind::Root)
         .push_event(
             MetadataFactory::add_push_source()
-                .read(ReadStepNdJson::default())
-                .merge(MergeStrategyAppend {})
-                .preprocess(TransformSql {
+                .read(odf::metadata::ReadStepNdJson::default())
+                .merge(odf::metadata::MergeStrategyAppend {})
+                .preprocess(odf::metadata::TransformSql {
                     engine: "datafusion".into(),
                     version: None,
                     query: Some(
@@ -791,7 +789,7 @@ impl IngestTestHarness {
             .add::<kamu_core::auth::AlwaysHappyDatasetActionAuthorizer>()
             .add_value(TenancyConfig::SingleTenant)
             .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
-            .bind::<dyn DatasetStorageUnit, DatasetStorageUnitLocalFs>()
+            .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
             .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
             .add::<DatasetRegistrySoloUnitBridge>()
             .add_value(SystemTimeSourceStub::new_set(
@@ -816,7 +814,10 @@ impl IngestTestHarness {
         }
     }
 
-    async fn create_dataset(&self, dataset_snapshot: DatasetSnapshot) -> CreateDatasetResult {
+    async fn create_dataset(
+        &self,
+        dataset_snapshot: odf::DatasetSnapshot,
+    ) -> odf::CreateDatasetResult {
         self.dataset_storage_unit_writer
             .create_dataset_from_snapshot(dataset_snapshot)
             .await
@@ -824,7 +825,7 @@ impl IngestTestHarness {
             .create_dataset_result
     }
 
-    async fn dataset_data_helper(&self, dataset_alias: &DatasetAlias) -> DatasetDataHelper {
+    async fn dataset_data_helper(&self, dataset_alias: &odf::DatasetAlias) -> DatasetDataHelper {
         let resolved_dataset = self
             .dataset_registry
             .get_dataset_by_ref(&dataset_alias.as_local_ref())
@@ -836,7 +837,7 @@ impl IngestTestHarness {
 
     async fn ingest_from_stream(
         &self,
-        created: &CreateDatasetResult,
+        created: &odf::CreateDatasetResult,
         source_name: Option<&str>,
         data: Box<dyn AsyncRead + Send + Unpin>,
         opts: PushIngestOpts,
@@ -857,7 +858,7 @@ impl IngestTestHarness {
 
     async fn ingest_from_url(
         &self,
-        created: &CreateDatasetResult,
+        created: &odf::CreateDatasetResult,
         source_name: Option<&str>,
         url: Url,
         opts: PushIngestOpts,

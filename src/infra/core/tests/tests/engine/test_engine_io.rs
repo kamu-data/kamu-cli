@@ -18,8 +18,6 @@ use kamu::domain::*;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_datasets_services::DatasetKeyValueServiceSysEnv;
-use odf_dataset::{BlockRef, DatasetStorageUnit};
-use odf_metadata::*;
 use odf_storage_impl::testing::MetadataFactory;
 use test_utils::LocalS3Server;
 use time_source::SystemTimeSourceDefault;
@@ -29,13 +27,13 @@ use crate::TransformTestHelper;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 async fn test_engine_io_common<
-    TDatasetStorageUnit: DatasetStorageUnit + DatasetStorageUnitWriter + 'static,
+    TDatasetStorageUnit: odf::DatasetStorageUnit + DatasetStorageUnitWriter + 'static,
 >(
     object_stores: Vec<Arc<dyn ObjectStoreBuilder>>,
     storage_unit: Arc<TDatasetStorageUnit>,
     run_info_dir: &Path,
     cache_dir: &Path,
-    transform: Transform,
+    transform: odf::metadata::Transform,
 ) {
     let run_info_dir = Arc::new(RunInfoDir::new(run_info_dir.to_path_buf()));
     let cache_dir = Arc::new(CacheDir::new(cache_dir.to_path_buf()));
@@ -100,19 +98,19 @@ async fn test_engine_io_common<
 
     let root_snapshot = MetadataFactory::dataset_snapshot()
         .name("root")
-        .kind(DatasetKind::Root)
+        .kind(odf::DatasetKind::Root)
         .push_event(
             MetadataFactory::set_polling_source()
                 .fetch_file(&src_path)
-                .read(ReadStepCsv {
+                .read(odf::metadata::ReadStepCsv {
                     header: Some(true),
                     schema: Some(vec![
                         "city STRING".to_string(),
                         "population INT".to_string(),
                     ]),
-                    ..ReadStepCsv::default()
+                    ..odf::metadata::ReadStepCsv::default()
                 })
-                .merge(MergeStrategySnapshot {
+                .merge(odf::metadata::MergeStrategySnapshot {
                     primary_key: vec!["city".to_string()],
                     compare_columns: None,
                 })
@@ -131,7 +129,7 @@ async fn test_engine_io_common<
     let root_target = ResolvedDataset::from(&root_created);
 
     let root_metadata_state =
-        DataWriterMetadataState::build(root_target.clone(), &BlockRef::Head, None)
+        DataWriterMetadataState::build(root_target.clone(), &odf::BlockRef::Head, None)
             .await
             .unwrap();
 
@@ -151,7 +149,7 @@ async fn test_engine_io_common<
 
     let deriv_snapshot = MetadataFactory::dataset_snapshot()
         .name("deriv")
-        .kind(DatasetKind::Derivative)
+        .kind(odf::DatasetKind::Derivative)
         .push_event(
             MetadataFactory::set_transform()
                 .inputs_from_refs([&root_alias.dataset_name])
@@ -171,6 +169,7 @@ async fn test_engine_io_common<
         v => panic!("Unexpected result: {v:?}"),
     };
 
+    use odf::metadata::IntoDataStreamBlock;
     let block = deriv_created
         .dataset
         .as_metadata_chain()
@@ -182,7 +181,7 @@ async fn test_engine_io_common<
 
     assert_eq!(
         block.event.new_data.unwrap().offset_interval,
-        OffsetInterval { start: 0, end: 2 }
+        odf::metadata::OffsetInterval { start: 0, end: 2 }
     );
 
     ///////////////////////////////////////////////////////////////////////////
@@ -205,7 +204,7 @@ async fn test_engine_io_common<
     .unwrap();
 
     let root_metadata_state =
-        DataWriterMetadataState::build(root_target.clone(), &BlockRef::Head, None)
+        DataWriterMetadataState::build(root_target.clone(), &odf::BlockRef::Head, None)
             .await
             .unwrap();
 
@@ -235,7 +234,7 @@ async fn test_engine_io_common<
 
     assert_eq!(
         block.event.new_data.unwrap().offset_interval,
-        OffsetInterval { start: 3, end: 4 }
+        odf::metadata::OffsetInterval { start: 3, end: 4 }
     );
 
     ///////////////////////////////////////////////////////////////////////////
@@ -266,7 +265,7 @@ async fn test_engine_io_local_file_mount() {
         .add_value(CurrentAccountSubject::new_test())
         .add_value(TenancyConfig::SingleTenant)
         .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
-        .bind::<dyn DatasetStorageUnit, DatasetStorageUnitLocalFs>()
+        .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
         .build();
 
     let storage_unit = catalog.get_one::<DatasetStorageUnitLocalFs>().unwrap();
@@ -306,7 +305,7 @@ async fn test_engine_io_s3_to_local_file_mount_proxy() {
         .add_value(CurrentAccountSubject::new_test())
         .add_value(TenancyConfig::SingleTenant)
         .add_builder(DatasetStorageUnitS3::builder().with_s3_context(s3_context.clone()))
-        .bind::<dyn DatasetStorageUnit, DatasetStorageUnitS3>()
+        .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitS3>()
         .build();
 
     let storage_unit = catalog.get_one::<DatasetStorageUnitS3>().unwrap();

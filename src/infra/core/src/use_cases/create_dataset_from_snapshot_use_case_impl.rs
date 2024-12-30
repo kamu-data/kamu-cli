@@ -18,12 +18,6 @@ use kamu_core::{
     MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
 };
 use messaging_outbox::{Outbox, OutboxExt};
-use odf_dataset::{
-    CreateDatasetFromSnapshotError,
-    CreateDatasetFromSnapshotResult,
-    CreateDatasetResult,
-};
-use odf_metadata::DatasetSnapshot;
 
 use crate::DatasetStorageUnitWriter;
 
@@ -56,11 +50,11 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
     #[tracing::instrument(level = "info", skip_all, fields(?snapshot, ?options))]
     async fn execute(
         &self,
-        snapshot: DatasetSnapshot,
+        snapshot: odf::DatasetSnapshot,
         options: CreateDatasetUseCaseOptions,
-    ) -> Result<CreateDatasetResult, CreateDatasetFromSnapshotError> {
+    ) -> Result<odf::CreateDatasetResult, odf::dataset::CreateDatasetFromSnapshotError> {
         let dataset_name = snapshot.name.dataset_name.clone();
-        let CreateDatasetFromSnapshotResult {
+        let odf::CreateDatasetFromSnapshotResult {
             create_dataset_result,
             new_upstream_ids,
         } = self

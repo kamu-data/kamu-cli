@@ -9,8 +9,6 @@
 
 use chrono::{DateTime, Utc};
 use internal_error::*;
-use odf_dataset::*;
-use odf_metadata as odf;
 use random_names::get_random_name;
 
 use crate::DatasetStorageUnitWriter;
@@ -25,23 +23,25 @@ pub fn get_staging_name() -> String {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) async fn create_dataset_from_snapshot_impl<
-    TStorageUnit: DatasetStorageUnit + DatasetStorageUnitWriter,
+    TStorageUnit: odf::DatasetStorageUnit + DatasetStorageUnitWriter,
 >(
     dataset_storage_unit: &TStorageUnit,
     mut snapshot: odf::DatasetSnapshot,
     system_time: DateTime<Utc>,
-) -> Result<CreateDatasetFromSnapshotResult, CreateDatasetFromSnapshotError> {
+) -> Result<odf::CreateDatasetFromSnapshotResult, odf::dataset::CreateDatasetFromSnapshotError> {
     // Validate / resolve events
     for event in &mut snapshot.metadata {
         match event {
-            odf::MetadataEvent::Seed(_) => Err(CreateDatasetFromSnapshotError::InvalidSnapshot(
-                InvalidSnapshotError::new(
-                    "Seed event is generated and cannot be specified explicitly",
+            odf::MetadataEvent::Seed(_) => Err(
+                odf::dataset::CreateDatasetFromSnapshotError::InvalidSnapshot(
+                    odf::dataset::InvalidSnapshotError::new(
+                        "Seed event is generated and cannot be specified explicitly",
+                    ),
                 ),
-            )),
+            ),
             odf::MetadataEvent::SetPollingSource(e) => {
                 if snapshot.kind != odf::DatasetKind::Root {
-                    Err(InvalidSnapshotError {
+                    Err(odf::dataset::InvalidSnapshotError {
                         reason: "SetPollingSource event is only allowed on root datasets"
                             .to_string(),
                     }
@@ -55,7 +55,7 @@ pub(crate) async fn create_dataset_from_snapshot_impl<
             }
             odf::MetadataEvent::AddPushSource(e) => {
                 if snapshot.kind != odf::DatasetKind::Root {
-                    Err(InvalidSnapshotError {
+                    Err(odf::dataset::InvalidSnapshotError {
                         reason: "AddPushSource event is only allowed on root datasets".to_string(),
                     }
                     .into())
@@ -68,7 +68,7 @@ pub(crate) async fn create_dataset_from_snapshot_impl<
             }
             odf::MetadataEvent::SetTransform(e) => {
                 if snapshot.kind != odf::DatasetKind::Derivative {
-                    Err(InvalidSnapshotError::new(
+                    Err(odf::dataset::InvalidSnapshotError::new(
                         "SetTransform is only allowed on derivative datasets",
                     )
                     .into())
@@ -92,10 +92,12 @@ pub(crate) async fn create_dataset_from_snapshot_impl<
             odf::MetadataEvent::AddData(_)
             | odf::MetadataEvent::ExecuteTransform(_)
             | odf::MetadataEvent::DisablePollingSource(_)
-            | odf::MetadataEvent::DisablePushSource(_) => Err(InvalidSnapshotError::new(format!(
-                "Event is not allowed to appear in a DatasetSnapshot: {event:?}"
-            ))
-            .into()),
+            | odf::MetadataEvent::DisablePushSource(_) => {
+                Err(odf::dataset::InvalidSnapshotError::new(format!(
+                    "Event is not allowed to appear in a DatasetSnapshot: {event:?}"
+                ))
+                .into())
+            }
         }?;
     }
 
@@ -110,7 +112,7 @@ pub(crate) async fn create_dataset_from_snapshot_impl<
             odf::MetadataBlockTyped {
                 system_time,
                 prev_block_hash: None,
-                event: odf::Seed {
+                event: odf::metadata::Seed {
                     dataset_id,
                     dataset_kind: snapshot.kind,
                 },
@@ -143,9 +145,9 @@ pub(crate) async fn create_dataset_from_snapshot_impl<
                     event,
                     sequence_number,
                 },
-                AppendOpts {
+                odf::dataset::AppendOpts {
                     update_ref: None,
-                    ..AppendOpts::default()
+                    ..odf::dataset::AppendOpts::default()
                 },
             )
             .await
@@ -165,9 +167,9 @@ pub(crate) async fn create_dataset_from_snapshot_impl<
 
     chain
         .set_ref(
-            &BlockRef::Head,
+            &odf::BlockRef::Head,
             &head,
-            SetRefOpts {
+            odf::dataset::SetRefOpts {
                 validate_block_present: false,
                 check_ref_is: Some(Some(&create_result.head)),
             },
@@ -175,8 +177,8 @@ pub(crate) async fn create_dataset_from_snapshot_impl<
         .await
         .int_err()?;
 
-    Ok(CreateDatasetFromSnapshotResult {
-        create_dataset_result: CreateDatasetResult {
+    Ok(odf::CreateDatasetFromSnapshotResult {
+        create_dataset_result: odf::CreateDatasetResult {
             head,
             ..create_result
         },
@@ -187,19 +189,19 @@ pub(crate) async fn create_dataset_from_snapshot_impl<
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 fn normalize_transform(
-    transform: &mut odf::Transform,
-) -> Result<(), CreateDatasetFromSnapshotError> {
-    let odf::Transform::Sql(sql) = transform;
+    transform: &mut odf::metadata::Transform,
+) -> Result<(), odf::dataset::CreateDatasetFromSnapshotError> {
+    let odf::metadata::Transform::Sql(sql) = transform;
 
     if let Some(query) = &sql.query {
         if sql.queries.is_some() {
-            return Err(InvalidSnapshotError::new(
+            return Err(odf::dataset::InvalidSnapshotError::new(
                 "Cannot specify both 'query' and 'queries' in SetTransform",
             )
             .into());
         }
 
-        sql.queries = Some(vec![odf::SqlQueryStep {
+        sql.queries = Some(vec![odf::metadata::SqlQueryStep {
             alias: None,
             query: query.clone(),
         }]);
@@ -217,7 +219,7 @@ fn normalize_transform(
         .count();
 
     if nameless_queries > 1 {
-        return Err(InvalidSnapshotError::new(
+        return Err(odf::dataset::InvalidSnapshotError::new(
             "Transform has multiple queries without an alias, only one is such query is allowed \
              to be treated as output",
         )
@@ -233,10 +235,10 @@ fn normalize_transform(
 /// - input datasets are always references by unique IDs
 /// - that query alias is populated (manually or from the initial reference)
 async fn resolve_transform_inputs(
-    inputs: &mut [odf::TransformInput],
-    repo: &dyn DatasetStorageUnit,
+    inputs: &mut [odf::metadata::TransformInput],
+    repo: &dyn odf::DatasetStorageUnit,
     output_dataset_alias: &odf::DatasetAlias,
-) -> Result<(), CreateDatasetFromSnapshotError> {
+) -> Result<(), odf::dataset::CreateDatasetFromSnapshotError> {
     let mut missing_inputs = Vec::new();
 
     for input in inputs.iter_mut() {
@@ -245,12 +247,14 @@ async fn resolve_transform_inputs(
             .await
         {
             Ok(hdl) => Ok(hdl),
-            Err(GetDatasetError::NotFound(_)) => {
+            Err(odf::dataset::GetDatasetError::NotFound(_)) => {
                 // Accumulate errors to report as one
                 missing_inputs.push(input.dataset_ref.clone());
                 continue;
             }
-            Err(GetDatasetError::Internal(e)) => Err(CreateDatasetFromSnapshotError::Internal(e)),
+            Err(odf::dataset::GetDatasetError::Internal(e)) => {
+                Err(odf::dataset::CreateDatasetFromSnapshotError::Internal(e))
+            }
         }?;
 
         if input.alias.is_none() {
@@ -261,8 +265,8 @@ async fn resolve_transform_inputs(
     }
 
     if !missing_inputs.is_empty() {
-        Err(CreateDatasetFromSnapshotError::MissingInputs(
-            MissingInputsError {
+        Err(odf::dataset::CreateDatasetFromSnapshotError::MissingInputs(
+            odf::dataset::MissingInputsError {
                 dataset_ref: output_dataset_alias.into(),
                 missing_inputs,
             },

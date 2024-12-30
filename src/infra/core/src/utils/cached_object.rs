@@ -12,8 +12,6 @@
 use std::path::PathBuf;
 
 use internal_error::{InternalError, ResultIntoInternal};
-use odf_metadata as odf;
-use odf_storage::ObjectRepository;
 use tempfile::{tempdir, TempDir};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -37,7 +35,7 @@ enum ObjectState {
 impl CachedObject {
     pub async fn from(
         object_hash: &odf::Multihash,
-        object_repository: &dyn ObjectRepository,
+        object_repository: &dyn odf::storage::ObjectRepository,
     ) -> Result<Self, InternalError> {
         let object_file_url = object_repository.get_internal_url(object_hash).await;
         if let Ok(local_path) = object_file_url.to_file_path() {

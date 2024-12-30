@@ -18,8 +18,6 @@ use kamu_core::{
     MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
 };
 use messaging_outbox::{Outbox, OutboxExt};
-use odf_dataset::{CommitError, CommitOpts, CommitResult};
-use odf_metadata::{DatasetHandle, MetadataEvent};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -55,16 +53,18 @@ impl CommitDatasetEventUseCase for CommitDatasetEventUseCaseImpl {
     )]
     async fn execute(
         &self,
-        dataset_handle: &DatasetHandle,
-        event: MetadataEvent,
-        opts: CommitOpts<'_>,
-    ) -> Result<CommitResult, CommitError> {
+        dataset_handle: &odf::DatasetHandle,
+        event: odf::MetadataEvent,
+        opts: odf::dataset::CommitOpts<'_>,
+    ) -> Result<odf::dataset::CommitResult, odf::dataset::CommitError> {
         self.dataset_action_authorizer
             .check_action_allowed(dataset_handle, DatasetAction::Write)
             .await
             .map_err(|e| match e {
-                DatasetActionUnauthorizedError::Access(e) => CommitError::Access(e),
-                DatasetActionUnauthorizedError::Internal(e) => CommitError::Internal(e),
+                DatasetActionUnauthorizedError::Access(e) => odf::dataset::CommitError::Access(e),
+                DatasetActionUnauthorizedError::Internal(e) => {
+                    odf::dataset::CommitError::Internal(e)
+                }
             })?;
 
         let resolved_dataset = self.dataset_registry.get_dataset_by_handle(dataset_handle);

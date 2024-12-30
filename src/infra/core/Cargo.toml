@@ -44,11 +44,9 @@ kamu-data-utils = { workspace = true }
 kamu-datasets = { workspace = true }
 kamu-ingest-datafusion = { workspace = true }
 messaging-outbox = { workspace = true }
-odf-storage = { workspace = true }
-odf-dataset = { workspace = true }
+odf = { workspace = true }
 odf-storage-impl = { workspace = true }
 odf-dataset-impl = { workspace = true }
-odf-metadata = { workspace = true }
 random-names = { workspace = true }
 s3-utils = { workspace = true }
 time-source = { workspace = true }

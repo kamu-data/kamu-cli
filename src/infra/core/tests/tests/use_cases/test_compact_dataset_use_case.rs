@@ -13,7 +13,6 @@ use std::sync::Arc;
 use kamu::testing::MockDatasetActionAuthorizer;
 use kamu::*;
 use kamu_core::*;
-use odf_metadata::{DatasetAlias, DatasetName};
 
 use crate::tests::use_cases::*;
 
@@ -21,7 +20,7 @@ use crate::tests::use_cases::*;
 
 #[tokio::test]
 async fn test_compact_dataset_success() {
-    let alias_foo = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
 
     let harness = CompactUseCaseHarness::new(
         MockDatasetActionAuthorizer::new().expect_check_write_dataset(&alias_foo, 1, true),
@@ -39,8 +38,8 @@ async fn test_compact_dataset_success() {
 
 #[tokio::test]
 async fn test_compact_multiple_datasets_success() {
-    let alias_foo = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
-    let alias_bar = DatasetAlias::new(None, DatasetName::new_unchecked("bar"));
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
 
     let harness = CompactUseCaseHarness::new(
         MockDatasetActionAuthorizer::new()
@@ -81,7 +80,7 @@ async fn test_compact_multiple_datasets_success() {
 
 #[tokio::test]
 async fn test_compact_dataset_unauthorized() {
-    let alias_foo = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
 
     let harness = CompactUseCaseHarness::new(
         MockDatasetActionAuthorizer::new().expect_check_write_dataset(&alias_foo, 1, false),
@@ -99,8 +98,8 @@ async fn test_compact_dataset_unauthorized() {
 
 #[tokio::test]
 async fn test_compact_dataset_mixed_authorization_outcome() {
-    let alias_foo = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
-    let alias_bar = DatasetAlias::new(None, DatasetName::new_unchecked("bar"));
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
 
     let harness = CompactUseCaseHarness::new(
         MockDatasetActionAuthorizer::new()

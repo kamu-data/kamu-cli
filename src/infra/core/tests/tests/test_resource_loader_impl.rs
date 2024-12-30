@@ -11,12 +11,12 @@ use std::path::Path;
 
 use kamu::domain::{ResourceError, ResourceLoader};
 use kamu::ResourceLoaderImpl;
-use odf_metadata::serde::yaml::*;
-use odf_metadata::*;
+use odf::serde::yaml::YamlDatasetSnapshotSerializer;
+use odf::serde::DatasetSnapshotSerializer;
 use odf_storage_impl::testing::MetadataFactory;
 use test_utils::HttpFileServer;
 
-fn create_test_snapshot(path: &Path) -> DatasetSnapshot {
+fn create_test_snapshot(path: &Path) -> odf::DatasetSnapshot {
     let snapshot = MetadataFactory::dataset_snapshot().name("test").build();
     let buffer = YamlDatasetSnapshotSerializer
         .write_manifest(&snapshot)

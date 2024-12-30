@@ -23,18 +23,6 @@ use kamu::testing::*;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_datasets_services::DatasetKeyValueServiceSysEnv;
-use odf::AsTypedBlock;
-use odf_dataset::{
-    BlockRef,
-    CommitOpts,
-    CreateDatasetResult,
-    Dataset,
-    DatasetStorageUnit,
-    MetadataChainExt,
-    SetRefOpts,
-};
-use odf_metadata as odf;
-use odf_storage::InsertOpts;
 use odf_storage_impl::testing::MetadataFactory;
 use time_source::{SystemTimeSource, SystemTimeSourceStub};
 
@@ -43,12 +31,12 @@ use crate::TransformTestHelper;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct DatasetHelper {
-    dataset: Arc<dyn Dataset>,
+    dataset: Arc<dyn odf::Dataset>,
     tempdir: PathBuf,
 }
 
 impl DatasetHelper {
-    fn new(dataset: Arc<dyn Dataset>, tempdir: impl Into<PathBuf>) -> Self {
+    fn new(dataset: Arc<dyn odf::Dataset>, tempdir: impl Into<PathBuf>) -> Self {
         Self {
             dataset,
             tempdir: tempdir.into(),
@@ -56,6 +44,7 @@ impl DatasetHelper {
     }
 
     async fn block_count(&self) -> usize {
+        use odf::dataset::MetadataChainExt;
         self.dataset.as_metadata_chain().iter_blocks().count().await
     }
 
@@ -92,17 +81,18 @@ impl DatasetHelper {
         let old_head = self
             .dataset
             .as_metadata_chain()
-            .resolve_ref(&BlockRef::Head)
+            .resolve_ref(&odf::BlockRef::Head)
             .await
             .unwrap();
 
+        use odf::metadata::AsTypedBlock;
         let orig_block = self
             .dataset
             .as_metadata_chain()
             .get_block(&old_head)
             .await
             .unwrap()
-            .into_typed::<odf::ExecuteTransform>()
+            .into_typed::<odf::metadata::ExecuteTransform>()
             .unwrap();
 
         let orig_slice = orig_block.event.new_data.as_ref().unwrap();
@@ -148,7 +138,7 @@ impl DatasetHelper {
 
             self.dataset
                 .as_checkpoint_repo()
-                .insert_bytes(&checkpoint_data, InsertOpts::default())
+                .insert_bytes(&checkpoint_data, odf::storage::InsertOpts::default())
                 .await
                 .unwrap()
                 .hash
@@ -181,9 +171,9 @@ impl DatasetHelper {
         self.dataset
             .as_metadata_chain()
             .set_ref(
-                &BlockRef::Head,
+                &odf::BlockRef::Head,
                 orig_block.prev_block_hash.as_ref().unwrap(),
-                SetRefOpts::default(),
+                odf::dataset::SetRefOpts::default(),
             )
             .await
             .unwrap();
@@ -191,7 +181,7 @@ impl DatasetHelper {
         let new_head = self
             .dataset
             .commit_event(
-                odf::ExecuteTransform {
+                odf::metadata::ExecuteTransform {
                     new_data: Some(new_slice.clone()),
                     new_checkpoint: Some(odf::Checkpoint {
                         physical_hash: new_checkpoint_hash,
@@ -200,9 +190,9 @@ impl DatasetHelper {
                     ..orig_block.event
                 }
                 .into(),
-                CommitOpts {
+                odf::dataset::CommitOpts {
                     system_time: Some(orig_block.system_time),
-                    ..CommitOpts::default()
+                    ..odf::dataset::CommitOpts::default()
                 },
             )
             .await
@@ -256,7 +246,7 @@ impl TestHarness {
             .add_value(CurrentAccountSubject::new_test())
             .add_value(TenancyConfig::SingleTenant)
             .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
-            .bind::<dyn DatasetStorageUnit, DatasetStorageUnitLocalFs>()
+            .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
             .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
             .add::<DatasetRegistrySoloUnitBridge>()
             .add_value(EngineProvisionerLocalConfig::default())
@@ -295,8 +285,11 @@ impl TestHarness {
         }
     }
 
-    async fn build_metadata_state(&self, created: &CreateDatasetResult) -> DataWriterMetadataState {
-        DataWriterMetadataState::build(ResolvedDataset::from(created), &BlockRef::Head, None)
+    async fn build_metadata_state(
+        &self,
+        created: &odf::CreateDatasetResult,
+    ) -> DataWriterMetadataState {
+        DataWriterMetadataState::build(ResolvedDataset::from(created), &odf::BlockRef::Head, None)
             .await
             .unwrap()
     }
@@ -306,7 +299,7 @@ impl TestHarness {
 
 // TODO: Remove `test_retractions` flag once RisingWave can handle them without
 // crashing
-async fn test_transform_common(transform: odf::Transform, test_retractions: bool) {
+async fn test_transform_common(transform: odf::metadata::Transform, test_retractions: bool) {
     let harness = TestHarness::new();
 
     ///////////////////////////////////////////////////////////////////////////
@@ -334,15 +327,15 @@ async fn test_transform_common(transform: odf::Transform, test_retractions: bool
             // TODO: Simplify using push sources
             MetadataFactory::set_polling_source()
                 .fetch_file(&src_path)
-                .read(odf::ReadStep::Csv(odf::ReadStepCsv {
+                .read(odf::metadata::ReadStep::Csv(odf::metadata::ReadStepCsv {
                     header: Some(true),
                     schema: Some(vec![
                         "city STRING".to_string(),
                         "population INT".to_string(),
                     ]),
-                    ..odf::ReadStepCsv::default()
+                    ..odf::metadata::ReadStepCsv::default()
                 }))
-                .merge(odf::MergeStrategySnapshot {
+                .merge(odf::metadata::MergeStrategySnapshot {
                     primary_key: vec!["city".to_string()],
                     compare_columns: None,
                 })
@@ -768,7 +761,7 @@ async fn test_transform_empty_inputs() {
     root.dataset
         .commit_event(
             MetadataFactory::add_push_source()
-                .read(odf::ReadStepNdJson {
+                .read(odf::metadata::ReadStepNdJson {
                     schema: Some(vec![
                         "city STRING".to_string(),
                         "population INT".to_string(),
@@ -777,7 +770,7 @@ async fn test_transform_empty_inputs() {
                 })
                 .build()
                 .into(),
-            CommitOpts {
+            odf::dataset::CommitOpts {
                 system_time: Some(harness.time_source.now()),
                 ..Default::default()
             },

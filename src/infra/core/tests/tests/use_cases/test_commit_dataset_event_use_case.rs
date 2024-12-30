@@ -14,8 +14,6 @@ use kamu::testing::MockDatasetActionAuthorizer;
 use kamu::CommitDatasetEventUseCaseImpl;
 use kamu_core::CommitDatasetEventUseCase;
 use messaging_outbox::MockOutbox;
-use odf_dataset::{CommitError, CommitOpts};
-use odf_metadata::{DatasetAlias, DatasetName, MetadataEvent};
 use odf_storage_impl::testing::MetadataFactory;
 
 use crate::tests::use_cases::*;
@@ -24,7 +22,7 @@ use crate::tests::use_cases::*;
 
 #[tokio::test]
 async fn test_commit_dataset_event() {
-    let alias_foo = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
 
     let mock_authorizer =
         MockDatasetActionAuthorizer::new().expect_check_write_dataset(&alias_foo, 1, true);
@@ -38,8 +36,8 @@ async fn test_commit_dataset_event() {
         .use_case
         .execute(
             &foo.dataset_handle,
-            MetadataEvent::SetInfo(MetadataFactory::set_info().description("test").build()),
-            CommitOpts::default(),
+            odf::MetadataEvent::SetInfo(MetadataFactory::set_info().description("test").build()),
+            odf::dataset::CommitOpts::default(),
         )
         .await;
     assert_matches!(res, Ok(_));
@@ -49,7 +47,7 @@ async fn test_commit_dataset_event() {
 
 #[tokio::test]
 async fn test_commit_event_unauthorized() {
-    let alias_foo = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
 
     let mock_authorizer =
         MockDatasetActionAuthorizer::new().expect_check_write_dataset(&alias_foo, 1, false);
@@ -63,19 +61,19 @@ async fn test_commit_event_unauthorized() {
         .use_case
         .execute(
             &foo.dataset_handle,
-            MetadataEvent::SetInfo(MetadataFactory::set_info().description("test").build()),
-            CommitOpts::default(),
+            odf::MetadataEvent::SetInfo(MetadataFactory::set_info().description("test").build()),
+            odf::dataset::CommitOpts::default(),
         )
         .await;
-    assert_matches!(res, Err(CommitError::Access(_)));
+    assert_matches!(res, Err(odf::dataset::CommitError::Access(_)));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
 async fn test_commit_event_with_new_dependencies() {
-    let alias_foo = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
-    let alias_bar = DatasetAlias::new(None, DatasetName::new_unchecked("bar"));
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
 
     let mock_authorizer =
         MockDatasetActionAuthorizer::new().expect_check_write_dataset(&alias_bar, 1, true);
@@ -93,7 +91,7 @@ async fn test_commit_event_with_new_dependencies() {
         .use_case
         .execute(
             &bar.dataset_handle,
-            MetadataEvent::SetTransform(
+            odf::MetadataEvent::SetTransform(
                 MetadataFactory::set_transform()
                     .inputs_from_refs_and_aliases(vec![(
                         foo.dataset_handle.id,
@@ -101,7 +99,7 @@ async fn test_commit_event_with_new_dependencies() {
                     )])
                     .build(),
             ),
-            CommitOpts::default(),
+            odf::dataset::CommitOpts::default(),
         )
         .await;
     assert_matches!(res, Ok(_));

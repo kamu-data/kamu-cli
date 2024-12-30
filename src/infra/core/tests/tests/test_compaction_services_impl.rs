@@ -22,8 +22,6 @@ use kamu::testing::DatasetDataHelper;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::auth;
-use odf_dataset::{AddDataParams, BlockRef, CommitOpts, CreateDatasetResult, DatasetStorageUnit};
-use odf_metadata::*;
 use odf_storage_impl::testing::MetadataFactory;
 use s3_utils::S3Context;
 use test_utils::LocalS3Server;
@@ -61,7 +59,7 @@ async fn test_dataset_compact() {
     let prev_head = created
         .dataset
         .as_metadata_chain()
-        .resolve_ref(&BlockRef::Head)
+        .resolve_ref(&odf::BlockRef::Head)
         .await
         .unwrap();
 
@@ -77,7 +75,7 @@ async fn test_dataset_compact() {
         created
             .dataset
             .as_metadata_chain()
-            .resolve_ref(&BlockRef::Head)
+            .resolve_ref(&odf::BlockRef::Head)
             .await
             .unwrap()
     );
@@ -153,10 +151,14 @@ async fn test_dataset_compact() {
     let last_new_block = new_blocks.first().unwrap();
     CompactTestHarness::assert_end_state_equivalent(&last_old_block.event, &last_new_block.event);
 
-    let new_add_data = last_new_block.event.as_variant::<AddData>().unwrap();
+    use odf::metadata::EnumWithVariants;
+    let new_add_data = last_new_block
+        .event
+        .as_variant::<odf::metadata::AddData>()
+        .unwrap();
     CompactTestHarness::assert_offset_interval_eq(
         new_add_data,
-        &OffsetInterval { start: 0, end: 5 },
+        &odf::metadata::OffsetInterval { start: 0, end: 5 },
     );
 }
 
@@ -189,7 +191,7 @@ async fn test_dataset_compact_s3() {
     let prev_head = created
         .dataset
         .as_metadata_chain()
-        .resolve_ref(&BlockRef::Head)
+        .resolve_ref(&odf::BlockRef::Head)
         .await
         .unwrap();
 
@@ -205,7 +207,7 @@ async fn test_dataset_compact_s3() {
         created
             .dataset
             .as_metadata_chain()
-            .resolve_ref(&BlockRef::Head)
+            .resolve_ref(&odf::BlockRef::Head)
             .await
             .unwrap()
     );
@@ -250,10 +252,14 @@ async fn test_dataset_compact_s3() {
     let last_new_block = new_blocks.first().unwrap();
     CompactTestHarness::assert_end_state_equivalent(&last_old_block.event, &last_new_block.event);
 
-    let new_add_data = last_new_block.event.as_variant::<AddData>().unwrap();
+    use odf::metadata::EnumWithVariants;
+    let new_add_data = last_new_block
+        .event
+        .as_variant::<odf::metadata::AddData>()
+        .unwrap();
     CompactTestHarness::assert_offset_interval_eq(
         new_add_data,
-        &OffsetInterval { start: 0, end: 5 },
+        &odf::metadata::OffsetInterval { start: 0, end: 5 },
     );
 }
 
@@ -285,7 +291,7 @@ async fn test_dataset_compaction_watermark_only_blocks() {
     created
         .dataset
         .commit_add_data(
-            AddDataParams {
+            odf::dataset::AddDataParams {
                 prev_checkpoint: None,
                 prev_offset: Some(2),
                 new_offset_interval: None,
@@ -294,9 +300,9 @@ async fn test_dataset_compaction_watermark_only_blocks() {
             },
             None,
             None,
-            CommitOpts {
+            odf::dataset::CommitOpts {
                 system_time: Some(harness.current_date_time),
-                ..CommitOpts::default()
+                ..odf::dataset::CommitOpts::default()
             },
         )
         .await
@@ -316,12 +322,12 @@ async fn test_dataset_compaction_watermark_only_blocks() {
     created
         .dataset
         .commit_add_data(
-            AddDataParams {
+            odf::dataset::AddDataParams {
                 prev_checkpoint: None,
                 prev_offset: Some(5),
                 new_offset_interval: None,
                 new_watermark: Some(Utc.with_ymd_and_hms(2050, 1, 2, 12, 0, 0).unwrap()),
-                new_source_state: Some(SourceState {
+                new_source_state: Some(odf::metadata::SourceState {
                     source_name: "src".to_string(),
                     kind: "odf/etag".to_string(),
                     value: "123".to_string(),
@@ -329,9 +335,9 @@ async fn test_dataset_compaction_watermark_only_blocks() {
             },
             None,
             None,
-            CommitOpts {
+            odf::dataset::CommitOpts {
                 system_time: Some(harness.current_date_time),
-                ..CommitOpts::default()
+                ..odf::dataset::CommitOpts::default()
             },
         )
         .await
@@ -389,27 +395,29 @@ async fn test_dataset_compaction_watermark_only_blocks() {
         )
         .await;
 
+    use odf::metadata::EnumWithVariants;
     let old_last_add_data = old_blocks
         .first()
         .unwrap()
         .event
-        .as_variant::<AddData>()
+        .as_variant::<odf::metadata::AddData>()
         .unwrap();
 
+    use odf::metadata::AsTypedBlock;
     let new_add_data = created
         .dataset
         .as_metadata_chain()
         .get_block(&new_head)
         .await
         .unwrap()
-        .into_typed::<AddData>()
+        .into_typed::<odf::metadata::AddData>()
         .unwrap()
         .event;
 
     assert_eq!(new_add_data.prev_offset, None);
     assert_eq!(
         new_add_data.new_data.as_ref().unwrap().offset_interval,
-        OffsetInterval { start: 0, end: 5 }
+        odf::metadata::OffsetInterval { start: 0, end: 5 }
     );
     assert_eq!(new_add_data.new_checkpoint, None);
     assert_eq!(new_add_data.new_watermark, old_last_add_data.new_watermark);
@@ -551,11 +559,12 @@ async fn test_dataset_compaction_limits() {
     CompactTestHarness::assert_end_state_equivalent(&last_old_block.event, &last_new_block.event);
 
     // Validate offsets
+    use odf::metadata::EnumWithVariants;
     let new_data_events: Vec<_> = harness
         .get_dataset_blocks(&dataset_ref)
         .await
         .into_iter()
-        .filter_map(|b| b.event.into_variant::<AddData>())
+        .filter_map(|b| b.event.into_variant::<odf::metadata::AddData>())
         .rev()
         .collect();
 
@@ -563,15 +572,15 @@ async fn test_dataset_compaction_limits() {
 
     CompactTestHarness::assert_offset_interval_eq(
         &new_data_events[0],
-        &OffsetInterval { start: 0, end: 5 },
+        &odf::metadata::OffsetInterval { start: 0, end: 5 },
     );
     CompactTestHarness::assert_offset_interval_eq(
         &new_data_events[1],
-        &OffsetInterval { start: 6, end: 11 },
+        &odf::metadata::OffsetInterval { start: 6, end: 11 },
     );
     CompactTestHarness::assert_offset_interval_eq(
         &new_data_events[2],
-        &OffsetInterval { start: 12, end: 15 },
+        &odf::metadata::OffsetInterval { start: 12, end: 15 },
     );
 }
 
@@ -698,14 +707,21 @@ async fn test_dataset_compaction_keep_all_non_data_blocks() {
         &new_blocks.first().unwrap().event,
     );
 
+    use odf::metadata::EnumWithVariants;
     CompactTestHarness::assert_offset_interval_eq(
-        new_blocks[2].event.as_variant::<AddData>().unwrap(),
-        &OffsetInterval { start: 0, end: 5 },
+        new_blocks[2]
+            .event
+            .as_variant::<odf::metadata::AddData>()
+            .unwrap(),
+        &odf::metadata::OffsetInterval { start: 0, end: 5 },
     );
 
     CompactTestHarness::assert_offset_interval_eq(
-        new_blocks[0].event.as_variant::<AddData>().unwrap(),
-        &OffsetInterval { start: 6, end: 11 },
+        new_blocks[0]
+            .event
+            .as_variant::<odf::metadata::AddData>()
+            .unwrap(),
+        &odf::metadata::OffsetInterval { start: 6, end: 11 },
     );
 }
 
@@ -720,7 +736,7 @@ async fn test_dataset_compaction_derive_error() {
         .create_dataset(
             MetadataFactory::dataset_snapshot()
                 .name("derive.foo")
-                .kind(DatasetKind::Derivative)
+                .kind(odf::DatasetKind::Derivative)
                 .push_event(MetadataFactory::set_data_schema().build())
                 .build(),
         )
@@ -952,7 +968,7 @@ async fn test_dataset_keep_metadata_only_compact() {
     let prev_head = created_derived
         .dataset
         .as_metadata_chain()
-        .resolve_ref(&BlockRef::Head)
+        .resolve_ref(&odf::BlockRef::Head)
         .await
         .unwrap();
 
@@ -974,7 +990,7 @@ async fn test_dataset_keep_metadata_only_compact() {
         created_derived
             .dataset
             .as_metadata_chain()
-            .resolve_ref(&BlockRef::Head)
+            .resolve_ref(&odf::BlockRef::Head)
             .await
             .unwrap()
     );
@@ -1095,7 +1111,7 @@ impl CompactTestHarness {
             .add_value(CurrentAccountSubject::new_test())
             .add_value(TenancyConfig::SingleTenant)
             .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
-            .bind::<dyn DatasetStorageUnit, DatasetStorageUnitLocalFs>()
+            .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
             .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
             .add::<DatasetRegistrySoloUnitBridge>()
             .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
@@ -1146,7 +1162,7 @@ impl CompactTestHarness {
             .add_builder(run_info_dir.clone())
             .add_value(TenancyConfig::SingleTenant)
             .add_builder(DatasetStorageUnitS3::builder().with_s3_context(s3_context.clone()))
-            .bind::<dyn DatasetStorageUnit, DatasetStorageUnitS3>()
+            .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitS3>()
             .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitS3>()
             .add::<DatasetRegistrySoloUnitBridge>()
             .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
@@ -1188,7 +1204,7 @@ impl CompactTestHarness {
         }
     }
 
-    async fn get_dataset_head(&self, dataset_ref: &DatasetRef) -> Multihash {
+    async fn get_dataset_head(&self, dataset_ref: &odf::DatasetRef) -> odf::Multihash {
         let resolved_dataset = self
             .dataset_registry
             .get_dataset_by_ref(dataset_ref)
@@ -1197,12 +1213,12 @@ impl CompactTestHarness {
 
         resolved_dataset
             .as_metadata_chain()
-            .resolve_ref(&BlockRef::Head)
+            .resolve_ref(&odf::BlockRef::Head)
             .await
             .unwrap()
     }
 
-    async fn get_dataset_blocks(&self, dataset_ref: &DatasetRef) -> Vec<MetadataBlock> {
+    async fn get_dataset_blocks(&self, dataset_ref: &odf::DatasetRef) -> Vec<odf::MetadataBlock> {
         let resolved_dataset = self
             .dataset_registry
             .get_dataset_by_ref(dataset_ref)
@@ -1219,7 +1235,10 @@ impl CompactTestHarness {
             .unwrap()
     }
 
-    async fn create_dataset(&self, dataset_snapshot: DatasetSnapshot) -> CreateDatasetResult {
+    async fn create_dataset(
+        &self,
+        dataset_snapshot: odf::DatasetSnapshot,
+    ) -> odf::CreateDatasetResult {
         self.dataset_storage_unit_writer
             .create_dataset_from_snapshot(dataset_snapshot)
             .await
@@ -1227,14 +1246,14 @@ impl CompactTestHarness {
             .create_dataset_result
     }
 
-    async fn create_test_root_dataset(&self) -> CreateDatasetResult {
+    async fn create_test_root_dataset(&self) -> odf::CreateDatasetResult {
         self.create_dataset(
             MetadataFactory::dataset_snapshot()
                 .name("foo")
-                .kind(DatasetKind::Root)
+                .kind(odf::DatasetKind::Root)
                 .push_event(
                     MetadataFactory::add_push_source()
-                        .read(ReadStepCsv {
+                        .read(odf::metadata::ReadStepCsv {
                             header: Some(true),
                             schema: Some(
                                 ["date TIMESTAMP", "city STRING", "population BIGINT"]
@@ -1242,14 +1261,14 @@ impl CompactTestHarness {
                                     .map(|s| (*s).to_string())
                                     .collect(),
                             ),
-                            ..ReadStepCsv::default()
+                            ..odf::metadata::ReadStepCsv::default()
                         })
-                        .merge(MergeStrategyLedger {
+                        .merge(odf::metadata::MergeStrategyLedger {
                             primary_key: vec!["date".to_string(), "city".to_string()],
                         })
                         .build(),
                 )
-                .push_event(SetVocab {
+                .push_event(odf::metadata::SetVocab {
                     event_time_column: Some("date".to_string()),
                     ..Default::default()
                 })
@@ -1258,11 +1277,11 @@ impl CompactTestHarness {
         .await
     }
 
-    async fn create_test_derived_dataset(&self) -> CreateDatasetResult {
+    async fn create_test_derived_dataset(&self) -> odf::CreateDatasetResult {
         self.create_dataset(
             MetadataFactory::dataset_snapshot()
                 .name("foo-derivative")
-                .kind(DatasetKind::Derivative)
+                .kind(odf::DatasetKind::Derivative)
                 .push_event(
                     MetadataFactory::set_transform()
                         .inputs_from_refs(["foo"])
@@ -1286,7 +1305,7 @@ impl CompactTestHarness {
         .await
     }
 
-    async fn dataset_data_helper(&self, dataset_ref: &DatasetRef) -> DatasetDataHelper {
+    async fn dataset_data_helper(&self, dataset_ref: &odf::DatasetRef) -> DatasetDataHelper {
         let resolved_dataset = self
             .dataset_registry
             .get_dataset_by_ref(dataset_ref)
@@ -1298,7 +1317,7 @@ impl CompactTestHarness {
 
     async fn ingest_multiple_blocks(
         &self,
-        dataset_created: &CreateDatasetResult,
+        dataset_created: &odf::CreateDatasetResult,
         blocks: i64,
         records_per_block: i64,
     ) {
@@ -1328,7 +1347,7 @@ impl CompactTestHarness {
         }
     }
 
-    async fn ingest_data(&self, data_str: String, dataset_created: &CreateDatasetResult) {
+    async fn ingest_data(&self, data_str: String, dataset_created: &odf::CreateDatasetResult) {
         let data = std::io::Cursor::new(data_str);
 
         let target = ResolvedDataset::from(dataset_created);
@@ -1345,13 +1364,13 @@ impl CompactTestHarness {
             .unwrap();
     }
 
-    async fn commit_set_licence_block(&self, dataset_ref: &DatasetRef, head: &Multihash) {
+    async fn commit_set_licence_block(&self, dataset_ref: &odf::DatasetRef, head: &odf::Multihash) {
         let resolved_dataset = self
             .dataset_registry
             .get_dataset_by_ref(dataset_ref)
             .await
             .unwrap();
-        let event = SetLicense {
+        let event = odf::metadata::SetLicense {
             short_name: "sl1".to_owned(),
             name: "set_license1".to_owned(),
             spdx_id: None,
@@ -1361,8 +1380,8 @@ impl CompactTestHarness {
         resolved_dataset
             .commit_event(
                 event.into(),
-                CommitOpts {
-                    block_ref: &BlockRef::Head,
+                odf::dataset::CommitOpts {
+                    block_ref: &odf::BlockRef::Head,
                     system_time: Some(self.current_date_time),
                     prev_block_hash: Some(Some(head)),
                     check_object_refs: false,
@@ -1375,9 +1394,10 @@ impl CompactTestHarness {
 
     // Ensures that old an new blocks end with same watermark, source state, and
     // checkpoint
-    fn assert_end_state_equivalent(old_event: &MetadataEvent, new_event: &MetadataEvent) {
-        let old_event = old_event.as_variant::<AddData>().unwrap();
-        let new_event = new_event.as_variant::<AddData>().unwrap();
+    fn assert_end_state_equivalent(old_event: &odf::MetadataEvent, new_event: &odf::MetadataEvent) {
+        use odf::metadata::EnumWithVariants;
+        let old_event = old_event.as_variant::<odf::metadata::AddData>().unwrap();
+        let new_event = new_event.as_variant::<odf::metadata::AddData>().unwrap();
 
         let Some(old_data) = old_event.new_data.as_ref() else {
             panic!("Old event didn't contain data:\n{old_event:#?}");
@@ -1392,19 +1412,24 @@ impl CompactTestHarness {
         assert_eq!(old_event.new_source_state, new_event.new_source_state);
     }
 
-    // Ensures that there are no AddData/Executetransform blocks
-    async fn check_is_data_slices_exist(&self, dataset_ref: &DatasetRef) -> bool {
+    // Ensures that there are no odf::metadata::AddData/Executetransform blocks
+    async fn check_is_data_slices_exist(&self, dataset_ref: &odf::DatasetRef) -> bool {
         let blocks = self.get_dataset_blocks(dataset_ref).await;
         for block in &blocks {
             match block.event {
-                MetadataEvent::AddData(_) | MetadataEvent::ExecuteTransform(_) => return true,
+                odf::MetadataEvent::AddData(_) | odf::MetadataEvent::ExecuteTransform(_) => {
+                    return true
+                }
                 _ => (),
             }
         }
         false
     }
 
-    fn assert_offset_interval_eq(event: &AddData, expected: &OffsetInterval) {
+    fn assert_offset_interval_eq(
+        event: &odf::metadata::AddData,
+        expected: &odf::metadata::OffsetInterval,
+    ) {
         let expected_prev_offset = if expected.start == 0 {
             None
         } else {
@@ -1417,7 +1442,7 @@ impl CompactTestHarness {
         assert_eq!(data.offset_interval, *expected);
     }
 
-    async fn verify_dataset(&self, dataset_create_result: &CreateDatasetResult) -> bool {
+    async fn verify_dataset(&self, dataset_create_result: &odf::CreateDatasetResult) -> bool {
         let result = self
             .verification_svc
             .verify(
@@ -1435,7 +1460,7 @@ impl CompactTestHarness {
 
     async fn compact_dataset(
         &self,
-        dataset_create_result: &CreateDatasetResult,
+        dataset_create_result: &odf::CreateDatasetResult,
         compaction_options: CompactionOptions,
     ) -> Result<CompactionResult, CompactionError> {
         let compaction_plan = self

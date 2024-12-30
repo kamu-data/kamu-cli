@@ -13,8 +13,6 @@ use std::sync::Arc;
 use kamu::testing::MockDatasetActionAuthorizer;
 use kamu::*;
 use kamu_core::*;
-use odf_dataset::CommitOpts;
-use odf_metadata::*;
 use odf_storage_impl::testing::MetadataFactory;
 
 use super::{BaseUseCaseHarness, BaseUseCaseHarnessOptions};
@@ -23,7 +21,7 @@ use super::{BaseUseCaseHarness, BaseUseCaseHarnessOptions};
 
 #[tokio::test]
 async fn test_reset_success() {
-    let alias_foo = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
 
     let harness = ResetUseCaseHarness::new(
         MockDatasetActionAuthorizer::new().expect_check_write_dataset(&alias_foo, 1, true),
@@ -32,8 +30,8 @@ async fn test_reset_success() {
     let foo = harness.create_root_dataset(&alias_foo).await;
     foo.dataset
         .commit_event(
-            MetadataEvent::SetInfo(MetadataFactory::set_info().description("test").build()),
-            CommitOpts::default(),
+            odf::MetadataEvent::SetInfo(MetadataFactory::set_info().description("test").build()),
+            odf::dataset::CommitOpts::default(),
         )
         .await
         .unwrap();
@@ -54,7 +52,7 @@ async fn test_reset_success() {
 
 #[tokio::test]
 async fn test_reset_dataset_unauthorized() {
-    let alias_foo = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
 
     let harness = ResetUseCaseHarness::new(
         MockDatasetActionAuthorizer::new().expect_check_write_dataset(&alias_foo, 1, false),

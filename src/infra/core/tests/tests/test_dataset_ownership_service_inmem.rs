@@ -28,7 +28,6 @@ use kamu_accounts_services::{
     PredefinedAccountsRegistrator,
 };
 use kamu_core::{DatasetOwnershipService, TenancyConfig};
-use odf_metadata::{AccountID, AccountName, DatasetAlias, DatasetID, DatasetName};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -83,7 +82,7 @@ struct DatasetOwnershipHarness {
     catalog: dill::Catalog,
     dataset_ownership_service: Arc<dyn DatasetOwnershipService>,
     auth_svc: Arc<dyn AuthenticationService>,
-    account_datasets: HashMap<AccountID, Vec<DatasetID>>,
+    account_datasets: HashMap<odf::AccountID, Vec<odf::DatasetID>>,
 }
 
 impl DatasetOwnershipHarness {
@@ -91,9 +90,9 @@ impl DatasetOwnershipHarness {
         let base_repo_harness = BaseRepoHarness::new(tenancy_config);
 
         let predefined_accounts = [
-            AccountName::new_unchecked("alice"),
-            AccountName::new_unchecked("bob"),
-            AccountName::new_unchecked("eve"),
+            odf::AccountName::new_unchecked("alice"),
+            odf::AccountName::new_unchecked("bob"),
+            odf::AccountName::new_unchecked("eve"),
         ];
         let mut predefined_accounts_config = PredefinedAccountsConfig::new();
         for account_name in predefined_accounts {
@@ -155,11 +154,11 @@ impl DatasetOwnershipHarness {
     }
 
     async fn create_multi_tenant_datasets(&mut self) {
-        let alice = AccountName::new_unchecked("alice");
-        let bob = AccountName::new_unchecked("bob");
-        let eve: AccountName = AccountName::new_unchecked("eve");
+        let alice = odf::AccountName::new_unchecked("alice");
+        let bob = odf::AccountName::new_unchecked("bob");
+        let eve: odf::AccountName = odf::AccountName::new_unchecked("eve");
 
-        let mut dataset_accounts: HashMap<&'static str, AccountName> = HashMap::new();
+        let mut dataset_accounts: HashMap<&'static str, odf::AccountName> = HashMap::new();
         dataset_accounts.insert("foo", alice.clone());
         dataset_accounts.insert("bar", alice.clone());
         dataset_accounts.insert("baz", bob.clone());
@@ -171,7 +170,7 @@ impl DatasetOwnershipHarness {
             .await;
     }
 
-    async fn create_datasets(&mut self, account_getter: impl Fn(&str) -> Option<AccountName>) {
+    async fn create_datasets(&mut self, account_getter: impl Fn(&str) -> Option<odf::AccountName>) {
         self.create_root_dataset(account_getter("foo"), "foo").await;
         self.create_root_dataset(account_getter("bar"), "bar").await;
         self.create_root_dataset(account_getter("baz"), "baz").await;
@@ -180,8 +179,14 @@ impl DatasetOwnershipHarness {
             account_getter("foo-bar"),
             "foo-bar",
             vec![
-                DatasetAlias::new(account_getter("foo"), DatasetName::new_unchecked("foo")),
-                DatasetAlias::new(account_getter("bar"), DatasetName::new_unchecked("bar")),
+                odf::DatasetAlias::new(
+                    account_getter("foo"),
+                    odf::DatasetName::new_unchecked("foo"),
+                ),
+                odf::DatasetAlias::new(
+                    account_getter("bar"),
+                    odf::DatasetName::new_unchecked("bar"),
+                ),
             ],
         )
         .await;
@@ -190,8 +195,14 @@ impl DatasetOwnershipHarness {
             account_getter("foo-baz"),
             "foo-baz",
             vec![
-                DatasetAlias::new(account_getter("foo"), DatasetName::new_unchecked("foo")),
-                DatasetAlias::new(account_getter("baz"), DatasetName::new_unchecked("baz")),
+                odf::DatasetAlias::new(
+                    account_getter("foo"),
+                    odf::DatasetName::new_unchecked("foo"),
+                ),
+                odf::DatasetAlias::new(
+                    account_getter("baz"),
+                    odf::DatasetName::new_unchecked("baz"),
+                ),
             ],
         )
         .await;
@@ -200,20 +211,24 @@ impl DatasetOwnershipHarness {
             account_getter("foo-bar-foo-baz"),
             "foo-bar-foo-baz",
             vec![
-                DatasetAlias::new(
+                odf::DatasetAlias::new(
                     account_getter("foo-bar"),
-                    DatasetName::new_unchecked("foo-bar"),
+                    odf::DatasetName::new_unchecked("foo-bar"),
                 ),
-                DatasetAlias::new(
+                odf::DatasetAlias::new(
                     account_getter("foo-baz"),
-                    DatasetName::new_unchecked("foo-baz"),
+                    odf::DatasetName::new_unchecked("foo-baz"),
                 ),
             ],
         )
         .await;
     }
 
-    async fn create_root_dataset(&mut self, account_name: Option<AccountName>, dataset_name: &str) {
+    async fn create_root_dataset(
+        &mut self,
+        account_name: Option<odf::AccountName>,
+        dataset_name: &str,
+    ) {
         let account_id = self
             .auth_svc
             .find_account_id_by_name(account_name.as_ref().unwrap())
@@ -223,9 +238,9 @@ impl DatasetOwnershipHarness {
 
         let created_dataset = self
             ._super()
-            .create_root_dataset(&DatasetAlias::new(
+            .create_root_dataset(&odf::DatasetAlias::new(
                 account_name,
-                DatasetName::new_unchecked(dataset_name),
+                odf::DatasetName::new_unchecked(dataset_name),
             ))
             .await;
 
@@ -239,9 +254,9 @@ impl DatasetOwnershipHarness {
 
     async fn create_derived_dataset(
         &mut self,
-        account_name: Option<AccountName>,
+        account_name: Option<odf::AccountName>,
         dataset_name: &str,
-        input_aliases: Vec<DatasetAlias>,
+        input_aliases: Vec<odf::DatasetAlias>,
     ) {
         let account_id = self
             .auth_svc
@@ -253,10 +268,13 @@ impl DatasetOwnershipHarness {
         let created_dataset = self
             ._super()
             .create_derived_dataset(
-                &DatasetAlias::new(account_name, DatasetName::new_unchecked(dataset_name)),
+                &odf::DatasetAlias::new(
+                    account_name,
+                    odf::DatasetName::new_unchecked(dataset_name),
+                ),
                 input_aliases
                     .iter()
-                    .map(DatasetAlias::as_local_ref)
+                    .map(odf::DatasetAlias::as_local_ref)
                     .collect(),
             )
             .await;

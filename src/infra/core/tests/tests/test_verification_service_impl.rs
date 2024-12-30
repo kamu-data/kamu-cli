@@ -17,8 +17,6 @@ use file_utils::OwnedFile;
 use kamu::domain::*;
 use kamu::testing::{BaseRepoHarness, ParquetWriterHelper};
 use kamu::*;
-use odf_dataset::{AddDataParams, CommitOpts};
-use odf_metadata::*;
 use odf_storage_impl::testing::MetadataFactory;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -27,14 +25,14 @@ use odf_storage_impl::testing::MetadataFactory;
 async fn test_verify_data_consistency() {
     let harness = VerifyHarness::new();
 
-    let foo_alias = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
-    let bar_alias = DatasetAlias::new(None, DatasetName::new_unchecked("bar"));
+    let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let bar_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
 
     let foo = harness.create_root_dataset(&foo_alias).await;
     foo.dataset
         .commit_event(
-            MetadataEvent::SetDataSchema(MetadataFactory::set_data_schema().build()),
-            CommitOpts::default(),
+            odf::MetadataEvent::SetDataSchema(MetadataFactory::set_data_schema().build()),
+            odf::dataset::CommitOpts::default(),
         )
         .await
         .unwrap();
@@ -44,8 +42,8 @@ async fn test_verify_data_consistency() {
         .await;
     bar.dataset
         .commit_event(
-            MetadataEvent::SetDataSchema(MetadataFactory::set_data_schema().build()),
-            CommitOpts::default(),
+            odf::MetadataEvent::SetDataSchema(MetadataFactory::set_data_schema().build()),
+            odf::dataset::CommitOpts::default(),
         )
         .await
         .unwrap();
@@ -93,16 +91,16 @@ async fn test_verify_data_consistency() {
     let head = bar
         .dataset
         .commit_add_data(
-            AddDataParams {
+            odf::dataset::AddDataParams {
                 prev_checkpoint: None,
                 prev_offset: None,
-                new_offset_interval: Some(OffsetInterval { start: 0, end: 0 }),
+                new_offset_interval: Some(odf::metadata::OffsetInterval { start: 0, end: 0 }),
                 new_watermark: None,
                 new_source_state: None,
             },
             Some(OwnedFile::new(data_path)),
             None,
-            CommitOpts::default(),
+            odf::dataset::CommitOpts::default(),
         )
         .await
         .unwrap()
@@ -110,9 +108,9 @@ async fn test_verify_data_consistency() {
 
     assert_matches!(
         bar.dataset.as_metadata_chain().get_block(&head).await.unwrap(),
-        MetadataBlock {
-            event: MetadataEvent::AddData(AddData {
-                new_data: Some(DataSlice {
+        odf::MetadataBlock {
+            event: odf::MetadataEvent::AddData(odf::metadata::AddData {
+                new_data: Some(odf::DataSlice {
                     logical_hash,
                     physical_hash,
                     ..

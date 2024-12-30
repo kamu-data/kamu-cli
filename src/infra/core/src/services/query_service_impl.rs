@@ -23,8 +23,6 @@ use dill::*;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer};
 use kamu_core::*;
-use odf_dataset::{BlockRef, MetadataChainExt, SearchSetDataSchemaVisitor, SearchSetVocabVisitor};
-use odf_metadata as odf;
 
 use crate::services::query::*;
 use crate::utils::docker_images;
@@ -133,7 +131,7 @@ impl QueryServiceImpl {
                 } else {
                     resolved_dataset
                         .as_metadata_chain()
-                        .resolve_ref(&BlockRef::Head)
+                        .resolve_ref(&odf::BlockRef::Head)
                         .await
                         .int_err()?
                 };
@@ -198,7 +196,7 @@ impl QueryServiceImpl {
 
                     let block_hash = resolved_dataset
                         .as_metadata_chain()
-                        .resolve_ref(&BlockRef::Head)
+                        .resolve_ref(&odf::BlockRef::Head)
                         .await
                         .int_err()?;
 
@@ -248,9 +246,10 @@ impl QueryServiceImpl {
     ) -> Result<Option<arrow::datatypes::SchemaRef>, QueryError> {
         let resolved_dataset = self.resolve_dataset(dataset_ref).await?;
 
+        use odf::dataset::MetadataChainExt;
         let schema = resolved_dataset
             .as_metadata_chain()
-            .accept_one(SearchSetDataSchemaVisitor::new())
+            .accept_one(odf::dataset::SearchSetDataSchemaVisitor::new())
             .await
             .int_err()?
             .into_event()
@@ -270,6 +269,7 @@ impl QueryServiceImpl {
         let resolved_dataset = self.resolve_dataset(dataset_ref).await?;
 
         // TODO: Update to use SetDataSchema event
+        use odf::dataset::MetadataChainExt;
         let maybe_last_data_slice_hash = resolved_dataset
             .as_metadata_chain()
             .last_data_block_with_new_data()
@@ -357,9 +357,10 @@ impl QueryService for QueryServiceImpl {
             })?;
         }
 
-        let vocab: odf::DatasetVocabulary = resolved_dataset
+        use odf::dataset::MetadataChainExt;
+        let vocab: odf::metadata::DatasetVocabulary = resolved_dataset
             .as_metadata_chain()
-            .accept_one(SearchSetVocabVisitor::new())
+            .accept_one(odf::dataset::SearchSetVocabVisitor::new())
             .await
             .int_err()?
             .into_event()

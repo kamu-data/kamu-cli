@@ -21,9 +21,6 @@ use kamu_core::{
     SyncRefRemote,
     SyncRequest,
 };
-use odf_dataset::{BlockRef, Dataset, DatasetFactory, GetDatasetError};
-use odf_metadata as odf;
-use odf_storage::GetRefError;
 use url::Url;
 
 use crate::UrlExt;
@@ -33,14 +30,14 @@ use crate::UrlExt;
 #[component(pub)]
 pub struct SyncRequestBuilder {
     dataset_registry: Arc<dyn DatasetRegistry>,
-    dataset_factory: Arc<dyn DatasetFactory>,
+    dataset_factory: Arc<dyn odf::dataset::DatasetFactory>,
     remote_repo_registry: Arc<dyn RemoteRepositoryRegistry>,
 }
 
 impl SyncRequestBuilder {
     pub fn new(
         dataset_registry: Arc<dyn DatasetRegistry>,
-        dataset_factory: Arc<dyn DatasetFactory>,
+        dataset_factory: Arc<dyn odf::dataset::DatasetFactory>,
         remote_repo_registry: Arc<dyn RemoteRepositoryRegistry>,
     ) -> Self {
         Self {
@@ -113,7 +110,7 @@ impl SyncRequestBuilder {
         match any_ref.as_local_ref(|repo| self.remote_repo_registry.get_repository(repo).is_ok()) {
             Ok(local_ref) => match self.dataset_registry.get_dataset_by_ref(&local_ref).await {
                 Ok(resolved_dataset) => Ok(SyncRef::Local(resolved_dataset)),
-                Err(GetDatasetError::NotFound(_)) if create_if_not_exists => {
+                Err(odf::dataset::GetDatasetError::NotFound(_)) if create_if_not_exists => {
                     if let Some(alias) = local_ref.alias() {
                         Ok(SyncRef::LocalNew(alias.clone()))
                     } else {
@@ -149,19 +146,19 @@ impl SyncRequestBuilder {
     async fn ensure_dataset_head_present(
         &self,
         dataset_ref: odf::DatasetRefAny,
-        dataset: &dyn Dataset,
+        dataset: &dyn odf::Dataset,
     ) -> Result<(), SyncError> {
         match dataset
             .as_metadata_chain()
-            .resolve_ref(&BlockRef::Head)
+            .resolve_ref(&odf::BlockRef::Head)
             .await
         {
             Ok(_) => Ok(()),
-            Err(GetRefError::NotFound(_)) => {
+            Err(odf::storage::GetRefError::NotFound(_)) => {
                 Err(DatasetAnyRefUnresolvedError { dataset_ref }.into())
             }
-            Err(GetRefError::Access(e)) => Err(SyncError::Access(e)),
-            Err(GetRefError::Internal(e)) => Err(SyncError::Internal(e)),
+            Err(odf::storage::GetRefError::Access(e)) => Err(SyncError::Access(e)),
+            Err(odf::storage::GetRefError::Internal(e)) => Err(SyncError::Internal(e)),
         }
     }
 }
@@ -178,7 +175,7 @@ pub(crate) fn resolve_remote_dataset_url(
             "Syncing remote dataset by ID is not yet supported".int_err(),
         )),
         odf::DatasetRefRemote::Alias(alias)
-        | odf::DatasetRefRemote::Handle(odf::DatasetHandleRemote { alias, .. }) => {
+        | odf::DatasetRefRemote::Handle(odf::metadata::DatasetHandleRemote { alias, .. }) => {
             let mut repo = remote_repo_registry.get_repository(&alias.repo_name)?;
 
             repo.url.ensure_trailing_slash();

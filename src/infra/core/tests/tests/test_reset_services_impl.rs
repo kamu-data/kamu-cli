@@ -13,8 +13,6 @@ use std::sync::Arc;
 use kamu::domain::*;
 use kamu::testing::BaseRepoHarness;
 use kamu::*;
-use odf_dataset::{BlockRef, CommitOpts, DatasetSummary, GetSummaryOpts, SetChainRefError};
-use odf_metadata::*;
 use odf_storage_impl::testing::MetadataFactory;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -77,7 +75,7 @@ async fn test_reset_dataset_to_non_existing_block_fails() {
     let test_case = harness.a_chain_with_2_blocks().await;
 
     let a_hash_not_present_in_chain =
-        Multihash::from_multibase("zW1a3CNT52HXiJNniLkWMeev3CPRy9QiNRMWGyTrVNg4hY8").unwrap();
+        odf::Multihash::from_multibase("zW1a3CNT52HXiJNniLkWMeev3CPRy9QiNRMWGyTrVNg4hY8").unwrap();
 
     let result = harness
         .reset_dataset(
@@ -89,7 +87,9 @@ async fn test_reset_dataset_to_non_existing_block_fails() {
     assert_matches!(
         result,
         Err(ResetError::Execution(
-            ResetExecutionError::SetReferenceFailed(SetChainRefError::BlockNotFound(_))
+            ResetExecutionError::SetReferenceFailed(odf::dataset::SetChainRefError::BlockNotFound(
+                _
+            ))
         ))
     );
 }
@@ -143,16 +143,16 @@ async fn test_reset_dataset_with_default_seed_block() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct ChainWith2BlocksTestCase {
-    dataset_handle: DatasetHandle,
-    hash_seed_block: Multihash,
-    hash_polling_source_block: Multihash,
+    dataset_handle: odf::DatasetHandle,
+    hash_seed_block: odf::Multihash,
+    hash_polling_source_block: odf::Multihash,
 }
 
 impl ChainWith2BlocksTestCase {
     fn new(
-        dataset_handle: DatasetHandle,
-        hash_seed_block: Multihash,
-        hash_polling_source_block: Multihash,
+        dataset_handle: odf::DatasetHandle,
+        hash_seed_block: odf::Multihash,
+        hash_polling_source_block: odf::Multihash,
     ) -> Self {
         Self {
             dataset_handle,
@@ -191,10 +191,10 @@ impl ResetTestHarness {
     }
 
     async fn a_chain_with_2_blocks(&self) -> ChainWith2BlocksTestCase {
-        let dataset_name = DatasetName::try_from("foo").unwrap();
+        let dataset_name = odf::DatasetName::try_from("foo").unwrap();
 
         let seed_block = MetadataFactory::metadata_block(
-            MetadataFactory::seed(DatasetKind::Root)
+            MetadataFactory::seed(odf::DatasetKind::Root)
                 .id_from(dataset_name.as_str())
                 .build(),
         )
@@ -202,7 +202,10 @@ impl ResetTestHarness {
 
         let create_result = self
             .dataset_storage_unit_writer()
-            .create_dataset(&DatasetAlias::new(None, dataset_name.clone()), seed_block)
+            .create_dataset(
+                &odf::DatasetAlias::new(None, dataset_name.clone()),
+                seed_block,
+            )
             .await
             .unwrap();
 
@@ -211,8 +214,8 @@ impl ResetTestHarness {
         let hash_polling_source_block = create_result
             .dataset
             .commit_event(
-                MetadataEvent::SetPollingSource(MetadataFactory::set_polling_source().build()),
-                CommitOpts::default(),
+                odf::MetadataEvent::SetPollingSource(MetadataFactory::set_polling_source().build()),
+                odf::dataset::CommitOpts::default(),
             )
             .await
             .unwrap()
@@ -223,9 +226,9 @@ impl ResetTestHarness {
 
     async fn reset_dataset(
         &self,
-        dataset_handle: &DatasetHandle,
-        block_hash: Option<&Multihash>,
-        old_head_maybe: Option<&Multihash>,
+        dataset_handle: &odf::DatasetHandle,
+        block_hash: Option<&odf::Multihash>,
+        old_head_maybe: Option<&odf::Multihash>,
     ) -> Result<ResetResult, ResetError> {
         let target = self.resolve_dataset(dataset_handle);
 
@@ -239,24 +242,27 @@ impl ResetTestHarness {
         Ok(reset_result)
     }
 
-    async fn get_dataset_head(&self, dataset_handle: &DatasetHandle) -> Multihash {
+    async fn get_dataset_head(&self, dataset_handle: &odf::DatasetHandle) -> odf::Multihash {
         let resolved_dataset = self.resolve_dataset(dataset_handle);
         resolved_dataset
             .as_metadata_chain()
-            .resolve_ref(&BlockRef::Head)
+            .resolve_ref(&odf::BlockRef::Head)
             .await
             .unwrap()
     }
 
-    async fn get_dataset_summary(&self, dataset_handle: &DatasetHandle) -> DatasetSummary {
+    async fn get_dataset_summary(
+        &self,
+        dataset_handle: &odf::DatasetHandle,
+    ) -> odf::DatasetSummary {
         let resolved_dataset = self.resolve_dataset(dataset_handle);
         resolved_dataset
-            .get_summary(GetSummaryOpts::default())
+            .get_summary(odf::dataset::GetSummaryOpts::default())
             .await
             .unwrap()
     }
 
-    fn resolve_dataset(&self, dataset_handle: &DatasetHandle) -> ResolvedDataset {
+    fn resolve_dataset(&self, dataset_handle: &odf::DatasetHandle) -> ResolvedDataset {
         self.dataset_registry()
             .get_dataset_by_handle(dataset_handle)
     }

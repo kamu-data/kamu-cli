@@ -13,7 +13,6 @@ use std::sync::Arc;
 use kamu::testing::MockDatasetActionAuthorizer;
 use kamu::*;
 use kamu_core::*;
-use odf_metadata::*;
 
 use super::{BaseUseCaseHarness, BaseUseCaseHarnessOptions};
 
@@ -21,7 +20,7 @@ use super::{BaseUseCaseHarness, BaseUseCaseHarnessOptions};
 
 #[tokio::test]
 async fn test_verify_success() {
-    let alias_foo = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
 
     let harness = VerifyUseCaseHarness::new(
         MockDatasetActionAuthorizer::new().expect_check_read_dataset(&alias_foo, 1, true),
@@ -41,8 +40,8 @@ async fn test_verify_success() {
 
 #[tokio::test]
 async fn test_verify_multiple_success() {
-    let alias_foo = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
-    let alias_bar = DatasetAlias::new(None, DatasetName::new_unchecked("bar"));
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
 
     let harness = VerifyUseCaseHarness::new(
         MockDatasetActionAuthorizer::new()
@@ -86,7 +85,7 @@ async fn test_verify_multiple_success() {
 
 #[tokio::test]
 async fn test_verify_unauthorized() {
-    let alias_foo = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
 
     let harness = VerifyUseCaseHarness::new(
         MockDatasetActionAuthorizer::new().expect_check_read_dataset(&alias_foo, 1, false),
@@ -106,9 +105,9 @@ async fn test_verify_unauthorized() {
 
 #[tokio::test]
 async fn test_verify_mixed_authorization_outcome() {
-    let alias_foo = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
-    let alias_bar = DatasetAlias::new(None, DatasetName::new_unchecked("bar"));
-    let alias_baz = DatasetAlias::new(None, DatasetName::new_unchecked("baz"));
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
+    let alias_baz = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("baz"));
 
     let harness = VerifyUseCaseHarness::new(
         MockDatasetActionAuthorizer::new()
@@ -193,7 +192,7 @@ impl VerifyUseCaseHarness {
     async fn verify_dataset(&self, target: ResolvedDataset) -> VerificationResult {
         self.use_case
             .execute(
-                VerificationRequest::<DatasetHandle> {
+                VerificationRequest::<odf::DatasetHandle> {
                     target: target.take_handle(),
                     block_range: (None, None),
                     options: VerificationOptions::default(),
@@ -206,7 +205,7 @@ impl VerifyUseCaseHarness {
     async fn verify_datasets(&self, targets: Vec<ResolvedDataset>) -> Vec<VerificationResult> {
         let requests: Vec<_> = targets
             .into_iter()
-            .map(|target| VerificationRequest::<DatasetHandle> {
+            .map(|target| VerificationRequest::<odf::DatasetHandle> {
                 target: target.take_handle(),
                 block_range: (None, None),
                 options: VerificationOptions::default(),

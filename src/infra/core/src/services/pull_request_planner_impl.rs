@@ -15,8 +15,6 @@ use dill::*;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::*;
-use odf_dataset::{BlockRef, DatasetNotFoundError, DatasetSummary, GetSummaryOpts};
-use odf_metadata as odf;
 use url::Url;
 
 use crate::SyncRequestBuilder;
@@ -154,7 +152,7 @@ impl PullRequestPlannerImpl {
         };
 
         let target = self.dataset_registry.get_dataset_by_handle(&hdl);
-        match DataWriterMetadataState::build(target.clone(), &BlockRef::Head, None).await {
+        match DataWriterMetadataState::build(target.clone(), &odf::BlockRef::Head, None).await {
             Ok(metadata_state) => Ok(PullIngestItem {
                 depth: pi.depth,
                 target,
@@ -472,7 +470,7 @@ impl<'a> PullGraphDepthFirstTraversal<'a> {
             let summary = self
                 .dataset_registry
                 .get_dataset_by_handle(&local_handle)
-                .get_summary(GetSummaryOpts::default())
+                .get_summary(odf::dataset::GetSummaryOpts::default())
                 .await
                 .int_err()?;
 
@@ -522,7 +520,7 @@ impl<'a> PullGraphDepthFirstTraversal<'a> {
                 {
                     Some(hdl) => Some(hdl),
                     None => {
-                        return Err(PullError::NotFound(DatasetNotFoundError {
+                        return Err(PullError::NotFound(odf::dataset::DatasetNotFoundError {
                             dataset_ref: local_ref.clone(),
                         }))
                     }
@@ -612,7 +610,7 @@ impl<'a> PullGraphDepthFirstTraversal<'a> {
                     if let Some(alias) = local_ref.alias() {
                         alias.clone()
                     } else {
-                        return Err(PullError::NotFound(DatasetNotFoundError {
+                        return Err(PullError::NotFound(odf::dataset::DatasetNotFoundError {
                             dataset_ref: local_ref.clone(),
                         }));
                     }
@@ -640,7 +638,7 @@ impl<'a> PullGraphDepthFirstTraversal<'a> {
             }
 
             odf::DatasetRefRemote::Alias(alias)
-            | odf::DatasetRefRemote::Handle(odf::DatasetHandleRemote { alias, .. }) => {
+            | odf::DatasetRefRemote::Handle(odf::metadata::DatasetHandleRemote { alias, .. }) => {
                 odf::DatasetAlias::new(None, alias.dataset_name.clone())
             }
 
@@ -715,7 +713,7 @@ impl<'a> PullGraphDepthFirstTraversal<'a> {
     // TODO: consider using data from dependency graph
     async fn traverse_upstream_datasets(
         &mut self,
-        summary: DatasetSummary,
+        summary: odf::DatasetSummary,
     ) -> Result<i32, PullError> {
         // TODO: EVO: Should be accounting for historical dependencies, not only current
         // ones?

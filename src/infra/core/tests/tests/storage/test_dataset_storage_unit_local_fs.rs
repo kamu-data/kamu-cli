@@ -14,7 +14,6 @@ use kamu::*;
 use kamu_accounts::{CurrentAccountSubject, DEFAULT_ACCOUNT_NAME};
 use kamu_core::{CreateDatasetFromSnapshotUseCase, TenancyConfig};
 use messaging_outbox::{Outbox, OutboxImmediateImpl};
-use odf_dataset::DatasetStorageUnit;
 use tempfile::TempDir;
 use time_source::SystemTimeSourceDefault;
 
@@ -43,7 +42,7 @@ impl LocalFsStorageUnitHarness {
             .add_value(CurrentAccountSubject::new_test())
             .add_value(tenancy_config)
             .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
-            .bind::<dyn DatasetStorageUnit, DatasetStorageUnitLocalFs>()
+            .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
             .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
             .add::<CreateDatasetFromSnapshotUseCaseImpl>();
 

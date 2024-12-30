@@ -21,7 +21,6 @@ use messaging_outbox::{
     MessageConsumerT,
     MessageDeliveryMechanism,
 };
-use odf_metadata::{AccountID, AccountName, DatasetID};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -31,8 +30,8 @@ pub struct DatasetOwnershipServiceInMemory {
 
 #[derive(Default)]
 struct State {
-    dataset_ids_by_account_id: HashMap<AccountID, HashSet<DatasetID>>,
-    account_ids_by_dataset_id: HashMap<DatasetID, Vec<AccountID>>,
+    dataset_ids_by_account_id: HashMap<odf::AccountID, HashSet<odf::DatasetID>>,
+    account_ids_by_dataset_id: HashMap<odf::DatasetID, Vec<odf::AccountID>>,
     initially_scanned: bool,
 }
 
@@ -58,8 +57,8 @@ impl DatasetOwnershipServiceInMemory {
     fn insert_dataset_record(
         &self,
         state: &mut State,
-        dataset_id: &DatasetID,
-        owner_account_id: &AccountID,
+        dataset_id: &odf::DatasetID,
+        owner_account_id: &odf::AccountID,
     ) {
         state
             .account_ids_by_dataset_id
@@ -96,8 +95,8 @@ impl DatasetOwnershipService for DatasetOwnershipServiceInMemory {
     #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id))]
     async fn get_dataset_owners(
         &self,
-        dataset_id: &DatasetID,
-    ) -> Result<Vec<AccountID>, InternalError> {
+        dataset_id: &odf::DatasetID,
+    ) -> Result<Vec<odf::AccountID>, InternalError> {
         self.check_has_initialized().await?;
 
         let guard = self.state.read().await;
@@ -112,8 +111,8 @@ impl DatasetOwnershipService for DatasetOwnershipServiceInMemory {
     #[tracing::instrument(level = "debug", skip_all, fields(%account_id))]
     async fn get_owned_datasets(
         &self,
-        account_id: &AccountID,
-    ) -> Result<Vec<DatasetID>, InternalError> {
+        account_id: &odf::AccountID,
+    ) -> Result<Vec<odf::DatasetID>, InternalError> {
         self.check_has_initialized().await?;
 
         let guard = self.state.read().await;
@@ -128,8 +127,8 @@ impl DatasetOwnershipService for DatasetOwnershipServiceInMemory {
     #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id, %account_id))]
     async fn is_dataset_owned_by(
         &self,
-        dataset_id: &DatasetID,
-        account_id: &AccountID,
+        dataset_id: &odf::DatasetID,
+        account_id: &odf::AccountID,
     ) -> Result<bool, InternalError> {
         self.check_has_initialized().await?;
 
@@ -252,7 +251,7 @@ impl InitOnStartup for DatasetOwnershipServiceInMemoryStateInitializer {
 
         tracing::debug!("Initializing dataset ownership data started");
 
-        let mut account_ids_by_name: HashMap<AccountName, AccountID> = HashMap::new();
+        let mut account_ids_by_name: HashMap<odf::AccountName, odf::AccountID> = HashMap::new();
 
         let mut datasets_stream = self.dataset_registry.all_dataset_handles();
         while let Some(Ok(dataset_handle)) = datasets_stream.next().await {

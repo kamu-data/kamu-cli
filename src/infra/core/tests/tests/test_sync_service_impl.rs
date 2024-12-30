@@ -19,9 +19,7 @@ use kamu::utils::simple_transfer_protocol::SimpleTransferProtocol;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
 use messaging_outbox::DummyOutboxImpl;
-use odf_dataset::{DatasetStorageUnit, DummyOdfServerAccessTokenResolver};
 use odf_dataset_impl::{DatasetFactoryImpl, IpfsGateway};
-use odf_metadata::*;
 use odf_storage_impl::testing::MetadataFactory;
 use test_utils::{HttpFileServer, LocalS3Server};
 use time_source::SystemTimeSourceDefault;
@@ -38,8 +36,8 @@ const FILE_DATA_ARRAY_SIZE: usize = 32;
 async fn assert_in_sync(
     dataset_repo_lhs: &DatasetStorageUnitLocalFs,
     dataset_repo_rhs: &DatasetStorageUnitLocalFs,
-    lhs: impl Into<DatasetRef>,
-    rhs: impl Into<DatasetRef>,
+    lhs: impl Into<odf::DatasetRef>,
+    rhs: impl Into<odf::DatasetRef>,
 ) {
     let lhs_layout = dataset_repo_lhs
         .get_dataset_layout(&lhs.into())
@@ -57,13 +55,13 @@ async fn assert_in_sync(
 async fn do_test_sync(
     tmp_workspace_dir_foo: &Path,
     tmp_workspace_dir_bar: &Path,
-    push_ref: &DatasetRefRemote,
-    pull_ref: &DatasetRefRemote,
+    push_ref: &odf::DatasetRefRemote,
+    pull_ref: &odf::DatasetRefRemote,
     ipfs: Option<(IpfsGateway, IpfsClient)>,
 ) {
     // Tests sync between "foo" -> remote -> "bar"
-    let dataset_alias_foo = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
-    let dataset_alias_bar = DatasetAlias::new(None, DatasetName::new_unchecked("bar"));
+    let dataset_alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let dataset_alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
     let is_ipfs = ipfs.is_none();
 
     let (ipfs_gateway, ipfs_client) = ipfs.unwrap_or_default();
@@ -80,12 +78,12 @@ async fn do_test_sync(
         .add_value(CurrentAccountSubject::new_test())
         .add_value(TenancyConfig::SingleTenant)
         .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir_foo))
-        .bind::<dyn DatasetStorageUnit, DatasetStorageUnitLocalFs>()
+        .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
         .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
         .add::<DatasetRegistrySoloUnitBridge>()
         .add_value(RemoteReposDir::new(tmp_workspace_dir_foo.join("repos")))
         .add::<RemoteRepositoryRegistryImpl>()
-        .add::<DummyOdfServerAccessTokenResolver>()
+        .add::<odf::dataset::DummyOdfServerAccessTokenResolver>()
         .add::<DatasetFactoryImpl>()
         .add::<SyncServiceImpl>()
         .add::<SyncRequestBuilder>()
@@ -102,12 +100,12 @@ async fn do_test_sync(
         .add_value(CurrentAccountSubject::new_test())
         .add_value(TenancyConfig::SingleTenant)
         .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir_bar))
-        .bind::<dyn DatasetStorageUnit, DatasetStorageUnitLocalFs>()
+        .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
         .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
         .add::<DatasetRegistrySoloUnitBridge>()
         .add_value(RemoteReposDir::new(tmp_workspace_dir_bar.join("repos")))
         .add::<RemoteRepositoryRegistryImpl>()
-        .add::<DummyOdfServerAccessTokenResolver>()
+        .add::<odf::dataset::DummyOdfServerAccessTokenResolver>()
         .add::<DatasetFactoryImpl>()
         .add::<SyncServiceImpl>()
         .add::<SyncRequestBuilder>()
@@ -145,7 +143,7 @@ async fn do_test_sync(
     // Add dataset
     let snapshot = MetadataFactory::dataset_snapshot()
         .name(dataset_alias_foo.clone())
-        .kind(DatasetKind::Root)
+        .kind(odf::DatasetKind::Root)
         .push_event(MetadataFactory::set_data_schema().build())
         .build();
 
@@ -589,8 +587,8 @@ async fn test_sync_to_from_local_fs() {
     do_test_sync(
         tmp_workspace_dir_foo.path(),
         tmp_workspace_dir_bar.path(),
-        &DatasetRefRemote::from(&repo_url),
-        &DatasetRefRemote::from(&repo_url),
+        &odf::DatasetRefRemote::from(&repo_url),
+        &odf::DatasetRefRemote::from(&repo_url),
         None,
     )
     .await;
@@ -608,8 +606,8 @@ async fn test_sync_to_from_s3() {
     do_test_sync(
         tmp_workspace_dir_foo.path(),
         tmp_workspace_dir_bar.path(),
-        &DatasetRefRemote::from(&s3.url),
-        &DatasetRefRemote::from(&s3.url),
+        &odf::DatasetRefRemote::from(&s3.url),
+        &odf::DatasetRefRemote::from(&s3.url),
         None,
     )
     .await;
@@ -633,8 +631,8 @@ async fn test_sync_from_http() {
     do_test_sync(
         tmp_workspace_dir_foo.path(),
         tmp_workspace_dir_bar.path(),
-        &DatasetRefRemote::from(push_repo_url),
-        &DatasetRefRemote::from(pull_repo_url),
+        &odf::DatasetRefRemote::from(push_repo_url),
+        &odf::DatasetRefRemote::from(pull_repo_url),
         None,
     )
     .await;
@@ -656,8 +654,8 @@ async fn test_sync_to_from_ipfs() {
     do_test_sync(
         tmp_workspace_dir_foo.path(),
         tmp_workspace_dir_bar.path(),
-        &DatasetRefRemote::from(&ipns_url),
-        &DatasetRefRemote::from(&ipns_url),
+        &odf::DatasetRefRemote::from(&ipns_url),
+        &odf::DatasetRefRemote::from(&ipns_url),
         Some((
             IpfsGateway {
                 url: Url::parse(&format!("http://127.0.0.1:{}", ipfs_daemon.http_port())).unwrap(),

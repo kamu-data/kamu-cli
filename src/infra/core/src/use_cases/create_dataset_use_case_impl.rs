@@ -18,8 +18,6 @@ use kamu_core::{
     MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
 };
 use messaging_outbox::{Outbox, OutboxExt};
-use odf_dataset::{CreateDatasetError, CreateDatasetResult};
-use odf_metadata::{DatasetAlias, MetadataBlockTyped, Seed};
 
 use crate::DatasetStorageUnitWriter;
 
@@ -52,10 +50,10 @@ impl CreateDatasetUseCase for CreateDatasetUseCaseImpl {
     #[tracing::instrument(level = "info", skip_all, fields(dataset_alias, ?seed_block, ?options))]
     async fn execute(
         &self,
-        dataset_alias: &DatasetAlias,
-        seed_block: MetadataBlockTyped<Seed>,
+        dataset_alias: &odf::DatasetAlias,
+        seed_block: odf::MetadataBlockTyped<odf::metadata::Seed>,
         options: CreateDatasetUseCaseOptions,
-    ) -> Result<CreateDatasetResult, CreateDatasetError> {
+    ) -> Result<odf::CreateDatasetResult, odf::dataset::CreateDatasetError> {
         let create_result = self
             .dataset_storage_unit_writer
             .create_dataset(dataset_alias, seed_block)

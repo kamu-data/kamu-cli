@@ -26,15 +26,12 @@ use kamu_core::{
     RemoteStatusService,
     StatusCheckError,
 };
-use odf_dataset::{BlockRef, DatasetFactory, MetadataChain};
-use odf_metadata as odf;
-use odf_storage::GetRefError;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct RemoteStatusServiceImpl {
     dataset_registry: Arc<dyn DatasetRegistry>,
-    dataset_factory: Arc<dyn DatasetFactory>,
+    dataset_factory: Arc<dyn odf::dataset::DatasetFactory>,
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
 }
 
@@ -43,7 +40,7 @@ pub struct RemoteStatusServiceImpl {
 impl RemoteStatusServiceImpl {
     pub fn new(
         dataset_registry: Arc<dyn DatasetRegistry>,
-        dataset_factory: Arc<dyn DatasetFactory>,
+        dataset_factory: Arc<dyn odf::dataset::DatasetFactory>,
         remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
     ) -> Self {
         Self {
@@ -55,7 +52,7 @@ impl RemoteStatusServiceImpl {
 
     async fn status(
         &self,
-        lhs_chain: &dyn MetadataChain,
+        lhs_chain: &dyn odf::MetadataChain,
         lhs_head: &odf::Multihash,
         alias: &odf::DatasetRefRemote,
     ) -> Result<CompareChainsResult, StatusCheckError> {
@@ -68,10 +65,12 @@ impl RemoteStatusServiceImpl {
             ));
         };
         let rhs_chain = rhs_ds.as_metadata_chain();
-        let rhs_head = match rhs_chain.resolve_ref(&BlockRef::Head).await {
+        let rhs_head = match rhs_chain.resolve_ref(&odf::BlockRef::Head).await {
             Ok(head) => head,
-            Err(GetRefError::Access(e)) => return Err(StatusCheckError::Access(e)),
-            Err(GetRefError::NotFound(_)) => return Err(StatusCheckError::RemoteDatasetNotFound),
+            Err(odf::storage::GetRefError::Access(e)) => return Err(StatusCheckError::Access(e)),
+            Err(odf::storage::GetRefError::NotFound(_)) => {
+                return Err(StatusCheckError::RemoteDatasetNotFound)
+            }
             Err(e) => return Err(StatusCheckError::Internal(e.int_err())),
         };
         let result = match MetadataChainComparator::compare_chains(
@@ -99,7 +98,10 @@ impl RemoteStatusService for RemoteStatusServiceImpl {
     ) -> Result<DatasetPushStatuses, InternalError> {
         let lhs_ds = self.dataset_registry.get_dataset_by_handle(dataset_handle);
         let lhs_chain = lhs_ds.as_metadata_chain();
-        let lhs_head = lhs_chain.resolve_ref(&BlockRef::Head).await.int_err()?;
+        let lhs_head = lhs_chain
+            .resolve_ref(&odf::BlockRef::Head)
+            .await
+            .int_err()?;
 
         let aliases = self
             .remote_alias_reg

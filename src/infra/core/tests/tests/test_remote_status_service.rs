@@ -27,16 +27,7 @@ use kamu::{
 };
 use kamu_core::utils::metadata_chain_comparator::CompareChainsResult;
 use kamu_core::*;
-use odf_dataset::{
-    AppendOpts,
-    BlockRef,
-    CreateDatasetResult,
-    DatasetVisibility,
-    DummyOdfServerAccessTokenResolver,
-    SetRefOpts,
-};
 use odf_dataset_impl::{DatasetFactoryImpl, IpfsGateway};
-use odf_metadata::*;
 use odf_storage_impl::testing::MetadataFactory;
 use url::Url;
 
@@ -77,7 +68,7 @@ async fn test_check_remotes_status_remote_behind() {
     let schema_block = RemoteStatusTestHarness::schema_block(head);
     let local_chain = local_ds.dataset.as_metadata_chain();
     let _ = local_chain
-        .append(schema_block, AppendOpts::default())
+        .append(schema_block, odf::dataset::AppendOpts::default())
         .await
         .unwrap();
 
@@ -109,7 +100,7 @@ async fn test_check_remotes_status_remote_ahead() {
     let schema_block = RemoteStatusTestHarness::schema_block(head);
     let local_chain = local_ds.dataset.as_metadata_chain();
     let _ = local_chain
-        .append(schema_block, AppendOpts::default())
+        .append(schema_block, odf::dataset::AppendOpts::default())
         .await
         .unwrap();
 
@@ -117,9 +108,9 @@ async fn test_check_remotes_status_remote_ahead() {
 
     local_chain
         .set_ref(
-            &BlockRef::Head,
+            &odf::BlockRef::Head,
             head,
-            SetRefOpts {
+            odf::dataset::SetRefOpts {
                 validate_block_present: true,
                 check_ref_is: None,
             },
@@ -155,7 +146,7 @@ async fn test_check_remotes_status_remote_diverge() {
     let schema_block = RemoteStatusTestHarness::schema_block(head);
     let local_chain = local_ds.dataset.as_metadata_chain();
     let _ = local_chain
-        .append(schema_block, AppendOpts::default())
+        .append(schema_block, odf::dataset::AppendOpts::default())
         .await
         .unwrap();
 
@@ -163,9 +154,9 @@ async fn test_check_remotes_status_remote_diverge() {
 
     local_chain
         .set_ref(
-            &BlockRef::Head,
+            &odf::BlockRef::Head,
             head,
-            SetRefOpts {
+            odf::dataset::SetRefOpts {
                 validate_block_present: true,
                 check_ref_is: None,
             },
@@ -186,7 +177,7 @@ async fn test_check_remotes_status_remote_diverge() {
     .build();
 
     let _ = local_chain
-        .append(diverge_schema_block, AppendOpts::default())
+        .append(diverge_schema_block, odf::dataset::AppendOpts::default())
         .await
         .unwrap();
 
@@ -256,7 +247,7 @@ impl RemoteStatusTestHarness {
             .add::<SyncRequestBuilder>()
             .add::<DatasetFactoryImpl>()
             .add::<RemoteAliasesRegistryImpl>()
-            .add::<DummyOdfServerAccessTokenResolver>()
+            .add::<odf::dataset::DummyOdfServerAccessTokenResolver>()
             .add_value(IpfsGateway::default())
             .add_value(IpfsClient::default())
             .add_value(RemoteReposDir::new(remote_repos_dir.clone()))
@@ -275,11 +266,11 @@ impl RemoteStatusTestHarness {
         }
     }
 
-    async fn create_dataset(&self) -> CreateDatasetResult {
-        let local_alias = DatasetAlias::new(None, DatasetName::new_unchecked("local"));
+    async fn create_dataset(&self) -> odf::CreateDatasetResult {
+        let local_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("local"));
 
         let seed_block =
-            MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build())
+            MetadataFactory::metadata_block(MetadataFactory::seed(odf::DatasetKind::Root).build())
                 .build_typed();
 
         self.dataset_storage_unit_writer()
@@ -288,9 +279,9 @@ impl RemoteStatusTestHarness {
             .unwrap()
     }
 
-    async fn push_dataset(&self, handle: &DatasetHandle) -> DatasetRefRemote {
+    async fn push_dataset(&self, handle: &odf::DatasetHandle) -> odf::DatasetRefRemote {
         let repo_url = Url::from_directory_path(self.remote_repos_dir.join("repo1")).unwrap();
-        let remote = DatasetRefRemote::from(&repo_url);
+        let remote = odf::DatasetRefRemote::from(&repo_url);
         let sync_request = self
             .sync_builder
             .build_sync_request(handle.alias.as_any_ref(), remote.as_any_ref(), true)
@@ -304,7 +295,7 @@ impl RemoteStatusTestHarness {
                     trust_source: None,
                     create_if_not_exists: false,
                     force: false,
-                    dataset_visibility: DatasetVisibility::Public,
+                    dataset_visibility: odf::DatasetVisibility::Public,
                 },
                 None,
             )
@@ -322,7 +313,7 @@ impl RemoteStatusTestHarness {
         remote
     }
 
-    fn schema_block(root_hash: &Multihash) -> MetadataBlock {
+    fn schema_block(root_hash: &odf::Multihash) -> odf::MetadataBlock {
         MetadataFactory::metadata_block(MetadataFactory::set_data_schema().build())
             .prev(root_hash, 0)
             .build()

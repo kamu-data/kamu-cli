@@ -19,7 +19,6 @@ use kamu::{
 use kamu_accounts::{CurrentAccountSubject, DEFAULT_ACCOUNT_NAME};
 use kamu_core::{CreateDatasetFromSnapshotUseCase, TenancyConfig};
 use messaging_outbox::{Outbox, OutboxImmediateImpl};
-use odf_dataset::DatasetStorageUnit;
 use s3_utils::S3Context;
 use test_utils::LocalS3Server;
 use time_source::SystemTimeSourceDefault;
@@ -53,7 +52,7 @@ impl S3StorageUnitHarness {
             .add_value(CurrentAccountSubject::new_test())
             .add_value(tenancy_config)
             .add_builder(DatasetStorageUnitS3::builder().with_s3_context(s3_context))
-            .bind::<dyn DatasetStorageUnit, DatasetStorageUnitS3>()
+            .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitS3>()
             .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitS3>()
             .add::<CreateDatasetFromSnapshotUseCaseImpl>();
 

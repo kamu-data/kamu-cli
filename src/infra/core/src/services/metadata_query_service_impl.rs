@@ -11,14 +11,6 @@ use chrono::{DateTime, Utc};
 use dill::*;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_core::*;
-use odf_dataset::{
-    MetadataChainExt,
-    SearchAddDataVisitor,
-    SearchSetPollingSourceVisitor,
-    SearchSetTransformVisitor,
-    TryStreamExtExt,
-};
-use odf_metadata::{self as odf, AsTypedBlock};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -37,14 +29,15 @@ impl MetadataQueryService for MetadataQueryServiceImpl {
     ) -> Result<
         Option<(
             odf::Multihash,
-            odf::MetadataBlockTyped<odf::SetPollingSource>,
+            odf::MetadataBlockTyped<odf::metadata::SetPollingSource>,
         )>,
         InternalError,
     > {
         // TODO: Support source evolution
+        use odf::dataset::MetadataChainExt;
         Ok(target
             .as_metadata_chain()
-            .accept_one(SearchSetPollingSourceVisitor::new())
+            .accept_one(odf::dataset::SearchSetPollingSourceVisitor::new())
             .await
             .int_err()?
             .into_hashed_block())
@@ -54,9 +47,16 @@ impl MetadataQueryService for MetadataQueryServiceImpl {
     async fn get_active_push_sources(
         &self,
         target: ResolvedDataset,
-    ) -> Result<Vec<(odf::Multihash, odf::MetadataBlockTyped<odf::AddPushSource>)>, InternalError>
-    {
+    ) -> Result<
+        Vec<(
+            odf::Multihash,
+            odf::MetadataBlockTyped<odf::metadata::AddPushSource>,
+        )>,
+        InternalError,
+    > {
         use futures::TryStreamExt;
+        use odf::dataset::{MetadataChainExt, TryStreamExtExt};
+        use odf::metadata::AsTypedBlock;
 
         // TODO: Support source disabling and evolution
         let stream = target
@@ -71,12 +71,18 @@ impl MetadataQueryService for MetadataQueryServiceImpl {
     async fn get_active_transform(
         &self,
         target: ResolvedDataset,
-    ) -> Result<Option<(odf::Multihash, odf::MetadataBlockTyped<odf::SetTransform>)>, InternalError>
-    {
+    ) -> Result<
+        Option<(
+            odf::Multihash,
+            odf::MetadataBlockTyped<odf::metadata::SetTransform>,
+        )>,
+        InternalError,
+    > {
         // TODO: Support transform evolution
+        use odf::dataset::MetadataChainExt;
         Ok(target
             .as_metadata_chain()
-            .accept_one(SearchSetTransformVisitor::new())
+            .accept_one(odf::dataset::SearchSetTransformVisitor::new())
             .await
             .int_err()?
             .into_hashed_block())
@@ -88,7 +94,8 @@ impl MetadataQueryService for MetadataQueryServiceImpl {
         &self,
         resolved_dataset: ResolvedDataset,
     ) -> Result<Option<DateTime<Utc>>, InternalError> {
-        let mut add_data_visitor = SearchAddDataVisitor::new();
+        use odf::dataset::MetadataChainExt;
+        let mut add_data_visitor = odf::dataset::SearchAddDataVisitor::new();
 
         resolved_dataset
             .as_metadata_chain()

@@ -13,8 +13,6 @@ use chrono::Utc;
 use kamu::testing::BaseRepoHarness;
 use kamu::DatasetChangesServiceImpl;
 use kamu_core::{DatasetChangesService, DatasetIntervalIncrement, TenancyConfig};
-use odf_dataset::CommitOpts;
-use odf_metadata::{Checkpoint, DatasetAlias, DatasetID, DatasetName, MetadataEvent, Multihash};
 use odf_storage_impl::testing::MetadataFactory;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -24,7 +22,10 @@ async fn test_initial_increment() {
     let harness = DatasetChangesHarness::new();
 
     let foo = harness
-        .create_root_dataset(&DatasetAlias::new(None, DatasetName::new_unchecked("foo")))
+        .create_root_dataset(&odf::DatasetAlias::new(
+            None,
+            odf::DatasetName::new_unchecked("foo"),
+        ))
         .await;
 
     // "foo" initially has Seed and SetPollingSource events
@@ -65,7 +66,10 @@ async fn test_no_changes_with_same_bounds() {
     let harness = DatasetChangesHarness::new();
 
     let foo = harness
-        .create_root_dataset(&DatasetAlias::new(None, DatasetName::new_unchecked("foo")))
+        .create_root_dataset(&odf::DatasetAlias::new(
+            None,
+            odf::DatasetName::new_unchecked("foo"),
+        ))
         .await;
 
     let increment_between = harness
@@ -90,7 +94,10 @@ async fn test_add_data_differences() {
     let harness = DatasetChangesHarness::new();
 
     let foo = harness
-        .create_root_dataset(&DatasetAlias::new(None, DatasetName::new_unchecked("foo")))
+        .create_root_dataset(&odf::DatasetAlias::new(
+            None,
+            odf::DatasetName::new_unchecked("foo"),
+        ))
         .await;
 
     // Commit SetDataSchema and 2 data nodes
@@ -98,8 +105,8 @@ async fn test_add_data_differences() {
     let commit_result_1 = foo
         .dataset
         .commit_event(
-            MetadataEvent::SetDataSchema(MetadataFactory::set_data_schema().build()),
-            CommitOpts::default(),
+            odf::MetadataEvent::SetDataSchema(MetadataFactory::set_data_schema().build()),
+            odf::dataset::CommitOpts::default(),
         )
         .await
         .unwrap();
@@ -109,17 +116,17 @@ async fn test_add_data_differences() {
     let commit_result_2 = foo
         .dataset
         .commit_event(
-            MetadataEvent::AddData(
+            odf::MetadataEvent::AddData(
                 MetadataFactory::add_data()
                     .some_new_data_with_offset(0, 9)
-                    .new_checkpoint(Some(Checkpoint {
-                        physical_hash: Multihash::from_digest_sha3_256(b"checkpoint-1"),
+                    .new_checkpoint(Some(odf::Checkpoint {
+                        physical_hash: odf::Multihash::from_digest_sha3_256(b"checkpoint-1"),
                         size: 1,
                     }))
                     .some_new_source_state()
                     .build(),
             ),
-            CommitOpts {
+            odf::dataset::CommitOpts {
                 check_object_refs: false,
                 ..Default::default()
             },
@@ -130,19 +137,19 @@ async fn test_add_data_differences() {
     let commit_result_3 = foo
         .dataset
         .commit_event(
-            MetadataEvent::AddData(
+            odf::MetadataEvent::AddData(
                 MetadataFactory::add_data()
                     .some_new_data_with_offset(10, 14)
-                    .prev_checkpoint(Some(Multihash::from_digest_sha3_256(b"checkpoint-1")))
-                    .new_checkpoint(Some(Checkpoint {
-                        physical_hash: Multihash::from_digest_sha3_256(b"checkpoint-2"),
+                    .prev_checkpoint(Some(odf::Multihash::from_digest_sha3_256(b"checkpoint-1")))
+                    .new_checkpoint(Some(odf::Checkpoint {
+                        physical_hash: odf::Multihash::from_digest_sha3_256(b"checkpoint-2"),
                         size: 1,
                     }))
                     .new_watermark(Some(new_watermark_time))
                     .some_new_source_state()
                     .build(),
             ),
-            CommitOpts {
+            odf::dataset::CommitOpts {
                 check_object_refs: false,
                 ..Default::default()
             },
@@ -161,7 +168,7 @@ async fn test_add_data_differences() {
                 updated_watermark: None,
             },
         ),
-        // SetDataSchema -> AddData #1
+        // SetDataSchema -> odf::metadata::AddData #1
         (
             Some(&commit_result_1.new_head),
             &commit_result_2.new_head,
@@ -171,7 +178,7 @@ async fn test_add_data_differences() {
                 updated_watermark: None,
             },
         ),
-        // AddData #1 -> AddData #2
+        // odf::metadata::AddData #1 -> odf::metadata::AddData #2
         (
             Some(&commit_result_2.new_head),
             &commit_result_3.new_head,
@@ -181,7 +188,7 @@ async fn test_add_data_differences() {
                 updated_watermark: Some(new_watermark_time),
             },
         ),
-        // SetDataSchema -> AddData #2
+        // SetDataSchema -> odf::metadata::AddData #2
         (
             Some(&commit_result_1.new_head),
             &commit_result_3.new_head,
@@ -191,7 +198,7 @@ async fn test_add_data_differences() {
                 updated_watermark: Some(new_watermark_time),
             },
         ),
-        // SetPollingSource -> AddData #1
+        // SetPollingSource -> odf::metadata::AddData #1
         (
             Some(commit_result_1.old_head.as_ref().unwrap()),
             &commit_result_2.new_head,
@@ -201,7 +208,7 @@ async fn test_add_data_differences() {
                 updated_watermark: None,
             },
         ),
-        // SetPollingSource -> AddData #2
+        // SetPollingSource -> odf::metadata::AddData #2
         (
             Some(commit_result_1.old_head.as_ref().unwrap()),
             &commit_result_3.new_head,
@@ -211,7 +218,7 @@ async fn test_add_data_differences() {
                 updated_watermark: Some(new_watermark_time),
             },
         ),
-        // Initial -> AddData #2
+        // Initial -> odf::metadata::AddData #2
         (
             None,
             &commit_result_3.new_head,
@@ -255,7 +262,7 @@ async fn test_add_data_differences() {
                 updated_watermark: Some(new_watermark_time),
             },
         ),
-        // Since AddData #1
+        // Since odf::metadata::AddData #1
         (
             Some(&commit_result_2.new_head),
             DatasetIntervalIncrement {
@@ -278,11 +285,14 @@ async fn test_execute_transform_differences() {
     let harness = DatasetChangesHarness::new();
 
     let foo = harness
-        .create_root_dataset(&DatasetAlias::new(None, DatasetName::new_unchecked("foo")))
+        .create_root_dataset(&odf::DatasetAlias::new(
+            None,
+            odf::DatasetName::new_unchecked("foo"),
+        ))
         .await;
     let bar = harness
         .create_derived_dataset(
-            &DatasetAlias::new(None, DatasetName::new_unchecked("bar")),
+            &odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar")),
             vec![foo.dataset_handle.as_local_ref()],
         )
         .await;
@@ -294,8 +304,8 @@ async fn test_execute_transform_differences() {
     let commit_result_1 = bar
         .dataset
         .commit_event(
-            MetadataEvent::SetDataSchema(MetadataFactory::set_data_schema().build()),
-            CommitOpts::default(),
+            odf::MetadataEvent::SetDataSchema(MetadataFactory::set_data_schema().build()),
+            odf::dataset::CommitOpts::default(),
         )
         .await
         .unwrap();
@@ -303,17 +313,17 @@ async fn test_execute_transform_differences() {
     let commit_result_2 = bar
         .dataset
         .commit_event(
-            MetadataEvent::ExecuteTransform(
+            odf::MetadataEvent::ExecuteTransform(
                 MetadataFactory::execute_transform()
                     .empty_query_inputs_from_particular_ids([foo.dataset_handle.id.clone()])
                     .some_new_data_with_offset(0, 14)
-                    .new_checkpoint(Some(Checkpoint {
-                        physical_hash: Multihash::from_digest_sha3_256(b"checkpoint-1"),
+                    .new_checkpoint(Some(odf::Checkpoint {
+                        physical_hash: odf::Multihash::from_digest_sha3_256(b"checkpoint-1"),
                         size: 1,
                     }))
                     .build(),
             ),
-            CommitOpts {
+            odf::dataset::CommitOpts {
                 check_object_refs: false,
                 ..Default::default()
             },
@@ -324,19 +334,19 @@ async fn test_execute_transform_differences() {
     let commit_result_3 = bar
         .dataset
         .commit_event(
-            MetadataEvent::ExecuteTransform(
+            odf::MetadataEvent::ExecuteTransform(
                 MetadataFactory::execute_transform()
                     .empty_query_inputs_from_particular_ids([foo.dataset_handle.id.clone()])
                     .some_new_data_with_offset(15, 19)
-                    .prev_checkpoint(Some(Multihash::from_digest_sha3_256(b"checkpoint-1")))
-                    .new_checkpoint(Some(Checkpoint {
-                        physical_hash: Multihash::from_digest_sha3_256(b"checkpoint-2"),
+                    .prev_checkpoint(Some(odf::Multihash::from_digest_sha3_256(b"checkpoint-1")))
+                    .new_checkpoint(Some(odf::Checkpoint {
+                        physical_hash: odf::Multihash::from_digest_sha3_256(b"checkpoint-2"),
                         size: 1,
                     }))
                     .new_watermark(Some(new_watermark_time))
                     .build(),
             ),
-            CommitOpts {
+            odf::dataset::CommitOpts {
                 check_object_refs: false,
                 ..Default::default()
             },
@@ -472,7 +482,10 @@ async fn test_multiple_watermarks_within_interval() {
     let harness = DatasetChangesHarness::new();
 
     let foo = harness
-        .create_root_dataset(&DatasetAlias::new(None, DatasetName::new_unchecked("foo")))
+        .create_root_dataset(&odf::DatasetAlias::new(
+            None,
+            odf::DatasetName::new_unchecked("foo"),
+        ))
         .await;
 
     // Commit SetDataSchema and 2 data nodes each having a watermark
@@ -480,8 +493,8 @@ async fn test_multiple_watermarks_within_interval() {
     let commit_result_1 = foo
         .dataset
         .commit_event(
-            MetadataEvent::SetDataSchema(MetadataFactory::set_data_schema().build()),
-            CommitOpts::default(),
+            odf::MetadataEvent::SetDataSchema(MetadataFactory::set_data_schema().build()),
+            odf::dataset::CommitOpts::default(),
         )
         .await
         .unwrap();
@@ -491,18 +504,18 @@ async fn test_multiple_watermarks_within_interval() {
     let commit_result_2 = foo
         .dataset
         .commit_event(
-            MetadataEvent::AddData(
+            odf::MetadataEvent::AddData(
                 MetadataFactory::add_data()
                     .some_new_data_with_offset(0, 9)
-                    .new_checkpoint(Some(Checkpoint {
-                        physical_hash: Multihash::from_digest_sha3_256(b"checkpoint-1"),
+                    .new_checkpoint(Some(odf::Checkpoint {
+                        physical_hash: odf::Multihash::from_digest_sha3_256(b"checkpoint-1"),
                         size: 1,
                     }))
                     .new_watermark(Some(watermark_1_time))
                     .some_new_source_state()
                     .build(),
             ),
-            CommitOpts {
+            odf::dataset::CommitOpts {
                 check_object_refs: false,
                 ..Default::default()
             },
@@ -515,19 +528,19 @@ async fn test_multiple_watermarks_within_interval() {
     let commit_result_3 = foo
         .dataset
         .commit_event(
-            MetadataEvent::AddData(
+            odf::MetadataEvent::AddData(
                 MetadataFactory::add_data()
                     .some_new_data_with_offset(10, 24)
-                    .prev_checkpoint(Some(Multihash::from_digest_sha3_256(b"checkpoint-1")))
-                    .new_checkpoint(Some(Checkpoint {
-                        physical_hash: Multihash::from_digest_sha3_256(b"checkpoint-2"),
+                    .prev_checkpoint(Some(odf::Multihash::from_digest_sha3_256(b"checkpoint-1")))
+                    .new_checkpoint(Some(odf::Checkpoint {
+                        physical_hash: odf::Multihash::from_digest_sha3_256(b"checkpoint-2"),
                         size: 1,
                     }))
                     .new_watermark(Some(watermark_2_time))
                     .some_new_source_state()
                     .build(),
             ),
-            CommitOpts {
+            odf::dataset::CommitOpts {
                 check_object_refs: false,
                 ..Default::default()
             },
@@ -546,7 +559,7 @@ async fn test_multiple_watermarks_within_interval() {
                 updated_watermark: None,
             },
         ),
-        // SetDataSchema -> AddData #1
+        // SetDataSchema -> odf::metadata::AddData #1
         (
             Some(commit_result_2.old_head.as_ref().unwrap()),
             &commit_result_2.new_head,
@@ -556,7 +569,7 @@ async fn test_multiple_watermarks_within_interval() {
                 updated_watermark: Some(watermark_1_time),
             },
         ),
-        // AddData #1 -> AddData #2
+        // odf::metadata::AddData #1 -> odf::metadata::AddData #2
         (
             Some(commit_result_3.old_head.as_ref().unwrap()),
             &commit_result_3.new_head,
@@ -566,7 +579,7 @@ async fn test_multiple_watermarks_within_interval() {
                 updated_watermark: Some(watermark_2_time),
             },
         ),
-        // Initial -> AddData #2
+        // Initial -> odf::metadata::AddData #2
         (
             None,
             &commit_result_3.new_head,
@@ -592,7 +605,7 @@ async fn test_multiple_watermarks_within_interval() {
                 updated_watermark: Some(watermark_2_time),
             },
         ),
-        // Since AddData #1
+        // Since odf::metadata::AddData #1
         (
             Some(&commit_result_2.new_head),
             DatasetIntervalIncrement {
@@ -615,15 +628,18 @@ async fn test_older_watermark_before_interval() {
     let harness = DatasetChangesHarness::new();
 
     let foo = harness
-        .create_root_dataset(&DatasetAlias::new(None, DatasetName::new_unchecked("foo")))
+        .create_root_dataset(&odf::DatasetAlias::new(
+            None,
+            odf::DatasetName::new_unchecked("foo"),
+        ))
         .await;
 
     // Commit SetDataSchema and 3 data nodes, with #1,3 containing watermark
 
     foo.dataset
         .commit_event(
-            MetadataEvent::SetDataSchema(MetadataFactory::set_data_schema().build()),
-            CommitOpts::default(),
+            odf::MetadataEvent::SetDataSchema(MetadataFactory::set_data_schema().build()),
+            odf::dataset::CommitOpts::default(),
         )
         .await
         .unwrap();
@@ -633,18 +649,18 @@ async fn test_older_watermark_before_interval() {
     let commit_result_2 = foo
         .dataset
         .commit_event(
-            MetadataEvent::AddData(
+            odf::MetadataEvent::AddData(
                 MetadataFactory::add_data()
                     .some_new_data_with_offset(0, 9)
-                    .new_checkpoint(Some(Checkpoint {
-                        physical_hash: Multihash::from_digest_sha3_256(b"checkpoint-1"),
+                    .new_checkpoint(Some(odf::Checkpoint {
+                        physical_hash: odf::Multihash::from_digest_sha3_256(b"checkpoint-1"),
                         size: 1,
                     }))
                     .new_watermark(Some(watermark_1_time))
                     .some_new_source_state()
                     .build(),
             ),
-            CommitOpts {
+            odf::dataset::CommitOpts {
                 check_object_refs: false,
                 ..Default::default()
             },
@@ -655,19 +671,19 @@ async fn test_older_watermark_before_interval() {
     let commit_result_3 = foo
         .dataset
         .commit_event(
-            MetadataEvent::AddData(
+            odf::MetadataEvent::AddData(
                 MetadataFactory::add_data()
                     .some_new_data_with_offset(10, 24)
-                    .prev_checkpoint(Some(Multihash::from_digest_sha3_256(b"checkpoint-1")))
-                    .new_checkpoint(Some(Checkpoint {
-                        physical_hash: Multihash::from_digest_sha3_256(b"checkpoint-2"),
+                    .prev_checkpoint(Some(odf::Multihash::from_digest_sha3_256(b"checkpoint-1")))
+                    .new_checkpoint(Some(odf::Checkpoint {
+                        physical_hash: odf::Multihash::from_digest_sha3_256(b"checkpoint-2"),
                         size: 1,
                     }))
                     .new_watermark(Some(watermark_1_time))
                     .some_new_source_state()
                     .build(),
             ),
-            CommitOpts {
+            odf::dataset::CommitOpts {
                 check_object_refs: false,
                 ..Default::default()
             },
@@ -680,19 +696,19 @@ async fn test_older_watermark_before_interval() {
     let commit_result_4 = foo
         .dataset
         .commit_event(
-            MetadataEvent::AddData(
+            odf::MetadataEvent::AddData(
                 MetadataFactory::add_data()
                     .some_new_data_with_offset(25, 36)
-                    .prev_checkpoint(Some(Multihash::from_digest_sha3_256(b"checkpoint-2")))
-                    .new_checkpoint(Some(Checkpoint {
-                        physical_hash: Multihash::from_digest_sha3_256(b"checkpoint-3"),
+                    .prev_checkpoint(Some(odf::Multihash::from_digest_sha3_256(b"checkpoint-2")))
+                    .new_checkpoint(Some(odf::Checkpoint {
+                        physical_hash: odf::Multihash::from_digest_sha3_256(b"checkpoint-3"),
                         size: 1,
                     }))
                     .new_watermark(Some(watermark_2_time))
                     .some_new_source_state()
                     .build(),
             ),
-            CommitOpts {
+            odf::dataset::CommitOpts {
                 check_object_refs: false,
                 ..Default::default()
             },
@@ -701,7 +717,7 @@ async fn test_older_watermark_before_interval() {
         .unwrap();
 
     let between_cases = [
-        // SetDataSchema -> AddData #1
+        // SetDataSchema -> odf::metadata::AddData #1
         (
             Some(commit_result_2.old_head.as_ref().unwrap()),
             &commit_result_2.new_head,
@@ -711,7 +727,7 @@ async fn test_older_watermark_before_interval() {
                 updated_watermark: Some(watermark_1_time),
             },
         ),
-        // AddData #1 -> AddData #2
+        // odf::metadata::AddData #1 -> odf::metadata::AddData #2
         (
             Some(commit_result_3.old_head.as_ref().unwrap()),
             &commit_result_3.new_head,
@@ -721,7 +737,7 @@ async fn test_older_watermark_before_interval() {
                 updated_watermark: None,
             },
         ),
-        // AddData #2 -> AddData #3
+        // odf::metadata::AddData #2 -> odf::metadata::AddData #3
         (
             Some(commit_result_4.old_head.as_ref().unwrap()),
             &commit_result_4.new_head,
@@ -731,7 +747,7 @@ async fn test_older_watermark_before_interval() {
                 updated_watermark: Some(watermark_2_time),
             },
         ),
-        // Initial -> AddData #2
+        // Initial -> odf::metadata::AddData #2
         (
             None,
             &commit_result_3.new_head,
@@ -741,7 +757,7 @@ async fn test_older_watermark_before_interval() {
                 updated_watermark: Some(watermark_1_time),
             },
         ),
-        // Initial -> AddData #3
+        // Initial -> odf::metadata::AddData #3
         (
             None,
             &commit_result_4.new_head,
@@ -767,7 +783,7 @@ async fn test_older_watermark_before_interval() {
                 updated_watermark: Some(watermark_2_time),
             },
         ),
-        // Since AddData #1
+        // Since odf::metadata::AddData #1
         (
             Some(&commit_result_2.new_head),
             DatasetIntervalIncrement {
@@ -809,8 +825,12 @@ impl DatasetChangesHarness {
 
     async fn check_between_cases(
         &self,
-        dataset_id: &DatasetID,
-        between_cases: &[(Option<&Multihash>, &Multihash, DatasetIntervalIncrement)],
+        dataset_id: &odf::DatasetID,
+        between_cases: &[(
+            Option<&odf::Multihash>,
+            &odf::Multihash,
+            DatasetIntervalIncrement,
+        )],
     ) {
         for (index, (old_head, new_head, expected_increment)) in between_cases.iter().enumerate() {
             assert_eq!(
@@ -826,8 +846,8 @@ impl DatasetChangesHarness {
 
     async fn check_since_cases(
         &self,
-        dataset_id: &DatasetID,
-        since_cases: &[(Option<&Multihash>, DatasetIntervalIncrement)],
+        dataset_id: &odf::DatasetID,
+        since_cases: &[(Option<&odf::Multihash>, DatasetIntervalIncrement)],
     ) {
         for (index, (old_head, expected_increment)) in since_cases.iter().enumerate() {
             assert_eq!(

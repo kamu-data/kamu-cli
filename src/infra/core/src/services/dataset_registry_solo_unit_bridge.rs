@@ -16,19 +16,17 @@ use kamu_core::{
     GetMultipleDatasetsError,
     ResolvedDataset,
 };
-use odf_dataset::{DatasetHandleStream, DatasetStorageUnit, GetDatasetError};
-use odf_metadata::{AccountName, DatasetHandle, DatasetID, DatasetRef};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct DatasetRegistrySoloUnitBridge {
-    dataset_storage_unit: Arc<dyn DatasetStorageUnit>,
+    dataset_storage_unit: Arc<dyn odf::DatasetStorageUnit>,
 }
 
 #[component(pub)]
 #[interface(dyn DatasetRegistry)]
 impl DatasetRegistrySoloUnitBridge {
-    pub fn new(dataset_storage_unit: Arc<dyn DatasetStorageUnit>) -> Self {
+    pub fn new(dataset_storage_unit: Arc<dyn odf::DatasetStorageUnit>) -> Self {
         Self {
             dataset_storage_unit,
         }
@@ -37,19 +35,22 @@ impl DatasetRegistrySoloUnitBridge {
 
 #[async_trait::async_trait]
 impl DatasetRegistry for DatasetRegistrySoloUnitBridge {
-    fn all_dataset_handles(&self) -> DatasetHandleStream<'_> {
+    fn all_dataset_handles(&self) -> odf::dataset::DatasetHandleStream<'_> {
         self.dataset_storage_unit.stored_dataset_handles()
     }
 
-    fn all_dataset_handles_by_owner(&self, owner_name: &AccountName) -> DatasetHandleStream<'_> {
+    fn all_dataset_handles_by_owner(
+        &self,
+        owner_name: &odf::AccountName,
+    ) -> odf::dataset::DatasetHandleStream<'_> {
         self.dataset_storage_unit
             .stored_dataset_handles_by_owner(owner_name)
     }
 
     async fn resolve_dataset_handle_by_ref(
         &self,
-        dataset_ref: &DatasetRef,
-    ) -> Result<DatasetHandle, GetDatasetError> {
+        dataset_ref: &odf::DatasetRef,
+    ) -> Result<odf::DatasetHandle, odf::dataset::GetDatasetError> {
         self.dataset_storage_unit
             .resolve_stored_dataset_handle_by_ref(dataset_ref)
             .await
@@ -57,7 +58,7 @@ impl DatasetRegistry for DatasetRegistrySoloUnitBridge {
 
     async fn resolve_multiple_dataset_handles_by_ids(
         &self,
-        dataset_ids: Vec<DatasetID>,
+        dataset_ids: Vec<odf::DatasetID>,
     ) -> Result<DatasetHandlesResolution, GetMultipleDatasetsError> {
         let mut res: DatasetHandlesResolution = Default::default();
 
@@ -73,7 +74,7 @@ impl DatasetRegistry for DatasetRegistrySoloUnitBridge {
         Ok(res)
     }
 
-    fn get_dataset_by_handle(&self, dataset_handle: &DatasetHandle) -> ResolvedDataset {
+    fn get_dataset_by_handle(&self, dataset_handle: &odf::DatasetHandle) -> ResolvedDataset {
         let dataset = self
             .dataset_storage_unit
             .get_stored_dataset_by_handle(dataset_handle);

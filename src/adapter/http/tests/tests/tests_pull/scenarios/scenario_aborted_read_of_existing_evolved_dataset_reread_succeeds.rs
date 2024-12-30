@@ -30,7 +30,7 @@ pub(crate) struct SmartPullAbortedReadOfExistingEvolvedRereadSucceedsScenario<
     pub server_dataset_layout: DatasetLayout,
     pub client_dataset_layout: DatasetLayout,
     pub server_dataset_ref: odf::DatasetRefRemote,
-    pub server_create_result: odf::dataset::CreateDatasetResult,
+    pub server_create_result: odf::CreateDatasetResult,
     pub server_commit_result: odf::dataset::CommitResult,
 }
 

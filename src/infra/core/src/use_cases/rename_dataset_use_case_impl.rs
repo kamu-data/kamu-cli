@@ -19,8 +19,6 @@ use kamu_core::{
     MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
 };
 use messaging_outbox::{Outbox, OutboxExt};
-use odf_dataset::{GetDatasetError, RenameDatasetError};
-use odf_metadata::{DatasetName, DatasetRef};
 
 use crate::DatasetStorageUnitWriter;
 
@@ -64,9 +62,9 @@ impl RenameDatasetUseCase for RenameDatasetUseCaseImpl {
     )]
     async fn execute(
         &self,
-        dataset_ref: &DatasetRef,
-        new_name: &DatasetName,
-    ) -> Result<(), RenameDatasetError> {
+        dataset_ref: &odf::DatasetRef,
+        new_name: &odf::DatasetName,
+    ) -> Result<(), odf::dataset::RenameDatasetError> {
         let owner_account_id = match self.current_account_subject.as_ref() {
             CurrentAccountSubject::Anonymous(_) => {
                 panic!("Anonymous account cannot rename dataset");
@@ -79,16 +77,24 @@ impl RenameDatasetUseCase for RenameDatasetUseCaseImpl {
             .await
         {
             Ok(h) => Ok(h),
-            Err(GetDatasetError::NotFound(e)) => Err(RenameDatasetError::NotFound(e)),
-            Err(GetDatasetError::Internal(e)) => Err(RenameDatasetError::Internal(e)),
+            Err(odf::dataset::GetDatasetError::NotFound(e)) => {
+                Err(odf::dataset::RenameDatasetError::NotFound(e))
+            }
+            Err(odf::dataset::GetDatasetError::Internal(e)) => {
+                Err(odf::dataset::RenameDatasetError::Internal(e))
+            }
         }?;
 
         self.dataset_action_authorizer
             .check_action_allowed(&dataset_handle, DatasetAction::Write)
             .await
             .map_err(|e| match e {
-                DatasetActionUnauthorizedError::Access(e) => RenameDatasetError::Access(e),
-                DatasetActionUnauthorizedError::Internal(e) => RenameDatasetError::Internal(e),
+                DatasetActionUnauthorizedError::Access(e) => {
+                    odf::dataset::RenameDatasetError::Access(e)
+                }
+                DatasetActionUnauthorizedError::Internal(e) => {
+                    odf::dataset::RenameDatasetError::Internal(e)
+                }
             })?;
 
         let old_name = dataset_handle.alias.dataset_name.clone();

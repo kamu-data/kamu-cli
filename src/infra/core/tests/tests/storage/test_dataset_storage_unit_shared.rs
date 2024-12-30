@@ -13,19 +13,18 @@ use itertools::Itertools;
 use kamu::DatasetStorageUnitWriter;
 use kamu_accounts::DEFAULT_ACCOUNT_NAME;
 use kamu_core::CreateDatasetFromSnapshotUseCase;
-use odf_dataset::*;
-use odf_metadata::*;
 use odf_storage_impl::testing::MetadataFactory;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_create_dataset<
-    TDatasetStorageUnit: DatasetStorageUnit + DatasetStorageUnitWriter,
+    TDatasetStorageUnit: odf::DatasetStorageUnit + DatasetStorageUnitWriter,
 >(
     storage_unit: &TDatasetStorageUnit,
-    account_name: Option<AccountName>,
+    account_name: Option<odf::AccountName>,
 ) {
-    let dataset_alias = DatasetAlias::new(account_name, DatasetName::new_unchecked("foo"));
+    let dataset_alias =
+        odf::DatasetAlias::new(account_name, odf::DatasetName::new_unchecked("foo"));
 
     assert_matches!(
         storage_unit
@@ -33,13 +32,13 @@ pub async fn test_create_dataset<
             .await
             .err()
             .unwrap(),
-        GetDatasetError::NotFound(_)
+        odf::dataset::GetDatasetError::NotFound(_)
     );
 
     let create_result = storage_unit
         .create_dataset(
             &dataset_alias,
-            MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build())
+            MetadataFactory::metadata_block(MetadataFactory::seed(odf::DatasetKind::Root).build())
                 .build_typed(),
         )
         .await
@@ -57,27 +56,27 @@ pub async fn test_create_dataset<
     let create_result = storage_unit
         .create_dataset(
             &dataset_alias,
-            MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build())
+            MetadataFactory::metadata_block(MetadataFactory::seed(odf::DatasetKind::Root).build())
                 .build_typed(),
         )
         .await;
 
     assert_matches!(
         create_result.err(),
-        Some(CreateDatasetError::NameCollision(_))
+        Some(odf::dataset::CreateDatasetError::NameCollision(_))
     );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_create_and_get_case_insensetive_dataset<
-    TDatasetStorageUnit: DatasetStorageUnit + DatasetStorageUnitWriter,
+    TDatasetStorageUnit: odf::DatasetStorageUnit + DatasetStorageUnitWriter,
 >(
     storage_unit: &TDatasetStorageUnit,
-    account_name: Option<AccountName>,
+    account_name: Option<odf::AccountName>,
 ) {
     let dataset_alias_to_create =
-        DatasetAlias::new(account_name.clone(), DatasetName::new_unchecked("Foo"));
+        odf::DatasetAlias::new(account_name.clone(), odf::DatasetName::new_unchecked("Foo"));
 
     assert_matches!(
         storage_unit
@@ -85,13 +84,13 @@ pub async fn test_create_and_get_case_insensetive_dataset<
             .await
             .err()
             .unwrap(),
-        GetDatasetError::NotFound(_)
+        odf::dataset::GetDatasetError::NotFound(_)
     );
 
     let create_result = storage_unit
         .create_dataset(
             &dataset_alias_to_create,
-            MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build())
+            MetadataFactory::metadata_block(MetadataFactory::seed(odf::DatasetKind::Root).build())
                 .build_typed(),
         )
         .await
@@ -100,11 +99,13 @@ pub async fn test_create_and_get_case_insensetive_dataset<
     assert_eq!(create_result.dataset_handle.alias, dataset_alias_to_create);
 
     let account_name_uppercase = account_name.clone().map(|account_name_value| {
-        AccountName::new_unchecked(&account_name_value.to_ascii_uppercase())
+        odf::AccountName::new_unchecked(&account_name_value.to_ascii_uppercase())
     });
 
-    let dataset_alias_in_another_registry =
-        DatasetAlias::new(account_name_uppercase, DatasetName::new_unchecked("foO"));
+    let dataset_alias_in_another_registry = odf::DatasetAlias::new(
+        account_name_uppercase,
+        odf::DatasetName::new_unchecked("foO"),
+    );
 
     // We should see the dataset
     assert!(storage_unit
@@ -114,16 +115,16 @@ pub async fn test_create_and_get_case_insensetive_dataset<
 
     // Test creation another dataset for existing account with different symbols
     // registry
-    let new_dataset_alias_to_create = DatasetAlias::new(
+    let new_dataset_alias_to_create = odf::DatasetAlias::new(
         account_name
             .clone()
-            .map(|a| AccountName::new_unchecked(a.to_uppercase().as_str())),
-        DatasetName::new_unchecked("BaR"),
+            .map(|a| odf::AccountName::new_unchecked(a.to_uppercase().as_str())),
+        odf::DatasetName::new_unchecked("BaR"),
     );
 
     let snapshot = MetadataFactory::dataset_snapshot()
         .name(new_dataset_alias_to_create.clone())
-        .kind(DatasetKind::Root)
+        .kind(odf::DatasetKind::Root)
         .push_event(MetadataFactory::set_polling_source().build())
         .build();
 
@@ -147,31 +148,31 @@ pub async fn test_create_and_get_case_insensetive_dataset<
     let create_result = storage_unit
         .create_dataset(
             &dataset_alias_in_another_registry,
-            MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build())
+            MetadataFactory::metadata_block(MetadataFactory::seed(odf::DatasetKind::Root).build())
                 .build_typed(),
         )
         .await;
 
     assert_matches!(
         create_result.err(),
-        Some(CreateDatasetError::NameCollision(_))
+        Some(odf::dataset::CreateDatasetError::NameCollision(_))
     );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_create_dataset_same_name_multiple_tenants<
-    TDatasetStorageUnit: DatasetStorageUnit + DatasetStorageUnitWriter,
+    TDatasetStorageUnit: odf::DatasetStorageUnit + DatasetStorageUnitWriter,
 >(
     storage_unit: &TDatasetStorageUnit,
 ) {
-    let dataset_alias_my = DatasetAlias::new(
-        Some(AccountName::new_unchecked("my")),
-        DatasetName::new_unchecked("foo"),
+    let dataset_alias_my = odf::DatasetAlias::new(
+        Some(odf::AccountName::new_unchecked("my")),
+        odf::DatasetName::new_unchecked("foo"),
     );
-    let dataset_alias_her = DatasetAlias::new(
-        Some(AccountName::new_unchecked("her")),
-        DatasetName::new_unchecked("foo"),
+    let dataset_alias_her = odf::DatasetAlias::new(
+        Some(odf::AccountName::new_unchecked("her")),
+        odf::DatasetName::new_unchecked("foo"),
     );
 
     assert_matches!(
@@ -180,7 +181,7 @@ pub async fn test_create_dataset_same_name_multiple_tenants<
             .await
             .err()
             .unwrap(),
-        GetDatasetError::NotFound(_)
+        odf::dataset::GetDatasetError::NotFound(_)
     );
 
     assert_matches!(
@@ -189,18 +190,18 @@ pub async fn test_create_dataset_same_name_multiple_tenants<
             .await
             .err()
             .unwrap(),
-        GetDatasetError::NotFound(_)
+        odf::dataset::GetDatasetError::NotFound(_)
     );
 
     let snapshot_my = MetadataFactory::dataset_snapshot()
         .name(dataset_alias_my.clone())
-        .kind(DatasetKind::Root)
+        .kind(odf::DatasetKind::Root)
         .push_event(MetadataFactory::set_polling_source().build())
         .build();
 
     let snapshot_her = MetadataFactory::dataset_snapshot()
         .name(dataset_alias_her.clone())
-        .kind(DatasetKind::Root)
+        .kind(odf::DatasetKind::Root)
         .push_event(MetadataFactory::set_polling_source().build())
         .build();
 
@@ -235,7 +236,7 @@ pub async fn test_create_dataset_same_name_multiple_tenants<
     let create_result_my = storage_unit
         .create_dataset(
             &dataset_alias_my,
-            MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build())
+            MetadataFactory::metadata_block(MetadataFactory::seed(odf::DatasetKind::Root).build())
                 .build_typed(),
         )
         .await;
@@ -243,31 +244,32 @@ pub async fn test_create_dataset_same_name_multiple_tenants<
     let create_result_her = storage_unit
         .create_dataset(
             &dataset_alias_her,
-            MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build())
+            MetadataFactory::metadata_block(MetadataFactory::seed(odf::DatasetKind::Root).build())
                 .build_typed(),
         )
         .await;
 
     assert_matches!(
         create_result_my.err(),
-        Some(CreateDatasetError::NameCollision(_))
+        Some(odf::dataset::CreateDatasetError::NameCollision(_))
     );
 
     assert_matches!(
         create_result_her.err(),
-        Some(CreateDatasetError::NameCollision(_))
+        Some(odf::dataset::CreateDatasetError::NameCollision(_))
     );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_create_dataset_from_snapshot<
-    TDatasetStorageUnit: DatasetStorageUnit + DatasetStorageUnitWriter,
+    TDatasetStorageUnit: odf::DatasetStorageUnit + DatasetStorageUnitWriter,
 >(
     storage_unit: &TDatasetStorageUnit,
-    account_name: Option<AccountName>,
+    account_name: Option<odf::AccountName>,
 ) {
-    let dataset_alias = DatasetAlias::new(account_name.clone(), DatasetName::new_unchecked("foo"));
+    let dataset_alias =
+        odf::DatasetAlias::new(account_name.clone(), odf::DatasetName::new_unchecked("foo"));
 
     assert_matches!(
         storage_unit
@@ -275,12 +277,12 @@ pub async fn test_create_dataset_from_snapshot<
             .await
             .err()
             .unwrap(),
-        GetDatasetError::NotFound(_)
+        odf::dataset::GetDatasetError::NotFound(_)
     );
 
     let snapshot = MetadataFactory::dataset_snapshot()
         .name(dataset_alias.clone())
-        .kind(DatasetKind::Root)
+        .kind(odf::DatasetKind::Root)
         .push_event(MetadataFactory::set_polling_source().build())
         .build();
 
@@ -298,7 +300,7 @@ pub async fn test_create_dataset_from_snapshot<
 
     let actual_head = dataset
         .as_metadata_chain()
-        .resolve_ref(&BlockRef::Head)
+        .resolve_ref(&odf::BlockRef::Head)
         .await
         .unwrap();
 
@@ -309,31 +311,36 @@ pub async fn test_create_dataset_from_snapshot<
             .create_dataset_from_snapshot(snapshot)
             .await
             .err(),
-        Some(CreateDatasetFromSnapshotError::NameCollision(_))
+        Some(odf::dataset::CreateDatasetFromSnapshotError::NameCollision(
+            _
+        ))
     );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_rename_dataset<
-    TDatasetStorageUnit: DatasetStorageUnit + DatasetStorageUnitWriter,
+    TDatasetStorageUnit: odf::DatasetStorageUnit + DatasetStorageUnitWriter,
 >(
     storage_unit: &TDatasetStorageUnit,
-    account_name: Option<AccountName>,
+    account_name: Option<odf::AccountName>,
 ) {
-    let alias_foo = DatasetAlias::new(account_name.clone(), DatasetName::new_unchecked("foo"));
-    let alias_bar = DatasetAlias::new(account_name.clone(), DatasetName::new_unchecked("bar"));
-    let alias_baz = DatasetAlias::new(account_name.clone(), DatasetName::new_unchecked("baz"));
+    let alias_foo =
+        odf::DatasetAlias::new(account_name.clone(), odf::DatasetName::new_unchecked("foo"));
+    let alias_bar =
+        odf::DatasetAlias::new(account_name.clone(), odf::DatasetName::new_unchecked("bar"));
+    let alias_baz =
+        odf::DatasetAlias::new(account_name.clone(), odf::DatasetName::new_unchecked("baz"));
 
     let snapshot_foo = MetadataFactory::dataset_snapshot()
         .name(alias_foo.clone())
-        .kind(DatasetKind::Root)
+        .kind(odf::DatasetKind::Root)
         .push_event(MetadataFactory::set_polling_source().build())
         .build();
 
     let snapshot_bar = MetadataFactory::dataset_snapshot()
         .name(alias_bar.clone())
-        .kind(DatasetKind::Derivative)
+        .kind(odf::DatasetKind::Derivative)
         .push_event(
             MetadataFactory::set_transform()
                 .inputs_from_refs(["foo"])
@@ -357,7 +364,7 @@ pub async fn test_rename_dataset<
                 &alias_bar.dataset_name
             )
             .await,
-        Err(RenameDatasetError::NameCollision(_))
+        Err(odf::dataset::RenameDatasetError::NameCollision(_))
     );
 
     storage_unit
@@ -375,31 +382,38 @@ pub async fn test_rename_dataset<
     let baz = storage_unit.get_stored_dataset_by_handle(&baz_hdl);
 
     use futures::StreamExt;
+    use odf::dataset::MetadataChainExt;
     assert_eq!(baz.as_metadata_chain().iter_blocks().count().await, 2);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_rename_dataset_same_name_multiple_tenants<
-    TDatasetStorageUnit: DatasetStorageUnit + DatasetStorageUnitWriter,
+    TDatasetStorageUnit: odf::DatasetStorageUnit + DatasetStorageUnitWriter,
 >(
     storage_unit: &TDatasetStorageUnit,
 ) {
-    let account_my = AccountName::new_unchecked("my");
-    let account_her = AccountName::new_unchecked("her");
+    let account_my = odf::AccountName::new_unchecked("my");
+    let account_her = odf::AccountName::new_unchecked("her");
 
-    let dataset_alias_my_foo =
-        DatasetAlias::new(Some(account_my.clone()), DatasetName::new_unchecked("foo"));
-    let dataset_alias_her_bar =
-        DatasetAlias::new(Some(account_her.clone()), DatasetName::new_unchecked("bar"));
-    let dataset_alias_my_baz =
-        DatasetAlias::new(Some(account_my.clone()), DatasetName::new_unchecked("baz"));
+    let dataset_alias_my_foo = odf::DatasetAlias::new(
+        Some(account_my.clone()),
+        odf::DatasetName::new_unchecked("foo"),
+    );
+    let dataset_alias_her_bar = odf::DatasetAlias::new(
+        Some(account_her.clone()),
+        odf::DatasetName::new_unchecked("bar"),
+    );
+    let dataset_alias_my_baz = odf::DatasetAlias::new(
+        Some(account_my.clone()),
+        odf::DatasetName::new_unchecked("baz"),
+    );
 
     let create_result_my_foo = storage_unit
         .create_dataset_from_snapshot(
             MetadataFactory::dataset_snapshot()
                 .name(dataset_alias_my_foo.clone())
-                .kind(DatasetKind::Root)
+                .kind(odf::DatasetKind::Root)
                 .push_event(MetadataFactory::set_polling_source().build())
                 .build(),
         )
@@ -411,7 +425,7 @@ pub async fn test_rename_dataset_same_name_multiple_tenants<
         .create_dataset_from_snapshot(
             MetadataFactory::dataset_snapshot()
                 .name(dataset_alias_her_bar.clone())
-                .kind(DatasetKind::Root)
+                .kind(odf::DatasetKind::Root)
                 .push_event(MetadataFactory::set_polling_source().build())
                 .build(),
         )
@@ -423,7 +437,7 @@ pub async fn test_rename_dataset_same_name_multiple_tenants<
         .create_dataset_from_snapshot(
             MetadataFactory::dataset_snapshot()
                 .name(dataset_alias_my_baz.clone())
-                .kind(DatasetKind::Root)
+                .kind(odf::DatasetKind::Root)
                 .push_event(MetadataFactory::set_polling_source().build())
                 .build(),
         )
@@ -433,19 +447,19 @@ pub async fn test_rename_dataset_same_name_multiple_tenants<
     storage_unit
         .rename_dataset(
             &create_result_my_foo.dataset_handle,
-            &DatasetName::new_unchecked("bar"),
+            &odf::DatasetName::new_unchecked("bar"),
         )
         .await
         .unwrap();
 
     let my_bar_hdl = storage_unit
-        .resolve_stored_dataset_handle_by_ref(&DatasetRef::try_from("my/bar").unwrap())
+        .resolve_stored_dataset_handle_by_ref(&odf::DatasetRef::try_from("my/bar").unwrap())
         .await
         .unwrap();
     let my_bar = storage_unit.get_stored_dataset_by_handle(&my_bar_hdl);
 
     let her_bar_hdl = storage_unit
-        .resolve_stored_dataset_handle_by_ref(&DatasetRef::try_from("her/bar").unwrap())
+        .resolve_stored_dataset_handle_by_ref(&odf::DatasetRef::try_from("her/bar").unwrap())
         .await
         .unwrap();
     let her_bar = storage_unit.get_stored_dataset_by_handle(&her_bar_hdl);
@@ -453,7 +467,7 @@ pub async fn test_rename_dataset_same_name_multiple_tenants<
     assert_eq!(
         my_bar
             .as_metadata_chain()
-            .resolve_ref(&BlockRef::Head)
+            .resolve_ref(&odf::BlockRef::Head)
             .await
             .unwrap(),
         create_result_my_foo.head
@@ -461,7 +475,7 @@ pub async fn test_rename_dataset_same_name_multiple_tenants<
     assert_eq!(
         her_bar
             .as_metadata_chain()
-            .resolve_ref(&BlockRef::Head)
+            .resolve_ref(&odf::BlockRef::Head)
             .await
             .unwrap(),
         create_result_her_bar.head
@@ -471,27 +485,28 @@ pub async fn test_rename_dataset_same_name_multiple_tenants<
         storage_unit
             .rename_dataset(
                 &create_result_my_baz.create_dataset_result.dataset_handle,
-                &DatasetName::new_unchecked("bar")
+                &odf::DatasetName::new_unchecked("bar")
             )
             .await,
-        Err(RenameDatasetError::NameCollision(_))
+        Err(odf::dataset::RenameDatasetError::NameCollision(_))
     );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_delete_dataset<
-    TDatasetStorageUnit: DatasetStorageUnit + DatasetStorageUnitWriter,
+    TDatasetStorageUnit: odf::DatasetStorageUnit + DatasetStorageUnitWriter,
 >(
     storage_unit: &TDatasetStorageUnit,
     create_dataset_from_snapshot: &dyn CreateDatasetFromSnapshotUseCase,
-    account_name: Option<AccountName>,
+    account_name: Option<odf::AccountName>,
 ) {
-    let alias_foo = DatasetAlias::new(account_name.clone(), DatasetName::new_unchecked("foo"));
+    let alias_foo =
+        odf::DatasetAlias::new(account_name.clone(), odf::DatasetName::new_unchecked("foo"));
 
     let snapshot = MetadataFactory::dataset_snapshot()
         .name(alias_foo.clone())
-        .kind(DatasetKind::Root)
+        .kind(odf::DatasetKind::Root)
         .push_event(MetadataFactory::set_polling_source().build())
         .build();
 
@@ -516,29 +531,29 @@ pub async fn test_delete_dataset<
             .await
             .err()
             .unwrap(),
-        GetDatasetError::NotFound(_),
+        odf::dataset::GetDatasetError::NotFound(_),
     );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_iterate_datasets<
-    TDatasetStorageUnit: DatasetStorageUnit + DatasetStorageUnitWriter,
+    TDatasetStorageUnit: odf::DatasetStorageUnit + DatasetStorageUnitWriter,
 >(
     storage_unit: &TDatasetStorageUnit,
 ) {
-    let alias_foo = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
-    let alias_bar = DatasetAlias::new(None, DatasetName::new_unchecked("bar"));
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
 
     let snapshot_foo = MetadataFactory::dataset_snapshot()
         .name("foo")
-        .kind(DatasetKind::Root)
+        .kind(odf::DatasetKind::Root)
         .push_event(MetadataFactory::set_polling_source().build())
         .build();
 
     let snapshot_bar = MetadataFactory::dataset_snapshot()
         .name("bar")
-        .kind(DatasetKind::Derivative)
+        .kind(odf::DatasetKind::Derivative)
         .push_event(
             MetadataFactory::set_transform()
                 .inputs_from_refs(["foo"])
@@ -573,7 +588,7 @@ pub async fn test_iterate_datasets<
     check_expected_datasets(
         vec![],
         storage_unit
-            .stored_dataset_handles_by_owner(&AccountName::new_unchecked("unknown-account")),
+            .stored_dataset_handles_by_owner(&odf::AccountName::new_unchecked("unknown-account")),
     )
     .await;
 }
@@ -581,30 +596,38 @@ pub async fn test_iterate_datasets<
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_iterate_datasets_multi_tenant<
-    TDatasetStorageUnit: DatasetStorageUnit + DatasetStorageUnitWriter,
+    TDatasetStorageUnit: odf::DatasetStorageUnit + DatasetStorageUnitWriter,
 >(
     storage_unit: &TDatasetStorageUnit,
 ) {
-    let account_my = AccountName::new_unchecked("my");
-    let account_her = AccountName::new_unchecked("her");
+    let account_my = odf::AccountName::new_unchecked("my");
+    let account_her = odf::AccountName::new_unchecked("her");
 
-    let alias_my_foo =
-        DatasetAlias::new(Some(account_my.clone()), DatasetName::new_unchecked("foo"));
-    let alias_her_foo =
-        DatasetAlias::new(Some(account_her.clone()), DatasetName::new_unchecked("foo"));
-    let alias_her_bar =
-        DatasetAlias::new(Some(account_her.clone()), DatasetName::new_unchecked("bar"));
-    let alias_my_baz =
-        DatasetAlias::new(Some(account_my.clone()), DatasetName::new_unchecked("baz"));
+    let alias_my_foo = odf::DatasetAlias::new(
+        Some(account_my.clone()),
+        odf::DatasetName::new_unchecked("foo"),
+    );
+    let alias_her_foo = odf::DatasetAlias::new(
+        Some(account_her.clone()),
+        odf::DatasetName::new_unchecked("foo"),
+    );
+    let alias_her_bar = odf::DatasetAlias::new(
+        Some(account_her.clone()),
+        odf::DatasetName::new_unchecked("bar"),
+    );
+    let alias_my_baz = odf::DatasetAlias::new(
+        Some(account_my.clone()),
+        odf::DatasetName::new_unchecked("baz"),
+    );
 
     let snapshot_my_foo = MetadataFactory::dataset_snapshot()
         .name("my/foo")
-        .kind(DatasetKind::Root)
+        .kind(odf::DatasetKind::Root)
         .push_event(MetadataFactory::set_polling_source().build())
         .build();
     let snapshot_my_baz = MetadataFactory::dataset_snapshot()
         .name("my/baz")
-        .kind(DatasetKind::Derivative)
+        .kind(odf::DatasetKind::Derivative)
         .push_event(
             MetadataFactory::set_transform()
                 .inputs_from_refs_and_aliases([("my/foo", "foo")])
@@ -614,12 +637,12 @@ pub async fn test_iterate_datasets_multi_tenant<
 
     let snapshot_her_foo = MetadataFactory::dataset_snapshot()
         .name("her/foo")
-        .kind(DatasetKind::Root)
+        .kind(odf::DatasetKind::Root)
         .push_event(MetadataFactory::set_polling_source().build())
         .build();
     let snapshot_her_bar = MetadataFactory::dataset_snapshot()
         .name("her/bar")
-        .kind(DatasetKind::Derivative)
+        .kind(odf::DatasetKind::Derivative)
         .push_event(
             MetadataFactory::set_transform()
                 .inputs_from_refs_and_aliases([("her/foo", "foo")])
@@ -672,7 +695,7 @@ pub async fn test_iterate_datasets_multi_tenant<
     check_expected_datasets(
         vec![],
         storage_unit
-            .stored_dataset_handles_by_owner(&AccountName::new_unchecked("unknown-account")),
+            .stored_dataset_handles_by_owner(&odf::AccountName::new_unchecked("unknown-account")),
     )
     .await;
 }
@@ -680,8 +703,8 @@ pub async fn test_iterate_datasets_multi_tenant<
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 async fn check_expected_datasets(
-    expected_aliases: Vec<DatasetAlias>,
-    actual_datasets_stream: DatasetHandleStream<'_>,
+    expected_aliases: Vec<odf::DatasetAlias>,
+    actual_datasets_stream: odf::dataset::DatasetHandleStream<'_>,
 ) {
     use futures::TryStreamExt;
     let mut actual_datasets: Vec<_> = actual_datasets_stream.try_collect().await.unwrap();
@@ -699,12 +722,13 @@ async fn check_expected_datasets(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_create_multiple_datasets_with_same_id<
-    TDatasetStorageUnit: DatasetStorageUnit + DatasetStorageUnitWriter,
+    TDatasetStorageUnit: odf::DatasetStorageUnit + DatasetStorageUnitWriter,
 >(
     storage_unit: &TDatasetStorageUnit,
-    account_name: Option<AccountName>,
+    account_name: Option<odf::AccountName>,
 ) {
-    let dataset_alias = DatasetAlias::new(account_name.clone(), DatasetName::new_unchecked("foo"));
+    let dataset_alias =
+        odf::DatasetAlias::new(account_name.clone(), odf::DatasetName::new_unchecked("foo"));
 
     assert_matches!(
         storage_unit
@@ -712,10 +736,10 @@ pub async fn test_create_multiple_datasets_with_same_id<
             .await
             .err()
             .unwrap(),
-        GetDatasetError::NotFound(_)
+        odf::dataset::GetDatasetError::NotFound(_)
     );
     let seed_block =
-        MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build())
+        MetadataFactory::metadata_block(MetadataFactory::seed(odf::DatasetKind::Root).build())
             .build_typed();
 
     let create_result = storage_unit
@@ -731,7 +755,8 @@ pub async fn test_create_multiple_datasets_with_same_id<
         .await
         .is_ok());
 
-    let dataset_alias = DatasetAlias::new(account_name, DatasetName::new_unchecked("bar"));
+    let dataset_alias =
+        odf::DatasetAlias::new(account_name, odf::DatasetName::new_unchecked("bar"));
 
     // Now test id collision with different alias
     let create_result = storage_unit
@@ -740,7 +765,7 @@ pub async fn test_create_multiple_datasets_with_same_id<
 
     assert_matches!(
         create_result.err(),
-        Some(CreateDatasetError::NameCollision(_))
+        Some(odf::dataset::CreateDatasetError::NameCollision(_))
     );
 }
 
