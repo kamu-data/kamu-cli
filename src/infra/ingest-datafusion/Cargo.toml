@@ -26,9 +26,7 @@ file-utils = { workspace = true }
 internal-error = { workspace = true }
 kamu-core = { workspace = true }
 kamu-data-utils = { workspace = true }
-odf-metadata = { workspace = true, features = ["arrow"] }
-odf-dataset = { workspace = true }
-odf-storage = { workspace = true }
+odf = { workspace = true, features = ["arrow"] }
 
 datafusion = { version = "43", default-features = false }
 geo-types = { version = "0.7", default-features = false, features = [] }

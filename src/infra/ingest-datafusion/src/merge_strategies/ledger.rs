@@ -11,7 +11,6 @@ use datafusion::logical_expr::SortExpr;
 use datafusion::prelude::*;
 use internal_error::*;
 use kamu_data_utils::data::dataframe_ext::DataFrameExt;
-use odf_metadata as odf;
 
 use crate::*;
 
@@ -19,12 +18,15 @@ use crate::*;
 ///
 /// See [`odf_metadata::MergeStrategyLedger`] for details.
 pub struct MergeStrategyLedger {
-    vocab: odf::DatasetVocabulary,
+    vocab: odf::metadata::DatasetVocabulary,
     primary_key: Vec<String>,
 }
 
 impl MergeStrategyLedger {
-    pub fn new(vocab: odf::DatasetVocabulary, cfg: odf_metadata::MergeStrategyLedger) -> Self {
+    pub fn new(
+        vocab: odf::metadata::DatasetVocabulary,
+        cfg: odf::metadata::MergeStrategyLedger,
+    ) -> Self {
         Self {
             vocab,
             primary_key: cfg.primary_key,
@@ -67,7 +69,7 @@ impl MergeStrategy for MergeStrategyLedger {
                 &self.vocab.operation_type_column,
                 // TODO: Cast to `u8` after Spark is updated
                 // See: https://github.com/kamu-data/kamu-cli/issues/445
-                lit(odf::OperationType::Append as i32),
+                lit(odf::metadata::OperationType::Append as i32),
             )
             .int_err()?
             .columns_to_front(&[&self.vocab.operation_type_column])
