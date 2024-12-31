@@ -132,6 +132,7 @@ impl NotebookCommand {
             .notebook_server_factory
             .start(
                 &client_url,
+                "datafusion",
                 self.address,
                 self.port,
                 None,
@@ -216,6 +217,7 @@ impl NotebookCommand {
             .notebook_server_factory
             .start(
                 &url::Url::parse("http://kamu-livy:8998").unwrap(),
+                "spark",
                 self.address,
                 self.port,
                 Some(network.name()),

@@ -42,6 +42,7 @@ impl NotebookServerFactory {
     pub async fn start<StartedClb>(
         &self,
         client_url: &url::Url,
+        engine: &str,
         address: Option<IpAddr>,
         port: Option<u16>,
         network: Option<&str>,
@@ -71,6 +72,7 @@ impl NotebookServerFactory {
                 ("NB_UID", "0"),
                 ("NB_GID", "0"),
                 ("KAMU_CLIENT_URL", client_url.as_str()),
+                ("KAMU_CLIENT_ENGINE", engine),
             ])
             .work_dir("/opt/workdir")
             .map(network, container_runtime::ContainerRunCommand::network)
