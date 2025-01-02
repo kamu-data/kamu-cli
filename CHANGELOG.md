@@ -11,6 +11,10 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Unreleased]
+### Changed
+- Merged two methods(`saveEnvVariable` and `modifyEnvVariable`) from `DatasetEnvVarsMut` info one `upsertEnvVariable`
+
 ## [0.216.0] - 2024-12-30
 ### Changed
 - Flight SQL protocol now supports anonymous and bearer token authentication

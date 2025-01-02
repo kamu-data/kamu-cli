@@ -97,7 +97,7 @@ impl DatasetEnvVar {
     ) -> Result<String, DatasetEnvVarEncryptionError> {
         if let Some(secret_nonce) = self.secret_nonce.as_ref() {
             let cipher = Aes256Gcm::new(Key::<Aes256Gcm>::from_slice(encryption_key.as_bytes()));
-            let decypted_value = cipher
+            let decrypted_value = cipher
                 .decrypt(
                     GenericArray::from_slice(secret_nonce.as_slice()),
                     self.value.as_ref(),
@@ -105,7 +105,7 @@ impl DatasetEnvVar {
                 .map_err(|err| DatasetEnvVarEncryptionError::InvalidCipherKeyError {
                     source: Box::new(AesGcmError(err)),
                 })?;
-            return Ok(std::str::from_utf8(decypted_value.as_slice())
+            return Ok(std::str::from_utf8(decrypted_value.as_slice())
                 .map_err(|err| DatasetEnvVarEncryptionError::InternalError(err.int_err()))?
                 .to_string());
         }

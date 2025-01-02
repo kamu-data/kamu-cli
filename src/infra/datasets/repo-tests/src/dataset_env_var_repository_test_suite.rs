@@ -20,7 +20,7 @@ use kamu_datasets::{
     DatasetEnvVarValue,
     DeleteDatasetEnvVarError,
     GetDatasetEnvVarError,
-    ModifyDatasetEnvVarError,
+    UpsertDatasetEnvVarStatus,
     SAMPLE_DATASET_ENV_VAR_ENCRYPTION_KEY,
 };
 use opendatafabric::DatasetID;
@@ -90,7 +90,7 @@ pub async fn test_insert_and_get_dataset_env_var(catalog: &Catalog) {
     )
     .unwrap();
     let save_result = dataset_env_var_repo
-        .save_dataset_env_var(&new_dataset_env_var)
+        .upsert_dataset_env_var(&new_dataset_env_var)
         .await;
 
     assert!(save_result.is_ok());
@@ -164,11 +164,11 @@ pub async fn test_insert_and_get_multiple_dataset_env_vars(catalog: &Catalog) {
     .unwrap();
 
     let save_result = dataset_env_var_repo
-        .save_dataset_env_var(&new_dataset_env_var)
+        .upsert_dataset_env_var(&new_dataset_env_var)
         .await;
     assert!(save_result.is_ok());
     let save_result = dataset_env_var_repo
-        .save_dataset_env_var(&new_secret_dataset_env_var)
+        .upsert_dataset_env_var(&new_secret_dataset_env_var)
         .await;
     assert!(save_result.is_ok());
 
@@ -229,11 +229,11 @@ pub async fn test_delete_dataset_env_vars(catalog: &Catalog) {
     )
     .unwrap();
     let save_result = dataset_env_var_repo
-        .save_dataset_env_var(&new_dataset_env_var)
+        .upsert_dataset_env_var(&new_dataset_env_var)
         .await;
     assert!(save_result.is_ok());
     let save_result = dataset_env_var_repo
-        .save_dataset_env_var(&new_bar_dataset_env_var)
+        .upsert_dataset_env_var(&new_bar_dataset_env_var)
         .await;
     assert!(save_result.is_ok());
 
@@ -265,7 +265,7 @@ pub async fn test_delete_dataset_env_vars(catalog: &Catalog) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_modify_dataset_env_vars(catalog: &Catalog) {
+pub async fn test_upsert_dataset_env_vars(catalog: &Catalog) {
     let dataset_env_var_repo = catalog.get_one::<dyn DatasetEnvVarRepository>().unwrap();
     let dataset_entry_repo = catalog.get_one::<dyn DatasetEntryRepository>().unwrap();
     let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
@@ -278,40 +278,38 @@ pub async fn test_modify_dataset_env_vars(catalog: &Catalog) {
         .await
         .unwrap();
 
-    let new_dataset_env_var = DatasetEnvVar::new(
+    let mut new_dataset_env_var = DatasetEnvVar::new(
         "foo",
         Utc::now().round_subsecs(6),
-        &DatasetEnvVarValue::Regular("foo".to_string()),
+        &DatasetEnvVarValue::Secret(SecretString::from("foo")),
         &entry_foo.id,
         SAMPLE_DATASET_ENV_VAR_ENCRYPTION_KEY,
     )
     .unwrap();
-    let save_result = dataset_env_var_repo
-        .save_dataset_env_var(&new_dataset_env_var)
+    let upsert_result = dataset_env_var_repo
+        .upsert_dataset_env_var(&new_dataset_env_var)
         .await;
-    assert!(save_result.is_ok());
+    assert_matches!(upsert_result, Ok(res) if res.status == UpsertDatasetEnvVarStatus::Created);
 
-    let modify_result = dataset_env_var_repo
-        .modify_dataset_env_var(&Uuid::new_v4(), vec![], None)
+    let upsert_result = dataset_env_var_repo
+        .upsert_dataset_env_var(&new_dataset_env_var)
         .await;
+    assert_matches!(upsert_result, Ok(res) if res.status == UpsertDatasetEnvVarStatus::UpToDate);
 
-    assert_matches!(modify_result, Err(ModifyDatasetEnvVarError::NotFound(_)));
     let (new_value, new_nonce) = new_dataset_env_var
         .generate_new_value(
             &DatasetEnvVarValue::Regular("new_foo".to_string()),
             SAMPLE_DATASET_ENV_VAR_ENCRYPTION_KEY,
         )
         .unwrap();
+    new_dataset_env_var.value.clone_from(&new_value);
+    new_dataset_env_var.secret_nonce.clone_from(&new_nonce);
 
-    let modify_result = dataset_env_var_repo
-        .modify_dataset_env_var(
-            &new_dataset_env_var.id,
-            new_value.clone(),
-            new_nonce.clone(),
-        )
+    let upsert_result = dataset_env_var_repo
+        .upsert_dataset_env_var(&new_dataset_env_var)
         .await;
 
-    assert!(modify_result.is_ok());
+    assert_matches!(upsert_result, Ok(res) if res.status == UpsertDatasetEnvVarStatus::Updated);
 
     let db_dataset_env_var = dataset_env_var_repo
         .get_dataset_env_var_by_id(&new_dataset_env_var.id)
@@ -358,11 +356,11 @@ pub async fn test_delete_all_dataset_env_vars(catalog: &Catalog) {
     )
     .unwrap();
     let save_result = dataset_env_var_repo
-        .save_dataset_env_var(&new_dataset_env_var)
+        .upsert_dataset_env_var(&new_dataset_env_var)
         .await;
     assert!(save_result.is_ok());
     let save_result = dataset_env_var_repo
-        .save_dataset_env_var(&new_bar_dataset_env_var)
+        .upsert_dataset_env_var(&new_bar_dataset_env_var)
         .await;
     assert!(save_result.is_ok());
 

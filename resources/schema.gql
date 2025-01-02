@@ -560,9 +560,8 @@ type DatasetEnvVars {
 }
 
 type DatasetEnvVarsMut {
-	saveEnvVariable(key: String!, value: String!, isSecret: Boolean!): SaveDatasetEnvVarResult!
+	upsertEnvVariable(key: String!, value: String!, isSecret: Boolean!): UpsertDatasetEnvVarResult!
 	deleteEnvVariable(id: DatasetEnvVarID!): DeleteDatasetEnvVarResult!
-	modifyEnvVariable(id: DatasetEnvVarID!, newValue: String!, isSecret: Boolean!): ModifyDatasetEnvVarResult!
 }
 
 type DatasetFlowConfigs {
@@ -1454,20 +1453,6 @@ type MetadataManifestUnsupportedVersion implements CommitResult & CreateDatasetF
 	message: String!
 }
 
-interface ModifyDatasetEnvVarResult {
-	message: String!
-}
-
-type ModifyDatasetEnvVarResultNotFound implements ModifyDatasetEnvVarResult {
-	envVarId: DatasetEnvVarID!
-	message: String!
-}
-
-type ModifyDatasetEnvVarResultSuccess implements ModifyDatasetEnvVarResult {
-	envVarId: DatasetEnvVarID!
-	message: String!
-}
-
 enum MqttQos {
 	AT_MOST_ONCE
 	AT_LEAST_ONCE
@@ -1695,21 +1680,6 @@ type RevokeResultAlreadyRevoked implements RevokeResult {
 
 type RevokeResultSuccess implements RevokeResult {
 	tokenId: AccessTokenID!
-	message: String!
-}
-
-interface SaveDatasetEnvVarResult {
-	message: String!
-}
-
-type SaveDatasetEnvVarResultDuplicate implements SaveDatasetEnvVarResult {
-	datasetEnvVarKey: String!
-	datasetName: DatasetName!
-	message: String!
-}
-
-type SaveDatasetEnvVarResultSuccess implements SaveDatasetEnvVarResult {
-	envVar: ViewDatasetEnvVar!
 	message: String!
 }
 
@@ -1985,6 +1955,24 @@ type TriggerFlowSuccess implements TriggerFlowResult {
 }
 
 interface UpdateReadmeResult {
+	message: String!
+}
+
+interface UpsertDatasetEnvVarResult {
+	message: String!
+}
+
+type UpsertDatasetEnvVarResultCreated implements UpsertDatasetEnvVarResult {
+	envVar: ViewDatasetEnvVar!
+	message: String!
+}
+
+type UpsertDatasetEnvVarResultUpdated implements UpsertDatasetEnvVarResult {
+	envVar: ViewDatasetEnvVar!
+	message: String!
+}
+
+type UpsertDatasetEnvVarUpToDate implements UpsertDatasetEnvVarResult {
 	message: String!
 }
 

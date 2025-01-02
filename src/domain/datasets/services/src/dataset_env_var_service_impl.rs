@@ -11,18 +11,17 @@ use std::sync::Arc;
 
 use database_common::PaginationOpts;
 use dill::*;
-use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
+use internal_error::{InternalError, ResultIntoInternal};
 use kamu_datasets::{
     DatasetEnvVar,
     DatasetEnvVarListing,
     DatasetEnvVarRepository,
     DatasetEnvVarService,
+    DatasetEnvVarUpsertResult,
     DatasetEnvVarValue,
     DatasetEnvVarsConfig,
     DeleteDatasetEnvVarError,
     GetDatasetEnvVarError,
-    ModifyDatasetEnvVarError,
-    SaveDatasetEnvVarError,
 };
 use opendatafabric::DatasetID;
 use secrecy::{ExposeSecret, SecretString};
@@ -66,24 +65,31 @@ impl DatasetEnvVarServiceImpl {
 
 #[async_trait::async_trait]
 impl DatasetEnvVarService for DatasetEnvVarServiceImpl {
-    async fn create_dataset_env_var(
+    async fn upsert_dataset_env_var(
         &self,
         dataset_env_var_key: &str,
         dataset_env_var_value: &DatasetEnvVarValue,
         dataset_id: &DatasetID,
-    ) -> Result<DatasetEnvVar, SaveDatasetEnvVarError> {
-        let dataset_env_var = DatasetEnvVar::new(
+    ) -> Result<DatasetEnvVarUpsertResult, InternalError> {
+        let mut dataset_env_var = DatasetEnvVar::new(
             dataset_env_var_key,
             self.time_source.now(),
             dataset_env_var_value,
             dataset_id,
             self.dataset_env_var_encryption_key.expose_secret(),
         )
-        .map_err(|err| SaveDatasetEnvVarError::Internal(err.int_err()))?;
-        self.dataset_env_var_repository
-            .save_dataset_env_var(&dataset_env_var)
+        .int_err()?;
+
+        let upsert_result = self
+            .dataset_env_var_repository
+            .upsert_dataset_env_var(&dataset_env_var)
             .await?;
-        Ok(dataset_env_var)
+        dataset_env_var.id = upsert_result.id;
+
+        Ok(DatasetEnvVarUpsertResult {
+            dataset_env_var,
+            status: upsert_result.status,
+        })
     }
 
     async fn get_exposed_value(
@@ -140,32 +146,6 @@ impl DatasetEnvVarService for DatasetEnvVarServiceImpl {
     ) -> Result<(), DeleteDatasetEnvVarError> {
         self.dataset_env_var_repository
             .delete_dataset_env_var(dataset_env_var_id)
-            .await
-    }
-
-    async fn modify_dataset_env_var(
-        &self,
-        dataset_env_var_id: &Uuid,
-        dataset_env_var_new_value: &DatasetEnvVarValue,
-    ) -> Result<(), ModifyDatasetEnvVarError> {
-        let existing_dataset_env_var = self
-            .dataset_env_var_repository
-            .get_dataset_env_var_by_id(dataset_env_var_id)
-            .await
-            .map_err(|err| match err {
-                GetDatasetEnvVarError::NotFound(e) => ModifyDatasetEnvVarError::NotFound(e),
-                GetDatasetEnvVarError::Internal(e) => ModifyDatasetEnvVarError::Internal(e),
-            })?;
-
-        let (new_value, nonce) = existing_dataset_env_var
-            .generate_new_value(
-                dataset_env_var_new_value,
-                self.dataset_env_var_encryption_key.expose_secret(),
-            )
-            .int_err()
-            .map_err(ModifyDatasetEnvVarError::Internal)?;
-        self.dataset_env_var_repository
-            .modify_dataset_env_var(dataset_env_var_id, new_value, nonce)
             .await
     }
 }

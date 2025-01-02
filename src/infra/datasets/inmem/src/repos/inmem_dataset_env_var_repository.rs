@@ -62,28 +62,49 @@ impl InMemoryDatasetEnvVarRepository {
 
 #[async_trait::async_trait]
 impl DatasetEnvVarRepository for InMemoryDatasetEnvVarRepository {
-    async fn save_dataset_env_var(
+    async fn upsert_dataset_env_var(
         &self,
         dataset_env_var: &DatasetEnvVar,
-    ) -> Result<(), SaveDatasetEnvVarError> {
+    ) -> Result<UpsertDatasetEnvVarResult, InternalError> {
         let mut guard = self.state.lock().unwrap();
-        if let Some(existing_dataset_env_var_key_id) =
-            guard.dataset_env_var_ids_by_keys.get(&dataset_env_var.key)
-            && guard
+
+        // Modify env var if such exists
+        if let Some(existing_dataset_env_var_key_id) = guard
+            .dataset_env_var_ids_by_keys
+            .get(&dataset_env_var.key)
+            .copied()
+            && let Some(existing_dataset_env_var) = guard
                 .dataset_env_vars_by_ids
-                .get(existing_dataset_env_var_key_id)
-                .unwrap()
-                .dataset_id
-                == dataset_env_var.dataset_id
+                .get_mut(&existing_dataset_env_var_key_id)
+            && existing_dataset_env_var.dataset_id == dataset_env_var.dataset_id
         {
-            return Err(SaveDatasetEnvVarError::Duplicate(
-                SaveDatasetEnvVarErrorDuplicate {
-                    dataset_env_var_key: dataset_env_var.key.clone(),
-                    dataset_id: dataset_env_var.dataset_id.clone(),
-                },
-            ));
+            let mut upsert_status = UpsertDatasetEnvVarStatus::UpToDate;
+            if existing_dataset_env_var.value != dataset_env_var.value {
+                existing_dataset_env_var
+                    .value
+                    .clone_from(&dataset_env_var.value);
+                upsert_status = UpsertDatasetEnvVarStatus::Updated;
+            }
+            if (existing_dataset_env_var.secret_nonce.is_none()
+                && dataset_env_var.secret_nonce.is_some())
+                || (existing_dataset_env_var.secret_nonce.is_some()
+                    && dataset_env_var.secret_nonce.is_none())
+            {
+                existing_dataset_env_var
+                    .secret_nonce
+                    .clone_from(&dataset_env_var.secret_nonce);
+                upsert_status = UpsertDatasetEnvVarStatus::Updated;
+            }
+            existing_dataset_env_var
+                .secret_nonce
+                .clone_from(&dataset_env_var.secret_nonce);
+            return Ok(UpsertDatasetEnvVarResult {
+                id: existing_dataset_env_var.id,
+                status: upsert_status,
+            });
         }
 
+        // Create a new env var
         guard
             .dataset_env_vars_by_ids
             .insert(dataset_env_var.id, dataset_env_var.clone());
@@ -99,7 +120,10 @@ impl DatasetEnvVarRepository for InMemoryDatasetEnvVarRepository {
         };
         dataset_env_vars_entries.push(dataset_env_var.id);
 
-        Ok(())
+        return Ok(UpsertDatasetEnvVarResult {
+            id: dataset_env_var.id,
+            status: UpsertDatasetEnvVarStatus::Created,
+        });
     }
 
     async fn get_all_dataset_env_vars_by_dataset_id(
@@ -207,27 +231,6 @@ impl DatasetEnvVarRepository for InMemoryDatasetEnvVarRepository {
                 dataset_env_var_key: dataset_env_var_id.to_string(),
             },
         ))
-    }
-
-    async fn modify_dataset_env_var(
-        &self,
-        dataset_env_var_id: &Uuid,
-        new_value: Vec<u8>,
-        secret_nonce: Option<Vec<u8>>,
-    ) -> Result<(), ModifyDatasetEnvVarError> {
-        let mut guard = self.state.lock().unwrap();
-        if let Some(existing_dataset_env_var) =
-            guard.dataset_env_vars_by_ids.get_mut(dataset_env_var_id)
-        {
-            existing_dataset_env_var.value = new_value;
-            existing_dataset_env_var.secret_nonce = secret_nonce;
-            return Ok(());
-        }
-        return Err(ModifyDatasetEnvVarError::NotFound(
-            DatasetEnvVarNotFoundError {
-                dataset_env_var_key: dataset_env_var_id.to_string(),
-            },
-        ));
     }
 }
 

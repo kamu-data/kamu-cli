@@ -8,4 +8,5 @@
 // by the Apache License, Version 2.0.
 
 mod test_dataset_entry_service;
+mod test_dataset_env_var_service_impl;
 mod test_dependency_graph_service_impl;

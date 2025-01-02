@@ -9,7 +9,7 @@
 
 use database_common::{PaginationOpts, TransactionRef, TransactionRefT};
 use dill::{component, interface};
-use internal_error::{ErrorIntoInternal, ResultIntoInternal};
+use internal_error::{InternalError, ResultIntoInternal};
 use opendatafabric::DatasetID;
 use uuid::Uuid;
 
@@ -33,19 +33,31 @@ impl PostgresDatasetEnvVarRepository {
 
 #[async_trait::async_trait]
 impl DatasetEnvVarRepository for PostgresDatasetEnvVarRepository {
-    async fn save_dataset_env_var(
+    async fn upsert_dataset_env_var(
         &self,
         dataset_env_var: &DatasetEnvVar,
-    ) -> Result<(), SaveDatasetEnvVarError> {
+    ) -> Result<UpsertDatasetEnvVarResult, InternalError> {
         let mut tr = self.transaction.lock().await;
-
         let connection_mut = tr.connection_mut().await?;
 
-        sqlx::query!(
+        let result = sqlx::query!(
             r#"
                 INSERT INTO dataset_env_vars (id, key, value, secret_nonce, created_at, dataset_id)
-                    VALUES ($1, $2, $3, $4, $5, $6)
-                "#,
+                VALUES ($1, $2, $3, $4, $5, $6)
+                ON CONFLICT (key, dataset_id)
+                DO UPDATE SET
+                    value = EXCLUDED.value,
+                    secret_nonce = CASE
+                        WHEN dataset_env_vars.secret_nonce IS NULL AND EXCLUDED.secret_nonce IS NOT NULL THEN EXCLUDED.secret_nonce
+                        WHEN dataset_env_vars.secret_nonce IS NOT NULL AND EXCLUDED.secret_nonce IS NULL THEN NULL
+                        ELSE EXCLUDED.secret_nonce
+                END
+                RETURNING xmax = 0 AS is_inserted,
+                id,
+                (
+                    SELECT value FROM dataset_env_vars WHERE key = $2 and dataset_id = $6
+                ) as "value: Vec<u8>";
+            "#,
             dataset_env_var.id,
             dataset_env_var.key,
             dataset_env_var.value,
@@ -53,23 +65,22 @@ impl DatasetEnvVarRepository for PostgresDatasetEnvVarRepository {
             dataset_env_var.created_at,
             dataset_env_var.dataset_id.to_string(),
         )
-        .execute(connection_mut)
+        .fetch_one(connection_mut)
         .await
-        .map_err(|e: sqlx::Error| match e {
-            sqlx::Error::Database(e) => {
-                if e.is_unique_violation() {
-                    SaveDatasetEnvVarError::Duplicate(SaveDatasetEnvVarErrorDuplicate {
-                        dataset_env_var_key: dataset_env_var.key.clone(),
-                        dataset_id: dataset_env_var.dataset_id.clone(),
-                    })
-                } else {
-                    SaveDatasetEnvVarError::Internal(e.int_err())
-                }
-            }
-            _ => SaveDatasetEnvVarError::Internal(e.int_err()),
-        })?;
+        .int_err()?;
 
-        Ok(())
+        let status = if result.is_inserted.unwrap_or(false) {
+            UpsertDatasetEnvVarStatus::Created
+        } else if dataset_env_var.value == result.value.unwrap() {
+            UpsertDatasetEnvVarStatus::UpToDate
+        } else {
+            UpsertDatasetEnvVarStatus::Updated
+        };
+
+        Ok(UpsertDatasetEnvVarResult {
+            id: result.id,
+            status,
+        })
     }
 
     async fn get_all_dataset_env_vars_by_dataset_id(
@@ -227,38 +238,6 @@ impl DatasetEnvVarRepository for PostgresDatasetEnvVarRepository {
 
         if delete_result.rows_affected() == 0 {
             return Err(DeleteDatasetEnvVarError::NotFound(
-                DatasetEnvVarNotFoundError {
-                    dataset_env_var_key: dataset_env_var_id.to_string(),
-                },
-            ));
-        }
-        Ok(())
-    }
-
-    async fn modify_dataset_env_var(
-        &self,
-        dataset_env_var_id: &Uuid,
-        new_value: Vec<u8>,
-        secret_nonce: Option<Vec<u8>>,
-    ) -> Result<(), ModifyDatasetEnvVarError> {
-        let mut tr = self.transaction.lock().await;
-
-        let connection_mut = tr.connection_mut().await?;
-
-        let update_result = sqlx::query!(
-            r#"
-                UPDATE dataset_env_vars SET value = $1, secret_nonce = $2 where id = $3
-            "#,
-            new_value,
-            secret_nonce,
-            dataset_env_var_id,
-        )
-        .execute(&mut *connection_mut)
-        .await
-        .int_err()?;
-
-        if update_result.rows_affected() == 0 {
-            return Err(ModifyDatasetEnvVarError::NotFound(
                 DatasetEnvVarNotFoundError {
                     dataset_env_var_key: dataset_env_var_id.to_string(),
                 },
