@@ -281,7 +281,7 @@ pub async fn test_upsert_dataset_env_vars(catalog: &Catalog) {
     let mut new_dataset_env_var = DatasetEnvVar::new(
         "foo",
         Utc::now().round_subsecs(6),
-        &DatasetEnvVarValue::Regular("foo".to_string()),
+        &DatasetEnvVarValue::Secret(SecretString::from("foo")),
         &entry_foo.id,
         SAMPLE_DATASET_ENV_VAR_ENCRYPTION_KEY,
     )
