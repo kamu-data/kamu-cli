@@ -1,0 +1,50 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                SELECT\n                    id as \"id: Uuid\",\n                    key,\n                    value as \"value: _\",\n                    secret_nonce as \"secret_nonce: _\",\n                    created_at as \"created_at: _\",\n                    dataset_id as \"dataset_id: _\"\n                FROM dataset_env_vars\n                WHERE key = $1 and dataset_id = $2\n                ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id: Uuid",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "key",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "value: _",
+        "ordinal": 2,
+        "type_info": "Blob"
+      },
+      {
+        "name": "secret_nonce: _",
+        "ordinal": 3,
+        "type_info": "Blob"
+      },
+      {
+        "name": "created_at: _",
+        "ordinal": 4,
+        "type_info": "Null"
+      },
+      {
+        "name": "dataset_id: _",
+        "ordinal": 5,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "140e91ce459e7759cbd0f57dc8f723cbffa51b784536d2045db121a64d795e2e"
+}

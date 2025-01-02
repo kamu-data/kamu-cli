@@ -60,6 +60,7 @@ pub struct DatasetEnvVarListing {
     pub total_count: usize,
 }
 
+#[derive(Debug)]
 pub struct DatasetEnvVarUpsertResult {
     pub dataset_env_var: DatasetEnvVar,
     pub status: UpsertDatasetEnvVarStatus,

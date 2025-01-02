@@ -79,6 +79,7 @@ impl DatasetEnvVarService for DatasetEnvVarServiceImpl {
             self.dataset_env_var_encryption_key.expose_secret(),
         )
         .int_err()?;
+
         let upsert_result = self
             .dataset_env_var_repository
             .upsert_dataset_env_var(&dataset_env_var)

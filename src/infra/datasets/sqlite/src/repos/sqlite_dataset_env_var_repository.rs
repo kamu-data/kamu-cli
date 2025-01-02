@@ -40,6 +40,7 @@ impl DatasetEnvVarRepository for SqliteDatasetEnvVarRepository {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
+        let dataset_env_var_dataset_id = dataset_env_var.dataset_id.to_string();
         let old_record = sqlx::query_as!(
             DatasetEnvVarRowModel,
             r#"
@@ -51,14 +52,16 @@ impl DatasetEnvVarRepository for SqliteDatasetEnvVarRepository {
                     created_at as "created_at: _",
                     dataset_id as "dataset_id: _"
                 FROM dataset_env_vars
-                WHERE id = $1
+                WHERE key = $1 and dataset_id = $2
                 "#,
-            dataset_env_var.id,
+            dataset_env_var.key,
+            dataset_env_var_dataset_id,
         )
         .fetch_optional(&mut *connection_mut)
         .await
         .int_err()?;
 
+        // ToDo compare decrypted value once postgres implementation is done
         if let Some(record) = &old_record
             && dataset_env_var.value == record.value
         {
@@ -68,7 +71,6 @@ impl DatasetEnvVarRepository for SqliteDatasetEnvVarRepository {
             });
         }
 
-        let dataset_env_var_dataset_id = dataset_env_var.dataset_id.to_string();
         sqlx::query!(
             r#"
                 INSERT INTO dataset_env_vars (id, key, value, secret_nonce, created_at, dataset_id)
@@ -79,7 +81,7 @@ impl DatasetEnvVarRepository for SqliteDatasetEnvVarRepository {
                     secret_nonce = CASE
                         WHEN dataset_env_vars.secret_nonce IS NULL AND excluded.secret_nonce IS NOT NULL THEN excluded.secret_nonce
                         WHEN dataset_env_vars.secret_nonce IS NOT NULL AND excluded.secret_nonce IS NULL THEN NULL
-                        ELSE dataset_env_vars.secret_nonce
+                        ELSE excluded.secret_nonce
                 END
             "#,
             dataset_env_var.id,

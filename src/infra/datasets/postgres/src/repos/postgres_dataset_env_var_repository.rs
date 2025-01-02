@@ -50,7 +50,7 @@ impl DatasetEnvVarRepository for PostgresDatasetEnvVarRepository {
                     secret_nonce = CASE
                         WHEN dataset_env_vars.secret_nonce IS NULL AND EXCLUDED.secret_nonce IS NOT NULL THEN EXCLUDED.secret_nonce
                         WHEN dataset_env_vars.secret_nonce IS NOT NULL AND EXCLUDED.secret_nonce IS NULL THEN NULL
-                        ELSE dataset_env_vars.secret_nonce
+                        ELSE EXCLUDED.secret_nonce
                 END
                 RETURNING xmax = 0 AS is_inserted,
                 id,
