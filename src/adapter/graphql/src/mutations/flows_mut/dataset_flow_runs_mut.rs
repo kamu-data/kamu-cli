@@ -100,7 +100,10 @@ impl DatasetFlowRunsMut {
             })?;
 
         Ok(TriggerFlowResult::Success(TriggerFlowSuccess {
-            flow: Flow::new(flow_state),
+            flow: Flow::build_batch(vec![flow_state], ctx)
+                .await?
+                .pop()
+                .unwrap(),
         }))
     }
 
@@ -139,7 +142,10 @@ impl DatasetFlowRunsMut {
 
         Ok(CancelScheduledTasksResult::Success(
             CancelScheduledTasksSuccess {
-                flow: Flow::new(flow_state),
+                flow: Flow::build_batch(vec![flow_state], ctx)
+                    .await?
+                    .pop()
+                    .unwrap(),
             },
         ))
     }
