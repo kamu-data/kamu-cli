@@ -646,12 +646,25 @@ impl FlowEventStore for SqliteFlowEventStore {
 
             let query_str = format!(
                 r#"
-                SELECT flow_id FROM flows
+                WITH unsorted_flows AS
+                    (SELECT
+                        f.flow_id,
+                        f.flow_status,
+                        MAX(e.event_time) as last_event_time,
+                        (CASE
+                            WHEN f.flow_status = 'waiting' THEN 1
+                            WHEN f.flow_status = 'running' THEN 2
+                            ELSE 3
+                        END) AS ord_status
+                    FROM flows f
+                    LEFT JOIN flow_events e USING(flow_id)
                     WHERE dataset_id = $1
                     AND (cast($2 as dataset_flow_type) IS NULL OR dataset_flow_type = $2)
                     AND (cast($3 as flow_status_type) IS NULL OR flow_status = $3)
-                    AND ($4 = 0 OR initiator IN ({}))
-                ORDER BY flow_id DESC
+                    AND ($4 = 0 OR initiator in ({}))
+                    GROUP BY f.flow_id, f.flow_status)
+                SELECT flow_id FROM unsorted_flows
+                ORDER BY ord_status, last_event_time DESC
                 LIMIT $5 OFFSET $6
                 "#,
                 maybe_initiators
