@@ -11,6 +11,10 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Unreleased]
+### Changed
+- GraphQL: accountListFlows returns list sorted by status and last event time
+
 ## [0.216.0] - 2024-12-30
 ### Changed
 - Flight SQL protocol now supports anonymous and bearer token authentication
