@@ -73,3 +73,11 @@ SET event_payload = jsonb_set(
     )
 )
 WHERE event_payload @> '{"Initiated": {"config_snapshot": {"Ingest": {"schedule_condition": {}}}}}'::jsonb;
+
+UPDATE your_table_name
+SET event_payload = jsonb_set(
+    event_payload,
+    '{Initiated,config_snapshot,CompactionRule}',
+    event_payload->'Initiated'->'config_snapshot'->'Compaction'
+) - '{Initiated,config_snapshot,Compaction}'
+WHERE event_payload @> '{"Initiated": {"config_snapshot": {"Compaction": {}}}}'::jsonb;
