@@ -39,12 +39,12 @@ pub async fn test_dataset_flow_empty_filters_distingush_dataset(catalog: &Catalo
         },
         6,
         vec![
-            foo_cases.compaction_flow_ids.flow_id_finished,
-            foo_cases.compaction_flow_ids.flow_id_running,
             foo_cases.compaction_flow_ids.flow_id_waiting,
-            foo_cases.ingest_flow_ids.flow_id_finished,
-            foo_cases.ingest_flow_ids.flow_id_running,
             foo_cases.ingest_flow_ids.flow_id_waiting,
+            foo_cases.compaction_flow_ids.flow_id_running,
+            foo_cases.ingest_flow_ids.flow_id_running,
+            foo_cases.compaction_flow_ids.flow_id_finished,
+            foo_cases.ingest_flow_ids.flow_id_finished,
         ],
     )
     .await;
@@ -59,12 +59,12 @@ pub async fn test_dataset_flow_empty_filters_distingush_dataset(catalog: &Catalo
         },
         6,
         vec![
-            bar_cases.compaction_flow_ids.flow_id_finished,
-            bar_cases.compaction_flow_ids.flow_id_running,
             bar_cases.compaction_flow_ids.flow_id_waiting,
-            bar_cases.ingest_flow_ids.flow_id_finished,
-            bar_cases.ingest_flow_ids.flow_id_running,
             bar_cases.ingest_flow_ids.flow_id_waiting,
+            bar_cases.compaction_flow_ids.flow_id_running,
+            bar_cases.ingest_flow_ids.flow_id_running,
+            bar_cases.compaction_flow_ids.flow_id_finished,
+            bar_cases.ingest_flow_ids.flow_id_finished,
         ],
     )
     .await;
@@ -140,9 +140,9 @@ pub async fn test_dataset_flow_filter_by_flow_type(catalog: &Catalog) {
                 ..Default::default()
             },
             vec![
-                foo_cases.ingest_flow_ids.flow_id_finished,
-                foo_cases.ingest_flow_ids.flow_id_running,
                 foo_cases.ingest_flow_ids.flow_id_waiting,
+                foo_cases.ingest_flow_ids.flow_id_running,
+                foo_cases.ingest_flow_ids.flow_id_finished,
             ],
         ),
         (
@@ -151,9 +151,9 @@ pub async fn test_dataset_flow_filter_by_flow_type(catalog: &Catalog) {
                 ..Default::default()
             },
             vec![
-                foo_cases.compaction_flow_ids.flow_id_finished,
-                foo_cases.compaction_flow_ids.flow_id_running,
                 foo_cases.compaction_flow_ids.flow_id_waiting,
+                foo_cases.compaction_flow_ids.flow_id_running,
+                foo_cases.compaction_flow_ids.flow_id_finished,
             ],
         ),
         (
@@ -261,10 +261,10 @@ pub async fn test_dataset_flow_filter_by_initiator_with_multiple_variants(catalo
                 ..Default::default()
             },
             vec![
-                foo_cases.compaction_flow_ids.flow_id_running,
                 foo_cases.compaction_flow_ids.flow_id_waiting,
-                foo_cases.ingest_flow_ids.flow_id_running,
                 foo_cases.ingest_flow_ids.flow_id_waiting,
+                foo_cases.compaction_flow_ids.flow_id_running,
+                foo_cases.ingest_flow_ids.flow_id_running,
             ],
         ),
         // should return the same amount even if some non existing user was provided
@@ -274,10 +274,10 @@ pub async fn test_dataset_flow_filter_by_initiator_with_multiple_variants(catalo
                 ..Default::default()
             },
             vec![
-                foo_cases.compaction_flow_ids.flow_id_running,
                 foo_cases.compaction_flow_ids.flow_id_waiting,
-                foo_cases.ingest_flow_ids.flow_id_running,
                 foo_cases.ingest_flow_ids.flow_id_waiting,
+                foo_cases.compaction_flow_ids.flow_id_running,
+                foo_cases.ingest_flow_ids.flow_id_running,
             ],
         ),
     ];
@@ -539,8 +539,8 @@ pub async fn test_dataset_flow_pagination(catalog: &Catalog) {
                 limit: 2,
             },
             vec![
-                foo_cases.compaction_flow_ids.flow_id_finished,
-                foo_cases.compaction_flow_ids.flow_id_running,
+                foo_cases.compaction_flow_ids.flow_id_waiting,
+                foo_cases.ingest_flow_ids.flow_id_waiting,
             ],
         ),
         (
@@ -549,9 +549,9 @@ pub async fn test_dataset_flow_pagination(catalog: &Catalog) {
                 limit: 3,
             },
             vec![
-                foo_cases.compaction_flow_ids.flow_id_waiting,
-                foo_cases.ingest_flow_ids.flow_id_finished,
+                foo_cases.compaction_flow_ids.flow_id_running,
                 foo_cases.ingest_flow_ids.flow_id_running,
+                foo_cases.compaction_flow_ids.flow_id_finished,
             ],
         ),
         (
@@ -560,8 +560,8 @@ pub async fn test_dataset_flow_pagination(catalog: &Catalog) {
                 limit: 2,
             },
             vec![
-                foo_cases.ingest_flow_ids.flow_id_running,
-                foo_cases.ingest_flow_ids.flow_id_waiting,
+                foo_cases.compaction_flow_ids.flow_id_finished,
+                foo_cases.ingest_flow_ids.flow_id_finished,
             ],
         ),
         (
@@ -569,7 +569,7 @@ pub async fn test_dataset_flow_pagination(catalog: &Catalog) {
                 offset: 5,
                 limit: 2,
             },
-            vec![foo_cases.ingest_flow_ids.flow_id_waiting],
+            vec![foo_cases.ingest_flow_ids.flow_id_finished],
         ),
         (
             PaginationOpts {
@@ -612,7 +612,7 @@ pub async fn test_dataset_flow_pagination_with_filters(catalog: &Catalog) {
             },
             3,
             vec![
-                foo_cases.ingest_flow_ids.flow_id_finished,
+                foo_cases.ingest_flow_ids.flow_id_waiting,
                 foo_cases.ingest_flow_ids.flow_id_running,
             ],
         ),
