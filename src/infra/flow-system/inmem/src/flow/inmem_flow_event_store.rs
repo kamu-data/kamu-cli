@@ -482,25 +482,7 @@ impl FlowEventStore for InMemoryFlowEventStore {
         filters: &DatasetFlowFilters,
         pagination: PaginationOpts,
     ) -> FlowIDStream {
-        let flow_ids_page: Vec<_> = {
-            let state = self.inner.as_state();
-            let g = state.lock().unwrap();
-            g.all_flows_by_dataset
-                .get(dataset_id)
-                .map(|dataset_flow_ids| {
-                    dataset_flow_ids
-                        .iter()
-                        .rev()
-                        .filter(|flow_id| g.matches_dataset_flow(**flow_id, filters))
-                        .skip(pagination.offset)
-                        .take(pagination.limit)
-                        .map(|flow_id| Ok(*flow_id))
-                        .collect()
-                })
-                .unwrap_or_default()
-        };
-
-        Box::pin(futures::stream::iter(flow_ids_page))
+        self.get_all_flow_ids_by_datasets(HashSet::from([dataset_id.clone()]), filters, pagination)
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id))]
