@@ -682,12 +682,7 @@ impl FlowEventStore for PostgresFlowEventStore {
                     (SELECT
                         f.flow_id,
                         f.flow_status,
-                        MAX(e.event_time) as last_event_time,
-                        (CASE
-                            WHEN f.flow_status = 'waiting' THEN 1
-                            WHEN f.flow_status = 'running' THEN 2
-                            ELSE 3
-                        END) AS ord_status
+                        MAX(e.event_time) as last_event_time
                     FROM flows f
                     LEFT JOIN flow_events e USING(flow_id)
                     WHERE
@@ -697,7 +692,7 @@ impl FlowEventStore for PostgresFlowEventStore {
                         AND (cast($4 as TEXT[]) IS NULL OR f.initiator = ANY($4))
                     GROUP BY f.flow_id, f.flow_status)
                 SELECT flow_id FROM unsorted_flows
-                ORDER BY ord_status, last_event_time DESC
+                ORDER BY flow_status, last_event_time DESC
                 LIMIT $5 OFFSET $6
                 "#,
                 dataset_ids as Vec<String>,
