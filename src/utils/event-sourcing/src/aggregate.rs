@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashMap;
 use std::marker::PhantomData;
 
 use internal_error::InternalError;
@@ -114,6 +115,38 @@ where
                 LoadError::ProjectionError(e) => Err(TryLoadError::ProjectionError(e)),
             },
         }
+    }
+
+    pub async fn load_multi(
+        queries: Vec<Proj::Query>,
+        event_store: &Store,
+    ) -> Result<Vec<Self>, LoadError<Proj>> {
+        use tokio_stream::StreamExt;
+
+        let mut event_stream = event_store.get_events_multi(queries.clone());
+
+        let mut aggs: HashMap<Proj::Query, Self> = HashMap::new();
+
+        while let Some(res) = event_stream.next().await {
+            let (query, event_id, event) = res?;
+            if let Some(agg) = aggs.get_mut(&query) {
+                agg.apply_stored(event_id, event)?;
+            } else {
+                let agg = Self::from_stored_event(query.clone(), event_id, event)?;
+                aggs.insert(query, agg);
+            }
+        }
+
+        let mut result: Vec<Self> = vec![];
+        for query in queries {
+            match aggs.remove(&query) {
+                None => return Err(AggregateNotFoundError::new(query).into()),
+                Some(agg) => {
+                    result.push(agg);
+                }
+            }
+        }
+        Ok(result)
     }
 
     /// Same as [Aggregate::load()] but with extra control knobs

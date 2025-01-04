@@ -13,7 +13,7 @@ use std::sync::Arc;
 use chrono::{DateTime, Utc};
 use database_common::PaginationOpts;
 use dill::{component, interface, Catalog};
-use futures::TryStreamExt;
+use futures::{StreamExt, TryStreamExt};
 use internal_error::ResultIntoInternal;
 use kamu_core::DatasetOwnershipService;
 use kamu_flow_system::*;
@@ -46,6 +46,18 @@ impl FlowQueryServiceImpl {
             agent_config,
         }
     }
+    fn flow_state_stream<'a>(&'a self, flow_ids: FlowIDStream<'a>) -> FlowStateStream<'a> {
+        Box::pin(async_stream::try_stream! {
+            let mut chunks = flow_ids.try_chunks(100);
+            while let Some(item) = chunks.next().await {
+                let ids = item.int_err()?;
+                let flows = Flow::load_multi(ids, self.flow_event_store.as_ref()).await.int_err()?;
+                for flow in flows {
+                    yield flow.into();
+                }
+            }
+        })
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -67,21 +79,11 @@ impl FlowQueryService for FlowQueryServiceImpl {
             .get_count_flows_by_dataset(dataset_id, &filters)
             .await?;
 
-        let dataset_id = dataset_id.clone();
+        let relevant_flow_ids =
+            self.flow_event_store
+                .get_all_flow_ids_by_dataset(&dataset_id, &filters, pagination);
 
-        let matched_stream = Box::pin(async_stream::try_stream! {
-            let relevant_flow_ids: Vec<_> = self
-                .flow_event_store
-                .get_all_flow_ids_by_dataset(&dataset_id, &filters, pagination)
-                .try_collect()
-                .await?;
-
-            // TODO: implement batch loading
-            for flow_id in relevant_flow_ids {
-                let flow = Flow::load(flow_id, self.flow_event_store.as_ref()).await.int_err()?;
-                yield flow.into();
-            }
-        });
+        let matched_stream = self.flow_state_stream(relevant_flow_ids);
 
         Ok(FlowStateListing {
             matched_stream,
@@ -144,20 +146,12 @@ impl FlowQueryService for FlowQueryServiceImpl {
 
         let account_dataset_ids: HashSet<DatasetID> = HashSet::from_iter(filtered_dataset_ids);
 
-        let matched_stream = Box::pin(async_stream::try_stream! {
-            let relevant_flow_ids: Vec<_> = self
-                .flow_event_store
-                .get_all_flow_ids_by_datasets(account_dataset_ids, &dataset_flow_filters, pagination)
-                .try_collect()
-                .await
-                .int_err()?;
-
-            // TODO: implement batch loading
-            for flow_id in relevant_flow_ids {
-                let flow = Flow::load(flow_id, self.flow_event_store.as_ref()).await.int_err()?;
-                yield flow.into();
-            }
-        });
+        let relevant_flow_ids = self.flow_event_store.get_all_flow_ids_by_datasets(
+            account_dataset_ids,
+            &dataset_flow_filters,
+            pagination,
+        );
+        let matched_stream = self.flow_state_stream(relevant_flow_ids);
 
         Ok(FlowStateListing {
             matched_stream,
@@ -209,19 +203,11 @@ impl FlowQueryService for FlowQueryServiceImpl {
             .await
             .int_err()?;
 
-        let matched_stream = Box::pin(async_stream::try_stream! {
-            let relevant_flow_ids: Vec<_> = self
-                .flow_event_store
-                .get_all_system_flow_ids(&filters, pagination)
-                .try_collect()
-                .await?;
+        let relevant_flow_ids = self
+            .flow_event_store
+            .get_all_system_flow_ids(&filters, pagination);
 
-            // TODO: implement batch loading
-            for flow_id in relevant_flow_ids {
-                let flow = Flow::load(flow_id, self.flow_event_store.as_ref()).await.int_err()?;
-                yield flow.into();
-            }
-        });
+        let matched_stream = self.flow_state_stream(relevant_flow_ids);
 
         Ok(FlowStateListing {
             matched_stream,
@@ -242,19 +228,10 @@ impl FlowQueryService for FlowQueryServiceImpl {
             .get_count_all_flows(&empty_filters)
             .await?;
 
-        let matched_stream = Box::pin(async_stream::try_stream! {
-            let all_flows: Vec<_> = self
-                .flow_event_store
-                .get_all_flow_ids(&empty_filters, pagination)
-                .try_collect()
-                .await?;
-
-            // TODO: implement batch loading
-            for flow_id in all_flows {
-                let flow = Flow::load(flow_id, self.flow_event_store.as_ref()).await.int_err()?;
-                yield flow.into();
-            }
-        });
+        let all_flows = self
+            .flow_event_store
+            .get_all_flow_ids(&empty_filters, pagination);
+        let matched_stream = self.flow_state_stream(all_flows);
 
         Ok(FlowStateListing {
             matched_stream,

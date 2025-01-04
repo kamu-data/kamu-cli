@@ -73,6 +73,19 @@ pub fn derive_aggregate(tokens: proc_macro::TokenStream) -> proc_macro::TokenStr
             }
 
             #[inline]
+            pub async fn load_multi(
+                queries: Vec<<#proj_type as ::event_sourcing::Projection>::Query>,
+                event_store: &#store_type,
+            ) -> Result<Vec<Self>, LoadError<#proj_type>> {
+                let aggs = ::event_sourcing::Aggregate::load_multi(queries, event_store).await?;
+                let mut result = vec![];
+                for agg in aggs {
+                    result.push(Self(agg));
+                }
+                Ok(result)
+            }
+
+            #[inline]
             pub async fn try_load(
                 query: <#proj_type as ::event_sourcing::Projection>::Query,
                 event_store: &#store_type,
