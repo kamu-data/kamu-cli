@@ -79,9 +79,9 @@ impl FlowQueryService for FlowQueryServiceImpl {
             .get_count_flows_by_dataset(dataset_id, &filters)
             .await?;
 
-        let relevant_flow_ids =
-            self.flow_event_store
-                .get_all_flow_ids_by_dataset(&dataset_id, &filters, pagination);
+        let relevant_flow_ids = self
+            .flow_event_store
+            .get_all_flow_ids_by_dataset(dataset_id, &filters, pagination);
 
         let matched_stream = self.flow_state_stream(relevant_flow_ids);
 
