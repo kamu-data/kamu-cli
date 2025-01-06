@@ -206,7 +206,15 @@ pub fn try_build_db_connection_settings(
     raw_db_config: &DatabaseConfig,
 ) -> Option<DatabaseConnectionSettings> {
     fn convert(c: &RemoteDatabaseConfig, provider: DatabaseProvider) -> DatabaseConnectionSettings {
-        DatabaseConnectionSettings::new(provider, c.database_name.clone(), c.host.clone(), c.port)
+        DatabaseConnectionSettings::new(
+            provider,
+            c.database_name.clone(),
+            c.host.clone(),
+            c.port,
+            c.max_connections,
+            c.max_lifetime_secs,
+            c.acquire_timeout_secs,
+        )
     }
 
     match raw_db_config {
