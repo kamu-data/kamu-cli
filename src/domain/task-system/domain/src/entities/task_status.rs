@@ -42,6 +42,10 @@ impl TaskOutcome {
     pub fn is_success(&self) -> bool {
         matches!(self, Self::Success(_))
     }
+
+    pub fn is_failed(&self) -> bool {
+        matches!(self, Self::Failed(_))
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

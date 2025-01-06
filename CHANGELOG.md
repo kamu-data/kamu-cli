@@ -14,6 +14,7 @@ Recommendation: for ease of reading, use the following order:
 ## [Unreleased]
 ### Fixed
 - GQL api flows queries now fetch dataset polling source only once per dataset(and only if Ingest flow type is here)
+- Flow trigger status now become disable on flow fail
 
 ## [0.216.0] - 2024-12-30
 ### Changed

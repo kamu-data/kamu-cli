@@ -590,6 +590,16 @@ impl MessageConsumerT<TaskProgressMessage> for FlowAgentImpl {
                                 .await?;
                         }
 
+                        // In case of failure:
+                        //  - disable trigger
+                        if message.outcome.is_failed() {
+                            let flow_trigger_service =
+                                target_catalog.get_one::<dyn FlowTriggerService>().unwrap();
+                            flow_trigger_service
+                                .pause_flow_trigger(finish_time, flow.flow_key.clone())
+                                .await?;
+                        }
+
                         let outbox = target_catalog.get_one::<dyn Outbox>().unwrap();
                         outbox
                             .post_message(
