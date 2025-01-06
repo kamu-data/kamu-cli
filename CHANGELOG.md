@@ -15,6 +15,7 @@ Recommendation: for ease of reading, use the following order:
 ### Changed
 - GraphQL: flows are listed ordered by status and last event time
 - Merged two methods(`saveEnvVariable` and `modifyEnvVariable`) from `DatasetEnvVarsMut` info one `upsertEnvVariable`
+- Extended database config options with next fields: `maxConnections`, `maxLifeTimeSecs` and `acquireTimeoutSecs`
 ### Fixed
 - GQL api flows queries now fetch dataset polling source only once per dataset(and only if Ingest flow type is here)
 - Flow trigger status now become disable on flow fail
