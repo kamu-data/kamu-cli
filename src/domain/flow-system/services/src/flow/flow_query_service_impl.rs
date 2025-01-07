@@ -48,12 +48,12 @@ impl FlowQueryServiceImpl {
     }
     fn flow_state_stream<'a>(&'a self, flow_ids: FlowIDStream<'a>) -> FlowStateStream<'a> {
         Box::pin(async_stream::try_stream! {
-            let mut chunks = flow_ids.try_chunks(100);
+            let mut chunks = flow_ids.try_chunks(32);
             while let Some(item) = chunks.next().await {
                 let ids = item.int_err()?;
                 let flows = Flow::load_multi(ids, self.flow_event_store.as_ref()).await.int_err()?;
                 for flow in flows {
-                    yield flow.into();
+                    yield flow.int_err()?.into();
                 }
             }
         })

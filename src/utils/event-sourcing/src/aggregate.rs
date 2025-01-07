@@ -117,34 +117,46 @@ where
         }
     }
 
+    /// Loads multiple aggregations
+    ///
+    /// Returns either collection of aggregation results or an error, when
+    /// failed to read from source stream.
+    ///
+    /// "Ok" vector contains results for every item from `queries` argument.
+    /// Order is preserved.
     pub async fn load_multi(
         queries: Vec<Proj::Query>,
         event_store: &Store,
-    ) -> Result<Vec<Self>, LoadError<Proj>> {
+    ) -> Result<Vec<Result<Self, LoadError<Proj>>>, GetEventsError> {
         use tokio_stream::StreamExt;
 
         let mut event_stream = event_store.get_events_multi(queries.clone());
-
-        let mut aggs: HashMap<Proj::Query, Self> = HashMap::new();
+        let mut agg_results: HashMap<Proj::Query, Result<Self, LoadError<Proj>>> = HashMap::new();
 
         while let Some(res) = event_stream.next().await {
+            // When failed to read at least one event from source stream,
+            // function returns error result immediately
             let (query, event_id, event) = res?;
-            if let Some(agg) = aggs.get_mut(&query) {
-                agg.apply_stored(event_id, event)?;
-            } else {
-                let agg = Self::from_stored_event(query.clone(), event_id, event)?;
-                aggs.insert(query, agg);
-            }
+            let agg_result: Result<Aggregate<Proj, Store>, LoadError<Proj>> =
+                match agg_results.remove(&query) {
+                    None => Self::from_stored_event(query.clone(), event_id, event)
+                        .map_err(|err| err.into()),
+                    Some(Ok(mut agg)) => match agg.apply_stored(event_id, event) {
+                        Ok(_) => Ok(agg),
+                        Err(err) => Err(err.into()),
+                    },
+                    Some(Err(err)) => Err(err),
+                };
+            agg_results.insert(query, agg_result);
         }
 
-        let mut result: Vec<Self> = vec![];
+        let mut result: Vec<Result<Self, LoadError<Proj>>> = vec![];
         for query in queries {
-            match aggs.remove(&query) {
-                None => return Err(AggregateNotFoundError::new(query).into()),
-                Some(agg) => {
-                    result.push(agg);
-                }
-            }
+            let item = match agg_results.remove(&query) {
+                None => Err(AggregateNotFoundError::new(query).into()),
+                Some(agg) => agg,
+            };
+            result.push(item);
         }
         Ok(result)
     }
