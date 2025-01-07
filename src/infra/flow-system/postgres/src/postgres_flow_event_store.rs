@@ -388,7 +388,7 @@ impl EventStore<FlowState> for PostgresFlowEventStore {
                 let event = serde_json::from_value::<FlowEvent>(event_row.event_payload)
                     .map_err(|e| sqlx::Error::Decode(Box::new(e)))?;
 
-                Ok((FlowID::try_from(event_row.flow_id).unwrap(), // todo: handle error
+                Ok((FlowID::try_from(event_row.flow_id).unwrap(), // ids are always > 0
                     EventID::new(event_row.event_id),
                     event))
             })
