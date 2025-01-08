@@ -11,8 +11,7 @@ use kamu_datasets::{
     DatasetEnvVarService,
     DatasetEnvVarValue,
     DeleteDatasetEnvVarError,
-    ModifyDatasetEnvVarError,
-    SaveDatasetEnvVarError,
+    UpsertDatasetEnvVarStatus,
 };
 use opendatafabric as odf;
 use secrecy::SecretString;
@@ -34,13 +33,13 @@ impl DatasetEnvVarsMut {
         Self { dataset_handle }
     }
 
-    async fn save_env_variable(
+    async fn upsert_env_variable(
         &self,
         ctx: &Context<'_>,
         key: String,
         value: String,
         is_secret: bool,
-    ) -> Result<SaveDatasetEnvVarResult> {
+    ) -> Result<UpsertDatasetEnvVarResult> {
         utils::check_dataset_write_access(ctx, &self.dataset_handle).await?;
 
         let dataset_env_var_service = from_catalog_n!(ctx, dyn DatasetEnvVarService);
@@ -51,31 +50,30 @@ impl DatasetEnvVarsMut {
             DatasetEnvVarValue::Regular(value)
         };
 
-        match dataset_env_var_service
-            .create_dataset_env_var(
+        let upsert_result = dataset_env_var_service
+            .upsert_dataset_env_var(
                 key.as_str(),
                 &dataset_env_var_value,
                 &self.dataset_handle.id,
             )
             .await
-        {
-            Ok(created_dataset_env_var) => Ok(SaveDatasetEnvVarResult::Success(
-                SaveDatasetEnvVarResultSuccess {
-                    env_var: ViewDatasetEnvVar::new(created_dataset_env_var),
-                },
-            )),
-            Err(err) => match err {
-                SaveDatasetEnvVarError::Duplicate(_) => Ok(SaveDatasetEnvVarResult::Duplicate(
-                    SaveDatasetEnvVarResultDuplicate {
-                        dataset_env_var_key: key,
-                        dataset_name: self.dataset_handle.alias.dataset_name.clone().into(),
-                    },
-                )),
-                SaveDatasetEnvVarError::Internal(internal_err) => {
-                    Err(GqlError::Internal(internal_err))
-                }
-            },
-        }
+            .map_err(GqlError::Internal)?;
+
+        Ok(match upsert_result.status {
+            UpsertDatasetEnvVarStatus::Created => {
+                UpsertDatasetEnvVarResult::Created(UpsertDatasetEnvVarResultCreated {
+                    env_var: ViewDatasetEnvVar::new(upsert_result.dataset_env_var),
+                })
+            }
+            UpsertDatasetEnvVarStatus::Updated => {
+                UpsertDatasetEnvVarResult::Updated(UpsertDatasetEnvVarResultUpdated {
+                    env_var: ViewDatasetEnvVar::new(upsert_result.dataset_env_var),
+                })
+            }
+            UpsertDatasetEnvVarStatus::UpToDate => {
+                UpsertDatasetEnvVarResult::UpToDate(UpsertDatasetEnvVarUpToDate)
+            }
+        })
     }
 
     async fn delete_env_variable(
@@ -108,65 +106,51 @@ impl DatasetEnvVarsMut {
             },
         }
     }
-
-    async fn modify_env_variable(
-        &self,
-        ctx: &Context<'_>,
-        id: DatasetEnvVarID,
-        new_value: String,
-        is_secret: bool,
-    ) -> Result<ModifyDatasetEnvVarResult> {
-        utils::check_dataset_write_access(ctx, &self.dataset_handle).await?;
-
-        let dataset_env_var_service = from_catalog_n!(ctx, dyn DatasetEnvVarService);
-        let dataset_env_var_value = if is_secret {
-            DatasetEnvVarValue::Secret(SecretString::from(new_value))
-        } else {
-            DatasetEnvVarValue::Regular(new_value)
-        };
-
-        match dataset_env_var_service
-            .modify_dataset_env_var(&id.clone().into(), &dataset_env_var_value)
-            .await
-        {
-            Ok(_) => Ok(ModifyDatasetEnvVarResult::Success(
-                ModifyDatasetEnvVarResultSuccess {
-                    env_var_id: id.clone(),
-                },
-            )),
-            Err(err) => match err {
-                ModifyDatasetEnvVarError::NotFound(_) => Ok(ModifyDatasetEnvVarResult::NotFound(
-                    ModifyDatasetEnvVarResultNotFound {
-                        env_var_id: id.clone(),
-                    },
-                )),
-                ModifyDatasetEnvVarError::Internal(internal_err) => {
-                    Err(GqlError::Internal(internal_err))
-                }
-            },
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Interface, Debug, Clone)]
 #[graphql(field(name = "message", ty = "String"))]
-pub enum SaveDatasetEnvVarResult {
-    Success(SaveDatasetEnvVarResultSuccess),
-    Duplicate(SaveDatasetEnvVarResultDuplicate),
+pub enum UpsertDatasetEnvVarResult {
+    Created(UpsertDatasetEnvVarResultCreated),
+    Updated(UpsertDatasetEnvVarResultUpdated),
+    UpToDate(UpsertDatasetEnvVarUpToDate),
+}
+
+#[derive(Debug, Clone)]
+pub struct UpsertDatasetEnvVarUpToDate;
+
+#[Object]
+impl UpsertDatasetEnvVarUpToDate {
+    pub async fn message(&self) -> String {
+        "Dataset env var is up to date".to_string()
+    }
 }
 
 #[derive(SimpleObject, Debug, Clone)]
 #[graphql(complex)]
-pub struct SaveDatasetEnvVarResultSuccess {
+pub struct UpsertDatasetEnvVarResultCreated {
     pub env_var: ViewDatasetEnvVar,
 }
 
 #[ComplexObject]
-impl SaveDatasetEnvVarResultSuccess {
+impl UpsertDatasetEnvVarResultCreated {
     async fn message(&self) -> String {
-        "Success".to_string()
+        "Created".to_string()
+    }
+}
+
+#[derive(SimpleObject, Debug, Clone)]
+#[graphql(complex)]
+pub struct UpsertDatasetEnvVarResultUpdated {
+    pub env_var: ViewDatasetEnvVar,
+}
+
+#[ComplexObject]
+impl UpsertDatasetEnvVarResultUpdated {
+    async fn message(&self) -> String {
+        "Updated".to_string()
     }
 }
 
