@@ -78,9 +78,9 @@ impl SqliteFlowEventStore {
                 dataset_flow_type,
                 initiator,
             )
-                    .execute(connection_mut)
-                    .await
-                    .map_err(ErrorIntoInternal::int_err)?;
+                .execute(connection_mut)
+                .await
+                .map_err(ErrorIntoInternal::int_err)?;
             }
             FlowKey::System(fk_system) => {
                 let system_flow_type = fk_system.flow_type;
@@ -165,9 +165,9 @@ impl SqliteFlowEventStore {
             maybe_scheduled_for_activation_at,
             maybe_prev_stored_event_id,
         )
-            .fetch_all(connection_mut)
-            .await
-            .map_err(|e| SaveEventsError::Internal(e.int_err()))?;
+        .fetch_all(connection_mut)
+        .await
+        .map_err(|e| SaveEventsError::Internal(e.int_err()))?;
 
         // If a previously stored event id does not match the expected,
         // this means we've just detected a concurrent modification (version conflict)
@@ -646,14 +646,11 @@ impl FlowEventStore for SqliteFlowEventStore {
 
             let query_str = format!(
                 r#"
-                SELECT
-                    flow_id
-                FROM flows
-                WHERE
-                    dataset_id = $1
+                SELECT flow_id FROM flows
+                    WHERE dataset_id = $1
                     AND (cast($2 as dataset_flow_type) IS NULL OR dataset_flow_type = $2)
                     AND (cast($3 as flow_status_type) IS NULL OR flow_status = $3)
-                    AND ($4 = 0 OR initiator in ({}))
+                    AND ($4 = 0 OR initiator IN ({}))
                 ORDER BY flow_status DESC, last_event_id DESC
                 LIMIT $5 OFFSET $6
                 "#,
@@ -760,11 +757,8 @@ impl FlowEventStore for SqliteFlowEventStore {
 
             let query_str = format!(
                 r#"
-                SELECT
-                    flow_id
-                FROM flows
-                WHERE
-                    dataset_id in ({})
+                SELECT flow_id FROM flows
+                    WHERE dataset_id in ({})
                     AND (cast($1 as dataset_flow_type) IS NULL OR dataset_flow_type = $1)
                     AND (cast($2 as flow_status_type) IS NULL OR flow_status = $2)
                     AND ($3 = 0 OR initiator in ({}))
