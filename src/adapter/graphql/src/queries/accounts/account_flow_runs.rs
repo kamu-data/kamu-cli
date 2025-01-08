@@ -86,12 +86,9 @@ impl AccountFlowRuns {
             .await
             .int_err()?;
 
-        let matched_flows: Vec<_> = flows_state_listing
-            .matched_stream
-            .map_ok(Flow::new)
-            .try_collect()
-            .await?;
+        let matched_flow_states: Vec<_> = flows_state_listing.matched_stream.try_collect().await?;
         let total_count = flows_state_listing.total_count;
+        let matched_flows = Flow::build_batch(matched_flow_states, ctx).await?;
 
         Ok(FlowConnection::new(
             matched_flows,
