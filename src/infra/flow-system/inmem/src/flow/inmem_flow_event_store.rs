@@ -535,13 +535,14 @@ impl FlowEventStore for InMemoryFlowEventStore {
             let recent_events: HashMap<FlowID, DateTime<Utc>> = g.events.iter().fold(
                 HashMap::new(),
                 |mut acc: HashMap<FlowID, DateTime<Utc>>, i: &FlowEvent| {
-                    let key = i.flow_id();
-                    match acc.get(&key) {
-                        Some(ref current) if current.ge(&&i.event_time()) => {}
-                        _ => {
-                            acc.insert(key, i.event_time());
-                        }
-                    };
+                    let event_time = i.event_time();
+                    acc.entry(i.flow_id())
+                        .and_modify(|val| {
+                            if event_time.gt(val) {
+                                *val = event_time;
+                            };
+                        })
+                        .or_insert(event_time);
                     acc
                 },
             );

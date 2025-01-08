@@ -592,21 +592,15 @@ impl FlowEventStore for PostgresFlowEventStore {
 
             let mut query_stream = sqlx::query!(
                 r#"
-                WITH unsorted_flows AS
-                    (SELECT
-                        f.flow_id,
-                        f.flow_status,
-                        MAX(e.event_time) as last_event_time
-                    FROM flows f
-                    LEFT JOIN flow_events e USING(flow_id)
-                    WHERE
-                        f.dataset_id = $1
-                        AND (cast($2 as dataset_flow_type) IS NULL OR f.dataset_flow_type = $2)
-                        AND (cast($3 as flow_status_type) IS NULL OR f.flow_status = $3)
-                        AND (cast($4 as TEXT[]) IS NULL OR f.initiator = ANY($4))
-                    GROUP BY f.flow_id, f.flow_status)
-                SELECT flow_id FROM unsorted_flows
-                ORDER BY flow_status, last_event_time DESC
+                SELECT
+                    flow_id
+                FROM flows
+                WHERE
+                    dataset_id = $1
+                    AND (cast($2 as dataset_flow_type) IS NULL OR dataset_flow_type = $2)
+                    AND (cast($3 as flow_status_type) IS NULL OR flow_status = $3)
+                    AND (cast($4 as TEXT[]) IS NULL OR initiator = ANY($4))
+                ORDER BY flow_status, last_event_id DESC
                 LIMIT $5 OFFSET $6
                 "#,
                dataset_id,
@@ -687,21 +681,15 @@ impl FlowEventStore for PostgresFlowEventStore {
 
             let mut query_stream = sqlx::query!(
                 r#"
-                WITH unsorted_flows AS
-                    (SELECT
-                        f.flow_id,
-                        f.flow_status,
-                        MAX(e.event_time) as last_event_time
-                    FROM flows f
-                    LEFT JOIN flow_events e USING(flow_id)
-                    WHERE
-                        f.dataset_id = ANY($1)
-                        AND (cast($2 as dataset_flow_type) IS NULL OR f.dataset_flow_type = $2)
-                        AND (cast($3 as flow_status_type) IS NULL OR f.flow_status = $3)
-                        AND (cast($4 as TEXT[]) IS NULL OR f.initiator = ANY($4))
-                    GROUP BY f.flow_id, f.flow_status)
-                SELECT flow_id FROM unsorted_flows
-                ORDER BY flow_status, last_event_time DESC
+                SELECT
+                    flow_id
+                FROM flows
+                WHERE
+                    dataset_id = ANY($1)
+                    AND (cast($2 as dataset_flow_type) IS NULL OR dataset_flow_type = $2)
+                    AND (cast($3 as flow_status_type) IS NULL OR flow_status = $3)
+                    AND (cast($4 as TEXT[]) IS NULL OR initiator = ANY($4))
+                ORDER BY flow_status, last_event_id DESC
                 LIMIT $5 OFFSET $6
                 "#,
                 dataset_ids as Vec<String>,
