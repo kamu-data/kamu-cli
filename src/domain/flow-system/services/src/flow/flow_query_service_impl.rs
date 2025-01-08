@@ -46,9 +46,14 @@ impl FlowQueryServiceImpl {
             agent_config,
         }
     }
+
     fn flow_state_stream<'a>(&'a self, flow_ids: FlowIDStream<'a>) -> FlowStateStream<'a> {
         Box::pin(async_stream::try_stream! {
-            let mut chunks = flow_ids.try_chunks(32);
+            // 32-items batching will give a performance boost,
+            // but queries for long-lived datasets should not bee too heavy.
+            // This number was chosen without any performance measurements. Subject of change.
+            let batch_size = 32;
+            let mut chunks = flow_ids.try_chunks(batch_size);
             while let Some(item) = chunks.next().await {
                 let ids = item.int_err()?;
                 let flows = Flow::load_multi(ids, self.flow_event_store.as_ref()).await.int_err()?;
@@ -79,11 +84,11 @@ impl FlowQueryService for FlowQueryServiceImpl {
             .get_count_flows_by_dataset(dataset_id, &filters)
             .await?;
 
-        let relevant_flow_ids = self
+        let flow_ids_stream = self
             .flow_event_store
             .get_all_flow_ids_by_dataset(dataset_id, &filters, pagination);
 
-        let matched_stream = self.flow_state_stream(relevant_flow_ids);
+        let matched_stream = self.flow_state_stream(flow_ids_stream);
 
         Ok(FlowStateListing {
             matched_stream,
@@ -146,12 +151,12 @@ impl FlowQueryService for FlowQueryServiceImpl {
 
         let account_dataset_ids: HashSet<DatasetID> = HashSet::from_iter(filtered_dataset_ids);
 
-        let relevant_flow_ids = self.flow_event_store.get_all_flow_ids_by_datasets(
+        let flow_ids_stream = self.flow_event_store.get_all_flow_ids_by_datasets(
             account_dataset_ids,
             &dataset_flow_filters,
             pagination,
         );
-        let matched_stream = self.flow_state_stream(relevant_flow_ids);
+        let matched_stream = self.flow_state_stream(flow_ids_stream);
 
         Ok(FlowStateListing {
             matched_stream,
@@ -203,11 +208,11 @@ impl FlowQueryService for FlowQueryServiceImpl {
             .await
             .int_err()?;
 
-        let relevant_flow_ids = self
+        let flow_ids_stream = self
             .flow_event_store
             .get_all_system_flow_ids(&filters, pagination);
 
-        let matched_stream = self.flow_state_stream(relevant_flow_ids);
+        let matched_stream = self.flow_state_stream(flow_ids_stream);
 
         Ok(FlowStateListing {
             matched_stream,
