@@ -597,7 +597,7 @@ impl FlowEventStore for PostgresFlowEventStore {
                     AND (cast($2 as dataset_flow_type) IS NULL OR dataset_flow_type = $2)
                     AND (cast($3 as flow_status_type) IS NULL OR flow_status = $3)
                     AND (cast($4 as TEXT[]) IS NULL OR initiator = ANY($4))
-                ORDER BY flow_id DESC
+                ORDER BY flow_status, last_event_id DESC
                 LIMIT $5 OFFSET $6
                 "#,
                dataset_id,
@@ -683,7 +683,7 @@ impl FlowEventStore for PostgresFlowEventStore {
                     AND (cast($2 as dataset_flow_type) IS NULL OR dataset_flow_type = $2)
                     AND (cast($3 as flow_status_type) IS NULL OR flow_status = $3)
                     AND (cast($4 as TEXT[]) IS NULL OR initiator = ANY($4))
-                ORDER BY flow_id DESC
+                ORDER BY flow_status, last_event_id DESC
                 LIMIT $5 OFFSET $6
                 "#,
                 dataset_ids as Vec<String>,

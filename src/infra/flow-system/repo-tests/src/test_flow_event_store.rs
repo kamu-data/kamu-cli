@@ -39,12 +39,12 @@ pub async fn test_dataset_flow_empty_filters_distingush_dataset(catalog: &Catalo
         },
         6,
         vec![
-            foo_cases.compaction_flow_ids.flow_id_finished,
-            foo_cases.compaction_flow_ids.flow_id_running,
             foo_cases.compaction_flow_ids.flow_id_waiting,
-            foo_cases.ingest_flow_ids.flow_id_finished,
-            foo_cases.ingest_flow_ids.flow_id_running,
             foo_cases.ingest_flow_ids.flow_id_waiting,
+            foo_cases.compaction_flow_ids.flow_id_running,
+            foo_cases.ingest_flow_ids.flow_id_running,
+            foo_cases.compaction_flow_ids.flow_id_finished,
+            foo_cases.ingest_flow_ids.flow_id_finished,
         ],
     )
     .await;
@@ -59,12 +59,12 @@ pub async fn test_dataset_flow_empty_filters_distingush_dataset(catalog: &Catalo
         },
         6,
         vec![
-            bar_cases.compaction_flow_ids.flow_id_finished,
-            bar_cases.compaction_flow_ids.flow_id_running,
             bar_cases.compaction_flow_ids.flow_id_waiting,
-            bar_cases.ingest_flow_ids.flow_id_finished,
-            bar_cases.ingest_flow_ids.flow_id_running,
             bar_cases.ingest_flow_ids.flow_id_waiting,
+            bar_cases.compaction_flow_ids.flow_id_running,
+            bar_cases.ingest_flow_ids.flow_id_running,
+            bar_cases.compaction_flow_ids.flow_id_finished,
+            bar_cases.ingest_flow_ids.flow_id_finished,
         ],
     )
     .await;
@@ -140,9 +140,9 @@ pub async fn test_dataset_flow_filter_by_flow_type(catalog: &Catalog) {
                 ..Default::default()
             },
             vec![
-                foo_cases.ingest_flow_ids.flow_id_finished,
-                foo_cases.ingest_flow_ids.flow_id_running,
                 foo_cases.ingest_flow_ids.flow_id_waiting,
+                foo_cases.ingest_flow_ids.flow_id_running,
+                foo_cases.ingest_flow_ids.flow_id_finished,
             ],
         ),
         (
@@ -151,9 +151,9 @@ pub async fn test_dataset_flow_filter_by_flow_type(catalog: &Catalog) {
                 ..Default::default()
             },
             vec![
-                foo_cases.compaction_flow_ids.flow_id_finished,
-                foo_cases.compaction_flow_ids.flow_id_running,
                 foo_cases.compaction_flow_ids.flow_id_waiting,
+                foo_cases.compaction_flow_ids.flow_id_running,
+                foo_cases.compaction_flow_ids.flow_id_finished,
             ],
         ),
         (
@@ -261,10 +261,10 @@ pub async fn test_dataset_flow_filter_by_initiator_with_multiple_variants(catalo
                 ..Default::default()
             },
             vec![
-                foo_cases.compaction_flow_ids.flow_id_running,
                 foo_cases.compaction_flow_ids.flow_id_waiting,
-                foo_cases.ingest_flow_ids.flow_id_running,
                 foo_cases.ingest_flow_ids.flow_id_waiting,
+                foo_cases.compaction_flow_ids.flow_id_running,
+                foo_cases.ingest_flow_ids.flow_id_running,
             ],
         ),
         // should return the same amount even if some non existing user was provided
@@ -274,10 +274,10 @@ pub async fn test_dataset_flow_filter_by_initiator_with_multiple_variants(catalo
                 ..Default::default()
             },
             vec![
-                foo_cases.compaction_flow_ids.flow_id_running,
                 foo_cases.compaction_flow_ids.flow_id_waiting,
-                foo_cases.ingest_flow_ids.flow_id_running,
                 foo_cases.ingest_flow_ids.flow_id_waiting,
+                foo_cases.compaction_flow_ids.flow_id_running,
+                foo_cases.ingest_flow_ids.flow_id_running,
             ],
         ),
     ];
@@ -362,29 +362,29 @@ pub async fn test_dataset_flow_filter_by_datasets(catalog: &Catalog) {
         (
             vec![foo_cases.dataset_id.clone()],
             vec![
-                foo_cases.compaction_flow_ids.flow_id_finished,
-                foo_cases.compaction_flow_ids.flow_id_running,
                 foo_cases.compaction_flow_ids.flow_id_waiting,
-                foo_cases.ingest_flow_ids.flow_id_finished,
-                foo_cases.ingest_flow_ids.flow_id_running,
                 foo_cases.ingest_flow_ids.flow_id_waiting,
+                foo_cases.compaction_flow_ids.flow_id_running,
+                foo_cases.ingest_flow_ids.flow_id_running,
+                foo_cases.compaction_flow_ids.flow_id_finished,
+                foo_cases.ingest_flow_ids.flow_id_finished,
             ],
         ),
         (
             vec![foo_cases.dataset_id.clone(), bar_cases.dataset_id.clone()],
             vec![
-                bar_cases.compaction_flow_ids.flow_id_finished,
-                bar_cases.compaction_flow_ids.flow_id_running,
                 bar_cases.compaction_flow_ids.flow_id_waiting,
-                bar_cases.ingest_flow_ids.flow_id_finished,
-                bar_cases.ingest_flow_ids.flow_id_running,
                 bar_cases.ingest_flow_ids.flow_id_waiting,
-                foo_cases.compaction_flow_ids.flow_id_finished,
-                foo_cases.compaction_flow_ids.flow_id_running,
                 foo_cases.compaction_flow_ids.flow_id_waiting,
-                foo_cases.ingest_flow_ids.flow_id_finished,
-                foo_cases.ingest_flow_ids.flow_id_running,
                 foo_cases.ingest_flow_ids.flow_id_waiting,
+                bar_cases.compaction_flow_ids.flow_id_running,
+                bar_cases.ingest_flow_ids.flow_id_running,
+                foo_cases.compaction_flow_ids.flow_id_running,
+                foo_cases.ingest_flow_ids.flow_id_running,
+                bar_cases.compaction_flow_ids.flow_id_finished,
+                bar_cases.ingest_flow_ids.flow_id_finished,
+                foo_cases.compaction_flow_ids.flow_id_finished,
+                foo_cases.ingest_flow_ids.flow_id_finished,
             ],
         ),
         (vec![DatasetID::new_seeded_ed25519(b"wrong")], vec![]),
@@ -461,13 +461,26 @@ pub async fn test_dataset_flow_filter_by_datasets_with_pagination(catalog: &Cata
     let bar_cases = make_dataset_test_case(flow_event_store.clone()).await;
     make_system_test_case(flow_event_store.clone()).await;
 
+    // Expected order:
+    // bar  compact waiting
+    // bar  ingest  waiting     <- (foo+bar) offset: 1
+    // foo  compact waiting
+    // foo  ingest  waiting
+    // bar  compact running
+    // bar  ingest  running
+    // foo  compact running     <- (foo) offset: 2
+    // foo  ingest  running     <- (foo+bar) offset: 1, limit: 7
+    // bar  compact finished
+    // bar  ingest  finished
+    // foo  compact finished    <- (foo) offset: 2, limit: 3
+    // foo  ingest  finished
     let cases = vec![
         (
             vec![foo_cases.dataset_id.clone()],
             vec![
-                foo_cases.compaction_flow_ids.flow_id_waiting,
-                foo_cases.ingest_flow_ids.flow_id_finished,
+                foo_cases.compaction_flow_ids.flow_id_running,
                 foo_cases.ingest_flow_ids.flow_id_running,
+                foo_cases.compaction_flow_ids.flow_id_finished,
             ],
             PaginationOpts {
                 offset: 2,
@@ -477,13 +490,13 @@ pub async fn test_dataset_flow_filter_by_datasets_with_pagination(catalog: &Cata
         (
             vec![foo_cases.dataset_id.clone(), bar_cases.dataset_id.clone()],
             vec![
-                bar_cases.compaction_flow_ids.flow_id_running,
-                bar_cases.compaction_flow_ids.flow_id_waiting,
-                bar_cases.ingest_flow_ids.flow_id_finished,
-                bar_cases.ingest_flow_ids.flow_id_running,
                 bar_cases.ingest_flow_ids.flow_id_waiting,
-                foo_cases.compaction_flow_ids.flow_id_finished,
+                foo_cases.compaction_flow_ids.flow_id_waiting,
+                foo_cases.ingest_flow_ids.flow_id_waiting,
+                bar_cases.compaction_flow_ids.flow_id_running,
+                bar_cases.ingest_flow_ids.flow_id_running,
                 foo_cases.compaction_flow_ids.flow_id_running,
+                foo_cases.ingest_flow_ids.flow_id_running,
             ],
             PaginationOpts {
                 offset: 1,
@@ -526,8 +539,8 @@ pub async fn test_dataset_flow_pagination(catalog: &Catalog) {
                 limit: 2,
             },
             vec![
-                foo_cases.compaction_flow_ids.flow_id_finished,
-                foo_cases.compaction_flow_ids.flow_id_running,
+                foo_cases.compaction_flow_ids.flow_id_waiting,
+                foo_cases.ingest_flow_ids.flow_id_waiting,
             ],
         ),
         (
@@ -536,9 +549,9 @@ pub async fn test_dataset_flow_pagination(catalog: &Catalog) {
                 limit: 3,
             },
             vec![
-                foo_cases.compaction_flow_ids.flow_id_waiting,
-                foo_cases.ingest_flow_ids.flow_id_finished,
+                foo_cases.compaction_flow_ids.flow_id_running,
                 foo_cases.ingest_flow_ids.flow_id_running,
+                foo_cases.compaction_flow_ids.flow_id_finished,
             ],
         ),
         (
@@ -547,8 +560,8 @@ pub async fn test_dataset_flow_pagination(catalog: &Catalog) {
                 limit: 2,
             },
             vec![
-                foo_cases.ingest_flow_ids.flow_id_running,
-                foo_cases.ingest_flow_ids.flow_id_waiting,
+                foo_cases.compaction_flow_ids.flow_id_finished,
+                foo_cases.ingest_flow_ids.flow_id_finished,
             ],
         ),
         (
@@ -556,7 +569,7 @@ pub async fn test_dataset_flow_pagination(catalog: &Catalog) {
                 offset: 5,
                 limit: 2,
             },
-            vec![foo_cases.ingest_flow_ids.flow_id_waiting],
+            vec![foo_cases.ingest_flow_ids.flow_id_finished],
         ),
         (
             PaginationOpts {
@@ -599,7 +612,7 @@ pub async fn test_dataset_flow_pagination_with_filters(catalog: &Catalog) {
             },
             3,
             vec![
-                foo_cases.ingest_flow_ids.flow_id_finished,
+                foo_cases.ingest_flow_ids.flow_id_waiting,
                 foo_cases.ingest_flow_ids.flow_id_running,
             ],
         ),
@@ -2236,21 +2249,23 @@ struct TestFlowIDs {
 
 async fn make_dataset_test_case(flow_event_store: Arc<dyn FlowEventStore>) -> DatasetTestCase {
     let (_, dataset_id) = DatasetID::new_generated_ed25519();
+    let ingest_flow_ids = make_dataset_test_flows(
+        &dataset_id,
+        DatasetFlowType::Ingest,
+        flow_event_store.clone(),
+    )
+    .await;
+    let compaction_flow_ids = make_dataset_test_flows(
+        &dataset_id,
+        DatasetFlowType::HardCompaction,
+        flow_event_store,
+    )
+    .await;
 
     DatasetTestCase {
         dataset_id: dataset_id.clone(),
-        ingest_flow_ids: make_dataset_test_flows(
-            &dataset_id,
-            DatasetFlowType::Ingest,
-            flow_event_store.clone(),
-        )
-        .await,
-        compaction_flow_ids: make_dataset_test_flows(
-            &dataset_id,
-            DatasetFlowType::HardCompaction,
-            flow_event_store,
-        )
-        .await,
+        ingest_flow_ids,
+        compaction_flow_ids,
     }
 }
 

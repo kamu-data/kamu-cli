@@ -482,25 +482,7 @@ impl FlowEventStore for InMemoryFlowEventStore {
         filters: &DatasetFlowFilters,
         pagination: PaginationOpts,
     ) -> FlowIDStream {
-        let flow_ids_page: Vec<_> = {
-            let state = self.inner.as_state();
-            let g = state.lock().unwrap();
-            g.all_flows_by_dataset
-                .get(dataset_id)
-                .map(|dataset_flow_ids| {
-                    dataset_flow_ids
-                        .iter()
-                        .rev()
-                        .filter(|flow_id| g.matches_dataset_flow(**flow_id, filters))
-                        .skip(pagination.offset)
-                        .take(pagination.limit)
-                        .map(|flow_id| Ok(*flow_id))
-                        .collect()
-                })
-                .unwrap_or_default()
-        };
-
-        Box::pin(futures::stream::iter(flow_ids_page))
+        self.get_all_flow_ids_by_datasets(HashSet::from([dataset_id.clone()]), filters, pagination)
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id))]
@@ -548,25 +530,62 @@ impl FlowEventStore for InMemoryFlowEventStore {
         let flow_ids_page: Vec<_> = {
             let state = self.inner.as_state();
             let g = state.lock().unwrap();
-            let mut result: Vec<Result<FlowID, _>> = vec![];
-            let mut total_count = 0;
-            for flow_id in g.all_flows.iter().rev() {
+
+            // Collect FlowID -> Most recent event time, for sorting purposes
+            let recent_events: HashMap<FlowID, DateTime<Utc>> = g.events.iter().fold(
+                HashMap::new(),
+                |mut acc: HashMap<FlowID, DateTime<Utc>>, i: &FlowEvent| {
+                    let event_time = i.event_time();
+                    acc.entry(i.flow_id())
+                        .and_modify(|val| {
+                            if event_time.gt(val) {
+                                *val = event_time;
+                            };
+                        })
+                        .or_insert(event_time);
+                    acc
+                },
+            );
+
+            // Split events by type
+            let mut waiting_flows: Vec<_> = vec![];
+            let mut running_flows: Vec<_> = vec![];
+            let mut finished_flows: Vec<_> = vec![];
+            for flow_id in &g.all_flows {
+                // Also also apply given filters on this stage in order to reduce amount of
+                // items to process in further steps
                 let flow_key = g.flow_key_by_flow_id.get(flow_id).unwrap();
                 if let FlowKey::Dataset(flow_key_dataset) = flow_key {
                     if dataset_ids.contains(&flow_key_dataset.dataset_id)
                         && g.matches_dataset_flow(*flow_id, filters)
                     {
-                        if result.len() >= pagination.limit {
-                            break;
+                        if let Some(flow) = g.flow_search_index.get(flow_id) {
+                            let item = (flow_id, recent_events.get(flow_id));
+                            match flow.flow_status {
+                                FlowStatus::Waiting => waiting_flows.push(item),
+                                FlowStatus::Running => running_flows.push(item),
+                                FlowStatus::Finished => finished_flows.push(item),
+                            }
                         }
-                        if total_count >= pagination.offset {
-                            result.push(Ok(*flow_id));
-                        }
-                        total_count += 1;
                     }
-                };
+                }
             }
-            result
+            // Sort every group separately
+            waiting_flows.sort_by(|a, b| b.cmp(a));
+            running_flows.sort_by(|a, b| b.cmp(a));
+            finished_flows.sort_by(|a, b| b.cmp(a));
+
+            let mut ordered_flows = vec![];
+            ordered_flows.append(&mut waiting_flows);
+            ordered_flows.append(&mut running_flows);
+            ordered_flows.append(&mut finished_flows);
+
+            ordered_flows
+                .iter()
+                .skip(pagination.offset)
+                .take(pagination.limit)
+                .map(|(flow_id, _)| Ok(**flow_id))
+                .collect()
         };
 
         Box::pin(futures::stream::iter(flow_ids_page))
