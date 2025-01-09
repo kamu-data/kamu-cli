@@ -48,11 +48,12 @@ clippy:
 
 
 # See: https://github.com/IBM/openapi-validator
+# ToDo replace openapi-validator version to latest once issue with linter is fixed
 .PHONY: lint-openapi
 lint-openapi:
 	$(KAMU_CONTAINER_RUNTIME_TYPE) run --rm -t \
 		-v "${PWD}:/data:ro" \
-  		ibmdevxsdk/openapi-validator:latest \
+  		ibmdevxsdk/openapi-validator:1.31.0 \
 		--config src/adapter/http/resources/openapi/linter-config.yaml \
 		--ruleset src/adapter/http/resources/openapi/linter-ruleset.yaml \
     	resources/openapi-mt.json
