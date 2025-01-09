@@ -52,7 +52,7 @@ url = { version = "2", default-features = false, features = ["serde"] }
 strum = { version = "0.26", features = ["derive"] }
 
 # TODO: Avoid this dependency or depend on sub-crates
-datafusion = { version = "43", default-features = false, features = [
+datafusion = { version = "44", default-features = false, features = [
     "parquet",
 ] }
 object_store = { version = "0.11", default-features = false }

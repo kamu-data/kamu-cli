@@ -175,7 +175,7 @@ pub fn preprocess_default(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub fn new_session_context(object_store_registry: Arc<dyn ObjectStoreRegistry>) -> SessionContext {
-    use datafusion::execution::runtime_env::{RuntimeConfig, RuntimeEnv};
+    use datafusion::execution::runtime_env::RuntimeEnvBuilder;
     use datafusion::prelude::*;
 
     // Note: We use single partition as ingest currently always reads one file at a
@@ -203,12 +203,12 @@ pub fn new_session_context(object_store_registry: Arc<dyn ObjectStoreRegistry>) 
         .parquet
         .schema_force_view_types = false;
 
-    let runtime_config = RuntimeConfig {
-        object_store_registry: object_store_registry.as_datafusion_registry(),
-        ..RuntimeConfig::default()
-    };
-
-    let runtime = Arc::new(RuntimeEnv::try_new(runtime_config).unwrap());
+    let runtime = Arc::new(
+        RuntimeEnvBuilder::new()
+            .with_object_store_registry(object_store_registry.as_datafusion_registry())
+            .build()
+            .unwrap(),
+    );
 
     #[allow(unused_mut)]
     let mut ctx = SessionContext::new_with_config_rt(config, runtime);

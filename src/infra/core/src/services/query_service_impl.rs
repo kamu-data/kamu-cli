@@ -13,7 +13,7 @@ use std::sync::Arc;
 
 use datafusion::arrow;
 use datafusion::error::DataFusionError;
-use datafusion::execution::runtime_env::{RuntimeConfig, RuntimeEnv};
+use datafusion::execution::runtime_env::RuntimeEnvBuilder;
 use datafusion::parquet::arrow::async_reader::ParquetObjectReader;
 use datafusion::parquet::file::metadata::ParquetMetaData;
 use datafusion::parquet::schema::types::Type;
@@ -73,11 +73,14 @@ impl QueryServiceImpl {
         // See: https://github.com/apache/datafusion/issues/13504
         cfg.options_mut().execution.parquet.schema_force_view_types = false;
 
-        let runtime_config = RuntimeConfig {
-            object_store_registry: self.object_store_registry.clone().as_datafusion_registry(),
-            ..RuntimeConfig::default()
-        };
-        let runtime = Arc::new(RuntimeEnv::try_new(runtime_config).unwrap());
+        let runtime = Arc::new(
+            RuntimeEnvBuilder::new()
+                .with_object_store_registry(
+                    self.object_store_registry.clone().as_datafusion_registry(),
+                )
+                .build()
+                .unwrap(),
+        );
         let session_context = SessionContext::new_with_config_rt(cfg, runtime);
 
         let schema = KamuSchema::prepare(

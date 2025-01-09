@@ -127,6 +127,7 @@ impl Reader for ReaderCsv {
             file_sort_order: Vec::new(),
             // TODO: Expose in ODF
             newlines_in_values: false,
+            null_regex: None,
         };
 
         let df = self

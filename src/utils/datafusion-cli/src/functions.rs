@@ -26,9 +26,8 @@ use arrow::datatypes::{DataType, Field, Schema, SchemaRef};
 use arrow::record_batch::RecordBatch;
 use arrow::util::pretty::pretty_format_batches;
 use async_trait::async_trait;
-use datafusion::catalog::Session;
+use datafusion::catalog::{Session, TableFunctionImpl};
 use datafusion::common::{plan_err, Column};
-use datafusion::datasource::function::TableFunctionImpl;
 use datafusion::datasource::TableProvider;
 use datafusion::error::Result;
 use datafusion::logical_expr::Expr;
@@ -362,7 +361,7 @@ impl TableFunctionImpl for ParquetMetadataFunc {
             Field::new("total_uncompressed_size", DataType::Int64, true),
         ]));
 
-        // construct recordbatch from metadata
+        // construct record batch from metadata
         let mut filename_arr = vec![];
         let mut row_group_id_arr = vec![];
         let mut row_group_num_rows_arr = vec![];

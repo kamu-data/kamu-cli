@@ -69,7 +69,7 @@ ringbuf = "0.3"
 zip = "2"
 
 # Data
-datafusion = { version = "43", default-features = false }
+datafusion = { version = "44", default-features = false }
 digest = "0.10"
 object_store = { version = "0.11", features = ["aws"] }
 sha3 = "0.10"
@@ -79,7 +79,7 @@ aws-config = { version = "1" }
 aws-sdk-s3 = { version = "1" }
 aws-smithy-types = { version = "1" }
 aws-credential-types = { version = "1" }
-hickory-resolver = "0.24"                                       # TODO: Needed for DNSLink resolution with IPFS
+hickory-resolver = "0.24"                # TODO: Needed for DNSLink resolution with IPFS
 http = "1"
 
 # Utils
@@ -120,7 +120,7 @@ tower-http = { version = "0.6", features = ["fs", "trace"] }
 axum = "0.7"
 
 # Optional dependencies
-alloy = { optional = true, version = "0.6", default-features = false, features = [
+alloy = { optional = true, version = "0.9", default-features = false, features = [
     "std",
     "provider-http",
     "provider-ws",
@@ -133,8 +133,8 @@ curl = { optional = true, version = "0.4", features = [
     "static-ssl",
 ] }
 curl-sys = { optional = true, version = "0.4" }
-datafusion-ethers = { optional = true, version = "43" }
-datafusion-functions-json = { optional = true, version = "0.43" }
+datafusion-ethers = { optional = true, version = "44" }
+datafusion-functions-json = { optional = true, version = "0.44" }
 rumqttc = { optional = true, version = "0.24" }
 mockall = { optional = true, version = "0.13", default-features = false }
 lazy_static = { version = "1" }
@@ -154,7 +154,7 @@ kamu-datasets-services = { workspace = true }
 kamu-datasets-inmem = { workspace = true }
 
 criterion = { version = "0.5", features = ["async_tokio"] }
-datafusion = { version = "43", default-features = false, features = [
+datafusion = { version = "44", default-features = false, features = [
     "parquet",
 ] }
 filetime = "0.2"

@@ -28,12 +28,14 @@ http-common = { workspace = true }
 internal-error = { workspace = true }
 kamu-accounts = { workspace = true }
 kamu-core = { workspace = true }
-opendatafabric = { workspace = true, default-features = false, features = ["arrow"] }
+opendatafabric = { workspace = true, default-features = false, features = [
+    "arrow",
+] }
 
 axum = { version = "0.7", default-features = false, features = [] }
 chrono = { version = "0.4", default-features = false }
-datafusion = { version = "43", default-features = false }
-datafusion-odata = { version = "43", default-features = false }
+datafusion = { version = "44", default-features = false }
+datafusion-odata = { version = "44", default-features = false }
 dill = "0.10"
 futures = { version = "0.3", default-features = false }
 http = "1"

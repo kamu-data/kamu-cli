@@ -11,6 +11,10 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Unreleased]
+### Changed
+- Updated to latest `datafusion` and `alloy` dependencies
+
 ## [0.217.1] - 2025-01-09
 ### Changed
 - Extended database config options with next fields: `maxConnections`, `maxLifeTimeSecs` and `acquireTimeoutSecs`

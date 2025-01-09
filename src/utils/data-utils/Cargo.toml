@@ -33,7 +33,7 @@ async-trait = "0.1"
 arrow = { version = "53", default-features = false }
 arrow-json = { version = "53", default-features = false }
 arrow-digest = { version = "53", default-features = false }
-datafusion = { version = "43", default-features = false, features = [
+datafusion = { version = "44", default-features = false, features = [
     "parquet",
     "serde",
 ] }
