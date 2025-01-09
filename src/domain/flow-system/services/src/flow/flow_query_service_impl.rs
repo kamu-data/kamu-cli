@@ -13,7 +13,7 @@ use std::sync::Arc;
 use chrono::{DateTime, Utc};
 use database_common::PaginationOpts;
 use dill::{component, interface, Catalog};
-use futures::{StreamExt, TryStreamExt};
+use futures::TryStreamExt;
 use internal_error::ResultIntoInternal;
 use kamu_core::DatasetOwnershipService;
 use kamu_flow_system::*;
@@ -47,16 +47,17 @@ impl FlowQueryServiceImpl {
         }
     }
 
-    fn flow_state_stream<'a>(&'a self, flow_ids: FlowIDStream<'a>) -> FlowStateStream<'a> {
+    fn flow_state_stream(&self, flow_ids: Vec<FlowID>) -> FlowStateStream {
         Box::pin(async_stream::try_stream! {
             // 32-items batching will give a performance boost,
             // but queries for long-lived datasets should not bee too heavy.
             // This number was chosen without any performance measurements. Subject of change.
-            let batch_size = 32;
-            let mut chunks = flow_ids.try_chunks(batch_size);
-            while let Some(item) = chunks.next().await {
-                let ids = item.int_err()?;
-                let flows = Flow::load_multi(ids, self.flow_event_store.as_ref()).await.int_err()?;
+            let chunk_size = 32;
+            for chunk in flow_ids.chunks(chunk_size) {
+                let flows = Flow::load_multi(
+                    chunk.to_vec(),
+                    self.flow_event_store.as_ref()
+                ).await.int_err()?;
                 for flow in flows {
                     yield flow.int_err()?.into();
                 }
@@ -84,11 +85,13 @@ impl FlowQueryService for FlowQueryServiceImpl {
             .get_count_flows_by_dataset(dataset_id, &filters)
             .await?;
 
-        let flow_ids_stream = self
+        let relevant_flow_ids: Vec<_> = self
             .flow_event_store
-            .get_all_flow_ids_by_dataset(dataset_id, &filters, pagination);
+            .get_all_flow_ids_by_dataset(dataset_id, &filters, pagination)
+            .try_collect()
+            .await?;
 
-        let matched_stream = self.flow_state_stream(flow_ids_stream);
+        let matched_stream = self.flow_state_stream(relevant_flow_ids);
 
         Ok(FlowStateListing {
             matched_stream,
@@ -151,12 +154,13 @@ impl FlowQueryService for FlowQueryServiceImpl {
 
         let account_dataset_ids: HashSet<DatasetID> = HashSet::from_iter(filtered_dataset_ids);
 
-        let flow_ids_stream = self.flow_event_store.get_all_flow_ids_by_datasets(
-            account_dataset_ids,
-            &dataset_flow_filters,
-            pagination,
-        );
-        let matched_stream = self.flow_state_stream(flow_ids_stream);
+        let relevant_flow_ids: Vec<_> = self
+            .flow_event_store
+            .get_all_flow_ids_by_datasets(account_dataset_ids, &dataset_flow_filters, pagination)
+            .try_collect()
+            .await
+            .int_err()?;
+        let matched_stream = self.flow_state_stream(relevant_flow_ids);
 
         Ok(FlowStateListing {
             matched_stream,
@@ -208,11 +212,13 @@ impl FlowQueryService for FlowQueryServiceImpl {
             .await
             .int_err()?;
 
-        let flow_ids_stream = self
+        let relevant_flow_ids: Vec<_> = self
             .flow_event_store
-            .get_all_system_flow_ids(&filters, pagination);
+            .get_all_system_flow_ids(&filters, pagination)
+            .try_collect()
+            .await?;
 
-        let matched_stream = self.flow_state_stream(flow_ids_stream);
+        let matched_stream = self.flow_state_stream(relevant_flow_ids);
 
         Ok(FlowStateListing {
             matched_stream,
@@ -233,9 +239,11 @@ impl FlowQueryService for FlowQueryServiceImpl {
             .get_count_all_flows(&empty_filters)
             .await?;
 
-        let all_flows = self
+        let all_flows: Vec<_> = self
             .flow_event_store
-            .get_all_flow_ids(&empty_filters, pagination);
+            .get_all_flow_ids(&empty_filters, pagination)
+            .try_collect()
+            .await?;
         let matched_stream = self.flow_state_stream(all_flows);
 
         Ok(FlowStateListing {
