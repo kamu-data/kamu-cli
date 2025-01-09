@@ -32,6 +32,7 @@ use messaging_outbox::{
 use time_source::SystemTimeSource;
 use tracing::Instrument as _;
 
+use crate::flow::FlowStateHelper;
 use crate::{
     FlowAbortHelper,
     FlowSchedulingHelper,
@@ -126,6 +127,7 @@ impl FlowAgentImpl {
         // Extract necessary dependencies
         let flow_event_store = target_catalog.get_one::<dyn FlowEventStore>().unwrap();
         let scheduling_helper = target_catalog.get_one::<FlowSchedulingHelper>().unwrap();
+        let flows_state_helper = target_catalog.get_one::<FlowStateHelper>().unwrap();
 
         // How many waiting flows do we have?
         let waiting_filters = AllFlowFilters {
@@ -152,13 +154,10 @@ impl FlowAgentImpl {
                 .try_collect()
                 .await?;
 
-            // Process each waiting flow
-            for waiting_flow_id in &waiting_flow_ids {
-                // TODO: batch loading of flows
-                let flow = Flow::load(*waiting_flow_id, flow_event_store.as_ref())
-                    .await
-                    .int_err()?;
+            processed_waiting_flows += waiting_flow_ids.len();
+            let mut state_stream = flows_state_helper.get_stream(waiting_flow_ids);
 
+            while let Some(flow) = state_stream.try_next().await? {
                 // We need to re-evaluate batching conditions only
                 if let Some(FlowStartCondition::Batching(b)) = &flow.start_condition {
                     scheduling_helper
@@ -173,8 +172,6 @@ impl FlowAgentImpl {
                         .await?;
                 }
             }
-
-            processed_waiting_flows += waiting_flow_ids.len();
         }
 
         Ok(())

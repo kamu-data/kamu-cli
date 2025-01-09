@@ -19,6 +19,7 @@ use kamu_core::DatasetOwnershipService;
 use kamu_flow_system::*;
 use opendatafabric::{AccountID, DatasetID};
 
+use crate::flow::flow_state_helper::FlowStateHelper;
 use crate::{FlowAbortHelper, FlowSchedulingHelper};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -28,6 +29,7 @@ pub struct FlowQueryServiceImpl {
     flow_event_store: Arc<dyn FlowEventStore>,
     dataset_ownership_service: Arc<dyn DatasetOwnershipService>,
     agent_config: Arc<FlowAgentConfig>,
+    flow_state: Arc<FlowStateHelper>,
 }
 
 #[component(pub)]
@@ -38,31 +40,15 @@ impl FlowQueryServiceImpl {
         flow_event_store: Arc<dyn FlowEventStore>,
         dataset_ownership_service: Arc<dyn DatasetOwnershipService>,
         agent_config: Arc<FlowAgentConfig>,
+        flow_state: Arc<FlowStateHelper>,
     ) -> Self {
         Self {
             catalog,
             flow_event_store,
             dataset_ownership_service,
             agent_config,
+            flow_state,
         }
-    }
-
-    fn flow_state_stream(&self, flow_ids: Vec<FlowID>) -> FlowStateStream {
-        Box::pin(async_stream::try_stream! {
-            // 32-items batching will give a performance boost,
-            // but queries for long-lived datasets should not bee too heavy.
-            // This number was chosen without any performance measurements. Subject of change.
-            let chunk_size = 32;
-            for chunk in flow_ids.chunks(chunk_size) {
-                let flows = Flow::load_multi(
-                    chunk.to_vec(),
-                    self.flow_event_store.as_ref()
-                ).await.int_err()?;
-                for flow in flows {
-                    yield flow.int_err()?.into();
-                }
-            }
-        })
     }
 }
 
@@ -91,7 +77,7 @@ impl FlowQueryService for FlowQueryServiceImpl {
             .try_collect()
             .await?;
 
-        let matched_stream = self.flow_state_stream(relevant_flow_ids);
+        let matched_stream = self.flow_state.get_stream(relevant_flow_ids);
 
         Ok(FlowStateListing {
             matched_stream,
@@ -160,7 +146,7 @@ impl FlowQueryService for FlowQueryServiceImpl {
             .try_collect()
             .await
             .int_err()?;
-        let matched_stream = self.flow_state_stream(relevant_flow_ids);
+        let matched_stream = self.flow_state.get_stream(relevant_flow_ids);
 
         Ok(FlowStateListing {
             matched_stream,
@@ -218,7 +204,7 @@ impl FlowQueryService for FlowQueryServiceImpl {
             .try_collect()
             .await?;
 
-        let matched_stream = self.flow_state_stream(relevant_flow_ids);
+        let matched_stream = self.flow_state.get_stream(relevant_flow_ids);
 
         Ok(FlowStateListing {
             matched_stream,
@@ -244,7 +230,7 @@ impl FlowQueryService for FlowQueryServiceImpl {
             .get_all_flow_ids(&empty_filters, pagination)
             .try_collect()
             .await?;
-        let matched_stream = self.flow_state_stream(all_flows);
+        let matched_stream = self.flow_state.get_stream(all_flows);
 
         Ok(FlowStateListing {
             matched_stream,
