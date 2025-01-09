@@ -13,6 +13,10 @@ Recommendation: for ease of reading, use the following order:
 
 ## [Unreleased]
 ### Changed
+- Extended database config options with next fields: `maxConnections`, `maxLifeTimeSecs` and `acquireTimeoutSecs`
+
+## [0.217.0] - 2025-01-08
+### Changed
 - GraphQL: flows are listed ordered by status and last event time
 - Merged two methods(`saveEnvVariable` and `modifyEnvVariable`) from `DatasetEnvVarsMut` info one `upsertEnvVariable`
 ### Fixed

@@ -7,10 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::time::Duration;
+
 use dill::*;
 use secrecy::ExposeSecret;
+use sqlx::pool::PoolOptions;
 use sqlx::postgres::PgConnectOptions;
-use sqlx::PgPool;
+use sqlx::{PgPool, Postgres};
 
 use crate::*;
 
@@ -58,7 +61,20 @@ impl PostgresPlugin {
                 .password(db_credentials.password.expose_secret());
         }
 
-        PgPool::connect_lazy_with(pg_options)
+        let pg_pool: PoolOptions<Postgres> = PoolOptions::new()
+            .max_lifetime(
+                db_connection_settings
+                    .max_lifetime_secs
+                    .map(Duration::from_secs),
+            )
+            .max_connections(db_connection_settings.max_connections.unwrap_or(10))
+            .acquire_timeout(
+                db_connection_settings
+                    .acquire_timeout_secs
+                    .map_or(Duration::from_secs(30), Duration::from_secs),
+            );
+
+        pg_pool.connect_lazy_with(pg_options)
     }
 }
 

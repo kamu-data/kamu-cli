@@ -706,6 +706,9 @@ impl DatabaseConfig {
             database_name: String::from("kamu"),
             host: String::from("localhost"),
             port: Some(DatabaseProvider::Postgres.default_port()),
+            acquire_timeout_secs: None,
+            max_connections: None,
+            max_lifetime_secs: None,
         })
     }
 
@@ -732,6 +735,9 @@ pub struct RemoteDatabaseConfig {
     pub database_name: String,
     pub host: String,
     pub port: Option<u16>,
+    pub max_connections: Option<u32>,
+    pub max_lifetime_secs: Option<u64>,
+    pub acquire_timeout_secs: Option<u64>,
 }
 
 #[skip_serializing_none]
