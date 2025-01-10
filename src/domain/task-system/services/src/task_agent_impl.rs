@@ -86,19 +86,21 @@ impl TaskAgentImpl {
                 })
                 .try_collect()
                 .await?;
+            let batch_size = running_task_ids.len();
 
-            for running_task_id in &running_task_ids {
-                // TODO: batch loading of tasks
-                let mut task = Task::load(*running_task_id, task_event_store.as_ref())
-                    .await
-                    .int_err()?;
+            let tasks = Task::load_multi(running_task_ids, task_event_store.as_ref())
+                .await
+                .int_err()?;
+
+            for task in tasks {
+                let mut t = task.int_err()?;
 
                 // Requeue
-                task.requeue(self.time_source.now()).int_err()?;
-                task.save(task_event_store.as_ref()).await.int_err()?;
+                t.requeue(self.time_source.now()).int_err()?;
+                t.save(task_event_store.as_ref()).await.int_err()?;
             }
 
-            processed_running_tasks += running_task_ids.len();
+            processed_running_tasks += batch_size;
         }
 
         Ok(())

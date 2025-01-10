@@ -11,9 +11,10 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## [Unreleased]
+## [0.217.2] - 2025-01-10
 ### Changed
 - Updated to latest `datafusion` and `alloy` dependencies
+- Performance improvements with batch loading of event sourcing aggregates
 
 ## [0.217.1] - 2025-01-09
 ### Changed
