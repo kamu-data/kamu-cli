@@ -34,7 +34,18 @@ use crate::utils::{authentication_catalogs, expect_anonymous_access_error};
 
 macro_rules! test_dataset_create_empty_without_visibility {
     ($tenancy_config:expr) => {
-        let harness = GraphQLDatasetsHarness::new($tenancy_config).await;
+        let mut mock_authentication_service = MockAuthenticationService::new();
+        mock_authentication_service
+            .expect_account_by_name()
+            .with(eq(DEFAULT_ACCOUNT_NAME.clone()))
+            .returning(|_| {
+                Ok(Some(Account::dummy()))
+            });
+        let harness = GraphQLDatasetsHarness::new_custom_authentication(
+            mock_authentication_service,
+            $tenancy_config,
+        )
+        .await;
 
         let request_code = indoc::indoc!(
             r#"
@@ -44,7 +55,6 @@ macro_rules! test_dataset_create_empty_without_visibility {
                   ... on CreateDatasetResultSuccess {
                     dataset {
                       name
-                      alias
                     }
                   }
                 }
@@ -64,7 +74,6 @@ macro_rules! test_dataset_create_empty_without_visibility {
                     "createEmpty": {
                         "dataset": {
                             "name": "foo",
-                            "alias": "foo",
                         }
                     }
                 }
@@ -78,7 +87,18 @@ macro_rules! test_dataset_create_empty_without_visibility {
 
 macro_rules! test_dataset_create_empty_public {
     ($tenancy_config:expr) => {
-        let harness = GraphQLDatasetsHarness::new($tenancy_config).await;
+        let mut mock_authentication_service = MockAuthenticationService::new();
+        mock_authentication_service
+            .expect_account_by_name()
+            .with(eq(DEFAULT_ACCOUNT_NAME.clone()))
+            .returning(|_| {
+                Ok(Some(Account::dummy()))
+            });
+        let harness = GraphQLDatasetsHarness::new_custom_authentication(
+            mock_authentication_service,
+            $tenancy_config,
+        )
+        .await;
 
         let request_code = indoc::indoc!(
             r#"
@@ -88,7 +108,6 @@ macro_rules! test_dataset_create_empty_public {
                   ... on CreateDatasetResultSuccess {
                     dataset {
                       name
-                      alias
                     }
                   }
                 }
@@ -108,7 +127,6 @@ macro_rules! test_dataset_create_empty_public {
                     "createEmpty": {
                         "dataset": {
                             "name": "foo",
-                            "alias": "foo",
                         }
                     }
                 }

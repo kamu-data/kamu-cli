@@ -1778,6 +1778,15 @@ type SetDataSchema {
 	schema: DataSchema!
 }
 
+interface SetDatasetVisibilityResult {
+	message: String!
+}
+
+type SetDatasetVisibilityResultSuccess implements SetDatasetVisibilityResult {
+	dummy: String
+	message: String!
+}
+
 interface SetFlowConfigResult {
 	message: String!
 }

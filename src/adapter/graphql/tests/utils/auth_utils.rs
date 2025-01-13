@@ -27,14 +27,14 @@ pub async fn authentication_catalogs(
                 logged_account.account_name.clone(),
             ));
     } else {
-        panic!()
+        unreachable!();
     }
 
     let base_auth_catalog = dill::CatalogBuilder::new_chained(base_catalog)
         .add::<LoginPasswordAuthProvider>()
         .add::<PredefinedAccountsRegistrator>()
         .add::<InMemoryAccountRepository>()
-        .add_value(predefined_accounts_config.clone())
+        .add_value(predefined_accounts_config)
         .build();
 
     let catalog_anonymous = dill::CatalogBuilder::new_chained(&base_auth_catalog)
