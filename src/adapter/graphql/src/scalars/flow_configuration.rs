@@ -13,14 +13,8 @@ use kamu_flow_system::{
     CompactionRuleFull,
     CompactionRuleMetadataOnly,
     FlowConfigurationRule,
-    FlowConfigurationSnapshot,
     IngestRule,
     ResetRule,
-    Schedule,
-    ScheduleCron,
-    ScheduleCronError,
-    ScheduleTimeDelta,
-    TransformRule,
 };
 use opendatafabric::DatasetHandle;
 
@@ -31,9 +25,7 @@ use crate::prelude::*;
 
 #[derive(SimpleObject, Clone, PartialEq, Eq)]
 pub struct FlowConfiguration {
-    pub paused: bool,
     pub ingest: Option<FlowConfigurationIngest>,
-    pub transform: Option<FlowConfigurationTransform>,
     pub compaction: Option<FlowConfigurationCompaction>,
     pub reset: Option<FlowConfigurationReset>,
 }
@@ -41,12 +33,6 @@ pub struct FlowConfiguration {
 impl From<kamu_flow_system::FlowConfigurationState> for FlowConfiguration {
     fn from(value: kamu_flow_system::FlowConfigurationState) -> Self {
         Self {
-            paused: !value.is_active(),
-            transform: if let FlowConfigurationRule::TransformRule(condition) = &value.rule {
-                Some((*condition).into())
-            } else {
-                None
-            },
             ingest: if let FlowConfigurationRule::IngestRule(ingest_rule) = &value.rule {
                 Some(ingest_rule.clone().into())
             } else {
@@ -76,7 +62,6 @@ impl From<kamu_flow_system::FlowConfigurationState> for FlowConfiguration {
 
 #[derive(SimpleObject, Clone, PartialEq, Eq)]
 pub struct FlowConfigurationIngest {
-    pub schedule: FlowConfigurationSchedule,
     pub fetch_uncacheable: bool,
 }
 
@@ -84,33 +69,6 @@ impl From<IngestRule> for FlowConfigurationIngest {
     fn from(value: IngestRule) -> Self {
         Self {
             fetch_uncacheable: value.fetch_uncacheable,
-            schedule: match value.schedule_condition {
-                Schedule::TimeDelta(time_delta) => {
-                    FlowConfigurationSchedule::TimeDelta(time_delta.every.into())
-                }
-                Schedule::Cron(cron) => FlowConfigurationSchedule::Cron(cron.clone().into()),
-            },
-        }
-    }
-}
-
-#[derive(Union, Clone, PartialEq, Eq)]
-pub enum FlowConfigurationSchedule {
-    TimeDelta(TimeDelta),
-    Cron(Cron5ComponentExpression),
-}
-
-#[derive(SimpleObject, Clone, PartialEq, Eq)]
-pub struct FlowConfigurationTransform {
-    pub min_records_to_await: u64,
-    pub max_batching_interval: TimeDelta,
-}
-
-impl From<TransformRule> for FlowConfigurationTransform {
-    fn from(value: TransformRule) -> Self {
-        Self {
-            min_records_to_await: value.min_records_to_await(),
-            max_batching_interval: (*value.max_batching_interval()).into(),
         }
     }
 }
@@ -199,138 +157,11 @@ impl From<CompactionRuleMetadataOnly> for CompactionMetadataOnly {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(SimpleObject, Clone, PartialEq, Eq)]
-pub struct Cron5ComponentExpression {
-    pub cron_5component_expression: String,
-}
-
-impl From<ScheduleCron> for Cron5ComponentExpression {
-    fn from(value: ScheduleCron) -> Self {
-        Self {
-            cron_5component_expression: value.source_5component_cron_expression,
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(SimpleObject, Clone, PartialEq, Eq)]
-pub struct TimeDelta {
-    pub every: i64,
-    pub unit: TimeUnit,
-}
-
-#[derive(Enum, Clone, Copy, PartialEq, Eq)]
-pub enum TimeUnit {
-    Minutes,
-    Hours,
-    Days,
-    Weeks,
-}
-
-impl From<chrono::Duration> for TimeDelta {
-    fn from(value: chrono::Duration) -> Self {
-        assert!(
-            value.num_seconds() > 0,
-            "Positive interval expected, but received [{value}]"
-        );
-
-        let num_weeks = value.num_weeks();
-        if (value - chrono::Duration::try_weeks(num_weeks).unwrap()).is_zero() {
-            return Self {
-                every: num_weeks,
-                unit: TimeUnit::Weeks,
-            };
-        }
-
-        let num_days = value.num_days();
-        if (value - chrono::Duration::try_days(num_days).unwrap()).is_zero() {
-            return Self {
-                every: num_days,
-                unit: TimeUnit::Days,
-            };
-        }
-
-        let num_hours = value.num_hours();
-        if (value - chrono::Duration::try_hours(num_hours).unwrap()).is_zero() {
-            return Self {
-                every: num_hours,
-                unit: TimeUnit::Hours,
-            };
-        }
-
-        let num_minutes = value.num_minutes();
-        if (value - chrono::Duration::try_minutes(num_minutes).unwrap()).is_zero() {
-            return Self {
-                every: num_minutes,
-                unit: TimeUnit::Minutes,
-            };
-        }
-
-        panic!(
-            "Expecting intervals not smaller than 1 minute that are clearly dividable by unit, \
-             but received [{value}]"
-        );
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 #[derive(OneofObject)]
 pub enum FlowRunConfiguration {
-    Transform(TransformConditionInput),
     Compaction(CompactionConditionInput),
     Ingest(IngestConditionInput),
     Reset(ResetConditionInput),
-}
-
-#[derive(OneofObject, Clone)]
-pub enum ScheduleInput {
-    TimeDelta(TimeDeltaInput),
-    /// Supported CRON syntax: min hour dayOfMonth month dayOfWeek
-    Cron5ComponentExpression(String),
-}
-
-#[derive(InputObject, Clone)]
-pub struct TimeDeltaInput {
-    pub every: u32,
-    pub unit: TimeUnit,
-}
-
-impl From<TimeDeltaInput> for chrono::Duration {
-    fn from(value: TimeDeltaInput) -> Self {
-        let every = i64::from(value.every);
-        match value.unit {
-            TimeUnit::Weeks => chrono::Duration::try_weeks(every).unwrap(),
-            TimeUnit::Days => chrono::Duration::try_days(every).unwrap(),
-            TimeUnit::Hours => chrono::Duration::try_hours(every).unwrap(),
-            TimeUnit::Minutes => chrono::Duration::try_minutes(every).unwrap(),
-        }
-    }
-}
-
-impl From<&TimeDeltaInput> for chrono::Duration {
-    fn from(value: &TimeDeltaInput) -> Self {
-        let every = i64::from(value.every);
-        match value.unit {
-            TimeUnit::Weeks => chrono::Duration::try_weeks(every).unwrap(),
-            TimeUnit::Days => chrono::Duration::try_days(every).unwrap(),
-            TimeUnit::Hours => chrono::Duration::try_hours(every).unwrap(),
-            TimeUnit::Minutes => chrono::Duration::try_minutes(every).unwrap(),
-        }
-    }
-}
-
-#[derive(InputObject, Clone)]
-pub struct TransformConditionInput {
-    pub min_records_to_await: u64,
-    pub max_batching_interval: TimeDeltaInput,
-}
-
-impl From<TransformConditionInput> for FlowRunConfiguration {
-    fn from(value: TransformConditionInput) -> Self {
-        Self::Transform(value)
-    }
 }
 
 #[derive(OneofObject, Clone)]
@@ -399,25 +230,13 @@ impl From<CompactionConditionInput> for FlowRunConfiguration {
 pub struct IngestConditionInput {
     /// Flag indicates to ignore cache during ingest step for API calls
     pub fetch_uncacheable: bool,
-    pub schedule: ScheduleInput,
 }
 
-impl TryFrom<IngestConditionInput> for IngestRule {
-    type Error = ScheduleCronError;
-
-    fn try_from(value: IngestConditionInput) -> std::result::Result<Self, Self::Error> {
-        let schedule = match value.schedule {
-            ScheduleInput::TimeDelta(td) => {
-                Schedule::TimeDelta(ScheduleTimeDelta { every: td.into() })
-            }
-            ScheduleInput::Cron5ComponentExpression(cron_5component_expression) => {
-                Schedule::try_from_5component_cron_expression(&cron_5component_expression)?
-            }
-        };
-        Ok(Self {
+impl From<IngestConditionInput> for IngestRule {
+    fn from(value: IngestConditionInput) -> Self {
+        Self {
             fetch_uncacheable: value.fetch_uncacheable,
-            schedule_condition: schedule,
-        })
+        }
     }
 }
 
@@ -429,35 +248,38 @@ impl From<IngestConditionInput> for FlowRunConfiguration {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(OneofObject, Clone)]
+pub enum FlowConfigurationInput {
+    Ingest(IngestConditionInput),
+    Compaction(CompactionConditionInput),
+}
+
+impl From<FlowConfigurationInput> for FlowRunConfiguration {
+    fn from(value: FlowConfigurationInput) -> Self {
+        match value {
+            FlowConfigurationInput::Ingest(ingest_input) => Self::Ingest(ingest_input),
+            FlowConfigurationInput::Compaction(compaction_input) => {
+                Self::Compaction(compaction_input)
+            }
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 impl FlowRunConfiguration {
     pub async fn try_into_snapshot(
         ctx: &Context<'_>,
         dataset_flow_type: &DatasetFlowType,
         dataset_handle: &DatasetHandle,
         flow_run_configuration_maybe: Option<&FlowRunConfiguration>,
-    ) -> Result<Option<FlowConfigurationSnapshot>, FlowInvalidRunConfigurations> {
+    ) -> Result<Option<FlowConfigurationRule>, FlowInvalidRunConfigurations> {
         match dataset_flow_type {
             DatasetFlowType::Ingest => {
                 if let Some(flow_run_configuration) = flow_run_configuration_maybe {
                     if let Self::Ingest(ingest_input) = flow_run_configuration {
-                        return Ok(Some(FlowConfigurationSnapshot::Ingest(IngestRule {
+                        return Ok(Some(FlowConfigurationRule::IngestRule(IngestRule {
                             fetch_uncacheable: ingest_input.fetch_uncacheable,
-                            schedule_condition: match &ingest_input.schedule {
-                                ScheduleInput::TimeDelta(td) => {
-                                    Schedule::TimeDelta(ScheduleTimeDelta { every: td.into() })
-                                }
-                                ScheduleInput::Cron5ComponentExpression(
-                                    cron_5component_expression,
-                                ) => Schedule::try_from_5component_cron_expression(
-                                    cron_5component_expression,
-                                )
-                                .map_err(|_| {
-                                    FlowInvalidRunConfigurations {
-                                        error: "Invalid schedule flow run configuration"
-                                            .to_string(),
-                                    }
-                                })?,
-                            },
                         })));
                     }
                     return Err(FlowInvalidRunConfigurations {
@@ -466,31 +288,11 @@ impl FlowRunConfiguration {
                     });
                 }
             }
-            DatasetFlowType::ExecuteTransform => {
-                if let Some(flow_run_configuration) = flow_run_configuration_maybe {
-                    if let Self::Transform(transform_input) = flow_run_configuration {
-                        return Ok(Some(FlowConfigurationSnapshot::Transform(
-                            TransformRule::new_checked(
-                                transform_input.min_records_to_await,
-                                transform_input.max_batching_interval.clone().into(),
-                            )
-                            .map_err(|_| {
-                                FlowInvalidRunConfigurations {
-                                    error: "Invalid transform flow run configuration".to_string(),
-                                }
-                            })?,
-                        )));
-                    }
-                    return Err(FlowInvalidRunConfigurations {
-                        error: "Incompatible flow run configuration and dataset flow type"
-                            .to_string(),
-                    });
-                }
-            }
+            DatasetFlowType::ExecuteTransform => return Ok(None),
             DatasetFlowType::HardCompaction => {
                 if let Some(flow_run_configuration) = flow_run_configuration_maybe {
                     if let Self::Compaction(compaction_input) = flow_run_configuration {
-                        return Ok(Some(FlowConfigurationSnapshot::Compaction(
+                        return Ok(Some(FlowConfigurationRule::CompactionRule(
                             match compaction_input {
                                 CompactionConditionInput::Full(compaction_input) => {
                                     CompactionRule::Full(
@@ -542,7 +344,7 @@ impl FlowRunConfiguration {
                         } else {
                             current_head_hash
                         };
-                        return Ok(Some(FlowConfigurationSnapshot::Reset(ResetRule {
+                        return Ok(Some(FlowConfigurationRule::ResetRule(ResetRule {
                             new_head_hash: reset_input.new_head_hash().map(Into::into),
                             old_head_hash,
                             recursive: reset_input.recursive,
@@ -553,7 +355,7 @@ impl FlowRunConfiguration {
                             .to_string(),
                     });
                 }
-                return Ok(Some(FlowConfigurationSnapshot::Reset(ResetRule {
+                return Ok(Some(FlowConfigurationRule::ResetRule(ResetRule {
                     new_head_hash: None,
                     old_head_hash: current_head_hash,
                     recursive: false,
@@ -570,11 +372,6 @@ impl FlowRunConfiguration {
         match self {
             Self::Ingest(_) => {
                 if flow_type == DatasetFlowType::Ingest {
-                    return Ok(());
-                }
-            }
-            Self::Transform(_) => {
-                if flow_type == DatasetFlowType::ExecuteTransform {
                     return Ok(());
                 }
             }

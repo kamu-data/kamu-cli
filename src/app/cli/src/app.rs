@@ -24,10 +24,15 @@ use kamu_accounts_services::PredefinedAccountsRegistrator;
 use kamu_adapter_http::{FileUploadLimitConfig, UploadServiceLocal};
 use kamu_adapter_oauth::GithubAuthenticationConfig;
 use kamu_datasets::DatasetEnvVar;
-use kamu_flow_system_inmem::domain::{FlowConfigurationUpdatedMessage, FlowProgressMessage};
+use kamu_flow_system_inmem::domain::{
+    FlowConfigurationUpdatedMessage,
+    FlowProgressMessage,
+    FlowTriggerUpdatedMessage,
+};
 use kamu_flow_system_services::{
     MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE,
     MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE,
+    MESSAGE_PRODUCER_KAMU_FLOW_TRIGGER_SERVICE,
 };
 use kamu_task_system_inmem::domain::{TaskProgressMessage, MESSAGE_PRODUCER_KAMU_TASK_AGENT};
 use messaging_outbox::{register_message_dispatcher, Outbox, OutboxDispatchingImpl};
@@ -488,14 +493,15 @@ pub fn configure_base_catalog(
 
     b.add::<kamu_auth_rebac_services::RebacServiceImpl>();
 
-    // TODO: Unstub FlightSQL authentication
-    b.add_builder(
-        kamu_adapter_flight_sql::SessionAuthBasicPredefined::builder()
-            .with_accounts_passwords([("kamu".to_string(), "kamu".to_string())].into()),
-    );
-    b.bind::<dyn kamu_adapter_flight_sql::SessionAuth, kamu_adapter_flight_sql::SessionAuthBasicPredefined>();
+    b.add::<kamu_adapter_flight_sql::SessionAuthAnonymous>();
     b.add::<kamu_adapter_flight_sql::SessionManagerCaching>();
     b.add::<kamu_adapter_flight_sql::SessionManagerCachingState>();
+    b.add_value(
+        kamu_adapter_flight_sql::sql_info::default_sql_info()
+            .build()
+            .unwrap(),
+    );
+    b.add::<kamu_adapter_flight_sql::KamuFlightSqlService>();
 
     if tenancy_config == TenancyConfig::MultiTenant {
         b.add::<kamu_auth_rebac_services::MultiTenantRebacDatasetLifecycleMessageConsumer>();
@@ -513,6 +519,10 @@ pub fn configure_base_catalog(
     b.bind::<dyn Outbox, OutboxDispatchingImpl>();
     b.add::<messaging_outbox::OutboxAgent>();
     b.add::<messaging_outbox::OutboxAgentMetrics>();
+
+    b.add::<crate::explore::FlightSqlServiceFactory>();
+    b.add::<crate::explore::SparkLivyServerFactory>();
+    b.add::<crate::explore::NotebookServerFactory>();
 
     register_message_dispatcher::<DatasetLifecycleMessage>(
         &mut b,
@@ -563,6 +573,10 @@ pub fn configure_server_catalog(base_catalog: &Catalog) -> CatalogBuilder {
     register_message_dispatcher::<FlowConfigurationUpdatedMessage>(
         &mut b,
         MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE,
+    );
+    register_message_dispatcher::<FlowTriggerUpdatedMessage>(
+        &mut b,
+        MESSAGE_PRODUCER_KAMU_FLOW_TRIGGER_SERVICE,
     );
 
     register_message_dispatcher::<TaskProgressMessage>(&mut b, MESSAGE_PRODUCER_KAMU_TASK_AGENT);
@@ -717,16 +731,15 @@ pub fn register_config_in_catalog(
     });
     catalog_builder.add_value(kamu::utils::ipfs_wrapper::IpfsClient::default());
 
-    catalog_builder.add_value(
-        config
-            .protocol
-            .as_ref()
-            .unwrap()
-            .flight_sql
-            .as_ref()
-            .unwrap()
-            .to_system(),
-    );
+    let flight_sql_conf = config
+        .protocol
+        .as_ref()
+        .unwrap()
+        .flight_sql
+        .as_ref()
+        .unwrap();
+    catalog_builder.add_value(flight_sql_conf.to_session_auth_config());
+    catalog_builder.add_value(flight_sql_conf.to_session_caching_config());
 
     if tenancy_config == TenancyConfig::MultiTenant {
         let mut implicit_user_config = PredefinedAccountsConfig::new();

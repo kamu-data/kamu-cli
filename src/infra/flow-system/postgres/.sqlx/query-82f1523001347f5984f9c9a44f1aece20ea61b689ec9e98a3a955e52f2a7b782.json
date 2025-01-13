@@ -1,0 +1,50 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                SELECT flow_id FROM flows\n                    WHERE dataset_id = ANY($1)\n                    AND (cast($2 as dataset_flow_type) IS NULL OR dataset_flow_type = $2)\n                    AND (cast($3 as flow_status_type) IS NULL OR flow_status = $3)\n                    AND (cast($4 as TEXT[]) IS NULL OR initiator = ANY($4))\n                ORDER BY flow_status, last_event_id DESC\n                LIMIT $5 OFFSET $6\n                ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "flow_id",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "TextArray",
+        {
+          "Custom": {
+            "name": "dataset_flow_type",
+            "kind": {
+              "Enum": [
+                "ingest",
+                "execute_transform",
+                "hard_compaction",
+                "reset"
+              ]
+            }
+          }
+        },
+        {
+          "Custom": {
+            "name": "flow_status_type",
+            "kind": {
+              "Enum": [
+                "waiting",
+                "running",
+                "finished"
+              ]
+            }
+          }
+        },
+        "TextArray",
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "82f1523001347f5984f9c9a44f1aece20ea61b689ec9e98a3a955e52f2a7b782"
+}

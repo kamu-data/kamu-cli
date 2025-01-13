@@ -45,29 +45,6 @@ impl DatasetFlowConfigs {
 
         Ok(maybe_flow_config.map(Into::into))
     }
-
-    /// Checks if all configs of this dataset are disabled
-    async fn all_paused(&self, ctx: &Context<'_>) -> Result<bool> {
-        check_dataset_read_access(ctx, &self.dataset_handle).await?;
-
-        let flow_config_service = from_catalog_n!(ctx, dyn FlowConfigurationService);
-        for dataset_flow_type in kamu_flow_system::DatasetFlowType::all() {
-            let maybe_flow_config = flow_config_service
-                .find_configuration(
-                    FlowKeyDataset::new(self.dataset_handle.id.clone(), *dataset_flow_type).into(),
-                )
-                .await
-                .int_err()?;
-
-            if let Some(flow_config) = maybe_flow_config
-                && flow_config.is_active()
-            {
-                return Ok(false);
-            }
-        }
-
-        Ok(true)
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

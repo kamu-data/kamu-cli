@@ -142,7 +142,41 @@ use super::query_types::{QueryResponse, *};
 #[transactional_handler]
 pub async fn query_handler_post(
     Extension(catalog): Extension<Catalog>,
-    Json(mut body): Json<QueryRequest>,
+    Json(body): Json<QueryRequest>,
+) -> Result<Json<QueryResponse>, ApiError> {
+    query_handler_impl(catalog, body).await
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Execute a batch query
+///
+/// Functions exactly like the [POST version](#tag/odf-query/POST/query) of the
+/// endpoint with all parameters passed in the query string instead of the body.
+#[utoipa::path(
+    get,
+    path = "/query",
+    params(QueryParams),
+    responses((status = OK, body = QueryResponse)),
+    tag = "odf-query",
+    security(
+        (),
+        ("api_key" = [])
+    ),
+)]
+#[transactional_handler]
+pub async fn query_handler(
+    Extension(catalog): Extension<Catalog>,
+    Query(params): Query<QueryParams>,
+) -> Result<Json<QueryResponse>, ApiError> {
+    query_handler_impl(catalog, params.into()).await
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn query_handler_impl(
+    catalog: Catalog,
+    mut body: QueryRequest,
 ) -> Result<Json<QueryResponse>, ApiError> {
     tracing::debug!(request = ?body, "Query");
 
@@ -250,30 +284,6 @@ pub async fn query_handler_post(
     };
 
     Ok(Json(response))
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// Execute a batch query
-///
-/// Functions exactly like the [POST version](#tag/odf-query/POST/query) of the
-/// endpoint with all parameters passed in the query string instead of the body.
-#[utoipa::path(
-    get,
-    path = "/query",
-    params(QueryParams),
-    responses((status = OK, body = QueryResponse)),
-    tag = "odf-query",
-    security(
-        (),
-        ("api_key" = [])
-    ),
-)]
-pub async fn query_handler(
-    catalog: Extension<Catalog>,
-    Query(params): Query<QueryParams>,
-) -> Result<Json<QueryResponse>, ApiError> {
-    query_handler_post(catalog, Json(params.into())).await
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

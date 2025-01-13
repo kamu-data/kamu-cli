@@ -28,7 +28,6 @@ pub enum FlowConfigurationEvent {
 pub struct FlowConfigurationEventCreated {
     pub event_time: DateTime<Utc>,
     pub flow_key: FlowKey,
-    pub paused: bool,
     pub rule: FlowConfigurationRule,
 }
 
@@ -38,7 +37,6 @@ pub struct FlowConfigurationEventCreated {
 pub struct FlowConfigurationEventModified {
     pub event_time: DateTime<Utc>,
     pub flow_key: FlowKey,
-    pub paused: bool,
     pub rule: FlowConfigurationRule,
 }
 

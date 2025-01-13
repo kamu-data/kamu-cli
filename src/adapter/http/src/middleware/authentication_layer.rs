@@ -75,8 +75,8 @@ impl<Svc> AuthenticationMiddleware<Svc> {
                 ))
                 .await;
 
-            // TODO: Getting the full account info here is expensive while all we need is
-            //       the caller identity
+            // TODO: PERF: Getting the full account info here is expensive while all we need
+            // is the caller identity
             match account_res {
                 Ok(account) => Ok(CurrentAccountSubject::logged(
                     account.id,
@@ -100,7 +100,14 @@ impl<Svc> AuthenticationMiddleware<Svc> {
                         AnonymousAccountReason::AuthenticationInvalid,
                     ))
                 }
-                Err(GetAccountInfoError::Internal(_)) => Err(internal_server_error_response()),
+                Err(GetAccountInfoError::Internal(err)) => {
+                    tracing::error!(
+                        error = ?err,
+                        error_msg = %err,
+                        "Internal error during authentication",
+                    );
+                    Err(internal_server_error_response())
+                }
             }
         } else {
             Ok(CurrentAccountSubject::anonymous(

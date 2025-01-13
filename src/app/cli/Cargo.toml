@@ -29,9 +29,8 @@ doctest = false
 
 
 [features]
-default = ["flight-sql", "ingest-evm", "ingest-mqtt", "query-extensions-json"]
+default = ["ingest-evm", "ingest-mqtt", "query-extensions-json"]
 
-flight-sql = ["dep:kamu-adapter-flight-sql"]
 ingest-evm = ["kamu/ingest-evm"]
 ingest-ftp = ["kamu/ingest-ftp"]
 ingest-mqtt = ["kamu/ingest-mqtt"]
@@ -55,7 +54,7 @@ kamu = { workspace = true }
 kamu-data-utils = { workspace = true }
 
 kamu-adapter-auth-oso-rebac = { workspace = true }
-kamu-adapter-flight-sql = { optional = true, workspace = true }
+kamu-adapter-flight-sql = { workspace = true }
 kamu-adapter-graphql = { workspace = true }
 kamu-adapter-http = { workspace = true, features = [
     "e2e",
@@ -128,8 +127,8 @@ serde_json = "1"
 tonic = { version = "0.12", default-features = false }
 tower = "0.5"
 tower-http = { version = "0.6", features = ["trace", "cors"] }
-utoipa = { version = "5", default-features = true, features = ["macros"] }
-utoipa-axum = { version = "0.1", default-features = true, features = [] }
+utoipa = { version = "=5.3.0", default-features = true, features = ["macros"] }
+utoipa-axum = { version = "=0.1.3", default-features = true, features = [] }
 
 # Web UI
 rust-embed = { optional = true, version = "8", features = [
@@ -164,7 +163,7 @@ tracing-bunyan-formatter = "0.3"
 async-trait = "0.1"
 chrono = "0.4"
 cfg-if = "1" # Conditional compilation
-datafusion = { version = "43", default-features = false, features = [
+datafusion = { version = "44", default-features = false, features = [
     "crypto_expressions",
     "encoding_expressions",
     "parquet",

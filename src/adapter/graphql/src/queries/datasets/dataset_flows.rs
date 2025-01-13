@@ -9,7 +9,7 @@
 
 use opendatafabric as odf;
 
-use super::{DatasetFlowConfigs, DatasetFlowRuns};
+use super::{DatasetFlowConfigs, DatasetFlowRuns, DatasetFlowTriggers};
 use crate::prelude::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -28,6 +28,11 @@ impl DatasetFlows {
     /// Returns interface for flow configurations queries
     async fn configs(&self) -> DatasetFlowConfigs {
         DatasetFlowConfigs::new(self.dataset_handle.clone())
+    }
+
+    /// Returns interface for flow triggers queries
+    async fn triggers(&self) -> DatasetFlowTriggers {
+        DatasetFlowTriggers::new(self.dataset_handle.clone())
     }
 
     /// Returns interface for flow runs queries

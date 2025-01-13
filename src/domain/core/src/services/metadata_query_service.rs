@@ -21,13 +21,7 @@ pub trait MetadataQueryService: Send + Sync {
     async fn get_active_polling_source(
         &self,
         target: ResolvedDataset,
-    ) -> Result<
-        Option<(
-            odf::Multihash,
-            odf::MetadataBlockTyped<odf::SetPollingSource>,
-        )>,
-        InternalError,
-    >;
+    ) -> Result<Option<PollingSourceBlockInfo>, InternalError>;
 
     /// Returns the set of active push sources
     async fn get_active_push_sources(
@@ -49,3 +43,8 @@ pub trait MetadataQueryService: Send + Sync {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub type PollingSourceBlockInfo = (
+    odf::Multihash,
+    odf::MetadataBlockTyped<odf::SetPollingSource>,
+);

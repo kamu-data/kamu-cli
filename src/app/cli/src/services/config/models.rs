@@ -528,20 +528,34 @@ impl Default for IpfsConfig {
 #[derive(Debug, Clone, Merge, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct FlightSqlConfig {
+    /// Whether clients can authenticate as 'anonymous' user
+    pub allow_anonymous: Option<bool>,
+
     /// Time after which FlightSQL client session will be forgotten and client
-    /// will have to re-authroize
-    pub session_expiration_timeout: Option<DurationString>,
+    /// will have to re-authroize (for authenticated clients)
+    pub authed_session_expiration_timeout: Option<DurationString>,
 
     /// Time after which FlightSQL session context will be released to free the
-    /// resources
-    pub session_inactivity_timeout: Option<DurationString>,
+    /// resources (for authenticated clients)
+    pub authed_session_inactivity_timeout: Option<DurationString>,
+
+    /// Time after which FlightSQL client session will be forgotten and client
+    /// will have to re-authroize (for anonymous clients)
+    pub anon_session_expiration_timeout: Option<DurationString>,
+
+    /// Time after which FlightSQL session context will be released to free the
+    /// resources (for anonymous clients)
+    pub anon_session_inactivity_timeout: Option<DurationString>,
 }
 
 impl FlightSqlConfig {
     pub fn new() -> Self {
         Self {
-            session_expiration_timeout: None,
-            session_inactivity_timeout: None,
+            allow_anonymous: None,
+            authed_session_expiration_timeout: None,
+            authed_session_inactivity_timeout: None,
+            anon_session_expiration_timeout: None,
+            anon_session_inactivity_timeout: None,
         }
     }
 
@@ -549,10 +563,24 @@ impl FlightSqlConfig {
         Self { ..Self::default() }
     }
 
-    pub fn to_system(&self) -> kamu_adapter_flight_sql::SessionCachingConfig {
+    pub fn to_session_auth_config(&self) -> kamu_adapter_flight_sql::SessionAuthConfig {
+        kamu_adapter_flight_sql::SessionAuthConfig {
+            allow_anonymous: self.allow_anonymous.unwrap(),
+        }
+    }
+
+    pub fn to_session_caching_config(&self) -> kamu_adapter_flight_sql::SessionCachingConfig {
         kamu_adapter_flight_sql::SessionCachingConfig {
-            session_expiration_timeout: self.session_expiration_timeout.unwrap().into(),
-            session_inactivity_timeout: self.session_inactivity_timeout.unwrap().into(),
+            authed_session_expiration_timeout: self
+                .authed_session_expiration_timeout
+                .unwrap()
+                .into(),
+            authed_session_inactivity_timeout: self
+                .authed_session_inactivity_timeout
+                .unwrap()
+                .into(),
+            anon_session_expiration_timeout: self.anon_session_expiration_timeout.unwrap().into(),
+            anon_session_inactivity_timeout: self.anon_session_inactivity_timeout.unwrap().into(),
         }
     }
 }
@@ -560,8 +588,19 @@ impl FlightSqlConfig {
 impl Default for FlightSqlConfig {
     fn default() -> Self {
         Self {
-            session_expiration_timeout: Some(DurationString::from_string("5m".to_owned()).unwrap()),
-            session_inactivity_timeout: Some(DurationString::from_string("5s".to_owned()).unwrap()),
+            allow_anonymous: Some(true),
+            authed_session_expiration_timeout: Some(
+                DurationString::from_string("30m".to_owned()).unwrap(),
+            ),
+            authed_session_inactivity_timeout: Some(
+                DurationString::from_string("5s".to_owned()).unwrap(),
+            ),
+            anon_session_expiration_timeout: Some(
+                DurationString::from_string("30m".to_owned()).unwrap(),
+            ),
+            anon_session_inactivity_timeout: Some(
+                DurationString::from_string("5s".to_owned()).unwrap(),
+            ),
         }
     }
 }
@@ -667,6 +706,9 @@ impl DatabaseConfig {
             database_name: String::from("kamu"),
             host: String::from("localhost"),
             port: Some(DatabaseProvider::Postgres.default_port()),
+            acquire_timeout_secs: None,
+            max_connections: None,
+            max_lifetime_secs: None,
         })
     }
 
@@ -693,6 +735,9 @@ pub struct RemoteDatabaseConfig {
     pub database_name: String,
     pub host: String,
     pub port: Option<u16>,
+    pub max_connections: Option<u32>,
+    pub max_lifetime_secs: Option<u64>,
+    pub acquire_timeout_secs: Option<u64>,
 }
 
 #[skip_serializing_none]

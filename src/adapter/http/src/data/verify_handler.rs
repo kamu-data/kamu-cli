@@ -130,13 +130,6 @@ pub async fn verify_handler(
     Json(request): Json<VerifyRequest>,
 ) -> Result<VerifyResponse, ApiError> {
     tracing::debug!(?request, "Verification request");
-
-    assert_eq!(
-        request.proof.r#type,
-        query::ProofType::Ed25519Signature2020,
-        "UnsupportedProofType",
-    );
-
     let response = verify(catalog, request).await?;
     tracing::debug!(?response, "Verification response");
     Ok(response)
@@ -144,6 +137,10 @@ pub async fn verify_handler(
 
 async fn verify(catalog: Catalog, request: VerifyRequest) -> Result<VerifyResponse, ApiError> {
     // 1. Validate request
+    match request.proof.r#type {
+        query::ProofType::Ed25519Signature2020 => {}
+    }
+
     if request.commitment.input_hash
         != odf::Multihash::from_digest_sha3_256(&query::to_canonical_json(&request.input))
     {
@@ -172,25 +169,23 @@ async fn verify(catalog: Catalog, request: VerifyRequest) -> Result<VerifyRespon
     // We are only interested in the output
     data_request.include.clear();
 
-    let query_result =
-        match query_handler::query_handler_post(axum::Extension(catalog), Json(data_request)).await
-        {
-            Ok(Json(v)) => Ok(v),
-            Err(err) => match err.source().unwrap().downcast_ref::<QueryError>() {
-                Some(QueryError::DatasetNotFound(err)) => {
-                    return Ok(VerifyResponse::from(DatasetNotFound::new(
-                        err.dataset_ref.id().unwrap().clone(),
-                    )));
-                }
-                Some(QueryError::DatasetBlockNotFound(err)) => {
-                    return Ok(VerifyResponse::from(DatasetBlockNotFound::new(
-                        err.dataset_id.clone(),
-                        err.block_hash.clone(),
-                    )));
-                }
-                _ => Err(err),
-            },
-        }?;
+    let query_result = match query_handler::query_handler_impl(catalog, data_request).await {
+        Ok(Json(v)) => Ok(v),
+        Err(err) => match err.source().unwrap().downcast_ref::<QueryError>() {
+            Some(QueryError::DatasetNotFound(err)) => {
+                return Ok(VerifyResponse::from(DatasetNotFound::new(
+                    err.dataset_ref.id().unwrap().clone(),
+                )));
+            }
+            Some(QueryError::DatasetBlockNotFound(err)) => {
+                return Ok(VerifyResponse::from(DatasetBlockNotFound::new(
+                    err.dataset_id.clone(),
+                    err.block_hash.clone(),
+                )));
+            }
+            _ => Err(err),
+        },
+    }?;
 
     let output_hash_actual =
         odf::Multihash::from_digest_sha3_256(&query::to_canonical_json(&query_result.output));

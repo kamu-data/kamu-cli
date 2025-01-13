@@ -7,26 +7,23 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::pin::Pin;
-
+use database_common::PaginationOpts;
 use event_sourcing::EventStore;
 use opendatafabric::DatasetID;
-use tokio_stream::Stream;
 
 use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub type FailableDatasetIDStream<'a> =
-    Pin<Box<dyn Stream<Item = Result<DatasetID, InternalError>> + Send + 'a>>;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 #[async_trait::async_trait]
 pub trait FlowConfigurationEventStore: EventStore<FlowConfigurationState> {
-    /// Returns all unique values of dataset IDs associated with update configs
-    // TODO: re-consider performance impact
-    fn list_all_dataset_ids(&self) -> FailableDatasetIDStream<'_>;
+    /// Returns unique values of dataset IDs associated with update configs
+    async fn list_dataset_ids(
+        &self,
+        pagination: &PaginationOpts,
+    ) -> Result<Vec<DatasetID>, InternalError>;
+
+    async fn all_dataset_ids_count(&self) -> Result<usize, InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

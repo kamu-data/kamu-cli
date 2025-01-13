@@ -17,6 +17,7 @@ mod errors;
 mod handles;
 mod listener;
 mod runtime;
+pub mod signal;
 mod terminate;
 
 pub use args::*;

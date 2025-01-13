@@ -10,6 +10,7 @@
 mod flow_config_test_listener;
 mod flow_harness_shared;
 mod flow_system_test_listener;
+mod flow_trigger_test_listener;
 mod manual_flow_abort_driver;
 mod manual_flow_trigger_driver;
 mod task_driver;
@@ -17,6 +18,7 @@ mod task_driver;
 pub(crate) use flow_config_test_listener::*;
 pub(crate) use flow_harness_shared::*;
 pub(crate) use flow_system_test_listener::*;
+pub(crate) use flow_trigger_test_listener::*;
 pub(crate) use manual_flow_abort_driver::*;
 pub(crate) use manual_flow_trigger_driver::*;
 pub(crate) use task_driver::*;

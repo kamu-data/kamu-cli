@@ -13,9 +13,10 @@ use std::net::SocketAddr;
 use arrow_flight::flight_service_server::FlightServiceServer;
 use arrow_flight::sql::client::FlightSqlServiceClient;
 use datafusion::prelude::*;
-use dill::Component;
 use futures::TryStreamExt;
 use indoc::indoc;
+use kamu_accounts::testing::MockAuthenticationService;
+use kamu_accounts::{Account, AuthenticationService, GetAccountInfoError};
 use kamu_adapter_flight_sql::*;
 use kamu_core::{MockQueryService, QueryService};
 use tokio::net::TcpListener;
@@ -51,22 +52,47 @@ async fn run_server() -> FlightServer {
     .await
     .unwrap();
 
+    let mut mock_authentication_service = MockAuthenticationService::new();
+    mock_authentication_service
+        .expect_account_by_token()
+        .with(mockall::predicate::eq("valid-token".to_string()))
+        .returning(|_| Ok(Account::dummy()));
+    mock_authentication_service
+        .expect_account_by_token()
+        .with(mockall::predicate::eq("invalid-token".to_string()))
+        .returning(|_| {
+            Err(GetAccountInfoError::AccessToken(
+                kamu_accounts::AccessTokenError::Invalid("foo".into()),
+            ))
+        });
+
     let mut query_svc: kamu_core::MockQueryService = kamu_core::MockQueryService::new();
     query_svc
         .expect_create_session()
         .return_once(move || Ok(ctx));
 
-    let catalog = dill::Catalog::builder()
-        .add_builder(
-            SessionAuthBasicPredefined::builder()
-                .with_accounts_passwords([("admin".to_string(), "password".to_string())].into()),
-        )
-        .bind::<dyn SessionAuth, SessionAuthBasicPredefined>()
+    let mut b = dill::Catalog::builder();
+
+    b.add::<SessionAuthAnonymous>()
+        .add_value(SessionAuthConfig {
+            allow_anonymous: true,
+        })
+        .add_value(mock_authentication_service)
+        .bind::<dyn AuthenticationService, MockAuthenticationService>()
         .add_value(query_svc)
         .bind::<dyn QueryService, MockQueryService>()
         .add::<SessionManagerSingleton>()
         .add::<SessionManagerSingletonState>()
-        .build();
+        .add_value(
+            kamu_adapter_flight_sql::sql_info::default_sql_info()
+                .build()
+                .unwrap(),
+        )
+        .add::<KamuFlightSqlService>();
+
+    database_common::NoOpDatabasePlugin::init_database_components(&mut b);
+
+    let catalog = b.build();
 
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr = listener.local_addr().unwrap();
@@ -77,9 +103,8 @@ async fn run_server() -> FlightServer {
             req.extensions_mut().insert(catalog.clone());
             Ok(req)
         }))
-        .add_service(FlightServiceServer::new(
-            KamuFlightSqlService::builder().build(),
-        ))
+        .layer(AuthenticationLayer::new())
+        .add_service(FlightServiceServer::new(KamuFlightSqlServiceWrapper))
         .serve_with_incoming(tokio_stream::wrappers::TcpListenerStream::new(listener));
 
     let task = tokio::task::spawn(service);
@@ -100,7 +125,7 @@ async fn get_client(addr: &SocketAddr) -> FlightSqlServiceClient<Channel> {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_auth_error() {
+async fn test_basic_auth_disabled() {
     let server = run_server().await;
     let mut client = get_client(&server.addr).await;
 
@@ -110,11 +135,79 @@ async fn test_auth_error() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_statement() {
+async fn test_invalid_bearer_token() {
+    let server = run_server().await;
+    let mut client = get_client(&server.addr).await;
+    client.set_token("invalid-token".to_string());
+
+    assert_matches!(
+        client.execute("select * from test".to_string(), None).await,
+        Err(_)
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_statement_anonymous() {
     let server = run_server().await;
 
     let mut client = get_client(&server.addr).await;
-    client.handshake("admin", "password").await.unwrap();
+    client.handshake("anonymous", "").await.unwrap();
+
+    let fi = client
+        .execute("select * from test".to_string(), None)
+        .await
+        .unwrap();
+
+    let mut record_batches: Vec<_> = client
+        .do_get(fi.endpoint[0].ticket.clone().unwrap())
+        .await
+        .unwrap()
+        .try_collect()
+        .await
+        .unwrap();
+
+    assert_eq!(record_batches.len(), 1);
+
+    let ctx = SessionContext::new();
+    let df = ctx.read_batch(record_batches.pop().unwrap()).unwrap();
+
+    kamu_data_utils::testing::assert_schema_eq(
+        df.schema(),
+        indoc!(
+            "
+            message arrow_schema {
+              OPTIONAL INT32 id;
+              OPTIONAL BYTE_ARRAY name (STRING);
+            }
+            "
+        ),
+    );
+    kamu_data_utils::testing::assert_data_eq(
+        df,
+        indoc!(
+            "
+            +----+------+
+            | id | name |
+            +----+------+
+            | 1  | a    |
+            | 2  | b    |
+            +----+------+
+            "
+        ),
+    )
+    .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_statement_bearer() {
+    let server = run_server().await;
+
+    let mut client = get_client(&server.addr).await;
+    client.set_token("valid-token".to_string());
 
     let fi = client
         .execute("select * from test".to_string(), None)

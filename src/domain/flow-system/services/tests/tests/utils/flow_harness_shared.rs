@@ -67,7 +67,8 @@ pub(crate) struct FlowHarness {
 
     pub catalog: Catalog,
     pub flow_configuration_service: Arc<dyn FlowConfigurationService>,
-    pub flow_configuration_event_store: Arc<dyn FlowConfigurationEventStore>,
+    pub flow_trigger_service: Arc<dyn FlowTriggerService>,
+    pub flow_trigger_event_store: Arc<dyn FlowTriggerEventStore>,
     pub flow_agent: Arc<FlowAgentImpl>,
     pub flow_query_service: Arc<dyn FlowQueryService>,
     pub flow_event_store: Arc<dyn FlowEventStore>,
@@ -151,6 +152,7 @@ impl FlowHarness {
             ))
             .add::<InMemoryFlowEventStore>()
             .add::<InMemoryFlowConfigurationEventStore>()
+            .add::<InMemoryFlowTriggerEventStore>()
             .add_value(fake_system_time_source.clone())
             .bind::<dyn SystemTimeSource, FakeSystemTimeSource>()
             .add_value(overrides.tenancy_config)
@@ -188,6 +190,10 @@ impl FlowHarness {
                 &mut b,
                 MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE,
             );
+            register_message_dispatcher::<FlowTriggerUpdatedMessage>(
+                &mut b,
+                MESSAGE_PRODUCER_KAMU_FLOW_TRIGGER_SERVICE,
+            );
             register_message_dispatcher::<FlowAgentUpdatedMessage>(
                 &mut b,
                 MESSAGE_PRODUCER_KAMU_FLOW_AGENT,
@@ -206,10 +212,11 @@ impl FlowHarness {
 
         Self {
             _tmp_dir: tmp_dir,
-            flow_configuration_service: catalog.get_one().unwrap(),
-            flow_configuration_event_store: catalog.get_one().unwrap(),
             flow_agent: catalog.get_one().unwrap(),
             flow_query_service: catalog.get_one().unwrap(),
+            flow_configuration_service: catalog.get_one().unwrap(),
+            flow_trigger_service: catalog.get_one().unwrap(),
+            flow_trigger_event_store: catalog.get_one().unwrap(),
             flow_event_store: catalog.get_one().unwrap(),
             auth_svc: catalog.get_one().unwrap(),
             fake_system_time_source,
@@ -329,18 +336,33 @@ impl FlowHarness {
             .unwrap();
     }
 
-    pub async fn set_dataset_flow_ingest(
+    pub async fn set_dataset_flow_trigger(
         &self,
         request_time: DateTime<Utc>,
+        dataset_id: DatasetID,
+        dataset_flow_type: DatasetFlowType,
+        trigger_rule: FlowTriggerRule,
+    ) {
+        self.flow_trigger_service
+            .set_trigger(
+                request_time,
+                FlowKeyDataset::new(dataset_id, dataset_flow_type).into(),
+                false,
+                trigger_rule,
+            )
+            .await
+            .unwrap();
+    }
+
+    pub async fn set_dataset_flow_ingest(
+        &self,
         dataset_id: DatasetID,
         dataset_flow_type: DatasetFlowType,
         ingest_rule: IngestRule,
     ) {
         self.flow_configuration_service
             .set_configuration(
-                request_time,
                 FlowKeyDataset::new(dataset_id, dataset_flow_type).into(),
-                false,
                 FlowConfigurationRule::IngestRule(ingest_rule),
             )
             .await
@@ -349,35 +371,14 @@ impl FlowHarness {
 
     pub async fn set_dataset_flow_reset_rule(
         &self,
-        request_time: DateTime<Utc>,
         dataset_id: DatasetID,
         dataset_flow_type: DatasetFlowType,
         reset_rule: ResetRule,
     ) {
         self.flow_configuration_service
             .set_configuration(
-                request_time,
                 FlowKeyDataset::new(dataset_id, dataset_flow_type).into(),
-                false,
                 FlowConfigurationRule::ResetRule(reset_rule),
-            )
-            .await
-            .unwrap();
-    }
-
-    pub async fn set_dataset_flow_transform_rule(
-        &self,
-        request_time: DateTime<Utc>,
-        dataset_id: DatasetID,
-        dataset_flow_type: DatasetFlowType,
-        transform_rule: TransformRule,
-    ) {
-        self.flow_configuration_service
-            .set_configuration(
-                request_time,
-                FlowKeyDataset::new(dataset_id, dataset_flow_type).into(),
-                false,
-                FlowConfigurationRule::TransformRule(transform_rule),
             )
             .await
             .unwrap();
@@ -385,16 +386,13 @@ impl FlowHarness {
 
     pub async fn set_dataset_flow_compaction_rule(
         &self,
-        request_time: DateTime<Utc>,
         dataset_id: DatasetID,
         dataset_flow_type: DatasetFlowType,
         compaction_rule: CompactionRule,
     ) {
         self.flow_configuration_service
             .set_configuration(
-                request_time,
                 FlowKeyDataset::new(dataset_id, dataset_flow_type).into(),
-                false,
                 FlowConfigurationRule::CompactionRule(compaction_rule),
             )
             .await
@@ -408,15 +406,15 @@ impl FlowHarness {
         dataset_flow_type: DatasetFlowType,
     ) {
         let flow_key: FlowKey = FlowKeyDataset::new(dataset_id, dataset_flow_type).into();
-        let current_config = self
-            .flow_configuration_service
-            .find_configuration(flow_key.clone())
+        let current_trigger = self
+            .flow_trigger_service
+            .find_trigger(flow_key.clone())
             .await
             .unwrap()
             .unwrap();
 
-        self.flow_configuration_service
-            .set_configuration(request_time, flow_key, true, current_config.rule)
+        self.flow_trigger_service
+            .set_trigger(request_time, flow_key, true, current_trigger.rule)
             .await
             .unwrap();
     }
@@ -428,15 +426,15 @@ impl FlowHarness {
         dataset_flow_type: DatasetFlowType,
     ) {
         let flow_key: FlowKey = FlowKeyDataset::new(dataset_id, dataset_flow_type).into();
-        let current_config = self
-            .flow_configuration_service
-            .find_configuration(flow_key.clone())
+        let current_trigger = self
+            .flow_trigger_service
+            .find_trigger(flow_key.clone())
             .await
             .unwrap()
             .unwrap();
 
-        self.flow_configuration_service
-            .set_configuration(request_time, flow_key, false, current_config.rule)
+        self.flow_trigger_service
+            .set_trigger(request_time, flow_key, false, current_trigger.rule)
             .await
             .unwrap();
     }

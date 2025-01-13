@@ -7,7 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use chrono::{Duration, Utc};
+use chrono::Utc;
+use database_common::PaginationOpts;
 use dill::Catalog;
 use futures::TryStreamExt;
 use kamu_flow_system::*;
@@ -37,8 +38,10 @@ pub async fn test_event_store_empty(catalog: &Catalog) {
     assert_eq!(events, []);
 
     let dataset_ids: Vec<_> = event_store
-        .list_all_dataset_ids()
-        .try_collect()
+        .list_dataset_ids(&PaginationOpts {
+            limit: 10,
+            offset: 0,
+        })
         .await
         .unwrap();
 
@@ -58,18 +61,16 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
     let event_1_1 = FlowConfigurationEventCreated {
         event_time: Utc::now(),
         flow_key: flow_key_1.clone(),
-        paused: false,
-        rule: FlowConfigurationRule::Schedule(Schedule::TimeDelta(ScheduleTimeDelta {
-            every: Duration::seconds(5),
-        })),
+        rule: FlowConfigurationRule::CompactionRule(CompactionRule::MetadataOnly(
+            CompactionRuleMetadataOnly { recursive: false },
+        )),
     };
     let event_1_2 = FlowConfigurationEventModified {
         event_time: Utc::now(),
         flow_key: flow_key_1.clone(),
-        paused: true,
-        rule: FlowConfigurationRule::Schedule(Schedule::TimeDelta(ScheduleTimeDelta {
-            every: Duration::seconds(5),
-        })),
+        rule: FlowConfigurationRule::CompactionRule(CompactionRule::MetadataOnly(
+            CompactionRuleMetadataOnly { recursive: true },
+        )),
     };
 
     event_store
@@ -91,10 +92,9 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
     let event_2 = FlowConfigurationEventCreated {
         event_time: Utc::now(),
         flow_key: flow_key_2.clone(),
-        paused: false,
-        rule: FlowConfigurationRule::Schedule(
-            Schedule::try_from_5component_cron_expression("0 * * * *").unwrap(),
-        ),
+        rule: FlowConfigurationRule::CompactionRule(CompactionRule::MetadataOnly(
+            CompactionRuleMetadataOnly { recursive: false },
+        )),
     };
 
     event_store
@@ -110,10 +110,9 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
     let event_3 = FlowConfigurationEventCreated {
         event_time: Utc::now(),
         flow_key: flow_key_3.clone(),
-        paused: false,
-        rule: FlowConfigurationRule::Schedule(Schedule::TimeDelta(ScheduleTimeDelta {
-            every: Duration::seconds(5),
-        })),
+        rule: FlowConfigurationRule::CompactionRule(CompactionRule::MetadataOnly(
+            CompactionRuleMetadataOnly { recursive: true },
+        )),
     };
 
     event_store
@@ -153,8 +152,10 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
     assert_eq!(&events[..], [event_3.into()]);
 
     let mut dataset_ids: Vec<_> = event_store
-        .list_all_dataset_ids()
-        .try_collect()
+        .list_dataset_ids(&PaginationOpts {
+            limit: 10,
+            offset: 0,
+        })
         .await
         .unwrap();
 
@@ -182,26 +183,23 @@ pub async fn test_event_store_get_events_with_windowing(catalog: &Catalog) {
     let event_1 = FlowConfigurationEventCreated {
         event_time: Utc::now(),
         flow_key: flow_key.clone(),
-        paused: false,
-        rule: FlowConfigurationRule::Schedule(Schedule::TimeDelta(ScheduleTimeDelta {
-            every: Duration::seconds(5),
-        })),
+        rule: FlowConfigurationRule::CompactionRule(CompactionRule::MetadataOnly(
+            CompactionRuleMetadataOnly { recursive: false },
+        )),
     };
     let event_2 = FlowConfigurationEventModified {
         event_time: Utc::now(),
         flow_key: flow_key.clone(),
-        paused: false,
-        rule: FlowConfigurationRule::Schedule(Schedule::TimeDelta(ScheduleTimeDelta {
-            every: Duration::seconds(5),
-        })),
+        rule: FlowConfigurationRule::CompactionRule(CompactionRule::MetadataOnly(
+            CompactionRuleMetadataOnly { recursive: true },
+        )),
     };
     let event_3 = FlowConfigurationEventCreated {
         event_time: Utc::now(),
         flow_key: flow_key.clone(),
-        paused: false,
-        rule: FlowConfigurationRule::Schedule(Schedule::TimeDelta(ScheduleTimeDelta {
-            every: Duration::seconds(5),
-        })),
+        rule: FlowConfigurationRule::CompactionRule(CompactionRule::MetadataOnly(
+            CompactionRuleMetadataOnly { recursive: false },
+        )),
     };
 
     let latest_event_id = event_store

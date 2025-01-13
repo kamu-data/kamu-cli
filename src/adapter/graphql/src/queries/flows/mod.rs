@@ -9,6 +9,7 @@
 
 mod flow;
 mod flow_config_snapshot;
+mod flow_description;
 mod flow_event;
 mod flow_outcome;
 mod flow_start_condition;

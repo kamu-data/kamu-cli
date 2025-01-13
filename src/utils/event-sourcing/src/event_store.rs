@@ -20,6 +20,26 @@ pub trait EventStore<Proj: Projection>: Send + Sync {
     /// Returns the event history of an aggregate in chronological order
     fn get_events(&self, query: &Proj::Query, opts: GetEventsOpts) -> EventStream<Proj::Event>;
 
+    /// Returns event history of multiple aggregates in chronological order
+    /// Created to give a room for query optimisations when needed
+    fn get_events_multi(
+        &self,
+        queries: Vec<Proj::Query>,
+    ) -> MultiEventStream<Proj::Query, Proj::Event> {
+        use tokio_stream::StreamExt;
+        let queries = queries.clone();
+
+        Box::pin(async_stream::try_stream! {
+          for query in queries {
+            let mut stream = self.get_events(&query, GetEventsOpts::default());
+            while let Some(event) = stream.next().await {
+              let (event_id, event) = event?;
+              yield (query.clone(), event_id, event)
+            }
+          }
+        })
+    }
+
     /// Persists a series of events
     ///
     /// The `query` argument must be the same as query passed when retrieving
@@ -40,6 +60,14 @@ pub trait EventStore<Proj: Projection>: Send + Sync {
 
 pub type EventStream<'a, Event> = std::pin::Pin<
     Box<dyn tokio_stream::Stream<Item = Result<(EventID, Event), GetEventsError>> + Send + 'a>,
+>;
+
+pub type MultiEventStream<'a, Query, Event> = std::pin::Pin<
+    Box<
+        dyn tokio_stream::Stream<Item = Result<(Query, EventID, Event), GetEventsError>>
+            + Send
+            + 'a,
+    >,
 >;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

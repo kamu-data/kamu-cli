@@ -651,7 +651,7 @@ impl FlowEventStore for SqliteFlowEventStore {
                     AND (cast($2 as dataset_flow_type) IS NULL OR dataset_flow_type = $2)
                     AND (cast($3 as flow_status_type) IS NULL OR flow_status = $3)
                     AND ($4 = 0 OR initiator IN ({}))
-                ORDER BY flow_id DESC
+                ORDER BY flow_status DESC, last_event_id DESC
                 LIMIT $5 OFFSET $6
                 "#,
                 maybe_initiators
@@ -762,7 +762,7 @@ impl FlowEventStore for SqliteFlowEventStore {
                     AND (cast($1 as dataset_flow_type) IS NULL OR dataset_flow_type = $1)
                     AND (cast($2 as flow_status_type) IS NULL OR flow_status = $2)
                     AND ($3 = 0 OR initiator in ({}))
-                ORDER BY flow_id DESC
+                ORDER BY flow_status DESC, last_event_id DESC
                 LIMIT $4 OFFSET $5
                 "#,
                 sqlite_generate_placeholders_list(dataset_ids.len(), 6),

@@ -36,7 +36,7 @@ async-trait = "0.1"
 aws-config = "1"
 aws-credential-types = "1"
 clap = { version = "4", features = ["derive"] }
-datafusion = { version = "43", features = [
+datafusion = { version = "44", features = [
     "crypto_expressions",
     "datetime_expressions",
     "encoding_expressions",

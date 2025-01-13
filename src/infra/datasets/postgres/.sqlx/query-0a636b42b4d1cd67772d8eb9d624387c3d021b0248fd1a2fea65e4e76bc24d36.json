@@ -1,0 +1,39 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                INSERT INTO dataset_env_vars (id, key, value, secret_nonce, created_at, dataset_id)\n                VALUES ($1, $2, $3, $4, $5, $6)\n                ON CONFLICT (key, dataset_id)\n                DO UPDATE SET\n                    value = EXCLUDED.value,\n                    secret_nonce = CASE\n                        WHEN dataset_env_vars.secret_nonce IS NULL AND EXCLUDED.secret_nonce IS NOT NULL THEN EXCLUDED.secret_nonce\n                        WHEN dataset_env_vars.secret_nonce IS NOT NULL AND EXCLUDED.secret_nonce IS NULL THEN NULL\n                        ELSE EXCLUDED.secret_nonce\n                END\n                RETURNING xmax = 0 AS is_inserted,\n                id,\n                (\n                    SELECT value FROM dataset_env_vars WHERE key = $2 and dataset_id = $6\n                ) as \"value: Vec<u8>\";\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "is_inserted",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 1,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "value: Vec<u8>",
+        "type_info": "Bytea"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Varchar",
+        "Bytea",
+        "Bytea",
+        "Timestamptz",
+        "Varchar"
+      ]
+    },
+    "nullable": [
+      null,
+      false,
+      null
+    ]
+  },
+  "hash": "0a636b42b4d1cd67772d8eb9d624387c3d021b0248fd1a2fea65e4e76bc24d36"
+}

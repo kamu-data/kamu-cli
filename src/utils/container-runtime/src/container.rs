@@ -129,7 +129,11 @@ impl ContainerRunCommand {
     }
 
     pub fn map_port(mut self, host: u16, container: u16) -> Self {
-        self.args.expose_port_map.push((host, container));
+        if host != 0 {
+            self.args.expose_port_map.push((host, container));
+        } else {
+            self.args.expose_ports.push(container);
+        }
         self
     }
 
@@ -235,6 +239,11 @@ impl ContainerRunCommand {
         self
     }
 
+    pub fn extra_host(mut self, spec: impl Into<ExtraHostSpec>) -> Self {
+        self.args.extra_hosts.push(spec.into());
+        self
+    }
+
     pub fn into_command(self) -> tokio::process::Command {
         let mut cmd = self.runtime.run_cmd(self.args);
 
@@ -305,6 +314,48 @@ impl ContainerRunCommand {
     pub async fn status(self) -> std::io::Result<ExitStatus> {
         let mut container = self.spawn()?;
         container.wait().await
+    }
+
+    pub fn maybe(self, cond: bool, fun: impl FnOnce(Self) -> Self) -> Self {
+        if cond {
+            fun(self)
+        } else {
+            self
+        }
+    }
+
+    pub fn maybe_or(
+        self,
+        cond: bool,
+        fun_if: impl FnOnce(Self) -> Self,
+        fun_else: impl FnOnce(Self) -> Self,
+    ) -> Self {
+        if cond {
+            fun_if(self)
+        } else {
+            fun_else(self)
+        }
+    }
+
+    pub fn map<T>(self, opt: Option<T>, fun: impl FnOnce(Self, T) -> Self) -> Self {
+        if let Some(val) = opt {
+            fun(self, val)
+        } else {
+            self
+        }
+    }
+
+    pub fn map_or<T>(
+        self,
+        opt: Option<T>,
+        fun_if: impl FnOnce(Self, T) -> Self,
+        fun_else: impl FnOnce(Self) -> Self,
+    ) -> Self {
+        if let Some(val) = opt {
+            fun_if(self, val)
+        } else {
+            fun_else(self)
+        }
     }
 }
 

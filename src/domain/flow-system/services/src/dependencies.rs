@@ -15,7 +15,9 @@ use crate::*;
 
 pub fn register_dependencies(catalog_builder: &mut CatalogBuilder) {
     catalog_builder.add::<FlowConfigurationServiceImpl>();
+    catalog_builder.add::<FlowTriggerServiceImpl>();
     catalog_builder.add::<FlowAgentImpl>();
+    catalog_builder.add::<FlowStateHelper>();
     catalog_builder.add::<FlowQueryServiceImpl>();
 
     catalog_builder.add::<FlowAbortHelper>();

@@ -19,6 +19,9 @@ pub struct DatabaseConnectionSettings {
     pub database_name: String,
     pub host: String,
     pub port: Option<u16>,
+    pub max_connections: Option<u32>,
+    pub max_lifetime_secs: Option<u64>,
+    pub acquire_timeout_secs: Option<u64>,
 }
 
 impl DatabaseConnectionSettings {
@@ -27,12 +30,18 @@ impl DatabaseConnectionSettings {
         database_name: String,
         host: String,
         port: Option<u16>,
+        max_connections: Option<u32>,
+        max_lifetime_secs: Option<u64>,
+        acquire_timeout_secs: Option<u64>,
     ) -> Self {
         Self {
             provider,
             database_name,
             host,
             port,
+            max_connections,
+            max_lifetime_secs,
+            acquire_timeout_secs,
         }
     }
 
@@ -46,6 +55,9 @@ impl DatabaseConnectionSettings {
             database_name: String::new(),
             host: String::from(path.to_str().unwrap()),
             port: None,
+            max_connections: None,
+            max_lifetime_secs: None,
+            acquire_timeout_secs: None,
         }
     }
 }

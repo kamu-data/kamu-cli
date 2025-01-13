@@ -81,7 +81,7 @@ pub async fn test_verify(mut kamu_api_server_client: KamuApiServerClient) {
 
     kamu_api_server_client
         .dataset()
-        .create_player_scores_dataset_with_data(None)
+        .create_player_scores_dataset_with_data()
         .await;
 
     let query_request = QueryRequest {
@@ -194,6 +194,7 @@ async fn test_dataset_metadata(
 ) {
     let CreateDatasetResponse {
         dataset_id: expected_dataset_id,
+        ..
     } = kamu_api_server_client
         .dataset()
         .create_player_scores_dataset()

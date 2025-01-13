@@ -652,6 +652,10 @@ Starts the notebook server for exploring the data in the workspace
 
 * `--address <ADDRESS>` — Expose HTTP server on specific network interface
 * `--http-port <HTTP_PORT>` — Expose HTTP server on specific port
+* `--engine <ENG>` — Engine type to use for the notebook
+
+  Possible values: `datafusion`, `spark`
+
 * `-e`, `--env <VAR>` — Propagate or set an environment variable in the notebook (e.g. `-e VAR` or `-e VAR=foo`)
 
 This command will run the Jupyter server and the Spark engine connected together, letting you query data with SQL before pulling it into the notebook for final processing and visualization.
@@ -1076,7 +1080,7 @@ Executes an SQL query or drops you into an SQL shell
 
 **Subcommands:**
 
-* `server` — Run JDBC server only
+* `server` — Runs an SQL engine in a server mode
 
 **Options:**
 
@@ -1145,16 +1149,38 @@ Note: Currently when connecting to a remote SQL kamu server you will need to man
 
 ## `kamu sql server`
 
-Run JDBC server only
+Runs an SQL engine in a server mode
 
 **Usage:** `kamu sql server [OPTIONS]`
 
 **Options:**
 
-* `--address <ADDRESS>` — Expose JDBC server on specific network interface
-* `--port <PORT>` — Expose JDBC server on specific port
-* `--livy` — Run Livy server instead of Spark JDBC
-* `--flight-sql` — Run Flight SQL server instead of Spark JDBC
+* `--address <ADDRESS>` — Expose server on specific network interface
+* `--port <PORT>` — Expose server on specific port
+* `--engine <ENG>` — Engine type to use for this server
+
+  Possible values: `datafusion`, `spark`
+
+* `--livy` — Run Livy server instead of JDBC
+
+**Examples:**
+
+By default runs the DataFusion engine exposing the FlightSQL protocol:
+
+    kamu sql server
+
+To customize interface and port:
+
+    kamu sql server --address 0.0.0.0 --port 50050
+
+To run with Spark engine:
+
+    kamu sql server --engine spark
+
+By default Spark runs with JDBC protocol, to instead run with Livy HTTP gateway:
+
+    kamu sql server --engine spark --livy
+
 
 
 

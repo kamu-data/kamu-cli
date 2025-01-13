@@ -97,10 +97,4 @@ ignore = [
     # Unmaintained (proc-macro-error)
     # https://rustsec.org/advisories/RUSTSEC-2024-0370.html
     "RUSTSEC-2024-0370",
-    # Unmaintained (instant)
-    # https://rustsec.org/advisories/RUSTSEC-2024-0384.html
-    "RUSTSEC-2024-0384",
-    # Security: requires update in hickory-resolver, which is not available yet
-    # https://github.com/rust-lang/crates.io-index
-    "RUSTSEC-2024-0421"
 ]

@@ -28,6 +28,43 @@ Recommendation: for ease of reading, use the following order:
   - GQL, `DatasetMetadata.currentDownstreamDependencies`: exclude datasets that cannot be accessed
   - E2E: added the ability to create an account using CLI
 
+## [0.217.2] - 2025-01-10
+### Changed
+- Updated to latest `datafusion` and `alloy` dependencies
+- Performance improvements with batch loading of event sourcing aggregates
+
+## [0.217.1] - 2025-01-09
+### Changed
+- Extended database config options with next fields: `maxConnections`, `maxLifeTimeSecs` and `acquireTimeoutSecs`
+
+## [0.217.0] - 2025-01-08
+### Changed
+- GraphQL: flows are listed ordered by status and last event time
+- Merged two methods(`saveEnvVariable` and `modifyEnvVariable`) from `DatasetEnvVarsMut` info one `upsertEnvVariable`
+### Fixed
+- GQL api flows queries now fetch dataset polling source only once per dataset(and only if Ingest flow type is here)
+- Flow trigger status now become disable on flow fail
+
+## [0.216.0] - 2024-12-30
+### Changed
+- Flight SQL protocol now supports anonymous and bearer token authentication
+- The `kamu notebook` command now defaults to `DataFusion` engine for speed, but you can switch to Spark with `--engine spark` argument
+- The `kamu notebook` command uses new image based on latest Jupyter and new [`kamu-client-python`](https://github.com/kamu-data/kamu-client-python) library
+- The `kamu sql server` command now defaults to `DataFusion` engine with interface changed to use `--engine datafusion/spark`, removing the `--flight-sql` flag
+- Examples in `examples/flightsql/python` were updated to new auth and showcasing `kamu` Python library
+- Most notebooks in `examples/` directory are using `kamu` Python library with `DataFusion` engine, with Spark still in use for GIS extensions
+
+## [0.215.1] - 2024-12-30
+### Fixed
+- GraphQL: in a multi-tenant workspace, `datasets.createEmpty` and `datasets.createFromSnapshot` mutations now return dataset aliases prefixed with account name.
+- Fix DB transaction error in `/verify` REST endpoint (cherry-picked from `0.214.1`)
+
+## [0.215.0] - 2024-12-27
+### Added
+- New entity `FlowTrigger` which is now responsible for flow activation and schedules
+### Changed
+- `DatasetFlowConfigsMut` now has only one method `setConfig` for all types of configurations
+
 ## [0.214.0] - 2024-12-23
 ### Added
 - New `kamu system decode` command that can decode an arbitrary block file for debugging

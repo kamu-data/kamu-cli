@@ -1,21 +1,16 @@
-# TODO: Pinned due to sparkmagic installation issue
-# See: https://github.com/jupyter-incubator/sparkmagic/issues/825
-# See workaround applied in: https://github.com/jupyter-incubator/sparkmagic/blob/master/Dockerfile.jupyter
-notebook==6.5.5
+kamu[jupyter-autoviz,jupyter-sql,spark]
 
-sparkmagic
-
-pandas
+dask
 geopandas
 geojson
-xarray
 netcdf4
-dask
+pandas
+xarray
 
-bokeh
-hvplot
-pandas-bokeh
-folium
 altair
+bokeh
+folium
+hvplot
 mapboxgl
+pandas-bokeh
 shapely

@@ -15,7 +15,6 @@ use crate::prelude::*;
 
 #[derive(Union)]
 pub enum FlowConfigurationSnapshot {
-    Transform(FlowConfigurationTransform),
     Compaction(FlowConfigurationCompactionRule),
     Ingest(FlowConfigurationIngest),
     Reset(FlowConfigurationReset),
@@ -28,18 +27,12 @@ pub struct FlowConfigurationCompactionRule {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl From<fs::FlowConfigurationSnapshot> for FlowConfigurationSnapshot {
-    fn from(value: fs::FlowConfigurationSnapshot) -> Self {
+impl From<fs::FlowConfigurationRule> for FlowConfigurationSnapshot {
+    fn from(value: fs::FlowConfigurationRule) -> Self {
         match value {
-            fs::FlowConfigurationSnapshot::Ingest(ingest_rule) => Self::Ingest(ingest_rule.into()),
-            fs::FlowConfigurationSnapshot::Transform(transform_rule) => {
-                Self::Transform(transform_rule.into())
-            }
-            fs::FlowConfigurationSnapshot::Schedule(_) => {
-                unreachable!()
-            }
-            fs::FlowConfigurationSnapshot::Reset(reset_rule) => Self::Reset(reset_rule.into()),
-            fs::FlowConfigurationSnapshot::Compaction(compaction_rule) => {
+            fs::FlowConfigurationRule::IngestRule(ingest_rule) => Self::Ingest(ingest_rule.into()),
+            fs::FlowConfigurationRule::ResetRule(reset_rule) => Self::Reset(reset_rule.into()),
+            fs::FlowConfigurationRule::CompactionRule(compaction_rule) => {
                 Self::Compaction(FlowConfigurationCompactionRule {
                     compaction_rule: match compaction_rule {
                         fs::CompactionRule::Full(compaction_full_rule) => {

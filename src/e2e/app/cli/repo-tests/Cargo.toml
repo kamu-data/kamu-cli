@@ -47,7 +47,7 @@ reqwest = { version = "0.12", default-features = false, features = [] }
 serde_json = { version = "1", default-features = false }
 tempfile = { version = "3" }
 url = { version = "2", default-features = false }
-datafusion = { version = "43", default-features = false, features = [] }
+datafusion = { version = "44", default-features = false, features = [] }
 
 
 [dev-dependencies]

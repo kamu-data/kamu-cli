@@ -10,7 +10,7 @@
 use chrono::{DateTime, Utc};
 use {event_sourcing as evs, kamu_flow_system as fs, kamu_task_system as ts};
 
-use super::{FlowStartCondition, FlowTrigger};
+use super::{FlowConfigurationSnapshot, FlowStartCondition, FlowTriggerType};
 use crate::prelude::*;
 use crate::queries::Task;
 use crate::utils;
@@ -27,6 +27,8 @@ pub enum FlowEvent {
     Initiated(FlowEventInitiated),
     /// Start condition defined
     StartConditionUpdated(FlowEventStartConditionUpdated),
+    /// Config snapshot modified
+    ConfigSnapshotModified(FlowConfigSnapshotModified),
     /// Flow scheduled for activation
     ScheduledForActivation(FlowEventScheduledForActivation),
     /// Secondary trigger added
@@ -60,6 +62,9 @@ impl FlowEvent {
                     e.event_time,
                     start_condition,
                 ))
+            }
+            fs::FlowEvent::ConfigSnapshotModified(e) => {
+                Self::ConfigSnapshotModified(FlowConfigSnapshotModified::build(event_id, e))
             }
             fs::FlowEvent::TriggerAdded(e) => {
                 Self::TriggerAdded(FlowEventTriggerAdded::build(event_id, e, ctx).await?)
@@ -100,7 +105,7 @@ impl FlowEvent {
 pub struct FlowEventInitiated {
     event_id: EventID,
     event_time: DateTime<Utc>,
-    trigger: FlowTrigger,
+    trigger: FlowTriggerType,
 }
 
 impl FlowEventInitiated {
@@ -112,7 +117,7 @@ impl FlowEventInitiated {
         Ok(Self {
             event_id: event_id.into(),
             event_time: event.event_time,
-            trigger: FlowTrigger::build(event.trigger, ctx).await?,
+            trigger: FlowTriggerType::build(&event.trigger, ctx).await?,
         })
     }
 }
@@ -146,7 +151,7 @@ impl FlowEventStartConditionUpdated {
 pub struct FlowEventTriggerAdded {
     event_id: EventID,
     event_time: DateTime<Utc>,
-    trigger: FlowTrigger,
+    trigger: FlowTriggerType,
 }
 
 impl FlowEventTriggerAdded {
@@ -158,8 +163,27 @@ impl FlowEventTriggerAdded {
         Ok(Self {
             event_id: event_id.into(),
             event_time: event.event_time,
-            trigger: FlowTrigger::build(event.trigger, ctx).await?,
+            trigger: FlowTriggerType::build(&event.trigger, ctx).await?,
         })
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject)]
+pub struct FlowConfigSnapshotModified {
+    event_id: EventID,
+    event_time: DateTime<Utc>,
+    config_snapshot: FlowConfigurationSnapshot,
+}
+
+impl FlowConfigSnapshotModified {
+    pub(crate) fn build(event_id: evs::EventID, event: fs::FlowConfigSnapshotModified) -> Self {
+        Self {
+            event_id: event_id.into(),
+            event_time: event.event_time,
+            config_snapshot: event.config_snapshot.into(),
+        }
     }
 }
 

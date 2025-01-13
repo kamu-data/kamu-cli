@@ -55,6 +55,16 @@ impl SqlitePlugin {
             .filename(&db_connection_settings.host)
             .create_if_missing(true);
 
+        if db_connection_settings.max_lifetime_secs.is_some() {
+            tracing::warn!("max_lifetime_secs is not supported for SQLite");
+        }
+        if db_connection_settings.max_connections.is_some() {
+            tracing::warn!("max_connections is not supported for SQLite");
+        }
+        if db_connection_settings.acquire_timeout_secs.is_some() {
+            tracing::warn!("acquire_timeout_secs is not supported for SQLite");
+        }
+
         SqlitePoolOptions::new()
             .max_connections(1)
             .connect_lazy_with(sqlite_options)

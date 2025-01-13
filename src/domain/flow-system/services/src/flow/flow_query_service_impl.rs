@@ -19,7 +19,7 @@ use kamu_datasets::DatasetOwnershipService;
 use kamu_flow_system::*;
 use opendatafabric::{AccountID, DatasetID};
 
-use super::FlowTriggerContext;
+use crate::flow::flow_state_helper::FlowStateHelper;
 use crate::{FlowAbortHelper, FlowSchedulingHelper};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -29,6 +29,7 @@ pub struct FlowQueryServiceImpl {
     flow_event_store: Arc<dyn FlowEventStore>,
     dataset_ownership_service: Arc<dyn DatasetOwnershipService>,
     agent_config: Arc<FlowAgentConfig>,
+    flow_state: Arc<FlowStateHelper>,
 }
 
 #[component(pub)]
@@ -39,12 +40,14 @@ impl FlowQueryServiceImpl {
         flow_event_store: Arc<dyn FlowEventStore>,
         dataset_ownership_service: Arc<dyn DatasetOwnershipService>,
         agent_config: Arc<FlowAgentConfig>,
+        flow_state: Arc<FlowStateHelper>,
     ) -> Self {
         Self {
             catalog,
             flow_event_store,
             dataset_ownership_service,
             agent_config,
+            flow_state,
         }
     }
 }
@@ -68,21 +71,13 @@ impl FlowQueryService for FlowQueryServiceImpl {
             .get_count_flows_by_dataset(dataset_id, &filters)
             .await?;
 
-        let dataset_id = dataset_id.clone();
+        let relevant_flow_ids: Vec<_> = self
+            .flow_event_store
+            .get_all_flow_ids_by_dataset(dataset_id, &filters, pagination)
+            .try_collect()
+            .await?;
 
-        let matched_stream = Box::pin(async_stream::try_stream! {
-            let relevant_flow_ids: Vec<_> = self
-                .flow_event_store
-                .get_all_flow_ids_by_dataset(&dataset_id, &filters, pagination)
-                .try_collect()
-                .await?;
-
-            // TODO: implement batch loading
-            for flow_id in relevant_flow_ids {
-                let flow = Flow::load(flow_id, self.flow_event_store.as_ref()).await.int_err()?;
-                yield flow.into();
-            }
-        });
+        let matched_stream = self.flow_state.get_stream(relevant_flow_ids);
 
         Ok(FlowStateListing {
             matched_stream,
@@ -145,20 +140,13 @@ impl FlowQueryService for FlowQueryServiceImpl {
 
         let account_dataset_ids: HashSet<DatasetID> = HashSet::from_iter(filtered_dataset_ids);
 
-        let matched_stream = Box::pin(async_stream::try_stream! {
-            let relevant_flow_ids: Vec<_> = self
-                .flow_event_store
-                .get_all_flow_ids_by_datasets(account_dataset_ids, &dataset_flow_filters, pagination)
-                .try_collect()
-                .await
-                .int_err()?;
-
-            // TODO: implement batch loading
-            for flow_id in relevant_flow_ids {
-                let flow = Flow::load(flow_id, self.flow_event_store.as_ref()).await.int_err()?;
-                yield flow.into();
-            }
-        });
+        let relevant_flow_ids: Vec<_> = self
+            .flow_event_store
+            .get_all_flow_ids_by_datasets(account_dataset_ids, &dataset_flow_filters, pagination)
+            .try_collect()
+            .await
+            .int_err()?;
+        let matched_stream = self.flow_state.get_stream(relevant_flow_ids);
 
         Ok(FlowStateListing {
             matched_stream,
@@ -210,19 +198,13 @@ impl FlowQueryService for FlowQueryServiceImpl {
             .await
             .int_err()?;
 
-        let matched_stream = Box::pin(async_stream::try_stream! {
-            let relevant_flow_ids: Vec<_> = self
-                .flow_event_store
-                .get_all_system_flow_ids(&filters, pagination)
-                .try_collect()
-                .await?;
+        let relevant_flow_ids: Vec<_> = self
+            .flow_event_store
+            .get_all_system_flow_ids(&filters, pagination)
+            .try_collect()
+            .await?;
 
-            // TODO: implement batch loading
-            for flow_id in relevant_flow_ids {
-                let flow = Flow::load(flow_id, self.flow_event_store.as_ref()).await.int_err()?;
-                yield flow.into();
-            }
-        });
+        let matched_stream = self.flow_state.get_stream(relevant_flow_ids);
 
         Ok(FlowStateListing {
             matched_stream,
@@ -243,19 +225,12 @@ impl FlowQueryService for FlowQueryServiceImpl {
             .get_count_all_flows(&empty_filters)
             .await?;
 
-        let matched_stream = Box::pin(async_stream::try_stream! {
-            let all_flows: Vec<_> = self
-                .flow_event_store
-                .get_all_flow_ids(&empty_filters, pagination)
-                .try_collect()
-                .await?;
-
-            // TODO: implement batch loading
-            for flow_id in all_flows {
-                let flow = Flow::load(flow_id, self.flow_event_store.as_ref()).await.int_err()?;
-                yield flow.into();
-            }
-        });
+        let all_flows: Vec<_> = self
+            .flow_event_store
+            .get_all_flow_ids(&empty_filters, pagination)
+            .try_collect()
+            .await?;
+        let matched_stream = self.flow_state.get_stream(all_flows);
 
         Ok(FlowStateListing {
             matched_stream,
@@ -281,7 +256,7 @@ impl FlowQueryService for FlowQueryServiceImpl {
         trigger_time: DateTime<Utc>,
         flow_key: FlowKey,
         initiator_account_id: AccountID,
-        config_snapshot_maybe: Option<FlowConfigurationSnapshot>,
+        config_snapshot_maybe: Option<FlowConfigurationRule>,
     ) -> Result<FlowState, RequestFlowError> {
         let activation_time = self.agent_config.round_time(trigger_time)?;
 
@@ -289,11 +264,11 @@ impl FlowQueryService for FlowQueryServiceImpl {
         scheduling_helper
             .trigger_flow_common(
                 &flow_key,
-                FlowTrigger::Manual(FlowTriggerManual {
+                None,
+                FlowTriggerType::Manual(FlowTriggerManual {
                     trigger_time: activation_time,
                     initiator_account_id,
                 }),
-                FlowTriggerContext::Unconditional,
                 config_snapshot_maybe,
             )
             .await

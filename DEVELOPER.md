@@ -348,6 +348,7 @@ We use the homegrown [`test-group`](https://crates.io/crates/test-group) crate t
    4. `ci/linter-improvements`
    5. `docs/expand-developer-docs`
    6. `chore/bump-dependencies`
+   7. `release/v1.2.3` - for hot fix releases
 4. Include brief description of your changes under `## Unreleased` section of the `CHANGELOG.md` in your PR
 5. (Recommended) Please configure git to [sign your commits](https://docs.github.com/en/authentication/managing-commit-signature-verification/signing-commits)
 6. Branches should have coarse-grained commits with good descriptions - otherwise commits should be squashed

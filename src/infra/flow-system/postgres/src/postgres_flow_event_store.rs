@@ -367,6 +367,40 @@ impl EventStore<FlowState> for PostgresFlowEventStore {
         })
     }
 
+    fn get_events_multi(&self, queries: Vec<FlowID>) -> MultiEventStream<FlowID, FlowEvent> {
+        let flow_ids: Vec<i64> = queries.iter().map(|id| (*id).try_into().unwrap()).collect();
+
+        Box::pin(async_stream::stream! {
+            let mut tr = self.transaction.lock().await;
+            let connection_mut = tr
+                .connection_mut()
+                .await?;
+
+            let mut query_stream = sqlx::query!(
+                r#"
+                SELECT flow_id, event_id, event_payload
+                FROM flow_events
+                WHERE flow_id = ANY($1)
+                ORDER BY event_id ASC
+                "#,
+                &flow_ids,
+            ).try_map(|event_row| {
+                let event = serde_json::from_value::<FlowEvent>(event_row.event_payload)
+                    .map_err(|e| sqlx::Error::Decode(Box::new(e)))?;
+
+                Ok((FlowID::try_from(event_row.flow_id).unwrap(), // ids are always > 0
+                    EventID::new(event_row.event_id),
+                    event))
+            })
+            .fetch(connection_mut)
+            .map_err(|e| GetEventsError::Internal(e.int_err()));
+
+            while let Some((flow_id, event_id, event)) = query_stream.try_next().await? {
+                yield Ok((flow_id, event_id, event));
+            }
+        })
+    }
+
     async fn save_events(
         &self,
         flow_id: &FlowID,
@@ -597,7 +631,7 @@ impl FlowEventStore for PostgresFlowEventStore {
                     AND (cast($2 as dataset_flow_type) IS NULL OR dataset_flow_type = $2)
                     AND (cast($3 as flow_status_type) IS NULL OR flow_status = $3)
                     AND (cast($4 as TEXT[]) IS NULL OR initiator = ANY($4))
-                ORDER BY flow_id DESC
+                ORDER BY flow_status, last_event_id DESC
                 LIMIT $5 OFFSET $6
                 "#,
                dataset_id,
@@ -683,7 +717,7 @@ impl FlowEventStore for PostgresFlowEventStore {
                     AND (cast($2 as dataset_flow_type) IS NULL OR dataset_flow_type = $2)
                     AND (cast($3 as flow_status_type) IS NULL OR flow_status = $3)
                     AND (cast($4 as TEXT[]) IS NULL OR initiator = ANY($4))
-                ORDER BY flow_id DESC
+                ORDER BY flow_status, last_event_id DESC
                 LIMIT $5 OFFSET $6
                 "#,
                 dataset_ids as Vec<String>,

@@ -602,7 +602,7 @@ async fn test_smart_pull_as(
 
     kamu_api_server_client
         .dataset()
-        .create_player_scores_dataset_with_data(Some(E2E_USER_ACCOUNT_NAME.clone()))
+        .create_player_scores_dataset_with_data()
         .await;
 
     {

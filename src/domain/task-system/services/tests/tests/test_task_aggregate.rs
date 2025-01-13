@@ -96,6 +96,42 @@ async fn test_task_save_load_update() {
     assert_eq!(task.outcome, Some(TaskOutcome::Cancelled));
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////#[test_log::test(tokio::test)]
+
+#[test_log::test(tokio::test)]
+async fn test_task_load_multi() {
+    let event_store = InMemoryTaskEventStore::new();
+
+    for _ in 0..5000 {
+        let task_id = event_store.new_task_id().await.unwrap();
+        let mut task = Task::new(
+            Utc::now(),
+            task_id,
+            LogicalPlanProbe::default().into(),
+            None,
+        );
+        task.save(&event_store).await.unwrap();
+        task.run(Utc::now()).unwrap();
+        task.cancel(Utc::now()).unwrap();
+        task.save(&event_store).await.unwrap();
+        task.finish(Utc::now(), TaskOutcome::Cancelled).unwrap();
+        task.save(&event_store).await.unwrap();
+    }
+
+    let delta = 2500;
+    let ids: Vec<TaskID> = (delta..(delta + 2000)).map(TaskID::new).collect();
+    let tasks = Task::load_multi(ids, &event_store).await.unwrap();
+
+    for (i, task_res) in tasks.into_iter().enumerate() {
+        assert!(task_res.is_ok());
+        let expected_id = TaskID::new(i as u64 + delta);
+        let task = task_res.unwrap();
+        assert_eq!(task.task_id, expected_id);
+        assert_eq!(task.status(), TaskStatus::Finished);
+        assert_eq!(task.outcome, Some(TaskOutcome::Cancelled));
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]

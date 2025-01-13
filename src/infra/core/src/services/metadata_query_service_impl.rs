@@ -27,13 +27,7 @@ impl MetadataQueryService for MetadataQueryServiceImpl {
     async fn get_active_polling_source(
         &self,
         target: ResolvedDataset,
-    ) -> Result<
-        Option<(
-            odf::Multihash,
-            odf::MetadataBlockTyped<odf::SetPollingSource>,
-        )>,
-        InternalError,
-    > {
+    ) -> Result<Option<PollingSourceBlockInfo>, InternalError> {
         // TODO: Support source evolution
         Ok(target
             .as_metadata_chain()

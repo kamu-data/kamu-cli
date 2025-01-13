@@ -9,19 +9,25 @@
 
 #![feature(lint_reasons)]
 
+mod auth_layer;
 mod service;
-mod service_builder;
+mod service_wrapper;
 mod session_auth;
+mod session_auth_anon;
+mod session_auth_bearer_only;
 mod session_manager;
 mod session_manager_caching;
 mod session_manager_singleton;
+pub mod sql_info;
+mod types;
 
+pub use auth_layer::*;
 pub use service::*;
-pub use service_builder::*;
+pub use service_wrapper::*;
 pub use session_auth::*;
+pub use session_auth_anon::*;
+pub use session_auth_bearer_only::*;
 pub use session_manager::*;
 pub use session_manager_caching::*;
 pub use session_manager_singleton::*;
-
-pub type SessionToken = String;
-pub type PlanToken = String;
+pub use types::*;

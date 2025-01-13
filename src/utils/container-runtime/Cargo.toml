@@ -33,6 +33,7 @@ serde = { version = "1", features = ["derive"] }
 thiserror = { version = "2", default-features = false, features = ["std"] }
 tokio = { version = "1", default-features = false, features = [
     "time",
+    "signal",
     "sync",
     "process",
     "parking_lot",

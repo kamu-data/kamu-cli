@@ -32,13 +32,14 @@ use messaging_outbox::{
 use time_source::SystemTimeSource;
 use tracing::Instrument as _;
 
+use crate::flow::FlowStateHelper;
 use crate::{
     FlowAbortHelper,
     FlowSchedulingHelper,
     MESSAGE_CONSUMER_KAMU_FLOW_AGENT,
     MESSAGE_PRODUCER_KAMU_FLOW_AGENT,
-    MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE,
     MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE,
+    MESSAGE_PRODUCER_KAMU_FLOW_TRIGGER_SERVICE,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -57,13 +58,13 @@ pub struct FlowAgentImpl {
 #[interface(dyn MessageConsumer)]
 #[interface(dyn MessageConsumerT<TaskProgressMessage>)]
 #[interface(dyn MessageConsumerT<DatasetLifecycleMessage>)]
-#[interface(dyn MessageConsumerT<FlowConfigurationUpdatedMessage>)]
+#[interface(dyn MessageConsumerT<FlowTriggerUpdatedMessage>)]
 #[meta(MessageConsumerMeta {
     consumer_name: MESSAGE_CONSUMER_KAMU_FLOW_AGENT,
     feeding_producers: &[
         MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
+        MESSAGE_PRODUCER_KAMU_FLOW_TRIGGER_SERVICE,
         MESSAGE_PRODUCER_KAMU_TASK_AGENT,
-        MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE
     ],
     delivery: MessageDeliveryMechanism::Transactional,
 })]
@@ -97,9 +98,9 @@ impl FlowAgentImpl {
             .await?;
 
         // Restore auto polling flows:
-        //   - read active configurations
+        //   - read active triggers
         //   - automatically trigger flows, if they are not waiting already
-        self.restore_auto_polling_flows_from_configurations(&transaction_catalog, start_time)
+        self.restore_auto_polling_flows_from_triggers(&transaction_catalog, start_time)
             .await?;
 
         // Publish progress event
@@ -126,6 +127,7 @@ impl FlowAgentImpl {
         // Extract necessary dependencies
         let flow_event_store = target_catalog.get_one::<dyn FlowEventStore>().unwrap();
         let scheduling_helper = target_catalog.get_one::<FlowSchedulingHelper>().unwrap();
+        let flows_state_helper = target_catalog.get_one::<FlowStateHelper>().unwrap();
 
         // How many waiting flows do we have?
         let waiting_filters = AllFlowFilters {
@@ -152,55 +154,48 @@ impl FlowAgentImpl {
                 .try_collect()
                 .await?;
 
-            // Process each waiting flow
-            for waiting_flow_id in &waiting_flow_ids {
-                // TODO: batch loading of flows
-                let flow = Flow::load(*waiting_flow_id, flow_event_store.as_ref())
-                    .await
-                    .int_err()?;
+            processed_waiting_flows += waiting_flow_ids.len();
+            let mut state_stream = flows_state_helper.get_stream(waiting_flow_ids);
 
+            while let Some(flow) = state_stream.try_next().await? {
                 // We need to re-evaluate batching conditions only
                 if let Some(FlowStartCondition::Batching(b)) = &flow.start_condition {
                     scheduling_helper
                         .trigger_flow_common(
                             &flow.flow_key,
-                            FlowTrigger::AutoPolling(FlowTriggerAutoPolling {
+                            Some(FlowTriggerRule::Batching(b.active_batching_rule)),
+                            FlowTriggerType::AutoPolling(FlowTriggerAutoPolling {
                                 trigger_time: start_time,
                             }),
-                            FlowTriggerContext::Batching(b.active_transform_rule),
                             None,
                         )
                         .await?;
                 }
             }
-
-            processed_waiting_flows += waiting_flow_ids.len();
         }
 
         Ok(())
     }
 
     #[tracing::instrument(level = "debug", skip_all)]
-    async fn restore_auto_polling_flows_from_configurations(
+    async fn restore_auto_polling_flows_from_triggers(
         &self,
         target_catalog: &Catalog,
         start_time: DateTime<Utc>,
     ) -> Result<(), InternalError> {
-        let flow_configuration_service = target_catalog
-            .get_one::<dyn FlowConfigurationService>()
-            .unwrap();
+        let flow_trigger_service = target_catalog.get_one::<dyn FlowTriggerService>().unwrap();
         let flow_event_store = target_catalog.get_one::<dyn FlowEventStore>().unwrap();
 
-        // Query all enabled flow configurations
-        let enabled_configurations: Vec<_> = flow_configuration_service
-            .list_enabled_configurations()
+        // Query all enabled flow triggers
+        let enabled_triggers: Vec<_> = flow_trigger_service
+            .list_enabled_triggers()
             .try_collect()
             .await?;
 
-        // Split configs by those which have a schedule or different rules
-        let (schedule_configs, non_schedule_configs): (Vec<_>, Vec<_>) = enabled_configurations
+        // Split triggers by those which have a schedule or different rules
+        let (schedule_triggers, non_schedule_triggers): (Vec<_>, Vec<_>) = enabled_triggers
             .into_iter()
-            .partition(|config| matches!(config.rule, FlowConfigurationRule::Schedule(_)));
+            .partition(|config| matches!(config.rule, FlowTriggerRule::Schedule(_)));
 
         let scheduling_helper = target_catalog.get_one::<FlowSchedulingHelper>().unwrap();
 
@@ -209,20 +204,20 @@ impl FlowAgentImpl {
         //
         // Thought: maybe we need topological sorting by derived relations as well to
         // optimize the initial execution order, but batching rules may work just fine
-        for enabled_config in schedule_configs
+        for enabled_trigger in schedule_triggers
             .into_iter()
-            .chain(non_schedule_configs.into_iter())
+            .chain(non_schedule_triggers.into_iter())
         {
             // Do not re-trigger the flow that has already triggered
             let maybe_pending_flow_id = flow_event_store
-                .try_get_pending_flow(&enabled_config.flow_key)
+                .try_get_pending_flow(&enabled_trigger.flow_key)
                 .await?;
             if maybe_pending_flow_id.is_none() {
                 scheduling_helper
-                    .activate_flow_configuration(
+                    .activate_flow_trigger(
                         start_time,
-                        enabled_config.flow_key,
-                        enabled_config.rule,
+                        enabled_trigger.flow_key,
+                        enabled_trigger.rule,
                     )
                     .await?;
             }
@@ -363,14 +358,14 @@ impl FlowAgentImpl {
     pub fn make_task_logical_plan(
         &self,
         flow_key: &FlowKey,
-        maybe_config_snapshot: Option<&FlowConfigurationSnapshot>,
+        maybe_config_snapshot: Option<&FlowConfigurationRule>,
     ) -> Result<LogicalPlan, InternalError> {
         match flow_key {
             FlowKey::Dataset(flow_key) => match flow_key.flow_type {
                 DatasetFlowType::Ingest | DatasetFlowType::ExecuteTransform => {
                     let mut fetch_uncacheable = false;
                     if let Some(config_snapshot) = maybe_config_snapshot
-                        && let FlowConfigurationSnapshot::Ingest(ingest_rule) = config_snapshot
+                        && let FlowConfigurationRule::IngestRule(ingest_rule) = config_snapshot
                     {
                         fetch_uncacheable = ingest_rule.fetch_uncacheable;
                     }
@@ -385,7 +380,7 @@ impl FlowAgentImpl {
                     let mut keep_metadata_only = false;
 
                     if let Some(config_snapshot) = maybe_config_snapshot
-                        && let FlowConfigurationSnapshot::Compaction(compaction_rule) =
+                        && let FlowConfigurationRule::CompactionRule(compaction_rule) =
                             config_snapshot
                     {
                         max_slice_size = compaction_rule.max_slice_size();
@@ -405,7 +400,7 @@ impl FlowAgentImpl {
                 }
                 DatasetFlowType::Reset => {
                     if let Some(config_rule) = maybe_config_snapshot
-                        && let FlowConfigurationSnapshot::Reset(reset_rule) = config_rule
+                        && let FlowConfigurationRule::ResetRule(reset_rule) = config_rule
                     {
                         return Ok(LogicalPlan::ResetDataset(LogicalPlanResetDataset {
                             dataset_id: flow_key.dataset_id.clone(),
@@ -592,6 +587,16 @@ impl MessageConsumerT<TaskProgressMessage> for FlowAgentImpl {
                                 .await?;
                         }
 
+                        // In case of failure:
+                        //  - disable trigger
+                        if message.outcome.is_failed() {
+                            let flow_trigger_service =
+                                target_catalog.get_one::<dyn FlowTriggerService>().unwrap();
+                            flow_trigger_service
+                                .pause_flow_trigger(finish_time, flow.flow_key.clone())
+                                .await?;
+                        }
+
                         let outbox = target_catalog.get_one::<dyn Outbox>().unwrap();
                         outbox
                             .post_message(
@@ -627,16 +632,16 @@ impl MessageConsumerT<TaskProgressMessage> for FlowAgentImpl {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl MessageConsumerT<FlowConfigurationUpdatedMessage> for FlowAgentImpl {
+impl MessageConsumerT<FlowTriggerUpdatedMessage> for FlowAgentImpl {
     #[tracing::instrument(
         level = "debug",
         skip_all,
-        name = "FlowAgentImpl[FlowConfigurationUpdatedMessage]"
+        name = "FlowAgentImpl[FlowTriggerUpdatedMessage]"
     )]
     async fn consume_message(
         &self,
         target_catalog: &Catalog,
-        message: &FlowConfigurationUpdatedMessage,
+        message: &FlowTriggerUpdatedMessage,
     ) -> Result<(), InternalError> {
         tracing::debug!(received_message = ?message, "Received flow configuration message");
 
@@ -655,7 +660,7 @@ impl MessageConsumerT<FlowConfigurationUpdatedMessage> for FlowAgentImpl {
         } else {
             let scheduling_helper = target_catalog.get_one::<FlowSchedulingHelper>().unwrap();
             scheduling_helper
-                .activate_flow_configuration(
+                .activate_flow_trigger(
                     self.agent_config.round_time(message.event_time)?,
                     message.flow_key.clone(),
                     message.rule.clone(),
@@ -731,7 +736,7 @@ impl MessageConsumerT<DatasetLifecycleMessage> for FlowAgentImpl {
 pub enum FlowTriggerContext {
     Unconditional,
     Scheduled(Schedule),
-    Batching(TransformRule),
+    Batching(BatchingRule),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -739,8 +744,8 @@ pub enum FlowTriggerContext {
 #[derive(Debug, Eq, PartialEq)]
 pub struct DownstreamDependencyFlowPlan {
     pub flow_key: FlowKey,
-    pub flow_trigger_context: FlowTriggerContext,
-    pub maybe_config_snapshot: Option<FlowConfigurationSnapshot>,
+    pub flow_trigger_rule: Option<FlowTriggerRule>,
+    pub maybe_config_snapshot: Option<FlowConfigurationRule>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

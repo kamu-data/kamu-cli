@@ -100,7 +100,10 @@ impl DatasetFlowRunsMut {
             })?;
 
         Ok(TriggerFlowResult::Success(TriggerFlowSuccess {
-            flow: Flow::new(flow_state),
+            flow: Flow::build_batch(vec![flow_state], ctx)
+                .await?
+                .pop()
+                .unwrap(),
         }))
     }
 
@@ -130,16 +133,19 @@ impl DatasetFlowRunsMut {
                 fs::CancelScheduledTasksError::Internal(e) => GqlError::Internal(e),
             })?;
 
-        // Pause flow configuration regardless of current state.
+        // Pause flow triggers regardless of current state.
         // Duplicate requests are auto-ignored.
-        let flow_configuration_service = from_catalog_n!(ctx, dyn fs::FlowConfigurationService);
-        flow_configuration_service
-            .pause_flow_configuration(Utc::now(), flow_state.flow_key.clone())
+        let flow_trigger_service = from_catalog_n!(ctx, dyn fs::FlowTriggerService);
+        flow_trigger_service
+            .pause_flow_trigger(Utc::now(), flow_state.flow_key.clone())
             .await?;
 
         Ok(CancelScheduledTasksResult::Success(
             CancelScheduledTasksSuccess {
-                flow: Flow::new(flow_state),
+                flow: Flow::build_batch(vec![flow_state], ctx)
+                    .await?
+                    .pop()
+                    .unwrap(),
             },
         ))
     }
