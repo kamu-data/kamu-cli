@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 #![feature(let_chains)]
+#![feature(lint_reasons)]
 
 // Re-exports
 pub use kamu_datasets as domain;

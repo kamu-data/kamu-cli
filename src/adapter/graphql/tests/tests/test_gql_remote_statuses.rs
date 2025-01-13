@@ -152,7 +152,8 @@ impl PushStatusesTestHarness {
                 .add::<DatasetRegistryRepoBridge>()
                 .add_value(TenancyConfig::SingleTenant)
                 .add_value(FakeRemoteStatusService {})
-                .bind::<dyn RemoteStatusService, FakeRemoteStatusService>();
+                .bind::<dyn RemoteStatusService, FakeRemoteStatusService>()
+                .add::<auth::AlwaysHappyDatasetActionAuthorizer>();
 
             NoOpDatabasePlugin::init_database_components(&mut b);
 

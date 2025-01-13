@@ -6116,6 +6116,7 @@ dependencies = [
 name = "kamu-core"
 version = "0.217.2"
 dependencies = [
+ "async-stream",
  "async-trait",
  "bytes",
  "chrono",

@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use futures::TryStreamExt;
+use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer};
 use kamu_core::{
     DatasetRegistryExt,
     {self as domain},
@@ -16,6 +16,7 @@ use opendatafabric as odf;
 
 use crate::prelude::*;
 use crate::queries::*;
+use crate::utils::check_dataset_read_access;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -24,22 +25,40 @@ pub struct Datasets;
 #[Object]
 impl Datasets {
     const DEFAULT_PER_PAGE: usize = 15;
+    const DATASETS_CHUNK_SIZE: usize = 100;
+
+    #[graphql(skip)]
+    async fn by_dataset_ref(
+        &self,
+        ctx: &Context<'_>,
+        dataset_ref: &odf::DatasetRef,
+    ) -> Result<Option<Dataset>> {
+        let dataset_registry = from_catalog_n!(ctx, dyn domain::DatasetRegistry);
+        // TODO: Extract into ViewDatasetUseCase
+        let maybe_handle = dataset_registry
+            .try_resolve_dataset_handle_by_ref(dataset_ref)
+            .await?;
+
+        let Some(handle) = maybe_handle else {
+            return Ok(None);
+        };
+
+        if check_dataset_read_access(ctx, &handle).await.is_err() {
+            return Ok(None);
+        }
+
+        let account = Account::from_dataset_alias(ctx, &handle.alias)
+            .await?
+            .expect("Account must exist");
+
+        Ok(Some(Dataset::new(account, handle)))
+    }
 
     /// Returns dataset by its ID
     async fn by_id(&self, ctx: &Context<'_>, dataset_id: DatasetID) -> Result<Option<Dataset>> {
-        let dataset_registry = from_catalog_n!(ctx, dyn domain::DatasetRegistry);
-        let hdl = dataset_registry
-            .try_resolve_dataset_handle_by_ref(&dataset_id.as_local_ref())
-            .await?;
-        Ok(match hdl {
-            Some(h) => {
-                let account = Account::from_dataset_alias(ctx, &h.alias)
-                    .await?
-                    .expect("Account must exist");
-                Some(Dataset::new(account, h))
-            }
-            None => None,
-        })
+        let dataset_id: odf::DatasetID = dataset_id.into();
+
+        self.by_dataset_ref(ctx, &dataset_id.into_local_ref()).await
     }
 
     /// Returns dataset by its owner and name
@@ -49,22 +68,10 @@ impl Datasets {
         account_name: AccountName,
         dataset_name: DatasetName,
     ) -> Result<Option<Dataset>> {
-        let dataset_registry = from_catalog_n!(ctx, dyn domain::DatasetRegistry);
         let dataset_alias = odf::DatasetAlias::new(Some(account_name.into()), dataset_name.into());
-        let hdl = dataset_registry
-            .try_resolve_dataset_handle_by_ref(&dataset_alias.into_local_ref())
-            .await?;
 
-        Ok(match hdl {
-            Some(h) => {
-                let account = Account::from_dataset_alias(ctx, &h.alias)
-                    .await?
-                    .expect("Account must exist");
-
-                Some(Dataset::new(account, h))
-            }
-            None => None,
-        })
+        self.by_dataset_ref(ctx, &dataset_alias.into_local_ref())
+            .await
     }
 
     #[graphql(skip)]
@@ -75,25 +82,47 @@ impl Datasets {
         page: Option<usize>,
         per_page: Option<usize>,
     ) -> Result<DatasetConnection> {
-        let dataset_registry = from_catalog_n!(ctx, dyn domain::DatasetRegistry);
+        let (dataset_registry, dataset_action_authorizer) = from_catalog_n!(
+            ctx,
+            dyn domain::DatasetRegistry,
+            dyn DatasetActionAuthorizer
+        );
 
         let page = page.unwrap_or(0);
         let per_page = per_page.unwrap_or(Self::DEFAULT_PER_PAGE);
 
         let account_name = account_ref.account_name_internal();
 
-        let mut all_datasets: Vec<_> = dataset_registry
-            .all_dataset_handles_by_owner(&account_name.clone().into())
-            .try_collect()
-            .await?;
-        let total_count = all_datasets.len();
-        all_datasets.sort_by(|a, b| a.alias.cmp(&b.alias));
+        use futures::TryStreamExt;
 
-        let nodes = all_datasets
+        let mut account_owned_datasets_stream = dataset_registry
+            .all_dataset_handles_by_owner(&account_name.clone().into())
+            .try_chunks(Self::DATASETS_CHUNK_SIZE);
+        let mut accessible_datasets_handles = Vec::new();
+
+        while let Some(account_owned_dataset_handles_chunk) =
+            account_owned_datasets_stream.try_next().await.int_err()?
+        {
+            let authorized_handles = dataset_action_authorizer
+                .classify_datasets_by_allowance(
+                    account_owned_dataset_handles_chunk,
+                    DatasetAction::Read,
+                )
+                .await?
+                .authorized_handles;
+
+            accessible_datasets_handles.extend(authorized_handles);
+        }
+
+        let total_count = accessible_datasets_handles.len();
+
+        accessible_datasets_handles.sort_by(|a, b| a.alias.cmp(&b.alias));
+
+        let nodes = accessible_datasets_handles
             .into_iter()
             .skip(page * per_page)
             .take(per_page)
-            .map(|hdl| Dataset::new(account_ref.clone(), hdl))
+            .map(|handle| Dataset::new(account_ref.clone(), handle))
             .collect();
 
         Ok(DatasetConnection::new(nodes, page, per_page, total_count))
@@ -114,22 +143,19 @@ impl Datasets {
             .find_account_name_by_id(&account_id)
             .await?;
 
-        match maybe_account_name {
-            Some(account_name) => {
-                self.by_account_impl(
-                    ctx,
-                    Account::new(account_id.into(), account_name.into()),
-                    page,
-                    per_page,
-                )
-                .await
-            }
-            None => {
-                let page = page.unwrap_or(0);
-                let per_page = per_page.unwrap_or(Self::DEFAULT_PER_PAGE);
+        if let Some(account_name) = maybe_account_name {
+            self.by_account_impl(
+                ctx,
+                Account::new(account_id.into(), account_name.into()),
+                page,
+                per_page,
+            )
+            .await
+        } else {
+            let page = page.unwrap_or(0);
+            let per_page = per_page.unwrap_or(Self::DEFAULT_PER_PAGE);
 
-                Ok(DatasetConnection::new(vec![], page, per_page, 0))
-            }
+            Ok(DatasetConnection::new(vec![], page, per_page, 0))
         }
     }
 

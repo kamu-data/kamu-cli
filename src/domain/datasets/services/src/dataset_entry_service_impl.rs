@@ -292,7 +292,7 @@ impl DatasetEntryServiceImpl {
         })
     }
 
-    async fn list_all_dataset_handles_by_owner_name(
+    async fn list_all_dataset_handles_by_owner_id(
         &self,
         owner_id: &odf::AccountID,
         pagination: PaginationOpts,
@@ -423,7 +423,7 @@ impl DatasetRegistry for DatasetEntryServiceImpl {
                 Ok(Arc::new(owner_id))
             },
             move |owner_id, pagination| async move {
-                self.list_all_dataset_handles_by_owner_name(&owner_id, pagination)
+                self.list_all_dataset_handles_by_owner_id(&owner_id, pagination)
                     .await
             },
         )

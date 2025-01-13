@@ -90,7 +90,10 @@ impl Account {
         alias: &odf::DatasetAlias,
     ) -> Result<Option<Self>, InternalError> {
         if alias.is_multi_tenant() {
-            Ok(Self::from_account_name(ctx, alias.account_name.as_ref().unwrap().clone()).await?)
+            // Safety: In multi-tenant, we have a name.
+            let account_name = alias.account_name.as_ref().unwrap().clone();
+
+            Ok(Self::from_account_name(ctx, account_name).await?)
         } else {
             let current_account_subject = from_catalog_n!(ctx, CurrentAccountSubject);
 

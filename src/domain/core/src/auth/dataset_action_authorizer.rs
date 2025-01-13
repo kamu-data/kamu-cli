@@ -11,11 +11,11 @@ use std::collections::HashSet;
 use std::str::FromStr;
 
 use dill::*;
-use internal_error::{ErrorIntoInternal, InternalError};
+use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use opendatafabric as odf;
 use thiserror::Error;
 
-use crate::AccessError;
+use crate::{AccessError, DatasetHandleStream};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -149,6 +149,57 @@ pub struct DatasetActionNotEnoughPermissionsError {
 pub struct ClassifyByAllowanceResponse {
     pub authorized_handles: Vec<odf::DatasetHandle>,
     pub unauthorized_handles_with_errors: Vec<(odf::DatasetHandle, DatasetActionUnauthorizedError)>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Extensions
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait::async_trait]
+pub trait DatasetActionAuthorizerExt: DatasetActionAuthorizer {
+    fn filtered_datasets_stream<'a>(
+        &'a self,
+        dataset_handles_stream: DatasetHandleStream<'a>,
+        action: DatasetAction,
+    ) -> DatasetHandleStream<'a>;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait::async_trait]
+impl<T> DatasetActionAuthorizerExt for T
+where
+    T: DatasetActionAuthorizer,
+    T: ?Sized,
+{
+    fn filtered_datasets_stream<'a>(
+        &'a self,
+        dataset_handles_stream: DatasetHandleStream<'a>,
+        action: DatasetAction,
+    ) -> DatasetHandleStream<'a> {
+        const STREAM_CHUNK_LEN: usize = 100;
+
+        Box::pin(async_stream::stream! {
+            use futures::TryStreamExt;
+
+            // Page by page check...
+            let mut related_dataset_handles = dataset_handles_stream
+                .try_chunks(STREAM_CHUNK_LEN);
+
+            while let Some(potentially_related_handles_chunk) =
+                related_dataset_handles.try_next().await.int_err()?
+            {
+                // ... the datasets that are accessed.
+                let hdls = self
+                    .filter_datasets_allowing(potentially_related_handles_chunk, action)
+                    .await?;
+
+                for hdl in hdls {
+                    yield Ok(hdl);
+                }
+            }
+        })
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
