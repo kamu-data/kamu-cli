@@ -55,6 +55,7 @@ impl PredefinedAccountsConfig {
                 registered_at: Utc::now(),
                 provider: String::from(PROVIDER_PASSWORD),
                 email: None,
+                treat_datasets_as_public: true,
             }],
         }
     }
@@ -92,6 +93,8 @@ pub struct AccountConfig {
     pub registered_at: DateTime<Utc>,
     #[serde(default)]
     pub is_admin: bool,
+    #[serde(default)]
+    pub treat_datasets_as_public: bool,
 }
 
 impl AccountConfig {
@@ -107,6 +110,7 @@ impl AccountConfig {
             avatar_url: None,
             registered_at: Self::default_registered_at(),
             is_admin: false,
+            treat_datasets_as_public: false,
         }
     }
 
