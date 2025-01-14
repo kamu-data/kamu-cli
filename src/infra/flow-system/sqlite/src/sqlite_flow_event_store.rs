@@ -1072,7 +1072,7 @@ impl FlowEventStore for SqliteFlowEventStore {
                 WHERE dataset_id IN ({})
                 AND (cast($1 as dataset_flow_type) IS NULL OR dataset_flow_type = $1)
                 AND (cast($2 as flow_status_type) IS NULL or flow_status = $2)
-                AND (cast($3 as TEXT[]) IS NULL OR initiator = IN ({}))
+                AND ($3 = 0 OR initiator IN ({}))
             "#,
             sqlite_generate_placeholders_list(ids.len(), 4),
             maybe_initiators
