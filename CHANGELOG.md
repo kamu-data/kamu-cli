@@ -11,6 +11,10 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Unreleased]
+### Fixed
+- Fix crash on resolving dataset by non existing account
+
 ## [0.217.2] - 2025-01-10
 ### Changed
 - Updated to latest `datafusion` and `alloy` dependencies
