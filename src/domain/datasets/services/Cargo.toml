@@ -41,6 +41,7 @@ petgraph = { version = "0.6", default-features = false, features = [
     "stable_graph",
 ] }
 secrecy = "0.10"
+thiserror = { version = "2", default-features = false }
 tokio = { version = "1", default-features = false }
 tokio-stream = { version = "0.1", default-features = false }
 tracing = { version = "0.1", default-features = false }

@@ -7,10 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::assert_matches::assert_matches;
 use std::sync::{Arc, RwLock};
 
 use chrono::{DateTime, TimeZone, Utc};
 use dill::{Catalog, CatalogBuilder, Component};
+use futures::TryStreamExt;
 use init_on_startup::InitOnStartup;
 use kamu::{DatasetRepositoryWriter, MockDatasetRepositoryWriter};
 use kamu_accounts::{Account, AccountRepository, CurrentAccountSubject};
@@ -18,8 +20,10 @@ use kamu_accounts_inmem::InMemoryAccountRepository;
 use kamu_core::testing::MockDatasetRepository;
 use kamu_core::{
     DatasetLifecycleMessage,
+    DatasetRegistry,
     DatasetRepository,
     DatasetVisibility,
+    GetDatasetError,
     TenancyConfig,
     MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
 };
@@ -194,11 +198,53 @@ async fn test_indexes_datasets_correctly() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_log::test(tokio::test)]
+async fn test_try_to_resolve_non_existing_dataset() {
+    let harness = DatasetEntryServiceHarness::new(
+        MockDatasetEntryRepository::new(),
+        MockDatasetRepository::new(),
+    );
+
+    let dataset_ref = DatasetAlias::new(
+        Some(AccountName::new_unchecked("foo")),
+        DatasetName::new_unchecked("bar"),
+    )
+    .as_local_ref();
+
+    let resolve_dataset_result = harness
+        .dataset_registry
+        .resolve_dataset_handle_by_ref(&dataset_ref)
+        .await;
+
+    assert_matches!(resolve_dataset_result, Err(GetDatasetError::NotFound(_)));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_try_to_resolve_all_datasets_for_non_existing_user() {
+    let harness = DatasetEntryServiceHarness::new(
+        MockDatasetEntryRepository::new(),
+        MockDatasetRepository::new(),
+    );
+
+    let resolve_dataset_result = harness
+        .dataset_registry
+        .all_dataset_handles_by_owner(&AccountName::new_unchecked("foo"));
+
+    let list_dataset: Vec<_> = resolve_dataset_result.try_collect().await.unwrap();
+
+    assert!(list_dataset.is_empty());
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 struct DatasetEntryServiceHarness {
     _catalog: Catalog,
     outbox: Arc<dyn Outbox>,
     dataset_entry_indexer: Arc<DatasetEntryIndexer>,
     account_repo: Arc<dyn AccountRepository>,
+    dataset_registry: Arc<dyn DatasetRegistry>,
 }
 
 impl DatasetEntryServiceHarness {
@@ -252,6 +298,7 @@ impl DatasetEntryServiceHarness {
             outbox: catalog.get_one().unwrap(),
             dataset_entry_indexer: catalog.get_one().unwrap(),
             account_repo: catalog.get_one().unwrap(),
+            dataset_registry: catalog.get_one().unwrap(),
             _catalog: catalog,
         }
     }

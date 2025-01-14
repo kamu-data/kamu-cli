@@ -6275,6 +6275,7 @@ dependencies = [
  "pretty_assertions",
  "secrecy",
  "test-log",
+ "thiserror 2.0.10",
  "time-source",
  "tokio",
  "tokio-stream",

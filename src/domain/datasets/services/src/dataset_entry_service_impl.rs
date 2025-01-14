@@ -12,8 +12,13 @@ use std::sync::{Arc, Mutex};
 
 use database_common::{EntityPageListing, EntityPageStreamer, PaginationOpts};
 use dill::{component, interface, meta, Catalog};
-use internal_error::{InternalError, ResultIntoInternal};
-use kamu_accounts::{AccountRepository, CurrentAccountSubject};
+use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
+use kamu_accounts::{
+    AccountNotFoundByNameError,
+    AccountRepository,
+    CurrentAccountSubject,
+    GetAccountByNameError,
+};
 use kamu_core::{
     DatasetHandleStream,
     DatasetHandlesResolution,
@@ -38,6 +43,7 @@ use messaging_outbox::{
     MessageDeliveryMechanism,
 };
 use opendatafabric as odf;
+use thiserror::Error;
 use time_source::SystemTimeSource;
 
 use crate::MESSAGE_CONSUMER_KAMU_DATASET_ENTRY_SERVICE;
@@ -242,7 +248,7 @@ impl DatasetEntryServiceImpl {
     async fn resolve_account_id_by_maybe_name(
         &self,
         maybe_account_name: Option<&odf::AccountName>,
-    ) -> Result<odf::AccountID, InternalError> {
+    ) -> Result<odf::AccountID, ResolveAccountIdByNameError> {
         let account_name = maybe_account_name
             .unwrap_or_else(|| self.current_account_subject.account_name_or_default());
 
@@ -254,11 +260,7 @@ impl DatasetEntryServiceImpl {
         if let Some(id) = maybe_cached_id {
             Ok(id)
         } else {
-            let account = self
-                .account_repo
-                .get_account_by_name(account_name)
-                .await
-                .int_err()?;
+            let account = self.account_repo.get_account_by_name(account_name).await?;
 
             let mut accounts_cache = self.accounts_cache.lock().unwrap();
             accounts_cache
@@ -383,14 +385,27 @@ impl DatasetRegistry for DatasetEntryServiceImpl {
 
         EntityPageStreamer::default().into_stream(
             move || async move {
-                let owner_id = self
+                let owner_id = match self
                     .resolve_account_id_by_maybe_name(Some(&owner_name))
-                    .await?;
+                    .await
+                {
+                    Ok(owner_id) => Some(owner_id),
+                    Err(ResolveAccountIdByNameError::NotFound(_)) => None,
+                    Err(e) => return Err(e.int_err()),
+                };
                 Ok(Arc::new(owner_id))
             },
-            move |owner_id, pagination| async move {
-                self.list_all_dataset_handles_by_owner_name(&owner_id, pagination)
-                    .await
+            move |owner_id_maybe, pagination| async move {
+                if let Some(owner_id) = owner_id_maybe.as_ref() {
+                    return self
+                        .list_all_dataset_handles_by_owner_name(owner_id, pagination)
+                        .await;
+                }
+
+                Ok(EntityPageListing {
+                    list: Vec::new(),
+                    total_count: 0,
+                })
             },
         )
     }
@@ -405,7 +420,16 @@ impl DatasetRegistry for DatasetEntryServiceImpl {
             odf::DatasetRef::Alias(alias) => {
                 let owner_id = self
                     .resolve_account_id_by_maybe_name(alias.account_name.as_ref())
-                    .await?;
+                    .await
+                    .map_err(|e| match e {
+                        ResolveAccountIdByNameError::NotFound(_) => {
+                            GetDatasetError::NotFound(DatasetNotFoundError {
+                                dataset_ref: dataset_ref.clone(),
+                            })
+                        }
+                        ResolveAccountIdByNameError::Internal(e) => GetDatasetError::Internal(e),
+                    })?;
+
                 match self
                     .dataset_entry_repo
                     .get_dataset_entry_by_owner_and_name(&owner_id, &alias.dataset_name)
@@ -526,6 +550,26 @@ impl MessageConsumerT<DatasetLifecycleMessage> for DatasetEntryServiceImpl {
                 // No action required
                 Ok(())
             }
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum ResolveAccountIdByNameError {
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+
+    #[error(transparent)]
+    NotFound(AccountNotFoundByNameError),
+}
+
+impl From<GetAccountByNameError> for ResolveAccountIdByNameError {
+    fn from(e: GetAccountByNameError) -> Self {
+        match e {
+            GetAccountByNameError::NotFound(e) => ResolveAccountIdByNameError::NotFound(e),
+            GetAccountByNameError::Internal(e) => ResolveAccountIdByNameError::Internal(e),
         }
     }
 }
