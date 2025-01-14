@@ -64,6 +64,14 @@ pub trait FlowEventStore: EventStore<FlowState> {
         filters: &DatasetFlowFilters,
     ) -> Result<usize, InternalError>;
 
+    /// Returns number of flows associated with the specified datasets and
+    /// matching filters, if specified
+    async fn get_count_flows_by_datasets(
+        &self,
+        dataset_ids: HashSet<DatasetID>,
+        filters: &DatasetFlowFilters,
+    ) -> Result<usize, InternalError>;
+
     /// Returns IDs of the flows associated with the specified
     /// dataset in reverse chronological order based on creation time.
     /// Applies filters/pagination, if specified

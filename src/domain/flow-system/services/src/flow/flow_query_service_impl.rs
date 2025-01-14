@@ -120,21 +120,17 @@ impl FlowQueryService for FlowQueryServiceImpl {
             owned_dataset_ids
         };
 
-        let mut total_count = 0;
+        let account_dataset_ids: HashSet<DatasetID> = HashSet::from_iter(filtered_dataset_ids);
+
         let dataset_flow_filters = DatasetFlowFilters {
             by_flow_status: filters.by_flow_status,
             by_flow_type: filters.by_flow_type,
             by_initiator: filters.by_initiator,
         };
-
-        for dataset_id in &filtered_dataset_ids {
-            total_count += self
-                .flow_event_store
-                .get_count_flows_by_dataset(dataset_id, &dataset_flow_filters)
-                .await?;
-        }
-
-        let account_dataset_ids: HashSet<DatasetID> = HashSet::from_iter(filtered_dataset_ids);
+        let total_count = self
+            .flow_event_store
+            .get_count_flows_by_datasets(account_dataset_ids.clone(), &dataset_flow_filters)
+            .await?;
 
         let relevant_flow_ids: Vec<_> = self
             .flow_event_store

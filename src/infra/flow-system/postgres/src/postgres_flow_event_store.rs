@@ -940,6 +940,47 @@ impl FlowEventStore for PostgresFlowEventStore {
             }
         })
     }
+
+    async fn get_count_flows_by_datasets(
+        &self,
+        dataset_ids: HashSet<DatasetID>,
+        filters: &DatasetFlowFilters,
+    ) -> Result<usize, InternalError> {
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+
+        let maybe_initiators = filters
+            .by_initiator
+            .as_ref()
+            .map(Self::prepare_initiator_filter);
+
+        let by_flow_type = filters.by_flow_type;
+        let by_flow_status = filters.by_flow_status;
+
+        let ids: Vec<String> = dataset_ids.iter().map(ToString::to_string).collect();
+
+        let query_result = sqlx::query!(
+            r#"
+            SELECT COUNT(flow_id) AS flows_count
+            FROM flows
+                WHERE dataset_id = ANY($1)
+                AND system_flow_type IS NOT NULL
+                AND (cast($2 as system_flow_type) IS NULL OR system_flow_type = $2)
+                AND (cast($3 as flow_status_type) IS NULL or flow_status = $3)
+                AND (cast($4 as TEXT[]) IS NULL OR initiator = ANY($4))
+            "#,
+            ids as Vec<String>,
+            by_flow_type as Option<DatasetFlowType>,
+            by_flow_status as Option<FlowStatus>,
+            maybe_initiators as Option<Vec<String>>,
+        )
+        .fetch_one(connection_mut)
+        .await
+        .int_err()?;
+
+        let flows_count = query_result.flows_count.unwrap_or_default();
+        Ok(usize::try_from(flows_count).unwrap())
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

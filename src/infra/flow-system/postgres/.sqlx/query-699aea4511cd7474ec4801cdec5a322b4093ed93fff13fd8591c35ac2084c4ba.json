@@ -1,0 +1,45 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT COUNT(flow_id) AS flows_count\n            FROM flows\n                WHERE dataset_id = ANY($1)\n                AND system_flow_type IS NOT NULL\n                AND (cast($2 as system_flow_type) IS NULL OR system_flow_type = $2)\n                AND (cast($3 as flow_status_type) IS NULL or flow_status = $3)\n                AND (cast($4 as TEXT[]) IS NULL OR initiator = ANY($4))\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "flows_count",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "TextArray",
+        {
+          "Custom": {
+            "name": "system_flow_type",
+            "kind": {
+              "Enum": [
+                "gc"
+              ]
+            }
+          }
+        },
+        {
+          "Custom": {
+            "name": "flow_status_type",
+            "kind": {
+              "Enum": [
+                "waiting",
+                "running",
+                "finished"
+              ]
+            }
+          }
+        },
+        "TextArray"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "699aea4511cd7474ec4801cdec5a322b4093ed93fff13fd8591c35ac2084c4ba"
+}

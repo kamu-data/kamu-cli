@@ -1049,6 +1049,62 @@ impl FlowEventStore for SqliteFlowEventStore {
             }
         })
     }
+
+    async fn get_count_flows_by_datasets(
+        &self,
+        dataset_ids: HashSet<DatasetID>,
+        filters: &DatasetFlowFilters,
+    ) -> Result<usize, InternalError> {
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+
+        let maybe_initiators = filters
+            .by_initiator
+            .as_ref()
+            .map(Self::prepare_initiator_filter);
+
+        let ids: Vec<String> = dataset_ids.iter().map(ToString::to_string).collect();
+
+        let query_str = format!(
+            r#"
+            SELECT COUNT(flow_id) AS flows_count
+            FROM flows
+                WHERE dataset_id IN ({})
+                AND system_flow_type IS NOT NULL
+                AND (cast($1 as system_flow_type) IS NULL OR system_flow_type = $1)
+                AND (cast($2 as flow_status_type) IS NULL or flow_status = $2)
+                AND (cast($3 as TEXT[]) IS NULL OR initiator = IN ({}))
+            "#,
+            sqlite_generate_placeholders_list(ids.len(), 4),
+            maybe_initiators
+                .as_ref()
+                .map(|initiators| sqlite_generate_placeholders_list(
+                    initiators.len(),
+                    ids.len() + 4
+                ))
+                .unwrap_or_default()
+        );
+
+        let mut query = sqlx::query(&query_str)
+            .bind(filters.by_flow_type)
+            .bind(filters.by_flow_status)
+            .bind(i32::from(maybe_initiators.is_some()));
+
+        for dataset_id in ids {
+            query = query.bind(dataset_id);
+        }
+
+        if let Some(initiators) = maybe_initiators {
+            for initiator in initiators {
+                query = query.bind(initiator);
+            }
+        }
+
+        let query_result = query.fetch_one(connection_mut).await.int_err()?;
+        let flows_count: i64 = query_result.get(0);
+
+        Ok(usize::try_from(flows_count).unwrap())
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

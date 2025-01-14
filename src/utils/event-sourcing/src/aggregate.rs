@@ -124,6 +124,15 @@ where
     ///
     /// "Ok" vector contains results for every item from `queries` argument.
     /// Order is preserved.
+    #[tracing::instrument(
+        level = "debug",
+        name = "load_multi",
+        skip_all,
+        fields(
+            agg_type = %std::any::type_name::<Proj>(),
+            agg_queries_cnt = ?queries.len(),
+        )
+    )]
     pub async fn load_multi(
         queries: Vec<Proj::Query>,
         event_store: &Store,
@@ -156,6 +165,19 @@ where
                 None => Err(AggregateNotFoundError::new(query).into()),
                 Some(agg) => agg,
             };
+
+            match &item {
+                Ok(agg) => {
+                    tracing::debug!(
+                        last_stored_event_id = %agg.last_stored_event_id.unwrap(),
+                        "Loaded aggregate",
+                    );
+                }
+                Err(err) => {
+                    tracing::error!(error = ?err, error_msg = %err, "Failed to load aggregate",);
+                }
+            }
+
             result.push(item);
         }
         Ok(result)
