@@ -1070,8 +1070,7 @@ impl FlowEventStore for SqliteFlowEventStore {
             SELECT COUNT(flow_id) AS flows_count
             FROM flows
                 WHERE dataset_id IN ({})
-                AND system_flow_type IS NOT NULL
-                AND (cast($1 as system_flow_type) IS NULL OR system_flow_type = $1)
+                AND (cast($1 as dataset_flow_type) IS NULL OR dataset_flow_type = $1)
                 AND (cast($2 as flow_status_type) IS NULL or flow_status = $2)
                 AND (cast($3 as TEXT[]) IS NULL OR initiator = IN ({}))
             "#,

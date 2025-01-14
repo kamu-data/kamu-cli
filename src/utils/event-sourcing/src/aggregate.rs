@@ -126,7 +126,6 @@ where
     /// Order is preserved.
     #[tracing::instrument(
         level = "debug",
-        name = "load_multi",
         skip_all,
         fields(
             agg_type = %std::any::type_name::<Proj>(),

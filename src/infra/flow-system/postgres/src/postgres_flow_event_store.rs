@@ -964,9 +964,8 @@ impl FlowEventStore for PostgresFlowEventStore {
             SELECT COUNT(flow_id) AS flows_count
             FROM flows
                 WHERE dataset_id = ANY($1)
-                AND system_flow_type IS NOT NULL
-                AND (cast($2 as system_flow_type) IS NULL OR system_flow_type = $2)
-                AND (cast($3 as flow_status_type) IS NULL or flow_status = $3)
+                AND (cast($2 as dataset_flow_type) IS NULL OR dataset_flow_type = $2)
+                AND (cast($3 as flow_status_type) IS NULL OR flow_status = $3)
                 AND (cast($4 as TEXT[]) IS NULL OR initiator = ANY($4))
             "#,
             ids as Vec<String>,
