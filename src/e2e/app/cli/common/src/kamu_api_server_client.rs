@@ -147,15 +147,6 @@ impl KamuApiServerClient {
             .await;
     }
 
-    pub async fn graphql_api_call_assert_with_token(
-        &self,
-        query: &str,
-        expected_response: Result<&str, &str>,
-    ) {
-        self.graphql_api_call_assert_impl(query, expected_response)
-            .await;
-    }
-
     async fn rest_api_call_response_body_assert(
         &self,
         response: Response,
