@@ -12,9 +12,13 @@
 pub mod commands;
 pub mod rest_api;
 mod test_flow;
+mod test_private_datasets;
 mod test_selftest;
 mod test_smart_transfer_protocol;
 
+pub mod private_datasets {
+    pub use crate::test_private_datasets::*;
+}
 pub use test_flow::*;
 pub use test_selftest::*;
 pub use test_smart_transfer_protocol::*;

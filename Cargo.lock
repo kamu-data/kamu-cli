@@ -5984,6 +5984,7 @@ dependencies = [
 name = "kamu-cli-e2e-common"
 version = "0.217.2"
 dependencies = [
+ "async-graphql",
  "async-trait",
  "chrono",
  "convert_case",
