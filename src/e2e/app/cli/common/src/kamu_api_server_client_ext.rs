@@ -32,7 +32,7 @@ use thiserror::Error;
 use tokio_retry::strategy::FixedInterval;
 use tokio_retry::Retry;
 
-use crate::{AccessToken, KamuApiServerClient, RequestBody};
+use crate::{AccessToken, GraphQLResponseExt, KamuApiServerClient, RequestBody};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -340,7 +340,7 @@ impl AuthApi<'_> {
     }
 
     async fn login(&mut self, login_request: &str) -> AccessToken {
-        let login_response = self.client.graphql_api_call(login_request).await;
+        let login_response = self.client.graphql_api_call(login_request).await.data();
         let access_token = login_response["auth"]["login"]["accessToken"]
             .as_str()
             .map(ToOwned::to_owned)
@@ -433,7 +433,8 @@ impl DatasetApi<'_> {
                 .replace("<dataset_alias>", &format!("{dataset_alias}"))
                 .as_str(),
             )
-            .await;
+            .await
+            .data();
 
         let create_response_node = &create_response["datasets"]["createEmpty"];
 
@@ -485,7 +486,8 @@ impl DatasetApi<'_> {
                 .replace("<dataset_visibility_value>", dataset_visibility_value)
                 .as_str(),
             )
-            .await;
+            .await
+            .data();
 
         let create_response_node = &create_response["datasets"]["createFromSnapshot"];
 
@@ -565,7 +567,8 @@ impl DatasetApi<'_> {
                 .replace("<dataset_id>", &dataset_id.as_did_str().to_stack_string())
                 .as_str(),
             )
-            .await;
+            .await
+            .data();
 
         let content = tail_response["datasets"]["byId"]["data"]["tail"]["data"]["content"]
             .as_str()
@@ -609,7 +612,8 @@ impl DatasetApi<'_> {
                 .replace("<dataset_id>", &dataset_id.as_did_str().to_stack_string())
                 .as_str(),
             )
-            .await;
+            .await
+            .data();
 
         let blocks = response["datasets"]["byId"]["metadata"]["chain"]["blocks"]["edges"]
             .as_array()
@@ -724,7 +728,8 @@ impl FlowApi<'_> {
                 )
                 .as_str(),
             )
-            .await;
+            .await
+            .data();
 
         let trigger_node = &response["datasets"]["byId"]["flows"]["runs"]["triggerFlow"];
         let message = trigger_node["message"].as_str().unwrap();
@@ -770,7 +775,8 @@ impl FlowApi<'_> {
                     .replace("<dataset_id>", &dataset_id.as_did_str().to_stack_string())
                     .as_str(),
                 )
-                .await;
+                .await
+                .data();
 
             let edges = response["datasets"]["byId"]["flows"]["runs"]["listFlows"]["edges"]
                 .as_array()
@@ -903,7 +909,8 @@ impl OdfQuery<'_> {
                 .replace("<query>", query)
                 .as_str(),
             )
-            .await;
+            .await
+            .data();
         let query_node = &response["data"]["query"];
 
         assert_eq!(

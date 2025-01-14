@@ -9,7 +9,7 @@
 
 use chrono::{DateTime, Utc};
 use internal_error::{InternalError, ResultIntoInternal};
-use reqwest::{Method, Response, StatusCode, Url};
+use reqwest::{Method, StatusCode, Url};
 use serde::Deserialize;
 use serde_json::json;
 use tokio_retry::strategy::FixedInterval;
@@ -80,7 +80,7 @@ impl KamuApiServerClient {
         method: Method,
         endpoint: &str,
         request_body: Option<RequestBody>,
-    ) -> Response {
+    ) -> reqwest::Response {
         let endpoint = self.server_base_url.join(endpoint).unwrap();
         let mut request_builder = match method {
             Method::GET => self.http_client.get(endpoint),
@@ -128,13 +128,15 @@ impl KamuApiServerClient {
         };
     }
 
-    pub async fn graphql_api_call(&self, query: &str) -> serde_json::Value {
+    pub async fn graphql_api_call(&self, query: &str) -> GraphQLResponse {
         let response = self.graphql_api_call_impl(query).await;
-        let response_body = response.json::<GraphQLResponseBody>().await.unwrap();
 
-        match response_body.data {
-            Some(response_body) => response_body,
-            None => panic!("Unexpected response body: {response_body:?}"),
+        let response_body = response.json::<async_graphql::Response>().await.unwrap();
+
+        if !response_body.errors.is_empty() {
+            Err(response_body.errors)
+        } else {
+            Ok(response_body.data.into_json().unwrap())
         }
     }
 
@@ -149,7 +151,7 @@ impl KamuApiServerClient {
 
     async fn rest_api_call_response_body_assert(
         &self,
-        response: Response,
+        response: reqwest::Response,
         expected_response_body: ExpectedResponseBody,
     ) {
         match expected_response_body {
@@ -170,7 +172,7 @@ impl KamuApiServerClient {
         };
     }
 
-    async fn graphql_api_call_impl(&self, query: &str) -> Response {
+    async fn graphql_api_call_impl(&self, query: &str) -> reqwest::Response {
         let endpoint = self.server_base_url.join("graphql").unwrap();
         let request_data = json!({
            "query": query
@@ -331,6 +333,21 @@ impl From<GraphQLResponseBody> for GraphQLPrettyResponseBody {
             errors: value
                 .errors
                 .map(|v| serde_json::to_string_pretty(&v).unwrap()),
+        }
+    }
+}
+
+pub type GraphQLResponse = Result<serde_json::Value, Vec<async_graphql::ServerError>>;
+
+pub trait GraphQLResponseExt {
+    fn data(self) -> serde_json::Value;
+}
+
+impl GraphQLResponseExt for GraphQLResponse {
+    fn data(self) -> serde_json::Value {
+        match self {
+            Ok(data) => data,
+            Err(e) => panic!("Unexpected errors: {e:?}"),
         }
     }
 }
