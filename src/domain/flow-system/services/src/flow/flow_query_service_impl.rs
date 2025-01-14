@@ -19,7 +19,6 @@ use kamu_core::DatasetOwnershipService;
 use kamu_flow_system::*;
 use opendatafabric::{AccountID, DatasetID};
 
-use crate::flow::flow_state_helper::FlowStateHelper;
 use crate::{FlowAbortHelper, FlowSchedulingHelper};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -29,7 +28,6 @@ pub struct FlowQueryServiceImpl {
     flow_event_store: Arc<dyn FlowEventStore>,
     dataset_ownership_service: Arc<dyn DatasetOwnershipService>,
     agent_config: Arc<FlowAgentConfig>,
-    flow_state: Arc<FlowStateHelper>,
 }
 
 #[component(pub)]
@@ -40,14 +38,12 @@ impl FlowQueryServiceImpl {
         flow_event_store: Arc<dyn FlowEventStore>,
         dataset_ownership_service: Arc<dyn DatasetOwnershipService>,
         agent_config: Arc<FlowAgentConfig>,
-        flow_state: Arc<FlowStateHelper>,
     ) -> Self {
         Self {
             catalog,
             flow_event_store,
             dataset_ownership_service,
             agent_config,
-            flow_state,
         }
     }
 }
@@ -77,7 +73,7 @@ impl FlowQueryService for FlowQueryServiceImpl {
             .try_collect()
             .await?;
 
-        let matched_stream = self.flow_state.get_stream(relevant_flow_ids);
+        let matched_stream = self.flow_event_store.get_stream(relevant_flow_ids);
 
         Ok(FlowStateListing {
             matched_stream,
@@ -146,7 +142,7 @@ impl FlowQueryService for FlowQueryServiceImpl {
             .try_collect()
             .await
             .int_err()?;
-        let matched_stream = self.flow_state.get_stream(relevant_flow_ids);
+        let matched_stream = self.flow_event_store.get_stream(relevant_flow_ids);
 
         Ok(FlowStateListing {
             matched_stream,
@@ -204,7 +200,7 @@ impl FlowQueryService for FlowQueryServiceImpl {
             .try_collect()
             .await?;
 
-        let matched_stream = self.flow_state.get_stream(relevant_flow_ids);
+        let matched_stream = self.flow_event_store.get_stream(relevant_flow_ids);
 
         Ok(FlowStateListing {
             matched_stream,
@@ -230,7 +226,7 @@ impl FlowQueryService for FlowQueryServiceImpl {
             .get_all_flow_ids(&empty_filters, pagination)
             .try_collect()
             .await?;
-        let matched_stream = self.flow_state.get_stream(all_flows);
+        let matched_stream = self.flow_event_store.get_stream(all_flows);
 
         Ok(FlowStateListing {
             matched_stream,

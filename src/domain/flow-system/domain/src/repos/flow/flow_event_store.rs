@@ -99,6 +99,8 @@ pub trait FlowEventStore: EventStore<FlowState> {
 
     /// Returns number of all flows, matching filters
     async fn get_count_all_flows(&self, filters: &AllFlowFilters) -> Result<usize, InternalError>;
+
+    fn get_stream(&self, flow_ids: Vec<FlowID>) -> FlowStateStream;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

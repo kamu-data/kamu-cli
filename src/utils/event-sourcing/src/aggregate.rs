@@ -137,17 +137,17 @@ where
             // When failed to read at least one event from source stream,
             // function returns error result immediately
             let (query, event_id, event) = res?;
-            let agg_result: Result<Aggregate<Proj, Store>, LoadError<Proj>> = match agg_results
-                .remove(&query)
-            {
-                None => Self::from_stored_event(query.clone(), event_id, event).map_err(Into::into),
-                Some(Ok(mut agg)) => match agg.apply_stored(event_id, event) {
-                    Ok(_) => Ok(agg),
-                    Err(err) => Err(err.into()),
-                },
-                Some(Err(err)) => Err(err),
-            };
-            agg_results.insert(query, agg_result);
+            if let Some(agg_result) = agg_results.get_mut(&query) {
+                if let Ok(agg) = agg_result {
+                    if let Err(err) = agg.apply_stored(event_id, event) {
+                        *agg_result = Err(err.into());
+                    }
+                }
+            } else {
+                let agg_result =
+                    Self::from_stored_event(query.clone(), event_id, event).map_err(Into::into);
+                agg_results.insert(query, agg_result);
+            }
         }
 
         let mut result: Vec<Result<Self, LoadError<Proj>>> = vec![];
