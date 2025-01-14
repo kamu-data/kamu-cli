@@ -1031,6 +1031,79 @@ impl FlowEventStore for SqliteFlowEventStore {
 
         Ok(usize::try_from(flows_count).unwrap())
     }
+
+    fn get_stream(&self, flow_ids: Vec<FlowID>) -> FlowStateStream {
+        Box::pin(async_stream::try_stream! {
+            // 32-items batching will give a performance boost,
+            // but queries for long-lived datasets should not bee too heavy.
+            // This number was chosen without any performance measurements. Subject of change.
+            let chunk_size = 32;
+            for chunk in flow_ids.chunks(chunk_size) {
+                let flows = Flow::load_multi(
+                    chunk.to_vec(),
+                    self
+                ).await.int_err()?;
+                for flow in flows {
+                    yield flow.int_err()?.into();
+                }
+            }
+        })
+    }
+
+    async fn get_count_flows_by_datasets(
+        &self,
+        dataset_ids: HashSet<DatasetID>,
+        filters: &DatasetFlowFilters,
+    ) -> Result<usize, InternalError> {
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+
+        let maybe_initiators = filters
+            .by_initiator
+            .as_ref()
+            .map(Self::prepare_initiator_filter);
+
+        let ids: Vec<String> = dataset_ids.iter().map(ToString::to_string).collect();
+
+        let query_str = format!(
+            r#"
+            SELECT COUNT(flow_id) AS flows_count
+            FROM flows
+                WHERE dataset_id IN ({})
+                AND (cast($1 as dataset_flow_type) IS NULL OR dataset_flow_type = $1)
+                AND (cast($2 as flow_status_type) IS NULL or flow_status = $2)
+                AND ($3 = 0 OR initiator IN ({}))
+            "#,
+            sqlite_generate_placeholders_list(ids.len(), 4),
+            maybe_initiators
+                .as_ref()
+                .map(|initiators| sqlite_generate_placeholders_list(
+                    initiators.len(),
+                    ids.len() + 4
+                ))
+                .unwrap_or_default()
+        );
+
+        let mut query = sqlx::query(&query_str)
+            .bind(filters.by_flow_type)
+            .bind(filters.by_flow_status)
+            .bind(i32::from(maybe_initiators.is_some()));
+
+        for dataset_id in ids {
+            query = query.bind(dataset_id);
+        }
+
+        if let Some(initiators) = maybe_initiators {
+            for initiator in initiators {
+                query = query.bind(initiator);
+            }
+        }
+
+        let query_result = query.fetch_one(connection_mut).await.int_err()?;
+        let flows_count: i64 = query_result.get(0);
+
+        Ok(usize::try_from(flows_count).unwrap())
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
