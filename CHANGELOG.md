@@ -11,7 +11,7 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## [Unreleased]
+## [0.217.3] - 2025-01-14
 ### Fixed
 - Fix crash on resolving dataset by non existing account
 - Minor improvements in event sourcing aggregation
