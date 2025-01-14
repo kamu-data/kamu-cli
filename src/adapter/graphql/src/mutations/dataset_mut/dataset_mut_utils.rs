@@ -22,6 +22,11 @@ pub(crate) async fn ensure_account_owns_dataset(
     let dataset_ownership_service = from_catalog_n!(ctx, dyn DatasetOwnershipService);
     let logged_account = utils::get_logged_account(ctx)?;
 
+    if logged_account.is_admin {
+        // Technically, the admin isn't the owner, but that's not a barrier in this case
+        return Ok(());
+    }
+
     let not_owner = !dataset_ownership_service
         .is_dataset_owned_by(&dataset_handle.id, &logged_account.account_id)
         .await?;
