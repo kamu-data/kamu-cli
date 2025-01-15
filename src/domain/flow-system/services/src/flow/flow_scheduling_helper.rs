@@ -13,7 +13,7 @@ use chrono::{DateTime, Utc};
 use dill::component;
 use internal_error::InternalError;
 use kamu_core::{DatasetChangesService, DependencyGraphService};
-use kamu_datasets::DatasetOwnershipService;
+use kamu_datasets::{DatasetEntryService, DatasetEntryServiceExt};
 use kamu_flow_system::*;
 use messaging_outbox::{Outbox, OutboxExt};
 use time_source::SystemTimeSource;
@@ -30,7 +30,7 @@ pub(crate) struct FlowSchedulingHelper {
     outbox: Arc<dyn Outbox>,
     dataset_changes_service: Arc<dyn DatasetChangesService>,
     dependency_graph_service: Arc<dyn DependencyGraphService>,
-    dataset_ownership_service: Arc<dyn DatasetOwnershipService>,
+    dataset_entry_service: Arc<dyn DatasetEntryService>,
     time_source: Arc<dyn SystemTimeSource>,
     agent_config: Arc<FlowAgentConfig>,
 }
@@ -44,7 +44,7 @@ impl FlowSchedulingHelper {
         outbox: Arc<dyn Outbox>,
         dataset_changes_service: Arc<dyn DatasetChangesService>,
         dependency_graph_service: Arc<dyn DependencyGraphService>,
-        dataset_ownership_service: Arc<dyn DatasetOwnershipService>,
+        dataset_entry_service: Arc<dyn DatasetEntryService>,
         time_source: Arc<dyn SystemTimeSource>,
         agent_config: Arc<FlowAgentConfig>,
     ) -> Self {
@@ -55,7 +55,7 @@ impl FlowSchedulingHelper {
             outbox,
             dataset_changes_service,
             dependency_graph_service,
-            dataset_ownership_service,
+            dataset_entry_service,
             time_source,
             agent_config,
         }
@@ -215,15 +215,18 @@ impl FlowSchedulingHelper {
 
             DownstreamDependencyTriggerType::TriggerOwnHardCompaction => {
                 let owner_account_id = self
-                    .dataset_ownership_service
-                    .get_dataset_owner(&fk_dataset.dataset_id)
-                    .await?;
+                    .dataset_entry_service
+                    .get_entry(&fk_dataset.dataset_id)
+                    .await
+                    .int_err()?
+                    .owner_id;
 
                 for dependent_dataset_id in dependent_dataset_ids {
                     let owned = self
-                        .dataset_ownership_service
+                        .dataset_entry_service
                         .is_dataset_owned_by(&dependent_dataset_id, &owner_account_id)
-                        .await?;
+                        .await
+                        .int_err()?;
 
                     if owned {
                         plans.push(DownstreamDependencyFlowPlan {

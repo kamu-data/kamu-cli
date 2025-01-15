@@ -8,11 +8,11 @@
 // by the Apache License, Version 2.0.
 
 use database_common::{EntityPageListing, PaginationOpts};
-use internal_error::InternalError;
+use internal_error::{ErrorIntoInternal, InternalError};
 use opendatafabric as odf;
 use thiserror::Error;
 
-use crate::{DatasetEntry, DatasetEntryStream};
+use crate::{DatasetEntry, DatasetEntryStream, GetDatasetEntryError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -23,6 +23,11 @@ pub trait DatasetEntryService: Sync + Send {
     fn all_entries(&self) -> DatasetEntryStream;
 
     fn entries_owned_by(&self, owner_id: &odf::AccountID) -> DatasetEntryStream;
+
+    async fn get_entry(
+        &self,
+        dataset_id: &odf::DatasetID,
+    ) -> Result<DatasetEntry, GetDatasetEntryError>;
 
     async fn list_all_entries(
         &self,
@@ -43,7 +48,13 @@ pub trait DatasetEntryServiceExt: Sync + Send {
     async fn get_owned_dataset_ids(
         &self,
         owner_id: &odf::AccountID,
-    ) -> Result<Vec<odf::DatasetID>, InternalError>;
+    ) -> Result<Vec<odf::DatasetID>, GetOwnedDatasetIdsError>;
+
+    async fn is_dataset_owned_by(
+        &self,
+        dataset_id: &odf::DatasetID,
+        account_id: &odf::AccountID,
+    ) -> Result<bool, IsDatasetOwnedByError>;
 }
 
 #[async_trait::async_trait]
@@ -55,7 +66,7 @@ where
     async fn get_owned_dataset_ids(
         &self,
         owner_id: &odf::AccountID,
-    ) -> Result<Vec<odf::DatasetID>, InternalError> {
+    ) -> Result<Vec<odf::DatasetID>, GetOwnedDatasetIdsError> {
         use futures::TryStreamExt;
 
         let owned_dataset_ids = self
@@ -68,6 +79,20 @@ where
 
         Ok(owned_dataset_ids)
     }
+
+    async fn is_dataset_owned_by(
+        &self,
+        dataset_id: &odf::DatasetID,
+        account_id: &odf::AccountID,
+    ) -> Result<bool, IsDatasetOwnedByError> {
+        match self.get_entry(dataset_id).await {
+            Ok(entry) => Ok(entry.owner_id == *account_id),
+            Err(err) => match err {
+                GetDatasetEntryError::NotFound(_) => Ok(false),
+                unexpected_error => Err(unexpected_error.int_err().into()),
+            },
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -76,6 +101,18 @@ where
 
 #[derive(Error, Debug)]
 pub enum ListDatasetEntriesError {
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+}
+
+#[derive(Error, Debug)]
+pub enum GetOwnedDatasetIdsError {
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+}
+
+#[derive(Error, Debug)]
+pub enum IsDatasetOwnedByError {
     #[error(transparent)]
     Internal(#[from] InternalError),
 }

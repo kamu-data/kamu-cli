@@ -12,7 +12,7 @@ use std::sync::Arc;
 
 use database_common::{EntityPageListing, EntityPageStreamer, PaginationOpts};
 use dill::{component, interface, meta, Catalog};
-use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
+use internal_error::{InternalError, ResultIntoInternal};
 use kamu_accounts::{AccountRepository, CurrentAccountSubject};
 use kamu_core::{
     DatasetHandleStream,
@@ -68,7 +68,6 @@ struct AccountsCache {
 #[component(pub)]
 #[interface(dyn DatasetEntryService)]
 #[interface(dyn DatasetRegistry)]
-#[interface(dyn DatasetOwnershipService)]
 #[interface(dyn MessageConsumer)]
 #[interface(dyn MessageConsumerT<DatasetLifecycleMessage>)]
 #[meta(MessageConsumerMeta {
@@ -350,6 +349,13 @@ impl DatasetEntryService for DatasetEntryServiceImpl {
         )
     }
 
+    async fn get_entry(
+        &self,
+        dataset_id: &odf::DatasetID,
+    ) -> Result<DatasetEntry, GetDatasetEntryError> {
+        self.dataset_entry_repo.get_dataset_entry(dataset_id).await
+    }
+
     async fn list_all_entries(
         &self,
         pagination: PaginationOpts,
@@ -520,40 +526,6 @@ impl DatasetRegistry for DatasetEntryServiceImpl {
     fn get_dataset_by_handle(&self, dataset_handle: &odf::DatasetHandle) -> ResolvedDataset {
         let dataset = self.dataset_repo.get_dataset_by_handle(dataset_handle);
         ResolvedDataset::new(dataset, dataset_handle.clone())
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[async_trait::async_trait]
-impl DatasetOwnershipService for DatasetEntryServiceImpl {
-    async fn get_dataset_owner(
-        &self,
-        dataset_id: &odf::DatasetID,
-    ) -> Result<odf::AccountID, InternalError> {
-        let dataset_entry = self
-            .dataset_entry_repo
-            .get_dataset_entry(dataset_id)
-            .await
-            .int_err()?;
-
-        Ok(dataset_entry.owner_id)
-    }
-
-    async fn is_dataset_owned_by(
-        &self,
-        dataset_id: &odf::DatasetID,
-        account_id: &odf::AccountID,
-    ) -> Result<bool, InternalError> {
-        let get_res = self.dataset_entry_repo.get_dataset_entry(dataset_id).await;
-
-        match get_res {
-            Ok(dataset_entry) => Ok(dataset_entry.owner_id == *account_id),
-            Err(err) => match err {
-                GetDatasetEntryError::NotFound(_) => Ok(false),
-                unexpected_error => Err(unexpected_error.int_err()),
-            },
-        }
     }
 }
 

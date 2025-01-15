@@ -113,7 +113,7 @@ impl FlowQueryService for FlowQueryServiceImpl {
             .dataset_entry_service
             .get_owned_dataset_ids(account_id)
             .await
-            .map_err(ListFlowsByDatasetError::Internal)?;
+            .int_err()?;
 
         let filtered_dataset_ids = if !filters.by_dataset_ids.is_empty() {
             owned_dataset_ids
@@ -165,7 +165,7 @@ impl FlowQueryService for FlowQueryServiceImpl {
             .dataset_entry_service
             .get_owned_dataset_ids(account_id)
             .await
-            .map_err(ListFlowsByDatasetError::Internal)?;
+            .int_err()?;
 
         let matched_stream = Box::pin(async_stream::try_stream! {
             for dataset_id in &owned_dataset_ids {

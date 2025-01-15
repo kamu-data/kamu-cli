@@ -34,7 +34,8 @@ impl AccountFlowTriggers {
 
         let owned_dataset_ids: Vec<_> = dataset_entry_service
             .get_owned_dataset_ids(&self.account.id)
-            .await?;
+            .await
+            .int_err()?;
 
         let mut all_triggers = flow_trigger_service
             .find_triggers_by_datasets(owned_dataset_ids)

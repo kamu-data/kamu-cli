@@ -33,7 +33,8 @@ impl AccountFlowTriggersMut {
         let dataset_entry_service = from_catalog_n!(ctx, dyn DatasetEntryService);
         let dataset_ids: Vec<_> = dataset_entry_service
             .get_owned_dataset_ids(&self.account.id)
-            .await?;
+            .await
+            .int_err()?;
 
         Ok(dataset_ids)
     }
