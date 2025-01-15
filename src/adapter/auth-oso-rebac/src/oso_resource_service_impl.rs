@@ -32,32 +32,46 @@ use crate::{DatasetResource, UserActor};
 type EntityId = String;
 
 #[derive(Debug, Default)]
-struct State {
+pub struct State {
     user_actor_cache_map: HashMap<EntityId, UserActor>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct OsoResourceServiceImplStateHolder {
+    pub state: RwLock<State>,
+}
+
+#[component(pub)]
+#[scope(Singleton)]
+impl OsoResourceServiceImplStateHolder {
+    pub fn new() -> Self {
+        Self {
+            state: RwLock::new(State::default()),
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // TODO: Private Datasets: add Service trait?
 pub struct OsoResourceServiceImpl {
-    state: RwLock<State>,
+    state_holder: Arc<OsoResourceServiceImplStateHolder>,
     dataset_entry_repo: Arc<dyn DatasetEntryRepository>,
     rebac_service: Arc<dyn RebacService>,
     account_repo: Arc<dyn AccountRepository>,
 }
 
 #[component(pub)]
-// TODO: Private Datasets: This service should be a singleton
-//                         Alternative: put the state into a separate component
-// #[scope(Singleton)]
 impl OsoResourceServiceImpl {
     pub fn new(
+        state_holder: Arc<OsoResourceServiceImplStateHolder>,
         dataset_entry_repo: Arc<dyn DatasetEntryRepository>,
         rebac_service: Arc<dyn RebacService>,
         account_repo: Arc<dyn AccountRepository>,
     ) -> Self {
         Self {
-            state: RwLock::new(State::default()),
+            state_holder,
             dataset_entry_repo,
             rebac_service,
             account_repo,
@@ -74,7 +88,7 @@ impl OsoResourceServiceImpl {
 
         // First, an attempt to get from the cache
         {
-            let readable_state = self.state.read().await;
+            let readable_state = self.state_holder.state.read().await;
 
             let account_id_stack = account_id.as_did_str().to_stack_string();
             let maybe_cached_user_actor = readable_state
@@ -107,7 +121,7 @@ impl OsoResourceServiceImpl {
         };
 
         // Lastly, caching
-        let mut writable_state = self.state.write().await;
+        let mut writable_state = self.state_holder.state.write().await;
 
         writable_state
             .user_actor_cache_map
