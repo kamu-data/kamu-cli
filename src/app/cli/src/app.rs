@@ -386,6 +386,8 @@ pub fn configure_base_catalog(
         b.add::<SystemTimeSourceDefault>();
     }
 
+    b.add::<DidGeneratorDefault>();
+
     b.add_builder(
         DatasetRepositoryLocalFs::builder().with_root(workspace_layout.datasets_dir.clone()),
     );

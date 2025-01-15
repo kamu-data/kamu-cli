@@ -18,11 +18,12 @@ use kamu_core::{
     DeleteDatasetError,
     DeleteDatasetUseCase,
     GetDatasetError,
+    MockDidGenerator,
 };
 use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
 use kamu_datasets_services::{DependencyGraphIndexer, DependencyGraphServiceImpl};
 use messaging_outbox::{consume_deserialized_message, ConsumerFilter, Message, MockOutbox};
-use opendatafabric::{DatasetAlias, DatasetName};
+use opendatafabric::{DatasetAlias, DatasetID, DatasetName};
 
 use crate::tests::use_cases::*;
 
@@ -31,14 +32,21 @@ use crate::tests::use_cases::*;
 #[tokio::test]
 async fn test_delete_dataset_success_via_ref() {
     let alias_foo = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
+    let (_, dataset_id_foo) = DatasetID::new_generated_ed25519();
 
     let mut mock_outbox = MockOutbox::new();
     expect_outbox_dataset_deleted(&mut mock_outbox, 1);
 
     let mock_authorizer =
-        MockDatasetActionAuthorizer::new().expect_check_write_dataset(&alias_foo, 1, true);
+        MockDatasetActionAuthorizer::new().expect_check_write_dataset(&dataset_id_foo, 1, true);
 
-    let harness = DeleteUseCaseHarness::new(mock_authorizer, mock_outbox);
+    let harness = DeleteUseCaseHarness::new(
+        mock_authorizer,
+        mock_outbox,
+        Some(MockDidGenerator::predefined_dataset_ids(vec![
+            dataset_id_foo,
+        ])),
+    );
 
     harness.create_root_dataset(&alias_foo).await;
     harness.reindex_dependency_graph().await;
@@ -60,14 +68,21 @@ async fn test_delete_dataset_success_via_ref() {
 #[tokio::test]
 async fn test_delete_dataset_success_via_handle() {
     let alias_foo = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
+    let (_, dataset_id_foo) = DatasetID::new_generated_ed25519();
 
     let mut mock_outbox = MockOutbox::new();
     expect_outbox_dataset_deleted(&mut mock_outbox, 1);
 
     let mock_authorizer =
-        MockDatasetActionAuthorizer::new().expect_check_write_dataset(&alias_foo, 1, true);
+        MockDatasetActionAuthorizer::new().expect_check_write_dataset(&dataset_id_foo, 1, true);
 
-    let harness = DeleteUseCaseHarness::new(mock_authorizer, mock_outbox);
+    let harness = DeleteUseCaseHarness::new(
+        mock_authorizer,
+        mock_outbox,
+        Some(MockDidGenerator::predefined_dataset_ids(vec![
+            dataset_id_foo,
+        ])),
+    );
 
     let foo = harness.create_root_dataset(&alias_foo).await;
     harness.reindex_dependency_graph().await;
@@ -88,7 +103,8 @@ async fn test_delete_dataset_success_via_handle() {
 
 #[tokio::test]
 async fn test_delete_dataset_not_found() {
-    let harness = DeleteUseCaseHarness::new(MockDatasetActionAuthorizer::new(), MockOutbox::new());
+    let harness =
+        DeleteUseCaseHarness::new(MockDatasetActionAuthorizer::new(), MockOutbox::new(), None);
 
     let alias_foo = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
     assert_matches!(
@@ -105,10 +121,14 @@ async fn test_delete_dataset_not_found() {
 #[tokio::test]
 async fn test_delete_unauthorized() {
     let alias_foo = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
+    let (_, dataset_id_foo) = DatasetID::new_generated_ed25519();
 
     let harness = DeleteUseCaseHarness::new(
-        MockDatasetActionAuthorizer::new().expect_check_write_dataset(&alias_foo, 1, false),
+        MockDatasetActionAuthorizer::new().expect_check_write_dataset(&dataset_id_foo, 1, false),
         MockOutbox::new(),
+        Some(MockDidGenerator::predefined_dataset_ids(vec![
+            dataset_id_foo,
+        ])),
     );
 
     let foo = harness.create_root_dataset(&alias_foo).await;
@@ -135,7 +155,8 @@ async fn test_delete_dataset_respects_dangling_refs() {
     let mut mock_outbox = MockOutbox::new();
     expect_outbox_dataset_deleted(&mut mock_outbox, 2);
 
-    let harness = DeleteUseCaseHarness::new(MockDatasetActionAuthorizer::allowing(), mock_outbox);
+    let harness =
+        DeleteUseCaseHarness::new(MockDatasetActionAuthorizer::allowing(), mock_outbox, None);
 
     let root = harness.create_root_dataset(&alias_foo).await;
     let derived = harness
@@ -201,11 +222,13 @@ impl DeleteUseCaseHarness {
     fn new(
         mock_dataset_action_authorizer: MockDatasetActionAuthorizer,
         mock_outbox: MockOutbox,
+        maybe_mock_did_generator: Option<MockDidGenerator>,
     ) -> Self {
         let base_harness = BaseUseCaseHarness::new(
             BaseUseCaseHarnessOptions::new()
                 .with_authorizer(mock_dataset_action_authorizer)
-                .with_outbox(mock_outbox),
+                .with_outbox(mock_outbox)
+                .with_maybe_mock_did_generator(maybe_mock_did_generator),
         );
 
         let catalog = dill::CatalogBuilder::new_chained(base_harness.catalog())

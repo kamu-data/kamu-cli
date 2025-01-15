@@ -32,7 +32,7 @@ mockall::mock! {
     impl DatasetActionAuthorizer for DatasetActionAuthorizer {
         async fn check_action_allowed(
             &self,
-            dataset_handle: &odf::DatasetHandle,
+            dataset_id: &odf::DatasetID,
             action: DatasetAction,
         ) -> Result<(), DatasetActionUnauthorizedError>;
 
@@ -63,13 +63,13 @@ mockall::mock! {
 
 impl MockDatasetActionAuthorizer {
     pub fn denying_error(
-        dataset_handle: &odf::DatasetHandle,
+        dataset_ref: odf::DatasetRef,
         action: DatasetAction,
     ) -> DatasetActionUnauthorizedError {
         DatasetActionUnauthorizedError::Access(AccessError::Forbidden(
             DatasetActionNotEnoughPermissionsError {
                 action,
-                dataset_ref: dataset_handle.as_local_ref(),
+                dataset_ref,
             }
             .into(),
         ))
@@ -79,7 +79,9 @@ impl MockDatasetActionAuthorizer {
         let mut mock_dataset_action_authorizer = MockDatasetActionAuthorizer::new();
         mock_dataset_action_authorizer
             .expect_check_action_allowed()
-            .returning(|dataset_handle, action| Err(Self::denying_error(dataset_handle, action)));
+            .returning(|dataset_id, action| {
+                Err(Self::denying_error(dataset_id.as_local_ref(), action))
+            });
         mock_dataset_action_authorizer
     }
 
@@ -93,13 +95,13 @@ impl MockDatasetActionAuthorizer {
 
     pub fn expect_check_read_dataset(
         self,
-        dataset_alias: &odf::DatasetAlias,
+        expected_dataset_id: &odf::DatasetID,
         times: usize,
         success: bool,
     ) -> Self {
-        let dataset_alias = dataset_alias.clone();
+        let expected_dataset_id = expected_dataset_id.clone();
         self.expect_check_action_allowed_internal(
-            function(move |dh: &odf::DatasetHandle| dh.alias == dataset_alias),
+            function(move |dataset_id| *dataset_id == expected_dataset_id),
             DatasetAction::Read,
             times,
             success,
@@ -108,13 +110,13 @@ impl MockDatasetActionAuthorizer {
 
     pub fn expect_check_write_dataset(
         self,
-        dataset_alias: &odf::DatasetAlias,
+        expected_dataset_id: &odf::DatasetID,
         times: usize,
         success: bool,
     ) -> Self {
-        let dataset_alias = dataset_alias.clone();
+        let expected_dataset_id = expected_dataset_id.clone();
         self.expect_check_action_allowed_internal(
-            function(move |dh: &odf::DatasetHandle| dh.alias == dataset_alias),
+            function(move |dataset_id| *dataset_id == expected_dataset_id),
             DatasetAction::Write,
             times,
             success,
@@ -137,17 +139,17 @@ impl MockDatasetActionAuthorizer {
         success: bool,
     ) -> Self
     where
-        P: Predicate<odf::DatasetHandle> + Sync + Send + 'static,
+        P: Predicate<odf::DatasetID> + Sync + Send + 'static,
     {
         if times > 0 {
             self.expect_check_action_allowed()
                 .with(dataset_handle_predicate, eq(action))
                 .times(times)
-                .returning(move |hdl, action| {
+                .returning(move |dataset_id, action| {
                     if success {
                         Ok(())
                     } else {
-                        Err(Self::denying_error(hdl, action))
+                        Err(Self::denying_error(dataset_id.as_local_ref(), action))
                     }
                 });
         } else {
@@ -176,7 +178,7 @@ impl MockDatasetActionAuthorizer {
                     if authorized.contains(&handle.alias) {
                         good.push(handle);
                     } else {
-                        let error = Self::denying_error(&handle, action);
+                        let error = Self::denying_error(handle.as_local_ref(), action);
                         bad.push((handle, error));
                     }
                 }

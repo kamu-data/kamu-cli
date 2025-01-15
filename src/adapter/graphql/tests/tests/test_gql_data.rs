@@ -59,6 +59,7 @@ async fn create_catalog_with_local_workspace(
         let mut b = dill::CatalogBuilder::new();
 
         b.add::<DependencyGraphServiceImpl>()
+            .add::<DidGeneratorDefault>()
             .add::<InMemoryDatasetDependencyRepository>()
             .add_value(current_account_subject)
             .add_value(predefined_accounts_config)

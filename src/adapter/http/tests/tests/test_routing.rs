@@ -43,6 +43,7 @@ async fn setup_repo() -> RepoFixture {
 
     let mut b = dill::CatalogBuilder::new();
     b.add::<SystemTimeSourceDefault>()
+        .add::<DidGeneratorDefault>()
         .add::<DummyOutboxImpl>()
         .add::<DependencyGraphServiceImpl>()
         .add::<InMemoryDatasetDependencyRepository>()

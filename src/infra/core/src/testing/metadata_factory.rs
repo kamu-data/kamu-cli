@@ -14,6 +14,8 @@ use opendatafabric::*;
 
 use super::IDFactory;
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub struct MetadataFactory;
 
 impl MetadataFactory {
@@ -82,6 +84,11 @@ impl SeedBuilder {
                 dataset_kind: kind,
             },
         }
+    }
+
+    pub fn id(mut self, dataset_id: DatasetID) -> Self {
+        self.v.dataset_id = dataset_id;
+        self
     }
 
     pub fn id_random(mut self) -> Self {

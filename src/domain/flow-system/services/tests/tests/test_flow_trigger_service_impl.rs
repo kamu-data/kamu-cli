@@ -372,6 +372,7 @@ impl FlowTriggerHarness {
                     .with_consumer_filter(messaging_outbox::ConsumerFilter::AllConsumers),
             )
             .bind::<dyn Outbox, OutboxImmediateImpl>()
+            .add::<DidGeneratorDefault>()
             .add::<FlowTriggerTestListener>()
             .add::<FlowTriggerServiceImpl>()
             .add::<InMemoryFlowTriggerEventStore>()

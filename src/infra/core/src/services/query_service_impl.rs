@@ -320,7 +320,7 @@ impl QueryServiceImpl {
             .await?;
 
         self.dataset_action_authorizer
-            .check_action_allowed(&dataset_handle, DatasetAction::Read)
+            .check_action_allowed(&dataset_handle.id, DatasetAction::Read)
             .await?;
 
         Ok(self.dataset_registry.get_dataset_by_handle(&dataset_handle))

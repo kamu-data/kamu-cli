@@ -131,7 +131,7 @@ where
                         {
                             Ok(dataset_handle) => {
                                 if let Err(err) = dataset_action_authorizer
-                                    .check_action_allowed(&dataset_handle, action)
+                                    .check_action_allowed(&dataset_handle.id, action)
                                     .await
                                 {
                                     if let Err(err_result) = Self::check_logged_in(catalog) {

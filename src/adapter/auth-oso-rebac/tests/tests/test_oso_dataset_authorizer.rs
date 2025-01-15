@@ -54,12 +54,12 @@ async fn test_owner_can_read_and_write_private_dataset() {
 
     let read_result = harness
         .dataset_authorizer
-        .check_action_allowed(&dataset_handle, DatasetAction::Read)
+        .check_action_allowed(&dataset_handle.id, DatasetAction::Read)
         .await;
 
     let write_result = harness
         .dataset_authorizer
-        .check_action_allowed(&dataset_handle, DatasetAction::Write)
+        .check_action_allowed(&dataset_handle.id, DatasetAction::Write)
         .await;
 
     let allowed_actions = harness
@@ -87,12 +87,12 @@ async fn test_guest_can_read_but_not_write_public_dataset() {
 
     let read_result = harness
         .dataset_authorizer
-        .check_action_allowed(&dataset_handle, DatasetAction::Read)
+        .check_action_allowed(&dataset_handle.id, DatasetAction::Read)
         .await;
 
     let write_result = harness
         .dataset_authorizer
-        .check_action_allowed(&dataset_handle, DatasetAction::Write)
+        .check_action_allowed(&dataset_handle.id, DatasetAction::Write)
         .await;
 
     let allowed_actions = harness

@@ -51,6 +51,7 @@ impl TransformTestHarness {
         std::fs::create_dir(&run_info_dir).unwrap();
 
         let catalog = dill::CatalogBuilder::new()
+            .add::<DidGeneratorDefault>()
             .add_value(RunInfoDir::new(run_info_dir))
             .add_value(CurrentAccountSubject::new_test())
             .add_value(TenancyConfig::SingleTenant)

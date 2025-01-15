@@ -139,6 +139,7 @@ async fn create_graph_remote(
         Arc::new(CurrentAccountSubject::new_test()),
         Arc::new(TenancyConfig::SingleTenant),
         Arc::new(SystemTimeSourceDefault),
+        Arc::new(DidGeneratorDefault),
     );
 
     create_graph(&remote_dataset_repo, datasets).await;
@@ -660,7 +661,7 @@ struct PullTestHarness {
 
 impl PullTestHarness {
     fn new(tenancy_config: TenancyConfig) -> Self {
-        let base_repo_harness = BaseRepoHarness::new(tenancy_config);
+        let base_repo_harness = BaseRepoHarness::new(tenancy_config, None);
 
         let calls = Arc::new(Mutex::new(Vec::new()));
 

@@ -24,7 +24,7 @@ pub trait DatasetActionAuthorizer: Sync + Send {
     async fn check_action_allowed(
         &self,
         // TODO: Private Datasets: migrate to use odf::DatasetID, here and below
-        dataset_handle: &odf::DatasetHandle,
+        dataset_id: &odf::DatasetID,
         action: DatasetAction,
     ) -> Result<(), DatasetActionUnauthorizedError>;
 
@@ -33,7 +33,7 @@ pub trait DatasetActionAuthorizer: Sync + Send {
         dataset_handle: &odf::DatasetHandle,
         action: DatasetAction,
     ) -> Result<bool, InternalError> {
-        match self.check_action_allowed(dataset_handle, action).await {
+        match self.check_action_allowed(&dataset_handle.id, action).await {
             Ok(()) => Ok(true),
             Err(DatasetActionUnauthorizedError::Access(_)) => Ok(false),
             Err(DatasetActionUnauthorizedError::Internal(err)) => Err(err),
@@ -228,7 +228,7 @@ impl AlwaysHappyDatasetActionAuthorizer {
 impl DatasetActionAuthorizer for AlwaysHappyDatasetActionAuthorizer {
     async fn check_action_allowed(
         &self,
-        _dataset_handle: &odf::DatasetHandle,
+        _dataset_id: &odf::DatasetID,
         _action: DatasetAction,
     ) -> Result<(), DatasetActionUnauthorizedError> {
         // Ignore rules

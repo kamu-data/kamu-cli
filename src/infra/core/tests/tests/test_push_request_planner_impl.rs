@@ -307,7 +307,7 @@ struct RemoteRepoData {
 
 impl PushTestHarness {
     fn new(tenancy_config: TenancyConfig, create_remote_repo: bool) -> Self {
-        let base_repo_harness = BaseRepoHarness::new(tenancy_config);
+        let base_repo_harness = BaseRepoHarness::new(tenancy_config, None);
 
         let repos_dir = base_repo_harness.temp_dir_path().join("repos");
         std::fs::create_dir(&repos_dir).unwrap();

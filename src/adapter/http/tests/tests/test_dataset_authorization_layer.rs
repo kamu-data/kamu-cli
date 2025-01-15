@@ -24,12 +24,13 @@ use kamu::{
 };
 use kamu_accounts::testing::MockAuthenticationService;
 use kamu_accounts::*;
-use kamu_core::TenancyConfig;
+use kamu_core::{DidGenerator, MockDidGenerator, TenancyConfig};
 use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
 use kamu_datasets_services::DependencyGraphServiceImpl;
 use messaging_outbox::DummyOutboxImpl;
 use mockall::predicate::{eq, function};
-use opendatafabric::{DatasetAlias, DatasetHandle, DatasetKind, DatasetName, DatasetRef};
+use opendatafabric as odf;
+use opendatafabric::{DatasetAlias, DatasetKind, DatasetName};
 use time_source::SystemTimeSourceDefault;
 use url::Url;
 
@@ -217,10 +218,15 @@ impl ServerHarness {
         let datasets_dir = temp_dir.path().join("datasets");
         std::fs::create_dir(&datasets_dir).unwrap();
 
+        let dataset_id = Self::dataset_id();
         let base_catalog = {
             let mut b = dill::CatalogBuilder::new();
 
             b.add::<SystemTimeSourceDefault>()
+                .add_value(MockDidGenerator::predefined_dataset_ids(vec![
+                    dataset_id.clone()
+                ]))
+                .bind::<dyn DidGenerator, MockDidGenerator>()
                 .add::<DummyOutboxImpl>()
                 .add::<DependencyGraphServiceImpl>()
                 .add::<InMemoryDatasetDependencyRepository>()
@@ -257,8 +263,12 @@ impl ServerHarness {
         create_dataset
             .execute(
                 &Self::dataset_alias(),
-                MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build())
-                    .build_typed(),
+                MetadataFactory::metadata_block(
+                    MetadataFactory::seed(DatasetKind::Root)
+                        .id(dataset_id.clone())
+                        .build(),
+                )
+                .build_typed(),
                 Default::default(),
             )
             .await
@@ -281,7 +291,7 @@ impl ServerHarness {
             .layer(
                 tower::ServiceBuilder::new()
                     .layer(axum::Extension(catalog_test))
-                    .layer(axum::Extension(DatasetRef::from_str("mydataset").unwrap()))
+                    .layer(axum::Extension(dataset_id.as_local_ref()))
                     .layer(kamu_adapter_http::DatasetAuthorizationLayer::new(
                         |request| {
                             if !request.method().is_safe() || request.uri().path() == "/bar" {
@@ -314,14 +324,17 @@ impl ServerHarness {
         mock_dataset_action_authorizer
             .expect_check_action_allowed()
             .with(
-                function(|dh: &DatasetHandle| dh.alias == ServerHarness::dataset_alias()),
+                function(|dataset_id: &odf::DatasetID| *dataset_id == ServerHarness::dataset_id()),
                 eq(action),
             )
-            .returning(move |dh, action| {
+            .returning(move |dataset_id, action| {
                 if should_authorize {
                     Ok(())
                 } else {
-                    Err(MockDatasetActionAuthorizer::denying_error(dh, action))
+                    Err(MockDatasetActionAuthorizer::denying_error(
+                        dataset_id.as_local_ref(),
+                        action,
+                    ))
                 }
             });
 
@@ -354,7 +367,7 @@ impl ServerHarness {
         .await
         .unwrap();
 
-        assert_eq!(response.status(), expected_status);
+        assert_eq!(expected_status, response.status());
     }
 
     pub fn test_url(&self, path: &str) -> Url {
@@ -371,7 +384,11 @@ impl ServerHarness {
         http::StatusCode::OK
     }
 
-    fn dataset_alias() -> DatasetAlias {
+    fn dataset_alias() -> odf::DatasetAlias {
         DatasetAlias::new(None, DatasetName::new_unchecked("mydataset"))
+    }
+
+    fn dataset_id() -> odf::DatasetID {
+        odf::DatasetID::new_seeded_ed25519(Self::dataset_alias().dataset_name.as_bytes())
     }
 }

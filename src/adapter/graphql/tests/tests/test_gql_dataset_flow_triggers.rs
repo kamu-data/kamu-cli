@@ -24,6 +24,7 @@ use kamu_core::{
     CreateDatasetFromSnapshotUseCase,
     CreateDatasetResult,
     DatasetRepository,
+    DidGeneratorDefault,
     TenancyConfig,
 };
 use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
@@ -1063,6 +1064,7 @@ impl FlowTriggerHarness {
             let mut b = dill::CatalogBuilder::new();
 
             b.add::<DummyOutboxImpl>()
+                .add::<DidGeneratorDefault>()
                 .add_value(TenancyConfig::SingleTenant)
                 .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
                 .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()

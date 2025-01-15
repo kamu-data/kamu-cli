@@ -40,7 +40,13 @@ use kamu::{
 };
 use kamu_accounts::testing::MockAuthenticationService;
 use kamu_accounts::{Account, AuthenticationService};
-use kamu_core::{CompactionExecutor, CompactionPlanner, DatasetRegistry, TenancyConfig};
+use kamu_core::{
+    CompactionExecutor,
+    CompactionPlanner,
+    DatasetRegistry,
+    DidGeneratorDefault,
+    TenancyConfig,
+};
 use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
 use kamu_datasets_services::DependencyGraphServiceImpl;
 use messaging_outbox::DummyOutboxImpl;
@@ -99,6 +105,7 @@ impl ServerSideLocalFsHarness {
             let base_url_rest = format!("http://{}", listener.local_addr().unwrap());
 
             b.add_value(RunInfoDir::new(run_info_dir))
+                .add::<DidGeneratorDefault>()
                 .add_value(CacheDir::new(cache_dir))
                 .add::<DummyOutboxImpl>()
                 .add_value(time_source.clone())

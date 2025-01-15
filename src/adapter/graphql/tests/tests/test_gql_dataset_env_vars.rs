@@ -23,6 +23,7 @@ use kamu_core::{
     CreateDatasetFromSnapshotUseCase,
     CreateDatasetResult,
     DatasetRepository,
+    DidGeneratorDefault,
     TenancyConfig,
 };
 use kamu_datasets::DatasetEnvVarsConfig;
@@ -336,6 +337,7 @@ impl DatasetEnvVarsHarness {
             let mut b = dill::CatalogBuilder::new();
 
             b.add::<DummyOutboxImpl>()
+                .add::<DidGeneratorDefault>()
                 .add_value(DatasetEnvVarsConfig::sample())
                 .add_value(TenancyConfig::SingleTenant)
                 .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))

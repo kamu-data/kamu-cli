@@ -179,7 +179,7 @@ impl DatasetMetadata {
         Ok(upstream_dependencies)
     }
 
-    // TODO: Convert to collection
+    // TODO: Convert to connection (page_based_connection!)
     // TODO: Private Datasets: tests
     /// Current downstream dependencies of a dataset
     async fn current_downstream_dependencies(

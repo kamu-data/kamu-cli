@@ -40,6 +40,7 @@ use kamu_core::{
     DatasetIntervalIncrement,
     DatasetLifecycleMessage,
     DatasetRepository,
+    DidGeneratorDefault,
     PullResult,
     ResetResult,
     TenancyConfig,
@@ -3113,6 +3114,7 @@ impl FlowRunsHarness {
                     .with_consumer_filter(messaging_outbox::ConsumerFilter::AllConsumers),
             )
             .bind::<dyn Outbox, OutboxImmediateImpl>()
+            .add::<DidGeneratorDefault>()
             .add_value(TenancyConfig::SingleTenant)
             .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()

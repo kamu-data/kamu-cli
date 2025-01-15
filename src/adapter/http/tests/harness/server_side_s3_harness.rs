@@ -44,7 +44,7 @@ use kamu::{
 };
 use kamu_accounts::testing::MockAuthenticationService;
 use kamu_accounts::{Account, AuthenticationService};
-use kamu_core::{DatasetRegistry, TenancyConfig};
+use kamu_core::{DatasetRegistry, DidGeneratorDefault, TenancyConfig};
 use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
 use kamu_datasets_services::DependencyGraphServiceImpl;
 use messaging_outbox::DummyOutboxImpl;
@@ -97,6 +97,7 @@ impl ServerSideS3Harness {
             let mut b = dill::CatalogBuilder::new();
 
             b.add_value(time_source.clone())
+                .add::<DidGeneratorDefault>()
                 .add_value(RunInfoDir::new(run_info_dir))
                 .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
                 .add::<DummyOutboxImpl>()

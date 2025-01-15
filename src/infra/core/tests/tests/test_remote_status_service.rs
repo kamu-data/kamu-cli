@@ -240,7 +240,7 @@ struct RemoteStatusTestHarness {
 
 impl RemoteStatusTestHarness {
     fn new() -> Self {
-        let base_repo_harness = BaseRepoHarness::new(TenancyConfig::SingleTenant); // TODO review
+        let base_repo_harness = BaseRepoHarness::new(TenancyConfig::SingleTenant, None); // TODO review
         let remote_repos_dir = base_repo_harness.temp_dir_path().join("remote_repos");
 
         let catalog = CatalogBuilder::new_chained(base_repo_harness.catalog())

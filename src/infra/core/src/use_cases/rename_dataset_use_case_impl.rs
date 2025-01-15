@@ -85,7 +85,7 @@ impl RenameDatasetUseCase for RenameDatasetUseCaseImpl {
         }?;
 
         self.dataset_action_authorizer
-            .check_action_allowed(&dataset_handle, DatasetAction::Write)
+            .check_action_allowed(&dataset_handle.id, DatasetAction::Write)
             .await?;
 
         let old_name = dataset_handle.alias.dataset_name.clone();
