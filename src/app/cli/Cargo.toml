@@ -178,7 +178,7 @@ futures = "0.3"
 glob = "0.3" # Used for path completions
 hex = { version = "0.4", default-features = false, features = [] }
 indoc = "2"
-itertools = "0.13"
+itertools = "0.14"
 libc = "0.2" # Signal names
 regex = "1"
 secrecy = "0.10"

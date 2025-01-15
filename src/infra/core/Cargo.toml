@@ -93,7 +93,7 @@ dashmap = { version = "6", default-features = false }
 dill = "0.11"
 futures = "0.3"
 glob = "0.3" # Used for glob fetch
-itertools = "0.13"
+itertools = "0.14"
 libc = "0.2" # Signal names
 like = { version = "0.3", default-features = false }
 pin-project = "1"
