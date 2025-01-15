@@ -37,6 +37,40 @@ pub trait DatasetEntryService: Sync + Send {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait::async_trait]
+pub trait DatasetEntryServiceExt: Sync + Send {
+    async fn get_owned_dataset_ids(
+        &self,
+        owner_id: &odf::AccountID,
+    ) -> Result<Vec<odf::DatasetID>, InternalError>;
+}
+
+#[async_trait::async_trait]
+impl<T> DatasetEntryServiceExt for T
+where
+    T: DatasetEntryService,
+    T: ?Sized,
+{
+    async fn get_owned_dataset_ids(
+        &self,
+        owner_id: &odf::AccountID,
+    ) -> Result<Vec<odf::DatasetID>, InternalError> {
+        use futures::TryStreamExt;
+
+        let owned_dataset_ids = self
+            .entries_owned_by(owner_id)
+            .try_collect::<Vec<_>>()
+            .await?
+            .into_iter()
+            .map(|dataset_entry| dataset_entry.id)
+            .collect::<Vec<_>>();
+
+        Ok(owned_dataset_ids)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Errors
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

@@ -19,11 +19,6 @@ pub trait DatasetOwnershipService: Sync + Send {
         dataset_id: &odf::DatasetID,
     ) -> Result<odf::AccountID, InternalError>;
 
-    async fn get_owned_datasets(
-        &self,
-        account_id: &odf::AccountID,
-    ) -> Result<Vec<odf::DatasetID>, InternalError>;
-
     async fn is_dataset_owned_by(
         &self,
         dataset_id: &odf::DatasetID,

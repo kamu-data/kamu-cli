@@ -540,23 +540,6 @@ impl DatasetOwnershipService for DatasetEntryServiceImpl {
         Ok(dataset_entry.owner_id)
     }
 
-    async fn get_owned_datasets(
-        &self,
-        account_id: &odf::AccountID,
-    ) -> Result<Vec<odf::DatasetID>, InternalError> {
-        use futures::TryStreamExt;
-
-        let owned_dataset_ids = self
-            .entries_owned_by(account_id)
-            .try_collect::<Vec<_>>()
-            .await?
-            .into_iter()
-            .map(|dataset_entry| dataset_entry.id)
-            .collect::<Vec<_>>();
-
-        Ok(owned_dataset_ids)
-    }
-
     async fn is_dataset_owned_by(
         &self,
         dataset_id: &odf::DatasetID,

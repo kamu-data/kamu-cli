@@ -6199,6 +6199,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "database-common",
+ "futures",
  "internal-error",
  "merge",
  "mockall",
