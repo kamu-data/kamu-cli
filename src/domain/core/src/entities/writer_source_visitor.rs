@@ -107,7 +107,7 @@ impl<'a> WriterSourceEventVisitor<'a> {
     }
 }
 
-impl<'a> MetadataChainVisitor for WriterSourceEventVisitor<'a> {
+impl MetadataChainVisitor for WriterSourceEventVisitor<'_> {
     type Error = ScanMetadataError;
 
     fn initial_decision(&self) -> Decision {

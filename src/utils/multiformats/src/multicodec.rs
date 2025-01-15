@@ -113,7 +113,7 @@ impl<'de> serde::Deserialize<'de> for Multicodec {
 
 struct MulticodecSerdeVisitor;
 
-impl<'de> serde::de::Visitor<'de> for MulticodecSerdeVisitor {
+impl serde::de::Visitor<'_> for MulticodecSerdeVisitor {
     type Value = Multicodec;
 
     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {

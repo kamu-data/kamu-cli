@@ -35,8 +35,8 @@ opendatafabric = { workspace = true, default-features = false, features = [
 axum = { version = "0.7", default-features = false, features = [] }
 chrono = { version = "0.4", default-features = false }
 datafusion = { version = "44", default-features = false }
-datafusion-odata = { version = "44", default-features = false }
-dill = "0.10"
+datafusion-odata = { version = "=44.0.0", default-features = false }
+dill = "0.11"
 futures = { version = "0.3", default-features = false }
 http = "1"
 tracing = "0.1"

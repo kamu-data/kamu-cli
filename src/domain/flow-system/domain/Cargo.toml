@@ -35,7 +35,7 @@ kamu-task-system = { workspace = true }
 async-trait = { version = "0.1", default-features = false }
 chrono = { version = "0.4", default-features = false }
 cron = { version = "0.12", default-features = false }
-dill = "0.10"
+dill = "0.11"
 lazy_static = { version = "1" }
 sqlx = { version = "0.8", default-features = false, features = ["macros"] }
 strum = { version = "0.26", features = ["derive"] }

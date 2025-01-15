@@ -59,7 +59,7 @@ impl<TServerHarness: ServerSideHarness> SmartPushNewEmptyDatasetScenario<TServer
             DatasetAlias::new(server_account_name.clone(), foo_name.clone()),
         ));
 
-        let client_dataset_ref = make_dataset_ref(&client_account_name, "foo");
+        let client_dataset_ref = make_dataset_ref(client_account_name.as_ref(), "foo");
 
         let server_alias = DatasetAlias::new(server_account_name, foo_name.clone());
         let server_odf_url = server_harness.dataset_url(&server_alias);

@@ -24,4 +24,4 @@ doctest = false
 [dependencies]
 kamu-auth-rebac = { workspace = true }
 
-dill = "0.10"
+dill = "0.11"

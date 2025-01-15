@@ -86,10 +86,10 @@ impl IpfsClient {
     }
 
     // TODO: PERF: Use more efficient DAG format suitable for streaming datasets
-    pub async fn add_path<'a>(
+    pub async fn add_path(
         &self,
         path: impl AsRef<Path>,
-        opts: AddOptions<'a>,
+        opts: AddOptions<'_>,
     ) -> Result<String, InternalError> {
         let mut cmd = self.ipfs_cmd();
         cmd.args(["add", "-Q", "--cid-version", "1", "--raw-leaves", "-r"]);
@@ -144,10 +144,10 @@ impl IpfsClient {
         }
     }
 
-    pub async fn name_publish<'a>(
+    pub async fn name_publish(
         &self,
         cid: &str,
-        options: PublishOptions<'a>,
+        options: PublishOptions<'_>,
     ) -> Result<String, InternalError> {
         let mut cmd = self.ipfs_cmd();
         cmd.args(["name", "publish", "-Q"]);

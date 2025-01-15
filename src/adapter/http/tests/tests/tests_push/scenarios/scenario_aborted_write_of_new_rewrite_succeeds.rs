@@ -68,7 +68,7 @@ impl<TServerHarness: ServerSideHarness> SmartPushAbortedWriteOfNewWriteSucceeds<
             DatasetAlias::new(server_account_name.clone(), foo_name.clone()),
         ));
 
-        let client_dataset_ref = make_dataset_ref(&client_account_name, "foo");
+        let client_dataset_ref = make_dataset_ref(client_account_name.as_ref(), "foo");
         let client_commit_result = commit_add_data_event(
             client_harness.dataset_registry().as_ref(),
             &client_dataset_ref,

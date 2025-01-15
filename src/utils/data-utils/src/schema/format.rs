@@ -99,7 +99,7 @@ impl<'a> ParquetJsonSchemaWriter<'a> {
                 // Also print logical type if it is available
                 // If there is a logical type, do not print converted type
                 let logical_type_str = Self::format_logical_and_converted(
-                    &basic_info.logical_type(),
+                    basic_info.logical_type().as_ref(),
                     basic_info.converted_type(),
                     precision,
                     scale,
@@ -145,7 +145,7 @@ impl<'a> ParquetJsonSchemaWriter<'a> {
     }
 
     fn format_logical_and_converted(
-        logical_type: &Option<LogicalType>,
+        logical_type: Option<&LogicalType>,
         converted_type: ConvertedType,
         precision: i32,
         scale: i32,
@@ -230,7 +230,7 @@ impl<'a> ParquetJsonSchemaWriter<'a> {
 
 struct JsonEscapedString<'a>(&'a str);
 
-impl<'a> std::fmt::Display for JsonEscapedString<'a> {
+impl std::fmt::Display for JsonEscapedString<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         use serde::Serializer;
 

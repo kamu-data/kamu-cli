@@ -25,9 +25,9 @@ use crate::{Message, MessageConsumerT, MessageSubscription};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn consume_deserialized_message<'a, TMessage: Message + 'static>(
+pub async fn consume_deserialized_message<TMessage: Message + 'static>(
     catalog: &Catalog,
-    consumer_filter: ConsumerFilter<'a>,
+    consumer_filter: ConsumerFilter<'_>,
     content_json: &str,
     version: u32,
 ) -> Result<(), InternalError> {

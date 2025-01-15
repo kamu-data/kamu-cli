@@ -141,7 +141,7 @@ impl Serialize for Multihash {
 
 struct MultihashVisitor;
 
-impl<'de> Visitor<'de> for MultihashVisitor {
+impl Visitor<'_> for MultihashVisitor {
     type Value = Multihash;
 
     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -266,7 +266,7 @@ impl<'a> MultihashFmt<'a> {
     }
 }
 
-impl<'a> std::fmt::Display for MultihashFmt<'a> {
+impl std::fmt::Display for MultihashFmt<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let s = Multibase::encode::<MAX_MULTIHASH_MULTIBASE_REPR_LEN>(
             self.value.as_bytes().as_slice(),
@@ -281,7 +281,7 @@ impl<'a> std::fmt::Display for MultihashFmt<'a> {
     }
 }
 
-impl<'a> std::fmt::Debug for MultihashFmt<'a> {
+impl std::fmt::Debug for MultihashFmt<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_fmt(format_args!("{self}"))
     }

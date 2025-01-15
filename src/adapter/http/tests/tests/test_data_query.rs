@@ -357,7 +357,7 @@ async fn test_data_query_handler() {
 
         // 1: Defaults - output only
         let res = cl
-            .post(&format!("{}query", harness.root_url))
+            .post(format!("{}query", harness.root_url))
             .json(&json!({
                 "query": query,
             }))
@@ -382,7 +382,7 @@ async fn test_data_query_handler() {
 
         // 2: Input and schema
         let res = cl
-            .post(&format!("{}query", harness.root_url))
+            .post(format!("{}query", harness.root_url))
             .json(&json!({
                 "query": query,
                 "include": ["input", "schema"],
@@ -427,7 +427,7 @@ async fn test_data_query_handler() {
 
         // 3: Full with proof
         let res = cl
-            .post(&format!("{}query", harness.root_url))
+            .post(format!("{}query", harness.root_url))
             .json(&json!({
                 "query": query,
                 "include": ["schema", "proof"],
@@ -523,7 +523,7 @@ async fn test_data_query_handler() {
 
         // Error: Dataset does not exist
         let res = cl
-            .post(&format!("{}query", harness.root_url))
+            .post(format!("{}query", harness.root_url))
             .json(&json!({
                 "query": query,
                 "datasets": [{
@@ -539,7 +539,7 @@ async fn test_data_query_handler() {
 
         // Error: Block does not exist
         let res = cl
-            .post(&format!("{}query", harness.root_url))
+            .post(format!("{}query", harness.root_url))
             .json(&json!({
                 "query": query,
                 "datasets": [{
@@ -586,7 +586,7 @@ async fn test_data_verify_handler() {
 
         // Get response with proof
         let res = cl
-            .post(&format!("{}query", harness.root_url))
+            .post(format!("{}query", harness.root_url))
             .json(&json!({
                 "query": query,
                 "include": ["proof"],
@@ -641,7 +641,7 @@ async fn test_data_verify_handler() {
         request.as_object_mut().unwrap().remove("output");
 
         let res = cl
-            .post(&format!("{}verify", harness.root_url))
+            .post(format!("{}verify", harness.root_url))
             .json(&request)
             .send()
             .await
@@ -658,7 +658,7 @@ async fn test_data_verify_handler() {
             "f1620c3e929e13d3f0f55ce24e7579919e01b356e79b4212a622b4fc2e7b0acb10d0e".into();
 
         let res = cl
-            .post(&format!("{}verify", harness.root_url))
+            .post(format!("{}verify", harness.root_url))
             .json(&invalid_request)
             .send()
             .await
@@ -683,7 +683,7 @@ async fn test_data_verify_handler() {
             "f1620ca4510738395af1429224dd785675309c344b2b549632e20275c69b15ed1d211".into();
 
         let res = cl
-            .post(&format!("{}verify", harness.root_url))
+            .post(format!("{}verify", harness.root_url))
             .json(&invalid_request)
             .send()
             .await
@@ -708,7 +708,7 @@ async fn test_data_verify_handler() {
             "uZbm7fFcWc4l6iyvaKe_txdKntL3h3kvsGHOaKIbPV6c42PH1VnSmpYHMopv4TU68syzgoEdcS26AvpkSQb9dBQ".into();
 
         let res = cl
-            .post(&format!("{}verify", harness.root_url))
+            .post(format!("{}verify", harness.root_url))
             .json(&invalid_request)
             .send()
             .await
@@ -737,7 +737,7 @@ async fn test_data_verify_handler() {
         invalid_request["proof"]["proofValue"] = sig.to_string().into();
 
         let res = cl
-            .post(&format!("{}verify", harness.root_url))
+            .post(format!("{}verify", harness.root_url))
             .json(&invalid_request)
             .send()
             .await
@@ -780,7 +780,7 @@ async fn test_data_verify_handler() {
         invalid_request["proof"]["proofValue"] = sig.to_string().into();
 
         let res = cl
-            .post(&format!("{}verify", harness.root_url))
+            .post(format!("{}verify", harness.root_url))
             .json(&invalid_request)
             .send()
             .await
@@ -823,7 +823,7 @@ async fn test_data_verify_handler() {
         invalid_request["proof"]["proofValue"] = sig.to_string().into();
 
         let res = cl
-            .post(&format!("{}verify", harness.root_url))
+            .post(format!("{}verify", harness.root_url))
             .json(&invalid_request)
             .send()
             .await

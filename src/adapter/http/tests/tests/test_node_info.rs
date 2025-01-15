@@ -22,7 +22,7 @@ async fn test_node_info_single_tenant() {
         let cl = reqwest::Client::new();
 
         let res = cl
-            .get(&format!("{}info", harness.root_url))
+            .get(format!("{}info", harness.root_url))
             .send()
             .await
             .unwrap()
@@ -48,7 +48,7 @@ async fn test_node_info_multi_tenant() {
         let cl = reqwest::Client::new();
 
         let res = cl
-            .get(&format!("{}info", harness.root_url))
+            .get(format!("{}info", harness.root_url))
             .send()
             .await
             .unwrap()

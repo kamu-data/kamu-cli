@@ -62,7 +62,7 @@ impl<TServerHarness: ServerSideHarness> SmartPullExistingDivergedDatasetScenario
         let server_dataset_layout =
             server_harness.dataset_layout(&server_create_result.dataset_handle);
 
-        let server_dataset_ref = make_dataset_ref(&server_account_name, "foo");
+        let server_dataset_ref = make_dataset_ref(server_account_name.as_ref(), "foo");
 
         // Generate a few blocks of random data
         let mut commit_result: Option<CommitResult> = None;

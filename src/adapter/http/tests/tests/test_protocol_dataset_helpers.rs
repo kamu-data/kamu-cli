@@ -48,7 +48,7 @@ async fn test_object_url_local_fs() {
         test_case.dataset.as_ref(),
         test_case.data_slice_object(),
         &test_case.dataset_url,
-        &Some(test_case.bearer_header.clone()),
+        Some(test_case.bearer_header.clone()).as_ref(),
     )
     .await
     .unwrap();
@@ -57,7 +57,7 @@ async fn test_object_url_local_fs() {
         test_case.dataset.as_ref(),
         test_case.checkpoint_object(),
         &test_case.dataset_url,
-        &Some(test_case.bearer_header.clone()),
+        Some(test_case.bearer_header.clone()).as_ref(),
     )
     .await
     .unwrap();
@@ -66,7 +66,7 @@ async fn test_object_url_local_fs() {
         test_case.dataset.as_ref(),
         test_case.data_slice_object(),
         &test_case.dataset_url,
-        &Some(test_case.bearer_header.clone()),
+        Some(test_case.bearer_header.clone()).as_ref(),
     )
     .await
     .unwrap();
@@ -75,7 +75,7 @@ async fn test_object_url_local_fs() {
         test_case.dataset.as_ref(),
         test_case.checkpoint_object(),
         &test_case.dataset_url,
-        &Some(test_case.bearer_header.clone()),
+        Some(test_case.bearer_header.clone()).as_ref(),
     )
     .await
     .unwrap();
@@ -88,7 +88,7 @@ async fn test_object_url_local_fs() {
             size: 12345,
         },
         &test_case.dataset_url,
-        &Some(test_case.bearer_header.clone()),
+        Some(test_case.bearer_header.clone()).as_ref(),
     )
     .await
     .unwrap();
@@ -101,7 +101,7 @@ async fn test_object_url_local_fs() {
             size: 321,
         },
         &test_case.dataset_url,
-        &Some(test_case.bearer_header.clone()),
+        Some(test_case.bearer_header.clone()).as_ref(),
     )
     .await
     .unwrap();
@@ -267,7 +267,7 @@ async fn test_pull_object_url_s3() {
         test_case.dataset.as_ref(),
         test_case.data_slice_object(),
         &test_case.dataset_url,
-        &Some(test_case.bearer_header.clone()),
+        Some(test_case.bearer_header.clone()).as_ref(),
     )
     .await
     .unwrap();
@@ -276,7 +276,7 @@ async fn test_pull_object_url_s3() {
         test_case.dataset.as_ref(),
         test_case.checkpoint_object(),
         &test_case.dataset_url,
-        &Some(test_case.bearer_header.clone()),
+        Some(test_case.bearer_header.clone()).as_ref(),
     )
     .await
     .unwrap();
@@ -285,7 +285,7 @@ async fn test_pull_object_url_s3() {
         test_case.dataset.as_ref(),
         test_case.data_slice_object(),
         &test_case.dataset_url,
-        &Some(test_case.bearer_header.clone()),
+        Some(test_case.bearer_header.clone()).as_ref(),
     )
     .await
     .unwrap();
@@ -294,7 +294,7 @@ async fn test_pull_object_url_s3() {
         test_case.dataset.as_ref(),
         test_case.checkpoint_object(),
         &test_case.dataset_url,
-        &Some(test_case.bearer_header.clone()),
+        Some(test_case.bearer_header.clone()).as_ref(),
     )
     .await
     .unwrap();
@@ -307,7 +307,7 @@ async fn test_pull_object_url_s3() {
             size: 12345,
         },
         &test_case.dataset_url,
-        &Some(test_case.bearer_header.clone()),
+        Some(test_case.bearer_header.clone()).as_ref(),
     )
     .await
     .unwrap();
@@ -320,7 +320,7 @@ async fn test_pull_object_url_s3() {
             size: 321,
         },
         &test_case.dataset_url,
-        &Some(test_case.bearer_header.clone()),
+        Some(test_case.bearer_header.clone()).as_ref(),
     )
     .await
     .unwrap();
@@ -492,7 +492,7 @@ async fn create_test_case(server_harness: &dyn ServerSideHarness) -> TestCase {
 
     let commit_result = commit_add_data_event(
         server_harness.cli_dataset_registry().as_ref(),
-        &make_dataset_ref(&None, "foo"),
+        &make_dataset_ref(None, "foo"),
         &server_harness.dataset_layout(&create_result.dataset_handle),
         None,
     )

@@ -72,7 +72,7 @@ impl serde::Serialize for Signature {
 
 struct SignatureVisitor;
 
-impl<'de> serde::de::Visitor<'de> for SignatureVisitor {
+impl serde::de::Visitor<'_> for SignatureVisitor {
     type Value = Signature;
 
     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
