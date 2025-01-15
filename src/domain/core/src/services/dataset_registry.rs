@@ -19,7 +19,6 @@ use crate::{DatasetHandleStream, GetDatasetError, ResolvedDataset};
 pub trait DatasetRegistry: Send + Sync {
     fn all_dataset_handles(&self) -> DatasetHandleStream<'_>;
 
-    // TODO: Private Datasets: replace AccountName with AccountID?
     fn all_dataset_handles_by_owner(&self, owner_name: &AccountName) -> DatasetHandleStream<'_>;
 
     async fn resolve_dataset_handle_by_ref(
