@@ -54,7 +54,7 @@ kamu-flow-system-inmem = { workspace = true }
 kamu-task-system-inmem = { workspace = true }
 kamu-task-system-services = { workspace = true }
 
-cron = { version = "0.12", default-features = false }
+cron = { version = "0.15", default-features = false }
 indoc = "2"
 mockall = "0.13"
 pretty_assertions = "1"
