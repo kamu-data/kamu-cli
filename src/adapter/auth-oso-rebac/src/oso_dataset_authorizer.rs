@@ -174,7 +174,7 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(dataset_handles=?dataset_handles, action=%action))]
-    async fn classify_datasets_by_allowance(
+    async fn classify_dataset_handles_by_allowance(
         &self,
         dataset_handles: Vec<odf::DatasetHandle>,
         action: DatasetAction,

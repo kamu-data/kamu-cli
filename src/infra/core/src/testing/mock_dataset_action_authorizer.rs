@@ -47,7 +47,7 @@ mockall::mock! {
             action: DatasetAction,
         ) -> Result<Vec<odf::DatasetHandle>, InternalError>;
 
-        async fn classify_datasets_by_allowance(
+        async fn classify_dataset_handles_by_allowance(
             &self,
             dataset_handles: Vec<odf::DatasetHandle>,
             action: DatasetAction,
@@ -165,7 +165,7 @@ impl MockDatasetActionAuthorizer {
         times: usize,
         authorized: HashSet<odf::DatasetAlias>,
     ) -> Self {
-        self.expect_classify_datasets_by_allowance()
+        self.expect_classify_dataset_handles_by_allowance()
             .with(always(), eq(action))
             .times(times)
             .returning(move |handles, action| {

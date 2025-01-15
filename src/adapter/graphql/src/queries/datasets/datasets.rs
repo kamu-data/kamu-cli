@@ -104,7 +104,7 @@ impl Datasets {
             account_owned_datasets_stream.try_next().await.int_err()?
         {
             let authorized_handles = dataset_action_authorizer
-                .classify_datasets_by_allowance(
+                .classify_dataset_handles_by_allowance(
                     account_owned_dataset_handles_chunk,
                     DatasetAction::Read,
                 )

@@ -55,7 +55,7 @@ pub trait DatasetActionAuthorizer: Sync + Send {
     ) -> Result<Vec<odf::DatasetHandle>, InternalError>;
 
     // TODO: Private Datasets: tests
-    async fn classify_datasets_by_allowance(
+    async fn classify_dataset_handles_by_allowance(
         &self,
         dataset_handles: Vec<odf::DatasetHandle>,
         action: DatasetAction,
@@ -250,7 +250,7 @@ impl DatasetActionAuthorizer for AlwaysHappyDatasetActionAuthorizer {
         Ok(dataset_handles)
     }
 
-    async fn classify_datasets_by_allowance(
+    async fn classify_dataset_handles_by_allowance(
         &self,
         dataset_handles: Vec<odf::DatasetHandle>,
         _action: DatasetAction,
