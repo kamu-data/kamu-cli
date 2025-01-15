@@ -398,7 +398,7 @@ impl<'a> MetadataChainWithStats<'a> {
 }
 
 #[async_trait]
-impl<'a> MetadataChain for MetadataChainWithStats<'a> {
+impl MetadataChain for MetadataChainWithStats<'_> {
     async fn resolve_ref(&self, r: &BlockRef) -> Result<Multihash, GetRefError> {
         self.chain.resolve_ref(r).await
     }

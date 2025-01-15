@@ -194,7 +194,7 @@ pub(crate) async fn commit_add_data_event(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) fn make_dataset_ref(
-    account_name: &Option<AccountName>,
+    account_name: Option<&AccountName>,
     dataset_name: &str,
 ) -> DatasetRef {
     match account_name {

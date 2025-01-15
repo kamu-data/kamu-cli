@@ -448,7 +448,7 @@ struct JsonListEncoder<'a, OffsetSize: OffsetSizeTrait, E: Encoder>(
     &'a arrow::array::GenericListArray<OffsetSize>,
     E,
 );
-impl<'a, OffsetSize: OffsetSizeTrait, E: Encoder> Encoder for JsonListEncoder<'a, OffsetSize, E> {
+impl<OffsetSize: OffsetSizeTrait, E: Encoder> Encoder for JsonListEncoder<'_, OffsetSize, E> {
     fn encode(&mut self, idx: usize, buf: &mut dyn std::io::Write) -> Result<(), WriterError> {
         write!(buf, "[")?;
         let start = self.0.value_offsets()[idx].as_usize();
@@ -487,7 +487,7 @@ pub struct JsonStructAoSEncoder<'a>(
     pub &'a arrow::datatypes::Fields,
     pub Vec<Box<dyn Encoder + 'a>>,
 );
-impl<'a> Encoder for JsonStructAoSEncoder<'a> {
+impl Encoder for JsonStructAoSEncoder<'_> {
     fn encode(&mut self, idx: usize, buf: &mut dyn std::io::Write) -> Result<(), WriterError> {
         buf.write_all(b"{")?;
 
@@ -511,7 +511,7 @@ pub struct JsonStructAoAEncoder<'a>(
     pub &'a arrow::datatypes::Fields,
     pub Vec<Box<dyn Encoder + 'a>>,
 );
-impl<'a> Encoder for JsonStructAoAEncoder<'a> {
+impl Encoder for JsonStructAoAEncoder<'_> {
     fn encode(&mut self, idx: usize, buf: &mut dyn std::io::Write) -> Result<(), WriterError> {
         write!(buf, "[")?;
 

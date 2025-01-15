@@ -241,7 +241,7 @@ pub struct EmptyCommitError {}
 
 struct FmtSchema<'a>(&'a SchemaRef);
 
-impl<'a> std::fmt::Display for FmtSchema<'a> {
+impl std::fmt::Display for FmtSchema<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let parquet_schema = datafusion::parquet::arrow::arrow_to_parquet_schema(self.0).unwrap();
 

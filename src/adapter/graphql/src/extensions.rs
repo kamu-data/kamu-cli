@@ -64,7 +64,7 @@ impl async_graphql::extensions::Extension for TracingExtension {
 
 struct ErrorMessageFormatter<'a>(&'a dyn std::error::Error);
 
-impl<'a> std::fmt::Display for ErrorMessageFormatter<'a> {
+impl std::fmt::Display for ErrorMessageFormatter<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut error = Some(self.0);
         while let Some(e) = error {
@@ -82,7 +82,7 @@ impl<'a> std::fmt::Display for ErrorMessageFormatter<'a> {
 
 struct ErrorBacktraceFormatter<'a>(&'a dyn std::error::Error);
 
-impl<'a> std::fmt::Display for ErrorBacktraceFormatter<'a> {
+impl std::fmt::Display for ErrorBacktraceFormatter<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // Uses the innermost captured backtrace
         let mut error = Some(self.0);

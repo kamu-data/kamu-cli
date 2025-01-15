@@ -28,7 +28,7 @@ pub struct ReaderParquet {
 impl ReaderParquet {
     pub async fn new(ctx: SessionContext, conf: ReadStepParquet) -> Result<Self, ReadError> {
         Ok(Self {
-            schema: super::from_ddl_schema(&ctx, &conf.schema)
+            schema: super::from_ddl_schema(&ctx, conf.schema.as_ref())
                 .await?
                 .map(Arc::new),
             ctx,

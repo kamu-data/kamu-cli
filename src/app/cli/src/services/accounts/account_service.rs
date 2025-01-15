@@ -62,7 +62,7 @@ impl AccountService {
                 .predefined
                 .iter()
                 .find(|a| a.account_name.as_str().eq(&current_account))
-                .map_or(false, |a| a.is_admin)
+                .is_some_and(|a| a.is_admin)
         } else {
             true
         };

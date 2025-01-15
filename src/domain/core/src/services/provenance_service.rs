@@ -50,7 +50,7 @@ pub enum NodeInfo<'a> {
     },
 }
 
-impl<'a> NodeInfo<'a> {
+impl NodeInfo<'_> {
     pub fn id(&self) -> &DatasetID {
         match self {
             NodeInfo::Local { id, .. } | NodeInfo::Remote { id, .. } => id,

@@ -40,7 +40,7 @@ async fn test_get_dataset_info_by_id() {
         let cl = reqwest::Client::new();
 
         let res = cl
-            .get(&format!(
+            .get(format!(
                 "{}datasets/{}",
                 harness.root_url, create_result.dataset_handle.id
             ))
@@ -74,7 +74,7 @@ async fn test_get_dataset_info_by_id_not_found_err() {
         let dataset_id = DatasetID::new_seeded_ed25519(b"foo");
 
         let res = cl
-            .get(&format!("{}datasets/{dataset_id}", harness.root_url))
+            .get(format!("{}datasets/{dataset_id}", harness.root_url))
             .header("Authorization", format!("Bearer {DUMMY_ACCESS_TOKEN}"))
             .send()
             .await

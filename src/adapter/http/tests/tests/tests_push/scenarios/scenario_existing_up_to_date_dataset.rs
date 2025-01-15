@@ -66,7 +66,7 @@ impl<TServerHarness: ServerSideHarness> SmartPushExistingUpToDateDatasetScenario
             DatasetAlias::new(server_account_name.clone(), foo_name.clone()),
         ));
 
-        let client_dataset_ref: DatasetRef = make_dataset_ref(&client_account_name, "foo");
+        let client_dataset_ref: DatasetRef = make_dataset_ref(client_account_name.as_ref(), "foo");
         commit_add_data_event(
             client_harness.dataset_registry().as_ref(),
             &client_dataset_ref,

@@ -108,7 +108,7 @@ pub struct CommitOpts<'a> {
     pub update_block_ref: bool,
 }
 
-impl<'a> Default for CommitOpts<'a> {
+impl Default for CommitOpts<'_> {
     fn default() -> Self {
         Self {
             block_ref: &BlockRef::Head,

@@ -132,7 +132,7 @@ impl DatasetEntryIndexer {
                 continue;
             }
 
-            match self.get_dataset_owner_id(maybe_owner_name).await {
+            match self.get_dataset_owner_id(maybe_owner_name.as_ref()).await {
                 Ok(owner_account_id) => {
                     map.insert(maybe_owner_name.clone(), owner_account_id);
                 }
@@ -148,7 +148,7 @@ impl DatasetEntryIndexer {
 
     async fn get_dataset_owner_id(
         &self,
-        maybe_owner_name: &Option<odf::AccountName>,
+        maybe_owner_name: Option<&odf::AccountName>,
     ) -> Result<odf::AccountID, GetAccountByNameError> {
         match &maybe_owner_name {
             Some(account_name) => {

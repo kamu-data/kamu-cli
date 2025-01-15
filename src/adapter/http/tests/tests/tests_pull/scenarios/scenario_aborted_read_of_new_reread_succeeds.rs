@@ -66,7 +66,7 @@ impl<TServerHarness: ServerSideHarness>
 
         let server_commit_result = commit_add_data_event(
             server_harness.cli_dataset_registry().as_ref(),
-            &make_dataset_ref(&server_account_name, "foo"),
+            &make_dataset_ref(server_account_name.as_ref(), "foo"),
             &server_dataset_layout,
             None,
         )

@@ -28,7 +28,7 @@ kamu-accounts = { workspace = true }
 kamu-core = { workspace = true }
 
 async-trait = "0.1"
-dill = "0.10"
+dill = "0.11"
 oso = "0.27"
 oso-derive = "0.27"
 tracing = { version = "0.1", default-features = false }

@@ -25,7 +25,7 @@ pub use shapefile::*;
 
 pub(crate) async fn from_ddl_schema(
     ctx: &datafusion::prelude::SessionContext,
-    ddl_schema: &Option<Vec<String>>,
+    ddl_schema: Option<&Vec<String>>,
 ) -> Result<Option<datafusion::arrow::datatypes::Schema>, kamu_core::ingest::ReadError> {
     use internal_error::*;
 

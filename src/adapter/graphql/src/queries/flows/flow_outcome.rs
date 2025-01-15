@@ -56,7 +56,7 @@ pub(crate) struct FlowFailureReasonInputDatasetCompacted {
 
 impl FlowOutcome {
     pub async fn from_maybe_flow_outcome(
-        outcome_result: &Option<kamu_flow_system::FlowOutcome>,
+        outcome_result: Option<&kamu_flow_system::FlowOutcome>,
         ctx: &Context<'_>,
     ) -> Result<Option<Self>, InternalError> {
         if let Some(value) = outcome_result {

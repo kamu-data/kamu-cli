@@ -62,7 +62,7 @@ impl<TServerHarness: ServerSideHarness>
         let client_dataset_layout =
             client_harness.dataset_layout(&client_create_result.dataset_handle.id, "foo");
 
-        let client_dataset_ref = make_dataset_ref(&client_account_name, "foo");
+        let client_dataset_ref = make_dataset_ref(client_account_name.as_ref(), "foo");
 
         let foo_name = DatasetName::new_unchecked("foo");
 
@@ -82,7 +82,7 @@ impl<TServerHarness: ServerSideHarness>
 
         // Extend server-side dataset with new node
         server_repo
-            .get_dataset_by_ref(&make_dataset_ref(&server_account_name, "foo"))
+            .get_dataset_by_ref(&make_dataset_ref(server_account_name.as_ref(), "foo"))
             .await
             .unwrap()
             .commit_event(

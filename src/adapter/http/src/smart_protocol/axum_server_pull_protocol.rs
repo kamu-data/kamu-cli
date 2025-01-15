@@ -273,7 +273,7 @@ impl AxumServerPullProtocolInstance {
                         self.dataset.as_ref(),
                         &r,
                         &self.dataset_url,
-                        &self.maybe_bearer_header,
+                        self.maybe_bearer_header.as_ref(),
                     )
                     .await
                     .protocol_int_err(PullPhase::ObjectsRequest)?;

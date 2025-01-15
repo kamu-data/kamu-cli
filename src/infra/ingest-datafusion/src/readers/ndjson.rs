@@ -32,7 +32,7 @@ impl ReaderNdJson {
 
     pub async fn new(ctx: SessionContext, conf: ReadStepNdJson) -> Result<Self, ReadError> {
         Ok(Self {
-            schema: super::from_ddl_schema(&ctx, &conf.schema)
+            schema: super::from_ddl_schema(&ctx, conf.schema.as_ref())
                 .await?
                 .map(Arc::new),
             ctx,

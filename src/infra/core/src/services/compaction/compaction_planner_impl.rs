@@ -88,7 +88,7 @@ impl CompactionPlannerImpl {
                             {
                                 let is_appended = self.append_add_data_batch_to_chain_info(
                                     &mut data_slice_batches,
-                                    &current_hash,
+                                    current_hash.as_ref(),
                                     &mut data_slice_batch_info,
                                 );
                                 if is_appended {
@@ -142,7 +142,7 @@ impl CompactionPlannerImpl {
                         }
                         let is_appended = self.append_add_data_batch_to_chain_info(
                             &mut data_slice_batches,
-                            &current_hash,
+                            current_hash.as_ref(),
                             &mut data_slice_batch_info,
                         );
                         data_slice_batches
@@ -169,14 +169,13 @@ impl CompactionPlannerImpl {
     fn append_add_data_batch_to_chain_info(
         &self,
         data_slice_batches: &mut Vec<CompactionDataSliceBatch>,
-        hash: &Option<odf::Multihash>,
+        hash: Option<&odf::Multihash>,
         data_slice_batch_info: &mut CompactionDataSliceBatchInfo,
     ) -> bool {
         match data_slice_batch_info.data_slices_batch.len().cmp(&1) {
             Ordering::Equal => {
-                data_slice_batches.push(CompactionDataSliceBatch::SingleBlock(
-                    hash.as_ref().unwrap().clone(),
-                ));
+                data_slice_batches
+                    .push(CompactionDataSliceBatch::SingleBlock(hash.unwrap().clone()));
                 true
             }
             Ordering::Greater => {
