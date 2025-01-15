@@ -44,7 +44,6 @@ tracing = { version = "0.1", default-features = false }
 kamu-accounts-inmem = { workspace = true }
 kamu-accounts-services = { workspace = true }
 kamu-auth-rebac-inmem = { workspace = true }
-kamu-auth-rebac-services = { workspace = true }
 kamu-core = { workspace = true, default-features = false, features = ["oso", "testing"] }
 kamu-datasets-inmem = { workspace = true }
 kamu-datasets-services = { workspace = true }
