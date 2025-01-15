@@ -964,7 +964,7 @@ async fn write_payload<TMessagePayload: Serialize>(
 ) -> Result<(), WriteMessageError> {
     let payload_as_json_string = ws_common::payload_to_json::<TMessagePayload>(payload)?;
 
-    let message = Message::Text(payload_as_json_string);
+    let message = Message::Text(payload_as_json_string.into());
     let send_result = socket.send(message).await;
     match send_result {
         Ok(_) => Ok(()),

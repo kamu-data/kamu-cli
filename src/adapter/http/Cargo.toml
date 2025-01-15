@@ -83,7 +83,7 @@ tokio-util = { version = "0.7", default-features = false, features = [
     "compat",
     "io",
 ] }
-tokio-tungstenite = { version = "0.24", features = [
+tokio-tungstenite = { version = "0.26", features = [
     "rustls-tls-native-roots",
     "url",
 ] }
