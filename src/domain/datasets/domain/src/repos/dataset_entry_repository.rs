@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashSet;
+
 use database_common::PaginationOpts;
 use internal_error::InternalError;
 use opendatafabric as odf;
@@ -82,6 +84,17 @@ pub type DatasetEntryStream<'a> = std::pin::Pin<
 pub struct DatasetEntriesResolution {
     pub resolved_entries: Vec<DatasetEntry>,
     pub unresolved_entries: Vec<odf::DatasetID>,
+}
+
+impl DatasetEntriesResolution {
+    pub fn resolved_entries_owner_ids(&self) -> HashSet<odf::AccountID> {
+        self.resolved_entries
+            .iter()
+            .fold(HashSet::new(), |mut acc, entry| {
+                acc.insert(entry.owner_id.clone());
+                acc
+            })
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

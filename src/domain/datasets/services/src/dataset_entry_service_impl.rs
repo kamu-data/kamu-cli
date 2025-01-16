@@ -204,7 +204,8 @@ impl DatasetEntryServiceImpl {
                 // Form DatasetHandle
                 handles.push(odf::DatasetHandle::new(
                     entry.id.clone(),
-                    self.make_alias(owner_name.clone(), entry.name.clone()),
+                    self.tenancy_config
+                        .make_alias(owner_name.clone(), entry.name.clone()),
                 ));
             }
         }
@@ -308,17 +309,6 @@ impl DatasetEntryServiceImpl {
                 .await
                 .int_err()?,
         })
-    }
-
-    fn make_alias(
-        &self,
-        owner_name: odf::AccountName,
-        dataset_name: odf::DatasetName,
-    ) -> odf::DatasetAlias {
-        match *self.tenancy_config {
-            TenancyConfig::MultiTenant => odf::DatasetAlias::new(Some(owner_name), dataset_name),
-            TenancyConfig::SingleTenant => odf::DatasetAlias::new(None, dataset_name),
-        }
     }
 }
 
@@ -467,7 +457,8 @@ impl DatasetRegistry for DatasetEntryServiceImpl {
                     let owner_name = self.resolve_account_name_by_id(&entry.owner_id).await?;
                     Ok(odf::DatasetHandle::new(
                         entry.id.clone(),
-                        self.make_alias(owner_name, entry.name.clone()),
+                        self.tenancy_config
+                            .make_alias(owner_name, entry.name.clone()),
                     ))
                 }
                 Err(GetDatasetEntryError::NotFound(_)) => {

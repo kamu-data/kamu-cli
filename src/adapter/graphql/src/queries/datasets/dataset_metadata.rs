@@ -14,6 +14,8 @@ use kamu_accounts::AccountService;
 use kamu_core::auth::{ClassifyByAllowanceIdsResponse, DatasetAction};
 use kamu_core::{
     self as domain,
+    DownstreamDependency,
+    GetDatasetDownstreamDependenciesUseCase,
     MetadataChainExt,
     SearchSetAttachmentsVisitor,
     SearchSetInfoVisitor,
@@ -186,84 +188,24 @@ impl DatasetMetadata {
         &self,
         ctx: &Context<'_>,
     ) -> Result<Vec<DependencyDatasetResult>> {
-        let (
-            dependency_graph_service,
-            dataset_action_authorizer,
-            dataset_entry_repository,
-            account_service,
-        ) = from_catalog_n!(
-            ctx,
-            dyn domain::DependencyGraphService,
-            dyn kamu_core::auth::DatasetActionAuthorizer,
-            dyn kamu_datasets::DatasetEntryRepository,
-            dyn AccountService
-        );
+        let get_dataset_downstream_dependencies_use_case =
+            from_catalog_n!(ctx, dyn GetDatasetDownstreamDependenciesUseCase);
 
-        use tokio_stream::StreamExt;
-
-        // TODO: PERF: chunk the stream
-        let downstream_dependency_ids = dependency_graph_service
-            .get_downstream_dependencies(&self.dataset_handle.id)
+        let downstream_dependencies = get_dataset_downstream_dependencies_use_case
+            .execute(&self.dataset_handle.id)
             .await
             .int_err()?
-            .collect::<Vec<_>>()
-            .await;
+            .into_iter()
+            .map(|dependency| match dependency {
+                DownstreamDependency::Resolved(r) => {
+                    let account = Account::new(r.owner_id.into(), r.owner_name.into());
+                    let dataset = Dataset::new(account, r.dataset_handle);
 
-        let mut downstream_dependencies = Vec::with_capacity(downstream_dependency_ids.len());
-
-        // Cut off datasets that we don't have access to
-        let authorized_ids = dataset_action_authorizer
-            .classify_dataset_ids_by_allowance(downstream_dependency_ids, DatasetAction::Read)
-            .await?
-            .authorized_ids;
-
-        let DatasetEntriesResolution {
-            resolved_entries,
-            unresolved_entries,
-        } = dataset_entry_repository
-            .get_multiple_dataset_entries(&authorized_ids)
-            .await
-            .int_err()?;
-
-        downstream_dependencies.extend(
-            unresolved_entries
-                .into_iter()
-                .map(DependencyDatasetResult::not_accessible),
-        );
-
-        let owner_ids = resolved_entries
-            .iter()
-            .fold(HashSet::new(), |mut acc, entry| {
-                acc.insert(entry.owner_id.clone());
-                acc
-            });
-        let account_map = account_service
-            .get_account_map(owner_ids.into_iter().collect())
-            .await
-            .int_err()?;
-
-        for dataset_entry in resolved_entries {
-            let maybe_account = account_map.get(&dataset_entry.owner_id);
-            if let Some(account) = maybe_account {
-                let dataset_handle = odf::DatasetHandle {
-                    id: dataset_entry.id,
-                    alias: odf::DatasetAlias::new(
-                        Some(account.account_name.clone()),
-                        dataset_entry.name,
-                    ),
-                };
-                let dataset = Dataset::new(Account::from_account(account.clone()), dataset_handle);
-
-                downstream_dependencies.push(DependencyDatasetResult::accessible(dataset));
-            } else {
-                tracing::warn!(
-                    "Downstream owner's account not found for dataset: {:?}",
-                    &dataset_entry
-                );
-                downstream_dependencies
-                    .push(DependencyDatasetResult::not_accessible(dataset_entry.id));
-            }
-        }
+                    DependencyDatasetResult::accessible(dataset)
+                }
+                DownstreamDependency::Unresolved(id) => DependencyDatasetResult::not_accessible(id),
+            })
+            .collect::<Vec<_>>();
 
         Ok(downstream_dependencies)
     }
