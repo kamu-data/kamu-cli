@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer};
+use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer, DatasetActionAuthorizerExt};
 use kamu_core::{
     DatasetRegistryExt,
     {self as domain},
@@ -25,7 +25,6 @@ pub struct Datasets;
 #[Object]
 impl Datasets {
     const DEFAULT_PER_PAGE: usize = 15;
-    const DATASETS_CHUNK_SIZE: usize = 100;
 
     #[graphql(skip)]
     async fn by_dataset_ref(
@@ -95,24 +94,13 @@ impl Datasets {
 
         use futures::TryStreamExt;
 
-        let mut account_owned_datasets_stream = dataset_registry
-            .all_dataset_handles_by_owner(&account_name.clone().into())
-            .try_chunks(Self::DATASETS_CHUNK_SIZE);
-        let mut accessible_datasets_handles = Vec::new();
-
-        while let Some(account_owned_dataset_handles_chunk) =
-            account_owned_datasets_stream.try_next().await.int_err()?
-        {
-            let authorized_handles = dataset_action_authorizer
-                .classify_dataset_handles_by_allowance(
-                    account_owned_dataset_handles_chunk,
-                    DatasetAction::Read,
-                )
-                .await?
-                .authorized_handles;
-
-            accessible_datasets_handles.extend(authorized_handles);
-        }
+        let account_owned_datasets_stream =
+            dataset_registry.all_dataset_handles_by_owner(&account_name.clone().into());
+        let readable_dataset_handles_stream = dataset_action_authorizer
+            .filtered_datasets_stream(account_owned_datasets_stream, DatasetAction::Read);
+        let mut accessible_datasets_handles = readable_dataset_handles_stream
+            .try_collect::<Vec<_>>()
+            .await?;
 
         let total_count = accessible_datasets_handles.len();
 
