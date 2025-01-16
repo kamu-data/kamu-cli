@@ -19,7 +19,7 @@ use kamu_accounts::{
     PredefinedAccountsConfig,
     JOB_KAMU_ACCOUNTS_PREDEFINED_ACCOUNTS_REGISTRATOR,
 };
-use kamu_auth_rebac::{AccountPropertyName, DatasetPropertyName, RebacRepository, RebacService};
+use kamu_auth_rebac::{AccountPropertyName, DatasetPropertyName, RebacService};
 use kamu_core::DatasetVisibility;
 use kamu_datasets::DatasetEntryService;
 use kamu_datasets_services::JOB_KAMU_DATASETS_DATASET_ENTRY_INDEXER;
@@ -34,7 +34,6 @@ type PredefinedAccountIdDatasetVisibilityMapping = HashMap<odf::AccountID, Datas
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct RebacIndexer {
-    rebac_repo: Arc<dyn RebacRepository>,
     rebac_service: Arc<dyn RebacService>,
     dataset_entry_service: Arc<dyn DatasetEntryService>,
     expensive_account_repo: Arc<dyn ExpensiveAccountRepository>,
@@ -53,14 +52,12 @@ pub struct RebacIndexer {
 })]
 impl RebacIndexer {
     pub fn new(
-        rebac_repo: Arc<dyn RebacRepository>,
         rebac_service: Arc<dyn RebacService>,
         dataset_entry_service: Arc<dyn DatasetEntryService>,
         expensive_account_repo: Arc<dyn ExpensiveAccountRepository>,
         predefined_accounts_config: Arc<PredefinedAccountsConfig>,
     ) -> Self {
         Self {
-            rebac_repo,
             rebac_service,
             dataset_entry_service,
             expensive_account_repo,
@@ -69,7 +66,7 @@ impl RebacIndexer {
     }
 
     async fn has_entities_indexed(&self) -> Result<bool, InternalError> {
-        let properties_count = self.rebac_repo.properties_count().await.int_err()?;
+        let properties_count = self.rebac_service.properties_count().await.int_err()?;
 
         Ok(properties_count > 0)
     }
