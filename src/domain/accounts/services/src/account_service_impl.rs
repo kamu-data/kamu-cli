@@ -10,7 +10,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use database_common::{EntityPageListing, EntityPageStreamer, PaginationOpts};
+use database_common::{EntityPageListing, EntityPageStreamer};
 use dill::*;
 use internal_error::ResultIntoInternal;
 use kamu_accounts::{
@@ -20,7 +20,6 @@ use kamu_accounts::{
     AccountService,
     GetAccountByIdError,
     GetAccountMapError,
-    ListAccountError,
 };
 use opendatafabric as odf;
 
@@ -45,31 +44,23 @@ impl AccountService for AccountServiceImpl {
     fn all_accounts(&self) -> AccountPageStream {
         EntityPageStreamer::default().into_stream(
             || async { Ok(()) },
-            |_, pagination| {
-                let list_fut = self.list_all_accounts(pagination);
-                async { list_fut.await.int_err() }
+            move |_, pagination| async move {
+                use futures::TryStreamExt;
+
+                let total_count = self.account_repo.accounts_count().await.int_err()?;
+                let entries = self
+                    .account_repo
+                    .get_accounts(pagination)
+                    .await
+                    .try_collect()
+                    .await?;
+
+                Ok(EntityPageListing {
+                    list: entries,
+                    total_count,
+                })
             },
         )
-    }
-
-    async fn list_all_accounts(
-        &self,
-        pagination: PaginationOpts,
-    ) -> Result<EntityPageListing<Account>, ListAccountError> {
-        use futures::TryStreamExt;
-
-        let total_count = self.account_repo.accounts_count().await.int_err()?;
-        let entries = self
-            .account_repo
-            .get_accounts(pagination)
-            .await
-            .try_collect()
-            .await?;
-
-        Ok(EntityPageListing {
-            list: entries,
-            total_count,
-        })
     }
 
     async fn get_account_map(

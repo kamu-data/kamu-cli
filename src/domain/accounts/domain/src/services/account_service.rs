@@ -9,7 +9,6 @@
 
 use std::collections::HashMap;
 
-use database_common::{EntityPageListing, PaginationOpts};
 use internal_error::InternalError;
 use opendatafabric as odf;
 use thiserror::Error;
@@ -25,11 +24,6 @@ pub trait AccountService: Sync + Send {
     // TODO: Private Datasets: extract to AccountRegistry?
     fn all_accounts(&self) -> AccountPageStream;
 
-    async fn list_all_accounts(
-        &self,
-        pagination: PaginationOpts,
-    ) -> Result<EntityPageListing<Account>, ListAccountError>;
-
     async fn get_account_map(
         &self,
         account_ids: Vec<odf::AccountID>,
@@ -38,14 +32,6 @@ pub trait AccountService: Sync + Send {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Error
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Error)]
-pub enum ListAccountError {
-    #[error(transparent)]
-    Internal(#[from] InternalError),
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Error)]
