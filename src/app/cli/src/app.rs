@@ -469,6 +469,7 @@ pub fn configure_base_catalog(
     b.add::<SetWatermarkUseCaseImpl>();
     b.add::<VerifyDatasetUseCaseImpl>();
     b.add::<GetDatasetDownstreamDependenciesUseCaseImpl>();
+    b.add::<GetDatasetUpstreamDependenciesUseCaseImpl>();
 
     b.add::<kamu_accounts_services::LoginPasswordAuthProvider>();
 

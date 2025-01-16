@@ -11,50 +11,23 @@ use internal_error::InternalError;
 use opendatafabric as odf;
 use thiserror::Error;
 
+use crate::DatasetDependency;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // TODO: Private Datasets: tests
 #[async_trait::async_trait]
-pub trait GetDatasetDownstreamDependenciesUseCase: Send + Sync {
+pub trait GetDatasetUpstreamDependenciesUseCase: Send + Sync {
     async fn execute(
         &self,
         dataset_id: &odf::DatasetID,
-    ) -> Result<Vec<DatasetDependency>, GetDatasetDownstreamDependenciesError>;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug)]
-pub struct ResolvedDatasetDependency {
-    pub dataset_handle: odf::DatasetHandle,
-    pub owner_id: odf::AccountID,
-    pub owner_name: odf::AccountName,
-}
-
-#[derive(Debug)]
-pub enum DatasetDependency {
-    Resolved(ResolvedDatasetDependency),
-    Unresolved(odf::DatasetID),
-}
-
-impl DatasetDependency {
-    pub fn resolved(
-        dataset_handle: odf::DatasetHandle,
-        owner_id: odf::AccountID,
-        owner_name: odf::AccountName,
-    ) -> Self {
-        Self::Resolved(ResolvedDatasetDependency {
-            dataset_handle,
-            owner_id,
-            owner_name,
-        })
-    }
+    ) -> Result<Vec<DatasetDependency>, GetDatasetUpstreamDependenciesError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
-pub enum GetDatasetDownstreamDependenciesError {
+pub enum GetDatasetUpstreamDependenciesError {
     #[error(transparent)]
     Internal(
         #[from]
