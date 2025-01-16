@@ -32,6 +32,7 @@ pub struct DatasetRepositoryS3 {
     registry_cache: Option<Arc<S3RegistryCache>>,
     metadata_cache_local_fs_path: Option<Arc<PathBuf>>,
     system_time_source: Arc<dyn SystemTimeSource>,
+    did_generator: Arc<dyn DidGenerator>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -54,6 +55,7 @@ impl DatasetRepositoryS3 {
         registry_cache: Option<Arc<S3RegistryCache>>,
         metadata_cache_local_fs_path: Option<Arc<PathBuf>>,
         system_time_source: Arc<dyn SystemTimeSource>,
+        did_generator: Arc<dyn DidGenerator>,
     ) -> Self {
         Self {
             s3_context,
@@ -62,6 +64,7 @@ impl DatasetRepositoryS3 {
             registry_cache,
             metadata_cache_local_fs_path,
             system_time_source,
+            did_generator,
         }
     }
 
@@ -417,7 +420,13 @@ impl DatasetRepositoryWriter for DatasetRepositoryS3 {
         &self,
         snapshot: DatasetSnapshot,
     ) -> Result<CreateDatasetFromSnapshotResult, CreateDatasetFromSnapshotError> {
-        create_dataset_from_snapshot_impl(self, snapshot, self.system_time_source.now()).await
+        create_dataset_from_snapshot_impl(
+            self,
+            snapshot,
+            self.system_time_source.now(),
+            self.did_generator.generate_dataset_id(),
+        )
+        .await
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(%dataset_handle, %new_name))]

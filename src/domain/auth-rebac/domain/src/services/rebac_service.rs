@@ -19,6 +19,7 @@ use crate::{
     DatasetPropertyName,
     EntityNotFoundError,
     EntityWithRelation,
+    PropertiesCountError,
     PropertyValue,
     SetEntityPropertyError,
     SubjectEntityRelationsError,
@@ -28,6 +29,8 @@ use crate::{
 
 #[async_trait::async_trait]
 pub trait RebacService: Send + Sync {
+    async fn properties_count(&self) -> Result<usize, PropertiesCountError>;
+
     // Account
     async fn set_account_property(
         &self,

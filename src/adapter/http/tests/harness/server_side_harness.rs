@@ -130,10 +130,10 @@ pub(crate) fn create_web_user_catalog(
         let mut mock_dataset_action_authorizer = MockDatasetActionAuthorizer::new();
         mock_dataset_action_authorizer
             .expect_check_action_allowed()
-            .returning(|dataset_handle, action| {
+            .returning(|dataset_id, action| {
                 if action == DatasetAction::Write {
                     Err(MockDatasetActionAuthorizer::denying_error(
-                        dataset_handle,
+                        dataset_id.as_local_ref(),
                         action,
                     ))
                 } else {

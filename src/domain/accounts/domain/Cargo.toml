@@ -37,6 +37,7 @@ async-trait = { version = "0.1", default-features = false }
 base32 = { version = "0.5" }
 chrono = { version = "0.4", default-features = false }
 crc32fast = { version = "1.4.2" }
+futures = { version = "0.3", default-features = false }
 jsonwebtoken = "9"
 lazy_static = { version = "1" }
 merge = "0.1"

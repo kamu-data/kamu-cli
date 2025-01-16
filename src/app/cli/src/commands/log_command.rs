@@ -122,7 +122,7 @@ impl Command for LogCommand {
             .await?;
 
         self.dataset_action_authorizer
-            .check_action_allowed(&dataset_handle, auth::DatasetAction::Read)
+            .check_action_allowed(&dataset_handle.id, auth::DatasetAction::Read)
             .await
             .map_err(|e| match e {
                 auth::DatasetActionUnauthorizedError::Access(e) => CLIError::failure(e),

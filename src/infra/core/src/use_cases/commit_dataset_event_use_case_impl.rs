@@ -62,7 +62,7 @@ impl CommitDatasetEventUseCase for CommitDatasetEventUseCaseImpl {
         opts: CommitOpts<'_>,
     ) -> Result<CommitResult, CommitError> {
         self.dataset_action_authorizer
-            .check_action_allowed(dataset_handle, DatasetAction::Write)
+            .check_action_allowed(&dataset_handle.id, DatasetAction::Write)
             .await?;
 
         let resolved_dataset = self.dataset_registry.get_dataset_by_handle(dataset_handle);

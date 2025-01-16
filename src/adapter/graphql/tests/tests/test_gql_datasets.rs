@@ -805,6 +805,7 @@ impl GraphQLDatasetsHarness {
             let mut b = dill::CatalogBuilder::new();
 
             b.add::<SystemTimeSourceDefault>()
+                .add::<DidGeneratorDefault>()
                 .add_builder(
                     OutboxImmediateImpl::builder()
                         .with_consumer_filter(messaging_outbox::ConsumerFilter::AllConsumers),

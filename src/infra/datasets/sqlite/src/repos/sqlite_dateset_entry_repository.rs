@@ -106,7 +106,7 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
                     dataset_name as name,
                     created_at   as "created_at: _"
                 FROM dataset_entries
-                ORDER BY created_at ASC
+                ORDER BY dataset_name ASC
                 LIMIT $1 OFFSET $2
                 "#,
                 limit,

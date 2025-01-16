@@ -641,6 +641,7 @@ impl FlowTriggerHarness {
                     .with_consumer_filter(messaging_outbox::ConsumerFilter::AllConsumers),
             )
             .bind::<dyn Outbox, OutboxImmediateImpl>()
+            .add::<DidGeneratorDefault>()
             .add_value(TenancyConfig::MultiTenant)
             .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()

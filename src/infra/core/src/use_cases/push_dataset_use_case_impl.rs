@@ -76,7 +76,7 @@ impl PushDatasetUseCaseImpl {
             unauthorized_handles_with_errors,
         } = self
             .dataset_action_authorizer
-            .classify_datasets_by_allowance(dataset_handles, DatasetAction::Read)
+            .classify_dataset_handles_by_allowance(dataset_handles, DatasetAction::Read)
             .await?;
 
         let unauthorized_responses = unauthorized_handles_with_errors

@@ -12,9 +12,9 @@ use std::sync::Arc;
 
 use kamu::testing::{MetadataFactory, MockDatasetActionAuthorizer};
 use kamu::CommitDatasetEventUseCaseImpl;
-use kamu_core::{CommitDatasetEventUseCase, CommitError, CommitOpts};
+use kamu_core::{CommitDatasetEventUseCase, CommitError, CommitOpts, MockDidGenerator};
 use messaging_outbox::MockOutbox;
-use opendatafabric::{DatasetAlias, DatasetName, MetadataEvent};
+use opendatafabric::{DatasetAlias, DatasetID, DatasetName, MetadataEvent};
 
 use crate::tests::use_cases::*;
 
@@ -23,13 +23,18 @@ use crate::tests::use_cases::*;
 #[tokio::test]
 async fn test_commit_dataset_event() {
     let alias_foo = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
+    let (_, dataset_id_foo) = DatasetID::new_generated_ed25519();
 
     let mock_authorizer =
-        MockDatasetActionAuthorizer::new().expect_check_write_dataset(&alias_foo, 1, true);
+        MockDatasetActionAuthorizer::new().expect_check_write_dataset(&dataset_id_foo, 1, true);
 
     let mock_outbox = MockOutbox::new();
 
-    let harness = CommitDatasetEventUseCaseHarness::new(mock_authorizer, mock_outbox);
+    let harness = CommitDatasetEventUseCaseHarness::new(
+        mock_authorizer,
+        mock_outbox,
+        MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo]),
+    );
     let foo = harness.create_root_dataset(&alias_foo).await;
 
     let res = harness
@@ -48,13 +53,18 @@ async fn test_commit_dataset_event() {
 #[tokio::test]
 async fn test_commit_event_unauthorized() {
     let alias_foo = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
+    let (_, dataset_id_foo) = DatasetID::new_generated_ed25519();
 
     let mock_authorizer =
-        MockDatasetActionAuthorizer::new().expect_check_write_dataset(&alias_foo, 1, false);
+        MockDatasetActionAuthorizer::new().expect_check_write_dataset(&dataset_id_foo, 1, false);
 
     let mock_outbox = MockOutbox::new();
 
-    let harness = CommitDatasetEventUseCaseHarness::new(mock_authorizer, mock_outbox);
+    let harness = CommitDatasetEventUseCaseHarness::new(
+        mock_authorizer,
+        mock_outbox,
+        MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo]),
+    );
     let foo = harness.create_root_dataset(&alias_foo).await;
 
     let res = harness
@@ -74,14 +84,19 @@ async fn test_commit_event_unauthorized() {
 async fn test_commit_event_with_new_dependencies() {
     let alias_foo = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
     let alias_bar = DatasetAlias::new(None, DatasetName::new_unchecked("bar"));
+    let (_, dataset_id_foo) = DatasetID::new_generated_ed25519();
+    let (_, dataset_id_bar) = DatasetID::new_generated_ed25519();
 
     let mock_authorizer =
-        MockDatasetActionAuthorizer::new().expect_check_write_dataset(&alias_bar, 1, true);
-
+        MockDatasetActionAuthorizer::new().expect_check_write_dataset(&dataset_id_bar, 1, true);
     let mut mock_outbox = MockOutbox::new();
     expect_outbox_dataset_dependencies_updated(&mut mock_outbox, 1);
 
-    let harness = CommitDatasetEventUseCaseHarness::new(mock_authorizer, mock_outbox);
+    let harness = CommitDatasetEventUseCaseHarness::new(
+        mock_authorizer,
+        mock_outbox,
+        MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo, dataset_id_bar]),
+    );
     let foo = harness.create_root_dataset(&alias_foo).await;
     let bar = harness
         .create_derived_dataset(&alias_bar, vec![foo.dataset_handle.as_local_ref()])
@@ -117,11 +132,13 @@ impl CommitDatasetEventUseCaseHarness {
     fn new(
         mock_dataset_action_authorizer: MockDatasetActionAuthorizer,
         mock_outbox: MockOutbox,
+        mock_did_generator: MockDidGenerator,
     ) -> Self {
         let base_harness = BaseUseCaseHarness::new(
             BaseUseCaseHarnessOptions::new()
                 .with_authorizer(mock_dataset_action_authorizer)
-                .with_outbox(mock_outbox),
+                .with_outbox(mock_outbox)
+                .with_maybe_mock_did_generator(Some(mock_did_generator)),
         );
 
         let catalog = dill::CatalogBuilder::new_chained(base_harness.catalog())

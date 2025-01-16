@@ -14,11 +14,12 @@ use dill::{component, interface, meta};
 use init_on_startup::{InitOnStartup, InitOnStartupMeta};
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_accounts::{
-    AccountService,
+    ExpensiveAccountRepository,
+    ExpensiveAccountRepositoryExt,
     PredefinedAccountsConfig,
     JOB_KAMU_ACCOUNTS_PREDEFINED_ACCOUNTS_REGISTRATOR,
 };
-use kamu_auth_rebac::{AccountPropertyName, DatasetPropertyName, RebacRepository, RebacService};
+use kamu_auth_rebac::{AccountPropertyName, DatasetPropertyName, RebacService};
 use kamu_core::DatasetVisibility;
 use kamu_datasets::DatasetEntryService;
 use kamu_datasets_services::JOB_KAMU_DATASETS_DATASET_ENTRY_INDEXER;
@@ -33,10 +34,9 @@ type PredefinedAccountIdDatasetVisibilityMapping = HashMap<odf::AccountID, Datas
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct RebacIndexer {
-    rebac_repo: Arc<dyn RebacRepository>,
     rebac_service: Arc<dyn RebacService>,
     dataset_entry_service: Arc<dyn DatasetEntryService>,
-    account_service: Arc<dyn AccountService>,
+    expensive_account_repo: Arc<dyn ExpensiveAccountRepository>,
     predefined_accounts_config: Arc<PredefinedAccountsConfig>,
 }
 
@@ -52,23 +52,21 @@ pub struct RebacIndexer {
 })]
 impl RebacIndexer {
     pub fn new(
-        rebac_repo: Arc<dyn RebacRepository>,
         rebac_service: Arc<dyn RebacService>,
         dataset_entry_service: Arc<dyn DatasetEntryService>,
-        account_service: Arc<dyn AccountService>,
+        expensive_account_repo: Arc<dyn ExpensiveAccountRepository>,
         predefined_accounts_config: Arc<PredefinedAccountsConfig>,
     ) -> Self {
         Self {
-            rebac_repo,
             rebac_service,
             dataset_entry_service,
-            account_service,
+            expensive_account_repo,
             predefined_accounts_config,
         }
     }
 
     async fn has_entities_indexed(&self) -> Result<bool, InternalError> {
-        let properties_count = self.rebac_repo.properties_count().await.int_err()?;
+        let properties_count = self.rebac_service.properties_count().await.int_err()?;
 
         Ok(properties_count > 0)
     }
@@ -117,7 +115,7 @@ impl RebacIndexer {
     ) -> Result<PredefinedAccountIdDatasetVisibilityMapping, InternalError> {
         use futures::TryStreamExt;
 
-        let mut accounts_stream = self.account_service.all_accounts();
+        let mut accounts_stream = self.expensive_account_repo.all_accounts();
 
         let predefined_accounts_map = self.predefined_accounts_config.predefined.iter().fold(
             HashMap::new(),

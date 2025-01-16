@@ -13,7 +13,7 @@ use dill::Component;
 use domain::DatasetRepository;
 use kamu::*;
 use kamu_accounts::{CurrentAccountSubject, DEFAULT_ACCOUNT_NAME};
-use kamu_core::{CreateDatasetFromSnapshotUseCase, TenancyConfig};
+use kamu_core::{CreateDatasetFromSnapshotUseCase, DidGeneratorDefault, TenancyConfig};
 use messaging_outbox::{Outbox, OutboxImmediateImpl};
 use tempfile::TempDir;
 use time_source::SystemTimeSourceDefault;
@@ -35,6 +35,7 @@ impl LocalFsRepoHarness {
 
         let mut b = dill::CatalogBuilder::new();
         b.add::<SystemTimeSourceDefault>()
+            .add::<DidGeneratorDefault>()
             .add_builder(
                 messaging_outbox::OutboxImmediateImpl::builder()
                     .with_consumer_filter(messaging_outbox::ConsumerFilter::AllConsumers),

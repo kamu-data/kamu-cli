@@ -196,7 +196,7 @@ impl PullDatasetUseCaseImpl {
             unauthorized_handles_with_errors,
         } = self
             .dataset_action_authorizer
-            .classify_datasets_by_allowance(written_datasets, DatasetAction::Write)
+            .classify_dataset_handles_by_allowance(written_datasets, DatasetAction::Write)
             .await?;
 
         let mut okay_jobs = Vec::with_capacity(authorized_handles.len() + other_jobs.len());
@@ -269,7 +269,7 @@ impl PullDatasetUseCaseImpl {
             unauthorized_handles_with_errors,
         } = self
             .dataset_action_authorizer
-            .classify_datasets_by_allowance(read_datasets, DatasetAction::Read)
+            .classify_dataset_handles_by_allowance(read_datasets, DatasetAction::Read)
             .await?;
 
         if unauthorized_handles_with_errors.is_empty() {

@@ -23,47 +23,31 @@ use crate::{AccessError, DatasetHandleStream};
 pub trait DatasetActionAuthorizer: Sync + Send {
     async fn check_action_allowed(
         &self,
-        // TODO: Private Datasets: migrate to use odf::DatasetID, here and below
-        dataset_handle: &odf::DatasetHandle,
+        dataset_id: &odf::DatasetID,
         action: DatasetAction,
     ) -> Result<(), DatasetActionUnauthorizedError>;
-
-    async fn is_action_allowed(
-        &self,
-        dataset_handle: &odf::DatasetHandle,
-        action: DatasetAction,
-    ) -> Result<bool, InternalError> {
-        match self.check_action_allowed(dataset_handle, action).await {
-            Ok(()) => Ok(true),
-            Err(DatasetActionUnauthorizedError::Access(_)) => Ok(false),
-            Err(DatasetActionUnauthorizedError::Internal(err)) => Err(err),
-        }
-    }
 
     // TODO: Private Datasets: tests
     async fn get_allowed_actions(
         &self,
-        dataset_handle: &odf::DatasetHandle,
+        dataset_id: &odf::DatasetID,
     ) -> Result<HashSet<DatasetAction>, InternalError>;
 
     // TODO: Private Datasets: tests
     async fn filter_datasets_allowing(
         &self,
-        // TODO: Private Datasets: use slice? here and above
         dataset_handles: Vec<odf::DatasetHandle>,
         action: DatasetAction,
     ) -> Result<Vec<odf::DatasetHandle>, InternalError>;
 
     // TODO: Private Datasets: tests
-    async fn classify_datasets_by_allowance(
+    async fn classify_dataset_handles_by_allowance(
         &self,
         dataset_handles: Vec<odf::DatasetHandle>,
         action: DatasetAction,
     ) -> Result<ClassifyByAllowanceResponse, InternalError>;
 
     // TODO: Private Datasets: tests
-    // TODO: Private Datasets: use classify_datasets_by_allowance() name
-    //       after migration
     async fn classify_dataset_ids_by_allowance(
         &self,
         dataset_ids: Vec<odf::DatasetID>,
@@ -157,6 +141,12 @@ pub struct ClassifyByAllowanceResponse {
 
 #[async_trait::async_trait]
 pub trait DatasetActionAuthorizerExt: DatasetActionAuthorizer {
+    async fn is_action_allowed(
+        &self,
+        dataset_id: &odf::DatasetID,
+        action: DatasetAction,
+    ) -> Result<bool, InternalError>;
+
     fn filtered_datasets_stream<'a>(
         &'a self,
         dataset_handles_stream: DatasetHandleStream<'a>,
@@ -172,6 +162,18 @@ where
     T: DatasetActionAuthorizer,
     T: ?Sized,
 {
+    async fn is_action_allowed(
+        &self,
+        dataset_id: &odf::DatasetID,
+        action: DatasetAction,
+    ) -> Result<bool, InternalError> {
+        match self.check_action_allowed(dataset_id, action).await {
+            Ok(()) => Ok(true),
+            Err(DatasetActionUnauthorizedError::Access(_)) => Ok(false),
+            Err(DatasetActionUnauthorizedError::Internal(err)) => Err(err),
+        }
+    }
+
     fn filtered_datasets_stream<'a>(
         &'a self,
         dataset_handles_stream: DatasetHandleStream<'a>,
@@ -183,15 +185,15 @@ where
             use futures::TryStreamExt;
 
             // Page by page check...
-            let mut related_dataset_handles = dataset_handles_stream
+            let mut chunked_dataset_handles = dataset_handles_stream
                 .try_chunks(STREAM_CHUNK_LEN);
 
-            while let Some(potentially_related_handles_chunk) =
-                related_dataset_handles.try_next().await.int_err()?
+            while let Some(datataset_handles_chunk) =
+                chunked_dataset_handles.try_next().await.int_err()?
             {
                 // ... the datasets that are accessed.
                 let hdls = self
-                    .filter_datasets_allowing(potentially_related_handles_chunk, action)
+                    .filter_datasets_allowing(datataset_handles_chunk, action)
                     .await?;
 
                 for hdl in hdls {
@@ -228,7 +230,7 @@ impl AlwaysHappyDatasetActionAuthorizer {
 impl DatasetActionAuthorizer for AlwaysHappyDatasetActionAuthorizer {
     async fn check_action_allowed(
         &self,
-        _dataset_handle: &odf::DatasetHandle,
+        _dataset_id: &odf::DatasetID,
         _action: DatasetAction,
     ) -> Result<(), DatasetActionUnauthorizedError> {
         // Ignore rules
@@ -237,7 +239,7 @@ impl DatasetActionAuthorizer for AlwaysHappyDatasetActionAuthorizer {
 
     async fn get_allowed_actions(
         &self,
-        _dataset_handle: &odf::DatasetHandle,
+        _dataset_id: &odf::DatasetID,
     ) -> Result<HashSet<DatasetAction>, InternalError> {
         Ok(HashSet::from([DatasetAction::Read, DatasetAction::Write]))
     }
@@ -250,7 +252,7 @@ impl DatasetActionAuthorizer for AlwaysHappyDatasetActionAuthorizer {
         Ok(dataset_handles)
     }
 
-    async fn classify_datasets_by_allowance(
+    async fn classify_dataset_handles_by_allowance(
         &self,
         dataset_handles: Vec<odf::DatasetHandle>,
         _action: DatasetAction,

@@ -48,23 +48,23 @@ use time_source::SystemTimeSourceDefault;
 #[test_log::test(tokio::test)]
 async fn test_owner_can_read_and_write_private_dataset() {
     let harness = DatasetAuthorizerHarness::new(logged("john")).await;
-    let dataset_handle = harness
+    let dataset_id = harness
         .create_private_dataset(dataset_alias("john/foo"))
         .await;
 
     let read_result = harness
         .dataset_authorizer
-        .check_action_allowed(&dataset_handle, DatasetAction::Read)
+        .check_action_allowed(&dataset_id, DatasetAction::Read)
         .await;
 
     let write_result = harness
         .dataset_authorizer
-        .check_action_allowed(&dataset_handle, DatasetAction::Write)
+        .check_action_allowed(&dataset_id, DatasetAction::Write)
         .await;
 
     let allowed_actions = harness
         .dataset_authorizer
-        .get_allowed_actions(&dataset_handle)
+        .get_allowed_actions(&dataset_id)
         .await;
 
     assert_matches!(read_result, Ok(()));
@@ -81,23 +81,23 @@ async fn test_owner_can_read_and_write_private_dataset() {
 #[test_log::test(tokio::test)]
 async fn test_guest_can_read_but_not_write_public_dataset() {
     let harness = DatasetAuthorizerHarness::new(anonymous()).await;
-    let dataset_handle = harness
+    let dataset_id = harness
         .create_public_dataset(dataset_alias("john/foo"))
         .await;
 
     let read_result = harness
         .dataset_authorizer
-        .check_action_allowed(&dataset_handle, DatasetAction::Read)
+        .check_action_allowed(&dataset_id, DatasetAction::Read)
         .await;
 
     let write_result = harness
         .dataset_authorizer
-        .check_action_allowed(&dataset_handle, DatasetAction::Write)
+        .check_action_allowed(&dataset_id, DatasetAction::Write)
         .await;
 
     let allowed_actions = harness
         .dataset_authorizer
-        .get_allowed_actions(&dataset_handle)
+        .get_allowed_actions(&dataset_id)
         .await;
 
     assert_matches!(read_result, Ok(()));
@@ -185,11 +185,11 @@ impl DatasetAuthorizerHarness {
         }
     }
 
-    async fn create_public_dataset(&self, alias: odf::DatasetAlias) -> odf::DatasetHandle {
+    async fn create_public_dataset(&self, alias: odf::DatasetAlias) -> odf::DatasetID {
         self.create_dataset(alias, DatasetVisibility::Public).await
     }
 
-    async fn create_private_dataset(&self, alias: odf::DatasetAlias) -> odf::DatasetHandle {
+    async fn create_private_dataset(&self, alias: odf::DatasetAlias) -> odf::DatasetID {
         self.create_dataset(alias, DatasetVisibility::Private).await
     }
 
@@ -197,7 +197,7 @@ impl DatasetAuthorizerHarness {
         &self,
         alias: odf::DatasetAlias,
         visibility: DatasetVisibility,
-    ) -> odf::DatasetHandle {
+    ) -> odf::DatasetID {
         let dataset_id = dataset_id(&alias);
 
         self.outbox
@@ -213,7 +213,7 @@ impl DatasetAuthorizerHarness {
             .await
             .unwrap();
 
-        odf::DatasetHandle::new(dataset_id, alias)
+        dataset_id
     }
 }
 

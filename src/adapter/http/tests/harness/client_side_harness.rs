@@ -75,6 +75,8 @@ impl ClientSideHarness {
 
         let mut b = dill::CatalogBuilder::new();
 
+        b.add::<DidGeneratorDefault>();
+
         b.add_value(RunInfoDir::new(run_info_dir));
         b.add_value(CacheDir::new(cache_dir));
         b.add_value(RemoteReposDir::new(repos_dir));

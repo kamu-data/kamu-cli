@@ -23,6 +23,7 @@ pub struct SqliteAccountRepository {
 
 #[component(pub)]
 #[interface(dyn AccountRepository)]
+#[interface(dyn ExpensiveAccountRepository)]
 #[interface(dyn PasswordHashRepository)]
 impl SqliteAccountRepository {
     pub fn new(transaction: TransactionRef) -> Self {
@@ -34,24 +35,6 @@ impl SqliteAccountRepository {
 
 #[async_trait::async_trait]
 impl AccountRepository for SqliteAccountRepository {
-    async fn accounts_count(&self) -> Result<usize, AccountsCountError> {
-        let mut tr = self.transaction.lock().await;
-
-        let connection_mut = tr.connection_mut().await?;
-
-        let accounts_count = sqlx::query_scalar!(
-            r#"
-            SELECT COUNT(*)
-            FROM accounts
-            "#,
-        )
-        .fetch_one(connection_mut)
-        .await
-        .int_err()?;
-
-        Ok(usize::try_from(accounts_count).unwrap_or(0))
-    }
-
     async fn create_account(&self, account: &Account) -> Result<(), CreateAccountError> {
         let mut tr = self.transaction.lock().await;
 
@@ -120,45 +103,6 @@ impl AccountRepository for SqliteAccountRepository {
         })?;
 
         Ok(())
-    }
-
-    async fn get_accounts(&self, pagination: PaginationOpts) -> AccountPageStream {
-        Box::pin(async_stream::stream! {
-            let mut tr = self.transaction.lock().await;
-            let connection_mut = tr.connection_mut().await?;
-
-            let limit = i64::try_from(pagination.limit).int_err()?;
-            let offset = i64::try_from(pagination.offset).int_err()?;
-
-            let mut query_stream = sqlx::query_as!(
-                AccountRowModel,
-                r#"
-                    SELECT id            AS "id: _",
-                           account_name,
-                           email,
-                           display_name,
-                           account_type  AS "account_type: AccountType",
-                           avatar_url,
-                           registered_at AS "registered_at: _",
-                           is_admin      AS "is_admin: _",
-                           provider,
-                           provider_identity_key
-                    FROM accounts
-                    ORDER BY registered_at ASC
-                    LIMIT $1 OFFSET $2
-                    "#,
-                limit,
-                offset,
-            )
-            .fetch(connection_mut)
-            .map_err(ErrorIntoInternal::int_err);
-
-            use futures::TryStreamExt;
-
-            while let Some(account_row_model) = query_stream.try_next().await? {
-                yield Ok(account_row_model.into());
-            }
-        })
     }
 
     async fn get_account_by_id(
@@ -402,6 +346,68 @@ impl AccountRepository for SqliteAccountRepository {
         .map_err(FindAccountIdByNameError::Internal)?;
 
         Ok(maybe_account_row.map(|account_row| account_row.id))
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait::async_trait]
+impl ExpensiveAccountRepository for SqliteAccountRepository {
+    async fn accounts_count(&self) -> Result<usize, AccountsCountError> {
+        let mut tr = self.transaction.lock().await;
+
+        let connection_mut = tr.connection_mut().await?;
+
+        let accounts_count = sqlx::query_scalar!(
+            r#"
+            SELECT COUNT(*)
+            FROM accounts
+            "#,
+        )
+        .fetch_one(connection_mut)
+        .await
+        .int_err()?;
+
+        Ok(usize::try_from(accounts_count).unwrap_or(0))
+    }
+
+    async fn get_accounts(&self, pagination: PaginationOpts) -> AccountPageStream {
+        Box::pin(async_stream::stream! {
+            let mut tr = self.transaction.lock().await;
+            let connection_mut = tr.connection_mut().await?;
+
+            let limit = i64::try_from(pagination.limit).int_err()?;
+            let offset = i64::try_from(pagination.offset).int_err()?;
+
+            let mut query_stream = sqlx::query_as!(
+                AccountRowModel,
+                r#"
+                SELECT id            AS "id: _",
+                       account_name,
+                       email,
+                       display_name,
+                       account_type  AS "account_type: AccountType",
+                       avatar_url,
+                       registered_at AS "registered_at: _",
+                       is_admin      AS "is_admin: _",
+                       provider,
+                       provider_identity_key
+                FROM accounts
+                ORDER BY registered_at ASC
+                LIMIT $1 OFFSET $2
+                "#,
+                limit,
+                offset,
+            )
+            .fetch(connection_mut)
+            .map_err(ErrorIntoInternal::int_err);
+
+            use futures::TryStreamExt;
+
+            while let Some(account_row_model) = query_stream.try_next().await? {
+                yield Ok(account_row_model.into());
+            }
+        })
     }
 }
 

@@ -11,7 +11,7 @@ use async_graphql::{Context, ErrorExtensions};
 use internal_error::*;
 use kamu_accounts::{CurrentAccountSubject, GetAccessTokenError, LoggedAccount};
 use kamu_core::auth::DatasetActionUnauthorizedError;
-use kamu_core::{DatasetRegistry, ResolvedDataset};
+use kamu_core::{auth, DatasetRegistry, ResolvedDataset};
 use kamu_datasets::DatasetEnvVarsConfig;
 use {kamu_task_system as ts, opendatafabric as odf};
 
@@ -109,32 +109,27 @@ pub(crate) async fn check_dataset_read_access(
     ctx: &Context<'_>,
     dataset_handle: &odf::DatasetHandle,
 ) -> Result<(), GqlError> {
-    let dataset_action_authorizer =
-        from_catalog_n!(ctx, dyn kamu_core::auth::DatasetActionAuthorizer);
-
-    dataset_action_authorizer
-        .check_action_allowed(dataset_handle, kamu_core::auth::DatasetAction::Read)
-        .await
-        .map_err(|e| match e {
-            DatasetActionUnauthorizedError::Access(_) => GqlError::Gql(
-                async_graphql::Error::new("Dataset access error")
-                    .extend_with(|_, eev| eev.set("alias", dataset_handle.alias.to_string())),
-            ),
-            DatasetActionUnauthorizedError::Internal(e) => GqlError::Internal(e),
-        })?;
-
-    Ok(())
+    check_dataset_access(ctx, dataset_handle, auth::DatasetAction::Read).await
 }
 
 pub(crate) async fn check_dataset_write_access(
     ctx: &Context<'_>,
     dataset_handle: &odf::DatasetHandle,
 ) -> Result<(), GqlError> {
-    let dataset_action_authorizer =
-        from_catalog_n!(ctx, dyn kamu_core::auth::DatasetActionAuthorizer);
+    check_dataset_access(ctx, dataset_handle, auth::DatasetAction::Write).await
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+async fn check_dataset_access(
+    ctx: &Context<'_>,
+    dataset_handle: &odf::DatasetHandle,
+    action: auth::DatasetAction,
+) -> Result<(), GqlError> {
+    let dataset_action_authorizer = from_catalog_n!(ctx, dyn auth::DatasetActionAuthorizer);
 
     dataset_action_authorizer
-        .check_action_allowed(dataset_handle, kamu_core::auth::DatasetAction::Write)
+        .check_action_allowed(&dataset_handle.id, action)
         .await
         .map_err(|e| match e {
             DatasetActionUnauthorizedError::Access(_) => make_dataset_access_error(dataset_handle),

@@ -130,23 +130,22 @@ impl KamuSchema {
 
         if !name_resolution_enabled {
             for (id, opts) in &self.inner.options.input_datasets {
-                let hdl = self
-                    .inner
-                    .dataset_registry
-                    .resolve_dataset_handle_by_ref(&id.as_local_ref())
-                    .await
-                    .int_err()?;
-
                 if !self
                     .inner
                     .dataset_action_authorizer
-                    .is_action_allowed(&hdl, auth::DatasetAction::Read)
+                    .is_action_allowed(id, auth::DatasetAction::Read)
                     .await?
                 {
                     // Ignore this alias and let the query fail with "not found" error
                     continue;
                 }
 
+                let hdl = self
+                    .inner
+                    .dataset_registry
+                    .resolve_dataset_handle_by_ref(&id.as_local_ref())
+                    .await
+                    .int_err()?;
                 let resolved_dataset = self.inner.dataset_registry.get_dataset_by_handle(&hdl);
 
                 tables.insert(

@@ -7,36 +7,60 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::HashMap;
-
 use internal_error::InternalError;
 use opendatafabric as odf;
 use thiserror::Error;
 
-use crate::Account;
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// TODO: Private Datasets: merge with AuthenticationService?
 // TODO: Private Datasets: tests
 #[async_trait::async_trait]
-pub trait AccountService: Sync + Send {
-    // TODO: Private Datasets: extract to AccountRegistry?
-
-    async fn get_account_map(
+pub trait GetDatasetDownstreamDependenciesUseCase: Send + Sync {
+    async fn execute(
         &self,
-        account_ids: Vec<odf::AccountID>,
-    ) -> Result<HashMap<odf::AccountID, Account>, GetAccountMapError>;
+        dataset_id: &odf::DatasetID,
+    ) -> Result<Vec<DatasetDependency>, GetDatasetDownstreamDependenciesError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Error
+
+#[derive(Debug)]
+pub struct ResolvedDatasetDependency {
+    pub dataset_handle: odf::DatasetHandle,
+    pub owner_id: odf::AccountID,
+    pub owner_name: odf::AccountName,
+}
+
+#[derive(Debug)]
+pub enum DatasetDependency {
+    Resolved(ResolvedDatasetDependency),
+    Unresolved(odf::DatasetID),
+}
+
+impl DatasetDependency {
+    pub fn resolved(
+        dataset_handle: odf::DatasetHandle,
+        owner_id: odf::AccountID,
+        owner_name: odf::AccountName,
+    ) -> Self {
+        Self::Resolved(ResolvedDatasetDependency {
+            dataset_handle,
+            owner_id,
+            owner_name,
+        })
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Error)]
-pub enum GetAccountMapError {
+#[derive(Error, Debug)]
+pub enum GetDatasetDownstreamDependenciesError {
     #[error(transparent)]
-    Internal(#[from] InternalError),
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

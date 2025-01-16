@@ -9,7 +9,7 @@
 
 use futures::StreamExt;
 use kamu_accounts::Account as AccountEntity;
-use kamu_datasets::DatasetOwnershipService;
+use kamu_datasets::{DatasetEntryService, DatasetEntryServiceExt};
 use kamu_flow_system::FlowTriggerService;
 
 use crate::prelude::*;
@@ -29,12 +29,13 @@ impl AccountFlowTriggers {
 
     /// Checks if all triggers of all datasets in account are disabled
     async fn all_paused(&self, ctx: &Context<'_>) -> Result<bool> {
-        let (dataset_ownership_service, flow_trigger_service) =
-            from_catalog_n!(ctx, dyn DatasetOwnershipService, dyn FlowTriggerService);
+        let (dataset_entry_service, flow_trigger_service) =
+            from_catalog_n!(ctx, dyn DatasetEntryService, dyn FlowTriggerService);
 
-        let owned_dataset_ids: Vec<_> = dataset_ownership_service
-            .get_owned_datasets(&self.account.id)
-            .await?;
+        let owned_dataset_ids: Vec<_> = dataset_entry_service
+            .get_owned_dataset_ids(&self.account.id)
+            .await
+            .int_err()?;
 
         let mut all_triggers = flow_trigger_service
             .find_triggers_by_datasets(owned_dataset_ids)

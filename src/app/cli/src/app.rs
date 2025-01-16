@@ -386,6 +386,8 @@ pub fn configure_base_catalog(
         b.add::<SystemTimeSourceDefault>();
     }
 
+    b.add::<DidGeneratorDefault>();
+
     b.add_builder(
         DatasetRepositoryLocalFs::builder().with_root(workspace_layout.datasets_dir.clone()),
     );
@@ -466,6 +468,8 @@ pub fn configure_base_catalog(
     b.add::<ResetDatasetUseCaseImpl>();
     b.add::<SetWatermarkUseCaseImpl>();
     b.add::<VerifyDatasetUseCaseImpl>();
+    b.add::<GetDatasetDownstreamDependenciesUseCaseImpl>();
+    b.add::<GetDatasetUpstreamDependenciesUseCaseImpl>();
 
     b.add::<kamu_accounts_services::LoginPasswordAuthProvider>();
 

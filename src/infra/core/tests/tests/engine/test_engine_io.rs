@@ -258,6 +258,7 @@ async fn test_engine_io_local_file_mount() {
     std::fs::create_dir(&cache_dir).unwrap();
 
     let catalog = dill::CatalogBuilder::new()
+        .add::<DidGeneratorDefault>()
         .add::<SystemTimeSourceDefault>()
         .add::<kamu_core::auth::AlwaysHappyDatasetActionAuthorizer>()
         .add::<DatasetKeyValueServiceSysEnv>()
@@ -299,6 +300,7 @@ async fn test_engine_io_s3_to_local_file_mount_proxy() {
     let s3_context = kamu::utils::s3_context::S3Context::from_url(&s3.url).await;
 
     let catalog = dill::CatalogBuilder::new()
+        .add::<DidGeneratorDefault>()
         .add::<SystemTimeSourceDefault>()
         .add::<kamu_core::auth::AlwaysHappyDatasetActionAuthorizer>()
         .add_value(CurrentAccountSubject::new_test())

@@ -61,10 +61,8 @@ impl OsoDatasetAuthorizer {
 
     async fn dataset_resource(
         &self,
-        dataset_handle: &odf::DatasetHandle,
+        dataset_id: &odf::DatasetID,
     ) -> Result<DatasetResource, InternalError> {
-        let dataset_id = &dataset_handle.id;
-
         let dataset_resource = self
             .oso_resource_service
             .dataset_resource(dataset_id)
@@ -86,14 +84,14 @@ impl OsoDatasetAuthorizer {
 
 #[async_trait::async_trait]
 impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
-    #[tracing::instrument(level = "debug", skip_all, fields(%dataset_handle, ?action))]
+    #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id, ?action))]
     async fn check_action_allowed(
         &self,
-        dataset_handle: &odf::DatasetHandle,
+        dataset_id: &odf::DatasetID,
         action: DatasetAction,
     ) -> Result<(), DatasetActionUnauthorizedError> {
         let (user_actor, dataset_resource) =
-            try_join!(self.user_actor(), self.dataset_resource(dataset_handle))?;
+            try_join!(self.user_actor(), self.dataset_resource(dataset_id))?;
 
         match self
             .kamu_auth_oso
@@ -104,7 +102,7 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
                 AccessError::Forbidden(
                     DatasetActionNotEnoughPermissionsError {
                         action,
-                        dataset_ref: dataset_handle.as_local_ref(),
+                        dataset_ref: dataset_id.as_local_ref(),
                     }
                     .into(),
                 ),
@@ -113,13 +111,13 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
         }
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(%dataset_handle))]
+    #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id))]
     async fn get_allowed_actions(
         &self,
-        dataset_handle: &odf::DatasetHandle,
+        dataset_id: &odf::DatasetID,
     ) -> Result<HashSet<DatasetAction>, InternalError> {
         let (user_actor, dataset_resource) =
-            try_join!(self.user_actor(), self.dataset_resource(dataset_handle))?;
+            try_join!(self.user_actor(), self.dataset_resource(dataset_id))?;
 
         self.kamu_auth_oso
             .get_allowed_actions(user_actor, dataset_resource)
@@ -174,7 +172,7 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(dataset_handles=?dataset_handles, action=%action))]
-    async fn classify_datasets_by_allowance(
+    async fn classify_dataset_handles_by_allowance(
         &self,
         dataset_handles: Vec<odf::DatasetHandle>,
         action: DatasetAction,

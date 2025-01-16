@@ -145,6 +145,7 @@ impl FlowHarness {
                     .with_consumer_filter(messaging_outbox::ConsumerFilter::AllConsumers),
             )
             .bind::<dyn Outbox, OutboxImmediateImpl>()
+            .add::<DidGeneratorDefault>()
             .add::<FlowSystemTestListener>()
             .add_value(FlowAgentConfig::new(
                 awaiting_step,

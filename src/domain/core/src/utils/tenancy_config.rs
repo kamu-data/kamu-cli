@@ -7,12 +7,27 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use opendatafabric as odf;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum TenancyConfig {
     SingleTenant,
     MultiTenant,
+}
+
+impl TenancyConfig {
+    pub fn make_alias(
+        &self,
+        owner_name: odf::AccountName,
+        dataset_name: odf::DatasetName,
+    ) -> odf::DatasetAlias {
+        match *self {
+            TenancyConfig::MultiTenant => odf::DatasetAlias::new(Some(owner_name), dataset_name),
+            TenancyConfig::SingleTenant => odf::DatasetAlias::new(None, dataset_name),
+        }
+    }
 }
 
 impl Default for TenancyConfig {

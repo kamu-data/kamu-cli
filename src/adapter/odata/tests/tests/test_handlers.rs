@@ -340,6 +340,7 @@ impl TestHarness {
             let mut b = dill::CatalogBuilder::new();
 
             b.add_value(RunInfoDir::new(run_info_dir))
+                .add::<DidGeneratorDefault>()
                 .add_value(CacheDir::new(cache_dir))
                 .add::<ObjectStoreRegistryImpl>()
                 .add::<ObjectStoreBuilderLocalFs>()

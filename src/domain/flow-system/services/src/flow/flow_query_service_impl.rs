@@ -15,7 +15,7 @@ use database_common::PaginationOpts;
 use dill::{component, interface, Catalog};
 use futures::TryStreamExt;
 use internal_error::ResultIntoInternal;
-use kamu_datasets::DatasetOwnershipService;
+use kamu_datasets::{DatasetEntryService, DatasetEntryServiceExt};
 use kamu_flow_system::*;
 use opendatafabric::{AccountID, DatasetID};
 
@@ -27,7 +27,7 @@ use crate::{FlowAbortHelper, FlowSchedulingHelper};
 pub struct FlowQueryServiceImpl {
     catalog: Catalog,
     flow_event_store: Arc<dyn FlowEventStore>,
-    dataset_ownership_service: Arc<dyn DatasetOwnershipService>,
+    dataset_entry_service: Arc<dyn DatasetEntryService>,
     agent_config: Arc<FlowAgentConfig>,
     flow_state: Arc<FlowStateHelper>,
 }
@@ -38,14 +38,14 @@ impl FlowQueryServiceImpl {
     pub fn new(
         catalog: Catalog,
         flow_event_store: Arc<dyn FlowEventStore>,
-        dataset_ownership_service: Arc<dyn DatasetOwnershipService>,
+        dataset_entry_service: Arc<dyn DatasetEntryService>,
         agent_config: Arc<FlowAgentConfig>,
         flow_state: Arc<FlowStateHelper>,
     ) -> Self {
         Self {
             catalog,
             flow_event_store,
-            dataset_ownership_service,
+            dataset_entry_service,
             agent_config,
             flow_state,
         }
@@ -110,10 +110,10 @@ impl FlowQueryService for FlowQueryServiceImpl {
         pagination: PaginationOpts,
     ) -> Result<FlowStateListing, ListFlowsByDatasetError> {
         let owned_dataset_ids = self
-            .dataset_ownership_service
-            .get_owned_datasets(account_id)
+            .dataset_entry_service
+            .get_owned_dataset_ids(account_id)
             .await
-            .map_err(ListFlowsByDatasetError::Internal)?;
+            .int_err()?;
 
         let filtered_dataset_ids = if !filters.by_dataset_ids.is_empty() {
             owned_dataset_ids
@@ -162,10 +162,10 @@ impl FlowQueryService for FlowQueryServiceImpl {
         account_id: &AccountID,
     ) -> Result<FlowDatasetListing, ListFlowsByDatasetError> {
         let owned_dataset_ids = self
-            .dataset_ownership_service
-            .get_owned_datasets(account_id)
+            .dataset_entry_service
+            .get_owned_dataset_ids(account_id)
             .await
-            .map_err(ListFlowsByDatasetError::Internal)?;
+            .int_err()?;
 
         let matched_stream = Box::pin(async_stream::try_stream! {
             for dataset_id in &owned_dataset_ids {

@@ -13,6 +13,7 @@ use std::sync::Arc;
 use futures::{future, StreamExt, TryStreamExt};
 use internal_error::InternalError;
 use kamu_core::{
+    DatasetHandleStream,
     DatasetRegistry,
     GetDatasetError,
     SearchError,
@@ -208,6 +209,32 @@ pub fn matches_local_ref_pattern(
                 && dataset_name_pattern.matches(&dataset_handle.alias.dataset_name)
         }
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// A utility that allows you to filter an `DatasetHandleStream` without
+/// changing its type (like `StreamExt::filter_ok()` does).
+pub fn filter_dataset_handle_stream<'a, F>(
+    mut stream: DatasetHandleStream<'a>,
+    predicate: F,
+) -> DatasetHandleStream<'a>
+where
+    F: Fn(&DatasetHandle) -> bool,
+    F: Send + 'a,
+{
+    Box::pin(async_stream::stream! {
+        while let Some(item) = stream.next().await {
+            if let Ok(dataset_handle) = &item {
+                if predicate(dataset_handle) {
+                    yield item;
+                }
+            } else {
+                // In case of an iteration error, it is not our responsibility to handle the error here.
+                yield item;
+            }
+        }
+    })
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

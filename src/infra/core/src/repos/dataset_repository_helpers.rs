@@ -30,6 +30,7 @@ pub(crate) async fn create_dataset_from_snapshot_impl<
     dataset_repo: &TRepository,
     mut snapshot: DatasetSnapshot,
     system_time: DateTime<Utc>,
+    new_dataset_id: DatasetID,
 ) -> Result<CreateDatasetFromSnapshotResult, CreateDatasetFromSnapshotError> {
     // Validate / resolve events
     for event in &mut snapshot.metadata {
@@ -98,11 +99,6 @@ pub(crate) async fn create_dataset_from_snapshot_impl<
         }?;
     }
 
-    // We are generating a key pair and deriving a dataset ID from it.
-    // The key pair is discarded for now, but in future can be used for
-    // proof of control over dataset and metadata signing.
-    let (_keypair, dataset_id) = DatasetID::new_generated_ed25519();
-
     let create_result = dataset_repo
         .create_dataset(
             &snapshot.name,
@@ -110,7 +106,7 @@ pub(crate) async fn create_dataset_from_snapshot_impl<
                 system_time,
                 prev_block_hash: None,
                 event: Seed {
-                    dataset_id,
+                    dataset_id: new_dataset_id,
                     dataset_kind: snapshot.kind,
                 },
                 sequence_number: 0,

@@ -9,26 +9,31 @@
 
 use internal_error::InternalError;
 use opendatafabric as odf;
+use thiserror::Error;
+
+use crate::DatasetDependency;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// TODO: Private Datasets: tests
 #[async_trait::async_trait]
-pub trait DatasetOwnershipService: Sync + Send {
-    async fn get_dataset_owner(
+pub trait GetDatasetUpstreamDependenciesUseCase: Send + Sync {
+    async fn execute(
         &self,
         dataset_id: &odf::DatasetID,
-    ) -> Result<odf::AccountID, InternalError>;
+    ) -> Result<Vec<DatasetDependency>, GetDatasetUpstreamDependenciesError>;
+}
 
-    async fn get_owned_datasets(
-        &self,
-        account_id: &odf::AccountID,
-    ) -> Result<Vec<odf::DatasetID>, InternalError>;
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    async fn is_dataset_owned_by(
-        &self,
-        dataset_id: &odf::DatasetID,
-        account_id: &odf::AccountID,
-    ) -> Result<bool, InternalError>;
+#[derive(Error, Debug)]
+pub enum GetDatasetUpstreamDependenciesError {
+    #[error(transparent)]
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

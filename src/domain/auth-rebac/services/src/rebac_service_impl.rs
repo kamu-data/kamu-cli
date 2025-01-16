@@ -28,6 +28,7 @@ use kamu_auth_rebac::{
     GetPropertiesError,
     InsertEntitiesRelationError,
     InsertRelationError,
+    PropertiesCountError,
     PropertyName,
     PropertyValue,
     RebacRepository,
@@ -56,6 +57,10 @@ impl RebacServiceImpl {
 
 #[async_trait::async_trait]
 impl RebacService for RebacServiceImpl {
+    async fn properties_count(&self) -> Result<usize, PropertiesCountError> {
+        self.rebac_repo.properties_count().await
+    }
+
     async fn set_account_property(
         &self,
         account_id: &odf::AccountID,

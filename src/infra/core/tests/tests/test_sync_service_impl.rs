@@ -70,6 +70,7 @@ async fn do_test_sync(
     std::fs::create_dir(&datasets_dir_bar).unwrap();
 
     let catalog_foo = dill::CatalogBuilder::new()
+        .add::<DidGeneratorDefault>()
         .add::<SystemTimeSourceDefault>()
         .add_value(ipfs_gateway.clone())
         .add_value(ipfs_client.clone())
@@ -92,6 +93,7 @@ async fn do_test_sync(
         .build();
 
     let catalog_bar = dill::CatalogBuilder::new()
+        .add::<DidGeneratorDefault>()
         .add::<SystemTimeSourceDefault>()
         .add_value(ipfs_gateway.clone())
         .add_value(ipfs_client.clone())
