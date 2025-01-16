@@ -277,6 +277,30 @@ impl DatasetEntryServiceImpl {
         }
     }
 
+    async fn list_all_entries(
+        &self,
+        pagination: PaginationOpts,
+    ) -> Result<EntityPageListing<DatasetEntry>, ListDatasetEntriesError> {
+        use futures::TryStreamExt;
+
+        let total_count = self
+            .dataset_entry_repo
+            .dataset_entries_count()
+            .await
+            .int_err()?;
+        let entries = self
+            .dataset_entry_repo
+            .get_dataset_entries(pagination)
+            .await
+            .try_collect()
+            .await?;
+
+        Ok(EntityPageListing {
+            list: entries,
+            total_count,
+        })
+    }
+
     async fn list_all_dataset_handles(
         &self,
         pagination: PaginationOpts,
@@ -289,6 +313,30 @@ impl DatasetEntryServiceImpl {
                 .entries_as_handles(dataset_entry_listing.list)
                 .await
                 .int_err()?,
+        })
+    }
+
+    async fn list_entries_owned_by(
+        &self,
+        owner_id: &odf::AccountID,
+        pagination: PaginationOpts,
+    ) -> Result<EntityPageListing<DatasetEntry>, ListDatasetEntriesError> {
+        use futures::TryStreamExt;
+
+        let total_count = self
+            .dataset_entry_repo
+            .dataset_entries_count_by_owner_id(owner_id)
+            .await?;
+        let entries = self
+            .dataset_entry_repo
+            .get_dataset_entries_by_owner_id(owner_id, pagination)
+            .await
+            .try_collect()
+            .await?;
+
+        Ok(EntityPageListing {
+            list: entries,
+            total_count,
         })
     }
 
@@ -344,54 +392,6 @@ impl DatasetEntryService for DatasetEntryServiceImpl {
         dataset_id: &odf::DatasetID,
     ) -> Result<DatasetEntry, GetDatasetEntryError> {
         self.dataset_entry_repo.get_dataset_entry(dataset_id).await
-    }
-
-    async fn list_all_entries(
-        &self,
-        pagination: PaginationOpts,
-    ) -> Result<EntityPageListing<DatasetEntry>, ListDatasetEntriesError> {
-        use futures::TryStreamExt;
-
-        let total_count = self
-            .dataset_entry_repo
-            .dataset_entries_count()
-            .await
-            .int_err()?;
-        let entries = self
-            .dataset_entry_repo
-            .get_dataset_entries(pagination)
-            .await
-            .try_collect()
-            .await?;
-
-        Ok(EntityPageListing {
-            list: entries,
-            total_count,
-        })
-    }
-
-    async fn list_entries_owned_by(
-        &self,
-        owner_id: &odf::AccountID,
-        pagination: PaginationOpts,
-    ) -> Result<EntityPageListing<DatasetEntry>, ListDatasetEntriesError> {
-        use futures::TryStreamExt;
-
-        let total_count = self
-            .dataset_entry_repo
-            .dataset_entries_count_by_owner_id(owner_id)
-            .await?;
-        let entries = self
-            .dataset_entry_repo
-            .get_dataset_entries_by_owner_id(owner_id, pagination)
-            .await
-            .try_collect()
-            .await?;
-
-        Ok(EntityPageListing {
-            list: entries,
-            total_count,
-        })
     }
 }
 

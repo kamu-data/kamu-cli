@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::{EntityPageListing, PaginationOpts};
 use internal_error::{ErrorIntoInternal, InternalError};
 use opendatafabric as odf;
 use thiserror::Error;
@@ -16,10 +15,9 @@ use crate::{DatasetEntry, DatasetEntryStream, GetDatasetEntryError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// TODO: Private Datasets: tests
 #[async_trait::async_trait]
 pub trait DatasetEntryService: Sync + Send {
-    // TODO: Private Datasets: tests
-    // TODO: Private Datasets: extract to DatasetEntryRegistry?
     fn all_entries(&self) -> DatasetEntryStream;
 
     fn entries_owned_by(&self, owner_id: &odf::AccountID) -> DatasetEntryStream;
@@ -28,17 +26,6 @@ pub trait DatasetEntryService: Sync + Send {
         &self,
         dataset_id: &odf::DatasetID,
     ) -> Result<DatasetEntry, GetDatasetEntryError>;
-
-    async fn list_all_entries(
-        &self,
-        pagination: PaginationOpts,
-    ) -> Result<EntityPageListing<DatasetEntry>, ListDatasetEntriesError>;
-
-    async fn list_entries_owned_by(
-        &self,
-        owner_id: &odf::AccountID,
-        pagination: PaginationOpts,
-    ) -> Result<EntityPageListing<DatasetEntry>, ListDatasetEntriesError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
