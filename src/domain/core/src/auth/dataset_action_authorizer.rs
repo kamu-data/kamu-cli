@@ -36,7 +36,6 @@ pub trait DatasetActionAuthorizer: Sync + Send {
     // TODO: Private Datasets: tests
     async fn filter_datasets_allowing(
         &self,
-        // TODO: Private Datasets: use slice? here and above
         dataset_handles: Vec<odf::DatasetHandle>,
         action: DatasetAction,
     ) -> Result<Vec<odf::DatasetHandle>, InternalError>;
@@ -49,8 +48,6 @@ pub trait DatasetActionAuthorizer: Sync + Send {
     ) -> Result<ClassifyByAllowanceResponse, InternalError>;
 
     // TODO: Private Datasets: tests
-    // TODO: Private Datasets: use classify_datasets_by_allowance() name
-    //       after migration
     async fn classify_dataset_ids_by_allowance(
         &self,
         dataset_ids: Vec<odf::DatasetID>,
@@ -188,15 +185,15 @@ where
             use futures::TryStreamExt;
 
             // Page by page check...
-            let mut related_dataset_handles = dataset_handles_stream
+            let mut chunked_dataset_handles = dataset_handles_stream
                 .try_chunks(STREAM_CHUNK_LEN);
 
-            while let Some(potentially_related_handles_chunk) =
-                related_dataset_handles.try_next().await.int_err()?
+            while let Some(datataset_handles_chunk) =
+                chunked_dataset_handles.try_next().await.int_err()?
             {
                 // ... the datasets that are accessed.
                 let hdls = self
-                    .filter_datasets_allowing(potentially_related_handles_chunk, action)
+                    .filter_datasets_allowing(datataset_handles_chunk, action)
                     .await?;
 
                 for hdl in hdls {
