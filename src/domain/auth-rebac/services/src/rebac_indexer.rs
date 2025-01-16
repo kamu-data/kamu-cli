@@ -14,7 +14,8 @@ use dill::{component, interface, meta};
 use init_on_startup::{InitOnStartup, InitOnStartupMeta};
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_accounts::{
-    AccountService,
+    ExpensiveAccountRepository,
+    ExpensiveAccountRepositoryExt,
     PredefinedAccountsConfig,
     JOB_KAMU_ACCOUNTS_PREDEFINED_ACCOUNTS_REGISTRATOR,
 };
@@ -36,7 +37,7 @@ pub struct RebacIndexer {
     rebac_repo: Arc<dyn RebacRepository>,
     rebac_service: Arc<dyn RebacService>,
     dataset_entry_service: Arc<dyn DatasetEntryService>,
-    account_service: Arc<dyn AccountService>,
+    expensive_account_repo: Arc<dyn ExpensiveAccountRepository>,
     predefined_accounts_config: Arc<PredefinedAccountsConfig>,
 }
 
@@ -55,14 +56,14 @@ impl RebacIndexer {
         rebac_repo: Arc<dyn RebacRepository>,
         rebac_service: Arc<dyn RebacService>,
         dataset_entry_service: Arc<dyn DatasetEntryService>,
-        account_service: Arc<dyn AccountService>,
+        expensive_account_repo: Arc<dyn ExpensiveAccountRepository>,
         predefined_accounts_config: Arc<PredefinedAccountsConfig>,
     ) -> Self {
         Self {
             rebac_repo,
             rebac_service,
             dataset_entry_service,
-            account_service,
+            expensive_account_repo,
             predefined_accounts_config,
         }
     }
@@ -117,7 +118,7 @@ impl RebacIndexer {
     ) -> Result<PredefinedAccountIdDatasetVisibilityMapping, InternalError> {
         use futures::TryStreamExt;
 
-        let mut accounts_stream = self.account_service.all_accounts();
+        let mut accounts_stream = self.expensive_account_repo.all_accounts();
 
         let predefined_accounts_map = self.predefined_accounts_config.predefined.iter().fold(
             HashMap::new(),

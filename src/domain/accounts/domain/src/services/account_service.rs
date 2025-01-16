@@ -13,7 +13,7 @@ use internal_error::InternalError;
 use opendatafabric as odf;
 use thiserror::Error;
 
-use crate::{Account, AccountPageStream};
+use crate::Account;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -22,7 +22,6 @@ use crate::{Account, AccountPageStream};
 #[async_trait::async_trait]
 pub trait AccountService: Sync + Send {
     // TODO: Private Datasets: extract to AccountRegistry?
-    fn all_accounts(&self) -> AccountPageStream;
 
     async fn get_account_map(
         &self,

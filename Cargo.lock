@@ -5388,6 +5388,7 @@ dependencies = [
  "chrono",
  "crc32fast",
  "database-common",
+ "futures",
  "internal-error",
  "jsonwebtoken",
  "lazy_static",

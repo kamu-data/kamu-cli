@@ -10,12 +10,10 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use database_common::{EntityPageListing, EntityPageStreamer};
 use dill::*;
 use internal_error::ResultIntoInternal;
 use kamu_accounts::{
     Account,
-    AccountPageStream,
     AccountRepository,
     AccountService,
     GetAccountByIdError,
@@ -41,28 +39,6 @@ impl AccountServiceImpl {
 
 #[async_trait::async_trait]
 impl AccountService for AccountServiceImpl {
-    fn all_accounts(&self) -> AccountPageStream {
-        EntityPageStreamer::default().into_stream(
-            || async { Ok(()) },
-            move |_, pagination| async move {
-                use futures::TryStreamExt;
-
-                let total_count = self.account_repo.accounts_count().await.int_err()?;
-                let entries = self
-                    .account_repo
-                    .get_accounts(pagination)
-                    .await
-                    .try_collect()
-                    .await?;
-
-                Ok(EntityPageListing {
-                    list: entries,
-                    total_count,
-                })
-            },
-        )
-    }
-
     async fn get_account_map(
         &self,
         account_ids: Vec<odf::AccountID>,
