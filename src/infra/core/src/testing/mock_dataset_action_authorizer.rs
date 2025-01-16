@@ -38,7 +38,7 @@ mockall::mock! {
 
         async fn get_allowed_actions(
             &self,
-            dataset_handle: &odf::DatasetHandle,
+            dataset_id: &odf::DatasetID,
         ) -> Result<HashSet<DatasetAction>, InternalError>;
 
         async fn filter_datasets_allowing(

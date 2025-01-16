@@ -160,7 +160,7 @@ impl Dataset {
         let dataset_action_authorizer = from_catalog_n!(ctx, dyn auth::DatasetActionAuthorizer);
 
         let allowed_actions = dataset_action_authorizer
-            .get_allowed_actions(&self.dataset_handle)
+            .get_allowed_actions(&self.dataset_handle.id)
             .await?;
         let can_read = allowed_actions.contains(&auth::DatasetAction::Read);
         let can_write = allowed_actions.contains(&auth::DatasetAction::Write);

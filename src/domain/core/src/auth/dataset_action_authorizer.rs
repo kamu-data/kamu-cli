@@ -23,7 +23,6 @@ use crate::{AccessError, DatasetHandleStream};
 pub trait DatasetActionAuthorizer: Sync + Send {
     async fn check_action_allowed(
         &self,
-        // TODO: Private Datasets: migrate to use odf::DatasetID, here and below
         dataset_id: &odf::DatasetID,
         action: DatasetAction,
     ) -> Result<(), DatasetActionUnauthorizedError>;
@@ -31,7 +30,7 @@ pub trait DatasetActionAuthorizer: Sync + Send {
     // TODO: Private Datasets: tests
     async fn get_allowed_actions(
         &self,
-        dataset_handle: &odf::DatasetHandle,
+        dataset_id: &odf::DatasetID,
     ) -> Result<HashSet<DatasetAction>, InternalError>;
 
     // TODO: Private Datasets: tests
@@ -243,7 +242,7 @@ impl DatasetActionAuthorizer for AlwaysHappyDatasetActionAuthorizer {
 
     async fn get_allowed_actions(
         &self,
-        _dataset_handle: &odf::DatasetHandle,
+        _dataset_id: &odf::DatasetID,
     ) -> Result<HashSet<DatasetAction>, InternalError> {
         Ok(HashSet::from([DatasetAction::Read, DatasetAction::Write]))
     }
