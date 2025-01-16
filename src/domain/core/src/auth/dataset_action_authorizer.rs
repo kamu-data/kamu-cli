@@ -28,18 +28,6 @@ pub trait DatasetActionAuthorizer: Sync + Send {
         action: DatasetAction,
     ) -> Result<(), DatasetActionUnauthorizedError>;
 
-    async fn is_action_allowed(
-        &self,
-        dataset_handle: &odf::DatasetHandle,
-        action: DatasetAction,
-    ) -> Result<bool, InternalError> {
-        match self.check_action_allowed(&dataset_handle.id, action).await {
-            Ok(()) => Ok(true),
-            Err(DatasetActionUnauthorizedError::Access(_)) => Ok(false),
-            Err(DatasetActionUnauthorizedError::Internal(err)) => Err(err),
-        }
-    }
-
     // TODO: Private Datasets: tests
     async fn get_allowed_actions(
         &self,
@@ -157,6 +145,12 @@ pub struct ClassifyByAllowanceResponse {
 
 #[async_trait::async_trait]
 pub trait DatasetActionAuthorizerExt: DatasetActionAuthorizer {
+    async fn is_action_allowed(
+        &self,
+        dataset_id: &odf::DatasetID,
+        action: DatasetAction,
+    ) -> Result<bool, InternalError>;
+
     fn filtered_datasets_stream<'a>(
         &'a self,
         dataset_handles_stream: DatasetHandleStream<'a>,
@@ -172,6 +166,18 @@ where
     T: DatasetActionAuthorizer,
     T: ?Sized,
 {
+    async fn is_action_allowed(
+        &self,
+        dataset_id: &odf::DatasetID,
+        action: DatasetAction,
+    ) -> Result<bool, InternalError> {
+        match self.check_action_allowed(dataset_id, action).await {
+            Ok(()) => Ok(true),
+            Err(DatasetActionUnauthorizedError::Access(_)) => Ok(false),
+            Err(DatasetActionUnauthorizedError::Internal(err)) => Err(err),
+        }
+    }
+
     fn filtered_datasets_stream<'a>(
         &'a self,
         dataset_handles_stream: DatasetHandleStream<'a>,
