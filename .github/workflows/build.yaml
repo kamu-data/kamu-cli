@@ -70,6 +70,7 @@ jobs:
             container-runtime: podman
             ipfs: true
             database: true
+            maximize-space: true
           # TODO: Not running docker as it takes ~7 minutes to install
           # See: https://github.com/actions/runner/issues/1456
           - name: MacOS / amd64
@@ -81,6 +82,7 @@ jobs:
             container-runtime: ''
             ipfs: false
             database: false
+            maximize-space: false
           # TODO: M1 cannot run docker due to lack of nested virtualization
           # See: https://github.com/marketplace/actions/setup-docker-on-macos#arm64-processors-m1-m2-m3-series-used-on-macos-14-images-are-unsupported
           - name: MacOS / arm64
@@ -92,6 +94,7 @@ jobs:
             container-runtime: ''
             ipfs: false
             database: false
+            maximize-space: false
           # TODO: DataFusion tests are temporarily disabled
           # See: https://github.com/kamu-data/kamu-cli/issues/226
           - name: Windows / amd64
@@ -104,6 +107,7 @@ jobs:
             container-runtime: ''
             ipfs: false
             database: false
+            maximize-space: false
     name: Test / ${{ matrix.name }}
     runs-on: ${{ matrix.runs-on }}
     services:
@@ -128,6 +132,14 @@ jobs:
         if: matrix.ipfs
         with:
           ipfs_version: "0.19"
+
+      - name: Maximize build space
+        if: maximize-space
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
 
       - uses: actions/checkout@v4
 
