@@ -23,7 +23,7 @@ use std::fmt::Display;
 use datafusion::sql::sqlparser::dialect::{dialect_from_str, Dialect, GenericDialect};
 use datafusion::sql::sqlparser::keywords::Keyword;
 use datafusion::sql::sqlparser::tokenizer::{Token, Tokenizer};
-use rustyline::highlight::Highlighter;
+use rustyline::highlight::{CmdKind, Highlighter};
 
 /// The syntax highlighter.
 #[derive(Debug)]
@@ -68,7 +68,7 @@ impl Highlighter for SyntaxHighlighter {
         }
     }
 
-    fn highlight_char(&self, line: &str, _pos: usize, _forced: bool) -> bool {
+    fn highlight_char(&self, line: &str, _pos: usize, _kind: CmdKind) -> bool {
         !line.is_empty()
     }
 }

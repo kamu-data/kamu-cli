@@ -87,7 +87,7 @@ impl MediaType {
     pub const ESRI_SHAPEFILE: MediaTypeRef<'static> = MediaTypeRef("application/vnd.shp");
 }
 
-impl<'a> MediaTypeRef<'a> {
+impl MediaTypeRef<'_> {
     pub fn to_owned(&self) -> MediaType {
         MediaType(self.0.to_string())
     }
@@ -99,7 +99,7 @@ impl std::fmt::Display for MediaType {
     }
 }
 
-impl<'a> std::fmt::Display for MediaTypeRef<'a> {
+impl std::fmt::Display for MediaTypeRef<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0)
     }
@@ -110,7 +110,8 @@ impl<'a> std::cmp::PartialEq<MediaTypeRef<'a>> for MediaType {
         self.0 == other.0
     }
 }
-impl<'a> std::cmp::PartialEq<MediaType> for MediaTypeRef<'a> {
+
+impl std::cmp::PartialEq<MediaType> for MediaTypeRef<'_> {
     fn eq(&self, other: &MediaType) -> bool {
         self.0 == other.0
     }

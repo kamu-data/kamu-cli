@@ -80,7 +80,7 @@ impl<TServerHarness: ServerSideHarness> SmartPushExistingEvolvedDatasetScenario<
 
         // Extend client-side dataset with new nodes
         let client_registry = client_harness.dataset_registry();
-        let client_dataset_ref = make_dataset_ref(&client_account_name, "foo");
+        let client_dataset_ref = make_dataset_ref(client_account_name.as_ref(), "foo");
         client_registry
             .get_dataset_by_ref(&client_dataset_ref)
             .await

@@ -862,7 +862,7 @@ impl FlowApi<'_> {
                 .replace("<dataset_id>", &dataset_id.as_did_str().to_stack_string())
                 .replace(
                     "<dataset_flow_type>",
-                    &format!("{dataset_flow_type:?}").to_case(Case::ScreamingSnake),
+                    &format!("{dataset_flow_type:?}").to_case(Case::UpperSnake),
                 )
                 .as_str(),
             )

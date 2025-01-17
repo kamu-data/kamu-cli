@@ -32,7 +32,7 @@ impl ReaderCsv {
 
     pub async fn new(ctx: SessionContext, conf: ReadStepCsv) -> Result<Self, ReadError> {
         Ok(Self {
-            schema: super::from_ddl_schema(&ctx, &conf.schema)
+            schema: super::from_ddl_schema(&ctx, conf.schema.as_ref())
                 .await?
                 .map(Arc::new),
             ctx,
@@ -53,7 +53,7 @@ impl Reader for ReaderCsv {
         // TODO: Move this to reader construction phase
         let delimiter = match &self.conf.separator {
             Some(v) if !v.is_empty() => {
-                if v.as_bytes().len() > 1 {
+                if v.len() > 1 {
                     return Err("Csv.separator supports only single-character ascii values"
                         .int_err()
                         .into());
@@ -64,7 +64,7 @@ impl Reader for ReaderCsv {
         };
         let quote = match &self.conf.quote {
             Some(v) if !v.is_empty() => {
-                if v.as_bytes().len() > 1 {
+                if v.len() > 1 {
                     Err(unsupported!(
                         "Csv.quote supports only single-character ascii values, got: {}",
                         v
@@ -77,7 +77,7 @@ impl Reader for ReaderCsv {
         }?;
         let escape = match &self.conf.escape {
             Some(v) if !v.is_empty() => {
-                if v.as_bytes().len() > 1 {
+                if v.len() > 1 {
                     Err(unsupported!(
                         "Csv.escape supports only single-character ascii values, got: {}",
                         v

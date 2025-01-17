@@ -126,7 +126,7 @@ impl<'a> ValidateSystemTimeIsMonotonicVisitor<'a> {
     }
 }
 
-impl<'a> MetadataChainVisitor for ValidateSystemTimeIsMonotonicVisitor<'a> {
+impl MetadataChainVisitor for ValidateSystemTimeIsMonotonicVisitor<'_> {
     type Error = AppendValidationError;
 
     fn initial_decision(&self) -> Decision {
@@ -237,7 +237,7 @@ impl<'a> ValidateOffsetsAreSequentialVisitor<'a> {
     }
 }
 
-impl<'a> MetadataChainVisitor for ValidateOffsetsAreSequentialVisitor<'a> {
+impl MetadataChainVisitor for ValidateOffsetsAreSequentialVisitor<'_> {
     type Error = AppendValidationError;
 
     fn initial_decision(&self) -> Decision {
@@ -541,7 +541,7 @@ impl<'a> ValidateAddDataVisitor<'a> {
     }
 }
 
-impl<'a> MetadataChainVisitor for ValidateAddDataVisitor<'a> {
+impl MetadataChainVisitor for ValidateAddDataVisitor<'_> {
     type Error = AppendValidationError;
 
     fn initial_decision(&self) -> Decision {
@@ -649,7 +649,7 @@ impl<'a> ValidateExecuteTransformVisitor<'a> {
     }
 }
 
-impl<'a> MetadataChainVisitor for ValidateExecuteTransformVisitor<'a> {
+impl MetadataChainVisitor for ValidateExecuteTransformVisitor<'_> {
     type Error = AppendValidationError;
 
     fn initial_decision(&self) -> Decision {

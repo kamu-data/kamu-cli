@@ -191,7 +191,7 @@ struct BadStatusCode {
 
 struct ReaderHelper<'a>(&'a mut dyn Stream);
 
-impl<'a> Read for ReaderHelper<'a> {
+impl Read for ReaderHelper<'_> {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize, IOError> {
         self.0.read(buf)
     }

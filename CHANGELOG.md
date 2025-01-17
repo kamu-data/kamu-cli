@@ -28,6 +28,11 @@ Recommendation: for ease of reading, use the following order:
   - GQL, `DatasetMetadata.currentDownstreamDependencies`: exclude datasets that cannot be accessed
   - E2E: added the ability to create an account using CLI
 
+## [0.217.3] - 2025-01-14
+### Fixed
+- Fix crash on resolving dataset by non-existing account
+- Minor improvements in event sourcing aggregation
+
 ## [0.217.2] - 2025-01-10
 ### Changed
 - Updated to latest `datafusion` and `alloy` dependencies

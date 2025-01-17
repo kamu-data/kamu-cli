@@ -675,6 +675,46 @@ impl FlowEventStore for InMemoryFlowEventStore {
             .filter(|flow_id| g.matches_any_flow(**flow_id, filters))
             .count())
     }
+
+    fn get_stream(&self, flow_ids: Vec<FlowID>) -> FlowStateStream {
+        Box::pin(async_stream::try_stream! {
+            // 32-items batching will give a performance boost,
+            // but queries for long-lived datasets should not bee too heavy.
+            // This number was chosen without any performance measurements. Subject of change.
+            let chunk_size = 32;
+            for chunk in flow_ids.chunks(chunk_size) {
+                let flows = Flow::load_multi(
+                    chunk.to_vec(),
+                    self
+                ).await.int_err()?;
+                for flow in flows {
+                    yield flow.int_err()?.into();
+                }
+            }
+        })
+    }
+
+    async fn get_count_flows_by_datasets(
+        &self,
+        dataset_ids: HashSet<DatasetID>,
+        filters: &DatasetFlowFilters,
+    ) -> Result<usize, InternalError> {
+        let state = self.inner.as_state();
+        let g = state.lock().unwrap();
+
+        let mut count = 0;
+        for flow_id in &g.all_flows {
+            let flow_key = g.flow_key_by_flow_id.get(flow_id).unwrap();
+            if let FlowKey::Dataset(flow_key_dataset) = flow_key {
+                if dataset_ids.contains(&flow_key_dataset.dataset_id)
+                    && g.matches_dataset_flow(*flow_id, filters)
+                {
+                    count += 1;
+                }
+            }
+        }
+        Ok(count)
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

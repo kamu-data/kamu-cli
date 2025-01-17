@@ -401,7 +401,7 @@ pub async fn prepare_pull_object_transfer_strategy(
     dataset: &dyn Dataset,
     object_file_ref: &ObjectFileReference,
     dataset_url: &Url,
-    maybe_bearer_header: &Option<BearerHeader>,
+    maybe_bearer_header: Option<&BearerHeader>,
 ) -> Result<PullObjectTransferStrategy, InternalError> {
     let get_download_url_result = match object_file_ref.object_type {
         ObjectType::DataSlice => {
@@ -481,7 +481,7 @@ fn get_simple_transfer_protocol_url(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 fn get_simple_transfer_protocol_headers(
-    maybe_bearer_header: &Option<BearerHeader>,
+    maybe_bearer_header: Option<&BearerHeader>,
     version: i32,
 ) -> Vec<HeaderRow> {
     let mut headers = vec![HeaderRow {
@@ -533,7 +533,7 @@ pub async fn prepare_push_object_transfer_strategy(
     dataset: &dyn Dataset,
     object_file_ref: &ObjectFileReference,
     dataset_url: &Url,
-    maybe_bearer_header: &Option<BearerHeader>,
+    maybe_bearer_header: Option<&BearerHeader>,
 ) -> Result<PushObjectTransferStrategy, InternalError> {
     let object_repo = match object_file_ref.object_type {
         ObjectType::DataSlice => dataset.as_data_repo(),

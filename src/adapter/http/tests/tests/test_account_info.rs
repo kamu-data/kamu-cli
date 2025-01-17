@@ -23,7 +23,7 @@ async fn test_get_account_info_with_wrong_token() {
         let cl = reqwest::Client::new();
 
         let res = cl
-            .get(&format!("{}accounts/me", harness.root_url))
+            .get(format!("{}accounts/me", harness.root_url))
             .send()
             .await
             .unwrap();
@@ -49,7 +49,7 @@ async fn test_get_account_info() {
         let cl = reqwest::Client::new();
 
         let res = cl
-            .get(&format!("{}accounts/me", harness.root_url))
+            .get(format!("{}accounts/me", harness.root_url))
             .header("Authorization", format!("Bearer {DUMMY_ACCESS_TOKEN}"))
             .send()
             .await

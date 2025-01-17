@@ -141,7 +141,7 @@ impl<'a, B> From<&'a http::Request<B>> for RouteOrUri<'a> {
     }
 }
 
-impl<'a> std::fmt::Display for RouteOrUri<'a> {
+impl std::fmt::Display for RouteOrUri<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             RouteOrUri::Route(s) => write!(f, "{s}"),

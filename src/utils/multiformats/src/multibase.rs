@@ -118,7 +118,7 @@ impl<'a, const S: usize> MultibaseFmt<'a, S> {
     }
 }
 
-impl<'a, const S: usize> std::fmt::Display for MultibaseFmt<'a, S> {
+impl<const S: usize> std::fmt::Display for MultibaseFmt<'_, S> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.to_str())
     }

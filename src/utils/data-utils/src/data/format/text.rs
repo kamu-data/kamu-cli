@@ -16,7 +16,7 @@ use super::traits::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct BooleanEncoder<'a>(pub &'a arrow::array::BooleanArray);
-impl<'a> Encoder for BooleanEncoder<'a> {
+impl Encoder for BooleanEncoder<'_> {
     fn encode(&mut self, idx: usize, buf: &mut dyn std::io::Write) -> Result<(), WriterError> {
         if self.0.value(idx) {
             write!(buf, "true")?;
@@ -28,7 +28,7 @@ impl<'a> Encoder for BooleanEncoder<'a> {
 }
 
 pub struct IntegerEncoder<'a, T: ArrowPrimitiveType>(pub &'a arrow::array::PrimitiveArray<T>);
-impl<'a, T: ArrowPrimitiveType> Encoder for IntegerEncoder<'a, T>
+impl<T: ArrowPrimitiveType> Encoder for IntegerEncoder<'_, T>
 where
     <T as ArrowPrimitiveType>::Native: std::fmt::Display,
 {
@@ -39,7 +39,7 @@ where
 }
 
 pub struct Float16Encoder<'a>(pub &'a arrow::array::Float16Array);
-impl<'a> Encoder for Float16Encoder<'a> {
+impl Encoder for Float16Encoder<'_> {
     fn encode(&mut self, idx: usize, buf: &mut dyn std::io::Write) -> Result<(), WriterError> {
         let mut serializer = serde_json::Serializer::new(buf);
         serializer
@@ -50,7 +50,7 @@ impl<'a> Encoder for Float16Encoder<'a> {
 }
 
 pub struct Float32Encoder<'a>(pub &'a arrow::array::Float32Array);
-impl<'a> Encoder for Float32Encoder<'a> {
+impl Encoder for Float32Encoder<'_> {
     fn encode(&mut self, idx: usize, buf: &mut dyn std::io::Write) -> Result<(), WriterError> {
         let mut serializer = serde_json::Serializer::new(buf);
         serializer.serialize_f32(self.0.value(idx)).unwrap();
@@ -59,7 +59,7 @@ impl<'a> Encoder for Float32Encoder<'a> {
 }
 
 pub struct Float64Encoder<'a>(pub &'a arrow::array::Float64Array);
-impl<'a> Encoder for Float64Encoder<'a> {
+impl Encoder for Float64Encoder<'_> {
     fn encode(&mut self, idx: usize, buf: &mut dyn std::io::Write) -> Result<(), WriterError> {
         let mut serializer = serde_json::Serializer::new(buf);
         serializer.serialize_f64(self.0.value(idx)).unwrap();
@@ -68,7 +68,7 @@ impl<'a> Encoder for Float64Encoder<'a> {
 }
 
 pub struct Decimal128Encoder<'a>(pub &'a arrow::array::Decimal128Array);
-impl<'a> Encoder for Decimal128Encoder<'a> {
+impl Encoder for Decimal128Encoder<'_> {
     fn encode(&mut self, idx: usize, buf: &mut dyn std::io::Write) -> Result<(), WriterError> {
         // TODO: PERF: Avoid allocation
         write!(buf, "{}", self.0.value_as_string(idx))?;
@@ -77,7 +77,7 @@ impl<'a> Encoder for Decimal128Encoder<'a> {
 }
 
 pub struct Decimal256Encoder<'a>(pub &'a arrow::array::Decimal256Array);
-impl<'a> Encoder for Decimal256Encoder<'a> {
+impl Encoder for Decimal256Encoder<'_> {
     fn encode(&mut self, idx: usize, buf: &mut dyn std::io::Write) -> Result<(), WriterError> {
         // TODO: PERF: Avoid allocation
         write!(buf, "{}", self.0.value_as_string(idx))?;
@@ -88,7 +88,7 @@ impl<'a> Encoder for Decimal256Encoder<'a> {
 pub struct StringEncoder<'a, OffsetSize: OffsetSizeTrait>(
     pub &'a arrow::array::GenericStringArray<OffsetSize>,
 );
-impl<'a, OffsetSize: OffsetSizeTrait> Encoder for StringEncoder<'a, OffsetSize> {
+impl<OffsetSize: OffsetSizeTrait> Encoder for StringEncoder<'_, OffsetSize> {
     fn encode(&mut self, idx: usize, buf: &mut dyn std::io::Write) -> Result<(), WriterError> {
         write!(buf, "{}", self.0.value(idx))?;
         Ok(())
@@ -98,7 +98,7 @@ impl<'a, OffsetSize: OffsetSizeTrait> Encoder for StringEncoder<'a, OffsetSize> 
 pub struct BinaryHexEncoder<'a, OffsetSize: OffsetSizeTrait>(
     pub &'a arrow::array::GenericBinaryArray<OffsetSize>,
 );
-impl<'a, OffsetSize: OffsetSizeTrait> Encoder for BinaryHexEncoder<'a, OffsetSize> {
+impl<OffsetSize: OffsetSizeTrait> Encoder for BinaryHexEncoder<'_, OffsetSize> {
     fn encode(&mut self, idx: usize, buf: &mut dyn std::io::Write) -> Result<(), WriterError> {
         let hex_str = hex::encode(self.0.value(idx));
         write!(buf, "{hex_str}")?;
@@ -107,7 +107,7 @@ impl<'a, OffsetSize: OffsetSizeTrait> Encoder for BinaryHexEncoder<'a, OffsetSiz
 }
 
 pub struct BinaryFixedHexEncoder<'a>(pub &'a arrow::array::FixedSizeBinaryArray);
-impl<'a> Encoder for BinaryFixedHexEncoder<'a> {
+impl Encoder for BinaryFixedHexEncoder<'_> {
     fn encode(&mut self, idx: usize, buf: &mut dyn std::io::Write) -> Result<(), WriterError> {
         let hex_str = hex::encode(self.0.value(idx));
         write!(buf, "{hex_str}")?;
@@ -120,7 +120,7 @@ impl<'a> Encoder for BinaryFixedHexEncoder<'a> {
 /// to be absolutely sure that result does not include symbols that have special
 /// meaning within a JSON string.
 pub struct ArrowEncoder<'a>(pub arrow::util::display::ArrayFormatter<'a>);
-impl<'a> Encoder for ArrowEncoder<'a> {
+impl Encoder for ArrowEncoder<'_> {
     fn encode(&mut self, idx: usize, buf: &mut dyn std::io::Write) -> Result<(), WriterError> {
         write!(buf, "{}", self.0.value(idx))?;
         Ok(())

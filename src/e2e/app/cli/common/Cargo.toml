@@ -36,7 +36,7 @@ opendatafabric = { workspace = true }
 async-graphql = { version = "7", default-features = false }
 async-trait = "0.1"
 chrono = { version = "0.4", default-features = false, features = ["now"] }
-convert_case = { version = "0.6" }
+convert_case = { version = "0.7" }
 indoc = "2"
 lazy_static = { version = "1" }
 pretty_assertions = "1"

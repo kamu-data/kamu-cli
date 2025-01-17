@@ -35,12 +35,13 @@ time-source = { workspace = true }
 async-stream = "0.3"
 async-trait = { version = "0.1", default-features = false }
 chrono = { version = "0.4", default-features = false }
-dill = "0.10"
+dill = "0.11"
 futures = { version = "0.3", default-features = false }
-petgraph = { version = "0.6", default-features = false, features = [
+petgraph = { version = "0.7", default-features = false, features = [
     "stable_graph",
 ] }
 secrecy = "0.10"
+thiserror = { version = "2", default-features = false }
 tokio = { version = "1", default-features = false }
 tokio-stream = { version = "0.1", default-features = false }
 tracing = { version = "0.1", default-features = false }

@@ -85,7 +85,7 @@ impl FetchService {
         match fetch_step {
             FetchStep::Url(furl) => {
                 let url = self.template_url(&furl.url, dataset_env_vars)?;
-                let headers = self.template_headers(&furl.headers, dataset_env_vars)?;
+                let headers = self.template_headers(furl.headers.as_ref(), dataset_env_vars)?;
 
                 match url.scheme() {
                     "file" => Self::fetch_file(
@@ -186,12 +186,12 @@ impl FetchService {
 
     pub(super) fn template_headers(
         &self,
-        headers_tpl: &Option<Vec<RequestHeader>>,
+        headers_tpl: Option<&Vec<RequestHeader>>,
         dataset_env_vars: &HashMap<String, DatasetEnvVar>,
     ) -> Result<Vec<RequestHeader>, PollingIngestError> {
         let mut res = Vec::new();
         let empty = Vec::new();
-        for htpl in headers_tpl.as_ref().unwrap_or(&empty) {
+        for htpl in headers_tpl.unwrap_or(&empty) {
             let hdr = RequestHeader {
                 name: htpl.name.clone(),
                 value: self.template_string(&htpl.value, dataset_env_vars)?,

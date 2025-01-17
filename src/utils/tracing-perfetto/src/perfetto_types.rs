@@ -46,7 +46,7 @@ pub enum Visitable<'a> {
     Event(&'a tracing::Event<'a>),
 }
 
-impl<'a> Visitable<'a> {
+impl Visitable<'_> {
     pub fn visit(&self, v: &mut dyn tracing::field::Visit) {
         match self {
             Visitable::Span(attrs) => attrs.record(v),

@@ -148,13 +148,13 @@ impl<'a> DidOdfFmt<'a> {
     }
 }
 
-impl<'a> std::fmt::Debug for DidOdfFmt<'a> {
+impl std::fmt::Debug for DidOdfFmt<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{self}")
     }
 }
 
-impl<'a> std::fmt::Display for DidOdfFmt<'a> {
+impl std::fmt::Display for DidOdfFmt<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "did:odf:{}", self.inner)
     }

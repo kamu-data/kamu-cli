@@ -130,7 +130,7 @@ impl MetadataEventDataStream {
     }
 }
 
-impl<'a> MetadataEventDataStreamRef<'a> {
+impl MetadataEventDataStreamRef<'_> {
     /// Helper for determining the last record offset in the dataset
     pub fn last_offset(&self) -> Option<u64> {
         self.new_data

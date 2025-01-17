@@ -1,2 +1,6 @@
 unreadable-literal-lint-fractions = false
 disallowed-macros = ["std::dbg"]
+disallowed-names = []
+
+# Note: bug in Clippy, introduced in nightly-2024-12-27
+# https://github.com/rust-lang/rust-clippy/issues/13885

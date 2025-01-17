@@ -138,13 +138,13 @@ impl<'a> AccountIDFmt<'a> {
     }
 }
 
-impl<'a> std::fmt::Debug for AccountIDFmt<'a> {
+impl std::fmt::Debug for AccountIDFmt<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{self}")
     }
 }
 
-impl<'a> std::fmt::Display for AccountIDFmt<'a> {
+impl std::fmt::Display for AccountIDFmt<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "did:odf:{}", self.inner)
     }
@@ -168,7 +168,7 @@ impl<'de> serde::Deserialize<'de> for AccountID {
 
 struct AccountIDSerdeVisitor;
 
-impl<'de> serde::de::Visitor<'de> for AccountIDSerdeVisitor {
+impl serde::de::Visitor<'_> for AccountIDSerdeVisitor {
     type Value = AccountID;
 
     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {

@@ -19,7 +19,7 @@ pub(crate) struct PrettyCLIError<'a> {
     pub include_backtraces: bool,
 }
 
-impl<'a> PrettyCLIError<'a> {
+impl PrettyCLIError<'_> {
     fn write_error(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut error_chain = Vec::new();
         let mut err_ref: Option<&dyn Error> = Some(self.error as &dyn Error);
@@ -159,7 +159,7 @@ impl<'a> PrettyCLIError<'a> {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl<'a> std::fmt::Display for PrettyCLIError<'a> {
+impl std::fmt::Display for PrettyCLIError<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.error {
             CLIError::BatchError(batch) => self.write_batch_error(batch, f),

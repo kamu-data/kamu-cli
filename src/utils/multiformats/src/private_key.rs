@@ -70,7 +70,7 @@ impl serde::Serialize for PrivateKey {
 
 struct PrivateKeyVisitor;
 
-impl<'de> serde::de::Visitor<'de> for PrivateKeyVisitor {
+impl serde::de::Visitor<'_> for PrivateKeyVisitor {
     type Value = PrivateKey;
 
     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {

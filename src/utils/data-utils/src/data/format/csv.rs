@@ -238,7 +238,7 @@ impl CsvEscapeStringEncoder<'static, CsvNullEncoder> {
     }
 }
 
-impl<'a, E: Encoder> Encoder for CsvEscapeStringEncoder<'a, E> {
+impl<E: Encoder> Encoder for CsvEscapeStringEncoder<'_, E> {
     fn encode(&mut self, idx: usize, buf: &mut dyn std::io::Write) -> Result<(), WriterError> {
         self.0.encode(idx, &mut self.2)?;
         CsvEscapeStringEncoder::write_escaped(buf, std::str::from_utf8(&self.2).unwrap(), self.1)?;

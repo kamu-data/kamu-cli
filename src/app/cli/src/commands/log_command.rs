@@ -170,10 +170,10 @@ impl AsciiRenderer {
         }
     }
 
-    async fn render_blocks<'a, 'b>(
-        &'a self,
+    async fn render_blocks(
+        &self,
         output: &mut impl Write,
-        blocks: DynMetadataStream<'b>,
+        blocks: DynMetadataStream<'_>,
     ) -> Result<(), CLIError> {
         let mut blocks = blocks.take(self.limit);
 
@@ -535,7 +535,7 @@ impl MetadataRenderer for PagedAsciiRenderer {
 // TODO: Figure out how to use std::fmt::Write with std::io::stdout()
 pub struct WritePager<'a>(pub &'a mut minus::Pager);
 
-impl<'a> Write for WritePager<'a> {
+impl Write for WritePager<'_> {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
         use std::fmt::Write;
         self.0.write_str(std::str::from_utf8(buf).unwrap()).unwrap();
@@ -558,10 +558,10 @@ impl YamlRenderer {
         Self { limit }
     }
 
-    async fn render_blocks<'a, 'b>(
+    async fn render_blocks(
         &self,
-        output: &'a mut impl Write,
-        blocks: DynMetadataStream<'b>,
+        output: &mut impl Write,
+        blocks: DynMetadataStream<'_>,
     ) -> Result<(), CLIError> {
         let mut blocks = blocks.take(self.limit);
 

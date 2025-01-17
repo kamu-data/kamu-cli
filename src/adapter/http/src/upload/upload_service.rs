@@ -235,7 +235,7 @@ impl Serialize for UploadTokenBase64Json {
 }
 
 struct UploadTokenBase64JsonVisitor;
-impl<'de> serde::de::Visitor<'de> for UploadTokenBase64JsonVisitor {
+impl serde::de::Visitor<'_> for UploadTokenBase64JsonVisitor {
     type Value = UploadTokenBase64Json;
 
     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {

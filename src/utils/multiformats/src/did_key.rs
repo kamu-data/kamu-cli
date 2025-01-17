@@ -161,7 +161,7 @@ impl serde::Serialize for DidKey {
 
 struct DidKeyVisitor;
 
-impl<'de> serde::de::Visitor<'de> for DidKeyVisitor {
+impl serde::de::Visitor<'_> for DidKeyVisitor {
     type Value = DidKey;
 
     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -268,13 +268,13 @@ impl<'a> DidKeyFmt<'a> {
     }
 }
 
-impl<'a> std::fmt::Debug for DidKeyFmt<'a> {
+impl std::fmt::Debug for DidKeyFmt<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{self}")
     }
 }
 
-impl<'a> std::fmt::Display for DidKeyFmt<'a> {
+impl std::fmt::Display for DidKeyFmt<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "did:key:{}", self.inner)
     }
@@ -305,13 +305,13 @@ impl<'a> DidKeyMultibaseFmt<'a> {
     }
 }
 
-impl<'a> std::fmt::Debug for DidKeyMultibaseFmt<'a> {
+impl std::fmt::Debug for DidKeyMultibaseFmt<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{self}")
     }
 }
 
-impl<'a> std::fmt::Display for DidKeyMultibaseFmt<'a> {
+impl std::fmt::Display for DidKeyMultibaseFmt<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
