@@ -37,7 +37,6 @@ use kamu_auth_rebac::{
     SetEntityPropertyError,
     SubjectEntityRelationsError,
     UnsetEntityPropertyError,
-    PROPERTY_VALUE_BOOLEAN_TRUE,
 };
 use opendatafabric as odf;
 
@@ -111,11 +110,7 @@ impl RebacService for RebacServiceImpl {
                 PropertyName::Account(account_property_name) => (account_property_name, value),
             })
             .fold(AccountProperties::default(), |mut acc, (name, value)| {
-                match name {
-                    AccountPropertyName::IsAnAdmin => {
-                        acc.is_admin = value == PROPERTY_VALUE_BOOLEAN_TRUE;
-                    }
-                };
+                acc.apply(name, &value);
                 acc
             });
 
@@ -192,14 +187,7 @@ impl RebacService for RebacServiceImpl {
                 PropertyName::Account(_) => unreachable!(),
             })
             .fold(DatasetProperties::default(), |mut acc, (name, value)| {
-                match name {
-                    DatasetPropertyName::AllowsAnonymousRead => {
-                        acc.allows_anonymous_read = value == PROPERTY_VALUE_BOOLEAN_TRUE;
-                    }
-                    DatasetPropertyName::AllowsPublicRead => {
-                        acc.allows_public_read = value == PROPERTY_VALUE_BOOLEAN_TRUE;
-                    }
-                };
+                acc.apply(name, &value);
                 acc
             });
 
@@ -243,14 +231,7 @@ impl RebacService for RebacServiceImpl {
                 .get_mut(&dataset_id)
                 .ok_or_else(|| format!("dataset_id not found: {dataset_id}").int_err())?;
 
-            match name {
-                DatasetPropertyName::AllowsAnonymousRead => {
-                    dataset_properties.allows_anonymous_read = value == PROPERTY_VALUE_BOOLEAN_TRUE;
-                }
-                DatasetPropertyName::AllowsPublicRead => {
-                    dataset_properties.allows_public_read = value == PROPERTY_VALUE_BOOLEAN_TRUE;
-                }
-            };
+            dataset_properties.apply(name, &value);
         }
 
         Ok(dataset_properties_map)
