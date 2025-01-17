@@ -42,15 +42,30 @@ use opendatafabric as odf;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub type DefaultAccountProperties = AccountProperties;
+pub type DefaultDatasetProperties = DatasetProperties;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub struct RebacServiceImpl {
     rebac_repo: Arc<dyn RebacRepository>,
+    default_account_properties: Arc<DefaultAccountProperties>,
+    default_dataset_properties: Arc<DefaultDatasetProperties>,
 }
 
 #[component(pub)]
 #[interface(dyn RebacService)]
 impl RebacServiceImpl {
-    pub fn new(rebac_repo: Arc<dyn RebacRepository>) -> Self {
-        Self { rebac_repo }
+    pub fn new(
+        rebac_repo: Arc<dyn RebacRepository>,
+        default_account_properties: Arc<DefaultAccountProperties>,
+        default_dataset_properties: Arc<DefaultDatasetProperties>,
+    ) -> Self {
+        Self {
+            rebac_repo,
+            default_account_properties,
+            default_dataset_properties,
+        }
     }
 }
 
@@ -103,13 +118,14 @@ impl RebacService for RebacServiceImpl {
             .await
             .int_err()?;
 
+        let default_account_properties = (*self.default_account_properties).clone();
         let account_properties = entity_properties
             .into_iter()
             .map(|(name, value)| match name {
                 PropertyName::Dataset(_) => unreachable!(),
                 PropertyName::Account(account_property_name) => (account_property_name, value),
             })
-            .fold(AccountProperties::default(), |mut acc, (name, value)| {
+            .fold(default_account_properties, |mut acc, (name, value)| {
                 acc.apply(name, &value);
                 acc
             });
@@ -180,13 +196,14 @@ impl RebacService for RebacServiceImpl {
             .await
             .int_err()?;
 
+        let default_dataset_properties = (*self.default_dataset_properties).clone();
         let dataset_properties = entity_properties
             .into_iter()
             .map(|(name, value)| match name {
                 PropertyName::Dataset(dataset_property_name) => (dataset_property_name, value),
                 PropertyName::Account(_) => unreachable!(),
             })
-            .fold(DatasetProperties::default(), |mut acc, (name, value)| {
+            .fold(default_dataset_properties, |mut acc, (name, value)| {
                 acc.apply(name, &value);
                 acc
             });
@@ -210,9 +227,10 @@ impl RebacService for RebacServiceImpl {
             .int_err()?;
 
         let mut dataset_properties_map = HashMap::new();
+        let default_dataset_properties = (*self.default_dataset_properties).clone();
 
         for dataset_id in dataset_ids {
-            dataset_properties_map.insert(dataset_id.clone(), DatasetProperties::default());
+            dataset_properties_map.insert(dataset_id.clone(), default_dataset_properties.clone());
         }
 
         let entity_properties_it =

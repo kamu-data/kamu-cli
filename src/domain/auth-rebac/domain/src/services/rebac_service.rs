@@ -103,7 +103,7 @@ pub trait RebacService: Send + Sync {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Default)]
+#[derive(Debug, Clone)]
 pub struct AccountProperties {
     pub is_admin: bool,
 }
@@ -120,7 +120,7 @@ impl AccountProperties {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Default)]
+#[derive(Debug, Clone)]
 pub struct DatasetProperties {
     pub allows_anonymous_read: bool,
     pub allows_public_read: bool,

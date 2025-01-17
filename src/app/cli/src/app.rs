@@ -496,6 +496,11 @@ pub fn configure_base_catalog(
     b.add::<DatabaseTransactionRunner>();
 
     b.add::<kamu_auth_rebac_services::RebacServiceImpl>();
+    b.add_value(kamu_auth_rebac_services::DefaultAccountProperties { is_admin: false });
+    b.add_value(kamu_auth_rebac_services::DefaultDatasetProperties {
+        allows_anonymous_read: false,
+        allows_public_read: false,
+    });
 
     b.add::<kamu_adapter_flight_sql::SessionAuthAnonymous>();
     b.add::<kamu_adapter_flight_sql::SessionManagerCaching>();
