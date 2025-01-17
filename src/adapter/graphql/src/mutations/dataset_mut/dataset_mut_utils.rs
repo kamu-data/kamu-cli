@@ -15,7 +15,7 @@ use crate::utils;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) async fn ensure_account_owns_dataset(
+pub(crate) async fn ensure_account_is_owner_or_admin(
     ctx: &Context<'_>,
     dataset_handle: &odf::DatasetHandle,
 ) -> Result<()> {
@@ -23,7 +23,6 @@ pub(crate) async fn ensure_account_owns_dataset(
     let logged_account = utils::get_logged_account(ctx)?;
 
     if logged_account.is_admin {
-        // Technically, the admin isn't the owner, but that's not a barrier in this case
         return Ok(());
     }
 
