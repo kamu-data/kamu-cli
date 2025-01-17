@@ -7,8 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-#![feature(lint_reasons)]
-
 mod dataset_resource;
 mod dependencies;
 mod kamu_auth_oso;

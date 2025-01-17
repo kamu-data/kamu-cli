@@ -222,6 +222,8 @@ async fn test_try_to_resolve_non_existing_dataset() {
 
 #[test_log::test(tokio::test)]
 async fn test_try_to_resolve_all_datasets_for_non_existing_user() {
+    use futures::TryStreamExt;
+
     let harness = DatasetEntryServiceHarness::new(
         MockDatasetEntryRepository::new(),
         MockDatasetRepository::new(),
