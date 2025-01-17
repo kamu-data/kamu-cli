@@ -11,7 +11,7 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## [Unreleased]
+## [0.219.0] - 2029-01-17
 ### Changed
 - Massive crates restructuring around Open Data Fabric code:
   - `src/odf` concentrates large number of related crates now, preparing for future separation in different Git repo
