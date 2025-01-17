@@ -134,7 +134,7 @@ jobs:
           ipfs_version: "0.19"
 
       - name: Maximize build space
-        if: maximize-space
+        if: matrix.maximize-space
         run: |
           sudo rm -rf /usr/share/dotnet
           sudo rm -rf /usr/local/lib/android
