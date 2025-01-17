@@ -13,7 +13,7 @@ use kamu_core::{self as domain, SetWatermarkPlanningError, SetWatermarkUseCase};
 use opendatafabric as odf;
 
 use crate::mutations::{
-    ensure_account_owns_dataset,
+    ensure_account_is_owner_or_admin,
     DatasetEnvVarsMut,
     DatasetFlowsMut,
     DatasetMetadataMut,
@@ -163,7 +163,7 @@ impl DatasetMut {
         ctx: &Context<'_>,
         visibility: DatasetVisibilityInput,
     ) -> Result<SetDatasetVisibilityResult> {
-        ensure_account_owns_dataset(ctx, &self.dataset_handle).await?;
+        ensure_account_is_owner_or_admin(ctx, &self.dataset_handle).await?;
 
         let rebac_svc = from_catalog_n!(ctx, dyn kamu_auth_rebac::RebacService);
 

@@ -825,6 +825,11 @@ impl GraphQLDatasetsHarness {
                 .bind::<dyn AuthenticationService, MockAuthenticationService>()
                 .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
                 .add::<RebacServiceImpl>()
+                .add_value(kamu_auth_rebac_services::DefaultAccountProperties { is_admin: false })
+                .add_value(kamu_auth_rebac_services::DefaultDatasetProperties {
+                    allows_anonymous_read: false,
+                    allows_public_read: false,
+                })
                 .add::<InMemoryRebacRepository>();
 
             if tenancy_config == TenancyConfig::MultiTenant {

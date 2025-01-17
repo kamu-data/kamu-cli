@@ -23,6 +23,7 @@ use crate::{
     PropertyValue,
     SetEntityPropertyError,
     SubjectEntityRelationsError,
+    PROPERTY_VALUE_BOOLEAN_TRUE,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -102,17 +103,40 @@ pub trait RebacService: Send + Sync {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Default)]
+#[derive(Debug, Clone)]
 pub struct AccountProperties {
     pub is_admin: bool,
 }
 
+impl AccountProperties {
+    pub fn apply(&mut self, name: AccountPropertyName, value: &PropertyValue) {
+        match name {
+            AccountPropertyName::IsAnAdmin => {
+                self.is_admin = value == PROPERTY_VALUE_BOOLEAN_TRUE;
+            }
+        };
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Default)]
+#[derive(Debug, Clone)]
 pub struct DatasetProperties {
     pub allows_anonymous_read: bool,
     pub allows_public_read: bool,
+}
+
+impl DatasetProperties {
+    pub fn apply(&mut self, name: DatasetPropertyName, value: &PropertyValue) {
+        match name {
+            DatasetPropertyName::AllowsAnonymousRead => {
+                self.allows_anonymous_read = value == PROPERTY_VALUE_BOOLEAN_TRUE;
+            }
+            DatasetPropertyName::AllowsPublicRead => {
+                self.allows_public_read = value == PROPERTY_VALUE_BOOLEAN_TRUE;
+            }
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
