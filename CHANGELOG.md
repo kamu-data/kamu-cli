@@ -11,6 +11,10 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [0.219.1] - 2029-01-18
+### Fixed
+- Reverted unstable AWS API dependencies
+
 ## [0.219.0] - 2029-01-17
 ### Changed
 - Massive crates restructuring around Open Data Fabric code:
