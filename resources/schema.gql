@@ -456,6 +456,10 @@ type Dataset {
 	"""
 	kind: DatasetKind!
 	"""
+	Returns the visibility of dataset
+	"""
+	visibility: DatasetVisibilityOutput!
+	"""
 	Access to the data of the dataset
 	"""
 	data: DatasetData!
@@ -660,11 +664,11 @@ type DatasetMetadata {
 	"""
 	Current upstream dependencies of a dataset
 	"""
-	currentUpstreamDependencies: [Dataset!]!
+	currentUpstreamDependencies: [DependencyDatasetResult!]!
 	"""
 	Current downstream dependencies of a dataset
 	"""
-	currentDownstreamDependencies: [Dataset!]!
+	currentDownstreamDependencies: [DependencyDatasetResult!]!
 	"""
 	Current polling source used by the root dataset
 	"""
@@ -736,6 +740,10 @@ type DatasetMut {
 	Manually advances the watermark of a root dataset
 	"""
 	setWatermark(watermark: DateTime!): SetWatermarkResult!
+	"""
+	Set visibility for the dataset
+	"""
+	setVisibility(visibility: DatasetVisibilityInput!): SetDatasetVisibilityResult!
 }
 
 scalar DatasetName
@@ -781,6 +789,13 @@ enum DatasetVisibility {
 	PRIVATE
 	PUBLIC
 }
+
+input DatasetVisibilityInput @oneOf {
+	private: PrivateDatasetVisibilityInput
+	public: PublicDatasetVisibilityInput
+}
+
+union DatasetVisibilityOutput = PrivateDatasetVisibility | PublicDatasetVisibility
 
 type Datasets {
 	"""
@@ -849,6 +864,20 @@ type DeleteResultDanglingReference implements DeleteResult {
 
 type DeleteResultSuccess implements DeleteResult {
 	deletedDataset: DatasetAlias!
+	message: String!
+}
+
+interface DependencyDatasetResult {
+	message: String!
+}
+
+type DependencyDatasetResultAccessible implements DependencyDatasetResult {
+	dataset: Dataset!
+	message: String!
+}
+
+type DependencyDatasetResultNotAccessible implements DependencyDatasetResult {
+	id: DatasetID!
 	message: String!
 }
 
@@ -1536,9 +1565,25 @@ type PrepStepPipe {
 	command: [String!]!
 }
 
+type PrivateDatasetVisibility {
+	dummy: String
+}
+
+input PrivateDatasetVisibilityInput {
+	dummy: String
+}
+
 input PropagationMode @oneOf {
 	custom: FlowConfigurationResetCustom
 	toSeed: FlowConfigurationResetToSeedDummy
+}
+
+type PublicDatasetVisibility {
+	anonymousAvailable: Boolean!
+}
+
+input PublicDatasetVisibilityInput {
+	anonymousAvailable: Boolean!
 }
 
 type Query {
@@ -1731,6 +1776,15 @@ type SetAttachments {
 
 type SetDataSchema {
 	schema: DataSchema!
+}
+
+interface SetDatasetVisibilityResult {
+	message: String!
+}
+
+type SetDatasetVisibilityResultSuccess implements SetDatasetVisibilityResult {
+	dummy: String
+	message: String!
 }
 
 interface SetFlowConfigResult {
@@ -1990,7 +2044,7 @@ type ViewAccessToken {
 	"""
 	createdAt: DateTime!
 	"""
-	Date of token revokation
+	Date of token revocation
 	"""
 	revokedAt: DateTime
 	"""
@@ -2009,7 +2063,7 @@ type ViewDatasetEnvVar {
 	"""
 	key: String!
 	"""
-	Non sercret value of dataset environment variable
+	Non secret value of dataset environment variable
 	"""
 	value: String
 	"""

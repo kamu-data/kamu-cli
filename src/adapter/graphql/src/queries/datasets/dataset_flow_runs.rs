@@ -17,7 +17,6 @@ use {kamu_flow_system as fs, opendatafabric as odf};
 use crate::mutations::{check_if_flow_belongs_to_dataset, FlowInDatasetError, FlowNotFound};
 use crate::prelude::*;
 use crate::queries::{Account, Flow};
-use crate::utils;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -35,8 +34,6 @@ impl DatasetFlowRuns {
     }
 
     async fn get_flow(&self, ctx: &Context<'_>, flow_id: FlowID) -> Result<GetFlowResult> {
-        utils::check_dataset_read_access(ctx, &self.dataset_handle).await?;
-
         if let Some(error) =
             check_if_flow_belongs_to_dataset(ctx, flow_id, &self.dataset_handle).await?
         {
@@ -67,8 +64,6 @@ impl DatasetFlowRuns {
         per_page: Option<usize>,
         filters: Option<DatasetFlowFilters>,
     ) -> Result<FlowConnection> {
-        utils::check_dataset_read_access(ctx, &self.dataset_handle).await?;
-
         let flow_query_service = from_catalog_n!(ctx, dyn fs::FlowQueryService);
 
         let page = page.unwrap_or(0);
@@ -122,8 +117,6 @@ impl DatasetFlowRuns {
     }
 
     async fn list_flow_initiators(&self, ctx: &Context<'_>) -> Result<AccountConnection> {
-        utils::check_dataset_read_access(ctx, &self.dataset_handle).await?;
-
         let flow_query_service = from_catalog_n!(ctx, dyn fs::FlowQueryService);
 
         let flow_initiator_ids: Vec<_> = flow_query_service

@@ -124,6 +124,7 @@ fn create_catalog_with_local_workspace(
     std::fs::create_dir(&datasets_dir).unwrap();
 
     dill::CatalogBuilder::new()
+        .add::<DidGeneratorDefault>()
         .add::<SystemTimeSourceDefault>()
         .add_value(TenancyConfig::SingleTenant)
         .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
@@ -149,6 +150,7 @@ async fn create_catalog_with_s3_workspace(
     let s3_context = S3Context::from_items(endpoint.clone(), bucket, key_prefix).await;
 
     dill::CatalogBuilder::new()
+        .add::<DidGeneratorDefault>()
         .add::<SystemTimeSourceDefault>()
         .add_value(TenancyConfig::SingleTenant)
         .add_builder(DatasetRepositoryS3::builder().with_s3_context(s3_context.clone()))

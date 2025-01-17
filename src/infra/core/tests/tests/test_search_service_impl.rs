@@ -31,6 +31,7 @@ async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
     std::fs::create_dir(&datasets_dir).unwrap();
 
     let catalog = dill::CatalogBuilder::new()
+        .add::<DidGeneratorDefault>()
         .add::<SystemTimeSourceDefault>()
         .add_value(CurrentAccountSubject::new_test())
         .add_value(TenancyConfig::SingleTenant)

@@ -616,7 +616,7 @@ struct DependencyGraphHarness {
 
 impl DependencyGraphHarness {
     fn new(tenancy_config: TenancyConfig) -> Self {
-        let base_repo_harness = BaseRepoHarness::new(tenancy_config);
+        let base_repo_harness = BaseRepoHarness::new(tenancy_config, None);
 
         let mut b = dill::CatalogBuilder::new_chained(base_repo_harness.catalog());
         b.add_builder(
@@ -773,7 +773,6 @@ impl DependencyGraphHarness {
             .dependency_graph_service
             .get_recursive_upstream_dependencies(dataset_ids)
             .await
-            .int_err()
             .unwrap()
             .collect()
             .await;

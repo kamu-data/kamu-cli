@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashSet;
+
 use database_common::PaginationOpts;
 use internal_error::InternalError;
 use opendatafabric as odf;
@@ -19,20 +21,23 @@ use crate::DatasetEntry;
 #[cfg_attr(any(feature = "testing", test), mockall::automock)]
 #[async_trait::async_trait]
 pub trait DatasetEntryRepository: Send + Sync {
-    async fn dataset_entries_count(&self) -> Result<usize, InternalError>;
+    async fn dataset_entries_count(&self) -> Result<usize, DatasetEntriesCountError>;
 
     async fn dataset_entries_count_by_owner_id(
         &self,
         owner_id: &odf::AccountID,
     ) -> Result<usize, InternalError>;
 
-    fn get_dataset_entries(&self, pagination: PaginationOpts) -> DatasetEntryStream<'_>;
+    async fn get_dataset_entries<'a>(
+        &'a self,
+        pagination: PaginationOpts,
+    ) -> DatasetEntryStream<'a>;
 
-    fn get_dataset_entries_by_owner_id(
-        &self,
+    async fn get_dataset_entries_by_owner_id<'a>(
+        &'a self,
         owner_id: &odf::AccountID,
         pagination: PaginationOpts,
-    ) -> DatasetEntryStream<'_>;
+    ) -> DatasetEntryStream<'a>;
 
     async fn get_dataset_entry(
         &self,
@@ -79,6 +84,27 @@ pub type DatasetEntryStream<'a> = std::pin::Pin<
 pub struct DatasetEntriesResolution {
     pub resolved_entries: Vec<DatasetEntry>,
     pub unresolved_entries: Vec<odf::DatasetID>,
+}
+
+impl DatasetEntriesResolution {
+    pub fn resolved_entries_owner_ids(&self) -> HashSet<odf::AccountID> {
+        self.resolved_entries
+            .iter()
+            .fold(HashSet::new(), |mut acc, entry| {
+                acc.insert(entry.owner_id.clone());
+                acc
+            })
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Errors
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum DatasetEntriesCountError {
+    #[error(transparent)]
+    Internal(#[from] InternalError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

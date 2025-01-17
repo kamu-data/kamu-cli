@@ -11,8 +11,7 @@ use std::assert_matches::assert_matches;
 use std::sync::{Arc, RwLock};
 
 use chrono::{DateTime, TimeZone, Utc};
-use dill::{Catalog, CatalogBuilder, Component};
-use futures::TryStreamExt;
+use dill::{CatalogBuilder, Component};
 use init_on_startup::InitOnStartup;
 use kamu::{DatasetRepositoryWriter, MockDatasetRepositoryWriter};
 use kamu_accounts::{Account, AccountRepository, CurrentAccountSubject};
@@ -223,6 +222,8 @@ async fn test_try_to_resolve_non_existing_dataset() {
 
 #[test_log::test(tokio::test)]
 async fn test_try_to_resolve_all_datasets_for_non_existing_user() {
+    use futures::TryStreamExt;
+
     let harness = DatasetEntryServiceHarness::new(
         MockDatasetEntryRepository::new(),
         MockDatasetRepository::new(),
@@ -240,7 +241,6 @@ async fn test_try_to_resolve_all_datasets_for_non_existing_user() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct DatasetEntryServiceHarness {
-    _catalog: Catalog,
     outbox: Arc<dyn Outbox>,
     dataset_entry_indexer: Arc<DatasetEntryIndexer>,
     account_repo: Arc<dyn AccountRepository>,
@@ -299,7 +299,6 @@ impl DatasetEntryServiceHarness {
             dataset_entry_indexer: catalog.get_one().unwrap(),
             account_repo: catalog.get_one().unwrap(),
             dataset_registry: catalog.get_one().unwrap(),
-            _catalog: catalog,
         }
     }
 

@@ -451,7 +451,10 @@ pub fn get_command(
             }
             cli::SystemSubCommand::E2e(sc) => Box::new(SystemE2ECommand::new(
                 sc.action,
+                sc.arguments.unwrap_or_default(),
                 sc.dataset,
+                cli_catalog.get_one()?,
+                cli_catalog.get_one()?,
                 cli_catalog.get_one()?,
             )),
             cli::SystemSubCommand::Gc(_) => Box::new(GcCommand::new(cli_catalog.get_one()?)),

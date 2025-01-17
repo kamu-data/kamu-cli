@@ -10,6 +10,9 @@
 use chrono::prelude::*;
 use kamu_core::{
     self as domain,
+    DatasetDependency,
+    GetDatasetDownstreamDependenciesUseCase,
+    GetDatasetUpstreamDependenciesUseCase,
     MetadataChainExt,
     SearchSetAttachmentsVisitor,
     SearchSetInfoVisitor,
@@ -79,77 +82,61 @@ impl DatasetMetadata {
         }
     }
 
+    // TODO: Private Datasets: tests
     /// Current upstream dependencies of a dataset
-    async fn current_upstream_dependencies(&self, ctx: &Context<'_>) -> Result<Vec<Dataset>> {
-        let (dependency_graph_service, dataset_registry) = from_catalog_n!(
-            ctx,
-            dyn domain::DependencyGraphService,
-            dyn domain::DatasetRegistry
-        );
+    async fn current_upstream_dependencies(
+        &self,
+        ctx: &Context<'_>,
+    ) -> Result<Vec<DependencyDatasetResult>> {
+        let get_dataset_upstream_dependencies_use_case =
+            from_catalog_n!(ctx, dyn GetDatasetUpstreamDependenciesUseCase);
 
-        use tokio_stream::StreamExt;
-        let upstream_dataset_ids: Vec<_> = dependency_graph_service
-            .get_upstream_dependencies(&self.dataset_handle.id)
+        let upstream_dependencies = get_dataset_upstream_dependencies_use_case
+            .execute(&self.dataset_handle.id)
             .await
             .int_err()?
-            .collect()
-            .await;
+            .into_iter()
+            .map(|dependency| match dependency {
+                DatasetDependency::Resolved(r) => {
+                    let account = Account::new(r.owner_id.into(), r.owner_name.into());
+                    let dataset = Dataset::new(account, r.dataset_handle);
 
-        let mut upstream = Vec::with_capacity(upstream_dataset_ids.len());
-        for upstream_dataset_id in upstream_dataset_ids {
-            let hdl = dataset_registry
-                .resolve_dataset_handle_by_ref(&upstream_dataset_id.as_local_ref())
-                .await
-                .int_err()?;
-            let maybe_account = Account::from_dataset_alias(ctx, &hdl.alias).await?;
-            if let Some(account) = maybe_account {
-                upstream.push(Dataset::new(account, hdl));
-            } else {
-                tracing::warn!(
-                    "Skipped upstream dataset '{}' with unresolved account",
-                    hdl.alias
-                );
-            }
-        }
+                    DependencyDatasetResult::accessible(dataset)
+                }
+                DatasetDependency::Unresolved(id) => DependencyDatasetResult::not_accessible(id),
+            })
+            .collect::<Vec<_>>();
 
-        Ok(upstream)
+        Ok(upstream_dependencies)
     }
 
-    // TODO: Convert to collection
+    // TODO: Convert to connection (page_based_connection!)
+    // TODO: Private Datasets: tests
     /// Current downstream dependencies of a dataset
-    async fn current_downstream_dependencies(&self, ctx: &Context<'_>) -> Result<Vec<Dataset>> {
-        let (dependency_graph_service, dataset_registry) = from_catalog_n!(
-            ctx,
-            dyn domain::DependencyGraphService,
-            dyn domain::DatasetRegistry
-        );
+    async fn current_downstream_dependencies(
+        &self,
+        ctx: &Context<'_>,
+    ) -> Result<Vec<DependencyDatasetResult>> {
+        let get_dataset_downstream_dependencies_use_case =
+            from_catalog_n!(ctx, dyn GetDatasetDownstreamDependenciesUseCase);
 
-        use tokio_stream::StreamExt;
-        let downstream_dataset_ids: Vec<_> = dependency_graph_service
-            .get_downstream_dependencies(&self.dataset_handle.id)
+        let downstream_dependencies = get_dataset_downstream_dependencies_use_case
+            .execute(&self.dataset_handle.id)
             .await
             .int_err()?
-            .collect()
-            .await;
+            .into_iter()
+            .map(|dependency| match dependency {
+                DatasetDependency::Resolved(r) => {
+                    let account = Account::new(r.owner_id.into(), r.owner_name.into());
+                    let dataset = Dataset::new(account, r.dataset_handle);
 
-        let mut downstream = Vec::with_capacity(downstream_dataset_ids.len());
-        for downstream_dataset_id in downstream_dataset_ids {
-            let hdl = dataset_registry
-                .resolve_dataset_handle_by_ref(&downstream_dataset_id.as_local_ref())
-                .await
-                .int_err()?;
-            let maybe_account = Account::from_dataset_alias(ctx, &hdl.alias).await?;
-            if let Some(account) = maybe_account {
-                downstream.push(Dataset::new(account, hdl));
-            } else {
-                tracing::warn!(
-                    "Skipped downstream dataset '{}' with unresolved account",
-                    hdl.alias
-                );
-            }
-        }
+                    DependencyDatasetResult::accessible(dataset)
+                }
+                DatasetDependency::Unresolved(id) => DependencyDatasetResult::not_accessible(id),
+            })
+            .collect::<Vec<_>>();
 
-        Ok(downstream)
+        Ok(downstream_dependencies)
     }
 
     /// Current polling source used by the root dataset
@@ -278,6 +265,53 @@ impl DatasetMetadata {
             .int_err()?
             .into_event()
             .map(Into::into))
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Interface, Debug, Clone)]
+#[graphql(field(name = "message", ty = "String"))]
+enum DependencyDatasetResult {
+    Accessible(DependencyDatasetResultAccessible),
+    NotAccessible(DependencyDatasetResultNotAccessible),
+}
+
+impl DependencyDatasetResult {
+    pub fn accessible(dataset: Dataset) -> Self {
+        Self::Accessible(DependencyDatasetResultAccessible { dataset })
+    }
+
+    pub fn not_accessible(dataset_id: odf::DatasetID) -> Self {
+        Self::NotAccessible(DependencyDatasetResultNotAccessible {
+            id: dataset_id.into(),
+        })
+    }
+}
+
+#[derive(SimpleObject, Debug, Clone)]
+#[graphql(complex)]
+pub struct DependencyDatasetResultAccessible {
+    pub dataset: Dataset,
+}
+
+#[ComplexObject]
+impl DependencyDatasetResultAccessible {
+    async fn message(&self) -> String {
+        "Found".to_string()
+    }
+}
+
+#[derive(SimpleObject, Debug, Clone)]
+#[graphql(complex)]
+pub struct DependencyDatasetResultNotAccessible {
+    pub id: DatasetID,
+}
+
+#[ComplexObject]
+impl DependencyDatasetResultNotAccessible {
+    async fn message(&self) -> String {
+        "Not Accessible".to_string()
     }
 }
 

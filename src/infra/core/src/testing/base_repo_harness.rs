@@ -17,8 +17,11 @@ use kamu_core::{
     DatasetRegistry,
     DatasetRegistryExt,
     DatasetRepository,
+    DidGenerator,
+    DidGeneratorDefault,
     GetDatasetError,
     MetadataChainExt,
+    MockDidGenerator,
     ResolvedDataset,
     RunInfoDir,
     TenancyConfig,
@@ -41,7 +44,10 @@ pub struct BaseRepoHarness {
 }
 
 impl BaseRepoHarness {
-    pub fn new(tenancy_config: TenancyConfig) -> Self {
+    pub fn new(
+        tenancy_config: TenancyConfig,
+        maybe_mock_did_generator: Option<MockDidGenerator>,
+    ) -> Self {
         let temp_dir = tempfile::tempdir().unwrap();
 
         let datasets_dir = temp_dir.path().join("datasets");
@@ -50,25 +56,33 @@ impl BaseRepoHarness {
         let run_info_dir = temp_dir.path().join("run");
         std::fs::create_dir(&run_info_dir).unwrap();
 
-        let catalog = dill::CatalogBuilder::new()
-            .add_value(RunInfoDir::new(run_info_dir))
-            .add_value(tenancy_config)
-            .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
-            .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-            .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
-            .add::<DatasetRegistryRepoBridge>()
-            .add_value(CurrentAccountSubject::new_test())
-            .add::<SystemTimeSourceDefault>()
-            .build();
+        let catalog = {
+            let mut b = dill::CatalogBuilder::new();
 
-        let dataset_registry = catalog.get_one().unwrap();
-        let dataset_repo_writer = catalog.get_one().unwrap();
+            b.add_value(RunInfoDir::new(run_info_dir))
+                .add_value(tenancy_config)
+                .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
+                .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+                .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
+                .add::<DatasetRegistryRepoBridge>()
+                .add_value(CurrentAccountSubject::new_test())
+                .add::<SystemTimeSourceDefault>();
+
+            if let Some(mock_did_generator) = maybe_mock_did_generator {
+                b.add_value(mock_did_generator)
+                    .bind::<dyn DidGenerator, MockDidGenerator>();
+            } else {
+                b.add::<DidGeneratorDefault>();
+            }
+
+            b.build()
+        };
 
         Self {
             temp_dir,
+            dataset_registry: catalog.get_one().unwrap(),
+            dataset_repo_writer: catalog.get_one().unwrap(),
             catalog,
-            dataset_registry,
-            dataset_repo_writer,
         }
     }
 

@@ -15,6 +15,8 @@ use opendatafabric as odf;
 use crate::prelude::*;
 use crate::queries::*;
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub struct DatasetEndpoints<'a> {
     owner: &'a Account,
     dataset_handle: odf::DatasetHandle,
@@ -48,7 +50,7 @@ impl<'a> DatasetEndpoints<'a> {
         self.dataset_handle.alias.dataset_name.as_str()
     }
 
-    #[allow(clippy::unused_async)]
+    #[expect(clippy::unused_async)]
     async fn web_link(&self) -> Result<LinkProtocolDesc> {
         let url = format!(
             "{}{}/{}",
@@ -60,7 +62,7 @@ impl<'a> DatasetEndpoints<'a> {
         Ok(LinkProtocolDesc { url })
     }
 
-    #[allow(clippy::unused_async)]
+    #[expect(clippy::unused_async)]
     async fn cli(&self) -> Result<CliProtocolDesc> {
         let url = format!(
             "odf+{}{}",
@@ -78,7 +80,7 @@ impl<'a> DatasetEndpoints<'a> {
         })
     }
 
-    #[allow(clippy::unused_async)]
+    #[expect(clippy::unused_async)]
     async fn rest(&self) -> Result<RestProtocolDesc> {
         let dataset_base_url = format!(
             "{}{}",
@@ -101,14 +103,14 @@ impl<'a> DatasetEndpoints<'a> {
         })
     }
 
-    #[allow(clippy::unused_async)]
+    #[expect(clippy::unused_async)]
     async fn flightsql(&self) -> Result<FlightSqlDesc> {
         Ok(FlightSqlDesc {
             url: self.config.protocols.base_url_flightsql.to_string(),
         })
     }
 
-    #[allow(clippy::unused_async)]
+    #[expect(clippy::unused_async)]
     async fn jdbc(&self) -> Result<JdbcDesc> {
         let mut url = self.config.protocols.base_url_flightsql.clone();
 
@@ -119,28 +121,28 @@ impl<'a> DatasetEndpoints<'a> {
         })
     }
 
-    #[allow(clippy::unused_async)]
+    #[expect(clippy::unused_async)]
     async fn postgresql(&self) -> Result<PostgreSqlDesl> {
         Ok(PostgreSqlDesl {
             url: "- coming soon -".to_string(),
         })
     }
 
-    #[allow(clippy::unused_async)]
+    #[expect(clippy::unused_async)]
     async fn kafka(&self) -> Result<KafkaProtocolDesc> {
         Ok(KafkaProtocolDesc {
             url: "- coming soon -".to_string(),
         })
     }
 
-    #[allow(clippy::unused_async)]
+    #[expect(clippy::unused_async)]
     async fn websocket(&self) -> Result<WebSocketProtocolDesc> {
         Ok(WebSocketProtocolDesc {
             url: "- coming soon -".to_string(),
         })
     }
 
-    #[allow(clippy::unused_async)]
+    #[expect(clippy::unused_async)]
     async fn odata(&self) -> Result<OdataProtocolDesc> {
         let mut url = format!("{}odata", self.config.protocols.base_url_rest);
         // to respect both kinds of workspaces: single-tenant & multi-tenant
@@ -168,3 +170,5 @@ impl<'a> DatasetEndpoints<'a> {
         })
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

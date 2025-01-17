@@ -12,10 +12,18 @@ use domain::{DeleteDatasetError, RenameDatasetError};
 use kamu_core::{self as domain, SetWatermarkPlanningError, SetWatermarkUseCase};
 use opendatafabric as odf;
 
-use super::{DatasetEnvVarsMut, DatasetFlowsMut, DatasetMetadataMut};
+use crate::mutations::{
+    ensure_account_is_owner_or_admin,
+    DatasetEnvVarsMut,
+    DatasetFlowsMut,
+    DatasetMetadataMut,
+};
 use crate::prelude::*;
-use crate::utils::ensure_dataset_env_vars_enabled;
+use crate::queries::*;
+use crate::utils::{ensure_dataset_env_vars_enabled, from_catalog_n};
 use crate::LoggedInGuard;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone)]
 pub struct DatasetMut {
@@ -147,6 +155,39 @@ impl DatasetMut {
             Err(e) => Err(e.int_err().into()),
         }
     }
+
+    /// Set visibility for the dataset
+    #[graphql(guard = "LoggedInGuard::new()")]
+    async fn set_visibility(
+        &self,
+        ctx: &Context<'_>,
+        visibility: DatasetVisibilityInput,
+    ) -> Result<SetDatasetVisibilityResult> {
+        ensure_account_is_owner_or_admin(ctx, &self.dataset_handle).await?;
+
+        let rebac_svc = from_catalog_n!(ctx, dyn kamu_auth_rebac::RebacService);
+
+        let (allows_public_read, allows_anonymous_read) = match visibility {
+            DatasetVisibilityInput::Private(_) => (false, false),
+            DatasetVisibilityInput::Public(PublicDatasetVisibility {
+                anonymous_available,
+            }) => (true, anonymous_available),
+        };
+
+        use kamu_auth_rebac::DatasetPropertyName;
+
+        for (name, value) in [
+            DatasetPropertyName::allows_public_read(allows_public_read),
+            DatasetPropertyName::allows_anonymous_read(allows_anonymous_read),
+        ] {
+            rebac_svc
+                .set_dataset_property(&self.dataset_handle.id, name, &value)
+                .await
+                .int_err()?;
+        }
+
+        Ok(SetDatasetVisibilityResultSuccess::default().into())
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -236,6 +277,35 @@ impl DeleteResultDanglingReference {
             self.not_deleted_dataset,
             self.dangling_child_refs.len()
         )
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(OneofObject)]
+pub enum DatasetVisibilityInput {
+    Private(PrivateDatasetVisibility),
+    Public(PublicDatasetVisibility),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Interface, Debug)]
+#[graphql(field(name = "message", ty = "String"))]
+pub enum SetDatasetVisibilityResult {
+    Success(SetDatasetVisibilityResultSuccess),
+}
+
+#[derive(SimpleObject, Debug, Default)]
+#[graphql(complex)]
+pub struct SetDatasetVisibilityResultSuccess {
+    _dummy: Option<String>,
+}
+
+#[ComplexObject]
+impl SetDatasetVisibilityResultSuccess {
+    async fn message(&self) -> String {
+        "Success".to_string()
     }
 }
 

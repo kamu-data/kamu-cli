@@ -529,6 +529,7 @@ impl GraphQLMetadataChainHarness {
             let mut b = dill::CatalogBuilder::new();
 
             b.add::<SystemTimeSourceDefault>()
+                .add::<DidGeneratorDefault>()
                 .add::<DummyOutboxImpl>()
                 .add::<CreateDatasetUseCaseImpl>()
                 .add::<CreateDatasetFromSnapshotUseCaseImpl>()

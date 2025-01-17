@@ -7,12 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use futures::TryStreamExt;
-use kamu_core::auth::DatasetAction;
+use kamu::utils::datasets_filtering::filter_dataset_handle_stream;
+use kamu_core::auth::{DatasetAction, DatasetActionAuthorizerExt};
 use kamu_core::{self as domain, TryStreamExtExt};
 
 use crate::prelude::*;
 use crate::queries::{Account, Dataset};
+use crate::utils::from_catalog_n;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Search
@@ -32,6 +33,8 @@ impl Search {
         page: Option<usize>,
         per_page: Option<usize>,
     ) -> Result<SearchResultConnection> {
+        use futures::TryStreamExt;
+
         let (dataset_registry, dataset_action_authorizer) = from_catalog_n!(
             ctx,
             dyn domain::DatasetRegistry,
@@ -41,17 +44,20 @@ impl Search {
         let page = page.unwrap_or(0);
         let per_page = per_page.unwrap_or(Self::DEFAULT_RESULTS_PER_PAGE);
 
-        let filtered_dataset_handles: Vec<_> = dataset_registry
-            .all_dataset_handles()
+        // TODO: Private Datasets: PERF: find a way to narrow down the number of records
+        //       to filter, e.g.:
+        //       - Anonymous: get all the public
+        //       - Logged: all owned datasets and datasets with relations
+        let filtered_all_dataset_handles_stream =
+            filter_dataset_handle_stream(dataset_registry.all_dataset_handles(), |hdl| {
+                hdl.alias.dataset_name.contains(&query)
+            });
+        let readable_dataset_handles_stream = dataset_action_authorizer
+            .filtered_datasets_stream(filtered_all_dataset_handles_stream, DatasetAction::Read);
+        let readable_dataset_handles = readable_dataset_handles_stream
             .filter_ok(|hdl| hdl.alias.dataset_name.contains(&query))
-            .try_collect()
-            .await
-            .int_err()?;
-
-        let readable_dataset_handles = dataset_action_authorizer
-            .filter_datasets_allowing(filtered_dataset_handles, DatasetAction::Read)
-            .await
-            .int_err()?;
+            .try_collect::<Vec<_>>()
+            .await?;
 
         let total_count = readable_dataset_handles.len();
 

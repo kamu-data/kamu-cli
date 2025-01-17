@@ -9,7 +9,8 @@
 
 use std::fmt::Display;
 
-use internal_error::InternalError;
+use database_common::{EntityPageListing, EntityPageStream, EntityPageStreamer, PaginationOpts};
+use internal_error::{InternalError, ResultIntoInternal};
 use opendatafabric::{AccountID, AccountName};
 use thiserror::Error;
 
@@ -54,6 +55,62 @@ pub trait AccountRepository: Send + Sync {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// TODO: Private Datasets: tests
+#[async_trait::async_trait]
+pub trait ExpensiveAccountRepository: AccountRepository {
+    async fn accounts_count(&self) -> Result<usize, AccountsCountError>;
+
+    async fn get_accounts(&self, pagination: PaginationOpts) -> AccountPageStream;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// TODO: Private Datasets: tests
+#[async_trait::async_trait]
+pub trait ExpensiveAccountRepositoryExt: ExpensiveAccountRepository {
+    fn all_accounts(&self) -> AccountPageStream;
+}
+
+#[async_trait::async_trait]
+impl<T> ExpensiveAccountRepositoryExt for T
+where
+    T: ExpensiveAccountRepository,
+    T: ?Sized,
+{
+    fn all_accounts(&self) -> AccountPageStream {
+        EntityPageStreamer::default().into_stream(
+            || async { Ok(()) },
+            move |_, pagination| async move {
+                use futures::TryStreamExt;
+
+                let total_count = self.accounts_count().await.int_err()?;
+                let entries = self.get_accounts(pagination).await.try_collect().await?;
+
+                Ok(EntityPageListing {
+                    list: entries,
+                    total_count,
+                })
+            },
+        )
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub type AccountPageStream<'a> = EntityPageStream<'a, Account>;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Errors
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum AccountsCountError {
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Error, Debug)]
 pub enum CreateAccountError {
     #[error(transparent)]
@@ -90,6 +147,14 @@ impl Display for CreateAccountDuplicateField {
             },
         )
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum GetAccountsError {
+    #[error(transparent)]
+    Internal(#[from] InternalError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

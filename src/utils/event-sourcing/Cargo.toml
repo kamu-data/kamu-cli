@@ -27,7 +27,6 @@ internal-error = { workspace = true }
 
 async-stream = "0.3"
 async-trait = { version = "0.1", default-features = false }
-serde = { version = "1", features = ["derive"] }
 thiserror = { version = "2", default-features = false, features = ["std"] }
 tokio-stream = { version = "0.1", default-features = false }
 tracing = { version = "0.1", default-features = false, features = [

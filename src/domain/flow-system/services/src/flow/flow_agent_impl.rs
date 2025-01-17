@@ -560,7 +560,7 @@ impl MessageConsumerT<TaskProgressMessage> for FlowAgentImpl {
                         let finish_time = self.agent_config.round_time(message.event_time)?;
 
                         // In case of success:
-                        //  - execute followup method
+                        //  - execute follow-up method
                         if let Some(flow_result) = flow.try_result_as_ref()
                             && !flow_result.is_empty()
                         {

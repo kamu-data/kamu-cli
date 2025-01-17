@@ -10,6 +10,7 @@
 use std::assert_matches::assert_matches;
 
 use kamu_cli_e2e_common::{
+    GraphQLResponseExt,
     KamuApiServerClient,
     KamuApiServerClientExt,
     LoginError,
@@ -86,33 +87,7 @@ pub async fn test_login_enabled_methods(kamu_api_server_client: KamuApiServerCli
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_login_dummy_github(kamu_api_server_client: KamuApiServerClient) {
-    // 1. No user
-    kamu_api_server_client
-        .graphql_api_call_assert(
-            indoc::indoc!(
-                r#"
-                query {
-                  accounts {
-                    byName(name: "e2e-user") {
-                      accountName
-                    }
-                  }
-                }
-                "#,
-            ),
-            Ok(indoc::indoc!(
-                r#"
-                {
-                  "accounts": {
-                    "byName": null
-                  }
-                }
-                "#,
-            )),
-        )
-        .await;
-
-    // 2. Create a user
+    // Create a user
     kamu_api_server_client
         .graphql_api_call_assert(
             indoc::indoc!(
@@ -144,7 +119,7 @@ pub async fn test_login_dummy_github(kamu_api_server_client: KamuApiServerClient
         )
         .await;
 
-    // 3. Verify that the user has been created
+    // Verify that the user has been created
     kamu_api_server_client
         .graphql_api_call_assert(
             indoc::indoc!(
@@ -192,7 +167,9 @@ pub async fn test_kamu_access_token_middleware(mut kamu_api_server_client: KamuA
         }
         "#,
          ))
-     .await;
+     .await
+     .data();
+
     let access_token = login_response["auth"]["login"]["accessToken"]
         .as_str()
         .map(ToOwned::to_owned)
@@ -230,7 +207,8 @@ pub async fn test_kamu_access_token_middleware(mut kamu_api_server_client: KamuA
             .replace("<account_id>", account_id.as_str())
             .as_str(),
         )
-        .await;
+        .await
+        .data();
     let kamu_token = create_token_response["auth"]["createAccessToken"]["token"]["composed"]
         .as_str()
         .map(ToOwned::to_owned)

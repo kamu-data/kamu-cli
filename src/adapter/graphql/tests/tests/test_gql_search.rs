@@ -28,6 +28,7 @@ async fn test_search_query() {
     std::fs::create_dir(&datasets_dir).unwrap();
 
     let cat = dill::CatalogBuilder::new()
+        .add::<DidGeneratorDefault>()
         .add::<SystemTimeSourceDefault>()
         .add::<DummyOutboxImpl>()
         .add::<DependencyGraphServiceImpl>()

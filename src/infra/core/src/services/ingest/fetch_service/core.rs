@@ -69,7 +69,6 @@ impl FetchService {
         }
     }
 
-    #[allow(unused_variables)]
     pub async fn fetch(
         &self,
         dataset_handle: &DatasetHandle,

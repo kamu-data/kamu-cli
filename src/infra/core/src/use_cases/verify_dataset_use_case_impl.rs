@@ -63,7 +63,7 @@ impl VerifyDatasetUseCase for VerifyDatasetUseCaseImpl {
         // TODO: verification of derived datasets requires read permission for inputs
         match self
             .dataset_action_authorizer
-            .check_action_allowed(&request.target, DatasetAction::Read)
+            .check_action_allowed(&request.target.id, DatasetAction::Read)
             .await
         {
             Ok(_) => {}
@@ -104,7 +104,7 @@ impl VerifyDatasetUseCase for VerifyDatasetUseCaseImpl {
         for request in requests {
             let res = self
                 .dataset_action_authorizer
-                .check_action_allowed(&request.target, DatasetAction::Read)
+                .check_action_allowed(&request.target.id, DatasetAction::Read)
                 .await;
             match res {
                 Ok(_) => authorized_requests.push(VerificationRequest {

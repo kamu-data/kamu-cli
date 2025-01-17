@@ -87,14 +87,14 @@ impl Outbox for OutboxDispatchingImpl {
     ) -> Result<(), InternalError> {
         tracing::debug!(content_json = %content_json, "Dispatching outbox message");
 
-        if self.transactional_producers.contains(producer_name) {
-            self.transactional_outbox
+        if self.immediate_producers.contains(producer_name) {
+            self.immediate_outbox
                 .post_message_as_json(producer_name, content_json, version)
                 .await?;
         }
 
-        if self.immediate_producers.contains(producer_name) {
-            self.immediate_outbox
+        if self.transactional_producers.contains(producer_name) {
+            self.transactional_outbox
                 .post_message_as_json(producer_name, content_json, version)
                 .await?;
         }

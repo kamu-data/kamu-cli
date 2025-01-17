@@ -28,6 +28,7 @@ use datafusion_odata::context::{CollectionContext, OnUnsupported, ServiceContext
 use datafusion_odata::error::ODataError;
 use dill::Catalog;
 use internal_error::ResultIntoInternal;
+use kamu_core::auth::DatasetActionAuthorizerExt;
 use kamu_core::*;
 use opendatafabric::*;
 
@@ -76,31 +77,26 @@ impl ServiceContext for ODataServiceContext {
         } else {
             registry.all_dataset_handles()
         };
+        let readable_dataset_handles_stream =
+            authorizer.filtered_datasets_stream(dataset_handles, DatasetAction::Read);
 
-        let dataset_handles: Vec<_> = dataset_handles
-            .try_collect()
+        let collections = readable_dataset_handles_stream
+            .map_ok(|dataset_handle| {
+                let resolved_dataset = registry.get_dataset_by_handle(&dataset_handle);
+                let context: Arc<dyn CollectionContext> = Arc::new(ODataCollectionContext {
+                    catalog: self.catalog.clone(),
+                    addr: CollectionAddr {
+                        name: dataset_handle.alias.dataset_name.to_string(),
+                        key: None,
+                    },
+                    resolved_dataset,
+                    service_base_url: self.service_base_url.clone(),
+                });
+                context
+            })
+            .try_collect::<Vec<_>>()
             .await
             .map_err(ODataError::internal)?;
-
-        let dataset_handles = authorizer
-            .filter_datasets_allowing(dataset_handles, DatasetAction::Read)
-            .await
-            .map_err(ODataError::internal)?;
-
-        let mut collections: Vec<Arc<dyn CollectionContext>> = Vec::new();
-        for dataset_handle in dataset_handles {
-            let resolved_dataset = registry.get_dataset_by_handle(&dataset_handle);
-
-            collections.push(Arc::new(ODataCollectionContext {
-                catalog: self.catalog.clone(),
-                addr: CollectionAddr {
-                    name: dataset_handle.alias.dataset_name.to_string(),
-                    key: None,
-                },
-                resolved_dataset,
-                service_base_url: self.service_base_url.clone(),
-            }));
-        }
 
         Ok(collections)
     }

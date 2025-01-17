@@ -11,7 +11,6 @@ use kamu_flow_system::{FlowConfigurationService, FlowKeyDataset};
 use opendatafabric as odf;
 
 use crate::prelude::*;
-use crate::utils::check_dataset_read_access;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -32,8 +31,6 @@ impl DatasetFlowConfigs {
         ctx: &Context<'_>,
         dataset_flow_type: DatasetFlowType,
     ) -> Result<Option<FlowConfiguration>> {
-        check_dataset_read_access(ctx, &self.dataset_handle).await?;
-
         let flow_config_service = from_catalog_n!(ctx, dyn FlowConfigurationService);
         let maybe_flow_config = flow_config_service
             .find_configuration(

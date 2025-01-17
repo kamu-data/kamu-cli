@@ -12,6 +12,7 @@ use std::str::FromStr;
 use chrono::{Duration, DurationRound, Utc};
 use futures::TryStreamExt;
 use kamu::testing::MockDatasetChangesService;
+use kamu_accounts::{AccountConfig, CurrentAccountSubject};
 use kamu_core::*;
 use kamu_flow_system::*;
 use kamu_task_system::*;
@@ -113,7 +114,6 @@ async fn test_read_initial_config_and_queue_without_waiting() {
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
 
     pretty_assertions::assert_eq!(
-        format!("{}", test_flow_listener.as_ref()),
         indoc::indoc!(
             r#"
             #0: +0ms:
@@ -150,7 +150,8 @@ async fn test_read_initial_config_and_queue_without_waiting() {
                 Flow ID = 0 Finished Success
 
             "#
-        )
+        ),
+        format!("{}", test_flow_listener.as_ref())
     );
 }
 
@@ -266,7 +267,6 @@ async fn test_read_initial_config_shouldnt_queue_in_recovery_case() {
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
 
     pretty_assertions::assert_eq!(
-        format!("{}", test_flow_listener.as_ref()),
         indoc::indoc!(
             r#"
             #0: +0ms:
@@ -287,7 +287,8 @@ async fn test_read_initial_config_shouldnt_queue_in_recovery_case() {
                 Flow ID = 0 Finished Success
 
             "#
-        )
+        ),
+        format!("{}", test_flow_listener.as_ref())
     );
 }
 
@@ -375,7 +376,6 @@ async fn test_cron_config() {
     .unwrap();
 
     pretty_assertions::assert_eq!(
-        format!("{}", test_flow_listener.as_ref()),
         indoc::indoc!(
             r#"
             #0: +0ms:
@@ -403,7 +403,8 @@ async fn test_cron_config() {
                 Flow ID = 0 Finished Success
 
             "#
-        )
+        ),
+        format!("{}", test_flow_listener.as_ref())
     );
 }
 
@@ -546,7 +547,6 @@ async fn test_manual_trigger() {
     .unwrap();
 
     pretty_assertions::assert_eq!(
-        format!("{}", test_flow_listener.as_ref()),
         indoc::indoc!(
             r#"
             #0: +0ms:
@@ -615,7 +615,8 @@ async fn test_manual_trigger() {
                 Flow ID = 0 Finished Success
 
             "#
-        )
+        ),
+        format!("{}", test_flow_listener.as_ref())
     );
 }
 
@@ -765,7 +766,6 @@ async fn test_ingest_trigger_with_ingest_config() {
     .unwrap();
 
     pretty_assertions::assert_eq!(
-        format!("{}", test_flow_listener.as_ref()),
         indoc::indoc!(
             r#"
             #0: +0ms:
@@ -834,7 +834,8 @@ async fn test_ingest_trigger_with_ingest_config() {
                 Flow ID = 0 Finished Success
 
             "#
-        )
+        ),
+        format!("{}", test_flow_listener.as_ref())
     );
 }
 
@@ -945,7 +946,6 @@ async fn test_manual_trigger_compaction() {
     .unwrap();
 
     pretty_assertions::assert_eq!(
-        format!("{}", test_flow_listener.as_ref()),
         indoc::indoc!(
             r#"
             #0: +0ms:
@@ -983,7 +983,8 @@ async fn test_manual_trigger_compaction() {
                 Flow ID = 0 Finished Success
 
             "#
-        )
+        ),
+        format!("{}", test_flow_listener.as_ref())
     );
 }
 
@@ -1083,7 +1084,6 @@ async fn test_manual_trigger_reset() {
     .unwrap();
 
     pretty_assertions::assert_eq!(
-        format!("{}", test_flow_listener.as_ref()),
         indoc::indoc!(
             r#"
             #0: +0ms:
@@ -1101,7 +1101,8 @@ async fn test_manual_trigger_reset() {
                 Flow ID = 0 Finished Success
 
             "#
-        )
+        ),
+        format!("{}", test_flow_listener.as_ref())
     );
 }
 
@@ -1268,14 +1269,12 @@ async fn test_reset_trigger_keep_metadata_compaction_for_derivatives() {
               harness.advance_time(Duration::milliseconds(400)).await;
           };
 
-          // tokio::join!(trigger0_handle, task0_handle, main_handle)
           tokio::join!(trigger0_handle, task0_handle, task1_handle, task2_handle, main_handle)
       } => Ok(())
   }
   .unwrap();
 
     pretty_assertions::assert_eq!(
-        format!("{}", test_flow_listener.as_ref()),
         indoc::indoc!(
             r#"
           #0: +0ms:
@@ -1337,7 +1336,8 @@ async fn test_reset_trigger_keep_metadata_compaction_for_derivatives() {
               Flow ID = 1 Finished Success
 
           "#
-        )
+        ),
+        format!("{}", test_flow_listener.as_ref())
     );
 }
 
@@ -1418,7 +1418,6 @@ async fn test_manual_trigger_compaction_with_config() {
     .unwrap();
 
     pretty_assertions::assert_eq!(
-        format!("{}", test_flow_listener.as_ref()),
         indoc::indoc!(
             r#"
             #0: +0ms:
@@ -1436,7 +1435,8 @@ async fn test_manual_trigger_compaction_with_config() {
                 Flow ID = 0 Finished Success
 
             "#
-        )
+        ),
+        format!("{}", test_flow_listener.as_ref())
     );
 }
 
@@ -1538,7 +1538,7 @@ async fn test_full_hard_compaction_trigger_keep_metadata_compaction_for_derivati
           });
           let task0_handle = task0_driver.run();
 
-          // Task 1: "foo_bar" start running at 110ms, finish at 180sms
+          // Task 1: "foo_baz" start running at 110ms, finish at 180sms
           let task1_driver = harness.task_driver(TaskDriverArgs {
               task_id: TaskID::new(1),
               task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
@@ -1566,7 +1566,7 @@ async fn test_full_hard_compaction_trigger_keep_metadata_compaction_for_derivati
           });
           let task1_handle = task1_driver.run();
 
-          // Task 2: "foo_bar_baz" start running at 200ms, finish at 240ms
+          // Task 2: "foo_bar" start running at 200ms, finish at 240ms
           let task2_driver = harness.task_driver(TaskDriverArgs {
               task_id: TaskID::new(2),
               task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "2")]),
@@ -1605,7 +1605,6 @@ async fn test_full_hard_compaction_trigger_keep_metadata_compaction_for_derivati
   .unwrap();
 
     pretty_assertions::assert_eq!(
-        format!("{}", test_flow_listener.as_ref()),
         indoc::indoc!(
             r#"
           #0: +0ms:
@@ -1667,7 +1666,8 @@ async fn test_full_hard_compaction_trigger_keep_metadata_compaction_for_derivati
               Flow ID = 1 Finished Success
 
           "#
-        )
+        ),
+        format!("{}", test_flow_listener.as_ref()),
     );
 }
 
@@ -1833,7 +1833,6 @@ async fn test_manual_trigger_keep_metadata_only_with_recursive_compaction() {
     .unwrap();
 
     pretty_assertions::assert_eq!(
-        format!("{}", test_flow_listener.as_ref()),
         indoc::indoc!(
             r#"
             #0: +0ms:
@@ -1897,7 +1896,8 @@ async fn test_manual_trigger_keep_metadata_only_with_recursive_compaction() {
                 Flow ID = 2 Finished Success
 
             "#
-        )
+        ),
+        format!("{}", test_flow_listener.as_ref())
     );
 }
 
@@ -2007,7 +2007,6 @@ async fn test_manual_trigger_keep_metadata_only_without_recursive_compaction() {
     .unwrap();
 
     pretty_assertions::assert_eq!(
-        format!("{}", test_flow_listener.as_ref()),
         indoc::indoc!(
             r#"
             #0: +0ms:
@@ -2025,7 +2024,8 @@ async fn test_manual_trigger_keep_metadata_only_without_recursive_compaction() {
                 Flow ID = 0 Finished Success
 
             "#
-        )
+        ),
+        format!("{}", test_flow_listener.as_ref())
     );
 }
 
@@ -2033,40 +2033,50 @@ async fn test_manual_trigger_keep_metadata_only_without_recursive_compaction() {
 
 #[test_log::test(tokio::test)]
 async fn test_manual_trigger_keep_metadata_only_compaction_multiple_accounts() {
-    let wasya_account_name = AccountName::new_unchecked("wasya");
-    let petya_account_name = AccountName::new_unchecked("petya");
+    let wasya = AccountConfig::from_name(AccountName::new_unchecked("wasya"));
+    let petya = AccountConfig::from_name(AccountName::new_unchecked("petya"));
+
+    let subject_wasya =
+        CurrentAccountSubject::logged(wasya.get_id(), wasya.account_name.clone(), false);
+    let subject_petya =
+        CurrentAccountSubject::logged(petya.get_id(), petya.account_name.clone(), false);
 
     let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
         tenancy_config: TenancyConfig::MultiTenant,
-        custom_account_names: vec![wasya_account_name.clone(), petya_account_name.clone()],
+        predefined_accounts: vec![wasya, petya],
         ..Default::default()
     })
     .await;
 
     let foo_create_result = harness
-        .create_root_dataset(DatasetAlias {
-            dataset_name: DatasetName::new_unchecked("foo"),
-            account_name: Some(wasya_account_name.clone()),
-        })
+        .create_root_dataset_using_subject(
+            DatasetAlias {
+                dataset_name: DatasetName::new_unchecked("foo"),
+                account_name: Some(subject_wasya.account_name().clone()),
+            },
+            subject_wasya.clone(),
+        )
         .await;
     let foo_id = foo_create_result.dataset_handle.id;
 
     let foo_bar_id = harness
-        .create_derived_dataset(
+        .create_derived_dataset_using_subject(
             DatasetAlias {
                 dataset_name: DatasetName::new_unchecked("foo.bar"),
-                account_name: Some(wasya_account_name.clone()),
+                account_name: Some(subject_wasya.account_name().clone()),
             },
             vec![foo_id.clone()],
+            subject_wasya,
         )
         .await;
     let foo_baz_id = harness
-        .create_derived_dataset(
+        .create_derived_dataset_using_subject(
             DatasetAlias {
                 dataset_name: DatasetName::new_unchecked("foo.baz"),
-                account_name: Some(petya_account_name.clone()),
+                account_name: Some(subject_petya.account_name().clone()),
             },
             vec![foo_id.clone()],
+            subject_petya,
         )
         .await;
 
@@ -2160,7 +2170,6 @@ async fn test_manual_trigger_keep_metadata_only_compaction_multiple_accounts() {
     .unwrap();
 
     pretty_assertions::assert_eq!(
-        format!("{}", test_flow_listener.as_ref()),
         indoc::indoc!(
             r#"
             #0: +0ms:
@@ -2198,7 +2207,8 @@ async fn test_manual_trigger_keep_metadata_only_compaction_multiple_accounts() {
                 Flow ID = 1 Finished Success
 
             "#
-        )
+        ),
+        format!("{}", test_flow_listener.as_ref())
     );
 }
 
@@ -2331,7 +2341,6 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
     .unwrap();
 
     pretty_assertions::assert_eq!(
-        format!("{}", test_flow_listener.as_ref()),
         indoc::indoc!(
             r#"
             #0: +0ms:
@@ -2421,7 +2430,8 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
                 Flow ID = 0 Finished Success
 
             "#
-        )
+        ),
+        format!("{}", test_flow_listener.as_ref())
     );
 }
 
@@ -2556,7 +2566,6 @@ async fn test_respect_last_success_time_when_schedule_resumes() {
     .unwrap();
 
     pretty_assertions::assert_eq!(
-        format!("{}", test_flow_listener.as_ref()),
         indoc::indoc!(
             r#"
             #0: +0ms:
@@ -2646,7 +2655,8 @@ async fn test_respect_last_success_time_when_schedule_resumes() {
                 Flow ID = 0 Finished Success
 
       "#
-        )
+        ),
+        format!("{}", test_flow_listener.as_ref())
     );
 }
 
@@ -2758,7 +2768,6 @@ async fn test_dataset_deleted() {
     .unwrap();
 
     pretty_assertions::assert_eq!(
-        format!("{}", test_flow_listener.as_ref()),
         indoc::indoc!(
             r#"
             #0: +0ms:
@@ -2826,7 +2835,8 @@ async fn test_dataset_deleted() {
                 Flow ID = 0 Finished Success
 
             "#
-        )
+        ),
+        format!("{}", test_flow_listener.as_ref())
     );
 }
 
@@ -2956,7 +2966,6 @@ async fn test_task_completions_trigger_next_loop_on_success() {
     .unwrap();
 
     pretty_assertions::assert_eq!(
-        format!("{}", test_flow_listener.as_ref()),
         indoc::indoc!(
             r#"
             #0: +0ms:
@@ -3038,7 +3047,8 @@ async fn test_task_completions_trigger_next_loop_on_success() {
                 Flow ID = 0 Finished Success
 
             "#
-        )
+        ),
+        format!("{}", test_flow_listener.as_ref())
     );
 }
 
@@ -3190,7 +3200,6 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
     .unwrap();
 
     pretty_assertions::assert_eq!(
-        format!("{}", test_flow_listener.as_ref()),
         indoc::indoc!(
             r#"
             #0: +0ms:
@@ -3292,7 +3301,8 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
                 Flow ID = 0 Finished Success
 
             "#
-        )
+        ),
+        format!("{}", test_flow_listener.as_ref())
     );
 }
 
@@ -3393,7 +3403,6 @@ async fn test_throttling_manual_triggers() {
     .unwrap();
 
     pretty_assertions::assert_eq!(
-        format!("{}", test_flow_listener.as_ref()),
         indoc::indoc!(
             r#"
             #0: +0ms:
@@ -3421,7 +3430,8 @@ async fn test_throttling_manual_triggers() {
                 Flow ID = 0 Finished Success
 
           "#
-        )
+        ),
+        format!("{}", test_flow_listener.as_ref())
     );
 }
 
@@ -3663,7 +3673,6 @@ async fn test_throttling_derived_dataset_with_2_parents() {
     .unwrap();
 
     pretty_assertions::assert_eq!(
-        format!("{}", test_flow_listener.as_ref()),
         indoc::indoc!(
             r#"
           #0: +0ms:
@@ -3887,7 +3896,8 @@ async fn test_throttling_derived_dataset_with_2_parents() {
               Flow ID = 0 Finished Success
 
         "#
-        )
+        ),
+        format!("{}", test_flow_listener.as_ref())
     );
 }
 
@@ -4086,7 +4096,6 @@ async fn test_batching_condition_records_reached() {
     .unwrap();
 
     pretty_assertions::assert_eq!(
-        format!("{}", test_flow_listener.as_ref()),
         indoc::indoc!(
             r#"
             #0: +0ms:
@@ -4220,7 +4229,8 @@ async fn test_batching_condition_records_reached() {
                 Flow ID = 0 Finished Success
 
       "#
-        )
+        ),
+        format!("{}", test_flow_listener.as_ref())
     );
 }
 
@@ -4391,7 +4401,6 @@ async fn test_batching_condition_timeout() {
     .unwrap();
 
     pretty_assertions::assert_eq!(
-        format!("{}", test_flow_listener.as_ref()),
         indoc::indoc!(
             r#"
             #0: +0ms:
@@ -4493,7 +4502,8 @@ async fn test_batching_condition_timeout() {
                 Flow ID = 0 Finished Success
 
       "#
-        )
+        ),
+        format!("{}", test_flow_listener.as_ref())
     );
 }
 
@@ -4664,7 +4674,6 @@ async fn test_batching_condition_watermark() {
     .unwrap();
 
     pretty_assertions::assert_eq!(
-        format!("{}", test_flow_listener.as_ref()),
         indoc::indoc!(
             r#"
         #0: +0ms:
@@ -4766,7 +4775,8 @@ async fn test_batching_condition_watermark() {
             Flow ID = 0 Finished Success
 
         "#
-        )
+        ),
+        format!("{}", test_flow_listener.as_ref())
     );
 }
 
@@ -5059,7 +5069,6 @@ async fn test_batching_condition_with_2_inputs() {
     .unwrap();
 
     pretty_assertions::assert_eq!(
-        format!("{}", test_flow_listener.as_ref()),
         indoc::indoc!(
             r#"
         #0: +0ms:
@@ -5314,7 +5323,8 @@ async fn test_batching_condition_with_2_inputs() {
             Flow ID = 0 Finished Success
 
         "#
-        )
+        ),
+        format!("{}", test_flow_listener.as_ref())
     );
 }
 
@@ -5322,42 +5332,51 @@ async fn test_batching_condition_with_2_inputs() {
 
 #[test_log::test(tokio::test)]
 async fn test_list_all_flow_initiators() {
-    let foo_account_name = AccountName::new_unchecked("foo");
-    let bar_account_name = AccountName::new_unchecked("bar");
+    let foo = AccountConfig::from_name(AccountName::new_unchecked("foo"));
+    let bar = AccountConfig::from_name(AccountName::new_unchecked("bar"));
+
+    let subject_foo = CurrentAccountSubject::logged(foo.get_id(), foo.account_name.clone(), false);
+    let subject_bar = CurrentAccountSubject::logged(bar.get_id(), bar.account_name.clone(), false);
 
     let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
-        custom_account_names: vec![foo_account_name.clone(), bar_account_name.clone()],
+        predefined_accounts: vec![foo, bar],
         tenancy_config: TenancyConfig::MultiTenant,
         ..Default::default()
     })
     .await;
 
     let foo_create_result = harness
-        .create_root_dataset(DatasetAlias {
-            dataset_name: DatasetName::new_unchecked("foo"),
-            account_name: Some(foo_account_name.clone()),
-        })
+        .create_root_dataset_using_subject(
+            DatasetAlias {
+                dataset_name: DatasetName::new_unchecked("foo"),
+                account_name: Some(subject_foo.account_name().clone()),
+            },
+            subject_foo.clone(),
+        )
         .await;
     let foo_id = foo_create_result.dataset_handle.id;
 
     let foo_account_id = harness
         .auth_svc
-        .find_account_id_by_name(&foo_account_name)
+        .find_account_id_by_name(subject_foo.account_name())
         .await
         .unwrap()
         .unwrap();
     let bar_account_id = harness
         .auth_svc
-        .find_account_id_by_name(&bar_account_name)
+        .find_account_id_by_name(subject_bar.account_name())
         .await
         .unwrap()
         .unwrap();
 
     let bar_create_result = harness
-        .create_root_dataset(DatasetAlias {
-            dataset_name: DatasetName::new_unchecked("bar"),
-            account_name: Some(bar_account_name.clone()),
-        })
+        .create_root_dataset_using_subject(
+            DatasetAlias {
+                dataset_name: DatasetName::new_unchecked("bar"),
+                account_name: Some(subject_bar.account_name().clone()),
+            },
+            subject_bar,
+        )
         .await;
     let bar_id = bar_create_result.dataset_handle.id;
 
@@ -5455,7 +5474,7 @@ async fn test_list_all_flow_initiators() {
         .await
         .unwrap();
 
-    assert_eq!(foo_dataset_initiators_list, [foo_account_id.clone()]);
+    pretty_assertions::assert_eq!([foo_account_id.clone()], *foo_dataset_initiators_list);
 
     let bar_dataset_initiators_list: Vec<_> = harness
         .flow_query_service
@@ -5467,59 +5486,69 @@ async fn test_list_all_flow_initiators() {
         .await
         .unwrap();
 
-    assert_eq!(bar_dataset_initiators_list, [bar_account_id.clone()]);
+    pretty_assertions::assert_eq!([bar_account_id.clone()], *bar_dataset_initiators_list);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
 async fn test_list_all_datasets_with_flow() {
-    let foo_account_name = AccountName::new_unchecked("foo");
-    let bar_account_name = AccountName::new_unchecked("bar");
+    let foo = AccountConfig::from_name(AccountName::new_unchecked("foo"));
+    let bar = AccountConfig::from_name(AccountName::new_unchecked("bar"));
+
+    let subject_foo = CurrentAccountSubject::logged(foo.get_id(), foo.account_name.clone(), false);
+    let subject_bar = CurrentAccountSubject::logged(bar.get_id(), bar.account_name.clone(), false);
 
     let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
-        custom_account_names: vec![foo_account_name.clone(), bar_account_name.clone()],
+        predefined_accounts: vec![foo, bar],
         tenancy_config: TenancyConfig::MultiTenant,
         ..Default::default()
     })
     .await;
 
     let foo_create_result = harness
-        .create_root_dataset(DatasetAlias {
-            dataset_name: DatasetName::new_unchecked("foo"),
-            account_name: Some(foo_account_name.clone()),
-        })
+        .create_root_dataset_using_subject(
+            DatasetAlias {
+                dataset_name: DatasetName::new_unchecked("foo"),
+                account_name: Some(subject_foo.account_name().clone()),
+            },
+            subject_foo.clone(),
+        )
         .await;
     let foo_id = foo_create_result.dataset_handle.id;
 
     let _foo_bar_id = harness
-        .create_derived_dataset(
+        .create_derived_dataset_using_subject(
             DatasetAlias {
                 dataset_name: DatasetName::new_unchecked("foo.bar"),
-                account_name: Some(foo_account_name.clone()),
+                account_name: Some(subject_foo.account_name().clone()),
             },
             vec![foo_id.clone()],
+            subject_foo.clone(),
         )
         .await;
 
     let foo_account_id = harness
         .auth_svc
-        .find_account_id_by_name(&foo_account_name)
+        .find_account_id_by_name(subject_foo.account_name())
         .await
         .unwrap()
         .unwrap();
     let bar_account_id = harness
         .auth_svc
-        .find_account_id_by_name(&bar_account_name)
+        .find_account_id_by_name(subject_bar.account_name())
         .await
         .unwrap()
         .unwrap();
 
     let bar_create_result = harness
-        .create_root_dataset(DatasetAlias {
-            dataset_name: DatasetName::new_unchecked("bar"),
-            account_name: Some(bar_account_name.clone()),
-        })
+        .create_root_dataset_using_subject(
+            DatasetAlias {
+                dataset_name: DatasetName::new_unchecked("bar"),
+                account_name: Some(subject_bar.account_name().clone()),
+            },
+            subject_bar,
+        )
         .await;
     let bar_id = bar_create_result.dataset_handle.id;
 
@@ -5617,7 +5646,7 @@ async fn test_list_all_datasets_with_flow() {
         .await
         .unwrap();
 
-    assert_eq!(foo_dataset_initiators_list, [foo_account_id.clone()]);
+    pretty_assertions::assert_eq!([foo_account_id.clone()], *foo_dataset_initiators_list);
 
     let bar_dataset_initiators_list: Vec<_> = harness
         .flow_query_service
@@ -5629,7 +5658,7 @@ async fn test_list_all_datasets_with_flow() {
         .await
         .unwrap();
 
-    assert_eq!(bar_dataset_initiators_list, [bar_account_id.clone()]);
+    pretty_assertions::assert_eq!([bar_account_id.clone()], *bar_dataset_initiators_list);
 
     let all_datasets_with_flow: Vec<_> = harness
         .flow_query_service
@@ -5641,7 +5670,7 @@ async fn test_list_all_datasets_with_flow() {
         .await
         .unwrap();
 
-    assert_eq!(all_datasets_with_flow, [foo_id]);
+    pretty_assertions::assert_eq!([foo_id], *all_datasets_with_flow);
 
     let all_datasets_with_flow: Vec<_> = harness
         .flow_query_service
@@ -5653,7 +5682,7 @@ async fn test_list_all_datasets_with_flow() {
         .await
         .unwrap();
 
-    assert_eq!(all_datasets_with_flow, [bar_id]);
+    pretty_assertions::assert_eq!([bar_id], *all_datasets_with_flow);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -5719,7 +5748,6 @@ async fn test_abort_flow_before_scheduling_tasks() {
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
 
     pretty_assertions::assert_eq!(
-        format!("{}", test_flow_listener.as_ref()),
         indoc::indoc!(
             r#"
             #0: +0ms:
@@ -5745,7 +5773,8 @@ async fn test_abort_flow_before_scheduling_tasks() {
                 Flow ID = 0 Finished Success
 
           "#
-        )
+        ),
+        format!("{}", test_flow_listener.as_ref())
     );
 }
 
@@ -5812,7 +5841,6 @@ async fn test_abort_flow_after_scheduling_still_waiting_for_executor() {
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
 
     pretty_assertions::assert_eq!(
-        format!("{}", test_flow_listener.as_ref()),
         indoc::indoc!(
             r#"
             #0: +0ms:
@@ -5843,7 +5871,8 @@ async fn test_abort_flow_after_scheduling_still_waiting_for_executor() {
                 Flow ID = 0 Finished Success
 
           "#
-        )
+        ),
+        format!("{}", test_flow_listener.as_ref())
     );
 }
 
@@ -5910,7 +5939,6 @@ async fn test_abort_flow_after_task_running_has_started() {
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
 
     pretty_assertions::assert_eq!(
-        format!("{}", test_flow_listener.as_ref()),
         indoc::indoc!(
             r#"
             #0: +0ms:
@@ -5930,7 +5958,8 @@ async fn test_abort_flow_after_task_running_has_started() {
                 Flow ID = 0 Finished Aborted
 
           "#
-        )
+        ),
+        format!("{}", test_flow_listener.as_ref())
     );
 }
 
@@ -6011,7 +6040,6 @@ async fn test_abort_flow_after_task_finishes() {
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
 
     pretty_assertions::assert_eq!(
-        format!("{}", test_flow_listener.as_ref()),
         indoc::indoc!(
             r#"
             #0: +0ms:
@@ -6048,7 +6076,8 @@ async fn test_abort_flow_after_task_finishes() {
                 Flow ID = 0 Finished Success
 
           "#
-        )
+        ),
+        format!("{}", test_flow_listener.as_ref())
     );
 }
 
@@ -6144,7 +6173,7 @@ async fn test_respect_last_success_time_when_activate_configuration() {
 
           // Main simulation script
           let main_handle = async {
-              // Initially both "foo" isscheduled without waiting.
+              // Initially both "foo" and "bar are scheduled without waiting.
               // "foo":
               //  - flow 0: task 0 starts at 10ms, finishes at 20ms
               //  - next flow 2 queued for 120ms (20ms initiated + 100ms period)
@@ -6184,7 +6213,6 @@ async fn test_respect_last_success_time_when_activate_configuration() {
     .unwrap();
 
     pretty_assertions::assert_eq!(
-        format!("{}", test_flow_listener.as_ref()),
         indoc::indoc!(
             r#"
             #0: +0ms:
@@ -6252,7 +6280,8 @@ async fn test_respect_last_success_time_when_activate_configuration() {
                 Flow ID = 0 Finished Success
 
       "#
-        )
+        ),
+        format!("{}", test_flow_listener.as_ref())
     );
 }
 

@@ -9,7 +9,7 @@
 
 use chrono::Utc;
 use kamu_accounts::Account;
-use kamu_core::DatasetOwnershipService;
+use kamu_datasets::{DatasetEntryService, DatasetEntryServiceExt};
 use kamu_flow_system::FlowTriggerService;
 use opendatafabric::DatasetID;
 
@@ -30,10 +30,11 @@ impl AccountFlowTriggersMut {
 
     #[graphql(skip)]
     async fn get_account_dataset_ids(&self, ctx: &Context<'_>) -> Result<Vec<DatasetID>> {
-        let dataset_ownership_service = from_catalog_n!(ctx, dyn DatasetOwnershipService);
-        let dataset_ids: Vec<_> = dataset_ownership_service
-            .get_owned_datasets(&self.account.id)
-            .await?;
+        let dataset_entry_service = from_catalog_n!(ctx, dyn DatasetEntryService);
+        let dataset_ids: Vec<_> = dataset_entry_service
+            .get_owned_dataset_ids(&self.account.id)
+            .await
+            .int_err()?;
 
         Ok(dataset_ids)
     }

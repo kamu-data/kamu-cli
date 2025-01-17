@@ -19,7 +19,12 @@ use kamu::{
     S3RegistryCache,
 };
 use kamu_accounts::{CurrentAccountSubject, DEFAULT_ACCOUNT_NAME};
-use kamu_core::{CreateDatasetFromSnapshotUseCase, DatasetRepository, TenancyConfig};
+use kamu_core::{
+    CreateDatasetFromSnapshotUseCase,
+    DatasetRepository,
+    DidGeneratorDefault,
+    TenancyConfig,
+};
 use messaging_outbox::{Outbox, OutboxImmediateImpl};
 use time_source::SystemTimeSourceDefault;
 
@@ -44,6 +49,7 @@ impl S3RepoHarness {
         let mut b = dill::CatalogBuilder::new();
 
         b.add::<SystemTimeSourceDefault>()
+            .add::<DidGeneratorDefault>()
             .add_builder(
                 messaging_outbox::OutboxImmediateImpl::builder()
                     .with_consumer_filter(messaging_outbox::ConsumerFilter::AllConsumers),

@@ -159,7 +159,7 @@ impl TaskAgentImpl {
             )
             .await?;
 
-        // Run task via ldefinition
+        // Run task via definition
         let task_run_result = self.task_runner.run_task(task_definition).await;
 
         // Deal with errors: we should not interrupt the main loop if task fails

@@ -11,17 +11,7 @@ use std::str::FromStr;
 
 use chrono::DateTime;
 use kamu::testing::LocalS3Server;
-use kamu_cli_e2e_common::{
-    KamuApiServerClient,
-    KamuApiServerClientExt,
-    DATASET_DERIVATIVE_LEADERBOARD_NAME,
-    DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR,
-    DATASET_ROOT_PLAYER_NAME,
-    DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
-    DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_2,
-    DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
-    E2E_USER_ACCOUNT_NAME,
-};
+use kamu_cli_e2e_common::*;
 use kamu_cli_puppet::extensions::{KamuCliPuppetExt, RepoAlias};
 use kamu_cli_puppet::KamuCliPuppet;
 use opendatafabric as odf;
@@ -170,6 +160,8 @@ async fn test_smart_push_smart_pull_sequence(
                     dataset_alias.dataset_name.as_str(),
                     "--to",
                     kamu_api_server_dataset_endpoint.as_str(),
+                    "--visibility",
+                    "public",
                 ],
                 None,
                 Some(["1 dataset(s) pushed"]),
@@ -322,6 +314,8 @@ async fn test_smart_push_force_smart_pull_force(
                     dataset_alias.dataset_name.as_str(),
                     "--to",
                     kamu_api_server_dataset_endpoint.as_str(),
+                    "--visibility",
+                    "public",
                 ],
                 None,
                 Some(["1 dataset(s) pushed"]),
@@ -475,6 +469,8 @@ async fn test_smart_push_no_alias_smart_pull_no_alias(
                     "--to",
                     kamu_api_server_dataset_endpoint.as_str(),
                     "--no-alias",
+                    "--visibility",
+                    "public",
                 ],
                 None,
                 Some(["1 dataset(s) pushed"]),
@@ -726,6 +722,8 @@ async fn test_smart_push_all_smart_pull_all(
                     root_dataset_alias.dataset_name.as_str(),
                     "--to",
                     kamu_api_server_root_dataset_endpoint.as_str(),
+                    "--visibility",
+                    "public",
                 ],
                 None,
                 Some(["1 dataset(s) pushed"]),
@@ -744,6 +742,8 @@ async fn test_smart_push_all_smart_pull_all(
                     derivative_dataset_alias.dataset_name.as_str(),
                     "--to",
                     kamu_api_server_derivative_dataset_endpoint.as_str(),
+                    "--visibility",
+                    "public",
                 ],
                 None,
                 Some(["1 dataset(s) pushed"]),
@@ -1008,6 +1008,8 @@ async fn test_smart_push_recursive_smart_pull_recursive(
                     root_dataset_alias.dataset_name.as_str(),
                     "--to",
                     kamu_api_server_root_dataset_endpoint.as_str(),
+                    "--visibility",
+                    "public",
                 ],
                 None,
                 Some(["1 dataset(s) pushed"]),
@@ -1381,7 +1383,12 @@ async fn test_smart_push_to_registered_repo_smart_pull(
         // 2.3. Push the dataset to the API server without too argument
         kamu_in_push_workspace
             .assert_success_command_execution(
-                ["push", dataset_alias.dataset_name.as_str()],
+                [
+                    "push",
+                    "--visibility",
+                    "public",
+                    dataset_alias.dataset_name.as_str(),
+                ],
                 None,
                 Some(["1 dataset(s) pushed"]),
             )

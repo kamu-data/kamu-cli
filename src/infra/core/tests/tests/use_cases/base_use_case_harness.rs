@@ -10,7 +10,7 @@
 use dill::Catalog;
 use kamu::testing::{BaseRepoHarness, MockDatasetActionAuthorizer};
 use kamu_core::auth::DatasetActionAuthorizer;
-use kamu_core::TenancyConfig;
+use kamu_core::{MockDidGenerator, TenancyConfig};
 use messaging_outbox::{MockOutbox, Outbox};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -19,6 +19,7 @@ pub(crate) struct BaseUseCaseHarnessOptions {
     tenancy_config: TenancyConfig,
     mock_dataset_action_authorizer: MockDatasetActionAuthorizer,
     mock_outbox: MockOutbox,
+    maybe_mock_did_generator: Option<MockDidGenerator>,
 }
 
 impl BaseUseCaseHarnessOptions {
@@ -38,6 +39,14 @@ impl BaseUseCaseHarnessOptions {
         self.mock_outbox = mock_outbox;
         self
     }
+
+    pub(crate) fn with_maybe_mock_did_generator(
+        mut self,
+        mock_did_generator: Option<MockDidGenerator>,
+    ) -> Self {
+        self.maybe_mock_did_generator = mock_did_generator;
+        self
+    }
 }
 
 impl Default for BaseUseCaseHarnessOptions {
@@ -46,6 +55,7 @@ impl Default for BaseUseCaseHarnessOptions {
             tenancy_config: TenancyConfig::SingleTenant,
             mock_dataset_action_authorizer: MockDatasetActionAuthorizer::new(),
             mock_outbox: MockOutbox::new(),
+            maybe_mock_did_generator: None,
         }
     }
 }
@@ -60,7 +70,8 @@ pub(crate) struct BaseUseCaseHarness {
 
 impl BaseUseCaseHarness {
     pub(crate) fn new(options: BaseUseCaseHarnessOptions) -> Self {
-        let base_repo_harness = BaseRepoHarness::new(options.tenancy_config);
+        let base_repo_harness =
+            BaseRepoHarness::new(options.tenancy_config, options.maybe_mock_did_generator);
 
         let catalog = dill::CatalogBuilder::new_chained(base_repo_harness.catalog())
             .add_value(options.mock_dataset_action_authorizer)

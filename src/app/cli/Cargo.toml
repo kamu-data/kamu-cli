@@ -53,7 +53,7 @@ time-source = { workspace = true }
 kamu = { workspace = true }
 kamu-data-utils = { workspace = true }
 
-kamu-adapter-auth-oso = { workspace = true }
+kamu-adapter-auth-oso-rebac = { workspace = true }
 kamu-adapter-flight-sql = { workspace = true }
 kamu-adapter-graphql = { workspace = true }
 kamu-adapter-http = { workspace = true, features = [

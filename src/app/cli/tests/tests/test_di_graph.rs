@@ -57,6 +57,7 @@ fn test_di_cli_graph_validates(tenancy_config: TenancyConfig) {
         &kamu_cli::config::CLIConfig::default(),
         &mut base_catalog_builder,
         tenancy_config,
+        false,
     );
     base_catalog_builder.add_value(Interact::new(false, false));
     let base_catalog = base_catalog_builder.build();
@@ -91,6 +92,7 @@ fn test_di_server_graph_validates(tenancy_config: TenancyConfig) {
         &kamu_cli::config::CLIConfig::default(),
         &mut base_catalog_builder,
         tenancy_config,
+        false,
     );
     let base_catalog = base_catalog_builder.build();
 

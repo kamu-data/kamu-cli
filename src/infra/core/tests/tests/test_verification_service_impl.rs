@@ -193,7 +193,7 @@ struct VerifyHarness {
 
 impl VerifyHarness {
     fn new() -> Self {
-        let base_repo_harness = BaseRepoHarness::new(TenancyConfig::SingleTenant);
+        let base_repo_harness = BaseRepoHarness::new(TenancyConfig::SingleTenant, None);
 
         let catalog = dill::CatalogBuilder::new_chained(base_repo_harness.catalog())
             .add::<TransformRequestPlannerImpl>()

@@ -29,8 +29,8 @@ use kamu_accounts_services::{
     PredefinedAccountsRegistrator,
 };
 use kamu_core::*;
-use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
-use kamu_datasets_services::DependencyGraphServiceImpl;
+use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEntryRepository};
+use kamu_datasets_services::{DatasetEntryServiceImpl, DependencyGraphServiceImpl};
 use kamu_flow_system::*;
 use kamu_flow_system_inmem::*;
 use kamu_flow_system_services::*;
@@ -61,7 +61,11 @@ pub(crate) const SCHEDULING_MANDATORY_THROTTLING_PERIOD_MS: i64 = SCHEDULING_ALI
 
 pub(crate) struct FlowHarness {
     _tmp_dir: tempfile::TempDir,
-    pub catalog: dill::Catalog,
+    catalog_without_subject: Catalog,
+    delete_dataset_use_case: Arc<dyn DeleteDatasetUseCase>,
+    create_dataset_from_snapshot_use_case: Arc<dyn CreateDatasetFromSnapshotUseCase>,
+
+    pub catalog: Catalog,
     pub flow_configuration_service: Arc<dyn FlowConfigurationService>,
     pub flow_trigger_service: Arc<dyn FlowTriggerService>,
     pub flow_trigger_event_store: Arc<dyn FlowTriggerEventStore>,
@@ -77,7 +81,7 @@ pub(crate) struct FlowHarnessOverrides {
     pub awaiting_step: Option<Duration>,
     pub mandatory_throttling_period: Option<Duration>,
     pub mock_dataset_changes: Option<MockDatasetChangesService>,
-    pub custom_account_names: Vec<AccountName>,
+    pub predefined_accounts: Vec<AccountConfig>,
     pub tenancy_config: TenancyConfig,
 }
 
@@ -92,19 +96,17 @@ impl FlowHarness {
         std::fs::create_dir(&datasets_dir).unwrap();
 
         let accounts_catalog = {
-            let predefined_accounts_config = if overrides.custom_account_names.is_empty() {
+            let predefined_accounts_config = if overrides.predefined_accounts.is_empty() {
                 PredefinedAccountsConfig::single_tenant()
             } else {
                 let mut predefined_accounts_config = PredefinedAccountsConfig::new();
-                for account_name in overrides.custom_account_names {
-                    predefined_accounts_config
-                        .predefined
-                        .push(AccountConfig::from_name(account_name));
+                for account in overrides.predefined_accounts {
+                    predefined_accounts_config.predefined.push(account);
                 }
                 predefined_accounts_config
             };
 
-            let mut b = dill::CatalogBuilder::new();
+            let mut b = CatalogBuilder::new();
             b.add_value(predefined_accounts_config)
                 .add::<LoginPasswordAuthProvider>()
                 .add::<PredefinedAccountsRegistrator>()
@@ -135,14 +137,15 @@ impl FlowHarness {
 
         let mock_dataset_changes = overrides.mock_dataset_changes.unwrap_or_default();
 
-        let catalog = {
-            let mut b = dill::CatalogBuilder::new_chained(&accounts_catalog);
+        let catalog_without_subject = {
+            let mut b = CatalogBuilder::new_chained(&accounts_catalog);
 
             b.add_builder(
                 messaging_outbox::OutboxImmediateImpl::builder()
                     .with_consumer_filter(messaging_outbox::ConsumerFilter::AllConsumers),
             )
             .bind::<dyn Outbox, OutboxImmediateImpl>()
+            .add::<DidGeneratorDefault>()
             .add::<FlowSystemTestListener>()
             .add_value(FlowAgentConfig::new(
                 awaiting_step,
@@ -157,10 +160,8 @@ impl FlowHarness {
             .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
             .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
-            .add::<DatasetRegistryRepoBridge>()
             .add_value(mock_dataset_changes)
             .bind::<dyn DatasetChangesService, MockDatasetChangesService>()
-            .add_value(CurrentAccountSubject::new_test())
             .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
             .add::<CreateDatasetFromSnapshotUseCaseImpl>()
             .add::<DeleteDatasetUseCaseImpl>()
@@ -170,11 +171,11 @@ impl FlowHarness {
             .add::<InMemoryAccessTokenRepository>()
             .add::<DependencyGraphServiceImpl>()
             .add::<InMemoryDatasetDependencyRepository>()
-            .add::<DatasetOwnershipServiceInMemory>()
+            .add::<DatasetEntryServiceImpl>()
+            .add::<InMemoryDatasetEntryRepository>()
             .add::<TaskSchedulerImpl>()
             .add::<InMemoryTaskEventStore>()
-            .add::<DatabaseTransactionRunner>()
-            .add::<DatasetOwnershipServiceInMemoryStateInitializer>();
+            .add::<DatabaseTransactionRunner>();
 
             kamu_flow_system_services::register_dependencies(&mut b);
 
@@ -206,35 +207,40 @@ impl FlowHarness {
             b.build()
         };
 
-        let flow_agent = catalog.get_one::<FlowAgentImpl>().unwrap();
-        let flow_query_service = catalog.get_one::<dyn FlowQueryService>().unwrap();
-        let flow_configuration_service = catalog.get_one::<dyn FlowConfigurationService>().unwrap();
-        let flow_trigger_service = catalog.get_one::<dyn FlowTriggerService>().unwrap();
-        let flow_trigger_event_store = catalog.get_one::<dyn FlowTriggerEventStore>().unwrap();
-        let flow_event_store = catalog.get_one::<dyn FlowEventStore>().unwrap();
-        let auth_svc = catalog.get_one::<dyn AuthenticationService>().unwrap();
+        let catalog = CatalogBuilder::new_chained(&catalog_without_subject)
+            .add_value(CurrentAccountSubject::new_test())
+            .build();
 
         Self {
             _tmp_dir: tmp_dir,
-            catalog,
-            flow_agent,
-            flow_query_service,
-            flow_configuration_service,
-            flow_trigger_service,
-            flow_trigger_event_store,
-            flow_event_store,
+            flow_agent: catalog.get_one().unwrap(),
+            flow_query_service: catalog.get_one().unwrap(),
+            flow_configuration_service: catalog.get_one().unwrap(),
+            flow_trigger_service: catalog.get_one().unwrap(),
+            flow_trigger_event_store: catalog.get_one().unwrap(),
+            flow_event_store: catalog.get_one().unwrap(),
+            auth_svc: catalog.get_one().unwrap(),
             fake_system_time_source,
-            auth_svc,
+            delete_dataset_use_case: catalog.get_one().unwrap(),
+            create_dataset_from_snapshot_use_case: catalog.get_one().unwrap(),
+            catalog,
+            catalog_without_subject,
         }
     }
 
-    pub async fn create_root_dataset(&self, dataset_alias: DatasetAlias) -> CreateDatasetResult {
-        let create_dataset_from_snapshot = self
-            .catalog
+    pub async fn create_root_dataset_using_subject(
+        &self,
+        dataset_alias: DatasetAlias,
+        subject: CurrentAccountSubject,
+    ) -> CreateDatasetResult {
+        let subject_catalog = CatalogBuilder::new_chained(&self.catalog_without_subject)
+            .add_value(subject)
+            .build();
+        let create_dataset_from_snapshot_use_case = subject_catalog
             .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
             .unwrap();
 
-        create_dataset_from_snapshot
+        create_dataset_from_snapshot_use_case
             .execute(
                 MetadataFactory::dataset_snapshot()
                     .name(dataset_alias)
@@ -247,17 +253,59 @@ impl FlowHarness {
             .unwrap()
     }
 
+    pub async fn create_root_dataset(&self, dataset_alias: DatasetAlias) -> CreateDatasetResult {
+        self.create_dataset_from_snapshot_use_case
+            .execute(
+                MetadataFactory::dataset_snapshot()
+                    .name(dataset_alias)
+                    .kind(DatasetKind::Root)
+                    .push_event(MetadataFactory::set_polling_source().build())
+                    .build(),
+                Default::default(),
+            )
+            .await
+            .unwrap()
+    }
+
+    pub async fn create_derived_dataset_using_subject(
+        &self,
+        dataset_alias: DatasetAlias,
+        input_ids: Vec<DatasetID>,
+        subject: CurrentAccountSubject,
+    ) -> DatasetID {
+        let subject_catalog = CatalogBuilder::new_chained(&self.catalog_without_subject)
+            .add_value(subject)
+            .build();
+        let create_dataset_from_snapshot_use_case = subject_catalog
+            .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
+            .unwrap();
+
+        let create_result = create_dataset_from_snapshot_use_case
+            .execute(
+                MetadataFactory::dataset_snapshot()
+                    .name(dataset_alias)
+                    .kind(DatasetKind::Derivative)
+                    .push_event(
+                        MetadataFactory::set_transform()
+                            .inputs_from_refs(input_ids)
+                            .build(),
+                    )
+                    .build(),
+                Default::default(),
+            )
+            .await
+            .unwrap();
+
+        create_result.dataset_handle.id
+    }
+
     pub async fn create_derived_dataset(
         &self,
         dataset_alias: DatasetAlias,
         input_ids: Vec<DatasetID>,
     ) -> DatasetID {
-        let create_dataset_from_snapshot = self
-            .catalog
-            .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
-            .unwrap();
-
-        let create_result = create_dataset_from_snapshot
+        let create_result = self
+            .create_dataset_from_snapshot_use_case
             .execute(
                 MetadataFactory::dataset_snapshot()
                     .name(dataset_alias)
@@ -278,22 +326,12 @@ impl FlowHarness {
 
     pub async fn eager_initialization(&self) {
         use init_on_startup::InitOnStartup;
-        let dataset_ownership_initializer = self
-            .catalog
-            .get_one::<DatasetOwnershipServiceInMemoryStateInitializer>()
-            .unwrap();
-        dataset_ownership_initializer
-            .run_initialization()
-            .await
-            .unwrap();
 
         self.flow_agent.run_initialization().await.unwrap();
     }
 
     pub async fn delete_dataset(&self, dataset_id: &DatasetID) {
-        // Do the actual deletion
-        let delete_dataset = self.catalog.get_one::<dyn DeleteDatasetUseCase>().unwrap();
-        delete_dataset
+        self.delete_dataset_use_case
             .execute_via_ref(&(dataset_id.as_local_ref()))
             .await
             .unwrap();
@@ -454,3 +492,5 @@ impl FlowHarness {
         }
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

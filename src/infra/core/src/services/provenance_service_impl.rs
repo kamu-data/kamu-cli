@@ -44,7 +44,7 @@ impl ProvenanceServiceImpl {
         visitor: &mut dyn LineageVisitor,
     ) -> Result<(), GetLineageError> {
         self.dataset_action_authorizer
-            .check_action_allowed(dataset_handle, auth::DatasetAction::Read)
+            .check_action_allowed(&dataset_handle.id, auth::DatasetAction::Read)
             .await?;
 
         let resolved_dataset = self.dataset_registry.get_dataset_by_handle(dataset_handle);

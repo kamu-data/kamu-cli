@@ -143,6 +143,7 @@ impl PushStatusesTestHarness {
             let mut b = CatalogBuilder::new();
 
             b.add_value(RunInfoDir::new(tempdir.path().join("run")))
+                .add::<DidGeneratorDefault>()
                 .add::<DummyOutboxImpl>()
                 .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
                 .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
@@ -152,7 +153,8 @@ impl PushStatusesTestHarness {
                 .add::<DatasetRegistryRepoBridge>()
                 .add_value(TenancyConfig::SingleTenant)
                 .add_value(FakeRemoteStatusService {})
-                .bind::<dyn RemoteStatusService, FakeRemoteStatusService>();
+                .bind::<dyn RemoteStatusService, FakeRemoteStatusService>()
+                .add::<auth::AlwaysHappyDatasetActionAuthorizer>();
 
             NoOpDatabasePlugin::init_database_components(&mut b);
 

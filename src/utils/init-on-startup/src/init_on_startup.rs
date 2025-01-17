@@ -82,6 +82,7 @@ pub async fn run_startup_jobs(catalog: &Catalog) -> Result<(), StartupJobsError>
         for startup_job_builder in startup_job_builders {
             let metadata = get_startup_job_metadata(&startup_job_builder);
             let job_name = metadata.job_name;
+
             if job_builders_by_name
                 .insert(job_name, (startup_job_builder, metadata))
                 .is_some()

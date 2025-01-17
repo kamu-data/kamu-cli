@@ -28,7 +28,10 @@ ingest-evm = ["dep:alloy", "dep:datafusion-ethers"]
 ingest-ftp = ["dep:curl", "dep:curl-sys"]
 ingest-mqtt = ["dep:rumqttc"]
 query-extensions-json = ["dep:datafusion-functions-json"]
-testing = ["dep:mockall", "kamu-data-utils/testing"]
+testing = [
+    "dep:mockall",
+    "kamu-data-utils/testing",
+]
 
 
 [dependencies]
@@ -145,10 +148,8 @@ libc = "0.2" # For getting uid:gid
 
 
 [dev-dependencies]
-database-common = { workspace = true }
 kamu = { workspace = true, features = ["testing"] }
-kamu-accounts-inmem = { workspace = true }
-kamu-accounts-services = { workspace = true }
+kamu-core = { workspace = true, features = ["testing"] }
 kamu-data-utils = { workspace = true, features = ["testing"] }
 kamu-datasets-services = { workspace = true }
 kamu-datasets-inmem = { workspace = true }

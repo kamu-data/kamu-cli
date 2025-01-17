@@ -16,7 +16,7 @@ use kamu::utils::ipfs_wrapper::IpfsClient;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::auth::DummyOdfServerAccessTokenResolver;
-use kamu_core::{DatasetRepository, TenancyConfig};
+use kamu_core::{DatasetRepository, DidGeneratorDefault, TenancyConfig};
 use kamu_datasets::DatasetEnvVarsConfig;
 use kamu_datasets_inmem::InMemoryDatasetEnvVarRepository;
 use kamu_datasets_services::DatasetEnvVarServiceImpl;
@@ -162,6 +162,7 @@ impl TaskAgentHarness {
 
         let mut b = CatalogBuilder::new();
         b.add::<TaskAgentImpl>()
+            .add::<DidGeneratorDefault>()
             .add::<TaskSchedulerImpl>()
             .add::<InMemoryTaskEventStore>()
             .add::<TaskDefinitionPlannerImpl>()

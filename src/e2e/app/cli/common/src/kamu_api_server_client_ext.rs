@@ -23,7 +23,7 @@ use kamu_adapter_http::data::query_types::{QueryRequest, QueryResponse};
 use kamu_adapter_http::data::verify_types::{VerifyRequest, VerifyResponse};
 use kamu_adapter_http::general::{AccountResponse, DatasetInfoResponse, NodeInfoResponse};
 use kamu_adapter_http::{LoginRequestBody, PlatformFileUploadQuery, UploadContext};
-use kamu_core::BlockRef;
+use kamu_core::{BlockRef, DatasetVisibility};
 use kamu_flow_system::{DatasetFlowType, FlowID};
 use lazy_static::lazy_static;
 use opendatafabric::{self as odf, DatasetAlias};
@@ -32,7 +32,7 @@ use thiserror::Error;
 use tokio_retry::strategy::FixedInterval;
 use tokio_retry::Retry;
 
-use crate::{AccessToken, KamuApiServerClient, RequestBody};
+use crate::{AccessToken, GraphQLResponseExt, KamuApiServerClient, RequestBody};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -150,13 +150,6 @@ pub const DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_4: &str = indoc::i
 );
 
 pub const E2E_USER_ACCOUNT_NAME_STR: &str = "e2e-user";
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub struct CreateDatasetResponse {
-    pub dataset_id: odf::DatasetID,
-    pub dataset_alias: DatasetAlias,
-}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -340,7 +333,7 @@ impl AuthApi<'_> {
     }
 
     async fn login(&mut self, login_request: &str) -> AccessToken {
-        let login_response = self.client.graphql_api_call(login_request).await;
+        let login_response = self.client.graphql_api_call(login_request).await.data();
         let access_token = login_response["auth"]["login"]["accessToken"]
             .as_str()
             .map(ToOwned::to_owned)
@@ -433,7 +426,8 @@ impl DatasetApi<'_> {
                 .replace("<dataset_alias>", &format!("{dataset_alias}"))
                 .as_str(),
             )
-            .await;
+            .await
+            .data();
 
         let create_response_node = &create_response["datasets"]["createEmpty"];
 
@@ -450,6 +444,21 @@ impl DatasetApi<'_> {
     }
 
     pub async fn create_dataset(&self, dataset_snapshot_yaml: &str) -> CreateDatasetResponse {
+        self.create_dataset_with_visibility(dataset_snapshot_yaml, DatasetVisibility::Public)
+            .await
+    }
+
+    pub async fn create_dataset_with_visibility(
+        &self,
+        dataset_snapshot_yaml: &str,
+        visibility: DatasetVisibility,
+    ) -> CreateDatasetResponse {
+        let dataset_visibility_value = if visibility.is_public() {
+            "PUBLIC"
+        } else {
+            "PRIVATE"
+        };
+
         let create_response = self
             .client
             .graphql_api_call(
@@ -457,7 +466,7 @@ impl DatasetApi<'_> {
                     r#"
                     mutation {
                       datasets {
-                        createFromSnapshot(snapshot: "<snapshot>", snapshotFormat: YAML) {
+                        createFromSnapshot(snapshot: "<snapshot>", snapshotFormat: YAML, datasetVisibility: "<dataset_visibility_value>") {
                           message
                           ... on CreateDatasetResultSuccess {
                             dataset {
@@ -471,9 +480,11 @@ impl DatasetApi<'_> {
                     "#,
                 )
                 .replace("<snapshot>", dataset_snapshot_yaml)
+                .replace("<dataset_visibility_value>", dataset_visibility_value)
                 .as_str(),
             )
-            .await;
+            .await
+            .data();
 
         let create_response_node = &create_response["datasets"]["createFromSnapshot"];
 
@@ -509,6 +520,122 @@ impl DatasetApi<'_> {
     pub async fn create_leaderboard(&self) -> CreateDatasetResponse {
         self.create_dataset(&DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT)
             .await
+    }
+
+    pub async fn get_visibility(
+        &self,
+        dataset_id: &odf::DatasetID,
+    ) -> Result<DatasetVisibility, GetDatasetVisibilityError> {
+        let response = self
+            .client
+            .graphql_api_call(
+                indoc::indoc!(
+                    r#"
+                    query {
+                      datasets {
+                        byId(
+                          datasetId: "<dataset_id>"
+                        ) {
+                          visibility {
+                            __typename
+                          }
+                        }
+                      }
+                    }
+                    "#,
+                )
+                .replace("<dataset_id>", &dataset_id.as_did_str().to_stack_string())
+                .as_str(),
+            )
+            .await;
+
+        match response {
+            Ok(data) => {
+                let dataset = &data["datasets"]["byId"];
+
+                if dataset.is_null() {
+                    Err(GetDatasetVisibilityError::NotFound)
+                } else {
+                    let typename = dataset["visibility"]["__typename"].as_str().unwrap();
+
+                    match typename {
+                        "PublicDatasetVisibility" => Ok(DatasetVisibility::Public),
+                        "PrivateDatasetVisibility" => Ok(DatasetVisibility::Private),
+                        unexpected_typename => {
+                            Err(format!("Unexpected typename: {unexpected_typename}")
+                                .int_err()
+                                .into())
+                        }
+                    }
+                }
+            }
+            Err(errors) => {
+                let first_error = errors.first().unwrap();
+
+                match first_error.message.as_str() {
+                    "Only the dataset owner can perform this action" => {
+                        Err(GetDatasetVisibilityError::Forbidden)
+                    }
+                    unexpected_message => {
+                        Err(format!("Unexpected error message: {unexpected_message}")
+                            .int_err()
+                            .into())
+                    }
+                }
+            }
+        }
+    }
+
+    pub async fn set_visibility(
+        &self,
+        dataset_id: &odf::DatasetID,
+        dataset_visibility: DatasetVisibility,
+    ) -> Result<(), SetDatasetVisibilityError> {
+        let visibility = match dataset_visibility {
+            DatasetVisibility::Private => "private: {}",
+            DatasetVisibility::Public => "public: { anonymousAvailable: false }",
+        };
+        let response = self
+            .client
+            .graphql_api_call(
+                indoc::indoc!(
+                    r#"
+                    mutation {
+                      datasets {
+                        byId(
+                          datasetId: "<dataset_id>"
+                        ) {
+                          setVisibility(visibility: { <dataset_visibility> }) {
+                            message
+                          }
+                        }
+                      }
+                    }
+                    "#,
+                )
+                .replace("<dataset_id>", &dataset_id.as_did_str().to_stack_string())
+                .replace("<dataset_visibility>", visibility)
+                .as_str(),
+            )
+            .await;
+
+        match response {
+            Ok(_) => Ok(()),
+            Err(errors) => {
+                let first_error = errors.first().unwrap();
+
+                match first_error.message.as_str() {
+                    "Only the dataset owner can perform this action" => {
+                        Err(SetDatasetVisibilityError::Forbidden)
+                    }
+                    unexpected_message => {
+                        Err(format!("Unexpected error message: {unexpected_message}")
+                            .int_err()
+                            .into())
+                    }
+                }
+            }
+        }
     }
 
     pub async fn ingest_data(&self, dataset_alias: &odf::DatasetAlias, data: RequestBody) {
@@ -553,7 +680,8 @@ impl DatasetApi<'_> {
                 .replace("<dataset_id>", &dataset_id.as_did_str().to_stack_string())
                 .as_str(),
             )
-            .await;
+            .await
+            .data();
 
         let content = tail_response["datasets"]["byId"]["data"]["tail"]["data"]["content"]
             .as_str()
@@ -597,7 +725,8 @@ impl DatasetApi<'_> {
                 .replace("<dataset_id>", &dataset_id.as_did_str().to_stack_string())
                 .as_str(),
             )
-            .await;
+            .await
+            .data();
 
         let blocks = response["datasets"]["byId"]["metadata"]["chain"]["blocks"]["edges"]
             .as_array()
@@ -640,6 +769,31 @@ impl DatasetApi<'_> {
 
         DatasetBlocksResponse { blocks }
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct CreateDatasetResponse {
+    pub dataset_id: odf::DatasetID,
+    pub dataset_alias: DatasetAlias,
+}
+
+#[derive(Error, Debug)]
+pub enum GetDatasetVisibilityError {
+    #[error("Forbidden")]
+    Forbidden,
+    #[error("Not found")]
+    NotFound,
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+}
+
+#[derive(Error, Debug)]
+pub enum SetDatasetVisibilityError {
+    #[error("Forbidden")]
+    Forbidden,
+    #[error(transparent)]
+    Internal(#[from] InternalError),
 }
 
 #[derive(Error, Debug)]
@@ -712,7 +866,8 @@ impl FlowApi<'_> {
                 )
                 .as_str(),
             )
-            .await;
+            .await
+            .data();
 
         let trigger_node = &response["datasets"]["byId"]["flows"]["runs"]["triggerFlow"];
         let message = trigger_node["message"].as_str().unwrap();
@@ -758,7 +913,8 @@ impl FlowApi<'_> {
                     .replace("<dataset_id>", &dataset_id.as_did_str().to_stack_string())
                     .as_str(),
                 )
-                .await;
+                .await
+                .data();
 
             let edges = response["datasets"]["byId"]["flows"]["runs"]["listFlows"]["edges"]
                 .as_array()
@@ -891,7 +1047,8 @@ impl OdfQuery<'_> {
                 .replace("<query>", query)
                 .as_str(),
             )
-            .await;
+            .await
+            .data();
         let query_node = &response["data"]["query"];
 
         assert_eq!(

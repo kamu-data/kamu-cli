@@ -10,6 +10,7 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
+use database_common::PaginationOpts;
 use dill::*;
 use opendatafabric::{AccountID, AccountName};
 
@@ -46,6 +47,7 @@ impl State {
 
 #[component(pub)]
 #[interface(dyn AccountRepository)]
+#[interface(dyn ExpensiveAccountRepository)]
 #[interface(dyn PasswordHashRepository)]
 #[scope(Singleton)]
 impl InMemoryAccountRepository {
@@ -182,6 +184,36 @@ impl AccountRepository for InMemoryAccountRepository {
         let guard = self.state.lock().unwrap();
         let maybe_account = guard.accounts_by_name.get(account_name);
         Ok(maybe_account.map(|a| a.id.clone()))
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait::async_trait]
+impl ExpensiveAccountRepository for InMemoryAccountRepository {
+    async fn accounts_count(&self) -> Result<usize, AccountsCountError> {
+        let readable_state = self.state.lock().unwrap();
+
+        let accounts_count = readable_state.accounts_by_id.len();
+
+        Ok(accounts_count)
+    }
+
+    async fn get_accounts(&self, pagination: PaginationOpts) -> AccountPageStream {
+        let dataset_entries_page = {
+            let readable_state = self.state.lock().unwrap();
+
+            readable_state
+                .accounts_by_id
+                .values()
+                .skip(pagination.offset)
+                .take(pagination.limit)
+                .cloned()
+                .map(Ok)
+                .collect::<Vec<_>>()
+        };
+
+        Box::pin(futures::stream::iter(dataset_entries_page))
     }
 }
 

@@ -131,7 +131,7 @@ pub async fn dataset_ingest_handler(
     // Authorization check
     let authorizer = catalog.get_one::<dyn DatasetActionAuthorizer>().unwrap();
     authorizer
-        .check_action_allowed(target.get_handle(), auth::DatasetAction::Write)
+        .check_action_allowed(&target.get_handle().id, auth::DatasetAction::Write)
         .await
         .map_err(|e| match e {
             DatasetActionUnauthorizedError::Access(_) => ApiError::new_forbidden(),

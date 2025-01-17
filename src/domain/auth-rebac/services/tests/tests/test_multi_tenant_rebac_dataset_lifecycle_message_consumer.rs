@@ -11,12 +11,12 @@ use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
 use dill::{Catalog, CatalogBuilder};
-use kamu_auth_rebac::{PropertyName, RebacService};
+use kamu_auth_rebac::{DatasetProperties, Entity, RebacRepository, RebacService};
 use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 use kamu_auth_rebac_services::{MultiTenantRebacDatasetLifecycleMessageConsumer, RebacServiceImpl};
 use kamu_core::{DatasetLifecycleMessage, DatasetVisibility};
 use messaging_outbox::{consume_deserialized_message, ConsumerFilter, Message};
-use opendatafabric::{AccountID, DatasetID, DatasetName};
+use opendatafabric as odf;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -28,46 +28,49 @@ type Harness = MultiTenantRebacDatasetLifecycleMessageConsumerHarness;
 async fn test_rebac_properties_added() {
     let harness = Harness::new();
 
-    let (_, public_dataset_id) = DatasetID::new_generated_ed25519();
-    let (_, private_dataset_id) = DatasetID::new_generated_ed25519();
-    let (_, owner_id) = AccountID::new_generated_ed25519();
+    let (_, public_dataset_id) = odf::DatasetID::new_generated_ed25519();
+    let (_, private_dataset_id) = odf::DatasetID::new_generated_ed25519();
+    let (_, owner_id) = odf::AccountID::new_generated_ed25519();
 
     // Pre-checks
     {
+        let public_dataset_entity = Entity::new_dataset(public_dataset_id.to_string());
+        let private_dataset_entity = Entity::new_dataset(private_dataset_id.to_string());
+
         assert_matches!(
             harness
-                .rebac_service
-                .get_dataset_properties(&public_dataset_id)
-                .await,
-            Ok(props)
-                if props.is_empty()
+                .rebac_repo
+                .get_entity_properties(&public_dataset_entity)
+                .await
+                .as_deref(),
+            Ok([])
         );
         assert_matches!(
             harness
-                .rebac_service
-                .get_dataset_properties(&private_dataset_id)
-                .await,
-            Ok(props)
-                if props.is_empty()
+                .rebac_repo
+                .get_entity_properties(&private_dataset_entity)
+                .await
+                .as_deref(),
+            Ok([])
         );
     }
 
     // Simulate creations
     {
         harness
-            .consume_message(DatasetLifecycleMessage::created(
+            .mimic(DatasetLifecycleMessage::created(
                 public_dataset_id.clone(),
                 owner_id.clone(),
                 DatasetVisibility::Public,
-                DatasetName::new_unchecked("public-dataset"),
+                odf::DatasetName::new_unchecked("public-dataset"),
             ))
             .await;
         harness
-            .consume_message(DatasetLifecycleMessage::created(
+            .mimic(DatasetLifecycleMessage::created(
                 private_dataset_id.clone(),
                 owner_id,
                 DatasetVisibility::Private,
-                DatasetName::new_unchecked("private-dataset"),
+                odf::DatasetName::new_unchecked("private-dataset"),
             ))
             .await;
     }
@@ -79,16 +82,20 @@ async fn test_rebac_properties_added() {
                 .rebac_service
                 .get_dataset_properties(&public_dataset_id)
                 .await,
-            Ok(props)
-                if props == vec![PropertyName::dataset_allows_public_read(true)]
+            Ok(DatasetProperties {
+                allows_anonymous_read: true,
+                allows_public_read: true
+            })
         );
         assert_matches!(
             harness
                 .rebac_service
                 .get_dataset_properties(&private_dataset_id)
                 .await,
-            Ok(props)
-                if props == vec![PropertyName::dataset_allows_public_read(false)]
+            Ok(DatasetProperties {
+                allows_anonymous_read: false,
+                allows_public_read: false
+            })
         );
     }
 }
@@ -99,17 +106,17 @@ async fn test_rebac_properties_added() {
 async fn test_rebac_properties_deleted() {
     let harness = Harness::new();
 
-    let (_, dataset_id) = DatasetID::new_generated_ed25519();
-    let (_, owner_id) = AccountID::new_generated_ed25519();
+    let (_, dataset_id) = odf::DatasetID::new_generated_ed25519();
+    let (_, owner_id) = odf::AccountID::new_generated_ed25519();
 
     // Simulate creation
     {
         harness
-            .consume_message(DatasetLifecycleMessage::created(
+            .mimic(DatasetLifecycleMessage::created(
                 dataset_id.clone(),
                 owner_id.clone(),
                 DatasetVisibility::Public,
-                DatasetName::new_unchecked("public-dataset"),
+                odf::DatasetName::new_unchecked("public-dataset"),
             ))
             .await;
     }
@@ -121,34 +128,38 @@ async fn test_rebac_properties_deleted() {
                 .rebac_service
                 .get_dataset_properties(&dataset_id)
                 .await,
-            Ok(props)
-                if props == vec![PropertyName::dataset_allows_public_read(true)]
+            Ok(DatasetProperties {
+                allows_anonymous_read: true,
+                allows_public_read: true
+            })
         );
     }
 
     // Simulate deletion
     {
         harness
-            .consume_message(DatasetLifecycleMessage::deleted(dataset_id.clone()))
+            .mimic(DatasetLifecycleMessage::deleted(dataset_id.clone()))
             .await;
     }
+
+    let dataset_entity = Entity::new_dataset(dataset_id.to_string());
 
     // Validate
     {
         assert_matches!(
             harness
-                .rebac_service
-                .get_dataset_properties(&dataset_id)
-                .await,
-            Ok(props)
-                if props.is_empty()
+                .rebac_repo
+                .get_entity_properties(&dataset_entity)
+                .await
+                .as_deref(),
+            Ok([])
         );
     }
 
     // Simulate deletion again to check idempotency
     {
         harness
-            .consume_message(DatasetLifecycleMessage::deleted(dataset_id.clone()))
+            .mimic(DatasetLifecycleMessage::deleted(dataset_id.clone()))
             .await;
     }
 
@@ -156,11 +167,11 @@ async fn test_rebac_properties_deleted() {
     {
         assert_matches!(
             harness
-                .rebac_service
-                .get_dataset_properties(&dataset_id)
-                .await,
-            Ok(props)
-                if props.is_empty()
+                .rebac_repo
+                .get_entity_properties(&dataset_entity)
+                .await
+                .as_deref(),
+            Ok([])
         );
     }
 }
@@ -169,6 +180,7 @@ async fn test_rebac_properties_deleted() {
 
 struct MultiTenantRebacDatasetLifecycleMessageConsumerHarness {
     catalog: Catalog,
+    rebac_repo: Arc<dyn RebacRepository>,
     rebac_service: Arc<dyn RebacService>,
 }
 
@@ -179,17 +191,23 @@ impl MultiTenantRebacDatasetLifecycleMessageConsumerHarness {
         catalog_builder
             .add::<MultiTenantRebacDatasetLifecycleMessageConsumer>()
             .add::<RebacServiceImpl>()
+            .add_value(kamu_auth_rebac_services::DefaultAccountProperties { is_admin: false })
+            .add_value(kamu_auth_rebac_services::DefaultDatasetProperties {
+                allows_anonymous_read: false,
+                allows_public_read: false,
+            })
             .add::<InMemoryRebacRepository>();
 
         let catalog = catalog_builder.build();
 
         Self {
+            rebac_repo: catalog.get_one().unwrap(),
             rebac_service: catalog.get_one().unwrap(),
             catalog,
         }
     }
 
-    pub async fn consume_message<TMessage: Message + 'static>(&self, message: TMessage) {
+    pub async fn mimic<TMessage: Message + 'static>(&self, message: TMessage) {
         let content_json = serde_json::to_string(&message).unwrap();
 
         consume_deserialized_message::<TMessage>(

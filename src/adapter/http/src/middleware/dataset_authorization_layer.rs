@@ -131,23 +131,19 @@ where
                         {
                             Ok(dataset_handle) => {
                                 if let Err(err) = dataset_action_authorizer
-                                    .check_action_allowed(&dataset_handle, action)
+                                    .check_action_allowed(&dataset_handle.id, action)
                                     .await
                                 {
                                     if let Err(err_result) = Self::check_logged_in(catalog) {
                                         tracing::error!(
-                                            "Dataset '{}' {} access denied: user not logged in",
-                                            dataset_ref,
-                                            action
+                                            "Dataset '{dataset_ref}' {action} access denied: user \
+                                             not logged in",
                                         );
                                         return Ok(CheckResult::ErrorResponse(err_result));
                                     }
 
                                     tracing::error!(
-                                        "Dataset '{}' {} access denied: {:?}",
-                                        dataset_ref,
-                                        action,
-                                        err
+                                        "Dataset '{dataset_ref}' {action} access denied: {err:?}",
                                     );
                                     return Ok(CheckResult::ErrorResponse(
                                         forbidden_access_response(),
@@ -175,3 +171,5 @@ where
         })
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

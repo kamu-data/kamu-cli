@@ -11,9 +11,26 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [0.218.0] - 2029-01-17
+### Changed
+- Private Datasets:
+  - OSO: using user actors / dateset resources that come from the database
+    - Thus, any access check relies on real entities
+  - GQL, added `Dataset.visibility()` to get the current visibility value
+  - GQL, added `DatasetMut.setVisibility()` to be able to change the dataset visibility after it has been created
+  - Deletion of previously created (and unused) ReBAC-properties and reindexing
+  - OSO: updating the schema to use identifiers instead of names
+  - OSO: added resource storage for access speed
+  - E2E: Using the correct account in multi-tenant mode
+    - And also the possibility of set it up
+  - `DatasetOwnershipService`: moved to the `kamu-dataset` crate area & implemented via `DatasetEntryServiceImpl`
+  - GQL, `DatasetMetadata.currentUpstreamDependencies`: indication if datasets not found/not accessed
+  - GQL, `DatasetMetadata.currentDownstreamDependencies`: exclude datasets that cannot be accessed
+  - E2E: added the ability to create an account using CLI
+
 ## [0.217.3] - 2025-01-14
 ### Fixed
-- Fix crash on resolving dataset by non existing account
+- Fix crash on resolving dataset by non-existing account
 - Minor improvements in event sourcing aggregation
 
 ## [0.217.2] - 2025-01-10

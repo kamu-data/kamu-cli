@@ -40,7 +40,7 @@ pub async fn test_gql_get_dataset_list_flows(mut kamu_api_server_client: KamuApi
     // - search DatasetBasics (id)
 
     kamu_api_server_client
-        .graphql_api_call_assert_with_token(
+        .graphql_api_call_assert(
             &get_dataset_list_flows_query(&dataset_id),
             Ok(indoc::indoc!(
                 r#"
@@ -108,7 +108,7 @@ pub async fn test_gql_dataset_all_flows_paused(mut kamu_api_server_client: KamuA
     // The query is almost identical to kamu-web-ui, for ease of later edits.
 
     kamu_api_server_client
-        .graphql_api_call_assert_with_token(
+        .graphql_api_call_assert(
             indoc::indoc!(
                 r#"
                 query datasetAllFlowsPaused() {
@@ -167,7 +167,7 @@ pub async fn test_gql_dataset_flows_initiators(mut kamu_api_server_client: KamuA
     // The query is almost identical to kamu-web-ui, for ease of later edits.
 
     kamu_api_server_client
-        .graphql_api_call_assert_with_token(
+        .graphql_api_call_assert(
             indoc::indoc!(
                 r#"
                 query datasetFlowsInitiators() {
@@ -259,7 +259,7 @@ pub async fn test_gql_dataset_trigger_flow(mut kamu_api_server_client: KamuApiSe
     // - search FlowSummaryData (datasetId, flowId)
 
     kamu_api_server_client
-        .graphql_api_call_assert_with_token(
+        .graphql_api_call_assert(
             indoc::indoc!(
                 r#"
                 mutation datasetTriggerFlow() {
@@ -589,7 +589,7 @@ pub async fn test_gql_dataset_trigger_flow(mut kamu_api_server_client: KamuApiSe
         .await;
 
     kamu_api_server_client
-        .graphql_api_call_assert_with_token(
+        .graphql_api_call_assert(
             &get_dataset_list_flows_query(&derivative_dataset_id),
             Ok(indoc::indoc!(
                 r#"

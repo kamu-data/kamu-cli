@@ -18,8 +18,6 @@ use indoc::indoc;
 use kamu::testing::{MetadataFactory, MockDatasetChangesService};
 use kamu::{
     CreateDatasetFromSnapshotUseCaseImpl,
-    DatasetOwnershipServiceInMemory,
-    DatasetRegistryRepoBridge,
     DatasetRepositoryLocalFs,
     DatasetRepositoryWriter,
     MetadataQueryServiceImpl,
@@ -42,13 +40,14 @@ use kamu_core::{
     DatasetIntervalIncrement,
     DatasetLifecycleMessage,
     DatasetRepository,
+    DidGeneratorDefault,
     PullResult,
     ResetResult,
     TenancyConfig,
     MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
 };
-use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
-use kamu_datasets_services::DependencyGraphServiceImpl;
+use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEntryRepository};
+use kamu_datasets_services::{DatasetEntryServiceImpl, DependencyGraphServiceImpl};
 use kamu_flow_system::{
     Flow,
     FlowAgentConfig,
@@ -3115,11 +3114,11 @@ impl FlowRunsHarness {
                     .with_consumer_filter(messaging_outbox::ConsumerFilter::AllConsumers),
             )
             .bind::<dyn Outbox, OutboxImmediateImpl>()
+            .add::<DidGeneratorDefault>()
             .add_value(TenancyConfig::SingleTenant)
             .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
             .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
-            .add::<DatasetRegistryRepoBridge>()
             .add::<MetadataQueryServiceImpl>()
             .add::<CreateDatasetFromSnapshotUseCaseImpl>()
             .add_value(dataset_changes_mock)
@@ -3141,7 +3140,8 @@ impl FlowRunsHarness {
             .add::<AccessTokenServiceImpl>()
             .add::<InMemoryAccessTokenRepository>()
             .add_value(JwtAuthenticationConfig::default())
-            .add::<DatasetOwnershipServiceInMemory>()
+            .add::<DatasetEntryServiceImpl>()
+            .add::<InMemoryDatasetEntryRepository>()
             .add::<DatabaseTransactionRunner>();
 
             NoOpDatabasePlugin::init_database_components(&mut b);

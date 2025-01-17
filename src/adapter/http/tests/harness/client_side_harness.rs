@@ -52,7 +52,7 @@ pub(crate) struct ClientSideHarness {
     catalog: dill::Catalog,
     pull_dataset_use_case: Arc<dyn PullDatasetUseCase>,
     push_dataset_use_case: Arc<dyn PushDatasetUseCase>,
-    access_token_resover: Arc<dyn OdfServerAccessTokenResolver>,
+    access_token_resolver: Arc<dyn OdfServerAccessTokenResolver>,
     options: ClientSideHarnessOptions,
 }
 
@@ -74,6 +74,8 @@ impl ClientSideHarness {
         std::fs::create_dir(&cache_dir).unwrap();
 
         let mut b = dill::CatalogBuilder::new();
+
+        b.add::<DidGeneratorDefault>();
 
         b.add_value(RunInfoDir::new(run_info_dir));
         b.add_value(CacheDir::new(cache_dir));
@@ -162,7 +164,7 @@ impl ClientSideHarness {
 
         let pull_dataset_use_case = catalog.get_one::<dyn PullDatasetUseCase>().unwrap();
         let push_dataset_use_case = catalog.get_one::<dyn PushDatasetUseCase>().unwrap();
-        let access_token_resover = catalog
+        let access_token_resolver = catalog
             .get_one::<dyn OdfServerAccessTokenResolver>()
             .unwrap();
 
@@ -171,7 +173,7 @@ impl ClientSideHarness {
             catalog,
             pull_dataset_use_case,
             push_dataset_use_case,
-            access_token_resover,
+            access_token_resolver,
             options,
         }
     }
@@ -341,7 +343,7 @@ impl ClientSideHarness {
         let mut ws_url = url.odf_to_transport_protocol().unwrap();
         ws_url.ensure_trailing_slash();
         let maybe_access_token = self
-            .access_token_resover
+            .access_token_resolver
             .resolve_odf_dataset_access_token(&ws_url);
 
         ws_url = ws_url.join(method).unwrap();
