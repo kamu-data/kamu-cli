@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\n                    SELECT id            AS \"id: _\",\n                           account_name,\n                           email,\n                           display_name,\n                           account_type  AS \"account_type: AccountType\",\n                           avatar_url,\n                           registered_at AS \"registered_at: _\",\n                           is_admin      AS \"is_admin: _\",\n                           provider,\n                           provider_identity_key\n                    FROM accounts\n                    ORDER BY registered_at ASC\n                    LIMIT $1 OFFSET $2\n                    ",
+  "query": "\n                SELECT id            AS \"id: _\",\n                       account_name,\n                       email,\n                       display_name,\n                       account_type  AS \"account_type: AccountType\",\n                       avatar_url,\n                       registered_at AS \"registered_at: _\",\n                       is_admin      AS \"is_admin: _\",\n                       provider,\n                       provider_identity_key\n                FROM accounts\n                ORDER BY registered_at ASC\n                LIMIT $1 OFFSET $2\n                ",
   "describe": {
     "columns": [
       {
@@ -70,5 +70,5 @@
       false
     ]
   },
-  "hash": "67ddd71595415860d71c398b5db2103074dafdfc2250b9a12b63d3ef1be598c7"
+  "hash": "58f4334a2ed2a7d814497c9399f2361dddd9ceb55089f09d9ac11924b993d8ac"
 }
