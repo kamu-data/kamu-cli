@@ -19,7 +19,6 @@ use kamu_datasets::{
     DeleteDatasetEnvVarError,
     GetDatasetEnvVarError,
 };
-use opendatafabric::DatasetID;
 use uuid::Uuid;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -44,7 +43,7 @@ impl DatasetEnvVarService for DatasetEnvVarServiceNull {
         &self,
         _dataset_env_var_key: &str,
         _dataset_env_var_value: &DatasetEnvVarValue,
-        _dataset_id: &DatasetID,
+        _dataset_id: &odf::DatasetID,
     ) -> Result<DatasetEnvVarUpsertResult, InternalError> {
         unreachable!()
     }
@@ -65,7 +64,7 @@ impl DatasetEnvVarService for DatasetEnvVarServiceNull {
 
     async fn get_all_dataset_env_vars_by_dataset_id(
         &self,
-        _dataset_id: &DatasetID,
+        _dataset_id: &odf::DatasetID,
         _pagination: Option<PaginationOpts>,
     ) -> Result<DatasetEnvVarListing, GetDatasetEnvVarError> {
         Ok(DatasetEnvVarListing {

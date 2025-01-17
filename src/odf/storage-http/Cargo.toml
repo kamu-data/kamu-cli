@@ -1,0 +1,46 @@
+[package]
+name = "opendatafabric-storage-http"
+description = "HTTP read-only implementation of storage facilities for Open Data Fabric based datasets"
+version = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+authors = { workspace = true }
+readme = { workspace = true }
+license-file = { workspace = true }
+keywords = { workspace = true }
+include = { workspace = true }
+edition = { workspace = true }
+publish = { workspace = true }
+
+
+[lints]
+workspace = true
+
+
+[lib]
+doctest = false
+
+
+[dependencies]
+async-utils = { workspace = true }
+internal-error = { workspace = true }
+odf-metadata = { workspace = true }
+odf-storage = { workspace = true }
+
+async-trait = "0.1"
+bytes = { version = "1", default-features = false }
+futures = "0.3"
+http = "1"
+reqwest = { version = "0.12", default-features = false, features = [ "stream" ] }
+tokio-util = { version = "0.7", default-features = false, features = ["compat"]}
+tracing = "0.1"
+url = { version = "2", default-features = false }
+
+
+[dev-dependencies]
+odf-storage = { workspace = true, features = [ "testing" ]}
+
+tokio = { version = "1", default-features = false }
+tempfile = "3"
+test-log = { version = "0.2", features = ["trace"] }
+test-utils = { workspace = true }

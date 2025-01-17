@@ -15,8 +15,6 @@ use dill::Component;
 use http::{HeaderMap, HeaderName, HeaderValue};
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu::domain::ServerUrlConfig;
-use kamu::testing::LocalS3Server;
-use kamu::utils::s3_context::S3Context;
 use kamu_accounts::{JwtAuthenticationConfig, PredefinedAccountsConfig, DEFAULT_ACCOUNT_ID};
 use kamu_accounts_inmem::{InMemoryAccessTokenRepository, InMemoryAccountRepository};
 use kamu_accounts_services::{
@@ -27,8 +25,9 @@ use kamu_accounts_services::{
 };
 use kamu_adapter_http::{FileUploadLimitConfig, UploadContext, UploadService, UploadServiceS3};
 use kamu_core::TenancyConfig;
-use opendatafabric::AccountID;
+use s3_utils::S3Context;
 use serde_json::json;
+use test_utils::LocalS3Server;
 use time_source::SystemTimeSourceDefault;
 use tokio::io::AsyncReadExt;
 
@@ -95,7 +94,7 @@ impl Harness {
         self.api_server.local_addr().to_string()
     }
 
-    fn make_access_token(&self, account_id: &AccountID) -> String {
+    fn make_access_token(&self, account_id: &odf::AccountID) -> String {
         self.authentication_service
             .make_access_token(account_id, 60)
             .unwrap()
@@ -303,7 +302,8 @@ async fn test_upload_then_read_file() {
     let upload_prepare_url = harness.upload_prepare_url("test.txt", "text/plain", FILE_BODY.len());
     let retrieve_url = harness.upload_retrieve_url();
     let access_token = harness.make_access_token(&DEFAULT_ACCOUNT_ID);
-    let different_access_token = harness.make_access_token(&(AccountID::new_generated_ed25519().1));
+    let different_access_token =
+        harness.make_access_token(&(odf::AccountID::new_generated_ed25519().1));
 
     let client = async move {
         let client = reqwest::Client::new();

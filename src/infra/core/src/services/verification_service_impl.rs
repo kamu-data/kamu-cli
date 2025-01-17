@@ -13,10 +13,11 @@ use dill::*;
 use futures::TryStreamExt;
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_core::*;
-use opendatafabric::*;
+use odf::dataset::MetadataChainImpl;
+use odf::storage::inmem::{NamedObjectRepositoryInMemory, ObjectRepositoryInMemory};
+use odf::storage::{MetadataBlockRepositoryImpl, ReferenceRepositoryImpl};
 
 use crate::utils::cached_object::CachedObject;
-use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -42,15 +43,15 @@ impl VerificationServiceImpl {
     async fn check_data_integrity(
         &self,
         resolved_dataset: &ResolvedDataset,
-        dataset_kind: DatasetKind,
-        block_range: (Option<Multihash>, Option<Multihash>),
+        dataset_kind: odf::DatasetKind,
+        block_range: (Option<odf::Multihash>, Option<odf::Multihash>),
         check_logical_hashes: bool,
         listener: Arc<dyn VerificationListener>,
     ) -> Result<(), VerificationError> {
         let chain = resolved_dataset.as_metadata_chain();
 
         let head = match block_range.1 {
-            None => chain.resolve_ref(&BlockRef::Head).await?,
+            None => chain.resolve_ref(&odf::BlockRef::Head).await?,
             Some(hash) => hash,
         };
         let tail = block_range.0;
@@ -107,7 +108,7 @@ impl VerificationServiceImpl {
                 if physical_hash_actual != output_slice.physical_hash {
                     // Root data files are non-reproducible by definition, so
                     // if physical hashes don't match - we can give up right away.
-                    if dataset_kind == DatasetKind::Root {
+                    if dataset_kind == odf::DatasetKind::Root {
                         return Err(VerificationError::DataDoesNotMatchMetadata(
                             DataDoesNotMatchMetadata {
                                 block_hash,
@@ -198,13 +199,13 @@ impl VerificationServiceImpl {
     async fn check_metadata_integrity(
         &self,
         resolved_dataset: &ResolvedDataset,
-        block_range: (Option<Multihash>, Option<Multihash>),
+        block_range: (Option<odf::Multihash>, Option<odf::Multihash>),
         listener: Arc<dyn VerificationListener>,
     ) -> Result<(), VerificationError> {
         let chain = resolved_dataset.as_metadata_chain();
 
         let head = match block_range.1 {
-            None => chain.resolve_ref(&BlockRef::Head).await?,
+            None => chain.resolve_ref(&odf::BlockRef::Head).await?,
             Some(hash) => hash,
         };
         let tail = block_range.0;
@@ -226,18 +227,21 @@ impl VerificationServiceImpl {
         );
 
         for (block_hash, block) in blocks.into_iter().rev() {
+            use odf::MetadataChain;
             match in_memory_chain
                 .append(
                     block,
-                    AppendOpts {
+                    odf::dataset::AppendOpts {
                         precomputed_hash: Some(&block_hash),
-                        ..AppendOpts::default()
+                        ..odf::dataset::AppendOpts::default()
                     },
                 )
                 .await
             {
                 Ok(_) => Ok(()),
-                Err(AppendError::RefNotFound(e)) => Err(VerificationError::RefNotFound(e)),
+                Err(odf::dataset::AppendError::RefNotFound(e)) => {
+                    Err(VerificationError::RefNotFound(e))
+                }
                 Err(e) => Err(VerificationError::Internal(e.int_err())),
             }?;
         }
@@ -265,7 +269,11 @@ impl VerificationService for VerificationServiceImpl {
         request: VerificationRequest<ResolvedDataset>,
         maybe_listener: Option<Arc<dyn VerificationListener>>,
     ) -> VerificationResult {
-        let dataset_kind = match request.target.get_summary(GetSummaryOpts::default()).await {
+        let dataset_kind = match request
+            .target
+            .get_summary(odf::dataset::GetSummaryOpts::default())
+            .await
+        {
             Ok(summary) => summary.kind,
             Err(e) => return VerificationResult::err(request.target.take_handle(), e.int_err()),
         };
@@ -292,7 +300,9 @@ impl VerificationService for VerificationServiceImpl {
                 .await?;
             }
 
-            if dataset_kind == DatasetKind::Derivative && request.options.replay_transformations {
+            if dataset_kind == odf::DatasetKind::Derivative
+                && request.options.replay_transformations
+            {
                 let plan = self
                     .transform_request_planner
                     .build_transform_verification_plan(

@@ -13,7 +13,6 @@ use std::collections::BTreeMap;
 use database_common::PaginationOpts;
 use dill::*;
 use kamu_task_system::*;
-use opendatafabric::DatasetID;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -26,7 +25,7 @@ pub struct InMemoryTaskEventStore {
 #[derive(Default)]
 struct State {
     events: Vec<TaskEvent>,
-    tasks_by_dataset: HashMap<DatasetID, Vec<TaskID>>,
+    tasks_by_dataset: HashMap<odf::DatasetID, Vec<TaskID>>,
     task_statuses: BTreeMap<TaskID, TaskStatus>,
     last_task_id: Option<TaskID>,
 }
@@ -182,7 +181,7 @@ impl TaskEventStore for InMemoryTaskEventStore {
     /// Note: no longer used, but might be used in future (admin view)
     fn get_tasks_by_dataset(
         &self,
-        dataset_id: &DatasetID,
+        dataset_id: &odf::DatasetID,
         pagination: PaginationOpts,
     ) -> TaskIDStream {
         let task_ids_page: Option<Vec<_>> = {
@@ -209,7 +208,7 @@ impl TaskEventStore for InMemoryTaskEventStore {
     /// Note: no longer used, but might be used in future (admin view)
     async fn get_count_tasks_by_dataset(
         &self,
-        dataset_id: &DatasetID,
+        dataset_id: &odf::DatasetID,
     ) -> Result<usize, InternalError> {
         let state = self.inner.as_state();
         let g = state.lock().unwrap();

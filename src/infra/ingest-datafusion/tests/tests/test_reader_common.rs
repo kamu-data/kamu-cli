@@ -11,8 +11,8 @@ use std::future::Future;
 use std::path::PathBuf;
 
 use datafusion::prelude::*;
-use kamu_data_utils::testing::*;
 use kamu_ingest_datafusion::*;
+use odf::utils::testing::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

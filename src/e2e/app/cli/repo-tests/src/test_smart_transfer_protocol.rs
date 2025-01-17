@@ -10,11 +10,10 @@
 use std::str::FromStr;
 
 use chrono::DateTime;
-use kamu::testing::LocalS3Server;
 use kamu_cli_e2e_common::*;
 use kamu_cli_puppet::extensions::{KamuCliPuppetExt, RepoAlias};
 use kamu_cli_puppet::KamuCliPuppet;
-use opendatafabric as odf;
+use test_utils::LocalS3Server;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

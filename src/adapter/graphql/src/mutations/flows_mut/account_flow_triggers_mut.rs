@@ -11,7 +11,6 @@ use chrono::Utc;
 use kamu_accounts::Account;
 use kamu_datasets::{DatasetEntryService, DatasetEntryServiceExt};
 use kamu_flow_system::FlowTriggerService;
-use opendatafabric::DatasetID;
 
 use crate::prelude::*;
 
@@ -29,7 +28,7 @@ impl AccountFlowTriggersMut {
     }
 
     #[graphql(skip)]
-    async fn get_account_dataset_ids(&self, ctx: &Context<'_>) -> Result<Vec<DatasetID>> {
+    async fn get_account_dataset_ids(&self, ctx: &Context<'_>) -> Result<Vec<odf::DatasetID>> {
         let dataset_entry_service = from_catalog_n!(ctx, dyn DatasetEntryService);
         let dataset_ids: Vec<_> = dataset_entry_service
             .get_owned_dataset_ids(&self.account.id)

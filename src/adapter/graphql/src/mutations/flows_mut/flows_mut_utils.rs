@@ -7,8 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_core::{DatasetRegistry, GetSummaryOpts, MetadataChainExt};
-use {kamu_flow_system as fs, opendatafabric as odf};
+use kamu_core::DatasetRegistry;
+use kamu_flow_system as fs;
 
 use super::FlowNotFound;
 use crate::prelude::*;
@@ -81,7 +81,7 @@ pub(crate) async fn ensure_expected_dataset_kind(
             let resolved_dataset = utils::get_dataset(ctx, dataset_handle)?;
 
             let dataset_kind = resolved_dataset
-                .get_summary(GetSummaryOpts::default())
+                .get_summary(odf::dataset::GetSummaryOpts::default())
                 .await
                 .int_err()?
                 .kind;
@@ -138,10 +138,11 @@ pub(crate) async fn ensure_flow_preconditions(
             if let Some(flow_configuration) = flow_run_configuration
                 && let FlowRunConfiguration::Reset(reset_configuration) = flow_configuration
             {
+                use odf::dataset::MetadataChainExt as _;
                 if let Some(new_head_hash) = &reset_configuration.new_head_hash() {
                     let metadata_chain = target.as_metadata_chain();
                     let current_head_hash_maybe = metadata_chain
-                        .try_get_ref(&kamu_core::BlockRef::Head)
+                        .try_get_ref(&odf::BlockRef::Head)
                         .await
                         .int_err()?;
                     if current_head_hash_maybe.is_none() {

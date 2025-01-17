@@ -10,7 +10,6 @@
 use argon2::Argon2;
 use chrono::{SubsecRound, Utc};
 use kamu_accounts::{Account, AccountType};
-use opendatafabric::{AccountID, AccountName};
 use password_hash::rand_core::OsRng;
 use password_hash::{PasswordHash, PasswordHasher, SaltString};
 
@@ -22,8 +21,8 @@ pub(crate) fn make_test_account(
     provider_identity_key: &str,
 ) -> Account {
     Account {
-        id: AccountID::new_seeded_ed25519(name.as_bytes()),
-        account_name: AccountName::new_unchecked(name),
+        id: odf::AccountID::new_seeded_ed25519(name.as_bytes()),
+        account_name: odf::AccountName::new_unchecked(name),
         email: None,
         display_name: String::from(name),
         account_type: AccountType::User,

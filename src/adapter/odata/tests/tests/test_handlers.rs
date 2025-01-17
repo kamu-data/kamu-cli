@@ -14,11 +14,10 @@ use database_common::NoOpDatabasePlugin;
 use dill::*;
 use indoc::indoc;
 use kamu::domain::*;
-use kamu::testing::*;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
 use messaging_outbox::DummyOutboxImpl;
-use opendatafabric::*;
+use odf::metadata::testing::MetadataFactory;
 use time_source::{SystemTimeSource, SystemTimeSourceStub};
 use url::Url;
 
@@ -350,10 +349,10 @@ impl TestHarness {
                 .add_value(dataset_action_authorizer)
                 .bind::<dyn auth::DatasetActionAuthorizer, TDatasetAuthorizer>()
                 .add_value(TenancyConfig::SingleTenant)
-                .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
-                .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-                .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
-                .add::<DatasetRegistryRepoBridge>()
+                .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
+                .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
+                .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
+                .add::<DatasetRegistrySoloUnitBridge>()
                 .add::<CreateDatasetFromSnapshotUseCaseImpl>()
                 .add_value(SystemTimeSourceStub::new_set(
                     Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap(),
@@ -385,7 +384,7 @@ impl TestHarness {
         }
     }
 
-    async fn create_simple_dataset(&self) -> CreateDatasetResult {
+    async fn create_simple_dataset(&self) -> odf::CreateDatasetResult {
         let create_dataset_from_snapshot = self
             .catalog
             .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
@@ -395,10 +394,10 @@ impl TestHarness {
             .execute(
                 MetadataFactory::dataset_snapshot()
                     .name("foo.bar")
-                    .kind(DatasetKind::Root)
+                    .kind(odf::DatasetKind::Root)
                     .push_event(
                         MetadataFactory::add_push_source()
-                            .read(ReadStepCsv {
+                            .read(odf::metadata::ReadStepCsv {
                                 header: Some(true),
                                 schema: Some(
                                     ["date TIMESTAMP", "city STRING", "population BIGINT"]
@@ -406,12 +405,12 @@ impl TestHarness {
                                         .map(|s| (*s).to_string())
                                         .collect(),
                                 ),
-                                ..ReadStepCsv::default()
+                                ..odf::metadata::ReadStepCsv::default()
                             })
-                            .merge(MergeStrategyAppend {})
+                            .merge(odf::metadata::MergeStrategyAppend {})
                             .build(),
                     )
-                    .push_event(SetVocab {
+                    .push_event(odf::metadata::SetVocab {
                         event_time_column: Some("date".to_string()),
                         ..Default::default()
                     })
@@ -441,7 +440,7 @@ impl TestHarness {
         ds
     }
 
-    async fn ingest_from_url(&self, created: &CreateDatasetResult, url: Url) {
+    async fn ingest_from_url(&self, created: &odf::CreateDatasetResult, url: Url) {
         let target = ResolvedDataset::from(created);
 
         let ingest_plan = self

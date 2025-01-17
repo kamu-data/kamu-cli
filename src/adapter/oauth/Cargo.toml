@@ -23,8 +23,8 @@ doctest = false
 
 [dependencies]
 internal-error = { workspace = true }
+odf = { workspace = true }
 kamu-accounts = { workspace = true }
-opendatafabric = { workspace = true }
 
 async-trait = "0.1"
 dill = "0.11"

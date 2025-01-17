@@ -26,11 +26,8 @@ database-common = { workspace = true }
 database-common-macros = { workspace = true }
 http-common = { workspace = true }
 internal-error = { workspace = true }
-kamu-accounts = { workspace = true }
 kamu-core = { workspace = true }
-opendatafabric = { workspace = true, default-features = false, features = [
-    "arrow",
-] }
+odf = { workspace = true, default-features = false, features = [ "arrow", "http", "lfs", "s3" ] }
 
 axum = { version = "0.7", default-features = false, features = [] }
 chrono = { version = "0.4", default-features = false }
@@ -46,6 +43,7 @@ utoipa-axum = { version = "=0.1.3", default-features = false, features = [] }
 
 [dev-dependencies]
 kamu = { workspace = true, features = ["testing"] }
+kamu-accounts = { workspace = true }
 messaging-outbox = { workspace = true }
 time-source = { workspace = true }
 

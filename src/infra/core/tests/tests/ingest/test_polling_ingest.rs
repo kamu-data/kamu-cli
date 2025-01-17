@@ -20,7 +20,7 @@ use kamu::testing::*;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_datasets_services::DatasetKeyValueServiceSysEnv;
-use opendatafabric::*;
+use odf::metadata::testing::MetadataFactory;
 use tempfile::TempDir;
 use time_source::{SystemTimeSource, SystemTimeSourceStub};
 
@@ -35,32 +35,32 @@ async fn test_ingest_polling_snapshot() {
 
     let dataset_snapshot = MetadataFactory::dataset_snapshot()
         .name("foo.bar")
-        .kind(DatasetKind::Root)
+        .kind(odf::DatasetKind::Root)
         .push_event(
             MetadataFactory::set_polling_source()
-                .fetch(FetchStep::Url(FetchStepUrl {
+                .fetch(odf::metadata::FetchStep::Url(odf::metadata::FetchStepUrl {
                     url: url::Url::from_file_path(&src_path)
                         .unwrap()
                         .as_str()
                         .to_owned(),
-                    event_time: Some(EventTimeSourceFromSystemTime {}.into()),
+                    event_time: Some(odf::metadata::EventTimeSourceFromSystemTime {}.into()),
                     cache: None,
                     headers: None,
                 }))
-                .read(ReadStep::Csv(ReadStepCsv {
+                .read(odf::metadata::ReadStep::Csv(odf::metadata::ReadStepCsv {
                     header: Some(true),
                     schema: Some(vec![
                         "city STRING".to_string(),
                         "population BIGINT".to_string(),
                     ]),
-                    ..ReadStepCsv::default()
+                    ..odf::metadata::ReadStepCsv::default()
                 }))
-                .preprocess(TransformSql {
+                .preprocess(odf::metadata::TransformSql {
                     engine: "datafusion".to_string(),
                     version: None,
                     query: None,
                     queries: Some(vec![
-                        SqlQueryStep {
+                        odf::metadata::SqlQueryStep {
                             alias: Some("step1".to_string()),
                             query: indoc::indoc!(
                                 r#"
@@ -72,7 +72,7 @@ async fn test_ingest_polling_snapshot() {
                             )
                             .to_string(),
                         },
-                        SqlQueryStep {
+                        odf::metadata::SqlQueryStep {
                             alias: None,
                             query: indoc::indoc!(
                                 r#"
@@ -87,7 +87,7 @@ async fn test_ingest_polling_snapshot() {
                     ]),
                     temporal_tables: None,
                 })
-                .merge(MergeStrategySnapshot {
+                .merge(odf::metadata::MergeStrategySnapshot {
                     primary_key: vec!["city".to_string()],
                     compare_columns: None,
                 })
@@ -216,7 +216,10 @@ async fn test_ingest_polling_snapshot() {
         .set(Utc.with_ymd_and_hms(2050, 2, 1, 12, 0, 0).unwrap());
 
     harness.ingest(&created).await.unwrap();
-    let event = data_helper.get_last_block_typed::<AddData>().await.event;
+    let event = data_helper
+        .get_last_block_typed::<odf::metadata::AddData>()
+        .await
+        .event;
 
     assert_eq!(event.new_data, None);
     assert_eq!(
@@ -236,19 +239,19 @@ async fn test_ingest_polling_ledger() {
 
     let dataset_snapshot = MetadataFactory::dataset_snapshot()
         .name("foo.bar")
-        .kind(DatasetKind::Root)
+        .kind(odf::DatasetKind::Root)
         .push_event(
             MetadataFactory::set_polling_source()
-                .fetch(FetchStep::Url(FetchStepUrl {
+                .fetch(odf::metadata::FetchStep::Url(odf::metadata::FetchStepUrl {
                     url: url::Url::from_file_path(&src_path)
                         .unwrap()
                         .as_str()
                         .to_owned(),
-                    event_time: Some(EventTimeSourceFromSystemTime {}.into()),
+                    event_time: Some(odf::metadata::EventTimeSourceFromSystemTime {}.into()),
                     cache: None,
                     headers: None,
                 }))
-                .read(ReadStep::Csv(ReadStepCsv {
+                .read(odf::metadata::ReadStep::Csv(odf::metadata::ReadStepCsv {
                     header: Some(true),
                     schema: Some(
                         ["date TIMESTAMP", "city STRING", "population BIGINT"]
@@ -256,14 +259,14 @@ async fn test_ingest_polling_ledger() {
                             .map(|s| (*s).to_string())
                             .collect(),
                     ),
-                    ..ReadStepCsv::default()
+                    ..odf::metadata::ReadStepCsv::default()
                 }))
-                .merge(MergeStrategyLedger {
+                .merge(odf::metadata::MergeStrategyLedger {
                     primary_key: vec!["date".to_string(), "city".to_string()],
                 })
                 .build(),
         )
-        .push_event(SetVocab {
+        .push_event(odf::metadata::SetVocab {
             event_time_column: Some("date".to_string()),
             ..Default::default()
         })
@@ -414,7 +417,10 @@ async fn test_ingest_polling_ledger() {
     .unwrap();
 
     harness.ingest(&created).await.unwrap();
-    let event = data_helper.get_last_block_typed::<AddData>().await.event;
+    let event = data_helper
+        .get_last_block_typed::<odf::metadata::AddData>()
+        .await
+        .event;
 
     assert_eq!(event.new_data, None);
     assert_eq!(
@@ -427,7 +433,10 @@ async fn test_ingest_polling_ledger() {
     std::fs::write(&src_path, "").unwrap();
 
     harness.ingest(&created).await.unwrap();
-    let event = data_helper.get_last_block_typed::<AddData>().await.event;
+    let event = data_helper
+        .get_last_block_typed::<odf::metadata::AddData>()
+        .await
+        .event;
 
     assert_eq!(event.new_data, None);
     assert_eq!(
@@ -447,36 +456,36 @@ async fn test_ingest_polling_empty_data() {
 
     let dataset_snapshot = MetadataFactory::dataset_snapshot()
         .name("foo.bar")
-        .kind(DatasetKind::Root)
+        .kind(odf::DatasetKind::Root)
         .push_event(
             MetadataFactory::set_polling_source()
-                .fetch(FetchStep::Url(FetchStepUrl {
+                .fetch(odf::metadata::FetchStep::Url(odf::metadata::FetchStepUrl {
                     url: url::Url::from_file_path(&src_path)
                         .unwrap()
                         .as_str()
                         .to_owned(),
-                    event_time: Some(EventTimeSourceFromSystemTime {}.into()),
+                    event_time: Some(odf::metadata::EventTimeSourceFromSystemTime {}.into()),
                     cache: None,
                     headers: None,
                 }))
-                .read(ReadStep::Csv(ReadStepCsv {
+                .read(odf::metadata::ReadStep::Csv(odf::metadata::ReadStepCsv {
                     header: Some(false),
                     schema: None,
-                    ..ReadStepCsv::default()
+                    ..odf::metadata::ReadStepCsv::default()
                 }))
-                .preprocess(TransformSql {
+                .preprocess(odf::metadata::TransformSql {
                     engine: "datafusion".to_string(),
                     version: None,
                     query: Some("select date, city, population from input".to_string()),
                     queries: None,
                     temporal_tables: None,
                 })
-                .merge(MergeStrategyLedger {
+                .merge(odf::metadata::MergeStrategyLedger {
                     primary_key: vec!["date".to_string(), "city".to_string()],
                 })
                 .build(),
         )
-        .push_event(SetVocab {
+        .push_event(odf::metadata::SetVocab {
             event_time_column: Some("date".to_string()),
             ..Default::default()
         })
@@ -491,7 +500,10 @@ async fn test_ingest_polling_empty_data() {
     harness.ingest(&created).await.unwrap();
 
     // Should only contain source state
-    let event = data_helper.get_last_block_typed::<AddData>().await.event;
+    let event = data_helper
+        .get_last_block_typed::<odf::metadata::AddData>()
+        .await
+        .event;
     assert_eq!(event.new_data, None);
     assert_eq!(event.new_watermark, None);
     assert!(event.new_source_state.is_some());
@@ -507,19 +519,19 @@ async fn test_ingest_polling_event_time_as_date() {
 
     let dataset_snapshot = MetadataFactory::dataset_snapshot()
         .name("foo.bar")
-        .kind(DatasetKind::Root)
+        .kind(odf::DatasetKind::Root)
         .push_event(
             MetadataFactory::set_polling_source()
-                .fetch(FetchStep::Url(FetchStepUrl {
+                .fetch(odf::metadata::FetchStep::Url(odf::metadata::FetchStepUrl {
                     url: url::Url::from_file_path(&src_path)
                         .unwrap()
                         .as_str()
                         .to_owned(),
-                    event_time: Some(EventTimeSourceFromSystemTime {}.into()),
+                    event_time: Some(odf::metadata::EventTimeSourceFromSystemTime {}.into()),
                     cache: None,
                     headers: None,
                 }))
-                .read(ReadStep::Csv(ReadStepCsv {
+                .read(odf::metadata::ReadStep::Csv(odf::metadata::ReadStepCsv {
                     header: Some(true),
                     schema: Some(
                         ["date DATE", "city STRING", "population BIGINT"]
@@ -527,15 +539,15 @@ async fn test_ingest_polling_event_time_as_date() {
                             .map(|s| (*s).to_string())
                             .collect(),
                     ),
-                    ..ReadStepCsv::default()
+                    ..odf::metadata::ReadStepCsv::default()
                 }))
-                .merge(MergeStrategySnapshot {
+                .merge(odf::metadata::MergeStrategySnapshot {
                     primary_key: vec!["date".to_string(), "city".to_string()],
                     compare_columns: None,
                 })
                 .build(),
         )
-        .push_event(SetVocab {
+        .push_event(odf::metadata::SetVocab {
             event_time_column: Some("date".to_string()),
             ..Default::default()
         })
@@ -610,30 +622,30 @@ async fn test_ingest_polling_event_time_of_invalid_type() {
 
     let dataset_snapshot = MetadataFactory::dataset_snapshot()
         .name("foo.bar")
-        .kind(DatasetKind::Root)
+        .kind(odf::DatasetKind::Root)
         .push_event(
             MetadataFactory::set_polling_source()
-                .fetch(FetchStep::Url(FetchStepUrl {
+                .fetch(odf::metadata::FetchStep::Url(odf::metadata::FetchStepUrl {
                     url: url::Url::from_file_path(&src_path)
                         .unwrap()
                         .as_str()
                         .to_owned(),
-                    event_time: Some(EventTimeSourceFromSystemTime {}.into()),
+                    event_time: Some(odf::metadata::EventTimeSourceFromSystemTime {}.into()),
                     cache: None,
                     headers: None,
                 }))
-                .read(ReadStep::Csv(ReadStepCsv {
+                .read(odf::metadata::ReadStep::Csv(odf::metadata::ReadStepCsv {
                     header: Some(true),
                     schema: Some(vec![
                         "date STRING".to_string(),
                         "city STRING".to_string(),
                         "population BIGINT".to_string(),
                     ]),
-                    ..ReadStepCsv::default()
+                    ..odf::metadata::ReadStepCsv::default()
                 }))
                 .build(),
         )
-        .push_event(SetVocab {
+        .push_event(odf::metadata::SetVocab {
             event_time_column: Some("date".to_string()),
             ..Default::default()
         })
@@ -668,29 +680,29 @@ async fn test_ingest_polling_bad_column_names_preserve() {
 
     let dataset_snapshot = MetadataFactory::dataset_snapshot()
         .name("foo.bar")
-        .kind(DatasetKind::Root)
+        .kind(odf::DatasetKind::Root)
         .push_event(
             MetadataFactory::set_polling_source()
-                .fetch(FetchStep::Url(FetchStepUrl {
+                .fetch(odf::metadata::FetchStep::Url(odf::metadata::FetchStepUrl {
                     url: url::Url::from_file_path(&src_path)
                         .unwrap()
                         .as_str()
                         .to_owned(),
-                    event_time: Some(EventTimeSourceFromSystemTime {}.into()),
+                    event_time: Some(odf::metadata::EventTimeSourceFromSystemTime {}.into()),
                     cache: None,
                     headers: None,
                 }))
-                .read(ReadStepNdJson {
+                .read(odf::metadata::ReadStepNdJson {
                     schema: Some(vec![
                         "\"Date (UTC)\" DATE not null".to_string(),
                         "\"City Name\" STRING not null".to_string(),
                         "\"Population\" BIGINT not null".to_string(),
                     ]),
-                    ..ReadStepNdJson::default()
+                    ..odf::metadata::ReadStepNdJson::default()
                 })
                 .build(),
         )
-        .push_event(SetVocab {
+        .push_event(odf::metadata::SetVocab {
             event_time_column: Some("Date (UTC)".to_string()),
             ..Default::default()
         })
@@ -753,22 +765,22 @@ async fn test_ingest_polling_bad_column_names_rename() {
 
     let dataset_snapshot = MetadataFactory::dataset_snapshot()
         .name("foo.bar")
-        .kind(DatasetKind::Root)
+        .kind(odf::DatasetKind::Root)
         .push_event(
             MetadataFactory::set_polling_source()
-                .fetch(FetchStep::Url(FetchStepUrl {
+                .fetch(odf::metadata::FetchStep::Url(odf::metadata::FetchStepUrl {
                     url: url::Url::from_file_path(&src_path)
                         .unwrap()
                         .as_str()
                         .to_owned(),
-                    event_time: Some(EventTimeSourceFromSystemTime {}.into()),
+                    event_time: Some(odf::metadata::EventTimeSourceFromSystemTime {}.into()),
                     cache: None,
                     headers: None,
                 }))
-                .read(ReadStepNdJson {
-                    ..ReadStepNdJson::default()
+                .read(odf::metadata::ReadStepNdJson {
+                    ..odf::metadata::ReadStepNdJson::default()
                 })
-                .preprocess(TransformSql {
+                .preprocess(odf::metadata::TransformSql {
                     engine: "datafusion".to_string(),
                     version: None,
                     query: Some(
@@ -849,10 +861,10 @@ async fn test_ingest_polling_schema_case_sensitivity() {
 
     let dataset_snapshot = MetadataFactory::dataset_snapshot()
         .name("foo.bar")
-        .kind(DatasetKind::Root)
+        .kind(odf::DatasetKind::Root)
         .push_event(
             MetadataFactory::set_polling_source()
-                .fetch(FetchStep::Url(FetchStepUrl {
+                .fetch(odf::metadata::FetchStep::Url(odf::metadata::FetchStepUrl {
                     url: url::Url::from_file_path(&src_path)
                         .unwrap()
                         .as_str()
@@ -861,21 +873,21 @@ async fn test_ingest_polling_schema_case_sensitivity() {
                     cache: None,
                     headers: None,
                 }))
-                .read(ReadStep::Csv(ReadStepCsv {
+                .read(odf::metadata::ReadStep::Csv(odf::metadata::ReadStepCsv {
                     header: Some(true),
                     schema: Some(vec![
                         "date TIMESTAMP".to_string(),
                         "UPPER STRING".to_string(),
                         "lower BIGINT".to_string(),
                     ]),
-                    ..ReadStepCsv::default()
+                    ..odf::metadata::ReadStepCsv::default()
                 }))
-                .merge(MergeStrategyLedger {
+                .merge(odf::metadata::MergeStrategyLedger {
                     primary_key: vec!["date".to_string()],
                 })
                 .build(),
         )
-        .push_event(SetVocab {
+        .push_event(odf::metadata::SetVocab {
             event_time_column: Some("date".to_string()),
             ..Default::default()
         })
@@ -1003,7 +1015,10 @@ async fn test_ingest_polling_schema_case_sensitivity() {
         .set(Utc.with_ymd_and_hms(2050, 1, 3, 12, 0, 0).unwrap());
 
     harness.ingest(&created).await.unwrap();
-    let event = data_helper.get_last_block_typed::<AddData>().await.event;
+    let event = data_helper
+        .get_last_block_typed::<odf::metadata::AddData>()
+        .await
+        .event;
 
     assert_eq!(event.new_data, None);
     assert_eq!(
@@ -1036,19 +1051,19 @@ async fn test_ingest_polling_preprocess_with_spark() {
 
     let dataset_snapshot = MetadataFactory::dataset_snapshot()
         .name("foo.bar")
-        .kind(DatasetKind::Root)
+        .kind(odf::DatasetKind::Root)
         .push_event(
             MetadataFactory::set_polling_source()
                 .fetch_file(&src_path)
-                .read(ReadStep::Csv(ReadStepCsv {
+                .read(odf::metadata::ReadStep::Csv(odf::metadata::ReadStepCsv {
                     header: Some(true),
                     schema: Some(vec![
                         "city STRING".to_string(),
                         "population BIGINT".to_string(),
                     ]),
-                    ..ReadStepCsv::default()
+                    ..odf::metadata::ReadStepCsv::default()
                 }))
-                .preprocess(TransformSql {
+                .preprocess(odf::metadata::TransformSql {
                     engine: "spark".to_string(),
                     version: None,
                     query: Some(
@@ -1128,19 +1143,19 @@ async fn test_ingest_polling_preprocess_with_flink() {
 
     let dataset_snapshot = MetadataFactory::dataset_snapshot()
         .name("foo.bar")
-        .kind(DatasetKind::Root)
+        .kind(odf::DatasetKind::Root)
         .push_event(
             MetadataFactory::set_polling_source()
                 .fetch_file(&src_path)
-                .read(ReadStep::Csv(ReadStepCsv {
+                .read(odf::metadata::ReadStep::Csv(odf::metadata::ReadStepCsv {
                     header: Some(true),
                     schema: Some(vec![
                         "city STRING".to_string(),
                         "population BIGINT".to_string(),
                     ]),
-                    ..ReadStepCsv::default()
+                    ..odf::metadata::ReadStepCsv::default()
                 }))
-                .preprocess(TransformSql {
+                .preprocess(odf::metadata::TransformSql {
                     engine: "flink".to_string(),
                     version: None,
                     query: Some(
@@ -1202,7 +1217,7 @@ async fn test_ingest_polling_preprocess_with_flink() {
 struct IngestTestHarness {
     temp_dir: TempDir,
     dataset_registry: Arc<dyn DatasetRegistry>,
-    dataset_repo_writer: Arc<dyn DatasetRepositoryWriter>,
+    dataset_storage_unit_writer: Arc<dyn DatasetStorageUnitWriter>,
     ingest_svc: Arc<dyn PollingIngestService>,
     time_source: Arc<SystemTimeSourceStub>,
     ctx: SessionContext,
@@ -1228,10 +1243,10 @@ impl IngestTestHarness {
             .add::<ObjectStoreBuilderLocalFs>()
             .add_value(CurrentAccountSubject::new_test())
             .add_value(TenancyConfig::SingleTenant)
-            .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
-            .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-            .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
-            .add::<DatasetRegistryRepoBridge>()
+            .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
+            .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
+            .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
+            .add::<DatasetRegistrySoloUnitBridge>()
             .add_value(EngineProvisionerLocalConfig::default())
             .add::<EngineProvisionerLocal>()
             .add_value(SystemTimeSourceStub::new_set(
@@ -1245,22 +1260,26 @@ impl IngestTestHarness {
             .build();
 
         let dataset_registry = catalog.get_one::<dyn DatasetRegistry>().unwrap();
-        let dataset_repo_writer = catalog.get_one::<dyn DatasetRepositoryWriter>().unwrap();
+        let dataset_storage_unit_writer =
+            catalog.get_one::<dyn DatasetStorageUnitWriter>().unwrap();
         let ingest_svc = catalog.get_one::<dyn PollingIngestService>().unwrap();
         let time_source = catalog.get_one::<SystemTimeSourceStub>().unwrap();
 
         Self {
             temp_dir,
             dataset_registry,
-            dataset_repo_writer,
+            dataset_storage_unit_writer,
             ingest_svc,
             time_source,
             ctx: SessionContext::new_with_config(SessionConfig::new().with_target_partitions(1)),
         }
     }
 
-    async fn create_dataset(&self, dataset_snapshot: DatasetSnapshot) -> CreateDatasetResult {
-        self.dataset_repo_writer
+    async fn create_dataset(
+        &self,
+        dataset_snapshot: odf::DatasetSnapshot,
+    ) -> odf::CreateDatasetResult {
+        self.dataset_storage_unit_writer
             .create_dataset_from_snapshot(dataset_snapshot)
             .await
             .unwrap()
@@ -1269,13 +1288,14 @@ impl IngestTestHarness {
 
     async fn ingest(
         &self,
-        created: &CreateDatasetResult,
+        created: &odf::CreateDatasetResult,
     ) -> Result<PollingIngestResult, PollingIngestError> {
         let target = ResolvedDataset::from(created);
 
-        let metadata_state = DataWriterMetadataState::build(target.clone(), &BlockRef::Head, None)
-            .await
-            .unwrap();
+        let metadata_state =
+            DataWriterMetadataState::build(target.clone(), &odf::BlockRef::Head, None)
+                .await
+                .unwrap();
 
         self.ingest_svc
             .ingest(
@@ -1287,7 +1307,7 @@ impl IngestTestHarness {
             .await
     }
 
-    async fn dataset_data_helper(&self, dataset_alias: &DatasetAlias) -> DatasetDataHelper {
+    async fn dataset_data_helper(&self, dataset_alias: &odf::DatasetAlias) -> DatasetDataHelper {
         let resolved_dataset = self
             .dataset_registry
             .get_dataset_by_ref(&dataset_alias.as_local_ref())

@@ -14,7 +14,6 @@ use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use futures::TryStreamExt;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu::domain::*;
-use opendatafabric::*;
 
 use super::{CLIError, Command};
 use crate::output::*;
@@ -23,7 +22,7 @@ pub struct AliasListCommand {
     dataset_registry: Arc<dyn DatasetRegistry>,
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
     output_config: Arc<OutputConfig>,
-    maybe_dataset_ref: Option<DatasetRef>,
+    maybe_dataset_ref: Option<odf::DatasetRef>,
 }
 
 impl AliasListCommand {
@@ -31,7 +30,7 @@ impl AliasListCommand {
         dataset_registry: Arc<dyn DatasetRegistry>,
         remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
         output_config: Arc<OutputConfig>,
-        maybe_dataset_ref: Option<DatasetRef>,
+        maybe_dataset_ref: Option<odf::DatasetRef>,
     ) -> Self {
         Self {
             dataset_registry,
@@ -43,7 +42,7 @@ impl AliasListCommand {
 
     async fn record_batch(
         &self,
-        datasets: &Vec<DatasetHandle>,
+        datasets: &Vec<odf::DatasetHandle>,
     ) -> Result<RecordBatch, InternalError> {
         let mut col_dataset = Vec::new();
         let mut col_kind = Vec::new();

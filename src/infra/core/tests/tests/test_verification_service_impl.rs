@@ -13,10 +13,11 @@ use std::sync::Arc;
 use datafusion::arrow::array::{Array, Int32Array, StringArray};
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use datafusion::arrow::record_batch::RecordBatch;
+use file_utils::OwnedFile;
 use kamu::domain::*;
-use kamu::testing::{BaseRepoHarness, MetadataFactory, ParquetWriterHelper};
+use kamu::testing::{BaseRepoHarness, ParquetWriterHelper};
 use kamu::*;
-use opendatafabric::*;
+use odf::metadata::testing::MetadataFactory;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -24,14 +25,14 @@ use opendatafabric::*;
 async fn test_verify_data_consistency() {
     let harness = VerifyHarness::new();
 
-    let foo_alias = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
-    let bar_alias = DatasetAlias::new(None, DatasetName::new_unchecked("bar"));
+    let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let bar_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
 
     let foo = harness.create_root_dataset(&foo_alias).await;
     foo.dataset
         .commit_event(
-            MetadataEvent::SetDataSchema(MetadataFactory::set_data_schema().build()),
-            CommitOpts::default(),
+            odf::MetadataEvent::SetDataSchema(MetadataFactory::set_data_schema().build()),
+            odf::dataset::CommitOpts::default(),
         )
         .await
         .unwrap();
@@ -41,8 +42,8 @@ async fn test_verify_data_consistency() {
         .await;
     bar.dataset
         .commit_event(
-            MetadataEvent::SetDataSchema(MetadataFactory::set_data_schema().build()),
-            CommitOpts::default(),
+            odf::MetadataEvent::SetDataSchema(MetadataFactory::set_data_schema().build()),
+            odf::dataset::CommitOpts::default(),
         )
         .await
         .unwrap();
@@ -81,25 +82,23 @@ async fn test_verify_data_consistency() {
     let data_path = harness.temp_dir_path().join("data");
 
     ParquetWriterHelper::from_record_batch(&data_path, &record_batch).unwrap();
-    let data_logical_hash =
-        kamu_data_utils::data::hash::get_parquet_logical_hash(&data_path).unwrap();
-    let data_physical_hash =
-        kamu_data_utils::data::hash::get_file_physical_hash(&data_path).unwrap();
+    let data_logical_hash = odf::utils::data::hash::get_parquet_logical_hash(&data_path).unwrap();
+    let data_physical_hash = odf::utils::data::hash::get_file_physical_hash(&data_path).unwrap();
 
     // Commit data
     let head = bar
         .dataset
         .commit_add_data(
-            AddDataParams {
+            odf::dataset::AddDataParams {
                 prev_checkpoint: None,
                 prev_offset: None,
-                new_offset_interval: Some(OffsetInterval { start: 0, end: 0 }),
+                new_offset_interval: Some(odf::metadata::OffsetInterval { start: 0, end: 0 }),
                 new_watermark: None,
                 new_source_state: None,
             },
             Some(OwnedFile::new(data_path)),
             None,
-            CommitOpts::default(),
+            odf::dataset::CommitOpts::default(),
         )
         .await
         .unwrap()
@@ -107,9 +106,9 @@ async fn test_verify_data_consistency() {
 
     assert_matches!(
         bar.dataset.as_metadata_chain().get_block(&head).await.unwrap(),
-        MetadataBlock {
-            event: MetadataEvent::AddData(AddData {
-                new_data: Some(DataSlice {
+        odf::MetadataBlock {
+            event: odf::MetadataEvent::AddData(odf::metadata::AddData {
+                new_data: Some(odf::DataSlice {
                     logical_hash,
                     physical_hash,
                     ..
@@ -147,7 +146,7 @@ async fn test_verify_data_consistency() {
     let record_batch =
         RecordBatch::try_new(Arc::clone(&schema), vec![Arc::clone(&a), Arc::clone(&b)]).unwrap();
 
-    let local_data_path = kamu_data_utils::data::local_url::into_local_path(
+    let local_data_path = odf::utils::data::local_url::into_local_path(
         bar.dataset
             .as_data_repo()
             .get_internal_url(&data_physical_hash)

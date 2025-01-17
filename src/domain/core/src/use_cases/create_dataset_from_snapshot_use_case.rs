@@ -7,9 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use opendatafabric::DatasetSnapshot;
-
-use crate::{CreateDatasetFromSnapshotError, CreateDatasetResult, CreateDatasetUseCaseOptions};
+use crate::CreateDatasetUseCaseOptions;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -17,9 +15,9 @@ use crate::{CreateDatasetFromSnapshotError, CreateDatasetResult, CreateDatasetUs
 pub trait CreateDatasetFromSnapshotUseCase: Send + Sync {
     async fn execute(
         &self,
-        snapshot: DatasetSnapshot,
+        snapshot: odf::DatasetSnapshot,
         options: CreateDatasetUseCaseOptions,
-    ) -> Result<CreateDatasetResult, CreateDatasetFromSnapshotError>;
+    ) -> Result<odf::CreateDatasetResult, odf::dataset::CreateDatasetFromSnapshotError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

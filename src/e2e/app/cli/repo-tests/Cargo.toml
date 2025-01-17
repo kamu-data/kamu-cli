@@ -37,7 +37,8 @@ kamu-cli-puppet = { workspace = true, default-features = false, features = [
     "extensions",
 ] }
 kamu-flow-system = { workspace = true }
-opendatafabric = { workspace = true }
+odf = { workspace = true }
+test-utils = { workspace = true }
 
 chrono = { version = "0.4", default-features = false }
 indoc = "2"
@@ -49,5 +50,3 @@ tempfile = { version = "3" }
 url = { version = "2", default-features = false }
 datafusion = { version = "44", default-features = false, features = [] }
 
-
-[dev-dependencies]

@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use enum_variants::*;
-use opendatafabric::{DatasetID, Multihash};
 use serde::{Deserialize, Serialize};
 
 use crate::TaskOutcome;
@@ -31,7 +30,7 @@ pub enum LogicalPlan {
 
 impl LogicalPlan {
     /// Returns the dataset ID this plan operates on if any
-    pub fn dataset_id(&self) -> Option<&DatasetID> {
+    pub fn dataset_id(&self) -> Option<&odf::DatasetID> {
         match self {
             LogicalPlan::UpdateDataset(upd) => Some(&upd.dataset_id),
             LogicalPlan::Probe(p) => p.dataset_id.as_ref(),
@@ -48,7 +47,7 @@ impl LogicalPlan {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct LogicalPlanUpdateDataset {
     /// ID of the dataset to update
-    pub dataset_id: DatasetID,
+    pub dataset_id: odf::DatasetID,
     pub fetch_uncacheable: bool,
 }
 
@@ -58,7 +57,7 @@ pub struct LogicalPlanUpdateDataset {
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub struct LogicalPlanProbe {
     /// ID of the dataset this task should be associated with
-    pub dataset_id: Option<DatasetID>,
+    pub dataset_id: Option<odf::DatasetID>,
     pub busy_time: Option<std::time::Duration>,
     pub end_with_outcome: Option<TaskOutcome>,
 }
@@ -68,7 +67,7 @@ pub struct LogicalPlanProbe {
 /// A task to perform a hard compaction of dataset
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct LogicalPlanHardCompactDataset {
-    pub dataset_id: DatasetID,
+    pub dataset_id: odf::DatasetID,
     pub max_slice_size: Option<u64>,
     pub max_slice_records: Option<u64>,
     pub keep_metadata_only: bool,
@@ -79,9 +78,9 @@ pub struct LogicalPlanHardCompactDataset {
 /// A task to perform the resetting of a dataset
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct LogicalPlanResetDataset {
-    pub dataset_id: DatasetID,
-    pub new_head_hash: Option<Multihash>,
-    pub old_head_hash: Option<Multihash>,
+    pub dataset_id: odf::DatasetID,
+    pub new_head_hash: Option<odf::Multihash>,
+    pub old_head_hash: Option<odf::Multihash>,
     pub recursive: bool,
 }
 

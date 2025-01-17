@@ -11,7 +11,6 @@ use database_common::{TransactionRef, TransactionRefT};
 use dill::{component, interface};
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_datasets::*;
-use opendatafabric::DatasetID;
 use sqlx::{QueryBuilder, Sqlite};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -72,7 +71,7 @@ impl DatasetDependencyRepository for SqliteDatasetDependencyRepository {
 
             use futures::TryStreamExt;
 
-            let mut maybe_last_downstream_id: Option<DatasetID> = None;
+            let mut maybe_last_downstream_id: Option<odf::DatasetID> = None;
             let mut current_upstreams = Vec::new();
 
             while let Some(entry) = query_stream.try_next().await? {
@@ -106,8 +105,8 @@ impl DatasetDependencyRepository for SqliteDatasetDependencyRepository {
 
     async fn add_upstream_dependencies(
         &self,
-        downstream_dataset_id: &DatasetID,
-        new_upstream_dataset_ids: &[&DatasetID],
+        downstream_dataset_id: &odf::DatasetID,
+        new_upstream_dataset_ids: &[&odf::DatasetID],
     ) -> Result<(), AddDependenciesError> {
         if new_upstream_dataset_ids.is_empty() {
             return Ok(());
@@ -145,8 +144,8 @@ impl DatasetDependencyRepository for SqliteDatasetDependencyRepository {
 
     async fn remove_upstream_dependencies(
         &self,
-        downstream_dataset_id: &DatasetID,
-        obsolete_upstream_dataset_ids: &[&DatasetID],
+        downstream_dataset_id: &odf::DatasetID,
+        obsolete_upstream_dataset_ids: &[&odf::DatasetID],
     ) -> Result<(), RemoveDependenciesError> {
         if obsolete_upstream_dataset_ids.is_empty() {
             return Ok(());
@@ -196,7 +195,10 @@ impl DatasetDependencyRepository for SqliteDatasetDependencyRepository {
 
 #[async_trait::async_trait]
 impl DatasetEntryRemovalListener for SqliteDatasetDependencyRepository {
-    async fn on_dataset_entry_removed(&self, dataset_id: &DatasetID) -> Result<(), InternalError> {
+    async fn on_dataset_entry_removed(
+        &self,
+        dataset_id: &odf::DatasetID,
+    ) -> Result<(), InternalError> {
         let mut tr = self.transaction.lock().await;
 
         let connection_mut = tr.connection_mut().await?;

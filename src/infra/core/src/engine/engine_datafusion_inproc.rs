@@ -13,7 +13,6 @@ use datafusion::prelude::*;
 use internal_error::*;
 use kamu_core::engine::*;
 use kamu_core::ResolvedDatasetsMap;
-use opendatafabric::*;
 
 /// An in-process engine using Apache Arrow Datafusion framework.
 ///
@@ -76,7 +75,7 @@ impl Engine for EngineDatafusionInproc {
         &self,
         request: RawQueryRequestExt,
     ) -> Result<RawQueryResponseExt, EngineError> {
-        let Transform::Sql(transform) = request.transform;
+        let odf::metadata::Transform::Sql(transform) = request.transform;
         assert_eq!(transform.engine.to_lowercase(), "datafusion");
 
         // Setup input

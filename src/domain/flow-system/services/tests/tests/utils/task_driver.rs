@@ -12,7 +12,6 @@ use std::sync::Arc;
 use chrono::Duration;
 use kamu_task_system::*;
 use messaging_outbox::{Outbox, OutboxExt};
-use opendatafabric::DatasetID;
 use time_source::SystemTimeSource;
 use tokio::task::yield_now;
 
@@ -29,7 +28,7 @@ pub(crate) struct TaskDriver {
 pub(crate) struct TaskDriverArgs {
     pub(crate) task_id: TaskID,
     pub(crate) task_metadata: TaskMetadata,
-    pub(crate) dataset_id: Option<DatasetID>,
+    pub(crate) dataset_id: Option<odf::DatasetID>,
     pub(crate) run_since_start: Duration,
     pub(crate) finish_in_with: Option<(Duration, TaskOutcome)>,
     pub(crate) expected_logical_plan: LogicalPlan,

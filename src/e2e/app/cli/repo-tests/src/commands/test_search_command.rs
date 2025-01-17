@@ -18,7 +18,6 @@ use kamu_cli_e2e_common::{
 };
 use kamu_cli_puppet::extensions::KamuCliPuppetExt;
 use kamu_cli_puppet::KamuCliPuppet;
-use opendatafabric::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // test_search_multi_user
@@ -111,7 +110,7 @@ async fn test_search_multi_user(
     )
     .await;
 
-    let player_scores_alias = DatasetAlias::new(
+    let player_scores_alias = odf::DatasetAlias::new(
         Some(E2E_USER_ACCOUNT_NAME.clone()),
         DATASET_ROOT_PLAYER_NAME.clone(),
     );

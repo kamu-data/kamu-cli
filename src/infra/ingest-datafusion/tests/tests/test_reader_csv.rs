@@ -10,7 +10,6 @@
 use datafusion::prelude::SessionContext;
 use indoc::indoc;
 use kamu_ingest_datafusion::*;
-use opendatafabric::*;
 
 use super::test_reader_common;
 
@@ -22,7 +21,7 @@ async fn test_read_csv_with_schema() {
     test_reader_common::test_reader_success_textual(
         ReaderCsv::new(
             SessionContext::new(),
-            ReadStepCsv {
+            odf::metadata::ReadStepCsv {
                 header: Some(true),
                 schema: Some(vec![
                     "city string not null".to_string(),
@@ -72,7 +71,7 @@ async fn test_read_csv_no_schema_no_infer() {
     test_reader_common::test_reader_success_textual(
         ReaderCsv::new(
             SessionContext::new(),
-            ReadStepCsv {
+            odf::metadata::ReadStepCsv {
                 header: Some(true),
                 ..Default::default()
             },
@@ -118,7 +117,7 @@ async fn test_read_csv_no_schema_infer() {
     test_reader_common::test_reader_success_textual(
         ReaderCsv::new(
             SessionContext::new(),
-            ReadStepCsv {
+            odf::metadata::ReadStepCsv {
                 header: Some(true),
                 infer_schema: Some(true),
                 ..Default::default()
@@ -165,7 +164,7 @@ async fn test_read_csv_no_header() {
     test_reader_common::test_reader_success_textual(
         ReaderCsv::new(
             SessionContext::new(),
-            ReadStepCsv {
+            odf::metadata::ReadStepCsv {
                 schema: Some(vec![
                     "city STRING".to_string(),
                     "population BIGINT".to_string(),
@@ -213,7 +212,7 @@ async fn test_read_csv_null_values() {
     test_reader_common::test_reader_success_textual(
         ReaderCsv::new(
             SessionContext::new(),
-            ReadStepCsv {
+            odf::metadata::ReadStepCsv {
                 header: Some(true),
                 infer_schema: Some(true),
                 ..Default::default()
@@ -260,7 +259,7 @@ async fn test_read_tsv_null_values() {
     test_reader_common::test_reader_success_textual(
         ReaderCsv::new(
             SessionContext::new(),
-            ReadStepCsv {
+            odf::metadata::ReadStepCsv {
                 header: Some(false),
                 separator: Some("\t".to_string()),
                 schema: Some(vec![

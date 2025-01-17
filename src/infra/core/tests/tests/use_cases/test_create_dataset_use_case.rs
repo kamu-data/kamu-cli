@@ -10,11 +10,10 @@
 use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
-use kamu::testing::MetadataFactory;
 use kamu::CreateDatasetUseCaseImpl;
 use kamu_core::CreateDatasetUseCase;
 use messaging_outbox::MockOutbox;
-use opendatafabric::{DatasetAlias, DatasetKind, DatasetName};
+use odf::metadata::testing::MetadataFactory;
 
 use crate::tests::use_cases::*;
 
@@ -22,7 +21,7 @@ use crate::tests::use_cases::*;
 
 #[tokio::test]
 async fn test_create_root_dataset() {
-    let alias_foo = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
 
     let mut mock_outbox = MockOutbox::new();
     expect_outbox_dataset_created(&mut mock_outbox, 1);
@@ -33,7 +32,7 @@ async fn test_create_root_dataset() {
         .use_case
         .execute(
             &alias_foo,
-            MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build())
+            MetadataFactory::metadata_block(MetadataFactory::seed(odf::DatasetKind::Root).build())
                 .build_typed(),
             Default::default(),
         )

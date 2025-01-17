@@ -10,7 +10,6 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use kamu_core::{BlockRef, Dataset};
 use url::Url;
 
 use super::errors::*;
@@ -25,7 +24,7 @@ use crate::BearerHeader;
 
 pub struct AxumServerPullProtocolInstance {
     socket: axum::extract::ws::WebSocket,
-    dataset: Arc<dyn Dataset>,
+    dataset: Arc<dyn odf::Dataset>,
     dataset_url: Url,
     maybe_bearer_header: Option<BearerHeader>,
 }
@@ -33,7 +32,7 @@ pub struct AxumServerPullProtocolInstance {
 impl AxumServerPullProtocolInstance {
     pub fn new(
         socket: axum::extract::ws::WebSocket,
-        dataset: Arc<dyn Dataset>,
+        dataset: Arc<dyn odf::Dataset>,
         dataset_url: Url,
         maybe_bearer_header: Option<BearerHeader>,
     ) -> Self {
@@ -156,7 +155,7 @@ impl AxumServerPullProtocolInstance {
 
         let metadata_chain = self.dataset.as_metadata_chain();
         let head = metadata_chain
-            .resolve_ref(&BlockRef::Head)
+            .resolve_ref(&odf::BlockRef::Head)
             .await
             .protocol_int_err(PullPhase::InitialRequest)?;
 
@@ -216,7 +215,7 @@ impl AxumServerPullProtocolInstance {
 
                 let metadata_chain = self.dataset.as_metadata_chain();
                 let head = metadata_chain
-                    .resolve_ref(&BlockRef::Head)
+                    .resolve_ref(&odf::BlockRef::Head)
                     .await
                     .protocol_int_err(PullPhase::MetadataRequest)?;
 

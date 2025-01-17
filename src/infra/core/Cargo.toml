@@ -31,23 +31,25 @@ query-extensions-json = ["dep:datafusion-functions-json"]
 testing = [
     "dep:mockall",
     "kamu-core/testing",
-    "kamu-data-utils/testing",
+    "odf/testing",
 ]
 
 
 [dependencies]
 # Kamu
+async-utils = { workspace = true }
 container-runtime = { workspace = true }
+file-utils = { workspace = true }
 init-on-startup = { workspace = true }
 internal-error = { workspace = true }
 kamu-accounts = { workspace = true }
 kamu-core = { workspace = true }
-kamu-data-utils = { workspace = true }
 kamu-datasets = { workspace = true }
 kamu-ingest-datafusion = { workspace = true }
 messaging-outbox = { workspace = true }
-opendatafabric = { workspace = true }
+odf = { workspace = true }
 random-names = { workspace = true }
+s3-utils = { workspace = true }
 time-source = { workspace = true }
 
 # Serialization
@@ -151,9 +153,10 @@ libc = "0.2" # For getting uid:gid
 [dev-dependencies]
 kamu = { workspace = true, features = ["testing"] }
 kamu-core = { workspace = true, features = ["testing"] }
-kamu-data-utils = { workspace = true, features = ["testing"] }
 kamu-datasets-services = { workspace = true }
 kamu-datasets-inmem = { workspace = true }
+odf = { workspace = true, features = ["testing"] }
+test-utils = { workspace = true }
 
 criterion = { version = "0.5", features = ["async_tokio"] }
 datafusion = { version = "44", default-features = false, features = [

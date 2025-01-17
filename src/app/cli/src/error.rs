@@ -14,8 +14,7 @@ use std::path::PathBuf;
 use internal_error::{BoxedError, InternalError};
 use kamu::domain::engine::normalize_logs;
 use kamu::domain::*;
-use kamu_data_utils::data::format::WriterError;
-use opendatafabric::DatasetRefPattern;
+use odf::utils::data::format::WriterError;
 use thiserror::Error;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -169,11 +168,11 @@ impl From<WriterError> for CLIError {
 // TODO: Replace with traits that distinguish critical and non-critical errors
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl From<GetDatasetError> for CLIError {
-    fn from(v: GetDatasetError) -> Self {
+impl From<odf::dataset::GetDatasetError> for CLIError {
+    fn from(v: odf::dataset::GetDatasetError) -> Self {
         match v {
-            e @ GetDatasetError::NotFound(_) => Self::failure(e),
-            e @ GetDatasetError::Internal(_) => Self::critical(e),
+            e @ odf::dataset::GetDatasetError::NotFound(_) => Self::failure(e),
+            e @ odf::dataset::GetDatasetError::Internal(_) => Self::critical(e),
         }
     }
 }
@@ -186,33 +185,33 @@ impl From<GetAliasesError> for CLIError {
     }
 }
 
-impl From<DeleteDatasetError> for CLIError {
-    fn from(v: DeleteDatasetError) -> Self {
+impl From<odf::dataset::DeleteDatasetError> for CLIError {
+    fn from(v: odf::dataset::DeleteDatasetError) -> Self {
         match v {
-            e @ (DeleteDatasetError::NotFound(_)
-            | DeleteDatasetError::DanglingReference(_)
-            | DeleteDatasetError::Access(_)) => Self::failure(e),
-            e @ DeleteDatasetError::Internal(_) => Self::critical(e),
+            e @ (odf::dataset::DeleteDatasetError::NotFound(_)
+            | odf::dataset::DeleteDatasetError::DanglingReference(_)
+            | odf::dataset::DeleteDatasetError::Access(_)) => Self::failure(e),
+            e @ odf::dataset::DeleteDatasetError::Internal(_) => Self::critical(e),
         }
     }
 }
 
-impl From<GetSummaryError> for CLIError {
-    fn from(e: GetSummaryError) -> Self {
+impl From<odf::dataset::GetSummaryError> for CLIError {
+    fn from(e: odf::dataset::GetSummaryError) -> Self {
         Self::critical(e)
     }
 }
 
-impl From<GetRefError> for CLIError {
-    fn from(e: GetRefError) -> Self {
+impl From<odf::storage::GetRefError> for CLIError {
+    fn from(e: odf::storage::GetRefError) -> Self {
         Self::critical(e)
     }
 }
 
-impl From<IterBlocksError> for CLIError {
-    fn from(v: IterBlocksError) -> Self {
+impl From<odf::dataset::IterBlocksError> for CLIError {
+    fn from(v: odf::dataset::IterBlocksError) -> Self {
         match v {
-            e @ IterBlocksError::BlockVersion(_) => Self::failure(e),
+            e @ odf::dataset::IterBlocksError::BlockVersion(_) => Self::failure(e),
             _ => Self::critical(v),
         }
     }
@@ -269,7 +268,7 @@ pub struct NotInMultiTenantWorkspace;
 #[derive(Error, Clone, PartialEq, Eq, Debug)]
 #[error("Multi-tenant reference is unexpected in single-tenant workspace: {dataset_ref_pattern}")]
 pub struct MultiTenantRefUnexpectedError {
-    pub dataset_ref_pattern: DatasetRefPattern,
+    pub dataset_ref_pattern: odf::DatasetRefPattern,
 }
 
 #[derive(Debug, Error)]

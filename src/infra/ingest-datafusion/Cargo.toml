@@ -22,10 +22,10 @@ doctest = false
 
 
 [dependencies]
+file-utils = { workspace = true }
 internal-error = { workspace = true }
-opendatafabric = { workspace = true, features = ["arrow"] }
 kamu-core = { workspace = true }
-kamu-data-utils = { workspace = true }
+odf = { workspace = true, features = ["arrow"] }
 
 datafusion = { version = "44", default-features = false }
 geo-types = { version = "0.7", default-features = false, features = [] }
@@ -56,7 +56,7 @@ tracing = "0.1"
 
 
 [dev-dependencies]
-kamu-data-utils = { workspace = true, features = ["testing"] }
+odf = { workspace = true, features = ["testing"] }
 
 criterion = { version = "0.5", features = ["async_tokio"] }
 indoc = "2"

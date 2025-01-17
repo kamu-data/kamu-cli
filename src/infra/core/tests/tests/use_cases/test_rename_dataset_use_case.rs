@@ -12,9 +12,8 @@ use std::sync::Arc;
 
 use kamu::testing::MockDatasetActionAuthorizer;
 use kamu::RenameDatasetUseCaseImpl;
-use kamu_core::{GetDatasetError, MockDidGenerator, RenameDatasetError, RenameDatasetUseCase};
+use kamu_core::{MockDidGenerator, RenameDatasetUseCase};
 use messaging_outbox::MockOutbox;
-use opendatafabric::{DatasetAlias, DatasetID, DatasetName};
 
 use crate::tests::use_cases::*;
 
@@ -22,9 +21,9 @@ use crate::tests::use_cases::*;
 
 #[tokio::test]
 async fn test_rename_dataset_success_via_ref() {
-    let alias_foo = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
-    let alias_bar = DatasetAlias::new(None, DatasetName::new_unchecked("bar"));
-    let (_, dataset_id_foo) = DatasetID::new_generated_ed25519();
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
+    let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
     let mock_authorizer =
         MockDatasetActionAuthorizer::new().expect_check_write_dataset(&dataset_id_foo, 1, true);
@@ -43,7 +42,7 @@ async fn test_rename_dataset_success_via_ref() {
     assert_matches!(harness.check_dataset_exists(&alias_foo).await, Ok(_));
     assert_matches!(
         harness.check_dataset_exists(&alias_bar).await,
-        Err(GetDatasetError::NotFound(_))
+        Err(odf::dataset::GetDatasetError::NotFound(_))
     );
 
     harness
@@ -54,7 +53,7 @@ async fn test_rename_dataset_success_via_ref() {
 
     assert_matches!(
         harness.check_dataset_exists(&alias_foo).await,
-        Err(GetDatasetError::NotFound(_))
+        Err(odf::dataset::GetDatasetError::NotFound(_))
     );
     assert_matches!(harness.check_dataset_exists(&alias_bar).await, Ok(_));
 }
@@ -66,16 +65,16 @@ async fn test_rename_dataset_not_found() {
     let harness =
         RenameUseCaseHarness::new(MockDatasetActionAuthorizer::new(), MockOutbox::new(), None);
 
-    let alias_foo = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     assert_matches!(
         harness
             .use_case
             .execute(
                 &alias_foo.as_local_ref(),
-                &DatasetName::new_unchecked("bar")
+                &odf::DatasetName::new_unchecked("bar")
             )
             .await,
-        Err(RenameDatasetError::NotFound(_))
+        Err(odf::dataset::RenameDatasetError::NotFound(_))
     );
 }
 
@@ -83,8 +82,8 @@ async fn test_rename_dataset_not_found() {
 
 #[tokio::test]
 async fn test_rename_dataset_unauthorized() {
-    let alias_foo = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
-    let (_, dataset_id_foo) = DatasetID::new_generated_ed25519();
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
     let harness = RenameUseCaseHarness::new(
         MockDatasetActionAuthorizer::new().expect_check_write_dataset(&dataset_id_foo, 1, false),
@@ -101,10 +100,10 @@ async fn test_rename_dataset_unauthorized() {
             .use_case
             .execute(
                 &alias_foo.as_local_ref(),
-                &DatasetName::new_unchecked("bar")
+                &odf::DatasetName::new_unchecked("bar")
             )
             .await,
-        Err(RenameDatasetError::Access(_))
+        Err(odf::dataset::RenameDatasetError::Access(_))
     );
 
     assert_matches!(harness.check_dataset_exists(&alias_foo).await, Ok(_));

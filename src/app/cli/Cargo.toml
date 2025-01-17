@@ -44,6 +44,7 @@ async-utils = { workspace = true }
 container-runtime = { workspace = true }
 database-common = { workspace = true }
 database-common-macros = { workspace = true }
+file-utils = { workspace = true }
 http-common = { workspace = true }
 init-on-startup = { workspace = true }
 internal-error = { workspace = true }
@@ -51,7 +52,6 @@ observability = { workspace = true, features = ["prometheus"] }
 time-source = { workspace = true }
 
 kamu = { workspace = true }
-kamu-data-utils = { workspace = true }
 
 kamu-adapter-auth-oso-rebac = { workspace = true }
 kamu-adapter-flight-sql = { workspace = true }
@@ -62,7 +62,7 @@ kamu-adapter-http = { workspace = true, features = [
 kamu-adapter-oauth = { workspace = true }
 kamu-adapter-odata = { workspace = true }
 kamu-datafusion-cli = { workspace = true }
-opendatafabric = { workspace = true }
+odf = { workspace = true, features = ["http", "s3"] }
 random-names = { workspace = true }
 
 kamu-flow-system-services = { workspace = true }

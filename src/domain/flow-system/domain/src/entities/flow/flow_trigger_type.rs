@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
-use opendatafabric::{AccountID, DatasetID};
 use serde::{Deserialize, Serialize};
 
 use crate::*;
@@ -33,7 +32,7 @@ impl FlowTriggerType {
         }
     }
 
-    pub fn initiator_account_id(&self) -> Option<&AccountID> {
+    pub fn initiator_account_id(&self) -> Option<&odf::AccountID> {
         if let Self::Manual(manual) = self {
             Some(&manual.initiator_account_id)
         } else {
@@ -80,13 +79,13 @@ impl FlowTriggerType {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FlowTriggerManual {
     pub trigger_time: DateTime<Utc>,
-    pub initiator_account_id: AccountID,
+    pub initiator_account_id: odf::AccountID,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub type InitiatorIDStream<'a> = std::pin::Pin<
-    Box<dyn tokio_stream::Stream<Item = Result<AccountID, InternalError>> + Send + 'a>,
+    Box<dyn tokio_stream::Stream<Item = Result<odf::AccountID, InternalError>> + Send + 'a>,
 >;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -110,7 +109,7 @@ pub struct FlowTriggerPush {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FlowTriggerInputDatasetFlow {
     pub trigger_time: DateTime<Utc>,
-    pub dataset_id: DatasetID,
+    pub dataset_id: odf::DatasetID,
     pub flow_type: DatasetFlowType,
     pub flow_id: FlowID,
     pub flow_result: FlowResult,
@@ -128,12 +127,11 @@ impl FlowTriggerInputDatasetFlow {
 mod tests {
     use kamu_accounts::DEFAULT_ACCOUNT_ID;
     use lazy_static::lazy_static;
-    use opendatafabric::Multihash;
 
     use super::*;
 
     lazy_static! {
-        static ref TEST_DATASET_ID: DatasetID = DatasetID::new_seeded_ed25519(b"test");
+        static ref TEST_DATASET_ID: odf::DatasetID = odf::DatasetID::new_seeded_ed25519(b"test");
         static ref AUTO_POLLING_TRIGGER: FlowTriggerType =
             FlowTriggerType::AutoPolling(FlowTriggerAutoPolling {
                 trigger_time: Utc::now(),
@@ -155,7 +153,7 @@ mod tests {
                 flow_result: FlowResult::DatasetUpdate(FlowResultDatasetUpdate::Changed(
                     FlowResultDatasetUpdateChanged {
                         old_head: None,
-                        new_head: Multihash::from_digest_sha3_256(b"some-slice")
+                        new_head: odf::Multihash::from_digest_sha3_256(b"some-slice")
                     }
                 ))
             });
@@ -182,7 +180,7 @@ mod tests {
             INPUT_DATASET_TRIGGER.clone()
         ]));
 
-        let initiator_account_id = AccountID::new_seeded_ed25519(b"different");
+        let initiator_account_id = odf::AccountID::new_seeded_ed25519(b"different");
         assert!(
             MANUAL_TRIGGER.is_unique_vs(&[FlowTriggerType::Manual(FlowTriggerManual {
                 trigger_time: Utc::now(),
@@ -239,7 +237,7 @@ mod tests {
             INPUT_DATASET_TRIGGER.is_unique_vs(&[FlowTriggerType::InputDatasetFlow(
                 FlowTriggerInputDatasetFlow {
                     trigger_time: Utc::now(),
-                    dataset_id: DatasetID::new_seeded_ed25519(b"different"),
+                    dataset_id: odf::DatasetID::new_seeded_ed25519(b"different"),
                     flow_type: DatasetFlowType::Ingest,
                     flow_id: FlowID::new(7),
                     flow_result: FlowResult::Empty

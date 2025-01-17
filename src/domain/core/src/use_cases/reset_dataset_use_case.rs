@@ -8,11 +8,10 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::InternalError;
-use opendatafabric::{DatasetHandle, Multihash};
 use thiserror::Error;
 
 use crate::auth::DatasetActionUnauthorizedError;
-use crate::{AccessError, ResetExecutionError, ResetPlanningError, ResetResult};
+use crate::{ResetExecutionError, ResetPlanningError, ResetResult};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -20,9 +19,9 @@ use crate::{AccessError, ResetExecutionError, ResetPlanningError, ResetResult};
 pub trait ResetDatasetUseCase: Send + Sync {
     async fn execute(
         &self,
-        dataset_handle: &DatasetHandle,
-        maybe_new_head: Option<&Multihash>,
-        maybe_old_head: Option<&Multihash>,
+        dataset_handle: &odf::DatasetHandle,
+        maybe_new_head: Option<&odf::Multihash>,
+        maybe_old_head: Option<&odf::Multihash>,
     ) -> Result<ResetResult, ResetError>;
 }
 
@@ -48,7 +47,7 @@ pub enum ResetError {
     Access(
         #[from]
         #[backtrace]
-        AccessError,
+        odf::AccessError,
     ),
 
     #[error(transparent)]

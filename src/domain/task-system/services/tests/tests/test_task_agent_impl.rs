@@ -15,8 +15,7 @@ use dill::{Catalog, CatalogBuilder, Component};
 use kamu::utils::ipfs_wrapper::IpfsClient;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
-use kamu_core::auth::DummyOdfServerAccessTokenResolver;
-use kamu_core::{DatasetRepository, DidGeneratorDefault, TenancyConfig};
+use kamu_core::{DidGeneratorDefault, TenancyConfig};
 use kamu_datasets::DatasetEnvVarsConfig;
 use kamu_datasets_inmem::InMemoryDatasetEnvVarRepository;
 use kamu_datasets_services::DatasetEnvVarServiceImpl;
@@ -25,6 +24,7 @@ use kamu_task_system_inmem::InMemoryTaskEventStore;
 use kamu_task_system_services::*;
 use messaging_outbox::{MockOutbox, Outbox};
 use mockall::predicate::{eq, function};
+use odf::dataset::{DatasetFactoryImpl, IpfsGateway};
 use tempfile::TempDir;
 use time_source::SystemTimeSourceDefault;
 
@@ -182,13 +182,13 @@ impl TaskAgentHarness {
             .add::<RemoteRepositoryRegistryImpl>()
             .add_value(IpfsGateway::default())
             .add_value(IpfsClient::default())
-            .add::<DummyOdfServerAccessTokenResolver>()
+            .add::<odf::dataset::DummyOdfServerAccessTokenResolver>()
             .add::<DatasetEnvVarServiceImpl>()
             .add::<InMemoryDatasetEnvVarRepository>()
-            .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
-            .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-            .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
-            .add::<DatasetRegistryRepoBridge>()
+            .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
+            .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
+            .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
+            .add::<DatasetRegistrySoloUnitBridge>()
             .add_value(CurrentAccountSubject::new_test())
             .add_value(TenancyConfig::SingleTenant)
             .add_value(DatasetEnvVarsConfig::sample());

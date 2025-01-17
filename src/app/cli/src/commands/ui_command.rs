@@ -21,7 +21,6 @@ use kamu::domain::TenancyConfig;
 use kamu_accounts::PredefinedAccountsConfig;
 use kamu_adapter_http::FileUploadLimitConfig;
 use kamu_datasets::DatasetEnvVarsConfig;
-use opendatafabric::AccountName;
 
 use super::{CLIError, Command};
 use crate::OutputConfig;
@@ -31,7 +30,7 @@ use crate::OutputConfig;
 pub struct UICommand {
     server_catalog: Catalog,
     tenancy_config: TenancyConfig,
-    current_account_name: AccountName,
+    current_account_name: odf::AccountName,
     predefined_accounts_config: Arc<PredefinedAccountsConfig>,
     file_upload_limit_config: Arc<FileUploadLimitConfig>,
     output_config: Arc<OutputConfig>,
@@ -45,7 +44,7 @@ impl UICommand {
     pub fn new(
         server_catalog: Catalog,
         tenancy_config: TenancyConfig,
-        current_account_name: AccountName,
+        current_account_name: odf::AccountName,
         predefined_accounts_config: Arc<PredefinedAccountsConfig>,
         file_upload_limit_config: Arc<FileUploadLimitConfig>,
         output_config: Arc<OutputConfig>,

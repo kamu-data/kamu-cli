@@ -13,9 +13,9 @@ use std::sync::Arc;
 
 use kamu::testing::*;
 use kamu::*;
-use kamu_core::auth::{DatasetAction, DummyOdfServerAccessTokenResolver};
+use kamu_core::auth::DatasetAction;
 use kamu_core::*;
-use opendatafabric::*;
+use odf::dataset::{DatasetFactoryImpl, IpfsGateway};
 use tempfile::TempDir;
 use url::Url;
 
@@ -25,7 +25,7 @@ use super::{BaseUseCaseHarness, BaseUseCaseHarnessOptions};
 
 #[tokio::test]
 async fn test_pull_ingest_success() {
-    let alias_foo = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
 
     let mocks = PullUseCaseHarnessMocks::default()
         .with_authorizer_mock(
@@ -72,8 +72,8 @@ async fn test_pull_ingest_success() {
 
 #[tokio::test]
 async fn test_pull_transform_success() {
-    let alias_foo = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
-    let alias_bar = DatasetAlias::new(None, DatasetName::new_unchecked("bar"));
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
 
     let mocks = PullUseCaseHarnessMocks::default()
         .with_authorizer_mock(
@@ -134,10 +134,10 @@ async fn test_pull_transform_success() {
 
 #[tokio::test]
 async fn test_pull_sync_success() {
-    let alias_foo = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
 
-    let remote_ref = DatasetRefRemote::Alias(DatasetAliasRemote {
-        repo_name: RepoName::new_unchecked(REMOTE_REPO_NAME_STR),
+    let remote_ref = odf::DatasetRefRemote::Alias(odf::DatasetAliasRemote {
+        repo_name: odf::RepoName::new_unchecked(REMOTE_REPO_NAME_STR),
         account_name: None,
         dataset_name: alias_foo.dataset_name.clone(),
     });
@@ -156,7 +156,7 @@ async fn test_pull_sync_success() {
                 remote_ref.clone(),
                 SyncResult::Updated {
                     old_head: None,
-                    new_head: Multihash::from_multibase(
+                    new_head: odf::Multihash::from_multibase(
                         "f16205603b882241c71351baf996d6dba7e3ddbd571457e93c1cd282bdc61f9fed5f2",
                     )
                     .unwrap(),
@@ -201,7 +201,7 @@ async fn test_pull_sync_success() {
     let pull_aliases: Vec<_> = aliases.get_by_kind(RemoteAliasKind::Pull).collect();
     assert_eq!(
         pull_aliases,
-        vec![&DatasetRefRemote::Alias(DatasetAliasRemote {
+        vec![&odf::DatasetRefRemote::Alias(odf::DatasetAliasRemote {
             repo_name: harness.remote_repo_name,
             account_name: None,
             dataset_name: alias_foo.dataset_name.clone()
@@ -213,10 +213,10 @@ async fn test_pull_sync_success() {
 
 #[tokio::test]
 async fn test_pull_sync_success_without_saving_alias() {
-    let alias_foo = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
 
-    let remote_ref = DatasetRefRemote::Alias(DatasetAliasRemote {
-        repo_name: RepoName::new_unchecked(REMOTE_REPO_NAME_STR),
+    let remote_ref = odf::DatasetRefRemote::Alias(odf::DatasetAliasRemote {
+        repo_name: odf::RepoName::new_unchecked(REMOTE_REPO_NAME_STR),
         account_name: None,
         dataset_name: alias_foo.dataset_name.clone(),
     });
@@ -235,7 +235,7 @@ async fn test_pull_sync_success_without_saving_alias() {
                 remote_ref.clone(),
                 SyncResult::Updated {
                     old_head: None,
-                    new_head: Multihash::from_multibase(
+                    new_head: odf::Multihash::from_multibase(
                         "f16205603b882241c71351baf996d6dba7e3ddbd571457e93c1cd282bdc61f9fed5f2",
                     )
                     .unwrap(),
@@ -291,11 +291,11 @@ async fn test_pull_sync_success_without_saving_alias() {
 
 #[tokio::test]
 async fn test_pull_multi_recursive() {
-    let alias_foo = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
-    let alias_bar = DatasetAlias::new(None, DatasetName::new_unchecked("bar"));
-    let alias_baz = DatasetAlias::new(None, DatasetName::new_unchecked("baz"));
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
+    let alias_baz = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("baz"));
 
-    let alias_foo_bar = DatasetAlias::new(None, DatasetName::new_unchecked("foo-bar"));
+    let alias_foo_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo-bar"));
 
     let mocks = PullUseCaseHarnessMocks::default()
         .with_authorizer_mock(
@@ -430,15 +430,15 @@ async fn test_pull_multi_recursive() {
 
 #[tokio::test]
 async fn test_pull_all_owned() {
-    let alias_foo = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
-    let alias_bar = DatasetAlias::new(None, DatasetName::new_unchecked("bar"));
-    let alias_baz = DatasetAlias::new(None, DatasetName::new_unchecked("baz"));
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
+    let alias_baz = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("baz"));
 
-    let alias_foo_bar = DatasetAlias::new(None, DatasetName::new_unchecked("foo-bar"));
-    let alias_foo_baz = DatasetAlias::new(None, DatasetName::new_unchecked("foo-baz"));
+    let alias_foo_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo-bar"));
+    let alias_foo_baz = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo-baz"));
 
-    let baz_ref_remote = DatasetRefRemote::Alias(DatasetAliasRemote {
-        repo_name: RepoName::new_unchecked(REMOTE_REPO_NAME_STR),
+    let baz_ref_remote = odf::DatasetRefRemote::Alias(odf::DatasetAliasRemote {
+        repo_name: odf::RepoName::new_unchecked(REMOTE_REPO_NAME_STR),
         account_name: None,
         dataset_name: alias_baz.dataset_name.clone(),
     });
@@ -600,9 +600,9 @@ async fn test_pull_all_owned() {
 
 #[tokio::test]
 async fn test_pull_authorization_issue() {
-    let alias_foo = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
-    let alias_bar = DatasetAlias::new(None, DatasetName::new_unchecked("bar"));
-    let alias_baz = DatasetAlias::new(None, DatasetName::new_unchecked("baz"));
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
+    let alias_baz = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("baz"));
 
     let mocks = PullUseCaseHarnessMocks::default().with_authorizer_mock(
         MockDatasetActionAuthorizer::new().make_expect_classify_datasets_by_allowance(
@@ -652,7 +652,7 @@ struct PullUseCaseHarness {
     base_harness: BaseUseCaseHarness,
     use_case: Arc<dyn PullDatasetUseCase>,
     remote_aliases_registry: Arc<dyn RemoteAliasesRegistry>,
-    remote_repo_name: RepoName,
+    remote_repo_name: odf::RepoName,
     remote_tmp_dir: TempDir,
 }
 
@@ -682,7 +682,7 @@ impl PullUseCaseHarness {
             .add::<RemoteAliasesRegistryImpl>()
             .add_value(RemoteRepositoryRegistryImpl::create(repos_dir).unwrap())
             .bind::<dyn RemoteRepositoryRegistry, RemoteRepositoryRegistryImpl>()
-            .add::<DummyOdfServerAccessTokenResolver>()
+            .add::<odf::dataset::DummyOdfServerAccessTokenResolver>()
             .add_value(IpfsGateway::default())
             .build();
 
@@ -692,7 +692,7 @@ impl PullUseCaseHarness {
         let remote_tmp_dir = tempfile::tempdir().unwrap();
         let remote_repo_url = Url::from_directory_path(remote_tmp_dir.path()).unwrap();
 
-        let remote_repo_name = RepoName::new_unchecked(REMOTE_REPO_NAME_STR);
+        let remote_repo_name = odf::RepoName::new_unchecked(REMOTE_REPO_NAME_STR);
         let remote_repo_registry = catalog.get_one::<dyn RemoteRepositoryRegistry>().unwrap();
         remote_repo_registry
             .add_repository(&remote_repo_name, remote_repo_url)
@@ -707,14 +707,17 @@ impl PullUseCaseHarness {
         }
     }
 
-    async fn get_remote_aliases(&self, created: &CreateDatasetResult) -> Box<dyn RemoteAliases> {
+    async fn get_remote_aliases(
+        &self,
+        created: &odf::CreateDatasetResult,
+    ) -> Box<dyn RemoteAliases> {
         self.remote_aliases_registry
             .get_remote_aliases(&created.dataset_handle)
             .await
             .unwrap()
     }
 
-    async fn copy_dataset_to_remote_repo(&self, dataset_alias: &DatasetAlias) {
+    async fn copy_dataset_to_remote_repo(&self, dataset_alias: &odf::DatasetAlias) {
         let src_path = self
             .base_harness
             .temp_dir_path()

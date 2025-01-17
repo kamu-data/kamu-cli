@@ -13,7 +13,6 @@ use std::sync::Arc;
 use chrono::{SubsecRound, Utc};
 use kamu_accounts::{Account, AccountRepository, AccountType};
 use kamu_datasets::DatasetEntry;
-use opendatafabric::{AccountID, AccountName, DatasetID, DatasetName};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -21,11 +20,11 @@ pub(crate) async fn new_account_with_name(
     account_repo: &Arc<dyn AccountRepository>,
     account_name: &str,
 ) -> Account {
-    let (_, id) = AccountID::new_generated_ed25519();
+    let (_, id) = odf::AccountID::new_generated_ed25519();
 
     let account = Account {
         id,
-        account_name: AccountName::new_unchecked(account_name),
+        account_name: odf::AccountName::new_unchecked(account_name),
         email: None,
         display_name: String::new(),
         account_type: AccountType::User,
@@ -49,9 +48,9 @@ pub(crate) async fn new_account(account_repo: &Arc<dyn AccountRepository>) -> Ac
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) fn new_dataset_entry_with(owner: &Account, dataset_name: &str) -> DatasetEntry {
-    let (_, dataset_id) = DatasetID::new_generated_ed25519();
+    let (_, dataset_id) = odf::DatasetID::new_generated_ed25519();
     let owner_id = owner.id.clone();
-    let dataset_alias = DatasetName::new_unchecked(dataset_name);
+    let dataset_alias = odf::DatasetName::new_unchecked(dataset_name);
     let created_at = Utc::now().round_subsecs(6);
 
     DatasetEntry::new(dataset_id, owner_id, dataset_alias, created_at)

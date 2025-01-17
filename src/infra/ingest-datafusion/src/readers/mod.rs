@@ -35,7 +35,7 @@ pub(crate) async fn from_ddl_schema(
 
     let ddl = ddl_schema.join(", ");
 
-    let schema = kamu_data_utils::schema::parse::parse_ddl_to_arrow_schema(ctx, &ddl, true)
+    let schema = odf::utils::schema::parse::parse_ddl_to_arrow_schema(ctx, &ddl, true)
         .await
         .int_err()?;
 

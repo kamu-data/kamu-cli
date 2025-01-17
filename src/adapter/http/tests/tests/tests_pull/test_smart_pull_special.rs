@@ -21,7 +21,6 @@ use std::assert_matches::assert_matches;
 use kamu::domain::PullResult;
 use kamu::testing::DatasetTestHelper;
 use kamu_core::TenancyConfig;
-use opendatafabric::DatasetRefAny;
 
 use crate::harness::{
     await_client_server_flow,
@@ -59,7 +58,7 @@ async fn test_smart_pull_unauthenticated() {
     let client_handle = async {
         let pull_result = scenario
             .client_harness
-            .pull_dataset_result(DatasetRefAny::from(scenario.server_dataset_ref), false)
+            .pull_dataset_result(odf::DatasetRefAny::from(scenario.server_dataset_ref), false)
             .await;
 
         pretty_assertions::assert_eq!(

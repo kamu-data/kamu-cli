@@ -8,24 +8,23 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
-use opendatafabric::{AccountID, DatasetID, DatasetName};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[cfg_attr(feature = "sqlx", derive(sqlx::FromRow))]
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct DatasetEntry {
-    pub id: DatasetID,
-    pub owner_id: AccountID,
-    pub name: DatasetName,
+    pub id: odf::DatasetID,
+    pub owner_id: odf::AccountID,
+    pub name: odf::DatasetName,
     pub created_at: DateTime<Utc>,
 }
 
 impl DatasetEntry {
     pub fn new(
-        id: DatasetID,
-        owner_id: AccountID,
-        name: DatasetName,
+        id: odf::DatasetID,
+        owner_id: odf::AccountID,
+        name: odf::DatasetName,
         created_at: DateTime<Utc>,
     ) -> Self {
         Self {
@@ -42,8 +41,8 @@ impl DatasetEntry {
 #[cfg(feature = "sqlx")]
 #[derive(Debug, Clone, sqlx::FromRow)]
 pub struct DatasetEntryRowModel {
-    pub id: DatasetID,
-    pub owner_id: AccountID,
+    pub id: odf::DatasetID,
+    pub owner_id: odf::AccountID,
     pub name: String,
     pub created_at: DateTime<Utc>,
 }
@@ -61,7 +60,7 @@ impl From<DatasetEntryRowModel> for DatasetEntry {
         Self {
             id,
             owner_id,
-            name: DatasetName::new_unchecked(&name),
+            name: odf::DatasetName::new_unchecked(&name),
             created_at,
         }
     }

@@ -8,10 +8,9 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::InternalError;
-use opendatafabric::*;
 use thiserror::Error;
 
-use crate::{auth, AccessError, DatasetNotFoundError, GetDatasetError};
+use crate::auth;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -21,7 +20,7 @@ pub trait ProvenanceService: Sync + Send {
     /// Some predefined visitors are available.
     async fn get_dataset_lineage(
         &self,
-        dataset_ref: &DatasetRef,
+        dataset_ref: &odf::DatasetRef,
         visitor: &mut dyn LineageVisitor,
         options: LineageOptions,
     ) -> Result<(), GetLineageError>;
@@ -39,25 +38,25 @@ pub trait LineageVisitor: Send {
 #[derive(Debug, Clone)]
 pub enum NodeInfo<'a> {
     Local {
-        id: DatasetID,
-        alias: DatasetAlias,
-        kind: DatasetKind,
+        id: odf::DatasetID,
+        alias: odf::DatasetAlias,
+        kind: odf::DatasetKind,
         dependencies: &'a [ResolvedTransformInput],
     },
     Remote {
-        id: DatasetID,
-        alias: DatasetAlias,
+        id: odf::DatasetID,
+        alias: odf::DatasetAlias,
     },
 }
 
 impl NodeInfo<'_> {
-    pub fn id(&self) -> &DatasetID {
+    pub fn id(&self) -> &odf::DatasetID {
         match self {
             NodeInfo::Local { id, .. } | NodeInfo::Remote { id, .. } => id,
         }
     }
 
-    pub fn alias(&self) -> &DatasetAlias {
+    pub fn alias(&self) -> &odf::DatasetAlias {
         match self {
             NodeInfo::Local { alias, .. } | NodeInfo::Remote { alias, .. } => alias,
         }
@@ -67,9 +66,9 @@ impl NodeInfo<'_> {
 #[derive(Debug, Clone)]
 pub struct ResolvedTransformInput {
     /// Resolved input handle
-    pub handle: DatasetHandle,
+    pub handle: odf::DatasetHandle,
     /// An alias of this input to be used in queries.
-    pub name: DatasetName,
+    pub name: odf::DatasetName,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -81,12 +80,12 @@ pub struct LineageOptions {}
 #[derive(Debug, Error)]
 pub enum GetLineageError {
     #[error(transparent)]
-    NotFound(#[from] DatasetNotFoundError),
+    NotFound(#[from] odf::dataset::DatasetNotFoundError),
     #[error(transparent)]
     Access(
         #[from]
         #[backtrace]
-        AccessError,
+        odf::AccessError,
     ),
     #[error(transparent)]
     Internal(
@@ -96,11 +95,11 @@ pub enum GetLineageError {
     ),
 }
 
-impl From<GetDatasetError> for GetLineageError {
-    fn from(v: GetDatasetError) -> Self {
+impl From<odf::dataset::GetDatasetError> for GetLineageError {
+    fn from(v: odf::dataset::GetDatasetError) -> Self {
         match v {
-            GetDatasetError::NotFound(e) => Self::NotFound(e),
-            GetDatasetError::Internal(e) => Self::Internal(e),
+            odf::dataset::GetDatasetError::NotFound(e) => Self::NotFound(e),
+            odf::dataset::GetDatasetError::Internal(e) => Self::Internal(e),
         }
     }
 }
@@ -113,3 +112,5 @@ impl From<auth::DatasetActionUnauthorizedError> for GetLineageError {
         }
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

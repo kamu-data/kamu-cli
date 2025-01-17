@@ -24,7 +24,6 @@ use kamu_core::{
     DatasetRegistry,
     NullCompactionMultiListener,
 };
-use opendatafabric::DatasetHandle;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -63,7 +62,7 @@ impl CompactDatasetUseCase for CompactDatasetUseCaseImpl {
     )]
     async fn execute(
         &self,
-        dataset_handle: &DatasetHandle,
+        dataset_handle: &odf::DatasetHandle,
         options: CompactionOptions,
         maybe_listener: Option<Arc<dyn CompactionListener>>,
     ) -> Result<CompactionResult, CompactionError> {
@@ -98,7 +97,7 @@ impl CompactDatasetUseCase for CompactDatasetUseCaseImpl {
     )]
     async fn execute_multi(
         &self,
-        dataset_handles: Vec<DatasetHandle>,
+        dataset_handles: Vec<odf::DatasetHandle>,
         options: CompactionOptions,
         multi_listener: Option<Arc<dyn CompactionMultiListener>>,
     ) -> Vec<CompactionResponse> {

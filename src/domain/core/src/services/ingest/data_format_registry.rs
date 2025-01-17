@@ -11,7 +11,6 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use datafusion::prelude::SessionContext;
-use opendatafabric as odf;
 
 use super::{ReadError, Reader, UnsupportedMediaTypeError};
 
@@ -23,14 +22,14 @@ pub trait DataFormatRegistry: Send + Sync {
 
     fn format_by_file_extension(&self, ext: &str) -> Option<DataFormatDesc>;
 
-    fn format_of(&self, conf: &odf::ReadStep) -> DataFormatDesc;
+    fn format_of(&self, conf: &odf::metadata::ReadStep) -> DataFormatDesc;
 
     // TODO: Avoid `async` poisoning by datafusion
     // TODO: Avoid passing `temp_path` here
     async fn get_reader(
         &self,
         ctx: SessionContext,
-        conf: odf::ReadStep,
+        conf: odf::metadata::ReadStep,
         temp_path: PathBuf,
     ) -> Result<Arc<dyn Reader>, ReadError>;
 
@@ -39,15 +38,15 @@ pub trait DataFormatRegistry: Send + Sync {
     /// actual data
     fn get_compatible_read_config(
         &self,
-        base_conf: odf::ReadStep,
+        base_conf: odf::metadata::ReadStep,
         actual_media_type: &MediaType,
-    ) -> Result<odf::ReadStep, UnsupportedMediaTypeError>;
+    ) -> Result<odf::metadata::ReadStep, UnsupportedMediaTypeError>;
 
     fn get_best_effort_config(
         &self,
         schema: Option<Vec<String>>,
         media_type: &MediaType,
-    ) -> Result<odf::ReadStep, UnsupportedMediaTypeError>;
+    ) -> Result<odf::metadata::ReadStep, UnsupportedMediaTypeError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

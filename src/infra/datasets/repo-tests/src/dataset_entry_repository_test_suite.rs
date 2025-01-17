@@ -23,7 +23,6 @@ use kamu_datasets::{
     SaveDatasetEntryError,
     UpdateDatasetEntryNameError,
 };
-use opendatafabric::{DatasetID, DatasetName};
 
 use crate::helpers::*;
 
@@ -227,7 +226,7 @@ pub async fn test_get_multiple_entries(catalog: &Catalog) {
     }
 
     {
-        let wrong_id = DatasetID::new_seeded_ed25519(b"wrong_id");
+        let wrong_id = odf::DatasetID::new_seeded_ed25519(b"wrong_id");
         let get_multiple_res = dataset_entry_repo
             .get_multiple_dataset_entries(&[dataset_entry_acc_2.id.clone(), wrong_id.clone()])
             .await
@@ -243,8 +242,8 @@ pub async fn test_get_multiple_entries(catalog: &Catalog) {
     }
 
     {
-        let wrong_id_1 = DatasetID::new_seeded_ed25519(b"wrong_id_1");
-        let wrong_id_2 = DatasetID::new_seeded_ed25519(b"wrong_id_2");
+        let wrong_id_1 = odf::DatasetID::new_seeded_ed25519(b"wrong_id_1");
+        let wrong_id_2 = odf::DatasetID::new_seeded_ed25519(b"wrong_id_2");
 
         let get_multiple_res = dataset_entry_repo
             .get_multiple_dataset_entries(&[wrong_id_1.clone(), wrong_id_2.clone()])
@@ -480,7 +479,7 @@ pub async fn test_try_save_duplicate_dataset_entry(catalog: &Catalog) {
     }
     {
         // We change the name to ensure we get a duplicate error and not a collision.
-        dataset_entry.name = DatasetName::new_unchecked("another-name");
+        dataset_entry.name = odf::DatasetName::new_unchecked("another-name");
 
         let save_res = dataset_entry_repo.save_dataset_entry(&dataset_entry).await;
 
@@ -595,7 +594,7 @@ pub async fn test_update_dataset_entry_name(catalog: &Catalog) {
     let account = new_account(&account_repo).await;
 
     let dataset_entry = new_dataset_entry(&account);
-    let new_name = DatasetName::new_unchecked("new-name");
+    let new_name = odf::DatasetName::new_unchecked("new-name");
     {
         let update_res = dataset_entry_repo
             .update_dataset_entry_name(&dataset_entry.id, &new_name)

@@ -10,7 +10,6 @@
 use std::sync::Arc;
 
 use kamu_core::*;
-use opendatafabric as odf;
 use random_names::get_random_name;
 use time_source::SystemTimeSource;
 
@@ -42,14 +41,15 @@ impl PushIngestPlannerImpl {
         target: ResolvedDataset,
         source_name: Option<&str>,
     ) -> Result<DataWriterMetadataState, PushIngestPlanningError> {
-        let metadata_state = DataWriterMetadataState::build(target, &BlockRef::Head, source_name)
-            .await
-            .map_err(|e| match e {
-                ScanMetadataError::SourceNotFound(err) => {
-                    PushIngestPlanningError::SourceNotFound(err.into())
-                }
-                ScanMetadataError::Internal(err) => PushIngestPlanningError::Internal(err),
-            })?;
+        let metadata_state =
+            DataWriterMetadataState::build(target, &odf::BlockRef::Head, source_name)
+                .await
+                .map_err(|e| match e {
+                    ScanMetadataError::SourceNotFound(err) => {
+                        PushIngestPlanningError::SourceNotFound(err.into())
+                    }
+                    ScanMetadataError::Internal(err) => PushIngestPlanningError::Internal(err),
+                })?;
         Ok(metadata_state)
     }
 
@@ -58,7 +58,7 @@ impl PushIngestPlannerImpl {
         target: ResolvedDataset,
         source_name: &str,
         opts: &PushIngestOpts,
-    ) -> Result<odf::AddPushSource, PushIngestPlanningError> {
+    ) -> Result<odf::metadata::AddPushSource, PushIngestPlanningError> {
         let read = match &opts.media_type {
             Some(media_type) => {
                 match self
@@ -74,19 +74,19 @@ impl PushIngestPlannerImpl {
             )),
         }?;
 
-        let add_push_source_event = odf::AddPushSource {
+        let add_push_source_event = odf::metadata::AddPushSource {
             source_name: String::from("auto"),
             read,
             preprocess: None,
-            merge: opendatafabric::MergeStrategy::Append(opendatafabric::MergeStrategyAppend {}),
+            merge: odf::metadata::MergeStrategy::Append(odf::metadata::MergeStrategyAppend {}),
         };
 
         let commit_result = target
             .commit_event(
                 odf::MetadataEvent::AddPushSource(add_push_source_event.clone()),
-                CommitOpts {
+                odf::dataset::CommitOpts {
                     system_time: opts.source_event_time,
-                    ..CommitOpts::default()
+                    ..Default::default()
                 },
             )
             .await;

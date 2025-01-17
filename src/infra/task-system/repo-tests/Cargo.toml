@@ -24,7 +24,7 @@ doctest = false
 [dependencies]
 database-common = { workspace = true }
 kamu-task-system = { workspace = true }
-opendatafabric = { workspace = true }
+odf = { workspace = true }
 
 chrono = { version = "0.4", default-features = false }
 dill = "0.11"

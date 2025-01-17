@@ -15,13 +15,13 @@ use axum::extract::{FromRequestParts, Path};
 use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use dill::Component;
 use kamu::domain::*;
-use kamu::testing::*;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
 use kamu_datasets_services::DependencyGraphServiceImpl;
 use messaging_outbox::DummyOutboxImpl;
-use opendatafabric::*;
+use odf::dataset::{DatasetFactoryImpl, IpfsGateway};
+use odf::metadata::testing::MetadataFactory;
 use time_source::SystemTimeSourceDefault;
 use utoipa_axum::router::OpenApiRouter;
 
@@ -33,7 +33,7 @@ use crate::harness::await_client_server_flow;
 struct RepoFixture {
     tmp_dir: tempfile::TempDir,
     catalog: dill::Catalog,
-    created_dataset: CreateDatasetResult,
+    created_dataset: odf::CreateDatasetResult,
 }
 
 async fn setup_repo() -> RepoFixture {
@@ -48,10 +48,10 @@ async fn setup_repo() -> RepoFixture {
         .add::<DependencyGraphServiceImpl>()
         .add::<InMemoryDatasetDependencyRepository>()
         .add_value(TenancyConfig::SingleTenant)
-        .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
-        .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-        .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
-        .add::<DatasetRegistryRepoBridge>()
+        .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
+        .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
+        .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
+        .add::<DatasetRegistrySoloUnitBridge>()
         .add_value(CurrentAccountSubject::new_test())
         .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
         .add::<CreateDatasetFromSnapshotUseCaseImpl>()
@@ -69,7 +69,7 @@ async fn setup_repo() -> RepoFixture {
         .execute(
             MetadataFactory::dataset_snapshot()
                 .name("foo")
-                .kind(DatasetKind::Root)
+                .kind(odf::DatasetKind::Root)
                 .push_event(MetadataFactory::set_polling_source().build())
                 .build(),
             Default::default(),
@@ -95,7 +95,7 @@ async fn setup_server<IdExt, Extractor>(
     SocketAddr,
 )
 where
-    IdExt: Fn(Extractor) -> DatasetRef,
+    IdExt: Fn(Extractor) -> odf::DatasetRef,
     IdExt: Clone + Send + 'static,
     Extractor: FromRequestParts<()> + Send + 'static,
     <Extractor as FromRequestParts<()>>::Rejection: std::fmt::Debug,
@@ -129,11 +129,12 @@ where
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-async fn setup_client(dataset_url: url::Url, head_expected: Multihash) {
+async fn setup_client(dataset_url: url::Url, head_expected: odf::Multihash) {
     let catalog = dill::CatalogBuilder::new()
-        .add::<auth::DummyOdfServerAccessTokenResolver>()
+        .add::<odf::dataset::DummyOdfServerAccessTokenResolver>()
         .build();
 
+    use odf::dataset::DatasetFactory as _;
     let dataset = DatasetFactoryImpl::new(IpfsGateway::default(), catalog.get_one().unwrap())
         .get_dataset(&dataset_url, false)
         .await
@@ -141,7 +142,7 @@ async fn setup_client(dataset_url: url::Url, head_expected: Multihash) {
 
     let head_actual = dataset
         .as_metadata_chain()
-        .resolve_ref(&BlockRef::Head)
+        .resolve_ref(&odf::BlockRef::Head)
         .await
         .unwrap();
 
@@ -172,7 +173,7 @@ async fn test_routing_root() {
 
 #[derive(Deserialize)]
 struct DatasetByID {
-    dataset_id: DatasetID,
+    dataset_id: odf::DatasetID,
 }
 
 #[test_log::test(tokio::test)]
@@ -202,7 +203,7 @@ async fn test_routing_dataset_id() {
 
 #[derive(Deserialize)]
 struct DatasetByName {
-    dataset_name: DatasetName,
+    dataset_name: odf::DatasetName,
 }
 
 #[test_log::test(tokio::test)]
@@ -212,7 +213,9 @@ async fn test_routing_dataset_name() {
     let (server, local_addr) = setup_server(
         repo.catalog,
         "/:dataset_name",
-        |Path(p): Path<DatasetByName>| DatasetAlias::new(None, p.dataset_name).into_local_ref(),
+        |Path(p): Path<DatasetByName>| {
+            odf::DatasetAlias::new(None, p.dataset_name).into_local_ref()
+        },
     )
     .await;
 
@@ -234,7 +237,9 @@ async fn test_routing_dataset_name_case_insensetive() {
     let (server, local_addr) = setup_server(
         repo.catalog,
         "/:dataset_name",
-        |Path(p): Path<DatasetByName>| DatasetAlias::new(None, p.dataset_name).into_local_ref(),
+        |Path(p): Path<DatasetByName>| {
+            odf::DatasetAlias::new(None, p.dataset_name).into_local_ref()
+        },
     )
     .await;
 
@@ -259,8 +264,8 @@ async fn test_routing_dataset_name_case_insensetive() {
 #[allow(dead_code)]
 #[derive(Deserialize)]
 struct DatasetByAccountAndName {
-    account_name: AccountName,
-    dataset_name: DatasetName,
+    account_name: odf::AccountName,
+    dataset_name: odf::DatasetName,
 }
 
 #[test_log::test(tokio::test)]
@@ -272,7 +277,7 @@ async fn test_routing_dataset_account_and_name() {
         "/:account_name/:dataset_name",
         |Path(p): Path<DatasetByAccountAndName>| {
             // TODO: Ignoring account name until DatasetRepository supports multi-tenancy
-            DatasetAlias::new(None, p.dataset_name).into_local_ref()
+            odf::DatasetAlias::new(None, p.dataset_name).into_local_ref()
         },
     )
     .await;
@@ -322,7 +327,7 @@ async fn test_routing_err_dataset_not_found() {
     let (server, local_addr) = setup_server(
         repo.catalog,
         "/:dataset_name",
-        |Path(p): Path<DatasetByName>| DatasetAlias::new(None, p.dataset_name).as_local_ref(),
+        |Path(p): Path<DatasetByName>| odf::DatasetAlias::new(None, p.dataset_name).as_local_ref(),
     )
     .await;
 

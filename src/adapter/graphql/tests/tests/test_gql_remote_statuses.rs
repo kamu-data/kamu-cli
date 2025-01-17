@@ -14,12 +14,11 @@ use database_common::NoOpDatabasePlugin;
 use dill::*;
 use indoc::indoc;
 use internal_error::InternalError;
-use kamu::testing::MetadataFactory;
 use kamu::*;
 use kamu_core::utils::metadata_chain_comparator::CompareChainsResult;
 use kamu_core::*;
 use messaging_outbox::DummyOutboxImpl;
-use opendatafabric::*;
+use odf::metadata::testing::MetadataFactory;
 use tempfile::TempDir;
 use time_source::SystemTimeSourceDefault;
 use url::Url;
@@ -41,7 +40,7 @@ async fn test_remote_push_statuses() {
     let create_result = create_dataset_from_snapshot
         .execute(
             MetadataFactory::dataset_snapshot()
-                .kind(DatasetKind::Root)
+                .kind(odf::DatasetKind::Root)
                 .name("foo")
                 .build(),
             Default::default(),
@@ -145,12 +144,12 @@ impl PushStatusesTestHarness {
             b.add_value(RunInfoDir::new(tempdir.path().join("run")))
                 .add::<DidGeneratorDefault>()
                 .add::<DummyOutboxImpl>()
-                .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
-                .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-                .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
+                .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
+                .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
+                .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
                 .add::<CreateDatasetFromSnapshotUseCaseImpl>()
                 .add::<SystemTimeSourceDefault>()
-                .add::<DatasetRegistryRepoBridge>()
+                .add::<DatasetRegistrySoloUnitBridge>()
                 .add_value(TenancyConfig::SingleTenant)
                 .add_value(FakeRemoteStatusService {})
                 .bind::<dyn RemoteStatusService, FakeRemoteStatusService>()
@@ -176,12 +175,12 @@ pub struct FakeRemoteStatusService {}
 impl RemoteStatusService for FakeRemoteStatusService {
     async fn check_remotes_status(
         &self,
-        _dataset_handle: &DatasetHandle,
+        _dataset_handle: &odf::DatasetHandle,
     ) -> std::result::Result<DatasetPushStatuses, InternalError> {
         Ok(DatasetPushStatuses {
             statuses: vec![
                 PushStatus {
-                    remote: DatasetRefRemote::Url(Arc::new(
+                    remote: odf::DatasetRefRemote::Url(Arc::new(
                         Url::parse("https://example.com/ahead").unwrap(),
                     )),
                     check_result: Ok(CompareChainsResult::LhsBehind {
@@ -189,7 +188,7 @@ impl RemoteStatusService for FakeRemoteStatusService {
                     }),
                 },
                 PushStatus {
-                    remote: DatasetRefRemote::Url(Arc::new(
+                    remote: odf::DatasetRefRemote::Url(Arc::new(
                         Url::parse("https://example.com/behind").unwrap(),
                     )),
                     check_result: Ok(CompareChainsResult::LhsAhead {
@@ -197,7 +196,7 @@ impl RemoteStatusService for FakeRemoteStatusService {
                     }),
                 },
                 PushStatus {
-                    remote: DatasetRefRemote::Url(Arc::new(
+                    remote: odf::DatasetRefRemote::Url(Arc::new(
                         Url::parse("https://example.com/diverged").unwrap(),
                     )),
                     check_result: Ok(CompareChainsResult::Divergence {
@@ -206,13 +205,13 @@ impl RemoteStatusService for FakeRemoteStatusService {
                     }),
                 },
                 PushStatus {
-                    remote: DatasetRefRemote::Url(Arc::new(
+                    remote: odf::DatasetRefRemote::Url(Arc::new(
                         Url::parse("https://example.com/equal").unwrap(),
                     )),
                     check_result: Ok(CompareChainsResult::Equal),
                 },
                 PushStatus {
-                    remote: DatasetRefRemote::Url(Arc::new(
+                    remote: odf::DatasetRefRemote::Url(Arc::new(
                         Url::parse("https://example.com/not-found").unwrap(),
                     )),
                     check_result: Err(StatusCheckError::RemoteDatasetNotFound),

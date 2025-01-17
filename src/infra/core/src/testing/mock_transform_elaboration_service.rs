@@ -11,7 +11,6 @@ use std::sync::Arc;
 
 use engine::TransformRequestExt;
 use kamu_core::*;
-use opendatafabric::DatasetAlias;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -31,7 +30,7 @@ mockall::mock! {
 }
 
 impl MockTransformElaborationService {
-    pub fn make_expect_elaborate_transform(mut self, target_alias: DatasetAlias) -> Self {
+    pub fn make_expect_elaborate_transform(mut self, target_alias: odf::DatasetAlias) -> Self {
         self.expect_elaborate_transform()
             .withf(move |target, _, _, _| target.get_alias() == &target_alias)
             .times(1)

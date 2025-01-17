@@ -9,6 +9,7 @@
 
 use container_runtime::ContainerRuntime;
 use kamu::utils::docker_images;
+use test_utils::test_docker_images;
 
 // Not really a test - used by CI to separate pulling of test images
 // into its own phase
@@ -37,11 +38,11 @@ async fn test_setup_pull_images() {
         .await
         .unwrap();
     container_runtime
-        .ensure_image(docker_images::HTTPD, None)
+        .ensure_image(test_docker_images::HTTPD, None)
         .await
         .unwrap();
     container_runtime
-        .ensure_image(docker_images::MINIO, None)
+        .ensure_image(test_docker_images::MINIO, None)
         .await
         .unwrap();
 

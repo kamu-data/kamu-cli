@@ -61,7 +61,7 @@ impl DataBatch {
         record_batches: &[datafusion::arrow::record_batch::RecordBatch],
         format: DataBatchFormat,
     ) -> Result<DataBatch> {
-        use kamu_data_utils::data::format::*;
+        use odf::utils::data::format::*;
 
         let num_records: usize = record_batches
             .iter()

@@ -13,7 +13,6 @@ use std::sync::Arc;
 use criterion::{criterion_group, criterion_main, Criterion};
 use datafusion::dataframe::DataFrameWriteOptions;
 use datafusion::prelude::*;
-use opendatafabric as odf;
 use rand::{Rng, SeedableRng};
 
 async fn setup(tempdir: &Path, num_rows: usize) -> String {
@@ -40,9 +39,10 @@ async fn setup(tempdir: &Path, num_rows: usize) -> String {
 
     for i in 0..num_rows {
         offset.append_value(i as u64);
-        op.append_value(
-            rng.gen_range(odf::OperationType::Append as u8..=odf::OperationType::CorrectTo as u8),
-        );
+        op.append_value(rng.gen_range(
+            odf::metadata::OperationType::Append as u8
+                ..=odf::metadata::OperationType::CorrectTo as u8,
+        ));
     }
 
     let mut buf = vec![0; num_rows];
@@ -109,8 +109,8 @@ async fn project(path: &str) {
     let ledger = ctx.table("ledger").await.unwrap();
 
     let res = MergeStrategySnapshot::new(
-        odf::DatasetVocabulary::default(),
-        odf::MergeStrategySnapshot {
+        odf::metadata::DatasetVocabulary::default(),
+        odf::metadata::MergeStrategySnapshot {
             primary_key: vec!["pk1".to_string(), "pk2".to_string()],
             compare_columns: Some(vec!["cmp1".to_string(), "cmp2".to_string()]),
         },

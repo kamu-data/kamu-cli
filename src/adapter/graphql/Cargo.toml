@@ -24,14 +24,13 @@ doctest = false
 [dependencies]
 database-common = { workspace = true }
 internal-error = { workspace = true }
-opendatafabric = { workspace = true, features = ["arrow"] }
+odf = { workspace = true, features = ["arrow", "http", "lfs", "s3"] }
 
 event-sourcing = { workspace = true }
 kamu = { workspace = true }
 kamu-accounts = { workspace = true }
 kamu-auth-rebac = { workspace = true }
 kamu-core = { workspace = true }
-kamu-data-utils = { workspace = true }
 kamu-datasets = { workspace = true }
 kamu-flow-system = { workspace = true }
 kamu-flow-system-services = { workspace = true }
@@ -64,6 +63,7 @@ uuid = { version = "1", default-features = false }
 [dev-dependencies]
 # TODO: Limit to mock or in-memory implementations only
 container-runtime = { workspace = true }
+file-utils = { workspace = true }
 init-on-startup = { workspace = true }
 kamu = { workspace = true, features = ["testing"] }
 kamu-accounts = { workspace = true, features = ["testing"] }
@@ -74,6 +74,7 @@ kamu-auth-rebac-services = { workspace = true }
 kamu-datasets-inmem = { workspace = true }
 kamu-datasets-services = { workspace = true }
 kamu-flow-system-inmem = { workspace = true }
+kamu-flow-system-services = { workspace = true }
 kamu-task-system-inmem = { workspace = true }
 kamu-task-system-services = { workspace = true }
 messaging-outbox = { workspace = true }

@@ -11,32 +11,15 @@ use chrono::{DateTime, Utc};
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_core::engine::TransformRequestInputExt;
 use kamu_core::{
-    BlockRef,
-    Dataset,
     InputSchemaNotDefinedError,
     InvalidInputIntervalError,
-    IterBlocksError,
-    MetadataChainExt,
     ResolvedDataset,
     ResolvedDatasetsMap,
-    SearchExecuteTransformVisitor,
-    SearchSetDataSchemaVisitor,
-    SearchSetTransformVisitor,
-    SearchSetVocabVisitor,
     TransformElaborateError,
     TransformNotDefinedError,
     TransformPlanError,
     TransformPreliminaryRequestExt,
     VerifyTransformPlanError,
-};
-use opendatafabric::{
-    DatasetVocabulary,
-    ExecuteTransform,
-    ExecuteTransformInput,
-    IntoDataStreamBlock,
-    SetDataSchema,
-    TransformInput,
-    Watermark,
 };
 use random_names::get_random_name;
 use thiserror::Error;
@@ -51,17 +34,18 @@ pub async fn build_preliminary_request_ext(
     let output_chain = target.as_metadata_chain();
 
     // TODO: externalize
-    let block_ref = BlockRef::Head;
+    let block_ref = odf::BlockRef::Head;
     let head = output_chain.resolve_ref(&block_ref).await.int_err()?;
 
     // TODO: PERF: Search for source, vocab, and data schema result in full scan
     let (source, schema, set_vocab, prev_query) = {
         // TODO: Support transform evolution
-        let mut set_transform_visitor = SearchSetTransformVisitor::new();
-        let mut set_vocab_visitor = SearchSetVocabVisitor::new();
-        let mut set_data_schema_visitor = SearchSetDataSchemaVisitor::new();
-        let mut execute_transform_visitor = SearchExecuteTransformVisitor::new();
+        let mut set_transform_visitor = odf::dataset::SearchSetTransformVisitor::new();
+        let mut set_vocab_visitor = odf::dataset::SearchSetVocabVisitor::new();
+        let mut set_data_schema_visitor = odf::dataset::SearchSetDataSchemaVisitor::new();
+        let mut execute_transform_visitor = odf::dataset::SearchExecuteTransformVisitor::new();
 
+        use odf::dataset::MetadataChainExt;
         target
             .as_metadata_chain()
             .accept_by_hash(
@@ -81,7 +65,7 @@ pub async fn build_preliminary_request_ext(
             set_data_schema_visitor
                 .into_event()
                 .as_ref()
-                .map(SetDataSchema::schema_as_arrow)
+                .map(odf::metadata::SetDataSchema::schema_as_arrow)
                 .transpose() // Option<Result<SchemaRef, E>> -> Result<Option<SchemaRef>, E>
                 .int_err()?,
             set_vocab_visitor.into_event(),
@@ -96,17 +80,19 @@ pub async fn build_preliminary_request_ext(
 
     // Prepare inputs
     use itertools::Itertools;
-    let input_states: Vec<(TransformInput, Option<ExecuteTransformInput>)> =
-        if let Some(query) = &prev_query {
-            source
-                .inputs
-                .iter()
-                .cloned()
-                .zip_eq(query.query_inputs.iter().cloned().map(Some))
-                .collect()
-        } else {
-            source.inputs.iter().map(|i| (i.clone(), None)).collect()
-        };
+    let input_states: Vec<(
+        odf::metadata::TransformInput,
+        Option<odf::metadata::ExecuteTransformInput>,
+    )> = if let Some(query) = &prev_query {
+        source
+            .inputs
+            .iter()
+            .cloned()
+            .zip_eq(query.query_inputs.iter().cloned().map(Some))
+            .collect()
+    } else {
+        source.inputs.iter().map(|i| (i.clone(), None)).collect()
+    };
 
     // Build preliminary transform request
     Ok(TransformPreliminaryRequestExt {
@@ -117,7 +103,9 @@ pub async fn build_preliminary_request_ext(
         transform: source.transform,
         system_time,
         schema,
-        prev_offset: prev_query.as_ref().and_then(ExecuteTransform::last_offset),
+        prev_offset: prev_query
+            .as_ref()
+            .and_then(odf::metadata::ExecuteTransform::last_offset),
         vocab: set_vocab.unwrap_or_default().into(),
         input_states,
         prev_checkpoint: prev_query.and_then(|q| q.new_checkpoint.map(|c| c.physical_hash)),
@@ -127,9 +115,9 @@ pub async fn build_preliminary_request_ext(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) async fn get_transform_input_from_query_input(
-    query_input: ExecuteTransformInput,
+    query_input: odf::metadata::ExecuteTransformInput,
     alias: String,
-    vocab_hint: Option<DatasetVocabulary>,
+    vocab_hint: Option<odf::metadata::DatasetVocabulary>,
     datasets_map: &ResolvedDatasetsMap,
 ) -> Result<TransformRequestInputExt, GetTransformInputError> {
     let resolved_input = datasets_map.get_by_id(&query_input.dataset_id);
@@ -137,9 +125,10 @@ pub(crate) async fn get_transform_input_from_query_input(
 
     // Find schema
     // TODO: Make single-pass via multi-visitor
+    use odf::dataset::MetadataChainExt;
     let schema = resolved_input
         .as_metadata_chain()
-        .accept_one(SearchSetDataSchemaVisitor::new())
+        .accept_one(odf::dataset::SearchSetDataSchemaVisitor::new())
         .await
         .int_err()?
         .into_event()
@@ -158,7 +147,7 @@ pub(crate) async fn get_transform_input_from_query_input(
             .try_collect()
             .await
             .map_err(|chain_err| match chain_err {
-                IterBlocksError::InvalidInterval(err) => {
+                odf::dataset::IterBlocksError::InvalidInterval(err) => {
                     GetTransformInputError::InvalidInputInterval(InvalidInputIntervalError {
                         head: err.head,
                         tail: err.tail,
@@ -171,6 +160,7 @@ pub(crate) async fn get_transform_input_from_query_input(
         Vec::new()
     };
 
+    use odf::metadata::IntoDataStreamBlock;
     let mut data_slices = Vec::new();
     let mut explicit_watermarks = Vec::new();
     for block in blocks_unprocessed
@@ -183,7 +173,7 @@ pub(crate) async fn get_transform_input_from_query_input(
         }
 
         if let Some(wm) = block.event.new_watermark {
-            explicit_watermarks.push(Watermark {
+            explicit_watermarks.push(odf::metadata::Watermark {
                 system_time: *block.system_time,
                 event_time: *wm,
             });
@@ -218,10 +208,13 @@ pub(crate) async fn get_transform_input_from_query_input(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // TODO: Avoid iterating through output chain multiple times
-async fn get_vocab(dataset: &dyn Dataset) -> Result<DatasetVocabulary, InternalError> {
+async fn get_vocab(
+    dataset: &dyn odf::Dataset,
+) -> Result<odf::metadata::DatasetVocabulary, InternalError> {
+    use odf::dataset::MetadataChainExt;
     Ok(dataset
         .as_metadata_chain()
-        .accept_one(SearchSetVocabVisitor::new())
+        .accept_one(odf::dataset::SearchSetVocabVisitor::new())
         .await
         .int_err()?
         .into_event()

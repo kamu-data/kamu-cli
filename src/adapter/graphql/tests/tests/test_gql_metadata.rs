@@ -11,13 +11,12 @@ use async_graphql::*;
 use database_common::NoOpDatabasePlugin;
 use dill::*;
 use indoc::indoc;
-use kamu::testing::MetadataFactory;
 use kamu::*;
 use kamu_core::*;
 use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
 use kamu_datasets_services::DependencyGraphServiceImpl;
 use messaging_outbox::DummyOutboxImpl;
-use opendatafabric::*;
+use odf::metadata::testing::MetadataFactory;
 use time_source::SystemTimeSourceDefault;
 
 use crate::utils::authentication_catalogs;
@@ -37,10 +36,10 @@ async fn test_current_push_sources() {
             .add::<DidGeneratorDefault>()
             .add::<DummyOutboxImpl>()
             .add_value(TenancyConfig::SingleTenant)
-            .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
-            .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-            .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
-            .add::<DatasetRegistryRepoBridge>()
+            .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
+            .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
+            .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
+            .add::<DatasetRegistrySoloUnitBridge>()
             .add::<MetadataQueryServiceImpl>()
             .add::<CreateDatasetFromSnapshotUseCaseImpl>()
             .add::<SystemTimeSourceDefault>()
@@ -65,7 +64,7 @@ async fn test_current_push_sources() {
     let create_result = create_dataset_from_snapshot
         .execute(
             MetadataFactory::dataset_snapshot()
-                .kind(DatasetKind::Root)
+                .kind(odf::DatasetKind::Root)
                 .name("foo")
                 .build(),
             Default::default(),
@@ -118,13 +117,13 @@ async fn test_current_push_sources() {
         .commit_event(
             MetadataFactory::add_push_source()
                 .source_name("source1")
-                .read(ReadStepCsv {
+                .read(odf::metadata::ReadStepCsv {
                     schema: Some(vec!["foo STRING".to_string()]),
                     ..Default::default()
                 })
                 .build()
                 .into(),
-            CommitOpts::default(),
+            odf::dataset::CommitOpts::default(),
         )
         .await
         .unwrap();
@@ -133,13 +132,13 @@ async fn test_current_push_sources() {
         .commit_event(
             MetadataFactory::add_push_source()
                 .source_name("source2")
-                .read(ReadStepNdJson {
+                .read(odf::metadata::ReadStepNdJson {
                     schema: Some(vec!["foo STRING".to_string()]),
                     ..Default::default()
                 })
                 .build()
                 .into(),
-            CommitOpts::default(),
+            odf::dataset::CommitOpts::default(),
         )
         .await
         .unwrap();

@@ -12,7 +12,6 @@ use std::collections::HashSet;
 use chrono::{DateTime, Utc};
 use database_common::PaginationOpts;
 use event_sourcing::EventStore;
-use opendatafabric::{AccountID, DatasetID};
 
 use crate::*;
 
@@ -46,21 +45,23 @@ pub trait FlowEventStore: EventStore<FlowState> {
     /// Applies filters/pagination, if specified
     fn get_all_flow_ids_by_dataset(
         &self,
-        dataset_id: &DatasetID,
+        dataset_id: &odf::DatasetID,
         filters: &DatasetFlowFilters,
         pagination: PaginationOpts,
     ) -> FlowIDStream;
 
     /// Returns IDs of the flow initiators associated with the specified
     /// dataset in reverse chronological order based on creation time.
-    fn get_unique_flow_initiator_ids_by_dataset(&self, dataset_id: &DatasetID)
-        -> InitiatorIDStream;
+    fn get_unique_flow_initiator_ids_by_dataset(
+        &self,
+        dataset_id: &odf::DatasetID,
+    ) -> InitiatorIDStream;
 
     /// Returns number of flows associated with the specified dataset and
     /// matching filters, if specified
     async fn get_count_flows_by_dataset(
         &self,
-        dataset_id: &DatasetID,
+        dataset_id: &odf::DatasetID,
         filters: &DatasetFlowFilters,
     ) -> Result<usize, InternalError>;
 
@@ -68,7 +69,7 @@ pub trait FlowEventStore: EventStore<FlowState> {
     /// matching filters, if specified
     async fn get_count_flows_by_datasets(
         &self,
-        dataset_ids: HashSet<DatasetID>,
+        dataset_ids: HashSet<odf::DatasetID>,
         filters: &DatasetFlowFilters,
     ) -> Result<usize, InternalError>;
 
@@ -77,7 +78,7 @@ pub trait FlowEventStore: EventStore<FlowState> {
     /// Applies filters/pagination, if specified
     fn get_all_flow_ids_by_datasets(
         &self,
-        dataset_ids: HashSet<DatasetID>,
+        dataset_ids: HashSet<odf::DatasetID>,
         filters: &DatasetFlowFilters,
         pagination: PaginationOpts,
     ) -> FlowIDStream;
@@ -122,7 +123,7 @@ pub struct DatasetFlowFilters {
 
 #[derive(Default, Debug, Clone)]
 pub struct AccountFlowFilters {
-    pub by_dataset_ids: HashSet<DatasetID>,
+    pub by_dataset_ids: HashSet<odf::DatasetID>,
     pub by_flow_type: Option<DatasetFlowType>,
     pub by_flow_status: Option<FlowStatus>,
     pub by_initiator: Option<InitiatorFilter>,
@@ -144,7 +145,7 @@ pub struct AllFlowFilters {
 #[derive(Debug, Clone)]
 pub enum InitiatorFilter {
     System,
-    Account(HashSet<AccountID>),
+    Account(HashSet<odf::AccountID>),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

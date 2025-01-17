@@ -29,9 +29,9 @@ impl ResetExecutor for ResetExecutorImpl {
         target
             .as_metadata_chain()
             .set_ref(
-                &BlockRef::Head,
+                &odf::BlockRef::Head,
                 &plan.new_head,
-                SetRefOpts {
+                odf::dataset::SetRefOpts {
                     validate_block_present: true,
                     check_ref_is: None,
                 },

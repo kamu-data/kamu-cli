@@ -13,11 +13,11 @@ use std::path::PathBuf;
 use chrono::{DateTime, Utc};
 use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::prelude::{DataFrame, SessionContext};
+use file_utils::OwnedFile;
 use internal_error::*;
-use opendatafabric::*;
 use thiserror::Error;
 
-use crate::{BlockRef, OwnedFile, ResolvedDatasetsMap};
+use crate::ResolvedDatasetsMap;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Engine
@@ -50,7 +50,7 @@ pub struct RawQueryRequestExt {
     /// Data to be used in the query
     pub input_data: DataFrame,
     /// Defines the query to be performed
-    pub transform: Transform,
+    pub transform: odf::metadata::Transform,
 }
 
 #[derive(Debug, Clone)]
@@ -73,13 +73,13 @@ pub struct TransformRequestExt {
     /// Randomly assigned value that identifies this specific engine operation
     pub operation_id: String,
     /// Identifies the output dataset
-    pub dataset_handle: DatasetHandle,
+    pub dataset_handle: odf::DatasetHandle,
     /// Block reference to advance upon commit
-    pub block_ref: BlockRef,
+    pub block_ref: odf::BlockRef,
     /// Current head (for concurrency control)
-    pub head: Multihash,
+    pub head: odf::Multihash,
     /// Transformation that will be applied to produce new data
-    pub transform: Transform,
+    pub transform: odf::metadata::Transform,
     /// System time to use for new records
     pub system_time: DateTime<Utc>,
     /// Expected data schema (if already defined)
@@ -89,30 +89,30 @@ pub struct TransformRequestExt {
     /// Defines the input data
     pub inputs: Vec<TransformRequestInputExt>,
     /// Output dataset's vocabulary
-    pub vocab: DatasetVocabulary,
+    pub vocab: odf::metadata::DatasetVocabulary,
     /// Previous checkpoint, if any
-    pub prev_checkpoint: Option<Multihash>,
+    pub prev_checkpoint: Option<odf::Multihash>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TransformRequestInputExt {
     /// Identifies the input dataset
-    pub dataset_handle: DatasetHandle,
+    pub dataset_handle: odf::DatasetHandle,
     /// An alias of this input to be used in queries
     pub alias: String,
     /// Input dataset's vocabulary
-    pub vocab: DatasetVocabulary,
+    pub vocab: odf::metadata::DatasetVocabulary,
     /// Last block of the input dataset that was previously incorporated into
     /// the derivative transformation, if any. Must be equal to the last
     /// non-empty `newBlockHash`. Together with `newBlockHash` defines a
     /// half-open `(prevBlockHash, newBlockHash]` interval of blocks that will
     /// be considered in this transaction.
-    pub prev_block_hash: Option<Multihash>,
+    pub prev_block_hash: Option<odf::Multihash>,
     /// Hash of the last block that will be incorporated into the derivative
     /// transformation. When present, defines a half-open `(prevBlockHash,
     /// newBlockHash]` interval of blocks that will be considered in this
     /// transaction.
-    pub new_block_hash: Option<Multihash>,
+    pub new_block_hash: Option<odf::Multihash>,
     /// Last data record offset in the input dataset that was previously
     /// incorporated into the derivative transformation, if any. Must be equal
     /// to the last non-empty `newOffset`. Together with `newOffset` defines a
@@ -127,15 +127,15 @@ pub struct TransformRequestInputExt {
     /// Arrow schema of the slices
     pub schema: SchemaRef,
     /// List of data files that will be read
-    pub data_slices: Vec<Multihash>,
+    pub data_slices: Vec<odf::Multihash>,
     /// TODO: remove?
-    pub explicit_watermarks: Vec<Watermark>,
+    pub explicit_watermarks: Vec<odf::metadata::Watermark>,
 }
 
 #[derive(Debug)]
 pub struct TransformResponseExt {
     /// Data slice produced by the transaction, if any
-    pub new_offset_interval: Option<OffsetInterval>,
+    pub new_offset_interval: Option<odf::metadata::OffsetInterval>,
     /// Watermark advanced by the transaction, if any
     pub new_watermark: Option<DateTime<Utc>>,
     /// Schema of the output
@@ -148,7 +148,7 @@ pub struct TransformResponseExt {
     pub new_data: Option<OwnedFile>,
 }
 
-impl From<TransformRequestInputExt> for ExecuteTransformInput {
+impl From<TransformRequestInputExt> for odf::metadata::ExecuteTransformInput {
     fn from(val: TransformRequestInputExt) -> Self {
         Self {
             dataset_id: val.dataset_handle.id,

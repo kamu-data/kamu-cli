@@ -15,7 +15,8 @@ use datafusion::arrow::array::*;
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use datafusion::arrow::record_batch::RecordBatch;
 use dill::Component;
-use kamu::testing::{MetadataFactory, ParquetWriterHelper};
+use file_utils::OwnedFile;
+use kamu::testing::ParquetWriterHelper;
 use kamu::*;
 use kamu_accounts::*;
 use kamu_accounts_inmem::{InMemoryAccessTokenRepository, InMemoryAccountRepository};
@@ -29,7 +30,7 @@ use kamu_core::*;
 use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
 use kamu_datasets_services::DependencyGraphServiceImpl;
 use messaging_outbox::DummyOutboxImpl;
-use opendatafabric::*;
+use odf::metadata::testing::MetadataFactory;
 use serde_json::json;
 use time_source::SystemTimeSourceDefault;
 
@@ -64,10 +65,10 @@ async fn create_catalog_with_local_workspace(
             .add_value(current_account_subject)
             .add_value(predefined_accounts_config)
             .add_value(tenancy_config)
-            .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
-            .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-            .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
-            .add::<DatasetRegistryRepoBridge>()
+            .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
+            .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
+            .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
+            .add::<DatasetRegistrySoloUnitBridge>()
             .add::<CreateDatasetUseCaseImpl>()
             .add::<DummyOutboxImpl>()
             .add::<SystemTimeSourceDefault>()
@@ -99,14 +100,14 @@ async fn create_catalog_with_local_workspace(
 async fn create_test_dataset(
     catalog: &dill::Catalog,
     tempdir: &Path,
-    account_name: Option<AccountName>,
+    account_name: Option<odf::AccountName>,
 ) {
     let create_dataset = catalog.get_one::<dyn CreateDatasetUseCase>().unwrap();
 
     let dataset = create_dataset
         .execute(
-            &DatasetAlias::new(account_name, DatasetName::new_unchecked("foo")),
-            MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build())
+            &odf::DatasetAlias::new(account_name, odf::DatasetName::new_unchecked("foo")),
+            MetadataFactory::metadata_block(MetadataFactory::seed(odf::DatasetKind::Root).build())
                 .build_typed(),
             Default::default(),
         )
@@ -125,7 +126,7 @@ async fn create_test_dataset(
                 .schema(&schema)
                 .build()
                 .into(),
-            CommitOpts::default(),
+            odf::dataset::CommitOpts::default(),
         )
         .await
         .unwrap();
@@ -141,16 +142,16 @@ async fn create_test_dataset(
 
     dataset
         .commit_add_data(
-            AddDataParams {
+            odf::dataset::AddDataParams {
                 prev_checkpoint: None,
                 prev_offset: None,
-                new_offset_interval: Some(OffsetInterval { start: 0, end: 3 }),
+                new_offset_interval: Some(odf::metadata::OffsetInterval { start: 0, end: 3 }),
                 new_watermark: None,
                 new_source_state: None,
             },
             Some(OwnedFile::new(tmp_data_path)),
             None,
-            CommitOpts::default(),
+            odf::dataset::CommitOpts::default(),
         )
         .await
         .unwrap();

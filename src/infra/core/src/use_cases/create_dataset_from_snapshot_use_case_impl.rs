@@ -12,18 +12,14 @@ use std::sync::Arc;
 use dill::{component, interface};
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::{
-    CreateDatasetFromSnapshotError,
-    CreateDatasetFromSnapshotResult,
     CreateDatasetFromSnapshotUseCase,
-    CreateDatasetResult,
     CreateDatasetUseCaseOptions,
     DatasetLifecycleMessage,
     MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
 };
 use messaging_outbox::{Outbox, OutboxExt};
-use opendatafabric::DatasetSnapshot;
 
-use crate::DatasetRepositoryWriter;
+use crate::DatasetStorageUnitWriter;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -31,19 +27,19 @@ use crate::DatasetRepositoryWriter;
 #[interface(dyn CreateDatasetFromSnapshotUseCase)]
 pub struct CreateDatasetFromSnapshotUseCaseImpl {
     current_account_subject: Arc<CurrentAccountSubject>,
-    dataset_repo_writer: Arc<dyn DatasetRepositoryWriter>,
+    dataset_storage_unit_writer: Arc<dyn DatasetStorageUnitWriter>,
     outbox: Arc<dyn Outbox>,
 }
 
 impl CreateDatasetFromSnapshotUseCaseImpl {
     pub fn new(
         current_account_subject: Arc<CurrentAccountSubject>,
-        dataset_repo_writer: Arc<dyn DatasetRepositoryWriter>,
+        dataset_storage_unit_writer: Arc<dyn DatasetStorageUnitWriter>,
         outbox: Arc<dyn Outbox>,
     ) -> Self {
         Self {
             current_account_subject,
-            dataset_repo_writer,
+            dataset_storage_unit_writer,
             outbox,
         }
     }
@@ -54,9 +50,9 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
     #[tracing::instrument(level = "info", skip_all, fields(?snapshot, ?options))]
     async fn execute(
         &self,
-        snapshot: DatasetSnapshot,
+        snapshot: odf::DatasetSnapshot,
         options: CreateDatasetUseCaseOptions,
-    ) -> Result<CreateDatasetResult, CreateDatasetFromSnapshotError> {
+    ) -> Result<odf::CreateDatasetResult, odf::dataset::CreateDatasetFromSnapshotError> {
         let logged_account_id = match self.current_account_subject.as_ref() {
             CurrentAccountSubject::Anonymous(_) => {
                 panic!("Anonymous account cannot create dataset");
@@ -64,11 +60,11 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
             CurrentAccountSubject::Logged(l) => l.account_id.clone(),
         };
         let dataset_name = snapshot.name.dataset_name.clone();
-        let CreateDatasetFromSnapshotResult {
+        let odf::CreateDatasetFromSnapshotResult {
             create_dataset_result,
             new_upstream_ids,
         } = self
-            .dataset_repo_writer
+            .dataset_storage_unit_writer
             .create_dataset_from_snapshot(snapshot)
             .await?;
 

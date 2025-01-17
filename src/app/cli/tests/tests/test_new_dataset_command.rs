@@ -13,12 +13,11 @@ use kamu::domain::*;
 use kamu::ResourceLoaderImpl;
 use kamu_cli::commands::*;
 use kamu_cli::CLIError;
-use opendatafabric::DatasetName;
 
 #[test_log::test(tokio::test)]
 async fn test_ambiguity_is_punished() {
     let mut cmd = NewDatasetCommand::new(
-        DatasetName::from_str("foo").unwrap(),
+        odf::DatasetName::from_str("foo").unwrap(),
         false,
         false,
         None::<&str>,
@@ -31,7 +30,7 @@ async fn test_root_dataset_parses() {
     let tempdir = tempfile::tempdir().unwrap();
     let path = tempdir.path().join("ds.yaml");
     let mut cmd = NewDatasetCommand::new(
-        DatasetName::from_str("foo").unwrap(),
+        odf::DatasetName::from_str("foo").unwrap(),
         true,
         false,
         Some(&path),
@@ -50,7 +49,7 @@ async fn test_derivative_dataset_parses() {
     let tempdir = tempfile::tempdir().unwrap();
     let path = tempdir.path().join("ds.yaml");
     let mut cmd = NewDatasetCommand::new(
-        DatasetName::from_str("foo").unwrap(),
+        odf::DatasetName::from_str("foo").unwrap(),
         false,
         true,
         Some(&path),

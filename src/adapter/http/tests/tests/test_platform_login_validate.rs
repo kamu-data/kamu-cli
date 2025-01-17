@@ -23,7 +23,6 @@ use kamu_accounts_services::{
 };
 use kamu_adapter_http::{LoginRequestBody, LoginResponseBody};
 use kamu_core::TenancyConfig;
-use opendatafabric::AccountName;
 use serde_json::json;
 use time_source::{SystemTimeSource, SystemTimeSourceStub};
 
@@ -51,12 +50,12 @@ impl Harness {
 
         let mut predefined_accounts_config = PredefinedAccountsConfig::new();
         predefined_accounts_config.predefined.push(
-            AccountConfig::from_name(AccountName::new_unchecked(USER_WASYA))
+            AccountConfig::from_name(odf::AccountName::new_unchecked(USER_WASYA))
                 .set_password(String::from(PASSWORD_WASYA)),
         );
         predefined_accounts_config
             .predefined
-            .push(AccountConfig::from_name(AccountName::new_unchecked(
+            .push(AccountConfig::from_name(odf::AccountName::new_unchecked(
                 USER_PETYA,
             )));
 

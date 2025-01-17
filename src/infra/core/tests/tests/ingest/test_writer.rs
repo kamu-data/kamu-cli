@@ -14,14 +14,12 @@ use chrono::{DateTime, TimeZone, Utc};
 use datafusion::prelude::*;
 use dill::Component;
 use indoc::indoc;
-use kamu::testing::MetadataFactory;
-use kamu::{DatasetRepositoryLocalFs, DatasetRepositoryWriter};
+use kamu::{DatasetStorageUnitLocalFs, DatasetStorageUnitWriter};
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::*;
-use kamu_data_utils::testing::{assert_arrow_schema_eq, assert_data_eq, assert_schema_eq};
 use kamu_ingest_datafusion::*;
-use odf::{AsTypedBlock, DatasetAlias};
-use opendatafabric as odf;
+use odf::metadata::testing::MetadataFactory;
+use odf::utils::testing::{assert_arrow_schema_eq, assert_data_eq, assert_schema_eq};
 use serde_json::json;
 use time_source::SystemTimeSourceDefault;
 
@@ -36,7 +34,7 @@ use time_source::SystemTimeSourceDefault;
 #[test_log::test(tokio::test)]
 async fn test_data_writer_happy_path() {
     let mut harness = Harness::new(vec![MetadataFactory::set_polling_source()
-        .merge(odf::MergeStrategySnapshot {
+        .merge(odf::metadata::MergeStrategySnapshot {
             primary_key: vec!["city".to_string()],
             compare_columns: None,
         })
@@ -295,8 +293,8 @@ async fn test_data_writer_happy_path() {
     assert_matches!(res, Err(WriteDataError::EmptyCommit(_)));
 
     // Round 4 (nothing but source state changed)
-    let source_state = odf::SourceState {
-        source_name: odf::SourceState::DEFAULT_SOURCE_NAME.to_string(),
+    let source_state = odf::metadata::SourceState {
+        source_name: odf::metadata::SourceState::DEFAULT_SOURCE_NAME.to_string(),
         kind: "odf/etag".to_string(),
         value: "123".to_string(),
     };
@@ -591,7 +589,7 @@ async fn test_data_writer_offsets_are_sequential_impl(ctx: SessionContext) -> St
     testing_logger::setup();
 
     let harness = Harness::new(vec![MetadataFactory::set_polling_source()
-        .merge(odf::MergeStrategyLedger {
+        .merge(odf::metadata::MergeStrategyLedger {
             primary_key: vec!["event_time".to_string(), "city".to_string()],
         })
         .build()
@@ -601,7 +599,7 @@ async fn test_data_writer_offsets_are_sequential_impl(ctx: SessionContext) -> St
     let mut writer = DataWriterDataFusion::from_metadata_chain(
         ctx.clone(),
         harness.target.clone(),
-        &BlockRef::Head,
+        &odf::BlockRef::Head,
         None,
     )
     .await
@@ -628,7 +626,7 @@ async fn test_data_writer_offsets_are_sequential_impl(ctx: SessionContext) -> St
 
     let df = ReaderNdJson::new(
         ctx.clone(),
-        odf::ReadStepNdJson {
+        odf::metadata::ReadStepNdJson {
             schema: Some(vec![
                 "event_time TIMESTAMP".to_string(),
                 "city STRING".to_string(),
@@ -659,7 +657,7 @@ async fn test_data_writer_offsets_are_sequential_impl(ctx: SessionContext) -> St
 
     let data_path = harness.get_last_data_file().await;
 
-    kamu_data_utils::testing::assert_parquet_offsets_are_in_order(&data_path);
+    odf::utils::testing::assert_parquet_offsets_are_in_order(&data_path);
 
     let plan = std::sync::Mutex::new(String::new());
     testing_logger::validate(|capture| {
@@ -690,7 +688,7 @@ async fn test_data_writer_offsets_are_sequential_impl(ctx: SessionContext) -> St
 #[test_log::test(tokio::test)]
 async fn test_data_writer_ledger_orders_by_event_time() {
     let mut harness = Harness::new(vec![MetadataFactory::set_polling_source()
-        .merge(odf::MergeStrategyLedger {
+        .merge(odf::metadata::MergeStrategyLedger {
             primary_key: vec!["event_time".to_string(), "city".to_string()],
         })
         .build()
@@ -763,7 +761,7 @@ async fn test_data_writer_ledger_orders_by_event_time() {
 #[test_log::test(tokio::test)]
 async fn test_data_writer_snapshot_orders_by_pk_and_operation_type() {
     let mut harness = Harness::new(vec![MetadataFactory::set_polling_source()
-        .merge(odf::MergeStrategySnapshot {
+        .merge(odf::metadata::MergeStrategySnapshot {
             primary_key: vec!["city".to_string()],
             compare_columns: None,
         })
@@ -904,7 +902,7 @@ async fn test_data_writer_snapshot_orders_by_pk_and_operation_type() {
 #[test_log::test(tokio::test)]
 async fn test_data_writer_normalizes_timestamps_to_utc_millis() {
     let mut harness = Harness::new(vec![MetadataFactory::set_polling_source()
-        .merge(odf::MergeStrategyLedger {
+        .merge(odf::metadata::MergeStrategyLedger {
             primary_key: vec!["event_time".to_string(), "city".to_string()],
         })
         .build()
@@ -970,7 +968,7 @@ async fn test_data_writer_optimal_parquet_encoding() {
     use ::datafusion::parquet::file::reader::FileReader;
 
     let mut harness = Harness::new(vec![MetadataFactory::set_polling_source()
-        .merge(odf::MergeStrategyLedger {
+        .merge(odf::metadata::MergeStrategyLedger {
             primary_key: vec!["event_time".to_string(), "city".to_string()],
         })
         .build()
@@ -1037,7 +1035,7 @@ async fn test_data_writer_optimal_parquet_encoding() {
 
 #[test_log::test(tokio::test)]
 async fn test_data_writer_builder_scan_no_source() {
-    let harness = Harness::new(vec![odf::SetVocab {
+    let harness = Harness::new(vec![odf::metadata::SetVocab {
         event_time_column: Some("foo".to_string()),
         ..Default::default()
     }
@@ -1045,14 +1043,14 @@ async fn test_data_writer_builder_scan_no_source() {
     .await;
 
     let metadata_state =
-        DataWriterMetadataState::build(harness.target.clone(), &BlockRef::Head, None)
+        DataWriterMetadataState::build(harness.target.clone(), &odf::BlockRef::Head, None)
             .await
             .unwrap();
 
     let head = harness
         .target
         .as_metadata_chain()
-        .resolve_ref(&BlockRef::Head)
+        .resolve_ref(&odf::BlockRef::Head)
         .await
         .unwrap();
 
@@ -1062,7 +1060,7 @@ async fn test_data_writer_builder_scan_no_source() {
             head: h,
             schema: None,
             source_event: None,
-            merge_strategy: odf::MergeStrategy::Append(_),
+            merge_strategy: odf::metadata::MergeStrategy::Append(_),
             vocab,
             prev_offset: None,
             prev_checkpoint: None,
@@ -1079,7 +1077,7 @@ async fn test_data_writer_builder_scan_no_source() {
 #[test_log::test(tokio::test)]
 async fn test_data_writer_builder_scan_polling_source() {
     let harness = Harness::new(vec![MetadataFactory::set_polling_source()
-        .merge(odf::MergeStrategyLedger {
+        .merge(odf::metadata::MergeStrategyLedger {
             primary_key: vec!["event_time".to_string(), "city".to_string()],
         })
         .build()
@@ -1087,7 +1085,7 @@ async fn test_data_writer_builder_scan_polling_source() {
     .await;
 
     let metadata_state =
-        DataWriterMetadataState::build(harness.target.clone(), &BlockRef::Head, None)
+        DataWriterMetadataState::build(harness.target.clone(), &odf::BlockRef::Head, None)
             .await
             .unwrap();
 
@@ -1096,14 +1094,14 @@ async fn test_data_writer_builder_scan_polling_source() {
         DataWriterMetadataState {
             schema: None,
             source_event: Some(_),
-            merge_strategy: odf::MergeStrategy::Ledger(_),
+            merge_strategy: odf::metadata::MergeStrategy::Ledger(_),
             vocab,
             prev_offset: None,
             prev_checkpoint: None,
             prev_watermark: None,
             prev_source_state: None,
             ..
-        } if vocab == odf::DatasetVocabulary::default()
+        } if vocab == odf::metadata::DatasetVocabulary::default()
     );
 }
 
@@ -1112,7 +1110,7 @@ async fn test_data_writer_builder_scan_polling_source() {
 #[test_log::test(tokio::test)]
 async fn test_data_writer_builder_scan_push_source() {
     let harness = Harness::new(vec![MetadataFactory::add_push_source()
-        .read(odf::ReadStepNdJson {
+        .read(odf::metadata::ReadStepNdJson {
             schema: Some(vec![
                 "event_time".to_string(),
                 "city".to_string(),
@@ -1120,7 +1118,7 @@ async fn test_data_writer_builder_scan_push_source() {
             ]),
             ..Default::default()
         })
-        .merge(odf::MergeStrategyLedger {
+        .merge(odf::metadata::MergeStrategyLedger {
             primary_key: vec!["event_time".to_string(), "city".to_string()],
         })
         .build()
@@ -1128,7 +1126,7 @@ async fn test_data_writer_builder_scan_push_source() {
     .await;
 
     let metadata_state =
-        DataWriterMetadataState::build(harness.target.clone(), &BlockRef::Head, None)
+        DataWriterMetadataState::build(harness.target.clone(), &odf::BlockRef::Head, None)
             .await
             .unwrap();
 
@@ -1137,14 +1135,14 @@ async fn test_data_writer_builder_scan_push_source() {
         DataWriterMetadataState {
             schema: None,
             source_event: Some(_),
-            merge_strategy: odf::MergeStrategy::Ledger(_),
+            merge_strategy: odf::metadata::MergeStrategy::Ledger(_),
             vocab,
             prev_offset: None,
             prev_checkpoint: None,
             prev_watermark: None,
             prev_source_state: None,
             ..
-        } if vocab == odf::DatasetVocabulary::default()
+        } if vocab == odf::metadata::DatasetVocabulary::default()
     );
 }
 
@@ -1154,7 +1152,7 @@ async fn test_data_writer_builder_scan_push_source() {
 async fn test_data_writer_builder_scan_push_source_with_extra_events() {
     let harness = Harness::new(vec![
         MetadataFactory::add_push_source()
-            .read(odf::ReadStepNdJson {
+            .read(odf::metadata::ReadStepNdJson {
                 schema: Some(vec![
                     "event_time".to_string(),
                     "city".to_string(),
@@ -1162,12 +1160,12 @@ async fn test_data_writer_builder_scan_push_source_with_extra_events() {
                 ]),
                 ..Default::default()
             })
-            .merge(odf::MergeStrategyLedger {
+            .merge(odf::metadata::MergeStrategyLedger {
                 primary_key: vec!["event_time".to_string(), "city".to_string()],
             })
             .build()
             .into(),
-        odf::SetLicense {
+        odf::metadata::SetLicense {
             name: "Open Government Licence - Canada".into(),
             short_name: "OGL-Canada-2.0".into(),
             spdx_id: Some("OGL-Canada-2.0".into()),
@@ -1178,7 +1176,7 @@ async fn test_data_writer_builder_scan_push_source_with_extra_events() {
     .await;
 
     let metadata_state =
-        DataWriterMetadataState::build(harness.target.clone(), &BlockRef::Head, None)
+        DataWriterMetadataState::build(harness.target.clone(), &odf::BlockRef::Head, None)
             .await
             .unwrap();
 
@@ -1187,14 +1185,14 @@ async fn test_data_writer_builder_scan_push_source_with_extra_events() {
         DataWriterMetadataState {
             schema: None,
             source_event: Some(_),
-            merge_strategy: odf::MergeStrategy::Ledger(_),
+            merge_strategy: odf::metadata::MergeStrategy::Ledger(_),
             vocab,
             prev_offset: None,
             prev_checkpoint: None,
             prev_watermark: None,
             prev_source_state: None,
             ..
-        } if vocab == odf::DatasetVocabulary::default()
+        } if vocab == odf::metadata::DatasetVocabulary::default()
     );
 }
 
@@ -1223,15 +1221,15 @@ impl Harness {
             .add::<SystemTimeSourceDefault>()
             .add_value(CurrentAccountSubject::new_test())
             .add_value(TenancyConfig::SingleTenant)
-            .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
-            .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+            .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
+            .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
             .build();
 
-        let dataset_repo = catalog.get_one::<DatasetRepositoryLocalFs>().unwrap();
+        let storage_unit = catalog.get_one::<DatasetStorageUnitLocalFs>().unwrap();
 
-        let foo_created = dataset_repo
+        let foo_created = storage_unit
             .create_dataset(
-                &DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo")),
+                &odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo")),
                 MetadataFactory::metadata_block(
                     MetadataFactory::seed(odf::DatasetKind::Root).build(),
                 )
@@ -1246,7 +1244,7 @@ impl Harness {
                 .dataset
                 .commit_event(
                     event,
-                    CommitOpts {
+                    odf::dataset::CommitOpts {
                         system_time: Some(system_time),
                         ..Default::default()
                     },
@@ -1262,7 +1260,7 @@ impl Harness {
         let writer = DataWriterDataFusion::from_metadata_chain(
             ctx.clone(),
             foo_target.clone(),
-            &BlockRef::Head,
+            &odf::BlockRef::Head,
             None,
         )
         .await
@@ -1290,7 +1288,7 @@ impl Harness {
         self.writer = DataWriterDataFusion::from_metadata_chain(
             self.ctx.clone(),
             self.target.clone(),
-            &BlockRef::Head,
+            &odf::BlockRef::Head,
             None,
         )
         .await
@@ -1301,7 +1299,7 @@ impl Harness {
         &mut self,
         data: &str,
         schema: &str,
-        new_source_state: Option<odf::SourceState>,
+        new_source_state: Option<odf::metadata::SourceState>,
     ) -> Result<WriteDataResult, WriteDataError> {
         let df = if data.is_empty() {
             None
@@ -1311,7 +1309,7 @@ impl Harness {
 
             let df = ReaderCsv::new(
                 self.ctx.clone(),
-                odf::ReadStepCsv {
+                odf::metadata::ReadStepCsv {
                     header: Some(true),
                     schema: Some(schema.split(',').map(ToString::to_string).collect()),
                     ..Default::default()
@@ -1346,24 +1344,34 @@ impl Harness {
 
     async fn get_last_schema_block(
         &self,
-    ) -> (odf::Multihash, odf::MetadataBlockTyped<odf::SetDataSchema>) {
+    ) -> (
+        odf::Multihash,
+        odf::MetadataBlockTyped<odf::metadata::SetDataSchema>,
+    ) {
         use futures::StreamExt;
+        use odf::dataset::{MetadataChainExt, TryStreamExtExt};
+        use odf::metadata::AsTypedBlock;
 
         let (hash, block) = self
             .target
             .as_metadata_chain()
             .iter_blocks()
-            .filter_ok(|(_, b)| b.as_typed::<odf::SetDataSchema>().is_some())
+            .filter_ok(|(_, b)| b.as_typed::<odf::metadata::SetDataSchema>().is_some())
             .next()
             .await
             .unwrap()
             .unwrap();
 
-        (hash, block.into_typed::<odf::SetDataSchema>().unwrap())
+        (
+            hash,
+            block.into_typed::<odf::metadata::SetDataSchema>().unwrap(),
+        )
     }
 
-    async fn get_last_data_block(&self) -> odf::MetadataBlockTyped<odf::AddData> {
+    async fn get_last_data_block(&self) -> odf::MetadataBlockTyped<odf::metadata::AddData> {
         use futures::StreamExt;
+        use odf::dataset::MetadataChainExt;
+        use odf::metadata::AsTypedBlock;
 
         let (_, block) = self
             .target
@@ -1373,13 +1381,13 @@ impl Harness {
             .await
             .unwrap()
             .unwrap();
-        block.into_typed::<odf::AddData>().unwrap()
+        block.into_typed::<odf::metadata::AddData>().unwrap()
     }
 
     async fn get_last_data_file(&self) -> PathBuf {
         let block = self.get_last_data_block().await;
 
-        kamu_data_utils::data::local_url::into_local_path(
+        odf::utils::data::local_url::into_local_path(
             self.target
                 .as_data_repo()
                 .get_internal_url(&block.event.new_data.unwrap().physical_hash)

@@ -7,11 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu::testing::MetadataFactory;
 use kamu_cli_e2e_common::DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR;
 use kamu_cli_puppet::extensions::KamuCliPuppetExt;
 use kamu_cli_puppet::KamuCliPuppet;
-use opendatafabric as odf;
+use odf::metadata::testing::MetadataFactory;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -232,7 +231,7 @@ pub async fn test_add_with_circular_dependency(kamu: KamuCliPuppet) {
     // Manifest with lots of comments
     let snapshot = MetadataFactory::dataset_snapshot()
         .name("plain")
-        .kind(opendatafabric::DatasetKind::Derivative)
+        .kind(odf::DatasetKind::Derivative)
         .push_event(
             MetadataFactory::set_transform()
                 .inputs_from_refs(["plain"])

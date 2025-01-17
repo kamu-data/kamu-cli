@@ -33,7 +33,7 @@ kamu-flow-system = { workspace = true }
 kamu-task-system = { workspace = true }
 messaging-outbox = { workspace = true }
 observability = { workspace = true, default-features = false }
-opendatafabric = { workspace = true }
+odf = { workspace = true }
 time-source = { workspace = true }
 
 async-stream = "0.3"
@@ -47,6 +47,7 @@ tracing = { version = "0.1", default-features = false }
 
 [dev-dependencies]
 kamu = { workspace = true, features = ["testing"] }
+kamu-accounts = { workspace = true }
 kamu-accounts-inmem = { workspace = true }
 kamu-accounts-services = { workspace = true }
 kamu-datasets-inmem = { workspace = true }
@@ -54,6 +55,7 @@ kamu-datasets-services = { workspace = true }
 kamu-flow-system-inmem = { workspace = true }
 kamu-task-system-inmem = { workspace = true }
 kamu-task-system-services = { workspace = true }
+odf = { workspace = true, features = ["testing"] }
 
 cron = { version = "0.15", default-features = false }
 indoc = "2"

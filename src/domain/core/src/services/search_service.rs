@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::{BoxedError, InternalError};
-use opendatafabric::*;
 use thiserror::Error;
 
 use crate::*;
@@ -28,7 +27,7 @@ pub trait SearchService: Send + Sync {
 
 #[derive(Debug, Clone, Default)]
 pub struct SearchOptions {
-    pub repository_names: Vec<RepoName>,
+    pub repository_names: Vec<odf::RepoName>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -38,9 +37,9 @@ pub struct SearchResult {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SearchResultDataset {
-    pub id: Option<DatasetID>,
-    pub alias: DatasetAliasRemote,
-    pub kind: Option<DatasetKind>,
+    pub id: Option<odf::DatasetID>,
+    pub alias: odf::DatasetAliasRemote,
+    pub kind: Option<odf::DatasetKind>,
     pub num_blocks: Option<u64>,
     pub num_records: Option<u64>,
     pub estimated_size: Option<u64>,
@@ -68,13 +67,13 @@ pub enum SearchError {
     UnsupportedProtocol(
         #[from]
         #[backtrace]
-        UnsupportedProtocolError,
+        odf::dataset::UnsupportedProtocolError,
     ),
     #[error(transparent)]
     Access(
         #[from]
         #[backtrace]
-        AccessError,
+        odf::metadata::AccessError,
     ),
     #[error(transparent)]
     Internal(

@@ -7,11 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu::testing::MetadataFactory;
 use kamu_cli_e2e_common::{KamuApiServerClient, KamuApiServerClientExt};
-use opendatafabric::serde::yaml::YamlDatasetSnapshotSerializer;
-use opendatafabric::serde::DatasetSnapshotSerializer;
-use opendatafabric::DatasetKind;
+use odf::metadata::serde::yaml::YamlDatasetSnapshotSerializer;
+use odf::metadata::serde::DatasetSnapshotSerializer;
+use odf::metadata::testing::MetadataFactory;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_gql_query_mut_create_empty_returns_correct_alias_mt(
@@ -119,7 +119,7 @@ pub async fn test_gql_query_mut_create_from_snapshot_returns_correct_alias_mt(
 
     let snapshot = MetadataFactory::dataset_snapshot()
         .name("foo")
-        .kind(DatasetKind::Root)
+        .kind(odf::DatasetKind::Root)
         .push_event(MetadataFactory::set_polling_source().build())
         .build();
 
@@ -186,7 +186,7 @@ pub async fn test_gql_query_mut_create_from_snapshot_returns_correct_alias_st(
 
     let snapshot = MetadataFactory::dataset_snapshot()
         .name("foo")
-        .kind(DatasetKind::Root)
+        .kind(odf::DatasetKind::Root)
         .push_event(MetadataFactory::set_polling_source().build())
         .build();
 

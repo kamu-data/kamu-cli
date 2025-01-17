@@ -17,8 +17,7 @@ use internal_error::{InternalError, ResultIntoInternal};
 use kamu_core::ingest::*;
 use kamu_core::*;
 use kamu_ingest_datafusion::DataWriterDataFusion;
-use opendatafabric::serde::yaml::Manifest;
-use opendatafabric::*;
+use odf::metadata::serde::yaml::Manifest;
 use random_names::get_random_name;
 use time_source::SystemTimeSource;
 
@@ -72,7 +71,7 @@ impl PollingIngestServiceImpl {
         let mut data_writer =
             DataWriterDataFusion::from_metadata_state(ctx.clone(), target.clone(), *metadata_state);
 
-        let Some(MetadataEvent::SetPollingSource(polling_source)) =
+        let Some(odf::MetadataEvent::SetPollingSource(polling_source)) =
             data_writer.source_event().cloned()
         else {
             tracing::warn!("Dataset does not define a polling source - considering up-to-date",);
@@ -176,7 +175,7 @@ impl PollingIngestServiceImpl {
 
         let uncacheable = args.data_writer.prev_offset().is_some()
             && args.data_writer.prev_source_state().is_none()
-            && !matches!(args.polling_source.fetch, FetchStep::Mqtt(_));
+            && !matches!(args.polling_source.fetch, odf::metadata::FetchStep::Mqtt(_));
 
         if uncacheable && !args.options.fetch_uncacheable {
             tracing::info!("Skipping fetch of uncacheable source");
@@ -321,7 +320,7 @@ impl PollingIngestServiceImpl {
                     ?savepoint_path,
                     "Ignoring savepoint due to --fetch-uncacheable"
                 );
-            } else if let FetchStep::Mqtt(_) = fetch_step {
+            } else if let odf::metadata::FetchStep::Mqtt(_) = fetch_step {
             } else {
                 tracing::info!(?savepoint_path, "Resuming from savepoint");
                 args.listener.on_cache_hit(&savepoint.created_at);
@@ -384,10 +383,10 @@ impl PollingIngestServiceImpl {
     /// fetch step and the source state in flatbuffers representation.
     fn get_savepoint_path(
         &self,
-        fetch_step: &FetchStep,
+        fetch_step: &odf::metadata::FetchStep,
         source_state: Option<&PollingSourceState>,
     ) -> PathBuf {
-        use opendatafabric::serde::flatbuffers::{
+        use odf::metadata::serde::flatbuffers::{
             FlatbuffersEnumSerializable,
             FlatbuffersSerializable,
         };
@@ -403,7 +402,7 @@ impl PollingIngestServiceImpl {
             fb.finish(offset, None);
         }
 
-        let hash = Multihash::from_digest_sha3_256(fb.finished_data());
+        let hash = odf::Multihash::from_digest_sha3_256(fb.finished_data());
 
         self.cache_dir.join(format!("fetch-savepoint-{hash}"))
     }
@@ -601,13 +600,13 @@ pub(crate) struct PrepStepResult {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct IngestIterationArgs<'a> {
-    dataset_handle: DatasetHandle,
+    dataset_handle: odf::DatasetHandle,
     iteration: usize,
     operation_id: String,
     operation_dir: PathBuf,
     system_time: DateTime<Utc>,
     options: PollingIngestOptions,
-    polling_source: SetPollingSource,
+    polling_source: odf::metadata::SetPollingSource,
     listener: Arc<dyn PollingIngestListener>,
     ctx: SessionContext,
     data_writer: &'a mut DataWriterDataFusion,

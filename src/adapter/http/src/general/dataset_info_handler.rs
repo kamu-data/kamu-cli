@@ -13,8 +13,7 @@ use database_common_macros::transactional_handler;
 use dill::Catalog;
 use http_common::*;
 use kamu_accounts::AuthenticationService;
-use kamu_core::{DatasetRegistry, GetDatasetError};
-use opendatafabric::{AccountID, AccountName, DatasetHandle, DatasetID, DatasetName};
+use kamu_core::DatasetRegistry;
 
 use crate::axum_utils::ensure_authenticated_account;
 
@@ -23,27 +22,30 @@ use crate::axum_utils::ensure_authenticated_account;
 #[derive(Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct DatasetOwnerInfo {
-    pub account_name: AccountName,
+    pub account_name: odf::AccountName,
 
     // TODO: This should not be optional. Awaiting dataset repository refactoring.
     #[schema(value_type = String, required = false)]
-    pub account_id: Option<AccountID>,
+    pub account_id: Option<odf::AccountID>,
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct DatasetInfoResponse {
-    pub id: DatasetID,
+    pub id: odf::DatasetID,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     #[schema(value_type = DatasetOwnerInfo, required = false)]
     pub owner: Option<DatasetOwnerInfo>,
 
-    pub dataset_name: DatasetName,
+    pub dataset_name: odf::DatasetName,
 }
 
 impl DatasetInfoResponse {
-    fn into_response(dataset_handle: DatasetHandle, account_id_maybe: Option<AccountID>) -> Self {
+    fn into_response(
+        dataset_handle: odf::DatasetHandle,
+        account_id_maybe: Option<odf::AccountID>,
+    ) -> Self {
         Self {
             id: dataset_handle.id,
             owner: dataset_handle
@@ -80,7 +82,7 @@ impl DatasetInfoResponse {
 #[transactional_handler]
 pub async fn dataset_info_handler(
     Extension(catalog): Extension<Catalog>,
-    Path(dataset_id): Path<DatasetID>,
+    Path(dataset_id): Path<odf::DatasetID>,
 ) -> Result<Json<DatasetInfoResponse>, ApiError> {
     let response = get_dataset_by_id(&catalog, &dataset_id).await?;
     tracing::debug!(?response, "Get dataset by id info response");
@@ -89,7 +91,7 @@ pub async fn dataset_info_handler(
 
 async fn get_dataset_by_id(
     catalog: &Catalog,
-    dataset_id: &DatasetID,
+    dataset_id: &odf::DatasetID,
 ) -> Result<Json<DatasetInfoResponse>, ApiError> {
     // TODO: Private Datasets: Revision of access permission checks: add missing
     //       https://github.com/kamu-data/kamu-cli/issues/730
@@ -103,8 +105,8 @@ async fn get_dataset_by_id(
         .resolve_dataset_handle_by_ref(&dataset_id.clone().as_local_ref())
         .await
         .map_err(|err| match err {
-            GetDatasetError::NotFound(e) => ApiError::not_found(e),
-            GetDatasetError::Internal(e) => e.api_err(),
+            odf::dataset::GetDatasetError::NotFound(e) => ApiError::not_found(e),
+            odf::dataset::GetDatasetError::Internal(e) => e.api_err(),
         })?;
 
     // TODO: Private Datasets: Use the real owner_id, not the alias name

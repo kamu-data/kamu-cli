@@ -13,7 +13,6 @@ use datafusion::error::DataFusionError;
 use datafusion::prelude::SessionContext;
 use indoc::indoc;
 use kamu_ingest_datafusion::*;
-use opendatafabric::*;
 
 use super::test_reader_common;
 
@@ -25,7 +24,7 @@ async fn test_read_ndjson_with_schema() {
     test_reader_common::test_reader_success_textual(
         ReaderNdJson::new(
             SessionContext::new(),
-            ReadStepNdJson {
+            odf::metadata::ReadStepNdJson {
                 schema: Some(vec![
                     "city string not null".to_string(),
                     "population int not null".to_string(),
@@ -73,7 +72,7 @@ async fn test_read_ndjson_infer_schema() {
     test_reader_common::test_reader_success_textual(
         ReaderNdJson::new(
             SessionContext::new(),
-            ReadStepNdJson {
+            odf::metadata::ReadStepNdJson {
                 ..Default::default()
             },
         )
@@ -117,7 +116,7 @@ async fn test_read_ndjson_format_date() {
     test_reader_common::test_reader_success_textual(
         ReaderNdJson::new(
             SessionContext::new(),
-            ReadStepNdJson {
+            odf::metadata::ReadStepNdJson {
                 schema: Some(vec!["date date not null".to_string()]),
                 ..Default::default()
             },
@@ -163,7 +162,7 @@ async fn test_read_ndjson_format_timestamp() {
     test_reader_common::test_reader_success_textual(
         ReaderNdJson::new(
             SessionContext::new(),
-            ReadStepNdJson {
+            odf::metadata::ReadStepNdJson {
                 schema: Some(vec!["event_time timestamp not null".to_string()]),
                 ..Default::default()
             },
@@ -215,7 +214,7 @@ async fn test_read_ndjson_format_timestamp_parse_failed() {
     test_reader_common::test_reader_textual(
         ReaderNdJson::new(
             SessionContext::new(),
-            ReadStepNdJson {
+            odf::metadata::ReadStepNdJson {
                 schema: Some(vec!["event_time timestamp not null".to_string()]),
                 ..Default::default()
             },

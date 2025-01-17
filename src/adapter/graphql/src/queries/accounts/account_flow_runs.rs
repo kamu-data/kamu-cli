@@ -15,7 +15,6 @@ use kamu::utils::datasets_filtering::filter_datasets_by_local_pattern;
 use kamu_accounts::Account as AccountEntity;
 use kamu_core::DatasetRegistry;
 use kamu_flow_system as fs;
-use opendatafabric::DatasetRefPattern;
 
 use super::Account;
 use crate::prelude::*;
@@ -106,7 +105,7 @@ impl AccountFlowRuns {
             .await
             .int_err()?
             .matched_stream
-            .map_ok(|dataset_id| DatasetRefPattern::Ref(dataset_id.as_local_ref()))
+            .map_ok(|dataset_id| odf::DatasetRefPattern::Ref(dataset_id.as_local_ref()))
             .try_collect()
             .await?;
 

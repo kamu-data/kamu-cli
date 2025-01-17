@@ -12,8 +12,7 @@ use std::sync::Arc;
 use dill::*;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_core::*;
-use opendatafabric::serde::yaml::Manifest;
-use opendatafabric::*;
+use odf::metadata::serde::yaml::Manifest;
 use thiserror::Error;
 
 use crate::DatasetConfig;
@@ -29,7 +28,7 @@ pub struct RemoteAliasesRegistryImpl {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl RemoteAliasesRegistryImpl {
-    async fn read_config(dataset: &dyn Dataset) -> Result<DatasetConfig, InternalError> {
+    async fn read_config(dataset: &dyn odf::Dataset) -> Result<DatasetConfig, InternalError> {
         match dataset.as_info_repo().get("config").await {
             Ok(bytes) => {
                 let manifest: Manifest<DatasetConfig> =
@@ -37,14 +36,14 @@ impl RemoteAliasesRegistryImpl {
                 assert_eq!(manifest.kind, "DatasetConfig");
                 Ok(manifest.content)
             }
-            Err(GetNamedError::Internal(e)) => Err(e),
-            Err(GetNamedError::Access(e)) => Err(e.int_err()),
-            Err(GetNamedError::NotFound(_)) => Ok(DatasetConfig::default()),
+            Err(odf::storage::GetNamedError::Internal(e)) => Err(e),
+            Err(odf::storage::GetNamedError::Access(e)) => Err(e.int_err()),
+            Err(odf::storage::GetNamedError::NotFound(_)) => Ok(DatasetConfig::default()),
         }
     }
 
     async fn write_config(
-        dataset: &dyn Dataset,
+        dataset: &dyn odf::Dataset,
         config: &DatasetConfig,
     ) -> Result<(), InternalError> {
         let manifest = Manifest {
@@ -69,7 +68,7 @@ impl RemoteAliasesRegistry for RemoteAliasesRegistryImpl {
     #[tracing::instrument(level = "debug", skip_all, fields(?dataset_handle))]
     async fn get_remote_aliases(
         &self,
-        dataset_handle: &DatasetHandle,
+        dataset_handle: &odf::DatasetHandle,
     ) -> Result<Box<dyn RemoteAliases>, GetAliasesError> {
         let resolved_dataset = self.dataset_registry.get_dataset_by_handle(dataset_handle);
 
@@ -103,7 +102,7 @@ impl RemoteAliases for RemoteAliasesImpl {
     fn get_by_kind<'a>(
         &'a self,
         kind: RemoteAliasKind,
-    ) -> Box<dyn Iterator<Item = &'a DatasetRefRemote> + 'a> {
+    ) -> Box<dyn Iterator<Item = &'a odf::DatasetRefRemote> + 'a> {
         let aliases = match kind {
             RemoteAliasKind::Pull => &self.config.pull_aliases,
             RemoteAliasKind::Push => &self.config.push_aliases,
@@ -111,7 +110,7 @@ impl RemoteAliases for RemoteAliasesImpl {
         Box::new(aliases.iter())
     }
 
-    fn contains(&self, remote_ref: &DatasetRefRemote, kind: RemoteAliasKind) -> bool {
+    fn contains(&self, remote_ref: &odf::DatasetRefRemote, kind: RemoteAliasKind) -> bool {
         let aliases = match kind {
             RemoteAliasKind::Pull => &self.config.pull_aliases,
             RemoteAliasKind::Push => &self.config.push_aliases,
@@ -134,7 +133,7 @@ impl RemoteAliases for RemoteAliasesImpl {
 
     async fn add(
         &mut self,
-        remote_ref: &DatasetRefRemote,
+        remote_ref: &odf::DatasetRefRemote,
         kind: RemoteAliasKind,
     ) -> Result<bool, InternalError> {
         let aliases = match kind {
@@ -155,7 +154,7 @@ impl RemoteAliases for RemoteAliasesImpl {
 
     async fn delete(
         &mut self,
-        remote_ref: &DatasetRefRemote,
+        remote_ref: &odf::DatasetRefRemote,
         kind: RemoteAliasKind,
     ) -> Result<bool, InternalError> {
         let aliases = match kind {
@@ -198,7 +197,7 @@ pub struct RemoteAliasesRegistryNull;
 impl RemoteAliasesRegistry for RemoteAliasesRegistryNull {
     async fn get_remote_aliases(
         &self,
-        _dataset_handle: &DatasetHandle,
+        _dataset_handle: &odf::DatasetHandle,
     ) -> Result<Box<dyn RemoteAliases>, GetAliasesError> {
         #[derive(Error, Debug)]
         #[error("get_remote_aliases requested from stub implementation")]

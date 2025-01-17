@@ -9,31 +9,34 @@
 
 use std::assert_matches::assert_matches;
 
-use kamu::testing::MetadataFactory;
-use kamu::*;
 use kamu_core::utils::metadata_chain_comparator::*;
-use kamu_core::*;
-use opendatafabric::*;
+use odf::dataset::MetadataChainImpl;
+use odf::metadata::testing::MetadataFactory;
+use odf::storage::inmem::{NamedObjectRepositoryInMemory, ObjectRepositoryInMemory};
+use odf::storage::{MetadataBlockRepositoryImpl, ReferenceRepositoryImpl};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn init_chain() -> impl MetadataChain {
+fn init_chain() -> impl odf::MetadataChain {
     let meta_block_repo = MetadataBlockRepositoryImpl::new(ObjectRepositoryInMemory::new());
     let ref_repo = ReferenceRepositoryImpl::new(NamedObjectRepositoryInMemory::new());
 
     MetadataChainImpl::new(meta_block_repo, ref_repo)
 }
 
-async fn push_block(chain: &dyn MetadataChain, block: MetadataBlock) -> Multihash {
-    chain.append(block, AppendOpts::default()).await.unwrap()
+async fn push_block(chain: &dyn odf::MetadataChain, block: odf::MetadataBlock) -> odf::Multihash {
+    chain
+        .append(block, odf::dataset::AppendOpts::default())
+        .await
+        .unwrap()
 }
 
 async fn compare_chains(
-    lhs_chain: &dyn MetadataChain,
-    rhs_chain: &dyn MetadataChain,
+    lhs_chain: &dyn odf::MetadataChain,
+    rhs_chain: &dyn odf::MetadataChain,
 ) -> CompareChainsResult {
-    let lhs_head = lhs_chain.resolve_ref(&BlockRef::Head).await.unwrap();
-    let rhs_head = match rhs_chain.resolve_ref(&BlockRef::Head).await {
+    let lhs_head = lhs_chain.resolve_ref(&odf::BlockRef::Head).await.unwrap();
+    let rhs_head = match rhs_chain.resolve_ref(&odf::BlockRef::Head).await {
         Ok(h) => Some(h),
         Err(_) => None,
     };
@@ -57,7 +60,8 @@ async fn test_same_seed_only() {
     let rhs_chain = init_chain();
 
     let block_seed =
-        MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build()).build();
+        MetadataFactory::metadata_block(MetadataFactory::seed(odf::DatasetKind::Root).build())
+            .build();
     push_block(&lhs_chain, block_seed.clone()).await;
     push_block(&rhs_chain, block_seed).await;
 
@@ -75,9 +79,11 @@ async fn test_different_seeds() {
     let rhs_chain = init_chain();
 
     let lhs_block_seed =
-        MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build()).build();
+        MetadataFactory::metadata_block(MetadataFactory::seed(odf::DatasetKind::Root).build())
+            .build();
     let rhs_block_seed =
-        MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build()).build();
+        MetadataFactory::metadata_block(MetadataFactory::seed(odf::DatasetKind::Root).build())
+            .build();
     push_block(&lhs_chain, lhs_block_seed).await;
     push_block(&rhs_chain, rhs_block_seed).await;
 
@@ -96,7 +102,8 @@ async fn test_seed_only_in_first() {
     let rhs_chain = init_chain();
 
     let lhs_block_seed =
-        MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build()).build();
+        MetadataFactory::metadata_block(MetadataFactory::seed(odf::DatasetKind::Root).build())
+            .build();
     push_block(&lhs_chain, lhs_block_seed).await;
 
     assert_matches!(
@@ -114,7 +121,8 @@ async fn test_equal_multiple_blocks() {
     let rhs_chain = init_chain();
 
     let block_seed =
-        MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build()).build();
+        MetadataFactory::metadata_block(MetadataFactory::seed(odf::DatasetKind::Root).build())
+            .build();
     let seed_hash = push_block(&lhs_chain, block_seed.clone()).await;
     push_block(&rhs_chain, block_seed).await;
 
@@ -160,7 +168,8 @@ async fn test_one_ahead_another() {
     let rhs_chain = init_chain();
 
     let block_seed =
-        MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build()).build();
+        MetadataFactory::metadata_block(MetadataFactory::seed(odf::DatasetKind::Root).build())
+            .build();
 
     let seed_hash = push_block(&lhs_chain, block_seed.clone()).await;
     push_block(&rhs_chain, block_seed).await;
@@ -213,7 +222,8 @@ async fn test_equal_length_divergence() {
     let rhs_chain = init_chain();
 
     let block_seed =
-        MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build()).build();
+        MetadataFactory::metadata_block(MetadataFactory::seed(odf::DatasetKind::Root).build())
+            .build();
 
     let seed_hash = push_block(&lhs_chain, block_seed.clone()).await;
     push_block(&rhs_chain, block_seed).await;
@@ -266,7 +276,8 @@ async fn test_different_length_divergence() {
     let rhs_chain = init_chain();
 
     let block_seed =
-        MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build()).build();
+        MetadataFactory::metadata_block(MetadataFactory::seed(odf::DatasetKind::Root).build())
+            .build();
 
     let seed_hash = push_block(&lhs_chain, block_seed.clone()).await;
     push_block(&rhs_chain, block_seed).await;

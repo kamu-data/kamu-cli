@@ -15,13 +15,12 @@ use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::prelude::*;
 use kamu_ingest_datafusion::*;
-use opendatafabric as odf;
 
 use crate::utils::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-type Op = odf::OperationType;
+type Op = odf::metadata::OperationType;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -116,11 +115,11 @@ where
 {
     let ctx = SessionContext::new();
     let strat = MergeStrategyLedger::new(
-        odf::DatasetVocabulary {
+        odf::metadata::DatasetVocabulary {
             event_time_column: "year".to_string(),
             ..Default::default()
         },
-        odf::MergeStrategyLedger {
+        odf::metadata::MergeStrategyLedger {
             primary_key: vec!["year".to_string(), "city".to_string()],
         },
     );
@@ -242,8 +241,8 @@ async fn test_ledger_merge_respects_pk() {
     let prev = make_input(&ctx, [(2020, "vancouver", 1), (2020, "seattle", 2)]);
     let new = make_input(&ctx, [(2020, "kiev", 3)]);
     let actual = MergeStrategyLedger::new(
-        odf::DatasetVocabulary::default(),
-        odf::MergeStrategyLedger {
+        odf::metadata::DatasetVocabulary::default(),
+        odf::metadata::MergeStrategyLedger {
             primary_key: vec!["year".to_string()],
         },
     )
@@ -255,8 +254,8 @@ async fn test_ledger_merge_respects_pk() {
     let prev = make_input(&ctx, [(2020, "vancouver", 1), (2020, "seattle", 2)]);
     let new = make_input(&ctx, [(2020, "seattle", 3)]);
     let actual = MergeStrategyLedger::new(
-        odf::DatasetVocabulary::default(),
-        odf::MergeStrategyLedger {
+        odf::metadata::DatasetVocabulary::default(),
+        odf::metadata::MergeStrategyLedger {
             primary_key: vec!["year".to_string(), "city".to_string()],
         },
     )
@@ -268,8 +267,8 @@ async fn test_ledger_merge_respects_pk() {
     let prev = make_input(&ctx, [(2020, "vancouver", 1), (2020, "seattle", 2)]);
     let new = make_input(&ctx, [(2020, "seattle", 3)]);
     let actual = MergeStrategyLedger::new(
-        odf::DatasetVocabulary::default(),
-        odf::MergeStrategyLedger {
+        odf::metadata::DatasetVocabulary::default(),
+        odf::metadata::MergeStrategyLedger {
             primary_key: vec![
                 "year".to_string(),
                 "city".to_string(),
@@ -285,8 +284,8 @@ async fn test_ledger_merge_respects_pk() {
     let prev = make_input(&ctx, [(2020, "vancouver", 1), (2020, "seattle", 2)]);
     let new = make_input(&ctx, [(2021, "seattle", 3)]);
     let actual = MergeStrategyLedger::new(
-        odf::DatasetVocabulary::default(),
-        odf::MergeStrategyLedger {
+        odf::metadata::DatasetVocabulary::default(),
+        odf::metadata::MergeStrategyLedger {
             primary_key: vec!["year".to_string(), "city".to_string()],
         },
     )
@@ -303,8 +302,8 @@ async fn test_ledger_merge_respects_pk() {
 async fn test_ledger_merge_invalid_pk() {
     let ctx = SessionContext::new();
     let strat = MergeStrategyLedger::new(
-        odf::DatasetVocabulary::default(),
-        odf::MergeStrategyLedger {
+        odf::metadata::DatasetVocabulary::default(),
+        odf::metadata::MergeStrategyLedger {
             primary_key: vec!["year".to_string(), "city".to_string(), "foo".to_string()],
         },
     );

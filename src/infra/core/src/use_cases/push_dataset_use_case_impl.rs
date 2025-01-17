@@ -32,7 +32,6 @@ use kamu_core::{
     SyncRequest,
     SyncService,
 };
-use opendatafabric::{DatasetHandle, DatasetPushTarget};
 
 use crate::SyncRequestBuilder;
 
@@ -68,9 +67,9 @@ impl PushDatasetUseCaseImpl {
     #[tracing::instrument(level = "debug", name = "PushDatasetUseCase::authorizations", skip_all, fields(?dataset_handles, ?push_target))]
     async fn make_authorization_checks(
         &self,
-        dataset_handles: Vec<DatasetHandle>,
-        push_target: Option<&DatasetPushTarget>,
-    ) -> Result<(Vec<DatasetHandle>, Vec<PushResponse>), InternalError> {
+        dataset_handles: Vec<odf::DatasetHandle>,
+        push_target: Option<&odf::DatasetPushTarget>,
+    ) -> Result<(Vec<odf::DatasetHandle>, Vec<PushResponse>), InternalError> {
         let ClassifyByAllowanceResponse {
             authorized_handles,
             unauthorized_handles_with_errors,
@@ -104,7 +103,7 @@ impl PushDatasetUseCaseImpl {
         &self,
         plan: &[PushItem],
         sync_options: SyncOptions,
-        push_target: Option<&DatasetPushTarget>,
+        push_target: Option<&odf::DatasetPushTarget>,
     ) -> (Vec<SyncRequest>, Vec<PushResponse>) {
         let mut sync_requests = Vec::new();
         let mut errors = Vec::new();
@@ -140,7 +139,7 @@ impl PushDatasetUseCase for PushDatasetUseCaseImpl {
     )]
     async fn execute_multi(
         &self,
-        dataset_handles: Vec<DatasetHandle>,
+        dataset_handles: Vec<odf::DatasetHandle>,
         options: PushMultiOptions,
         sync_listener: Option<Arc<dyn SyncMultiListener>>,
     ) -> Result<Vec<PushResponse>, InternalError> {

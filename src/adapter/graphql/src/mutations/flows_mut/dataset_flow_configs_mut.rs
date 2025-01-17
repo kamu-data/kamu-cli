@@ -16,7 +16,6 @@ use kamu_flow_system::{
     IngestRule,
     SetFlowConfigurationError,
 };
-use opendatafabric as odf;
 
 use super::{
     ensure_expected_dataset_kind,

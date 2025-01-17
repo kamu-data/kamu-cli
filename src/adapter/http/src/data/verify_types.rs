@@ -10,7 +10,6 @@
 use std::borrow::Cow;
 
 use axum::response::Json;
-use opendatafabric as odf;
 
 use super::query_types as query;
 

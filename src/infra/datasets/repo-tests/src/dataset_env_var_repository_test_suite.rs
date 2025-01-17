@@ -23,7 +23,6 @@ use kamu_datasets::{
     UpsertDatasetEnvVarStatus,
     SAMPLE_DATASET_ENV_VAR_ENCRYPTION_KEY,
 };
-use opendatafabric::DatasetID;
 use secrecy::SecretString;
 use uuid::Uuid;
 
@@ -42,7 +41,10 @@ pub async fn test_missing_dataset_env_var_not_found(catalog: &Catalog) {
     );
 
     let dataset_env_var_result = dataset_env_var_repo
-        .get_dataset_env_var_by_key_and_dataset_id("foo", &DatasetID::new_seeded_ed25519(b"foo"))
+        .get_dataset_env_var_by_key_and_dataset_id(
+            "foo",
+            &odf::DatasetID::new_seeded_ed25519(b"foo"),
+        )
         .await;
     assert_matches!(
         dataset_env_var_result,
@@ -51,7 +53,7 @@ pub async fn test_missing_dataset_env_var_not_found(catalog: &Catalog) {
 
     let dataset_env_vars = dataset_env_var_repo
         .get_all_dataset_env_vars_by_dataset_id(
-            &DatasetID::new_seeded_ed25519(b"foo"),
+            &odf::DatasetID::new_seeded_ed25519(b"foo"),
             &PaginationOpts {
                 offset: 0,
                 limit: 5,

@@ -19,7 +19,6 @@ use kamu::domain::{
     VerificationRequest,
     VerifyDatasetUseCase,
 };
-use opendatafabric::{DatasetHandle, DatasetRefPattern};
 
 use crate::{
     BatchError,
@@ -35,7 +34,7 @@ pub struct CompactCommand {
     compact_dataset_use_case: Arc<dyn CompactDatasetUseCase>,
     verify_dataset_use_case: Arc<dyn VerifyDatasetUseCase>,
     dataset_registry: Arc<dyn DatasetRegistry>,
-    dataset_ref_patterns: Vec<DatasetRefPattern>,
+    dataset_ref_patterns: Vec<odf::DatasetRefPattern>,
     max_slice_size: u64,
     max_slice_records: u64,
     is_hard: bool,
@@ -49,7 +48,7 @@ impl CompactCommand {
         compact_dataset_use_case: Arc<dyn CompactDatasetUseCase>,
         verify_dataset_use_case: Arc<dyn VerifyDatasetUseCase>,
         dataset_registry: Arc<dyn DatasetRegistry>,
-        dataset_ref_patterns: Vec<DatasetRefPattern>,
+        dataset_ref_patterns: Vec<odf::DatasetRefPattern>,
         max_slice_size: u64,
         max_slice_records: u64,
         is_hard: bool,
@@ -70,7 +69,7 @@ impl CompactCommand {
         }
     }
 
-    async fn verify_dataset(&self, dataset_handle: &DatasetHandle) -> Result<(), CLIError> {
+    async fn verify_dataset(&self, dataset_handle: &odf::DatasetHandle) -> Result<(), CLIError> {
         let progress = VerificationMultiProgress::new();
         let listener = Arc::new(progress.clone());
         let draw_thread = std::thread::spawn(move || {
@@ -109,7 +108,7 @@ impl Command for CompactCommand {
             ));
         }
 
-        let dataset_handles: Vec<DatasetHandle> = {
+        let dataset_handles: Vec<odf::DatasetHandle> = {
             kamu::utils::datasets_filtering::filter_datasets_by_local_pattern(
                 self.dataset_registry.as_ref(),
                 self.dataset_ref_patterns.clone(),

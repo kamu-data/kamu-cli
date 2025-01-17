@@ -10,8 +10,6 @@
 use std::io::{Read, Write};
 
 use internal_error::*;
-use opendatafabric::serde::{MetadataBlockDeserializer, MetadataBlockSerializer};
-use opendatafabric::{self as odf};
 
 use super::{CLIError, Command};
 
@@ -63,6 +61,8 @@ impl Command for SystemDecodeCommand {
         } else {
             return Err(CLIError::usage_error("Specify URL, path, or --stdin"));
         };
+
+        use odf::serde::{MetadataBlockDeserializer, MetadataBlockSerializer};
 
         let de = odf::serde::flatbuffers::FlatbuffersMetadataBlockDeserializer;
         let block = de.read_manifest(&data).int_err()?;

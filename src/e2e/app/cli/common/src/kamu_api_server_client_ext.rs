@@ -23,10 +23,8 @@ use kamu_adapter_http::data::query_types::{QueryRequest, QueryResponse};
 use kamu_adapter_http::data::verify_types::{VerifyRequest, VerifyResponse};
 use kamu_adapter_http::general::{AccountResponse, DatasetInfoResponse, NodeInfoResponse};
 use kamu_adapter_http::{LoginRequestBody, PlatformFileUploadQuery, UploadContext};
-use kamu_core::{BlockRef, DatasetVisibility};
 use kamu_flow_system::{DatasetFlowType, FlowID};
 use lazy_static::lazy_static;
-use opendatafabric::{self as odf, DatasetAlias};
 use reqwest::{Method, StatusCode, Url};
 use thiserror::Error;
 use tokio_retry::strategy::FixedInterval;
@@ -444,14 +442,14 @@ impl DatasetApi<'_> {
     }
 
     pub async fn create_dataset(&self, dataset_snapshot_yaml: &str) -> CreateDatasetResponse {
-        self.create_dataset_with_visibility(dataset_snapshot_yaml, DatasetVisibility::Public)
+        self.create_dataset_with_visibility(dataset_snapshot_yaml, odf::DatasetVisibility::Public)
             .await
     }
 
     pub async fn create_dataset_with_visibility(
         &self,
         dataset_snapshot_yaml: &str,
-        visibility: DatasetVisibility,
+        visibility: odf::DatasetVisibility,
     ) -> CreateDatasetResponse {
         let dataset_visibility_value = if visibility.is_public() {
             "PUBLIC"
@@ -525,7 +523,7 @@ impl DatasetApi<'_> {
     pub async fn get_visibility(
         &self,
         dataset_id: &odf::DatasetID,
-    ) -> Result<DatasetVisibility, GetDatasetVisibilityError> {
+    ) -> Result<odf::DatasetVisibility, GetDatasetVisibilityError> {
         let response = self
             .client
             .graphql_api_call(
@@ -559,8 +557,8 @@ impl DatasetApi<'_> {
                     let typename = dataset["visibility"]["__typename"].as_str().unwrap();
 
                     match typename {
-                        "PublicDatasetVisibility" => Ok(DatasetVisibility::Public),
-                        "PrivateDatasetVisibility" => Ok(DatasetVisibility::Private),
+                        "PublicDatasetVisibility" => Ok(odf::DatasetVisibility::Public),
+                        "PrivateDatasetVisibility" => Ok(odf::DatasetVisibility::Private),
                         unexpected_typename => {
                             Err(format!("Unexpected typename: {unexpected_typename}")
                                 .int_err()
@@ -589,11 +587,11 @@ impl DatasetApi<'_> {
     pub async fn set_visibility(
         &self,
         dataset_id: &odf::DatasetID,
-        dataset_visibility: DatasetVisibility,
+        dataset_visibility: odf::DatasetVisibility,
     ) -> Result<(), SetDatasetVisibilityError> {
         let visibility = match dataset_visibility {
-            DatasetVisibility::Private => "private: {}",
-            DatasetVisibility::Public => "public: { anonymousAvailable: false }",
+            odf::DatasetVisibility::Private => "private: {}",
+            odf::DatasetVisibility::Public => "public: { anonymousAvailable: false }",
         };
         let response = self
             .client
@@ -740,19 +738,23 @@ impl DatasetApi<'_> {
                 let system_time_as_str = node["systemTime"].as_str().unwrap();
                 let sequence_number = node["sequenceNumber"].as_u64().unwrap();
                 let event = match node["event"]["__typename"].as_str().unwrap() {
-                    "AddData" => odf::MetadataEventTypeFlags::ADD_DATA,
-                    "ExecuteTransform" => odf::MetadataEventTypeFlags::EXECUTE_TRANSFORM,
-                    "Seed" => odf::MetadataEventTypeFlags::SEED,
-                    "SetPollingSource" => odf::MetadataEventTypeFlags::SET_POLLING_SOURCE,
-                    "SetTransform" => odf::MetadataEventTypeFlags::SET_TRANSFORM,
-                    "SetVocab" => odf::MetadataEventTypeFlags::SET_VOCAB,
-                    "SetAttachments" => odf::MetadataEventTypeFlags::SET_ATTACHMENTS,
-                    "SetInfo" => odf::MetadataEventTypeFlags::SET_INFO,
-                    "SetLicense" => odf::MetadataEventTypeFlags::SET_LICENSE,
-                    "SetDataSchema" => odf::MetadataEventTypeFlags::SET_DATA_SCHEMA,
-                    "AddPushSource" => odf::MetadataEventTypeFlags::ADD_PUSH_SOURCE,
-                    "DisablePushSource" => odf::MetadataEventTypeFlags::DISABLE_PUSH_SOURCE,
-                    "DisablePollingSource" => odf::MetadataEventTypeFlags::DISABLE_POLLING_SOURCE,
+                    "AddData" => odf::metadata::MetadataEventTypeFlags::ADD_DATA,
+                    "ExecuteTransform" => odf::metadata::MetadataEventTypeFlags::EXECUTE_TRANSFORM,
+                    "Seed" => odf::metadata::MetadataEventTypeFlags::SEED,
+                    "SetPollingSource" => odf::metadata::MetadataEventTypeFlags::SET_POLLING_SOURCE,
+                    "SetTransform" => odf::metadata::MetadataEventTypeFlags::SET_TRANSFORM,
+                    "SetVocab" => odf::metadata::MetadataEventTypeFlags::SET_VOCAB,
+                    "SetAttachments" => odf::metadata::MetadataEventTypeFlags::SET_ATTACHMENTS,
+                    "SetInfo" => odf::metadata::MetadataEventTypeFlags::SET_INFO,
+                    "SetLicense" => odf::metadata::MetadataEventTypeFlags::SET_LICENSE,
+                    "SetDataSchema" => odf::metadata::MetadataEventTypeFlags::SET_DATA_SCHEMA,
+                    "AddPushSource" => odf::metadata::MetadataEventTypeFlags::ADD_PUSH_SOURCE,
+                    "DisablePushSource" => {
+                        odf::metadata::MetadataEventTypeFlags::DISABLE_PUSH_SOURCE
+                    }
+                    "DisablePollingSource" => {
+                        odf::metadata::MetadataEventTypeFlags::DISABLE_POLLING_SOURCE
+                    }
                     unexpected_event => panic!("Unexpected event type: {unexpected_event}"),
                 };
 
@@ -775,7 +777,7 @@ impl DatasetApi<'_> {
 
 pub struct CreateDatasetResponse {
     pub dataset_id: odf::DatasetID,
-    pub dataset_alias: DatasetAlias,
+    pub dataset_alias: odf::DatasetAlias,
 }
 
 #[derive(Error, Debug)]
@@ -812,7 +814,7 @@ pub struct DatasetBlock {
     pub prev_block_hash: Option<odf::Multihash>,
     pub system_time: DateTime<Utc>,
     pub sequence_number: u64,
-    pub event: odf::MetadataEventTypeFlags,
+    pub event: odf::metadata::MetadataEventTypeFlags,
 }
 
 #[derive(Debug)]
@@ -973,7 +975,7 @@ impl OdfTransferApi<'_> {
     pub async fn metadata_block_hash_by_ref(
         &self,
         dataset_alias: &odf::DatasetAlias,
-        block_ref: BlockRef,
+        block_ref: odf::BlockRef,
     ) -> Result<odf::Multihash, MetadataBlockHashByRefError> {
         let response = self
             .client

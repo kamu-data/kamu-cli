@@ -15,7 +15,6 @@ use futures::TryStreamExt;
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_core::*;
 use kamu_datasets::DatasetEnvVar;
-use opendatafabric::*;
 
 use super::*;
 use crate::PollingSourceState;
@@ -38,7 +37,7 @@ impl FetchService {
     // TODO: Account for re-orgs
     pub(crate) async fn fetch_ethereum_logs(
         &self,
-        fetch: &FetchStepEthereumLogs,
+        fetch: &odf::metadata::FetchStepEthereumLogs,
         prev_source_state: Option<&PollingSourceState>,
         target_path: &Path,
         dataset_env_vars: &HashMap<String, DatasetEnvVar>,

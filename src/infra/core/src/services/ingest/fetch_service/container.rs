@@ -17,7 +17,6 @@ use internal_error::*;
 use kamu_core::engine::ProcessError;
 use kamu_core::*;
 use kamu_datasets::DatasetEnvVar;
-use opendatafabric::*;
 
 use super::*;
 use crate::PollingSourceState;
@@ -31,7 +30,7 @@ impl FetchService {
     pub(super) async fn fetch_container(
         &self,
         operation_id: &str,
-        fetch: &FetchStepContainer,
+        fetch: &odf::metadata::FetchStepContainer,
         prev_source_state: Option<&PollingSourceState>,
         target_path: &Path,
         dataset_env_vars: &HashMap<String, DatasetEnvVar>,
@@ -99,7 +98,7 @@ impl FetchService {
         let mut batch_size = self.source_config.target_records_per_slice;
 
         if let Some(env_vars) = &fetch.env {
-            for EnvVar { name, value } in env_vars {
+            for odf::metadata::EnvVar { name, value } in env_vars {
                 let value = if let Some(value) = value {
                     self.template_string(value, dataset_env_vars)?
                 } else {

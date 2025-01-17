@@ -8,10 +8,8 @@
 // by the Apache License, Version 2.0.
 
 use chrono::Utc;
-use kamu::testing::MetadataFactory;
-use kamu_accounts::DUMMY_ACCESS_TOKEN;
 use kamu_core::TenancyConfig;
-use opendatafabric::{DatasetAlias, DatasetID, DatasetKind, DatasetName};
+use odf::metadata::testing::MetadataFactory;
 use serde_json::json;
 
 use crate::harness::*;
@@ -22,13 +20,13 @@ use crate::harness::*;
 async fn test_get_dataset_info_by_id() {
     let harness = DatasetInfoHarness::new(TenancyConfig::SingleTenant).await;
 
-    let dataset_alias = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
+    let dataset_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let create_result = harness
         .server_harness
         .cli_create_dataset_use_case()
         .execute(
             &dataset_alias,
-            MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build())
+            MetadataFactory::metadata_block(MetadataFactory::seed(odf::DatasetKind::Root).build())
                 .system_time(Utc::now())
                 .build_typed(),
             Default::default(),
@@ -44,7 +42,10 @@ async fn test_get_dataset_info_by_id() {
                 "{}datasets/{}",
                 harness.root_url, create_result.dataset_handle.id
             ))
-            .header("Authorization", format!("Bearer {DUMMY_ACCESS_TOKEN}"))
+            .header(
+                "Authorization",
+                format!("Bearer {}", odf::dataset::DUMMY_ODF_ACCESS_TOKEN),
+            )
             .send()
             .await
             .unwrap()
@@ -71,11 +72,14 @@ async fn test_get_dataset_info_by_id_not_found_err() {
 
     let client = async move {
         let cl = reqwest::Client::new();
-        let dataset_id = DatasetID::new_seeded_ed25519(b"foo");
+        let dataset_id = odf::DatasetID::new_seeded_ed25519(b"foo");
 
         let res = cl
             .get(format!("{}datasets/{dataset_id}", harness.root_url))
-            .header("Authorization", format!("Bearer {DUMMY_ACCESS_TOKEN}"))
+            .header(
+                "Authorization",
+                format!("Bearer {}", odf::dataset::DUMMY_ODF_ACCESS_TOKEN),
+            )
             .send()
             .await
             .unwrap();

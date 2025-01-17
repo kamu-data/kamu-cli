@@ -9,7 +9,6 @@
 
 use chrono::{DateTime, TimeZone, Utc};
 use lazy_static::lazy_static;
-use opendatafabric::{AccountID, AccountName};
 use serde::{Deserialize, Serialize};
 
 use crate::AccountConfig;
@@ -22,10 +21,10 @@ pub type AccountDisplayName = String;
 pub const DEFAULT_ACCOUNT_NAME_STR: &str = "kamu";
 
 lazy_static! {
-    pub static ref DEFAULT_ACCOUNT_NAME: AccountName =
-        AccountName::new_unchecked(DEFAULT_ACCOUNT_NAME_STR);
-    pub static ref DEFAULT_ACCOUNT_ID: AccountID =
-        AccountID::new_seeded_ed25519(DEFAULT_ACCOUNT_NAME_STR.as_bytes());
+    pub static ref DEFAULT_ACCOUNT_NAME: odf::AccountName =
+        odf::AccountName::new_unchecked(DEFAULT_ACCOUNT_NAME_STR);
+    pub static ref DEFAULT_ACCOUNT_ID: odf::AccountID =
+        odf::AccountID::new_seeded_ed25519(DEFAULT_ACCOUNT_NAME_STR.as_bytes());
     static ref DUMMY_REGISTRATION_TIME: DateTime<Utc> =
         Utc.with_ymd_and_hms(2024, 4, 1, 12, 0, 0).unwrap();
 }
@@ -34,8 +33,8 @@ lazy_static! {
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Account {
-    pub id: AccountID,
-    pub account_name: AccountName,
+    pub id: odf::AccountID,
+    pub account_name: odf::AccountName,
     pub email: Option<String>,
     pub display_name: AccountDisplayName,
     pub account_type: AccountType,
@@ -92,10 +91,10 @@ impl Account {
         Self::test(DEFAULT_ACCOUNT_ID.clone(), DEFAULT_ACCOUNT_NAME_STR)
     }
 
-    pub fn test(id: AccountID, name: &str) -> Self {
+    pub fn test(id: odf::AccountID, name: &str) -> Self {
         Self {
             id,
-            account_name: AccountName::new_unchecked(name),
+            account_name: odf::AccountName::new_unchecked(name),
             account_type: AccountType::User,
             display_name: name.to_string(),
             avatar_url: None,
@@ -114,7 +113,7 @@ impl Account {
 #[reusable::reusable(account_row_model)]
 #[derive(Debug, Clone, sqlx::FromRow, PartialEq, Eq)]
 pub struct AccountRowModel {
-    pub id: AccountID,
+    pub id: odf::AccountID,
     pub account_name: String,
     pub email: Option<String>,
     pub display_name: String,
@@ -138,7 +137,7 @@ impl From<AccountRowModel> for Account {
     fn from(value: AccountRowModel) -> Self {
         Account {
             id: value.id,
-            account_name: AccountName::new_unchecked(&value.account_name),
+            account_name: odf::AccountName::new_unchecked(&value.account_name),
             email: value.email,
             display_name: value.display_name,
             account_type: value.account_type,
@@ -156,7 +155,7 @@ impl From<AccountWithTokenRowModel> for Account {
     fn from(value: AccountWithTokenRowModel) -> Self {
         Account {
             id: value.id,
-            account_name: AccountName::new_unchecked(&value.account_name),
+            account_name: odf::AccountName::new_unchecked(&value.account_name),
             email: value.email,
             display_name: value.display_name,
             account_type: value.account_type,

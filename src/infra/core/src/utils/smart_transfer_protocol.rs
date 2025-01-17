@@ -9,8 +9,7 @@
 
 use std::sync::Arc;
 
-use kamu_core::{Dataset, DatasetVisibility, SyncError, SyncListener, SyncResult};
-use opendatafabric as odf;
+use kamu_core::{SyncError, SyncListener, SyncResult};
 use url::Url;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -19,7 +18,7 @@ use url::Url;
 pub struct TransferOptions {
     pub max_parallel_transfers: usize,
     pub force_update_if_diverged: bool,
-    pub visibility_for_created_dataset: DatasetVisibility,
+    pub visibility_for_created_dataset: odf::DatasetVisibility,
 }
 
 impl Default for TransferOptions {
@@ -34,7 +33,7 @@ impl Default for TransferOptions {
         Self {
             max_parallel_transfers,
             force_update_if_diverged: false,
-            visibility_for_created_dataset: DatasetVisibility::Private,
+            visibility_for_created_dataset: odf::DatasetVisibility::Private,
         }
     }
 }
@@ -46,7 +45,7 @@ pub trait SmartTransferProtocolClient: Sync + Send {
     async fn pull_protocol_client_flow(
         &self,
         http_src_url: &Url,
-        dst: Option<Arc<dyn Dataset>>,
+        dst: Option<Arc<dyn odf::Dataset>>,
         dst_alias: Option<&odf::DatasetAlias>,
         listener: Arc<dyn SyncListener>,
         transfer_options: TransferOptions,
@@ -54,7 +53,7 @@ pub trait SmartTransferProtocolClient: Sync + Send {
 
     async fn push_protocol_client_flow(
         &self,
-        src: Arc<dyn Dataset>,
+        src: Arc<dyn odf::Dataset>,
         http_dst_url: &Url,
         dst_head: Option<&odf::Multihash>,
         listener: Arc<dyn SyncListener>,

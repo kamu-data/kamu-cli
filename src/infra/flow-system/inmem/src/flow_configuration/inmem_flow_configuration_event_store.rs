@@ -10,7 +10,6 @@
 use database_common::PaginationOpts;
 use dill::*;
 use kamu_flow_system::*;
-use opendatafabric::DatasetID;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -23,7 +22,7 @@ pub struct InMemoryFlowConfigurationEventStore {
 #[derive(Default)]
 struct State {
     events: Vec<FlowConfigurationEvent>,
-    dataset_ids: Vec<DatasetID>,
+    dataset_ids: Vec<odf::DatasetID>,
 }
 
 impl EventStoreState<FlowConfigurationState> for State {
@@ -102,7 +101,7 @@ impl FlowConfigurationEventStore for InMemoryFlowConfigurationEventStore {
     async fn list_dataset_ids(
         &self,
         pagination: &PaginationOpts,
-    ) -> Result<Vec<DatasetID>, InternalError> {
+    ) -> Result<Vec<odf::DatasetID>, InternalError> {
         Ok(self
             .inner
             .as_state()

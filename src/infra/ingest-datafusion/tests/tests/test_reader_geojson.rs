@@ -10,7 +10,6 @@
 use datafusion::prelude::SessionContext;
 use indoc::indoc;
 use kamu_ingest_datafusion::*;
-use opendatafabric::*;
 
 use super::test_reader_common;
 
@@ -24,7 +23,7 @@ async fn test_read_geojson_with_schema() {
     test_reader_common::test_reader_success_textual(
         ReaderGeoJson::new(
             SessionContext::new(),
-            ReadStepGeoJson {
+            odf::metadata::ReadStepGeoJson {
                 schema: Some(vec![
                     "id int not null".to_string(),
                     "zipcode string not null".to_string(),
@@ -78,7 +77,7 @@ async fn test_read_geojson_infer_schema() {
     test_reader_common::test_reader_success_textual(
         ReaderGeoJson::new(
             SessionContext::new(),
-            ReadStepGeoJson {
+            odf::metadata::ReadStepGeoJson {
                 schema: None,
             },
             temp_dir.path().join("reader-tmp"),

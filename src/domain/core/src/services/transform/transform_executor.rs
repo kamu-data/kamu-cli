@@ -15,7 +15,6 @@ use thiserror::Error;
 use super::TransformPlan;
 use crate::engine::EngineError;
 use crate::{
-    CommitError,
     DataNotReproducible,
     EngineProvisioningError,
     ResolvedDataset,
@@ -67,7 +66,7 @@ pub enum TransformExecuteError {
     CommitError(
         #[from]
         #[backtrace]
-        CommitError,
+        odf::dataset::CommitError,
     ),
     #[error(transparent)]
     Internal(

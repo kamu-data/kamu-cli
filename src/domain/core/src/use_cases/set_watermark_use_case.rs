@@ -9,16 +9,10 @@
 
 use chrono::{DateTime, Utc};
 use internal_error::InternalError;
-use opendatafabric::DatasetHandle;
 use thiserror::Error;
 
 use crate::auth::DatasetActionUnauthorizedError;
-use crate::{
-    AccessError,
-    SetWatermarkExecutionError,
-    SetWatermarkPlanningError,
-    SetWatermarkResult,
-};
+use crate::{SetWatermarkExecutionError, SetWatermarkPlanningError, SetWatermarkResult};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -26,7 +20,7 @@ use crate::{
 pub trait SetWatermarkUseCase: Send + Sync {
     async fn execute(
         &self,
-        dataset_handle: &DatasetHandle,
+        dataset_handle: &odf::DatasetHandle,
         new_watermark: DateTime<Utc>,
     ) -> Result<SetWatermarkResult, SetWatermarkError>;
 }
@@ -45,7 +39,7 @@ pub enum SetWatermarkError {
     Access(
         #[from]
         #[backtrace]
-        AccessError,
+        odf::AccessError,
     ),
 
     #[error(transparent)]

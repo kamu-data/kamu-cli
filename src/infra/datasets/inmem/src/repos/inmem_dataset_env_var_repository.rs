@@ -14,7 +14,6 @@ use std::sync::{Arc, Mutex};
 use database_common::PaginationOpts;
 use dill::*;
 use internal_error::InternalError;
-use opendatafabric::DatasetID;
 use uuid::Uuid;
 
 use crate::domain::*;
@@ -29,7 +28,7 @@ pub struct InMemoryDatasetEnvVarRepository {
 
 #[derive(Default)]
 struct State {
-    dataset_env_var_ids_by_dataset_id: HashMap<DatasetID, Vec<Uuid>>,
+    dataset_env_var_ids_by_dataset_id: HashMap<odf::DatasetID, Vec<Uuid>>,
     dataset_env_var_ids_by_keys: HashMap<String, Uuid>,
     dataset_env_vars_by_ids: HashMap<Uuid, DatasetEnvVar>,
 }
@@ -128,7 +127,7 @@ impl DatasetEnvVarRepository for InMemoryDatasetEnvVarRepository {
 
     async fn get_all_dataset_env_vars_by_dataset_id(
         &self,
-        dataset_id: &DatasetID,
+        dataset_id: &odf::DatasetID,
         pagination: &PaginationOpts,
     ) -> Result<Vec<DatasetEnvVar>, GetDatasetEnvVarError> {
         let guard = self.state.lock().unwrap();
@@ -152,7 +151,7 @@ impl DatasetEnvVarRepository for InMemoryDatasetEnvVarRepository {
 
     async fn get_all_dataset_env_vars_count_by_dataset_id(
         &self,
-        dataset_id: &DatasetID,
+        dataset_id: &odf::DatasetID,
     ) -> Result<usize, GetDatasetEnvVarError> {
         let guard = self.state.lock().unwrap();
 
@@ -182,7 +181,7 @@ impl DatasetEnvVarRepository for InMemoryDatasetEnvVarRepository {
     async fn get_dataset_env_var_by_key_and_dataset_id(
         &self,
         dataset_env_var_key: &str,
-        dataset_id: &DatasetID,
+        dataset_id: &odf::DatasetID,
     ) -> Result<DatasetEnvVar, GetDatasetEnvVarError> {
         let guard = self.state.lock().unwrap();
         if let Some(existing_dataset_env_var_key_id) =
@@ -238,7 +237,10 @@ impl DatasetEnvVarRepository for InMemoryDatasetEnvVarRepository {
 
 #[async_trait::async_trait]
 impl DatasetEntryRemovalListener for InMemoryDatasetEnvVarRepository {
-    async fn on_dataset_entry_removed(&self, dataset_id: &DatasetID) -> Result<(), InternalError> {
+    async fn on_dataset_entry_removed(
+        &self,
+        dataset_id: &odf::DatasetID,
+    ) -> Result<(), InternalError> {
         let mut guard = self.state.lock().unwrap();
 
         if let Some(env_var_ids) = guard.dataset_env_var_ids_by_dataset_id.remove(dataset_id) {

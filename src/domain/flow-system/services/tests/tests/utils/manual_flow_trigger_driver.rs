@@ -14,7 +14,6 @@ use database_common_macros::transactional_method1;
 use dill::Catalog;
 use kamu_accounts::DEFAULT_ACCOUNT_ID;
 use kamu_flow_system::{FlowConfigurationRule, FlowKey, FlowQueryService, RequestFlowError};
-use opendatafabric::AccountID;
 use time_source::SystemTimeSource;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -28,7 +27,7 @@ pub(crate) struct ManualFlowTriggerDriver {
 pub(crate) struct ManualFlowTriggerArgs {
     pub(crate) flow_key: FlowKey,
     pub(crate) run_since_start: Duration,
-    pub(crate) initiator_id: Option<AccountID>,
+    pub(crate) initiator_id: Option<odf::AccountID>,
     pub(crate) flow_configuration_snapshot_maybe: Option<FlowConfigurationRule>,
 }
 

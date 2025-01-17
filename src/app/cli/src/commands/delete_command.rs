@@ -13,7 +13,6 @@ use futures::{StreamExt, TryStreamExt};
 use internal_error::ResultIntoInternal;
 use kamu::domain::*;
 use kamu::utils::datasets_filtering::filter_datasets_by_local_pattern;
-use opendatafabric::*;
 
 use super::{CLIError, Command};
 use crate::ConfirmDeleteService;
@@ -23,7 +22,7 @@ use crate::ConfirmDeleteService;
 pub struct DeleteCommand {
     dataset_registry: Arc<dyn DatasetRegistry>,
     delete_dataset: Arc<dyn DeleteDatasetUseCase>,
-    dataset_ref_patterns: Vec<DatasetRefPattern>,
+    dataset_ref_patterns: Vec<odf::DatasetRefPattern>,
     dependency_graph_service: Arc<dyn DependencyGraphService>,
     confirm_delete_service: Arc<ConfirmDeleteService>,
     all: bool,
@@ -41,7 +40,7 @@ impl DeleteCommand {
         recursive: bool,
     ) -> Self
     where
-        I: IntoIterator<Item = DatasetRefPattern>,
+        I: IntoIterator<Item = odf::DatasetRefPattern>,
     {
         Self {
             dataset_registry,
@@ -69,7 +68,7 @@ impl Command for DeleteCommand {
     }
 
     async fn run(&mut self) -> Result<(), CLIError> {
-        let dataset_handles: Vec<DatasetHandle> = if self.all {
+        let dataset_handles: Vec<odf::DatasetHandle> = if self.all {
             self.dataset_registry
                 .all_dataset_handles()
                 .try_collect()
@@ -83,7 +82,7 @@ impl Command for DeleteCommand {
             .await?
         };
 
-        let dataset_handles: Vec<DatasetHandle> = if !self.recursive {
+        let dataset_handles: Vec<odf::DatasetHandle> = if !self.recursive {
             dataset_handles
         } else {
             self.dependency_graph_service
@@ -92,7 +91,7 @@ impl Command for DeleteCommand {
                 )
                 .await
                 .int_err()?
-                .map(DatasetID::into_local_ref)
+                .map(odf::DatasetID::into_local_ref)
                 .then(|hdl| {
                     let registry = self.dataset_registry.clone();
                     async move { registry.resolve_dataset_handle_by_ref(&hdl).await }
@@ -134,8 +133,10 @@ impl Command for DeleteCommand {
                 .await
             {
                 Ok(_) => Ok(()),
-                Err(DeleteDatasetError::DanglingReference(e)) => Err(CLIError::failure(e)),
-                Err(DeleteDatasetError::Access(e)) => Err(CLIError::failure(e)),
+                Err(odf::dataset::DeleteDatasetError::DanglingReference(e)) => {
+                    Err(CLIError::failure(e))
+                }
+                Err(odf::dataset::DeleteDatasetError::Access(e)) => Err(CLIError::failure(e)),
                 Err(e) => Err(CLIError::critical(e)),
             }?;
         }

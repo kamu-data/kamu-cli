@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::{ErrorIntoInternal, InternalError};
-use opendatafabric as odf;
 use thiserror::Error;
 
 use crate::{DatasetEntry, DatasetEntryStream, GetDatasetEntryError};

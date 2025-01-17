@@ -13,7 +13,6 @@ use std::sync::Arc;
 use dill::{component, interface};
 use internal_error::ResultIntoInternal;
 use kamu_core::*;
-use opendatafabric as odf;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -48,7 +47,7 @@ impl CompactionPlannerImpl {
         let mut maybe_seed: Option<odf::Multihash> = None;
 
         let mut current_hash: Option<odf::Multihash> = None;
-        let mut vocab_event: Option<odf::SetVocab> = None;
+        let mut vocab_event: Option<odf::metadata::SetVocab> = None;
         let mut data_slice_batch_info = CompactionDataSliceBatchInfo::default();
         let mut data_slice_batches: Vec<CompactionDataSliceBatch> = vec![];
         let (mut batch_size, mut batch_records) = (0u64, 0u64);
@@ -56,7 +55,7 @@ impl CompactionPlannerImpl {
         ////////////////////////////////////////////////////////////////////////////////
 
         let chain = target.as_metadata_chain();
-        let head = chain.resolve_ref(&BlockRef::Head).await?;
+        let head = chain.resolve_ref(&odf::BlockRef::Head).await?;
 
         let object_data_repo = target.as_data_repo();
 
@@ -155,7 +154,7 @@ impl CompactionPlannerImpl {
             }
         }
 
-        let vocab: odf::DatasetVocabulary = vocab_event.unwrap_or_default().into();
+        let vocab: odf::metadata::DatasetVocabulary = vocab_event.unwrap_or_default().into();
 
         Ok(CompactionPlan {
             data_slice_batches,
@@ -201,7 +200,7 @@ impl CompactionPlanner for CompactionPlannerImpl {
         maybe_listener: Option<Arc<dyn CompactionListener>>,
     ) -> Result<CompactionPlan, CompactionPlanningError> {
         let dataset_kind = target
-            .get_summary(GetSummaryOpts::default())
+            .get_summary(odf::dataset::GetSummaryOpts::default())
             .await
             .int_err()?
             .kind;

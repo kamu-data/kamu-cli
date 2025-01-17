@@ -16,7 +16,7 @@ use container_runtime::*;
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_core::*;
 use kamu_datasets::{DatasetEnvVar, DatasetKeyValueService};
-use opendatafabric::*;
+use odf::metadata::FetchStep;
 use url::Url;
 
 use super::*;
@@ -71,7 +71,7 @@ impl FetchService {
 
     pub async fn fetch(
         &self,
-        dataset_handle: &DatasetHandle,
+        dataset_handle: &odf::DatasetHandle,
         operation_id: &str,
         fetch_step: &FetchStep,
         prev_source_state: Option<&PollingSourceState>,
@@ -186,13 +186,13 @@ impl FetchService {
 
     pub(super) fn template_headers(
         &self,
-        headers_tpl: Option<&Vec<RequestHeader>>,
+        headers_tpl: Option<&Vec<odf::metadata::RequestHeader>>,
         dataset_env_vars: &HashMap<String, DatasetEnvVar>,
-    ) -> Result<Vec<RequestHeader>, PollingIngestError> {
+    ) -> Result<Vec<odf::metadata::RequestHeader>, PollingIngestError> {
         let mut res = Vec::new();
         let empty = Vec::new();
         for htpl in headers_tpl.unwrap_or(&empty) {
-            let hdr = RequestHeader {
+            let hdr = odf::metadata::RequestHeader {
                 name: htpl.name.clone(),
                 value: self.template_string(&htpl.value, dataset_env_vars)?,
             };

@@ -16,9 +16,7 @@ use flate2::Compression;
 use futures::TryStreamExt;
 use headers::Header as _;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
-use kamu::deserialize_metadata_block;
 use kamu_core::*;
-use opendatafabric::{MetadataBlock, MetadataEvent, Multihash};
 use tar::Header;
 use thiserror::Error;
 use url::Url;
@@ -40,7 +38,7 @@ pub enum PrepareDatasetTransferEstimateError {
     InvalidInterval(
         #[from]
         #[backtrace]
-        InvalidIntervalError,
+        odf::dataset::InvalidIntervalError,
     ),
     #[error(transparent)]
     Internal(
@@ -50,19 +48,19 @@ pub enum PrepareDatasetTransferEstimateError {
     ),
 }
 
-impl From<IterBlocksError> for PrepareDatasetTransferEstimateError {
-    fn from(v: IterBlocksError) -> Self {
+impl From<odf::dataset::IterBlocksError> for PrepareDatasetTransferEstimateError {
+    fn from(v: odf::dataset::IterBlocksError) -> Self {
         match v {
-            IterBlocksError::InvalidInterval(e) => Self::InvalidInterval(e),
+            odf::dataset::IterBlocksError::InvalidInterval(e) => Self::InvalidInterval(e),
             _ => Self::Internal(v.int_err()),
         }
     }
 }
 
 pub async fn prepare_dataset_transfer_plan(
-    metadata_chain: &dyn MetadataChain,
-    stop_at: &Multihash,
-    begin_after: Option<&Multihash>,
+    metadata_chain: &dyn odf::MetadataChain,
+    stop_at: &odf::Multihash,
+    begin_after: Option<&odf::Multihash>,
     ignore_missing_tail: bool,
 ) -> Result<TransferPlan, PrepareDatasetTransferEstimateError> {
     let mut block_stream =
@@ -88,7 +86,7 @@ pub async fn prepare_dataset_transfer_plan(
             .int_err()?;
 
         match block.event {
-            MetadataEvent::AddData(add_data) => {
+            odf::MetadataEvent::AddData(add_data) => {
                 if let Some(new_data) = &add_data.new_data {
                     data_objects_count += 1;
                     bytes_in_data_objects += new_data.size;
@@ -99,7 +97,7 @@ pub async fn prepare_dataset_transfer_plan(
                     bytes_in_checkpoint_objects += new_checkpoint.size;
                 }
             }
-            MetadataEvent::ExecuteTransform(execute_transform) => {
+            odf::MetadataEvent::ExecuteTransform(execute_transform) => {
                 if let Some(new_data) = &execute_transform.new_data {
                     data_objects_count += 1;
                     bytes_in_data_objects += new_data.size;
@@ -110,17 +108,17 @@ pub async fn prepare_dataset_transfer_plan(
                     bytes_in_checkpoint_objects += new_checkpoint.size;
                 }
             }
-            MetadataEvent::Seed(_)
-            | MetadataEvent::SetDataSchema(_)
-            | MetadataEvent::SetPollingSource(_)
-            | MetadataEvent::DisablePollingSource(_)
-            | MetadataEvent::AddPushSource(_)
-            | MetadataEvent::DisablePushSource(_)
-            | MetadataEvent::SetTransform(_)
-            | MetadataEvent::SetVocab(_)
-            | MetadataEvent::SetAttachments(_)
-            | MetadataEvent::SetInfo(_)
-            | MetadataEvent::SetLicense(_) => (),
+            odf::MetadataEvent::Seed(_)
+            | odf::MetadataEvent::SetDataSchema(_)
+            | odf::MetadataEvent::SetPollingSource(_)
+            | odf::MetadataEvent::DisablePollingSource(_)
+            | odf::MetadataEvent::AddPushSource(_)
+            | odf::MetadataEvent::DisablePushSource(_)
+            | odf::MetadataEvent::SetTransform(_)
+            | odf::MetadataEvent::SetVocab(_)
+            | odf::MetadataEvent::SetAttachments(_)
+            | odf::MetadataEvent::SetInfo(_)
+            | odf::MetadataEvent::SetLicense(_) => (),
         }
     }
 
@@ -136,16 +134,16 @@ pub async fn prepare_dataset_transfer_plan(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn prepare_dataset_metadata_batch(
-    metadata_chain: &dyn MetadataChain,
-    stop_at: &Multihash,
-    begin_after: Option<&Multihash>,
+    metadata_chain: &dyn odf::MetadataChain,
+    stop_at: &odf::Multihash,
+    begin_after: Option<&odf::Multihash>,
     ignore_missing_tail: bool,
 ) -> Result<MetadataBlocksBatch, InternalError> {
     let mut num_blocks: u32 = 0;
     let encoder = flate2::write::GzEncoder::new(Vec::new(), Compression::default());
     let mut tarball_builder = tar::Builder::new(encoder);
 
-    let blocks_for_transfer: Vec<HashedMetadataBlock> = metadata_chain
+    let blocks_for_transfer: Vec<odf::dataset::HashedMetadataBlock> = metadata_chain
         .iter_blocks_interval(stop_at, begin_after, ignore_missing_tail)
         .try_collect()
         .await
@@ -188,7 +186,7 @@ pub async fn prepare_dataset_metadata_batch(
 
 pub fn decode_metadata_batch(
     blocks_batch: &MetadataBlocksBatch,
-) -> Result<VecDeque<HashedMetadataBlock>, GetBlockError> {
+) -> Result<VecDeque<odf::dataset::HashedMetadataBlock>, odf::storage::GetBlockError> {
     let blocks_data = unpack_dataset_metadata_batch(blocks_batch);
 
     blocks_data
@@ -199,14 +197,16 @@ pub fn decode_metadata_batch(
             //       This is currently necessary because we need to be able to deserialize
             //       blocks BEFORE an instance of MetadataChain exists.
             //       Consider injecting a configurable block deserializer.
-            deserialize_metadata_block(&hash, &bytes).map(|block| (hash, block))
+            odf::storage::deserialize_metadata_block(&hash, &bytes).map(|block| (hash, block))
         })
         .collect::<Result<VecDeque<_>, _>>()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn unpack_dataset_metadata_batch(blocks_batch: &MetadataBlocksBatch) -> Vec<(Multihash, Vec<u8>)> {
+fn unpack_dataset_metadata_batch(
+    blocks_batch: &MetadataBlocksBatch,
+) -> Vec<(odf::Multihash, Vec<u8>)> {
     assert!(
         blocks_batch.media_type.eq(MEDIA_TAR_GZ),
         "Unsupported media type {}",
@@ -221,7 +221,7 @@ fn unpack_dataset_metadata_batch(blocks_batch: &MetadataBlocksBatch) -> Vec<(Mul
 
     let decoder = flate2::read::GzDecoder::new(blocks_batch.payload.as_slice());
     let mut archive = tar::Archive::new(decoder);
-    let blocks_data: Vec<(Multihash, Vec<u8>)> = archive
+    let blocks_data: Vec<(odf::Multihash, Vec<u8>)> = archive
         .entries()
         .unwrap()
         .filter_map(Result::ok)
@@ -231,7 +231,7 @@ fn unpack_dataset_metadata_batch(blocks_batch: &MetadataBlocksBatch) -> Vec<(Mul
             entry.read_exact(buf.as_mut_slice()).unwrap();
 
             let path = entry.path().unwrap();
-            let hash = Multihash::from_multibase(path.to_str().unwrap()).unwrap();
+            let hash = odf::Multihash::from_multibase(path.to_str().unwrap()).unwrap();
 
             (hash, buf)
         })
@@ -248,7 +248,7 @@ pub enum CollectMissingObjectReferencesFromIntervalError {
     InvalidInterval(
         #[from]
         #[backtrace]
-        InvalidIntervalError,
+        odf::dataset::InvalidIntervalError,
     ),
     #[error(transparent)]
     Internal(
@@ -258,19 +258,19 @@ pub enum CollectMissingObjectReferencesFromIntervalError {
     ),
 }
 
-impl From<IterBlocksError> for CollectMissingObjectReferencesFromIntervalError {
-    fn from(v: IterBlocksError) -> Self {
+impl From<odf::dataset::IterBlocksError> for CollectMissingObjectReferencesFromIntervalError {
+    fn from(v: odf::dataset::IterBlocksError) -> Self {
         match v {
-            IterBlocksError::InvalidInterval(e) => Self::InvalidInterval(e),
+            odf::dataset::IterBlocksError::InvalidInterval(e) => Self::InvalidInterval(e),
             _ => Self::Internal(v.int_err()),
         }
     }
 }
 
 pub async fn collect_object_references_from_interval(
-    dataset: &dyn Dataset,
-    head: &Multihash,
-    tail: Option<&Multihash>,
+    dataset: &dyn odf::Dataset,
+    head: &odf::Multihash,
+    tail: Option<&odf::Multihash>,
     ignore_missing_tail: bool,
     missing_files_only: bool,
 ) -> Result<Vec<ObjectFileReference>, CollectMissingObjectReferencesFromIntervalError> {
@@ -296,8 +296,8 @@ pub async fn collect_object_references_from_interval(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn collect_object_references_from_metadata(
-    dataset: &dyn Dataset,
-    blocks: &VecDeque<HashedMetadataBlock>,
+    dataset: &dyn odf::Dataset,
+    blocks: &VecDeque<odf::dataset::HashedMetadataBlock>,
     missing_files_only: bool,
 ) -> Vec<ObjectFileReference> {
     let mut res_references: Vec<ObjectFileReference> = Vec::new();
@@ -317,8 +317,8 @@ pub async fn collect_object_references_from_metadata(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 async fn collect_object_references_from_block(
-    dataset: &dyn Dataset,
-    block: &MetadataBlock,
+    dataset: &dyn odf::Dataset,
+    block: &odf::MetadataBlock,
     target_references: &mut Vec<ObjectFileReference>,
     missing_files_only: bool,
 ) {
@@ -326,7 +326,7 @@ async fn collect_object_references_from_block(
     let checkpoint_repo = dataset.as_checkpoint_repo();
 
     match &block.event {
-        MetadataEvent::AddData(e) => {
+        odf::MetadataEvent::AddData(e) => {
             if let Some(new_data) = &e.new_data {
                 if !missing_files_only
                     || !data_repo.contains(&new_data.physical_hash).await.unwrap()
@@ -353,7 +353,7 @@ async fn collect_object_references_from_block(
                 }
             }
         }
-        MetadataEvent::ExecuteTransform(e) => {
+        odf::MetadataEvent::ExecuteTransform(e) => {
             if let Some(new_data) = &e.new_data {
                 if !missing_files_only
                     || !data_repo.contains(&new_data.physical_hash).await.unwrap()
@@ -381,24 +381,24 @@ async fn collect_object_references_from_block(
             }
         }
 
-        MetadataEvent::Seed(_)
-        | MetadataEvent::SetDataSchema(_)
-        | MetadataEvent::SetPollingSource(_)
-        | MetadataEvent::DisablePollingSource(_)
-        | MetadataEvent::AddPushSource(_)
-        | MetadataEvent::DisablePushSource(_)
-        | MetadataEvent::SetTransform(_)
-        | MetadataEvent::SetVocab(_)
-        | MetadataEvent::SetAttachments(_)
-        | MetadataEvent::SetInfo(_)
-        | MetadataEvent::SetLicense(_) => (),
+        odf::MetadataEvent::Seed(_)
+        | odf::MetadataEvent::SetDataSchema(_)
+        | odf::MetadataEvent::SetPollingSource(_)
+        | odf::MetadataEvent::DisablePollingSource(_)
+        | odf::MetadataEvent::AddPushSource(_)
+        | odf::MetadataEvent::DisablePushSource(_)
+        | odf::MetadataEvent::SetTransform(_)
+        | odf::MetadataEvent::SetVocab(_)
+        | odf::MetadataEvent::SetAttachments(_)
+        | odf::MetadataEvent::SetInfo(_)
+        | odf::MetadataEvent::SetLicense(_) => (),
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn prepare_pull_object_transfer_strategy(
-    dataset: &dyn Dataset,
+    dataset: &dyn odf::Dataset,
     object_file_ref: &ObjectFileReference,
     dataset_url: &Url,
     maybe_bearer_header: Option<&BearerHeader>,
@@ -409,7 +409,7 @@ pub async fn prepare_pull_object_transfer_strategy(
                 .as_data_repo()
                 .get_external_download_url(
                     &object_file_ref.physical_hash,
-                    ExternalTransferOpts::default(),
+                    odf::storage::ExternalTransferOpts::default(),
                 )
                 .await
         }
@@ -418,7 +418,7 @@ pub async fn prepare_pull_object_transfer_strategy(
                 .as_checkpoint_repo()
                 .get_external_download_url(
                     &object_file_ref.physical_hash,
-                    ExternalTransferOpts::default(),
+                    odf::storage::ExternalTransferOpts::default(),
                 )
                 .await
         }
@@ -431,7 +431,7 @@ pub async fn prepare_pull_object_transfer_strategy(
             expires_at: result.expires_at,
         }),
         Err(error) => match error {
-            GetExternalUrlError::NotSupported => Ok(TransferUrl {
+            odf::storage::GetExternalUrlError::NotSupported => Ok(TransferUrl {
                 url: get_simple_transfer_protocol_url(object_file_ref, dataset_url),
                 headers: get_simple_transfer_protocol_headers(
                     maybe_bearer_header,
@@ -439,9 +439,9 @@ pub async fn prepare_pull_object_transfer_strategy(
                 ),
                 expires_at: None,
             }),
-            GetExternalUrlError::Access(e) => Err(e.int_err()), /* TODO: propagate */
+            odf::storage::GetExternalUrlError::Access(e) => Err(e.int_err()), /* TODO: propagate */
             // AccessError
-            GetExternalUrlError::Internal(e) => Err(e),
+            odf::storage::GetExternalUrlError::Internal(e) => Err(e),
         },
     };
 
@@ -530,7 +530,7 @@ fn reconstruct_header_map(headers_as_primitives: Vec<HeaderRow>) -> http::Header
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn prepare_push_object_transfer_strategy(
-    dataset: &dyn Dataset,
+    dataset: &dyn odf::Dataset,
     object_file_ref: &ObjectFileReference,
     dataset_url: &Url,
     maybe_bearer_header: Option<&BearerHeader>,
@@ -555,7 +555,7 @@ pub async fn prepare_push_object_transfer_strategy(
         let get_upload_url_result = object_repo
             .get_external_upload_url(
                 &object_file_ref.physical_hash,
-                ExternalTransferOpts::default(),
+                odf::storage::ExternalTransferOpts::default(),
             )
             .await;
         let transfer_url_result = match get_upload_url_result {
@@ -565,7 +565,7 @@ pub async fn prepare_push_object_transfer_strategy(
                 expires_at: result.expires_at,
             }),
             Err(error) => match error {
-                GetExternalUrlError::NotSupported => Ok(TransferUrl {
+                odf::storage::GetExternalUrlError::NotSupported => Ok(TransferUrl {
                     url: get_simple_transfer_protocol_url(object_file_ref, dataset_url),
                     headers: get_simple_transfer_protocol_headers(
                         maybe_bearer_header,
@@ -573,9 +573,9 @@ pub async fn prepare_push_object_transfer_strategy(
                     ),
                     expires_at: None,
                 }),
-                GetExternalUrlError::Access(e) => Err(e.int_err()), /* TODO: propagate */
+                odf::storage::GetExternalUrlError::Access(e) => Err(e.int_err()), /* TODO: propagate */
                 // AccessError
-                GetExternalUrlError::Internal(e) => Err(e),
+                odf::storage::GetExternalUrlError::Internal(e) => Err(e),
             },
         };
         match transfer_url_result {
@@ -592,7 +592,7 @@ pub async fn prepare_push_object_transfer_strategy(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn dataset_import_object_file(
-    dataset: &dyn Dataset,
+    dataset: &dyn odf::Dataset,
     object_transfer_strategy: PullObjectTransferStrategy,
 ) -> Result<(), SyncError> {
     assert!(
@@ -630,7 +630,7 @@ pub async fn dataset_import_object_file(
     let res = target_object_repository
         .insert_stream(
             Box::new(reader),
-            InsertOpts {
+            odf::storage::InsertOpts {
                 precomputed_hash: None,
                 expected_hash: Some(&object_file_reference.physical_hash),
                 size_hint: Some(object_file_reference.size),
@@ -640,7 +640,7 @@ pub async fn dataset_import_object_file(
 
     match res {
         Ok(_) => Ok(()),
-        Err(InsertError::HashMismatch(e)) => Err(CorruptedSourceError {
+        Err(odf::storage::InsertError::HashMismatch(e)) => Err(CorruptedSourceError {
             message: concat!(
                 "Data file hash declared by the source didn't match ",
                 "the computed - this may be an indication of hashing ",
@@ -650,15 +650,15 @@ pub async fn dataset_import_object_file(
             source: Some(e.into()),
         }
         .into()),
-        Err(InsertError::Access(e)) => Err(SyncError::Access(e)),
-        Err(InsertError::Internal(e)) => Err(SyncError::Internal(e)),
+        Err(odf::storage::InsertError::Access(e)) => Err(SyncError::Access(e)),
+        Err(odf::storage::InsertError::Internal(e)) => Err(SyncError::Internal(e)),
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn dataset_export_object_file(
-    dataset: &dyn Dataset,
+    dataset: &dyn odf::Dataset,
     object_transfer_strategy: PushObjectTransferStrategy,
 ) -> Result<(), SyncError> {
     if object_transfer_strategy.push_strategy == ObjectPushStrategy::SkipUpload {

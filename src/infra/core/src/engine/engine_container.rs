@@ -12,7 +12,7 @@ use std::sync::Arc;
 
 use container_runtime::*;
 use kamu_core::engine::EngineError;
-use opendatafabric::engine::EngineGrpcClient;
+use odf::metadata::engine::EngineGrpcClient;
 
 use super::ODFEngineConfig;
 

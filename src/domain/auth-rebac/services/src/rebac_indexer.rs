@@ -20,16 +20,14 @@ use kamu_accounts::{
     JOB_KAMU_ACCOUNTS_PREDEFINED_ACCOUNTS_REGISTRATOR,
 };
 use kamu_auth_rebac::{AccountPropertyName, DatasetPropertyName, RebacService};
-use kamu_core::DatasetVisibility;
 use kamu_datasets::DatasetEntryService;
 use kamu_datasets_services::JOB_KAMU_DATASETS_DATASET_ENTRY_INDEXER;
-use opendatafabric as odf;
 
 use crate::JOB_KAMU_REBAC_INDEXER;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-type PredefinedAccountIdDatasetVisibilityMapping = HashMap<odf::AccountID, DatasetVisibility>;
+type PredefinedAccountIdDatasetVisibilityMapping = HashMap<odf::AccountID, odf::DatasetVisibility>;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -141,9 +139,9 @@ impl RebacIndexer {
                 predefined_accounts_map.get(&account.account_name)
             {
                 let visibility = if *treat_datasets_as_public {
-                    DatasetVisibility::Public
+                    odf::DatasetVisibility::Public
                 } else {
-                    DatasetVisibility::Private
+                    odf::DatasetVisibility::Private
                 };
 
                 visibility_map.insert(account.id, visibility);

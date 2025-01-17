@@ -30,7 +30,7 @@ testing = ["dep:mockall"]
 [dependencies]
 database-common = { workspace = true }
 internal-error = { workspace = true }
-opendatafabric = { workspace = true }
+odf = { workspace = true }
 
 aes-gcm = { version = "0.10.3" }
 async-trait = { version = "0.1", default-features = false }

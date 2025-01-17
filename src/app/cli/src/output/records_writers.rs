@@ -14,8 +14,8 @@ use datafusion::arrow::array::ArrayRef;
 use datafusion::arrow::datatypes::{DataType, Schema};
 use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::arrow::util::display::array_value_to_string;
-use kamu_data_utils::data::format::WriterError;
-pub use kamu_data_utils::data::format::{
+use odf::utils::data::format::WriterError;
+pub use odf::utils::data::format::{
     CsvWriter,
     CsvWriterOptions,
     JsonArrayOfArraysWriter,

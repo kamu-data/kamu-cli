@@ -14,11 +14,11 @@ use chrono::Duration;
 use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use dill::Component;
 use indoc::indoc;
-use kamu::testing::{MetadataFactory, MockDatasetActionAuthorizer, MockDatasetChangesService};
+use kamu::testing::{MockDatasetActionAuthorizer, MockDatasetChangesService};
 use kamu::{
     CreateDatasetFromSnapshotUseCaseImpl,
-    DatasetRepositoryLocalFs,
-    DatasetRepositoryWriter,
+    DatasetStorageUnitLocalFs,
+    DatasetStorageUnitWriter,
     MetadataQueryServiceImpl,
 };
 use kamu_accounts::{JwtAuthenticationConfig, DEFAULT_ACCOUNT_NAME, DEFAULT_ACCOUNT_NAME_STR};
@@ -36,7 +36,7 @@ use kamu_flow_system_inmem::{
 use kamu_task_system_inmem::InMemoryTaskEventStore;
 use kamu_task_system_services::TaskSchedulerImpl;
 use messaging_outbox::{register_message_dispatcher, Outbox, OutboxImmediateImpl};
-use opendatafabric::{AccountName, DatasetAlias, DatasetID, DatasetKind, DatasetName};
+use odf::metadata::testing::MetadataFactory;
 use time_source::SystemTimeSourceDefault;
 
 use crate::utils::authentication_catalogs;
@@ -45,9 +45,9 @@ use crate::utils::authentication_catalogs;
 
 #[test_log::test(tokio::test)]
 async fn test_list_account_flows() {
-    let foo_dataset_name = DatasetName::new_unchecked("foo");
+    let foo_dataset_name = odf::DatasetName::new_unchecked("foo");
     let foo_dataset_alias =
-        DatasetAlias::new(Some(DEFAULT_ACCOUNT_NAME.clone()), foo_dataset_name.clone());
+        odf::DatasetAlias::new(Some(DEFAULT_ACCOUNT_NAME.clone()), foo_dataset_name.clone());
 
     let mock_dataset_action_authorizer = MockDatasetActionAuthorizer::allowing();
     let harness = FlowTriggerHarness::with_overrides(FlowTriggerHarnessOverrides {
@@ -136,13 +136,13 @@ async fn test_list_datasets_with_flow() {
     })
     .await;
 
-    let foo_dataset_name = DatasetName::new_unchecked("foo");
+    let foo_dataset_name = odf::DatasetName::new_unchecked("foo");
     let foo_dataset_alias =
-        DatasetAlias::new(Some(DEFAULT_ACCOUNT_NAME.clone()), foo_dataset_name.clone());
+        odf::DatasetAlias::new(Some(DEFAULT_ACCOUNT_NAME.clone()), foo_dataset_name.clone());
 
-    let bar_dataset_name = DatasetName::new_unchecked("bar");
+    let bar_dataset_name = odf::DatasetName::new_unchecked("bar");
     let bar_dataset_alias =
-        DatasetAlias::new(Some(DEFAULT_ACCOUNT_NAME.clone()), bar_dataset_name.clone());
+        odf::DatasetAlias::new(Some(DEFAULT_ACCOUNT_NAME.clone()), bar_dataset_name.clone());
 
     let create_result = harness.create_root_dataset(foo_dataset_alias).await;
     let _bar_create_result = harness.create_root_dataset(bar_dataset_alias).await;
@@ -235,9 +235,9 @@ async fn test_list_datasets_with_flow() {
 async fn test_pause_resume_account_flows() {
     let schema = kamu_adapter_graphql::schema_quiet();
 
-    let foo_dataset_alias = DatasetAlias::new(
+    let foo_dataset_alias = odf::DatasetAlias::new(
         Some(DEFAULT_ACCOUNT_NAME.clone()),
-        DatasetName::new_unchecked("foo"),
+        odf::DatasetName::new_unchecked("foo"),
     );
 
     let mock_dataset_action_authorizer = MockDatasetActionAuthorizer::allowing();
@@ -435,13 +435,13 @@ async fn test_pause_resume_account_flows() {
 async fn test_account_triggers_all_paused() {
     let schema = kamu_adapter_graphql::schema_quiet();
 
-    let foo_dataset_alias = DatasetAlias::new(
+    let foo_dataset_alias = odf::DatasetAlias::new(
         Some(DEFAULT_ACCOUNT_NAME.clone()),
-        DatasetName::new_unchecked("foo"),
+        odf::DatasetName::new_unchecked("foo"),
     );
-    let bar_dataset_alias = DatasetAlias::new(
+    let bar_dataset_alias = odf::DatasetAlias::new(
         Some(DEFAULT_ACCOUNT_NAME.clone()),
-        DatasetName::new_unchecked("bar"),
+        odf::DatasetName::new_unchecked("bar"),
     );
 
     let mock_dataset_action_authorizer = MockDatasetActionAuthorizer::allowing();
@@ -643,9 +643,9 @@ impl FlowTriggerHarness {
             .bind::<dyn Outbox, OutboxImmediateImpl>()
             .add::<DidGeneratorDefault>()
             .add_value(TenancyConfig::MultiTenant)
-            .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
-            .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-            .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
+            .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
+            .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
+            .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
             .add::<MetadataQueryServiceImpl>()
             .add::<CreateDatasetFromSnapshotUseCaseImpl>()
             .add_value(dataset_changes_mock)
@@ -698,7 +698,10 @@ impl FlowTriggerHarness {
         }
     }
 
-    async fn create_root_dataset(&self, dataset_alias: DatasetAlias) -> CreateDatasetResult {
+    async fn create_root_dataset(
+        &self,
+        dataset_alias: odf::DatasetAlias,
+    ) -> odf::CreateDatasetResult {
         let create_dataset_from_snapshot = self
             .catalog_authorized
             .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
@@ -707,7 +710,7 @@ impl FlowTriggerHarness {
         create_dataset_from_snapshot
             .execute(
                 MetadataFactory::dataset_snapshot()
-                    .kind(DatasetKind::Root)
+                    .kind(odf::DatasetKind::Root)
                     .name(dataset_alias)
                     .push_event(MetadataFactory::set_polling_source().build())
                     .build(),
@@ -717,7 +720,7 @@ impl FlowTriggerHarness {
             .unwrap()
     }
 
-    fn list_flows_query(account_name: &AccountName) -> String {
+    fn list_flows_query(account_name: &odf::AccountName) -> String {
         indoc!(
             r#"
           {
@@ -872,7 +875,7 @@ impl FlowTriggerHarness {
         .replace("<accountName>", account_name.as_ref())
     }
 
-    fn trigger_flow_mutation(id: &DatasetID, dataset_flow_type: &str) -> String {
+    fn trigger_flow_mutation(id: &odf::DatasetID, dataset_flow_type: &str) -> String {
         indoc!(
             r#"
           mutation {
@@ -925,7 +928,7 @@ impl FlowTriggerHarness {
         .replace("<dataset_flow_type>", dataset_flow_type)
     }
 
-    fn pause_account_flows(account_name: &AccountName) -> String {
+    fn pause_account_flows(account_name: &odf::AccountName) -> String {
         indoc!(
             r#"
             mutation {
@@ -944,7 +947,7 @@ impl FlowTriggerHarness {
         .replace("<name>", account_name.as_ref())
     }
 
-    fn resume_account_flows(account_name: &AccountName) -> String {
+    fn resume_account_flows(account_name: &odf::AccountName) -> String {
         indoc!(
             r#"
             mutation {
@@ -963,7 +966,7 @@ impl FlowTriggerHarness {
         .replace("<name>", account_name.as_ref())
     }
 
-    fn all_paused_trigger_query(id: &DatasetID) -> String {
+    fn all_paused_trigger_query(id: &odf::DatasetID) -> String {
         indoc!(
             r#"
             {
@@ -982,7 +985,7 @@ impl FlowTriggerHarness {
         .replace("<id>", &id.to_string())
     }
 
-    fn all_paused_account_triggers_query(account_name: &AccountName) -> String {
+    fn all_paused_account_triggers_query(account_name: &odf::AccountName) -> String {
         indoc!(
             r#"
             {
@@ -1002,7 +1005,7 @@ impl FlowTriggerHarness {
     }
 
     fn set_ingest_trigger_time_delta_mutation(
-        id: &DatasetID,
+        id: &odf::DatasetID,
         dataset_flow_type: &str,
         paused: bool,
         every: u64,

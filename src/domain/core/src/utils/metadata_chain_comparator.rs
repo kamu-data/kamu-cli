@@ -12,7 +12,6 @@ use std::convert::TryFrom;
 use async_trait::async_trait;
 use futures::{StreamExt, TryStreamExt};
 use internal_error::*;
-use opendatafabric::{MetadataBlock, Multihash};
 use thiserror::Error;
 
 use crate::*;
@@ -28,12 +27,14 @@ pub struct MetadataChainComparator {}
 //   skip through long chains faster
 impl MetadataChainComparator {
     pub async fn compare_chains(
-        lhs_chain: &dyn MetadataChain,
-        lhs_head: &Multihash,
-        rhs_chain: &dyn MetadataChain,
-        rhs_head: Option<&Multihash>,
+        lhs_chain: &dyn odf::MetadataChain,
+        lhs_head: &odf::Multihash,
+        rhs_chain: &dyn odf::MetadataChain,
+        rhs_head: Option<&odf::Multihash>,
         listener: &dyn CompareChainsListener,
     ) -> Result<CompareChainsResult, CompareChainsError> {
+        use odf::MetadataChain;
+
         // When source and destination point to the same block, chains are equal, no
         // further scanning required
         if Some(&lhs_head) == rhs_head.as_ref() {
@@ -159,15 +160,16 @@ impl MetadataChainComparator {
     async fn check_expected_common_ancestor(
         ahead_chain: &MetadataChainWithStats<'_>,
         ahead_sequence_number: u64,
-        ahead_head: &Multihash,
+        ahead_head: &odf::Multihash,
         reference_chain: &MetadataChainWithStats<'_>,
         expected_common_sequence_number: u64,
-        expected_common_ancestor_hash: &Multihash,
+        expected_common_ancestor_hash: &odf::Multihash,
     ) -> Result<CommonAncestorCheck, CompareChainsError> {
         let ahead_size = ahead_sequence_number - expected_common_sequence_number;
         ahead_chain.expecting_to_read_blocks(ahead_size);
 
-        let ahead_blocks: Vec<HashedMetadataBlock> = ahead_chain
+        use odf::MetadataChain;
+        let ahead_blocks: Vec<odf::dataset::HashedMetadataBlock> = ahead_chain
             .iter_blocks_interval(ahead_head, None, false)
             .take(usize::try_from(ahead_size).unwrap())
             .try_collect()
@@ -217,10 +219,10 @@ impl MetadataChainComparator {
 
     async fn find_common_ancestor_sequence_number(
         lhs_chain: &MetadataChainWithStats<'_>,
-        lhs_head: &Multihash,
+        lhs_head: &odf::Multihash,
         lhs_start_block_sequence_number: u64,
         rhs_chain: &MetadataChainWithStats<'_>,
-        rhs_head: &Multihash,
+        rhs_head: &odf::Multihash,
         rhs_start_block_sequence_number: u64,
     ) -> Result<Option<u64>, CompareChainsError> {
         if lhs_start_block_sequence_number > rhs_start_block_sequence_number {
@@ -233,6 +235,7 @@ impl MetadataChainComparator {
             );
         }
 
+        use odf::MetadataChain;
         let mut lhs_stream = lhs_chain.iter_blocks_interval(lhs_head, None, false);
         let mut rhs_stream = rhs_chain.iter_blocks_interval(rhs_head, None, false);
 
@@ -278,10 +281,10 @@ impl MetadataChainComparator {
 pub enum CompareChainsResult {
     Equal,
     LhsAhead {
-        lhs_ahead_blocks: Vec<HashedMetadataBlock>,
+        lhs_ahead_blocks: Vec<odf::dataset::HashedMetadataBlock>,
     },
     LhsBehind {
-        rhs_ahead_blocks: Vec<HashedMetadataBlock>,
+        rhs_ahead_blocks: Vec<odf::dataset::HashedMetadataBlock>,
     },
     Divergence {
         uncommon_blocks_in_lhs: u64,
@@ -294,7 +297,7 @@ pub enum CompareChainsResult {
 #[derive(Debug)]
 enum CommonAncestorCheck {
     Success {
-        ahead_blocks: Vec<HashedMetadataBlock>,
+        ahead_blocks: Vec<odf::dataset::HashedMetadataBlock>,
     },
     Failure {
         common_ancestor_sequence_number: Option<u64>,
@@ -311,7 +314,7 @@ pub enum CompareChainsError {
     Access(
         #[from]
         #[backtrace]
-        AccessError,
+        odf::AccessError,
     ),
     #[error(transparent)]
     Internal(
@@ -321,52 +324,56 @@ pub enum CompareChainsError {
     ),
 }
 
-impl From<GetBlockError> for CompareChainsError {
-    fn from(v: GetBlockError) -> Self {
+impl From<odf::storage::GetBlockError> for CompareChainsError {
+    fn from(v: odf::storage::GetBlockError) -> Self {
         match v {
-            GetBlockError::NotFound(e) => Self::Corrupted(CorruptedSourceError {
+            odf::storage::GetBlockError::NotFound(e) => Self::Corrupted(CorruptedSourceError {
                 message: "Metadata chain is broken".to_owned(),
                 source: Some(e.into()),
             }),
-            GetBlockError::BlockVersion(e) => Self::Corrupted(CorruptedSourceError {
+            odf::storage::GetBlockError::BlockVersion(e) => Self::Corrupted(CorruptedSourceError {
                 message: "Metadata chain is broken".to_owned(),
                 source: Some(e.into()),
             }),
-            GetBlockError::BlockMalformed(e) => Self::Corrupted(CorruptedSourceError {
-                message: "Metadata chain is broken".to_owned(),
-                source: Some(e.into()),
-            }),
-            GetBlockError::Access(e) => Self::Access(e),
-            GetBlockError::Internal(e) => Self::Internal(e),
+            odf::storage::GetBlockError::BlockMalformed(e) => {
+                Self::Corrupted(CorruptedSourceError {
+                    message: "Metadata chain is broken".to_owned(),
+                    source: Some(e.into()),
+                })
+            }
+            odf::storage::GetBlockError::Access(e) => Self::Access(e),
+            odf::storage::GetBlockError::Internal(e) => Self::Internal(e),
         }
     }
 }
 
-impl From<IterBlocksError> for CompareChainsError {
-    fn from(v: IterBlocksError) -> Self {
+impl From<odf::dataset::IterBlocksError> for CompareChainsError {
+    fn from(v: odf::dataset::IterBlocksError) -> Self {
         match v {
-            IterBlocksError::RefNotFound(e) => CompareChainsError::Internal(e.int_err()),
-            IterBlocksError::BlockNotFound(e) => {
+            odf::dataset::IterBlocksError::RefNotFound(e) => {
+                CompareChainsError::Internal(e.int_err())
+            }
+            odf::dataset::IterBlocksError::BlockNotFound(e) => {
                 CompareChainsError::Corrupted(CorruptedSourceError {
                     message: "Metadata chain is broken".to_owned(),
                     source: Some(e.into()),
                 })
             }
-            IterBlocksError::BlockVersion(e) => {
+            odf::dataset::IterBlocksError::BlockVersion(e) => {
                 CompareChainsError::Corrupted(CorruptedSourceError {
                     message: "Metadata chain is broken".to_owned(),
                     source: Some(e.into()),
                 })
             }
-            IterBlocksError::BlockMalformed(e) => {
+            odf::dataset::IterBlocksError::BlockMalformed(e) => {
                 CompareChainsError::Corrupted(CorruptedSourceError {
                     message: "Metadata chain is broken".to_owned(),
                     source: Some(e.into()),
                 })
             }
-            IterBlocksError::InvalidInterval(_) => unreachable!(),
-            IterBlocksError::Access(e) => CompareChainsError::Access(e),
-            IterBlocksError::Internal(e) => CompareChainsError::Internal(e),
+            odf::dataset::IterBlocksError::InvalidInterval(_) => unreachable!(),
+            odf::dataset::IterBlocksError::Access(e) => CompareChainsError::Access(e),
+            odf::dataset::IterBlocksError::Internal(e) => CompareChainsError::Internal(e),
         }
     }
 }
@@ -374,14 +381,14 @@ impl From<IterBlocksError> for CompareChainsError {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct MetadataChainWithStats<'a> {
-    chain: &'a dyn MetadataChain,
+    chain: &'a dyn odf::MetadataChain,
     on_expected: Box<dyn Fn(u64) + Send + Sync + 'a>,
     on_read: Box<dyn Fn(u64) + Send + Sync + 'a>,
 }
 
 impl<'a> MetadataChainWithStats<'a> {
     fn new(
-        chain: &'a dyn MetadataChain,
+        chain: &'a dyn odf::MetadataChain,
         on_expected: impl Fn(u64) + Send + Sync + 'a,
         on_read: impl Fn(u64) + Send + Sync + 'a,
     ) -> Self {
@@ -398,27 +405,36 @@ impl<'a> MetadataChainWithStats<'a> {
 }
 
 #[async_trait]
-impl MetadataChain for MetadataChainWithStats<'_> {
-    async fn resolve_ref(&self, r: &BlockRef) -> Result<Multihash, GetRefError> {
+impl odf::MetadataChain for MetadataChainWithStats<'_> {
+    async fn resolve_ref(
+        &self,
+        r: &odf::BlockRef,
+    ) -> Result<odf::Multihash, odf::storage::GetRefError> {
         self.chain.resolve_ref(r).await
     }
 
-    async fn get_block(&self, hash: &Multihash) -> Result<MetadataBlock, GetBlockError> {
+    async fn get_block(
+        &self,
+        hash: &odf::Multihash,
+    ) -> Result<odf::MetadataBlock, odf::storage::GetBlockError> {
         (self.on_read)(1);
         self.chain.get_block(hash).await
     }
 
-    async fn contains_block(&self, hash: &Multihash) -> Result<bool, ContainsBlockError> {
+    async fn contains_block(
+        &self,
+        hash: &odf::Multihash,
+    ) -> Result<bool, odf::storage::ContainsBlockError> {
         (self.on_read)(1);
         self.chain.contains_block(hash).await
     }
 
     fn iter_blocks_interval<'b>(
         &'b self,
-        head: &'b Multihash,
-        tail: Option<&'b Multihash>,
+        head: &'b odf::Multihash,
+        tail: Option<&'b odf::Multihash>,
         ignore_missing_tail: bool,
-    ) -> DynMetadataStream<'b> {
+    ) -> odf::dataset::DynMetadataStream<'b> {
         Box::pin(
             self.chain
                 .iter_blocks_interval(head, tail, ignore_missing_tail)
@@ -431,10 +447,10 @@ impl MetadataChain for MetadataChainWithStats<'_> {
 
     fn iter_blocks_interval_inclusive<'b>(
         &'b self,
-        head: &'b Multihash,
-        tail: &'b Multihash,
+        head: &'b odf::Multihash,
+        tail: &'b odf::Multihash,
         ignore_missing_tail: bool,
-    ) -> DynMetadataStream<'b> {
+    ) -> odf::dataset::DynMetadataStream<'b> {
         Box::pin(
             self.chain
                 .iter_blocks_interval_inclusive(head, tail, ignore_missing_tail)
@@ -447,9 +463,9 @@ impl MetadataChain for MetadataChainWithStats<'_> {
 
     fn iter_blocks_interval_ref<'b>(
         &'b self,
-        head: &'b BlockRef,
-        tail: Option<&'b BlockRef>,
-    ) -> DynMetadataStream<'b> {
+        head: &'b odf::BlockRef,
+        tail: Option<&'b odf::BlockRef>,
+    ) -> odf::dataset::DynMetadataStream<'b> {
         Box::pin(self.chain.iter_blocks_interval_ref(head, tail).map(|v| {
             (self.on_read)(1);
             v
@@ -458,26 +474,26 @@ impl MetadataChain for MetadataChainWithStats<'_> {
 
     async fn set_ref<'b>(
         &'b self,
-        r: &BlockRef,
-        hash: &Multihash,
-        opts: SetRefOpts<'b>,
-    ) -> Result<(), SetRefError> {
+        r: &odf::BlockRef,
+        hash: &odf::Multihash,
+        opts: odf::dataset::SetRefOpts<'b>,
+    ) -> Result<(), odf::dataset::SetChainRefError> {
         self.chain.set_ref(r, hash, opts).await
     }
 
     async fn append<'b>(
         &'b self,
-        block: MetadataBlock,
-        opts: AppendOpts<'b>,
-    ) -> Result<Multihash, AppendError> {
+        block: odf::MetadataBlock,
+        opts: odf::dataset::AppendOpts<'b>,
+    ) -> Result<odf::Multihash, odf::dataset::AppendError> {
         self.chain.append(block, opts).await
     }
 
-    fn as_reference_repo(&self) -> &dyn ReferenceRepository {
+    fn as_reference_repo(&self) -> &dyn odf::storage::ReferenceRepository {
         self.chain.as_reference_repo()
     }
 
-    fn as_metadata_block_repository(&self) -> &dyn MetadataBlockRepository {
+    fn as_metadata_block_repository(&self) -> &dyn odf::storage::MetadataBlockRepository {
         self.chain.as_metadata_block_repository()
     }
 }

@@ -13,24 +13,26 @@ use datafusion::logical_expr::{LogicalPlanBuilder, Operator, SortExpr};
 use datafusion::prelude::*;
 use datafusion::sql::TableReference;
 use internal_error::*;
-use kamu_data_utils::data::dataframe_ext::*;
-use opendatafabric as odf;
+use odf::utils::data::dataframe_ext::*;
 
 use crate::*;
 
-type Op = odf::OperationType;
+type Op = odf::metadata::OperationType;
 
 /// Snapshot merge strategy.
 ///
 /// See [`odf::MergeStrategySnapshot`] for details.
 pub struct MergeStrategySnapshot {
-    vocab: odf::DatasetVocabulary,
+    vocab: odf::metadata::DatasetVocabulary,
     primary_key: Vec<String>,
     compare_columns: Option<Vec<String>>,
 }
 
 impl MergeStrategySnapshot {
-    pub fn new(vocab: odf::DatasetVocabulary, cfg: odf::MergeStrategySnapshot) -> Self {
+    pub fn new(
+        vocab: odf::metadata::DatasetVocabulary,
+        cfg: odf::metadata::MergeStrategySnapshot,
+    ) -> Self {
         assert!(!cfg.primary_key.is_empty());
         if let Some(c) = &cfg.compare_columns {
             assert!(!c.is_empty());
@@ -355,7 +357,7 @@ impl MergeStrategy for MergeStrategySnapshot {
                     &self.vocab.operation_type_column,
                     // TODO: Cast to `u8` after Spark is updated
                     // See: https://github.com/kamu-data/kamu-cli/issues/445
-                    lit(odf::OperationType::Append as i32),
+                    lit(odf::metadata::OperationType::Append as i32),
                 )
                 .int_err()?
                 .columns_to_front(&[&self.vocab.operation_type_column])

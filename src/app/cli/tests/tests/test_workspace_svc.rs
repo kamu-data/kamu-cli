@@ -10,14 +10,14 @@
 use std::path::Path;
 use std::sync::Arc;
 
-use kamu::domain::*;
-use kamu::testing::{MetadataFactory, ParquetWriterHelper};
+use file_utils::OwnedFile;
+use kamu::testing::ParquetWriterHelper;
 use kamu::*;
 use kamu_cli::*;
 use kamu_cli_puppet::extensions::KamuCliPuppetExt;
 use kamu_cli_puppet::KamuCliPuppet;
-use opendatafabric::serde::yaml::Manifest;
-use opendatafabric::*;
+use odf::dataset::{DatasetFactoryImpl, DatasetLayout};
+use odf::metadata::testing::MetadataFactory;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -87,16 +87,17 @@ async fn init_v0_workspace(workspace_path: &Path) {
     let datasets_dir = workspace_root.join("datasets");
     std::fs::create_dir(&datasets_dir).unwrap();
 
-    let dataset_name = DatasetName::new_unchecked("foo");
+    let dataset_name = odf::DatasetName::new_unchecked("foo");
     let dataset_dir = datasets_dir.join(&dataset_name);
 
+    use odf::Dataset;
     let dataset = DatasetFactoryImpl::get_local_fs(DatasetLayout::create(&dataset_dir).unwrap());
 
     // Metadata & refs
     dataset
         .commit_event(
-            MetadataFactory::seed(DatasetKind::Root).build().into(),
-            CommitOpts::default(),
+            MetadataFactory::seed(odf::DatasetKind::Root).build().into(),
+            odf::dataset::CommitOpts::default(),
         )
         .await
         .unwrap();
@@ -104,7 +105,7 @@ async fn init_v0_workspace(workspace_path: &Path) {
     dataset
         .commit_event(
             MetadataFactory::set_data_schema().build().into(),
-            CommitOpts::default(),
+            odf::dataset::CommitOpts::default(),
         )
         .await
         .unwrap();
@@ -118,23 +119,25 @@ async fn init_v0_workspace(workspace_path: &Path) {
 
     dataset
         .commit_add_data(
-            AddDataParams {
+            odf::dataset::AddDataParams {
                 prev_checkpoint: None,
                 prev_offset: None,
-                new_offset_interval: Some(OffsetInterval { start: 0, end: 10 }),
+                new_offset_interval: Some(odf::metadata::OffsetInterval { start: 0, end: 10 }),
                 new_watermark: None,
                 new_source_state: None,
             },
             Some(OwnedFile::new(data_path)),
-            Some(CheckpointRef::New(OwnedFile::new(checkpoint_path))),
-            CommitOpts::default(),
+            Some(odf::dataset::CheckpointRef::New(OwnedFile::new(
+                checkpoint_path,
+            ))),
+            odf::dataset::CommitOpts::default(),
         )
         .await
         .unwrap();
 
     // Summary
     dataset
-        .get_summary(GetSummaryOpts::default())
+        .get_summary(odf::dataset::GetSummaryOpts::default())
         .await
         .unwrap();
 
@@ -147,7 +150,7 @@ async fn init_v0_workspace(workspace_path: &Path) {
 
     // Dataset config
     let dataset_config = DatasetConfig::default();
-    let manifest = Manifest {
+    let manifest = odf::metadata::serde::yaml::Manifest {
         kind: "DatasetConfig".to_owned(),
         version: 1,
         content: dataset_config,

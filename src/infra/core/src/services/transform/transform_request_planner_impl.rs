@@ -15,15 +15,6 @@ use dill::*;
 use engine::TransformRequestExt;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_core::*;
-use opendatafabric::{
-    AsTypedBlock,
-    DatasetVocabulary,
-    ExecuteTransform,
-    MetadataBlock,
-    MetadataEventTypeFlags,
-    Multihash,
-    SetDataSchema,
-};
 use random_names::get_random_name;
 use time_source::SystemTimeSource;
 
@@ -81,10 +72,14 @@ impl TransformRequestPlannerImpl {
     }
 
     // TODO: Avoid iterating through output chain multiple times
-    async fn get_vocab(&self, dataset: &dyn Dataset) -> Result<DatasetVocabulary, InternalError> {
+    async fn get_vocab(
+        &self,
+        dataset: &dyn odf::Dataset,
+    ) -> Result<odf::metadata::DatasetVocabulary, InternalError> {
+        use odf::dataset::MetadataChainExt;
         Ok(dataset
             .as_metadata_chain()
-            .accept_one(SearchSetVocabVisitor::new())
+            .accept_one(odf::dataset::SearchSetVocabVisitor::new())
             .await
             .int_err()?
             .into_event()
@@ -111,12 +106,12 @@ impl TransformRequestPlanner for TransformRequestPlannerImpl {
     async fn build_transform_verification_plan(
         &self,
         target: ResolvedDataset,
-        block_range: (Option<Multihash>, Option<Multihash>),
+        block_range: (Option<odf::Multihash>, Option<odf::Multihash>),
     ) -> Result<VerifyTransformOperation, VerifyTransformPlanError> {
         let metadata_chain = target.as_metadata_chain();
 
         let head = match block_range.1 {
-            None => metadata_chain.resolve_ref(&BlockRef::Head).await?,
+            None => metadata_chain.resolve_ref(&odf::BlockRef::Head).await?,
             Some(hash) => hash,
         };
         let tail = block_range.0;
@@ -131,16 +126,17 @@ impl TransformRequestPlanner for TransformRequestPlannerImpl {
 
         let (source, set_vocab, schema, blocks, finished_range) = {
             // TODO: Support dataset evolution
+            use odf::dataset::*;
             let mut set_transform_visitor = SearchSetTransformVisitor::new();
             let mut set_vocab_visitor = SearchSetVocabVisitor::new();
             let mut set_data_schema_visitor = SearchSetDataSchemaVisitor::new();
 
-            type Flag = MetadataEventTypeFlags;
+            type Flag = odf::metadata::MetadataEventTypeFlags;
             type Decision = MetadataVisitorDecision;
 
             struct ExecuteTransformCollectorVisitor {
                 tail_sequence_number: Option<u64>,
-                blocks: Vec<(Multihash, MetadataBlock)>,
+                blocks: Vec<(odf::Multihash, odf::MetadataBlock)>,
                 finished_range: bool,
             }
 
@@ -196,7 +192,7 @@ impl TransformRequestPlanner for TransformRequestPlannerImpl {
                 set_data_schema_visitor
                     .into_event()
                     .as_ref()
-                    .map(SetDataSchema::schema_as_arrow)
+                    .map(odf::metadata::SetDataSchema::schema_as_arrow)
                     .transpose() // Option<Result<SchemaRef, E>> -> Result<Option<SchemaRef>, E>
                     .int_err()?,
                 blocks,
@@ -206,7 +202,7 @@ impl TransformRequestPlanner for TransformRequestPlannerImpl {
 
         // Ensure start_block was found if specified
         if tail.is_some() && !finished_range {
-            return Err(InvalidIntervalError {
+            return Err(odf::dataset::InvalidIntervalError {
                 head,
                 tail: tail.unwrap(),
             }
@@ -259,7 +255,8 @@ impl TransformRequestPlanner for TransformRequestPlannerImpl {
         let mut steps = Vec::new();
 
         for (block_hash, block) in blocks.into_iter().rev() {
-            let block_t = block.as_typed::<ExecuteTransform>().unwrap();
+            use odf::metadata::AsTypedBlock;
+            let block_t = block.as_typed::<odf::metadata::ExecuteTransform>().unwrap();
 
             let inputs = futures::stream::iter(&block_t.event.query_inputs)
                 .then(|slice| {
@@ -282,7 +279,7 @@ impl TransformRequestPlanner for TransformRequestPlannerImpl {
                 request: TransformRequestExt {
                     operation_id: get_random_name(None, 10),
                     dataset_handle: target.get_handle().clone(),
-                    block_ref: BlockRef::Head,
+                    block_ref: odf::BlockRef::Head,
                     head: block_t.prev_block_hash.unwrap().clone(),
                     transform: source.transform.clone(),
                     system_time: block.system_time,

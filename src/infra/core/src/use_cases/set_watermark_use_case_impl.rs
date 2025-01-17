@@ -13,7 +13,6 @@ use chrono::{DateTime, Utc};
 use dill::{component, interface};
 use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer};
 use kamu_core::*;
-use opendatafabric::DatasetHandle;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -52,7 +51,7 @@ impl SetWatermarkUseCase for SetWatermarkUseCaseImpl {
     )]
     async fn execute(
         &self,
-        dataset_handle: &DatasetHandle,
+        dataset_handle: &odf::DatasetHandle,
         new_watermark: DateTime<Utc>,
     ) -> Result<SetWatermarkResult, SetWatermarkError> {
         // Permission check

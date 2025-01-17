@@ -27,7 +27,7 @@ sqlx = ["dep:sqlx"]
 
 [dependencies]
 internal-error = { workspace = true }
-opendatafabric = { workspace = true }
+odf = { workspace = true }
 
 async-trait = "0.1"
 strum = { version = "0.26", features = ["derive"] }

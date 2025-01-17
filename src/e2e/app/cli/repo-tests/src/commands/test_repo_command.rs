@@ -9,17 +9,16 @@
 
 use kamu_cli_puppet::extensions::{KamuCliPuppetExt, RepoAlias};
 use kamu_cli_puppet::KamuCliPuppet;
-use opendatafabric::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_repository_pull_aliases_commands(kamu: KamuCliPuppet) {
-    kamu.add_dataset(DatasetSnapshot {
+    kamu.add_dataset(odf::DatasetSnapshot {
         name: "foo".try_into().unwrap(),
-        kind: DatasetKind::Root,
-        metadata: vec![AddPushSource {
-            source_name: SourceState::DEFAULT_SOURCE_NAME.to_string(),
-            read: ReadStepNdJson {
+        kind: odf::DatasetKind::Root,
+        metadata: vec![odf::metadata::AddPushSource {
+            source_name: odf::metadata::SourceState::DEFAULT_SOURCE_NAME.to_string(),
+            read: odf::metadata::ReadStepNdJson {
                 schema: Some(vec![
                     "event_time TIMESTAMP".to_owned(),
                     "foo_string STRING".to_owned(),
@@ -28,7 +27,7 @@ pub async fn test_repository_pull_aliases_commands(kamu: KamuCliPuppet) {
             }
             .into(),
             preprocess: None,
-            merge: MergeStrategyLedger {
+            merge: odf::metadata::MergeStrategyLedger {
                 primary_key: vec!["event_time".to_owned(), "foo_string".to_owned()],
             }
             .into(),
@@ -62,7 +61,9 @@ pub async fn test_repository_pull_aliases_commands(kamu: KamuCliPuppet) {
     }
 
     let aliases = kamu
-        .get_list_of_repo_aliases(&DatasetRef::from(DatasetName::new_unchecked("foo")))
+        .get_list_of_repo_aliases(&odf::DatasetRef::from(odf::DatasetName::new_unchecked(
+            "foo",
+        )))
         .await;
     pretty_assertions::assert_eq!(dataset_aliases, aliases);
 
@@ -72,7 +73,9 @@ pub async fn test_repository_pull_aliases_commands(kamu: KamuCliPuppet) {
         .success();
 
     let aliases = kamu
-        .get_list_of_repo_aliases(&DatasetRef::from(DatasetName::new_unchecked("foo")))
+        .get_list_of_repo_aliases(&odf::DatasetRef::from(odf::DatasetName::new_unchecked(
+            "foo",
+        )))
         .await;
     pretty_assertions::assert_eq!(dataset_aliases[..2], aliases);
 
@@ -82,7 +85,9 @@ pub async fn test_repository_pull_aliases_commands(kamu: KamuCliPuppet) {
         .success();
 
     let aliases = kamu
-        .get_list_of_repo_aliases(&DatasetRef::from(DatasetName::new_unchecked("foo")))
+        .get_list_of_repo_aliases(&odf::DatasetRef::from(odf::DatasetName::new_unchecked(
+            "foo",
+        )))
         .await;
     assert!(aliases.is_empty());
 }
@@ -90,12 +95,12 @@ pub async fn test_repository_pull_aliases_commands(kamu: KamuCliPuppet) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_repository_push_aliases_commands(kamu: KamuCliPuppet) {
-    kamu.add_dataset(DatasetSnapshot {
+    kamu.add_dataset(odf::DatasetSnapshot {
         name: "foo".try_into().unwrap(),
-        kind: DatasetKind::Root,
-        metadata: vec![AddPushSource {
-            source_name: SourceState::DEFAULT_SOURCE_NAME.to_string(),
-            read: ReadStepNdJson {
+        kind: odf::DatasetKind::Root,
+        metadata: vec![odf::metadata::AddPushSource {
+            source_name: odf::metadata::SourceState::DEFAULT_SOURCE_NAME.to_string(),
+            read: odf::metadata::ReadStepNdJson {
                 schema: Some(vec![
                     "event_time TIMESTAMP".to_owned(),
                     "foo_string STRING".to_owned(),
@@ -104,7 +109,7 @@ pub async fn test_repository_push_aliases_commands(kamu: KamuCliPuppet) {
             }
             .into(),
             preprocess: None,
-            merge: MergeStrategyLedger {
+            merge: odf::metadata::MergeStrategyLedger {
                 primary_key: vec!["event_time".to_owned(), "foo_string".to_owned()],
             }
             .into(),
@@ -138,7 +143,9 @@ pub async fn test_repository_push_aliases_commands(kamu: KamuCliPuppet) {
     }
 
     let aliases = kamu
-        .get_list_of_repo_aliases(&DatasetRef::from(DatasetName::new_unchecked("foo")))
+        .get_list_of_repo_aliases(&odf::DatasetRef::from(odf::DatasetName::new_unchecked(
+            "foo",
+        )))
         .await;
     pretty_assertions::assert_eq!(dataset_aliases, aliases);
 
@@ -148,7 +155,9 @@ pub async fn test_repository_push_aliases_commands(kamu: KamuCliPuppet) {
         .success();
 
     let aliases = kamu
-        .get_list_of_repo_aliases(&DatasetRef::from(DatasetName::new_unchecked("foo")))
+        .get_list_of_repo_aliases(&odf::DatasetRef::from(odf::DatasetName::new_unchecked(
+            "foo",
+        )))
         .await;
     pretty_assertions::assert_eq!(dataset_aliases[..2], aliases);
     // Test remove all push aliases
@@ -157,7 +166,9 @@ pub async fn test_repository_push_aliases_commands(kamu: KamuCliPuppet) {
         .success();
 
     let aliases = kamu
-        .get_list_of_repo_aliases(&DatasetRef::from(DatasetName::new_unchecked("foo")))
+        .get_list_of_repo_aliases(&odf::DatasetRef::from(odf::DatasetName::new_unchecked(
+            "foo",
+        )))
         .await;
     assert!(aliases.is_empty());
 }

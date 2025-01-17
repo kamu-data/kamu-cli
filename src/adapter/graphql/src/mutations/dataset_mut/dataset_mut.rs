@@ -8,9 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
-use domain::{DeleteDatasetError, RenameDatasetError};
 use kamu_core::{self as domain, SetWatermarkPlanningError, SetWatermarkUseCase};
-use opendatafabric as odf;
 
 use crate::mutations::{
     ensure_account_is_owner_or_admin,
@@ -79,18 +77,18 @@ impl DatasetMut {
                 old_name: self.dataset_handle.alias.dataset_name.clone().into(),
                 new_name,
             })),
-            Err(RenameDatasetError::NameCollision(e)) => {
+            Err(odf::dataset::RenameDatasetError::NameCollision(e)) => {
                 Ok(RenameResult::NameCollision(RenameResultNameCollision {
                     colliding_alias: e.alias.into(),
                 }))
             }
-            Err(RenameDatasetError::Access(_)) => Err(GqlError::Gql(
+            Err(odf::dataset::RenameDatasetError::Access(_)) => Err(GqlError::Gql(
                 Error::new("Dataset access error")
                     .extend_with(|_, eev| eev.set("alias", self.dataset_handle.alias.to_string())),
             )),
             // "Not found" should not be reachable, since we've just resolved the dataset by ID
-            Err(RenameDatasetError::NotFound(e)) => Err(e.int_err().into()),
-            Err(RenameDatasetError::Internal(e)) => Err(e.into()),
+            Err(odf::dataset::RenameDatasetError::NotFound(e)) => Err(e.int_err().into()),
+            Err(odf::dataset::RenameDatasetError::Internal(e)) => Err(e.into()),
         }
     }
 
@@ -105,23 +103,23 @@ impl DatasetMut {
             Ok(_) => Ok(DeleteResult::Success(DeleteResultSuccess {
                 deleted_dataset: self.dataset_handle.alias.clone().into(),
             })),
-            Err(DeleteDatasetError::DanglingReference(e)) => Ok(DeleteResult::DanglingReference(
-                DeleteResultDanglingReference {
+            Err(odf::dataset::DeleteDatasetError::DanglingReference(e)) => Ok(
+                DeleteResult::DanglingReference(DeleteResultDanglingReference {
                     not_deleted_dataset: self.dataset_handle.alias.clone().into(),
                     dangling_child_refs: e
                         .children
                         .iter()
                         .map(|child_dataset| child_dataset.as_local_ref().into())
                         .collect(),
-                },
-            )),
-            Err(DeleteDatasetError::Access(_)) => Err(GqlError::Gql(
+                }),
+            ),
+            Err(odf::dataset::DeleteDatasetError::Access(_)) => Err(GqlError::Gql(
                 Error::new("Dataset access error")
                     .extend_with(|_, eev| eev.set("alias", self.dataset_handle.alias.to_string())),
             )),
             // "Not found" should not be reachable, since we've just resolved the dataset by ID
-            Err(DeleteDatasetError::NotFound(e)) => Err(e.int_err().into()),
-            Err(DeleteDatasetError::Internal(e)) => Err(e.into()),
+            Err(odf::dataset::DeleteDatasetError::NotFound(e)) => Err(e.int_err().into()),
+            Err(odf::dataset::DeleteDatasetError::Internal(e)) => Err(e.into()),
         }
     }
 

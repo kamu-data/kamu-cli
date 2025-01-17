@@ -11,7 +11,6 @@ use std::sync::Arc;
 
 use dill::*;
 use kamu_core::*;
-use opendatafabric::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -30,8 +29,8 @@ impl PushRequestPlannerImpl {
 
     async fn collect_push_plan_item(
         &self,
-        local_handle: DatasetHandle,
-        push_target: Option<&DatasetPushTarget>,
+        local_handle: odf::DatasetHandle,
+        push_target: Option<&odf::DatasetPushTarget>,
     ) -> Result<PushItem, PushResponse> {
         tracing::debug!(%local_handle, "Resolved push plan local target");
 
@@ -59,8 +58,8 @@ impl PushRequestPlanner for PushRequestPlannerImpl {
     #[tracing::instrument(level = "debug", skip_all, fields(?dataset_handles, ?push_target))]
     async fn collect_plan(
         &self,
-        dataset_handles: &[DatasetHandle],
-        push_target: Option<&DatasetPushTarget>,
+        dataset_handles: &[odf::DatasetHandle],
+        push_target: Option<&odf::DatasetPushTarget>,
     ) -> (Vec<PushItem>, Vec<PushResponse>) {
         let mut plan = Vec::new();
         let mut errors = Vec::new();

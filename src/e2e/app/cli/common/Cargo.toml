@@ -31,7 +31,7 @@ kamu-cli-puppet = { workspace = true, default-features = false, features = [
 ] }
 kamu-core = { workspace = true }
 kamu-flow-system = { workspace = true }
-opendatafabric = { workspace = true }
+odf = { workspace = true }
 
 async-graphql = { version = "7", default-features = false }
 async-trait = "0.1"

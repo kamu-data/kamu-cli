@@ -12,11 +12,11 @@ use std::collections::VecDeque;
 use std::sync::Arc;
 
 use chrono::Utc;
-use kamu::testing::{BaseRepoHarness, MetadataFactory};
+use kamu::testing::BaseRepoHarness;
 use kamu::AppendDatasetMetadataBatchUseCaseImpl;
 use kamu_core::AppendDatasetMetadataBatchUseCase;
 use messaging_outbox::MockOutbox;
-use opendatafabric::*;
+use odf::metadata::testing::MetadataFactory;
 
 use crate::tests::use_cases::*;
 
@@ -24,26 +24,26 @@ use crate::tests::use_cases::*;
 
 #[tokio::test]
 async fn test_append_dataset_metadata_batch() {
-    let alias_foo = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
 
     let mock_outbox = MockOutbox::new();
 
     let harness = AppendDatasetMetadataBatchUseCaseHarness::new(mock_outbox);
     let foo = harness.create_root_dataset(&alias_foo).await;
 
-    let set_info_block = MetadataBlock {
+    let set_info_block = odf::MetadataBlock {
         system_time: Utc::now(),
         prev_block_hash: Some(foo.head.clone()),
         sequence_number: 2,
-        event: MetadataEvent::SetInfo(MetadataFactory::set_info().description("test").build()),
+        event: odf::MetadataEvent::SetInfo(MetadataFactory::set_info().description("test").build()),
     };
     let hash_set_info_block = BaseRepoHarness::hash_from_block(&set_info_block);
 
-    let set_license_block = MetadataBlock {
+    let set_license_block = odf::MetadataBlock {
         system_time: Utc::now(),
         prev_block_hash: Some(hash_set_info_block.clone()),
         sequence_number: 3,
-        event: MetadataEvent::SetLicense(MetadataFactory::set_license().build()),
+        event: odf::MetadataEvent::SetLicense(MetadataFactory::set_license().build()),
     };
     let hash_set_license_block = BaseRepoHarness::hash_from_block(&set_license_block);
 
@@ -63,8 +63,8 @@ async fn test_append_dataset_metadata_batch() {
 
 #[tokio::test]
 async fn test_append_dataset_metadata_batch_with_new_dependencies() {
-    let alias_foo = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
-    let alias_bar = DatasetAlias::new(None, DatasetName::new_unchecked("bar"));
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
 
     let mut mock_outbox = MockOutbox::new();
     expect_outbox_dataset_dependencies_updated(&mut mock_outbox, 1);
@@ -75,11 +75,11 @@ async fn test_append_dataset_metadata_batch_with_new_dependencies() {
         .create_derived_dataset(&alias_bar, vec![foo.dataset_handle.as_local_ref()])
         .await;
 
-    let set_transform_block = MetadataBlock {
+    let set_transform_block = odf::MetadataBlock {
         system_time: Utc::now(),
         prev_block_hash: Some(bar.head.clone()),
         sequence_number: 2,
-        event: MetadataEvent::SetTransform(
+        event: odf::MetadataEvent::SetTransform(
             MetadataFactory::set_transform()
                 .inputs_from_refs_and_aliases(vec![(foo.dataset_handle.id, alias_foo.to_string())])
                 .build(),

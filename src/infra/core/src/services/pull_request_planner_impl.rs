@@ -15,7 +15,6 @@ use dill::*;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::*;
-use opendatafabric::*;
 use url::Url;
 
 use crate::SyncRequestBuilder;
@@ -153,7 +152,7 @@ impl PullRequestPlannerImpl {
         };
 
         let target = self.dataset_registry.get_dataset_by_handle(&hdl);
-        match DataWriterMetadataState::build(target.clone(), &BlockRef::Head, None).await {
+        match DataWriterMetadataState::build(target.clone(), &odf::BlockRef::Head, None).await {
             Ok(metadata_state) => Ok(PullIngestItem {
                 depth: pi.depth,
                 target,
@@ -391,7 +390,7 @@ struct PullGraphDepthFirstTraversal<'a> {
     current_account_subject: Arc<CurrentAccountSubject>,
     options: &'a PullOptions,
     tenancy_config: TenancyConfig,
-    visited: HashMap<DatasetAlias, PullItem>,
+    visited: HashMap<odf::DatasetAlias, PullItem>,
 }
 
 impl<'a> PullGraphDepthFirstTraversal<'a> {
@@ -471,7 +470,7 @@ impl<'a> PullGraphDepthFirstTraversal<'a> {
             let summary = self
                 .dataset_registry
                 .get_dataset_by_handle(&local_handle)
-                .get_summary(GetSummaryOpts::default())
+                .get_summary(odf::dataset::GetSummaryOpts::default())
                 .await
                 .int_err()?;
 
@@ -483,8 +482,8 @@ impl<'a> PullGraphDepthFirstTraversal<'a> {
                 // The exact depth is not important, as long as we keep `depth=>0` for derived
                 // datasets.
                 match summary.kind {
-                    DatasetKind::Root => -1,
-                    DatasetKind::Derivative => 0,
+                    odf::DatasetKind::Root => -1,
+                    odf::DatasetKind::Derivative => 0,
                 }
             };
 
@@ -511,7 +510,7 @@ impl<'a> PullGraphDepthFirstTraversal<'a> {
     async fn try_resolve_local_handle(
         &self,
         request: &PullRequest,
-    ) -> Result<Option<DatasetHandle>, PullError> {
+    ) -> Result<Option<odf::DatasetHandle>, PullError> {
         let maybe_local_handle = match request {
             PullRequest::Local(local_ref) => {
                 match self
@@ -521,7 +520,7 @@ impl<'a> PullGraphDepthFirstTraversal<'a> {
                 {
                     Some(hdl) => Some(hdl),
                     None => {
-                        return Err(PullError::NotFound(DatasetNotFoundError {
+                        return Err(PullError::NotFound(odf::dataset::DatasetNotFoundError {
                             dataset_ref: local_ref.clone(),
                         }))
                     }
@@ -550,14 +549,14 @@ impl<'a> PullGraphDepthFirstTraversal<'a> {
     // TODO: avoid traversing all datasets for every alias
     async fn try_inverse_lookup_dataset_by_pull_alias(
         &self,
-        remote_ref: &DatasetRefRemote,
-    ) -> Result<Option<DatasetHandle>, InternalError> {
+        remote_ref: &odf::DatasetRefRemote,
+    ) -> Result<Option<odf::DatasetHandle>, InternalError> {
         // Do a quick check when remote and local names match
         if let Some(remote_name) = remote_ref.dataset_name() {
             if let Some(local_handle) = self
                 .dataset_registry
                 .try_resolve_dataset_handle_by_ref(
-                    &DatasetAlias::new(None, remote_name.clone()).as_local_ref(),
+                    &odf::DatasetAlias::new(None, remote_name.clone()).as_local_ref(),
                 )
                 .await?
             {
@@ -598,9 +597,9 @@ impl<'a> PullGraphDepthFirstTraversal<'a> {
 
     fn form_local_alias(
         &self,
-        maybe_local_handle: Option<&DatasetHandle>,
+        maybe_local_handle: Option<&odf::DatasetHandle>,
         request: &PullRequest,
-    ) -> Result<DatasetAlias, PullError> {
+    ) -> Result<odf::DatasetAlias, PullError> {
         let local_alias = if let Some(hdl) = maybe_local_handle {
             // Target exists
             hdl.alias.clone()
@@ -611,7 +610,7 @@ impl<'a> PullGraphDepthFirstTraversal<'a> {
                     if let Some(alias) = local_ref.alias() {
                         alias.clone()
                     } else {
-                        return Err(PullError::NotFound(DatasetNotFoundError {
+                        return Err(PullError::NotFound(odf::dataset::DatasetNotFoundError {
                             dataset_ref: local_ref.clone(),
                         }));
                     }
@@ -631,19 +630,19 @@ impl<'a> PullGraphDepthFirstTraversal<'a> {
 
     fn infer_alias_from_remote_ref(
         &self,
-        remote_ref: &DatasetRefRemote,
-    ) -> Result<DatasetAlias, PullError> {
+        remote_ref: &odf::DatasetRefRemote,
+    ) -> Result<odf::DatasetAlias, PullError> {
         Ok(match &remote_ref {
-            DatasetRefRemote::ID(_, _) => {
+            odf::DatasetRefRemote::ID(_, _) => {
                 unimplemented!("Pulling from remote by ID is not supported")
             }
 
-            DatasetRefRemote::Alias(alias)
-            | DatasetRefRemote::Handle(DatasetHandleRemote { alias, .. }) => {
-                DatasetAlias::new(None, alias.dataset_name.clone())
+            odf::DatasetRefRemote::Alias(alias)
+            | odf::DatasetRefRemote::Handle(odf::metadata::DatasetHandleRemote { alias, .. }) => {
+                odf::DatasetAlias::new(None, alias.dataset_name.clone())
             }
 
-            DatasetRefRemote::Url(url) => DatasetAlias::new(
+            odf::DatasetRefRemote::Url(url) => odf::DatasetAlias::new(
                 if self.tenancy_config == TenancyConfig::MultiTenant {
                     Some(self.current_account_subject.account_name().clone())
                 } else {
@@ -654,18 +653,18 @@ impl<'a> PullGraphDepthFirstTraversal<'a> {
         })
     }
 
-    fn infer_local_name_from_url(&self, url: &Url) -> Result<DatasetName, PullError> {
+    fn infer_local_name_from_url(&self, url: &Url) -> Result<odf::DatasetName, PullError> {
         // Try to use last path segment for a name (ignoring the trailing slash)
         if let Some(path) = url.path_segments() {
             if let Some(last_segment) = path.rev().find(|s| !s.is_empty()) {
-                if let Ok(name) = DatasetName::try_from(last_segment) {
+                if let Ok(name) = odf::DatasetName::try_from(last_segment) {
                     return Ok(name);
                 }
             }
         }
         // Fall back to using domain name
         if let Some(url::Host::Domain(host)) = url.host() {
-            if let Ok(name) = DatasetName::try_from(host) {
+            if let Ok(name) = odf::DatasetName::try_from(host) {
                 return Ok(name);
             }
         }
@@ -678,8 +677,8 @@ impl<'a> PullGraphDepthFirstTraversal<'a> {
     async fn resolve_remote_ref(
         &self,
         request: &PullRequest,
-        maybe_local_handle: Option<&DatasetHandle>,
-    ) -> Result<Option<DatasetRefRemote>, PullError> {
+        maybe_local_handle: Option<&odf::DatasetHandle>,
+    ) -> Result<Option<odf::DatasetRefRemote>, PullError> {
         let remote_ref = if let PullRequest::Remote(remote) = request {
             Ok(Some(remote.remote_ref.clone()))
         } else if let Some(hdl) = &maybe_local_handle {
@@ -693,8 +692,8 @@ impl<'a> PullGraphDepthFirstTraversal<'a> {
 
     async fn resolve_pull_alias(
         &self,
-        hdl: &DatasetHandle,
-    ) -> Result<Option<DatasetRefRemote>, PullError> {
+        hdl: &odf::DatasetHandle,
+    ) -> Result<Option<odf::DatasetRefRemote>, PullError> {
         let remote_aliases = match self.remote_alias_registry.get_remote_aliases(hdl).await {
             Ok(v) => Ok(v),
             Err(e) => match e {
@@ -714,7 +713,7 @@ impl<'a> PullGraphDepthFirstTraversal<'a> {
     // TODO: consider using data from dependency graph
     async fn traverse_upstream_datasets(
         &mut self,
-        summary: DatasetSummary,
+        summary: odf::DatasetSummary,
     ) -> Result<i32, PullError> {
         // TODO: EVO: Should be accounting for historical dependencies, not only current
         // ones?
@@ -743,7 +742,7 @@ impl<'a> PullGraphDepthFirstTraversal<'a> {
 struct PullItem {
     depth: i32,
     local_target: PullLocalTarget,
-    maybe_remote_ref: Option<DatasetRefRemote>,
+    maybe_remote_ref: Option<odf::DatasetRefRemote>,
     maybe_original_request: Option<PullRequest>,
 }
 

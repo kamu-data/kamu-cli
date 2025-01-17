@@ -9,7 +9,6 @@
 
 use dill::Catalog;
 use kamu_accounts::{AccountRepository, PasswordHashRepository, PROVIDER_PASSWORD};
-use opendatafabric::AccountName;
 
 use crate::{generate_salt, make_password_hash, make_test_account};
 
@@ -18,7 +17,7 @@ use crate::{generate_salt, make_password_hash, make_test_account};
 pub async fn test_no_password_stored(catalog: &Catalog) {
     let password_hash_repo = catalog.get_one::<dyn PasswordHashRepository>().unwrap();
 
-    let account_name = AccountName::new_unchecked("I don't exist");
+    let account_name = odf::AccountName::new_unchecked("I don't exist");
     let result = password_hash_repo
         .find_password_hash_by_account_name(&account_name)
         .await

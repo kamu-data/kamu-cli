@@ -14,7 +14,6 @@ use database_common::{PaginationOpts, TransactionRef, TransactionRefT};
 use dill::*;
 use futures::TryStreamExt;
 use kamu_flow_system::*;
-use opendatafabric::{AccountID, DatasetID};
 use sqlx::{FromRow, Postgres, QueryBuilder};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -207,7 +206,7 @@ impl PostgresFlowEventStore {
 
     async fn get_dataset_flow_run_stats(
         &self,
-        dataset_id: &DatasetID,
+        dataset_id: &odf::DatasetID,
         flow_type: DatasetFlowType,
     ) -> Result<FlowRunStats, InternalError> {
         let mut tr = self.transaction.lock().await;
@@ -603,7 +602,7 @@ impl FlowEventStore for PostgresFlowEventStore {
 
     fn get_all_flow_ids_by_dataset(
         &self,
-        dataset_id: &DatasetID,
+        dataset_id: &odf::DatasetID,
         filters: &DatasetFlowFilters,
         pagination: PaginationOpts,
     ) -> FlowIDStream {
@@ -654,7 +653,7 @@ impl FlowEventStore for PostgresFlowEventStore {
 
     async fn get_count_flows_by_dataset(
         &self,
-        dataset_id: &DatasetID,
+        dataset_id: &odf::DatasetID,
         filters: &DatasetFlowFilters,
     ) -> Result<usize, InternalError> {
         let mut tr = self.transaction.lock().await;
@@ -689,7 +688,7 @@ impl FlowEventStore for PostgresFlowEventStore {
 
     fn get_all_flow_ids_by_datasets(
         &self,
-        dataset_ids: HashSet<DatasetID>,
+        dataset_ids: HashSet<odf::DatasetID>,
         filters: &DatasetFlowFilters,
         pagination: PaginationOpts,
     ) -> FlowIDStream {
@@ -740,7 +739,7 @@ impl FlowEventStore for PostgresFlowEventStore {
 
     fn get_unique_flow_initiator_ids_by_dataset(
         &self,
-        dataset_id: &DatasetID,
+        dataset_id: &odf::DatasetID,
     ) -> InitiatorIDStream {
         let dataset_id = dataset_id.to_string();
 
@@ -759,7 +758,7 @@ impl FlowEventStore for PostgresFlowEventStore {
                 dataset_id,
                 SYSTEM_INITIATOR,
             ).try_map(|event_row| {
-                Ok(AccountID::from_did_str(&event_row.initiator).unwrap())
+                Ok(odf::AccountID::from_did_str(&event_row.initiator).unwrap())
             })
             .fetch(connection_mut);
 
@@ -943,7 +942,7 @@ impl FlowEventStore for PostgresFlowEventStore {
 
     async fn get_count_flows_by_datasets(
         &self,
-        dataset_ids: HashSet<DatasetID>,
+        dataset_ids: HashSet<odf::DatasetID>,
         filters: &DatasetFlowFilters,
     ) -> Result<usize, InternalError> {
         let mut tr = self.transaction.lock().await;

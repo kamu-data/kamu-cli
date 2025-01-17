@@ -23,7 +23,7 @@ doctest = false
 
 [dependencies]
 database-common = { workspace = true }
-opendatafabric = { workspace = true }
+odf = { workspace = true }
 kamu-task-system = { workspace = true }
 
 async-stream = "0.3"

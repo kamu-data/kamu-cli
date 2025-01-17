@@ -17,7 +17,6 @@ use kamu::domain::{
     CompactionPhase,
     CompactionResult,
 };
-use opendatafabric::DatasetHandle;
 
 #[derive(Clone)]
 pub struct CompactionMultiProgress {
@@ -48,7 +47,10 @@ impl CompactionMultiProgress {
 }
 
 impl CompactionMultiListener for CompactionMultiProgress {
-    fn begin_compact(&self, dataset_handle: &DatasetHandle) -> Option<Arc<dyn CompactionListener>> {
+    fn begin_compact(
+        &self,
+        dataset_handle: &odf::DatasetHandle,
+    ) -> Option<Arc<dyn CompactionListener>> {
         Some(Arc::new(CompactionProgress::new(
             dataset_handle,
             &self.multi_progress,
@@ -57,7 +59,7 @@ impl CompactionMultiListener for CompactionMultiProgress {
 }
 
 pub struct CompactionProgress {
-    dataset_handle: DatasetHandle,
+    dataset_handle: odf::DatasetHandle,
     curr_progress: indicatif::ProgressBar,
 }
 
@@ -65,7 +67,7 @@ pub struct CompactionProgress {
 
 impl CompactionProgress {
     pub fn new(
-        dataset_handle: &DatasetHandle,
+        dataset_handle: &odf::DatasetHandle,
         multi_progress: &Arc<indicatif::MultiProgress>,
     ) -> Self {
         Self {

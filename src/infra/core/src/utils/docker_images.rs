@@ -14,10 +14,6 @@ pub const RISINGWAVE: &str = "ghcr.io/kamu-data/engine-risingwave:0.2.0-risingwa
 
 pub const LIVY: &str = SPARK;
 pub const JUPYTER: &str = "ghcr.io/kamu-data/jupyter:0.7.0";
-
-// Test Images
-pub const HTTPD: &str = "docker.io/httpd:2.4";
-pub const MINIO: &str = "docker.io/minio/minio:RELEASE.2021-08-31T05-46-54Z";
 pub const BUSYBOX: &str = "docker.io/busybox:latest";
 
 #[cfg(feature = "ingest-mqtt")]

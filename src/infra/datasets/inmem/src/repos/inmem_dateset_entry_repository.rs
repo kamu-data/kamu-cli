@@ -14,16 +14,15 @@ use database_common::PaginationOpts;
 use dill::*;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_datasets::*;
-use opendatafabric::{AccountID, DatasetID, DatasetName};
 use tokio::sync::RwLock;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Default)]
 struct State {
-    rows: HashMap<DatasetID, DatasetEntry>,
-    rows_by_name: BTreeMap<DatasetName, DatasetEntry>,
-    rows_by_owner: HashMap<AccountID, BTreeSet<DatasetID>>,
+    rows: HashMap<odf::DatasetID, DatasetEntry>,
+    rows_by_name: BTreeMap<odf::DatasetName, DatasetEntry>,
+    rows_by_owner: HashMap<odf::AccountID, BTreeSet<odf::DatasetID>>,
 }
 
 impl State {
@@ -69,7 +68,7 @@ impl DatasetEntryRepository for InMemoryDatasetEntryRepository {
 
     async fn dataset_entries_count_by_owner_id(
         &self,
-        owner_id: &AccountID,
+        owner_id: &odf::AccountID,
     ) -> Result<usize, InternalError> {
         let readable_state = self.state.read().await;
 
@@ -100,7 +99,7 @@ impl DatasetEntryRepository for InMemoryDatasetEntryRepository {
 
     async fn get_dataset_entry(
         &self,
-        dataset_id: &DatasetID,
+        dataset_id: &odf::DatasetID,
     ) -> Result<DatasetEntry, GetDatasetEntryError> {
         let readable_state = self.state.read().await;
 
@@ -115,7 +114,7 @@ impl DatasetEntryRepository for InMemoryDatasetEntryRepository {
 
     async fn get_multiple_dataset_entries(
         &self,
-        dataset_ids: &[DatasetID],
+        dataset_ids: &[odf::DatasetID],
     ) -> Result<DatasetEntriesResolution, GetMultipleDatasetEntriesError> {
         let readable_state = self.state.read().await;
 
@@ -135,8 +134,8 @@ impl DatasetEntryRepository for InMemoryDatasetEntryRepository {
 
     async fn get_dataset_entry_by_owner_and_name(
         &self,
-        owner_id: &AccountID,
-        name: &DatasetName,
+        owner_id: &odf::AccountID,
+        name: &odf::DatasetName,
     ) -> Result<DatasetEntry, GetDatasetEntryByNameError> {
         let readable_state = self.state.read().await;
 
@@ -156,7 +155,7 @@ impl DatasetEntryRepository for InMemoryDatasetEntryRepository {
 
     async fn get_dataset_entries_by_owner_id<'a>(
         &'a self,
-        owner_id: &AccountID,
+        owner_id: &odf::AccountID,
         pagination: PaginationOpts,
     ) -> DatasetEntryStream<'a> {
         let dataset_entries_page = {
@@ -216,8 +215,8 @@ impl DatasetEntryRepository for InMemoryDatasetEntryRepository {
 
     async fn update_dataset_entry_name(
         &self,
-        dataset_id: &DatasetID,
-        new_name: &DatasetName,
+        dataset_id: &odf::DatasetID,
+        new_name: &odf::DatasetName,
     ) -> Result<(), UpdateDatasetEntryNameError> {
         let mut writable_state = self.state.write().await;
 
@@ -259,7 +258,7 @@ impl DatasetEntryRepository for InMemoryDatasetEntryRepository {
 
     async fn delete_dataset_entry(
         &self,
-        dataset_id: &DatasetID,
+        dataset_id: &odf::DatasetID,
     ) -> Result<(), DeleteEntryDatasetError> {
         {
             let mut writable_state = self.state.write().await;

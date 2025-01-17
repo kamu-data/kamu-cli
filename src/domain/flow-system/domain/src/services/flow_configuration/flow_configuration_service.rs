@@ -9,7 +9,6 @@
 
 use event_sourcing::TryLoadError;
 use internal_error::{ErrorIntoInternal, InternalError};
-use opendatafabric::DatasetID;
 use tokio_stream::Stream;
 
 use crate::*;
@@ -27,7 +26,7 @@ pub trait FlowConfigurationService: Sync + Send {
     /// Find all configurations by dataset ids
     async fn find_configurations_by_datasets(
         &self,
-        dataset_ids: Vec<DatasetID>,
+        dataset_ids: Vec<odf::DatasetID>,
     ) -> FlowConfigurationStateStream;
 
     /// Set or modify flow configuration
@@ -47,19 +46,19 @@ pub trait FlowConfigurationService: Sync + Send {
 pub trait FlowConfigurationServiceExt {
     async fn try_get_dataset_ingest_rule(
         &self,
-        dataset_id: DatasetID,
+        dataset_id: odf::DatasetID,
         flow_type: DatasetFlowType,
     ) -> Result<Option<IngestRule>, FindFlowConfigurationError>;
 
     async fn try_get_dataset_compaction_rule(
         &self,
-        dataset_id: DatasetID,
+        dataset_id: odf::DatasetID,
         flow_type: DatasetFlowType,
     ) -> Result<Option<CompactionRule>, FindFlowConfigurationError>;
 
     async fn try_get_dataset_reset_rule(
         &self,
-        dataset_id: DatasetID,
+        dataset_id: odf::DatasetID,
         flow_type: DatasetFlowType,
     ) -> Result<Option<ResetRule>, FindFlowConfigurationError>;
 
@@ -73,7 +72,7 @@ pub trait FlowConfigurationServiceExt {
 impl<T: FlowConfigurationService + ?Sized> FlowConfigurationServiceExt for T {
     async fn try_get_dataset_ingest_rule(
         &self,
-        dataset_id: DatasetID,
+        dataset_id: odf::DatasetID,
         flow_type: DatasetFlowType,
     ) -> Result<Option<IngestRule>, FindFlowConfigurationError> {
         let maybe_config = self
@@ -92,7 +91,7 @@ impl<T: FlowConfigurationService + ?Sized> FlowConfigurationServiceExt for T {
 
     async fn try_get_dataset_compaction_rule(
         &self,
-        dataset_id: DatasetID,
+        dataset_id: odf::DatasetID,
         flow_type: DatasetFlowType,
     ) -> Result<Option<CompactionRule>, FindFlowConfigurationError> {
         let maybe_config = self
@@ -111,7 +110,7 @@ impl<T: FlowConfigurationService + ?Sized> FlowConfigurationServiceExt for T {
 
     async fn try_get_dataset_reset_rule(
         &self,
-        dataset_id: DatasetID,
+        dataset_id: odf::DatasetID,
         flow_type: DatasetFlowType,
     ) -> Result<Option<ResetRule>, FindFlowConfigurationError> {
         let maybe_config = self

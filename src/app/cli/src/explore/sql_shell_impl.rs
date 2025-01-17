@@ -16,7 +16,7 @@ use std::time::Duration;
 
 use container_runtime::*;
 use internal_error::*;
-use kamu::*;
+use odf::dataset::DatasetLayout;
 use random_names::get_random_name;
 
 use crate::error::{CommandRunError, SubprocessError};

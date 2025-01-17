@@ -9,23 +9,27 @@
 
 mod compaction;
 pub mod ingest;
+mod object_store;
 mod query;
 mod remote;
 mod reset;
+mod storage;
 mod sync;
 mod transform;
 mod watermark;
 
 pub use compaction::*;
 pub use ingest::*;
+pub use object_store::*;
 pub use remote::*;
 pub use reset::*;
+pub use storage::*;
 pub use sync::*;
 pub use transform::*;
 pub use watermark::*;
 
 mod dataset_changes_service_impl;
-mod dataset_registry_repo_bridge;
+mod dataset_registry_solo_unit_bridge;
 mod export_service_impl;
 mod metadata_query_service_impl;
 mod provenance_service_impl;
@@ -36,7 +40,7 @@ mod query_service_impl;
 mod verification_service_impl;
 
 pub use dataset_changes_service_impl::*;
-pub use dataset_registry_repo_bridge::*;
+pub use dataset_registry_solo_unit_bridge::*;
 pub use export_service_impl::*;
 pub use metadata_query_service_impl::*;
 pub use provenance_service_impl::*;

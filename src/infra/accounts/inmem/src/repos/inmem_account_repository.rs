@@ -12,7 +12,6 @@ use std::sync::{Arc, Mutex};
 
 use database_common::PaginationOpts;
 use dill::*;
-use opendatafabric::{AccountID, AccountName};
 
 use crate::domain::*;
 
@@ -26,10 +25,10 @@ pub struct InMemoryAccountRepository {
 
 #[derive(Default)]
 struct State {
-    accounts_by_id: HashMap<AccountID, Account>,
-    accounts_by_name: HashMap<AccountName, Account>,
-    account_id_by_provider_identity_key: HashMap<String, AccountID>,
-    password_hash_by_account_name: HashMap<AccountName, String>,
+    accounts_by_id: HashMap<odf::AccountID, Account>,
+    accounts_by_name: HashMap<odf::AccountName, Account>,
+    account_id_by_provider_identity_key: HashMap<String, odf::AccountID>,
+    password_hash_by_account_name: HashMap<odf::AccountName, String>,
 }
 
 impl State {
@@ -109,7 +108,7 @@ impl AccountRepository for InMemoryAccountRepository {
 
     async fn get_account_by_id(
         &self,
-        account_id: &AccountID,
+        account_id: &odf::AccountID,
     ) -> Result<Account, GetAccountByIdError> {
         let guard = self.state.lock().unwrap();
         if let Some(account_data) = guard.accounts_by_id.get(account_id) {
@@ -123,7 +122,7 @@ impl AccountRepository for InMemoryAccountRepository {
 
     async fn get_accounts_by_ids(
         &self,
-        account_ids: Vec<AccountID>,
+        account_ids: Vec<odf::AccountID>,
     ) -> Result<Vec<Account>, GetAccountByIdError> {
         let guard = self.state.lock().unwrap();
 
@@ -137,7 +136,7 @@ impl AccountRepository for InMemoryAccountRepository {
 
     async fn get_account_by_name(
         &self,
-        account_name: &AccountName,
+        account_name: &odf::AccountName,
     ) -> Result<Account, GetAccountByNameError> {
         let guard = self.state.lock().unwrap();
         if let Some(account_data) = guard.accounts_by_name.get(account_name) {
@@ -154,7 +153,7 @@ impl AccountRepository for InMemoryAccountRepository {
     async fn find_account_id_by_provider_identity_key(
         &self,
         provider_identity_key: &str,
-    ) -> Result<Option<AccountID>, FindAccountIdByProviderIdentityKeyError> {
+    ) -> Result<Option<odf::AccountID>, FindAccountIdByProviderIdentityKeyError> {
         let guard = self.state.lock().unwrap();
         let maybe_account_id = guard
             .account_id_by_provider_identity_key
@@ -165,7 +164,7 @@ impl AccountRepository for InMemoryAccountRepository {
     async fn find_account_id_by_email(
         &self,
         email: &str,
-    ) -> Result<Option<AccountID>, FindAccountIdByEmailError> {
+    ) -> Result<Option<odf::AccountID>, FindAccountIdByEmailError> {
         let guard = self.state.lock().unwrap();
         for account in guard.accounts_by_id.values() {
             if let Some(account_email) = &account.email
@@ -179,8 +178,8 @@ impl AccountRepository for InMemoryAccountRepository {
 
     async fn find_account_id_by_name(
         &self,
-        account_name: &AccountName,
-    ) -> Result<Option<AccountID>, FindAccountIdByNameError> {
+        account_name: &odf::AccountName,
+    ) -> Result<Option<odf::AccountID>, FindAccountIdByNameError> {
         let guard = self.state.lock().unwrap();
         let maybe_account = guard.accounts_by_name.get(account_name);
         Ok(maybe_account.map(|a| a.id.clone()))
@@ -223,7 +222,7 @@ impl ExpensiveAccountRepository for InMemoryAccountRepository {
 impl PasswordHashRepository for InMemoryAccountRepository {
     async fn save_password_hash(
         &self,
-        account_name: &AccountName,
+        account_name: &odf::AccountName,
         password_hash: String,
     ) -> Result<(), SavePasswordHashError> {
         let mut guard = self.state.lock().unwrap();
@@ -235,7 +234,7 @@ impl PasswordHashRepository for InMemoryAccountRepository {
 
     async fn find_password_hash_by_account_name(
         &self,
-        account_name: &AccountName,
+        account_name: &odf::AccountName,
     ) -> Result<Option<String>, FindPasswordHashError> {
         let guard = self.state.lock().unwrap();
         let maybe_hash_as_string = guard

@@ -11,11 +11,8 @@ use ::serde::{Deserialize, Serialize};
 use ::serde_with::skip_serializing_none;
 use async_trait::async_trait;
 use internal_error::InternalError;
-use opendatafabric::*;
 use thiserror::Error;
 use url::Url;
-
-use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -30,13 +27,16 @@ pub struct RepositoryAccessInfo {
 
 #[async_trait]
 pub trait RemoteRepositoryRegistry: Send + Sync {
-    fn get_all_repositories<'s>(&'s self) -> Box<dyn Iterator<Item = RepoName> + 's>;
+    fn get_all_repositories<'s>(&'s self) -> Box<dyn Iterator<Item = odf::RepoName> + 's>;
 
-    fn get_repository(&self, repo_name: &RepoName) -> Result<RepositoryAccessInfo, GetRepoError>;
+    fn get_repository(
+        &self,
+        repo_name: &odf::RepoName,
+    ) -> Result<RepositoryAccessInfo, GetRepoError>;
 
-    fn add_repository(&self, repo_name: &RepoName, url: Url) -> Result<(), AddRepoError>;
+    fn add_repository(&self, repo_name: &odf::RepoName, url: Url) -> Result<(), AddRepoError>;
 
-    fn delete_repository(&self, repo_name: &RepoName) -> Result<(), DeleteRepoError>;
+    fn delete_repository(&self, repo_name: &odf::RepoName) -> Result<(), DeleteRepoError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -65,7 +65,7 @@ pub enum AddRepoError {
     UnsupportedProtocol(
         #[from]
         #[backtrace]
-        UnsupportedProtocolError,
+        odf::dataset::UnsupportedProtocolError,
     ),
     #[error(transparent)]
     AlreadyExists(
@@ -104,7 +104,7 @@ pub enum DeleteRepoError {
 #[derive(Error, Clone, Eq, PartialEq, Debug)]
 #[error("Repository {repo_name} does not exist")]
 pub struct RepositoryNotFoundError {
-    pub repo_name: RepoName,
+    pub repo_name: odf::RepoName,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -112,5 +112,5 @@ pub struct RepositoryNotFoundError {
 #[derive(Error, Clone, Eq, PartialEq, Debug)]
 #[error("Repository {repo_name} already exists")]
 pub struct RepositoryAlreadyExistsError {
-    pub repo_name: RepoName,
+    pub repo_name: odf::RepoName,
 }

@@ -173,7 +173,7 @@ async fn test_statement_anonymous() {
     let ctx = SessionContext::new();
     let df = ctx.read_batch(record_batches.pop().unwrap()).unwrap();
 
-    kamu_data_utils::testing::assert_schema_eq(
+    odf::utils::testing::assert_schema_eq(
         df.schema(),
         indoc!(
             "
@@ -184,7 +184,7 @@ async fn test_statement_anonymous() {
             "
         ),
     );
-    kamu_data_utils::testing::assert_data_eq(
+    odf::utils::testing::assert_data_eq(
         df,
         indoc!(
             "
@@ -227,7 +227,7 @@ async fn test_statement_bearer() {
     let ctx = SessionContext::new();
     let df = ctx.read_batch(record_batches.pop().unwrap()).unwrap();
 
-    kamu_data_utils::testing::assert_schema_eq(
+    odf::utils::testing::assert_schema_eq(
         df.schema(),
         indoc!(
             "
@@ -238,7 +238,7 @@ async fn test_statement_bearer() {
             "
         ),
     );
-    kamu_data_utils::testing::assert_data_eq(
+    odf::utils::testing::assert_data_eq(
         df,
         indoc!(
             "

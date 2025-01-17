@@ -28,7 +28,6 @@ use kamu_core::{
     SetWatermarkResult,
     TenancyConfig,
 };
-use opendatafabric::{DatasetAlias, DatasetName};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -37,9 +36,9 @@ async fn test_no_watermark_initially() {
     let harness = WatermarkTestHarness::new(TenancyConfig::SingleTenant);
 
     let foo = harness
-        .create_root_dataset(&DatasetAlias::new(
+        .create_root_dataset(&odf::DatasetAlias::new(
             None,
-            DatasetName::try_from("foo").unwrap(),
+            odf::DatasetName::try_from("foo").unwrap(),
         ))
         .await;
 
@@ -56,9 +55,9 @@ async fn test_set_watermark() {
     let harness = WatermarkTestHarness::new(TenancyConfig::SingleTenant);
 
     let foo = harness
-        .create_root_dataset(&DatasetAlias::new(
+        .create_root_dataset(&odf::DatasetAlias::new(
             None,
-            DatasetName::try_from("foo").unwrap(),
+            odf::DatasetName::try_from("foo").unwrap(),
         ))
         .await;
 
@@ -123,15 +122,15 @@ async fn test_set_watermark_rejects_on_derivative() {
     let harness = WatermarkTestHarness::new(TenancyConfig::MultiTenant);
 
     let root = harness
-        .create_root_dataset(&DatasetAlias::new(
+        .create_root_dataset(&odf::DatasetAlias::new(
             None,
-            DatasetName::try_from("foo").unwrap(),
+            odf::DatasetName::try_from("foo").unwrap(),
         ))
         .await;
 
     let derived = harness
         .create_derived_dataset(
-            &DatasetAlias::new(None, DatasetName::try_from("bar").unwrap()),
+            &odf::DatasetAlias::new(None, odf::DatasetName::try_from("bar").unwrap()),
             vec![root.dataset_handle.as_local_ref()],
         )
         .await;

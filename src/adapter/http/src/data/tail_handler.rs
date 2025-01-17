@@ -14,7 +14,6 @@ use dill::Catalog;
 use http_common::*;
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_core::*;
-use opendatafabric::DatasetRef;
 
 use super::query_types::{DataFormat, Schema, SchemaFormat};
 use crate::DatasetAliasInPath;
@@ -37,7 +36,7 @@ use crate::DatasetAliasInPath;
 #[tracing::instrument(level = "info", skip_all, (%dataset_ref))]
 pub async fn dataset_tail_handler(
     Extension(catalog): Extension<Catalog>,
-    Extension(dataset_ref): Extension<DatasetRef>,
+    Extension(dataset_ref): Extension<odf::DatasetRef>,
     Query(params): Query<DatasetTailParams>,
 ) -> Result<Json<DatasetTailResponse>, ApiError> {
     tracing::debug!(request = ?params, "Tail");

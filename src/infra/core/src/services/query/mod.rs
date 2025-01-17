@@ -29,8 +29,6 @@ use futures::stream::{self, StreamExt};
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_core::auth::DatasetActionAuthorizerExt;
 use kamu_core::*;
-use opendatafabric::*;
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Catalog
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -253,7 +251,7 @@ pub(crate) struct KamuTable {
     session_config: Arc<SessionConfig>,
     table_options: Arc<TableOptions>,
     resolved_dataset: ResolvedDataset,
-    as_of: Option<Multihash>,
+    as_of: Option<odf::Multihash>,
     hints: Option<DatasetQueryHints>,
     cache: Mutex<TableCache>,
 }
@@ -269,7 +267,7 @@ impl KamuTable {
         session_config: Arc<SessionConfig>,
         table_options: Arc<TableOptions>,
         resolved_dataset: ResolvedDataset,
-        as_of: Option<Multihash>,
+        as_of: Option<odf::Multihash>,
         hints: Option<DatasetQueryHints>,
     ) -> Self {
         Self {
@@ -284,10 +282,11 @@ impl KamuTable {
 
     #[tracing::instrument(level="info", skip_all, fields(dataset = ?self.resolved_dataset))]
     async fn init_table_schema(&self) -> Result<SchemaRef, InternalError> {
+        use odf::dataset::MetadataChainExt;
         let maybe_set_data_schema = self
             .resolved_dataset
             .as_metadata_chain()
-            .accept_one(SearchSetDataSchemaVisitor::new())
+            .accept_one(odf::dataset::SearchSetDataSchemaVisitor::new())
             .await
             .int_err()?
             .into_event();
@@ -379,14 +378,14 @@ impl KamuTable {
 
     async fn collect_data_file_hashes(
         &self,
-        as_of: Option<&Multihash>,
-    ) -> Result<Vec<Multihash>, InternalError> {
+        as_of: Option<&odf::Multihash>,
+    ) -> Result<Vec<odf::Multihash>, InternalError> {
         let hash = if let Some(hash) = as_of {
             hash.clone()
         } else {
             self.resolved_dataset
                 .as_metadata_chain()
-                .resolve_ref(&BlockRef::Head)
+                .resolve_ref(&odf::BlockRef::Head)
                 .await
                 .int_err()?
         };
@@ -395,15 +394,16 @@ impl KamuTable {
 
         let last_records_to_consider = self.hints.as_ref().and_then(|o| o.last_records_to_consider);
 
-        type Flag = MetadataEventTypeFlags;
-        type Decision = MetadataVisitorDecision;
+        type Flag = odf::metadata::MetadataEventTypeFlags;
+        type Decision = odf::dataset::MetadataVisitorDecision;
 
         struct DataSliceCollectorVisitorState {
-            files: Vec<Multihash>,
+            files: Vec<odf::Multihash>,
             num_records: u64,
             last_records_to_consider: Option<u64>,
         }
 
+        use odf::dataset::MetadataChainExt;
         let final_state = self
             .resolved_dataset
             .as_metadata_chain()
@@ -417,8 +417,8 @@ impl KamuTable {
                 Decision::NextOfType(Flag::DATA_BLOCK),
                 |state, _hash, block| {
                     let new_data = match &block.event {
-                        MetadataEvent::AddData(e) => e.new_data.as_ref(),
-                        MetadataEvent::ExecuteTransform(e) => e.new_data.as_ref(),
+                        odf::MetadataEvent::AddData(e) => e.new_data.as_ref(),
+                        odf::MetadataEvent::ExecuteTransform(e) => e.new_data.as_ref(),
                         _ => unreachable!(),
                     };
                     let Some(slice) = new_data else {

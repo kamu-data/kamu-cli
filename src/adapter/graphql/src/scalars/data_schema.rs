@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_data_utils::schema::{convert, format};
+use odf::utils::schema::{convert, format};
 
 use crate::prelude::*;
 

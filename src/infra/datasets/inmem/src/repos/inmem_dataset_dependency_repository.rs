@@ -13,14 +13,13 @@ use std::sync::{Arc, Mutex};
 use dill::*;
 use internal_error::InternalError;
 use kamu_datasets::*;
-use opendatafabric::DatasetID;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Default)]
 struct State {
-    upstream_by_downstream: HashMap<DatasetID, HashSet<DatasetID>>,
-    downstream_by_upstream: HashMap<DatasetID, HashSet<DatasetID>>,
+    upstream_by_downstream: HashMap<odf::DatasetID, HashSet<odf::DatasetID>>,
+    downstream_by_upstream: HashMap<odf::DatasetID, HashSet<odf::DatasetID>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -75,8 +74,8 @@ impl DatasetDependencyRepository for InMemoryDatasetDependencyRepository {
 
     async fn add_upstream_dependencies(
         &self,
-        downstream_dataset_id: &DatasetID,
-        new_upstream_dataset_ids: &[&DatasetID],
+        downstream_dataset_id: &odf::DatasetID,
+        new_upstream_dataset_ids: &[&odf::DatasetID],
     ) -> Result<(), AddDependenciesError> {
         if new_upstream_dataset_ids.is_empty() {
             return Ok(());
@@ -113,8 +112,8 @@ impl DatasetDependencyRepository for InMemoryDatasetDependencyRepository {
 
     async fn remove_upstream_dependencies(
         &self,
-        downstream_dataset_id: &DatasetID,
-        obsolete_upstream_dataset_ids: &[&DatasetID],
+        downstream_dataset_id: &odf::DatasetID,
+        obsolete_upstream_dataset_ids: &[&odf::DatasetID],
     ) -> Result<(), RemoveDependenciesError> {
         if obsolete_upstream_dataset_ids.is_empty() {
             return Ok(());
@@ -162,7 +161,10 @@ impl DatasetDependencyRepository for InMemoryDatasetDependencyRepository {
 
 #[async_trait::async_trait]
 impl DatasetEntryRemovalListener for InMemoryDatasetDependencyRepository {
-    async fn on_dataset_entry_removed(&self, dataset_id: &DatasetID) -> Result<(), InternalError> {
+    async fn on_dataset_entry_removed(
+        &self,
+        dataset_id: &odf::DatasetID,
+    ) -> Result<(), InternalError> {
         let mut guard = self.state.lock().unwrap();
 
         if let Some(upstreams) = guard.upstream_by_downstream.remove(dataset_id) {

@@ -10,18 +10,9 @@
 use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
-use auth::DummyOdfServerAccessTokenResolver;
 use kamu::testing::BaseRepoHarness;
 use kamu::*;
 use kamu_core::*;
-use opendatafabric::{
-    DatasetAlias,
-    DatasetAliasRemote,
-    DatasetName,
-    DatasetPushTarget,
-    DatasetRefRemote,
-    RepoName,
-};
 use tempfile::TempDir;
 use url::Url;
 
@@ -31,7 +22,7 @@ use url::Url;
 async fn test_push_repo_target() {
     let harness = PushTestHarness::new(TenancyConfig::SingleTenant, true);
 
-    let alias_foo = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let foo = harness.create_root_dataset(&alias_foo).await;
 
     let remote_repo_data = harness.maybe_remote_repo_data.unwrap();
@@ -40,7 +31,7 @@ async fn test_push_repo_target() {
         .push_request_planner
         .collect_plan(
             &[foo.dataset_handle.clone()],
-            Some(&DatasetPushTarget::Repository(
+            Some(&odf::DatasetPushTarget::Repository(
                 remote_repo_data.remote_repo_name.clone(),
             )),
         )
@@ -61,7 +52,7 @@ async fn test_push_repo_target() {
                 dataset_name: None,
                 account_name: None,
             },
-            push_target: Some(DatasetPushTarget::Repository(
+            push_target: Some(odf::DatasetPushTarget::Repository(
                 remote_repo_data.remote_repo_name
             ))
         }
@@ -74,7 +65,7 @@ async fn test_push_repo_target() {
 async fn test_push_url_target() {
     let harness = PushTestHarness::new(TenancyConfig::SingleTenant, false);
 
-    let alias_foo = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let foo = harness.create_root_dataset(&alias_foo).await;
 
     let push_url = Url::parse("http://example.com/foo").unwrap();
@@ -83,7 +74,7 @@ async fn test_push_url_target() {
         .push_request_planner
         .collect_plan(
             &[foo.dataset_handle.clone()],
-            Some(&DatasetPushTarget::Url(push_url.clone())),
+            Some(&odf::DatasetPushTarget::Url(push_url.clone())),
         )
         .await;
     assert!(errors.is_empty());
@@ -99,7 +90,7 @@ async fn test_push_url_target() {
                 dataset_name: None,
                 account_name: None,
             },
-            push_target: Some(DatasetPushTarget::Url(push_url))
+            push_target: Some(odf::DatasetPushTarget::Url(push_url))
         }
     );
 }
@@ -110,14 +101,14 @@ async fn test_push_url_target() {
 async fn test_push_remote_alias_target() {
     let harness = PushTestHarness::new(TenancyConfig::SingleTenant, true);
 
-    let alias_foo = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let foo = harness.create_root_dataset(&alias_foo).await;
 
     let remote_repo_data = harness.maybe_remote_repo_data.unwrap();
 
-    let remote_alias = DatasetAliasRemote {
+    let remote_alias = odf::DatasetAliasRemote {
         repo_name: remote_repo_data.remote_repo_name.clone(),
-        dataset_name: DatasetName::new_unchecked("bar"),
+        dataset_name: odf::DatasetName::new_unchecked("bar"),
         account_name: None,
     };
 
@@ -125,7 +116,7 @@ async fn test_push_remote_alias_target() {
         .push_request_planner
         .collect_plan(
             &[foo.dataset_handle.clone()],
-            Some(&DatasetPushTarget::Alias(remote_alias.clone())),
+            Some(&odf::DatasetPushTarget::Alias(remote_alias.clone())),
         )
         .await;
     assert!(errors.is_empty());
@@ -141,7 +132,7 @@ async fn test_push_remote_alias_target() {
                 dataset_name: Some(remote_alias.dataset_name.clone()),
                 account_name: None,
             },
-            push_target: Some(DatasetPushTarget::Alias(remote_alias))
+            push_target: Some(odf::DatasetPushTarget::Alias(remote_alias))
         }
     );
 }
@@ -152,7 +143,7 @@ async fn test_push_remote_alias_target() {
 async fn test_push_remote_no_target_presaved_push_alias() {
     let harness = PushTestHarness::new(TenancyConfig::SingleTenant, true);
 
-    let alias_foo = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let foo = harness.create_root_dataset(&alias_foo).await;
 
     let remote_repo_data = harness.maybe_remote_repo_data.unwrap();
@@ -164,7 +155,7 @@ async fn test_push_remote_no_target_presaved_push_alias() {
         .unwrap();
     aliases
         .add(
-            &DatasetRefRemote::Url(Arc::new(remote_repo_data.remote_repo_url.clone())),
+            &odf::DatasetRefRemote::Url(Arc::new(remote_repo_data.remote_repo_url.clone())),
             RemoteAliasKind::Push,
         )
         .await
@@ -198,7 +189,7 @@ async fn test_push_remote_no_target_presaved_push_alias() {
 async fn test_push_remote_no_target_no_alias() {
     let harness = PushTestHarness::new(TenancyConfig::SingleTenant, true);
 
-    let alias_foo = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let foo = harness.create_root_dataset(&alias_foo).await;
 
     let remote_repo_data = harness.maybe_remote_repo_data.unwrap();
@@ -236,13 +227,13 @@ async fn test_push_remote_no_target_no_alias_multiple_repos_exist() {
 
     let extra_remote_tmp_dir = tempfile::tempdir().unwrap();
     let extra_remote_repo_url = Url::from_directory_path(extra_remote_tmp_dir.path()).unwrap();
-    let extra_remote_repo_name = RepoName::new_unchecked("extra-remote");
+    let extra_remote_repo_name = odf::RepoName::new_unchecked("extra-remote");
     harness
         .remote_repo_registry
         .add_repository(&extra_remote_repo_name, extra_remote_repo_url)
         .unwrap();
 
-    let alias_foo = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let foo = harness.create_root_dataset(&alias_foo).await;
 
     let (items, errors) = harness
@@ -268,7 +259,7 @@ async fn test_push_remote_no_target_no_alias_multiple_repos_exist() {
 async fn test_push_remote_no_target_no_alias_no_repositories() {
     let harness = PushTestHarness::new(TenancyConfig::SingleTenant, false);
 
-    let alias_foo = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let foo = harness.create_root_dataset(&alias_foo).await;
 
     let (items, errors) = harness
@@ -300,7 +291,7 @@ struct PushTestHarness {
 }
 
 struct RemoteRepoData {
-    remote_repo_name: RepoName,
+    remote_repo_name: odf::RepoName,
     remote_repo_url: Url,
     _remote_tmp_dir: TempDir,
 }
@@ -315,7 +306,7 @@ impl PushTestHarness {
         let catalog = dill::CatalogBuilder::new_chained(base_repo_harness.catalog())
             .add_value(RemoteRepositoryRegistryImpl::create(repos_dir).unwrap())
             .bind::<dyn RemoteRepositoryRegistry, RemoteRepositoryRegistryImpl>()
-            .add::<DummyOdfServerAccessTokenResolver>()
+            .add::<odf::dataset::DummyOdfServerAccessTokenResolver>()
             .add::<PushRequestPlannerImpl>()
             .add::<RemoteAliasResolverImpl>()
             .add::<RemoteAliasesRegistryImpl>()
@@ -325,7 +316,7 @@ impl PushTestHarness {
             let remote_tmp_dir = tempfile::tempdir().unwrap();
             let remote_repo_url = Url::from_directory_path(remote_tmp_dir.path()).unwrap();
 
-            let remote_repo_name = RepoName::new_unchecked("remote");
+            let remote_repo_name = odf::RepoName::new_unchecked("remote");
             let remote_repo_registry = catalog.get_one::<dyn RemoteRepositoryRegistry>().unwrap();
             remote_repo_registry
                 .add_repository(&remote_repo_name, remote_repo_url.clone())

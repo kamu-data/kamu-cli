@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::InternalError;
-use opendatafabric::{AccountID, AccountName};
 use thiserror::Error;
 
 use super::{InvalidCredentialsError, RejectedCredentialsError};
@@ -20,7 +19,7 @@ use crate::{AccountDisplayName, AccountType};
 pub trait AuthenticationProvider: Sync + Send {
     fn provider_name(&self) -> &'static str;
 
-    fn generate_id(&self, account_name: &AccountName) -> AccountID;
+    fn generate_id(&self, account_name: &odf::AccountName) -> odf::AccountID;
 
     async fn login(
         &self,
@@ -32,7 +31,7 @@ pub trait AuthenticationProvider: Sync + Send {
 
 #[derive(Debug)]
 pub struct ProviderLoginResponse {
-    pub account_name: AccountName,
+    pub account_name: odf::AccountName,
     pub email: Option<String>,
     pub display_name: AccountDisplayName,
     pub account_type: AccountType,

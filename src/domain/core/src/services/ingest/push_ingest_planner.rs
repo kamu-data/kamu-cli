@@ -11,16 +11,9 @@ use std::path::PathBuf;
 
 use chrono::{DateTime, Utc};
 use internal_error::InternalError;
-use opendatafabric as odf;
 use thiserror::Error;
 
-use crate::{
-    CommitError,
-    DataWriterMetadataState,
-    MediaType,
-    ResolvedDataset,
-    SchemaInferenceOpts,
-};
+use crate::{DataWriterMetadataState, MediaType, ResolvedDataset, SchemaInferenceOpts};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -64,7 +57,7 @@ pub struct PushIngestArgs {
     pub operation_dir: PathBuf,
     pub system_time: DateTime<Utc>,
     pub opts: PushIngestOpts,
-    pub push_source: odf::AddPushSource,
+    pub push_source: odf::metadata::AddPushSource,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -89,7 +82,7 @@ pub enum PushIngestPlanningError {
     CommitError(
         #[from]
         #[backtrace]
-        CommitError,
+        odf::dataset::CommitError,
     ),
 
     #[error(transparent)]

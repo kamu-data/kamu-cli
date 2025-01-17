@@ -21,7 +21,6 @@ use kamu_datasets::{
 };
 use kamu_datasets_inmem::InMemoryDatasetEnvVarRepository;
 use kamu_datasets_services::DatasetEnvVarServiceImpl;
-use opendatafabric::DatasetID;
 use secrecy::SecretString;
 use time_source::SystemTimeSourceDefault;
 
@@ -36,7 +35,7 @@ async fn test_upsert_dataset_env_var() {
         .upsert_dataset_env_var(
             "foo_key",
             &DatasetEnvVarValue::Secret(SecretString::from("foo_value")),
-            &DatasetID::new_seeded_ed25519(b"foo"),
+            &odf::DatasetID::new_seeded_ed25519(b"foo"),
         )
         .await;
 
@@ -57,7 +56,7 @@ async fn test_upsert_dataset_env_var() {
         .upsert_dataset_env_var(
             "foo_key",
             &DatasetEnvVarValue::Secret(SecretString::from("foo_value")),
-            &DatasetID::new_seeded_ed25519(b"foo"),
+            &odf::DatasetID::new_seeded_ed25519(b"foo"),
         )
         .await;
 
@@ -75,7 +74,7 @@ async fn test_upsert_dataset_env_var() {
         .upsert_dataset_env_var(
             "foo_key",
             &DatasetEnvVarValue::Regular("foo_value".to_owned()),
-            &DatasetID::new_seeded_ed25519(b"foo"),
+            &odf::DatasetID::new_seeded_ed25519(b"foo"),
         )
         .await;
 
@@ -94,7 +93,7 @@ async fn test_upsert_dataset_env_var() {
         .upsert_dataset_env_var(
             "foo_key",
             &DatasetEnvVarValue::Regular("foo_value".to_owned()),
-            &DatasetID::new_seeded_ed25519(b"foo"),
+            &odf::DatasetID::new_seeded_ed25519(b"foo"),
         )
         .await;
 
@@ -111,7 +110,7 @@ async fn test_upsert_dataset_env_var() {
         .upsert_dataset_env_var(
             "foo_key",
             &DatasetEnvVarValue::Regular("new_foo_value".to_owned()),
-            &DatasetID::new_seeded_ed25519(b"foo"),
+            &odf::DatasetID::new_seeded_ed25519(b"foo"),
         )
         .await;
 
@@ -129,7 +128,7 @@ async fn test_upsert_dataset_env_var() {
         .upsert_dataset_env_var(
             "foo_key",
             &DatasetEnvVarValue::Secret(SecretString::from("new_foo_value")),
-            &DatasetID::new_seeded_ed25519(b"foo"),
+            &odf::DatasetID::new_seeded_ed25519(b"foo"),
         )
         .await;
 

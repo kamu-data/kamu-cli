@@ -10,7 +10,6 @@
 use std::sync::Arc;
 
 use kamu_core::*;
-use opendatafabric::{DatasetAlias, DatasetRefRemote};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -35,8 +34,8 @@ mockall::mock! {
 impl MockSyncService {
     pub fn make_expect_sync_pull_from_remote_to_existing_local(
         mut self,
-        target_alias: DatasetAlias,
-        src_remote_ref: DatasetRefRemote,
+        target_alias: odf::DatasetAlias,
+        src_remote_ref: odf::DatasetRefRemote,
         injected_result: SyncResult,
     ) -> Self {
         self.expect_sync()

@@ -18,7 +18,6 @@ use database_common::{
 use dill::*;
 use futures::TryStreamExt;
 use kamu_flow_system::*;
-use opendatafabric::DatasetID;
 use sqlx::{QueryBuilder, Sqlite};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -239,7 +238,7 @@ impl FlowConfigurationEventStore for SqliteFlowConfigurationEventStore {
     async fn list_dataset_ids(
         &self,
         pagination: &PaginationOpts,
-    ) -> Result<Vec<DatasetID>, InternalError> {
+    ) -> Result<Vec<odf::DatasetID>, InternalError> {
         let mut tr = self.transaction.lock().await;
 
         let connection_mut = tr.connection_mut().await?;
@@ -266,7 +265,7 @@ impl FlowConfigurationEventStore for SqliteFlowConfigurationEventStore {
         Ok(dataset_ids
             .into_iter()
             .map(|event_row| {
-                DatasetID::from_did_str(event_row.dataset_id.unwrap().as_str())
+                odf::DatasetID::from_did_str(event_row.dataset_id.unwrap().as_str())
                     .map_err(InternalError::new)
             })
             .collect::<Result<Vec<_>, InternalError>>()?)

@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_core::MetadataChainExt;
 use kamu_flow_system::{
     CompactionRule,
     CompactionRuleFull,
@@ -16,7 +15,7 @@ use kamu_flow_system::{
     IngestRule,
     ResetRule,
 };
-use opendatafabric::DatasetHandle;
+use odf::dataset::MetadataChainExt as _;
 
 use crate::mutations::{FlowInvalidRunConfigurations, FlowTypeIsNotSupported};
 use crate::prelude::*;
@@ -271,7 +270,7 @@ impl FlowRunConfiguration {
     pub async fn try_into_snapshot(
         ctx: &Context<'_>,
         dataset_flow_type: &DatasetFlowType,
-        dataset_handle: &DatasetHandle,
+        dataset_handle: &odf::DatasetHandle,
         flow_run_configuration_maybe: Option<&FlowRunConfiguration>,
     ) -> Result<Option<FlowConfigurationRule>, FlowInvalidRunConfigurations> {
         match dataset_flow_type {
@@ -332,7 +331,7 @@ impl FlowRunConfiguration {
                 // validation step
                 let current_head_hash = resolved_dataset
                     .as_metadata_chain()
-                    .try_get_ref(&kamu_core::BlockRef::Head)
+                    .try_get_ref(&odf::BlockRef::Head)
                     .await
                     .map_err(|_| FlowInvalidRunConfigurations {
                         error: "Cannot fetch default value".to_string(),

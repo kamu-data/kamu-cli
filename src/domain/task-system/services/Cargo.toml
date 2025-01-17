@@ -32,6 +32,7 @@ kamu-core = { workspace = true }
 kamu-datasets = { workspace = true }
 time-source = { workspace = true }
 kamu-task-system = { workspace = true }
+odf = { workspace = true }
 
 async-trait = { version = "0.1", default-features = false }
 dill = "0.11"
@@ -46,6 +47,7 @@ kamu-accounts = { workspace = true }
 kamu-datasets-services = { workspace = true }
 kamu-datasets-inmem = { workspace = true }
 kamu-task-system-inmem = { workspace = true }
+
 
 chrono = { version = "0.4", default-features = false }
 mockall = "0.13"

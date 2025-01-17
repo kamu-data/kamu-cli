@@ -22,7 +22,6 @@ use kamu_cli_e2e_common::{
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_3,
 };
 use kamu_flow_system::DatasetFlowType;
-use opendatafabric as odf;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -1058,13 +1057,13 @@ pub async fn test_trigger_flow_hard_compaction(mut kamu_api_server_client: KamuA
 
     pretty_assertions::assert_eq!(
         vec![
-            (6, odf::MetadataEventTypeFlags::ADD_DATA),
-            (5, odf::MetadataEventTypeFlags::ADD_DATA),
-            (4, odf::MetadataEventTypeFlags::ADD_DATA),
-            (3, odf::MetadataEventTypeFlags::SET_DATA_SCHEMA),
-            (2, odf::MetadataEventTypeFlags::SET_VOCAB),
-            (1, odf::MetadataEventTypeFlags::ADD_PUSH_SOURCE),
-            (0, odf::MetadataEventTypeFlags::SEED),
+            (6, odf::metadata::MetadataEventTypeFlags::ADD_DATA),
+            (5, odf::metadata::MetadataEventTypeFlags::ADD_DATA),
+            (4, odf::metadata::MetadataEventTypeFlags::ADD_DATA),
+            (3, odf::metadata::MetadataEventTypeFlags::SET_DATA_SCHEMA),
+            (2, odf::metadata::MetadataEventTypeFlags::SET_VOCAB),
+            (1, odf::metadata::MetadataEventTypeFlags::ADD_PUSH_SOURCE),
+            (0, odf::metadata::MetadataEventTypeFlags::SEED),
         ],
         kamu_api_server_client
             .dataset()
@@ -1107,11 +1106,11 @@ pub async fn test_trigger_flow_hard_compaction(mut kamu_api_server_client: KamuA
 
     pretty_assertions::assert_eq!(
         vec![
-            (4, odf::MetadataEventTypeFlags::ADD_DATA),
-            (3, odf::MetadataEventTypeFlags::SET_DATA_SCHEMA),
-            (2, odf::MetadataEventTypeFlags::SET_VOCAB),
-            (1, odf::MetadataEventTypeFlags::ADD_PUSH_SOURCE),
-            (0, odf::MetadataEventTypeFlags::SEED),
+            (4, odf::metadata::MetadataEventTypeFlags::ADD_DATA),
+            (3, odf::metadata::MetadataEventTypeFlags::SET_DATA_SCHEMA),
+            (2, odf::metadata::MetadataEventTypeFlags::SET_VOCAB),
+            (1, odf::metadata::MetadataEventTypeFlags::ADD_PUSH_SOURCE),
+            (0, odf::metadata::MetadataEventTypeFlags::SEED),
         ],
         kamu_api_server_client
             .dataset()
@@ -1139,9 +1138,9 @@ pub async fn test_trigger_flow_reset(mut kamu_api_server_client: KamuApiServerCl
 
     pretty_assertions::assert_eq!(
         vec![
-            (2, odf::MetadataEventTypeFlags::SET_VOCAB),
-            (1, odf::MetadataEventTypeFlags::ADD_PUSH_SOURCE),
-            (0, odf::MetadataEventTypeFlags::SEED),
+            (2, odf::metadata::MetadataEventTypeFlags::SET_VOCAB),
+            (1, odf::metadata::MetadataEventTypeFlags::ADD_PUSH_SOURCE),
+            (0, odf::metadata::MetadataEventTypeFlags::SEED),
         ],
         kamu_api_server_client
             .dataset()
@@ -1164,7 +1163,7 @@ pub async fn test_trigger_flow_reset(mut kamu_api_server_client: KamuApiServerCl
     kamu_api_server_client.flow().wait(&root_dataset_id).await;
 
     pretty_assertions::assert_eq!(
-        vec![(0, odf::MetadataEventTypeFlags::SEED)],
+        vec![(0, odf::metadata::MetadataEventTypeFlags::SEED)],
         kamu_api_server_client
             .dataset()
             .blocks(&root_dataset_id)

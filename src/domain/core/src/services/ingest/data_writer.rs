@@ -13,11 +13,10 @@ use std::path::PathBuf;
 use chrono::{DateTime, Utc};
 use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::prelude::*;
+use file_utils::OwnedFile;
 use internal_error::*;
-use opendatafabric as odf;
 
 use super::MergeError;
-use crate::{AddDataParams, CommitError, OwnedFile};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -50,7 +49,10 @@ pub trait DataWriter {
     ) -> Result<StageDataResult, StageDataError>;
 
     /// Commit previously staged data and advance writer state
-    async fn commit(&mut self, staged: StageDataResult) -> Result<WriteDataResult, CommitError>;
+    async fn commit(
+        &mut self,
+        staged: StageDataResult,
+    ) -> Result<WriteDataResult, odf::dataset::CommitError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -59,7 +61,7 @@ pub struct WriteWatermarkOpts {
     /// Will be used for system time data column and metadata block timestamp
     pub system_time: DateTime<Utc>,
     /// Data source state to store in the commit
-    pub new_source_state: Option<odf::SourceState>,
+    pub new_source_state: Option<odf::metadata::SourceState>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -73,7 +75,7 @@ pub struct WriteDataOpts {
     /// Explicit watermark to use in the commit
     pub new_watermark: Option<DateTime<Utc>>,
     /// Data source state to store in the commit
-    pub new_source_state: Option<odf::SourceState>,
+    pub new_source_state: Option<odf::metadata::SourceState>,
     // TODO: Find a better way to deal with temporary files
     /// Local FS path to which data slice will be written before committing it
     /// into the data object store of a dataset
@@ -86,7 +88,7 @@ pub struct WriteDataOpts {
 pub struct WriteDataResult {
     pub old_head: odf::Multihash,
     pub new_head: odf::Multihash,
-    pub add_data_block: Option<odf::MetadataBlockTyped<odf::AddData>>,
+    pub add_data_block: Option<odf::MetadataBlockTyped<odf::metadata::AddData>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -98,7 +100,7 @@ pub struct StageDataResult {
     /// Set when `SetDataSchema` event needs to be committed
     pub new_schema: Option<SchemaRef>,
     /// Set when `AddData` event needs to be committed
-    pub add_data: Option<AddDataParams>,
+    pub add_data: Option<odf::dataset::AddDataParams>,
     /// Set when commmit will contains some data
     pub data_file: Option<OwnedFile>,
 }
@@ -111,7 +113,7 @@ pub enum WriteWatermarkError {
     EmptyCommit(#[from] EmptyCommitError),
 
     #[error(transparent)]
-    CommitError(#[from] CommitError),
+    CommitError(#[from] odf::dataset::CommitError),
 
     #[error(transparent)]
     Internal(#[from] InternalError),
@@ -134,7 +136,7 @@ pub enum WriteDataError {
     EmptyCommit(#[from] EmptyCommitError),
 
     #[error(transparent)]
-    CommitError(#[from] CommitError),
+    CommitError(#[from] odf::dataset::CommitError),
 
     #[error(transparent)]
     Internal(#[from] InternalError),

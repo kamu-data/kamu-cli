@@ -19,7 +19,6 @@ use kamu::domain::{
     CommitDatasetEventUseCase,
     CreateDatasetFromSnapshotUseCase,
     CreateDatasetUseCase,
-    DatasetRepository,
     RunInfoDir,
     ServerUrlConfig,
 };
@@ -30,10 +29,9 @@ use kamu::{
     CompactionPlannerImpl,
     CreateDatasetFromSnapshotUseCaseImpl,
     CreateDatasetUseCaseImpl,
-    DatasetLayout,
-    DatasetRegistryRepoBridge,
-    DatasetRepositoryLocalFs,
-    DatasetRepositoryWriter,
+    DatasetRegistrySoloUnitBridge,
+    DatasetStorageUnitLocalFs,
+    DatasetStorageUnitWriter,
     ObjectStoreBuilderLocalFs,
     ObjectStoreRegistryImpl,
     RemoteRepositoryRegistryImpl,
@@ -50,7 +48,7 @@ use kamu_core::{
 use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
 use kamu_datasets_services::DependencyGraphServiceImpl;
 use messaging_outbox::DummyOutboxImpl;
-use opendatafabric::{AccountName, DatasetAlias, DatasetHandle};
+use odf::dataset::DatasetLayout;
 use tempfile::TempDir;
 use time_source::{SystemTimeSource, SystemTimeSourceStub};
 use url::Url;
@@ -113,11 +111,11 @@ impl ServerSideLocalFsHarness {
                 .add::<DependencyGraphServiceImpl>()
                 .add::<InMemoryDatasetDependencyRepository>()
                 .add_value(options.tenancy_config)
-                .add_builder(DatasetRepositoryLocalFs::builder().with_root(datasets_dir))
-                .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-                .bind::<dyn DatasetRepositoryWriter, DatasetRepositoryLocalFs>()
+                .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
+                .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
+                .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
                 .add_value(server_authentication_mock(&account))
-                .add::<DatasetRegistryRepoBridge>()
+                .add::<DatasetRegistrySoloUnitBridge>()
                 .bind::<dyn AuthenticationService, MockAuthenticationService>()
                 .add_value(ServerUrlConfig::new_test(Some(&base_url_rest)))
                 .add::<CompactionPlannerImpl>()
@@ -166,9 +164,11 @@ impl ServerSideLocalFsHarness {
 
 #[async_trait::async_trait]
 impl ServerSideHarness for ServerSideLocalFsHarness {
-    fn operating_account_name(&self) -> Option<AccountName> {
+    fn operating_account_name(&self) -> Option<odf::AccountName> {
         match self.options.tenancy_config {
-            TenancyConfig::MultiTenant => Some(AccountName::new_unchecked(SERVER_ACCOUNT_NAME)),
+            TenancyConfig::MultiTenant => {
+                Some(odf::AccountName::new_unchecked(SERVER_ACCOUNT_NAME))
+            }
             TenancyConfig::SingleTenant => None,
         }
     }
@@ -217,7 +217,7 @@ impl ServerSideHarness for ServerSideLocalFsHarness {
         self.account.clone()
     }
 
-    fn dataset_url_with_scheme(&self, dataset_alias: &DatasetAlias, scheme: &str) -> Url {
+    fn dataset_url_with_scheme(&self, dataset_alias: &odf::DatasetAlias, scheme: &str) -> Url {
         let api_server_address = self.api_server_addr();
         Url::from_str(
             match self.options.tenancy_config {
@@ -242,7 +242,7 @@ impl ServerSideHarness for ServerSideLocalFsHarness {
         .unwrap()
     }
 
-    fn dataset_layout(&self, dataset_handle: &DatasetHandle) -> DatasetLayout {
+    fn dataset_layout(&self, dataset_handle: &odf::DatasetHandle) -> DatasetLayout {
         let root_path = match self.options.tenancy_config {
             TenancyConfig::MultiTenant => self
                 .internal_datasets_folder_path()

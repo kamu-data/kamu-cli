@@ -9,7 +9,6 @@
 
 use kamu_adapter_auth_oso_rebac::{DatasetResource, KamuAuthOso, UserActor};
 use kamu_core::auth::DatasetAction;
-use opendatafabric as odf;
 
 // TODO: Private Datasets: cover all other schema branches
 

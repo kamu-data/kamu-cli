@@ -12,10 +12,7 @@ use std::str::FromStr;
 
 use dill::*;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
-use opendatafabric as odf;
 use thiserror::Error;
-
-use crate::{AccessError, DatasetHandleStream};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -114,7 +111,7 @@ impl oso::ToPolar for DatasetAction {
 #[derive(Debug, Error)]
 pub enum DatasetActionUnauthorizedError {
     #[error(transparent)]
-    Access(AccessError),
+    Access(odf::AccessError),
 
     #[error(transparent)]
     Internal(#[from] InternalError),
@@ -149,9 +146,9 @@ pub trait DatasetActionAuthorizerExt: DatasetActionAuthorizer {
 
     fn filtered_datasets_stream<'a>(
         &'a self,
-        dataset_handles_stream: DatasetHandleStream<'a>,
+        dataset_handles_stream: odf::dataset::DatasetHandleStream<'a>,
         action: DatasetAction,
-    ) -> DatasetHandleStream<'a>;
+    ) -> odf::dataset::DatasetHandleStream<'a>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -176,9 +173,9 @@ where
 
     fn filtered_datasets_stream<'a>(
         &'a self,
-        dataset_handles_stream: DatasetHandleStream<'a>,
+        dataset_handles_stream: odf::dataset::DatasetHandleStream<'a>,
         action: DatasetAction,
-    ) -> DatasetHandleStream<'a> {
+    ) -> odf::dataset::DatasetHandleStream<'a> {
         const STREAM_CHUNK_LEN: usize = 100;
 
         Box::pin(async_stream::stream! {

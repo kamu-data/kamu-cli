@@ -15,15 +15,14 @@ use datafusion::arrow::array;
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::prelude::*;
-use kamu_data_utils::data::dataframe_ext::*;
 use kamu_ingest_datafusion::*;
-use opendatafabric as odf;
+use odf::utils::data::dataframe_ext::*;
 
 use crate::utils::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-type Op = odf::OperationType;
+type Op = odf::metadata::OperationType;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -65,7 +64,7 @@ where
 
 fn make_output<I, S>(ctx: &SessionContext, rows: I) -> DataFrame
 where
-    I: IntoIterator<Item = (odf::OperationType, Option<i32>, S, i64)>,
+    I: IntoIterator<Item = (odf::metadata::OperationType, Option<i32>, S, i64)>,
     S: Into<String>,
 {
     let schema = Arc::new(Schema::new(vec![
@@ -107,7 +106,7 @@ where
 
 fn make_ledger<I, S>(ctx: &SessionContext, rows: I) -> DataFrame
 where
-    I: IntoIterator<Item = (odf::OperationType, i32, S, i64)>,
+    I: IntoIterator<Item = (odf::metadata::OperationType, i32, S, i64)>,
     S: Into<String>,
 {
     let schema = Arc::new(Schema::new(vec![
@@ -153,17 +152,17 @@ where
 
 async fn test_snapshot_project<L, E, S>(ledger: L, expected: E)
 where
-    L: IntoIterator<Item = (odf::OperationType, i32, S, i64)>,
-    E: IntoIterator<Item = (odf::OperationType, i32, S, i64)>,
+    L: IntoIterator<Item = (odf::metadata::OperationType, i32, S, i64)>,
+    E: IntoIterator<Item = (odf::metadata::OperationType, i32, S, i64)>,
     S: Into<String>,
 {
     let ctx = SessionContext::new();
     let strat = MergeStrategySnapshot::new(
-        odf::DatasetVocabulary {
+        odf::metadata::DatasetVocabulary {
             event_time_column: "year".to_string(),
             ..Default::default()
         },
-        odf::MergeStrategySnapshot {
+        odf::metadata::MergeStrategySnapshot {
             primary_key: vec!["city".to_string()],
             compare_columns: None,
         },
@@ -270,19 +269,19 @@ async fn test_snapshot_project_mixed() {
 
 async fn test_snapshot_merge<L, I, E, S>(ledger: L, input: I, expected: E)
 where
-    L: IntoIterator<Item = (odf::OperationType, i32, S, i64)>,
+    L: IntoIterator<Item = (odf::metadata::OperationType, i32, S, i64)>,
     I: IntoIterator<Item = (S, i64)>,
-    E: IntoIterator<Item = (odf::OperationType, Option<i32>, S, i64)>,
+    E: IntoIterator<Item = (odf::metadata::OperationType, Option<i32>, S, i64)>,
     S: Into<String>,
 {
     let ctx = SessionContext::new();
 
     let strat = MergeStrategySnapshot::new(
-        odf::DatasetVocabulary {
+        odf::metadata::DatasetVocabulary {
             event_time_column: "year".to_string(),
             ..Default::default()
         },
-        odf::MergeStrategySnapshot {
+        odf::metadata::MergeStrategySnapshot {
             primary_key: vec!["city".to_string()],
             compare_columns: None,
         },
@@ -384,8 +383,8 @@ async fn test_snapshot_merge_mix_of_changes() {
 async fn test_snapshot_merge_invalid_pk() {
     let ctx = SessionContext::new();
     let strat = MergeStrategySnapshot::new(
-        odf::DatasetVocabulary::default(),
-        odf::MergeStrategySnapshot {
+        odf::metadata::DatasetVocabulary::default(),
+        odf::metadata::MergeStrategySnapshot {
             primary_key: vec!["city".to_string(), "foo".to_string()],
             compare_columns: None,
         },
@@ -405,11 +404,11 @@ async fn test_snapshot_merge_input_carries_event_time() {
     let ctx = SessionContext::new();
 
     let strat = MergeStrategySnapshot::new(
-        odf::DatasetVocabulary {
+        odf::metadata::DatasetVocabulary {
             event_time_column: "year".to_string(),
             ..Default::default()
         },
-        odf::MergeStrategySnapshot {
+        odf::metadata::MergeStrategySnapshot {
             primary_key: vec!["city".to_string()],
             compare_columns: None,
         },

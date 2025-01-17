@@ -24,8 +24,7 @@ doctest = false
 [features]
 extensions = [
     # Internal
-    "dep:kamu-data-utils",
-    "dep:opendatafabric",
+    "dep:odf",
     # External
     "dep:async-trait",
     "dep:datafusion",
@@ -44,8 +43,7 @@ tempfile = "3"
 tokio = { version = "1", default-features = false, features = ["rt"] }
 
 # Feature: extensions
-kamu-data-utils = { optional = true, workspace = true, features = ["testing"] }
-opendatafabric = { optional = true, workspace = true }
+odf = { optional = true, workspace = true, features = ["testing"] }
 
 async-trait = { optional = true, version = "0.1" }
 datafusion = { optional = true, version = "44", default-features = false }

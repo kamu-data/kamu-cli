@@ -14,7 +14,6 @@ use database_common::{PaginationOpts, TransactionRef, TransactionRefT};
 use dill::{component, interface};
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_datasets::*;
-use opendatafabric::{AccountID, DatasetID, DatasetName};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -61,7 +60,7 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
 
     async fn dataset_entries_count_by_owner_id(
         &self,
-        owner_id: &AccountID,
+        owner_id: &odf::AccountID,
     ) -> Result<usize, InternalError> {
         let stack_owner_id = owner_id.as_did_str().to_stack_string();
 
@@ -122,7 +121,7 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
 
     async fn get_dataset_entry(
         &self,
-        dataset_id: &DatasetID,
+        dataset_id: &odf::DatasetID,
     ) -> Result<DatasetEntry, GetDatasetEntryError> {
         let mut tr = self.transaction.lock().await;
 
@@ -155,7 +154,7 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
 
     async fn get_multiple_dataset_entries(
         &self,
-        dataset_ids: &[DatasetID],
+        dataset_ids: &[odf::DatasetID],
     ) -> Result<DatasetEntriesResolution, GetMultipleDatasetEntriesError> {
         let mut tr = self.transaction.lock().await;
 
@@ -203,8 +202,8 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
 
     async fn get_dataset_entry_by_owner_and_name(
         &self,
-        owner_id: &AccountID,
-        name: &DatasetName,
+        owner_id: &odf::AccountID,
+        name: &odf::DatasetName,
     ) -> Result<DatasetEntry, GetDatasetEntryByNameError> {
         let mut tr = self.transaction.lock().await;
 
@@ -239,7 +238,7 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
 
     async fn get_dataset_entries_by_owner_id<'a>(
         &'a self,
-        owner_id: &AccountID,
+        owner_id: &odf::AccountID,
         pagination: PaginationOpts,
     ) -> DatasetEntryStream<'a> {
         let stack_owner_id = owner_id.as_did_str().to_stack_string();
@@ -314,8 +313,8 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
 
     async fn update_dataset_entry_name(
         &self,
-        dataset_id: &DatasetID,
-        new_name: &DatasetName,
+        dataset_id: &odf::DatasetID,
+        new_name: &odf::DatasetName,
     ) -> Result<(), UpdateDatasetEntryNameError> {
         let mut tr = self.transaction.lock().await;
 
@@ -350,7 +349,7 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
 
     async fn delete_dataset_entry(
         &self,
-        dataset_id: &DatasetID,
+        dataset_id: &odf::DatasetID,
     ) -> Result<(), DeleteEntryDatasetError> {
         {
             let mut tr = self.transaction.lock().await;

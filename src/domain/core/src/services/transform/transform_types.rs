@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::InternalError;
-use opendatafabric::{DatasetHandle, DatasetID, Multihash};
 use thiserror::Error;
 
 use super::{
@@ -27,8 +26,8 @@ use super::{
 pub enum TransformResult {
     UpToDate,
     Updated {
-        old_head: Multihash,
-        new_head: Multihash,
+        old_head: odf::Multihash,
+        new_head: odf::Multihash,
     },
 }
 
@@ -94,7 +93,7 @@ pub enum VerifyTransformError {
 #[derive(Debug, Error)]
 #[error("Dataset {dataset_handle} has not defined a schema yet")]
 pub struct InputSchemaNotDefinedError {
-    pub dataset_handle: DatasetHandle,
+    pub dataset_handle: odf::DatasetHandle,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -102,9 +101,9 @@ pub struct InputSchemaNotDefinedError {
 #[derive(Error, Debug)]
 #[error("Invalid block interval [{head}, {tail}) in input dataset '{input_dataset_id}'")]
 pub struct InvalidInputIntervalError {
-    pub input_dataset_id: DatasetID,
-    pub head: Multihash,
-    pub tail: Multihash,
+    pub input_dataset_id: odf::DatasetID,
+    pub head: odf::Multihash,
+    pub tail: odf::Multihash,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

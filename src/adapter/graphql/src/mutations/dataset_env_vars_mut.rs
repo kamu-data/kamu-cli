@@ -13,7 +13,6 @@ use kamu_datasets::{
     DeleteDatasetEnvVarError,
     UpsertDatasetEnvVarStatus,
 };
-use opendatafabric as odf;
 use secrecy::SecretString;
 
 use crate::prelude::*;

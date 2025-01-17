@@ -12,7 +12,7 @@ use std::path::{Path, PathBuf};
 
 use dill::*;
 use merge::Merge;
-use opendatafabric::serde::yaml::Manifest;
+use odf::metadata::serde::yaml::Manifest;
 
 use crate::config::models::*;
 use crate::error::CLIError;

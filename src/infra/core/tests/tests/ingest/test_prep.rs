@@ -13,7 +13,6 @@ use std::io::prelude::*;
 use indoc::indoc;
 use kamu::domain::PollingIngestError;
 use kamu::ingest::*;
-use opendatafabric::*;
 
 #[test]
 fn test_prep_pipe() {
@@ -23,7 +22,7 @@ fn test_prep_pipe() {
     let target_path = tempdir.path().join("prepared.bin");
     let run_info_dir = tempdir.path();
 
-    let prep_steps = vec![PrepStep::Pipe(PrepStepPipe {
+    let prep_steps = vec![odf::metadata::PrepStep::Pipe(odf::metadata::PrepStepPipe {
         command: ["jq", "-c", ".[]"]
             .iter()
             .map(|s| (*s).to_string())
@@ -77,10 +76,12 @@ fn test_prep_decompress_zip_single_file() {
     let target_path = tempdir.path().join("prepared.bin");
     let run_info_dir = tempdir.path();
 
-    let prep_steps = vec![PrepStep::Decompress(PrepStepDecompress {
-        format: CompressionFormat::Zip,
-        sub_path: None,
-    })];
+    let prep_steps = vec![odf::metadata::PrepStep::Decompress(
+        odf::metadata::PrepStepDecompress {
+            format: odf::metadata::CompressionFormat::Zip,
+            sub_path: None,
+        },
+    )];
 
     let content = indoc!(
         "
@@ -121,10 +122,12 @@ fn test_prep_decompress_zip_bad_file() {
     let target_path = tempdir.path().join("prepared.bin");
     let run_info_dir = tempdir.path();
 
-    let prep_steps = vec![PrepStep::Decompress(PrepStepDecompress {
-        format: CompressionFormat::Zip,
-        sub_path: None,
-    })];
+    let prep_steps = vec![odf::metadata::PrepStep::Decompress(
+        odf::metadata::PrepStepDecompress {
+            format: odf::metadata::CompressionFormat::Zip,
+            sub_path: None,
+        },
+    )];
 
     std::fs::write(&src_path, "garbage").unwrap();
 
@@ -142,10 +145,12 @@ fn test_prep_decompress_gzip() {
     let target_path = tempdir.path().join("prepared.bin");
     let run_info_dir = tempdir.path();
 
-    let prep_steps = vec![PrepStep::Decompress(PrepStepDecompress {
-        format: CompressionFormat::Gzip,
-        sub_path: None,
-    })];
+    let prep_steps = vec![odf::metadata::PrepStep::Decompress(
+        odf::metadata::PrepStepDecompress {
+            format: odf::metadata::CompressionFormat::Gzip,
+            sub_path: None,
+        },
+    )];
 
     let content = indoc!(
         "

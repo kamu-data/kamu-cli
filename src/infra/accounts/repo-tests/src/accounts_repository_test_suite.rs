@@ -11,7 +11,6 @@ use std::assert_matches::assert_matches;
 
 use dill::Catalog;
 use kamu_accounts::*;
-use opendatafabric::{AccountID, AccountName};
 
 use crate::make_test_account;
 
@@ -29,14 +28,14 @@ pub async fn test_missing_account_not_found(catalog: &Catalog) {
         .unwrap();
     assert!(maybe_account_id.is_none());
 
-    let account_name = AccountName::new_unchecked("wasya");
+    let account_name = odf::AccountName::new_unchecked("wasya");
     let maybe_account_id = account_repo
         .find_account_id_by_name(&account_name)
         .await
         .unwrap();
     assert!(maybe_account_id.is_none());
 
-    let account_id = AccountID::new_seeded_ed25519(b"wrong");
+    let account_id = odf::AccountID::new_seeded_ed25519(b"wrong");
     let account_result = account_repo.get_account_by_id(&account_id).await;
     assert_matches!(account_result, Err(GetAccountByIdError::NotFound(_)));
 
@@ -63,7 +62,7 @@ pub async fn test_insert_and_locate_password_account(catalog: &Catalog) {
         .unwrap();
     assert_eq!(maybe_account_id.as_ref(), Some(&account.id));
 
-    let account_name = AccountName::new_unchecked("wasya");
+    let account_name = odf::AccountName::new_unchecked("wasya");
     let maybe_account_id = account_repo
         .find_account_id_by_name(&account_name)
         .await
@@ -114,7 +113,7 @@ pub async fn test_insert_and_locate_github_account(catalog: &Catalog) {
         .unwrap();
     assert_eq!(maybe_account_id.as_ref(), Some(&account.id));
 
-    let account_name = AccountName::new_unchecked("wasya");
+    let account_name = odf::AccountName::new_unchecked("wasya");
     let maybe_account_id = account_repo
         .find_account_id_by_name(&account_name)
         .await
@@ -168,12 +167,12 @@ pub async fn test_insert_and_locate_multiple_github_account(catalog: &Catalog) {
     account_repo.create_account(&account_petya).await.unwrap();
 
     let account_id_wasya = account_repo
-        .find_account_id_by_name(&AccountName::new_unchecked("wasya"))
+        .find_account_id_by_name(&odf::AccountName::new_unchecked("wasya"))
         .await
         .unwrap()
         .unwrap();
     let account_id_petya = account_repo
-        .find_account_id_by_name(&AccountName::new_unchecked("petya"))
+        .find_account_id_by_name(&odf::AccountName::new_unchecked("petya"))
         .await
         .unwrap()
         .unwrap();
@@ -212,7 +211,7 @@ pub async fn test_insert_and_locate_account_without_email(catalog: &Catalog) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_duplicate_password_account_id(catalog: &Catalog) {
-    let id = AccountID::new_generated_ed25519().1;
+    let id = odf::AccountID::new_generated_ed25519().1;
     let account = Account {
         id: id.clone(),
         ..make_test_account("wasya", PROVIDER_PASSWORD, "wasya")
@@ -260,7 +259,7 @@ pub async fn test_duplicate_password_account_email(catalog: &Catalog) {
 pub async fn test_duplicate_github_account_id(catalog: &Catalog) {
     const GITHUB_ACCOUNT_ID: &str = "8875909";
 
-    let id = AccountID::new_generated_ed25519().1;
+    let id = odf::AccountID::new_generated_ed25519().1;
     let account = Account {
         id: id.clone(),
         ..make_test_account(
@@ -291,7 +290,7 @@ pub async fn test_duplicate_github_account_name(catalog: &Catalog) {
     const GITHUB_ACCOUNT_ID: &str = "8875909";
 
     let account = Account {
-        id: AccountID::new_generated_ed25519().1,
+        id: odf::AccountID::new_generated_ed25519().1,
         ..make_test_account(
             "wasya",
             kamu_adapter_oauth::PROVIDER_GITHUB,
@@ -304,7 +303,7 @@ pub async fn test_duplicate_github_account_name(catalog: &Catalog) {
 
     assert_matches!(
         account_repo.create_account(&Account {
-            id: AccountID::new_generated_ed25519().1,
+            id: odf::AccountID::new_generated_ed25519().1,
             ..make_test_account(
                 "wasya",
                 kamu_adapter_oauth::PROVIDER_GITHUB,
@@ -321,7 +320,7 @@ pub async fn test_duplicate_github_account_provider_identity(catalog: &Catalog) 
     const GITHUB_ACCOUNT_ID: &str = "8875909";
 
     let account = Account {
-        id: AccountID::new_generated_ed25519().1,
+        id: odf::AccountID::new_generated_ed25519().1,
         ..make_test_account(
             "wasya",
             kamu_adapter_oauth::PROVIDER_GITHUB,
@@ -334,7 +333,7 @@ pub async fn test_duplicate_github_account_provider_identity(catalog: &Catalog) 
 
     assert_matches!(
         account_repo.create_account(&Account {
-            id: AccountID::new_generated_ed25519().1,
+            id: odf::AccountID::new_generated_ed25519().1,
             ..make_test_account(
                 "petya",
                 kamu_adapter_oauth::PROVIDER_GITHUB,
@@ -351,7 +350,7 @@ pub async fn test_duplicate_github_account_email(catalog: &Catalog) {
     const GITHUB_ACCOUNT_ID: &str = "8875909";
 
     let account = Account {
-        id: AccountID::new_generated_ed25519().1,
+        id: odf::AccountID::new_generated_ed25519().1,
         email: Some(String::from("test@example.com")),
         ..make_test_account(
             "wasya",
@@ -365,7 +364,7 @@ pub async fn test_duplicate_github_account_email(catalog: &Catalog) {
 
     assert_matches!(
         account_repo.create_account(&Account {
-            id: AccountID::new_generated_ed25519().1,
+            id: odf::AccountID::new_generated_ed25519().1,
             email: Some(String::from("test@example.com")),
             ..make_test_account("petya", kamu_adapter_oauth::PROVIDER_GITHUB, "12345")
         }).await,

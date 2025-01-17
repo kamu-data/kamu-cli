@@ -14,7 +14,6 @@ use engine::{TransformRequestExt, TransformResponseExt};
 use internal_error::ResultIntoInternal;
 use kamu_core::*;
 use kamu_ingest_datafusion::DataWriterDataFusion;
-use opendatafabric::{EnumWithVariants, ExecuteTransform, SetDataSchema, Transform};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -83,7 +82,7 @@ impl TransformExecutorImpl {
         let engine = engine_provisioner
             .provision_engine(
                 match request.transform {
-                    Transform::Sql(ref sql) => &sql.engine,
+                    odf::metadata::Transform::Sql(ref sql) => &sql.engine,
                 },
                 listener.clone().get_engine_provisioning_listener(),
             )
@@ -124,8 +123,8 @@ impl TransformExecutorImpl {
                 // TODO: make schema commit atomic with data
                 let commit_schema_result = resolved_dataset
                     .commit_event(
-                        SetDataSchema::new(&new_schema).into(),
-                        CommitOpts {
+                        odf::metadata::SetDataSchema::new(&new_schema).into(),
+                        odf::dataset::CommitOpts {
                             block_ref: &request.block_ref,
                             system_time: Some(request.system_time),
                             prev_block_hash: Some(Some(&new_head)),
@@ -139,7 +138,7 @@ impl TransformExecutorImpl {
             }
         }
 
-        let params = ExecuteTransformParams {
+        let params = odf::dataset::ExecuteTransformParams {
             query_inputs: request.inputs.iter().map(|i| i.clone().into()).collect(),
             prev_checkpoint: request.prev_checkpoint,
             prev_offset: request.prev_offset,
@@ -151,8 +150,10 @@ impl TransformExecutorImpl {
             .commit_execute_transform(
                 params,
                 response.new_data,
-                response.new_checkpoint.map(CheckpointRef::New),
-                CommitOpts {
+                response
+                    .new_checkpoint
+                    .map(odf::dataset::CheckpointRef::New),
+                odf::dataset::CommitOpts {
                     block_ref: &request.block_ref,
                     system_time: Some(request.system_time),
                     prev_block_hash: Some(Some(&new_head)),
@@ -166,9 +167,11 @@ impl TransformExecutorImpl {
                 new_head = res.new_head;
                 Ok(())
             }
-            Err(CommitError::MetadataAppendError(AppendError::InvalidBlock(
-                AppendValidationError::NoOpEvent(_),
-            ))) => Ok(()),
+            Err(odf::dataset::CommitError::MetadataAppendError(
+                odf::dataset::AppendError::InvalidBlock(
+                    odf::dataset::AppendValidationError::NoOpEvent(_),
+                ),
+            )) => Ok(()),
             Err(err) => Err(err),
         }?;
 
@@ -224,6 +227,7 @@ impl TransformExecutor for TransformExecutorImpl {
         let num_steps = verification_operation.steps.len();
         listener.begin_phase(VerificationPhase::ReplayTransform);
 
+        use odf::metadata::EnumWithVariants;
         for (step_index, step) in verification_operation.steps.into_iter().enumerate() {
             let request = step.request;
 
@@ -231,11 +235,11 @@ impl TransformExecutor for TransformExecutorImpl {
             let expected_block = step.expected_block;
             let expected_event = expected_block
                 .event
-                .into_variant::<ExecuteTransform>()
+                .into_variant::<odf::metadata::ExecuteTransform>()
                 .unwrap();
 
             // Will be set during "commit" step
-            let mut actual_event: Option<ExecuteTransform> = None;
+            let mut actual_event: Option<odf::metadata::ExecuteTransform> = None;
 
             tracing::info!(
                 %block_hash,
@@ -267,7 +271,7 @@ impl TransformExecutor for TransformExecutorImpl {
                 request,
                 &verification_operation.datasets_map,
                 |request, response| async move {
-                    let params = ExecuteTransformParams {
+                    let params = odf::dataset::ExecuteTransformParams {
                         query_inputs: request.inputs.iter().map(|i| i.clone().into()).collect(),
                         prev_checkpoint: request.prev_checkpoint,
                         prev_offset: request.prev_offset,
@@ -280,7 +284,10 @@ impl TransformExecutor for TransformExecutorImpl {
                         .prepare_execute_transform(
                             params,
                             response.new_data.as_ref(),
-                            response.new_checkpoint.map(CheckpointRef::New).as_ref(),
+                            response
+                                .new_checkpoint
+                                .map(odf::dataset::CheckpointRef::New)
+                                .as_ref(),
                         )
                         .await?;
 

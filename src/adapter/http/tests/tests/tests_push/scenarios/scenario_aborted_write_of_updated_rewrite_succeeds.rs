@@ -7,10 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu::domain::*;
-use kamu::testing::MetadataFactory;
-use kamu::DatasetLayout;
-use opendatafabric::*;
+use odf::dataset::DatasetLayout;
+use odf::metadata::testing::MetadataFactory;
 
 use crate::harness::{
     commit_add_data_event,
@@ -29,10 +27,10 @@ pub(crate) struct SmartPushAbortedWriteOfUpdatedWriteSucceeds<TServerHarness: Se
     pub server_harness: TServerHarness,
     pub server_dataset_layout: DatasetLayout,
     pub client_dataset_layout: DatasetLayout,
-    pub server_dataset_ref: DatasetRefRemote,
-    pub client_dataset_ref: DatasetRef,
-    pub client_create_result: CreateDatasetResult,
-    pub client_commit_result: CommitResult,
+    pub server_dataset_ref: odf::DatasetRefRemote,
+    pub client_dataset_ref: odf::DatasetRef,
+    pub client_create_result: odf::CreateDatasetResult,
+    pub client_commit_result: odf::dataset::CommitResult,
 }
 
 impl<TServerHarness: ServerSideHarness>
@@ -49,11 +47,11 @@ impl<TServerHarness: ServerSideHarness>
             .create_dataset_from_snapshot()
             .execute(
                 MetadataFactory::dataset_snapshot()
-                    .name(DatasetAlias::new(
+                    .name(odf::DatasetAlias::new(
                         client_account_name.clone(),
-                        DatasetName::new_unchecked("foo"),
+                        odf::DatasetName::new_unchecked("foo"),
                     ))
-                    .kind(DatasetKind::Root)
+                    .kind(odf::DatasetKind::Root)
                     .push_event(MetadataFactory::set_polling_source().build())
                     .push_event(MetadataFactory::set_data_schema().build())
                     .build(),
@@ -65,11 +63,11 @@ impl<TServerHarness: ServerSideHarness>
         let client_dataset_layout =
             client_harness.dataset_layout(&client_create_result.dataset_handle.id, "foo");
 
-        let foo_name = DatasetName::new_unchecked("foo");
+        let foo_name = odf::DatasetName::new_unchecked("foo");
 
-        let server_dataset_layout = server_harness.dataset_layout(&DatasetHandle::new(
+        let server_dataset_layout = server_harness.dataset_layout(&odf::DatasetHandle::new(
             client_create_result.dataset_handle.id.clone(),
-            DatasetAlias::new(server_account_name.clone(), foo_name.clone()),
+            odf::DatasetAlias::new(server_account_name.clone(), foo_name.clone()),
         ));
 
         // Hard folder synchronization
@@ -77,7 +75,7 @@ impl<TServerHarness: ServerSideHarness>
 
         write_dataset_alias(
             &server_dataset_layout,
-            &DatasetAlias::new(server_account_name.clone(), foo_name.clone()),
+            &odf::DatasetAlias::new(server_account_name.clone(), foo_name.clone()),
         )
         .await;
 
@@ -93,12 +91,12 @@ impl<TServerHarness: ServerSideHarness>
             .commit_dataset_event()
             .execute(
                 &client_dataset_handle,
-                MetadataEvent::SetInfo(
+                odf::MetadataEvent::SetInfo(
                     MetadataFactory::set_info()
                         .description("updated description")
                         .build(),
                 ),
-                CommitOpts::default(),
+                odf::dataset::CommitOpts::default(),
             )
             .await
             .unwrap();
@@ -120,9 +118,9 @@ impl<TServerHarness: ServerSideHarness>
         )
         .unwrap();
 
-        let server_alias = DatasetAlias::new(server_account_name, foo_name);
+        let server_alias = odf::DatasetAlias::new(server_account_name, foo_name);
         let server_odf_url = server_harness.dataset_url(&server_alias);
-        let server_dataset_ref = DatasetRefRemote::from(&server_odf_url);
+        let server_dataset_ref = odf::DatasetRefRemote::from(&server_odf_url);
 
         Self {
             client_harness,

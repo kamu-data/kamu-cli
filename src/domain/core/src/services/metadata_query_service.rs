@@ -9,7 +9,6 @@
 
 use chrono::{DateTime, Utc};
 use internal_error::InternalError;
-use opendatafabric as odf;
 
 use crate::ResolvedDataset;
 
@@ -27,13 +26,25 @@ pub trait MetadataQueryService: Send + Sync {
     async fn get_active_push_sources(
         &self,
         target: ResolvedDataset,
-    ) -> Result<Vec<(odf::Multihash, odf::MetadataBlockTyped<odf::AddPushSource>)>, InternalError>;
+    ) -> Result<
+        Vec<(
+            odf::Multihash,
+            odf::MetadataBlockTyped<odf::metadata::AddPushSource>,
+        )>,
+        InternalError,
+    >;
 
     /// Returns an active transform, if any
     async fn get_active_transform(
         &self,
         target: ResolvedDataset,
-    ) -> Result<Option<(odf::Multihash, odf::MetadataBlockTyped<odf::SetTransform>)>, InternalError>;
+    ) -> Result<
+        Option<(
+            odf::Multihash,
+            odf::MetadataBlockTyped<odf::metadata::SetTransform>,
+        )>,
+        InternalError,
+    >;
 
     /// Attempt reading watermark that is currently associated with a dataset
     async fn try_get_current_watermark(
@@ -46,5 +57,7 @@ pub trait MetadataQueryService: Send + Sync {
 
 pub type PollingSourceBlockInfo = (
     odf::Multihash,
-    odf::MetadataBlockTyped<odf::SetPollingSource>,
+    odf::MetadataBlockTyped<odf::metadata::SetPollingSource>,
 );
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

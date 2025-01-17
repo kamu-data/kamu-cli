@@ -14,8 +14,6 @@ use dill::*;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::auth::*;
-use kamu_core::AccessError;
-use opendatafabric as odf;
 use tokio::try_join;
 
 use crate::dataset_resource::*;
@@ -99,7 +97,7 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
         {
             Ok(allowed) if allowed => Ok(()),
             Ok(_not_allowed) => Err(DatasetActionUnauthorizedError::Access(
-                AccessError::Forbidden(
+                odf::AccessError::Forbidden(
                     DatasetActionNotEnoughPermissionsError {
                         action,
                         dataset_ref: dataset_id.as_local_ref(),
@@ -217,7 +215,7 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
                 let dataset_ref = dataset_handle.as_local_ref();
                 unmatched_results.push((
                     dataset_handle,
-                    DatasetActionUnauthorizedError::Access(AccessError::Forbidden(
+                    DatasetActionUnauthorizedError::Access(odf::AccessError::Forbidden(
                         DatasetActionNotEnoughPermissionsError {
                             action,
                             dataset_ref,
@@ -261,7 +259,7 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
                 let dataset_ref = dataset_id.as_local_ref();
                 unauthorized_ids_with_errors.push((
                     dataset_id,
-                    DatasetActionUnauthorizedError::Access(AccessError::Forbidden(
+                    DatasetActionUnauthorizedError::Access(odf::AccessError::Forbidden(
                         DatasetActionNotEnoughPermissionsError {
                             action,
                             dataset_ref,

@@ -10,10 +10,9 @@
 use std::sync::Arc;
 
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
-use kamu::domain::{DatasetRegistry, DatasetRegistryExt, MetadataChainExt};
+use kamu::domain::{DatasetRegistry, DatasetRegistryExt};
 use kamu_accounts::{AccountConfig, AccountRepository, PROVIDER_PASSWORD};
 use kamu_accounts_services::LoginPasswordAuthProvider;
-use opendatafabric as odf;
 
 use super::{CLIError, Command};
 
@@ -65,6 +64,7 @@ impl Command for SystemE2ECommand {
                     .get_dataset_by_ref(dataset_ref)
                     .await?;
 
+                use odf::dataset::MetadataChainExt;
                 let maybe_physical_hash = resolved_dataset
                     .as_metadata_chain()
                     .last_data_block_with_new_data()
@@ -82,8 +82,7 @@ impl Command for SystemE2ECommand {
                     .get_internal_url(&physical_hash)
                     .await;
 
-                let path =
-                    kamu_data_utils::data::local_url::into_local_path(internal_url).int_err()?;
+                let path = odf::utils::data::local_url::into_local_path(internal_url).int_err()?;
 
                 println!("{}", path.display());
             }

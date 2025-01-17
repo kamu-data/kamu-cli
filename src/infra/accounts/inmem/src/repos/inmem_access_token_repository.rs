@@ -16,7 +16,6 @@ use database_common::PaginationOpts;
 use dill::*;
 use internal_error::ErrorIntoInternal;
 use kamu_accounts::AccessToken;
-use opendatafabric::AccountID;
 use uuid::Uuid;
 
 use crate::domain::*;
@@ -32,7 +31,7 @@ pub struct InMemoryAccessTokenRepository {
 
 #[derive(Default)]
 struct State {
-    token_hashes_by_account_id: HashMap<AccountID, Vec<Uuid>>,
+    token_hashes_by_account_id: HashMap<odf::AccountID, Vec<Uuid>>,
     token_ids_by_name: HashMap<String, Uuid>,
     tokens_by_id: HashMap<Uuid, AccessToken>,
 }
@@ -119,7 +118,7 @@ impl AccessTokenRepository for InMemoryAccessTokenRepository {
 
     async fn get_access_tokens_count_by_account_id(
         &self,
-        account_id: &AccountID,
+        account_id: &odf::AccountID,
     ) -> Result<usize, GetAccessTokenError> {
         let guard = self.state.lock().unwrap();
 
@@ -131,7 +130,7 @@ impl AccessTokenRepository for InMemoryAccessTokenRepository {
 
     async fn get_access_tokens_by_account_id(
         &self,
-        account_id: &AccountID,
+        account_id: &odf::AccountID,
         pagination: &PaginationOpts,
     ) -> Result<Vec<AccessToken>, GetAccessTokenError> {
         let guard = self.state.lock().unwrap();

@@ -12,8 +12,7 @@ use std::path::Path;
 use dill::{component, interface};
 use internal_error::ResultIntoInternal;
 use kamu_core::*;
-use opendatafabric::serde::yaml::*;
-use opendatafabric::*;
+use odf::serde::yaml::YamlDatasetSnapshotDeserializer;
 use url::Url;
 
 #[component]
@@ -28,13 +27,14 @@ impl ResourceLoaderImpl {
     pub async fn load_dataset_snapshot_from_http(
         &self,
         url: &Url,
-    ) -> Result<DatasetSnapshot, ResourceError> {
+    ) -> Result<odf::DatasetSnapshot, ResourceError> {
         match reqwest::get(url.clone())
             .await
             .int_err()?
             .error_for_status()
         {
             Ok(response) => {
+                use odf::serde::DatasetSnapshotDeserializer;
                 let bytes = response.bytes().await.int_err()?;
                 YamlDatasetSnapshotDeserializer
                     .read_manifest(&bytes)
@@ -56,7 +56,8 @@ impl ResourceLoader for ResourceLoaderImpl {
     async fn load_dataset_snapshot_from_path(
         &self,
         path: &Path,
-    ) -> Result<DatasetSnapshot, ResourceError> {
+    ) -> Result<odf::DatasetSnapshot, ResourceError> {
+        use odf::serde::DatasetSnapshotDeserializer;
         let buffer = std::fs::read(path).int_err()?;
         let snapshot = YamlDatasetSnapshotDeserializer
             .read_manifest(&buffer)
@@ -67,7 +68,7 @@ impl ResourceLoader for ResourceLoaderImpl {
     async fn load_dataset_snapshot_from_url(
         &self,
         url: &Url,
-    ) -> Result<DatasetSnapshot, ResourceError> {
+    ) -> Result<odf::DatasetSnapshot, ResourceError> {
         match url.scheme() {
             "file" => {
                 let path = url.to_file_path().expect("Invalid file URL");
@@ -81,7 +82,7 @@ impl ResourceLoader for ResourceLoaderImpl {
     async fn load_dataset_snapshot_from_ref(
         &self,
         sref: &str,
-    ) -> Result<DatasetSnapshot, ResourceError> {
+    ) -> Result<odf::DatasetSnapshot, ResourceError> {
         let path = Path::new(sref);
         if path.exists() {
             self.load_dataset_snapshot_from_path(path).await

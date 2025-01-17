@@ -7,8 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use opendatafabric::{AccountID, AccountName};
-
 use crate::{DEFAULT_ACCOUNT_ID, DEFAULT_ACCOUNT_NAME};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -21,8 +19,8 @@ pub enum CurrentAccountSubject {
 
 #[derive(Debug, Clone)]
 pub struct LoggedAccount {
-    pub account_id: AccountID,
-    pub account_name: AccountName,
+    pub account_id: odf::AccountID,
+    pub account_name: odf::AccountName,
     pub is_admin: bool,
 }
 
@@ -38,7 +36,11 @@ impl CurrentAccountSubject {
         Self::Anonymous(reason)
     }
 
-    pub fn logged(account_id: AccountID, account_name: AccountName, is_admin: bool) -> Self {
+    pub fn logged(
+        account_id: odf::AccountID,
+        account_name: odf::AccountName,
+        is_admin: bool,
+    ) -> Self {
         Self::Logged(LoggedAccount {
             account_id,
             account_name,
@@ -56,7 +58,7 @@ impl CurrentAccountSubject {
         )
     }
 
-    pub fn account_name(&self) -> &AccountName {
+    pub fn account_name(&self) -> &odf::AccountName {
         match self {
             CurrentAccountSubject::Anonymous(_) => {
                 panic!("Anonymous account misused");
@@ -65,7 +67,7 @@ impl CurrentAccountSubject {
         }
     }
 
-    pub fn account_name_or_default(&self) -> &AccountName {
+    pub fn account_name_or_default(&self) -> &odf::AccountName {
         match self {
             CurrentAccountSubject::Logged(l) => &l.account_name,
             CurrentAccountSubject::Anonymous(_) => &DEFAULT_ACCOUNT_NAME,

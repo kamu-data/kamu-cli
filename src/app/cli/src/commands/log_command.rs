@@ -16,9 +16,6 @@ use chrono::prelude::*;
 use console::style;
 use futures::{StreamExt, TryStreamExt};
 use kamu::domain::*;
-use opendatafabric::serde::yaml::YamlMetadataBlockSerializer;
-use opendatafabric::serde::MetadataBlockSerializer;
-use opendatafabric::{MetadataBlock, *};
 
 use super::{CLIError, Command};
 use crate::output::OutputConfig;
@@ -38,7 +35,7 @@ pub enum MetadataLogOutputFormat {
 pub struct LogCommand {
     dataset_registry: Arc<dyn DatasetRegistry>,
     dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
-    dataset_ref: DatasetRef,
+    dataset_ref: odf::DatasetRef,
     output_format: Option<MetadataLogOutputFormat>,
     filter: Option<String>,
     limit: usize,
@@ -49,7 +46,7 @@ impl LogCommand {
     pub fn new(
         dataset_registry: Arc<dyn DatasetRegistry>,
         dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
-        dataset_ref: DatasetRef,
+        dataset_ref: odf::DatasetRef,
         output_format: Option<MetadataLogOutputFormat>,
         filter: Option<String>,
         limit: usize,
@@ -67,21 +64,23 @@ impl LogCommand {
     }
 
     #[allow(clippy::match_same_arms)]
-    fn filter_block(&self, block: &MetadataBlock) -> bool {
+    fn filter_block(&self, block: &odf::MetadataBlock) -> bool {
         // Keep in sync with CLI parser
         // TODO: replace with bitfield enum
         if let Some(f) = &self.filter {
             match &block.event {
-                MetadataEvent::AddData(_) if f.contains("data") || f.contains("watermark") => true,
-                MetadataEvent::ExecuteTransform(_)
+                odf::MetadataEvent::AddData(_) if f.contains("data") || f.contains("watermark") => {
+                    true
+                }
+                odf::MetadataEvent::ExecuteTransform(_)
                     if f.contains("data") || f.contains("watermark") =>
                 {
                     true
                 }
-                MetadataEvent::Seed(_) if f.contains("source") => true,
-                MetadataEvent::SetPollingSource(_) if f.contains("source") => true,
-                MetadataEvent::SetTransform(_) if f.contains("source") => true,
-                MetadataEvent::SetVocab(_) if f.contains("source") => true,
+                odf::MetadataEvent::Seed(_) if f.contains("source") => true,
+                odf::MetadataEvent::SetPollingSource(_) if f.contains("source") => true,
+                odf::MetadataEvent::SetTransform(_) if f.contains("source") => true,
+                odf::MetadataEvent::SetVocab(_) if f.contains("source") => true,
                 _ => false,
             }
         } else {
@@ -131,6 +130,8 @@ impl Command for LogCommand {
 
         let resolved_dataset = self.dataset_registry.get_dataset_by_handle(&dataset_handle);
 
+        use odf::dataset::{MetadataChainExt, TryStreamExtExt};
+
         let blocks = Box::pin(
             resolved_dataset
                 .as_metadata_chain()
@@ -150,20 +151,20 @@ impl Command for LogCommand {
 trait MetadataRenderer {
     async fn show<'a>(
         &'a mut self,
-        dataset_handle: &DatasetHandle,
-        blocks: DynMetadataStream<'a>,
+        dataset_handle: &odf::DatasetHandle,
+        blocks: odf::dataset::DynMetadataStream<'a>,
     ) -> Result<(), CLIError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct AsciiRenderer {
-    id_to_name_lookup: BTreeMap<DatasetID, DatasetAlias>,
+    id_to_name_lookup: BTreeMap<odf::DatasetID, odf::DatasetAlias>,
     limit: usize,
 }
 
 impl AsciiRenderer {
-    fn new(id_to_name_lookup: BTreeMap<DatasetID, DatasetAlias>, limit: usize) -> Self {
+    fn new(id_to_name_lookup: BTreeMap<odf::DatasetID, odf::DatasetAlias>, limit: usize) -> Self {
         Self {
             id_to_name_lookup,
             limit,
@@ -173,7 +174,7 @@ impl AsciiRenderer {
     async fn render_blocks(
         &self,
         output: &mut impl Write,
-        blocks: DynMetadataStream<'_>,
+        blocks: odf::dataset::DynMetadataStream<'_>,
     ) -> Result<(), CLIError> {
         let mut blocks = blocks.take(self.limit);
 
@@ -197,8 +198,8 @@ impl AsciiRenderer {
     fn render_block(
         &self,
         output: &mut impl Write,
-        hash: &Multihash,
-        block: &MetadataBlock,
+        hash: &odf::Multihash,
+        block: &odf::MetadataBlock,
     ) -> Result<(), std::io::Error> {
         self.render_header(output, hash, block)?;
         self.render_property(
@@ -211,14 +212,14 @@ impl AsciiRenderer {
         )?;
 
         match &block.event {
-            MetadataEvent::SetDataSchema(e @ SetDataSchema { .. }) => {
+            odf::MetadataEvent::SetDataSchema(e @ odf::metadata::SetDataSchema { .. }) => {
                 let schema = e.schema_as_arrow().unwrap();
-                let schema_str = kamu_data_utils::schema::format::format_schema_arrow(&schema);
+                let schema_str = odf::utils::schema::format::format_schema_arrow(&schema);
 
                 self.render_property(output, 0, "Kind", "SetDataSchema")?;
                 self.render_property(output, 0, "Schema", schema_str)?;
             }
-            MetadataEvent::AddData(AddData {
+            odf::MetadataEvent::AddData(odf::metadata::AddData {
                 prev_checkpoint,
                 prev_offset,
                 new_data,
@@ -262,7 +263,7 @@ impl AsciiRenderer {
                     )?;
                 }
             }
-            MetadataEvent::ExecuteTransform(ExecuteTransform {
+            odf::MetadataEvent::ExecuteTransform(odf::metadata::ExecuteTransform {
                 query_inputs,
                 prev_checkpoint,
                 prev_offset,
@@ -322,15 +323,15 @@ impl AsciiRenderer {
                     )?;
                 }
             }
-            MetadataEvent::Seed(e) => {
+            odf::MetadataEvent::Seed(e) => {
                 self.render_property(output, 0, "Kind", "Seed")?;
                 self.render_property(output, 0, "DatasetKind", format!("{:?}", e.dataset_kind))?;
-                self.render_property(output, 0, "DatasetID", &e.dataset_id)?;
+                self.render_property(output, 0, "odf::DatasetID", &e.dataset_id)?;
             }
-            MetadataEvent::SetAttachments(e) => {
+            odf::MetadataEvent::SetAttachments(e) => {
                 self.render_property(output, 0, "Kind", "SetAttachments")?;
                 match &e.attachments {
-                    Attachments::Embedded(e) => {
+                    odf::metadata::Attachments::Embedded(e) => {
                         self.render_section(output, 0, "Embedded")?;
                         for (i, item) in e.items.iter().enumerate() {
                             self.render_section(output, 1, &format!("Item[{i}]"))?;
@@ -340,7 +341,7 @@ impl AsciiRenderer {
                     }
                 }
             }
-            MetadataEvent::SetInfo(e) => {
+            odf::MetadataEvent::SetInfo(e) => {
                 self.render_property(output, 0, "Kind", "SetInfo")?;
                 if let Some(description) = &e.description {
                     self.render_property(output, 0, "Description", description)?;
@@ -349,7 +350,7 @@ impl AsciiRenderer {
                     self.render_property(output, 0, "Keywords", keywords.join(", "))?;
                 }
             }
-            MetadataEvent::SetLicense(e) => {
+            odf::MetadataEvent::SetLicense(e) => {
                 self.render_property(output, 0, "Kind", "SetLicense")?;
                 self.render_property(output, 0, "ShortName", &e.short_name)?;
                 self.render_property(output, 0, "Name", &e.name)?;
@@ -358,27 +359,31 @@ impl AsciiRenderer {
                 }
                 self.render_property(output, 0, "WebsiteURL", &e.website_url)?;
             }
-            MetadataEvent::SetPollingSource(SetPollingSource { .. }) => {
+            odf::MetadataEvent::SetPollingSource(odf::metadata::SetPollingSource { .. }) => {
                 self.render_property(output, 0, "Kind", "SetPollingSource")?;
                 self.render_property(output, 0, "Source", "...")?;
             }
-            MetadataEvent::DisablePollingSource(_) => {
+            odf::MetadataEvent::DisablePollingSource(_) => {
                 self.render_property(output, 0, "Kind", "DisablePollingSource")?;
             }
-            MetadataEvent::AddPushSource(AddPushSource { source_name, .. }) => {
+            odf::MetadataEvent::AddPushSource(odf::metadata::AddPushSource {
+                source_name, ..
+            }) => {
                 self.render_property(output, 0, "Kind", "AddPushSource")?;
                 self.render_property(output, 0, "SourceName", source_name)?;
                 self.render_property(output, 0, "Source", "...")?;
             }
-            MetadataEvent::DisablePushSource(DisablePushSource { source_name }) => {
+            odf::MetadataEvent::DisablePushSource(odf::metadata::DisablePushSource {
+                source_name,
+            }) => {
                 self.render_property(output, 0, "Kind", "DisablePushSource")?;
                 self.render_property(output, 0, "SourceName", source_name)?;
             }
-            MetadataEvent::SetTransform(_) => {
+            odf::MetadataEvent::SetTransform(_) => {
                 self.render_property(output, 0, "Kind", "SetTransform")?;
                 self.render_property(output, 0, "Transform", "...")?;
             }
-            MetadataEvent::SetVocab(SetVocab {
+            odf::MetadataEvent::SetVocab(odf::metadata::SetVocab {
                 offset_column,
                 operation_type_column,
                 system_time_column,
@@ -407,7 +412,7 @@ impl AsciiRenderer {
         &self,
         output: &mut impl Write,
         indent: i32,
-        slice: &DataSlice,
+        slice: &odf::DataSlice,
     ) -> Result<(), std::io::Error> {
         self.render_property(output, indent, "Offset.Start", slice.offset_interval.start)?;
         self.render_property(output, indent, "Offset.End", slice.offset_interval.end)?;
@@ -427,7 +432,7 @@ impl AsciiRenderer {
         &self,
         output: &mut impl Write,
         indent: i32,
-        checkpoint: &Checkpoint,
+        checkpoint: &odf::Checkpoint,
     ) -> Result<(), std::io::Error> {
         self.render_property(output, indent, "PhysicalHash", &checkpoint.physical_hash)?;
         self.render_property(output, indent, "Size", checkpoint.size)?;
@@ -437,8 +442,8 @@ impl AsciiRenderer {
     fn render_header(
         &self,
         output: &mut impl Write,
-        hash: &Multihash,
-        block: &MetadataBlock,
+        hash: &odf::Multihash,
+        block: &odf::MetadataBlock,
     ) -> Result<(), std::io::Error> {
         use std::fmt::Write;
         let mut buf = String::new();
@@ -486,8 +491,8 @@ impl AsciiRenderer {
 impl MetadataRenderer for AsciiRenderer {
     async fn show<'a>(
         &'a mut self,
-        _dataset_handle: &DatasetHandle,
-        blocks: DynMetadataStream<'a>,
+        _dataset_handle: &odf::DatasetHandle,
+        blocks: odf::dataset::DynMetadataStream<'a>,
     ) -> Result<(), CLIError> {
         self.render_blocks(&mut std::io::stdout(), blocks).await?;
         Ok(())
@@ -497,12 +502,12 @@ impl MetadataRenderer for AsciiRenderer {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct PagedAsciiRenderer {
-    id_to_name_lookup: BTreeMap<DatasetID, DatasetAlias>,
+    id_to_name_lookup: BTreeMap<odf::DatasetID, odf::DatasetAlias>,
     limit: usize,
 }
 
 impl PagedAsciiRenderer {
-    fn new(id_to_name_lookup: BTreeMap<DatasetID, DatasetAlias>, limit: usize) -> Self {
+    fn new(id_to_name_lookup: BTreeMap<odf::DatasetID, odf::DatasetAlias>, limit: usize) -> Self {
         Self {
             id_to_name_lookup,
             limit,
@@ -514,8 +519,8 @@ impl PagedAsciiRenderer {
 impl MetadataRenderer for PagedAsciiRenderer {
     async fn show<'a>(
         &'a mut self,
-        dataset_handle: &DatasetHandle,
-        blocks: DynMetadataStream<'a>,
+        dataset_handle: &odf::DatasetHandle,
+        blocks: odf::dataset::DynMetadataStream<'a>,
     ) -> Result<(), CLIError> {
         let mut pager = minus::Pager::new();
         pager
@@ -561,7 +566,7 @@ impl YamlRenderer {
     async fn render_blocks(
         &self,
         output: &mut impl Write,
-        blocks: DynMetadataStream<'_>,
+        blocks: odf::dataset::DynMetadataStream<'_>,
     ) -> Result<(), CLIError> {
         let mut blocks = blocks.take(self.limit);
 
@@ -583,9 +588,12 @@ impl YamlRenderer {
 
     fn render_block(
         output: &mut impl Write,
-        _hash: &Multihash,
-        block: &MetadataBlock,
+        _hash: &odf::Multihash,
+        block: &odf::MetadataBlock,
     ) -> Result<(), std::io::Error> {
+        use odf::metadata::serde::yaml::YamlMetadataBlockSerializer;
+        use odf::metadata::serde::MetadataBlockSerializer;
+
         let buf = YamlMetadataBlockSerializer.write_manifest(block).unwrap();
 
         writeln!(output, "{}", std::str::from_utf8(&buf).unwrap())
@@ -596,8 +604,8 @@ impl YamlRenderer {
 impl MetadataRenderer for YamlRenderer {
     async fn show<'a>(
         &'a mut self,
-        _dataset_handle: &DatasetHandle,
-        blocks: DynMetadataStream<'a>,
+        _dataset_handle: &odf::DatasetHandle,
+        blocks: odf::dataset::DynMetadataStream<'a>,
     ) -> Result<(), CLIError> {
         self.render_blocks(&mut std::io::stdout(), blocks).await?;
         Ok(())
@@ -620,8 +628,8 @@ impl PagedYamlRenderer {
 impl MetadataRenderer for PagedYamlRenderer {
     async fn show<'a>(
         &'a mut self,
-        dataset_handle: &DatasetHandle,
-        blocks: DynMetadataStream<'a>,
+        dataset_handle: &odf::DatasetHandle,
+        blocks: odf::dataset::DynMetadataStream<'a>,
     ) -> Result<(), CLIError> {
         let mut pager = minus::Pager::new();
         pager

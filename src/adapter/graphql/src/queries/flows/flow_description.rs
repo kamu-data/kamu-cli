@@ -17,8 +17,8 @@ use kamu_core::{
     MetadataQueryService,
     PollingSourceBlockInfo,
 };
+use kamu_flow_system as fs;
 use kamu_flow_system::FlowResultDatasetUpdate;
-use {kamu_flow_system as fs, opendatafabric as odf};
 
 use crate::prelude::*;
 
@@ -239,7 +239,7 @@ pub struct FlowDescriptionBuilder {
     //
     // In addition it might be useful if we will add another entity which cause
     // duplicate requests
-    dataset_polling_sources: HashMap<opendatafabric::DatasetID, Option<PollingSourceBlockInfo>>,
+    dataset_polling_sources: HashMap<odf::DatasetID, Option<PollingSourceBlockInfo>>,
 }
 
 impl FlowDescriptionBuilder {
