@@ -30,6 +30,7 @@ ingest-mqtt = ["dep:rumqttc"]
 query-extensions-json = ["dep:datafusion-functions-json"]
 testing = [
     "dep:mockall",
+    "kamu-core/testing",
     "kamu-data-utils/testing",
 ]
 
