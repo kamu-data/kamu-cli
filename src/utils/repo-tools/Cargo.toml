@@ -18,14 +18,16 @@ workspace = true
 
 
 [dependencies]
-clap = { version = "4", default-features = false, features = ["std"] }
 chrono = { version = "0.4", default-features = false, features = ["std", "clock"] }
+clap = { version = "4", default-features = false, features = ["std"] }
 regex = { version = "1", default-features = false, features = ["std", "unicode"] }
+reqwest = { version = "0.12", features = ["blocking", "json"] }
 semver = { version = "1", default-features = false }
+serde = { version = "1", default-features = false, features = ["derive"] }
 toml = { version = "0.8", default-features = false, features = ["parse"] }
 
 [dev-dependencies]
 glob = { version = "0.3", default-features = false }
-grep-searcher = "0.1"
 grep-regex = "0.1"
+grep-searcher = "0.1"
 indoc = "2"

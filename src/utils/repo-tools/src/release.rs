@@ -15,6 +15,7 @@ use chrono::{Datelike, NaiveDate};
 use clap::ArgAction;
 use regex::Captures;
 use semver::Version;
+use serde::Deserialize;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -75,6 +76,8 @@ fn main() {
 
     update_openapi_schema(Path::new("resources/openapi.json"), &new_version);
     update_openapi_schema(Path::new("resources/openapi-mt.json"), &new_version);
+
+    update_web_ui_version_for_release(Path::new(".github/workflows/release.yaml"));
 }
 
 fn get_current_version() -> Version {
@@ -169,6 +172,53 @@ fn update_changelog(path: &Path, new_version: &Version, current_date: NaiveDate)
     assert_ne!(text, new_text, "Unreleased changes section not found");
 
     std::fs::write(path, new_text).expect("Failed to write to changelog file");
+}
+
+fn update_web_ui_version_for_release(path: &Path) {
+    fn get_latest_version() -> Version {
+        // To avoid requiring the use of GITHUB_TOKEN here, we use a little trick
+        const DESKTOP_LINE_USER_AGENT: &str =
+            "Mozilla/5.0 (X11; Linux x86_64; rv:134.0) Gecko/20100101 Firefox/134.0";
+
+        let client = reqwest::blocking::Client::builder()
+            .user_agent(DESKTOP_LINE_USER_AGENT)
+            .build()
+            .unwrap();
+
+        #[derive(Debug, Deserialize)]
+        struct GitHubReleaseLikeResponse {
+            tag_name: String,
+        }
+
+        let response = client
+            .get("https://api.github.com/repos/kamu-data/kamu-web-ui/releases/latest")
+            .send()
+            .expect("GitHub API request error")
+            .json::<GitHubReleaseLikeResponse>()
+            .expect("GitHub API request parsing failed");
+        let tag = response.tag_name.trim_start_matches('v');
+
+        Version::parse(tag).expect("Failed to parse tag name")
+    }
+
+    let latest_version = get_latest_version();
+
+    let text = std::fs::read_to_string(path).expect("Could not read the CI release config");
+
+    let re = regex::Regex::new(r#"KAMU_WEB_UI_VERSION: "\d+\.\d+\.\d+""#).unwrap();
+    let new_text = re
+        .replace(&text, |_: &Captures| {
+            format!(r#"KAMU_WEB_UI_VERSION: "{latest_version}""#)
+        })
+        .to_string();
+
+    if text != new_text {
+        eprintln!("New KAMU_WEB_UI version: {latest_version}");
+
+        std::fs::write(path, new_text).expect("Failed to write to CI release config");
+    } else {
+        eprintln!("KAMU_WEB_UI version has not changed: {latest_version}");
+    }
 }
 
 fn add_years(d: NaiveDate, years: i32) -> NaiveDate {
