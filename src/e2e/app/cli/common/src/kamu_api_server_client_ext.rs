@@ -256,19 +256,7 @@ pub struct AuthApi<'a> {
 
 impl AuthApi<'_> {
     pub async fn login_as_kamu(&mut self) -> AccessToken {
-        self.login(
-            indoc::indoc!(
-                r#"
-                mutation {
-                  auth {
-                    login(loginMethod: "password", loginCredentialsJson: "{\"login\":\"kamu\",\"password\":\"kamu\"}") {
-                      accessToken
-                    }
-                  }
-                }
-                "#,
-            )
-        ).await
+        self.login_with_password("kamu", "kamu").await
     }
 
     pub async fn login_as_e2e_user(&mut self) -> AccessToken {
@@ -285,6 +273,25 @@ impl AuthApi<'_> {
             "#,
         ))
         .await
+    }
+
+    pub async fn login_with_password(&mut self, user: &str, password: &str) -> AccessToken {
+        self.login(
+            indoc::indoc!(
+                r#"
+                mutation {
+                  auth {
+                    login(loginMethod: "password", loginCredentialsJson: "{\"login\":\"<user>\",\"password\":\"<password>\"}") {
+                      accessToken
+                    }
+                  }
+                }
+                "#,
+            )
+            .replace("<user>", user)
+            .replace("<password>", password)
+            .as_str()
+        ).await
     }
 
     pub async fn login_via_rest(
