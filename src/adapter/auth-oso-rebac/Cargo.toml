@@ -30,13 +30,13 @@ kamu-auth-rebac-services = { workspace = true }
 kamu-core = { workspace = true, default-features = false, features = ["oso"] }
 kamu-datasets = { workspace = true }
 messaging-outbox = { workspace = true }
-odf = { workspace = true }
+odf = { workspace = true, default-features = false, features = ["arrow"] }
 
 async-trait = "0.1"
 dill = "0.11"
 futures = { version = "0.3", default-features = false }
 oso = { version = "0.27", default-features = false, features = ["derive"] }
-thiserror = { version = "1", default-features = false }
+thiserror = { version = "2", default-features = false }
 tokio = { version = "1", default-features = false, features = ["macros"] }
 tracing = { version = "0.1", default-features = false }
 
@@ -47,7 +47,7 @@ kamu-auth-rebac-inmem = { workspace = true }
 kamu-core = { workspace = true, default-features = false, features = ["oso", "testing"] }
 kamu-datasets-inmem = { workspace = true }
 kamu-datasets-services = { workspace = true }
-odf = { workspace = true, features = [ "testing" ] }
+odf = { workspace = true, default-features = false, features = ["testing"] }
 time-source = { workspace = true }
 
 test-log = { version = "0.2", features = ["trace"] }
