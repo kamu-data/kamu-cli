@@ -13,13 +13,14 @@ use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use kamu_accounts::*;
 use kamu_accounts_inmem::{InMemoryAccessTokenRepository, InMemoryAccountRepository};
 use kamu_accounts_services::{AccessTokenServiceImpl, AuthenticationServiceImpl};
+use messaging_outbox::{MockOutbox, Outbox};
 use time_source::{SystemTimeSource, SystemTimeSourceStub};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
 async fn test_enabled_login_methods() {
-    let catalog = make_catalog();
+    let catalog = make_catalog(MockOutbox::new());
     let authentication_service = catalog.get_one::<dyn AuthenticationService>().unwrap();
 
     let mut supported_login_methods = authentication_service.supported_login_methods();
@@ -31,7 +32,10 @@ async fn test_enabled_login_methods() {
 
 #[test_log::test(tokio::test)]
 async fn test_login() {
-    let catalog = make_catalog();
+    let mut mock_outbox = MockOutbox::new();
+    expect_outbox_account_created(&mut mock_outbox);
+
+    let catalog = make_catalog(mock_outbox);
     let authentication_service = catalog.get_one::<dyn AuthenticationService>().unwrap();
 
     let response_a = authentication_service
@@ -55,7 +59,10 @@ async fn test_login() {
 
 #[test_log::test(tokio::test)]
 async fn test_use_good_access_token() {
-    let catalog = make_catalog();
+    let mut mock_outbox = MockOutbox::new();
+    expect_outbox_account_created(&mut mock_outbox);
+
+    let catalog = make_catalog(mock_outbox);
     let authentication_service = catalog.get_one::<dyn AuthenticationService>().unwrap();
 
     let login_response = authentication_service
@@ -78,7 +85,7 @@ async fn test_use_good_access_token() {
 
 #[test_log::test(tokio::test)]
 async fn test_use_bad_access_token() {
-    let catalog = make_catalog();
+    let catalog = make_catalog(MockOutbox::new());
     let authentication_service = catalog.get_one::<dyn AuthenticationService>().unwrap();
 
     assert_matches!(
@@ -93,7 +100,7 @@ async fn test_use_bad_access_token() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn make_catalog() -> dill::Catalog {
+fn make_catalog(mock_outbox: MockOutbox) -> dill::Catalog {
     let mut b = dill::CatalogBuilder::new();
 
     b.add::<DummyAuthenticationProviderA>()
@@ -106,11 +113,32 @@ fn make_catalog() -> dill::Catalog {
         .add_value(SystemTimeSourceStub::new())
         .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
         .add_value(JwtAuthenticationConfig::default())
-        .add::<DatabaseTransactionRunner>();
+        .add::<DatabaseTransactionRunner>()
+        .add_value(mock_outbox)
+        .bind::<dyn Outbox, MockOutbox>();
 
     NoOpDatabasePlugin::init_database_components(&mut b);
 
     b.build()
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn expect_outbox_account_created(mock_outbox: &mut MockOutbox) {
+    use mockall::predicate::{always, eq, function};
+    mock_outbox
+        .expect_post_message_as_json()
+        .with(
+            eq(MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERVICE),
+            function(|message_as_json: &serde_json::Value| {
+                matches!(
+                    serde_json::from_value::<AccountLifecycleMessage>(message_as_json.clone()),
+                    Ok(AccountLifecycleMessage::Created(_))
+                )
+            }),
+            always(),
+        )
+        .returning(|_, _, _| Ok(()));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -150,7 +178,7 @@ impl AuthenticationProvider for DummyAuthenticationProviderA {
     ) -> Result<ProviderLoginResponse, ProviderLoginError> {
         Ok(ProviderLoginResponse {
             account_name: DEFAULT_ACCOUNT_NAME.clone(),
-            email: None,
+            email: DUMMY_EMAIL_ADDRESS.clone(),
             display_name: String::from(DEFAULT_ACCOUNT_NAME_STR),
             account_type: AccountType::User,
             avatar_url: None,
@@ -175,7 +203,7 @@ impl AuthenticationProvider for DummyAuthenticationProviderB {
     ) -> Result<ProviderLoginResponse, ProviderLoginError> {
         Ok(ProviderLoginResponse {
             account_name: DEFAULT_ACCOUNT_NAME.clone(),
-            email: None,
+            email: DUMMY_EMAIL_ADDRESS.clone(),
             display_name: String::from(DEFAULT_ACCOUNT_NAME_STR),
             account_type: AccountType::User,
             avatar_url: None,

@@ -44,6 +44,7 @@ async-utils = { workspace = true }
 container-runtime = { workspace = true }
 database-common = { workspace = true }
 database-common-macros = { workspace = true }
+email-utils = { workspace = true }
 file-utils = { workspace = true }
 http-common = { workspace = true }
 init-on-startup = { workspace = true }
@@ -122,7 +123,7 @@ async-graphql = { version = "7", features = [
 async-graphql-axum = "7"
 axum = { version = "0.7", features = ["ws"] }
 http = "1"
-reqwest = { version = "0.12", default-features = false, features = [] }
+reqwest = { version = "0.12", default-features = false }
 serde_json = "1"
 tonic = { version = "0.12", default-features = false }
 tower = "0.5"

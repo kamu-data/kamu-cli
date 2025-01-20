@@ -12,6 +12,8 @@ use std::sync::{Arc, Mutex};
 
 use database_common::PaginationOpts;
 use dill::*;
+use email_utils::Email;
+use odf::AccountName;
 
 use crate::domain::*;
 
@@ -40,6 +42,48 @@ impl State {
             password_hash_by_account_name: HashMap::new(),
         }
     }
+
+    fn check_unique_name(&self, account_name: &AccountName) -> Result<(), AccountErrorDuplicate> {
+        if self.accounts_by_name.contains_key(account_name) {
+            return Err(AccountErrorDuplicate {
+                account_field: AccountDuplicateField::Name,
+            });
+        }
+
+        Ok(())
+    }
+
+    fn check_unique_provider_identity_key(
+        &self,
+        provider_identity_key: &String,
+    ) -> Result<(), AccountErrorDuplicate> {
+        if self
+            .account_id_by_provider_identity_key
+            .contains_key(provider_identity_key)
+        {
+            return Err(AccountErrorDuplicate {
+                account_field: AccountDuplicateField::ProviderIdentityKey,
+            });
+        }
+
+        Ok(())
+    }
+
+    fn check_unique_email(&self, email: &Email) -> Result<(), AccountErrorDuplicate> {
+        for other_account in self.accounts_by_id.values() {
+            if other_account
+                .email
+                .as_ref()
+                .eq_ignore_ascii_case(email.as_ref())
+            {
+                return Err(AccountErrorDuplicate {
+                    account_field: AccountDuplicateField::Email,
+                });
+            }
+        }
+
+        Ok(())
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -64,34 +108,20 @@ impl AccountRepository for InMemoryAccountRepository {
     async fn create_account(&self, account: &Account) -> Result<(), CreateAccountError> {
         let mut guard = self.state.lock().unwrap();
         if guard.accounts_by_id.contains_key(&account.id) {
-            return Err(CreateAccountError::Duplicate(CreateAccountErrorDuplicate {
-                account_field: CreateAccountDuplicateField::Id,
+            return Err(CreateAccountError::Duplicate(AccountErrorDuplicate {
+                account_field: AccountDuplicateField::Id,
             }));
         }
-        if guard.accounts_by_name.contains_key(&account.account_name) {
-            return Err(CreateAccountError::Duplicate(CreateAccountErrorDuplicate {
-                account_field: CreateAccountDuplicateField::Name,
-            }));
-        }
-        if guard
-            .account_id_by_provider_identity_key
-            .contains_key(&account.provider_identity_key)
-        {
-            return Err(CreateAccountError::Duplicate(CreateAccountErrorDuplicate {
-                account_field: CreateAccountDuplicateField::ProviderIdentityKey,
-            }));
-        }
-        if let Some(email) = &account.email {
-            for account in guard.accounts_by_id.values() {
-                if let Some(account_email) = &account.email
-                    && account_email.eq_ignore_ascii_case(email)
-                {
-                    return Err(CreateAccountError::Duplicate(CreateAccountErrorDuplicate {
-                        account_field: CreateAccountDuplicateField::Email,
-                    }));
-                }
-            }
-        }
+
+        guard
+            .check_unique_name(&account.account_name)
+            .map_err(CreateAccountError::Duplicate)?;
+        guard
+            .check_unique_provider_identity_key(&account.provider_identity_key)
+            .map_err(CreateAccountError::Duplicate)?;
+        guard
+            .check_unique_email(&account.email)
+            .map_err(CreateAccountError::Duplicate)?;
 
         guard
             .accounts_by_id
@@ -102,6 +132,98 @@ impl AccountRepository for InMemoryAccountRepository {
         guard
             .account_id_by_provider_identity_key
             .insert(account.provider_identity_key.clone(), account.id.clone());
+
+        Ok(())
+    }
+
+    async fn update_account(&self, updated_account: Account) -> Result<(), UpdateAccountError> {
+        let mut guard = self.state.lock().unwrap();
+        let Some(account) = guard.accounts_by_id.get(&updated_account.id).cloned() else {
+            return Err(UpdateAccountError::NotFound(AccountNotFoundByIdError {
+                account_id: updated_account.id.clone(),
+            }));
+        };
+
+        if account == updated_account {
+            return Ok(());
+        }
+
+        if updated_account.account_name != account.account_name {
+            guard
+                .check_unique_name(&updated_account.account_name)
+                .map_err(UpdateAccountError::Duplicate)?;
+        }
+        if updated_account.provider_identity_key != account.provider_identity_key {
+            guard
+                .check_unique_provider_identity_key(&updated_account.provider_identity_key)
+                .map_err(UpdateAccountError::Duplicate)?;
+        }
+        if updated_account.email != account.email {
+            guard
+                .check_unique_email(&updated_account.email)
+                .map_err(UpdateAccountError::Duplicate)?;
+        }
+
+        guard
+            .accounts_by_id
+            .insert(updated_account.id.clone(), updated_account.clone());
+
+        if updated_account.account_name != account.account_name {
+            guard.accounts_by_name.remove(&account.account_name);
+        }
+        guard.accounts_by_name.insert(
+            updated_account.account_name.clone(),
+            updated_account.clone(),
+        );
+
+        if updated_account.provider_identity_key != account.provider_identity_key {
+            guard
+                .account_id_by_provider_identity_key
+                .remove(&account.provider_identity_key);
+        }
+        guard.account_id_by_provider_identity_key.insert(
+            updated_account.provider_identity_key.clone(),
+            updated_account.id.clone(),
+        );
+
+        Ok(())
+    }
+
+    async fn update_account_email(
+        &self,
+        account_id: &odf::AccountID,
+        new_email: Email,
+    ) -> Result<(), UpdateAccountError> {
+        let account_name = {
+            let guard = self.state.lock().unwrap();
+            let Some(account) = guard.accounts_by_id.get(account_id) else {
+                return Err(UpdateAccountError::NotFound(AccountNotFoundByIdError {
+                    account_id: account_id.clone(),
+                }));
+            };
+
+            if new_email != account.email {
+                guard
+                    .check_unique_email(&new_email)
+                    .map_err(UpdateAccountError::Duplicate)?;
+            }
+
+            account.account_name.clone()
+        };
+
+        let mut guard = self.state.lock().unwrap();
+
+        guard
+            .accounts_by_id
+            .get_mut(account_id)
+            .expect("must exist")
+            .email = new_email.clone();
+
+        guard
+            .accounts_by_name
+            .get_mut(&account_name)
+            .expect("must exist")
+            .email = new_email;
 
         Ok(())
     }
@@ -163,13 +285,11 @@ impl AccountRepository for InMemoryAccountRepository {
 
     async fn find_account_id_by_email(
         &self,
-        email: &str,
+        email: &Email,
     ) -> Result<Option<odf::AccountID>, FindAccountIdByEmailError> {
         let guard = self.state.lock().unwrap();
         for account in guard.accounts_by_id.values() {
-            if let Some(account_email) = &account.email
-                && account_email.eq_ignore_ascii_case(email)
-            {
+            if account.email.as_ref().eq_ignore_ascii_case(email.as_ref()) {
                 return Ok(Some(account.id.clone()));
             }
         }

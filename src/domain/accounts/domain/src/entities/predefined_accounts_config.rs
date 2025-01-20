@@ -8,10 +8,12 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
+use email_utils::Email;
 use merge::Merge;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
+use super::DUMMY_EMAIL_ADDRESS;
 use crate::{
     AccountDisplayName,
     AccountType,
@@ -53,7 +55,7 @@ impl PredefinedAccountsConfig {
                 is_admin: true,
                 registered_at: Utc::now(),
                 provider: String::from(PROVIDER_PASSWORD),
-                email: None,
+                email: DUMMY_EMAIL_ADDRESS.clone(),
                 treat_datasets_as_public: true,
             }],
         }
@@ -83,7 +85,7 @@ pub struct AccountConfig {
     id: Option<odf::AccountID>,
     pub account_name: odf::AccountName,
     pub password: Option<String>,
-    pub email: Option<String>,
+    pub email: Email,
     // 'display_name' is auto-derived from `account_name` if omitted
     display_name: Option<AccountDisplayName>,
     #[serde(default = "AccountConfig::default_account_type")]
@@ -100,12 +102,13 @@ pub struct AccountConfig {
 }
 
 impl AccountConfig {
-    pub fn from_name(account_name: odf::AccountName) -> Self {
+    pub fn test_config_from_name(account_name: odf::AccountName) -> Self {
+        let email = Email::parse(&format!("{}@example.com", account_name.as_str())).unwrap();
         Self {
             id: None,
             account_name,
             password: None,
-            email: None,
+            email,
             display_name: None,
             account_type: Self::default_account_type(),
             provider: Self::default_provider(),

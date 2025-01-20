@@ -94,8 +94,9 @@ impl Command for SystemE2ECommand {
                 for account_name in &self.arguments {
                     eprint!("Add {account_name}... ");
 
-                    let account_config =
-                        AccountConfig::from_name(odf::AccountName::new_unchecked(account_name));
+                    let account_config = AccountConfig::test_config_from_name(
+                        odf::AccountName::new_unchecked(account_name),
+                    );
                     let account = (&account_config).into();
 
                     self.account_repo.create_account(&account).await.int_err()?;

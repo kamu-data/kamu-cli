@@ -3867,6 +3867,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "email-utils"
+version = "0.220.0"
+dependencies = [
+ "serde",
+ "thiserror 2.0.11",
+ "validator",
+]
+
+[[package]]
 name = "ena"
 version = "0.14.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5473,11 +5482,13 @@ dependencies = [
  "chrono",
  "crc32fast",
  "database-common",
+ "email-utils",
  "futures",
  "internal-error",
  "jsonwebtoken",
  "lazy_static",
  "merge",
+ "messaging-outbox",
  "mockall",
  "opendatafabric",
  "rand",
@@ -5499,6 +5510,7 @@ dependencies = [
  "database-common",
  "database-common-macros",
  "dill",
+ "email-utils",
  "futures",
  "internal-error",
  "kamu-accounts",
@@ -5520,6 +5532,7 @@ dependencies = [
  "database-common",
  "database-common-macros",
  "dill",
+ "email-utils",
  "futures",
  "internal-error",
  "kamu-accounts",
@@ -5542,6 +5555,7 @@ dependencies = [
  "database-common",
  "database-common-macros",
  "dill",
+ "email-utils",
  "futures",
  "internal-error",
  "kamu-accounts",
@@ -5562,6 +5576,7 @@ dependencies = [
  "chrono",
  "database-common",
  "dill",
+ "email-utils",
  "kamu-accounts",
  "kamu-adapter-oauth",
  "opendatafabric",
@@ -5579,12 +5594,15 @@ dependencies = [
  "chrono",
  "database-common",
  "dill",
+ "email-utils",
  "futures",
  "init-on-startup",
  "internal-error",
  "jsonwebtoken",
  "kamu-accounts",
  "kamu-accounts-inmem",
+ "messaging-outbox",
+ "mockall",
  "opendatafabric",
  "password-hash",
  "serde",
@@ -5606,6 +5624,7 @@ dependencies = [
  "database-common",
  "database-common-macros",
  "dill",
+ "email-utils",
  "futures",
  "internal-error",
  "kamu-accounts",
@@ -5691,6 +5710,7 @@ dependencies = [
  "database-common",
  "datafusion",
  "dill",
+ "email-utils",
  "event-sourcing",
  "file-utils",
  "futures",
@@ -5749,6 +5769,7 @@ dependencies = [
  "datafusion",
  "dill",
  "ed25519-dalek",
+ "email-utils",
  "flate2",
  "fs_extra",
  "futures",
@@ -5805,6 +5826,7 @@ version = "0.220.0"
 dependencies = [
  "async-trait",
  "dill",
+ "email-utils",
  "http 1.2.0",
  "internal-error",
  "kamu-accounts",
@@ -5964,6 +5986,7 @@ dependencies = [
  "dill",
  "dirs 6.0.0",
  "duration-string",
+ "email-utils",
  "file-utils",
  "fs_extra",
  "futures",
@@ -6326,6 +6349,7 @@ dependencies = [
  "chrono",
  "database-common",
  "dill",
+ "email-utils",
  "futures",
  "itertools 0.14.0",
  "kamu-accounts",
@@ -11520,6 +11544,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b3758f5e68192bb96cc8f9b7e2c2cfdabb435499a28499a42f8f984092adad4b"
 dependencies = [
  "getrandom",
+]
+
+[[package]]
+name = "validator"
+version = "0.20.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "43fb22e1a008ece370ce08a3e9e4447a910e92621bb49b85d6e48a45397e7cfa"
+dependencies = [
+ "idna",
+ "once_cell",
+ "regex",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "url",
 ]
 
 [[package]]

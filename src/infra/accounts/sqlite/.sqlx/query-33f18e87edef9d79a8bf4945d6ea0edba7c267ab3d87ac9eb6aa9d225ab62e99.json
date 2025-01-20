@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\n                SELECT\n                    at.token_hash,\n                    a.id as \"id: _\",\n                    a.account_name,\n                    a.email as \"email?\",\n                    a.display_name,\n                    a.account_type as \"account_type: AccountType\",\n                    registered_at as \"registered_at: _\",\n                    a.avatar_url,\n                    a.is_admin as \"is_admin: _\",\n                    a.provider,\n                    a.provider_identity_key\n                FROM access_tokens at\n                INNER JOIN accounts a ON at.account_id = a.id\n                WHERE at.id = $1 and at.revoked_at IS null\n                ",
+  "query": "\n                SELECT\n                    at.token_hash,\n                    a.id as \"id: _\",\n                    a.account_name,\n                    a.email,\n                    a.display_name,\n                    a.account_type as \"account_type: AccountType\",\n                    registered_at as \"registered_at: _\",\n                    a.avatar_url,\n                    a.is_admin as \"is_admin: _\",\n                    a.provider,\n                    a.provider_identity_key\n                FROM access_tokens at\n                INNER JOIN accounts a ON at.account_id = a.id\n                WHERE at.id = $1 and at.revoked_at IS null\n                ",
   "describe": {
     "columns": [
       {
@@ -19,7 +19,7 @@
         "type_info": "Text"
       },
       {
-        "name": "email?",
+        "name": "email",
         "ordinal": 3,
         "type_info": "Text"
       },
@@ -66,7 +66,7 @@
       false,
       false,
       false,
-      true,
+      false,
       false,
       false,
       false,
@@ -76,5 +76,5 @@
       false
     ]
   },
-  "hash": "908411ed3618da0eef322d0e1133b7ee78cee2972f3ed09df952a7c137c20a4b"
+  "hash": "33f18e87edef9d79a8bf4945d6ea0edba7c267ab3d87ac9eb6aa9d225ab62e99"
 }

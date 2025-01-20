@@ -45,6 +45,10 @@ type Account {
 	"""
 	accountType: AccountType!
 	"""
+	Email address
+	"""
+	email: String!
+	"""
 	Avatar URL
 	"""
 	avatarUrl: String
@@ -122,6 +126,10 @@ type AccountFlowsMut {
 scalar AccountID
 
 type AccountMut {
+	"""
+	Update account email
+	"""
+	updateEmail(newEmail: String!): UpdateEmailResult!
 	"""
 	Access to the mutable flow configurations of this account
 	"""
@@ -2019,6 +2027,25 @@ interface TriggerFlowResult {
 
 type TriggerFlowSuccess implements TriggerFlowResult {
 	flow: Flow!
+	message: String!
+}
+
+type UpdateEmailInvalid implements UpdateEmailResult {
+	dummy: Boolean!
+	message: String!
+}
+
+type UpdateEmailNonUnique implements UpdateEmailResult {
+	dummy: Boolean!
+	message: String!
+}
+
+interface UpdateEmailResult {
+	message: String!
+}
+
+type UpdateEmailSuccess implements UpdateEmailResult {
+	newEmail: String!
 	message: String!
 }
 

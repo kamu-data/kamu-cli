@@ -36,6 +36,7 @@ use kamu_adapter_http::{
     UploadTokenBase64Json,
 };
 use kamu_core::{MediaType, TenancyConfig};
+use messaging_outbox::DummyOutboxImpl;
 use serde_json::json;
 use time_source::SystemTimeSourceDefault;
 
@@ -69,9 +70,9 @@ impl Harness {
             let mut predefined_account_configs = PredefinedAccountsConfig::single_tenant();
             predefined_account_configs
                 .predefined
-                .push(AccountConfig::from_name(odf::AccountName::new_unchecked(
-                    ANOTHER_ACCOUNT_NAME,
-                )));
+                .push(AccountConfig::test_config_from_name(
+                    odf::AccountName::new_unchecked(ANOTHER_ACCOUNT_NAME),
+                ));
 
             b.add_value(CacheDir::new(cache_dir.clone()))
                 .add_value(predefined_account_configs)
@@ -85,7 +86,8 @@ impl Harness {
                 .add_value(ServerUrlConfig::new_test(Some(&api_server_address)))
                 .add_value(FileUploadLimitConfig::new_in_bytes(100))
                 .add::<UploadServiceLocal>()
-                .add::<PredefinedAccountsRegistrator>();
+                .add::<PredefinedAccountsRegistrator>()
+                .add::<DummyOutboxImpl>();
 
             NoOpDatabasePlugin::init_database_components(&mut b);
 

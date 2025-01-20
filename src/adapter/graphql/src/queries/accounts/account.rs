@@ -166,6 +166,15 @@ impl Account {
         })
     }
 
+    /// Email address
+    async fn email(&self, ctx: &Context<'_>) -> Result<&str> {
+        check_logged_account_id_match(ctx, &self.account_id)?;
+
+        let full_account_info = self.get_full_account_info(ctx).await?;
+
+        Ok(full_account_info.email.as_ref())
+    }
+
     /// Avatar URL
     async fn avatar_url(&self, ctx: &Context<'_>) -> Result<&Option<String>> {
         let full_account_info = self.get_full_account_info(ctx).await?;

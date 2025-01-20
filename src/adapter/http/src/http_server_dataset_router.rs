@@ -128,6 +128,7 @@ pub async fn platform_login_handler(
             kamu_accounts::LoginError::UnsupportedMethod(e) => ApiError::bad_request(e),
             kamu_accounts::LoginError::InvalidCredentials(e) => ApiError::new_unauthorized_from(e),
             kamu_accounts::LoginError::RejectedCredentials(e) => ApiError::new_unauthorized_from(e),
+            kamu_accounts::LoginError::NoPrimaryEmail(e) => ApiError::new_unauthorized_from(e),
             kamu_accounts::LoginError::DuplicateCredentials => ApiError::bad_request(e),
             kamu_accounts::LoginError::Internal(e) => e.api_err(),
         }),

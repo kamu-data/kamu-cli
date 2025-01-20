@@ -27,7 +27,7 @@ database-common-macros = { workspace = true }
 http-common = { workspace = true }
 internal-error = { workspace = true }
 kamu-core = { workspace = true }
-odf = { workspace = true, default-features = false, features = [ "arrow", "http", "lfs", "s3" ] }
+odf = { workspace = true, default-features = false, features = ["arrow", "http", "lfs", "s3"] }
 
 axum = { version = "0.7", default-features = false, features = [] }
 chrono = { version = "0.4", default-features = false }

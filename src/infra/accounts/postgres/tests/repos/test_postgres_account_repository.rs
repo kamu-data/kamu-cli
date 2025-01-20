@@ -103,6 +103,62 @@ database_transactional_test!(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+database_transactional_test!(
+    storage = postgres,
+    fixture = kamu_accounts_repo_tests::test_update_email_success,
+    harness = PostgresAccountRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = postgres,
+    fixture = kamu_accounts_repo_tests::test_update_email_errors,
+    harness = PostgresAccountRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = postgres,
+    fixture = kamu_accounts_repo_tests::test_update_account_success,
+    harness = PostgresAccountRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = postgres,
+    fixture = kamu_accounts_repo_tests::test_update_account_not_found,
+    harness = PostgresAccountRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = postgres,
+    fixture = kamu_accounts_repo_tests::test_update_account_duplicate_name,
+    harness = PostgresAccountRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = postgres,
+    fixture = kamu_accounts_repo_tests::test_update_account_duplicate_email,
+    harness = PostgresAccountRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = postgres,
+    fixture = kamu_accounts_repo_tests::test_update_account_duplicate_provider_identity,
+    harness = PostgresAccountRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 struct PostgresAccountRepositoryHarness {
     catalog: Catalog,
 }

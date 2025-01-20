@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, TimeZone, Utc};
+use email_utils::Email;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 
@@ -27,6 +28,7 @@ lazy_static! {
         odf::AccountID::new_seeded_ed25519(DEFAULT_ACCOUNT_NAME_STR.as_bytes());
     static ref DUMMY_REGISTRATION_TIME: DateTime<Utc> =
         Utc.with_ymd_and_hms(2024, 4, 1, 12, 0, 0).unwrap();
+    pub static ref DUMMY_EMAIL_ADDRESS: Email = Email::parse("kamu@example.com").unwrap();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -35,7 +37,7 @@ lazy_static! {
 pub struct Account {
     pub id: odf::AccountID,
     pub account_name: odf::AccountName,
-    pub email: Option<String>,
+    pub email: Email,
     pub display_name: AccountDisplayName,
     pub account_type: AccountType,
     pub avatar_url: Option<String>,
@@ -98,7 +100,7 @@ impl Account {
             account_type: AccountType::User,
             display_name: name.to_string(),
             avatar_url: None,
-            email: None,
+            email: Email::parse(format!("{name}@example.com").as_str()).unwrap(),
             registered_at: DUMMY_REGISTRATION_TIME.to_utc(),
             is_admin: false,
             provider: String::from(PROVIDER_PASSWORD),
@@ -115,7 +117,7 @@ impl Account {
 pub struct AccountRowModel {
     pub id: odf::AccountID,
     pub account_name: String,
-    pub email: Option<String>,
+    pub email: String,
     pub display_name: String,
     pub account_type: AccountType,
     pub avatar_url: Option<String>,
@@ -138,7 +140,7 @@ impl From<AccountRowModel> for Account {
         Account {
             id: value.id,
             account_name: odf::AccountName::new_unchecked(&value.account_name),
-            email: value.email,
+            email: Email::parse(&value.email).unwrap(),
             display_name: value.display_name,
             account_type: value.account_type,
             avatar_url: value.avatar_url,
@@ -156,7 +158,7 @@ impl From<AccountWithTokenRowModel> for Account {
         Account {
             id: value.id,
             account_name: odf::AccountName::new_unchecked(&value.account_name),
-            email: value.email,
+            email: Email::parse(&value.email).unwrap(),
             display_name: value.display_name,
             account_type: value.account_type,
             avatar_url: value.avatar_url,

@@ -23,6 +23,7 @@ doctest = false
 
 [dependencies]
 database-common = { workspace = true }
+email-utils = { workspace = true }
 kamu-accounts = { workspace = true }
 odf = { workspace = true }
 internal-error = { workspace = true }

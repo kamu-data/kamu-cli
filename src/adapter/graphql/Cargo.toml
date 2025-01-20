@@ -23,6 +23,7 @@ doctest = false
 
 [dependencies]
 database-common = { workspace = true }
+email-utils = { workspace = true }
 internal-error = { workspace = true }
 odf = { workspace = true, features = ["arrow", "http", "lfs", "s3"] }
 

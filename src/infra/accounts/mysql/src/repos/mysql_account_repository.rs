@@ -9,7 +9,9 @@
 
 use database_common::{PaginationOpts, TransactionRef, TransactionRefT};
 use dill::{component, interface};
+use email_utils::Email;
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
+use sqlx::error::DatabaseError;
 use sqlx::Row;
 
 use crate::domain::*;
@@ -30,6 +32,29 @@ impl MySqlAccountRepository {
             transaction: transaction.into(),
         }
     }
+
+    fn convert_unique_constraint_violation(&self, e: &dyn DatabaseError) -> AccountErrorDuplicate {
+        let mysql_error_message = e.message();
+
+        let account_field = if mysql_error_message.contains("for key 'PRIMARY'") {
+            AccountDuplicateField::Id
+        } else if mysql_error_message.contains("for key 'idx_accounts_name'") {
+            AccountDuplicateField::Name
+        } else if mysql_error_message.contains("for key 'idx_accounts_email'") {
+            AccountDuplicateField::Email
+        } else if mysql_error_message.contains("for key 'idx_accounts_provider_identity_key'") {
+            AccountDuplicateField::ProviderIdentityKey
+        } else {
+            tracing::error!(
+                error = ?e,
+                error_msg = mysql_error_message,
+                "Unexpected MySQL error"
+            );
+            AccountDuplicateField::Id
+        };
+
+        AccountErrorDuplicate { account_field }
+    }
 }
 
 #[async_trait::async_trait]
@@ -46,7 +71,7 @@ impl AccountRepository for MySqlAccountRepository {
             "#,
             account.id.to_string(),
             account.account_name.to_ascii_lowercase(),
-            account.email.as_ref().map(|email| email.to_ascii_lowercase()),
+            account.email.as_ref().to_ascii_lowercase(),
             account.display_name,
             account.account_type,
             account.avatar_url,
@@ -60,34 +85,107 @@ impl AccountRepository for MySqlAccountRepository {
         .map_err(|e: sqlx::Error| match e {
             sqlx::Error::Database(e) => {
                 if e.is_unique_violation() {
-                    let mysql_error_message = e.message();
-
-                    let account_field = if mysql_error_message.contains("for key 'PRIMARY'") {
-                        CreateAccountDuplicateField::Id
-                    } else if mysql_error_message.contains("for key 'idx_accounts_name'") {
-                        CreateAccountDuplicateField::Name
-                    } else if mysql_error_message.contains("for key 'idx_accounts_email'") {
-                        CreateAccountDuplicateField::Email
-                    } else if mysql_error_message.contains("for key 'idx_accounts_provider_identity_key'") {
-                        CreateAccountDuplicateField::ProviderIdentityKey
-                    } else {
-                        tracing::error!(
-                            error = ?e,
-                            error_msg = mysql_error_message,
-                            "Unexpected MySQL error"
-                        );
-                        CreateAccountDuplicateField::Id
-                    };
-
-                    CreateAccountError::Duplicate(CreateAccountErrorDuplicate {
-                        account_field
-                    })
+                    CreateAccountError::Duplicate(self.convert_unique_constraint_violation(e.as_ref()))
                 } else {
                     CreateAccountError::Internal(e.int_err())
                 }
             }
             _ => CreateAccountError::Internal(e.int_err())
         })?;
+
+        Ok(())
+    }
+
+    async fn update_account(&self, updated_account: Account) -> Result<(), UpdateAccountError> {
+        let mut tr = self.transaction.lock().await;
+
+        let connection_mut = tr.connection_mut().await?;
+
+        let update_result = sqlx::query!(
+            r#"
+            UPDATE accounts SET
+                account_name = ?,
+                email = ?,
+                display_name = ?,
+                account_type = ?,
+                avatar_url = ?,
+                registered_at = ?,
+                is_admin = ?,
+                provider = ?,
+                provider_identity_key = ?
+            WHERE id = ?
+            "#,
+            updated_account.account_name.to_ascii_lowercase(),
+            updated_account.email.as_ref().to_ascii_lowercase(),
+            updated_account.display_name,
+            updated_account.account_type as AccountType,
+            updated_account.avatar_url,
+            updated_account.registered_at,
+            updated_account.is_admin,
+            updated_account.provider.to_string(),
+            updated_account.provider_identity_key.to_string(),
+            updated_account.id.to_string(),
+        )
+        .execute(connection_mut)
+        .await
+        .map_err(|e: sqlx::Error| match e {
+            sqlx::Error::Database(e) => {
+                if e.is_unique_violation() {
+                    UpdateAccountError::Duplicate(
+                        self.convert_unique_constraint_violation(e.as_ref()),
+                    )
+                } else {
+                    UpdateAccountError::Internal(e.int_err())
+                }
+            }
+            _ => UpdateAccountError::Internal(e.int_err()),
+        })?;
+
+        if update_result.rows_affected() == 0 {
+            return Err(UpdateAccountError::NotFound(AccountNotFoundByIdError {
+                account_id: updated_account.id.clone(),
+            }));
+        }
+
+        Ok(())
+    }
+
+    async fn update_account_email(
+        &self,
+        account_id: &odf::AccountID,
+        new_email: Email,
+    ) -> Result<(), UpdateAccountError> {
+        let mut tr = self.transaction.lock().await;
+
+        let connection_mut = tr.connection_mut().await?;
+
+        let update_result = sqlx::query!(
+            r#"
+            UPDATE accounts SET email = ? WHERE id = ?
+            "#,
+            new_email.as_ref(),
+            account_id.to_string(),
+        )
+        .execute(connection_mut)
+        .await
+        .map_err(|e: sqlx::Error| match e {
+            sqlx::Error::Database(e) => {
+                if e.is_unique_violation() {
+                    UpdateAccountError::Duplicate(
+                        self.convert_unique_constraint_violation(e.as_ref()),
+                    )
+                } else {
+                    UpdateAccountError::Internal(e.int_err())
+                }
+            }
+            _ => UpdateAccountError::Internal(e.int_err()),
+        })?;
+
+        if update_result.rows_affected() == 0 {
+            return Err(UpdateAccountError::NotFound(AccountNotFoundByIdError {
+                account_id: account_id.clone(),
+            }));
+        }
 
         Ok(())
     }
@@ -106,7 +204,7 @@ impl AccountRepository for MySqlAccountRepository {
             SELECT
                 id as "id: _",
                 account_name,
-                email as "email?",
+                email,
                 display_name,
                 account_type as "account_type: AccountType",
                 avatar_url,
@@ -182,7 +280,7 @@ impl AccountRepository for MySqlAccountRepository {
                 account_name: odf::AccountName::new_unchecked(
                     &account_row.get::<String, &str>("account_name"),
                 ),
-                email: account_row.get("email"),
+                email: Email::parse(account_row.get("email")).unwrap(),
                 display_name: account_row.get("display_name"),
                 account_type: account_row.get_unchecked("account_type"),
                 avatar_url: account_row.get("avatar_url"),
@@ -208,7 +306,7 @@ impl AccountRepository for MySqlAccountRepository {
             SELECT
                 id as "id: _",
                 account_name,
-                email as "email?",
+                email,
                 display_name,
                 account_type as "account_type: AccountType",
                 avatar_url,
@@ -262,7 +360,7 @@ impl AccountRepository for MySqlAccountRepository {
 
     async fn find_account_id_by_email(
         &self,
-        email: &str,
+        email: &Email,
     ) -> Result<Option<odf::AccountID>, FindAccountIdByEmailError> {
         let mut tr = self.transaction.lock().await;
 
@@ -275,7 +373,7 @@ impl AccountRepository for MySqlAccountRepository {
               FROM accounts
               WHERE lower(email) = lower(?)
             "#,
-            email
+            email.as_ref()
         )
         .fetch_optional(connection_mut)
         .await
@@ -344,7 +442,7 @@ impl ExpensiveAccountRepository for MySqlAccountRepository {
                 r#"
                 SELECT id            AS "id: _",
                        account_name,
-                       email         AS "email?",
+                       email,
                        display_name,
                        account_type  AS "account_type: AccountType",
                        avatar_url,

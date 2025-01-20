@@ -221,7 +221,7 @@ impl AccessTokenRepository for PostgresAccessTokenRepository {
                     at.token_hash,
                     a.id as "id: _",
                     a.account_name,
-                    a.email as "email?",
+                    a.email,
                     a.display_name,
                     a.account_type as "account_type: AccountType",
                     a.avatar_url,

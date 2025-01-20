@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n                SELECT\n                    at.token_hash,\n                    a.id as \"id: _\",\n                    a.account_name,\n                    a.email as \"email?\",\n                    a.display_name,\n                    a.account_type as \"account_type: AccountType\",\n                    a.avatar_url,\n                    a.registered_at,\n                    a.is_admin,\n                    a.provider,\n                    a.provider_identity_key\n                FROM access_tokens at\n                INNER JOIN accounts a ON a.id = account_id\n                WHERE at.id = $1 AND at.revoked_at IS null\n                ",
+  "query": "\n                SELECT\n                    at.token_hash,\n                    a.id as \"id: _\",\n                    a.account_name,\n                    a.email,\n                    a.display_name,\n                    a.account_type as \"account_type: AccountType\",\n                    a.avatar_url,\n                    a.registered_at,\n                    a.is_admin,\n                    a.provider,\n                    a.provider_identity_key\n                FROM access_tokens at\n                INNER JOIN accounts a ON a.id = account_id\n                WHERE at.id = $1 AND at.revoked_at IS null\n                ",
   "describe": {
     "columns": [
       {
@@ -20,7 +20,7 @@
       },
       {
         "ordinal": 3,
-        "name": "email?",
+        "name": "email",
         "type_info": "Varchar"
       },
       {
@@ -78,7 +78,7 @@
       false,
       false,
       false,
-      true,
+      false,
       false,
       false,
       true,
@@ -88,5 +88,5 @@
       false
     ]
   },
-  "hash": "a71ca5086cd2688147540849ce2bfca610ced55560daa51666c2277d130282a7"
+  "hash": "ebcd0a58b3538f7c95c8b631f3105e87f92846047dec2224d4312a3ea3e669c1"
 }

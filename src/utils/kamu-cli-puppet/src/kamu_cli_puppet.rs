@@ -61,6 +61,7 @@ impl KamuCliPuppet {
                       users:
                         predefined:
                           - accountName: e2e-user
+                            email: e2e-user@example.com
                     "#
                 )
                 .into(),
