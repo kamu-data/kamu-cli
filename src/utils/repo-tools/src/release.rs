@@ -15,8 +15,13 @@ use chrono::{Datelike, NaiveDate};
 use clap::ArgAction;
 use regex::Captures;
 use semver::Version;
+use serde::Deserialize;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 const CHANGE_DATE_YEARS: i32 = 4;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 fn main() {
     let matches = clap::Command::new("release")
@@ -56,12 +61,23 @@ fn main() {
 
     eprintln!("New version: {new_version}");
 
+    let current_date = chrono::Utc::now().naive_utc().date();
+
     update_crates(&new_version);
 
-    update_license(Path::new("LICENSE.txt"), &current_version, &new_version);
+    update_changelog(Path::new("CHANGELOG.md"), &new_version, current_date);
+
+    update_license(
+        Path::new("LICENSE.txt"),
+        &current_version,
+        &new_version,
+        current_date,
+    );
 
     update_openapi_schema(Path::new("resources/openapi.json"), &new_version);
     update_openapi_schema(Path::new("resources/openapi-mt.json"), &new_version);
+
+    update_web_ui_version_for_release(Path::new(".github/workflows/release.yaml"));
 }
 
 fn get_current_version() -> Version {
@@ -92,14 +108,14 @@ fn update_crates(new_version: &Version) {
         .expect("`cargo set-version` returned non-zero exit code");
 }
 
-fn update_license(license_path: &Path, current_version: &Version, new_version: &Version) {
+fn update_license(
+    license_path: &Path,
+    current_version: &Version,
+    new_version: &Version,
+    current_date: NaiveDate,
+) {
     let text = std::fs::read_to_string(license_path).expect("Could not read the license file");
-    let new_text = update_license_text(
-        &text,
-        current_version,
-        new_version,
-        chrono::Utc::now().naive_utc().date(),
-    );
+    let new_text = update_license_text(&text, current_version, new_version, current_date);
     assert_ne!(text, new_text);
     std::fs::write(license_path, new_text).expect("Failed to write to license file");
 }
@@ -141,6 +157,68 @@ fn update_license_text(
         text
     }
     .to_string()
+}
+
+fn update_changelog(path: &Path, new_version: &Version, current_date: NaiveDate) {
+    let text = std::fs::read_to_string(path).expect("Could not read the changelog file");
+
+    let re = regex::Regex::new(r#"## +\[?Unreleased\]? *"#).unwrap();
+    let new_text = re
+        .replace(&text, |_: &Captures| {
+            format!("## [{new_version}] - {current_date}")
+        })
+        .to_string();
+
+    assert_ne!(text, new_text, "Unreleased changes section not found");
+
+    std::fs::write(path, new_text).expect("Failed to write to changelog file");
+}
+
+fn update_web_ui_version_for_release(path: &Path) {
+    fn get_latest_version() -> Version {
+        // To avoid requiring the use of GITHUB_TOKEN here, we use a little trick
+        const DESKTOP_LINE_USER_AGENT: &str =
+            "Mozilla/5.0 (X11; Linux x86_64; rv:134.0) Gecko/20100101 Firefox/134.0";
+
+        let client = reqwest::blocking::Client::builder()
+            .user_agent(DESKTOP_LINE_USER_AGENT)
+            .build()
+            .unwrap();
+
+        #[derive(Debug, Deserialize)]
+        struct GitHubReleaseLikeResponse {
+            tag_name: String,
+        }
+
+        let response = client
+            .get("https://api.github.com/repos/kamu-data/kamu-web-ui/releases/latest")
+            .send()
+            .expect("GitHub API request error")
+            .json::<GitHubReleaseLikeResponse>()
+            .expect("GitHub API request parsing failed");
+        let tag = response.tag_name.trim_start_matches('v');
+
+        Version::parse(tag).expect("Failed to parse tag name")
+    }
+
+    let latest_version = get_latest_version();
+
+    let text = std::fs::read_to_string(path).expect("Could not read the CI release config");
+
+    let re = regex::Regex::new(r#"KAMU_WEB_UI_VERSION: "\d+\.\d+\.\d+""#).unwrap();
+    let new_text = re
+        .replace(&text, |_: &Captures| {
+            format!(r#"KAMU_WEB_UI_VERSION: "{latest_version}""#)
+        })
+        .to_string();
+
+    if text != new_text {
+        eprintln!("New KAMU_WEB_UI version: {latest_version}");
+
+        std::fs::write(path, new_text).expect("Failed to write to CI release config");
+    } else {
+        eprintln!("KAMU_WEB_UI version has not changed: {latest_version}");
+    }
 }
 
 fn add_years(d: NaiveDate, years: i32) -> NaiveDate {
