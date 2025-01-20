@@ -16,7 +16,11 @@ use clap::ArgAction;
 use regex::Captures;
 use semver::Version;
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 const CHANGE_DATE_YEARS: i32 = 4;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 fn main() {
     let matches = clap::Command::new("release")
@@ -56,9 +60,18 @@ fn main() {
 
     eprintln!("New version: {new_version}");
 
+    let current_date = chrono::Utc::now().naive_utc().date();
+
     update_crates(&new_version);
 
-    update_license(Path::new("LICENSE.txt"), &current_version, &new_version);
+    update_changelog(Path::new("CHANGELOG.md"), &new_version, current_date);
+
+    update_license(
+        Path::new("LICENSE.txt"),
+        &current_version,
+        &new_version,
+        current_date,
+    );
 
     update_openapi_schema(Path::new("resources/openapi.json"), &new_version);
     update_openapi_schema(Path::new("resources/openapi-mt.json"), &new_version);
@@ -92,14 +105,14 @@ fn update_crates(new_version: &Version) {
         .expect("`cargo set-version` returned non-zero exit code");
 }
 
-fn update_license(license_path: &Path, current_version: &Version, new_version: &Version) {
+fn update_license(
+    license_path: &Path,
+    current_version: &Version,
+    new_version: &Version,
+    current_date: NaiveDate,
+) {
     let text = std::fs::read_to_string(license_path).expect("Could not read the license file");
-    let new_text = update_license_text(
-        &text,
-        current_version,
-        new_version,
-        chrono::Utc::now().naive_utc().date(),
-    );
+    let new_text = update_license_text(&text, current_version, new_version, current_date);
     assert_ne!(text, new_text);
     std::fs::write(license_path, new_text).expect("Failed to write to license file");
 }
@@ -141,6 +154,21 @@ fn update_license_text(
         text
     }
     .to_string()
+}
+
+fn update_changelog(path: &Path, new_version: &Version, current_date: NaiveDate) {
+    let text = std::fs::read_to_string(path).expect("Could not read the changelog file");
+
+    let re = regex::Regex::new(r#"## +\[?Unreleased\]? *"#).unwrap();
+    let new_text = re
+        .replace(&text, |_: &Captures| {
+            format!("## [{new_version}] - {current_date}")
+        })
+        .to_string();
+
+    assert_ne!(text, new_text, "Unreleased changes section not found");
+
+    std::fs::write(path, new_text).expect("Failed to write to changelog file");
 }
 
 fn add_years(d: NaiveDate, years: i32) -> NaiveDate {
