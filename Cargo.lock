@@ -10625,6 +10625,7 @@ version = "0.219.1"
 dependencies = [
  "axum",
  "container-runtime",
+ "opendatafabric",
  "rand",
  "tempfile",
  "tokio",

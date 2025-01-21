@@ -26,6 +26,7 @@ use kamu_adapter_http::{LoginRequestBody, PlatformFileUploadQuery, UploadContext
 use kamu_flow_system::{DatasetFlowType, FlowID};
 use lazy_static::lazy_static;
 use reqwest::{Method, StatusCode, Url};
+use serde::Deserialize;
 use thiserror::Error;
 use tokio_retry::strategy::FixedInterval;
 use tokio_retry::Retry;
@@ -167,6 +168,8 @@ pub trait KamuApiServerClientExt {
 
     fn odf_query(&self) -> OdfQuery;
 
+    fn search(&self) -> SearchApi;
+
     fn swagger(&self) -> SwaggerApi;
 
     fn upload(&self) -> UploadApi;
@@ -202,6 +205,10 @@ impl KamuApiServerClientExt for KamuApiServerClient {
 
     fn odf_query(&self) -> OdfQuery {
         OdfQuery { client: self }
+    }
+
+    fn search(&self) -> SearchApi {
+        SearchApi { client: self }
     }
 
     fn swagger(&self) -> SwaggerApi {
@@ -450,6 +457,21 @@ impl DatasetApi<'_> {
 
     pub async fn create_dataset(&self, dataset_snapshot_yaml: &str) -> CreateDatasetResponse {
         self.create_dataset_with_visibility(dataset_snapshot_yaml, odf::DatasetVisibility::Public)
+            .await
+    }
+
+    pub async fn create_dataset_from_snapshot_with_visibility(
+        &self,
+        snapshot: odf::DatasetSnapshot,
+        visibility: odf::DatasetVisibility,
+    ) -> CreateDatasetResponse {
+        let serialized_snapshot = odf::serde::yaml::YamlDatasetSnapshotSerializer
+            .write_manifest_str(&snapshot)
+            .unwrap()
+            .escape_default()
+            .to_string();
+
+        self.create_dataset_with_visibility(&serialized_snapshot, visibility)
             .await
     }
 
@@ -1197,6 +1219,66 @@ pub enum QueryError {
     Unauthorized,
     #[error(transparent)]
     Internal(#[from] InternalError),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// API: Search
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct SearchApi<'a> {
+    client: &'a KamuApiServerClient,
+}
+
+impl SearchApi<'_> {
+    pub async fn search(&self, query: &str) -> Vec<FoundDatasetItem> {
+        let mut response = self
+            .client
+            .graphql_api_call(
+                indoc::indoc!(
+                    r#"
+                    query {
+                      search {
+                        query(query: "<query>") {
+                          nodes {
+                            __typename
+                            ... on Dataset {
+                              id
+                              alias
+                            }
+                          }
+                        }
+                      }
+                    }
+                    "#
+                )
+                .replace("<query>", query)
+                .as_str(),
+            )
+            .await
+            .data();
+
+        response["search"]["query"]["nodes"]
+            .as_array_mut()
+            .map(|nodes| {
+                nodes
+                    .iter_mut()
+                    .map(|node| {
+                        let typename = node["__typename"].as_str().unwrap();
+
+                        pretty_assertions::assert_eq!("Dataset", typename);
+
+                        serde_json::from_value::<FoundDatasetItem>(node.take()).unwrap()
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .unwrap()
+    }
+}
+
+#[derive(Debug, Deserialize, PartialEq, Eq)]
+pub struct FoundDatasetItem {
+    pub id: odf::DatasetID,
+    pub alias: odf::DatasetAlias,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

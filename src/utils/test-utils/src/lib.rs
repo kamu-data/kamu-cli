@@ -9,6 +9,7 @@
 
 mod http_file_server;
 mod minio_server;
+pub mod odf;
 pub mod test_docker_images;
 
 pub use http_file_server::*;
