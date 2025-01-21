@@ -653,7 +653,10 @@ impl DatasetApi<'_> {
 
                 match first_error.message.as_str() {
                     "Only the dataset owner can perform this action" => {
-                        Err(SetDatasetVisibilityError::Forbidden)
+                        Err(SetDatasetVisibilityError::ForbiddenOnlyOwner)
+                    }
+                    "Anonymous access forbidden" => {
+                        Err(SetDatasetVisibilityError::ForbiddenAnonymous)
                     }
                     unexpected_message => {
                         Err(format!("Unexpected error message: {unexpected_message}")
@@ -821,8 +824,10 @@ pub enum GetDatasetVisibilityError {
 
 #[derive(Error, Debug)]
 pub enum SetDatasetVisibilityError {
-    #[error("Forbidden")]
-    Forbidden,
+    #[error("ForbiddenOnlyOwner")]
+    ForbiddenOnlyOwner,
+    #[error("ForbiddenAnonymous")]
+    ForbiddenAnonymous,
     #[error(transparent)]
     Internal(#[from] InternalError),
 }

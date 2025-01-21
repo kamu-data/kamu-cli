@@ -25,6 +25,13 @@ use odf::metadata::testing::MetadataFactory;
 pub async fn test_only_the_dataset_owner_or_admin_can_change_its_visibility(
     kamu_api_server_client: KamuApiServerClient,
 ) {
+    // 4 actors:
+    // - anonymous
+    // - alice (owner) w/ dataset
+    // - bob (not owner)
+    // - admin
+    let anonymous_client = kamu_api_server_client.clone();
+
     let mut owner_client = kamu_api_server_client.clone();
     owner_client
         .auth()
@@ -52,13 +59,43 @@ pub async fn test_only_the_dataset_owner_or_admin_can_change_its_visibility(
 
     {
         assert_matches!(
+            anonymous_client
+                .dataset()
+                .set_visibility(&dataset_id, odf::DatasetVisibility::Private)
+                .await,
+            Err(SetDatasetVisibilityError::ForbiddenAnonymous)
+        );
+
+        assert_matches!(
+            anonymous_client.dataset().get_visibility(&dataset_id).await,
+            Ok(odf::DatasetVisibility::Public)
+        );
+        assert_matches!(
+            owner_client.dataset().get_visibility(&dataset_id).await,
+            Ok(odf::DatasetVisibility::Public)
+        );
+        assert_matches!(
+            not_owner_client.dataset().get_visibility(&dataset_id).await,
+            Ok(odf::DatasetVisibility::Public)
+        );
+        assert_matches!(
+            admin_client.dataset().get_visibility(&dataset_id).await,
+            Ok(odf::DatasetVisibility::Public)
+        );
+    }
+    {
+        assert_matches!(
             not_owner_client
                 .dataset()
                 .set_visibility(&dataset_id, odf::DatasetVisibility::Private)
                 .await,
-            Err(SetDatasetVisibilityError::Forbidden)
+            Err(SetDatasetVisibilityError::ForbiddenOnlyOwner)
         );
 
+        assert_matches!(
+            anonymous_client.dataset().get_visibility(&dataset_id).await,
+            Ok(odf::DatasetVisibility::Public)
+        );
         assert_matches!(
             owner_client.dataset().get_visibility(&dataset_id).await,
             Ok(odf::DatasetVisibility::Public)
@@ -82,6 +119,10 @@ pub async fn test_only_the_dataset_owner_or_admin_can_change_its_visibility(
         );
 
         assert_matches!(
+            anonymous_client.dataset().get_visibility(&dataset_id).await,
+            Err(GetDatasetVisibilityError::NotFound)
+        );
+        assert_matches!(
             owner_client.dataset().get_visibility(&dataset_id).await,
             Ok(odf::DatasetVisibility::Private)
         );
@@ -103,6 +144,10 @@ pub async fn test_only_the_dataset_owner_or_admin_can_change_its_visibility(
             Ok(_)
         );
 
+        assert_matches!(
+            anonymous_client.dataset().get_visibility(&dataset_id).await,
+            Ok(odf::DatasetVisibility::Public)
+        );
         assert_matches!(
             owner_client.dataset().get_visibility(&dataset_id).await,
             Ok(odf::DatasetVisibility::Public)
