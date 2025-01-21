@@ -839,6 +839,123 @@ impl DatasetApi<'_> {
             .map(|node| serde_json::from_value::<AccountDataset>(node.take()).unwrap())
             .collect()
     }
+
+    pub async fn dependencies(&self, dataset_id: &odf::DatasetID) -> DatasetDependencies {
+        let mut response = self
+            .client
+            .graphql_api_call(
+                indoc::indoc!(
+                    r#"
+                    query {
+                      datasets {
+                        byId(
+                          datasetId: "<dataset_id>"
+                        ) {
+                          metadata {
+                            currentUpstreamDependencies {
+                              __typename
+                              ... on DependencyDatasetResultAccessible {
+                                dataset {
+                                  id
+                                  alias
+                                }
+                              }
+                              ... on DependencyDatasetResultNotAccessible {
+                                id
+                                message
+                              }
+                            }
+                            currentDownstreamDependencies {
+                              __typename
+                              ... on DependencyDatasetResultAccessible {
+                                dataset {
+                                  id
+                                  alias
+                                }
+                              }
+                              ... on DependencyDatasetResultNotAccessible {
+                                id
+                                message
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                    "#
+                )
+                .replace(
+                    "<dataset_id>",
+                    dataset_id.as_did_str().to_stack_string().as_str(),
+                )
+                .as_str(),
+            )
+            .await
+            .data();
+
+        let metadata = &mut response["datasets"]["byId"]["metadata"];
+
+        fn map_dependency(dependency: &mut serde_json::Value) -> DatasetDependency {
+            let typename = dependency["__typename"].as_str().unwrap();
+
+            match typename {
+                "DependencyDatasetResultAccessible" => {
+                    let dataset = dependency["dataset"].take();
+
+                    DatasetDependency::Resolved(
+                        serde_json::from_value::<ResolvedDatasetDependency>(dataset).unwrap(),
+                    )
+                }
+                "DependencyDatasetResultNotAccessible" => DatasetDependency::Unresolved(
+                    serde_json::from_value::<UnresolvedDatasetDependency>(dependency.take())
+                        .unwrap(),
+                ),
+                unexpected_typename => {
+                    unreachable!("Unexpected typename: {unexpected_typename}");
+                }
+            }
+        }
+
+        let mut upstream = metadata["currentUpstreamDependencies"]
+            .as_array_mut()
+            .map(|dependencies| {
+                dependencies
+                    .iter_mut()
+                    .map(map_dependency)
+                    .collect::<Vec<_>>()
+            })
+            .unwrap();
+        let mut downstream = metadata["currentDownstreamDependencies"]
+            .as_array_mut()
+            .map(|dependencies| {
+                dependencies
+                    .iter_mut()
+                    .map(map_dependency)
+                    .collect::<Vec<_>>()
+            })
+            .unwrap();
+
+        use std::cmp::Ordering;
+
+        fn comparator(left: &DatasetDependency, right: &DatasetDependency) -> Ordering {
+            match (left, right) {
+                (DatasetDependency::Resolved(l), DatasetDependency::Resolved(r)) => {
+                    l.alias.cmp(&r.alias)
+                }
+                (_, DatasetDependency::Resolved(_)) => Ordering::Less,
+                (DatasetDependency::Resolved(_), _) => Ordering::Greater,
+                _ => Ordering::Equal,
+            }
+        }
+
+        upstream.sort_by(comparator);
+        downstream.sort_by(comparator);
+
+        DatasetDependencies {
+            upstream,
+            downstream,
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -866,6 +983,30 @@ pub struct DatasetBlocksResponse {
 pub struct AccountDataset {
     pub id: odf::DatasetID,
     pub alias: odf::DatasetAlias,
+}
+
+#[derive(Debug, Deserialize, PartialEq, Eq)]
+pub struct ResolvedDatasetDependency {
+    pub id: odf::DatasetID,
+    pub alias: odf::DatasetAlias,
+}
+
+#[derive(Debug, Deserialize, PartialEq, Eq)]
+pub struct UnresolvedDatasetDependency {
+    pub id: odf::DatasetID,
+    pub message: String,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum DatasetDependency {
+    Resolved(ResolvedDatasetDependency),
+    Unresolved(UnresolvedDatasetDependency),
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct DatasetDependencies {
+    pub upstream: Vec<DatasetDependency>,
+    pub downstream: Vec<DatasetDependency>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
