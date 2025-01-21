@@ -832,12 +832,16 @@ impl DatasetApi<'_> {
             .await
             .data();
 
-        response["datasets"]["byAccountName"]["nodes"]
+        let mut result = response["datasets"]["byAccountName"]["nodes"]
             .as_array_mut()
             .unwrap()
             .iter_mut()
             .map(|node| serde_json::from_value::<AccountDataset>(node.take()).unwrap())
-            .collect()
+            .collect::<Vec<_>>();
+
+        result.sort_by(|left, right| left.alias.cmp(&right.alias));
+
+        result
     }
 
     pub async fn dependencies(&self, dataset_id: &odf::DatasetID) -> DatasetDependencies {
@@ -1471,7 +1475,7 @@ impl SearchApi<'_> {
             .await
             .data();
 
-        response["search"]["query"]["nodes"]
+        let mut result = response["search"]["query"]["nodes"]
             .as_array_mut()
             .map(|nodes| {
                 nodes
@@ -1483,9 +1487,13 @@ impl SearchApi<'_> {
 
                         serde_json::from_value::<FoundDatasetItem>(node.take()).unwrap()
                     })
-                    .collect()
+                    .collect::<Vec<_>>()
             })
-            .unwrap()
+            .unwrap();
+
+        result.sort_by(|left, right| left.alias.cmp(&right.alias));
+
+        result
     }
 }
 

@@ -274,11 +274,7 @@ pub async fn test_a_private_dataset_is_available_only_to_the_owner_or_admin_in_t
                 alias: public_dataset_alias.clone()
             }
         ],
-        *{
-            let mut res = owner_client.search().search("data").await;
-            res.sort_by(|left, right| left.alias.cmp(&right.alias));
-            res
-        }
+        *owner_client.search().search("data").await
     );
     pretty_assertions::assert_eq!(
         [
@@ -291,11 +287,7 @@ pub async fn test_a_private_dataset_is_available_only_to_the_owner_or_admin_in_t
                 alias: public_dataset_alias
             }
         ],
-        *{
-            let mut res = admin_client.search().search("data").await;
-            res.sort_by(|left, right| left.alias.cmp(&right.alias));
-            res
-        }
+        *owner_client.search().search("data").await
     );
 }
 
@@ -520,11 +512,7 @@ pub async fn test_a_private_dataset_is_available_only_to_the_owner_or_admin_in_a
                 alias: public_dataset_alias.clone()
             }
         ],
-        *{
-            let mut res = owner_client.dataset().by_account_name(&owner_name).await;
-            res.sort_by(|left, right| left.alias.cmp(&right.alias));
-            res
-        }
+        *owner_client.dataset().by_account_name(&owner_name).await
     );
     pretty_assertions::assert_eq!(
         [AccountDataset {
@@ -547,11 +535,7 @@ pub async fn test_a_private_dataset_is_available_only_to_the_owner_or_admin_in_a
                 alias: public_dataset_alias
             }
         ],
-        *{
-            let mut res = admin_client.dataset().by_account_name(&owner_name).await;
-            res.sort_by(|left, right| left.alias.cmp(&right.alias));
-            res
-        }
+        *owner_client.dataset().by_account_name(&owner_name).await
     );
 }
 
