@@ -20,9 +20,10 @@ use crate::{internal_error, PlanId, SessionManager};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// This basic session manager is for testing use only. It creates context
-/// once and reuses it for all the folowing operations. Once created the context
-/// is never released, thus all resources associated with table providers will
-/// remain tied up until the entire Flight SQL service is cleaned up.
+/// once and reuses it for all the following operations. Once created the
+/// context is never released, thus all resources associated with table
+/// providers will remain tied up until the entire Flight SQL service is cleaned
+/// up.
 #[dill::component]
 #[dill::interface(dyn SessionManager)]
 pub struct SessionManagerSingleton {

@@ -62,7 +62,7 @@ use crate::KamuFlightSqlService;
 // This type is a singleton that is called by GRPC server. For it to play nicely
 // with DB transactions we follow the same pattern as in Axum where middleware
 // layers are responsible for attaching the Catalog to incoming requests. This
-// wrapper will extract the catalog from the reuqest extensions and instantiate
+// wrapper will extract the catalog from the request extensions and instantiate
 // the inner service in the request context.
 pub struct KamuFlightSqlServiceWrapper;
 
@@ -91,7 +91,7 @@ impl KamuFlightSqlServiceWrapper {
         //
         // We want it to open and close DB transaction for the duration of the handler.
         //
-        // Currently, however, because the contruction of `datafusion::SessionContext`
+        // Currently, however, because the construction of `datafusion::SessionContext`
         // is expensive we cache it in memory for a short period of time. Because the
         // context holds on to core objects it also holds on to the DB transaction, thus
         // transactions outlive the duration of the handler which would violate the

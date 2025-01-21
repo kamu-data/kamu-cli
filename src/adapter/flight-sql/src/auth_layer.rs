@@ -171,7 +171,7 @@ where
                 }
                 _ => {
                     // Disallow fully unauthorized access - anonymous users have to go through
-                    // handshare procedure
+                    // handshake procedure
                     return Ok(Status::unauthenticated(
                         "Unauthenticated access is not allowed. Provide a bearer token or use \
                          basic auth and handshake endpoint to login as anonymous.",
