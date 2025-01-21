@@ -829,15 +829,16 @@ pub async fn test_trigger_flow_ingest(mut kamu_api_server_client: KamuApiServerC
 
     kamu_api_server_client.flow().wait(&root_dataset_id).await;
 
-    pretty_assertions::assert_eq!(
-        indoc::indoc!(
-            r#"
-            op,system_time,event_time,city,population
-            0,2050-01-02T03:04:05Z,2020-01-01T00:00:00Z,A,1000
-            0,2050-01-02T03:04:05Z,2020-01-01T00:00:00Z,B,2000
-            0,2050-01-02T03:04:05Z,2020-01-01T00:00:00Z,C,3000"#
-        ),
-        kamu_api_server_client.odf_query().query(QUERY).await
+    assert_matches!(
+        kamu_api_server_client.odf_query().query(QUERY).await,
+        Ok(result)
+            if result == indoc::indoc!(
+                r#"
+                op,system_time,event_time,city,population
+                0,2050-01-02T03:04:05Z,2020-01-01T00:00:00Z,A,1000
+                0,2050-01-02T03:04:05Z,2020-01-01T00:00:00Z,B,2000
+                0,2050-01-02T03:04:05Z,2020-01-01T00:00:00Z,C,3000"#
+            )
     );
 
     // Update iteration 2
@@ -869,18 +870,19 @@ pub async fn test_trigger_flow_ingest(mut kamu_api_server_client: KamuApiServerC
 
     kamu_api_server_client.flow().wait(&root_dataset_id).await;
 
-    pretty_assertions::assert_eq!(
-        indoc::indoc!(
-            r#"
-            op,system_time,event_time,city,population
-            0,2050-01-02T03:04:05Z,2020-01-01T00:00:00Z,A,1000
-            0,2050-01-02T03:04:05Z,2020-01-01T00:00:00Z,B,2000
-            0,2050-01-02T03:04:05Z,2020-01-01T00:00:00Z,C,3000
-            0,2051-01-02T03:04:05Z,2020-01-02T00:00:00Z,A,1500
-            0,2051-01-02T03:04:05Z,2020-01-02T00:00:00Z,B,2500
-            0,2051-01-02T03:04:05Z,2020-01-02T00:00:00Z,C,3500"#
-        ),
-        kamu_api_server_client.odf_query().query(QUERY).await
+    assert_matches!(
+        kamu_api_server_client.odf_query().query(QUERY).await,
+        Ok(result)
+            if result == indoc::indoc!(
+                r#"
+                op,system_time,event_time,city,population
+                0,2050-01-02T03:04:05Z,2020-01-01T00:00:00Z,A,1000
+                0,2050-01-02T03:04:05Z,2020-01-01T00:00:00Z,B,2000
+                0,2050-01-02T03:04:05Z,2020-01-01T00:00:00Z,C,3000
+                0,2051-01-02T03:04:05Z,2020-01-02T00:00:00Z,A,1500
+                0,2051-01-02T03:04:05Z,2020-01-02T00:00:00Z,B,2500
+                0,2051-01-02T03:04:05Z,2020-01-02T00:00:00Z,C,3500"#
+            )
     );
 }
 

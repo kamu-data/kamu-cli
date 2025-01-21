@@ -1050,7 +1050,7 @@ pub struct OdfQuery<'a> {
 }
 
 impl OdfQuery<'_> {
-    pub async fn query(&self, query: &str) -> String {
+    pub async fn query(&self, query: &str) -> Result<String, QueryError> {
         let response = self
             .client
             .graphql_api_call(
@@ -1087,26 +1087,35 @@ impl OdfQuery<'_> {
             .data();
         let query_node = &response["data"]["query"];
 
-        assert_eq!(
-            query_node["__typename"].as_str(),
-            Some("DataQueryResultSuccess"),
-            "{}",
-            indoc::formatdoc!(
-                r#"
-                Query:
-                {query}
-                Unexpected response:
-                {query_node:#}
-                "#
-            )
-        );
+        match query_node["__typename"].as_str() {
+            Some("DataQueryResultSuccess") => {
+                let content = query_node["data"]["content"]
+                    .as_str()
+                    .map(ToOwned::to_owned)
+                    .unwrap();
 
-        let content = query_node["data"]["content"]
-            .as_str()
-            .map(ToOwned::to_owned)
-            .unwrap();
+                Ok(content)
+            }
+            Some("DataQueryResultError") => {
+                let kind = query_node["errorKind"]
+                    .as_str()
+                    .map(ToOwned::to_owned)
+                    .unwrap();
+                let message = query_node["errorMessage"]
+                    .as_str()
+                    .map(ToOwned::to_owned)
+                    .unwrap();
 
-        content
+                Err(QueryExecutionError {
+                    error_kind: kind,
+                    error_message: message,
+                }
+                .into())
+            }
+            unexpected_type_name => Err(format!("Unexpected __typename: {unexpected_type_name:?}")
+                .int_err()
+                .into()),
+        }
     }
 
     pub async fn query_player_scores_dataset(&self) -> String {
@@ -1124,6 +1133,7 @@ impl OdfQuery<'_> {
             "#
         ))
         .await
+        .unwrap()
     }
 
     pub async fn query_via_rest(
@@ -1219,9 +1229,17 @@ impl OdfQuery<'_> {
 }
 
 #[derive(Error, Debug)]
+#[error("{self:?}")]
+pub struct QueryExecutionError {
+    pub error_kind: String,
+    pub error_message: String,
+}
+
+#[derive(Error, Debug)]
 pub enum QueryError {
-    #[error("Unauthorized")]
-    Unauthorized,
+    #[error(transparent)]
+    ExecutionError(#[from] QueryExecutionError),
+
     #[error(transparent)]
     Internal(#[from] InternalError),
 }
