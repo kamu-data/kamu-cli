@@ -21,6 +21,7 @@ use kamu_cli_e2e_common::{
     QueryError,
     ResolvedDatasetDependency,
     SetDatasetVisibilityError,
+    UnresolvedDatasetDependency,
     DATASET_ROOT_PLAYER_SCORES_SNAPSHOT,
 };
 use odf::metadata::testing::MetadataFactory;
@@ -701,6 +702,164 @@ pub async fn test_a_private_dataset_as_a_downstream_dependency_is_visible_only_t
         admin_client
             .dataset()
             .dependencies(&public_root_dataset_id)
+            .await
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_a_private_dataset_as_an_upstream_dependency_is_visible_only_to_the_owner_or_admin(
+    kamu_api_server_client: KamuApiServerClient,
+) {
+    // 4 actors:
+    // - anonymous
+    // - alice (owner) w/ datasets
+    // - bob (not owner)
+    // - admin
+    let anonymous_client = kamu_api_server_client.clone();
+
+    let mut owner_client = kamu_api_server_client.clone();
+    let owner_name = odf::AccountName::new_unchecked("alice");
+    owner_client
+        .auth()
+        .login_with_password(owner_name.as_str(), "alice")
+        .await;
+
+    let mut not_owner_client = kamu_api_server_client.clone();
+    not_owner_client
+        .auth()
+        .login_with_password("bob", "bob")
+        .await;
+
+    let mut admin_client = kamu_api_server_client;
+    admin_client
+        .auth()
+        .login_with_password("admin", "admin")
+        .await;
+
+    let public_root_dataset_alias = test_utils::odf::alias("alice", "public-root-dataset");
+    let CreateDatasetResponse {
+        dataset_id: public_root_dataset_id,
+        ..
+    } = owner_client
+        .dataset()
+        .create_dataset_from_snapshot_with_visibility(
+            MetadataFactory::dataset_snapshot()
+                .name(public_root_dataset_alias.dataset_name.as_str())
+                .build(),
+            odf::DatasetVisibility::Public,
+        )
+        .await;
+    let private_root_dataset_alias = test_utils::odf::alias("alice", "private-root-dataset");
+    let CreateDatasetResponse {
+        dataset_id: private_root_dataset_id,
+        ..
+    } = owner_client
+        .dataset()
+        .create_dataset_from_snapshot_with_visibility(
+            MetadataFactory::dataset_snapshot()
+                .name(private_root_dataset_alias.dataset_name.as_str())
+                .build(),
+            odf::DatasetVisibility::Private,
+        )
+        .await;
+    let derivative_dataset_alias = test_utils::odf::alias("alice", "private-derivative-dataset");
+    let CreateDatasetResponse {
+        dataset_id: derivative_dataset_id,
+        ..
+    } = owner_client
+        .dataset()
+        .create_dataset_from_snapshot_with_visibility(
+            MetadataFactory::dataset_snapshot()
+                .name(derivative_dataset_alias.dataset_name.as_str())
+                .kind(odf::DatasetKind::Derivative)
+                .push_event(
+                    MetadataFactory::set_transform()
+                        .inputs_from_refs(vec![
+                            public_root_dataset_alias.clone(),
+                            private_root_dataset_alias.clone(),
+                        ])
+                        .build(),
+                )
+                .build(),
+            odf::DatasetVisibility::Public,
+        )
+        .await;
+
+    pretty_assertions::assert_eq!(
+        DatasetDependencies {
+            upstream: vec![
+                DatasetDependency::Unresolved(UnresolvedDatasetDependency {
+                    id: private_root_dataset_id.clone(),
+                    message: "Not Accessible".into()
+                }),
+                DatasetDependency::Resolved(ResolvedDatasetDependency {
+                    id: public_root_dataset_id.clone(),
+                    alias: public_root_dataset_alias.clone()
+                })
+            ],
+            downstream: vec![]
+        },
+        anonymous_client
+            .dataset()
+            .dependencies(&derivative_dataset_id)
+            .await
+    );
+    pretty_assertions::assert_eq!(
+        DatasetDependencies {
+            upstream: vec![
+                DatasetDependency::Unresolved(UnresolvedDatasetDependency {
+                    id: private_root_dataset_id.clone(),
+                    message: "Not Accessible".into()
+                }),
+                DatasetDependency::Resolved(ResolvedDatasetDependency {
+                    id: public_root_dataset_id.clone(),
+                    alias: public_root_dataset_alias.clone()
+                })
+            ],
+            downstream: vec![]
+        },
+        not_owner_client
+            .dataset()
+            .dependencies(&derivative_dataset_id)
+            .await
+    );
+    pretty_assertions::assert_eq!(
+        DatasetDependencies {
+            upstream: vec![
+                DatasetDependency::Resolved(ResolvedDatasetDependency {
+                    id: private_root_dataset_id.clone(),
+                    alias: private_root_dataset_alias.clone()
+                }),
+                DatasetDependency::Resolved(ResolvedDatasetDependency {
+                    id: public_root_dataset_id.clone(),
+                    alias: public_root_dataset_alias.clone()
+                })
+            ],
+            downstream: vec![]
+        },
+        owner_client
+            .dataset()
+            .dependencies(&derivative_dataset_id)
+            .await
+    );
+    pretty_assertions::assert_eq!(
+        DatasetDependencies {
+            upstream: vec![
+                DatasetDependency::Resolved(ResolvedDatasetDependency {
+                    id: private_root_dataset_id,
+                    alias: private_root_dataset_alias
+                }),
+                DatasetDependency::Resolved(ResolvedDatasetDependency {
+                    id: public_root_dataset_id,
+                    alias: public_root_dataset_alias
+                })
+            ],
+            downstream: vec![]
+        },
+        admin_client
+            .dataset()
+            .dependencies(&derivative_dataset_id)
             .await
     );
 }
