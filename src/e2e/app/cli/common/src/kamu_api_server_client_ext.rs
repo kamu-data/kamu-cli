@@ -245,6 +245,8 @@ impl AccountApi<'_> {
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Error, Debug)]
 pub enum AccountMeError {
     #[error("Unauthorized")]
@@ -356,6 +358,8 @@ impl AuthApi<'_> {
         access_token
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
 pub enum LoginError {
@@ -803,6 +807,38 @@ impl DatasetApi<'_> {
 
         DatasetBlocksResponse { blocks }
     }
+
+    pub async fn by_account_name(&self, account_name: &odf::AccountName) -> Vec<AccountDataset> {
+        let mut response = self
+            .client
+            .graphql_api_call(
+                indoc::indoc!(
+                    r#"
+                    query {
+                      datasets {
+                        byAccountName(accountName: "<account_name>") {
+                          nodes {
+                            id
+                            alias
+                          }
+                        }
+                      }
+                    }
+                    "#
+                )
+                .replace("<account_name>", account_name)
+                .as_str(),
+            )
+            .await
+            .data();
+
+        response["datasets"]["byAccountName"]["nodes"]
+            .as_array_mut()
+            .unwrap()
+            .iter_mut()
+            .map(|node| serde_json::from_value::<AccountDataset>(node.take()).unwrap())
+            .collect()
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -811,6 +847,28 @@ pub struct CreateDatasetResponse {
     pub dataset_id: odf::DatasetID,
     pub dataset_alias: odf::DatasetAlias,
 }
+
+#[derive(Debug)]
+pub struct DatasetBlock {
+    pub block_hash: odf::Multihash,
+    pub prev_block_hash: Option<odf::Multihash>,
+    pub system_time: DateTime<Utc>,
+    pub sequence_number: u64,
+    pub event: odf::metadata::MetadataEventTypeFlags,
+}
+
+#[derive(Debug)]
+pub struct DatasetBlocksResponse {
+    pub blocks: Vec<DatasetBlock>,
+}
+
+#[derive(Debug, Deserialize, PartialEq, Eq)]
+pub struct AccountDataset {
+    pub id: odf::DatasetID,
+    pub alias: odf::DatasetAlias,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
 pub enum GetDatasetVisibilityError {
@@ -840,20 +898,6 @@ pub enum DatasetByIdError {
     NotFound,
     #[error(transparent)]
     Internal(#[from] InternalError),
-}
-
-#[derive(Debug)]
-pub struct DatasetBlock {
-    pub block_hash: odf::Multihash,
-    pub prev_block_hash: Option<odf::Multihash>,
-    pub system_time: DateTime<Utc>,
-    pub sequence_number: u64,
-    pub event: odf::metadata::MetadataEventTypeFlags,
-}
-
-#[derive(Debug)]
-pub struct DatasetBlocksResponse {
-    pub blocks: Vec<DatasetBlock>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -972,6 +1016,8 @@ impl FlowApi<'_> {
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Debug)]
 pub enum FlowTriggerResponse {
     Success(FlowID),
@@ -1032,6 +1078,8 @@ impl OdfTransferApi<'_> {
         }
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
 pub enum MetadataBlockHashByRefError {
@@ -1228,6 +1276,8 @@ impl OdfQuery<'_> {
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Error, Debug)]
 #[error("{self:?}")]
 pub struct QueryExecutionError {
@@ -1292,11 +1342,13 @@ impl SearchApi<'_> {
 
                         serde_json::from_value::<FoundDatasetItem>(node.take()).unwrap()
                     })
-                    .collect::<Vec<_>>()
+                    .collect()
             })
             .unwrap()
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Deserialize, PartialEq, Eq)]
 pub struct FoundDatasetItem {
@@ -1426,6 +1478,8 @@ impl UploadApi<'_> {
         }
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
 pub enum UploadPrepareError {
