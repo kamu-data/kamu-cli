@@ -18,6 +18,7 @@ use odf::metadata::serde::yaml::{YamlDatasetSnapshotSerializer, YamlMetadataBloc
 use odf::metadata::serde::{DatasetSnapshotSerializer, MetadataBlockDeserializer};
 use regex::Regex;
 use serde::Deserialize;
+use url::Url;
 
 use crate::{ExecuteCommandResult, KamuCliPuppet};
 
@@ -103,39 +104,23 @@ pub trait KamuCliPuppetExt {
         expected_data: &str,
     );
 
-    // async fn pull(&self, dataset_ref: &odf::DatasetRefAny) -> PullResponse;
+    async fn login_to_node(&self, node_url: &Url, account_name: &str, password: &str);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait]
 impl KamuCliPuppetExt for KamuCliPuppet {
-    // async fn pull(&self, dataset_ref: &odf::DatasetRefAny) -> PullResponse {
-    //     let assert = self.execute(["pull", &format!("{dataset_ref}")]).await;
-    //
-    //     let stderr = std::str::from_utf8(&assert.get_output().stderr).unwrap();
-    //
-    //     println!("{stderr}");
-    //
-    //     let re= Regex::new(r#"((\d+) dataset\(s\) updated)|((\d+) dataset\(s\)
-    // up-to-date)|(Error: Failed to update (\d+) dataset\(s\))"#).unwrap();
-    //
-    //     let Some(caps) = re.captures(stderr) else {
-    //         panic!("No occurrences of expected strings:\n{stderr}");
-    //     };
-    //
-    //     dbg!(caps);
-    //
-    //     // (\d+) dataset\(s\) updated|(\d+) dataset\(s\) up-to-date|Failed to
-    // update     // (\d+) dataset\(s\)
-    //
-    //     // println!("stderr:\n{stderr}");
-    //
-    //     PullResponse {
-    //         failed_to_update: 0,
-    //     }
-    //     // serde_json::from_str(stdout).unwrap()
-    // }
+    async fn login_to_node(&self, node_url: &Url, account_name: &str, password: &str) {
+        let url = node_url.as_str();
+
+        self.assert_success_command_execution(
+            ["login", "password", account_name, password, url],
+            None,
+            Some([format!("Login successful: {url}").as_str()]),
+        )
+        .await;
+    }
 
     async fn list_datasets(&self) -> Vec<DatasetRecord> {
         let assert = self

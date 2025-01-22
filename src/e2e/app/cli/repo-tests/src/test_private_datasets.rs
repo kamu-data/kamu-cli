@@ -24,6 +24,8 @@ use kamu_cli_e2e_common::{
     UnresolvedDatasetDependency,
     DATASET_ROOT_PLAYER_SCORES_SNAPSHOT,
 };
+use kamu_cli_puppet::extensions::KamuCliPuppetExt;
+use kamu_cli_puppet::KamuCliPuppet;
 use odf::metadata::testing::MetadataFactory;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -847,5 +849,109 @@ pub async fn test_a_private_dataset_as_an_upstream_dependency_is_visible_only_to
             .await
     );
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_a_private_dataset_can_only_be_pulled_by_the_owner_or_admin(
+    kamu_api_server_client: KamuApiServerClient,
+) {
+    // 4 actors:
+    // - anonymous
+    // - alice (owner) w/ datasets
+    // - bob (not owner)
+    // - admin
+    let mut owner_client = kamu_api_server_client;
+    let owner_name = odf::AccountName::new_unchecked("alice");
+    owner_client
+        .auth()
+        .login_with_password(owner_name.as_str(), "alice")
+        .await;
+
+    let private_dataset_alias = test_utils::odf::alias("alice", "private-dataset");
+    owner_client
+        .dataset()
+        .create_dataset_from_snapshot_with_visibility(
+            MetadataFactory::dataset_snapshot()
+                .name(private_dataset_alias.dataset_name.as_str())
+                .build(),
+            odf::DatasetVisibility::Private,
+        )
+        .await;
+
+    let dataset_url = owner_client.dataset().get_endpoint(&private_dataset_alias);
+    let dataset_ref: odf::DatasetRefAny = dataset_url.clone().into();
+    let node_url = owner_client.get_base_url();
+
+    {
+        let _anonymous_workspace = KamuCliPuppet::new_workspace_tmp_multi_tenant().await;
+
+        // Summary of individual errors:
+        //
+        // > Failed to sync s373r/private-dataset from odf+http://127.0.0.1:36967/alice/private-dataset:
+        //   0: Internal error
+        //   1: HTTP status client error (401 Unauthorized) for url (http://127.0.0.1:36967/alice/private-dataset/refs/head)
+
+        // TODO: assert
+    }
+    {
+        let bob_workspace = KamuCliPuppet::new_workspace_tmp_multi_tenant().await;
+
+        bob_workspace.login_to_node(node_url, "bob", "bob").await;
+
+        // Summary of individual errors:
+        //
+        // > Failed to sync s373r/private-dataset from odf+http://127.0.0.1:36967/alice/private-dataset:
+        //   0: Internal error
+        //   1: HTTP status client error (401 Unauthorized) for url (http://127.0.0.1:36967/alice/private-dataset/refs/head)
+
+        // TODO: assert
+    }
+    {
+        let owner_workspace = KamuCliPuppet::new_workspace_tmp_multi_tenant().await;
+
+        owner_workspace
+            .login_to_node(node_url, "alice", "alice")
+            .await;
+
+        owner_workspace
+            .assert_success_command_execution(
+                ["pull", format!("{dataset_ref}").as_str()],
+                None,
+                Some([r#"1 dataset\(s\) updated"#]),
+            )
+            .await;
+    }
+    {
+        let admin_workspace = KamuCliPuppet::new_workspace_tmp_multi_tenant().await;
+
+        admin_workspace
+            .login_to_node(node_url, "admin", "admin")
+            .await;
+
+        admin_workspace
+            .assert_success_command_execution(
+                ["pull", format!("{dataset_ref}").as_str()],
+                None,
+                Some([r#"1 dataset\(s\) updated"#]),
+            )
+            .await;
+    }
+}
+
+// bob_workspace
+//     .assert_failure_command_execution(
+//         ["pull", format!("{dataset_ref}").as_str()],
+//         None,
+//         Some([
+//             r#"Failed to update 1 dataset\(s\)"#,
+//             format!(
+//                 r#"Failed to sync .*\/{0} from {1}: odf::Dataset {1}/ not
+// found"#,                 private_dataset_alias.dataset_name.as_str(),
+//                 regex::escape(dataset_url.as_str())
+//             )
+//                 .as_str(),
+//         ]),
+//     )
+//     .await;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
