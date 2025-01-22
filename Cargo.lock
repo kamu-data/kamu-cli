@@ -6204,6 +6204,7 @@ dependencies = [
  "indoc 2.0.5",
  "opendatafabric",
  "pretty_assertions",
+ "regex",
  "serde",
  "serde_json",
  "tempfile",
