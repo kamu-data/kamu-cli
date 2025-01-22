@@ -26,6 +26,7 @@ doctest = false
 
 
 [dev-dependencies]
+database-common = { workspace = true, features = ["testing"] }
 kamu-cli-e2e-common = { workspace = true }
 kamu-cli-e2e-repo-tests = { workspace = true }
 

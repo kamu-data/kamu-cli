@@ -6108,6 +6108,7 @@ dependencies = [
 name = "kamu-cli-e2e-mysql"
 version = "0.219.1"
 dependencies = [
+ "database-common",
  "indoc 2.0.5",
  "kamu-cli-e2e-common",
  "kamu-cli-e2e-repo-tests",
@@ -6121,6 +6122,7 @@ dependencies = [
 name = "kamu-cli-e2e-postgres"
 version = "0.219.1"
 dependencies = [
+ "database-common",
  "indoc 2.0.5",
  "kamu-cli-e2e-common",
  "kamu-cli-e2e-repo-tests",
@@ -6159,6 +6161,7 @@ dependencies = [
 name = "kamu-cli-e2e-sqlite"
 version = "0.219.1"
 dependencies = [
+ "database-common",
  "indoc 2.0.5",
  "kamu-cli-e2e-common",
  "kamu-cli-e2e-repo-tests",
