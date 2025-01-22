@@ -104,9 +104,9 @@ impl ApiError {
         Self::new(source, http::StatusCode::NOT_IMPLEMENTED)
     }
 
-    pub fn not_found_without_body() -> Self {
+    pub fn not_found_without_reason() -> Self {
         Self {
-            source: "".into(),
+            source: "Not Found".into(),
             status_code: http::StatusCode::NOT_FOUND,
         }
     }

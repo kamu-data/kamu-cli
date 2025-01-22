@@ -210,11 +210,11 @@ pub async fn odata_collection_handler_common(
     query: axum::extract::Query<QueryParamsRaw>,
 ) -> Result<axum::response::Response<String>, ApiError> {
     let Some(addr) = CollectionAddr::decode(&collection_addr) else {
-        return Err(ApiError::not_found_without_body());
+        return Err(ApiError::not_found_without_reason());
     };
 
     let Ok(dataset_name) = odf::DatasetName::try_from(&addr.name) else {
-        return Err(ApiError::not_found_without_body());
+        return Err(ApiError::not_found_without_reason());
     };
 
     let registry: Arc<dyn DatasetRegistry> = catalog.get_one().unwrap();
@@ -225,7 +225,7 @@ pub async fn odata_collection_handler_common(
     {
         Ok(hdl) => Ok(hdl),
         Err(odf::dataset::GetDatasetError::NotFound(_)) => {
-            return Err(ApiError::not_found_without_body());
+            return Err(ApiError::not_found_without_reason());
         }
         Err(e) => Err(e),
     }

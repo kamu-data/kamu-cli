@@ -12,8 +12,11 @@
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 use dill::Catalog;
-use http_common::{ApiError, IntoApiError};
+use http_common::{ApiError, IntoApiError, ResultIntoApiError};
+use internal_error::ResultIntoInternal;
 use kamu_accounts::{AnonymousAccountReason, CurrentAccountSubject};
+use kamu_core::auth;
+use kamu_core::auth::DatasetActionAuthorizerExt;
 use thiserror::Error;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -87,7 +90,7 @@ impl IntoApiError for AnonymousAccessError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn ensure_authenticated_account(
+pub(crate) fn ensure_authenticated_account(
     catalog: &Catalog,
 ) -> Result<odf::AccountID, AnonymousAccessError> {
     let current_account_subject = catalog.get_one::<CurrentAccountSubject>().unwrap();
@@ -105,6 +108,46 @@ pub fn ensure_authenticated_account(
                 reason: "No authentication token provided",
             },
         }),
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) async fn check_dataset_read_access(
+    catalog: &Catalog,
+    dataset_handle: &odf::DatasetHandle,
+) -> Result<(), ApiError> {
+    check_dataset_access(catalog, dataset_handle, auth::DatasetAction::Read).await
+}
+
+#[expect(dead_code)]
+pub(crate) async fn check_dataset_write_access(
+    catalog: &Catalog,
+    dataset_handle: &odf::DatasetHandle,
+) -> Result<(), ApiError> {
+    check_dataset_access(catalog, dataset_handle, auth::DatasetAction::Write).await
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+async fn check_dataset_access(
+    catalog: &Catalog,
+    dataset_handle: &odf::DatasetHandle,
+    action: auth::DatasetAction,
+) -> Result<(), ApiError> {
+    let dataset_action_authorizer = catalog
+        .get_one::<dyn auth::DatasetActionAuthorizer>()
+        .int_err()
+        .api_err()?;
+
+    let accessible = dataset_action_authorizer
+        .is_action_allowed(&dataset_handle.id, action)
+        .await?;
+
+    if accessible {
+        Ok(())
+    } else {
+        Err(ApiError::not_found_without_reason())
     }
 }
 
