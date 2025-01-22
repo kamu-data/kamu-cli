@@ -153,10 +153,7 @@ async fn test_smart_push_existing_dataset_unauthenticated() {
         let dataset_result = &push_result.first().unwrap().result;
         match dataset_result {
             Ok(_) => panic!(),
-            Err(e) => assert_matches!(
-                e,
-                PushError::SyncError(SyncError::Access(odf::AccessError::Unauthorized(_)))
-            ),
+            Err(e) => assert_matches!(e, PushError::SyncError(SyncError::DatasetNotFound(_))),
         }
     };
 
@@ -197,10 +194,7 @@ async fn test_smart_push_existing_dataset_unauthorized() {
         let dataset_result = &push_result.first().unwrap().result;
         match dataset_result {
             Ok(_) => panic!(),
-            Err(e) => assert_matches!(
-                e,
-                PushError::SyncError(SyncError::Access(odf::AccessError::Forbidden(_)))
-            ),
+            Err(e) => assert_matches!(e, PushError::SyncError(SyncError::DatasetNotFound(_))),
         }
     };
 

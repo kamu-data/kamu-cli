@@ -551,7 +551,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
             Ok((ws_stream, _)) => ws_stream,
             Err(e) => {
                 tracing::debug!("Failed to connect to pull URL: {}", e);
-                return Err(map_tungstenite_error(e));
+                return Err(map_tungstenite_error(e, http_src_url));
             }
         };
 
@@ -783,7 +783,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
             Ok((ws_stream, _)) => ws_stream,
             Err(e) => {
                 tracing::debug!("Failed to connect to push URL: {}", e);
-                return Err(map_tungstenite_error(e));
+                return Err(map_tungstenite_error(e, http_dst_url));
             }
         };
 
@@ -935,7 +935,7 @@ async fn write_payload<TMessagePayload: Serialize>(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn map_tungstenite_error(error: TungsteniteError) -> SyncError {
+fn map_tungstenite_error(error: TungsteniteError, dataset_endpoint: &Url) -> SyncError {
     use http::StatusCode;
 
     if let TungsteniteError::Http(response) = &error {
@@ -945,6 +945,9 @@ fn map_tungstenite_error(error: TungsteniteError) -> SyncError {
             }
             StatusCode::UNAUTHORIZED => {
                 return SyncError::Access(odf::AccessError::Unauthorized(Box::new(error)))
+            }
+            StatusCode::NOT_FOUND => {
+                return DatasetAnyRefUnresolvedError::new(dataset_endpoint).into();
             }
             StatusCode::BAD_REQUEST => {
                 if let Some(body) = response.body().as_ref()
