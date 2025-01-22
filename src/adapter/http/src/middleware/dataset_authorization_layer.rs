@@ -15,7 +15,7 @@ use axum::response::Response;
 use database_common::DatabaseTransactionRunner;
 use futures::Future;
 use internal_error::InternalError;
-use kamu_accounts::CurrentAccountSubject;
+use kamu_core::auth::DatasetActionAuthorizerExt;
 use kamu_core::DatasetRegistry;
 use tower::{Layer, Service};
 
@@ -59,17 +59,6 @@ where
 pub struct DatasetAuthorizationMiddleware<Svc, DatasetActionQuery> {
     inner: Svc,
     dataset_action_query: DatasetActionQuery,
-}
-
-impl<Svc, DatasetActionQuery> DatasetAuthorizationMiddleware<Svc, DatasetActionQuery> {
-    fn check_logged_in(catalog: &dill::Catalog) -> Result<(), axum::response::Response> {
-        let current_account_subject = catalog.get_one::<CurrentAccountSubject>().unwrap();
-        if let CurrentAccountSubject::Anonymous(_) = current_account_subject.as_ref() {
-            Err(unauthorized_access_response())
-        } else {
-            Ok(())
-        }
-    }
 }
 
 impl<Svc, DatasetActionQuery> Service<http::Request<Body>>
@@ -129,27 +118,17 @@ where
                             .await
                         {
                             Ok(dataset_handle) => {
-                                if let Err(err) = dataset_action_authorizer
-                                    .check_action_allowed(&dataset_handle.id, action)
-                                    .await
-                                {
-                                    if let Err(err_result) = Self::check_logged_in(catalog) {
-                                        tracing::error!(
-                                            "Dataset '{dataset_ref}' {action} access denied: user \
-                                             not logged in",
-                                        );
-                                        return Ok(CheckResult::ErrorResponse(err_result));
-                                    }
+                                // For anonymous or user, the dataset does not exist if there is no
+                                // access
+                                let not_accessible = !dataset_action_authorizer
+                                    .is_action_allowed(&dataset_handle.id, action)
+                                    .await?;
 
-                                    tracing::error!(
-                                        "Dataset '{dataset_ref}' {action} access denied: {err:?}",
-                                    );
-                                    return Ok(CheckResult::ErrorResponse(
-                                        forbidden_access_response(),
-                                    ));
+                                if not_accessible {
+                                    Ok(CheckResult::ErrorResponse(not_found_response()))
+                                } else {
+                                    Ok(CheckResult::Proceed)
                                 }
-
-                                Ok(CheckResult::Proceed)
                             }
                             Err(odf::dataset::GetDatasetError::NotFound(_)) => {
                                 Ok(CheckResult::Proceed)

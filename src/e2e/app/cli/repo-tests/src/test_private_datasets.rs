@@ -883,28 +883,44 @@ pub async fn test_a_private_dataset_can_only_be_pulled_by_the_owner_or_admin(
     let node_url = owner_client.get_base_url();
 
     {
-        let _anonymous_workspace = KamuCliPuppet::new_workspace_tmp_multi_tenant().await;
+        let anonymous_workspace = KamuCliPuppet::new_workspace_tmp_multi_tenant().await;
 
-        // Summary of individual errors:
-        //
-        // > Failed to sync s373r/private-dataset from odf+http://127.0.0.1:36967/alice/private-dataset:
-        //   0: Internal error
-        //   1: HTTP status client error (401 Unauthorized) for url (http://127.0.0.1:36967/alice/private-dataset/refs/head)
-
-        // TODO: assert
+        anonymous_workspace
+            .assert_failure_command_execution(
+                ["pull", format!("{dataset_ref}").as_str()],
+                None,
+                Some([
+                    r#"Failed to update 1 dataset\(s\)"#,
+                    format!(
+                        r#"Failed to sync .*\/{0} from {1}: odf::Dataset {1}/ not found"#,
+                        private_dataset_alias.dataset_name.as_str(),
+                        regex::escape(dataset_url.as_str())
+                    )
+                    .as_str(),
+                ]),
+            )
+            .await;
     }
     {
         let bob_workspace = KamuCliPuppet::new_workspace_tmp_multi_tenant().await;
 
         bob_workspace.login_to_node(node_url, "bob", "bob").await;
 
-        // Summary of individual errors:
-        //
-        // > Failed to sync s373r/private-dataset from odf+http://127.0.0.1:36967/alice/private-dataset:
-        //   0: Internal error
-        //   1: HTTP status client error (401 Unauthorized) for url (http://127.0.0.1:36967/alice/private-dataset/refs/head)
-
-        // TODO: assert
+        bob_workspace
+            .assert_failure_command_execution(
+                ["pull", format!("{dataset_ref}").as_str()],
+                None,
+                Some([
+                    r#"Failed to update 1 dataset\(s\)"#,
+                    format!(
+                        r#"Failed to sync .*\/{0} from {1}: odf::Dataset {1}/ not found"#,
+                        private_dataset_alias.dataset_name.as_str(),
+                        regex::escape(dataset_url.as_str())
+                    )
+                    .as_str(),
+                ]),
+            )
+            .await;
     }
     {
         let owner_workspace = KamuCliPuppet::new_workspace_tmp_multi_tenant().await;
