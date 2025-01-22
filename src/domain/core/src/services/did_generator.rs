@@ -36,11 +36,9 @@ impl MockDidGenerator {
     pub fn predefined_dataset_ids(dataset_ids: Vec<odf::DatasetID>) -> Self {
         let mut mock = Self::default();
 
-        let dataset_ids_count = dataset_ids.len();
         let mut dataset_ids_it = dataset_ids.into_iter();
 
         mock.expect_generate_dataset_id()
-            .times(dataset_ids_count)
             .returning(move || dataset_ids_it.next().unwrap());
 
         mock
