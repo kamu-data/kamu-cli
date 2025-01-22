@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::ffi::OsStr;
+
 use kamu_cli_e2e_common::{
     DATASET_DERIVATIVE_LEADERBOARD_NAME,
     DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR,
@@ -145,7 +147,10 @@ async fn test_pull_env_var_template_default_value(kamu: KamuCliPuppet) {
 
     kamu.assert_success_command_execution_with_env(
         ["pull", "test.pull-from-file"],
-        vec![("workspace_dir".as_ref(), kamu.workspace_path().as_os_str())],
+        vec![(
+            OsStr::new("workspace_dir"),
+            kamu.workspace_path().as_os_str(),
+        )],
         None,
         Some([indoc::indoc!(
             r#"

@@ -124,51 +124,64 @@ impl KamuCliPuppet {
         temp_dir.join("e2e-output-data.txt")
     }
 
-    pub async fn execute<I, S>(&self, cmd: I) -> ExecuteCommandResult
+    pub async fn execute<CmdIt, CmdItem>(&self, cmd: CmdIt) -> ExecuteCommandResult
     where
-        I: IntoIterator<Item = S>,
-        S: AsRef<ffi::OsStr>,
+        CmdIt: IntoIterator<Item = CmdItem>,
+        CmdItem: AsRef<ffi::OsStr>,
     {
-        self.execute_impl(cmd, None::<Vec<u8>>, None).await
+        let options = ExecuteOptions::<Vec<u8>, Vec<(&str, &str)>, &str>::default();
+        self.execute_impl(cmd, options).await
     }
 
-    pub async fn execute_with_input<I, S, T>(&self, cmd: I, input: T) -> ExecuteCommandResult
-    where
-        I: IntoIterator<Item = S>,
-        S: AsRef<ffi::OsStr>,
-        T: Into<Vec<u8>>,
-    {
-        self.execute_impl(cmd, Some(input), None).await
-    }
-
-    pub async fn execute_with_env<I, S>(
+    pub async fn execute_with_input<CmdIt, CmdItem, InputIt>(
         &self,
-        cmd: I,
-        env_vars: Vec<(&ffi::OsStr, &ffi::OsStr)>,
+        cmd: CmdIt,
+        input: InputIt,
     ) -> ExecuteCommandResult
     where
-        I: IntoIterator<Item = S>,
-        S: AsRef<ffi::OsStr>,
+        CmdIt: IntoIterator<Item = CmdItem>,
+        CmdItem: AsRef<ffi::OsStr>,
+        InputIt: Into<Vec<u8>>,
     {
-        self.execute_impl(cmd, None::<Vec<u8>>, Some(env_vars))
-            .await
+        let options = ExecuteOptions::<_, Vec<(&str, &str)>, _>::builder()
+            .input(input)
+            .build();
+        self.execute_impl(cmd, options).await
     }
 
-    async fn execute_impl<I, S, T>(
+    pub async fn execute_with_env<CmdIt, CmdItem, EnvIt, EnvItem>(
         &self,
-        cmd: I,
-        maybe_input: Option<T>,
-        maybe_env: Option<Vec<(&ffi::OsStr, &ffi::OsStr)>>,
+        cmd: CmdIt,
+        env_vars: EnvIt,
     ) -> ExecuteCommandResult
     where
-        I: IntoIterator<Item = S>,
-        S: AsRef<ffi::OsStr>,
-        T: Into<Vec<u8>>,
+        CmdIt: IntoIterator<Item = CmdItem>,
+        CmdItem: AsRef<ffi::OsStr>,
+        EnvIt: IntoIterator<Item = (EnvItem, EnvItem)>,
+        EnvItem: AsRef<ffi::OsStr>,
+    {
+        let options = ExecuteOptions::<Vec<u8>, _, _>::builder()
+            .env(env_vars)
+            .build();
+        self.execute_impl(cmd, options).await
+    }
+
+    async fn execute_impl<CmdIt, CmdItem, InputIt, EnvIt, EnvItem>(
+        &self,
+        cmd: CmdIt,
+        options: ExecuteOptions<InputIt, EnvIt, EnvItem>,
+    ) -> ExecuteCommandResult
+    where
+        CmdIt: IntoIterator<Item = CmdItem>,
+        CmdItem: AsRef<ffi::OsStr>,
+        InputIt: Into<Vec<u8>>,
+        EnvIt: IntoIterator<Item = (EnvItem, EnvItem)>,
+        EnvItem: AsRef<ffi::OsStr>,
     {
         let mut command = assert_cmd::Command::cargo_bin("kamu-cli").unwrap();
 
-        if let Some(env_vars) = maybe_env {
-            for (name, value) in env_vars {
+        if let Some(env) = options.env {
+            for (name, value) in env {
                 command.env(name, value);
             }
         };
@@ -192,7 +205,7 @@ impl KamuCliPuppet {
 
         command.args(cmd);
 
-        if let Some(input) = maybe_input {
+        if let Some(input) = options.input {
             command.write_stdin(input);
         }
 
@@ -210,6 +223,31 @@ pub struct NewWorkspaceOptions {
     pub kamu_config: Option<String>,
     pub env_vars: Vec<(String, String)>,
     pub account: Option<odf::AccountName>,
+}
+
+#[derive(bon::Builder)]
+struct ExecuteOptions<InputIt, EnvIt, EnvItem>
+where
+    InputIt: Into<Vec<u8>>,
+    EnvIt: IntoIterator<Item = (EnvItem, EnvItem)>,
+    EnvItem: AsRef<ffi::OsStr>,
+{
+    input: Option<InputIt>,
+    env: Option<EnvIt>,
+}
+
+impl<I, E, S> Default for ExecuteOptions<I, E, S>
+where
+    I: Into<Vec<u8>>,
+    E: IntoIterator<Item = (S, S)>,
+    S: AsRef<ffi::OsStr>,
+{
+    fn default() -> Self {
+        ExecuteOptions {
+            input: None,
+            env: None,
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

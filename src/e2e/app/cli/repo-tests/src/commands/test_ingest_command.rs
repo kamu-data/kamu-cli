@@ -396,7 +396,7 @@ async fn assert_ingest_data_to_player_scores_from_stdio<I, S, T>(
     expected_tail_table: &str,
 ) where
     I: IntoIterator<Item = S> + Send + Clone,
-    S: AsRef<std::ffi::OsStr>,
+    S: AsRef<std::ffi::OsStr> + Send,
     T: Into<Vec<u8>> + Send + Clone,
 {
     // Ingest
