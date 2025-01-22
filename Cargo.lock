@@ -6172,6 +6172,7 @@ dependencies = [
  "opendatafabric",
  "paste",
  "pretty_assertions",
+ "regex",
  "reqwest",
  "serde_json",
  "tempfile",

@@ -22,7 +22,7 @@ pub async fn test_add_dataset_from_stdin(kamu: KamuCliPuppet) {
         Some([indoc::indoc!(
             r#"
             Added: player-scores
-            Added 1 dataset(s)
+            Added 1 dataset\(s\)
             "#
         )]),
     )
@@ -49,7 +49,7 @@ pub async fn test_add_dataset_with_name(kamu: KamuCliPuppet) {
         Some([indoc::indoc!(
             r#"
             Added: player-scores-1
-            Added 1 dataset(s)
+            Added 1 dataset\(s\)
             "#
         )]),
     )
@@ -75,7 +75,7 @@ pub async fn test_add_dataset_with_name(kamu: KamuCliPuppet) {
         Some([indoc::indoc!(
             r#"
             Added: player-scores-2
-            Added 1 dataset(s)
+            Added 1 dataset\(s\)
             "#
         )]),
     )
@@ -113,7 +113,7 @@ pub async fn test_add_dataset_with_replace(kamu: KamuCliPuppet) {
         Some([indoc::indoc!(
             r#"
             Skipped: player-scores: Already exists
-            Added 0 dataset(s)
+            Added 0 dataset\(s\)
             "#
         )]),
     )
@@ -126,7 +126,7 @@ pub async fn test_add_dataset_with_replace(kamu: KamuCliPuppet) {
         Some([indoc::indoc!(
             r#"
             Added: player-scores
-            Added 1 dataset(s)
+            Added 1 dataset\(s\)
             "#
         )]),
     )
@@ -202,7 +202,7 @@ pub async fn test_add_recursive(kamu: KamuCliPuppet) {
             r#"
             Added: commented
             Added: plain
-            Added 2 dataset(s)
+            Added 2 dataset\(s\)
             "#
         )]),
     )
@@ -267,7 +267,7 @@ pub async fn test_add_with_circular_dependency(kamu: KamuCliPuppet) {
             r#"
             Added: plain
             Skipped: plain: Already exists
-            Added 1 dataset(s)
+            Added 1 dataset\(s\)
             "#
         )]),
     )

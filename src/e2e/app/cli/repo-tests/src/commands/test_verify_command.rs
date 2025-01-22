@@ -35,7 +35,7 @@ pub async fn test_verify_regular_dataset(kamu: KamuCliPuppet) {
     kamu.assert_success_command_execution(
         ["verify", dataset_name.as_str()],
         None,
-        Some(["1 dataset(s) are valid"]),
+        Some([r#"1 dataset\(s\) are valid"#]),
     )
     .await;
 }
@@ -71,7 +71,7 @@ pub async fn test_verify_recursive(kamu: KamuCliPuppet) {
     kamu.assert_success_command_execution(
         ["verify", dataset_derivative_name.as_str()],
         None,
-        Some(["1 dataset(s) are valid"]),
+        Some([r#"1 dataset\(s\) are valid"#]),
     )
     .await;
 
@@ -79,7 +79,7 @@ pub async fn test_verify_recursive(kamu: KamuCliPuppet) {
     kamu.assert_success_command_execution(
         ["verify", dataset_derivative_name.as_str(), "--recursive"],
         None,
-        Some(["2 dataset(s) are valid"]),
+        Some([r#"2 dataset\(s\) are valid"#]),
     )
     .await;
 }
@@ -102,7 +102,7 @@ pub async fn test_verify_integrity(kamu: KamuCliPuppet) {
     kamu.assert_success_command_execution(
         ["verify", dataset_name.as_str(), "--integrity"],
         None,
-        Some(["1 dataset(s) are valid"]),
+        Some([r#"1 dataset\(s\) are valid"#]),
     )
     .await;
 }

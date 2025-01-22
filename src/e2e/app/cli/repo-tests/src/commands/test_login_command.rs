@@ -114,7 +114,7 @@ async fn test_login_logout_password(
             kamu_api_server_dataset_endpoint.as_str(),
         ],
         None,
-        Some(["1 dataset(s) pushed"]),
+        Some([r#"1 dataset\(s\) pushed"#]),
     )
     .await;
 

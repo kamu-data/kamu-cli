@@ -360,7 +360,7 @@ impl KamuCliPuppetExt for KamuCliPuppet {
         assert_execute_command_result(
             &self.execute(cmd).await.success(),
             maybe_expected_stdout,
-            maybe_expected_stderr.map(|it| it.into_iter().map(OutputExpectation::Match)),
+            maybe_expected_stderr,
         );
     }
 
@@ -378,7 +378,7 @@ impl KamuCliPuppetExt for KamuCliPuppet {
         assert_execute_command_result(
             &self.execute_with_input(cmd, input).await.success(),
             maybe_expected_stdout,
-            maybe_expected_stderr.map(|it| it.into_iter().map(OutputExpectation::Match)),
+            maybe_expected_stderr,
         );
     }
 
@@ -396,7 +396,7 @@ impl KamuCliPuppetExt for KamuCliPuppet {
         assert_execute_command_result(
             &self.execute_with_env(cmd, env_vars).await.success(),
             maybe_expected_stdout,
-            maybe_expected_stderr.map(|it| it.into_iter().map(OutputExpectation::Match)),
+            maybe_expected_stderr,
         );
     }
 
@@ -412,7 +412,7 @@ impl KamuCliPuppetExt for KamuCliPuppet {
         assert_execute_command_result(
             &self.execute(cmd).await.failure(),
             maybe_expected_stdout,
-            maybe_expected_stderr.map(|it| it.into_iter().map(OutputExpectation::Match)),
+            maybe_expected_stderr,
         );
     }
 
@@ -430,7 +430,7 @@ impl KamuCliPuppetExt for KamuCliPuppet {
         assert_execute_command_result(
             &self.execute_with_input(cmd, input).await.failure(),
             maybe_expected_stdout,
-            maybe_expected_stderr.map(|it| it.into_iter().map(OutputExpectation::Match)),
+            maybe_expected_stderr,
         );
     }
 }
@@ -486,15 +486,10 @@ pub struct RepoRecord {
 // Helpers
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub enum OutputExpectation<'a> {
-    Match(&'a str),
-    Regex(&'a str),
-}
-
 fn assert_execute_command_result<'a>(
     command_result: &ExecuteCommandResult,
     maybe_expected_stdout: Option<&str>,
-    maybe_expected_stderr: Option<impl IntoIterator<Item = OutputExpectation<'a>>>,
+    maybe_expected_stderr: Option<impl IntoIterator<Item = &'a str>>,
 ) {
     let actual_stdout = std::str::from_utf8(&command_result.get_output().stdout).unwrap();
 
@@ -505,23 +500,13 @@ fn assert_execute_command_result<'a>(
     if let Some(expected_stderr_items) = maybe_expected_stderr {
         let stderr = std::str::from_utf8(&command_result.get_output().stderr).unwrap();
 
-        for expected_stderr_item in expected_stderr_items {
-            match expected_stderr_item {
-                OutputExpectation::Match(expected_text) => {
-                    assert!(
-                        stderr.contains(expected_text),
-                        "Expected output:\n{expected_text}\nUnexpected output:\n{stderr}",
-                    );
-                }
-                OutputExpectation::Regex(regex) => {
-                    let re = Regex::new(regex).unwrap();
+        for expected_stderr_item_re in expected_stderr_items {
+            let re = Regex::new(expected_stderr_item_re).unwrap();
 
-                    assert!(
-                        re.is_match(stderr),
-                        "Expected found regex match:\n{regex}\nUnexpected output:\n{stderr}",
-                    );
-                }
-            }
+            assert!(
+                re.is_match(stderr),
+                "Expected found regex match:\n'{re}'\nUnexpected output:\n{stderr}",
+            );
         }
     }
 }

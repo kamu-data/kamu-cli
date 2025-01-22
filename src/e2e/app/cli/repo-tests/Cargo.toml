@@ -38,6 +38,7 @@ kamu-cli-puppet = { workspace = true, default-features = false, features = [
 ] }
 kamu-flow-system = { workspace = true }
 odf = { workspace = true }
+regex = { version = "1", default-features = false }
 test-utils = { workspace = true }
 
 chrono = { version = "0.4", default-features = false }

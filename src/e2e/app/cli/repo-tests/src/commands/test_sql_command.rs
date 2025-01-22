@@ -240,7 +240,7 @@ pub async fn test_sql_command_export_errors(kamu: KamuCliPuppet) {
             "spark",
         ],
         None,
-        Some(["Data export to file(s) is available with DataFusion (default) engine only"]),
+        Some([r#"Data export to file\(s\) is available with DataFusion \(default\) engine only"#]),
     )
     .await;
 
@@ -273,7 +273,7 @@ pub async fn test_sql_command_export_errors(kamu: KamuCliPuppet) {
             "20000",
         ],
         None,
-        Some(["Partitioning is only supported for data export to file(s)"]),
+        Some([r#"Partitioning is only supported for data export to file\(s\)"#]),
     )
     .await;
 

@@ -193,14 +193,14 @@ pub async fn test_repo_delete_args_validation(kamu: KamuCliPuppet) {
     kamu.assert_failure_command_execution(
         ["repo", "delete", "some-repo", "--all"],
         None,
-        Some(["You can either specify repository(s) or pass --all"]),
+        Some([r#"You can either specify repository\(s\) or pass --all"#]),
     )
     .await;
 
     kamu.assert_failure_command_execution(
         ["repo", "delete"],
         None,
-        Some(["Specify repository(s) or pass --all"]),
+        Some([r#"Specify repository\(s\) or pass --all"#]),
     )
     .await;
 }

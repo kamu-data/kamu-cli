@@ -29,7 +29,7 @@ pub async fn test_delete_dataset(kamu: KamuCliPuppet) {
     kamu.assert_success_command_execution(
         ["--yes", "delete", "player-scores"],
         None,
-        Some(["Deleted 1 dataset(s)"]),
+        Some([r#"Deleted 1 dataset\(s\)"#]),
     )
     .await;
 
@@ -87,7 +87,7 @@ pub async fn test_delete_dataset_recursive(kamu: KamuCliPuppet) {
     kamu.assert_success_command_execution(
         ["--yes", "delete", "player-scores", "--recursive"],
         None,
-        Some(["Deleted 2 dataset(s)"]),
+        Some([r#"Deleted 2 dataset\(s\)"#]),
     )
     .await;
 
@@ -144,7 +144,7 @@ pub async fn test_delete_dataset_all(kamu: KamuCliPuppet) {
     kamu.assert_success_command_execution(
         ["--yes", "delete", "--all"],
         None,
-        Some(["Deleted 3 dataset(s)"]),
+        Some([r#"Deleted 3 dataset\(s\)"#]),
     )
     .await;
 
@@ -229,11 +229,7 @@ pub async fn test_delete_warning(mut kamu_node_api_client: KamuApiServerClient) 
     kamu.assert_success_command_execution(
         ["push", ds_name_str, "--to", "file-repo/pull-1-2"],
         None,
-        Some([indoc::indoc!(
-            r#"
-                1 dataset(s) pushed
-            "#
-        )]),
+        Some([r#"1 dataset\(s\) pushed"#]),
     )
     .await;
 
@@ -265,11 +261,7 @@ pub async fn test_delete_warning(mut kamu_node_api_client: KamuApiServerClient) 
     kamu.assert_success_command_execution(
         ["push", ds_name_str, "--to", "file-repo/pull-1-3-4"],
         None,
-        Some([indoc::indoc!(
-            r#"
-                1 dataset(s) pushed
-            "#
-        )]),
+        Some([r#"1 dataset\(s\) pushed"#]),
     )
     .await;
 
@@ -287,11 +279,7 @@ pub async fn test_delete_warning(mut kamu_node_api_client: KamuApiServerClient) 
     kamu.assert_success_command_execution(
         ["push", ds_name_str, "--to", "file-repo/pull-1-3"],
         None,
-        Some([indoc::indoc!(
-            r#"
-                1 dataset(s) pushed
-            "#
-        )]),
+        Some([r#"1 dataset\(s\) pushed"#]),
     )
     .await;
 
@@ -306,12 +294,16 @@ pub async fn test_delete_warning(mut kamu_node_api_client: KamuApiServerClient) 
     let removed_url = Url::from_file_path(repo_path.join("removed")).unwrap();
     let expected_out = indoc::formatdoc!(
         r#"
-            player-scores dataset is out of sync with remote(s):
-             - ahead of '{pull_1_url}'
-             - diverged from '{pull_1_2_url}'
-             - behind '{pull_1_3_4_url}'
-             - could not check state of '{removed_url}'. Error: Remote dataset not found
-        "#
+        player-scores dataset is out of sync with remote\(s\):
+         - ahead of '{}'
+         - diverged from '{}'
+         - behind '{}'
+         - could not check state of '{}'. Error: Remote dataset not found
+        "#,
+        regex::escape(pull_1_url.as_str()),
+        regex::escape(pull_1_2_url.as_str()),
+        regex::escape(pull_1_3_4_url.as_str()),
+        regex::escape(removed_url.as_str())
     );
 
     kamu.assert_success_command_execution(
@@ -335,14 +327,14 @@ pub async fn test_delete_args_validation(kamu: KamuCliPuppet) {
     kamu.assert_failure_command_execution(
         ["delete", "player-scores", "--all"],
         None,
-        Some(["You can either specify dataset(s) or pass --all"]),
+        Some([r#"You can either specify dataset\(s\) or pass --all"#]),
     )
     .await;
 
     kamu.assert_failure_command_execution(
         ["delete"],
         None,
-        Some(["Specify dataset(s) or pass --all"]),
+        Some([r#"Specify dataset\(s\) or pass --all"#]),
     )
     .await;
 }
