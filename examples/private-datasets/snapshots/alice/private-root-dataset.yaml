@@ -1,0 +1,20 @@
+kind: DatasetSnapshot
+version: 1
+content:
+  name: private-root-dataset
+  kind: Root
+  metadata:
+    - kind: SetPollingSource
+      fetch:
+        kind: FilesGlob
+        path: ./data/private-root-dataset.csv
+      read:
+        kind: Csv
+        header: true
+        schema:
+          - city STRING
+          - population INT
+      merge:
+        kind: Snapshot
+        primaryKey:
+          - city
