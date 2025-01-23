@@ -572,6 +572,14 @@ pub async fn test_a_private_dataset_as_a_downstream_dependency_is_visible_only_t
         .login_with_password("admin", "admin")
         .await;
 
+    //                                     ┌──────────────────────────────────┐
+    //                                 ┌───┤ alice/private-derivative-dataset │
+    // ┌───────────────────────────┐   │   └──────────────────────────────────┘
+    // │ alice/public-root-dataset ├◄──┤
+    // └───────────────────────────┘   │   ┌──────────────────────────────────┐
+    //                                 └───┤ alice/public-derivative-dataset  │
+    //                                     └──────────────────────────────────┘
+    //
     let public_root_dataset_alias = test_utils::odf::alias("alice", "public-root-dataset");
     let CreateDatasetResponse {
         dataset_id: public_root_dataset_id,
@@ -723,6 +731,14 @@ pub async fn test_a_private_dataset_as_an_upstream_dependency_is_visible_only_to
         .login_with_password("admin", "admin")
         .await;
 
+    // ┌────────────────────────────┐
+    // │ alice/public-root-dataset  ├◄──┐
+    // └────────────────────────────┘   │   ┌─────────────────────────────────┐
+    //                                  ├───┤ alice/public-derivative-dataset │
+    // ┌────────────────────────────┐   │   └─────────────────────────────────┘
+    // │ alice/private-root-dataset ├◄──┘
+    // └────────────────────────────┘
+    //
     let public_root_dataset_alias = test_utils::odf::alias("alice", "public-root-dataset");
     let CreateDatasetResponse {
         dataset_id: public_root_dataset_id,
@@ -749,7 +765,8 @@ pub async fn test_a_private_dataset_as_an_upstream_dependency_is_visible_only_to
             odf::DatasetVisibility::Private,
         )
         .await;
-    let derivative_dataset_alias = test_utils::odf::alias("alice", "private-derivative-dataset");
+    let public_derivative_dataset_alias =
+        test_utils::odf::alias("alice", "public-derivative-dataset");
     let CreateDatasetResponse {
         dataset_id: derivative_dataset_id,
         ..
@@ -757,7 +774,7 @@ pub async fn test_a_private_dataset_as_an_upstream_dependency_is_visible_only_to
         .dataset()
         .create_dataset_from_snapshot_with_visibility(
             MetadataFactory::dataset_snapshot()
-                .name(derivative_dataset_alias.dataset_name.as_str())
+                .name(public_derivative_dataset_alias.dataset_name.as_str())
                 .kind(odf::DatasetKind::Derivative)
                 .push_event(
                     MetadataFactory::set_transform()
