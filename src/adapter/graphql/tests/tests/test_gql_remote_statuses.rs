@@ -148,6 +148,7 @@ impl PushStatusesTestHarness {
                 .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
                 .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
                 .add::<CreateDatasetFromSnapshotUseCaseImpl>()
+                .add::<ViewDatasetUseCaseImpl>()
                 .add::<SystemTimeSourceDefault>()
                 .add::<DatasetRegistrySoloUnitBridge>()
                 .add_value(TenancyConfig::SingleTenant)

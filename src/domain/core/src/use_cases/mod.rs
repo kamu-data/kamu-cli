@@ -21,6 +21,7 @@ mod rename_dataset_use_case;
 mod reset_dataset_use_case;
 mod set_watermark_use_case;
 mod verify_dataset_use_case;
+mod view_dataset_use_case;
 
 pub use append_dataset_metadata_batch_use_case::*;
 pub use commit_dataset_event_use_case::*;
@@ -36,3 +37,4 @@ pub use rename_dataset_use_case::*;
 pub use reset_dataset_use_case::*;
 pub use set_watermark_use_case::*;
 pub use verify_dataset_use_case::*;
+pub use view_dataset_use_case::*;

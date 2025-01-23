@@ -16,6 +16,7 @@ use kamu::{
     DatasetRegistrySoloUnitBridge,
     DatasetStorageUnitLocalFs,
     DatasetStorageUnitWriter,
+    ViewDatasetUseCaseImpl,
 };
 use kamu_core::{auth, CreateDatasetFromSnapshotUseCase, DidGeneratorDefault, TenancyConfig};
 use kamu_datasets::DatasetEnvVarsConfig;
@@ -337,6 +338,7 @@ impl DatasetEnvVarsHarness {
                 .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
                 .add::<DatasetRegistrySoloUnitBridge>()
                 .add::<CreateDatasetFromSnapshotUseCaseImpl>()
+                .add::<ViewDatasetUseCaseImpl>()
                 .add::<SystemTimeSourceDefault>()
                 .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
                 .add::<DependencyGraphServiceImpl>()

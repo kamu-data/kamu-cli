@@ -21,6 +21,7 @@ use kamu::{
     DatasetStorageUnitLocalFs,
     DatasetStorageUnitWriter,
     MetadataQueryServiceImpl,
+    ViewDatasetUseCaseImpl,
 };
 use kamu_accounts::{
     CurrentAccountSubject,
@@ -3119,6 +3120,7 @@ impl FlowRunsHarness {
             .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
             .add::<MetadataQueryServiceImpl>()
             .add::<CreateDatasetFromSnapshotUseCaseImpl>()
+            .add::<ViewDatasetUseCaseImpl>()
             .add_value(dataset_changes_mock)
             .bind::<dyn DatasetChangesService, MockDatasetChangesService>()
             .add::<SystemTimeSourceDefault>()

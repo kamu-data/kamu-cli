@@ -9,13 +9,13 @@
 
 use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer, DatasetActionAuthorizerExt};
 use kamu_core::{
-    DatasetRegistryExt,
+    ViewDatasetUseCase,
+    ViewDatasetUseCaseError,
     {self as domain},
 };
 
 use crate::prelude::*;
 use crate::queries::*;
-use crate::utils::check_dataset_read_access;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -31,20 +31,15 @@ impl Datasets {
         ctx: &Context<'_>,
         dataset_ref: &odf::DatasetRef,
     ) -> Result<Option<Dataset>> {
-        let dataset_registry = from_catalog_n!(ctx, dyn domain::DatasetRegistry);
-        // TODO: Extract into ViewDatasetUseCase
-        let maybe_handle = dataset_registry
-            .try_resolve_dataset_handle_by_ref(dataset_ref)
-            .await?;
+        let view_dataset_use_case = from_catalog_n!(ctx, dyn ViewDatasetUseCase);
 
-        let Some(handle) = maybe_handle else {
-            return Ok(None);
-        };
-
-        if check_dataset_read_access(ctx, &handle).await.is_err() {
-            return Ok(None);
-        }
-
+        let handle = match view_dataset_use_case.execute(dataset_ref).await {
+            Ok(handle) => Ok(handle),
+            Err(e) => match e {
+                ViewDatasetUseCaseError::NotAccessible(_) => return Ok(None),
+                unexpected_error => Err(unexpected_error.int_err()),
+            },
+        }?;
         let account = Account::from_dataset_alias(ctx, &handle.alias)
             .await?
             .expect("Account must exist");
