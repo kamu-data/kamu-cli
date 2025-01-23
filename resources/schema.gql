@@ -1989,7 +1989,21 @@ union Transform = TransformSql
 type TransformInput {
 	datasetRef: DatasetRef!
 	alias: String!
+	dataset: TransformInputDataset!
+}
+
+interface TransformInputDataset {
+	message: String!
+}
+
+type TransformInputDatasetAccessible implements TransformInputDataset {
 	dataset: Dataset!
+	message: String!
+}
+
+type TransformInputDatasetNotAccessible implements TransformInputDataset {
+	datasetRef: DatasetRef!
+	message: String!
 }
 
 type TransformSql {
