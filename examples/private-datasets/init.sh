@@ -15,3 +15,9 @@ cp -f .kamuconfig .kamu/
     kamu --account alice pull public-root-dataset
     kamu --account alice pull private-root-dataset
 )
+
+(
+    cd ./snapshots/bob
+
+    kamu --account bob add --visibility private private-derivative-dataset.yaml
+)

@@ -13,9 +13,9 @@ content:
         engine: datafusion
         queries:
           - query: |
-              SELECT city, population
+              SELECT event_time, city, population
               FROM "alice/public-root-dataset"
               UNION ALL
-              SELECT city, population
-              FROM "private/public-root-dataset"
+              SELECT event_time, city, population
+              FROM "alice/private-root-dataset"
               ORDER BY city, population

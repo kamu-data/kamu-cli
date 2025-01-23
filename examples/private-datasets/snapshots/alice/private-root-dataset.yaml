@@ -12,9 +12,11 @@ content:
         kind: Csv
         header: true
         schema:
+          - event_time TIMESTAMP
           - city STRING
-          - population INT
+          - population BIGINT
       merge:
-        kind: Snapshot
+        kind: Ledger
         primaryKey:
+          - event_time
           - city

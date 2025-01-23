@@ -1,4 +1,4 @@
-city,population
-A,1000
-B,2000
-C,3000
+event_time,city,population
+2020-01-01,A,1000
+2020-01-01,B,2000
+2020-01-01,C,3000
