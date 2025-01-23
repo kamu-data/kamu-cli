@@ -11,11 +11,17 @@ use std::time::Duration;
 
 use dill::*;
 use secrecy::ExposeSecret;
+use sqlx::migrate::Migrator;
 use sqlx::pool::PoolOptions;
 use sqlx::postgres::PgConnectOptions;
 use sqlx::{PgPool, Postgres};
 
 use crate::*;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(feature = "testing")]
+pub static POSTGRES_MIGRATOR: Migrator = sqlx::migrate!("../../../migrations/postgres");
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

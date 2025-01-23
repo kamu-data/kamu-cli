@@ -21,6 +21,10 @@ workspace = true
 doctest = false
 
 
+[features]
+testing = []
+
+
 [dependencies]
 async-stream = "0.3"
 async-trait = "0.1"

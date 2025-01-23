@@ -11,6 +11,10 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Unreleased]
+### Added
+- Reusable static database migrators 
+
 ## [0.219.1] - 2029-01-18
 ### Fixed
 - Reverted unstable AWS API dependencies

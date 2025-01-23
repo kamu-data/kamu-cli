@@ -11,11 +11,17 @@ use std::time::Duration;
 
 use dill::*;
 use secrecy::ExposeSecret;
+use sqlx::migrate::Migrator;
 use sqlx::mysql::MySqlConnectOptions;
 use sqlx::pool::PoolOptions;
 use sqlx::{MySql, MySqlPool};
 
 use crate::*;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(feature = "testing")]
+pub static MYSQL_MIGRATOR: Migrator = sqlx::migrate!("../../../migrations/mysql");
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
