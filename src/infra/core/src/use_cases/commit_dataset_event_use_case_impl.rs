@@ -96,21 +96,10 @@ impl CommitDatasetEventUseCase for CommitDatasetEventUseCaseImpl {
         event: odf::MetadataEvent,
         opts: odf::dataset::CommitOpts<'_>,
     ) -> Result<odf::dataset::CommitResult, odf::dataset::CommitError> {
-        use odf::dataset::CommitError;
-
         self.edit_dataset_use_case
             .execute(&dataset_handle.as_local_ref())
             .await
-            .map_err(|e| match e {
-                EditDatasetUseCaseError::NotAccessible(e) => match e {
-                    NotAccessibleError::Unauthorized(e) => match e {
-                        DatasetActionUnauthorizedError::Access(e) => CommitError::Access(e),
-                        unexpected_error => CommitError::Internal(unexpected_error.int_err()),
-                    },
-                    unexpected_error => CommitError::Internal(unexpected_error.int_err()),
-                },
-                unexpected_error => CommitError::Internal(unexpected_error.int_err()),
-            })?;
+            .map_err(map_edit_use_case_error)?;
 
         let event = self.validate_event(event).await?;
 
@@ -131,6 +120,25 @@ impl CommitDatasetEventUseCase for CommitDatasetEventUseCaseImpl {
         }
 
         Ok(commit_result)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Helpers
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn map_edit_use_case_error(e: EditDatasetUseCaseError) -> odf::dataset::CommitError {
+    use odf::dataset::CommitError;
+
+    match e {
+        EditDatasetUseCaseError::NotAccessible(e) => match e {
+            NotAccessibleError::Unauthorized(e) => match e {
+                DatasetActionUnauthorizedError::Access(e) => CommitError::Access(e),
+                unexpected_error => CommitError::Internal(unexpected_error.int_err()),
+            },
+            unexpected_error => CommitError::Internal(unexpected_error.int_err()),
+        },
+        unexpected_error => CommitError::Internal(unexpected_error.int_err()),
     }
 }
 
