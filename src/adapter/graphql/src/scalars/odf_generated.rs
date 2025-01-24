@@ -1472,7 +1472,7 @@ pub struct TransformInput {
 
 #[ComplexObject]
 impl TransformInput {
-    async fn dataset(&self, ctx: &Context<'_>) -> Result<TransformInputDataset> {
+    async fn input_dataset(&self, ctx: &Context<'_>) -> Result<TransformInputDataset> {
         Dataset::try_from_ref(ctx, &self.dataset_ref).await
     }
 }
