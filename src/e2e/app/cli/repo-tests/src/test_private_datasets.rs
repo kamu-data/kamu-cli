@@ -895,79 +895,161 @@ pub async fn test_a_private_dataset_can_only_be_pulled_by_the_owner_or_admin(
         )
         .await;
 
-    let private_dataset_url = owner_client.dataset().get_endpoint(&private_dataset_alias);
-    let private_dataset_ref: odf::DatasetRefAny = private_dataset_url.clone().into();
     let node_url = owner_client.get_base_url();
 
+    // SiTP
     {
-        let anonymous_workspace = KamuCliPuppet::new_workspace_tmp_multi_tenant().await;
+        let private_dataset_url = owner_client.dataset().get_endpoint(&private_dataset_alias);
+        let private_dataset_ref: odf::DatasetRefAny = private_dataset_url.clone().into();
 
-        anonymous_workspace
-            .assert_failure_command_execution(
-                ["pull", format!("{private_dataset_ref}").as_str()],
-                None,
-                Some([
-                    r#"Failed to update 1 dataset\(s\)"#,
-                    format!(
-                        r#"Failed to sync .*\/{0} from {1}: odf::Dataset {1}/ not found"#,
-                        private_dataset_alias.dataset_name.as_str(),
-                        regex::escape(private_dataset_url.as_str())
-                    )
-                    .as_str(),
-                ]),
-            )
-            .await;
+        {
+            let anonymous_workspace = KamuCliPuppet::new_workspace_tmp_multi_tenant().await;
+
+            anonymous_workspace
+                .assert_failure_command_execution(
+                    ["pull", format!("{private_dataset_ref}").as_str()],
+                    None,
+                    Some([
+                        r#"Failed to update 1 dataset\(s\)"#,
+                        format!(
+                            r#"Failed to sync .*\/{0} from {1}: odf::Dataset {1}/ not found"#,
+                            private_dataset_alias.dataset_name.as_str(),
+                            regex::escape(private_dataset_url.as_str())
+                        )
+                        .as_str(),
+                    ]),
+                )
+                .await;
+        }
+        {
+            let bob_workspace = KamuCliPuppet::new_workspace_tmp_multi_tenant().await;
+
+            bob_workspace.login_to_node(node_url, "bob", "bob").await;
+
+            bob_workspace
+                .assert_failure_command_execution(
+                    ["pull", format!("{private_dataset_ref}").as_str()],
+                    None,
+                    Some([
+                        r#"Failed to update 1 dataset\(s\)"#,
+                        format!(
+                            r#"Failed to sync .*\/{0} from {1}: odf::Dataset {1}/ not found"#,
+                            private_dataset_alias.dataset_name.as_str(),
+                            regex::escape(private_dataset_url.as_str())
+                        )
+                        .as_str(),
+                    ]),
+                )
+                .await;
+        }
+        {
+            let owner_workspace = KamuCliPuppet::new_workspace_tmp_multi_tenant().await;
+
+            owner_workspace
+                .login_to_node(node_url, "alice", "alice")
+                .await;
+
+            owner_workspace
+                .assert_success_command_execution(
+                    ["pull", format!("{private_dataset_ref}").as_str()],
+                    None,
+                    Some([r#"1 dataset\(s\) updated"#]),
+                )
+                .await;
+        }
+        {
+            let admin_workspace = KamuCliPuppet::new_workspace_tmp_multi_tenant().await;
+
+            admin_workspace
+                .login_to_node(node_url, "admin", "admin")
+                .await;
+
+            admin_workspace
+                .assert_success_command_execution(
+                    ["pull", format!("{private_dataset_ref}").as_str()],
+                    None,
+                    Some([r#"1 dataset\(s\) updated"#]),
+                )
+                .await;
+        }
     }
+    // SmTP
     {
-        let bob_workspace = KamuCliPuppet::new_workspace_tmp_multi_tenant().await;
+        let private_dataset_odf_url = owner_client
+            .dataset()
+            .get_odf_endpoint(&private_dataset_alias);
+        let private_dataset_ref: odf::DatasetRefAny = private_dataset_odf_url.clone().into();
 
-        bob_workspace.login_to_node(node_url, "bob", "bob").await;
+        {
+            let anonymous_workspace = KamuCliPuppet::new_workspace_tmp_multi_tenant().await;
 
-        bob_workspace
-            .assert_failure_command_execution(
-                ["pull", format!("{private_dataset_ref}").as_str()],
-                None,
-                Some([
-                    r#"Failed to update 1 dataset\(s\)"#,
-                    format!(
-                        r#"Failed to sync .*\/{0} from {1}: odf::Dataset {1}/ not found"#,
-                        private_dataset_alias.dataset_name.as_str(),
-                        regex::escape(private_dataset_url.as_str())
-                    )
-                    .as_str(),
-                ]),
-            )
-            .await;
-    }
-    {
-        let owner_workspace = KamuCliPuppet::new_workspace_tmp_multi_tenant().await;
+            anonymous_workspace
+                .assert_failure_command_execution(
+                    ["pull", format!("{private_dataset_ref}").as_str()],
+                    None,
+                    Some([
+                        r#"Failed to update 1 dataset\(s\)"#,
+                        format!(
+                            r#"Failed to sync .*\/{0} from {1}: odf::Dataset {1}/ not found"#,
+                            private_dataset_alias.dataset_name.as_str(),
+                            regex::escape(private_dataset_odf_url.as_str())
+                        )
+                        .as_str(),
+                    ]),
+                )
+                .await;
+        }
+        {
+            let bob_workspace = KamuCliPuppet::new_workspace_tmp_multi_tenant().await;
 
-        owner_workspace
-            .login_to_node(node_url, "alice", "alice")
-            .await;
+            bob_workspace.login_to_node(node_url, "bob", "bob").await;
 
-        owner_workspace
-            .assert_success_command_execution(
-                ["pull", format!("{private_dataset_ref}").as_str()],
-                None,
-                Some([r#"1 dataset\(s\) updated"#]),
-            )
-            .await;
-    }
-    {
-        let admin_workspace = KamuCliPuppet::new_workspace_tmp_multi_tenant().await;
+            bob_workspace
+                .assert_failure_command_execution(
+                    ["pull", format!("{private_dataset_ref}").as_str()],
+                    None,
+                    Some([
+                        r#"Failed to update 1 dataset\(s\)"#,
+                        format!(
+                            r#"Failed to sync .*\/{0} from {1}: odf::Dataset {1}/ not found"#,
+                            private_dataset_alias.dataset_name.as_str(),
+                            regex::escape(private_dataset_odf_url.as_str())
+                        )
+                        .as_str(),
+                    ]),
+                )
+                .await;
+        }
+        {
+            let owner_workspace = KamuCliPuppet::new_workspace_tmp_multi_tenant().await;
 
-        admin_workspace
-            .login_to_node(node_url, "admin", "admin")
-            .await;
+            owner_workspace
+                .login_to_node(node_url, "alice", "alice")
+                .await;
 
-        admin_workspace
-            .assert_success_command_execution(
-                ["pull", format!("{private_dataset_ref}").as_str()],
-                None,
-                Some([r#"1 dataset\(s\) updated"#]),
-            )
-            .await;
+            owner_workspace
+                .assert_success_command_execution(
+                    ["pull", format!("{private_dataset_ref}").as_str()],
+                    None,
+                    Some([r#"1 dataset\(s\) updated"#]),
+                )
+                .await;
+        }
+        {
+            let admin_workspace = KamuCliPuppet::new_workspace_tmp_multi_tenant().await;
+
+            admin_workspace
+                .login_to_node(node_url, "admin", "admin")
+                .await;
+
+            admin_workspace
+                .assert_success_command_execution(
+                    ["pull", format!("{private_dataset_ref}").as_str()],
+                    None,
+                    Some([r#"1 dataset\(s\) updated"#]),
+                )
+                .await;
+        }
     }
 }
 
@@ -1045,7 +1127,7 @@ pub async fn test_a_public_derivative_dataset_that_has_a_private_dependency_can_
 
     let public_derivative_dataset_ref: odf::DatasetRefAny = owner_client
         .dataset()
-        .get_endpoint(&public_derivative_dataset_alias)
+        .get_odf_endpoint(&public_derivative_dataset_alias)
         .into();
     let node_url = owner_client.get_base_url();
 

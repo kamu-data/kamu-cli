@@ -386,10 +386,20 @@ pub struct DatasetApi<'a> {
 }
 
 impl DatasetApi<'_> {
+    /// Used for Simple Transfer Protocol
     pub fn get_endpoint(&self, dataset_alias: &odf::DatasetAlias) -> Url {
-        let node_url = self.client.get_odf_node_url();
+        let node_url = self.client.get_base_url();
+        let url = node_url.join(format!("{dataset_alias}").as_str()).unwrap();
+        pretty_assertions::assert_eq!("http", url.scheme());
+        url
+    }
 
-        node_url.join(format!("{dataset_alias}").as_str()).unwrap()
+    /// Used for Smart Transfer Protocol
+    pub fn get_odf_endpoint(&self, dataset_alias: &odf::DatasetAlias) -> Url {
+        let node_url = self.client.get_odf_node_url();
+        let url = node_url.join(format!("{dataset_alias}").as_str()).unwrap();
+        pretty_assertions::assert_eq!("odf+http", url.scheme());
+        url
     }
 
     pub async fn by_id(

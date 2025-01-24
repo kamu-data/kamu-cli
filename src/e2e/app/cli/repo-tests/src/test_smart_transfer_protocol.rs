@@ -116,7 +116,7 @@ async fn test_smart_push_smart_pull_sequence(
     );
     let kamu_api_server_dataset_endpoint = kamu_api_server_client
         .dataset()
-        .get_endpoint(&dataset_alias);
+        .get_odf_endpoint(&dataset_alias);
 
     // 1. Grub a token
     let token = kamu_api_server_client.auth().login_as_e2e_user().await;
@@ -270,7 +270,7 @@ async fn test_smart_push_force_smart_pull_force(
     );
     let kamu_api_server_dataset_endpoint = kamu_api_server_client
         .dataset()
-        .get_endpoint(&dataset_alias);
+        .get_odf_endpoint(&dataset_alias);
 
     // 1. Grub a token
     let token = kamu_api_server_client.auth().login_as_e2e_user().await;
@@ -424,7 +424,7 @@ async fn test_smart_push_no_alias_smart_pull_no_alias(
     );
     let kamu_api_server_dataset_endpoint = kamu_api_server_client
         .dataset()
-        .get_endpoint(&dataset_alias);
+        .get_odf_endpoint(&dataset_alias);
 
     // 1. Grub a token
     let token = kamu_api_server_client.auth().login_as_e2e_user().await;
@@ -594,7 +594,7 @@ async fn test_smart_pull_as(
     );
     let kamu_api_server_dataset_endpoint = kamu_api_server_client
         .dataset()
-        .get_endpoint(&dataset_alias);
+        .get_odf_endpoint(&dataset_alias);
 
     // 1. Grub a token
     kamu_api_server_client.auth().login_as_e2e_user().await;
@@ -646,7 +646,7 @@ async fn test_smart_push_all_smart_pull_all(
     );
     let kamu_api_server_root_dataset_endpoint = kamu_api_server_client
         .dataset()
-        .get_endpoint(&root_dataset_alias);
+        .get_odf_endpoint(&root_dataset_alias);
 
     let derivative_dataset_alias = odf::DatasetAlias::new(
         Some(E2E_USER_ACCOUNT_NAME.clone()),
@@ -654,7 +654,7 @@ async fn test_smart_push_all_smart_pull_all(
     );
     let kamu_api_server_derivative_dataset_endpoint = kamu_api_server_client
         .dataset()
-        .get_endpoint(&derivative_dataset_alias);
+        .get_odf_endpoint(&derivative_dataset_alias);
 
     // 1. Grub a token
     let token = kamu_api_server_client.auth().login_as_e2e_user().await;
@@ -939,7 +939,7 @@ async fn test_smart_push_recursive_smart_pull_recursive(
     );
     let kamu_api_server_root_dataset_endpoint = kamu_api_server_client
         .dataset()
-        .get_endpoint(&root_dataset_alias);
+        .get_odf_endpoint(&root_dataset_alias);
 
     let derivative_dataset_alias = odf::DatasetAlias::new(
         Some(E2E_USER_ACCOUNT_NAME.clone()),
@@ -1198,7 +1198,7 @@ async fn test_smart_push_visibility(
     );
     let kamu_api_server_dataset_endpoint = kamu_api_server_client
         .dataset()
-        .get_endpoint(&dataset_alias);
+        .get_odf_endpoint(&dataset_alias);
 
     // 1. Grub a token
     let token = kamu_api_server_client.auth().login_as_e2e_user().await;
@@ -1339,7 +1339,7 @@ async fn test_smart_push_to_registered_repo_smart_pull(
     );
     let kamu_api_server_dataset_endpoint = kamu_api_server_client
         .dataset()
-        .get_endpoint(&dataset_alias);
+        .get_odf_endpoint(&dataset_alias);
 
     // 1. Grub a token
     let token = kamu_api_server_client.auth().login_as_e2e_user().await;
