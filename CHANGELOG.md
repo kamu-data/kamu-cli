@@ -11,7 +11,7 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## [Unreleased]
+## [0.219.2] - 2025-01-24
 ### Added
 - Reusable static database migrators 
 
