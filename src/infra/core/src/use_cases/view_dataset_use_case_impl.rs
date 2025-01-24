@@ -101,9 +101,9 @@ impl ViewDatasetUseCase for ViewDatasetUseCaseImpl {
                 Err(err) => {
                     if let ViewDatasetUseCaseError::Internal(e) = err {
                         return Err(e);
-                    } else {
-                        multi_result.inaccessible_refs.push((dataset_ref, err));
                     }
+
+                    multi_result.inaccessible_refs.push((dataset_ref, err));
                 }
             }
         }

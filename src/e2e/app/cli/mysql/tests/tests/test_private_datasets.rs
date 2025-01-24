@@ -218,3 +218,29 @@ kamu_cli_run_api_server_e2e_test!(
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_execute_command_e2e_test!(
+    storage = mysql,
+    fixture = kamu_cli_e2e_repo_tests::private_datasets::test_a_dataset_that_has_a_private_dependency_can_only_be_pulled_in_workspace_by_the_owner_or_admin,
+    // We need synthetic time for the tests, but the third-party JWT code
+    // uses the current time. Assuming that the token lifetime is 24 hours, we will
+    // use the projected date (the current day) as a workaround.
+    options = Options::default()
+        .with_multi_tenant()
+        .with_today_as_frozen_system_time()
+        .with_kamu_config(indoc::indoc!(
+            r#"
+            kind: CLIConfig
+            version: 1
+            content:
+              users:
+                predefined:
+                  - accountName: admin
+                    isAdmin: true
+                  - accountName: alice
+                  - accountName: bob
+            "#
+        )),
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

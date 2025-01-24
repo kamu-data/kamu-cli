@@ -14,9 +14,11 @@ use std::time::Duration;
 
 use chrono::{DateTime, Utc};
 use futures::TryStreamExt;
+use kamu::domain::auth::DatasetActionNotEnoughPermissionsError;
 use kamu::domain::*;
 use kamu::utils::datasets_filtering::filter_datasets_by_any_pattern;
 use kamu_accounts::CurrentAccountSubject;
+use odf::AccessError;
 
 use super::{BatchError, CLIError, Command};
 use crate::output::OutputConfig;
@@ -279,20 +281,7 @@ impl Command for PullCommand {
                     .filter(|res| res.result.is_err())
                     .map(|res| {
                         let ctx = format!("Failed to {}", self.describe_response(&res));
-                        let err = res
-                            .result
-                            .err()
-                            .map(|err| {
-                                if let PullError::Access(_) = err {
-                                    let dataset_ref = res.maybe_local_ref.clone().unwrap();
-                                    PullError::NotFound(odf::dataset::DatasetNotFoundError {
-                                        dataset_ref,
-                                    })
-                                } else {
-                                    err
-                                }
-                            })
-                            .unwrap();
+                        let err = res.result.err().map(sanitize_pull_error).unwrap();
 
                         (err, ctx)
                     }),
@@ -979,3 +968,26 @@ impl SyncListener for PrettySyncProgress {
         );
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Helpers
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn sanitize_pull_error(original_pull_error: PullError) -> PullError {
+    // Tricky way...
+    if let PullError::Access(pull_access_error) = &original_pull_error {
+        if let AccessError::Forbidden(forbidden_error) = pull_access_error {
+            if let Some(permissions_error) =
+                forbidden_error.downcast_ref::<DatasetActionNotEnoughPermissionsError>()
+            {
+                let dataset_ref = permissions_error.dataset_ref.clone();
+                return PullError::NotFound(odf::dataset::DatasetNotFoundError { dataset_ref });
+            }
+        }
+    };
+
+    // No miracle happened, giving away the error that was
+    original_pull_error
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -1,7 +1,7 @@
 kind: DatasetSnapshot
 version: 1
 content:
-  name: public-derivative-dataset
+  name: private-derivative-dataset
   kind: Derivative
   metadata:
     - kind: SetTransform
@@ -18,3 +18,4 @@ content:
               UNION ALL
               SELECT event_time, city, population
               FROM "alice/private-root-dataset"
+              ORDER BY city, population

@@ -24,7 +24,7 @@ use kamu_cli_e2e_common::{
     UnresolvedDatasetDependency,
     DATASET_ROOT_PLAYER_SCORES_SNAPSHOT,
 };
-use kamu_cli_puppet::extensions::KamuCliPuppetExt;
+use kamu_cli_puppet::extensions::{AddDatasetOptions, KamuCliPuppetExt};
 use kamu_cli_puppet::KamuCliPuppet;
 use odf::metadata::testing::MetadataFactory;
 
@@ -1103,6 +1103,164 @@ pub async fn test_a_public_derivative_dataset_that_has_a_private_dependency_can_
             )
             .await;
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_a_dataset_that_has_a_private_dependency_can_only_be_pulled_in_workspace_by_the_owner_or_admin(
+    mut kamu: KamuCliPuppet,
+) {
+    // 3 actors:
+    // - alice
+    // - bob
+    // - admin
+
+    //                                         ┌───────────────────────────────────┐
+    //                                      ┌◄─┤ alice/public-derivative-dataset-1 │
+    // ┌────────────────────────────┐       │  └───────────────────────────────────┘
+    // │ alice/public-root-dataset  ├◄──┐   │
+    // └────────────────────────────┘   │   │  ┌───────────────────────────────────┐
+    //                                  ├─◄─┤◄─┤  bob/public-derivative-dataset-2  │
+    // ┌────────────────────────────┐   │   │  └───────────────────────────────────┘
+    // │ alice/private-root-dataset ├◄──┘   │
+    // └────────────────────────────┘       │  ┌───────────────────────────────────┐
+    //                                      └◄─┤ admin/public-derivative-dataset-3 │
+    //                                         └───────────────────────────────────┘
+    //
+    let alice = odf::AccountName::new_unchecked("alice");
+    let bob = odf::AccountName::new_unchecked("bob");
+    let admin = odf::AccountName::new_unchecked("admin");
+
+    let alice_public_root_dataset_alias =
+        test_utils::odf::alias(alice.as_str(), "public-root-dataset");
+    let alice_private_root_dataset_alias =
+        test_utils::odf::alias(alice.as_str(), "private-root-dataset");
+    let alice_public_derivative_dataset_alias =
+        test_utils::odf::alias(bob.as_str(), "public-derivative-dataset-1");
+    let bob_public_derivative_dataset_alias =
+        test_utils::odf::alias(bob.as_str(), "public-derivative-dataset-2");
+    let admin_public_derivative_dataset_alias =
+        test_utils::odf::alias(bob.as_str(), "public-derivative-dataset-3");
+
+    // Alice
+
+    kamu.set_account(Some(alice.clone()));
+
+    kamu.add_dataset(
+        MetadataFactory::dataset_snapshot()
+            .name(alice_public_root_dataset_alias.dataset_name.as_str())
+            .build(),
+        AddDatasetOptions::builder()
+            .visibility(odf::DatasetVisibility::Public)
+            .build(),
+    )
+    .await;
+    kamu.add_dataset(
+        MetadataFactory::dataset_snapshot()
+            .name(alice_private_root_dataset_alias.dataset_name.as_str())
+            .build(),
+        AddDatasetOptions::builder()
+            .visibility(odf::DatasetVisibility::Private)
+            .build(),
+    )
+    .await;
+    kamu.add_dataset(
+        MetadataFactory::dataset_snapshot()
+            .name(alice_public_derivative_dataset_alias.dataset_name.as_str())
+            .kind(odf::DatasetKind::Derivative)
+            .push_event(
+                MetadataFactory::set_transform()
+                    .inputs_from_refs(vec![
+                        alice_public_root_dataset_alias.clone(),
+                        alice_private_root_dataset_alias.clone(),
+                    ])
+                    .build(),
+            )
+            .build(),
+        AddDatasetOptions::builder()
+            .visibility(odf::DatasetVisibility::Public)
+            .build(),
+    )
+    .await;
+
+    kamu.assert_success_command_execution(
+        [
+            "pull",
+            alice_public_derivative_dataset_alias.dataset_name.as_str(),
+        ],
+        None,
+        Some([r#"1 dataset\(s\) up-to-date"#]),
+    )
+    .await;
+
+    // Bob
+
+    kamu.set_account(Some(bob));
+
+    kamu.add_dataset(
+        MetadataFactory::dataset_snapshot()
+            .name(bob_public_derivative_dataset_alias.dataset_name.as_str())
+            .kind(odf::DatasetKind::Derivative)
+            .push_event(
+                MetadataFactory::set_transform()
+                    .inputs_from_refs(vec![
+                        alice_public_root_dataset_alias.clone(),
+                        alice_private_root_dataset_alias.clone(),
+                    ])
+                    .build(),
+            )
+            .build(),
+        AddDatasetOptions::builder()
+            .visibility(odf::DatasetVisibility::Public)
+            .build(),
+    )
+    .await;
+
+    kamu.assert_failure_command_execution(
+        [
+            "pull",
+            bob_public_derivative_dataset_alias.dataset_name.as_str(),
+        ],
+        None,
+        Some([
+            r#"Failed to update 1 dataset\(s\)"#,
+            r#"Failed to pull public-derivative-dataset-2: Dataset not found: alice/private-root-dataset"#
+        ]),
+    )
+        .await;
+
+    // Admin
+
+    kamu.set_account(Some(admin));
+
+    kamu.add_dataset(
+        MetadataFactory::dataset_snapshot()
+            .name(admin_public_derivative_dataset_alias.dataset_name.as_str())
+            .kind(odf::DatasetKind::Derivative)
+            .push_event(
+                MetadataFactory::set_transform()
+                    .inputs_from_refs(vec![
+                        alice_public_root_dataset_alias,
+                        alice_private_root_dataset_alias,
+                    ])
+                    .build(),
+            )
+            .build(),
+        AddDatasetOptions::builder()
+            .visibility(odf::DatasetVisibility::Public)
+            .build(),
+    )
+    .await;
+
+    kamu.assert_success_command_execution(
+        [
+            "pull",
+            admin_public_derivative_dataset_alias.dataset_name.as_str(),
+        ],
+        None,
+        Some([r#"1 dataset\(s\) up-to-date"#]),
+    )
+    .await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

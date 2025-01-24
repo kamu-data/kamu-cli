@@ -79,7 +79,7 @@ pub trait KamuCliPuppetExt {
 
     async fn list_datasets(&self) -> Vec<DatasetRecord>;
 
-    async fn add_dataset(&self, dataset_snapshot: odf::DatasetSnapshot);
+    async fn add_dataset(&self, dataset_snapshot: odf::DatasetSnapshot, options: AddDatasetOptions);
 
     async fn list_blocks(&self, dataset_name: &odf::DatasetName) -> Vec<BlockRecord>;
 
@@ -133,19 +133,27 @@ impl KamuCliPuppetExt for KamuCliPuppet {
         serde_json::from_str(stdout).unwrap()
     }
 
-    async fn add_dataset(&self, dataset_snapshot: odf::DatasetSnapshot) {
+    async fn add_dataset(
+        &self,
+        dataset_snapshot: odf::DatasetSnapshot,
+        options: AddDatasetOptions,
+    ) {
         let content = YamlDatasetSnapshotSerializer
             .write_manifest(&dataset_snapshot)
             .unwrap();
 
         let mut f = tempfile::NamedTempFile::new().unwrap();
-
         f.as_file().write_all(&content).unwrap();
         f.flush().unwrap();
 
-        self.execute(["add".as_ref(), f.path().as_os_str()])
-            .await
-            .success();
+        let mut cmd = vec!["add", f.path().to_str().unwrap()];
+        let maybe_visibility = options.visibility.map(|v| format!("{v}"));
+
+        if let Some(visibility) = &maybe_visibility {
+            cmd.extend(["--visibility", visibility.as_str()]);
+        }
+
+        self.execute(cmd).await.success();
     }
 
     async fn get_list_of_repo_aliases(&self, dataset_ref: &odf::DatasetRef) -> Vec<RepoAlias> {
@@ -464,7 +472,14 @@ pub struct BlockRecord {
 #[serde(rename_all = "PascalCase", deny_unknown_fields)]
 pub struct RepoRecord {
     pub name: odf::RepoName,
-    pub url: url::Url,
+    pub url: Url,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, bon::Builder, Default)]
+pub struct AddDatasetOptions {
+    visibility: Option<odf::DatasetVisibility>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

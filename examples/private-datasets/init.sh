@@ -14,6 +14,7 @@ cp -f .kamuconfig .kamu/
 
     kamu --account alice pull public-root-dataset
     kamu --account alice pull private-root-dataset
+    kamu --account alice pull public-derivative-dataset
 )
 
 (

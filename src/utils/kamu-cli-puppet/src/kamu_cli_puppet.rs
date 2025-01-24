@@ -50,9 +50,9 @@ impl KamuCliPuppet {
     }
 
     pub async fn new_workspace_tmp_multi_tenant() -> Self {
-        Self::new_workspace_tmp_with(NewWorkspaceOptions {
-            is_multi_tenant: true,
-            kamu_config: Some(
+        let options = NewWorkspaceOptions::builder()
+            .is_multi_tenant(true)
+            .kamu_config(
                 indoc::indoc!(
                     r#"
                     kind: CLIConfig
@@ -64,11 +64,11 @@ impl KamuCliPuppet {
                     "#
                 )
                 .into(),
-            ),
-            account: Some(odf::AccountName::new_unchecked("e2e-user")),
-            ..Default::default()
-        })
-        .await
+            )
+            .account(odf::AccountName::new_unchecked("e2e-user"))
+            .build();
+
+        Self::new_workspace_tmp_with(options).await
     }
 
     pub async fn new_workspace_tmp_with(options: NewWorkspaceOptions) -> Self {
@@ -217,10 +217,11 @@ impl KamuCliPuppet {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Default)]
+#[derive(Default, bon::Builder)]
 pub struct NewWorkspaceOptions {
     pub is_multi_tenant: bool,
     pub kamu_config: Option<String>,
+    #[builder(default)]
     pub env_vars: Vec<(String, String)>,
     pub account: Option<odf::AccountName>,
 }
