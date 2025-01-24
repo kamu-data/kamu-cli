@@ -279,7 +279,22 @@ impl Command for PullCommand {
                     .filter(|res| res.result.is_err())
                     .map(|res| {
                         let ctx = format!("Failed to {}", self.describe_response(&res));
-                        (res.result.err().unwrap(), ctx)
+                        let err = res
+                            .result
+                            .err()
+                            .map(|err| {
+                                if let PullError::Access(_) = err {
+                                    let dataset_ref = res.maybe_local_ref.clone().unwrap();
+                                    PullError::NotFound(odf::dataset::DatasetNotFoundError {
+                                        dataset_ref,
+                                    })
+                                } else {
+                                    err
+                                }
+                            })
+                            .unwrap();
+
+                        (err, ctx)
                     }),
             )
             .into())
