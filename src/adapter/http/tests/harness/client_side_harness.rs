@@ -144,6 +144,7 @@ impl ClientSideHarness {
         b.add::<CreateDatasetUseCaseImpl>();
         b.add::<PullDatasetUseCaseImpl>();
         b.add::<PushDatasetUseCaseImpl>();
+        b.add::<ViewAndEditDatasetUseCasesImpl>();
 
         b.add_value(ContainerRuntime::default());
         b.add_value(kamu::utils::ipfs_wrapper::IpfsClient::default());

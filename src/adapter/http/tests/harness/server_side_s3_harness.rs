@@ -37,6 +37,7 @@ use kamu::{
     ObjectStoreBuilderLocalFs,
     ObjectStoreBuilderS3,
     ObjectStoreRegistryImpl,
+    ViewAndEditDatasetUseCasesImpl,
 };
 use kamu_accounts::testing::MockAuthenticationService;
 use kamu_accounts::{Account, AuthenticationService};
@@ -118,7 +119,8 @@ impl ServerSideS3Harness {
                 .add::<AppendDatasetMetadataBatchUseCaseImpl>()
                 .add::<CreateDatasetUseCaseImpl>()
                 .add::<CreateDatasetFromSnapshotUseCaseImpl>()
-                .add::<CommitDatasetEventUseCaseImpl>();
+                .add::<CommitDatasetEventUseCaseImpl>()
+                .add::<ViewAndEditDatasetUseCasesImpl>();
 
             database_common::NoOpDatabasePlugin::init_database_components(&mut b);
 

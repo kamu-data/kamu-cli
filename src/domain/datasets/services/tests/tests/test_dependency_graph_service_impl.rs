@@ -633,7 +633,8 @@ impl DependencyGraphHarness {
         .add::<InMemoryDatasetDependencyRepository>()
         .add::<CreateDatasetFromSnapshotUseCaseImpl>()
         .add::<CommitDatasetEventUseCaseImpl>()
-        .add::<DeleteDatasetUseCaseImpl>();
+        .add::<DeleteDatasetUseCaseImpl>()
+        .add::<ViewAndEditDatasetUseCasesImpl>();
 
         register_message_dispatcher::<DatasetLifecycleMessage>(
             &mut b,

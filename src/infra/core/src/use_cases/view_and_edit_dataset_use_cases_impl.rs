@@ -157,7 +157,7 @@ impl EditDatasetUseCase for ViewAndEditDatasetUseCasesImpl {
         &self,
         dataset_ref: &odf::DatasetRef,
     ) -> Result<odf::DatasetHandle, EditDatasetUseCaseError> {
-        self.execute_impl(dataset_ref, DatasetAction::Read).await
+        self.execute_impl(dataset_ref, DatasetAction::Write).await
     }
 
     #[tracing::instrument(
@@ -170,7 +170,7 @@ impl EditDatasetUseCase for ViewAndEditDatasetUseCasesImpl {
         &self,
         dataset_refs: Vec<odf::DatasetRef>,
     ) -> Result<EditMultiResult, InternalError> {
-        self.execute_multi_impl(dataset_refs, DatasetAction::Read)
+        self.execute_multi_impl(dataset_refs, DatasetAction::Write)
             .await
     }
 }

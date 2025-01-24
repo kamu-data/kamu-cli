@@ -11,7 +11,7 @@ use std::str::FromStr;
 
 use chrono::{DateTime, Utc};
 use enum_variants::*;
-use internal_error::{InternalError, ResultIntoInternal};
+use internal_error::InternalError;
 
 use crate::dtos::*;
 use crate::formats::*;
@@ -279,16 +279,20 @@ pub trait TransformInputExt {
 
 impl TransformInputExt for TransformInput {
     fn into_sanitized_dataset_ref(self) -> Result<DatasetRef, InternalError> {
-        if let Some(alias) = self.alias {
-            DatasetRef::from_str(&alias).int_err()
+        if let Some(alias) = self.alias
+            && let Ok(parsed_alias) = DatasetRef::from_str(&alias)
+        {
+            Ok(parsed_alias)
         } else {
             Ok(self.dataset_ref)
         }
     }
 
     fn as_sanitized_dataset_ref(&self) -> Result<DatasetRef, InternalError> {
-        if let Some(alias) = &self.alias {
-            DatasetRef::from_str(alias).int_err()
+        if let Some(alias) = &self.alias
+            && let Ok(parsed_alias) = DatasetRef::from_str(alias)
+        {
+            Ok(parsed_alias)
         } else {
             Ok(self.dataset_ref.clone())
         }

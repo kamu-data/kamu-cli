@@ -35,6 +35,7 @@ use kamu::{
     ObjectStoreBuilderLocalFs,
     ObjectStoreRegistryImpl,
     RemoteRepositoryRegistryImpl,
+    ViewAndEditDatasetUseCasesImpl,
 };
 use kamu_accounts::testing::MockAuthenticationService;
 use kamu_accounts::{Account, AuthenticationService};
@@ -126,7 +127,8 @@ impl ServerSideLocalFsHarness {
                 .add::<AppendDatasetMetadataBatchUseCaseImpl>()
                 .add::<CreateDatasetUseCaseImpl>()
                 .add::<CreateDatasetFromSnapshotUseCaseImpl>()
-                .add::<CommitDatasetEventUseCaseImpl>();
+                .add::<CommitDatasetEventUseCaseImpl>()
+                .add::<ViewAndEditDatasetUseCasesImpl>();
 
             database_common::NoOpDatabasePlugin::init_database_components(&mut b);
 

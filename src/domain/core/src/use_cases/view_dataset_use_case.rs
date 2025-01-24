@@ -49,7 +49,7 @@ impl ViewMultiResult {
             .map(|dataset_ref| format!("'{dataset_ref}'"))
             .join(", ");
 
-        format!("Some input datasets are inaccessible: {joined_inaccessible_datasets}")
+        format!("Some input dataset(s) are inaccessible: {joined_inaccessible_datasets}")
     }
 }
 
