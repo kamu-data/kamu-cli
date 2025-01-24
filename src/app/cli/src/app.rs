@@ -469,7 +469,7 @@ pub fn configure_base_catalog(
     b.add::<ResetDatasetUseCaseImpl>();
     b.add::<SetWatermarkUseCaseImpl>();
     b.add::<VerifyDatasetUseCaseImpl>();
-    b.add::<ViewDatasetUseCaseImpl>();
+    b.add::<ViewAndEditDatasetUseCasesImpl>();
 
     b.add::<kamu_accounts_services::LoginPasswordAuthProvider>();
 

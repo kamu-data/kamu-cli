@@ -17,7 +17,7 @@ use kamu::{
     DatasetStorageUnitLocalFs,
     DatasetStorageUnitWriter,
     MetadataQueryServiceImpl,
-    ViewDatasetUseCaseImpl,
+    ViewAndEditDatasetUseCasesImpl,
 };
 use kamu_core::{auth, CreateDatasetFromSnapshotUseCase, DidGeneratorDefault, TenancyConfig};
 use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
@@ -1065,7 +1065,7 @@ impl FlowTriggerHarness {
                 .add::<DatasetRegistrySoloUnitBridge>()
                 .add::<MetadataQueryServiceImpl>()
                 .add::<CreateDatasetFromSnapshotUseCaseImpl>()
-                .add::<ViewDatasetUseCaseImpl>()
+                .add::<ViewAndEditDatasetUseCasesImpl>()
                 .add::<SystemTimeSourceDefault>()
                 .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
                 .add::<InMemoryDatasetDependencyRepository>()

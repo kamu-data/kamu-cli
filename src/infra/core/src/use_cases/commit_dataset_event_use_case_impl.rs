@@ -10,14 +10,21 @@
 use std::sync::Arc;
 
 use dill::{component, interface};
-use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer, DatasetActionUnauthorizedError};
+use internal_error::ErrorIntoInternal;
+use kamu_core::auth::DatasetActionUnauthorizedError;
 use kamu_core::{
     CommitDatasetEventUseCase,
     DatasetLifecycleMessage,
     DatasetRegistry,
+    EditDatasetUseCase,
+    EditDatasetUseCaseError,
+    NotAccessibleError,
+    ViewDatasetUseCase,
     MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
 };
 use messaging_outbox::{Outbox, OutboxExt};
+use odf::dataset::{AppendError, InvalidEventError};
+use odf::metadata::{EnumWithVariants, TransformInputExt};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -25,21 +32,53 @@ use messaging_outbox::{Outbox, OutboxExt};
 #[interface(dyn CommitDatasetEventUseCase)]
 pub struct CommitDatasetEventUseCaseImpl {
     dataset_registry: Arc<dyn DatasetRegistry>,
-    dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
+    view_dataset_use_case: Arc<dyn ViewDatasetUseCase>,
+    edit_dataset_use_case: Arc<dyn EditDatasetUseCase>,
     outbox: Arc<dyn Outbox>,
 }
 
 impl CommitDatasetEventUseCaseImpl {
     pub fn new(
         dataset_registry: Arc<dyn DatasetRegistry>,
-        dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
+        view_dataset_use_case: Arc<dyn ViewDatasetUseCase>,
+        edit_dataset_use_case: Arc<dyn EditDatasetUseCase>,
         outbox: Arc<dyn Outbox>,
     ) -> Self {
         Self {
             dataset_registry,
-            dataset_action_authorizer,
+            view_dataset_use_case,
+            edit_dataset_use_case,
             outbox,
         }
+    }
+
+    async fn validate_event(
+        &self,
+        event: odf::MetadataEvent,
+    ) -> Result<odf::MetadataEvent, odf::dataset::CommitError> {
+        if let Some(set_transform) = event.as_variant::<odf::metadata::SetTransform>() {
+            let mut inputs_dataset_refs = Vec::with_capacity(set_transform.inputs.len());
+            for input in &set_transform.inputs {
+                let input_dataset_ref = input.as_sanitized_dataset_ref()?;
+                inputs_dataset_refs.push(input_dataset_ref);
+            }
+
+            let view_result = self
+                .view_dataset_use_case
+                .execute_multi(inputs_dataset_refs)
+                .await?;
+
+            if !view_result.inaccessible_refs.is_empty() {
+                let message = view_result.into_inaccessible_input_datasets_message();
+
+                return Err(AppendError::InvalidBlock(
+                    InvalidEventError::new(event, message).into(),
+                )
+                .into());
+            }
+        }
+
+        Ok(event)
     }
 }
 
@@ -57,15 +96,23 @@ impl CommitDatasetEventUseCase for CommitDatasetEventUseCaseImpl {
         event: odf::MetadataEvent,
         opts: odf::dataset::CommitOpts<'_>,
     ) -> Result<odf::dataset::CommitResult, odf::dataset::CommitError> {
-        self.dataset_action_authorizer
-            .check_action_allowed(&dataset_handle.id, DatasetAction::Write)
+        use odf::dataset::CommitError;
+
+        self.edit_dataset_use_case
+            .execute(&dataset_handle.as_local_ref())
             .await
             .map_err(|e| match e {
-                DatasetActionUnauthorizedError::Access(e) => odf::dataset::CommitError::Access(e),
-                DatasetActionUnauthorizedError::Internal(e) => {
-                    odf::dataset::CommitError::Internal(e)
-                }
+                EditDatasetUseCaseError::NotAccessible(e) => match e {
+                    NotAccessibleError::Unauthorized(e) => match e {
+                        DatasetActionUnauthorizedError::Access(e) => CommitError::Access(e),
+                        unexpected_error => CommitError::Internal(unexpected_error.int_err()),
+                    },
+                    unexpected_error => CommitError::Internal(unexpected_error.int_err()),
+                },
+                unexpected_error => CommitError::Internal(unexpected_error.int_err()),
             })?;
+
+        let event = self.validate_event(event).await?;
 
         let resolved_dataset = self.dataset_registry.get_dataset_by_handle(dataset_handle);
 

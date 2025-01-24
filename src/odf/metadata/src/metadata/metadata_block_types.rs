@@ -7,11 +7,15 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::str::FromStr;
+
 use chrono::{DateTime, Utc};
 use enum_variants::*;
+use internal_error::{InternalError, ResultIntoInternal};
 
 use crate::dtos::*;
 use crate::formats::*;
+use crate::DatasetRef;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -262,3 +266,33 @@ impl IntoDataStreamBlock for MetadataBlock {
             })
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub trait TransformInputExt {
+    /// To prevent the dataset ID from leaking, use an alias, if available
+    fn into_sanitized_dataset_ref(self) -> Result<DatasetRef, InternalError>;
+
+    /// To prevent the dataset ID from leaking, use an alias, if available
+    fn as_sanitized_dataset_ref(&self) -> Result<DatasetRef, InternalError>;
+}
+
+impl TransformInputExt for TransformInput {
+    fn into_sanitized_dataset_ref(self) -> Result<DatasetRef, InternalError> {
+        if let Some(alias) = self.alias {
+            DatasetRef::from_str(&alias).int_err()
+        } else {
+            Ok(self.dataset_ref)
+        }
+    }
+
+    fn as_sanitized_dataset_ref(&self) -> Result<DatasetRef, InternalError> {
+        if let Some(alias) = &self.alias {
+            DatasetRef::from_str(alias).int_err()
+        } else {
+            Ok(self.dataset_ref.clone())
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

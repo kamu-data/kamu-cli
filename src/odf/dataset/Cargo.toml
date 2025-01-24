@@ -26,7 +26,6 @@ testing = ["dep:mockall"]
 
 
 [dependencies]
-async-utils = { workspace = true }
 file-utils = { workspace = true }
 internal-error = { workspace = true }
 odf-metadata = { workspace = true }

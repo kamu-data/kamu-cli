@@ -543,7 +543,7 @@ impl GraphQLMetadataChainHarness {
                 .add::<CreateDatasetUseCaseImpl>()
                 .add::<CreateDatasetFromSnapshotUseCaseImpl>()
                 .add::<CommitDatasetEventUseCaseImpl>()
-                .add::<ViewDatasetUseCaseImpl>()
+                .add::<ViewAndEditDatasetUseCasesImpl>()
                 .add::<DependencyGraphServiceImpl>()
                 .add::<InMemoryDatasetDependencyRepository>()
                 .add_value(tenancy_config)

@@ -7,10 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::str::FromStr;
-
 use kamu_core::{DatasetRegistry, ViewDatasetUseCase};
 use kamu_flow_system as fs;
+use odf::metadata::TransformInputExt;
 
 use super::FlowNotFound;
 use crate::prelude::*;
@@ -139,13 +138,7 @@ pub(crate) async fn ensure_flow_preconditions(
                     let mut inputs_dataset_refs =
                         Vec::with_capacity(set_transform_block.event.inputs.len());
                     for input in set_transform_block.event.inputs {
-                        // To prevent the dataset ID from leaking, use an alias, if available
-                        let input_dataset_ref = if let Some(input_alias) = input.alias {
-                            odf::DatasetRef::from_str(&input_alias).int_err()?
-                        } else {
-                            input.dataset_ref
-                        };
-
+                        let input_dataset_ref = input.as_sanitized_dataset_ref()?;
                         inputs_dataset_refs.push(input_dataset_ref);
                     }
 
@@ -154,14 +147,9 @@ pub(crate) async fn ensure_flow_preconditions(
                         .await?;
 
                     if !view_result.inaccessible_refs.is_empty() {
-                        let inaccessible_dataset_refs_it = view_result
-                            .inaccessible_refs
-                            .into_iter()
-                            .map(|(dataset_ref, _)| dataset_ref);
-
-                        return Ok(Some(FlowPreconditionsNotMet::inaccessible_input_datasets(
-                            inaccessible_dataset_refs_it,
-                        )));
+                        return Ok(Some(FlowPreconditionsNotMet {
+                            preconditions: view_result.into_inaccessible_input_datasets_message(),
+                        }));
                     }
                 }
                 None => {
@@ -216,26 +204,6 @@ pub(crate) async fn ensure_flow_preconditions(
 #[graphql(complex)]
 pub struct FlowPreconditionsNotMet {
     pub preconditions: String,
-}
-
-impl FlowPreconditionsNotMet {
-    pub fn inaccessible_input_datasets<It>(inaccessible_dataset_refs_it: It) -> Self
-    where
-        It: IntoIterator<Item = odf::DatasetRef>,
-    {
-        use itertools::Itertools;
-
-        let joined_inaccessible_datasets = inaccessible_dataset_refs_it
-            .into_iter()
-            .map(|dataset_ref| format!("'{dataset_ref}'"))
-            .join(", ");
-        let reason =
-            format!("Some input datasets are inaccessible: {joined_inaccessible_datasets}");
-
-        Self {
-            preconditions: reason,
-        }
-    }
 }
 
 #[ComplexObject]

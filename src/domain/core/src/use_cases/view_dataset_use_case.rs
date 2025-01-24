@@ -34,7 +34,23 @@ pub trait ViewDatasetUseCase: Send + Sync {
 #[derive(Debug)]
 pub struct ViewMultiResult {
     pub viewable_resolved_refs: Vec<(odf::DatasetRef, odf::DatasetHandle)>,
-    pub inaccessible_refs: Vec<(odf::DatasetRef, ViewDatasetUseCaseError)>,
+    pub inaccessible_refs: Vec<(odf::DatasetRef, NotAccessibleError)>,
+}
+
+impl ViewMultiResult {
+    pub fn into_inaccessible_input_datasets_message(self) -> String {
+        use itertools::Itertools;
+
+        let inaccessible_dataset_refs_it = self
+            .inaccessible_refs
+            .into_iter()
+            .map(|(dataset_ref, _)| dataset_ref);
+        let joined_inaccessible_datasets = inaccessible_dataset_refs_it
+            .map(|dataset_ref| format!("'{dataset_ref}'"))
+            .join(", ");
+
+        format!("Some input datasets are inaccessible: {joined_inaccessible_datasets}")
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -70,7 +70,7 @@ async fn create_catalog_with_local_workspace(
             .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
             .add::<DatasetRegistrySoloUnitBridge>()
             .add::<CreateDatasetUseCaseImpl>()
-            .add::<ViewDatasetUseCaseImpl>()
+            .add::<ViewAndEditDatasetUseCasesImpl>()
             .add::<DummyOutboxImpl>()
             .add::<SystemTimeSourceDefault>()
             .add::<QueryServiceImpl>()

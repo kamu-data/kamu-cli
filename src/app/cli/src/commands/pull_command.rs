@@ -975,15 +975,12 @@ impl SyncListener for PrettySyncProgress {
 
 fn sanitize_pull_error(original_pull_error: PullError) -> PullError {
     // Tricky way...
-    if let PullError::Access(pull_access_error) = &original_pull_error {
-        if let AccessError::Forbidden(forbidden_error) = pull_access_error {
-            if let Some(permissions_error) =
-                forbidden_error.downcast_ref::<DatasetActionNotEnoughPermissionsError>()
-            {
-                let dataset_ref = permissions_error.dataset_ref.clone();
-                return PullError::NotFound(odf::dataset::DatasetNotFoundError { dataset_ref });
-            }
-        }
+    if let PullError::Access(AccessError::Forbidden(forbidden_error)) = &original_pull_error
+        && let Some(permissions_error) =
+            forbidden_error.downcast_ref::<DatasetActionNotEnoughPermissionsError>()
+    {
+        let dataset_ref = permissions_error.dataset_ref.clone();
+        return PullError::NotFound(odf::dataset::DatasetNotFoundError { dataset_ref });
     };
 
     // No miracle happened, giving away the error that was
