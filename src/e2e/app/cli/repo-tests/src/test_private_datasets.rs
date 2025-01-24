@@ -768,7 +768,7 @@ pub async fn test_a_private_dataset_as_an_upstream_dependency_is_visible_only_to
     let public_derivative_dataset_alias =
         test_utils::odf::alias("alice", "public-derivative-dataset");
     let CreateDatasetResponse {
-        dataset_id: derivative_dataset_id,
+        dataset_id: public_derivative_dataset_id,
         ..
     } = owner_client
         .dataset()
@@ -805,7 +805,7 @@ pub async fn test_a_private_dataset_as_an_upstream_dependency_is_visible_only_to
         },
         anonymous_client
             .dataset()
-            .dependencies(&derivative_dataset_id)
+            .dependencies(&public_derivative_dataset_id)
             .await
     );
     pretty_assertions::assert_eq!(
@@ -824,7 +824,7 @@ pub async fn test_a_private_dataset_as_an_upstream_dependency_is_visible_only_to
         },
         not_owner_client
             .dataset()
-            .dependencies(&derivative_dataset_id)
+            .dependencies(&public_derivative_dataset_id)
             .await
     );
     pretty_assertions::assert_eq!(
@@ -843,7 +843,7 @@ pub async fn test_a_private_dataset_as_an_upstream_dependency_is_visible_only_to
         },
         owner_client
             .dataset()
-            .dependencies(&derivative_dataset_id)
+            .dependencies(&public_derivative_dataset_id)
             .await
     );
     pretty_assertions::assert_eq!(
@@ -862,7 +862,7 @@ pub async fn test_a_private_dataset_as_an_upstream_dependency_is_visible_only_to
         },
         admin_client
             .dataset()
-            .dependencies(&derivative_dataset_id)
+            .dependencies(&public_derivative_dataset_id)
             .await
     );
 }
@@ -895,8 +895,8 @@ pub async fn test_a_private_dataset_can_only_be_pulled_by_the_owner_or_admin(
         )
         .await;
 
-    let dataset_url = owner_client.dataset().get_endpoint(&private_dataset_alias);
-    let dataset_ref: odf::DatasetRefAny = dataset_url.clone().into();
+    let private_dataset_url = owner_client.dataset().get_endpoint(&private_dataset_alias);
+    let private_dataset_ref: odf::DatasetRefAny = private_dataset_url.clone().into();
     let node_url = owner_client.get_base_url();
 
     {
@@ -904,14 +904,14 @@ pub async fn test_a_private_dataset_can_only_be_pulled_by_the_owner_or_admin(
 
         anonymous_workspace
             .assert_failure_command_execution(
-                ["pull", format!("{dataset_ref}").as_str()],
+                ["pull", format!("{private_dataset_ref}").as_str()],
                 None,
                 Some([
                     r#"Failed to update 1 dataset\(s\)"#,
                     format!(
                         r#"Failed to sync .*\/{0} from {1}: odf::Dataset {1}/ not found"#,
                         private_dataset_alias.dataset_name.as_str(),
-                        regex::escape(dataset_url.as_str())
+                        regex::escape(private_dataset_url.as_str())
                     )
                     .as_str(),
                 ]),
@@ -925,14 +925,14 @@ pub async fn test_a_private_dataset_can_only_be_pulled_by_the_owner_or_admin(
 
         bob_workspace
             .assert_failure_command_execution(
-                ["pull", format!("{dataset_ref}").as_str()],
+                ["pull", format!("{private_dataset_ref}").as_str()],
                 None,
                 Some([
                     r#"Failed to update 1 dataset\(s\)"#,
                     format!(
                         r#"Failed to sync .*\/{0} from {1}: odf::Dataset {1}/ not found"#,
                         private_dataset_alias.dataset_name.as_str(),
-                        regex::escape(dataset_url.as_str())
+                        regex::escape(private_dataset_url.as_str())
                     )
                     .as_str(),
                 ]),
@@ -948,7 +948,7 @@ pub async fn test_a_private_dataset_can_only_be_pulled_by_the_owner_or_admin(
 
         owner_workspace
             .assert_success_command_execution(
-                ["pull", format!("{dataset_ref}").as_str()],
+                ["pull", format!("{private_dataset_ref}").as_str()],
                 None,
                 Some([r#"1 dataset\(s\) updated"#]),
             )
@@ -963,7 +963,7 @@ pub async fn test_a_private_dataset_can_only_be_pulled_by_the_owner_or_admin(
 
         admin_workspace
             .assert_success_command_execution(
-                ["pull", format!("{dataset_ref}").as_str()],
+                ["pull", format!("{private_dataset_ref}").as_str()],
                 None,
                 Some([r#"1 dataset\(s\) updated"#]),
             )
@@ -971,20 +971,138 @@ pub async fn test_a_private_dataset_can_only_be_pulled_by_the_owner_or_admin(
     }
 }
 
-// bob_workspace
-//     .assert_failure_command_execution(
-//         ["pull", format!("{dataset_ref}").as_str()],
-//         None,
-//         Some([
-//             r#"Failed to update 1 dataset\(s\)"#,
-//             format!(
-//                 r#"Failed to sync .*\/{0} from {1}: odf::Dataset {1}/ not
-// found"#,                 private_dataset_alias.dataset_name.as_str(),
-//                 regex::escape(dataset_url.as_str())
-//             )
-//                 .as_str(),
-//         ]),
-//     )
-//     .await;
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_a_public_derivative_dataset_that_has_a_private_dependency_can_be_pulled_by_anyone(
+    kamu_api_server_client: KamuApiServerClient,
+) {
+    // 4 actors:
+    // - anonymous
+    // - alice (owner) w/ datasets
+    // - bob (not owner)
+    // - admin
+    let mut owner_client = kamu_api_server_client;
+    let owner_name = odf::AccountName::new_unchecked("alice");
+    owner_client
+        .auth()
+        .login_with_password(owner_name.as_str(), "alice")
+        .await;
+
+    // ┌────────────────────────────┐
+    // │ alice/public-root-dataset  ├◄──┐
+    // └────────────────────────────┘   │   ┌─────────────────────────────────┐
+    //                                  ├───┤ alice/public-derivative-dataset │
+    // ┌────────────────────────────┐   │   └─────────────────────────────────┘
+    // │ alice/private-root-dataset ├◄──┘
+    // └────────────────────────────┘
+    //
+    let public_root_dataset_alias = test_utils::odf::alias("alice", "public-root-dataset");
+    let CreateDatasetResponse {
+        dataset_id: _public_root_dataset_id,
+        ..
+    } = owner_client
+        .dataset()
+        .create_dataset_from_snapshot_with_visibility(
+            MetadataFactory::dataset_snapshot()
+                .name(public_root_dataset_alias.dataset_name.as_str())
+                .build(),
+            odf::DatasetVisibility::Public,
+        )
+        .await;
+    let private_root_dataset_alias = test_utils::odf::alias("alice", "private-root-dataset");
+    let CreateDatasetResponse {
+        dataset_id: _private_root_dataset_id,
+        ..
+    } = owner_client
+        .dataset()
+        .create_dataset_from_snapshot_with_visibility(
+            MetadataFactory::dataset_snapshot()
+                .name(private_root_dataset_alias.dataset_name.as_str())
+                .build(),
+            odf::DatasetVisibility::Private,
+        )
+        .await;
+    let public_derivative_dataset_alias =
+        test_utils::odf::alias("alice", "public-derivative-dataset");
+    owner_client
+        .dataset()
+        .create_dataset_from_snapshot_with_visibility(
+            MetadataFactory::dataset_snapshot()
+                .name(public_derivative_dataset_alias.dataset_name.as_str())
+                .kind(odf::DatasetKind::Derivative)
+                .push_event(
+                    MetadataFactory::set_transform()
+                        .inputs_from_refs(vec![
+                            public_root_dataset_alias.clone(),
+                            private_root_dataset_alias.clone(),
+                        ])
+                        .build(),
+                )
+                .build(),
+            odf::DatasetVisibility::Public,
+        )
+        .await;
+
+    let public_derivative_dataset_ref: odf::DatasetRefAny = owner_client
+        .dataset()
+        .get_endpoint(&public_derivative_dataset_alias)
+        .into();
+    let node_url = owner_client.get_base_url();
+
+    {
+        let anonymous_workspace = KamuCliPuppet::new_workspace_tmp_multi_tenant().await;
+
+        anonymous_workspace
+            .assert_success_command_execution(
+                ["pull", format!("{public_derivative_dataset_ref}").as_str()],
+                None,
+                Some([r#"1 dataset\(s\) updated"#]),
+            )
+            .await;
+    }
+    {
+        let bob_workspace = KamuCliPuppet::new_workspace_tmp_multi_tenant().await;
+
+        bob_workspace.login_to_node(node_url, "bob", "bob").await;
+
+        bob_workspace
+            .assert_success_command_execution(
+                ["pull", format!("{public_derivative_dataset_ref}").as_str()],
+                None,
+                Some([r#"1 dataset\(s\) updated"#]),
+            )
+            .await;
+    }
+    {
+        let owner_workspace = KamuCliPuppet::new_workspace_tmp_multi_tenant().await;
+
+        owner_workspace
+            .login_to_node(node_url, "alice", "alice")
+            .await;
+
+        owner_workspace
+            .assert_success_command_execution(
+                ["pull", format!("{public_derivative_dataset_ref}").as_str()],
+                None,
+                Some([r#"1 dataset\(s\) updated"#]),
+            )
+            .await;
+    }
+    {
+        let admin_workspace = KamuCliPuppet::new_workspace_tmp_multi_tenant().await;
+
+        admin_workspace
+            .login_to_node(node_url, "admin", "admin")
+            .await;
+
+        admin_workspace
+            .assert_success_command_execution(
+                ["pull", format!("{public_derivative_dataset_ref}").as_str()],
+                None,
+                Some([r#"1 dataset\(s\) updated"#]),
+            )
+            .await;
+    }
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
