@@ -7,7 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_core::DatasetRegistry;
+use std::str::FromStr;
+
+use kamu_core::{DatasetRegistry, ViewDatasetUseCase};
 use kamu_flow_system as fs;
 
 use super::FlowNotFound;
@@ -125,13 +127,49 @@ pub(crate) async fn ensure_flow_preconditions(
             }
         }
         DatasetFlowType::ExecuteTransform => {
-            let metadata_query_service = from_catalog_n!(ctx, dyn kamu_core::MetadataQueryService);
+            let (metadata_query_service, view_dataset_use_case) = from_catalog_n!(
+                ctx,
+                dyn kamu_core::MetadataQueryService,
+                dyn ViewDatasetUseCase
+            );
             let source_res = metadata_query_service.get_active_transform(target).await?;
-            if source_res.is_none() {
-                return Ok(Some(FlowPreconditionsNotMet {
-                    preconditions: "No SetTransform event defined".to_string(),
-                }));
-            };
+
+            match source_res {
+                Some((_, set_transform_block)) => {
+                    let mut inputs_dataset_refs =
+                        Vec::with_capacity(set_transform_block.event.inputs.len());
+                    for input in set_transform_block.event.inputs {
+                        // To prevent the dataset ID from leaking, use an alias, if available
+                        let input_dataset_ref = if let Some(input_alias) = input.alias {
+                            odf::DatasetRef::from_str(&input_alias).int_err()?
+                        } else {
+                            input.dataset_ref
+                        };
+
+                        inputs_dataset_refs.push(input_dataset_ref);
+                    }
+
+                    let view_result = view_dataset_use_case
+                        .execute_multi(inputs_dataset_refs)
+                        .await?;
+
+                    if !view_result.inaccessible_refs.is_empty() {
+                        let inaccessible_dataset_refs_it = view_result
+                            .inaccessible_refs
+                            .into_iter()
+                            .map(|(dataset_ref, _)| dataset_ref);
+
+                        return Ok(Some(FlowPreconditionsNotMet::inaccessible_input_datasets(
+                            inaccessible_dataset_refs_it,
+                        )));
+                    }
+                }
+                None => {
+                    return Ok(Some(FlowPreconditionsNotMet {
+                        preconditions: "No SetTransform event defined".to_string(),
+                    }));
+                }
+            }
         }
         DatasetFlowType::HardCompaction => (),
         DatasetFlowType::Reset => {
@@ -178,6 +216,26 @@ pub(crate) async fn ensure_flow_preconditions(
 #[graphql(complex)]
 pub struct FlowPreconditionsNotMet {
     pub preconditions: String,
+}
+
+impl FlowPreconditionsNotMet {
+    pub fn inaccessible_input_datasets<It>(inaccessible_dataset_refs_it: It) -> Self
+    where
+        It: IntoIterator<Item = odf::DatasetRef>,
+    {
+        use itertools::Itertools;
+
+        let joined_inaccessible_datasets = inaccessible_dataset_refs_it
+            .into_iter()
+            .map(|dataset_ref| format!("'{dataset_ref}'"))
+            .join(", ");
+        let reason =
+            format!("Some input datasets are inaccessible: {joined_inaccessible_datasets}");
+
+        Self {
+            preconditions: reason,
+        }
+    }
 }
 
 #[ComplexObject]

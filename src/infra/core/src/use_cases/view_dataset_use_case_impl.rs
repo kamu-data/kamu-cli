@@ -10,9 +10,9 @@
 use std::sync::Arc;
 
 use dill::{component, interface};
-use internal_error::ErrorIntoInternal;
+use internal_error::{ErrorIntoInternal, InternalError};
 use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer, DatasetActionUnauthorizedError};
-use kamu_core::{DatasetRegistry, ViewDatasetUseCase, ViewDatasetUseCaseError};
+use kamu_core::{DatasetRegistry, ViewDatasetUseCase, ViewDatasetUseCaseError, ViewMultiResult};
 use odf::dataset::GetDatasetError;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -73,6 +73,42 @@ impl ViewDatasetUseCase for ViewDatasetUseCaseImpl {
             })?;
 
         Ok(handle)
+    }
+
+    #[tracing::instrument(
+        level = "info",
+        name = "ViewDatasetUseCase::execute_multi",
+        skip_all,
+        fields(dataset_refs)
+    )]
+    async fn execute_multi(
+        &self,
+        dataset_refs: Vec<odf::DatasetRef>,
+    ) -> Result<ViewMultiResult, InternalError> {
+        let mut multi_result = ViewMultiResult {
+            viewable_resolved_refs: Vec::with_capacity(dataset_refs.len()),
+            inaccessible_refs: vec![],
+        };
+
+        // TODO: Private Datasets: resolve multi refs at once
+        for dataset_ref in dataset_refs {
+            match self.execute(&dataset_ref).await {
+                Ok(handle) => {
+                    multi_result
+                        .viewable_resolved_refs
+                        .push((dataset_ref, handle));
+                }
+                Err(err) => {
+                    if let ViewDatasetUseCaseError::Internal(e) = err {
+                        return Err(e);
+                    } else {
+                        multi_result.inaccessible_refs.push((dataset_ref, err));
+                    }
+                }
+            }
+        }
+
+        Ok(multi_result)
     }
 }
 

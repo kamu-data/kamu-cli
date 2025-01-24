@@ -22,6 +22,19 @@ pub trait ViewDatasetUseCase: Send + Sync {
         &self,
         dataset_ref: &odf::DatasetRef,
     ) -> Result<odf::DatasetHandle, ViewDatasetUseCaseError>;
+
+    async fn execute_multi(
+        &self,
+        dataset_refs: Vec<odf::DatasetRef>,
+    ) -> Result<ViewMultiResult, InternalError>;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug)]
+pub struct ViewMultiResult {
+    pub viewable_resolved_refs: Vec<(odf::DatasetRef, odf::DatasetHandle)>,
+    pub inaccessible_refs: Vec<(odf::DatasetRef, ViewDatasetUseCaseError)>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
