@@ -12,10 +12,9 @@ use axum::response::Json;
 use database_common_macros::transactional_handler;
 use dill::Catalog;
 use http_common::*;
+use internal_error::ErrorIntoInternal;
 use kamu_accounts::AuthenticationService;
-use kamu_core::DatasetRegistry;
-
-use crate::axum_utils::ensure_authenticated_account;
+use kamu_core::{ViewDatasetUseCase, ViewDatasetUseCaseError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -93,20 +92,16 @@ async fn get_dataset_by_id(
     catalog: &Catalog,
     dataset_id: &odf::DatasetID,
 ) -> Result<Json<DatasetInfoResponse>, ApiError> {
-    // TODO: Private Datasets: Revision of access permission checks: add missing
-    //       https://github.com/kamu-data/kamu-cli/issues/730
-    //
-    // Context: This is incorrect - the endpoint should check permissions
-    //          to access dataset and not reject non-authed users
-    ensure_authenticated_account(catalog).api_err()?;
+    let view_dataset_use_case = catalog.get_one::<dyn ViewDatasetUseCase>().unwrap();
 
-    let dataset_registry = catalog.get_one::<dyn DatasetRegistry>().unwrap();
-    let dataset_handle = dataset_registry
-        .resolve_dataset_handle_by_ref(&dataset_id.clone().as_local_ref())
+    let dataset_handle = view_dataset_use_case
+        .execute(&dataset_id.as_local_ref())
         .await
-        .map_err(|err| match err {
-            odf::dataset::GetDatasetError::NotFound(e) => ApiError::not_found(e),
-            odf::dataset::GetDatasetError::Internal(e) => e.api_err(),
+        .map_err(|e| match e {
+            ViewDatasetUseCaseError::NotFound(_) | ViewDatasetUseCaseError::Access(_) => {
+                ApiError::not_found_without_reason()
+            }
+            unexpected_error => unexpected_error.int_err().api_err(),
         })?;
 
     // TODO: Private Datasets: Use the real owner_id, not the alias name
