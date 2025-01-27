@@ -7816,6 +7816,7 @@ dependencies = [
  "pin-project",
  "serde",
  "serde_with",
+ "strum",
  "thiserror 2.0.11",
  "tokio-stream",
  "url",

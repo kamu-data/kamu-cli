@@ -7,8 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::fmt::Display;
-
 use ::serde::{Deserialize, Serialize};
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
@@ -255,7 +253,8 @@ impl From<CheckpointRef> for Option<OwnedFile> {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Copy, Clone, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Default, Eq, PartialEq, Serialize, Deserialize, strum::Display)]
+#[strum(serialize_all = "snake_case")]
 pub enum DatasetVisibility {
     #[default]
     #[serde(alias = "private")]
@@ -276,15 +275,6 @@ impl DatasetVisibility {
         match self {
             DatasetVisibility::Private => false,
             DatasetVisibility::Public => true,
-        }
-    }
-}
-
-impl Display for DatasetVisibility {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            DatasetVisibility::Private => write!(f, "private"),
-            DatasetVisibility::Public => write!(f, "public"),
         }
     }
 }
