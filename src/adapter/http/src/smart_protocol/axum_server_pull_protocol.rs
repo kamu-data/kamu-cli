@@ -71,7 +71,7 @@ impl AxumServerPullProtocolInstance {
                   "Push process aborted with internal error",
                 );
             }
-            Err(ref _e @ PullServerError::ReadFailed(ref err)) => {
+            Err(PullServerError::ReadFailed(err)) => {
                 if let ReadMessageError::IncompatibleVersion = err.read_error {
                     if let Err(write_err) = axum_write_close_payload::<DatasetPullResponse>(
                         &mut self.socket,

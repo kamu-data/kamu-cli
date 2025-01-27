@@ -49,7 +49,7 @@ pub async fn test_compact_hard(kamu: KamuCliPuppet) {
             "--hard",
         ],
         None,
-        Some(["1 dataset(s) were compacted"]),
+        Some([r#"1 dataset\(s\) were compacted"#]),
     )
     .await;
 
@@ -96,7 +96,7 @@ pub async fn test_compact_keep_metadata_only(kamu: KamuCliPuppet) {
             "--keep-metadata-only",
         ],
         None,
-        Some(["1 dataset(s) were compacted"]),
+        Some([r#"1 dataset\(s\) were compacted"#]),
     )
     .await;
 
@@ -145,7 +145,7 @@ pub async fn test_compact_verify(kamu: KamuCliPuppet) {
         None,
         Some([
             "verify with target_alias: player-scores",
-            "1 dataset(s) were compacted",
+            r#"1 dataset\(s\) were compacted"#,
         ]),
     )
     .await;

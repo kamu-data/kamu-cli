@@ -78,7 +78,7 @@ async fn test_dataset_access_unsafe_methods_anonymous() {
         false,
         DatasetAction::Write,
         false,
-        http::StatusCode::UNAUTHORIZED,
+        http::StatusCode::NOT_FOUND,
     )
     .await;
 }
@@ -93,7 +93,7 @@ async fn test_dataset_access_unsafe_methods_logged_but_unauthorized() {
         true,
         DatasetAction::Write,
         false,
-        http::StatusCode::FORBIDDEN,
+        http::StatusCode::NOT_FOUND,
     )
     .await;
 }
@@ -153,7 +153,7 @@ async fn test_dataset_access_safe_method_but_potential_write_anonymous() {
         false,
         DatasetAction::Write,
         false,
-        http::StatusCode::UNAUTHORIZED,
+        http::StatusCode::NOT_FOUND,
     )
     .await;
 }
@@ -168,7 +168,7 @@ async fn test_dataset_access_safe_method_but_potential_write_logged_but_unauthor
         true,
         DatasetAction::Write,
         false,
-        http::StatusCode::FORBIDDEN,
+        http::StatusCode::NOT_FOUND,
     )
     .await;
 }

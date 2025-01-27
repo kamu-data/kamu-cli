@@ -133,7 +133,7 @@ pub async fn dataset_ingest_handler(
         .check_action_allowed(&target.get_handle().id, auth::DatasetAction::Write)
         .await
         .map_err(|e| match e {
-            DatasetActionUnauthorizedError::Access(_) => ApiError::new_forbidden(),
+            DatasetActionUnauthorizedError::Access(_) => ApiError::not_found_without_reason(),
             DatasetActionUnauthorizedError::Internal(e) => e.api_err(),
         })?;
 

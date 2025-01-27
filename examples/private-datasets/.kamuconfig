@@ -1,0 +1,9 @@
+kind: CLIConfig
+version: 1
+content:
+  users:
+    predefined:
+      - accountName: admin
+        isAdmin: true
+      - accountName: alice
+      - accountName: bob

@@ -11,6 +11,25 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## Unreleased
+### Changed
+- Private Datasets:
+  - GQL, `DatasetFlowRunsMut::trigger_flow()`: added check of input datasets for accessibility for `ExecuteTransform`
+  - GQL, `TransformInput::input_dataset()`: dataset may not be accessible
+  - GQL, `MetadataChainMut::commit_event`: added check of dataset inputs for availability for `SetTransform`
+  - HTTP: added access check for the dataset router (`DatasetAuthorizationMiddleware`), affected:
+    - `POST /:dataset/ingest`
+    - `GET /:dataset/metadata`
+    - `GET /:dataset/tail`
+  - HTTP, `GET /datasets/:id`: access check corrected
+  - HTTP: replaced access errors with not found errors
+  - CLI, `kamu pull`: replaced access errors with not found errors
+- Continued work on use cases extracting:
+  - `ViewDatasetUseCase`
+  - `EditDatasetUseCase`
+  - `GetDatasetDownstreamDependenciesUseCaseImpl`
+  - `GetDatasetUpstreamDependenciesUseCaseImpl`
+
 ## [0.219.2] - 2025-01-24
 ### Added
 - Reusable static database migrators 

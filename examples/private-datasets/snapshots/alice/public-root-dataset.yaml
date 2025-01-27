@@ -1,0 +1,22 @@
+kind: DatasetSnapshot
+version: 1
+content:
+  name: public-root-dataset
+  kind: Root
+  metadata:
+    - kind: SetPollingSource
+      fetch:
+        kind: FilesGlob
+        path: ./data/public-root-dataset.csv
+      read:
+        kind: Csv
+        header: true
+        schema:
+          - event_time TIMESTAMP
+          - city STRING
+          - population BIGINT
+      merge:
+        kind: Ledger
+        primaryKey:
+          - event_time
+          - city

@@ -7,33 +7,36 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_cli_puppet::extensions::{KamuCliPuppetExt, RepoAlias};
+use kamu_cli_puppet::extensions::{AddDatasetOptions, KamuCliPuppetExt, RepoAlias};
 use kamu_cli_puppet::KamuCliPuppet;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_repository_pull_aliases_commands(kamu: KamuCliPuppet) {
-    kamu.add_dataset(odf::DatasetSnapshot {
-        name: "foo".try_into().unwrap(),
-        kind: odf::DatasetKind::Root,
-        metadata: vec![odf::metadata::AddPushSource {
-            source_name: odf::metadata::SourceState::DEFAULT_SOURCE_NAME.to_string(),
-            read: odf::metadata::ReadStepNdJson {
-                schema: Some(vec![
-                    "event_time TIMESTAMP".to_owned(),
-                    "foo_string STRING".to_owned(),
-                ]),
-                ..Default::default()
+    kamu.add_dataset(
+        odf::DatasetSnapshot {
+            name: "foo".try_into().unwrap(),
+            kind: odf::DatasetKind::Root,
+            metadata: vec![odf::metadata::AddPushSource {
+                source_name: odf::metadata::SourceState::DEFAULT_SOURCE_NAME.to_string(),
+                read: odf::metadata::ReadStepNdJson {
+                    schema: Some(vec![
+                        "event_time TIMESTAMP".to_owned(),
+                        "foo_string STRING".to_owned(),
+                    ]),
+                    ..Default::default()
+                }
+                .into(),
+                preprocess: None,
+                merge: odf::metadata::MergeStrategyLedger {
+                    primary_key: vec!["event_time".to_owned(), "foo_string".to_owned()],
+                }
+                .into(),
             }
-            .into(),
-            preprocess: None,
-            merge: odf::metadata::MergeStrategyLedger {
-                primary_key: vec!["event_time".to_owned(), "foo_string".to_owned()],
-            }
-            .into(),
-        }
-        .into()],
-    })
+            .into()],
+        },
+        AddDatasetOptions::default(),
+    )
     .await;
 
     let dataset_aliases = vec![
@@ -95,27 +98,30 @@ pub async fn test_repository_pull_aliases_commands(kamu: KamuCliPuppet) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_repository_push_aliases_commands(kamu: KamuCliPuppet) {
-    kamu.add_dataset(odf::DatasetSnapshot {
-        name: "foo".try_into().unwrap(),
-        kind: odf::DatasetKind::Root,
-        metadata: vec![odf::metadata::AddPushSource {
-            source_name: odf::metadata::SourceState::DEFAULT_SOURCE_NAME.to_string(),
-            read: odf::metadata::ReadStepNdJson {
-                schema: Some(vec![
-                    "event_time TIMESTAMP".to_owned(),
-                    "foo_string STRING".to_owned(),
-                ]),
-                ..Default::default()
+    kamu.add_dataset(
+        odf::DatasetSnapshot {
+            name: "foo".try_into().unwrap(),
+            kind: odf::DatasetKind::Root,
+            metadata: vec![odf::metadata::AddPushSource {
+                source_name: odf::metadata::SourceState::DEFAULT_SOURCE_NAME.to_string(),
+                read: odf::metadata::ReadStepNdJson {
+                    schema: Some(vec![
+                        "event_time TIMESTAMP".to_owned(),
+                        "foo_string STRING".to_owned(),
+                    ]),
+                    ..Default::default()
+                }
+                .into(),
+                preprocess: None,
+                merge: odf::metadata::MergeStrategyLedger {
+                    primary_key: vec!["event_time".to_owned(), "foo_string".to_owned()],
+                }
+                .into(),
             }
-            .into(),
-            preprocess: None,
-            merge: odf::metadata::MergeStrategyLedger {
-                primary_key: vec!["event_time".to_owned(), "foo_string".to_owned()],
-            }
-            .into(),
-        }
-        .into()],
-    })
+            .into()],
+        },
+        AddDatasetOptions::default(),
+    )
     .await;
 
     let dataset_aliases = vec![
@@ -193,14 +199,14 @@ pub async fn test_repo_delete_args_validation(kamu: KamuCliPuppet) {
     kamu.assert_failure_command_execution(
         ["repo", "delete", "some-repo", "--all"],
         None,
-        Some(["You can either specify repository(s) or pass --all"]),
+        Some([r#"You can either specify repository\(s\) or pass --all"#]),
     )
     .await;
 
     kamu.assert_failure_command_execution(
         ["repo", "delete"],
         None,
-        Some(["Specify repository(s) or pass --all"]),
+        Some([r#"Specify repository\(s\) or pass --all"#]),
     )
     .await;
 }

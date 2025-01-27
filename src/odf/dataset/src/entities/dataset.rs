@@ -253,7 +253,8 @@ impl From<CheckpointRef> for Option<OwnedFile> {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Copy, Clone, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Default, Eq, PartialEq, Serialize, Deserialize, strum::Display)]
+#[strum(serialize_all = "snake_case")]
 pub enum DatasetVisibility {
     #[default]
     #[serde(alias = "private")]

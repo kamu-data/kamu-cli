@@ -68,8 +68,9 @@ async fn test_login_logout_password(
 ) {
     let kamu_node_url = kamu_node_api_client.get_base_url().as_str();
     let dataset_alias = odf::DatasetAlias::new(None, DATASET_ROOT_PLAYER_NAME.clone());
-    let kamu_api_server_dataset_endpoint =
-        kamu_node_api_client.dataset().get_endpoint(&dataset_alias);
+    let kamu_api_server_dataset_endpoint = kamu_node_api_client
+        .dataset()
+        .get_odf_endpoint(&dataset_alias);
 
     let kamu = KamuCliPuppet::new_workspace_tmp(is_workspace_multi_tenant).await;
 
@@ -114,7 +115,7 @@ async fn test_login_logout_password(
             kamu_api_server_dataset_endpoint.as_str(),
         ],
         None,
-        Some(["1 dataset(s) pushed"]),
+        Some([r#"1 dataset\(s\) pushed"#]),
     )
     .await;
 

@@ -52,7 +52,7 @@ pub async fn dataset_tail_handler(
                 e.int_err().api_err()
             }
             QueryError::DatasetSchemaNotAvailable(e) => ApiError::no_content(e),
-            QueryError::Access(e) => e.api_err(),
+            QueryError::Access(_) => ApiError::not_found_without_reason(),
             QueryError::Internal(e) => e.api_err(),
         })?;
 

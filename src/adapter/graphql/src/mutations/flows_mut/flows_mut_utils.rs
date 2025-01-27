@@ -7,8 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_core::DatasetRegistry;
+use kamu_core::{DatasetRegistry, ViewDatasetUseCase};
 use kamu_flow_system as fs;
+use odf::metadata::TransformInputExt;
 
 use super::FlowNotFound;
 use crate::prelude::*;
@@ -125,13 +126,38 @@ pub(crate) async fn ensure_flow_preconditions(
             }
         }
         DatasetFlowType::ExecuteTransform => {
-            let metadata_query_service = from_catalog_n!(ctx, dyn kamu_core::MetadataQueryService);
+            let (metadata_query_service, view_dataset_use_case) = from_catalog_n!(
+                ctx,
+                dyn kamu_core::MetadataQueryService,
+                dyn ViewDatasetUseCase
+            );
             let source_res = metadata_query_service.get_active_transform(target).await?;
-            if source_res.is_none() {
-                return Ok(Some(FlowPreconditionsNotMet {
-                    preconditions: "No SetTransform event defined".to_string(),
-                }));
-            };
+
+            match source_res {
+                Some((_, set_transform_block)) => {
+                    let mut inputs_dataset_refs =
+                        Vec::with_capacity(set_transform_block.event.inputs.len());
+                    for input in set_transform_block.event.inputs {
+                        let input_dataset_ref = input.as_sanitized_dataset_ref()?;
+                        inputs_dataset_refs.push(input_dataset_ref);
+                    }
+
+                    let view_result = view_dataset_use_case
+                        .execute_multi(inputs_dataset_refs)
+                        .await?;
+
+                    if !view_result.inaccessible_refs.is_empty() {
+                        return Ok(Some(FlowPreconditionsNotMet {
+                            preconditions: view_result.into_inaccessible_input_datasets_message(),
+                        }));
+                    }
+                }
+                None => {
+                    return Ok(Some(FlowPreconditionsNotMet {
+                        preconditions: "No SetTransform event defined".to_string(),
+                    }));
+                }
+            }
         }
         DatasetFlowType::HardCompaction => (),
         DatasetFlowType::Reset => {

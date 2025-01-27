@@ -551,35 +551,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
             Ok((ws_stream, _)) => ws_stream,
             Err(e) => {
                 tracing::debug!("Failed to connect to pull URL: {}", e);
-                if let TungsteniteError::Http(response) = &e {
-                    match response.status() {
-                        http::StatusCode::FORBIDDEN => {
-                            return Err(SyncError::Access(odf::AccessError::Forbidden(Box::new(e))))
-                        }
-                        http::StatusCode::UNAUTHORIZED => {
-                            return Err(SyncError::Access(odf::AccessError::Unauthorized(
-                                Box::new(e),
-                            )))
-                        }
-                        http::StatusCode::BAD_REQUEST => {
-                            if let Some(body) = response.body().as_ref()
-                                && let Ok(body_message) = std::str::from_utf8(body)
-                            {
-                                return InternalError::bail(body_message)
-                                    .map_err(SyncError::Internal);
-                            }
-                        }
-                        _ => {}
-                    }
-                    if response.status() == http::StatusCode::FORBIDDEN {
-                        return Err(SyncError::Access(odf::AccessError::Forbidden(Box::new(e))));
-                    } else if response.status() == http::StatusCode::UNAUTHORIZED {
-                        return Err(SyncError::Access(odf::AccessError::Unauthorized(Box::new(
-                            e,
-                        ))));
-                    }
-                }
-                return Err(SyncError::Internal(e.int_err()));
+                return Err(map_tungstenite_error(e, http_src_url));
             }
         };
 
@@ -811,35 +783,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
             Ok((ws_stream, _)) => ws_stream,
             Err(e) => {
                 tracing::debug!("Failed to connect to push URL: {}", e);
-                if let TungsteniteError::Http(response) = &e {
-                    match response.status() {
-                        http::StatusCode::FORBIDDEN => {
-                            return Err(SyncError::Access(odf::AccessError::Forbidden(Box::new(e))))
-                        }
-                        http::StatusCode::UNAUTHORIZED => {
-                            return Err(SyncError::Access(odf::AccessError::Unauthorized(
-                                Box::new(e),
-                            )))
-                        }
-                        http::StatusCode::BAD_REQUEST => {
-                            if let Some(body) = response.body().as_ref()
-                                && let Ok(body_message) = std::str::from_utf8(body)
-                            {
-                                return InternalError::bail(body_message)
-                                    .map_err(SyncError::Internal);
-                            }
-                        }
-                        _ => {}
-                    }
-                    if response.status() == http::StatusCode::FORBIDDEN {
-                        return Err(SyncError::Access(odf::AccessError::Forbidden(Box::new(e))));
-                    } else if response.status() == http::StatusCode::UNAUTHORIZED {
-                        return Err(SyncError::Access(odf::AccessError::Unauthorized(Box::new(
-                            e,
-                        ))));
-                    }
-                }
-                return Err(SyncError::Internal(e.int_err()));
+                return Err(map_tungstenite_error(e, http_dst_url));
             }
         };
 
@@ -942,6 +886,8 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Helpers
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 type TungsteniteStream = WebSocketStream<MaybeTlsStream<TcpStream>>;
 
@@ -985,6 +931,36 @@ async fn write_payload<TMessagePayload: Serialize>(
         Ok(_) => Ok(()),
         Err(e) => Err(WriteMessageError::SocketError(Box::new(e))),
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn map_tungstenite_error(error: TungsteniteError, dataset_endpoint: &Url) -> SyncError {
+    use http::StatusCode;
+
+    if let TungsteniteError::Http(response) = &error {
+        match response.status() {
+            StatusCode::FORBIDDEN => {
+                return SyncError::Access(odf::AccessError::Forbidden(Box::new(error)));
+            }
+            StatusCode::UNAUTHORIZED => {
+                return SyncError::Access(odf::AccessError::Unauthorized(Box::new(error)))
+            }
+            StatusCode::NOT_FOUND => {
+                return DatasetAnyRefUnresolvedError::new(dataset_endpoint).into();
+            }
+            StatusCode::BAD_REQUEST => {
+                if let Some(body) = response.body().as_ref()
+                    && let Ok(body_message) = std::str::from_utf8(body)
+                {
+                    return SyncError::Internal(body_message.int_err());
+                }
+            }
+            _ => {}
+        }
+    }
+
+    SyncError::Internal(error.int_err())
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -69,6 +69,9 @@ impl FetchService {
         }
     }
 
+    // Because of the conditional compilation,
+    // we find easier to allow this rule here.
+    #[allow(unused_variables)]
     pub async fn fetch(
         &self,
         dataset_handle: &odf::DatasetHandle,

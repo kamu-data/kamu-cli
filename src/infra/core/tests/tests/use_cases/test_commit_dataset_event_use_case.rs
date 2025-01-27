@@ -87,8 +87,9 @@ async fn test_commit_event_with_new_dependencies() {
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
     let (_, dataset_id_bar) = odf::DatasetID::new_generated_ed25519();
 
-    let mock_authorizer =
-        MockDatasetActionAuthorizer::new().expect_check_write_dataset(&dataset_id_bar, 1, true);
+    let mock_authorizer = MockDatasetActionAuthorizer::new()
+        .expect_check_write_dataset(&dataset_id_bar, 1, true)
+        .expect_check_read_dataset(&dataset_id_foo, 1, true);
     let mut mock_outbox = MockOutbox::new();
     expect_outbox_dataset_dependencies_updated(&mut mock_outbox, 1);
 

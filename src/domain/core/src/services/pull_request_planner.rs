@@ -268,7 +268,7 @@ pub struct PullResponse {
     pub maybe_local_ref: Option<odf::DatasetRef>,
     /// Destination reference, if resolved
     pub maybe_remote_ref: Option<odf::DatasetRefRemote>,
-    /// Result of the push operation
+    /// Result of the pull operation
     pub result: Result<PullResult, PullError>,
 }
 

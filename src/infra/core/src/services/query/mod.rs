@@ -131,7 +131,7 @@ impl KamuSchema {
                 if !self
                     .inner
                     .dataset_action_authorizer
-                    .is_action_allowed(id, auth::DatasetAction::Read)
+                    .is_action_allowed(id, DatasetAction::Read)
                     .await?
                 {
                     // Ignore this alias and let the query fail with "not found" error

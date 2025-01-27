@@ -30,7 +30,6 @@ oso = ["dep:oso"]
 
 
 [dependencies]
-async-utils = { workspace = true }
 container-runtime = { workspace = true }
 file-utils = { workspace = true }
 internal-error = { workspace = true }
@@ -40,19 +39,17 @@ odf = { workspace = true }
 
 async-stream = { version = "0.3", default-features = false }
 async-trait = { version = "0.1", default-features = false }
-bytes = { version = "1", default-features = false }
 chrono = { version = "0.4", default-features = false }
 dill = "0.11"
 futures = { version = "0.3", default-features = false }
-http = { version = "1" }
+itertools = { version = "0.14", default-features = false }
 pathdiff = { version = "0.2", default-features = false }
-pin-project = { version = "1", default-features = false }
+strum = { version = "0.26", features = ["derive"] }
 thiserror = { version = "2", default-features = false, features = ["std"] }
 tokio = { version = "1", default-features = false }
 tokio-stream = { version = "0.1", default-features = false }
 tracing = "0.1"
 url = { version = "2", default-features = false, features = ["serde"] }
-strum = { version = "0.26", features = ["derive"] }
 
 # TODO: Avoid this dependency or depend on sub-crates
 datafusion = { version = "44", default-features = false, features = [

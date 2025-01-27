@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_cli_puppet::extensions::KamuCliPuppetExt;
+use kamu_cli_puppet::extensions::{AddDatasetOptions, KamuCliPuppetExt};
 use kamu_cli_puppet::KamuCliPuppet;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -29,11 +29,14 @@ pub async fn test_complete_config(kamu: KamuCliPuppet) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_complete_dataset_name(kamu: KamuCliPuppet) {
-    kamu.add_dataset(odf::DatasetSnapshot {
-        name: "foo.bar".try_into().unwrap(),
-        kind: odf::DatasetKind::Root,
-        metadata: vec![],
-    })
+    kamu.add_dataset(
+        odf::DatasetSnapshot {
+            name: "foo.bar".try_into().unwrap(),
+            kind: odf::DatasetKind::Root,
+            metadata: vec![],
+        },
+        AddDatasetOptions::default(),
+    )
     .await;
 
     let completions = kamu.complete("kamu log", 2).await;

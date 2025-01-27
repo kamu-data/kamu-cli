@@ -458,17 +458,19 @@ pub fn configure_base_catalog(
     b.add::<AppendDatasetMetadataBatchUseCaseImpl>();
     b.add::<CommitDatasetEventUseCaseImpl>();
     b.add::<CompactDatasetUseCaseImpl>();
-    b.add::<CreateDatasetUseCaseImpl>();
     b.add::<CreateDatasetFromSnapshotUseCaseImpl>();
+    b.add::<CreateDatasetUseCaseImpl>();
     b.add::<DeleteDatasetUseCaseImpl>();
+    b.add::<EditDatasetUseCaseImpl>();
+    b.add::<GetDatasetDownstreamDependenciesUseCaseImpl>();
+    b.add::<GetDatasetUpstreamDependenciesUseCaseImpl>();
     b.add::<PullDatasetUseCaseImpl>();
     b.add::<PushDatasetUseCaseImpl>();
     b.add::<RenameDatasetUseCaseImpl>();
     b.add::<ResetDatasetUseCaseImpl>();
     b.add::<SetWatermarkUseCaseImpl>();
     b.add::<VerifyDatasetUseCaseImpl>();
-    b.add::<GetDatasetDownstreamDependenciesUseCaseImpl>();
-    b.add::<GetDatasetUpstreamDependenciesUseCaseImpl>();
+    b.add::<ViewDatasetUseCaseImpl>();
 
     b.add::<kamu_accounts_services::LoginPasswordAuthProvider>();
 

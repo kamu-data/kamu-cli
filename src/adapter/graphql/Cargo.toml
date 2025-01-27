@@ -54,15 +54,12 @@ secrecy = "0.10"
 serde = { version = "1", default-features = false }
 serde_json = "1"
 tokio = { version = "1", default-features = false, features = [] }
-tokio-stream = { version = "0.1", default-features = false }
 tracing = "0.1"
 url = { version = "2", default-features = false }
 uuid = { version = "1", default-features = false }
 
 
 [dev-dependencies]
-# TODO: Limit to mock or in-memory implementations only
-container-runtime = { workspace = true }
 file-utils = { workspace = true }
 init-on-startup = { workspace = true }
 kamu = { workspace = true, features = ["testing"] }

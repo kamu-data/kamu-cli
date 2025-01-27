@@ -87,7 +87,7 @@ async fn test_get_dataset_info_by_id_not_found_err() {
         pretty_assertions::assert_eq!(http::StatusCode::NOT_FOUND, res.status());
         pretty_assertions::assert_eq!(
             json!({
-                "message": format!("Dataset not found: {dataset_id}")
+                "message": "Not Found"
             }),
             res.json::<serde_json::Value>().await.unwrap()
         );

@@ -26,6 +26,7 @@ use kamu_adapter_http::{LoginRequestBody, PlatformFileUploadQuery, UploadContext
 use kamu_flow_system::{DatasetFlowType, FlowID};
 use lazy_static::lazy_static;
 use reqwest::{Method, StatusCode, Url};
+use serde::Deserialize;
 use thiserror::Error;
 use tokio_retry::strategy::FixedInterval;
 use tokio_retry::Retry;
@@ -167,6 +168,8 @@ pub trait KamuApiServerClientExt {
 
     fn odf_query(&self) -> OdfQuery;
 
+    fn search(&self) -> SearchApi;
+
     fn swagger(&self) -> SwaggerApi;
 
     fn upload(&self) -> UploadApi;
@@ -204,6 +207,10 @@ impl KamuApiServerClientExt for KamuApiServerClient {
         OdfQuery { client: self }
     }
 
+    fn search(&self) -> SearchApi {
+        SearchApi { client: self }
+    }
+
     fn swagger(&self) -> SwaggerApi {
         SwaggerApi { client: self }
     }
@@ -238,6 +245,8 @@ impl AccountApi<'_> {
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Error, Debug)]
 pub enum AccountMeError {
     #[error("Unauthorized")]
@@ -256,19 +265,7 @@ pub struct AuthApi<'a> {
 
 impl AuthApi<'_> {
     pub async fn login_as_kamu(&mut self) -> AccessToken {
-        self.login(
-            indoc::indoc!(
-                r#"
-                mutation {
-                  auth {
-                    login(loginMethod: "password", loginCredentialsJson: "{\"login\":\"kamu\",\"password\":\"kamu\"}") {
-                      accessToken
-                    }
-                  }
-                }
-                "#,
-            )
-        ).await
+        self.login_with_password("kamu", "kamu").await
     }
 
     pub async fn login_as_e2e_user(&mut self) -> AccessToken {
@@ -285,6 +282,25 @@ impl AuthApi<'_> {
             "#,
         ))
         .await
+    }
+
+    pub async fn login_with_password(&mut self, user: &str, password: &str) -> AccessToken {
+        self.login(
+            indoc::indoc!(
+                r#"
+                mutation {
+                  auth {
+                    login(loginMethod: "password", loginCredentialsJson: "{\"login\":\"<user>\",\"password\":\"<password>\"}") {
+                      accessToken
+                    }
+                  }
+                }
+                "#,
+            )
+            .replace("<user>", user)
+            .replace("<password>", password)
+            .as_str()
+        ).await
     }
 
     pub async fn login_via_rest(
@@ -343,6 +359,8 @@ impl AuthApi<'_> {
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Error, Debug)]
 pub enum LoginError {
     #[error("Unauthorized")]
@@ -368,10 +386,20 @@ pub struct DatasetApi<'a> {
 }
 
 impl DatasetApi<'_> {
+    /// Used for Simple Transfer Protocol
     pub fn get_endpoint(&self, dataset_alias: &odf::DatasetAlias) -> Url {
-        let node_url = self.client.get_odf_node_url();
+        let node_url = self.client.get_base_url();
+        let url = node_url.join(format!("{dataset_alias}").as_str()).unwrap();
+        pretty_assertions::assert_eq!("http", url.scheme());
+        url
+    }
 
-        node_url.join(format!("{dataset_alias}").as_str()).unwrap()
+    /// Used for Smart Transfer Protocol
+    pub fn get_odf_endpoint(&self, dataset_alias: &odf::DatasetAlias) -> Url {
+        let node_url = self.client.get_odf_node_url();
+        let url = node_url.join(format!("{dataset_alias}").as_str()).unwrap();
+        pretty_assertions::assert_eq!("odf+http", url.scheme());
+        url
     }
 
     pub async fn by_id(
@@ -443,6 +471,21 @@ impl DatasetApi<'_> {
 
     pub async fn create_dataset(&self, dataset_snapshot_yaml: &str) -> CreateDatasetResponse {
         self.create_dataset_with_visibility(dataset_snapshot_yaml, odf::DatasetVisibility::Public)
+            .await
+    }
+
+    pub async fn create_dataset_from_snapshot_with_visibility(
+        &self,
+        snapshot: odf::DatasetSnapshot,
+        visibility: odf::DatasetVisibility,
+    ) -> CreateDatasetResponse {
+        let serialized_snapshot = odf::serde::yaml::YamlDatasetSnapshotSerializer
+            .write_manifest_str(&snapshot)
+            .unwrap()
+            .escape_default()
+            .to_string();
+
+        self.create_dataset_with_visibility(&serialized_snapshot, visibility)
             .await
     }
 
@@ -624,7 +667,10 @@ impl DatasetApi<'_> {
 
                 match first_error.message.as_str() {
                     "Only the dataset owner can perform this action" => {
-                        Err(SetDatasetVisibilityError::Forbidden)
+                        Err(SetDatasetVisibilityError::ForbiddenOnlyOwner)
+                    }
+                    "Anonymous access forbidden" => {
+                        Err(SetDatasetVisibilityError::ForbiddenAnonymous)
                     }
                     unexpected_message => {
                         Err(format!("Unexpected error message: {unexpected_message}")
@@ -771,6 +817,159 @@ impl DatasetApi<'_> {
 
         DatasetBlocksResponse { blocks }
     }
+
+    pub async fn by_account_name(&self, account_name: &odf::AccountName) -> Vec<AccountDataset> {
+        let mut response = self
+            .client
+            .graphql_api_call(
+                indoc::indoc!(
+                    r#"
+                    query {
+                      datasets {
+                        byAccountName(accountName: "<account_name>") {
+                          nodes {
+                            id
+                            alias
+                          }
+                        }
+                      }
+                    }
+                    "#
+                )
+                .replace("<account_name>", account_name)
+                .as_str(),
+            )
+            .await
+            .data();
+
+        let mut result = response["datasets"]["byAccountName"]["nodes"]
+            .as_array_mut()
+            .unwrap()
+            .iter_mut()
+            .map(|node| serde_json::from_value::<AccountDataset>(node.take()).unwrap())
+            .collect::<Vec<_>>();
+
+        result.sort_by(|left, right| left.alias.cmp(&right.alias));
+
+        result
+    }
+
+    pub async fn dependencies(&self, dataset_id: &odf::DatasetID) -> DatasetDependencies {
+        let mut response = self
+            .client
+            .graphql_api_call(
+                indoc::indoc!(
+                    r#"
+                    query {
+                      datasets {
+                        byId(
+                          datasetId: "<dataset_id>"
+                        ) {
+                          metadata {
+                            currentUpstreamDependencies {
+                              __typename
+                              ... on DependencyDatasetResultAccessible {
+                                dataset {
+                                  id
+                                  alias
+                                }
+                              }
+                              ... on DependencyDatasetResultNotAccessible {
+                                id
+                                message
+                              }
+                            }
+                            currentDownstreamDependencies {
+                              __typename
+                              ... on DependencyDatasetResultAccessible {
+                                dataset {
+                                  id
+                                  alias
+                                }
+                              }
+                              ... on DependencyDatasetResultNotAccessible {
+                                id
+                                message
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                    "#
+                )
+                .replace(
+                    "<dataset_id>",
+                    dataset_id.as_did_str().to_stack_string().as_str(),
+                )
+                .as_str(),
+            )
+            .await
+            .data();
+
+        let metadata = &mut response["datasets"]["byId"]["metadata"];
+
+        fn map_dependency(dependency: &mut serde_json::Value) -> DatasetDependency {
+            let typename = dependency["__typename"].as_str().unwrap();
+
+            match typename {
+                "DependencyDatasetResultAccessible" => {
+                    let dataset = dependency["dataset"].take();
+
+                    DatasetDependency::Resolved(
+                        serde_json::from_value::<ResolvedDatasetDependency>(dataset).unwrap(),
+                    )
+                }
+                "DependencyDatasetResultNotAccessible" => DatasetDependency::Unresolved(
+                    serde_json::from_value::<UnresolvedDatasetDependency>(dependency.take())
+                        .unwrap(),
+                ),
+                unexpected_typename => {
+                    unreachable!("Unexpected typename: {unexpected_typename}");
+                }
+            }
+        }
+
+        let mut upstream = metadata["currentUpstreamDependencies"]
+            .as_array_mut()
+            .map(|dependencies| {
+                dependencies
+                    .iter_mut()
+                    .map(map_dependency)
+                    .collect::<Vec<_>>()
+            })
+            .unwrap();
+        let mut downstream = metadata["currentDownstreamDependencies"]
+            .as_array_mut()
+            .map(|dependencies| {
+                dependencies
+                    .iter_mut()
+                    .map(map_dependency)
+                    .collect::<Vec<_>>()
+            })
+            .unwrap();
+
+        use std::cmp::Ordering;
+
+        fn comparator(left: &DatasetDependency, right: &DatasetDependency) -> Ordering {
+            match (left, right) {
+                (DatasetDependency::Resolved(l), DatasetDependency::Resolved(r)) => {
+                    l.alias.cmp(&r.alias)
+                }
+                (_, DatasetDependency::Resolved(_)) => Ordering::Less,
+                (DatasetDependency::Resolved(_), _) => Ordering::Greater,
+                _ => Ordering::Equal,
+            }
+        }
+
+        upstream.sort_by(comparator);
+        downstream.sort_by(comparator);
+
+        DatasetDependencies {
+            upstream,
+            downstream,
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -778,34 +977,6 @@ impl DatasetApi<'_> {
 pub struct CreateDatasetResponse {
     pub dataset_id: odf::DatasetID,
     pub dataset_alias: odf::DatasetAlias,
-}
-
-#[derive(Error, Debug)]
-pub enum GetDatasetVisibilityError {
-    #[error("Forbidden")]
-    Forbidden,
-    #[error("Not found")]
-    NotFound,
-    #[error(transparent)]
-    Internal(#[from] InternalError),
-}
-
-#[derive(Error, Debug)]
-pub enum SetDatasetVisibilityError {
-    #[error("Forbidden")]
-    Forbidden,
-    #[error(transparent)]
-    Internal(#[from] InternalError),
-}
-
-#[derive(Error, Debug)]
-pub enum DatasetByIdError {
-    #[error("Unauthorized")]
-    Unauthorized,
-    #[error("Not found")]
-    NotFound,
-    #[error(transparent)]
-    Internal(#[from] InternalError),
 }
 
 #[derive(Debug)]
@@ -820,6 +991,68 @@ pub struct DatasetBlock {
 #[derive(Debug)]
 pub struct DatasetBlocksResponse {
     pub blocks: Vec<DatasetBlock>,
+}
+
+#[derive(Debug, Deserialize, PartialEq, Eq)]
+pub struct AccountDataset {
+    pub id: odf::DatasetID,
+    pub alias: odf::DatasetAlias,
+}
+
+#[derive(Debug, Deserialize, PartialEq, Eq)]
+pub struct ResolvedDatasetDependency {
+    pub id: odf::DatasetID,
+    pub alias: odf::DatasetAlias,
+}
+
+#[derive(Debug, Deserialize, PartialEq, Eq)]
+pub struct UnresolvedDatasetDependency {
+    pub id: odf::DatasetID,
+    pub message: String,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum DatasetDependency {
+    Resolved(ResolvedDatasetDependency),
+    Unresolved(UnresolvedDatasetDependency),
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct DatasetDependencies {
+    pub upstream: Vec<DatasetDependency>,
+    pub downstream: Vec<DatasetDependency>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum GetDatasetVisibilityError {
+    #[error("Forbidden")]
+    Forbidden,
+    #[error("Not found")]
+    NotFound,
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+}
+
+#[derive(Error, Debug)]
+pub enum SetDatasetVisibilityError {
+    #[error("ForbiddenOnlyOwner")]
+    ForbiddenOnlyOwner,
+    #[error("ForbiddenAnonymous")]
+    ForbiddenAnonymous,
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+}
+
+#[derive(Error, Debug)]
+pub enum DatasetByIdError {
+    #[error("Unauthorized")]
+    Unauthorized,
+    #[error("Not found")]
+    NotFound,
+    #[error(transparent)]
+    Internal(#[from] InternalError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -938,6 +1171,8 @@ impl FlowApi<'_> {
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Debug)]
 pub enum FlowTriggerResponse {
     Success(FlowID),
@@ -999,6 +1234,8 @@ impl OdfTransferApi<'_> {
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Error, Debug)]
 pub enum MetadataBlockHashByRefError {
     #[error("Not found")]
@@ -1016,7 +1253,7 @@ pub struct OdfQuery<'a> {
 }
 
 impl OdfQuery<'_> {
-    pub async fn query(&self, query: &str) -> String {
+    pub async fn query(&self, query: &str) -> Result<String, QueryError> {
         let response = self
             .client
             .graphql_api_call(
@@ -1053,26 +1290,35 @@ impl OdfQuery<'_> {
             .data();
         let query_node = &response["data"]["query"];
 
-        assert_eq!(
-            query_node["__typename"].as_str(),
-            Some("DataQueryResultSuccess"),
-            "{}",
-            indoc::formatdoc!(
-                r#"
-                Query:
-                {query}
-                Unexpected response:
-                {query_node:#}
-                "#
-            )
-        );
+        match query_node["__typename"].as_str() {
+            Some("DataQueryResultSuccess") => {
+                let content = query_node["data"]["content"]
+                    .as_str()
+                    .map(ToOwned::to_owned)
+                    .unwrap();
 
-        let content = query_node["data"]["content"]
-            .as_str()
-            .map(ToOwned::to_owned)
-            .unwrap();
+                Ok(content)
+            }
+            Some("DataQueryResultError") => {
+                let kind = query_node["errorKind"]
+                    .as_str()
+                    .map(ToOwned::to_owned)
+                    .unwrap();
+                let message = query_node["errorMessage"]
+                    .as_str()
+                    .map(ToOwned::to_owned)
+                    .unwrap();
 
-        content
+                Err(QueryExecutionError {
+                    error_kind: kind,
+                    error_message: message,
+                }
+                .into())
+            }
+            unexpected_type_name => Err(format!("Unexpected __typename: {unexpected_type_name:?}")
+                .int_err()
+                .into()),
+        }
     }
 
     pub async fn query_player_scores_dataset(&self) -> String {
@@ -1090,6 +1336,7 @@ impl OdfQuery<'_> {
             "#
         ))
         .await
+        .unwrap()
     }
 
     pub async fn query_via_rest(
@@ -1184,12 +1431,88 @@ impl OdfQuery<'_> {
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+#[error("{self:?}")]
+pub struct QueryExecutionError {
+    pub error_kind: String,
+    pub error_message: String,
+}
+
 #[derive(Error, Debug)]
 pub enum QueryError {
-    #[error("Unauthorized")]
-    Unauthorized,
+    #[error(transparent)]
+    ExecutionError(#[from] QueryExecutionError),
+
     #[error(transparent)]
     Internal(#[from] InternalError),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// API: Search
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct SearchApi<'a> {
+    client: &'a KamuApiServerClient,
+}
+
+impl SearchApi<'_> {
+    pub async fn search(&self, query: &str) -> Vec<FoundDatasetItem> {
+        let mut response = self
+            .client
+            .graphql_api_call(
+                indoc::indoc!(
+                    r#"
+                    query {
+                      search {
+                        query(query: "<query>") {
+                          nodes {
+                            __typename
+                            ... on Dataset {
+                              id
+                              alias
+                            }
+                          }
+                        }
+                      }
+                    }
+                    "#
+                )
+                .replace("<query>", query)
+                .as_str(),
+            )
+            .await
+            .data();
+
+        let mut result = response["search"]["query"]["nodes"]
+            .as_array_mut()
+            .map(|nodes| {
+                nodes
+                    .iter_mut()
+                    .map(|node| {
+                        let typename = node["__typename"].as_str().unwrap();
+
+                        pretty_assertions::assert_eq!("Dataset", typename);
+
+                        serde_json::from_value::<FoundDatasetItem>(node.take()).unwrap()
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .unwrap();
+
+        result.sort_by(|left, right| left.alias.cmp(&right.alias));
+
+        result
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Deserialize, PartialEq, Eq)]
+pub struct FoundDatasetItem {
+    pub id: odf::DatasetID,
+    pub alias: odf::DatasetAlias,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1314,6 +1637,8 @@ impl UploadApi<'_> {
         }
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
 pub enum UploadPrepareError {

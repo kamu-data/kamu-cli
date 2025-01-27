@@ -139,11 +139,13 @@ impl ClientSideHarness {
         b.add::<DatasetKeyValueServiceSysEnv>();
 
         b.add::<AppendDatasetMetadataBatchUseCaseImpl>();
-        b.add::<CreateDatasetFromSnapshotUseCaseImpl>();
         b.add::<CommitDatasetEventUseCaseImpl>();
+        b.add::<CreateDatasetFromSnapshotUseCaseImpl>();
         b.add::<CreateDatasetUseCaseImpl>();
+        b.add::<EditDatasetUseCaseImpl>();
         b.add::<PullDatasetUseCaseImpl>();
         b.add::<PushDatasetUseCaseImpl>();
+        b.add::<ViewDatasetUseCaseImpl>();
 
         b.add_value(ContainerRuntime::default());
         b.add_value(kamu::utils::ipfs_wrapper::IpfsClient::default());

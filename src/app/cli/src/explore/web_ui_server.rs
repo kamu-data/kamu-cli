@@ -26,7 +26,7 @@ use kamu_accounts::{
     PROVIDER_PASSWORD,
 };
 use kamu_accounts_services::PasswordLoginCredentials;
-use kamu_adapter_http::FileUploadLimitConfig;
+use kamu_adapter_http::{DatasetAuthorizationLayer, FileUploadLimitConfig};
 use rust_embed::RustEmbed;
 use serde::Serialize;
 use url::Url;
@@ -175,7 +175,8 @@ impl WebUIServer {
             kamu_adapter_http::add_dataset_resolver_layer(
                 OpenApiRouter::new()
                     .merge(kamu_adapter_http::smart_transfer_protocol_router())
-                    .merge(kamu_adapter_http::data::dataset_router()),
+                    .merge(kamu_adapter_http::data::dataset_router())
+                    .layer(DatasetAuthorizationLayer::default()),
                 tenancy_config,
             ),
         )

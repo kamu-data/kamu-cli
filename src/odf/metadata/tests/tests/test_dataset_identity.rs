@@ -127,6 +127,7 @@ fn test_dataset_name_validation() {
     assert_matches!(DatasetName::try_from("invalid--id"), Err(_));
     assert_matches!(DatasetName::try_from("invalid..id"), Err(_));
     assert_matches!(DatasetName::try_from("in^valid"), Err(_));
+    assert_matches!(DatasetName::try_from("invalid_id"), Err(_));
 }
 
 #[test]
@@ -195,6 +196,7 @@ fn test_local_alias_validation() {
     assert_matches!(DatasetAlias::try_from("repo.name/user-name/blah"), Err(_));
     assert_matches!(DatasetAlias::try_from("user-name/.invalid"), Err(_));
     assert_matches!(DatasetAlias::try_from(".invalid/local.id"), Err(_));
+    assert_matches!(DatasetAlias::try_from("invalid_alias"), Err(_));
 }
 
 #[allow(clippy::needless_borrows_for_generic_args)]

@@ -16,7 +16,9 @@ use chrono::{DateTime, Utc};
 use datafusion::prelude::{ParquetReadOptions, SessionContext};
 use odf::metadata::serde::yaml::{YamlDatasetSnapshotSerializer, YamlMetadataBlockDeserializer};
 use odf::metadata::serde::{DatasetSnapshotSerializer, MetadataBlockDeserializer};
+use regex::Regex;
 use serde::Deserialize;
+use url::Url;
 
 use crate::{ExecuteCommandResult, KamuCliPuppet};
 
@@ -24,59 +26,60 @@ use crate::{ExecuteCommandResult, KamuCliPuppet};
 
 #[async_trait]
 pub trait KamuCliPuppetExt {
-    async fn assert_success_command_execution<I, S>(
+    async fn assert_success_command_execution<CmdIt, CmdItem>(
         &self,
-        cmd: I,
+        cmd: CmdIt,
         maybe_expected_stdout: Option<&str>,
         maybe_expected_stderr: Option<impl IntoIterator<Item = &str> + Send>,
     ) where
-        I: IntoIterator<Item = S> + Send,
-        S: AsRef<std::ffi::OsStr>;
+        CmdIt: IntoIterator<Item = CmdItem> + Send,
+        CmdItem: AsRef<std::ffi::OsStr> + Send;
 
-    async fn assert_success_command_execution_with_input<I, S, T>(
+    async fn assert_success_command_execution_with_input<CmdIt, CmdItem, InputIt>(
         &self,
-        cmd: I,
-        input: T,
+        cmd: CmdIt,
+        input: InputIt,
         maybe_expected_stdout: Option<&str>,
         maybe_expected_stderr: Option<impl IntoIterator<Item = &str> + Send>,
     ) where
-        I: IntoIterator<Item = S> + Send,
-        S: AsRef<std::ffi::OsStr>,
-        T: Into<Vec<u8>> + Send;
+        CmdIt: IntoIterator<Item = CmdItem> + Send,
+        CmdItem: AsRef<std::ffi::OsStr> + Send,
+        InputIt: Into<Vec<u8>> + Send;
 
-    async fn assert_success_command_execution_with_env<I, S>(
+    async fn assert_success_command_execution_with_env<CmdIt, CmdItem, EnvItem>(
         &self,
-        cmd: I,
-        env_vars: Vec<(&std::ffi::OsStr, &std::ffi::OsStr)>,
+        cmd: CmdIt,
+        env_vars: Vec<(EnvItem, EnvItem)>,
         maybe_expected_stdout: Option<&str>,
         maybe_expected_stderr: Option<impl IntoIterator<Item = &str> + Send>,
     ) where
-        I: IntoIterator<Item = S> + Send,
-        S: AsRef<std::ffi::OsStr>;
+        CmdIt: IntoIterator<Item = CmdItem> + Send,
+        CmdItem: AsRef<std::ffi::OsStr> + Send,
+        EnvItem: AsRef<std::ffi::OsStr> + Send;
 
-    async fn assert_failure_command_execution<I, S>(
+    async fn assert_failure_command_execution<CmdIt, CmdItem>(
         &self,
-        cmd: I,
+        cmd: CmdIt,
         maybe_expected_stdout: Option<&str>,
         maybe_expected_stderr: Option<impl IntoIterator<Item = &str> + Send>,
     ) where
-        I: IntoIterator<Item = S> + Send,
-        S: AsRef<std::ffi::OsStr>;
+        CmdIt: IntoIterator<Item = CmdItem> + Send,
+        CmdItem: AsRef<std::ffi::OsStr> + Send;
 
-    async fn assert_failure_command_execution_with_input<I, S, T>(
+    async fn assert_failure_command_execution_with_input<CmdIt, CmdItem, InputIt>(
         &self,
-        cmd: I,
-        input: T,
+        cmd: CmdIt,
+        input: InputIt,
         maybe_expected_stdout: Option<&str>,
         maybe_expected_stderr: Option<impl IntoIterator<Item = &str> + Send>,
     ) where
-        I: IntoIterator<Item = S> + Send,
-        S: AsRef<std::ffi::OsStr>,
-        T: Into<Vec<u8>> + Send;
+        CmdIt: IntoIterator<Item = CmdItem> + Send,
+        CmdItem: AsRef<std::ffi::OsStr> + Send,
+        InputIt: Into<Vec<u8>> + Send;
 
     async fn list_datasets(&self) -> Vec<DatasetRecord>;
 
-    async fn add_dataset(&self, dataset_snapshot: odf::DatasetSnapshot);
+    async fn add_dataset(&self, dataset_snapshot: odf::DatasetSnapshot, options: AddDatasetOptions);
 
     async fn list_blocks(&self, dataset_name: &odf::DatasetName) -> Vec<BlockRecord>;
 
@@ -100,12 +103,25 @@ pub trait KamuCliPuppetExt {
         expected_schema: &str,
         expected_data: &str,
     );
+
+    async fn login_to_node(&self, node_url: &Url, account_name: &str, password: &str);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait]
 impl KamuCliPuppetExt for KamuCliPuppet {
+    async fn login_to_node(&self, node_url: &Url, account_name: &str, password: &str) {
+        let url = node_url.as_str();
+
+        self.assert_success_command_execution(
+            ["login", "password", account_name, password, url],
+            None,
+            Some([format!("Login successful: {url}").as_str()]),
+        )
+        .await;
+    }
+
     async fn list_datasets(&self) -> Vec<DatasetRecord> {
         let assert = self
             .execute(["list", "--wide", "--output-format", "json"])
@@ -117,19 +133,27 @@ impl KamuCliPuppetExt for KamuCliPuppet {
         serde_json::from_str(stdout).unwrap()
     }
 
-    async fn add_dataset(&self, dataset_snapshot: odf::DatasetSnapshot) {
+    async fn add_dataset(
+        &self,
+        dataset_snapshot: odf::DatasetSnapshot,
+        options: AddDatasetOptions,
+    ) {
         let content = YamlDatasetSnapshotSerializer
             .write_manifest(&dataset_snapshot)
             .unwrap();
 
         let mut f = tempfile::NamedTempFile::new().unwrap();
-
         f.as_file().write_all(&content).unwrap();
         f.flush().unwrap();
 
-        self.execute(["add".as_ref(), f.path().as_os_str()])
-            .await
-            .success();
+        let mut cmd = vec!["add", f.path().to_str().unwrap()];
+        let maybe_visibility = options.visibility.map(|v| format!("{v}"));
+
+        if let Some(visibility) = &maybe_visibility {
+            cmd.extend(["--visibility", visibility.as_str()]);
+        }
+
+        self.execute(cmd).await.success();
     }
 
     async fn get_list_of_repo_aliases(&self, dataset_ref: &odf::DatasetRef) -> Vec<RepoAlias> {
@@ -317,14 +341,14 @@ impl KamuCliPuppetExt for KamuCliPuppet {
             .success();
     }
 
-    async fn assert_success_command_execution<I, S>(
+    async fn assert_success_command_execution<CmdIt, CmdItem>(
         &self,
-        cmd: I,
+        cmd: CmdIt,
         maybe_expected_stdout: Option<&str>,
         maybe_expected_stderr: Option<impl IntoIterator<Item = &str> + Send>,
     ) where
-        I: IntoIterator<Item = S> + Send,
-        S: AsRef<std::ffi::OsStr>,
+        CmdIt: IntoIterator<Item = CmdItem> + Send,
+        CmdItem: AsRef<std::ffi::OsStr> + Send,
     {
         assert_execute_command_result(
             &self.execute(cmd).await.success(),
@@ -333,16 +357,16 @@ impl KamuCliPuppetExt for KamuCliPuppet {
         );
     }
 
-    async fn assert_success_command_execution_with_input<I, S, T>(
+    async fn assert_success_command_execution_with_input<CmdIt, CmdItem, InputIt>(
         &self,
-        cmd: I,
-        input: T,
+        cmd: CmdIt,
+        input: InputIt,
         maybe_expected_stdout: Option<&str>,
         maybe_expected_stderr: Option<impl IntoIterator<Item = &str> + Send>,
     ) where
-        I: IntoIterator<Item = S> + Send,
-        S: AsRef<std::ffi::OsStr>,
-        T: Into<Vec<u8>> + Send,
+        CmdIt: IntoIterator<Item = CmdItem> + Send,
+        CmdItem: AsRef<std::ffi::OsStr> + Send,
+        InputIt: Into<Vec<u8>> + Send,
     {
         assert_execute_command_result(
             &self.execute_with_input(cmd, input).await.success(),
@@ -351,15 +375,16 @@ impl KamuCliPuppetExt for KamuCliPuppet {
         );
     }
 
-    async fn assert_success_command_execution_with_env<I, S>(
+    async fn assert_success_command_execution_with_env<CmdIt, CmdItem, EnvItem>(
         &self,
-        cmd: I,
-        env_vars: Vec<(&std::ffi::OsStr, &std::ffi::OsStr)>,
+        cmd: CmdIt,
+        env_vars: Vec<(EnvItem, EnvItem)>,
         maybe_expected_stdout: Option<&str>,
         maybe_expected_stderr: Option<impl IntoIterator<Item = &str> + Send>,
     ) where
-        I: IntoIterator<Item = S> + Send,
-        S: AsRef<std::ffi::OsStr>,
+        CmdIt: IntoIterator<Item = CmdItem> + Send,
+        CmdItem: AsRef<std::ffi::OsStr> + Send,
+        EnvItem: AsRef<std::ffi::OsStr> + Send,
     {
         assert_execute_command_result(
             &self.execute_with_env(cmd, env_vars).await.success(),
@@ -368,14 +393,14 @@ impl KamuCliPuppetExt for KamuCliPuppet {
         );
     }
 
-    async fn assert_failure_command_execution<I, S>(
+    async fn assert_failure_command_execution<CmdIt, CmdItem>(
         &self,
-        cmd: I,
+        cmd: CmdIt,
         maybe_expected_stdout: Option<&str>,
         maybe_expected_stderr: Option<impl IntoIterator<Item = &str> + Send>,
     ) where
-        I: IntoIterator<Item = S> + Send,
-        S: AsRef<std::ffi::OsStr>,
+        CmdIt: IntoIterator<Item = CmdItem> + Send,
+        CmdItem: AsRef<std::ffi::OsStr> + Send,
     {
         assert_execute_command_result(
             &self.execute(cmd).await.failure(),
@@ -384,16 +409,16 @@ impl KamuCliPuppetExt for KamuCliPuppet {
         );
     }
 
-    async fn assert_failure_command_execution_with_input<I, S, T>(
+    async fn assert_failure_command_execution_with_input<CmdIt, CmdItem, InputIt>(
         &self,
-        cmd: I,
-        input: T,
+        cmd: CmdIt,
+        input: InputIt,
         maybe_expected_stdout: Option<&str>,
         maybe_expected_stderr: Option<impl IntoIterator<Item = &str> + Send>,
     ) where
-        I: IntoIterator<Item = S> + Send,
-        S: AsRef<std::ffi::OsStr>,
-        T: Into<Vec<u8>> + Send,
+        CmdIt: IntoIterator<Item = CmdItem> + Send,
+        CmdItem: AsRef<std::ffi::OsStr> + Send,
+        InputIt: Into<Vec<u8>> + Send,
     {
         assert_execute_command_result(
             &self.execute_with_input(cmd, input).await.failure(),
@@ -447,9 +472,18 @@ pub struct BlockRecord {
 #[serde(rename_all = "PascalCase", deny_unknown_fields)]
 pub struct RepoRecord {
     pub name: odf::RepoName,
-    pub url: url::Url,
+    pub url: Url,
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, bon::Builder, Default)]
+pub struct AddDatasetOptions {
+    visibility: Option<odf::DatasetVisibility>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Helpers
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 fn assert_execute_command_result<'a>(
@@ -466,10 +500,12 @@ fn assert_execute_command_result<'a>(
     if let Some(expected_stderr_items) = maybe_expected_stderr {
         let stderr = std::str::from_utf8(&command_result.get_output().stderr).unwrap();
 
-        for expected_stderr_item in expected_stderr_items {
+        for expected_stderr_item_re in expected_stderr_items {
+            let re = Regex::new(expected_stderr_item_re).unwrap();
+
             assert!(
-                stderr.contains(expected_stderr_item),
-                "Expected output:\n{expected_stderr_item}\nUnexpected output:\n{stderr}",
+                re.is_match(stderr),
+                "Expected found regex match:\n'{re}'\nUnexpected output:\n{stderr}",
             );
         }
     }

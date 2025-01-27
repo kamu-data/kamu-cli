@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::ffi::OsStr;
+
 use kamu_cli_e2e_common::{
     DATASET_DERIVATIVE_LEADERBOARD_NAME,
     DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR,
@@ -134,7 +136,7 @@ async fn test_pull_env_var_template_default_value(kamu: KamuCliPuppet) {
         Some([indoc::indoc!(
             r#"
             Added: test.pull-from-file
-            Added 1 dataset(s)
+            Added 1 dataset\(s\)
             "#
         )]),
     )
@@ -145,13 +147,12 @@ async fn test_pull_env_var_template_default_value(kamu: KamuCliPuppet) {
 
     kamu.assert_success_command_execution_with_env(
         ["pull", "test.pull-from-file"],
-        vec![("workspace_dir".as_ref(), kamu.workspace_path().as_os_str())],
+        vec![(
+            OsStr::new("workspace_dir"),
+            kamu.workspace_path().as_os_str(),
+        )],
         None,
-        Some([indoc::indoc!(
-            r#"
-                1 dataset(s) updated
-            "#
-        )]),
+        Some([r#"1 dataset\(s\) updated"#]),
     )
     .await;
 }
@@ -166,7 +167,7 @@ async fn test_pull_env_var_template_default_value_missing_values(kamu: KamuCliPu
         Some([indoc::indoc!(
             r#"
             Added: test.pull-from-file
-            Added 1 dataset(s)
+            Added 1 dataset\(s\)
             "#
         )]),
     )
@@ -178,11 +179,9 @@ async fn test_pull_env_var_template_default_value_missing_values(kamu: KamuCliPu
     kamu.assert_failure_command_execution(
         ["pull", "test.pull-from-file"],
         None,
-        Some([indoc::indoc!(
-            r#"
-                Failed to pull test.pull-from-file: Missing values for variable(s): 'env.data_dir || env.workspace_dir'
-            "#
-        )]),
+        Some([
+            r#"Failed to pull test.pull-from-file: Missing values for variable\(s\): 'env.data_dir \|\| env.workspace_dir'"#
+        ]),
     )
         .await;
 }
@@ -214,7 +213,7 @@ async fn test_pull_reset_derivative(kamu: KamuCliPuppet) {
     kamu.assert_success_command_execution(
         ["pull", dataset_derivative_alias.dataset_name.as_str()],
         None,
-        Some(["1 dataset(s) updated"]),
+        Some([r#"1 dataset\(s\) updated"#]),
     )
     .await;
 
@@ -265,7 +264,7 @@ async fn test_pull_reset_derivative(kamu: KamuCliPuppet) {
     kamu.assert_failure_command_execution(
         ["pull", dataset_derivative_alias.dataset_name.as_str()],
         None,
-        Some(["Failed to update 1 dataset(s)"]),
+        Some([r#"Failed to update 1 dataset\(s\)"#]),
     )
     .await;
 
@@ -283,7 +282,7 @@ async fn test_pull_reset_derivative(kamu: KamuCliPuppet) {
             "--reset-derivatives-on-diverged-input",
         ],
         None,
-        Some(["1 dataset(s) updated"]),
+        Some([r#"1 dataset\(s\) updated"#]),
     )
     .await;
 
@@ -343,7 +342,7 @@ async fn test_pull_derivative(kamu: KamuCliPuppet) {
     kamu.assert_success_command_execution(
         ["pull", dataset_derivative_name.as_str()],
         None,
-        Some(["1 dataset(s) updated"]),
+        Some([r#"1 dataset\(s\) updated"#]),
     )
     .await;
 

@@ -17,34 +17,37 @@ use kamu_cli_e2e_common::{
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_3,
     DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
 };
-use kamu_cli_puppet::extensions::KamuCliPuppetExt;
+use kamu_cli_puppet::extensions::{AddDatasetOptions, KamuCliPuppetExt};
 use kamu_cli_puppet::KamuCliPuppet;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_push_ingest_from_file_ledger(kamu: KamuCliPuppet) {
-    kamu.add_dataset(odf::DatasetSnapshot {
-        name: "population".try_into().unwrap(),
-        kind: odf::DatasetKind::Root,
-        metadata: vec![odf::metadata::AddPushSource {
-            source_name: odf::metadata::SourceState::DEFAULT_SOURCE_NAME.to_string(),
-            read: odf::metadata::ReadStepNdJson {
-                schema: Some(vec![
-                    "event_time TIMESTAMP".to_owned(),
-                    "city STRING".to_owned(),
-                    "population BIGINT".to_owned(),
-                ]),
-                ..Default::default()
+    kamu.add_dataset(
+        odf::DatasetSnapshot {
+            name: "population".try_into().unwrap(),
+            kind: odf::DatasetKind::Root,
+            metadata: vec![odf::metadata::AddPushSource {
+                source_name: odf::metadata::SourceState::DEFAULT_SOURCE_NAME.to_string(),
+                read: odf::metadata::ReadStepNdJson {
+                    schema: Some(vec![
+                        "event_time TIMESTAMP".to_owned(),
+                        "city STRING".to_owned(),
+                        "population BIGINT".to_owned(),
+                    ]),
+                    ..Default::default()
+                }
+                .into(),
+                preprocess: None,
+                merge: odf::metadata::MergeStrategyLedger {
+                    primary_key: vec!["event_time".to_owned(), "city".to_owned()],
+                }
+                .into(),
             }
-            .into(),
-            preprocess: None,
-            merge: odf::metadata::MergeStrategyLedger {
-                primary_key: vec!["event_time".to_owned(), "city".to_owned()],
-            }
-            .into(),
-        }
-        .into()],
-    })
+            .into()],
+        },
+        AddDatasetOptions::default(),
+    )
     .await;
 
     let data_path = kamu.workspace_path().join("data.csv");
@@ -102,28 +105,31 @@ pub async fn test_push_ingest_from_file_ledger(kamu: KamuCliPuppet) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_push_ingest_from_file_snapshot_with_event_time(kamu: KamuCliPuppet) {
-    kamu.add_dataset(odf::DatasetSnapshot {
-        name: "population".try_into().unwrap(),
-        kind: odf::DatasetKind::Root,
-        metadata: vec![odf::metadata::AddPushSource {
-            source_name: odf::metadata::SourceState::DEFAULT_SOURCE_NAME.to_string(),
-            read: odf::metadata::ReadStepNdJson {
-                schema: Some(vec![
-                    "city STRING".to_owned(),
-                    "population BIGINT".to_owned(),
-                ]),
-                ..Default::default()
+    kamu.add_dataset(
+        odf::DatasetSnapshot {
+            name: "population".try_into().unwrap(),
+            kind: odf::DatasetKind::Root,
+            metadata: vec![odf::metadata::AddPushSource {
+                source_name: odf::metadata::SourceState::DEFAULT_SOURCE_NAME.to_string(),
+                read: odf::metadata::ReadStepNdJson {
+                    schema: Some(vec![
+                        "city STRING".to_owned(),
+                        "population BIGINT".to_owned(),
+                    ]),
+                    ..Default::default()
+                }
+                .into(),
+                preprocess: None,
+                merge: odf::metadata::MergeStrategySnapshot {
+                    primary_key: vec!["city".to_owned()],
+                    compare_columns: None,
+                }
+                .into(),
             }
-            .into(),
-            preprocess: None,
-            merge: odf::metadata::MergeStrategySnapshot {
-                primary_key: vec!["city".to_owned()],
-                compare_columns: None,
-            }
-            .into(),
-        }
-        .into()],
-    })
+            .into()],
+        },
+        AddDatasetOptions::default(),
+    )
     .await;
 
     let data_path = kamu.workspace_path().join("data.csv");
@@ -396,7 +402,7 @@ async fn assert_ingest_data_to_player_scores_from_stdio<I, S, T>(
     expected_tail_table: &str,
 ) where
     I: IntoIterator<Item = S> + Send + Clone,
-    S: AsRef<std::ffi::OsStr>,
+    S: AsRef<std::ffi::OsStr> + Send,
     T: Into<Vec<u8>> + Send + Clone,
 {
     // Ingest

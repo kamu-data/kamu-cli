@@ -9,6 +9,8 @@
 
 mod id_factory;
 mod metadata_factory;
+mod shortcuts;
 
 pub use id_factory::*;
 pub use metadata_factory::*;
+pub use shortcuts::*;
