@@ -16,10 +16,10 @@ use kamu_core::{
     DatasetRegistry,
     EditDatasetUseCase,
     EditDatasetUseCaseError,
-    EditMultiResult,
+    EditMultiResponse,
     ViewDatasetUseCase,
     ViewDatasetUseCaseError,
-    ViewMultiResult,
+    ViewMultiResponse,
 };
 use odf::dataset::GetDatasetError;
 
@@ -80,8 +80,8 @@ impl ViewAndEditDatasetUseCasesImpl {
         &self,
         dataset_refs: Vec<odf::DatasetRef>,
         action: DatasetAction,
-    ) -> Result<ViewMultiResult, InternalError> {
-        let mut multi_result = ViewMultiResult {
+    ) -> Result<ViewMultiResponse, InternalError> {
+        let mut multi_result = ViewMultiResponse {
             viewable_resolved_refs: Vec::with_capacity(dataset_refs.len()),
             inaccessible_refs: vec![],
         };
@@ -135,7 +135,7 @@ impl ViewDatasetUseCase for ViewAndEditDatasetUseCasesImpl {
     async fn execute_multi(
         &self,
         dataset_refs: Vec<odf::DatasetRef>,
-    ) -> Result<ViewMultiResult, InternalError> {
+    ) -> Result<ViewMultiResponse, InternalError> {
         self.execute_multi_impl(dataset_refs, DatasetAction::Read)
             .await
     }
@@ -169,7 +169,7 @@ impl EditDatasetUseCase for ViewAndEditDatasetUseCasesImpl {
     async fn execute_multi(
         &self,
         dataset_refs: Vec<odf::DatasetRef>,
-    ) -> Result<EditMultiResult, InternalError> {
+    ) -> Result<EditMultiResponse, InternalError> {
         self.execute_multi_impl(dataset_refs, DatasetAction::Write)
             .await
     }

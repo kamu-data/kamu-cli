@@ -9,7 +9,7 @@
 
 use internal_error::InternalError;
 
-use crate::{ViewDatasetUseCaseError, ViewMultiResult};
+use crate::{ViewDatasetUseCaseError, ViewMultiResponse};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -24,12 +24,12 @@ pub trait EditDatasetUseCase: Send + Sync {
     async fn execute_multi(
         &self,
         dataset_refs: Vec<odf::DatasetRef>,
-    ) -> Result<EditMultiResult, InternalError>;
+    ) -> Result<EditMultiResponse, InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub type EditMultiResult = ViewMultiResult;
+pub type EditMultiResponse = ViewMultiResponse;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

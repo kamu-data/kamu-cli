@@ -26,18 +26,18 @@ pub trait ViewDatasetUseCase: Send + Sync {
     async fn execute_multi(
         &self,
         dataset_refs: Vec<odf::DatasetRef>,
-    ) -> Result<ViewMultiResult, InternalError>;
+    ) -> Result<ViewMultiResponse, InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug)]
-pub struct ViewMultiResult {
+pub struct ViewMultiResponse {
     pub viewable_resolved_refs: Vec<(odf::DatasetRef, odf::DatasetHandle)>,
     pub inaccessible_refs: Vec<(odf::DatasetRef, NotAccessibleError)>,
 }
 
-impl ViewMultiResult {
+impl ViewMultiResponse {
     pub fn into_inaccessible_input_datasets_message(self) -> String {
         use itertools::Itertools;
 
