@@ -11,8 +11,6 @@ use internal_error::InternalError;
 use odf::dataset::DatasetNotFoundError;
 use thiserror::Error;
 
-use crate::auth::DatasetActionUnauthorizedError;
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // TODO: Private Datasets: tests
@@ -34,7 +32,7 @@ pub trait ViewDatasetUseCase: Send + Sync {
 #[derive(Debug)]
 pub struct ViewMultiResponse {
     pub viewable_resolved_refs: Vec<(odf::DatasetRef, odf::DatasetHandle)>,
-    pub inaccessible_refs: Vec<(odf::DatasetRef, NotAccessibleError)>,
+    pub inaccessible_refs: Vec<(odf::DatasetRef, ViewDatasetUseCaseError)>,
 }
 
 impl ViewMultiResponse {
@@ -56,18 +54,16 @@ impl ViewMultiResponse {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
-pub enum NotAccessibleError {
+pub enum ViewDatasetUseCaseError {
     #[error(transparent)]
     NotFound(#[from] DatasetNotFoundError),
 
     #[error(transparent)]
-    Unauthorized(#[from] DatasetActionUnauthorizedError),
-}
-
-#[derive(Error, Debug)]
-pub enum ViewDatasetUseCaseError {
-    #[error(transparent)]
-    NotAccessible(#[from] NotAccessibleError),
+    Access(
+        #[from]
+        #[backtrace]
+        odf::AccessError,
+    ),
 
     #[error(transparent)]
     Internal(

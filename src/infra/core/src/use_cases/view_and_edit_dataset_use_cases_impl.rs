@@ -55,10 +55,8 @@ impl ViewAndEditDatasetUseCasesImpl {
             .await
         {
             Ok(handle) => Ok(handle),
-            Err(get_dataset_error) => match get_dataset_error {
-                GetDatasetError::NotFound(e) => {
-                    Err(ViewDatasetUseCaseError::NotAccessible(e.into()))
-                }
+            Err(e) => match e {
+                GetDatasetError::NotFound(e) => Err(ViewDatasetUseCaseError::NotFound(e)),
                 unexpected_error => Err(unexpected_error.int_err().into()),
             },
         }?;
@@ -67,9 +65,7 @@ impl ViewAndEditDatasetUseCasesImpl {
             .check_action_allowed(&handle.id, action)
             .await
             .map_err(|e| match e {
-                access_error @ DatasetActionUnauthorizedError::Access(_) => {
-                    ViewDatasetUseCaseError::NotAccessible(access_error.into())
-                }
+                DatasetActionUnauthorizedError::Access(e) => ViewDatasetUseCaseError::Access(e),
                 unexpected_error => ViewDatasetUseCaseError::Internal(unexpected_error.int_err()),
             })?;
 
@@ -94,12 +90,9 @@ impl ViewAndEditDatasetUseCasesImpl {
                         .viewable_resolved_refs
                         .push((dataset_ref, handle));
                 }
-                Err(e) => match e {
-                    ViewDatasetUseCaseError::NotAccessible(e) => {
-                        multi_result.inaccessible_refs.push((dataset_ref, e));
-                    }
-                    ViewDatasetUseCaseError::Internal(e) => return Err(e),
-                },
+                Err(e) => {
+                    multi_result.inaccessible_refs.push((dataset_ref, e));
+                }
             }
         }
 

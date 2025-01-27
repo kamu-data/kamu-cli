@@ -11,14 +11,12 @@ use std::sync::Arc;
 
 use dill::{component, interface};
 use internal_error::ErrorIntoInternal;
-use kamu_core::auth::DatasetActionUnauthorizedError;
 use kamu_core::{
     CommitDatasetEventUseCase,
     DatasetLifecycleMessage,
     DatasetRegistry,
     EditDatasetUseCase,
     EditDatasetUseCaseError,
-    NotAccessibleError,
     ViewDatasetUseCase,
     MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
 };
@@ -99,7 +97,13 @@ impl CommitDatasetEventUseCase for CommitDatasetEventUseCaseImpl {
         self.edit_dataset_use_case
             .execute(&dataset_handle.as_local_ref())
             .await
-            .map_err(map_edit_use_case_error)?;
+            .map_err(|e| {
+                use odf::dataset::CommitError;
+                match e {
+                    EditDatasetUseCaseError::Access(e) => CommitError::Access(e),
+                    unexpected_error => CommitError::Internal(unexpected_error.int_err()),
+                }
+            })?;
 
         let event = self.validate_event(event).await?;
 
@@ -120,25 +124,6 @@ impl CommitDatasetEventUseCase for CommitDatasetEventUseCaseImpl {
         }
 
         Ok(commit_result)
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Helpers
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-fn map_edit_use_case_error(e: EditDatasetUseCaseError) -> odf::dataset::CommitError {
-    use odf::dataset::CommitError;
-
-    match e {
-        EditDatasetUseCaseError::NotAccessible(e) => match e {
-            NotAccessibleError::Unauthorized(e) => match e {
-                DatasetActionUnauthorizedError::Access(e) => CommitError::Access(e),
-                unexpected_error => CommitError::Internal(unexpected_error.int_err()),
-            },
-            unexpected_error => CommitError::Internal(unexpected_error.int_err()),
-        },
-        unexpected_error => CommitError::Internal(unexpected_error.int_err()),
     }
 }
 

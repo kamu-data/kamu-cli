@@ -36,7 +36,9 @@ impl Datasets {
         let handle = match view_dataset_use_case.execute(dataset_ref).await {
             Ok(handle) => Ok(handle),
             Err(e) => match e {
-                ViewDatasetUseCaseError::NotAccessible(_) => return Ok(None),
+                ViewDatasetUseCaseError::NotFound(_) | ViewDatasetUseCaseError::Access(_) => {
+                    return Ok(None)
+                }
                 unexpected_error => Err(unexpected_error.int_err()),
             },
         }?;

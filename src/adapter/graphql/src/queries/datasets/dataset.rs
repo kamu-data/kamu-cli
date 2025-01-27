@@ -54,7 +54,7 @@ impl Dataset {
         let handle = match view_dataset_use_case.execute(dataset_ref).await {
             Ok(handle) => Ok(handle),
             Err(e) => match e {
-                ViewDatasetUseCaseError::NotAccessible(_) => {
+                ViewDatasetUseCaseError::Access(_) => {
                     return Ok(TransformInputDataset::not_accessible(dataset_ref.clone()))
                 }
                 unexpected_error => Err(unexpected_error.int_err()),

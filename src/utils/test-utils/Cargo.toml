@@ -23,7 +23,6 @@ doctest = false
 
 [dependencies]
 container-runtime = { workspace = true }
-odf = { workspace = true, default-features = false }
 
 axum = "0.7"
 rand = "0.8"
