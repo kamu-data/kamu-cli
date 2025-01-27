@@ -11,7 +11,7 @@ use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
 use kamu::testing::MockDatasetActionAuthorizer;
-use kamu::{CommitDatasetEventUseCaseImpl, ViewAndEditDatasetUseCasesImpl};
+use kamu::CommitDatasetEventUseCaseImpl;
 use kamu_core::{CommitDatasetEventUseCase, MockDidGenerator};
 use messaging_outbox::MockOutbox;
 use odf::metadata::testing::MetadataFactory;
@@ -144,7 +144,6 @@ impl CommitDatasetEventUseCaseHarness {
 
         let catalog = dill::CatalogBuilder::new_chained(base_harness.catalog())
             .add::<CommitDatasetEventUseCaseImpl>()
-            .add::<ViewAndEditDatasetUseCasesImpl>()
             .build();
 
         let use_case = catalog.get_one::<dyn CommitDatasetEventUseCase>().unwrap();

@@ -8,8 +8,8 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::InternalError;
-
-use crate::{ViewDatasetUseCaseError, ViewMultiResponse};
+use odf::dataset::DatasetNotFoundError;
+use thiserror::Error;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -29,10 +29,32 @@ pub trait EditDatasetUseCase: Send + Sync {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub type EditMultiResponse = ViewMultiResponse;
+#[derive(Debug)]
+pub struct EditMultiResponse {
+    pub viewable_resolved_refs: Vec<(odf::DatasetRef, odf::DatasetHandle)>,
+    pub inaccessible_refs: Vec<(odf::DatasetRef, EditDatasetUseCaseError)>,
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub type EditDatasetUseCaseError = ViewDatasetUseCaseError;
+#[derive(Error, Debug)]
+pub enum EditDatasetUseCaseError {
+    #[error(transparent)]
+    NotFound(#[from] DatasetNotFoundError),
+
+    #[error(transparent)]
+    Access(
+        #[from]
+        #[backtrace]
+        odf::AccessError,
+    ),
+
+    #[error(transparent)]
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

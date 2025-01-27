@@ -20,7 +20,7 @@ use kamu::{
     DatasetStorageUnitLocalFs,
     DatasetStorageUnitWriter,
     MetadataQueryServiceImpl,
-    ViewAndEditDatasetUseCasesImpl,
+    ViewDatasetUseCaseImpl,
 };
 use kamu_accounts::{JwtAuthenticationConfig, DEFAULT_ACCOUNT_NAME, DEFAULT_ACCOUNT_NAME_STR};
 use kamu_accounts_inmem::InMemoryAccessTokenRepository;
@@ -649,7 +649,7 @@ impl FlowTriggerHarness {
             .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
             .add::<MetadataQueryServiceImpl>()
             .add::<CreateDatasetFromSnapshotUseCaseImpl>()
-            .add::<ViewAndEditDatasetUseCasesImpl>()
+            .add::<ViewDatasetUseCaseImpl>()
             .add_value(dataset_changes_mock)
             .bind::<dyn DatasetChangesService, MockDatasetChangesService>()
             .add::<SystemTimeSourceDefault>()

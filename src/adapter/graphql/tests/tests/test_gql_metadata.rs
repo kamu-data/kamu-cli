@@ -42,7 +42,7 @@ async fn test_current_push_sources() {
             .add::<DatasetRegistrySoloUnitBridge>()
             .add::<MetadataQueryServiceImpl>()
             .add::<CreateDatasetFromSnapshotUseCaseImpl>()
-            .add::<ViewAndEditDatasetUseCasesImpl>()
+            .add::<ViewDatasetUseCaseImpl>()
             .add::<SystemTimeSourceDefault>()
             .add::<EngineProvisionerNull>()
             .add::<ObjectStoreRegistryImpl>()

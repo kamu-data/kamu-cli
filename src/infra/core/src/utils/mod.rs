@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+pub(crate) mod access_dataset_helper;
 pub mod cached_object;
 pub mod datasets_filtering;
 pub mod docker_images;

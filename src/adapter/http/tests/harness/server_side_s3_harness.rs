@@ -34,10 +34,11 @@ use kamu::{
     DatasetRegistrySoloUnitBridge,
     DatasetStorageUnitS3,
     DatasetStorageUnitWriter,
+    EditDatasetUseCaseImpl,
     ObjectStoreBuilderLocalFs,
     ObjectStoreBuilderS3,
     ObjectStoreRegistryImpl,
-    ViewAndEditDatasetUseCasesImpl,
+    ViewDatasetUseCaseImpl,
 };
 use kamu_accounts::testing::MockAuthenticationService;
 use kamu_accounts::{Account, AuthenticationService};
@@ -120,7 +121,8 @@ impl ServerSideS3Harness {
                 .add::<CreateDatasetUseCaseImpl>()
                 .add::<CreateDatasetFromSnapshotUseCaseImpl>()
                 .add::<CommitDatasetEventUseCaseImpl>()
-                .add::<ViewAndEditDatasetUseCasesImpl>();
+                .add::<ViewDatasetUseCaseImpl>()
+                .add::<EditDatasetUseCaseImpl>();
 
             database_common::NoOpDatabasePlugin::init_database_components(&mut b);
 

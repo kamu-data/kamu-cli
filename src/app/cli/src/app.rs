@@ -461,6 +461,7 @@ pub fn configure_base_catalog(
     b.add::<CreateDatasetFromSnapshotUseCaseImpl>();
     b.add::<CreateDatasetUseCaseImpl>();
     b.add::<DeleteDatasetUseCaseImpl>();
+    b.add::<EditDatasetUseCaseImpl>();
     b.add::<GetDatasetDownstreamDependenciesUseCaseImpl>();
     b.add::<GetDatasetUpstreamDependenciesUseCaseImpl>();
     b.add::<PullDatasetUseCaseImpl>();
@@ -469,7 +470,7 @@ pub fn configure_base_catalog(
     b.add::<ResetDatasetUseCaseImpl>();
     b.add::<SetWatermarkUseCaseImpl>();
     b.add::<VerifyDatasetUseCaseImpl>();
-    b.add::<ViewAndEditDatasetUseCasesImpl>();
+    b.add::<ViewDatasetUseCaseImpl>();
 
     b.add::<kamu_accounts_services::LoginPasswordAuthProvider>();
 

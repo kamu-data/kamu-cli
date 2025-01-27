@@ -814,7 +814,7 @@ impl GraphQLDatasetsHarness {
                 .add::<CreateDatasetFromSnapshotUseCaseImpl>()
                 .add::<RenameDatasetUseCaseImpl>()
                 .add::<DeleteDatasetUseCaseImpl>()
-                .add::<ViewAndEditDatasetUseCasesImpl>()
+                .add::<ViewDatasetUseCaseImpl>()
                 .add::<DependencyGraphServiceImpl>()
                 .add::<InMemoryDatasetDependencyRepository>()
                 .add_value(tenancy_config)
