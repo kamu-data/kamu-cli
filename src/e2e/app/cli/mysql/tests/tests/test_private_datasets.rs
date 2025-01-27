@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use kamu_cli_e2e_common::prelude::*;
+use kamu_cli_e2e_repo_tests::private_datasets::PRIVATE_DATESET_WORKSPACE_KAMU_CONFIG;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -20,19 +21,7 @@ kamu_cli_run_api_server_e2e_test!(
     options = Options::default()
         .with_multi_tenant()
         .with_today_as_frozen_system_time()
-        .with_kamu_config(indoc::indoc!(
-            r#"
-            kind: CLIConfig
-            version: 1
-            content:
-              users:
-                predefined:
-                  - accountName: admin
-                    isAdmin: true
-                  - accountName: alice
-                  - accountName: bob
-            "#
-        )),
+        .with_kamu_config(PRIVATE_DATESET_WORKSPACE_KAMU_CONFIG),
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -46,19 +35,7 @@ kamu_cli_run_api_server_e2e_test!(
     options = Options::default()
         .with_multi_tenant()
         .with_today_as_frozen_system_time()
-        .with_kamu_config(indoc::indoc!(
-            r#"
-            kind: CLIConfig
-            version: 1
-            content:
-              users:
-                predefined:
-                  - accountName: admin
-                    isAdmin: true
-                  - accountName: alice
-                  - accountName: bob
-            "#
-        )),
+        .with_kamu_config(PRIVATE_DATESET_WORKSPACE_KAMU_CONFIG),
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -72,19 +49,7 @@ kamu_cli_run_api_server_e2e_test!(
     options = Options::default()
         .with_multi_tenant()
         .with_today_as_frozen_system_time()
-        .with_kamu_config(indoc::indoc!(
-            r#"
-            kind: CLIConfig
-            version: 1
-            content:
-              users:
-                predefined:
-                  - accountName: admin
-                    isAdmin: true
-                  - accountName: alice
-                  - accountName: bob
-            "#
-        )),
+        .with_kamu_config(PRIVATE_DATESET_WORKSPACE_KAMU_CONFIG),
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -98,19 +63,7 @@ kamu_cli_run_api_server_e2e_test!(
     options = Options::default()
         .with_multi_tenant()
         .with_today_as_frozen_system_time()
-        .with_kamu_config(indoc::indoc!(
-            r#"
-            kind: CLIConfig
-            version: 1
-            content:
-              users:
-                predefined:
-                  - accountName: admin
-                    isAdmin: true
-                  - accountName: alice
-                  - accountName: bob
-            "#
-        )),
+        .with_kamu_config(PRIVATE_DATESET_WORKSPACE_KAMU_CONFIG),
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -124,19 +77,7 @@ kamu_cli_run_api_server_e2e_test!(
     options = Options::default()
         .with_multi_tenant()
         .with_today_as_frozen_system_time()
-        .with_kamu_config(indoc::indoc!(
-            r#"
-            kind: CLIConfig
-            version: 1
-            content:
-              users:
-                predefined:
-                  - accountName: admin
-                    isAdmin: true
-                  - accountName: alice
-                  - accountName: bob
-            "#
-        )),
+        .with_kamu_config(PRIVATE_DATESET_WORKSPACE_KAMU_CONFIG),
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -150,19 +91,7 @@ kamu_cli_run_api_server_e2e_test!(
     options = Options::default()
         .with_multi_tenant()
         .with_today_as_frozen_system_time()
-        .with_kamu_config(indoc::indoc!(
-            r#"
-            kind: CLIConfig
-            version: 1
-            content:
-              users:
-                predefined:
-                  - accountName: admin
-                    isAdmin: true
-                  - accountName: alice
-                  - accountName: bob
-            "#
-        )),
+        .with_kamu_config(PRIVATE_DATESET_WORKSPACE_KAMU_CONFIG),
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -176,19 +105,7 @@ kamu_cli_run_api_server_e2e_test!(
     options = Options::default()
         .with_multi_tenant()
         .with_today_as_frozen_system_time()
-        .with_kamu_config(indoc::indoc!(
-            r#"
-            kind: CLIConfig
-            version: 1
-            content:
-              users:
-                predefined:
-                  - accountName: admin
-                    isAdmin: true
-                  - accountName: alice
-                  - accountName: bob
-            "#
-        )),
+        .with_kamu_config(PRIVATE_DATESET_WORKSPACE_KAMU_CONFIG),
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -202,19 +119,7 @@ kamu_cli_run_api_server_e2e_test!(
     options = Options::default()
         .with_multi_tenant()
         .with_today_as_frozen_system_time()
-        .with_kamu_config(indoc::indoc!(
-            r#"
-            kind: CLIConfig
-            version: 1
-            content:
-              users:
-                predefined:
-                  - accountName: admin
-                    isAdmin: true
-                  - accountName: alice
-                  - accountName: bob
-            "#
-        )),
+        .with_kamu_config(PRIVATE_DATESET_WORKSPACE_KAMU_CONFIG),
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -228,19 +133,7 @@ kamu_cli_execute_command_e2e_test!(
     options = Options::default()
         .with_multi_tenant()
         .with_today_as_frozen_system_time()
-        .with_kamu_config(indoc::indoc!(
-            r#"
-            kind: CLIConfig
-            version: 1
-            content:
-              users:
-                predefined:
-                  - accountName: admin
-                    isAdmin: true
-                  - accountName: alice
-                  - accountName: bob
-            "#
-        )),
+        .with_kamu_config(PRIVATE_DATESET_WORKSPACE_KAMU_CONFIG),
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

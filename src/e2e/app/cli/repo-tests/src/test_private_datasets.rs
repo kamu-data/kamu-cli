@@ -30,6 +30,22 @@ use odf::metadata::testing::MetadataFactory;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub const PRIVATE_DATESET_WORKSPACE_KAMU_CONFIG: &str = indoc::indoc!(
+    r#"
+    kind: CLIConfig
+    version: 1
+    content:
+      users:
+        predefined:
+          - accountName: admin
+            isAdmin: true
+          - accountName: alice
+          - accountName: bob
+    "#
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub async fn test_only_the_dataset_owner_or_admin_can_change_its_visibility(
     kamu_api_server_client: KamuApiServerClient,
 ) {
