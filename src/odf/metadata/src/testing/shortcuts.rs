@@ -7,12 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use crate::{AccountName, DatasetAlias, DatasetName};
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn alias(account: &str, dataset_name: &str) -> odf::DatasetAlias {
-    odf::DatasetAlias::new(
-        Some(odf::AccountName::new_unchecked(account)),
-        odf::DatasetName::new_unchecked(dataset_name),
+pub fn alias(account: &str, dataset_name: &str) -> DatasetAlias {
+    DatasetAlias::new(
+        Some(AccountName::new_unchecked(account)),
+        DatasetName::new_unchecked(dataset_name),
     )
 }
 
