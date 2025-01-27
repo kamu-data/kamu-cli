@@ -17,7 +17,6 @@ use internal_error::*;
 use kamu_core::*;
 
 use super::query_types;
-use crate::axum_utils::check_dataset_read_access;
 use crate::DatasetAliasInPath;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -156,8 +155,6 @@ pub async fn dataset_metadata_handler(
         .get_dataset_by_ref(&dataset_ref)
         .await
         .api_err()?;
-
-    check_dataset_read_access(&catalog, resolved_dataset.get_handle()).await?;
 
     let mut attachments_visitor = params
         .include

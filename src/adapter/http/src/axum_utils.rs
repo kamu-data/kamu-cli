@@ -7,18 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Errors
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 use dill::Catalog;
-use http_common::{ApiError, IntoApiError, ResultIntoApiError};
-use internal_error::ResultIntoInternal;
+use http_common::{ApiError, IntoApiError};
 use kamu_accounts::{AnonymousAccountReason, CurrentAccountSubject};
-use kamu_core::auth;
-use kamu_core::auth::DatasetActionAuthorizerExt;
 use thiserror::Error;
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Errors
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) fn bad_request_response() -> axum::response::Response {
@@ -76,6 +71,18 @@ pub(crate) fn body_into_async_read(body: axum::body::Body) -> impl tokio::io::As
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub(crate) fn get_dataset_action_for_request(
+    request: &http::Request<axum::body::Body>,
+) -> kamu_core::auth::DatasetAction {
+    if !request.method().is_safe() || request.uri().path() == "/push" {
+        kamu_core::auth::DatasetAction::Write
+    } else {
+        kamu_core::auth::DatasetAction::Read
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Debug, Error)]
 #[error("{reason}")]
 pub struct AnonymousAccessError {
@@ -108,46 +115,6 @@ pub(crate) fn ensure_authenticated_account(
                 reason: "No authentication token provided",
             },
         }),
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub(crate) async fn check_dataset_read_access(
-    catalog: &Catalog,
-    dataset_handle: &odf::DatasetHandle,
-) -> Result<(), ApiError> {
-    check_dataset_access(catalog, dataset_handle, auth::DatasetAction::Read).await
-}
-
-#[expect(dead_code)]
-pub(crate) async fn check_dataset_write_access(
-    catalog: &Catalog,
-    dataset_handle: &odf::DatasetHandle,
-) -> Result<(), ApiError> {
-    check_dataset_access(catalog, dataset_handle, auth::DatasetAction::Write).await
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-async fn check_dataset_access(
-    catalog: &Catalog,
-    dataset_handle: &odf::DatasetHandle,
-    action: auth::DatasetAction,
-) -> Result<(), ApiError> {
-    let dataset_action_authorizer = catalog
-        .get_one::<dyn auth::DatasetActionAuthorizer>()
-        .int_err()
-        .api_err()?;
-
-    let accessible = dataset_action_authorizer
-        .is_action_allowed(&dataset_handle.id, action)
-        .await?;
-
-    if accessible {
-        Ok(())
-    } else {
-        Err(ApiError::not_found_without_reason())
     }
 }
 

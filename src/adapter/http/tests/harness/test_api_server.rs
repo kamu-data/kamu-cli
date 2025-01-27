@@ -10,6 +10,7 @@
 use std::net::SocketAddr;
 
 use dill::Catalog;
+use kamu_adapter_http::DatasetAuthorizationLayer;
 use kamu_core::TenancyConfig;
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
@@ -47,7 +48,8 @@ impl TestAPIServer {
                 kamu_adapter_http::add_dataset_resolver_layer(
                     OpenApiRouter::new()
                         .merge(kamu_adapter_http::smart_transfer_protocol_router())
-                        .merge(kamu_adapter_http::data::dataset_router()),
+                        .merge(kamu_adapter_http::data::dataset_router())
+                        .layer(DatasetAuthorizationLayer::default()),
                     tenancy_config,
                 ),
             )

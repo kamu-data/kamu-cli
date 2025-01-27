@@ -22,7 +22,7 @@ use indoc::indoc;
 use internal_error::*;
 use kamu::domain::{Protocols, ServerUrlConfig, TenancyConfig};
 use kamu_adapter_http::e2e::e2e_router;
-use kamu_adapter_http::FileUploadLimitConfig;
+use kamu_adapter_http::{DatasetAuthorizationLayer, FileUploadLimitConfig};
 use kamu_flow_system_inmem::domain::FlowAgent;
 use kamu_task_system_inmem::domain::TaskAgent;
 use messaging_outbox::OutboxAgent;
@@ -167,9 +167,10 @@ impl APIServer {
             kamu_adapter_http::add_dataset_resolver_layer(
                 OpenApiRouter::new()
                     .merge(kamu_adapter_http::smart_transfer_protocol_router())
-                    .merge(kamu_adapter_http::data::dataset_router()),
+                    .merge(kamu_adapter_http::data::dataset_router())
+                    .layer(DatasetAuthorizationLayer::default()),
                 tenancy_config,
-            ),
+            )
         );
 
         let is_e2e_testing = e2e_output_data_path.is_some();

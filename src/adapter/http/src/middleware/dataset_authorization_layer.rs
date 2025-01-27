@@ -53,6 +53,16 @@ where
     }
 }
 
+impl Default
+    for DatasetAuthorizationLayer<
+        for<'a> fn(&'a http::Request<Body>) -> kamu_core::auth::DatasetAction,
+    >
+{
+    fn default() -> Self {
+        Self::new(get_dataset_action_for_request)
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone)]
