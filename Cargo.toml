@@ -6,6 +6,7 @@ members = [
     "src/utils/database-common",
     "src/utils/database-common-macros",
     "src/utils/datafusion-cli",
+    "src/utils/email-utils",
     "src/utils/enum-variants",
     "src/utils/event-sourcing",
     "src/utils/event-sourcing-macros",
@@ -111,6 +112,7 @@ async-utils = { version = "0.220.0", path = "src/utils/async-utils", default-fea
 container-runtime = { version = "0.220.0", path = "src/utils/container-runtime", default-features = false }
 database-common = { version = "0.220.0", path = "src/utils/database-common", default-features = false }
 database-common-macros = { version = "0.220.0", path = "src/utils/database-common-macros", default-features = false }
+email-utils = { version = "0.220.0", path = "src/utils/email-utils", default-features = false }
 enum-variants = { version = "0.220.0", path = "src/utils/enum-variants", default-features = false }
 event-sourcing = { version = "0.220.0", path = "src/utils/event-sourcing", default-features = false }
 event-sourcing-macros = { version = "0.220.0", path = "src/utils/event-sourcing-macros", default-features = false }

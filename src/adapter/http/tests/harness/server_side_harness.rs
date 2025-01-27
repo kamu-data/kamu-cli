@@ -12,6 +12,7 @@
 use std::sync::Arc;
 
 use chrono::Utc;
+use email_utils::Email;
 use internal_error::InternalError;
 use kamu::domain::auth::{
     AlwaysHappyDatasetActionAuthorizer,
@@ -34,6 +35,7 @@ use time_source::SystemTimeSourceStub;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) const SERVER_ACCOUNT_NAME: &str = "kamu-server";
+pub(crate) const SERVER_ACCOUNT_EMAIL_ADDRESS: &str = "kamu-server@example.com";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -95,7 +97,7 @@ pub(crate) fn make_server_account() -> Account {
         account_name: odf::AccountName::new_unchecked(SERVER_ACCOUNT_NAME),
         account_type: AccountType::User,
         display_name: SERVER_ACCOUNT_NAME.to_string(),
-        email: None,
+        email: Email::parse(SERVER_ACCOUNT_EMAIL_ADDRESS).unwrap(),
         avatar_url: None,
         registered_at: Utc::now(),
         is_admin: false,

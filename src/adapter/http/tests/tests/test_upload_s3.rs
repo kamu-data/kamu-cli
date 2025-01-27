@@ -25,6 +25,7 @@ use kamu_accounts_services::{
 };
 use kamu_adapter_http::{FileUploadLimitConfig, UploadContext, UploadService, UploadServiceS3};
 use kamu_core::TenancyConfig;
+use messaging_outbox::DummyOutboxImpl;
 use s3_utils::S3Context;
 use serde_json::json;
 use test_utils::LocalS3Server;
@@ -69,7 +70,8 @@ impl Harness {
                     UploadServiceS3::builder().with_s3_upload_context(s3_upload_context.clone()),
                 )
                 .bind::<dyn UploadService, UploadServiceS3>()
-                .add::<PredefinedAccountsRegistrator>();
+                .add::<PredefinedAccountsRegistrator>()
+                .add::<DummyOutboxImpl>();
 
             NoOpDatabasePlugin::init_database_components(&mut b);
 

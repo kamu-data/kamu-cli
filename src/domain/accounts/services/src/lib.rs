@@ -12,14 +12,6 @@
 // Re-exports
 pub use kamu_accounts as domain;
 
-mod access_token_service_impl;
-mod account_service_impl;
-mod authentication_service_impl;
-mod login_password_auth_provider;
-mod predefined_accounts_registrator;
+mod services;
 
-pub use access_token_service_impl::*;
-pub use account_service_impl::*;
-pub use authentication_service_impl::*;
-pub use login_password_auth_provider::*;
-pub use predefined_accounts_registrator::*;
+pub use services::*;

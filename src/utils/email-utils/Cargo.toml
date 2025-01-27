@@ -1,0 +1,27 @@
+[package]
+name = "email-utils"
+description = "Utility about email validation"
+version = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+authors = { workspace = true }
+readme = { workspace = true }
+license-file = { workspace = true }
+keywords = { workspace = true }
+include = { workspace = true }
+edition = { workspace = true }
+publish = { workspace = true }
+
+
+[lints]
+workspace = true
+
+
+[lib]
+doctest = false
+
+
+[dependencies]
+serde = { version = "1", default-features = false }
+thiserror = { version = "2", default-features = false, features = ["std"] }
+validator = "0.20" 

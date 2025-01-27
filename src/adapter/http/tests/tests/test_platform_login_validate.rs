@@ -23,6 +23,7 @@ use kamu_accounts_services::{
 };
 use kamu_adapter_http::{LoginRequestBody, LoginResponseBody};
 use kamu_core::TenancyConfig;
+use messaging_outbox::DummyOutboxImpl;
 use serde_json::json;
 use time_source::{SystemTimeSource, SystemTimeSourceStub};
 
@@ -50,14 +51,14 @@ impl Harness {
 
         let mut predefined_accounts_config = PredefinedAccountsConfig::new();
         predefined_accounts_config.predefined.push(
-            AccountConfig::from_name(odf::AccountName::new_unchecked(USER_WASYA))
+            AccountConfig::test_config_from_name(odf::AccountName::new_unchecked(USER_WASYA))
                 .set_password(String::from(PASSWORD_WASYA)),
         );
         predefined_accounts_config
             .predefined
-            .push(AccountConfig::from_name(odf::AccountName::new_unchecked(
-                USER_PETYA,
-            )));
+            .push(AccountConfig::test_config_from_name(
+                odf::AccountName::new_unchecked(USER_PETYA),
+            ));
 
         let catalog = {
             let mut b = dill::CatalogBuilder::new();
@@ -72,7 +73,8 @@ impl Harness {
                 .add::<DatabaseTransactionRunner>()
                 .add::<AccessTokenServiceImpl>()
                 .add::<InMemoryAccessTokenRepository>()
-                .add::<PredefinedAccountsRegistrator>();
+                .add::<PredefinedAccountsRegistrator>()
+                .add::<DummyOutboxImpl>();
 
             NoOpDatabasePlugin::init_database_components(&mut b);
 

@@ -67,6 +67,26 @@ impl PredefinedAccountsRegistrator {
 
         Ok(())
     }
+
+    async fn compare_and_update_account(
+        &self,
+        account: Account,
+        account_config: &AccountConfig,
+    ) -> Result<(), InternalError> {
+        let updated_account = Account {
+            registered_at: account.registered_at,
+            ..account_config.into()
+        };
+
+        if account != updated_account {
+            self.account_repository
+                .update_account(updated_account)
+                .await
+                .int_err()?;
+        }
+
+        Ok(())
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -81,15 +101,15 @@ impl InitOnStartup for PredefinedAccountsRegistrator {
     async fn run_initialization(&self) -> Result<(), InternalError> {
         for account_config in &self.predefined_accounts_config.predefined {
             let account_id = account_config.get_id();
-            let is_unknown_account =
-                match self.account_repository.get_account_by_id(&account_id).await {
-                    Ok(_) => Ok(false),
-                    Err(GetAccountByIdError::NotFound(_)) => Ok(true),
-                    Err(GetAccountByIdError::Internal(e)) => Err(e),
-                }?;
-
-            if is_unknown_account {
-                self.register_unknown_account(account_config).await?;
+            match self.account_repository.get_account_by_id(&account_id).await {
+                Ok(account) => {
+                    self.compare_and_update_account(account, account_config)
+                        .await?;
+                }
+                Err(GetAccountByIdError::NotFound(_)) => {
+                    self.register_unknown_account(account_config).await?;
+                }
+                Err(GetAccountByIdError::Internal(e)) => return Err(e),
             }
         }
 

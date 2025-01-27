@@ -11,6 +11,17 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Unreleased]
+### Added
+- GQL suport to query and update email on the currently logged account
+- Account registration sends `AccountLifecycleEvent` to `Outbox`
+### Changed
+- Emails are mandatory for Kamu accounts now:
+   - predefined users need to specify an email in config
+   - predefined users are auto-synced at startup in case they existed before
+   - GitHub users are queried for primary verified email, even if it is not public
+   - migration code for the database existing users
+
 ## [0.220.0] - 2025-01-27
 ### Changed
 - Private Datasets:

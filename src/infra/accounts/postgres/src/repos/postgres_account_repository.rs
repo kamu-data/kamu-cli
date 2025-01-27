@@ -9,7 +9,9 @@
 
 use database_common::{PaginationOpts, TransactionRef, TransactionRefT};
 use dill::{component, interface};
+use email_utils::Email;
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
+use sqlx::error::DatabaseError;
 
 use crate::domain::*;
 
@@ -29,6 +31,26 @@ impl PostgresAccountRepository {
             transaction: transaction.into(),
         }
     }
+
+    fn convert_unique_constraint_violation(&self, e: &dyn DatabaseError) -> AccountErrorDuplicate {
+        let account_field: AccountDuplicateField = match e.constraint() {
+            Some("accounts_pkey") => AccountDuplicateField::Id,
+            Some("idx_accounts_email") => AccountDuplicateField::Email,
+            Some("idx_accounts_name") => AccountDuplicateField::Name,
+            Some("idx_accounts_provider_identity_key") => {
+                AccountDuplicateField::ProviderIdentityKey
+            }
+            _ => {
+                tracing::error!(
+                    error = ?e,
+                    error_msg = e.message(),
+                    "Unexpected Postgres error"
+                );
+                AccountDuplicateField::Id
+            }
+        };
+        AccountErrorDuplicate { account_field }
+    }
 }
 
 #[async_trait::async_trait]
@@ -45,7 +67,7 @@ impl AccountRepository for PostgresAccountRepository {
             "#,
             account.id.to_string(),
             account.account_name.to_ascii_lowercase(),
-            account.email.as_ref().map(|email| email.to_ascii_lowercase()),
+            account.email.as_ref().to_ascii_lowercase(),
             account.display_name,
             account.account_type as AccountType,
             account.avatar_url,
@@ -59,29 +81,107 @@ impl AccountRepository for PostgresAccountRepository {
         .map_err(|e: sqlx::Error| match e {
             sqlx::Error::Database(e) => {
                 if e.is_unique_violation() {
-                    let account_field = match e.constraint() {
-                        Some("accounts_pkey") => CreateAccountDuplicateField::Id,
-                        Some("idx_accounts_email") => CreateAccountDuplicateField::Email,
-                        Some("idx_accounts_name") => CreateAccountDuplicateField::Name,
-                        Some("idx_accounts_provider_identity_key") => CreateAccountDuplicateField::ProviderIdentityKey,
-                        _ => {
-                            tracing::error!(
-                                error = ?e,
-                                error_msg = e.message(),
-                                "Unexpected Postgres error"
-                            );
-                            CreateAccountDuplicateField::Id
-                        }
-                    };
-                    CreateAccountError::Duplicate(CreateAccountErrorDuplicate {
-                        account_field
-                    })
+                    CreateAccountError::Duplicate(self.convert_unique_constraint_violation(e.as_ref()))
                 } else {
                     CreateAccountError::Internal(e.int_err())
                 }
             }
             _ => CreateAccountError::Internal(e.int_err())
         })?;
+
+        Ok(())
+    }
+
+    async fn update_account(&self, updated_account: Account) -> Result<(), UpdateAccountError> {
+        let mut tr = self.transaction.lock().await;
+
+        let connection_mut = tr.connection_mut().await?;
+
+        let update_result = sqlx::query!(
+            r#"
+            UPDATE accounts SET
+                account_name = $2,
+                email = $3,
+                display_name = $4,
+                account_type = $5,
+                avatar_url = $6,
+                registered_at = $7,
+                is_admin = $8,
+                provider = $9,
+                provider_identity_key = $10
+            WHERE id = $1
+            "#,
+            updated_account.id.to_string(),
+            updated_account.account_name.to_ascii_lowercase(),
+            updated_account.email.as_ref().to_ascii_lowercase(),
+            updated_account.display_name,
+            updated_account.account_type as AccountType,
+            updated_account.avatar_url,
+            updated_account.registered_at,
+            updated_account.is_admin,
+            updated_account.provider.to_string(),
+            updated_account.provider_identity_key.to_string(),
+        )
+        .execute(connection_mut)
+        .await
+        .map_err(|e: sqlx::Error| match e {
+            sqlx::Error::Database(e) => {
+                if e.is_unique_violation() {
+                    UpdateAccountError::Duplicate(
+                        self.convert_unique_constraint_violation(e.as_ref()),
+                    )
+                } else {
+                    UpdateAccountError::Internal(e.int_err())
+                }
+            }
+            _ => UpdateAccountError::Internal(e.int_err()),
+        })?;
+
+        if update_result.rows_affected() == 0 {
+            return Err(UpdateAccountError::NotFound(AccountNotFoundByIdError {
+                account_id: updated_account.id.clone(),
+            }));
+        }
+
+        Ok(())
+    }
+
+    async fn update_account_email(
+        &self,
+        account_id: &odf::AccountID,
+        new_email: Email,
+    ) -> Result<(), UpdateAccountError> {
+        let mut tr = self.transaction.lock().await;
+
+        let connection_mut = tr.connection_mut().await?;
+
+        let update_result = sqlx::query!(
+            r#"
+            UPDATE accounts SET email = $1 WHERE id = $2
+            "#,
+            new_email.as_ref(),
+            account_id.to_string(),
+        )
+        .execute(connection_mut)
+        .await
+        .map_err(|e: sqlx::Error| match e {
+            sqlx::Error::Database(e) => {
+                if e.is_unique_violation() {
+                    UpdateAccountError::Duplicate(
+                        self.convert_unique_constraint_violation(e.as_ref()),
+                    )
+                } else {
+                    UpdateAccountError::Internal(e.int_err())
+                }
+            }
+            _ => UpdateAccountError::Internal(e.int_err()),
+        })?;
+
+        if update_result.rows_affected() == 0 {
+            return Err(UpdateAccountError::NotFound(AccountNotFoundByIdError {
+                account_id: account_id.clone(),
+            }));
+        }
 
         Ok(())
     }
@@ -145,7 +245,7 @@ impl AccountRepository for PostgresAccountRepository {
             SELECT
                 id as "id: _",
                 account_name,
-                email as "email?",
+                email,
                 display_name,
                 account_type as "account_type: AccountType",
                 avatar_url,
@@ -233,7 +333,7 @@ impl AccountRepository for PostgresAccountRepository {
 
     async fn find_account_id_by_email(
         &self,
-        email: &str,
+        email: &Email,
     ) -> Result<Option<odf::AccountID>, FindAccountIdByEmailError> {
         let mut tr = self.transaction.lock().await;
 
@@ -246,7 +346,7 @@ impl AccountRepository for PostgresAccountRepository {
               FROM accounts
               WHERE lower(email) = lower($1)
             "#,
-            email
+            email.as_ref()
         )
         .fetch_optional(connection_mut)
         .await

@@ -11,6 +11,7 @@ use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
 use chrono::{SubsecRound, Utc};
+use email_utils::Email;
 use kamu_accounts::{Account, AccountRepository, AccountType};
 use kamu_datasets::DatasetEntry;
 
@@ -25,7 +26,7 @@ pub(crate) async fn new_account_with_name(
     let account = Account {
         id,
         account_name: odf::AccountName::new_unchecked(account_name),
-        email: None,
+        email: Email::parse(format!("{account_name}@example.com").as_str()).unwrap(),
         display_name: String::new(),
         account_type: AccountType::User,
         avatar_url: None,

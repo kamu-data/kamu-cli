@@ -31,6 +31,7 @@ kamu_cli_run_api_server_e2e_test!(
                   users:
                     predefined:
                       - accountName: kamu
+                        email: kamu@example.com
                 "#
             )
         ),
@@ -57,6 +58,7 @@ kamu_cli_run_api_server_e2e_test!(
                   users:
                     predefined:
                       - accountName: kamu
+                        email: kamu@example.com
                 "#
             )
         ),

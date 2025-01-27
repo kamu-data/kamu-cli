@@ -10,7 +10,7 @@
 use internal_error::{BoxedError, InternalError};
 use thiserror::Error;
 
-use super::{InvalidCredentialsError, RejectedCredentialsError};
+use super::{InvalidCredentialsError, NoPrimaryEmailError, RejectedCredentialsError};
 use crate::{Account, FindAccountIdByProviderIdentityKeyError, ProviderLoginError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -87,6 +87,13 @@ pub enum LoginError {
         RejectedCredentialsError,
     ),
 
+    #[error(transparent)]
+    NoPrimaryEmail(
+        #[from]
+        #[backtrace]
+        NoPrimaryEmailError,
+    ),
+
     #[error("Credentials are already used by an existing account")]
     DuplicateCredentials,
 
@@ -109,6 +116,7 @@ impl From<ProviderLoginError> for LoginError {
         match value {
             ProviderLoginError::InvalidCredentials(e) => Self::InvalidCredentials(e),
             ProviderLoginError::RejectedCredentials(e) => Self::RejectedCredentials(e),
+            ProviderLoginError::NoPrimaryEmail(e) => Self::NoPrimaryEmail(e),
             ProviderLoginError::Internal(e) => Self::Internal(e),
         }
     }

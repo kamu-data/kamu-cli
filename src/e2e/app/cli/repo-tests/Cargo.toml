@@ -45,7 +45,7 @@ chrono = { version = "0.4", default-features = false }
 indoc = "2"
 paste = { version = "1", default-features = false }
 pretty_assertions = { version = "1" }
-reqwest = { version = "0.12", default-features = false, features = [] }
+reqwest = { version = "0.12", default-features = false }
 serde_json = { version = "1", default-features = false }
 tempfile = { version = "3" }
 url = { version = "2", default-features = false }

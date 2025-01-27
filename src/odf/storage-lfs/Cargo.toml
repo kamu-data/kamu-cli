@@ -33,12 +33,12 @@ bytes = { version = "1", default-features = false }
 digest = "0.10"
 
 sha3 = "0.10"
-tokio = { version = "1", default-features = false, features = [ "fs" ] }
+tokio = { version = "1", default-features = false, features = ["fs"] }
 tracing = "0.1"
 url = { version = "2", default-features = false }
 
 
 [dev-dependencies]
-odf-storage = { workspace = true, features = [ "testing" ] }
+odf-storage = { workspace = true, features = ["testing"] }
 
 tempfile = "3"

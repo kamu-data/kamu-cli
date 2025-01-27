@@ -239,7 +239,7 @@ impl AccessTokenRepository for SqliteAccessTokenRepository {
                     at.token_hash,
                     a.id as "id: _",
                     a.account_name,
-                    a.email as "email?",
+                    a.email,
                     a.display_name,
                     a.account_type as "account_type: AccountType",
                     registered_at as "registered_at: _",

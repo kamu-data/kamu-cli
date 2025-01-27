@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            SELECT\n                id as \"id: _\",\n                account_name,\n                email as \"email?\",\n                display_name,\n                account_type as \"account_type: AccountType\",\n                avatar_url,\n                registered_at,\n                is_admin,\n                provider,\n                provider_identity_key\n            FROM accounts\n            WHERE id = ANY($1)\n            ",
+  "query": "\n            SELECT\n                id as \"id: _\",\n                account_name,\n                email,\n                display_name,\n                account_type as \"account_type: AccountType\",\n                avatar_url,\n                registered_at,\n                is_admin,\n                provider,\n                provider_identity_key\n            FROM accounts\n            WHERE id = ANY($1)\n            ",
   "describe": {
     "columns": [
       {
@@ -15,7 +15,7 @@
       },
       {
         "ordinal": 2,
-        "name": "email?",
+        "name": "email",
         "type_info": "Varchar"
       },
       {
@@ -72,7 +72,7 @@
     "nullable": [
       false,
       false,
-      true,
+      false,
       false,
       false,
       true,
@@ -82,5 +82,5 @@
       false
     ]
   },
-  "hash": "fad5c88cb73b59634713c03f21de3b18ef3854336e5a2c2e0797ca5ed17cfacd"
+  "hash": "c441cb5ce9d52b150659059449990672e96b3323ff18721230e84aec8c3e40f6"
 }

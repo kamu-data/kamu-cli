@@ -7,10 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use email_utils::Email;
 use internal_error::InternalError;
 use thiserror::Error;
 
-use super::{InvalidCredentialsError, RejectedCredentialsError};
+use super::{InvalidCredentialsError, NoPrimaryEmailError, RejectedCredentialsError};
 use crate::{AccountDisplayName, AccountType};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -32,7 +33,7 @@ pub trait AuthenticationProvider: Sync + Send {
 #[derive(Debug)]
 pub struct ProviderLoginResponse {
     pub account_name: odf::AccountName,
-    pub email: Option<String>,
+    pub email: Email,
     pub display_name: AccountDisplayName,
     pub account_type: AccountType,
     pub avatar_url: Option<String>,
@@ -55,6 +56,13 @@ pub enum ProviderLoginError {
         #[from]
         #[backtrace]
         RejectedCredentialsError,
+    ),
+
+    #[error(transparent)]
+    NoPrimaryEmail(
+        #[from]
+        #[backtrace]
+        NoPrimaryEmailError,
     ),
 
     #[error(transparent)]

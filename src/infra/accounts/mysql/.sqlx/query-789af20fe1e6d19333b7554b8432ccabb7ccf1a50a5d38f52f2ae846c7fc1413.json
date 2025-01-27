@@ -1,6 +1,6 @@
 {
   "db_name": "MySQL",
-  "query": "\n                SELECT id            AS \"id: _\",\n                       account_name,\n                       email         AS \"email?\",\n                       display_name,\n                       account_type  AS \"account_type: AccountType\",\n                       avatar_url,\n                       registered_at AS \"registered_at: _\",\n                       is_admin      AS \"is_admin: _\",\n                       provider,\n                       provider_identity_key\n                FROM accounts\n                ORDER BY registered_at ASC\n                LIMIT ? OFFSET ?\n                ",
+  "query": "\n            SELECT\n                id as \"id: _\",\n                account_name,\n                email,\n                display_name,\n                account_type as \"account_type: AccountType\",\n                avatar_url,\n                registered_at,\n                is_admin as \"is_admin: _\",\n                provider,\n                provider_identity_key\n            FROM accounts\n            WHERE id = ?\n            ",
   "describe": {
     "columns": [
       {
@@ -23,10 +23,10 @@
       },
       {
         "ordinal": 2,
-        "name": "email?",
+        "name": "email",
         "type_info": {
           "type": "VarString",
-          "flags": "UNIQUE_KEY",
+          "flags": "NOT_NULL | UNIQUE_KEY | NO_DEFAULT_VALUE",
           "max_size": 1280
         }
       },
@@ -59,7 +59,7 @@
       },
       {
         "ordinal": 6,
-        "name": "registered_at: _",
+        "name": "registered_at",
         "type_info": {
           "type": "Timestamp",
           "flags": "NOT_NULL | UNSIGNED | BINARY | NO_DEFAULT_VALUE",
@@ -95,12 +95,12 @@
       }
     ],
     "parameters": {
-      "Right": 2
+      "Right": 1
     },
     "nullable": [
       false,
       false,
-      true,
+      false,
       false,
       false,
       true,
@@ -110,5 +110,5 @@
       false
     ]
   },
-  "hash": "e6ae81849ab0194ecdfa3e69720c0635e35b499be6a025b71513d51b41ee1fb8"
+  "hash": "789af20fe1e6d19333b7554b8432ccabb7ccf1a50a5d38f52f2ae846c7fc1413"
 }

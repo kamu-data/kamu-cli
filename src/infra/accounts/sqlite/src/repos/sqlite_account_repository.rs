@@ -9,7 +9,9 @@
 
 use database_common::{PaginationOpts, TransactionRef, TransactionRefT};
 use dill::{component, interface};
+use email_utils::Email;
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
+use sqlx::error::DatabaseError;
 use sqlx::Row;
 
 use crate::domain::*;
@@ -30,6 +32,29 @@ impl SqliteAccountRepository {
             transaction: transaction.into(),
         }
     }
+
+    fn convert_unique_constraint_violation(&self, e: &dyn DatabaseError) -> AccountErrorDuplicate {
+        let sqlite_error_message = e.message();
+
+        let account_field = if sqlite_error_message.contains("accounts.id") {
+            AccountDuplicateField::Id
+        } else if sqlite_error_message.contains("accounts.account_name") {
+            AccountDuplicateField::Name
+        } else if sqlite_error_message.contains("accounts.email") {
+            AccountDuplicateField::Email
+        } else if sqlite_error_message.contains("accounts.provider_identity_key") {
+            AccountDuplicateField::ProviderIdentityKey
+        } else {
+            tracing::error!(
+                error = ?e,
+                error_msg = sqlite_error_message,
+                "Unexpected SQLite error"
+            );
+            AccountDuplicateField::Id
+        };
+
+        AccountErrorDuplicate { account_field }
+    }
 }
 
 #[async_trait::async_trait]
@@ -44,10 +69,7 @@ impl AccountRepository for SqliteAccountRepository {
 
         let account_id = account.id.to_string();
         let account_name = account.account_name.to_ascii_lowercase();
-        let email = account
-            .email
-            .as_ref()
-            .map(|email| email.to_ascii_lowercase());
+        let email = account.email.as_ref().to_ascii_lowercase();
         let provider = account.provider.to_string();
         let provider_identity_key = account.provider_identity_key.to_string();
 
@@ -72,34 +94,119 @@ impl AccountRepository for SqliteAccountRepository {
         .map_err(|e: sqlx::Error| match e {
             sqlx::Error::Database(e) => {
                 if e.is_unique_violation() {
-                    let sqlite_error_message = e.message();
-
-                    let account_field = if sqlite_error_message.contains("accounts.id") {
-                        CreateAccountDuplicateField::Id
-                    } else if sqlite_error_message.contains("accounts.account_name") {
-                        CreateAccountDuplicateField::Name
-                    } else if sqlite_error_message.contains("accounts.email") {
-                        CreateAccountDuplicateField::Email
-                    } else if sqlite_error_message.contains("accounts.provider_identity_key") {
-                        CreateAccountDuplicateField::ProviderIdentityKey
-                    } else {
-                        tracing::error!(
-                            error = ?e,
-                            error_msg = sqlite_error_message,
-                            "Unexpected SQLite error"
-                        );
-                        CreateAccountDuplicateField::Id
-                    };
-
-                    CreateAccountError::Duplicate(CreateAccountErrorDuplicate {
-                        account_field
-                    })
+                    CreateAccountError::Duplicate(self.convert_unique_constraint_violation(e.as_ref()))
                 } else {
                     CreateAccountError::Internal(e.int_err())
                 }
             }
             _ => CreateAccountError::Internal(e.int_err())
         })?;
+
+        Ok(())
+    }
+
+    async fn update_account(&self, updated_account: Account) -> Result<(), UpdateAccountError> {
+        let mut tr = self.transaction.lock().await;
+
+        let connection_mut = tr
+            .connection_mut()
+            .await
+            .map_err(UpdateAccountError::Internal)?;
+
+        let account_id = updated_account.id.to_string();
+        let account_name = updated_account.account_name.to_ascii_lowercase();
+        let email = updated_account.email.as_ref().to_ascii_lowercase();
+        let provider = updated_account.provider.to_string();
+        let provider_identity_key = updated_account.provider_identity_key.to_string();
+
+        let update_result = sqlx::query!(
+            r#"
+            UPDATE accounts SET
+                account_name = $2,
+                email = $3,
+                display_name = $4,
+                account_type = $5,
+                avatar_url = $6,
+                registered_at = $7,
+                is_admin = $8,
+                provider = $9,
+                provider_identity_key = $10
+            WHERE id = $1
+            "#,
+            account_id,
+            account_name,
+            email,
+            updated_account.display_name,
+            updated_account.account_type,
+            updated_account.avatar_url,
+            updated_account.registered_at,
+            updated_account.is_admin,
+            provider,
+            provider_identity_key
+        )
+        .execute(connection_mut)
+        .await
+        .map_err(|e: sqlx::Error| match e {
+            sqlx::Error::Database(e) => {
+                if e.is_unique_violation() {
+                    UpdateAccountError::Duplicate(
+                        self.convert_unique_constraint_violation(e.as_ref()),
+                    )
+                } else {
+                    UpdateAccountError::Internal(e.int_err())
+                }
+            }
+            _ => UpdateAccountError::Internal(e.int_err()),
+        })?;
+
+        if update_result.rows_affected() == 0 {
+            return Err(UpdateAccountError::NotFound(AccountNotFoundByIdError {
+                account_id: updated_account.id.clone(),
+            }));
+        }
+
+        Ok(())
+    }
+
+    async fn update_account_email(
+        &self,
+        account_id: &odf::AccountID,
+        new_email: Email,
+    ) -> Result<(), UpdateAccountError> {
+        let mut tr = self.transaction.lock().await;
+
+        let connection_mut = tr.connection_mut().await?;
+
+        let new_email = new_email.as_ref().to_string();
+        let account_id_str = account_id.to_string();
+
+        let update_result = sqlx::query!(
+            r#"
+            UPDATE accounts SET email = $1 WHERE id = $2
+            "#,
+            new_email,
+            account_id_str,
+        )
+        .execute(connection_mut)
+        .await
+        .map_err(|e: sqlx::Error| match e {
+            sqlx::Error::Database(e) => {
+                if e.is_unique_violation() {
+                    UpdateAccountError::Duplicate(
+                        self.convert_unique_constraint_violation(e.as_ref()),
+                    )
+                } else {
+                    UpdateAccountError::Internal(e.int_err())
+                }
+            }
+            _ => UpdateAccountError::Internal(e.int_err()),
+        })?;
+
+        if update_result.rows_affected() == 0 {
+            return Err(UpdateAccountError::NotFound(AccountNotFoundByIdError {
+                account_id: account_id.clone(),
+            }));
+        }
 
         Ok(())
     }
@@ -205,7 +312,7 @@ impl AccountRepository for SqliteAccountRepository {
                 account_name: odf::AccountName::new_unchecked(
                     &account_row.get::<String, &str>("account_name"),
                 ),
-                email: account_row.get("email"),
+                email: Email::parse(account_row.get("email")).unwrap(),
                 display_name: account_row.get("display_name"),
                 account_type: account_row.get_unchecked("account_type"),
                 avatar_url: account_row.get("avatar_url"),
@@ -295,7 +402,7 @@ impl AccountRepository for SqliteAccountRepository {
 
     async fn find_account_id_by_email(
         &self,
-        email: &str,
+        email: &Email,
     ) -> Result<Option<odf::AccountID>, FindAccountIdByEmailError> {
         let mut tr = self.transaction.lock().await;
 
@@ -304,6 +411,8 @@ impl AccountRepository for SqliteAccountRepository {
             .await
             .map_err(FindAccountIdByEmailError::Internal)?;
 
+        let email_str = email.as_ref();
+
         use odf::AccountID;
         let maybe_account_row = sqlx::query!(
             r#"
@@ -311,7 +420,7 @@ impl AccountRepository for SqliteAccountRepository {
               FROM accounts
               WHERE lower(email) = lower($1)
             "#,
-            email
+            email_str,
         )
         .fetch_optional(connection_mut)
         .await

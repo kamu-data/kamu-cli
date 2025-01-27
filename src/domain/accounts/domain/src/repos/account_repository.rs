@@ -10,6 +10,7 @@
 use std::fmt::Display;
 
 use database_common::{EntityPageListing, EntityPageStream, EntityPageStreamer, PaginationOpts};
+use email_utils::Email;
 use internal_error::{InternalError, ResultIntoInternal};
 use thiserror::Error;
 
@@ -43,13 +44,21 @@ pub trait AccountRepository: Send + Sync {
 
     async fn find_account_id_by_email(
         &self,
-        email: &str,
+        email: &Email,
     ) -> Result<Option<odf::AccountID>, FindAccountIdByEmailError>;
 
     async fn find_account_id_by_name(
         &self,
         account_name: &odf::AccountName,
     ) -> Result<Option<odf::AccountID>, FindAccountIdByNameError>;
+
+    async fn update_account(&self, updated_account: Account) -> Result<(), UpdateAccountError>;
+
+    async fn update_account_email(
+        &self,
+        account_id: &odf::AccountID,
+        new_email: Email,
+    ) -> Result<(), UpdateAccountError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -113,27 +122,27 @@ pub enum AccountsCountError {
 #[derive(Error, Debug)]
 pub enum CreateAccountError {
     #[error(transparent)]
-    Duplicate(CreateAccountErrorDuplicate),
+    Duplicate(AccountErrorDuplicate),
 
     #[error(transparent)]
     Internal(#[from] InternalError),
 }
 
 #[derive(Error, Debug)]
-#[error("Account not created, duplicate {account_field}")]
-pub struct CreateAccountErrorDuplicate {
-    pub account_field: CreateAccountDuplicateField,
+#[error("Duplicate {account_field}")]
+pub struct AccountErrorDuplicate {
+    pub account_field: AccountDuplicateField,
 }
 
 #[derive(Debug, PartialEq, Eq)]
-pub enum CreateAccountDuplicateField {
+pub enum AccountDuplicateField {
     Id,
     Name,
     Email,
     ProviderIdentityKey,
 }
 
-impl Display for CreateAccountDuplicateField {
+impl Display for AccountDuplicateField {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -210,6 +219,20 @@ pub enum FindAccountIdByEmailError {
 
 #[derive(Error, Debug)]
 pub enum FindAccountIdByNameError {
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Error)]
+pub enum UpdateAccountError {
+    #[error(transparent)]
+    NotFound(AccountNotFoundByIdError),
+
+    #[error(transparent)]
+    Duplicate(AccountErrorDuplicate),
+
     #[error(transparent)]
     Internal(#[from] InternalError),
 }

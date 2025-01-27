@@ -17,6 +17,7 @@ use internal_error::*;
 use jsonwebtoken::errors::ErrorKind;
 use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
 use kamu_accounts::*;
+use messaging_outbox::{Outbox, OutboxExt};
 use time_source::SystemTimeSource;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -34,6 +35,7 @@ pub struct AuthenticationServiceImpl {
     authentication_providers_by_method: HashMap<&'static str, Arc<dyn AuthenticationProvider>>,
     account_repository: Arc<dyn AccountRepository>,
     access_token_svc: Arc<dyn AccessTokenService>,
+    outbox: Arc<dyn Outbox>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -48,6 +50,7 @@ impl AuthenticationServiceImpl {
         access_token_svc: Arc<dyn AccessTokenService>,
         time_source: Arc<dyn SystemTimeSource>,
         config: Arc<JwtAuthenticationConfig>,
+        outbox: Arc<dyn Outbox>,
     ) -> Self {
         let mut authentication_providers_by_method = HashMap::new();
 
@@ -70,6 +73,7 @@ impl AuthenticationServiceImpl {
             authentication_providers_by_method,
             account_repository,
             access_token_svc,
+            outbox,
         }
     }
 
@@ -164,6 +168,19 @@ impl AuthenticationServiceImpl {
                 }),
         }
     }
+
+    async fn notify_account_created(&self, new_account: &Account) -> Result<(), InternalError> {
+        self.outbox
+            .post_message(
+                MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERVICE,
+                AccountLifecycleMessage::created(
+                    new_account.id.clone(),
+                    new_account.email.clone(),
+                    new_account.display_name.clone(),
+                ),
+            )
+            .await
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -225,6 +242,10 @@ impl AuthenticationService for AuthenticationServiceImpl {
                         CreateAccountError::Duplicate(_) => LoginError::DuplicateCredentials,
                         CreateAccountError::Internal(e) => LoginError::Internal(e),
                     })?;
+
+                // Notify interested parties
+                self.notify_account_created(&new_account).await?;
+
                 new_account.id
             }
         };

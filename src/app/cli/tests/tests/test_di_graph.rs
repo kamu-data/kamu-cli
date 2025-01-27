@@ -88,12 +88,9 @@ fn test_di_server_graph_validates(tenancy_config: TenancyConfig) {
     kamu_cli::configure_in_memory_components(&mut base_catalog_builder);
     base_catalog_builder.add_value(OutputConfig::default());
 
-    kamu_cli::register_config_in_catalog(
-        &kamu_cli::config::CLIConfig::default(),
-        &mut base_catalog_builder,
-        tenancy_config,
-        false,
-    );
+    let config = kamu_cli::config::CLIConfig::default();
+
+    kamu_cli::register_config_in_catalog(&config, &mut base_catalog_builder, tenancy_config, false);
     let base_catalog = base_catalog_builder.build();
 
     let mut cli_catalog_builder = kamu_cli::configure_server_catalog(&base_catalog);

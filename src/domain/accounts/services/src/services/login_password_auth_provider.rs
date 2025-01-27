@@ -22,6 +22,7 @@ use crate::domain::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct LoginPasswordAuthProvider {
+    account_repository: Arc<dyn AccountRepository>,
     password_hash_repository: Arc<dyn PasswordHashRepository>,
 }
 
@@ -29,8 +30,12 @@ pub struct LoginPasswordAuthProvider {
 #[interface(dyn AuthenticationProvider)]
 impl LoginPasswordAuthProvider {
     #[allow(clippy::needless_pass_by_value)]
-    pub fn new(password_hash_repository: Arc<dyn PasswordHashRepository>) -> Self {
+    pub fn new(
+        account_repository: Arc<dyn AccountRepository>,
+        password_hash_repository: Arc<dyn PasswordHashRepository>,
+    ) -> Self {
         Self {
+            account_repository,
             password_hash_repository,
         }
     }
@@ -141,12 +146,19 @@ impl AuthenticationProvider for LoginPasswordAuthProvider {
         .await
         .int_err()??;
 
+        // Extract known account data
+        let account = self
+            .account_repository
+            .get_account_by_name(&account_name)
+            .await
+            .int_err()?;
+
         Ok(ProviderLoginResponse {
             account_name,
-            email: None,
+            email: account.email.clone(),
             display_name: password_login_credentials.login.clone(),
-            account_type: AccountType::User,
-            avatar_url: None,
+            account_type: account.account_type,
+            avatar_url: account.avatar_url.clone(),
             provider_identity_key: password_login_credentials.login.to_ascii_lowercase(),
         })
     }

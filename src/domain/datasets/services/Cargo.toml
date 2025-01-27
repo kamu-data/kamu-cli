@@ -29,7 +29,7 @@ kamu-accounts = { workspace = true }
 kamu-core = { workspace = true }
 kamu-datasets = { workspace = true }
 messaging-outbox = { workspace = true }
-odf = { workspace = true, features = [ "http", "lfs", "s3" ] }
+odf = { workspace = true, features = ["http", "lfs", "s3"] }
 time-source = { workspace = true }
 
 async-stream = "0.3"
