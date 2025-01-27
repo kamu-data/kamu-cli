@@ -11,7 +11,7 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## Unreleased
+## [0.220.0] - 2025-01-27
 ### Changed
 - Private Datasets:
   - GQL, `DatasetFlowRunsMut::trigger_flow()`: added check of input datasets for accessibility for `ExecuteTransform`
