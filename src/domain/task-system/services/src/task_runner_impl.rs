@@ -73,8 +73,13 @@ impl TaskRunnerImpl {
             PullPlanIterationJob::Transform(transform_item) => {
                 self.run_transform_update(transform_item).await
             }
-            PullPlanIterationJob::Sync(_) => {
-                unreachable!("No Sync jobs possible from update requests");
+            PullPlanIterationJob::Sync(sync_item) => {
+                // TODO: either initiate a sync job, or create a specialized error
+                tracing::error!(
+                    ?sync_item,
+                    "Attempted to launch sync job for dataset update"
+                );
+                Ok(TaskOutcome::Failed(TaskError::Empty))
             }
         }
     }
