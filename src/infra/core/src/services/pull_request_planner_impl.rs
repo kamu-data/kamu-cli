@@ -332,6 +332,7 @@ impl PullRequestPlanner for PullRequestPlannerImpl {
                 } else if depth == 0 && item.maybe_remote_ref.is_some() {
                     match self.build_sync_item(item, options.sync_options).await {
                         Ok(psi) => {
+                            println!("psi: {:?}", psi);
                             tracing::debug!(depth, ?psi, "Added sync item to pull plan");
                             jobs.push(PullPlanIterationJob::Sync(psi));
                         }
