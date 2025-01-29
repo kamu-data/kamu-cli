@@ -16,9 +16,18 @@ use internal_error::ResultIntoInternal;
 use kamu::testing::BaseRepoHarness;
 use kamu::*;
 use kamu_core::*;
-use kamu_datasets::{DatasetDependencies, DatasetDependencyRepository};
+use kamu_datasets::{
+    CreateDatasetFromSnapshotUseCase,
+    DatasetDependencies,
+    DatasetDependencyRepository,
+    DeleteDatasetUseCase,
+};
 use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
-use kamu_datasets_services::DependencyGraphServiceImpl;
+use kamu_datasets_services::{
+    CreateDatasetFromSnapshotUseCaseImpl,
+    DeleteDatasetUseCaseImpl,
+    DependencyGraphServiceImpl,
+};
 use messaging_outbox::{register_message_dispatcher, Outbox, OutboxImmediateImpl};
 use odf::metadata::testing::MetadataFactory;
 

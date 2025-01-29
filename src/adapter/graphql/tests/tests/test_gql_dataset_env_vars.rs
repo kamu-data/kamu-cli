@@ -11,22 +11,15 @@ use async_graphql::value;
 use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use dill::Component;
 use indoc::indoc;
-use kamu::{
-    CreateDatasetFromSnapshotUseCaseImpl,
-    DatasetRegistrySoloUnitBridge,
-    DatasetStorageUnitLocalFs,
-    ViewDatasetUseCaseImpl,
-};
-use kamu_core::{
-    auth,
-    CreateDatasetFromSnapshotUseCase,
-    DatasetStorageUnitWriter,
-    DidGeneratorDefault,
-    TenancyConfig,
-};
-use kamu_datasets::DatasetEnvVarsConfig;
+use kamu::{DatasetRegistrySoloUnitBridge, DatasetStorageUnitLocalFs, ViewDatasetUseCaseImpl};
+use kamu_core::{auth, DatasetStorageUnitWriter, DidGeneratorDefault, TenancyConfig};
+use kamu_datasets::{CreateDatasetFromSnapshotUseCase, DatasetEnvVarsConfig};
 use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEnvVarRepository};
-use kamu_datasets_services::{DatasetEnvVarServiceImpl, DependencyGraphServiceImpl};
+use kamu_datasets_services::{
+    CreateDatasetFromSnapshotUseCaseImpl,
+    DatasetEnvVarServiceImpl,
+    DependencyGraphServiceImpl,
+};
 use messaging_outbox::DummyOutboxImpl;
 use odf::metadata::testing::MetadataFactory;
 use time_source::SystemTimeSourceDefault;

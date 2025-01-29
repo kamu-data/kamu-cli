@@ -10,13 +10,16 @@
 use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
-use kamu::testing::MockDatasetActionAuthorizer;
+use kamu::testing::{
+    expect_outbox_dataset_dependencies_updated,
+    BaseUseCaseHarness,
+    BaseUseCaseHarnessOptions,
+    MockDatasetActionAuthorizer,
+};
 use kamu::CommitDatasetEventUseCaseImpl;
 use kamu_core::{CommitDatasetEventUseCase, MockDidGenerator};
 use messaging_outbox::MockOutbox;
 use odf::metadata::testing::MetadataFactory;
-
-use crate::tests::use_cases::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

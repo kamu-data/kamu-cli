@@ -16,8 +16,14 @@ use kamu_accounts::*;
 use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 use kamu_auth_rebac_services::{MultiTenantRebacDatasetLifecycleMessageConsumer, RebacServiceImpl};
 use kamu_core::*;
+use kamu_datasets::CreateDatasetFromSnapshotUseCase;
 use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
-use kamu_datasets_services::DependencyGraphServiceImpl;
+use kamu_datasets_services::{
+    CreateDatasetFromSnapshotUseCaseImpl,
+    DeleteDatasetUseCaseImpl,
+    DependencyGraphServiceImpl,
+    RenameDatasetUseCaseImpl,
+};
 use messaging_outbox::{register_message_dispatcher, Outbox, OutboxImmediateImpl};
 use mockall::predicate::eq;
 use odf::metadata::testing::MetadataFactory;

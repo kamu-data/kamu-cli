@@ -23,7 +23,6 @@ use kamu_accounts::*;
 use kamu_accounts_services::PredefinedAccountsRegistrator;
 use kamu_adapter_http::{FileUploadLimitConfig, UploadServiceLocal};
 use kamu_adapter_oauth::GithubAuthenticationConfig;
-use kamu_datasets::DatasetEnvVar;
 use kamu_flow_system_inmem::domain::{
     FlowConfigurationUpdatedMessage,
     FlowProgressMessage,
@@ -458,19 +457,20 @@ pub fn configure_base_catalog(
     b.add::<AppendDatasetMetadataBatchUseCaseImpl>();
     b.add::<CommitDatasetEventUseCaseImpl>();
     b.add::<CompactDatasetUseCaseImpl>();
-    b.add::<CreateDatasetFromSnapshotUseCaseImpl>();
-    b.add::<CreateDatasetUseCaseImpl>();
-    b.add::<DeleteDatasetUseCaseImpl>();
     b.add::<EditDatasetUseCaseImpl>();
     b.add::<GetDatasetDownstreamDependenciesUseCaseImpl>();
     b.add::<GetDatasetUpstreamDependenciesUseCaseImpl>();
     b.add::<PullDatasetUseCaseImpl>();
     b.add::<PushDatasetUseCaseImpl>();
-    b.add::<RenameDatasetUseCaseImpl>();
     b.add::<ResetDatasetUseCaseImpl>();
     b.add::<SetWatermarkUseCaseImpl>();
     b.add::<VerifyDatasetUseCaseImpl>();
     b.add::<ViewDatasetUseCaseImpl>();
+
+    b.add::<kamu_datasets_services::CreateDatasetFromSnapshotUseCaseImpl>();
+    b.add::<kamu_datasets_services::CreateDatasetUseCaseImpl>();
+    b.add::<kamu_datasets_services::DeleteDatasetUseCaseImpl>();
+    b.add::<kamu_datasets_services::RenameDatasetUseCaseImpl>();
 
     b.add::<kamu_accounts_services::LoginPasswordAuthProvider>();
 
@@ -820,7 +820,7 @@ pub fn register_config_in_catalog(
                 catalog_builder.add::<kamu_datasets_services::DatasetEnvVarServiceNull>();
             } else {
                 assert!(
-                    DatasetEnvVar::try_asm_256_gcm_from_str(encryption_key).is_ok(),
+                    kamu_datasets::DatasetEnvVar::try_asm_256_gcm_from_str(encryption_key).is_ok(),
                     "Invalid dataset env var encryption key",
                 );
                 catalog_builder.add::<kamu_datasets_services::DatasetKeyValueServiceImpl>();

@@ -60,5 +60,6 @@ odf = { workspace = true, features = ["testing"] }
 indoc = "2"
 mockall = "0.13"
 oop = "0.0.2"
+serde_json = "1"
 pretty_assertions = { version = "1" }
 test-log = { version = "0.2", features = ["trace"] }

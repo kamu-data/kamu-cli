@@ -16,10 +16,10 @@ use kamu_core::{
     DatasetLifecycleMessage,
     DatasetRegistry,
     DatasetStorageUnitWriter,
-    DeleteDatasetUseCase,
     DependencyGraphService,
     MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
 };
+use kamu_datasets::DeleteDatasetUseCase;
 use messaging_outbox::{Outbox, OutboxExt};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -27,8 +27,9 @@ use kamu_accounts_services::{
     PredefinedAccountsRegistrator,
 };
 use kamu_core::*;
+use kamu_datasets::CreateDatasetUseCase;
 use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
-use kamu_datasets_services::DependencyGraphServiceImpl;
+use kamu_datasets_services::{CreateDatasetUseCaseImpl, DependencyGraphServiceImpl};
 use messaging_outbox::DummyOutboxImpl;
 use odf::metadata::testing::MetadataFactory;
 use serde_json::json;

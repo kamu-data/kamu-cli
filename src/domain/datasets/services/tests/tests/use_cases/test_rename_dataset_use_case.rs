@@ -10,12 +10,16 @@
 use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
-use kamu::testing::MockDatasetActionAuthorizer;
-use kamu::RenameDatasetUseCaseImpl;
-use kamu_core::{MockDidGenerator, RenameDatasetUseCase};
+use kamu::testing::{
+    expect_outbox_dataset_renamed,
+    BaseUseCaseHarness,
+    BaseUseCaseHarnessOptions,
+    MockDatasetActionAuthorizer,
+};
+use kamu_core::MockDidGenerator;
+use kamu_datasets::RenameDatasetUseCase;
+use kamu_datasets_services::RenameDatasetUseCaseImpl;
 use messaging_outbox::MockOutbox;
-
-use crate::tests::use_cases::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

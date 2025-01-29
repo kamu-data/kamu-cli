@@ -12,21 +12,15 @@ use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use dill::Component;
 use indoc::indoc;
 use kamu::{
-    CreateDatasetFromSnapshotUseCaseImpl,
     DatasetRegistrySoloUnitBridge,
     DatasetStorageUnitLocalFs,
     MetadataQueryServiceImpl,
     ViewDatasetUseCaseImpl,
 };
-use kamu_core::{
-    auth,
-    CreateDatasetFromSnapshotUseCase,
-    DatasetStorageUnitWriter,
-    DidGeneratorDefault,
-    TenancyConfig,
-};
+use kamu_core::{auth, DatasetStorageUnitWriter, DidGeneratorDefault, TenancyConfig};
+use kamu_datasets::CreateDatasetFromSnapshotUseCase;
 use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
-use kamu_datasets_services::DependencyGraphServiceImpl;
+use kamu_datasets_services::{CreateDatasetFromSnapshotUseCaseImpl, DependencyGraphServiceImpl};
 use kamu_flow_system_inmem::InMemoryFlowConfigurationEventStore;
 use kamu_flow_system_services::FlowConfigurationServiceImpl;
 use messaging_outbox::DummyOutboxImpl;

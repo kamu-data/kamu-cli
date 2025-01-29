@@ -29,8 +29,14 @@ use kamu_accounts_services::{
     PredefinedAccountsRegistrator,
 };
 use kamu_core::*;
+use kamu_datasets::{CreateDatasetFromSnapshotUseCase, DeleteDatasetUseCase};
 use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEntryRepository};
-use kamu_datasets_services::{DatasetEntryServiceImpl, DependencyGraphServiceImpl};
+use kamu_datasets_services::{
+    CreateDatasetFromSnapshotUseCaseImpl,
+    DatasetEntryServiceImpl,
+    DeleteDatasetUseCaseImpl,
+    DependencyGraphServiceImpl,
+};
 use kamu_flow_system::*;
 use kamu_flow_system_inmem::*;
 use kamu_flow_system_services::*;

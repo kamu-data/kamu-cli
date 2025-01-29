@@ -15,18 +15,18 @@ use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use dill::Component;
 use indoc::indoc;
 use kamu::testing::{MockDatasetActionAuthorizer, MockDatasetChangesService};
-use kamu::{
-    CreateDatasetFromSnapshotUseCaseImpl,
-    DatasetStorageUnitLocalFs,
-    MetadataQueryServiceImpl,
-    ViewDatasetUseCaseImpl,
-};
+use kamu::{DatasetStorageUnitLocalFs, MetadataQueryServiceImpl, ViewDatasetUseCaseImpl};
 use kamu_accounts::{JwtAuthenticationConfig, DEFAULT_ACCOUNT_NAME, DEFAULT_ACCOUNT_NAME_STR};
 use kamu_accounts_inmem::InMemoryAccessTokenRepository;
 use kamu_accounts_services::{AccessTokenServiceImpl, AuthenticationServiceImpl};
 use kamu_core::*;
+use kamu_datasets::CreateDatasetFromSnapshotUseCase;
 use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEntryRepository};
-use kamu_datasets_services::{DatasetEntryServiceImpl, DependencyGraphServiceImpl};
+use kamu_datasets_services::{
+    CreateDatasetFromSnapshotUseCaseImpl,
+    DatasetEntryServiceImpl,
+    DependencyGraphServiceImpl,
+};
 use kamu_flow_system::FlowAgentConfig;
 use kamu_flow_system_inmem::{
     InMemoryFlowConfigurationEventStore,

@@ -13,7 +13,7 @@ use mockall::predicate::{always, eq, function};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn expect_outbox_dataset_created(mock_outbox: &mut MockOutbox, times: usize) {
+pub fn expect_outbox_dataset_created(mock_outbox: &mut MockOutbox, times: usize) {
     mock_outbox
         .expect_post_message_as_json()
         .with(
@@ -32,10 +32,7 @@ pub(crate) fn expect_outbox_dataset_created(mock_outbox: &mut MockOutbox, times:
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn expect_outbox_dataset_dependencies_updated(
-    mock_outbox: &mut MockOutbox,
-    times: usize,
-) {
+pub fn expect_outbox_dataset_dependencies_updated(mock_outbox: &mut MockOutbox, times: usize) {
     mock_outbox
         .expect_post_message_as_json()
         .with(
@@ -54,7 +51,7 @@ pub(crate) fn expect_outbox_dataset_dependencies_updated(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn expect_outbox_dataset_renamed(mock_outbox: &mut MockOutbox, times: usize) {
+pub fn expect_outbox_dataset_renamed(mock_outbox: &mut MockOutbox, times: usize) {
     mock_outbox
         .expect_post_message_as_json()
         .with(
@@ -73,7 +70,7 @@ pub(crate) fn expect_outbox_dataset_renamed(mock_outbox: &mut MockOutbox, times:
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn expect_outbox_dataset_deleted(mock_outbox: &mut MockOutbox, times: usize) {
+pub fn expect_outbox_dataset_deleted(mock_outbox: &mut MockOutbox, times: usize) {
     mock_outbox
         .expect_post_message_as_json()
         .with(

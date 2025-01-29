@@ -19,15 +19,12 @@ use kamu::domain::auth::{
     DatasetAction,
     DatasetActionAuthorizer,
 };
-use kamu::domain::{
-    CommitDatasetEventUseCase,
-    CreateDatasetFromSnapshotUseCase,
-    CreateDatasetUseCase,
-};
+use kamu::domain::CommitDatasetEventUseCase;
 use kamu::testing::MockDatasetActionAuthorizer;
 use kamu_accounts::testing::MockAuthenticationService;
 use kamu_accounts::{Account, AccountType, CurrentAccountSubject, PROVIDER_PASSWORD};
 use kamu_core::{CompactionExecutor, CompactionPlanner, DatasetRegistry, TenancyConfig};
+use kamu_datasets::{CreateDatasetFromSnapshotUseCase, CreateDatasetUseCase};
 use odf::dataset::DatasetLayout;
 use reqwest::Url;
 use time_source::SystemTimeSourceStub;

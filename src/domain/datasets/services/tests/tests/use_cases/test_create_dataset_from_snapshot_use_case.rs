@@ -10,12 +10,16 @@
 use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
-use kamu::CreateDatasetFromSnapshotUseCaseImpl;
-use kamu_core::CreateDatasetFromSnapshotUseCase;
+use kamu::testing::{
+    expect_outbox_dataset_created,
+    expect_outbox_dataset_dependencies_updated,
+    BaseUseCaseHarness,
+    BaseUseCaseHarnessOptions,
+};
+use kamu_datasets::CreateDatasetFromSnapshotUseCase;
+use kamu_datasets_services::CreateDatasetFromSnapshotUseCaseImpl;
 use messaging_outbox::MockOutbox;
 use odf::metadata::testing::MetadataFactory;
-
-use crate::tests::use_cases::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

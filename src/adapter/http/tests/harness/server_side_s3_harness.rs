@@ -18,8 +18,6 @@ use kamu::domain::{
     CommitDatasetEventUseCase,
     CompactionExecutor,
     CompactionPlanner,
-    CreateDatasetFromSnapshotUseCase,
-    CreateDatasetUseCase,
     ObjectStoreBuilder,
     RunInfoDir,
     ServerUrlConfig,
@@ -29,8 +27,6 @@ use kamu::{
     CommitDatasetEventUseCaseImpl,
     CompactionExecutorImpl,
     CompactionPlannerImpl,
-    CreateDatasetFromSnapshotUseCaseImpl,
-    CreateDatasetUseCaseImpl,
     DatasetRegistrySoloUnitBridge,
     DatasetStorageUnitS3,
     EditDatasetUseCaseImpl,
@@ -42,8 +38,13 @@ use kamu::{
 use kamu_accounts::testing::MockAuthenticationService;
 use kamu_accounts::{Account, AuthenticationService};
 use kamu_core::{DatasetRegistry, DatasetStorageUnitWriter, DidGeneratorDefault, TenancyConfig};
+use kamu_datasets::{CreateDatasetFromSnapshotUseCase, CreateDatasetUseCase};
 use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
-use kamu_datasets_services::DependencyGraphServiceImpl;
+use kamu_datasets_services::{
+    CreateDatasetFromSnapshotUseCaseImpl,
+    CreateDatasetUseCaseImpl,
+    DependencyGraphServiceImpl,
+};
 use messaging_outbox::DummyOutboxImpl;
 use odf::dataset::DatasetLayout;
 use s3_utils::S3Context;

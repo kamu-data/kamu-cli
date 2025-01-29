@@ -11,6 +11,11 @@ use std::collections::{HashSet, LinkedList};
 use std::sync::Arc;
 
 use kamu::domain::*;
+use kamu_datasets::{
+    CreateDatasetFromSnapshotUseCase,
+    CreateDatasetUseCaseOptions,
+    DeleteDatasetUseCase,
+};
 
 use super::{BatchError, CLIError, Command};
 use crate::{ConfirmDeleteService, OutputConfig};

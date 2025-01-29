@@ -36,6 +36,7 @@ http-common = { workspace = true }
 # TODO: Adapters should depend only on kamu-domain crate and be implementation-agnostic
 kamu = { workspace = true }
 kamu-accounts = { workspace = true }
+kamu-datasets = { workspace = true }
 kamu-core = { workspace = true, features = ["utoipa"] }
 odf = { workspace = true, features = ["http", "lfs", "s3", "utoipa"] }
 s3-utils = { workspace = true }

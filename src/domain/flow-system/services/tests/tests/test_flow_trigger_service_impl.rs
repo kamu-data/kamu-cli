@@ -18,8 +18,13 @@ use futures::TryStreamExt;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::*;
+use kamu_datasets::{CreateDatasetFromSnapshotUseCase, DeleteDatasetUseCase};
 use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
-use kamu_datasets_services::DependencyGraphServiceImpl;
+use kamu_datasets_services::{
+    CreateDatasetFromSnapshotUseCaseImpl,
+    DeleteDatasetUseCaseImpl,
+    DependencyGraphServiceImpl,
+};
 use kamu_flow_system::*;
 use kamu_flow_system_inmem::*;
 use kamu_flow_system_services::*;
@@ -542,7 +547,7 @@ impl FlowTriggerHarness {
     }
 
     async fn delete_dataset(&self, dataset_id: &odf::DatasetID) {
-        // Do the actual deletion
+        // Do the actual deletionResetDatasetUseCase
         let delete_dataset = self.catalog.get_one::<dyn DeleteDatasetUseCase>().unwrap();
         delete_dataset
             .execute_via_ref(&(dataset_id.as_local_ref()))

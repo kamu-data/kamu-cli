@@ -16,12 +16,7 @@ use dill::Component;
 use futures::TryStreamExt;
 use indoc::indoc;
 use kamu::testing::MockDatasetChangesService;
-use kamu::{
-    CreateDatasetFromSnapshotUseCaseImpl,
-    DatasetStorageUnitLocalFs,
-    MetadataQueryServiceImpl,
-    ViewDatasetUseCaseImpl,
-};
+use kamu::{DatasetStorageUnitLocalFs, MetadataQueryServiceImpl, ViewDatasetUseCaseImpl};
 use kamu_accounts::{
     CurrentAccountSubject,
     JwtAuthenticationConfig,
@@ -34,7 +29,6 @@ use kamu_accounts_services::{AccessTokenServiceImpl, AuthenticationServiceImpl};
 use kamu_core::{
     auth,
     CompactionResult,
-    CreateDatasetFromSnapshotUseCase,
     DatasetChangesService,
     DatasetIntervalIncrement,
     DatasetLifecycleMessage,
@@ -45,8 +39,13 @@ use kamu_core::{
     TenancyConfig,
     MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
 };
+use kamu_datasets::CreateDatasetFromSnapshotUseCase;
 use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEntryRepository};
-use kamu_datasets_services::{DatasetEntryServiceImpl, DependencyGraphServiceImpl};
+use kamu_datasets_services::{
+    CreateDatasetFromSnapshotUseCaseImpl,
+    DatasetEntryServiceImpl,
+    DependencyGraphServiceImpl,
+};
 use kamu_flow_system::{
     Flow,
     FlowAgentConfig,
