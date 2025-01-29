@@ -18,7 +18,7 @@ use dill::*;
 use futures::TryStreamExt;
 use init_on_startup::{InitOnStartup, InitOnStartupMeta};
 use internal_error::InternalError;
-use kamu_core::{DatasetLifecycleMessage, MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE};
+use kamu_datasets::{DatasetLifecycleMessage, MESSAGE_PRODUCER_KAMU_DATASET_SERVICE};
 use kamu_flow_system::*;
 use kamu_task_system::*;
 use messaging_outbox::{
@@ -61,7 +61,7 @@ pub struct FlowAgentImpl {
 #[meta(MessageConsumerMeta {
     consumer_name: MESSAGE_CONSUMER_KAMU_FLOW_AGENT,
     feeding_producers: &[
-        MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
+        MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
         MESSAGE_PRODUCER_KAMU_FLOW_TRIGGER_SERVICE,
         MESSAGE_PRODUCER_KAMU_TASK_AGENT,
     ],

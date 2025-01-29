@@ -12,14 +12,12 @@ use std::sync::Arc;
 use dill::{component, interface};
 use internal_error::ResultIntoInternal;
 use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer, DatasetActionUnauthorizedError};
-use kamu_core::{
+use kamu_core::{DatasetRegistry, DatasetStorageUnitWriter, DependencyGraphService};
+use kamu_datasets::{
     DatasetLifecycleMessage,
-    DatasetRegistry,
-    DatasetStorageUnitWriter,
-    DependencyGraphService,
-    MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
+    DeleteDatasetUseCase,
+    MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
 };
-use kamu_datasets::DeleteDatasetUseCase;
 use messaging_outbox::{Outbox, OutboxExt};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -149,7 +147,7 @@ impl DeleteDatasetUseCase for DeleteDatasetUseCaseImpl {
         // Notify interested parties
         self.outbox
             .post_message(
-                MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
+                MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
                 DatasetLifecycleMessage::deleted(dataset_handle.id.clone()),
             )
             .await?;

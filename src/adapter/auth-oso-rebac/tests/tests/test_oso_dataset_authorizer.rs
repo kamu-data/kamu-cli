@@ -22,11 +22,8 @@ use kamu_accounts_inmem::InMemoryAccountRepository;
 use kamu_accounts_services::{LoginPasswordAuthProvider, PredefinedAccountsRegistrator};
 use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer, DatasetActionUnauthorizedError};
-use kamu_core::{
-    DatasetLifecycleMessage,
-    TenancyConfig,
-    MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
-};
+use kamu_core::TenancyConfig;
+use kamu_datasets::{DatasetLifecycleMessage, MESSAGE_PRODUCER_KAMU_DATASET_SERVICE};
 use kamu_datasets_inmem::InMemoryDatasetEntryRepository;
 use kamu_datasets_services::DatasetEntryServiceImpl;
 use messaging_outbox::{
@@ -163,7 +160,7 @@ impl DatasetAuthorizerHarness {
 
             register_message_dispatcher::<DatasetLifecycleMessage>(
                 &mut b,
-                MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
+                MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
             );
 
             b.build()
@@ -204,7 +201,7 @@ impl DatasetAuthorizerHarness {
 
         self.outbox
             .post_message(
-                MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
+                MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
                 DatasetLifecycleMessage::created(
                     dataset_id.clone(),
                     account_id(&alias),

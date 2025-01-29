@@ -12,13 +12,12 @@ use std::sync::Arc;
 use dill::{component, interface};
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer, DatasetActionUnauthorizedError};
-use kamu_core::{
+use kamu_core::{DatasetRegistry, DatasetStorageUnitWriter};
+use kamu_datasets::{
     DatasetLifecycleMessage,
-    DatasetRegistry,
-    DatasetStorageUnitWriter,
-    MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
+    RenameDatasetUseCase,
+    MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
 };
-use kamu_datasets::RenameDatasetUseCase;
 use messaging_outbox::{Outbox, OutboxExt};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -104,7 +103,7 @@ impl RenameDatasetUseCase for RenameDatasetUseCaseImpl {
 
         self.outbox
             .post_message(
-                MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
+                MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
                 DatasetLifecycleMessage::renamed(
                     dataset_handle.id.clone(),
                     owner_account_id,

@@ -17,8 +17,8 @@ use kamu::testing::{
     BaseUseCaseHarnessOptions,
     MockDatasetActionAuthorizer,
 };
-use kamu_core::{DatasetLifecycleMessage, MockDidGenerator};
-use kamu_datasets::DeleteDatasetUseCase;
+use kamu_core::MockDidGenerator;
+use kamu_datasets::{DatasetLifecycleMessage, DeleteDatasetUseCase};
 use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
 use kamu_datasets_services::{
     DeleteDatasetUseCaseImpl,

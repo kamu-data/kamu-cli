@@ -11,12 +11,13 @@ use std::sync::Arc;
 
 use dill::{component, interface};
 use kamu_accounts::CurrentAccountSubject;
-use kamu_core::{
+use kamu_core::DatasetStorageUnitWriter;
+use kamu_datasets::{
+    CreateDatasetFromSnapshotUseCase,
+    CreateDatasetUseCaseOptions,
     DatasetLifecycleMessage,
-    DatasetStorageUnitWriter,
-    MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
+    MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
 };
-use kamu_datasets::{CreateDatasetFromSnapshotUseCase, CreateDatasetUseCaseOptions};
 use messaging_outbox::{Outbox, OutboxExt};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -68,7 +69,7 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
 
         self.outbox
             .post_message(
-                MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
+                MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
                 DatasetLifecycleMessage::created(
                     create_dataset_result.dataset_handle.id.clone(),
                     logged_account_id,
@@ -81,7 +82,7 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
         if !new_upstream_ids.is_empty() {
             self.outbox
                 .post_message(
-                    MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
+                    MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
                     DatasetLifecycleMessage::dependencies_updated(
                         create_dataset_result.dataset_handle.id.clone(),
                         new_upstream_ids,

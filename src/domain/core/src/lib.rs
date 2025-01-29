@@ -13,14 +13,12 @@
 pub mod auth;
 pub mod entities;
 pub mod jobs;
-pub mod messages;
 pub mod services;
 pub mod use_cases;
 pub mod utils;
 
 pub use entities::*;
 pub use jobs::*;
-pub use messages::*;
 pub use services::*;
 pub use use_cases::*;
 pub use utils::paths::*;

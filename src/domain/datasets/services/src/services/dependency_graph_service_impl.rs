@@ -14,15 +14,18 @@ use dill::*;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_core::{
     DatasetIDStream,
-    DatasetLifecycleMessage,
     DatasetNodeNotFoundError,
     DatasetRegistry,
     DependencyGraphService,
     DependencyOrder,
     GetDependenciesError,
-    MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
 };
-use kamu_datasets::{DatasetDependencies, DatasetDependencyRepository};
+use kamu_datasets::{
+    DatasetDependencies,
+    DatasetDependencyRepository,
+    DatasetLifecycleMessage,
+    MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
+};
 use messaging_outbox::{
     MessageConsumer,
     MessageConsumerMeta,
@@ -84,7 +87,7 @@ impl State {
 #[interface(dyn MessageConsumerT<DatasetLifecycleMessage>)]
 #[meta(MessageConsumerMeta {
     consumer_name: MESSAGE_CONSUMER_KAMU_DEPENDENCY_GRAPH_SERVICE,
-    feeding_producers: &[MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE],
+    feeding_producers: &[MESSAGE_PRODUCER_KAMU_DATASET_SERVICE],
     delivery: MessageDeliveryMechanism::Immediate,
  })]
 #[scope(Singleton)]

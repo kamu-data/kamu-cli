@@ -11,12 +11,13 @@ use std::sync::Arc;
 
 use dill::{component, interface};
 use kamu_accounts::CurrentAccountSubject;
-use kamu_core::{
+use kamu_core::DatasetStorageUnitWriter;
+use kamu_datasets::{
+    CreateDatasetUseCase,
+    CreateDatasetUseCaseOptions,
     DatasetLifecycleMessage,
-    DatasetStorageUnitWriter,
-    MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
+    MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
 };
-use kamu_datasets::{CreateDatasetUseCase, CreateDatasetUseCaseOptions};
 use messaging_outbox::{Outbox, OutboxExt};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -65,7 +66,7 @@ impl CreateDatasetUseCase for CreateDatasetUseCaseImpl {
 
         self.outbox
             .post_message(
-                MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
+                MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
                 DatasetLifecycleMessage::created(
                     create_result.dataset_handle.id.clone(),
                     logged_account_id,

@@ -534,9 +534,9 @@ pub fn configure_base_catalog(
     b.add::<crate::explore::SparkLivyServerFactory>();
     b.add::<crate::explore::NotebookServerFactory>();
 
-    register_message_dispatcher::<DatasetLifecycleMessage>(
+    register_message_dispatcher::<kamu_datasets::DatasetLifecycleMessage>(
         &mut b,
-        MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
+        kamu_datasets::MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
     );
 
     b

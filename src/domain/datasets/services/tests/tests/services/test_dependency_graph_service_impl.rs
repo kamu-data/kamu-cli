@@ -20,7 +20,9 @@ use kamu_datasets::{
     CreateDatasetFromSnapshotUseCase,
     DatasetDependencies,
     DatasetDependencyRepository,
+    DatasetLifecycleMessage,
     DeleteDatasetUseCase,
+    MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
 };
 use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
 use kamu_datasets_services::{
@@ -647,7 +649,7 @@ impl DependencyGraphHarness {
 
         register_message_dispatcher::<DatasetLifecycleMessage>(
             &mut b,
-            MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
+            MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
         );
 
         let catalog = b.build();
