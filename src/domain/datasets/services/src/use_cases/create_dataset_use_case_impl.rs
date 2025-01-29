@@ -20,12 +20,16 @@ use kamu_datasets::{
 };
 use messaging_outbox::{Outbox, OutboxExt};
 
+use crate::{DatasetEntryWriter, DependencyGraphWriter};
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
 #[interface(dyn CreateDatasetUseCase)]
 pub struct CreateDatasetUseCaseImpl {
     current_account_subject: Arc<CurrentAccountSubject>,
+    dataset_entry_writer: Arc<dyn DatasetEntryWriter>,
+    dependency_graph_writer: Arc<dyn DependencyGraphWriter>,
     dataset_storage_unit_writer: Arc<dyn DatasetStorageUnitWriter>,
     outbox: Arc<dyn Outbox>,
 }
@@ -33,11 +37,15 @@ pub struct CreateDatasetUseCaseImpl {
 impl CreateDatasetUseCaseImpl {
     pub fn new(
         current_account_subject: Arc<CurrentAccountSubject>,
+        dataset_entry_writer: Arc<dyn DatasetEntryWriter>,
+        dependency_graph_writer: Arc<dyn DependencyGraphWriter>,
         dataset_storage_unit_writer: Arc<dyn DatasetStorageUnitWriter>,
         outbox: Arc<dyn Outbox>,
     ) -> Self {
         Self {
             current_account_subject,
+            dataset_entry_writer,
+            dependency_graph_writer,
             dataset_storage_unit_writer,
             outbox,
         }
@@ -59,6 +67,19 @@ impl CreateDatasetUseCase for CreateDatasetUseCaseImpl {
             }
             CurrentAccountSubject::Logged(l) => l.account_id.clone(),
         };
+
+        self.dataset_entry_writer
+            .create_entry(
+                &seed_block.event.dataset_id,
+                &logged_account_id,
+                &dataset_alias.dataset_name,
+            )
+            .await?;
+
+        self.dependency_graph_writer
+            .create_dataset_node(&seed_block.event.dataset_id)
+            .await?;
+
         let create_result = self
             .dataset_storage_unit_writer
             .create_dataset(dataset_alias, seed_block)

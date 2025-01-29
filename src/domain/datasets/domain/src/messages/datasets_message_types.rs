@@ -20,7 +20,6 @@ const DATASET_LIFECYCLE_OUTBOX_VERSION: u32 = 1;
 pub enum DatasetLifecycleMessage {
     Created(DatasetLifecycleMessageCreated),
     DependenciesUpdated(DatasetLifecycleMessageDependenciesUpdated),
-    Renamed(DatasetLifecycleMessageRenamed),
     Deleted(DatasetLifecycleMessageDeleted),
 }
 
@@ -51,20 +50,6 @@ impl DatasetLifecycleMessage {
 
     pub fn deleted(dataset_id: odf::DatasetID) -> Self {
         Self::Deleted(DatasetLifecycleMessageDeleted { dataset_id })
-    }
-
-    pub fn renamed(
-        dataset_id: odf::DatasetID,
-        owner_account_id: odf::AccountID,
-        old_dataset_name: odf::DatasetName,
-        new_dataset_name: odf::DatasetName,
-    ) -> Self {
-        Self::Renamed(DatasetLifecycleMessageRenamed {
-            dataset_id,
-            owner_account_id,
-            old_dataset_name,
-            new_dataset_name,
-        })
     }
 }
 
