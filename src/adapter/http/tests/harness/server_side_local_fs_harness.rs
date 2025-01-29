@@ -19,6 +19,7 @@ use kamu::domain::{
     CommitDatasetEventUseCase,
     CreateDatasetFromSnapshotUseCase,
     CreateDatasetUseCase,
+    DatasetStorageUnitWriter,
     RunInfoDir,
     ServerUrlConfig,
 };
@@ -31,7 +32,6 @@ use kamu::{
     CreateDatasetUseCaseImpl,
     DatasetRegistrySoloUnitBridge,
     DatasetStorageUnitLocalFs,
-    DatasetStorageUnitWriter,
     EditDatasetUseCaseImpl,
     ObjectStoreBuilderLocalFs,
     ObjectStoreRegistryImpl,

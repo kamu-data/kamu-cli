@@ -10,9 +10,7 @@
 mod dataset_storage_unit_helpers;
 mod dataset_storage_unit_local_fs;
 mod dataset_storage_unit_s3;
-mod dataset_storage_unit_writer;
 
 pub use dataset_storage_unit_helpers::*;
 pub use dataset_storage_unit_local_fs::*;
 pub use dataset_storage_unit_s3::*;
-pub use dataset_storage_unit_writer::*;

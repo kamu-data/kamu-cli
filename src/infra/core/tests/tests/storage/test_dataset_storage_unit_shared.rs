@@ -10,9 +10,8 @@
 use std::assert_matches::assert_matches;
 
 use itertools::Itertools;
-use kamu::DatasetStorageUnitWriter;
 use kamu_accounts::DEFAULT_ACCOUNT_NAME;
-use kamu_core::CreateDatasetFromSnapshotUseCase;
+use kamu_core::{CreateDatasetFromSnapshotUseCase, DatasetStorageUnitWriter};
 use odf::metadata::testing::MetadataFactory;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

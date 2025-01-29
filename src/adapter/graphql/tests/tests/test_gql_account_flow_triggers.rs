@@ -18,7 +18,6 @@ use kamu::testing::{MockDatasetActionAuthorizer, MockDatasetChangesService};
 use kamu::{
     CreateDatasetFromSnapshotUseCaseImpl,
     DatasetStorageUnitLocalFs,
-    DatasetStorageUnitWriter,
     MetadataQueryServiceImpl,
     ViewDatasetUseCaseImpl,
 };

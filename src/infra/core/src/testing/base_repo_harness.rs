@@ -15,6 +15,7 @@ use kamu_accounts::CurrentAccountSubject;
 use kamu_core::{
     DatasetRegistry,
     DatasetRegistryExt,
+    DatasetStorageUnitWriter,
     DidGenerator,
     DidGeneratorDefault,
     MockDidGenerator,
@@ -27,7 +28,7 @@ use odf::metadata::serde::MetadataBlockSerializer;
 use odf::metadata::testing::MetadataFactory;
 use time_source::SystemTimeSourceDefault;
 
-use crate::{DatasetRegistrySoloUnitBridge, DatasetStorageUnitLocalFs, DatasetStorageUnitWriter};
+use crate::{DatasetRegistrySoloUnitBridge, DatasetStorageUnitLocalFs};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

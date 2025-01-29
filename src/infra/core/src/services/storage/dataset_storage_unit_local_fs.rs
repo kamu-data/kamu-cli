@@ -14,7 +14,7 @@ use async_trait::async_trait;
 use dill::*;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_accounts::{CurrentAccountSubject, DEFAULT_ACCOUNT_NAME_STR};
-use kamu_core::{DidGenerator, TenancyConfig};
+use kamu_core::{DatasetStorageUnitWriter, DidGenerator, TenancyConfig};
 use odf::dataset::{DatasetImpl, DatasetLayout, MetadataChainImpl};
 use odf::storage::lfs::{NamedObjectRepositoryLocalFS, ObjectRepositoryLocalFSSha3};
 use odf::storage::{

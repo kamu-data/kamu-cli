@@ -12,7 +12,12 @@ use std::sync::Arc;
 use dill::Component;
 use kamu::*;
 use kamu_accounts::{CurrentAccountSubject, DEFAULT_ACCOUNT_NAME};
-use kamu_core::{CreateDatasetFromSnapshotUseCase, DidGeneratorDefault, TenancyConfig};
+use kamu_core::{
+    CreateDatasetFromSnapshotUseCase,
+    DatasetStorageUnitWriter,
+    DidGeneratorDefault,
+    TenancyConfig,
+};
 use messaging_outbox::{Outbox, OutboxImmediateImpl};
 use tempfile::TempDir;
 use time_source::SystemTimeSourceDefault;
