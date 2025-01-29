@@ -10,17 +10,8 @@
 mod test_append_dataset_metadata_batch_use_case;
 mod test_commit_dataset_event_use_case;
 mod test_compact_dataset_use_case;
-mod test_create_dataset_from_snapshot_use_case;
-mod test_create_dataset_use_case;
-mod test_delete_dataset_use_case;
 mod test_pull_dataset_use_case;
 mod test_push_dataset_use_case;
-mod test_rename_dataset_use_case;
 mod test_reset_dataset_use_case;
 mod test_set_watermark_use_case;
 mod test_verify_dataset_use_case;
-
-mod base_use_case_harness;
-mod outbox_expectation_helpers;
-pub(crate) use base_use_case_harness::*;
-pub(crate) use outbox_expectation_helpers::*;

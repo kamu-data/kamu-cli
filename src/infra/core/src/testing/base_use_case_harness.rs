@@ -8,14 +8,15 @@
 // by the Apache License, Version 2.0.
 
 use dill::Catalog;
-use kamu::testing::{BaseRepoHarness, MockDatasetActionAuthorizer};
 use kamu_core::auth::DatasetActionAuthorizer;
 use kamu_core::{MockDidGenerator, TenancyConfig};
 use messaging_outbox::{MockOutbox, Outbox};
 
+use crate::testing::{BaseRepoHarness, MockDatasetActionAuthorizer};
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) struct BaseUseCaseHarnessOptions {
+pub struct BaseUseCaseHarnessOptions {
     tenancy_config: TenancyConfig,
     mock_dataset_action_authorizer: MockDatasetActionAuthorizer,
     mock_outbox: MockOutbox,
@@ -23,11 +24,11 @@ pub(crate) struct BaseUseCaseHarnessOptions {
 }
 
 impl BaseUseCaseHarnessOptions {
-    pub(crate) fn new() -> Self {
+    pub fn new() -> Self {
         Self::default()
     }
 
-    pub(crate) fn with_authorizer(
+    pub fn with_authorizer(
         mut self,
         mock_dataset_action_authorizer: MockDatasetActionAuthorizer,
     ) -> Self {
@@ -35,12 +36,12 @@ impl BaseUseCaseHarnessOptions {
         self
     }
 
-    pub(crate) fn with_outbox(mut self, mock_outbox: MockOutbox) -> Self {
+    pub fn with_outbox(mut self, mock_outbox: MockOutbox) -> Self {
         self.mock_outbox = mock_outbox;
         self
     }
 
-    pub(crate) fn with_maybe_mock_did_generator(
+    pub fn with_maybe_mock_did_generator(
         mut self,
         mock_did_generator: Option<MockDidGenerator>,
     ) -> Self {
@@ -63,13 +64,13 @@ impl Default for BaseUseCaseHarnessOptions {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[oop::extend(BaseRepoHarness, base_repo_harness)]
-pub(crate) struct BaseUseCaseHarness {
+pub struct BaseUseCaseHarness {
     base_repo_harness: BaseRepoHarness,
     catalog: Catalog,
 }
 
 impl BaseUseCaseHarness {
-    pub(crate) fn new(options: BaseUseCaseHarnessOptions) -> Self {
+    pub fn new(options: BaseUseCaseHarnessOptions) -> Self {
         let base_repo_harness =
             BaseRepoHarness::new(options.tenancy_config, options.maybe_mock_did_generator);
 

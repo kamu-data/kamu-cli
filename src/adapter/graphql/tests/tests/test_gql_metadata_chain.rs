@@ -15,8 +15,13 @@ use dill::Component;
 use indoc::indoc;
 use kamu::*;
 use kamu_core::*;
+use kamu_datasets::{CreateDatasetFromSnapshotUseCase, CreateDatasetUseCase};
 use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
-use kamu_datasets_services::DependencyGraphServiceImpl;
+use kamu_datasets_services::{
+    CreateDatasetFromSnapshotUseCaseImpl,
+    CreateDatasetUseCaseImpl,
+    DependencyGraphServiceImpl,
+};
 use messaging_outbox::DummyOutboxImpl;
 use odf::metadata::testing::MetadataFactory;
 use time_source::SystemTimeSourceDefault;

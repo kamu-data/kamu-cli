@@ -10,14 +10,11 @@
 use std::sync::Arc;
 
 use dill::*;
-use kamu::{CreateDatasetFromSnapshotUseCaseImpl, DatasetStorageUnitS3, S3RegistryCache};
+use kamu::{DatasetStorageUnitS3, S3RegistryCache};
 use kamu_accounts::{CurrentAccountSubject, DEFAULT_ACCOUNT_NAME};
-use kamu_core::{
-    CreateDatasetFromSnapshotUseCase,
-    DatasetStorageUnitWriter,
-    DidGeneratorDefault,
-    TenancyConfig,
-};
+use kamu_core::{DatasetStorageUnitWriter, DidGeneratorDefault, TenancyConfig};
+use kamu_datasets::CreateDatasetFromSnapshotUseCase;
+use kamu_datasets_services::CreateDatasetFromSnapshotUseCaseImpl;
 use messaging_outbox::{Outbox, OutboxImmediateImpl};
 use s3_utils::S3Context;
 use test_utils::LocalS3Server;

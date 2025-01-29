@@ -17,6 +17,8 @@ use internal_error::InternalError;
 use kamu::*;
 use kamu_core::utils::metadata_chain_comparator::CompareChainsResult;
 use kamu_core::*;
+use kamu_datasets::CreateDatasetFromSnapshotUseCase;
+use kamu_datasets_services::CreateDatasetFromSnapshotUseCaseImpl;
 use messaging_outbox::DummyOutboxImpl;
 use odf::metadata::testing::MetadataFactory;
 use tempfile::TempDir;

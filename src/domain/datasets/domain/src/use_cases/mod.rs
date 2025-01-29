@@ -7,5 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod services;
-mod use_cases;
+mod create_dataset_from_snapshot_use_case;
+mod create_dataset_use_case;
+mod delete_dataset_use_case;
+mod rename_dataset_use_case;
+
+pub use create_dataset_from_snapshot_use_case::*;
+pub use create_dataset_use_case::*;
+pub use delete_dataset_use_case::*;
+pub use rename_dataset_use_case::*;

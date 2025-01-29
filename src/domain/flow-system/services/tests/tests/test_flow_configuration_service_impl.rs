@@ -16,8 +16,13 @@ use futures::TryStreamExt;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::*;
+use kamu_datasets::{CreateDatasetFromSnapshotUseCase, DeleteDatasetUseCase};
 use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
-use kamu_datasets_services::DependencyGraphServiceImpl;
+use kamu_datasets_services::{
+    CreateDatasetFromSnapshotUseCaseImpl,
+    DeleteDatasetUseCaseImpl,
+    DependencyGraphServiceImpl,
+};
 use kamu_flow_system::*;
 use kamu_flow_system_inmem::*;
 use kamu_flow_system_services::*;

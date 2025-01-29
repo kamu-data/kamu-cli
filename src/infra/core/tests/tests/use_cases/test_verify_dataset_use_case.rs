@@ -10,11 +10,9 @@
 use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
-use kamu::testing::MockDatasetActionAuthorizer;
+use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions, MockDatasetActionAuthorizer};
 use kamu::*;
 use kamu_core::*;
-
-use super::{BaseUseCaseHarness, BaseUseCaseHarnessOptions};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

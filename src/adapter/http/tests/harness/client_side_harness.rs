@@ -21,8 +21,14 @@ use kamu::utils::simple_transfer_protocol::SimpleTransferProtocol;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_adapter_http::{OdfSmtpVersion, SmartTransferProtocolClientWs};
+use kamu_datasets::CreateDatasetFromSnapshotUseCase;
 use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
-use kamu_datasets_services::{DatasetKeyValueServiceSysEnv, DependencyGraphServiceImpl};
+use kamu_datasets_services::{
+    CreateDatasetFromSnapshotUseCaseImpl,
+    CreateDatasetUseCaseImpl,
+    DatasetKeyValueServiceSysEnv,
+    DependencyGraphServiceImpl,
+};
 use messaging_outbox::DummyOutboxImpl;
 use odf::dataset::{DatasetFactoryImpl, DatasetLayout, IpfsGateway};
 use tempfile::TempDir;

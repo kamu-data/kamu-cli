@@ -12,12 +12,11 @@ use std::sync::Arc;
 use dill::{component, interface};
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::{
-    CreateDatasetUseCase,
-    CreateDatasetUseCaseOptions,
     DatasetLifecycleMessage,
     DatasetStorageUnitWriter,
     MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
 };
+use kamu_datasets::{CreateDatasetUseCase, CreateDatasetUseCaseOptions};
 use messaging_outbox::{Outbox, OutboxExt};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

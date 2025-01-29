@@ -15,6 +15,7 @@ use futures::{stream, Future, StreamExt, TryStreamExt};
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_core::utils::metadata_chain_comparator::*;
 use kamu_core::*;
+use kamu_datasets::{CreateDatasetUseCase, CreateDatasetUseCaseOptions};
 use odf::dataset::MetadataChainImpl;
 use odf::storage::inmem::{NamedObjectRepositoryInMemory, ObjectRepositoryInMemory};
 use odf::storage::{MetadataBlockRepositoryImpl, ReferenceRepositoryImpl};

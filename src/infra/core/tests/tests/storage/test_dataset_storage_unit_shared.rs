@@ -11,7 +11,8 @@ use std::assert_matches::assert_matches;
 
 use itertools::Itertools;
 use kamu_accounts::DEFAULT_ACCOUNT_NAME;
-use kamu_core::{CreateDatasetFromSnapshotUseCase, DatasetStorageUnitWriter};
+use kamu_core::DatasetStorageUnitWriter;
+use kamu_datasets::CreateDatasetFromSnapshotUseCase;
 use odf::metadata::testing::MetadataFactory;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

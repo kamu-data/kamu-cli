@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use kamu::domain::*;
+use kamu_datasets::RenameDatasetUseCase;
 
 use super::{CLIError, Command};
 

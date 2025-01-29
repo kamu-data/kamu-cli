@@ -16,6 +16,8 @@ use indoc::indoc;
 use kamu::domain::*;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
+use kamu_datasets::CreateDatasetFromSnapshotUseCase;
+use kamu_datasets_services::CreateDatasetFromSnapshotUseCaseImpl;
 use messaging_outbox::DummyOutboxImpl;
 use odf::metadata::testing::MetadataFactory;
 use time_source::{SystemTimeSource, SystemTimeSourceStub};

@@ -18,6 +18,7 @@ use kamu::utils::ipfs_wrapper::IpfsClient;
 use kamu::utils::simple_transfer_protocol::SimpleTransferProtocol;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
+use kamu_datasets_services::CreateDatasetUseCaseImpl;
 use messaging_outbox::DummyOutboxImpl;
 use odf::dataset::{DatasetFactoryImpl, IpfsGateway};
 use odf::metadata::testing::MetadataFactory;

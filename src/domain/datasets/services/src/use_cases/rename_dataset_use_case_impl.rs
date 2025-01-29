@@ -16,9 +16,9 @@ use kamu_core::{
     DatasetLifecycleMessage,
     DatasetRegistry,
     DatasetStorageUnitWriter,
-    RenameDatasetUseCase,
     MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
 };
+use kamu_datasets::RenameDatasetUseCase;
 use messaging_outbox::{Outbox, OutboxExt};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

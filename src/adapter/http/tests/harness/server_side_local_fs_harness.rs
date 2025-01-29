@@ -17,8 +17,6 @@ use internal_error::{InternalError, ResultIntoInternal};
 use kamu::domain::{
     CacheDir,
     CommitDatasetEventUseCase,
-    CreateDatasetFromSnapshotUseCase,
-    CreateDatasetUseCase,
     DatasetStorageUnitWriter,
     RunInfoDir,
     ServerUrlConfig,
@@ -28,8 +26,6 @@ use kamu::{
     CommitDatasetEventUseCaseImpl,
     CompactionExecutorImpl,
     CompactionPlannerImpl,
-    CreateDatasetFromSnapshotUseCaseImpl,
-    CreateDatasetUseCaseImpl,
     DatasetRegistrySoloUnitBridge,
     DatasetStorageUnitLocalFs,
     EditDatasetUseCaseImpl,
@@ -47,8 +43,13 @@ use kamu_core::{
     DidGeneratorDefault,
     TenancyConfig,
 };
+use kamu_datasets::{CreateDatasetFromSnapshotUseCase, CreateDatasetUseCase};
 use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
-use kamu_datasets_services::DependencyGraphServiceImpl;
+use kamu_datasets_services::{
+    CreateDatasetFromSnapshotUseCaseImpl,
+    CreateDatasetUseCaseImpl,
+    DependencyGraphServiceImpl,
+};
 use messaging_outbox::DummyOutboxImpl;
 use odf::dataset::DatasetLayout;
 use tempfile::TempDir;

@@ -12,13 +12,16 @@ use std::collections::VecDeque;
 use std::sync::Arc;
 
 use chrono::Utc;
-use kamu::testing::BaseRepoHarness;
+use kamu::testing::{
+    expect_outbox_dataset_dependencies_updated,
+    BaseRepoHarness,
+    BaseUseCaseHarness,
+    BaseUseCaseHarnessOptions,
+};
 use kamu::AppendDatasetMetadataBatchUseCaseImpl;
 use kamu_core::AppendDatasetMetadataBatchUseCase;
 use messaging_outbox::MockOutbox;
 use odf::metadata::testing::MetadataFactory;
-
-use crate::tests::use_cases::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
