@@ -85,7 +85,6 @@ impl SyncRequestBuilder {
             }
             Err(remote_ref) => {
                 let remote_dataset_url = Arc::new(
-                    // #ToDo check error
                     self.remote_alias_resolver
                         .resolve_pull_url(&remote_ref)
                         .await

@@ -277,7 +277,6 @@ async fn test_pause_resume_individual_system_flows() {
     // It should disappear from the list of enabled triggers, and create 1 more
     // event
     let triggers = harness.list_enabled_triggers().await;
-    // println!("")
     assert_eq!(0, triggers.len());
     assert_eq!(2, harness.trigger_events_count());
 

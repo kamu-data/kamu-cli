@@ -290,6 +290,7 @@ impl RemoteAliasResolverApiHelper {
             .send()
             .await
             .int_err()?;
+
         if account_response.status().is_client_error() {
             return Ok(None);
         }
