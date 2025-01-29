@@ -17,6 +17,7 @@ use dill::Component;
 use kamu::domain::*;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
+use kamu_adapter_http::DatasetAuthorizationLayer;
 use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
 use kamu_datasets_services::DependencyGraphServiceImpl;
 use messaging_outbox::DummyOutboxImpl;
@@ -104,6 +105,7 @@ where
         .nest(
             path,
             kamu_adapter_http::smart_transfer_protocol_router()
+                .layer(DatasetAuthorizationLayer::default())
                 .layer(kamu_adapter_http::DatasetResolverLayer::new(
                     identity_extractor,
                     |_| false, /* does not matter for routing tests */

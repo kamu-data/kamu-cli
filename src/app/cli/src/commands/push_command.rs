@@ -211,7 +211,8 @@ impl Command for PushCommand {
                     .filter(|res| res.result.is_err())
                     .map(|res| {
                         let push_err = format!("Failed to push {res}");
-                        (res.result.err().unwrap(), push_err)
+                        let err = res.result.err().unwrap();
+                        (err, push_err)
                     }),
             )
             .into())

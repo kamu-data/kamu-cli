@@ -1,0 +1,22 @@
+kind: DatasetSnapshot
+version: 1
+content:
+  name: 1priv2
+  kind: Root
+  metadata:
+    - kind: AddPushSource
+      sourceName: default
+      read:
+        kind: NdJson
+        schema:
+          - "match_time TIMESTAMP"
+          - "match_id BIGINT"
+          - "player_id STRING"
+          - "score BIGINT"
+      merge:
+        kind: Ledger
+        primaryKey:
+          - match_id
+          - player_id
+    - kind: SetVocab
+      eventTimeColumn: match_time
