@@ -149,7 +149,7 @@ impl TaskAgentImpl {
         );
 
         // Prepare task definition (requires transaction)
-        let task_definition = match DatabaseTransactionRunner::new(self.catalog.clone())
+        let Ok(task_definition) = DatabaseTransactionRunner::new(self.catalog.clone())
             .transactional_with(
                 |task_definition_planner: Arc<dyn TaskDefinitionPlanner>| async move {
                     task_definition_planner
@@ -158,9 +158,8 @@ impl TaskAgentImpl {
                 },
             )
             .await
-        {
-            Ok(task_definition) => task_definition,
-            Err(_) => return Ok(TaskOutcome::Failed(TaskError::Empty)),
+        else {
+            return Ok(TaskOutcome::Failed(TaskError::Empty));
         };
 
         // Run task via definition

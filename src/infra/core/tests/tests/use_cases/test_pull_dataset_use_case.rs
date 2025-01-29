@@ -679,6 +679,7 @@ impl PullUseCaseHarness {
             .bind::<dyn SyncService, MockSyncService>()
             .add::<SyncRequestBuilder>()
             .add::<DatasetFactoryImpl>()
+            .add::<RemoteAliasResolverImpl>()
             .add::<RemoteAliasesRegistryImpl>()
             .add_value(RemoteRepositoryRegistryImpl::create(repos_dir).unwrap())
             .bind::<dyn RemoteRepositoryRegistry, RemoteRepositoryRegistryImpl>()

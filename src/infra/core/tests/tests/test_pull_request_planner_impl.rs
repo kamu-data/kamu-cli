@@ -680,6 +680,7 @@ impl PullTestHarness {
             .add::<TransformRequestPlannerImpl>()
             .add::<ObjectStoreRegistryImpl>()
             .add::<SyncServiceImpl>()
+            .add::<RemoteAliasResolverImpl>()
             .add::<SyncRequestBuilder>()
             .add::<DatasetFactoryImpl>()
             .add::<odf::dataset::DummyOdfServerAccessTokenResolver>()

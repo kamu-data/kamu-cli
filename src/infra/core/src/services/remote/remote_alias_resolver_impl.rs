@@ -203,6 +203,12 @@ impl RemoteAliasResolver for RemoteAliasResolverImpl {
             odf::DatasetRefRemote::Alias(alias)
             | odf::DatasetRefRemote::Handle(odf::metadata::DatasetHandleRemote { alias, .. }) => {
                 let remote_repo = self.remote_repo_reg.get_repository(&alias.repo_name)?;
+                if remote_repo.url.is_s3_protocol() {
+                    return Ok(remote_repo
+                        .url
+                        .join(&format!("{}/", alias.local_alias()))
+                        .unwrap());
+                }
 
                 let transfer_url = if remote_repo.url.is_odf_protocol() {
                     remote_repo.url.clone().odf_to_transport_protocol()?
