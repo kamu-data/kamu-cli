@@ -11,7 +11,7 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## [Unreleased]
+## [0.221.0] - 2025-01-29
 ### Added
 - GQL suport to query and update email on the currently logged account
 - Account registration sends `AccountLifecycleEvent` to `Outbox`
