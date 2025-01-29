@@ -17,3 +17,9 @@ kamu --account alice push 5priv1 --to platform.europort.kamu.dev/alice/5priv1 --
 kamu --account alice push 5priv2 --to platform.europort.kamu.dev/alice/5priv2 --visibility private --force
 kamu --account alice push 5pub1 --to platform.europort.kamu.dev/alice/5pub1 --visibility public --force
 kamu --account alice push 5pub2 --to platform.europort.kamu.dev/alice/5pub2 --visibility public --force
+
+kamu --account bob login https://platform.europort.kamu.dev
+
+kamu --account bob push 6pub1 --to platform.europort.kamu.dev/bob/6pub1 --visibility public --force
+kamu --account bob push 6pub2 --to platform.europort.kamu.dev/bob/6pub2 --visibility public --force
+

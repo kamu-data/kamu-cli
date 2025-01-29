@@ -1,0 +1,20 @@
+kind: DatasetSnapshot
+version: 1
+content:
+  name: 6pub1
+  kind: Derivative
+  metadata:
+    - kind: SetTransform
+      inputs:
+        - datasetRef: alice/5priv1
+        - datasetRef: alice/5pub1
+      transform:
+        kind: Sql
+        engine: datafusion
+        queries:
+          - query: |
+              SELECT *
+              FROM "alice/5priv1"
+              UNION ALL
+              SELECT *
+              FROM "alice/5pub1"

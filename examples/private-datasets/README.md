@@ -41,3 +41,10 @@ How `alice` sees the `alice/3pub` dataset lineage:
 How `bob` sees the `alice/3pub` dataset lineage:
 
 ![bob_3pub_lineage.png](assets/bob_3pub_lineage.png)
+
+### Dataset with a private dependency
+
+In case we have an inaccessible dataset of another user, we cannot update our derived dataset:
+
+![bob_6pub1_lineage.png](assets/bob_6pub1_lineage.png)
+![bob_6pub1_update.png](assets/bob_6pub1_update.png)
