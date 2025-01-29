@@ -15,11 +15,16 @@ use kamu::{
     CreateDatasetFromSnapshotUseCaseImpl,
     DatasetRegistrySoloUnitBridge,
     DatasetStorageUnitLocalFs,
-    DatasetStorageUnitWriter,
     MetadataQueryServiceImpl,
     ViewDatasetUseCaseImpl,
 };
-use kamu_core::{auth, CreateDatasetFromSnapshotUseCase, DidGeneratorDefault, TenancyConfig};
+use kamu_core::{
+    auth,
+    CreateDatasetFromSnapshotUseCase,
+    DatasetStorageUnitWriter,
+    DidGeneratorDefault,
+    TenancyConfig,
+};
 use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
 use kamu_datasets_services::DependencyGraphServiceImpl;
 use kamu_flow_system_inmem::InMemoryFlowConfigurationEventStore;

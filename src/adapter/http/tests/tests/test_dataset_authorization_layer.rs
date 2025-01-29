@@ -14,14 +14,9 @@ use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use dill::{CatalogBuilder, Component};
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu::domain::auth::DatasetAction;
-use kamu::domain::CreateDatasetUseCase;
+use kamu::domain::{CreateDatasetUseCase, DatasetStorageUnitWriter};
 use kamu::testing::MockDatasetActionAuthorizer;
-use kamu::{
-    CreateDatasetUseCaseImpl,
-    DatasetRegistrySoloUnitBridge,
-    DatasetStorageUnitLocalFs,
-    DatasetStorageUnitWriter,
-};
+use kamu::{CreateDatasetUseCaseImpl, DatasetRegistrySoloUnitBridge, DatasetStorageUnitLocalFs};
 use kamu_accounts::testing::MockAuthenticationService;
 use kamu_accounts::*;
 use kamu_core::{DidGenerator, MockDidGenerator, TenancyConfig};

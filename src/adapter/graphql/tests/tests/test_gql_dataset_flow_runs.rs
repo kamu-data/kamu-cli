@@ -19,7 +19,6 @@ use kamu::testing::MockDatasetChangesService;
 use kamu::{
     CreateDatasetFromSnapshotUseCaseImpl,
     DatasetStorageUnitLocalFs,
-    DatasetStorageUnitWriter,
     MetadataQueryServiceImpl,
     ViewDatasetUseCaseImpl,
 };
@@ -39,6 +38,7 @@ use kamu_core::{
     DatasetChangesService,
     DatasetIntervalIncrement,
     DatasetLifecycleMessage,
+    DatasetStorageUnitWriter,
     DidGeneratorDefault,
     PullResult,
     ResetResult,

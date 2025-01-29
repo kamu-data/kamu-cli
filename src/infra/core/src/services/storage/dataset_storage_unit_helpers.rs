@@ -9,9 +9,8 @@
 
 use chrono::{DateTime, Utc};
 use internal_error::*;
+use kamu_core::DatasetStorageUnitWriter;
 use random_names::get_random_name;
-
-use crate::DatasetStorageUnitWriter;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

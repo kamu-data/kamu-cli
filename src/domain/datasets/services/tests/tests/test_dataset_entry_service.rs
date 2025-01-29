@@ -13,12 +13,13 @@ use std::sync::{Arc, RwLock};
 use chrono::{DateTime, TimeZone, Utc};
 use dill::{CatalogBuilder, Component};
 use init_on_startup::InitOnStartup;
-use kamu::{DatasetStorageUnitWriter, MockDatasetStorageUnitWriter};
 use kamu_accounts::{Account, AccountRepository, CurrentAccountSubject};
 use kamu_accounts_inmem::InMemoryAccountRepository;
 use kamu_core::{
     DatasetLifecycleMessage,
     DatasetRegistry,
+    DatasetStorageUnitWriter,
+    MockDatasetStorageUnitWriter,
     TenancyConfig,
     MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
 };

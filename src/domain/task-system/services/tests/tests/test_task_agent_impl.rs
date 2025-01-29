@@ -15,7 +15,7 @@ use dill::{Catalog, CatalogBuilder, Component};
 use kamu::utils::ipfs_wrapper::IpfsClient;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
-use kamu_core::{DidGeneratorDefault, TenancyConfig};
+use kamu_core::{DatasetStorageUnitWriter, DidGeneratorDefault, TenancyConfig};
 use kamu_datasets::DatasetEnvVarsConfig;
 use kamu_datasets_inmem::InMemoryDatasetEnvVarRepository;
 use kamu_datasets_services::DatasetEnvVarServiceImpl;

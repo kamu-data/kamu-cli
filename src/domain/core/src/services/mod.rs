@@ -24,6 +24,7 @@ pub use watermark::*;
 
 pub mod dataset_changes_service;
 pub mod dataset_registry;
+pub mod dataset_storage_unit_writer;
 pub mod dependency_graph_service;
 mod did_generator;
 pub mod engine_provisioner;
@@ -46,6 +47,7 @@ pub mod verification_service;
 
 pub use dataset_changes_service::*;
 pub use dataset_registry::*;
+pub use dataset_storage_unit_writer::*;
 pub use dependency_graph_service::*;
 pub use did_generator::*;
 pub use engine_provisioner::*;

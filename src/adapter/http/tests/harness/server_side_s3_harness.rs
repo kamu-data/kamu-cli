@@ -33,7 +33,6 @@ use kamu::{
     CreateDatasetUseCaseImpl,
     DatasetRegistrySoloUnitBridge,
     DatasetStorageUnitS3,
-    DatasetStorageUnitWriter,
     EditDatasetUseCaseImpl,
     ObjectStoreBuilderLocalFs,
     ObjectStoreBuilderS3,
@@ -42,7 +41,7 @@ use kamu::{
 };
 use kamu_accounts::testing::MockAuthenticationService;
 use kamu_accounts::{Account, AuthenticationService};
-use kamu_core::{DatasetRegistry, DidGeneratorDefault, TenancyConfig};
+use kamu_core::{DatasetRegistry, DatasetStorageUnitWriter, DidGeneratorDefault, TenancyConfig};
 use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
 use kamu_datasets_services::DependencyGraphServiceImpl;
 use messaging_outbox::DummyOutboxImpl;

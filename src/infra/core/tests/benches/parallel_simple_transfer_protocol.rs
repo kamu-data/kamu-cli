@@ -23,7 +23,6 @@ use kamu::utils::simple_transfer_protocol::{
 use kamu::{
     DatasetRegistrySoloUnitBridge,
     DatasetStorageUnitLocalFs,
-    DatasetStorageUnitWriter,
     RemoteReposDir,
     RemoteRepositoryRegistryImpl,
     SyncRequestBuilder,

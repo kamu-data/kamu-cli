@@ -14,7 +14,7 @@ use chrono::{DateTime, TimeZone, Utc};
 use datafusion::prelude::*;
 use dill::Component;
 use indoc::indoc;
-use kamu::{DatasetStorageUnitLocalFs, DatasetStorageUnitWriter};
+use kamu::DatasetStorageUnitLocalFs;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::*;
 use kamu_ingest_datafusion::*;

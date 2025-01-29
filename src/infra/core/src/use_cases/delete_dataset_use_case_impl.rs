@@ -15,13 +15,12 @@ use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer, DatasetActionUnaut
 use kamu_core::{
     DatasetLifecycleMessage,
     DatasetRegistry,
+    DatasetStorageUnitWriter,
     DeleteDatasetUseCase,
     DependencyGraphService,
     MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
 };
 use messaging_outbox::{Outbox, OutboxExt};
-
-use crate::DatasetStorageUnitWriter;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
