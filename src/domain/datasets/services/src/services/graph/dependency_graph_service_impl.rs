@@ -36,6 +36,7 @@ use petgraph::stable_graph::{NodeIndex, StableDiGraph};
 use petgraph::visit::{depth_first_search, Bfs, DfsEvent, Reversed};
 use petgraph::Direction;
 
+use super::DependencyGraphWriter;
 use crate::MESSAGE_CONSUMER_KAMU_DEPENDENCY_GRAPH_SERVICE;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -83,6 +84,7 @@ impl State {
 
 #[component(pub)]
 #[interface(dyn DependencyGraphService)]
+#[interface(dyn DependencyGraphWriter)]
 #[interface(dyn MessageConsumer)]
 #[interface(dyn MessageConsumerT<DatasetLifecycleMessage>)]
 #[meta(MessageConsumerMeta {
@@ -387,6 +389,30 @@ impl DependencyGraphService for DependencyGraphServiceImpl {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[async_trait::async_trait]
+impl DependencyGraphWriter for DependencyGraphServiceImpl {
+    async fn create_dataset_node(&self, dataset_id: &odf::DatasetID) -> Result<(), InternalError> {
+        let mut state = self.state.write().await;
+
+        state.get_or_create_dataset_node(dataset_id);
+
+        Ok(())
+    }
+
+    async fn remove_dataset_node(&self, dataset_id: &odf::DatasetID) -> Result<(), InternalError> {
+        let mut state = self.state.write().await;
+
+        let node_index = state.get_dataset_node(dataset_id).int_err()?;
+
+        state.datasets_graph.remove_node(node_index);
+        state.dataset_node_indices.remove(dataset_id);
+
+        Ok(())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 impl MessageConsumer for DependencyGraphServiceImpl {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -412,15 +438,8 @@ impl MessageConsumerT<DatasetLifecycleMessage> for DependencyGraphServiceImpl {
         let mut state = self.state.write().await;
 
         match message {
-            DatasetLifecycleMessage::Created(message) => {
-                state.get_or_create_dataset_node(&message.dataset_id);
-            }
-
-            DatasetLifecycleMessage::Deleted(message) => {
-                let node_index = state.get_dataset_node(&message.dataset_id).int_err()?;
-
-                state.datasets_graph.remove_node(node_index);
-                state.dataset_node_indices.remove(&message.dataset_id);
+            DatasetLifecycleMessage::Created(_) | DatasetLifecycleMessage::Deleted(_) => {
+                // Nothing to do
             }
 
             DatasetLifecycleMessage::DependenciesUpdated(message) => {
@@ -465,10 +484,6 @@ impl MessageConsumerT<DatasetLifecycleMessage> for DependencyGraphServiceImpl {
                 for added_id in added_dependencies {
                     self.add_dependency(&mut state, added_id, &message.dataset_id);
                 }
-            }
-
-            DatasetLifecycleMessage::Renamed(_) => {
-                // No action required
             }
         }
 

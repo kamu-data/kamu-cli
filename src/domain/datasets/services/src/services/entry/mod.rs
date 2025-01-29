@@ -7,10 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod entry;
-mod env;
-mod graph;
+mod dataset_entry_indexer;
+mod dataset_entry_service_impl;
+mod dataset_entry_writer;
 
-pub use entry::*;
-pub use env::*;
-pub use graph::*;
+pub use dataset_entry_indexer::*;
+pub use dataset_entry_service_impl::*;
+pub use dataset_entry_writer::*;

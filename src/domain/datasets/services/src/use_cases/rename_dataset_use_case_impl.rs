@@ -10,24 +10,19 @@
 use std::sync::Arc;
 
 use dill::{component, interface};
-use kamu_accounts::CurrentAccountSubject;
 use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer, DatasetActionUnauthorizedError};
 use kamu_core::{DatasetRegistry, DatasetStorageUnitWriter};
-use kamu_datasets::{
-    DatasetLifecycleMessage,
-    RenameDatasetUseCase,
-    MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
-};
-use messaging_outbox::{Outbox, OutboxExt};
+use kamu_datasets::RenameDatasetUseCase;
+
+use crate::DatasetEntryWriter;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct RenameDatasetUseCaseImpl {
     dataset_registry: Arc<dyn DatasetRegistry>,
+    dataset_entry_writer: Arc<dyn DatasetEntryWriter>,
     dataset_storage_unit_writer: Arc<dyn DatasetStorageUnitWriter>,
     dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
-    outbox: Arc<dyn Outbox>,
-    current_account_subject: Arc<CurrentAccountSubject>,
 }
 
 #[component(pub)]
@@ -35,17 +30,15 @@ pub struct RenameDatasetUseCaseImpl {
 impl RenameDatasetUseCaseImpl {
     pub fn new(
         dataset_registry: Arc<dyn DatasetRegistry>,
+        dataset_entry_writer: Arc<dyn DatasetEntryWriter>,
         dataset_storage_unit_writer: Arc<dyn DatasetStorageUnitWriter>,
         dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
-        outbox: Arc<dyn Outbox>,
-        current_account_subject: Arc<CurrentAccountSubject>,
     ) -> Self {
         Self {
             dataset_registry,
+            dataset_entry_writer,
             dataset_storage_unit_writer,
             dataset_action_authorizer,
-            outbox,
-            current_account_subject,
         }
     }
 }
@@ -63,12 +56,6 @@ impl RenameDatasetUseCase for RenameDatasetUseCaseImpl {
         dataset_ref: &odf::DatasetRef,
         new_name: &odf::DatasetName,
     ) -> Result<(), odf::dataset::RenameDatasetError> {
-        let owner_account_id = match self.current_account_subject.as_ref() {
-            CurrentAccountSubject::Anonymous(_) => {
-                panic!("Anonymous account cannot rename dataset");
-            }
-            CurrentAccountSubject::Logged(l) => l.account_id.clone(),
-        };
         let dataset_handle = match self
             .dataset_registry
             .resolve_dataset_handle_by_ref(dataset_ref)
@@ -95,22 +82,15 @@ impl RenameDatasetUseCase for RenameDatasetUseCaseImpl {
                 }
             })?;
 
-        let old_name = dataset_handle.alias.dataset_name.clone();
-
-        self.dataset_storage_unit_writer
-            .rename_dataset(&dataset_handle, new_name)
+        // TODO: error handling such as name collision should move to this level.
+        self.dataset_entry_writer
+            .rename_entry(&dataset_handle, new_name)
             .await?;
 
-        self.outbox
-            .post_message(
-                MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
-                DatasetLifecycleMessage::renamed(
-                    dataset_handle.id.clone(),
-                    owner_account_id,
-                    old_name,
-                    new_name.clone(),
-                ),
-            )
+        // TODO: once we get rid of aliases and unify repo storage,
+        // there will be nothing to do at storage level on rename
+        self.dataset_storage_unit_writer
+            .rename_dataset(&dataset_handle, new_name)
             .await?;
 
         Ok(())

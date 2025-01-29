@@ -78,15 +78,6 @@ async fn test_correctly_handles_outbox_messages() {
         )
         .await;
 
-    harness
-        .mimic_dataset_renamed(
-            dataset_id.clone(),
-            owner_account_id,
-            initial_dataset_name,
-            new_dataset_name,
-        )
-        .await;
-
     harness.mimic_dataset_deleted(dataset_id).await;
 }
 
@@ -319,27 +310,6 @@ impl DatasetEntryServiceHarness {
                     owner_account_id,
                     private_visibility,
                     dataset_name,
-                ),
-            )
-            .await
-            .unwrap();
-    }
-
-    async fn mimic_dataset_renamed(
-        &self,
-        dataset_id: odf::DatasetID,
-        owner_account_id: odf::AccountID,
-        old_dataset_name: odf::DatasetName,
-        new_dataset_name: odf::DatasetName,
-    ) {
-        self.outbox
-            .post_message(
-                MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
-                DatasetLifecycleMessage::renamed(
-                    dataset_id,
-                    owner_account_id,
-                    old_dataset_name,
-                    new_dataset_name,
                 ),
             )
             .await

@@ -51,25 +51,6 @@ pub fn expect_outbox_dataset_dependencies_updated(mock_outbox: &mut MockOutbox, 
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn expect_outbox_dataset_renamed(mock_outbox: &mut MockOutbox, times: usize) {
-    mock_outbox
-        .expect_post_message_as_json()
-        .with(
-            eq(MESSAGE_PRODUCER_KAMU_DATASET_SERVICE),
-            function(|message_as_json: &serde_json::Value| {
-                matches!(
-                    serde_json::from_value::<DatasetLifecycleMessage>(message_as_json.clone()),
-                    Ok(DatasetLifecycleMessage::Renamed(_))
-                )
-            }),
-            always(),
-        )
-        .times(times)
-        .returning(|_, _, _| Ok(()));
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 pub fn expect_outbox_dataset_deleted(mock_outbox: &mut MockOutbox, times: usize) {
     mock_outbox
         .expect_post_message_as_json()

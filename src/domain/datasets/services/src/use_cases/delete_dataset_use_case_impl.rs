@@ -20,31 +20,39 @@ use kamu_datasets::{
 };
 use messaging_outbox::{Outbox, OutboxExt};
 
+use crate::{DatasetEntryWriter, DependencyGraphWriter};
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
 #[interface(dyn DeleteDatasetUseCase)]
 pub struct DeleteDatasetUseCaseImpl {
     dataset_registry: Arc<dyn DatasetRegistry>,
+    dataset_entry_writer: Arc<dyn DatasetEntryWriter>,
     dataset_storage_unit_writer: Arc<dyn DatasetStorageUnitWriter>,
     dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
     dependency_graph_service: Arc<dyn DependencyGraphService>,
+    dependency_graph_writer: Arc<dyn DependencyGraphWriter>,
     outbox: Arc<dyn Outbox>,
 }
 
 impl DeleteDatasetUseCaseImpl {
     pub fn new(
         dataset_registry: Arc<dyn DatasetRegistry>,
+        dataset_entry_writer: Arc<dyn DatasetEntryWriter>,
         dataset_storage_unit_writer: Arc<dyn DatasetStorageUnitWriter>,
         dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
         dependency_graph_service: Arc<dyn DependencyGraphService>,
+        dependency_graph_writer: Arc<dyn DependencyGraphWriter>,
         outbox: Arc<dyn Outbox>,
     ) -> Self {
         Self {
             dataset_registry,
+            dataset_entry_writer,
             dataset_storage_unit_writer,
             dataset_action_authorizer,
             dependency_graph_service,
+            dependency_graph_writer,
             outbox,
         }
     }
@@ -139,9 +147,19 @@ impl DeleteDatasetUseCase for DeleteDatasetUseCaseImpl {
         // Validate against dangling ref
         self.ensure_no_dangling_references(dataset_handle).await?;
 
+        // Remove entry
+        self.dataset_entry_writer
+            .remove_entry(dataset_handle)
+            .await?;
+
         // Do actual delete
         self.dataset_storage_unit_writer
             .delete_dataset(dataset_handle)
+            .await?;
+
+        // Remove graph node
+        self.dependency_graph_writer
+            .remove_dataset_node(&dataset_handle.id)
             .await?;
 
         // Notify interested parties

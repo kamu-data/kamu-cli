@@ -718,8 +718,7 @@ impl MessageConsumerT<DatasetLifecycleMessage> for FlowAgentImpl {
             }
 
             DatasetLifecycleMessage::Created(_)
-            | DatasetLifecycleMessage::DependenciesUpdated(_)
-            | DatasetLifecycleMessage::Renamed(_) => {
+            | DatasetLifecycleMessage::DependenciesUpdated(_) => {
                 // No action required
             }
         }

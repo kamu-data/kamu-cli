@@ -10,16 +10,10 @@
 use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
-use kamu::testing::{
-    expect_outbox_dataset_renamed,
-    BaseUseCaseHarness,
-    BaseUseCaseHarnessOptions,
-    MockDatasetActionAuthorizer,
-};
+use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions, MockDatasetActionAuthorizer};
 use kamu_core::MockDidGenerator;
 use kamu_datasets::RenameDatasetUseCase;
 use kamu_datasets_services::RenameDatasetUseCaseImpl;
-use messaging_outbox::MockOutbox;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -31,12 +25,9 @@ async fn test_rename_dataset_success_via_ref() {
 
     let mock_authorizer =
         MockDatasetActionAuthorizer::new().expect_check_write_dataset(&dataset_id_foo, 1, true);
-    let mut mock_outbox = MockOutbox::new();
-    expect_outbox_dataset_renamed(&mut mock_outbox, 1);
 
     let harness = RenameUseCaseHarness::new(
         mock_authorizer,
-        mock_outbox,
         Some(MockDidGenerator::predefined_dataset_ids(vec![
             dataset_id_foo,
         ])),
@@ -66,8 +57,7 @@ async fn test_rename_dataset_success_via_ref() {
 
 #[tokio::test]
 async fn test_rename_dataset_not_found() {
-    let harness =
-        RenameUseCaseHarness::new(MockDatasetActionAuthorizer::new(), MockOutbox::new(), None);
+    let harness = RenameUseCaseHarness::new(MockDatasetActionAuthorizer::new(), None);
 
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     assert_matches!(
@@ -91,7 +81,6 @@ async fn test_rename_dataset_unauthorized() {
 
     let harness = RenameUseCaseHarness::new(
         MockDatasetActionAuthorizer::new().expect_check_write_dataset(&dataset_id_foo, 1, false),
-        MockOutbox::new(),
         Some(MockDidGenerator::predefined_dataset_ids(vec![
             dataset_id_foo,
         ])),
@@ -124,13 +113,11 @@ struct RenameUseCaseHarness {
 impl RenameUseCaseHarness {
     fn new(
         mock_dataset_action_authorizer: MockDatasetActionAuthorizer,
-        mock_outbox: MockOutbox,
         maybe_mock_did_generator: Option<MockDidGenerator>,
     ) -> Self {
         let base_harness = BaseUseCaseHarness::new(
             BaseUseCaseHarnessOptions::new()
                 .with_authorizer(mock_dataset_action_authorizer)
-                .with_outbox(mock_outbox)
                 .with_maybe_mock_did_generator(maybe_mock_did_generator),
         );
 

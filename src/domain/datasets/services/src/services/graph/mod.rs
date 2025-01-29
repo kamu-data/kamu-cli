@@ -7,10 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod entry;
-mod env;
-mod graph;
+mod dependency_graph_indexer;
+mod dependency_graph_service_impl;
+mod dependency_graph_writer;
 
-pub use entry::*;
-pub use env::*;
-pub use graph::*;
+pub use dependency_graph_indexer::*;
+pub use dependency_graph_service_impl::*;
+pub use dependency_graph_writer::*;

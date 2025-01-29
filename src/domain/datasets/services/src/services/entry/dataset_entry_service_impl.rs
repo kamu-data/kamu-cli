@@ -11,7 +11,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use database_common::{EntityPageListing, EntityPageStreamer, PaginationOpts};
-use dill::{component, interface, meta, Catalog};
+use dill::{component, interface};
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_accounts::{
     AccountNotFoundByNameError,
@@ -27,17 +27,11 @@ use kamu_core::{
     TenancyConfig,
 };
 use kamu_datasets::*;
-use messaging_outbox::{
-    MessageConsumer,
-    MessageConsumerMeta,
-    MessageConsumerT,
-    MessageDeliveryMechanism,
-};
 use thiserror::Error;
 use time_source::SystemTimeSource;
 use tokio::sync::RwLock;
 
-use crate::MESSAGE_CONSUMER_KAMU_DATASET_ENTRY_SERVICE;
+use super::DatasetEntryWriter;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -63,16 +57,8 @@ struct AccountsCache {
 
 #[component(pub)]
 #[interface(dyn DatasetEntryService)]
+#[interface(dyn DatasetEntryWriter)]
 #[interface(dyn DatasetRegistry)]
-#[interface(dyn MessageConsumer)]
-#[interface(dyn MessageConsumerT<DatasetLifecycleMessage>)]
-#[meta(MessageConsumerMeta {
-    consumer_name: MESSAGE_CONSUMER_KAMU_DATASET_ENTRY_SERVICE,
-    feeding_producers: &[
-        MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
-    ],
-    delivery: MessageDeliveryMechanism::Immediate,
-})]
 impl DatasetEntryServiceImpl {
     pub fn new(
         time_source: Arc<dyn SystemTimeSource>,
@@ -91,62 +77,6 @@ impl DatasetEntryServiceImpl {
             tenancy_config,
             accounts_cache: Default::default(),
         }
-    }
-
-    async fn handle_dataset_lifecycle_created_message(
-        &self,
-        DatasetLifecycleMessageCreated {
-            dataset_id,
-            owner_account_id,
-            dataset_name,
-            ..
-        }: &DatasetLifecycleMessageCreated,
-    ) -> Result<(), InternalError> {
-        match self.dataset_entry_repo.get_dataset_entry(dataset_id).await {
-            Ok(_) => return Ok(()), // idempotent handling of duplicates
-            Err(GetDatasetEntryError::NotFound(_)) => { /* happy case, create record */ }
-            Err(GetDatasetEntryError::Internal(e)) => return Err(e),
-        }
-
-        let entry = DatasetEntry::new(
-            dataset_id.clone(),
-            owner_account_id.clone(),
-            dataset_name.clone(),
-            self.time_source.now(),
-        );
-
-        self.dataset_entry_repo
-            .save_dataset_entry(&entry)
-            .await
-            .int_err()
-    }
-
-    async fn handle_dataset_lifecycle_deleted_message(
-        &self,
-        DatasetLifecycleMessageDeleted { dataset_id, .. }: &DatasetLifecycleMessageDeleted,
-    ) -> Result<(), InternalError> {
-        match self
-            .dataset_entry_repo
-            .delete_dataset_entry(dataset_id)
-            .await
-        {
-            Ok(_) | Err(DeleteEntryDatasetError::NotFound(_)) => Ok(()),
-            Err(DeleteEntryDatasetError::Internal(e)) => Err(e),
-        }
-    }
-
-    async fn handle_dataset_lifecycle_renamed_message(
-        &self,
-        DatasetLifecycleMessageRenamed {
-            dataset_id,
-            new_dataset_name,
-            ..
-        }: &DatasetLifecycleMessageRenamed,
-    ) -> Result<(), InternalError> {
-        self.dataset_entry_repo
-            .update_dataset_entry_name(dataset_id, new_dataset_name)
-            .await
-            .int_err()
     }
 
     async fn entries_as_handles(
@@ -549,41 +479,52 @@ impl DatasetRegistry for DatasetEntryServiceImpl {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl MessageConsumer for DatasetEntryServiceImpl {}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 #[async_trait::async_trait]
-impl MessageConsumerT<DatasetLifecycleMessage> for DatasetEntryServiceImpl {
-    #[tracing::instrument(
-        level = "debug",
-        skip_all,
-        name = "DatasetEntryService[DatasetLifecycleMessage]"
-    )]
-    async fn consume_message(
+impl DatasetEntryWriter for DatasetEntryServiceImpl {
+    async fn create_entry(
         &self,
-        _: &Catalog,
-        message: &DatasetLifecycleMessage,
+        dataset_id: &odf::DatasetID,
+        owner_account_id: &odf::AccountID,
+        dataset_name: &odf::DatasetName,
     ) -> Result<(), InternalError> {
-        tracing::debug!(received_message = ?message, "Received dataset lifecycle message");
+        match self.dataset_entry_repo.get_dataset_entry(dataset_id).await {
+            Ok(_) => return Ok(()), // idempotent handling of duplicates
+            Err(GetDatasetEntryError::NotFound(_)) => { /* happy case, create record */ }
+            Err(GetDatasetEntryError::Internal(e)) => return Err(e),
+        }
 
-        match message {
-            DatasetLifecycleMessage::Created(message) => {
-                self.handle_dataset_lifecycle_created_message(message).await
-            }
+        let entry = DatasetEntry::new(
+            dataset_id.clone(),
+            owner_account_id.clone(),
+            dataset_name.clone(),
+            self.time_source.now(),
+        );
 
-            DatasetLifecycleMessage::Deleted(message) => {
-                self.handle_dataset_lifecycle_deleted_message(message).await
-            }
+        self.dataset_entry_repo
+            .save_dataset_entry(&entry)
+            .await
+            .int_err()
+    }
 
-            DatasetLifecycleMessage::Renamed(message) => {
-                self.handle_dataset_lifecycle_renamed_message(message).await
-            }
+    async fn rename_entry(
+        &self,
+        dataset_handle: &odf::DatasetHandle,
+        new_dataset_name: &odf::DatasetName,
+    ) -> Result<(), InternalError> {
+        self.dataset_entry_repo
+            .update_dataset_entry_name(&dataset_handle.id, new_dataset_name)
+            .await
+            .int_err()
+    }
 
-            DatasetLifecycleMessage::DependenciesUpdated(_) => {
-                // No action required
-                Ok(())
-            }
+    async fn remove_entry(&self, dataset_handle: &odf::DatasetHandle) -> Result<(), InternalError> {
+        match self
+            .dataset_entry_repo
+            .delete_dataset_entry(&dataset_handle.id)
+            .await
+        {
+            Ok(_) | Err(DeleteEntryDatasetError::NotFound(_)) => Ok(()),
+            Err(DeleteEntryDatasetError::Internal(e)) => Err(e),
         }
     }
 }
