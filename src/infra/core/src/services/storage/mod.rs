@@ -7,10 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod dataset_storage_unit_helpers;
 mod dataset_storage_unit_local_fs;
 mod dataset_storage_unit_s3;
 
-pub use dataset_storage_unit_helpers::*;
 pub use dataset_storage_unit_local_fs::*;
 pub use dataset_storage_unit_s3::*;

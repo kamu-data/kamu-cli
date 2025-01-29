@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 #![feature(let_chains)]
+#![feature(trait_upcasting)]
 
 // Re-exports
 pub use kamu_datasets as domain;
