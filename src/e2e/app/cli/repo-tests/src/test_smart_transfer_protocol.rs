@@ -1411,6 +1411,7 @@ async fn test_smart_push_pull_with_registered_repo_smart_pull(
             .await
             .success();
 
+        // ToDo: fix this behavior in scope of separation of pull and update commands
         let dataset_ref = if is_pull_workspace_multi_tenant {
             kamu_api_server_dataset_endpoint.as_str()
         } else {
