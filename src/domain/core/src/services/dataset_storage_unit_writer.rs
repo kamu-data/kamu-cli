@@ -18,11 +18,6 @@ pub trait DatasetStorageUnitWriter: Sync + Send {
         seed_block: odf::MetadataBlockTyped<odf::metadata::Seed>,
     ) -> Result<odf::CreateDatasetResult, odf::dataset::CreateDatasetError>;
 
-    async fn create_dataset_from_snapshot(
-        &self,
-        snapshot: odf::DatasetSnapshot,
-    ) -> Result<odf::CreateDatasetFromSnapshotResult, odf::dataset::CreateDatasetFromSnapshotError>;
-
     async fn rename_dataset(
         &self,
         dataset_handle: &odf::DatasetHandle,

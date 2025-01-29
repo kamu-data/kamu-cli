@@ -320,49 +320,7 @@ impl DatasetEntryService for DatasetEntryServiceImpl {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl DatasetRegistry for DatasetEntryServiceImpl {
-    #[tracing::instrument(level = "debug", skip_all)]
-    fn all_dataset_handles(&self) -> odf::dataset::DatasetHandleStream {
-        EntityPageStreamer::default().into_stream(
-            || async { Ok(()) },
-            |_, pagination| self.list_all_dataset_handles(pagination),
-        )
-    }
-
-    #[tracing::instrument(level = "debug", skip_all, fields(%owner_name))]
-    fn all_dataset_handles_by_owner(
-        &self,
-        owner_name: &odf::AccountName,
-    ) -> odf::dataset::DatasetHandleStream {
-        let owner_name = owner_name.clone();
-
-        EntityPageStreamer::default().into_stream(
-            move || async move {
-                let owner_id = match self
-                    .resolve_account_id_by_maybe_name(Some(&owner_name))
-                    .await
-                {
-                    Ok(owner_id) => Some(owner_id),
-                    Err(ResolveAccountIdByNameError::NotFound(_)) => None,
-                    Err(e) => return Err(e.int_err()),
-                };
-                Ok(Arc::new(owner_id))
-            },
-            move |owner_id_maybe, pagination| async move {
-                if let Some(owner_id) = owner_id_maybe.as_ref() {
-                    return self
-                        .list_all_dataset_handles_by_owner_id(owner_id, pagination)
-                        .await;
-                }
-
-                Ok(EntityPageListing {
-                    list: Vec::new(),
-                    total_count: 0,
-                })
-            },
-        )
-    }
-
+impl odf::dataset::DatasetHandleResolver for DatasetEntryServiceImpl {
     #[tracing::instrument(level = "debug", skip_all, fields(%dataset_ref))]
     async fn resolve_dataset_handle_by_ref(
         &self,
@@ -424,6 +382,53 @@ impl DatasetRegistry for DatasetEntryServiceImpl {
                 }
             },
         }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait::async_trait]
+impl DatasetRegistry for DatasetEntryServiceImpl {
+    #[tracing::instrument(level = "debug", skip_all)]
+    fn all_dataset_handles(&self) -> odf::dataset::DatasetHandleStream {
+        EntityPageStreamer::default().into_stream(
+            || async { Ok(()) },
+            |_, pagination| self.list_all_dataset_handles(pagination),
+        )
+    }
+
+    #[tracing::instrument(level = "debug", skip_all, fields(%owner_name))]
+    fn all_dataset_handles_by_owner(
+        &self,
+        owner_name: &odf::AccountName,
+    ) -> odf::dataset::DatasetHandleStream {
+        let owner_name = owner_name.clone();
+
+        EntityPageStreamer::default().into_stream(
+            move || async move {
+                let owner_id = match self
+                    .resolve_account_id_by_maybe_name(Some(&owner_name))
+                    .await
+                {
+                    Ok(owner_id) => Some(owner_id),
+                    Err(ResolveAccountIdByNameError::NotFound(_)) => None,
+                    Err(e) => return Err(e.int_err()),
+                };
+                Ok(Arc::new(owner_id))
+            },
+            move |owner_id_maybe, pagination| async move {
+                if let Some(owner_id) = owner_id_maybe.as_ref() {
+                    return self
+                        .list_all_dataset_handles_by_owner_id(owner_id, pagination)
+                        .await;
+                }
+
+                Ok(EntityPageListing {
+                    list: Vec::new(),
+                    total_count: 0,
+                })
+            },
+        )
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(?dataset_ids))]

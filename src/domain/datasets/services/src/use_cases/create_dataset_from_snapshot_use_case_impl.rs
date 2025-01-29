@@ -10,34 +10,45 @@
 use std::sync::Arc;
 
 use dill::{component, interface};
-use kamu_accounts::CurrentAccountSubject;
-use kamu_core::DatasetStorageUnitWriter;
+use internal_error::ResultIntoInternal;
+use kamu_core::{DatasetRegistry, DatasetStorageUnitWriter, DidGenerator};
 use kamu_datasets::{
     CreateDatasetFromSnapshotUseCase,
+    CreateDatasetUseCase,
     CreateDatasetUseCaseOptions,
     DatasetLifecycleMessage,
     MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
 };
 use messaging_outbox::{Outbox, OutboxExt};
+use time_source::SystemTimeSource;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
 #[interface(dyn CreateDatasetFromSnapshotUseCase)]
 pub struct CreateDatasetFromSnapshotUseCaseImpl {
-    current_account_subject: Arc<CurrentAccountSubject>,
+    create_dataset_use_case: Arc<dyn CreateDatasetUseCase>,
+    system_time_source: Arc<dyn SystemTimeSource>,
+    did_generator: Arc<dyn DidGenerator>,
+    dataset_registry: Arc<dyn DatasetRegistry>,
     dataset_storage_unit_writer: Arc<dyn DatasetStorageUnitWriter>,
     outbox: Arc<dyn Outbox>,
 }
 
 impl CreateDatasetFromSnapshotUseCaseImpl {
     pub fn new(
-        current_account_subject: Arc<CurrentAccountSubject>,
+        create_dataset_use_case: Arc<dyn CreateDatasetUseCase>,
+        system_time_source: Arc<dyn SystemTimeSource>,
+        did_generator: Arc<dyn DidGenerator>,
+        dataset_registry: Arc<dyn DatasetRegistry>,
         dataset_storage_unit_writer: Arc<dyn DatasetStorageUnitWriter>,
         outbox: Arc<dyn Outbox>,
     ) -> Self {
         Self {
-            current_account_subject,
+            create_dataset_use_case,
+            system_time_source,
+            did_generator,
+            dataset_registry,
             dataset_storage_unit_writer,
             outbox,
         }
@@ -49,35 +60,91 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
     #[tracing::instrument(level = "info", skip_all, fields(?snapshot, ?options))]
     async fn execute(
         &self,
-        snapshot: odf::DatasetSnapshot,
+        mut snapshot: odf::DatasetSnapshot,
         options: CreateDatasetUseCaseOptions,
     ) -> Result<odf::CreateDatasetResult, odf::dataset::CreateDatasetFromSnapshotError> {
-        let logged_account_id = match self.current_account_subject.as_ref() {
-            CurrentAccountSubject::Anonymous(_) => {
-                panic!("Anonymous account cannot create dataset");
-            }
-            CurrentAccountSubject::Logged(l) => l.account_id.clone(),
-        };
-        let dataset_name = snapshot.name.dataset_name.clone();
-        let odf::CreateDatasetFromSnapshotResult {
-            create_dataset_result,
-            new_upstream_ids,
-        } = self
-            .dataset_storage_unit_writer
-            .create_dataset_from_snapshot(snapshot)
-            .await?;
+        // Validate / resolve metadata events from the snapshot
+        odf::dataset::normalize_and_validate_dataset_snapshot(
+            self.dataset_registry.as_ref(),
+            &mut snapshot,
+        )
+        .await?;
 
-        self.outbox
-            .post_message(
-                MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
-                DatasetLifecycleMessage::created(
-                    create_dataset_result.dataset_handle.id.clone(),
-                    logged_account_id,
-                    options.dataset_visibility,
-                    dataset_name,
-                ),
+        let system_time = self.system_time_source.now();
+
+        let create_dataset_result = self
+            .create_dataset_use_case
+            .execute(
+                &snapshot.name,
+                odf::MetadataBlockTyped {
+                    system_time,
+                    prev_block_hash: None,
+                    event: odf::metadata::Seed {
+                        dataset_id: self.did_generator.generate_dataset_id(),
+                        dataset_kind: snapshot.kind,
+                    },
+                    sequence_number: 0,
+                },
+                options,
             )
             .await?;
+
+        let chain = create_dataset_result.dataset.as_metadata_chain();
+        let mut head = create_dataset_result.head.clone();
+        let mut sequence_number = 1;
+        let mut new_upstream_ids: Vec<odf::DatasetID> = vec![];
+
+        for event in snapshot.metadata {
+            if let odf::MetadataEvent::SetTransform(transform) = &event {
+                // Collect only the latest upstream dataset IDs
+                new_upstream_ids.clear();
+                for new_input in &transform.inputs {
+                    // Note: We already resolved all references to IDs above in
+                    // `resolve_transform_inputs`
+                    new_upstream_ids.push(new_input.dataset_ref.id().cloned().unwrap());
+                }
+            }
+
+            head = match chain
+                .append(
+                    odf::MetadataBlock {
+                        system_time,
+                        prev_block_hash: Some(head),
+                        event,
+                        sequence_number,
+                    },
+                    odf::dataset::AppendOpts {
+                        update_ref: None,
+                        ..odf::dataset::AppendOpts::default()
+                    },
+                )
+                .await
+            {
+                Ok(head) => Ok(head),
+                Err(e) => {
+                    // Attempt to clean up dataset
+                    let _ = self
+                        .dataset_storage_unit_writer
+                        .delete_dataset(&create_dataset_result.dataset_handle)
+                        .await;
+                    Err(e)
+                }
+            }?;
+
+            sequence_number += 1;
+        }
+
+        chain
+            .set_ref(
+                &odf::BlockRef::Head,
+                &head,
+                odf::dataset::SetRefOpts {
+                    validate_block_present: false,
+                    check_ref_is: Some(Some(&create_dataset_result.head)),
+                },
+            )
+            .await
+            .int_err()?;
 
         if !new_upstream_ids.is_empty() {
             self.outbox

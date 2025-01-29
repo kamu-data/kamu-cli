@@ -14,7 +14,7 @@ use async_trait::async_trait;
 use dill::*;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_accounts::{CurrentAccountSubject, DEFAULT_ACCOUNT_NAME_STR};
-use kamu_core::{DatasetStorageUnitWriter, DidGenerator, TenancyConfig};
+use kamu_core::{DatasetStorageUnitWriter, TenancyConfig};
 use odf::dataset::{DatasetImpl, DatasetLayout, MetadataChainImpl};
 use odf::storage::lfs::{NamedObjectRepositoryLocalFS, ObjectRepositoryLocalFSSha3};
 use odf::storage::{
@@ -22,18 +22,13 @@ use odf::storage::{
     MetadataBlockRepositoryImpl,
     ReferenceRepositoryImpl,
 };
-use time_source::SystemTimeSource;
 use url::Url;
-
-use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct DatasetStorageUnitLocalFs {
     storage_strategy: Box<dyn DatasetStorageStrategy>,
     thrash_lock: tokio::sync::Mutex<()>,
-    system_time_source: Arc<dyn SystemTimeSource>,
-    did_generator: Arc<dyn DidGenerator>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -45,8 +40,6 @@ impl DatasetStorageUnitLocalFs {
         root: PathBuf,
         current_account_subject: Arc<CurrentAccountSubject>,
         tenancy_config: Arc<TenancyConfig>,
-        system_time_source: Arc<dyn SystemTimeSource>,
-        did_generator: Arc<dyn DidGenerator>,
     ) -> Self {
         Self {
             storage_strategy: match *tenancy_config {
@@ -59,8 +52,6 @@ impl DatasetStorageUnitLocalFs {
                 }
             },
             thrash_lock: tokio::sync::Mutex::new(()),
-            system_time_source,
-            did_generator,
         }
     }
 
@@ -301,21 +292,6 @@ impl DatasetStorageUnitWriter for DatasetStorageUnitLocalFs {
             dataset,
             head,
         })
-    }
-
-    #[tracing::instrument(level = "debug", skip_all, fields(?snapshot))]
-    async fn create_dataset_from_snapshot(
-        &self,
-        snapshot: odf::DatasetSnapshot,
-    ) -> Result<odf::CreateDatasetFromSnapshotResult, odf::dataset::CreateDatasetFromSnapshotError>
-    {
-        create_dataset_from_snapshot_impl(
-            self,
-            snapshot,
-            self.system_time_source.now(),
-            self.did_generator.generate_dataset_id(),
-        )
-        .await
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(%dataset_handle, %new_name))]

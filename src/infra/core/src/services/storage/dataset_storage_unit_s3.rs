@@ -15,7 +15,7 @@ use chrono::{DateTime, Utc};
 use dill::*;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_accounts::{CurrentAccountSubject, DEFAULT_ACCOUNT_NAME_STR};
-use kamu_core::{DatasetStorageUnitWriter, DidGenerator, TenancyConfig};
+use kamu_core::{DatasetStorageUnitWriter, TenancyConfig};
 use odf::dataset::{DatasetImpl, MetadataChainImpl};
 use odf::storage::lfs::ObjectRepositoryCachingLocalFs;
 use odf::storage::s3::{NamedObjectRepositoryS3, ObjectRepositoryS3Sha3};
@@ -28,8 +28,6 @@ use s3_utils::S3Context;
 use time_source::SystemTimeSource;
 use tokio::sync::Mutex;
 
-use crate::*;
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct DatasetStorageUnitS3 {
@@ -39,7 +37,6 @@ pub struct DatasetStorageUnitS3 {
     registry_cache: Option<Arc<S3RegistryCache>>,
     metadata_cache_local_fs_path: Option<Arc<PathBuf>>,
     system_time_source: Arc<dyn SystemTimeSource>,
-    did_generator: Arc<dyn DidGenerator>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -62,7 +59,6 @@ impl DatasetStorageUnitS3 {
         registry_cache: Option<Arc<S3RegistryCache>>,
         metadata_cache_local_fs_path: Option<Arc<PathBuf>>,
         system_time_source: Arc<dyn SystemTimeSource>,
-        did_generator: Arc<dyn DidGenerator>,
     ) -> Self {
         Self {
             s3_context,
@@ -71,7 +67,6 @@ impl DatasetStorageUnitS3 {
             registry_cache,
             metadata_cache_local_fs_path,
             system_time_source,
-            did_generator,
         }
     }
 
@@ -441,21 +436,6 @@ impl DatasetStorageUnitWriter for DatasetStorageUnitS3 {
             dataset,
             head,
         })
-    }
-
-    #[tracing::instrument(level = "debug", skip_all, fields(?snapshot))]
-    async fn create_dataset_from_snapshot(
-        &self,
-        snapshot: odf::DatasetSnapshot,
-    ) -> Result<odf::CreateDatasetFromSnapshotResult, odf::dataset::CreateDatasetFromSnapshotError>
-    {
-        create_dataset_from_snapshot_impl(
-            self,
-            snapshot,
-            self.system_time_source.now(),
-            self.did_generator.generate_dataset_id(),
-        )
-        .await
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(%dataset_handle, %new_name))]

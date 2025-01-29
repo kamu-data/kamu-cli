@@ -34,6 +34,18 @@ impl DatasetRegistrySoloUnitBridge {
 }
 
 #[async_trait::async_trait]
+impl odf::dataset::DatasetHandleResolver for DatasetRegistrySoloUnitBridge {
+    async fn resolve_dataset_handle_by_ref(
+        &self,
+        dataset_ref: &odf::DatasetRef,
+    ) -> Result<odf::DatasetHandle, odf::dataset::GetDatasetError> {
+        self.dataset_storage_unit
+            .resolve_stored_dataset_handle_by_ref(dataset_ref)
+            .await
+    }
+}
+
+#[async_trait::async_trait]
 impl DatasetRegistry for DatasetRegistrySoloUnitBridge {
     fn all_dataset_handles(&self) -> odf::dataset::DatasetHandleStream<'_> {
         self.dataset_storage_unit.stored_dataset_handles()
@@ -47,19 +59,12 @@ impl DatasetRegistry for DatasetRegistrySoloUnitBridge {
             .stored_dataset_handles_by_owner(owner_name)
     }
 
-    async fn resolve_dataset_handle_by_ref(
-        &self,
-        dataset_ref: &odf::DatasetRef,
-    ) -> Result<odf::DatasetHandle, odf::dataset::GetDatasetError> {
-        self.dataset_storage_unit
-            .resolve_stored_dataset_handle_by_ref(dataset_ref)
-            .await
-    }
-
     async fn resolve_multiple_dataset_handles_by_ids(
         &self,
         dataset_ids: Vec<odf::DatasetID>,
     ) -> Result<DatasetHandlesResolution, GetMultipleDatasetsError> {
+        use odf::dataset::DatasetHandleResolver;
+
         let mut res: DatasetHandlesResolution = Default::default();
 
         for dataset_id in dataset_ids {

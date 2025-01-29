@@ -8,11 +8,15 @@
 // by the Apache License, Version 2.0.
 
 mod dataset_factory;
+mod dataset_handle_resolver;
 mod metadata_chain_visitor;
 mod metadata_chain_visitors;
 mod odf_server_access_token_resolver;
+mod snapshot_validator;
 
 pub use dataset_factory::*;
+pub use dataset_handle_resolver::*;
 pub use metadata_chain_visitor::*;
 pub use metadata_chain_visitors::*;
 pub use odf_server_access_token_resolver::*;
+pub use snapshot_validator::*;
