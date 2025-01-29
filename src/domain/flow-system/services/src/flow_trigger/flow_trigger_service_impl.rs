@@ -12,7 +12,7 @@ use std::sync::Arc;
 use chrono::{DateTime, Utc};
 use database_common::PaginationOpts;
 use dill::*;
-use kamu_core::{DatasetLifecycleMessage, MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE};
+use kamu_datasets::{DatasetLifecycleMessage, MESSAGE_PRODUCER_KAMU_DATASET_SERVICE};
 use kamu_flow_system::{FlowTriggerEventStore, *};
 use messaging_outbox::{
     MessageConsumer,
@@ -45,7 +45,7 @@ pub struct FlowTriggerServiceImpl {
 #[interface(dyn MessageConsumerT<DatasetLifecycleMessage>)]
 #[meta(MessageConsumerMeta {
     consumer_name: MESSAGE_CONSUMER_KAMU_FLOW_TRIGGER_SERVICE,
-    feeding_producers: &[MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE],
+    feeding_producers: &[MESSAGE_PRODUCER_KAMU_DATASET_SERVICE],
     delivery: MessageDeliveryMechanism::Transactional,
 })]
 impl FlowTriggerServiceImpl {

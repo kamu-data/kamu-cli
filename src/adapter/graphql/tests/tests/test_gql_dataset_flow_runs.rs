@@ -31,15 +31,17 @@ use kamu_core::{
     CompactionResult,
     DatasetChangesService,
     DatasetIntervalIncrement,
-    DatasetLifecycleMessage,
     DatasetStorageUnitWriter,
     DidGeneratorDefault,
     PullResult,
     ResetResult,
     TenancyConfig,
-    MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
 };
-use kamu_datasets::CreateDatasetFromSnapshotUseCase;
+use kamu_datasets::{
+    CreateDatasetFromSnapshotUseCase,
+    DatasetLifecycleMessage,
+    MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
+};
 use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEntryRepository};
 use kamu_datasets_services::{
     CreateDatasetFromSnapshotUseCaseImpl,
@@ -3148,7 +3150,7 @@ impl FlowRunsHarness {
 
             register_message_dispatcher::<DatasetLifecycleMessage>(
                 &mut b,
-                MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
+                MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
             );
             register_message_dispatcher::<ts::TaskProgressMessage>(
                 &mut b,

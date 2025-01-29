@@ -14,7 +14,7 @@ use dill::{Catalog, CatalogBuilder};
 use kamu_auth_rebac::{DatasetProperties, Entity, RebacRepository, RebacService};
 use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 use kamu_auth_rebac_services::{MultiTenantRebacDatasetLifecycleMessageConsumer, RebacServiceImpl};
-use kamu_core::DatasetLifecycleMessage;
+use kamu_datasets::DatasetLifecycleMessage;
 use messaging_outbox::{consume_deserialized_message, ConsumerFilter, Message};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

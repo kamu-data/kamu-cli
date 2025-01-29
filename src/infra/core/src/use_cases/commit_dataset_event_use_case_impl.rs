@@ -12,13 +12,8 @@ use std::sync::Arc;
 use dill::{component, interface};
 use internal_error::ErrorIntoInternal;
 use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer};
-use kamu_core::{
-    CommitDatasetEventUseCase,
-    DatasetLifecycleMessage,
-    DatasetRegistry,
-    ViewMultiResponse,
-    MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
-};
+use kamu_core::{CommitDatasetEventUseCase, DatasetRegistry, ViewMultiResponse};
+use kamu_datasets::{DatasetLifecycleMessage, MESSAGE_PRODUCER_KAMU_DATASET_SERVICE};
 use messaging_outbox::{Outbox, OutboxExt};
 use odf::dataset::{AppendError, InvalidEventError};
 use odf::metadata::EnumWithVariants;
@@ -118,7 +113,7 @@ impl CommitDatasetEventUseCase for CommitDatasetEventUseCaseImpl {
         if !commit_result.new_upstream_ids.is_empty() {
             self.outbox
                 .post_message(
-                    MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
+                    MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
                     DatasetLifecycleMessage::dependencies_updated(
                         dataset_handle.id.clone(),
                         commit_result.new_upstream_ids.clone(),

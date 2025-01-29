@@ -16,7 +16,11 @@ use kamu_accounts::*;
 use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 use kamu_auth_rebac_services::{MultiTenantRebacDatasetLifecycleMessageConsumer, RebacServiceImpl};
 use kamu_core::*;
-use kamu_datasets::CreateDatasetFromSnapshotUseCase;
+use kamu_datasets::{
+    CreateDatasetFromSnapshotUseCase,
+    DatasetLifecycleMessage,
+    MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
+};
 use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
 use kamu_datasets_services::{
     CreateDatasetFromSnapshotUseCaseImpl,
@@ -847,7 +851,7 @@ impl GraphQLDatasetsHarness {
 
             register_message_dispatcher::<DatasetLifecycleMessage>(
                 &mut b,
-                MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
+                MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
             );
 
             b.build()

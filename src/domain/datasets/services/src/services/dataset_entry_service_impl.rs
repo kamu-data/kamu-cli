@@ -21,15 +21,10 @@ use kamu_accounts::{
 };
 use kamu_core::{
     DatasetHandlesResolution,
-    DatasetLifecycleMessage,
-    DatasetLifecycleMessageCreated,
-    DatasetLifecycleMessageDeleted,
-    DatasetLifecycleMessageRenamed,
     DatasetRegistry,
     GetMultipleDatasetsError,
     ResolvedDataset,
     TenancyConfig,
-    MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
 };
 use kamu_datasets::*;
 use messaging_outbox::{
@@ -74,7 +69,7 @@ struct AccountsCache {
 #[meta(MessageConsumerMeta {
     consumer_name: MESSAGE_CONSUMER_KAMU_DATASET_ENTRY_SERVICE,
     feeding_producers: &[
-        MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
+        MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
     ],
     delivery: MessageDeliveryMechanism::Immediate,
 })]

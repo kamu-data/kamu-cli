@@ -12,11 +12,8 @@ use std::sync::Arc;
 
 use dill::{component, interface};
 use internal_error::ResultIntoInternal;
-use kamu_core::{
-    AppendDatasetMetadataBatchUseCase,
-    DatasetLifecycleMessage,
-    MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
-};
+use kamu_core::AppendDatasetMetadataBatchUseCase;
+use kamu_datasets::{DatasetLifecycleMessage, MESSAGE_PRODUCER_KAMU_DATASET_SERVICE};
 use messaging_outbox::{Outbox, OutboxExt};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -110,7 +107,7 @@ impl AppendDatasetMetadataBatchUseCase for AppendDatasetMetadataBatchUseCaseImpl
 
             self.outbox
                 .post_message(
-                    MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
+                    MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
                     DatasetLifecycleMessage::dependencies_updated(
                         summary.id.clone(),
                         new_upstream_ids,

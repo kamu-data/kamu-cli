@@ -16,19 +16,19 @@ use init_on_startup::InitOnStartup;
 use kamu_accounts::{Account, AccountRepository, CurrentAccountSubject};
 use kamu_accounts_inmem::InMemoryAccountRepository;
 use kamu_core::{
-    DatasetLifecycleMessage,
     DatasetRegistry,
     DatasetStorageUnitWriter,
     MockDatasetStorageUnitWriter,
     TenancyConfig,
-    MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
 };
 use kamu_datasets::{
     DatasetEntry,
     DatasetEntryNotFoundError,
     DatasetEntryRepository,
+    DatasetLifecycleMessage,
     GetDatasetEntryError,
     MockDatasetEntryRepository,
+    MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
 };
 use kamu_datasets_services::{DatasetEntryIndexer, DatasetEntryServiceImpl};
 use messaging_outbox::{register_message_dispatcher, Outbox, OutboxExt, OutboxImmediateImpl};
@@ -287,7 +287,7 @@ impl DatasetEntryServiceHarness {
 
             register_message_dispatcher::<DatasetLifecycleMessage>(
                 &mut b,
-                MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
+                MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
             );
 
             b.build()
@@ -313,7 +313,7 @@ impl DatasetEntryServiceHarness {
 
         self.outbox
             .post_message(
-                MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
+                MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
                 DatasetLifecycleMessage::created(
                     dataset_id,
                     owner_account_id,
@@ -334,7 +334,7 @@ impl DatasetEntryServiceHarness {
     ) {
         self.outbox
             .post_message(
-                MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
+                MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
                 DatasetLifecycleMessage::renamed(
                     dataset_id,
                     owner_account_id,
@@ -349,7 +349,7 @@ impl DatasetEntryServiceHarness {
     async fn mimic_dataset_deleted(&self, dataset_id: odf::DatasetID) {
         self.outbox
             .post_message(
-                MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
+                MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
                 DatasetLifecycleMessage::deleted(dataset_id),
             )
             .await

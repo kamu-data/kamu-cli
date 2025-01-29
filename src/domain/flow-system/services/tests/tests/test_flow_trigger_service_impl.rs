@@ -18,7 +18,12 @@ use futures::TryStreamExt;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::*;
-use kamu_datasets::{CreateDatasetFromSnapshotUseCase, DeleteDatasetUseCase};
+use kamu_datasets::{
+    CreateDatasetFromSnapshotUseCase,
+    DatasetLifecycleMessage,
+    DeleteDatasetUseCase,
+    MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
+};
 use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
 use kamu_datasets_services::{
     CreateDatasetFromSnapshotUseCaseImpl,
@@ -396,7 +401,7 @@ impl FlowTriggerHarness {
 
             register_message_dispatcher::<DatasetLifecycleMessage>(
                 &mut b,
-                MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
+                MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
             );
             register_message_dispatcher::<FlowTriggerUpdatedMessage>(
                 &mut b,

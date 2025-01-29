@@ -7,10 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod core_message_consumers;
-mod core_message_producers;
-mod core_message_types;
+mod datasets_message_producers;
+mod datasets_message_types;
 
-pub use core_message_consumers::*;
-pub use core_message_producers::*;
-pub use core_message_types::*;
+pub use datasets_message_producers::*;
+pub use datasets_message_types::*;
