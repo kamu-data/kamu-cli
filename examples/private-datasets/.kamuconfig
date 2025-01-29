@@ -5,5 +5,10 @@ content:
     predefined:
       - accountName: admin
         isAdmin: true
+        email: admin@private.datasets
       - accountName: alice
+        avatarUrl: https://cdn-icons-png.flaticon.com/512/3665/3665909.png
+        email: alice@private.datasets
       - accountName: bob
+        avatarUrl: https://cdn-icons-png.flaticon.com/512/3665/3665917.png
+        email: bob@private.datasets

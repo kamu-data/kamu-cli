@@ -1,0 +1,16 @@
+kind: DatasetSnapshot
+version: 1
+content:
+  name: 5pub1
+  kind: Derivative
+  metadata:
+    - kind: SetTransform
+      inputs:
+        - datasetRef: alice/4pub
+      transform:
+        kind: Sql
+        engine: datafusion
+        queries:
+          - query: |
+              SELECT *
+              FROM "alice/4pub"

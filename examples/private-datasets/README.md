@@ -33,3 +33,11 @@ stateDiagram-v2
     alice/4priv --> alice/5pub2
     alice/4priv --> alice/5priv2
 ```
+
+How `alice` sees the `alice/3pub` dataset lineage:
+
+![alice_3pub_lineage.png](assets/alice_3pub_lineage.png)
+
+How `bob` sees the `alice/3pub` dataset lineage:
+
+![bob_3pub_lineage.png](assets/bob_3pub_lineage.png)

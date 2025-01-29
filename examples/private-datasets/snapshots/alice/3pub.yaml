@@ -1,0 +1,20 @@
+kind: DatasetSnapshot
+version: 1
+content:
+  name: 3pub
+  kind: Derivative
+  metadata:
+    - kind: SetTransform
+      inputs:
+        - datasetRef: alice/2pub
+        - datasetRef: alice/2priv
+      transform:
+        kind: Sql
+        engine: datafusion
+        queries:
+          - query: |
+              SELECT *
+              FROM "alice/2pub"
+              UNION ALL
+              SELECT *
+              FROM "alice/2priv"
