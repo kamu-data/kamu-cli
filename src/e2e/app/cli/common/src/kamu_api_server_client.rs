@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::path::{Path, PathBuf};
+
 use chrono::{DateTime, Utc};
 use internal_error::{InternalError, ResultIntoInternal};
 use reqwest::{Method, StatusCode, Url};
@@ -39,15 +41,17 @@ pub enum ExpectedResponseBody {
 pub struct KamuApiServerClient {
     http_client: reqwest::Client,
     server_base_url: Url,
+    workspace_path: PathBuf,
     token: Option<AccessToken>,
 }
 
 impl KamuApiServerClient {
-    pub fn new(server_base_url: Url) -> Self {
+    pub fn new(server_base_url: Url, workspace_path: PathBuf) -> Self {
         let http_client = reqwest::Client::new();
 
         Self {
             http_client,
+            workspace_path,
             server_base_url,
             token: None,
         }
@@ -63,6 +67,10 @@ impl KamuApiServerClient {
 
     pub fn get_base_url(&self) -> &Url {
         &self.server_base_url
+    }
+
+    pub fn get_workspace_path(&self) -> &Path {
+        &self.workspace_path
     }
 
     pub fn get_odf_node_url(&self) -> Url {

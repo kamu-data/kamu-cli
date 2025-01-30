@@ -22,6 +22,7 @@ use crate::KamuApiServerClient;
 
 pub async fn api_server_e2e_test<ServerRunFut, Fixture, FixtureFut>(
     e2e_data_file_path: PathBuf,
+    workspace_path: PathBuf,
     server_run_fut: ServerRunFut,
     fixture: Fixture,
 ) where
@@ -31,7 +32,7 @@ pub async fn api_server_e2e_test<ServerRunFut, Fixture, FixtureFut>(
 {
     let test_fut = async move {
         let base_url = get_server_api_base_url(e2e_data_file_path).await?;
-        let kamu_api_server_client = KamuApiServerClient::new(base_url);
+        let kamu_api_server_client = KamuApiServerClient::new(base_url, workspace_path);
 
         kamu_api_server_client.e2e().ready().await?;
 
