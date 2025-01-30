@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
-use internal_error::{InternalError, ResultIntoInternal};
+use internal_error::InternalError;
 use odf_metadata::*;
 use thiserror::Error;
 
@@ -74,21 +74,9 @@ pub async fn append_metadata_to_dataset(
         sequence_number += 1;
     }
 
-    chain
-        .set_ref(
-            &BlockRef::Head,
-            &head,
-            SetRefOpts {
-                validate_block_present: false,
-                check_ref_is: Some(Some(current_head)),
-            },
-        )
-        .await
-        .int_err()?;
-
     Ok(AppendResult {
-        old_head: Some(current_head.clone()),
-        new_head: head,
+        existing_head: Some(current_head.clone()),
+        proposed_head: head,
         new_upstream_ids,
     })
 }

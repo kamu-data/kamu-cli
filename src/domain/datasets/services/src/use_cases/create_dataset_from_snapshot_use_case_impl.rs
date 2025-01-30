@@ -110,7 +110,7 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
         chain
             .set_ref(
                 &odf::BlockRef::Head,
-                &append_result.new_head,
+                &append_result.proposed_head,
                 odf::dataset::SetRefOpts {
                     validate_block_present: false,
                     check_ref_is: Some(Some(&create_dataset_result.head)),

@@ -10,7 +10,6 @@
 use std::path::Path;
 use std::sync::Arc;
 
-use chrono::{DateTime, Utc};
 use dill::{Catalog, Component};
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::{
@@ -23,6 +22,7 @@ use kamu_core::{
     RunInfoDir,
     TenancyConfig,
 };
+use odf::dataset::testing::create_test_dataset_fron_snapshot;
 use odf::metadata::serde::flatbuffers::FlatbuffersMetadataBlockSerializer;
 use odf::metadata::serde::MetadataBlockSerializer;
 use odf::metadata::testing::MetadataFactory;
@@ -35,6 +35,8 @@ use crate::{DatasetRegistrySoloUnitBridge, DatasetStorageUnitLocalFs};
 pub struct BaseRepoHarness {
     temp_dir: tempfile::TempDir,
     catalog: Catalog,
+    did_generator: Arc<dyn DidGenerator>,
+    system_time_source: Arc<dyn SystemTimeSource>,
     dataset_registry: Arc<dyn DatasetRegistry>,
     dataset_storage_unit_writer: Arc<dyn odf::DatasetStorageUnitWriter>,
 }
@@ -76,6 +78,8 @@ impl BaseRepoHarness {
 
         Self {
             temp_dir,
+            did_generator: catalog.get_one().unwrap(),
+            system_time_source: catalog.get_one().unwrap(),
             dataset_registry: catalog.get_one().unwrap(),
             dataset_storage_unit_writer: catalog.get_one().unwrap(),
             catalog,
@@ -109,35 +113,23 @@ impl BaseRepoHarness {
     }
 
     pub async fn create_root_dataset(&self, alias: &odf::DatasetAlias) -> odf::CreateDatasetResult {
-        let system_time_source = self.catalog.get_one::<dyn SystemTimeSource>().unwrap();
+        let snapshot = MetadataFactory::dataset_snapshot()
+            .name(alias.clone())
+            .kind(odf::DatasetKind::Root)
+            .push_event(MetadataFactory::set_polling_source().build())
+            .build();
 
-        let system_time = system_time_source.now();
+        let result = create_test_dataset_fron_snapshot(
+            self.dataset_registry.as_ref(),
+            self.dataset_storage_unit_writer.as_ref(),
+            snapshot,
+            self.did_generator.generate_dataset_id(),
+            self.system_time_source.now(),
+        )
+        .await
+        .unwrap();
 
-        let mut create_dataset_result = self
-            .create_dataset(system_time, alias, odf::DatasetKind::Root)
-            .await;
-
-        create_dataset_result.head = create_dataset_result
-            .dataset
-            .as_metadata_chain()
-            .append(
-                odf::MetadataBlock {
-                    system_time,
-                    prev_block_hash: Some(create_dataset_result.head),
-                    event: odf::MetadataEvent::SetPollingSource(
-                        MetadataFactory::set_polling_source().build(),
-                    ),
-                    sequence_number: 1,
-                },
-                odf::dataset::AppendOpts {
-                    update_ref: None,
-                    ..odf::dataset::AppendOpts::default()
-                },
-            )
-            .await
-            .unwrap();
-
-        create_dataset_result
+        result.create_dataset_result
     }
 
     pub async fn create_derived_dataset(
@@ -145,58 +137,25 @@ impl BaseRepoHarness {
         alias: &odf::DatasetAlias,
         input_dataset_refs: Vec<odf::DatasetRef>,
     ) -> odf::CreateDatasetResult {
-        let system_time_source = self.catalog.get_one::<dyn SystemTimeSource>().unwrap();
+        let result = create_test_dataset_fron_snapshot(
+            self.dataset_registry.as_ref(),
+            self.dataset_storage_unit_writer.as_ref(),
+            MetadataFactory::dataset_snapshot()
+                .name(alias.clone())
+                .kind(odf::DatasetKind::Derivative)
+                .push_event(
+                    MetadataFactory::set_transform()
+                        .inputs_from_refs(input_dataset_refs)
+                        .build(),
+                )
+                .build(),
+            self.did_generator.generate_dataset_id(),
+            self.system_time_source.now(),
+        )
+        .await
+        .unwrap();
 
-        let system_time = system_time_source.now();
-
-        let mut create_dataset_result = self
-            .create_dataset(system_time, alias, odf::DatasetKind::Derivative)
-            .await;
-
-        create_dataset_result.head = create_dataset_result
-            .dataset
-            .as_metadata_chain()
-            .append(
-                odf::MetadataBlock {
-                    system_time,
-                    prev_block_hash: Some(create_dataset_result.head),
-                    event: odf::MetadataEvent::SetTransform(
-                        MetadataFactory::set_transform()
-                            .inputs_from_refs(input_dataset_refs)
-                            .build(),
-                    ),
-                    sequence_number: 1,
-                },
-                odf::dataset::AppendOpts {
-                    update_ref: None,
-                    ..odf::dataset::AppendOpts::default()
-                },
-            )
-            .await
-            .unwrap();
-
-        create_dataset_result
-    }
-
-    async fn create_dataset(
-        &self,
-        system_time: DateTime<Utc>,
-        alias: &odf::DatasetAlias,
-        dataset_kind: odf::DatasetKind,
-    ) -> odf::CreateDatasetResult {
-        let did_generator = self.catalog.get_one::<dyn DidGenerator>().unwrap();
-
-        self.dataset_storage_unit_writer
-            .create_dataset(
-                alias,
-                odf::dataset::make_seed_block(
-                    did_generator.generate_dataset_id(),
-                    dataset_kind,
-                    system_time,
-                ),
-            )
-            .await
-            .unwrap()
+        result.create_dataset_result
     }
 
     pub async fn num_blocks(&self, target: ResolvedDataset) -> usize {

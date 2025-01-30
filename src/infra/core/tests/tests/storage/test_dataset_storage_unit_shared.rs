@@ -14,7 +14,6 @@ use itertools::Itertools;
 use kamu::DatasetRegistrySoloUnitBridge;
 use kamu_accounts::DEFAULT_ACCOUNT_NAME;
 use kamu_core::DidGenerator;
-use kamu_datasets::CreateDatasetFromSnapshotUseCase;
 use odf::dataset::testing::create_test_dataset_fron_snapshot;
 use odf::metadata::testing::MetadataFactory;
 use time_source::SystemTimeSource;
@@ -565,12 +564,15 @@ pub async fn test_rename_dataset_same_name_multiple_tenants<
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_delete_dataset<
-    TDatasetStorageUnit: odf::DatasetStorageUnit + odf::DatasetStorageUnitWriter,
+    TDatasetStorageUnit: odf::DatasetStorageUnit + odf::DatasetStorageUnitWriter + 'static,
 >(
     storage_unit: Arc<TDatasetStorageUnit>,
-    create_dataset_from_snapshot: &dyn CreateDatasetFromSnapshotUseCase,
+    did_generator: &dyn DidGenerator,
+    time_source: &dyn SystemTimeSource,
     account_name: Option<odf::AccountName>,
 ) {
+    let dataset_registry = DatasetRegistrySoloUnitBridge::new(storage_unit.clone());
+
     let alias_foo =
         odf::DatasetAlias::new(account_name.clone(), odf::DatasetName::new_unchecked("foo"));
 
@@ -580,10 +582,16 @@ pub async fn test_delete_dataset<
         .push_event(MetadataFactory::set_polling_source().build())
         .build();
 
-    let create_result = create_dataset_from_snapshot
-        .execute(snapshot, Default::default())
-        .await
-        .unwrap();
+    let create_result = create_test_dataset_fron_snapshot(
+        &dataset_registry,
+        storage_unit.as_ref(),
+        snapshot,
+        did_generator.generate_dataset_id(),
+        time_source.now(),
+    )
+    .await
+    .unwrap()
+    .create_dataset_result;
 
     assert!(storage_unit
         .resolve_stored_dataset_handle_by_ref(&alias_foo.as_local_ref())
