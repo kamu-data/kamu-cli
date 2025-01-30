@@ -56,7 +56,7 @@ pub async fn create_test_dataset_fron_snapshot(
     chain
         .set_ref(
             &BlockRef::Head,
-            &append_result.new_head,
+            &append_result.proposed_head,
             SetRefOpts {
                 validate_block_present: false,
                 check_ref_is: Some(Some(&create_dataset_result.head)),
@@ -66,7 +66,10 @@ pub async fn create_test_dataset_fron_snapshot(
         .int_err()?;
 
     Ok(CreateDatasetFromSnapshotResult {
-        create_dataset_result,
+        create_dataset_result: CreateDatasetResult {
+            head: append_result.proposed_head,
+            ..create_dataset_result
+        },
         new_upstream_ids: append_result.new_upstream_ids,
     })
 }

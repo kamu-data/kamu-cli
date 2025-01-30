@@ -13,8 +13,6 @@ use dill::Component;
 use kamu::*;
 use kamu_accounts::{CurrentAccountSubject, DEFAULT_ACCOUNT_NAME};
 use kamu_core::{DidGenerator, DidGeneratorDefault, TenancyConfig};
-use kamu_datasets::CreateDatasetFromSnapshotUseCase;
-use kamu_datasets_services::CreateDatasetFromSnapshotUseCaseImpl;
 use messaging_outbox::{Outbox, OutboxImmediateImpl};
 use tempfile::TempDir;
 use time_source::{SystemTimeSource, SystemTimeSourceDefault};
@@ -28,7 +26,6 @@ struct LocalFsStorageUnitHarness {
     storage_unit: Arc<DatasetStorageUnitLocalFs>,
     did_generator: Arc<dyn DidGenerator>,
     system_time_source: Arc<dyn SystemTimeSource>,
-    create_dataset_from_snapshot: Arc<dyn CreateDatasetFromSnapshotUseCase>,
 }
 
 impl LocalFsStorageUnitHarness {
@@ -48,8 +45,7 @@ impl LocalFsStorageUnitHarness {
             .add_value(tenancy_config)
             .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
             .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
-            .bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
-            .add::<CreateDatasetFromSnapshotUseCaseImpl>();
+            .bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>();
 
         let catalog = b.build();
 
@@ -57,7 +53,6 @@ impl LocalFsStorageUnitHarness {
             storage_unit: catalog.get_one().unwrap(),
             did_generator: catalog.get_one().unwrap(),
             system_time_source: catalog.get_one().unwrap(),
-            create_dataset_from_snapshot: catalog.get_one().unwrap(),
             _catalog: catalog,
         }
     }
@@ -191,7 +186,8 @@ async fn test_delete_dataset() {
 
     test_dataset_storage_unit_shared::test_delete_dataset(
         harness.storage_unit,
-        harness.create_dataset_from_snapshot.as_ref(),
+        harness.did_generator.as_ref(),
+        harness.system_time_source.as_ref(),
         None,
     )
     .await;
@@ -206,7 +202,8 @@ async fn test_delete_dataset_multi_tenant() {
 
     test_dataset_storage_unit_shared::test_delete_dataset(
         harness.storage_unit,
-        harness.create_dataset_from_snapshot.as_ref(),
+        harness.did_generator.as_ref(),
+        harness.system_time_source.as_ref(),
         Some(DEFAULT_ACCOUNT_NAME.clone()),
     )
     .await;

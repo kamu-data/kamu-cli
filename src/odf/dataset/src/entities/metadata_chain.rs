@@ -572,8 +572,8 @@ impl From<SetRefError> for SetChainRefError {
 
 #[derive(Clone, Debug)]
 pub struct AppendResult {
-    pub old_head: Option<Multihash>,
-    pub new_head: Multihash,
+    pub existing_head: Option<Multihash>,
+    pub proposed_head: Multihash,
     pub new_upstream_ids: Vec<DatasetID>,
 }
 
