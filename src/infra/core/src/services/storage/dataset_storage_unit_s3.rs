@@ -15,7 +15,7 @@ use chrono::{DateTime, Utc};
 use dill::*;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_accounts::{CurrentAccountSubject, DEFAULT_ACCOUNT_NAME_STR};
-use kamu_core::{DatasetStorageUnitWriter, TenancyConfig};
+use kamu_core::TenancyConfig;
 use odf::dataset::{DatasetImpl, MetadataChainImpl};
 use odf::storage::lfs::ObjectRepositoryCachingLocalFs;
 use odf::storage::s3::{NamedObjectRepositoryS3, ObjectRepositoryS3Sha3};
@@ -316,7 +316,7 @@ impl odf::DatasetStorageUnit for DatasetStorageUnitS3 {
 }
 
 #[async_trait]
-impl DatasetStorageUnitWriter for DatasetStorageUnitS3 {
+impl odf::DatasetStorageUnitWriter for DatasetStorageUnitS3 {
     #[tracing::instrument(level = "debug", skip_all, fields(%dataset_alias, ?seed_block))]
     async fn create_dataset(
         &self,

@@ -8,5 +8,7 @@
 // by the Apache License, Version 2.0.
 
 mod mock_odf_server_access_token_resolver;
+mod snapshot_create_test_helper;
 
 pub use mock_odf_server_access_token_resolver::*;
+pub use snapshot_create_test_helper::*;

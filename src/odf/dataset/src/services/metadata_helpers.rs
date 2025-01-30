@@ -7,11 +7,91 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use internal_error::InternalError;
+use chrono::{DateTime, Utc};
+use internal_error::{InternalError, ResultIntoInternal};
 use odf_metadata::*;
 use thiserror::Error;
 
 use crate::*;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub fn make_seed_block(
+    dataset_id: DatasetID,
+    dataset_kind: DatasetKind,
+    system_time: DateTime<Utc>,
+) -> MetadataBlockTyped<Seed> {
+    MetadataBlockTyped {
+        system_time,
+        prev_block_hash: None,
+        event: Seed {
+            dataset_id,
+            dataset_kind,
+        },
+        sequence_number: 0,
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn append_metadata_to_dataset(
+    metadata: Vec<MetadataEvent>,
+    dataset: &dyn Dataset,
+    current_head: &Multihash,
+    system_time: DateTime<Utc>,
+) -> Result<AppendResult, AppendError> {
+    let chain = dataset.as_metadata_chain();
+    let mut head = current_head.clone();
+    let mut sequence_number = 1;
+    let mut new_upstream_ids: Vec<DatasetID> = vec![];
+
+    for event in metadata {
+        if let MetadataEvent::SetTransform(transform) = &event {
+            // Collect only the latest upstream dataset IDs
+            new_upstream_ids.clear();
+            for new_input in &transform.inputs {
+                // Note: We already resolved all references to IDs above in
+                // `resolve_transform_inputs`
+                new_upstream_ids.push(new_input.dataset_ref.id().cloned().unwrap());
+            }
+        }
+
+        head = chain
+            .append(
+                MetadataBlock {
+                    system_time,
+                    prev_block_hash: Some(head),
+                    event,
+                    sequence_number,
+                },
+                AppendOpts {
+                    update_ref: None,
+                    ..AppendOpts::default()
+                },
+            )
+            .await?;
+
+        sequence_number += 1;
+    }
+
+    chain
+        .set_ref(
+            &BlockRef::Head,
+            &head,
+            SetRefOpts {
+                validate_block_present: false,
+                check_ref_is: Some(Some(current_head)),
+            },
+        )
+        .await
+        .int_err()?;
+
+    Ok(AppendResult {
+        old_head: Some(current_head.clone()),
+        new_head: head,
+        new_upstream_ids,
+    })
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

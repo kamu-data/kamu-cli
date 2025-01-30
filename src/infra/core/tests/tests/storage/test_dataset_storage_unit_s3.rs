@@ -12,13 +12,13 @@ use std::sync::Arc;
 use dill::*;
 use kamu::{DatasetStorageUnitS3, S3RegistryCache};
 use kamu_accounts::{CurrentAccountSubject, DEFAULT_ACCOUNT_NAME};
-use kamu_core::{DatasetStorageUnitWriter, DidGeneratorDefault, TenancyConfig};
+use kamu_core::{DidGenerator, DidGeneratorDefault, TenancyConfig};
 use kamu_datasets::CreateDatasetFromSnapshotUseCase;
 use kamu_datasets_services::CreateDatasetFromSnapshotUseCaseImpl;
 use messaging_outbox::{Outbox, OutboxImmediateImpl};
 use s3_utils::S3Context;
 use test_utils::LocalS3Server;
-use time_source::SystemTimeSourceDefault;
+use time_source::{SystemTimeSource, SystemTimeSourceDefault};
 
 use super::test_dataset_storage_unit_shared;
 
@@ -27,6 +27,8 @@ use super::test_dataset_storage_unit_shared;
 struct S3StorageUnitHarness {
     _catalog: dill::Catalog,
     storage_unit: Arc<DatasetStorageUnitS3>,
+    did_generator: Arc<dyn DidGenerator>,
+    system_time_source: Arc<dyn SystemTimeSource>,
     create_dataset_from_snapshot: Arc<dyn CreateDatasetFromSnapshotUseCase>,
 }
 
@@ -51,7 +53,7 @@ impl S3StorageUnitHarness {
             .add_value(tenancy_config)
             .add_builder(DatasetStorageUnitS3::builder().with_s3_context(s3_context))
             .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitS3>()
-            .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitS3>()
+            .bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitS3>()
             .add::<CreateDatasetFromSnapshotUseCaseImpl>();
 
         if registry_caching {
@@ -60,14 +62,12 @@ impl S3StorageUnitHarness {
 
         let catalog = b.build();
 
-        let storage_unit = catalog.get_one().unwrap();
-
-        let create_dataset_from_snapshot = catalog.get_one().unwrap();
-
         Self {
+            storage_unit: catalog.get_one().unwrap(),
+            did_generator: catalog.get_one().unwrap(),
+            system_time_source: catalog.get_one().unwrap(),
+            create_dataset_from_snapshot: catalog.get_one().unwrap(),
             _catalog: catalog,
-            storage_unit,
-            create_dataset_from_snapshot,
         }
     }
 }
@@ -123,7 +123,9 @@ async fn test_create_dataset_same_name_multiple_tenants() {
     let harness = S3StorageUnitHarness::create(&s3, TenancyConfig::MultiTenant, false).await;
 
     test_dataset_storage_unit_shared::test_create_dataset_same_name_multiple_tenants(
-        harness.storage_unit.as_ref(),
+        harness.storage_unit,
+        harness.did_generator.as_ref(),
+        harness.system_time_source.as_ref(),
     )
     .await;
 }
@@ -138,7 +140,9 @@ async fn test_create_dataset_from_snapshot() {
     let harness = S3StorageUnitHarness::create(&s3, TenancyConfig::SingleTenant, false).await;
 
     test_dataset_storage_unit_shared::test_create_dataset_from_snapshot(
-        harness.storage_unit.as_ref(),
+        harness.storage_unit,
+        harness.did_generator.as_ref(),
+        harness.system_time_source.as_ref(),
         None,
     )
     .await;
@@ -153,7 +157,9 @@ async fn test_create_dataset_from_snapshot_multi_tenant() {
     let harness = S3StorageUnitHarness::create(&s3, TenancyConfig::MultiTenant, false).await;
 
     test_dataset_storage_unit_shared::test_create_dataset_from_snapshot(
-        harness.storage_unit.as_ref(),
+        harness.storage_unit,
+        harness.did_generator.as_ref(),
+        harness.system_time_source.as_ref(),
         Some(DEFAULT_ACCOUNT_NAME.clone()),
     )
     .await;
@@ -167,8 +173,13 @@ async fn test_rename_dataset() {
     let s3 = LocalS3Server::new().await;
     let harness = S3StorageUnitHarness::create(&s3, TenancyConfig::SingleTenant, false).await;
 
-    test_dataset_storage_unit_shared::test_rename_dataset(harness.storage_unit.as_ref(), None)
-        .await;
+    test_dataset_storage_unit_shared::test_rename_dataset(
+        harness.storage_unit,
+        harness.did_generator.as_ref(),
+        harness.system_time_source.as_ref(),
+        None,
+    )
+    .await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -180,7 +191,9 @@ async fn test_rename_dataset_multi_tenant() {
     let harness = S3StorageUnitHarness::create(&s3, TenancyConfig::MultiTenant, false).await;
 
     test_dataset_storage_unit_shared::test_rename_dataset(
-        harness.storage_unit.as_ref(),
+        harness.storage_unit,
+        harness.did_generator.as_ref(),
+        harness.system_time_source.as_ref(),
         Some(DEFAULT_ACCOUNT_NAME.clone()),
     )
     .await;
@@ -195,7 +208,9 @@ async fn test_rename_dataset_multi_tenant_with_caching() {
     let harness = S3StorageUnitHarness::create(&s3, TenancyConfig::MultiTenant, true).await;
 
     test_dataset_storage_unit_shared::test_rename_dataset(
-        harness.storage_unit.as_ref(),
+        harness.storage_unit,
+        harness.did_generator.as_ref(),
+        harness.system_time_source.as_ref(),
         Some(DEFAULT_ACCOUNT_NAME.clone()),
     )
     .await;
@@ -210,7 +225,9 @@ async fn test_rename_dataset_same_name_multiple_tenants() {
     let harness = S3StorageUnitHarness::create(&s3, TenancyConfig::MultiTenant, false).await;
 
     test_dataset_storage_unit_shared::test_rename_dataset_same_name_multiple_tenants(
-        harness.storage_unit.as_ref(),
+        harness.storage_unit,
+        harness.did_generator.as_ref(),
+        harness.system_time_source.as_ref(),
     )
     .await;
 }
@@ -224,7 +241,7 @@ async fn test_delete_dataset() {
     let harness = S3StorageUnitHarness::create(&s3, TenancyConfig::SingleTenant, false).await;
 
     test_dataset_storage_unit_shared::test_delete_dataset(
-        harness.storage_unit.as_ref(),
+        harness.storage_unit,
         harness.create_dataset_from_snapshot.as_ref(),
         None,
     )
@@ -240,7 +257,7 @@ async fn test_delete_dataset_multi_tenant() {
     let harness = S3StorageUnitHarness::create(&s3, TenancyConfig::MultiTenant, false).await;
 
     test_dataset_storage_unit_shared::test_delete_dataset(
-        harness.storage_unit.as_ref(),
+        harness.storage_unit,
         harness.create_dataset_from_snapshot.as_ref(),
         Some(DEFAULT_ACCOUNT_NAME.clone()),
     )
@@ -255,7 +272,12 @@ async fn test_iterate_datasets() {
     let s3 = LocalS3Server::new().await;
     let harness = S3StorageUnitHarness::create(&s3, TenancyConfig::SingleTenant, false).await;
 
-    test_dataset_storage_unit_shared::test_iterate_datasets(harness.storage_unit.as_ref()).await;
+    test_dataset_storage_unit_shared::test_iterate_datasets(
+        harness.storage_unit,
+        harness.did_generator.as_ref(),
+        harness.system_time_source.as_ref(),
+    )
+    .await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -267,7 +289,9 @@ async fn test_iterate_datasets_multi_tenant() {
     let harness = S3StorageUnitHarness::create(&s3, TenancyConfig::MultiTenant, false).await;
 
     test_dataset_storage_unit_shared::test_iterate_datasets_multi_tenant(
-        harness.storage_unit.as_ref(),
+        harness.storage_unit,
+        harness.did_generator.as_ref(),
+        harness.system_time_source.as_ref(),
     )
     .await;
 }
@@ -281,7 +305,9 @@ async fn test_create_and_get_case_insensetive_dataset() {
     let harness = S3StorageUnitHarness::create(&s3, TenancyConfig::SingleTenant, false).await;
 
     test_dataset_storage_unit_shared::test_create_and_get_case_insensetive_dataset(
-        harness.storage_unit.as_ref(),
+        harness.storage_unit,
+        harness.did_generator.as_ref(),
+        harness.system_time_source.as_ref(),
         None,
     )
     .await;
@@ -296,7 +322,9 @@ async fn test_create_and_get_case_insensetive_dataset_multi_tenant() {
     let harness = S3StorageUnitHarness::create(&s3, TenancyConfig::MultiTenant, false).await;
 
     test_dataset_storage_unit_shared::test_create_and_get_case_insensetive_dataset(
-        harness.storage_unit.as_ref(),
+        harness.storage_unit,
+        harness.did_generator.as_ref(),
+        harness.system_time_source.as_ref(),
         Some(DEFAULT_ACCOUNT_NAME.clone()),
     )
     .await;

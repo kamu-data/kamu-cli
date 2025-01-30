@@ -14,7 +14,6 @@ use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use dill::{CatalogBuilder, Component};
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu::domain::auth::DatasetAction;
-use kamu::domain::DatasetStorageUnitWriter;
 use kamu::testing::MockDatasetActionAuthorizer;
 use kamu::{DatasetRegistrySoloUnitBridge, DatasetStorageUnitLocalFs};
 use kamu_accounts::testing::MockAuthenticationService;
@@ -238,7 +237,7 @@ impl ServerHarness {
                         .with_root(datasets_dir),
                 )
                 .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
-                .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
+                .bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
                 .add::<DatasetRegistrySoloUnitBridge>()
                 .add::<CreateDatasetUseCaseImpl>()
                 .add::<DatabaseTransactionRunner>();

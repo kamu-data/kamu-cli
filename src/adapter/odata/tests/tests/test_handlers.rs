@@ -353,7 +353,7 @@ impl TestHarness {
                 .add_value(TenancyConfig::SingleTenant)
                 .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
                 .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
-                .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
+                .bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
                 .add::<DatasetRegistrySoloUnitBridge>()
                 .add::<CreateDatasetFromSnapshotUseCaseImpl>()
                 .add_value(SystemTimeSourceStub::new_set(

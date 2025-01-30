@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use dill::{component, interface};
 use internal_error::ResultIntoInternal;
-use kamu_core::{DatasetRegistry, DatasetStorageUnitWriter, DidGenerator};
+use kamu_core::{DatasetRegistry, DidGenerator};
 use kamu_datasets::{
     CreateDatasetFromSnapshotUseCase,
     CreateDatasetUseCase,
@@ -31,7 +31,7 @@ pub struct CreateDatasetFromSnapshotUseCaseImpl {
     system_time_source: Arc<dyn SystemTimeSource>,
     did_generator: Arc<dyn DidGenerator>,
     dataset_registry: Arc<dyn DatasetRegistry>,
-    dataset_storage_unit_writer: Arc<dyn DatasetStorageUnitWriter>,
+    dataset_storage_unit_writer: Arc<dyn odf::DatasetStorageUnitWriter>,
     outbox: Arc<dyn Outbox>,
 }
 
@@ -41,7 +41,7 @@ impl CreateDatasetFromSnapshotUseCaseImpl {
         system_time_source: Arc<dyn SystemTimeSource>,
         did_generator: Arc<dyn DidGenerator>,
         dataset_registry: Arc<dyn DatasetRegistry>,
-        dataset_storage_unit_writer: Arc<dyn DatasetStorageUnitWriter>,
+        dataset_storage_unit_writer: Arc<dyn odf::DatasetStorageUnitWriter>,
         outbox: Arc<dyn Outbox>,
     ) -> Self {
         Self {
@@ -70,74 +70,47 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
         )
         .await?;
 
+        // Create new clean dataset
         let system_time = self.system_time_source.now();
-
         let create_dataset_result = self
             .create_dataset_use_case
             .execute(
                 &snapshot.name,
-                odf::MetadataBlockTyped {
+                odf::dataset::make_seed_block(
+                    self.did_generator.generate_dataset_id(),
+                    snapshot.kind,
                     system_time,
-                    prev_block_hash: None,
-                    event: odf::metadata::Seed {
-                        dataset_id: self.did_generator.generate_dataset_id(),
-                        dataset_kind: snapshot.kind,
-                    },
-                    sequence_number: 0,
-                },
+                ),
                 options,
             )
             .await?;
 
-        let chain = create_dataset_result.dataset.as_metadata_chain();
-        let mut head = create_dataset_result.head.clone();
-        let mut sequence_number = 1;
-        let mut new_upstream_ids: Vec<odf::DatasetID> = vec![];
-
-        for event in snapshot.metadata {
-            if let odf::MetadataEvent::SetTransform(transform) = &event {
-                // Collect only the latest upstream dataset IDs
-                new_upstream_ids.clear();
-                for new_input in &transform.inputs {
-                    // Note: We already resolved all references to IDs above in
-                    // `resolve_transform_inputs`
-                    new_upstream_ids.push(new_input.dataset_ref.id().cloned().unwrap());
-                }
+        // Append snapshot metadata
+        let append_result = match odf::dataset::append_metadata_to_dataset(
+            snapshot.metadata,
+            create_dataset_result.dataset.as_ref(),
+            &create_dataset_result.head,
+            system_time,
+        )
+        .await
+        {
+            Ok(append_result) => Ok(append_result),
+            Err(e) => {
+                // Attempt to clean up dataset
+                let _ = self
+                    .dataset_storage_unit_writer
+                    .delete_dataset(&create_dataset_result.dataset_handle)
+                    .await;
+                Err(e)
             }
+        }?;
 
-            head = match chain
-                .append(
-                    odf::MetadataBlock {
-                        system_time,
-                        prev_block_hash: Some(head),
-                        event,
-                        sequence_number,
-                    },
-                    odf::dataset::AppendOpts {
-                        update_ref: None,
-                        ..odf::dataset::AppendOpts::default()
-                    },
-                )
-                .await
-            {
-                Ok(head) => Ok(head),
-                Err(e) => {
-                    // Attempt to clean up dataset
-                    let _ = self
-                        .dataset_storage_unit_writer
-                        .delete_dataset(&create_dataset_result.dataset_handle)
-                        .await;
-                    Err(e)
-                }
-            }?;
-
-            sequence_number += 1;
-        }
-
+        // Commit HEAD
+        let chain = create_dataset_result.dataset.as_metadata_chain();
         chain
             .set_ref(
                 &odf::BlockRef::Head,
-                &head,
+                &append_result.new_head,
                 odf::dataset::SetRefOpts {
                     validate_block_present: false,
                     check_ref_is: Some(Some(&create_dataset_result.head)),
@@ -146,13 +119,14 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
             .await
             .int_err()?;
 
-        if !new_upstream_ids.is_empty() {
+        // Notify of dependencies
+        if !append_result.new_upstream_ids.is_empty() {
             self.outbox
                 .post_message(
                     MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
                     DatasetLifecycleMessage::dependencies_updated(
                         create_dataset_result.dataset_handle.id.clone(),
-                        new_upstream_ids,
+                        append_result.new_upstream_ids,
                     ),
                 )
                 .await?;

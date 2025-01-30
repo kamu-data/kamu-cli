@@ -12,7 +12,7 @@ use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use dill::Component;
 use indoc::indoc;
 use kamu::{DatasetRegistrySoloUnitBridge, DatasetStorageUnitLocalFs, ViewDatasetUseCaseImpl};
-use kamu_core::{auth, DatasetStorageUnitWriter, DidGeneratorDefault, TenancyConfig};
+use kamu_core::{auth, DidGeneratorDefault, TenancyConfig};
 use kamu_datasets::{CreateDatasetFromSnapshotUseCase, DatasetEnvVarsConfig};
 use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEnvVarRepository};
 use kamu_datasets_services::{
@@ -333,7 +333,7 @@ impl DatasetEnvVarsHarness {
                 .add_value(TenancyConfig::SingleTenant)
                 .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
                 .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
-                .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
+                .bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
                 .add::<DatasetRegistrySoloUnitBridge>()
                 .add::<CreateDatasetFromSnapshotUseCaseImpl>()
                 .add::<ViewDatasetUseCaseImpl>()

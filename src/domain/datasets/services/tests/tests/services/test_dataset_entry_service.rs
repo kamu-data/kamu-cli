@@ -15,12 +15,7 @@ use dill::{CatalogBuilder, Component};
 use init_on_startup::InitOnStartup;
 use kamu_accounts::{Account, AccountRepository, CurrentAccountSubject};
 use kamu_accounts_inmem::InMemoryAccountRepository;
-use kamu_core::{
-    DatasetRegistry,
-    DatasetStorageUnitWriter,
-    MockDatasetStorageUnitWriter,
-    TenancyConfig,
-};
+use kamu_core::{DatasetRegistry, TenancyConfig};
 use kamu_datasets::{
     DatasetEntry,
     DatasetEntryNotFoundError,
@@ -259,8 +254,8 @@ impl DatasetEntryServiceHarness {
             b.add_value(mock_dataset_repository);
             b.bind::<dyn odf::DatasetStorageUnit, odf::dataset::MockDatasetStorageUnit>();
 
-            b.add_value(MockDatasetStorageUnitWriter::new());
-            b.bind::<dyn DatasetStorageUnitWriter, MockDatasetStorageUnitWriter>();
+            b.add_value(odf::MockDatasetStorageUnitWriter::new());
+            b.bind::<dyn odf::DatasetStorageUnitWriter, odf::MockDatasetStorageUnitWriter>();
 
             let account_repository = InMemoryAccountRepository::new();
             b.add_value(account_repository);

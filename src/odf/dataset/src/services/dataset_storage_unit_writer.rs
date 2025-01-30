@@ -7,6 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use odf_metadata::{DatasetAlias, DatasetHandle, DatasetName, MetadataBlockTyped, Seed};
+
+use crate::{CreateDatasetError, CreateDatasetResult, DeleteDatasetError, RenameDatasetError};
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[cfg_attr(any(feature = "testing", test), mockall::automock)]
@@ -14,20 +18,20 @@
 pub trait DatasetStorageUnitWriter: Sync + Send {
     async fn create_dataset(
         &self,
-        dataset_alias: &odf::DatasetAlias,
-        seed_block: odf::MetadataBlockTyped<odf::metadata::Seed>,
-    ) -> Result<odf::CreateDatasetResult, odf::dataset::CreateDatasetError>;
+        dataset_alias: &DatasetAlias,
+        seed_block: MetadataBlockTyped<Seed>,
+    ) -> Result<CreateDatasetResult, CreateDatasetError>;
 
     async fn rename_dataset(
         &self,
-        dataset_handle: &odf::DatasetHandle,
-        new_name: &odf::DatasetName,
-    ) -> Result<(), odf::dataset::RenameDatasetError>;
+        dataset_handle: &DatasetHandle,
+        new_name: &DatasetName,
+    ) -> Result<(), RenameDatasetError>;
 
     async fn delete_dataset(
         &self,
-        dataset_handle: &odf::DatasetHandle,
-    ) -> Result<(), odf::dataset::DeleteDatasetError>;
+        dataset_handle: &DatasetHandle,
+    ) -> Result<(), DeleteDatasetError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

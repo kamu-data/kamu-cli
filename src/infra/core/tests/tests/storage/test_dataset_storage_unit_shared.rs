@@ -8,17 +8,21 @@
 // by the Apache License, Version 2.0.
 
 use std::assert_matches::assert_matches;
+use std::sync::Arc;
 
 use itertools::Itertools;
+use kamu::DatasetRegistrySoloUnitBridge;
 use kamu_accounts::DEFAULT_ACCOUNT_NAME;
-use kamu_core::DatasetStorageUnitWriter;
+use kamu_core::DidGenerator;
 use kamu_datasets::CreateDatasetFromSnapshotUseCase;
+use odf::dataset::testing::create_test_dataset_fron_snapshot;
 use odf::metadata::testing::MetadataFactory;
+use time_source::SystemTimeSource;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_create_dataset<
-    TDatasetStorageUnit: odf::DatasetStorageUnit + DatasetStorageUnitWriter,
+    TDatasetStorageUnit: odf::DatasetStorageUnit + odf::DatasetStorageUnitWriter,
 >(
     storage_unit: &TDatasetStorageUnit,
     account_name: Option<odf::AccountName>,
@@ -70,11 +74,15 @@ pub async fn test_create_dataset<
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_create_and_get_case_insensetive_dataset<
-    TDatasetStorageUnit: odf::DatasetStorageUnit + DatasetStorageUnitWriter,
+    TDatasetStorageUnit: odf::DatasetStorageUnit + odf::DatasetStorageUnitWriter + 'static,
 >(
-    storage_unit: &TDatasetStorageUnit,
+    storage_unit: Arc<TDatasetStorageUnit>,
+    did_generator: &dyn DidGenerator,
+    time_source: &dyn SystemTimeSource,
     account_name: Option<odf::AccountName>,
 ) {
+    let dataset_registry = DatasetRegistrySoloUnitBridge::new(storage_unit.clone());
+
     let dataset_alias_to_create =
         odf::DatasetAlias::new(account_name.clone(), odf::DatasetName::new_unchecked("Foo"));
 
@@ -128,11 +136,16 @@ pub async fn test_create_and_get_case_insensetive_dataset<
         .push_event(MetadataFactory::set_polling_source().build())
         .build();
 
-    let create_result = storage_unit
-        .create_dataset_from_snapshot(snapshot)
-        .await
-        .unwrap()
-        .create_dataset_result;
+    let create_result = create_test_dataset_fron_snapshot(
+        &dataset_registry,
+        storage_unit.as_ref(),
+        snapshot,
+        did_generator.generate_dataset_id(),
+        time_source.now(),
+    )
+    .await
+    .unwrap()
+    .create_dataset_result;
 
     // Assert dataset_name eq to new alias and account_name eq to old existing one
     assert_eq!(
@@ -162,10 +175,14 @@ pub async fn test_create_and_get_case_insensetive_dataset<
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_create_dataset_same_name_multiple_tenants<
-    TDatasetStorageUnit: odf::DatasetStorageUnit + DatasetStorageUnitWriter,
+    TDatasetStorageUnit: odf::DatasetStorageUnit + odf::DatasetStorageUnitWriter + 'static,
 >(
-    storage_unit: &TDatasetStorageUnit,
+    storage_unit: Arc<TDatasetStorageUnit>,
+    did_generator: &dyn DidGenerator,
+    time_source: &dyn SystemTimeSource,
 ) {
+    let dataset_registry = DatasetRegistrySoloUnitBridge::new(storage_unit.clone());
+
     let dataset_alias_my = odf::DatasetAlias::new(
         Some(odf::AccountName::new_unchecked("my")),
         odf::DatasetName::new_unchecked("foo"),
@@ -205,17 +222,27 @@ pub async fn test_create_dataset_same_name_multiple_tenants<
         .push_event(MetadataFactory::set_polling_source().build())
         .build();
 
-    let create_result_my = storage_unit
-        .create_dataset_from_snapshot(snapshot_my.clone())
-        .await
-        .unwrap()
-        .create_dataset_result;
+    let create_result_my = create_test_dataset_fron_snapshot(
+        &dataset_registry,
+        storage_unit.as_ref(),
+        snapshot_my.clone(),
+        did_generator.generate_dataset_id(),
+        time_source.now(),
+    )
+    .await
+    .unwrap()
+    .create_dataset_result;
 
-    let create_result_her = storage_unit
-        .create_dataset_from_snapshot(snapshot_her.clone())
-        .await
-        .unwrap()
-        .create_dataset_result;
+    let create_result_her = create_test_dataset_fron_snapshot(
+        &dataset_registry,
+        storage_unit.as_ref(),
+        snapshot_her.clone(),
+        did_generator.generate_dataset_id(),
+        time_source.now(),
+    )
+    .await
+    .unwrap()
+    .create_dataset_result;
 
     assert_eq!(create_result_her.dataset_handle.alias, dataset_alias_her);
     assert_eq!(create_result_my.dataset_handle.alias, dataset_alias_my);
@@ -263,11 +290,15 @@ pub async fn test_create_dataset_same_name_multiple_tenants<
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_create_dataset_from_snapshot<
-    TDatasetStorageUnit: odf::DatasetStorageUnit + DatasetStorageUnitWriter,
+    TDatasetStorageUnit: odf::DatasetStorageUnit + odf::DatasetStorageUnitWriter + 'static,
 >(
-    storage_unit: &TDatasetStorageUnit,
+    storage_unit: Arc<TDatasetStorageUnit>,
+    did_generator: &dyn DidGenerator,
+    time_source: &dyn SystemTimeSource,
     account_name: Option<odf::AccountName>,
 ) {
+    let dataset_registry = DatasetRegistrySoloUnitBridge::new(storage_unit.clone());
+
     let dataset_alias =
         odf::DatasetAlias::new(account_name.clone(), odf::DatasetName::new_unchecked("foo"));
 
@@ -286,11 +317,16 @@ pub async fn test_create_dataset_from_snapshot<
         .push_event(MetadataFactory::set_polling_source().build())
         .build();
 
-    let create_result = storage_unit
-        .create_dataset_from_snapshot(snapshot.clone())
-        .await
-        .unwrap()
-        .create_dataset_result;
+    let create_result = create_test_dataset_fron_snapshot(
+        &dataset_registry,
+        storage_unit.as_ref(),
+        snapshot.clone(),
+        did_generator.generate_dataset_id(),
+        time_source.now(),
+    )
+    .await
+    .unwrap()
+    .create_dataset_result;
 
     let hdl = storage_unit
         .resolve_stored_dataset_handle_by_ref(&create_result.dataset_handle.into())
@@ -307,10 +343,15 @@ pub async fn test_create_dataset_from_snapshot<
     assert_eq!(actual_head, create_result.head);
 
     assert_matches!(
-        storage_unit
-            .create_dataset_from_snapshot(snapshot)
-            .await
-            .err(),
+        create_test_dataset_fron_snapshot(
+            &dataset_registry,
+            storage_unit.as_ref(),
+            snapshot,
+            did_generator.generate_dataset_id(),
+            time_source.now(),
+        )
+        .await
+        .err(),
         Some(odf::dataset::CreateDatasetFromSnapshotError::NameCollision(
             _
         ))
@@ -320,11 +361,15 @@ pub async fn test_create_dataset_from_snapshot<
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_rename_dataset<
-    TDatasetStorageUnit: odf::DatasetStorageUnit + DatasetStorageUnitWriter,
+    TDatasetStorageUnit: odf::DatasetStorageUnit + odf::DatasetStorageUnitWriter + 'static,
 >(
-    storage_unit: &TDatasetStorageUnit,
+    storage_unit: Arc<TDatasetStorageUnit>,
+    did_generator: &dyn DidGenerator,
+    time_source: &dyn SystemTimeSource,
     account_name: Option<odf::AccountName>,
 ) {
+    let dataset_registry = DatasetRegistrySoloUnitBridge::new(storage_unit.clone());
+
     let alias_foo =
         odf::DatasetAlias::new(account_name.clone(), odf::DatasetName::new_unchecked("foo"));
     let alias_bar =
@@ -348,14 +393,25 @@ pub async fn test_rename_dataset<
         )
         .build();
 
-    let create_result_foo = storage_unit
-        .create_dataset_from_snapshot(snapshot_foo)
-        .await
-        .unwrap();
-    storage_unit
-        .create_dataset_from_snapshot(snapshot_bar)
-        .await
-        .unwrap();
+    let create_result_foo = create_test_dataset_fron_snapshot(
+        &dataset_registry,
+        storage_unit.as_ref(),
+        snapshot_foo,
+        did_generator.generate_dataset_id(),
+        time_source.now(),
+    )
+    .await
+    .unwrap();
+
+    create_test_dataset_fron_snapshot(
+        &dataset_registry,
+        storage_unit.as_ref(),
+        snapshot_bar,
+        did_generator.generate_dataset_id(),
+        time_source.now(),
+    )
+    .await
+    .unwrap();
 
     assert_matches!(
         storage_unit
@@ -389,10 +445,14 @@ pub async fn test_rename_dataset<
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_rename_dataset_same_name_multiple_tenants<
-    TDatasetStorageUnit: odf::DatasetStorageUnit + DatasetStorageUnitWriter,
+    TDatasetStorageUnit: odf::DatasetStorageUnit + odf::DatasetStorageUnitWriter + 'static,
 >(
-    storage_unit: &TDatasetStorageUnit,
+    storage_unit: Arc<TDatasetStorageUnit>,
+    did_generator: &dyn DidGenerator,
+    time_source: &dyn SystemTimeSource,
 ) {
+    let dataset_registry = DatasetRegistrySoloUnitBridge::new(storage_unit.clone());
+
     let account_my = odf::AccountName::new_unchecked("my");
     let account_her = odf::AccountName::new_unchecked("her");
 
@@ -409,40 +469,50 @@ pub async fn test_rename_dataset_same_name_multiple_tenants<
         odf::DatasetName::new_unchecked("baz"),
     );
 
-    let create_result_my_foo = storage_unit
-        .create_dataset_from_snapshot(
-            MetadataFactory::dataset_snapshot()
-                .name(dataset_alias_my_foo.clone())
-                .kind(odf::DatasetKind::Root)
-                .push_event(MetadataFactory::set_polling_source().build())
-                .build(),
-        )
-        .await
-        .unwrap()
-        .create_dataset_result;
+    let create_result_my_foo = create_test_dataset_fron_snapshot(
+        &dataset_registry,
+        storage_unit.as_ref(),
+        MetadataFactory::dataset_snapshot()
+            .name(dataset_alias_my_foo.clone())
+            .kind(odf::DatasetKind::Root)
+            .push_event(MetadataFactory::set_polling_source().build())
+            .build(),
+        did_generator.generate_dataset_id(),
+        time_source.now(),
+    )
+    .await
+    .unwrap()
+    .create_dataset_result;
 
-    let create_result_her_bar = storage_unit
-        .create_dataset_from_snapshot(
-            MetadataFactory::dataset_snapshot()
-                .name(dataset_alias_her_bar.clone())
-                .kind(odf::DatasetKind::Root)
-                .push_event(MetadataFactory::set_polling_source().build())
-                .build(),
-        )
-        .await
-        .unwrap()
-        .create_dataset_result;
+    let create_result_her_bar = create_test_dataset_fron_snapshot(
+        &dataset_registry,
+        storage_unit.as_ref(),
+        MetadataFactory::dataset_snapshot()
+            .name(dataset_alias_her_bar.clone())
+            .kind(odf::DatasetKind::Root)
+            .push_event(MetadataFactory::set_polling_source().build())
+            .build(),
+        did_generator.generate_dataset_id(),
+        time_source.now(),
+    )
+    .await
+    .unwrap()
+    .create_dataset_result;
 
-    let create_result_my_baz = storage_unit
-        .create_dataset_from_snapshot(
-            MetadataFactory::dataset_snapshot()
-                .name(dataset_alias_my_baz.clone())
-                .kind(odf::DatasetKind::Root)
-                .push_event(MetadataFactory::set_polling_source().build())
-                .build(),
-        )
-        .await
-        .unwrap();
+    let create_result_my_baz = create_test_dataset_fron_snapshot(
+        &dataset_registry,
+        storage_unit.as_ref(),
+        MetadataFactory::dataset_snapshot()
+            .name(dataset_alias_my_baz.clone())
+            .kind(odf::DatasetKind::Root)
+            .push_event(MetadataFactory::set_polling_source().build())
+            .build(),
+        did_generator.generate_dataset_id(),
+        time_source.now(),
+    )
+    .await
+    .unwrap()
+    .create_dataset_result;
 
     storage_unit
         .rename_dataset(
@@ -484,7 +554,7 @@ pub async fn test_rename_dataset_same_name_multiple_tenants<
     assert_matches!(
         storage_unit
             .rename_dataset(
-                &create_result_my_baz.create_dataset_result.dataset_handle,
+                &create_result_my_baz.dataset_handle,
                 &odf::DatasetName::new_unchecked("bar")
             )
             .await,
@@ -495,9 +565,9 @@ pub async fn test_rename_dataset_same_name_multiple_tenants<
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_delete_dataset<
-    TDatasetStorageUnit: odf::DatasetStorageUnit + DatasetStorageUnitWriter,
+    TDatasetStorageUnit: odf::DatasetStorageUnit + odf::DatasetStorageUnitWriter,
 >(
-    storage_unit: &TDatasetStorageUnit,
+    storage_unit: Arc<TDatasetStorageUnit>,
     create_dataset_from_snapshot: &dyn CreateDatasetFromSnapshotUseCase,
     account_name: Option<odf::AccountName>,
 ) {
@@ -538,10 +608,14 @@ pub async fn test_delete_dataset<
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_iterate_datasets<
-    TDatasetStorageUnit: odf::DatasetStorageUnit + DatasetStorageUnitWriter,
+    TDatasetStorageUnit: odf::DatasetStorageUnit + odf::DatasetStorageUnitWriter + 'static,
 >(
-    storage_unit: &TDatasetStorageUnit,
+    storage_unit: Arc<TDatasetStorageUnit>,
+    did_generator: &dyn DidGenerator,
+    time_source: &dyn SystemTimeSource,
 ) {
+    let dataset_registry = DatasetRegistrySoloUnitBridge::new(storage_unit.clone());
+
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
 
@@ -561,14 +635,25 @@ pub async fn test_iterate_datasets<
         )
         .build();
 
-    storage_unit
-        .create_dataset_from_snapshot(snapshot_foo)
-        .await
-        .unwrap();
-    storage_unit
-        .create_dataset_from_snapshot(snapshot_bar)
-        .await
-        .unwrap();
+    create_test_dataset_fron_snapshot(
+        &dataset_registry,
+        storage_unit.as_ref(),
+        snapshot_foo,
+        did_generator.generate_dataset_id(),
+        time_source.now(),
+    )
+    .await
+    .unwrap();
+
+    create_test_dataset_fron_snapshot(
+        &dataset_registry,
+        storage_unit.as_ref(),
+        snapshot_bar,
+        did_generator.generate_dataset_id(),
+        time_source.now(),
+    )
+    .await
+    .unwrap();
 
     // All
     check_expected_datasets(
@@ -596,10 +681,14 @@ pub async fn test_iterate_datasets<
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_iterate_datasets_multi_tenant<
-    TDatasetStorageUnit: odf::DatasetStorageUnit + DatasetStorageUnitWriter,
+    TDatasetStorageUnit: odf::DatasetStorageUnit + odf::DatasetStorageUnitWriter + 'static,
 >(
-    storage_unit: &TDatasetStorageUnit,
+    storage_unit: Arc<TDatasetStorageUnit>,
+    did_generator: &dyn DidGenerator,
+    time_source: &dyn SystemTimeSource,
 ) {
+    let dataset_registry = DatasetRegistrySoloUnitBridge::new(storage_unit.clone());
+
     let account_my = odf::AccountName::new_unchecked("my");
     let account_her = odf::AccountName::new_unchecked("her");
 
@@ -650,23 +739,45 @@ pub async fn test_iterate_datasets_multi_tenant<
         )
         .build();
 
-    storage_unit
-        .create_dataset_from_snapshot(snapshot_my_foo)
-        .await
-        .unwrap();
-    storage_unit
-        .create_dataset_from_snapshot(snapshot_my_baz)
-        .await
-        .unwrap();
+    create_test_dataset_fron_snapshot(
+        &dataset_registry,
+        storage_unit.as_ref(),
+        snapshot_my_foo,
+        did_generator.generate_dataset_id(),
+        time_source.now(),
+    )
+    .await
+    .unwrap();
 
-    storage_unit
-        .create_dataset_from_snapshot(snapshot_her_foo)
-        .await
-        .unwrap();
-    storage_unit
-        .create_dataset_from_snapshot(snapshot_her_bar)
-        .await
-        .unwrap();
+    create_test_dataset_fron_snapshot(
+        &dataset_registry,
+        storage_unit.as_ref(),
+        snapshot_my_baz,
+        did_generator.generate_dataset_id(),
+        time_source.now(),
+    )
+    .await
+    .unwrap();
+
+    create_test_dataset_fron_snapshot(
+        &dataset_registry,
+        storage_unit.as_ref(),
+        snapshot_her_foo,
+        did_generator.generate_dataset_id(),
+        time_source.now(),
+    )
+    .await
+    .unwrap();
+
+    create_test_dataset_fron_snapshot(
+        &dataset_registry,
+        storage_unit.as_ref(),
+        snapshot_her_bar,
+        did_generator.generate_dataset_id(),
+        time_source.now(),
+    )
+    .await
+    .unwrap();
 
     check_expected_datasets(
         vec![
@@ -722,7 +833,7 @@ async fn check_expected_datasets(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_create_multiple_datasets_with_same_id<
-    TDatasetStorageUnit: odf::DatasetStorageUnit + DatasetStorageUnitWriter,
+    TDatasetStorageUnit: odf::DatasetStorageUnit + odf::DatasetStorageUnitWriter,
 >(
     storage_unit: &TDatasetStorageUnit,
     account_name: Option<odf::AccountName>,

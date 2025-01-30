@@ -37,7 +37,7 @@ use kamu::{
 };
 use kamu_accounts::testing::MockAuthenticationService;
 use kamu_accounts::{Account, AuthenticationService};
-use kamu_core::{DatasetRegistry, DatasetStorageUnitWriter, DidGeneratorDefault, TenancyConfig};
+use kamu_core::{DatasetRegistry, DidGeneratorDefault, TenancyConfig};
 use kamu_datasets::{CreateDatasetFromSnapshotUseCase, CreateDatasetUseCase};
 use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
 use kamu_datasets_services::{
@@ -106,7 +106,7 @@ impl ServerSideS3Harness {
                 .add_value(options.tenancy_config)
                 .add_builder(DatasetStorageUnitS3::builder().with_s3_context(s3_context.clone()))
                 .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitS3>()
-                .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitS3>()
+                .bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitS3>()
                 .add::<DatasetRegistrySoloUnitBridge>()
                 .add_value(server_authentication_mock(&account))
                 .bind::<dyn AuthenticationService, MockAuthenticationService>()

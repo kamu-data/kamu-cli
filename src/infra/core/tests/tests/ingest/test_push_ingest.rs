@@ -17,6 +17,7 @@ use kamu::domain::*;
 use kamu::testing::*;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
+use odf::dataset::testing::create_test_dataset_fron_snapshot;
 use odf::metadata::testing::MetadataFactory;
 use tempfile::TempDir;
 use time_source::{SystemTimeSource, SystemTimeSourceStub};
@@ -766,9 +767,11 @@ async fn test_ingest_sql_case_sensitivity() {
 struct IngestTestHarness {
     temp_dir: TempDir,
     dataset_registry: Arc<dyn DatasetRegistry>,
-    dataset_storage_unit_writer: Arc<dyn DatasetStorageUnitWriter>,
+    dataset_storage_unit_writer: Arc<dyn odf::DatasetStorageUnitWriter>,
     push_ingest_planner: Arc<dyn PushIngestPlanner>,
     push_ingest_executor: Arc<dyn PushIngestExecutor>,
+    time_source: Arc<dyn SystemTimeSource>,
+    did_generator: Arc<dyn DidGenerator>,
     ctx: SessionContext,
 }
 
@@ -791,7 +794,7 @@ impl IngestTestHarness {
             .add_value(TenancyConfig::SingleTenant)
             .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
             .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
-            .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
+            .bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
             .add::<DatasetRegistrySoloUnitBridge>()
             .add_value(SystemTimeSourceStub::new_set(
                 Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap(),
@@ -811,6 +814,8 @@ impl IngestTestHarness {
             dataset_storage_unit_writer: catalog.get_one().unwrap(),
             push_ingest_planner: catalog.get_one().unwrap(),
             push_ingest_executor: catalog.get_one().unwrap(),
+            time_source: catalog.get_one().unwrap(),
+            did_generator: catalog.get_one().unwrap(),
             ctx: SessionContext::new_with_config(SessionConfig::new().with_target_partitions(1)),
         }
     }
@@ -819,11 +824,16 @@ impl IngestTestHarness {
         &self,
         dataset_snapshot: odf::DatasetSnapshot,
     ) -> odf::CreateDatasetResult {
-        self.dataset_storage_unit_writer
-            .create_dataset_from_snapshot(dataset_snapshot)
-            .await
-            .unwrap()
-            .create_dataset_result
+        create_test_dataset_fron_snapshot(
+            self.dataset_registry.as_ref(),
+            self.dataset_storage_unit_writer.as_ref(),
+            dataset_snapshot,
+            self.did_generator.generate_dataset_id(),
+            self.time_source.now(),
+        )
+        .await
+        .unwrap()
+        .create_dataset_result
     }
 
     async fn dataset_data_helper(&self, dataset_alias: &odf::DatasetAlias) -> DatasetDataHelper {

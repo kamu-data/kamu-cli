@@ -11,7 +11,6 @@ use std::sync::Arc;
 
 use dill::{component, interface};
 use kamu_accounts::CurrentAccountSubject;
-use kamu_core::DatasetStorageUnitWriter;
 use kamu_datasets::{
     CreateDatasetUseCase,
     CreateDatasetUseCaseOptions,
@@ -30,7 +29,7 @@ pub struct CreateDatasetUseCaseImpl {
     current_account_subject: Arc<CurrentAccountSubject>,
     dataset_entry_writer: Arc<dyn DatasetEntryWriter>,
     dependency_graph_writer: Arc<dyn DependencyGraphWriter>,
-    dataset_storage_unit_writer: Arc<dyn DatasetStorageUnitWriter>,
+    dataset_storage_unit_writer: Arc<dyn odf::DatasetStorageUnitWriter>,
     outbox: Arc<dyn Outbox>,
 }
 
@@ -39,7 +38,7 @@ impl CreateDatasetUseCaseImpl {
         current_account_subject: Arc<CurrentAccountSubject>,
         dataset_entry_writer: Arc<dyn DatasetEntryWriter>,
         dependency_graph_writer: Arc<dyn DependencyGraphWriter>,
-        dataset_storage_unit_writer: Arc<dyn DatasetStorageUnitWriter>,
+        dataset_storage_unit_writer: Arc<dyn odf::DatasetStorageUnitWriter>,
         outbox: Arc<dyn Outbox>,
     ) -> Self {
         Self {

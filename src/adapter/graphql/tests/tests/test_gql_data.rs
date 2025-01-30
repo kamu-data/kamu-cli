@@ -68,7 +68,7 @@ async fn create_catalog_with_local_workspace(
             .add_value(tenancy_config)
             .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
             .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
-            .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
+            .bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
             .add::<DatasetRegistrySoloUnitBridge>()
             .add::<CreateDatasetUseCaseImpl>()
             .add::<ViewDatasetUseCaseImpl>()

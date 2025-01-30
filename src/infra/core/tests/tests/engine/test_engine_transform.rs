@@ -23,6 +23,7 @@ use kamu::testing::*;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_datasets_services::DatasetKeyValueServiceSysEnv;
+use odf::dataset::testing::create_test_dataset_fron_snapshot;
 use odf::metadata::testing::MetadataFactory;
 use time_source::{SystemTimeSource, SystemTimeSourceStub};
 
@@ -219,11 +220,13 @@ impl DatasetHelper {
 
 struct TestHarness {
     tempdir: tempfile::TempDir,
-    dataset_storage_unit_writer: Arc<dyn DatasetStorageUnitWriter>,
+    dataset_registry: Arc<dyn DatasetRegistry>,
+    dataset_storage_unit_writer: Arc<dyn odf::DatasetStorageUnitWriter>,
     ingest_svc: Arc<dyn PollingIngestService>,
     push_ingest_planner: Arc<dyn PushIngestPlanner>,
     push_ingest_executor: Arc<dyn PushIngestExecutor>,
     transform_helper: TransformTestHelper,
+    did_generator: Arc<dyn DidGenerator>,
     time_source: Arc<SystemTimeSourceStub>,
 }
 
@@ -248,7 +251,7 @@ impl TestHarness {
             .add_value(TenancyConfig::SingleTenant)
             .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
             .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
-            .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
+            .bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
             .add::<DatasetRegistrySoloUnitBridge>()
             .add_value(EngineProvisionerLocalConfig::default())
             .add::<EngineProvisionerLocal>()
@@ -277,11 +280,13 @@ impl TestHarness {
 
         Self {
             tempdir,
+            dataset_registry: catalog.get_one().unwrap(),
             dataset_storage_unit_writer: catalog.get_one().unwrap(),
             ingest_svc: catalog.get_one().unwrap(),
             push_ingest_planner: catalog.get_one().unwrap(),
             push_ingest_executor: catalog.get_one().unwrap(),
             time_source: catalog.get_one().unwrap(),
+            did_generator: catalog.get_one().unwrap(),
             transform_helper,
         }
     }
@@ -346,12 +351,16 @@ async fn test_transform_common(transform: odf::metadata::Transform, test_retract
 
     let root_alias = root_snapshot.name.clone();
 
-    let root_created = harness
-        .dataset_storage_unit_writer
-        .create_dataset_from_snapshot(root_snapshot)
-        .await
-        .unwrap()
-        .create_dataset_result;
+    let root_created = create_test_dataset_fron_snapshot(
+        harness.dataset_registry.as_ref(),
+        harness.dataset_storage_unit_writer.as_ref(),
+        root_snapshot,
+        harness.did_generator.generate_dataset_id(),
+        harness.time_source.now(),
+    )
+    .await
+    .unwrap()
+    .create_dataset_result;
 
     let root_target = ResolvedDataset::from(&root_created);
 
@@ -383,12 +392,16 @@ async fn test_transform_common(transform: odf::metadata::Transform, test_retract
         )
         .build();
 
-    let deriv_created = harness
-        .dataset_storage_unit_writer
-        .create_dataset_from_snapshot(deriv_snapshot)
-        .await
-        .unwrap()
-        .create_dataset_result;
+    let deriv_created = create_test_dataset_fron_snapshot(
+        harness.dataset_registry.as_ref(),
+        harness.dataset_storage_unit_writer.as_ref(),
+        deriv_snapshot,
+        harness.did_generator.generate_dataset_id(),
+        harness.time_source.now(),
+    )
+    .await
+    .unwrap()
+    .create_dataset_result;
 
     let deriv_helper = DatasetHelper::new(deriv_created.dataset.clone(), harness.tempdir.path());
     let deriv_data_helper = DatasetDataHelper::new(deriv_created.dataset.clone());
@@ -705,17 +718,19 @@ async fn test_transform_empty_inputs() {
     // Root setup
     ///////////////////////////////////////////////////////////////////////////
 
-    let root = harness
-        .dataset_storage_unit_writer
-        .create_dataset_from_snapshot(
-            MetadataFactory::dataset_snapshot()
-                .name("root")
-                .kind(odf::DatasetKind::Root)
-                .build(),
-        )
-        .await
-        .unwrap()
-        .create_dataset_result;
+    let root = create_test_dataset_fron_snapshot(
+        harness.dataset_registry.as_ref(),
+        harness.dataset_storage_unit_writer.as_ref(),
+        MetadataFactory::dataset_snapshot()
+            .name("root")
+            .kind(odf::DatasetKind::Root)
+            .build(),
+        harness.did_generator.generate_dataset_id(),
+        harness.time_source.now(),
+    )
+    .await
+    .unwrap()
+    .create_dataset_result;
 
     ///////////////////////////////////////////////////////////////////////////
     // Derivative setup
@@ -737,12 +752,16 @@ async fn test_transform_empty_inputs() {
         )
         .build();
 
-    let deriv = harness
-        .dataset_storage_unit_writer
-        .create_dataset_from_snapshot(deriv_snapshot)
-        .await
-        .unwrap()
-        .create_dataset_result;
+    let deriv = create_test_dataset_fron_snapshot(
+        harness.dataset_registry.as_ref(),
+        harness.dataset_storage_unit_writer.as_ref(),
+        deriv_snapshot,
+        harness.did_generator.generate_dataset_id(),
+        harness.time_source.now(),
+    )
+    .await
+    .unwrap()
+    .create_dataset_result;
 
     // let deriv_helper = DatasetHelper::new(dataset.clone(),
     // harness.tempdir.path()); let deriv_data_helper =

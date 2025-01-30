@@ -15,7 +15,7 @@ use dill::{Catalog, CatalogBuilder, Component};
 use kamu::utils::ipfs_wrapper::IpfsClient;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
-use kamu_core::{DatasetStorageUnitWriter, DidGeneratorDefault, TenancyConfig};
+use kamu_core::{DidGeneratorDefault, TenancyConfig};
 use kamu_datasets::DatasetEnvVarsConfig;
 use kamu_datasets_inmem::InMemoryDatasetEnvVarRepository;
 use kamu_datasets_services::DatasetEnvVarServiceImpl;
@@ -187,7 +187,7 @@ impl TaskAgentHarness {
             .add::<InMemoryDatasetEnvVarRepository>()
             .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
             .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
-            .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
+            .bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
             .add::<DatasetRegistrySoloUnitBridge>()
             .add_value(CurrentAccountSubject::new_test())
             .add_value(TenancyConfig::SingleTenant)
