@@ -1227,6 +1227,7 @@ impl Harness {
 
         let storage_unit = catalog.get_one::<DatasetStorageUnitLocalFs>().unwrap();
 
+        use odf::dataset::DatasetStorageUnitWriter;
         let foo_created = storage_unit
             .create_dataset(
                 &odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo")),

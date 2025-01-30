@@ -14,7 +14,7 @@ use async_trait::async_trait;
 use dill::*;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_accounts::{CurrentAccountSubject, DEFAULT_ACCOUNT_NAME_STR};
-use kamu_core::{DatasetStorageUnitWriter, TenancyConfig};
+use kamu_core::TenancyConfig;
 use odf::dataset::{DatasetImpl, DatasetLayout, MetadataChainImpl};
 use odf::storage::lfs::{NamedObjectRepositoryLocalFS, ObjectRepositoryLocalFSSha3};
 use odf::storage::{
@@ -168,7 +168,7 @@ impl odf::DatasetStorageUnit for DatasetStorageUnitLocalFs {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait]
-impl DatasetStorageUnitWriter for DatasetStorageUnitLocalFs {
+impl odf::DatasetStorageUnitWriter for DatasetStorageUnitLocalFs {
     #[tracing::instrument(level = "debug", skip_all, fields(%dataset_alias, ?seed_block))]
     async fn create_dataset(
         &self,

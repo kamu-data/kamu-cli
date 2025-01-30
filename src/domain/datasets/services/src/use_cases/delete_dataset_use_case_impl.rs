@@ -12,7 +12,7 @@ use std::sync::Arc;
 use dill::{component, interface};
 use internal_error::ResultIntoInternal;
 use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer, DatasetActionUnauthorizedError};
-use kamu_core::{DatasetRegistry, DatasetStorageUnitWriter, DependencyGraphService};
+use kamu_core::{DatasetRegistry, DependencyGraphService};
 use kamu_datasets::{
     DatasetLifecycleMessage,
     DeleteDatasetUseCase,
@@ -29,7 +29,7 @@ use crate::{DatasetEntryWriter, DependencyGraphWriter};
 pub struct DeleteDatasetUseCaseImpl {
     dataset_registry: Arc<dyn DatasetRegistry>,
     dataset_entry_writer: Arc<dyn DatasetEntryWriter>,
-    dataset_storage_unit_writer: Arc<dyn DatasetStorageUnitWriter>,
+    dataset_storage_unit_writer: Arc<dyn odf::DatasetStorageUnitWriter>,
     dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
     dependency_graph_service: Arc<dyn DependencyGraphService>,
     dependency_graph_writer: Arc<dyn DependencyGraphWriter>,
@@ -40,7 +40,7 @@ impl DeleteDatasetUseCaseImpl {
     pub fn new(
         dataset_registry: Arc<dyn DatasetRegistry>,
         dataset_entry_writer: Arc<dyn DatasetEntryWriter>,
-        dataset_storage_unit_writer: Arc<dyn DatasetStorageUnitWriter>,
+        dataset_storage_unit_writer: Arc<dyn odf::DatasetStorageUnitWriter>,
         dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
         dependency_graph_service: Arc<dyn DependencyGraphService>,
         dependency_graph_writer: Arc<dyn DependencyGraphWriter>,

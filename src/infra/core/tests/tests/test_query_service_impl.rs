@@ -27,12 +27,14 @@ use odf::metadata::testing::MetadataFactory;
 use s3_utils::S3Context;
 use tempfile::TempDir;
 use test_utils::LocalS3Server;
-use time_source::SystemTimeSourceDefault;
+use time_source::{SystemTimeSource, SystemTimeSourceDefault};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 async fn create_test_dataset(catalog: &dill::Catalog, tempdir: &Path) -> odf::CreateDatasetResult {
-    let dataset_storage_unit_writer = catalog.get_one::<dyn DatasetStorageUnitWriter>().unwrap();
+    let dataset_storage_unit_writer = catalog
+        .get_one::<dyn odf::DatasetStorageUnitWriter>()
+        .unwrap();
     let dataset_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
 
     let create_result = dataset_storage_unit_writer
@@ -126,7 +128,7 @@ fn create_catalog_with_local_workspace(
         .add_value(TenancyConfig::SingleTenant)
         .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
         .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
-        .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
+        .bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
         .add::<DatasetRegistrySoloUnitBridge>()
         .add::<QueryServiceImpl>()
         .add::<ObjectStoreRegistryImpl>()
@@ -152,7 +154,7 @@ async fn create_catalog_with_s3_workspace(
         .add_value(TenancyConfig::SingleTenant)
         .add_builder(DatasetStorageUnitS3::builder().with_s3_context(s3_context.clone()))
         .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitS3>()
-        .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitS3>()
+        .bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitS3>()
         .add::<DatasetRegistrySoloUnitBridge>()
         .add::<QueryServiceImpl>()
         .add::<ObjectStoreRegistryImpl>()
@@ -410,16 +412,20 @@ async fn test_dataset_tail_empty_dataset() {
         MockDatasetActionAuthorizer::new().expect_check_read_a_dataset(2, true),
     );
 
-    let dataset_storage_unit_writer = catalog.get_one::<dyn DatasetStorageUnitWriter>().unwrap();
+    let did_generator = catalog.get_one::<dyn DidGenerator>().unwrap();
+    let time_source = catalog.get_one::<dyn SystemTimeSource>().unwrap();
+    let dataset_storage_unit_writer = catalog
+        .get_one::<dyn odf::DatasetStorageUnitWriter>()
+        .unwrap();
+
     dataset_storage_unit_writer
         .create_dataset(
             &"foo".try_into().unwrap(),
-            odf::MetadataBlockTyped {
-                system_time: Utc::now(),
-                prev_block_hash: None,
-                event: MetadataFactory::seed(odf::DatasetKind::Root).build(),
-                sequence_number: 0,
-            },
+            odf::dataset::make_seed_block(
+                did_generator.generate_dataset_id(),
+                odf::DatasetKind::Root,
+                time_source.now(),
+            ),
         )
         .await
         .unwrap();
@@ -690,7 +696,9 @@ async fn test_sql_statement_with_state_simple() {
         MockDatasetActionAuthorizer::allowing(),
     );
 
-    let dataset_storage_unit_writer = catalog.get_one::<dyn DatasetStorageUnitWriter>().unwrap();
+    let dataset_storage_unit_writer = catalog
+        .get_one::<dyn odf::DatasetStorageUnitWriter>()
+        .unwrap();
     let ctx = SessionContext::new();
 
     // Dataset init
@@ -919,7 +927,9 @@ async fn test_sql_statement_with_state_cte() {
         MockDatasetActionAuthorizer::allowing(),
     );
 
-    let dataset_storage_unit_writer = catalog.get_one::<dyn DatasetStorageUnitWriter>().unwrap();
+    let dataset_storage_unit_writer = catalog
+        .get_one::<dyn odf::DatasetStorageUnitWriter>()
+        .unwrap();
     let ctx = SessionContext::new();
 
     // Dataset `foo`

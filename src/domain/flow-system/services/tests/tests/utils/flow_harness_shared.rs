@@ -170,7 +170,7 @@ impl FlowHarness {
             .add_value(overrides.tenancy_config)
             .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
             .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
-            .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
+            .bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
             .add_value(mock_dataset_changes)
             .bind::<dyn DatasetChangesService, MockDatasetChangesService>()
             .add::<auth::AlwaysHappyDatasetActionAuthorizer>()

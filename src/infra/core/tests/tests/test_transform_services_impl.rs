@@ -18,9 +18,10 @@ use kamu::domain::engine::*;
 use kamu::domain::*;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
+use odf::dataset::testing::create_test_dataset_fron_snapshot;
 use odf::metadata::testing::MetadataFactory;
 use tempfile::TempDir;
-use time_source::SystemTimeSourceDefault;
+use time_source::{SystemTimeSource, SystemTimeSourceDefault};
 
 use crate::mock_engine_provisioner;
 
@@ -28,8 +29,10 @@ use crate::mock_engine_provisioner;
 
 struct TransformTestHarness {
     _tempdir: TempDir,
+    system_time_source: Arc<dyn SystemTimeSource>,
+    did_generator: Arc<dyn DidGenerator>,
     dataset_registry: Arc<dyn DatasetRegistry>,
-    dataset_storage_unit_writer: Arc<dyn DatasetStorageUnitWriter>,
+    dataset_storage_unit_writer: Arc<dyn odf::DatasetStorageUnitWriter>,
     transform_request_planner: Arc<dyn TransformRequestPlanner>,
     transform_elab_svc: Arc<dyn TransformElaborationService>,
     transform_executor: Arc<dyn TransformExecutor>,
@@ -57,7 +60,7 @@ impl TransformTestHarness {
             .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
             .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
             .add::<DatasetRegistrySoloUnitBridge>()
-            .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
+            .bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
             .add::<SystemTimeSourceDefault>()
             .add::<ObjectStoreRegistryImpl>()
             .add::<ObjectStoreBuilderLocalFs>()
@@ -76,6 +79,8 @@ impl TransformTestHarness {
 
         Self {
             _tempdir: tempdir,
+            system_time_source: catalog.get_one().unwrap(),
+            did_generator: catalog.get_one().unwrap(),
             dataset_registry: catalog.get_one().unwrap(),
             dataset_storage_unit_writer: catalog.get_one().unwrap(),
             compaction_planner: catalog.get_one().unwrap(),
@@ -93,19 +98,23 @@ impl TransformTestHarness {
     }
 
     pub async fn new_root(&self, name: &str) -> odf::DatasetHandle {
-        let snap = MetadataFactory::dataset_snapshot()
+        let snapshot = MetadataFactory::dataset_snapshot()
             .name(name)
             .kind(odf::DatasetKind::Root)
             .push_event(MetadataFactory::set_data_schema().build())
             .build();
 
-        let create_result = self
-            .dataset_storage_unit_writer
-            .create_dataset_from_snapshot(snap)
-            .await
-            .unwrap()
-            .create_dataset_result;
-        create_result.dataset_handle
+        create_test_dataset_fron_snapshot(
+            self.dataset_registry.as_ref(),
+            self.dataset_storage_unit_writer.as_ref(),
+            snapshot,
+            self.did_generator.generate_dataset_id(),
+            self.system_time_source.now(),
+        )
+        .await
+        .unwrap()
+        .create_dataset_result
+        .dataset_handle
     }
 
     async fn new_deriv(
@@ -116,19 +125,24 @@ impl TransformTestHarness {
         let transform = MetadataFactory::set_transform()
             .inputs_from_refs(inputs)
             .build();
-        let snap = MetadataFactory::dataset_snapshot()
+        let snapshot = MetadataFactory::dataset_snapshot()
             .name(name)
             .kind(odf::DatasetKind::Derivative)
             .push_event(transform.clone())
             .push_event(MetadataFactory::set_data_schema().build())
             .build();
 
-        let create_result = self
-            .dataset_storage_unit_writer
-            .create_dataset_from_snapshot(snap)
-            .await
-            .unwrap()
-            .create_dataset_result;
+        let create_result = create_test_dataset_fron_snapshot(
+            self.dataset_registry.as_ref(),
+            self.dataset_storage_unit_writer.as_ref(),
+            snapshot,
+            self.did_generator.generate_dataset_id(),
+            self.system_time_source.now(),
+        )
+        .await
+        .unwrap()
+        .create_dataset_result;
+
         (create_result, transform)
     }
 
@@ -670,38 +684,40 @@ async fn test_transform_with_compaction_retry() {
     );
     let root_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
 
-    let foo_created_result = harness
-        .dataset_storage_unit_writer
-        .create_dataset_from_snapshot(
-            MetadataFactory::dataset_snapshot()
-                .name(root_alias)
-                .kind(odf::DatasetKind::Root)
-                .push_event(
-                    MetadataFactory::add_push_source()
-                        .read(odf::metadata::ReadStepCsv {
-                            header: Some(true),
-                            schema: Some(
-                                ["date TIMESTAMP", "city STRING", "population BIGINT"]
-                                    .iter()
-                                    .map(|s| (*s).to_string())
-                                    .collect(),
-                            ),
-                            ..odf::metadata::ReadStepCsv::default()
-                        })
-                        .merge(odf::metadata::MergeStrategyLedger {
-                            primary_key: vec!["date".to_string(), "city".to_string()],
-                        })
-                        .build(),
-                )
-                .push_event(odf::metadata::SetVocab {
-                    event_time_column: Some("date".to_string()),
-                    ..Default::default()
-                })
-                .build(),
-        )
-        .await
-        .unwrap()
-        .create_dataset_result;
+    let foo_created_result = create_test_dataset_fron_snapshot(
+        harness.dataset_registry.as_ref(),
+        harness.dataset_storage_unit_writer.as_ref(),
+        MetadataFactory::dataset_snapshot()
+            .name(root_alias)
+            .kind(odf::DatasetKind::Root)
+            .push_event(
+                MetadataFactory::add_push_source()
+                    .read(odf::metadata::ReadStepCsv {
+                        header: Some(true),
+                        schema: Some(
+                            ["date TIMESTAMP", "city STRING", "population BIGINT"]
+                                .iter()
+                                .map(|s| (*s).to_string())
+                                .collect(),
+                        ),
+                        ..odf::metadata::ReadStepCsv::default()
+                    })
+                    .merge(odf::metadata::MergeStrategyLedger {
+                        primary_key: vec!["date".to_string(), "city".to_string()],
+                    })
+                    .build(),
+            )
+            .push_event(odf::metadata::SetVocab {
+                event_time_column: Some("date".to_string()),
+                ..Default::default()
+            })
+            .build(),
+        harness.did_generator.generate_dataset_id(),
+        harness.system_time_source.now(),
+    )
+    .await
+    .unwrap()
+    .create_dataset_result;
 
     let data_str = indoc!(
         "

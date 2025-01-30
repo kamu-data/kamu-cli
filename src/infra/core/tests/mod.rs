@@ -10,6 +10,7 @@
 #![feature(assert_matches)]
 #![feature(exit_status_error)]
 #![feature(let_chains)]
+#![feature(trait_upcasting)]
 
 mod tests;
 pub mod utils;

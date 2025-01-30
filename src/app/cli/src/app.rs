@@ -390,7 +390,7 @@ pub fn configure_base_catalog(
         DatasetStorageUnitLocalFs::builder().with_root(workspace_layout.datasets_dir.clone()),
     );
     b.bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>();
-    b.bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>();
+    b.bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>();
 
     b.add::<odf::dataset::DatasetFactoryImpl>();
 

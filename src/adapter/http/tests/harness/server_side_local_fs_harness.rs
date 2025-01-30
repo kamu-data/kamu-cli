@@ -14,13 +14,7 @@ use std::sync::Arc;
 
 use dill::Component;
 use internal_error::{InternalError, ResultIntoInternal};
-use kamu::domain::{
-    CacheDir,
-    CommitDatasetEventUseCase,
-    DatasetStorageUnitWriter,
-    RunInfoDir,
-    ServerUrlConfig,
-};
+use kamu::domain::{CacheDir, CommitDatasetEventUseCase, RunInfoDir, ServerUrlConfig};
 use kamu::{
     AppendDatasetMetadataBatchUseCaseImpl,
     CommitDatasetEventUseCaseImpl,
@@ -116,7 +110,7 @@ impl ServerSideLocalFsHarness {
                 .add_value(options.tenancy_config)
                 .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
                 .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
-                .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
+                .bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
                 .add_value(server_authentication_mock(&account))
                 .add::<DatasetRegistrySoloUnitBridge>()
                 .bind::<dyn AuthenticationService, MockAuthenticationService>()

@@ -16,7 +16,6 @@ use kamu_accounts::CurrentAccountSubject;
 use kamu_core::{
     DatasetRegistry,
     DatasetRegistryExt,
-    DatasetStorageUnitWriter,
     DidGenerator,
     DidGeneratorDefault,
     MockDidGenerator,
@@ -37,7 +36,7 @@ pub struct BaseRepoHarness {
     temp_dir: tempfile::TempDir,
     catalog: Catalog,
     dataset_registry: Arc<dyn DatasetRegistry>,
-    dataset_storage_unit_writer: Arc<dyn DatasetStorageUnitWriter>,
+    dataset_storage_unit_writer: Arc<dyn odf::DatasetStorageUnitWriter>,
 }
 
 impl BaseRepoHarness {
@@ -60,7 +59,7 @@ impl BaseRepoHarness {
                 .add_value(tenancy_config)
                 .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
                 .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
-                .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
+                .bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
                 .add::<DatasetRegistrySoloUnitBridge>()
                 .add_value(CurrentAccountSubject::new_test())
                 .add::<SystemTimeSourceDefault>();
@@ -95,7 +94,7 @@ impl BaseRepoHarness {
         self.dataset_registry.as_ref()
     }
 
-    pub fn dataset_storage_unit_writer(&self) -> &dyn DatasetStorageUnitWriter {
+    pub fn dataset_storage_unit_writer(&self) -> &dyn odf::DatasetStorageUnitWriter {
         self.dataset_storage_unit_writer.as_ref()
     }
 
@@ -190,15 +189,11 @@ impl BaseRepoHarness {
         self.dataset_storage_unit_writer
             .create_dataset(
                 alias,
-                odf::MetadataBlockTyped {
+                odf::dataset::make_seed_block(
+                    did_generator.generate_dataset_id(),
+                    dataset_kind,
                     system_time,
-                    prev_block_hash: None,
-                    event: odf::metadata::Seed {
-                        dataset_id: did_generator.generate_dataset_id(),
-                        dataset_kind,
-                    },
-                    sequence_number: 0,
-                },
+                ),
             )
             .await
             .unwrap()

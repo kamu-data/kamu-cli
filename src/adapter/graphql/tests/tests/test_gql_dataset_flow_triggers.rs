@@ -17,7 +17,7 @@ use kamu::{
     MetadataQueryServiceImpl,
     ViewDatasetUseCaseImpl,
 };
-use kamu_core::{auth, DatasetStorageUnitWriter, DidGeneratorDefault, TenancyConfig};
+use kamu_core::{auth, DidGeneratorDefault, TenancyConfig};
 use kamu_datasets::CreateDatasetFromSnapshotUseCase;
 use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
 use kamu_datasets_services::CreateDatasetFromSnapshotUseCaseImpl;
@@ -1061,7 +1061,7 @@ impl FlowTriggerHarness {
                 .add_value(TenancyConfig::SingleTenant)
                 .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
                 .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
-                .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
+                .bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
                 .add::<DatasetRegistrySoloUnitBridge>()
                 .add::<MetadataQueryServiceImpl>()
                 .add::<CreateDatasetFromSnapshotUseCaseImpl>()

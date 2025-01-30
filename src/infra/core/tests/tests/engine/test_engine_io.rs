@@ -18,25 +18,29 @@ use kamu::domain::*;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_datasets_services::DatasetKeyValueServiceSysEnv;
+use odf::dataset::testing::create_test_dataset_fron_snapshot;
 use odf::metadata::testing::MetadataFactory;
 use test_utils::LocalS3Server;
-use time_source::SystemTimeSourceDefault;
+use time_source::{SystemTimeSource, SystemTimeSourceDefault};
 
 use crate::TransformTestHelper;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 async fn test_engine_io_common<
-    TDatasetStorageUnit: odf::DatasetStorageUnit + DatasetStorageUnitWriter + 'static,
+    TDatasetStorageUnit: odf::DatasetStorageUnit + odf::DatasetStorageUnitWriter + 'static,
 >(
     object_stores: Vec<Arc<dyn ObjectStoreBuilder>>,
     storage_unit: Arc<TDatasetStorageUnit>,
+    did_generator: Arc<dyn DidGenerator>,
     run_info_dir: &Path,
     cache_dir: &Path,
     transform: odf::metadata::Transform,
 ) {
     let run_info_dir = Arc::new(RunInfoDir::new(run_info_dir.to_path_buf()));
     let cache_dir = Arc::new(CacheDir::new(cache_dir.to_path_buf()));
+
+    let dataset_registry = DatasetRegistrySoloUnitBridge::new(storage_unit.clone());
 
     let engine_provisioner = Arc::new(EngineProvisionerLocal::new(
         EngineProvisionerLocalConfig::default(),
@@ -120,11 +124,16 @@ async fn test_engine_io_common<
 
     let root_alias = root_snapshot.name.clone();
 
-    let root_created = storage_unit
-        .create_dataset_from_snapshot(root_snapshot)
-        .await
-        .unwrap()
-        .create_dataset_result;
+    let root_created = create_test_dataset_fron_snapshot(
+        &dataset_registry,
+        storage_unit.as_ref(),
+        root_snapshot,
+        did_generator.generate_dataset_id(),
+        time_source.now(),
+    )
+    .await
+    .unwrap()
+    .create_dataset_result;
 
     let root_target = ResolvedDataset::from(&root_created);
 
@@ -158,11 +167,16 @@ async fn test_engine_io_common<
         )
         .build();
 
-    let deriv_created = storage_unit
-        .create_dataset_from_snapshot(deriv_snapshot)
-        .await
-        .unwrap()
-        .create_dataset_result;
+    let deriv_created = create_test_dataset_fron_snapshot(
+        &dataset_registry,
+        storage_unit.as_ref(),
+        deriv_snapshot,
+        did_generator.generate_dataset_id(),
+        time_source.now(),
+    )
+    .await
+    .unwrap()
+    .create_dataset_result;
 
     let block_hash = match transform_helper.transform_dataset(&deriv_created).await {
         TransformResult::Updated { new_head, .. } => new_head,
@@ -270,10 +284,12 @@ async fn test_engine_io_local_file_mount() {
         .build();
 
     let storage_unit = catalog.get_one::<DatasetStorageUnitLocalFs>().unwrap();
+    let did_generator = catalog.get_one::<dyn DidGenerator>().unwrap();
 
     test_engine_io_common(
         vec![Arc::new(ObjectStoreBuilderLocalFs::new())],
         storage_unit,
+        did_generator,
         &run_info_dir,
         &cache_dir,
         MetadataFactory::transform()
@@ -311,6 +327,7 @@ async fn test_engine_io_s3_to_local_file_mount_proxy() {
         .build();
 
     let storage_unit = catalog.get_one::<DatasetStorageUnitS3>().unwrap();
+    let did_generator = catalog.get_one::<dyn DidGenerator>().unwrap();
 
     test_engine_io_common(
         vec![
@@ -320,6 +337,7 @@ async fn test_engine_io_s3_to_local_file_mount_proxy() {
             Arc::new(ObjectStoreBuilderS3::new(s3_context, true)),
         ],
         storage_unit,
+        did_generator,
         &run_info_dir,
         &cache_dir,
         MetadataFactory::transform()
