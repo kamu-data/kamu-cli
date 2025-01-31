@@ -11,7 +11,7 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-### Unreleased
+### [0.221.1] - 2025-01-31
 ### Fixed
 - Private Datasets:
   - Validation `SetTransform` event (input datasets): IDs are used for accessibility checks. 
