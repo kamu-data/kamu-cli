@@ -20,6 +20,10 @@ workspace = true
 [lib]
 doctest = false
 
+[features]
+default = []
+testing = []
+
 
 [dependencies]
 database-common = { workspace = true }

@@ -13,43 +13,19 @@ use chrono::{DateTime, Duration, TimeZone, Utc};
 use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use dill::*;
 use kamu::testing::MockDatasetChangesService;
-use kamu::*;
-use kamu_accounts::{
-    AccountConfig,
-    AuthenticationService,
-    CurrentAccountSubject,
-    JwtAuthenticationConfig,
-    PredefinedAccountsConfig,
-};
-use kamu_accounts_inmem::{InMemoryAccessTokenRepository, InMemoryAccountRepository};
-use kamu_accounts_services::{
-    AccessTokenServiceImpl,
-    AuthenticationServiceImpl,
-    LoginPasswordAuthProvider,
-    PredefinedAccountsRegistrator,
-};
+use kamu_accounts::DEFAULT_ACCOUNT_NAME_STR;
 use kamu_core::*;
-use kamu_datasets::{
-    CreateDatasetFromSnapshotUseCase,
-    DatasetLifecycleMessage,
-    DeleteDatasetUseCase,
-    MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
-};
-use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEntryRepository};
-use kamu_datasets_services::{
-    CreateDatasetFromSnapshotUseCaseImpl,
-    DatasetEntryServiceImpl,
-    DeleteDatasetUseCaseImpl,
-    DependencyGraphServiceImpl,
-};
+use kamu_datasets::{DatasetEntry, DatasetLifecycleMessage, MESSAGE_PRODUCER_KAMU_DATASET_SERVICE};
+use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
+use kamu_datasets_services::testing::FakeDatasetEntryService;
+use kamu_datasets_services::{DependencyGraphServiceImpl, DependencyGraphWriter};
 use kamu_flow_system::*;
 use kamu_flow_system_inmem::*;
 use kamu_flow_system_services::*;
 use kamu_task_system::{TaskProgressMessage, MESSAGE_PRODUCER_KAMU_TASK_AGENT};
 use kamu_task_system_inmem::InMemoryTaskEventStore;
 use kamu_task_system_services::TaskSchedulerImpl;
-use messaging_outbox::{register_message_dispatcher, Outbox, OutboxImmediateImpl};
-use odf::metadata::testing::MetadataFactory;
+use messaging_outbox::{register_message_dispatcher, Outbox, OutboxExt, OutboxImmediateImpl};
 use time_source::{FakeSystemTimeSource, SystemTimeSource};
 use tokio::task::yield_now;
 
@@ -71,20 +47,18 @@ pub(crate) const SCHEDULING_MANDATORY_THROTTLING_PERIOD_MS: i64 = SCHEDULING_ALI
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) struct FlowHarness {
-    _tmp_dir: tempfile::TempDir,
-    catalog_without_subject: Catalog,
-    delete_dataset_use_case: Arc<dyn DeleteDatasetUseCase>,
-    create_dataset_from_snapshot_use_case: Arc<dyn CreateDatasetFromSnapshotUseCase>,
-
     pub catalog: Catalog,
+    pub outbox: Arc<dyn Outbox>,
+    pub dependency_graph_writer: Arc<dyn DependencyGraphWriter>,
+    pub fake_dataset_entry_service: Arc<FakeDatasetEntryService>,
+    pub fake_system_time_source: FakeSystemTimeSource,
+
     pub flow_configuration_service: Arc<dyn FlowConfigurationService>,
     pub flow_trigger_service: Arc<dyn FlowTriggerService>,
     pub flow_trigger_event_store: Arc<dyn FlowTriggerEventStore>,
     pub flow_agent: Arc<FlowAgentImpl>,
     pub flow_query_service: Arc<dyn FlowQueryService>,
     pub flow_event_store: Arc<dyn FlowEventStore>,
-    pub auth_svc: Arc<dyn AuthenticationService>,
-    pub fake_system_time_source: FakeSystemTimeSource,
 }
 
 #[derive(Default)]
@@ -92,46 +66,14 @@ pub(crate) struct FlowHarnessOverrides {
     pub awaiting_step: Option<Duration>,
     pub mandatory_throttling_period: Option<Duration>,
     pub mock_dataset_changes: Option<MockDatasetChangesService>,
-    pub predefined_accounts: Vec<AccountConfig>,
-    pub tenancy_config: TenancyConfig,
 }
 
 impl FlowHarness {
-    pub async fn new() -> Self {
-        Self::with_overrides(FlowHarnessOverrides::default()).await
+    pub fn new() -> Self {
+        Self::with_overrides(FlowHarnessOverrides::default())
     }
 
-    pub async fn with_overrides(overrides: FlowHarnessOverrides) -> Self {
-        let tmp_dir = tempfile::tempdir().unwrap();
-        let datasets_dir = tmp_dir.path().join("datasets");
-        std::fs::create_dir(&datasets_dir).unwrap();
-
-        let accounts_catalog = {
-            let predefined_accounts_config = if overrides.predefined_accounts.is_empty() {
-                PredefinedAccountsConfig::single_tenant()
-            } else {
-                let mut predefined_accounts_config = PredefinedAccountsConfig::new();
-                for account in overrides.predefined_accounts {
-                    predefined_accounts_config.predefined.push(account);
-                }
-                predefined_accounts_config
-            };
-
-            let mut b = CatalogBuilder::new();
-            b.add_value(predefined_accounts_config)
-                .add::<LoginPasswordAuthProvider>()
-                .add::<PredefinedAccountsRegistrator>()
-                .add::<InMemoryAccountRepository>();
-
-            NoOpDatabasePlugin::init_database_components(&mut b);
-
-            b.build()
-        };
-
-        init_on_startup::run_startup_jobs(&accounts_catalog)
-            .await
-            .unwrap();
-
+    pub fn with_overrides(overrides: FlowHarnessOverrides) -> Self {
         let t = Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap();
         let fake_system_time_source = FakeSystemTimeSource::new(t);
 
@@ -148,15 +90,14 @@ impl FlowHarness {
 
         let mock_dataset_changes = overrides.mock_dataset_changes.unwrap_or_default();
 
-        let catalog_without_subject = {
-            let mut b = CatalogBuilder::new_chained(&accounts_catalog);
+        let catalog = {
+            let mut b = CatalogBuilder::new();
 
             b.add_builder(
                 messaging_outbox::OutboxImmediateImpl::builder()
                     .with_consumer_filter(messaging_outbox::ConsumerFilter::AllConsumers),
             )
             .bind::<dyn Outbox, OutboxImmediateImpl>()
-            .add::<DidGeneratorDefault>()
             .add::<FlowSystemTestListener>()
             .add_value(FlowAgentConfig::new(
                 awaiting_step,
@@ -167,26 +108,16 @@ impl FlowHarness {
             .add::<InMemoryFlowTriggerEventStore>()
             .add_value(fake_system_time_source.clone())
             .bind::<dyn SystemTimeSource, FakeSystemTimeSource>()
-            .add_value(overrides.tenancy_config)
-            .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
-            .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
-            .bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
             .add_value(mock_dataset_changes)
             .bind::<dyn DatasetChangesService, MockDatasetChangesService>()
-            .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
-            .add::<CreateDatasetFromSnapshotUseCaseImpl>()
-            .add::<DeleteDatasetUseCaseImpl>()
-            .add::<AuthenticationServiceImpl>()
-            .add_value(JwtAuthenticationConfig::default())
-            .add::<AccessTokenServiceImpl>()
-            .add::<InMemoryAccessTokenRepository>()
             .add::<DependencyGraphServiceImpl>()
             .add::<InMemoryDatasetDependencyRepository>()
-            .add::<DatasetEntryServiceImpl>()
-            .add::<InMemoryDatasetEntryRepository>()
             .add::<TaskSchedulerImpl>()
             .add::<InMemoryTaskEventStore>()
-            .add::<DatabaseTransactionRunner>();
+            .add::<DatabaseTransactionRunner>()
+            .add::<FakeDatasetEntryService>();
+
+            NoOpDatabasePlugin::init_database_components(&mut b);
 
             kamu_flow_system_services::register_dependencies(&mut b);
 
@@ -218,99 +149,43 @@ impl FlowHarness {
             b.build()
         };
 
-        let catalog = CatalogBuilder::new_chained(&catalog_without_subject)
-            .add_value(CurrentAccountSubject::new_test())
-            .build();
-
         Self {
-            _tmp_dir: tmp_dir,
+            outbox: catalog.get_one().unwrap(),
+            dependency_graph_writer: catalog.get_one().unwrap(),
+            fake_dataset_entry_service: catalog.get_one().unwrap(),
+
             flow_agent: catalog.get_one().unwrap(),
             flow_query_service: catalog.get_one().unwrap(),
             flow_configuration_service: catalog.get_one().unwrap(),
             flow_trigger_service: catalog.get_one().unwrap(),
             flow_trigger_event_store: catalog.get_one().unwrap(),
             flow_event_store: catalog.get_one().unwrap(),
-            auth_svc: catalog.get_one().unwrap(),
             fake_system_time_source,
-            delete_dataset_use_case: catalog.get_one().unwrap(),
-            create_dataset_from_snapshot_use_case: catalog.get_one().unwrap(),
             catalog,
-            catalog_without_subject,
         }
     }
 
-    pub async fn create_root_dataset_using_subject(
-        &self,
-        dataset_alias: odf::DatasetAlias,
-        subject: CurrentAccountSubject,
-    ) -> odf::CreateDatasetResult {
-        let subject_catalog = CatalogBuilder::new_chained(&self.catalog_without_subject)
-            .add_value(subject)
-            .build();
-        let create_dataset_from_snapshot_use_case = subject_catalog
-            .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
-            .unwrap();
+    pub async fn create_root_dataset(&self, dataset_alias: odf::DatasetAlias) -> odf::DatasetID {
+        let dataset_id = odf::DatasetID::new_generated_ed25519().1;
 
-        create_dataset_from_snapshot_use_case
-            .execute(
-                MetadataFactory::dataset_snapshot()
-                    .name(dataset_alias)
-                    .kind(odf::DatasetKind::Root)
-                    .push_event(MetadataFactory::set_polling_source().build())
-                    .build(),
-                Default::default(),
-            )
-            .await
-            .unwrap()
-    }
+        let owner_id = match dataset_alias.account_name {
+            Some(acocunt_name) => odf::AccountID::new_seeded_ed25519(acocunt_name.as_bytes()),
+            None => odf::AccountID::new_seeded_ed25519(DEFAULT_ACCOUNT_NAME_STR.as_bytes()),
+        };
 
-    pub async fn create_root_dataset(
-        &self,
-        dataset_alias: odf::DatasetAlias,
-    ) -> odf::CreateDatasetResult {
-        self.create_dataset_from_snapshot_use_case
-            .execute(
-                MetadataFactory::dataset_snapshot()
-                    .name(dataset_alias)
-                    .kind(odf::DatasetKind::Root)
-                    .push_event(MetadataFactory::set_polling_source().build())
-                    .build(),
-                Default::default(),
-            )
-            .await
-            .unwrap()
-    }
+        self.fake_dataset_entry_service.add_entry(DatasetEntry {
+            created_at: self.fake_system_time_source.now(),
+            id: dataset_id.clone(),
+            owner_id,
+            name: dataset_alias.dataset_name,
+        });
 
-    pub async fn create_derived_dataset_using_subject(
-        &self,
-        dataset_alias: odf::DatasetAlias,
-        input_ids: Vec<odf::DatasetID>,
-        subject: CurrentAccountSubject,
-    ) -> odf::DatasetID {
-        let subject_catalog = CatalogBuilder::new_chained(&self.catalog_without_subject)
-            .add_value(subject)
-            .build();
-        let create_dataset_from_snapshot_use_case = subject_catalog
-            .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
-            .unwrap();
-
-        let create_result = create_dataset_from_snapshot_use_case
-            .execute(
-                MetadataFactory::dataset_snapshot()
-                    .name(dataset_alias)
-                    .kind(odf::DatasetKind::Derivative)
-                    .push_event(
-                        MetadataFactory::set_transform()
-                            .inputs_from_refs(input_ids)
-                            .build(),
-                    )
-                    .build(),
-                Default::default(),
-            )
+        self.dependency_graph_writer
+            .create_dataset_node(&dataset_id)
             .await
             .unwrap();
 
-        create_result.dataset_handle.id
+        dataset_id
     }
 
     pub async fn create_derived_dataset(
@@ -318,24 +193,30 @@ impl FlowHarness {
         dataset_alias: odf::DatasetAlias,
         input_ids: Vec<odf::DatasetID>,
     ) -> odf::DatasetID {
-        let create_result = self
-            .create_dataset_from_snapshot_use_case
-            .execute(
-                MetadataFactory::dataset_snapshot()
-                    .name(dataset_alias)
-                    .kind(odf::DatasetKind::Derivative)
-                    .push_event(
-                        MetadataFactory::set_transform()
-                            .inputs_from_refs(input_ids)
-                            .build(),
-                    )
-                    .build(),
-                Default::default(),
-            )
+        let dataset_id = odf::DatasetID::new_generated_ed25519().1;
+
+        let owner_id = match dataset_alias.account_name {
+            Some(acocunt_name) => odf::AccountID::new_seeded_ed25519(acocunt_name.as_bytes()),
+            None => odf::AccountID::new_seeded_ed25519(DEFAULT_ACCOUNT_NAME_STR.as_bytes()),
+        };
+
+        self.fake_dataset_entry_service.add_entry(DatasetEntry {
+            created_at: self.fake_system_time_source.now(),
+            id: dataset_id.clone(),
+            owner_id,
+            name: dataset_alias.dataset_name,
+        });
+
+        self.dependency_graph_writer
+            .create_dataset_node(&dataset_id)
+            .await
+            .unwrap();
+        self.dependency_graph_writer
+            .update_dataset_node_dependencies(&self.catalog, &dataset_id, input_ids)
             .await
             .unwrap();
 
-        create_result.dataset_handle.id
+        dataset_id
     }
 
     pub async fn eager_initialization(&self) {
@@ -344,9 +225,17 @@ impl FlowHarness {
         self.flow_agent.run_initialization().await.unwrap();
     }
 
-    pub async fn delete_dataset(&self, dataset_id: &odf::DatasetID) {
-        self.delete_dataset_use_case
-            .execute_via_ref(&(dataset_id.as_local_ref()))
+    pub async fn issue_dataset_deleted(&self, dataset_id: &odf::DatasetID) {
+        self.dependency_graph_writer
+            .remove_dataset_node(dataset_id)
+            .await
+            .unwrap();
+
+        self.outbox
+            .post_message(
+                MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
+                DatasetLifecycleMessage::deleted(dataset_id.clone()),
+            )
             .await
             .unwrap();
     }
