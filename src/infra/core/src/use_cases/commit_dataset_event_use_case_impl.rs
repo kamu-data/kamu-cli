@@ -21,7 +21,7 @@ use kamu_core::{
 };
 use messaging_outbox::{Outbox, OutboxExt};
 use odf::dataset::{AppendError, InvalidEventError};
-use odf::metadata::{EnumWithVariants, TransformInputExt};
+use odf::metadata::EnumWithVariants;
 
 use crate::utils::access_dataset_helper::{AccessDatasetHelper, DatasetAccessError};
 
@@ -54,11 +54,11 @@ impl CommitDatasetEventUseCaseImpl {
         event: odf::MetadataEvent,
     ) -> Result<odf::MetadataEvent, odf::dataset::CommitError> {
         if let Some(set_transform) = event.as_variant::<odf::metadata::SetTransform>() {
-            let mut inputs_dataset_refs = Vec::with_capacity(set_transform.inputs.len());
-            for input in &set_transform.inputs {
-                let input_dataset_ref = input.as_sanitized_dataset_ref()?;
-                inputs_dataset_refs.push(input_dataset_ref);
-            }
+            let inputs_dataset_refs = set_transform
+                .inputs
+                .iter()
+                .map(|input| input.dataset_ref.clone())
+                .collect::<Vec<_>>();
 
             let view_multi_result: ViewMultiResponse = access_dataset_helper
                 .access_multi_dataset(inputs_dataset_refs, DatasetAction::Read)
@@ -66,7 +66,9 @@ impl CommitDatasetEventUseCaseImpl {
                 .map(Into::into)?;
 
             if !view_multi_result.inaccessible_refs.is_empty() {
-                let message = view_multi_result.into_inaccessible_input_datasets_message();
+                let dataset_ref_alias_map = set_transform.as_dataset_ref_alias_map();
+                let message = view_multi_result
+                    .into_inaccessible_input_datasets_message(&dataset_ref_alias_map);
 
                 return Err(AppendError::InvalidBlock(
                     InvalidEventError::new(event, message).into(),
