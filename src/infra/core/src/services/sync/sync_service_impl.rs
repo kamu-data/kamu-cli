@@ -554,7 +554,6 @@ impl SyncService for SyncServiceImpl {
 pub trait UrlExt {
     fn ensure_trailing_slash(&mut self);
     fn is_odf_protocol(&self) -> bool;
-    fn is_s3_protocol(&self) -> bool;
     fn as_odf_protocol(&self) -> Result<Url, InternalError>;
 
     /// Converts from odf+http(s) scheme to plain http(s)
@@ -575,10 +574,6 @@ impl UrlExt for Url {
 
     fn is_odf_protocol(&self) -> bool {
         self.scheme().starts_with("odf+")
-    }
-
-    fn is_s3_protocol(&self) -> bool {
-        self.scheme().starts_with("s3+")
     }
 
     fn odf_to_transport_protocol(&self) -> Result<Url, InternalError> {
