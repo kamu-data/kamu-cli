@@ -409,6 +409,62 @@ impl DependencyGraphWriter for DependencyGraphServiceImpl {
 
         Ok(())
     }
+
+    async fn update_dataset_node_dependencies(
+        &self,
+        catalog: &Catalog,
+        dataset_id: &odf::DatasetID,
+        new_upstream_ids: Vec<odf::DatasetID>,
+    ) -> Result<(), InternalError> {
+        let repository = catalog
+            .get_one::<dyn DatasetDependencyRepository>()
+            .unwrap();
+
+        let mut state = self.state.write().await;
+
+        let node_index = state.get_dataset_node(dataset_id).int_err()?;
+
+        let existing_upstream_ids: HashSet<_> = state
+            .datasets_graph
+            .neighbors_directed(node_index, Direction::Incoming)
+            .map(|node_index| {
+                state
+                    .datasets_graph
+                    .node_weight(node_index)
+                    .unwrap()
+                    .clone()
+            })
+            .collect();
+
+        let new_upstream_ids: HashSet<_> = new_upstream_ids.iter().cloned().collect();
+
+        let obsolete_dependencies: Vec<_> = existing_upstream_ids
+            .difference(&new_upstream_ids)
+            .collect();
+        let added_dependencies: Vec<_> = new_upstream_ids
+            .difference(&existing_upstream_ids)
+            .collect();
+
+        repository
+            .remove_upstream_dependencies(dataset_id, &obsolete_dependencies)
+            .await
+            .int_err()?;
+
+        repository
+            .add_upstream_dependencies(dataset_id, &added_dependencies)
+            .await
+            .int_err()?;
+
+        for obsolete_upstream_id in obsolete_dependencies {
+            self.remove_dependency(&mut state, obsolete_upstream_id, dataset_id);
+        }
+
+        for added_id in added_dependencies {
+            self.add_dependency(&mut state, added_id, dataset_id);
+        }
+
+        Ok(())
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -431,59 +487,18 @@ impl MessageConsumerT<DatasetLifecycleMessage> for DependencyGraphServiceImpl {
     ) -> Result<(), InternalError> {
         tracing::debug!(received_message = ?message, "Received dataset lifecycle message");
 
-        let repository = catalog
-            .get_one::<dyn DatasetDependencyRepository>()
-            .unwrap();
-
-        let mut state = self.state.write().await;
-
         match message {
             DatasetLifecycleMessage::Created(_) | DatasetLifecycleMessage::Deleted(_) => {
                 // Nothing to do
             }
 
             DatasetLifecycleMessage::DependenciesUpdated(message) => {
-                let node_index = state.get_dataset_node(&message.dataset_id).int_err()?;
-
-                let existing_upstream_ids: HashSet<_> = state
-                    .datasets_graph
-                    .neighbors_directed(node_index, Direction::Incoming)
-                    .map(|node_index| {
-                        state
-                            .datasets_graph
-                            .node_weight(node_index)
-                            .unwrap()
-                            .clone()
-                    })
-                    .collect();
-
-                let new_upstream_ids: HashSet<_> =
-                    message.new_upstream_ids.iter().cloned().collect();
-
-                let obsolete_dependencies: Vec<_> = existing_upstream_ids
-                    .difference(&new_upstream_ids)
-                    .collect();
-                let added_dependencies: Vec<_> = new_upstream_ids
-                    .difference(&existing_upstream_ids)
-                    .collect();
-
-                repository
-                    .remove_upstream_dependencies(&message.dataset_id, &obsolete_dependencies)
-                    .await
-                    .int_err()?;
-
-                repository
-                    .add_upstream_dependencies(&message.dataset_id, &added_dependencies)
-                    .await
-                    .int_err()?;
-
-                for obsolete_upstream_id in obsolete_dependencies {
-                    self.remove_dependency(&mut state, obsolete_upstream_id, &message.dataset_id);
-                }
-
-                for added_id in added_dependencies {
-                    self.add_dependency(&mut state, added_id, &message.dataset_id);
-                }
+                self.update_dataset_node_dependencies(
+                    catalog,
+                    &message.dataset_id,
+                    message.new_upstream_ids.clone(),
+                )
+                .await?;
             }
         }
 

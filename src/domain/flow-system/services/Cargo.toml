@@ -51,7 +51,7 @@ kamu-accounts = { workspace = true }
 kamu-accounts-inmem = { workspace = true }
 kamu-accounts-services = { workspace = true }
 kamu-datasets-inmem = { workspace = true }
-kamu-datasets-services = { workspace = true }
+kamu-datasets-services = { workspace = true, features = ["testing"] }
 kamu-flow-system-inmem = { workspace = true }
 kamu-task-system-inmem = { workspace = true }
 kamu-task-system-services = { workspace = true }

@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use dill::Catalog;
 use internal_error::InternalError;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -16,6 +17,13 @@ pub trait DependencyGraphWriter: Send + Sync {
     async fn create_dataset_node(&self, dataset_id: &odf::DatasetID) -> Result<(), InternalError>;
 
     async fn remove_dataset_node(&self, dataset_id: &odf::DatasetID) -> Result<(), InternalError>;
+
+    async fn update_dataset_node_dependencies(
+        &self,
+        catalog: &Catalog,
+        dataset_id: &odf::DatasetID,
+        new_upstream_ids: Vec<odf::DatasetID>,
+    ) -> Result<(), InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

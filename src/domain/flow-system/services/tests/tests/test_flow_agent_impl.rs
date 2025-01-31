@@ -31,16 +31,15 @@ use super::{
 
 #[test_log::test(tokio::test)]
 async fn test_read_initial_config_and_queue_without_waiting() {
-    let harness = FlowHarness::new().await;
+    let harness = FlowHarness::new();
 
     // Create a "foo" root dataset, and configure ingestion schedule every 60ms
-    let foo_create_result = harness
+    let foo_id = harness
         .create_root_dataset(odf::DatasetAlias {
             dataset_name: odf::DatasetName::new_unchecked("foo"),
             account_name: None,
         })
         .await;
-    let foo_id = foo_create_result.dataset_handle.id;
 
     harness
         .set_dataset_flow_ingest(
@@ -158,16 +157,15 @@ async fn test_read_initial_config_and_queue_without_waiting() {
 
 #[test_log::test(tokio::test)]
 async fn test_read_initial_config_shouldnt_queue_in_recovery_case() {
-    let harness = FlowHarness::new().await;
+    let harness = FlowHarness::new();
 
     // Create a "foo" root dataset
-    let foo_create_result = harness
+    let foo_id = harness
         .create_root_dataset(odf::DatasetAlias {
             dataset_name: odf::DatasetName::new_unchecked("foo"),
             account_name: None,
         })
         .await;
-    let foo_id = foo_create_result.dataset_handle.id;
     let foo_flow_key = FlowKey::dataset(foo_id.clone(), DatasetFlowType::Ingest);
 
     // Remember start time
@@ -300,17 +298,15 @@ async fn test_cron_config() {
         awaiting_step: Some(Duration::seconds(1)),
         mandatory_throttling_period: Some(Duration::seconds(1)),
         ..Default::default()
-    })
-    .await;
+    });
 
     // Create a "foo" root dataset, configure ingestion cron schedule of every 5s
-    let foo_create_result = harness
+    let foo_id = harness
         .create_root_dataset(odf::DatasetAlias {
             dataset_name: odf::DatasetName::new_unchecked("foo"),
             account_name: None,
         })
         .await;
-    let foo_id = foo_create_result.dataset_handle.id;
 
     harness.eager_initialization().await;
 
@@ -411,23 +407,21 @@ async fn test_cron_config() {
 
 #[test_log::test(tokio::test)]
 async fn test_manual_trigger() {
-    let harness = FlowHarness::new().await;
+    let harness = FlowHarness::new();
 
-    let foo_create_result = harness
+    let foo_id = harness
         .create_root_dataset(odf::DatasetAlias {
             dataset_name: odf::DatasetName::new_unchecked("foo"),
             account_name: None,
         })
         .await;
-    let foo_id = foo_create_result.dataset_handle.id;
 
-    let bar_create_result = harness
+    let bar_id = harness
         .create_root_dataset(odf::DatasetAlias {
             dataset_name: odf::DatasetName::new_unchecked("bar"),
             account_name: None,
         })
         .await;
-    let bar_id = bar_create_result.dataset_handle.id;
 
     // Note: only "foo" has auto-schedule, "bar" hasn't
     harness
@@ -623,24 +617,20 @@ async fn test_manual_trigger() {
 
 #[test_log::test(tokio::test)]
 async fn test_ingest_trigger_with_ingest_config() {
-    let harness = FlowHarness::new().await;
+    let harness = FlowHarness::new();
 
     let foo_id = harness
         .create_root_dataset(odf::DatasetAlias {
             dataset_name: odf::DatasetName::new_unchecked("foo"),
             account_name: None,
         })
-        .await
-        .dataset_handle
-        .id;
+        .await;
     let bar_id = harness
         .create_root_dataset(odf::DatasetAlias {
             dataset_name: odf::DatasetName::new_unchecked("bar"),
             account_name: None,
         })
-        .await
-        .dataset_handle
-        .id;
+        .await;
 
     harness
         .set_dataset_flow_ingest(
@@ -842,23 +832,21 @@ async fn test_ingest_trigger_with_ingest_config() {
 
 #[test_log::test(tokio::test)]
 async fn test_manual_trigger_compaction() {
-    let harness = FlowHarness::new().await;
+    let harness = FlowHarness::new();
 
-    let foo_create_result = harness
+    let foo_id = harness
         .create_root_dataset(odf::DatasetAlias {
             dataset_name: odf::DatasetName::new_unchecked("foo"),
             account_name: None,
         })
         .await;
-    let foo_id = foo_create_result.dataset_handle.id;
 
-    let bar_create_result = harness
+    let bar_id = harness
         .create_root_dataset(odf::DatasetAlias {
             dataset_name: odf::DatasetName::new_unchecked("bar"),
             account_name: None,
         })
         .await;
-    let bar_id = bar_create_result.dataset_handle.id;
 
     harness.eager_initialization().await;
 
@@ -991,47 +979,32 @@ async fn test_manual_trigger_compaction() {
 
 #[test_log::test(tokio::test)]
 async fn test_manual_trigger_reset() {
-    let harness = FlowHarness::new().await;
+    let harness = FlowHarness::new();
 
-    let create_dataset_result = harness
+    let foo_id = harness
         .create_root_dataset(odf::DatasetAlias {
             dataset_name: odf::DatasetName::new_unchecked("foo"),
             account_name: None,
         })
         .await;
 
-    let dataset_blocks: Vec<_> = create_dataset_result
-        .dataset
-        .as_metadata_chain()
-        .iter_blocks_interval(&create_dataset_result.head, None, false)
-        .try_collect()
-        .await
-        .unwrap();
-
     harness.eager_initialization().await;
     harness
         .set_dataset_flow_reset_rule(
-            create_dataset_result.dataset_handle.id.clone(),
+            foo_id.clone(),
             DatasetFlowType::Reset,
             ResetRule {
-                new_head_hash: Some(dataset_blocks[1].0.clone()),
-                old_head_hash: Some(dataset_blocks[0].0.clone()),
+                new_head_hash: Some(odf::Multihash::from_digest_sha3_256(b"new-slice")),
+                old_head_hash: Some(odf::Multihash::from_digest_sha3_256(b"old-slice")),
                 recursive: false,
             },
         )
         .await;
 
-    let foo_flow_key: FlowKey = FlowKeyDataset::new(
-        create_dataset_result.dataset_handle.id.clone(),
-        DatasetFlowType::Reset,
-    )
-    .into();
+    let foo_flow_key: FlowKey = FlowKeyDataset::new(foo_id.clone(), DatasetFlowType::Reset).into();
 
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
-    test_flow_listener.define_dataset_display_name(
-        create_dataset_result.dataset_handle.id.clone(),
-        "foo".to_string(),
-    );
+    test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
 
     // Run scheduler concurrently with manual triggers script
     tokio::select! {
@@ -1044,18 +1017,18 @@ async fn test_manual_trigger_reset() {
                   let task0_driver = harness.task_driver(TaskDriverArgs {
                     task_id: TaskID::new(0),
                     task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
-                    dataset_id: Some(create_dataset_result.dataset_handle.id.clone()),
+                    dataset_id: Some(foo_id.clone()),
                     run_since_start: Duration::milliseconds(20),
                     finish_in_with: Some((Duration::milliseconds(90), TaskOutcome::Success(
                       TaskResult::ResetDatasetResult(TaskResetDatasetResult {
-                        reset_result: ResetResult { new_head: odf::Multihash::from_digest_sha3_256(b"new-head") },
+                        reset_result: ResetResult { new_head: odf::Multihash::from_digest_sha3_256(b"new-slice") },
                       })
                     ))),
                     expected_logical_plan: LogicalPlan::ResetDataset(LogicalPlanResetDataset {
-                      dataset_id: create_dataset_result.dataset_handle.id.clone(),
-                      // By deafult should reset to seed block
-                      new_head_hash: Some(dataset_blocks[1].0.clone()),
-                      old_head_hash: Some(dataset_blocks[0].0.clone()),
+                      dataset_id: foo_id.clone(),
+                      // By default should reset to seed block
+                      new_head_hash: Some(odf::Multihash::from_digest_sha3_256(b"new-slice")),
+                      old_head_hash: Some(odf::Multihash::from_digest_sha3_256(b"old-slice")),
                       recursive: false,
                     }),
                 });
@@ -1109,29 +1082,22 @@ async fn test_manual_trigger_reset() {
 
 #[test_log::test(tokio::test)]
 async fn test_reset_trigger_keep_metadata_compaction_for_derivatives() {
-    let harness = FlowHarness::new().await;
+    let harness = FlowHarness::new();
 
-    let create_foo_result = harness
+    let foo_id = harness
         .create_root_dataset(odf::DatasetAlias {
             dataset_name: odf::DatasetName::new_unchecked("foo"),
             account_name: None,
         })
         .await;
 
-    let dataset_blocks: Vec<_> = create_foo_result
-        .dataset
-        .as_metadata_chain()
-        .iter_blocks_interval(&create_foo_result.head, None, false)
-        .try_collect()
-        .await
-        .unwrap();
     let foo_bar_id = harness
         .create_derived_dataset(
             odf::DatasetAlias {
                 dataset_name: odf::DatasetName::new_unchecked("foo.bar"),
                 account_name: None,
             },
-            vec![create_foo_result.dataset_handle.id.clone()],
+            vec![foo_id.clone()],
         )
         .await;
     let foo_baz_id = harness
@@ -1140,17 +1106,17 @@ async fn test_reset_trigger_keep_metadata_compaction_for_derivatives() {
                 dataset_name: odf::DatasetName::new_unchecked("foo.baz"),
                 account_name: None,
             },
-            vec![create_foo_result.dataset_handle.id.clone()],
+            vec![foo_id.clone()],
         )
         .await;
 
     harness
         .set_dataset_flow_reset_rule(
-            create_foo_result.dataset_handle.id.clone(),
+            foo_id.clone(),
             DatasetFlowType::Reset,
             ResetRule {
-                new_head_hash: Some(dataset_blocks[1].0.clone()),
-                old_head_hash: Some(dataset_blocks[0].0.clone()),
+                new_head_hash: Some(odf::Multihash::from_digest_sha3_256(b"new-slice")),
+                old_head_hash: Some(odf::Multihash::from_digest_sha3_256(b"old-slice")),
                 recursive: true,
             },
         )
@@ -1158,17 +1124,10 @@ async fn test_reset_trigger_keep_metadata_compaction_for_derivatives() {
 
     harness.eager_initialization().await;
 
-    let foo_flow_key: FlowKey = FlowKeyDataset::new(
-        create_foo_result.dataset_handle.id.clone(),
-        DatasetFlowType::Reset,
-    )
-    .into();
+    let foo_flow_key: FlowKey = FlowKeyDataset::new(foo_id.clone(), DatasetFlowType::Reset).into();
 
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
-    test_flow_listener.define_dataset_display_name(
-        create_foo_result.dataset_handle.id.clone(),
-        "foo".to_string(),
-    );
+    test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
     test_flow_listener.define_dataset_display_name(foo_bar_id.clone(), "foo_bar".to_string());
     test_flow_listener.define_dataset_display_name(foo_baz_id.clone(), "foo_baz".to_string());
 
@@ -1191,17 +1150,17 @@ async fn test_reset_trigger_keep_metadata_compaction_for_derivatives() {
           let task0_driver = harness.task_driver(TaskDriverArgs {
               task_id: TaskID::new(0),
               task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
-              dataset_id: Some(create_foo_result.dataset_handle.id.clone()),
+              dataset_id: Some(foo_id.clone()),
               run_since_start: Duration::milliseconds(20),
               finish_in_with: Some((Duration::milliseconds(70), TaskOutcome::Success(
                 TaskResult::ResetDatasetResult(TaskResetDatasetResult {
-                  reset_result: ResetResult { new_head: odf::Multihash::from_digest_sha3_256(b"new-head") }
+                  reset_result: ResetResult { new_head: odf::Multihash::from_digest_sha3_256(b"new-slice") }
                 })
               ))),
               expected_logical_plan: LogicalPlan::ResetDataset(LogicalPlanResetDataset {
-                dataset_id: create_foo_result.dataset_handle.id.clone(),
-                new_head_hash: Some(dataset_blocks[1].0.clone()),
-                old_head_hash: Some(dataset_blocks[0].0.clone()),
+                dataset_id: foo_id.clone(),
+                new_head_hash: Some(odf::Multihash::from_digest_sha3_256(b"new-slice")),
+                old_head_hash: Some(odf::Multihash::from_digest_sha3_256(b"old-slice")),
                 recursive: true,
               }),
           });
@@ -1346,15 +1305,14 @@ async fn test_reset_trigger_keep_metadata_compaction_for_derivatives() {
 async fn test_manual_trigger_compaction_with_config() {
     let max_slice_size = 1_000_000u64;
     let max_slice_records = 1000u64;
-    let harness = FlowHarness::new().await;
+    let harness = FlowHarness::new();
 
-    let foo_create_result = harness
+    let foo_id = harness
         .create_root_dataset(odf::DatasetAlias {
             dataset_name: odf::DatasetName::new_unchecked("foo"),
             account_name: None,
         })
         .await;
-    let foo_id = foo_create_result.dataset_handle.id;
 
     harness.eager_initialization().await;
     harness
@@ -1445,15 +1403,14 @@ async fn test_manual_trigger_compaction_with_config() {
 async fn test_full_hard_compaction_trigger_keep_metadata_compaction_for_derivatives() {
     let max_slice_size = 1_000_000u64;
     let max_slice_records = 1000u64;
-    let harness = FlowHarness::new().await;
+    let harness = FlowHarness::new();
 
-    let foo_create_result = harness
+    let foo_id = harness
         .create_root_dataset(odf::DatasetAlias {
             dataset_name: odf::DatasetName::new_unchecked("foo"),
             account_name: None,
         })
         .await;
-    let foo_id = foo_create_result.dataset_handle.id;
 
     let foo_bar_id = harness
         .create_derived_dataset(
@@ -1674,15 +1631,14 @@ async fn test_full_hard_compaction_trigger_keep_metadata_compaction_for_derivati
 
 #[test_log::test(tokio::test)]
 async fn test_manual_trigger_keep_metadata_only_with_recursive_compaction() {
-    let harness = FlowHarness::new().await;
+    let harness = FlowHarness::new();
 
-    let foo_create_result = harness
+    let foo_id = harness
         .create_root_dataset(odf::DatasetAlias {
             dataset_name: odf::DatasetName::new_unchecked("foo"),
             account_name: None,
         })
         .await;
-    let foo_id = foo_create_result.dataset_handle.id;
 
     let foo_bar_id = harness
         .create_derived_dataset(
@@ -1904,15 +1860,14 @@ async fn test_manual_trigger_keep_metadata_only_with_recursive_compaction() {
 
 #[test_log::test(tokio::test)]
 async fn test_manual_trigger_keep_metadata_only_without_recursive_compaction() {
-    let harness = FlowHarness::new().await;
+    let harness = FlowHarness::new();
 
-    let foo_create_result = harness
+    let foo_id = harness
         .create_root_dataset(odf::DatasetAlias {
             dataset_name: odf::DatasetName::new_unchecked("foo"),
             account_name: None,
         })
         .await;
-    let foo_id = foo_create_result.dataset_handle.id;
 
     let foo_bar_id = harness
         .create_derived_dataset(
@@ -2040,42 +1995,31 @@ async fn test_manual_trigger_keep_metadata_only_compaction_multiple_accounts() {
     let subject_petya =
         CurrentAccountSubject::logged(petya.get_id(), petya.account_name.clone(), false);
 
-    let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
-        tenancy_config: TenancyConfig::MultiTenant,
-        predefined_accounts: vec![wasya, petya],
-        ..Default::default()
-    })
-    .await;
+    let harness = FlowHarness::new();
 
-    let foo_create_result = harness
-        .create_root_dataset_using_subject(
-            odf::DatasetAlias {
-                dataset_name: odf::DatasetName::new_unchecked("foo"),
-                account_name: Some(subject_wasya.account_name().clone()),
-            },
-            subject_wasya.clone(),
-        )
+    let foo_id = harness
+        .create_root_dataset(odf::DatasetAlias {
+            dataset_name: odf::DatasetName::new_unchecked("foo"),
+            account_name: Some(subject_wasya.account_name().clone()),
+        })
         .await;
-    let foo_id = foo_create_result.dataset_handle.id;
 
     let foo_bar_id = harness
-        .create_derived_dataset_using_subject(
+        .create_derived_dataset(
             odf::DatasetAlias {
                 dataset_name: odf::DatasetName::new_unchecked("foo.bar"),
                 account_name: Some(subject_wasya.account_name().clone()),
             },
             vec![foo_id.clone()],
-            subject_wasya,
         )
         .await;
     let foo_baz_id = harness
-        .create_derived_dataset_using_subject(
+        .create_derived_dataset(
             odf::DatasetAlias {
                 dataset_name: odf::DatasetName::new_unchecked("foo.baz"),
                 account_name: Some(subject_petya.account_name().clone()),
             },
             vec![foo_id.clone()],
-            subject_petya,
         )
         .await;
 
@@ -2215,23 +2159,21 @@ async fn test_manual_trigger_keep_metadata_only_compaction_multiple_accounts() {
 
 #[test_log::test(tokio::test)]
 async fn test_dataset_flow_configuration_paused_resumed_modified() {
-    let harness = FlowHarness::new().await;
+    let harness = FlowHarness::new();
 
-    let foo_create_result = harness
+    let foo_id = harness
         .create_root_dataset(odf::DatasetAlias {
             dataset_name: odf::DatasetName::new_unchecked("foo"),
             account_name: None,
         })
         .await;
-    let foo_id = foo_create_result.dataset_handle.id;
 
-    let bar_create_result = harness
+    let bar_id = harness
         .create_root_dataset(odf::DatasetAlias {
             dataset_name: odf::DatasetName::new_unchecked("bar"),
             account_name: None,
         })
         .await;
-    let bar_id = bar_create_result.dataset_handle.id;
 
     harness
         .set_dataset_flow_trigger(
@@ -2438,23 +2380,21 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
 
 #[test_log::test(tokio::test)]
 async fn test_respect_last_success_time_when_schedule_resumes() {
-    let harness = FlowHarness::new().await;
+    let harness = FlowHarness::new();
 
-    let foo_create_result = harness
+    let foo_id = harness
         .create_root_dataset(odf::DatasetAlias {
             dataset_name: odf::DatasetName::new_unchecked("foo"),
             account_name: None,
         })
         .await;
-    let foo_id = foo_create_result.dataset_handle.id;
 
-    let bar_create_result = harness
+    let bar_id = harness
         .create_root_dataset(odf::DatasetAlias {
             dataset_name: odf::DatasetName::new_unchecked("bar"),
             account_name: None,
         })
         .await;
-    let bar_id = bar_create_result.dataset_handle.id;
 
     harness
         .set_dataset_flow_trigger(
@@ -2663,23 +2603,21 @@ async fn test_respect_last_success_time_when_schedule_resumes() {
 
 #[test_log::test(tokio::test)]
 async fn test_dataset_deleted() {
-    let harness = FlowHarness::new().await;
+    let harness = FlowHarness::new();
 
-    let foo_create_result = harness
+    let foo_id = harness
         .create_root_dataset(odf::DatasetAlias {
             dataset_name: odf::DatasetName::new_unchecked("foo"),
             account_name: None,
         })
         .await;
-    let foo_id = foo_create_result.dataset_handle.id;
 
-    let bar_create_result = harness
+    let bar_id = harness
         .create_root_dataset(odf::DatasetAlias {
             dataset_name: odf::DatasetName::new_unchecked("bar"),
             account_name: None,
         })
         .await;
-    let bar_id = bar_create_result.dataset_handle.id;
 
     harness
         .set_dataset_flow_trigger(
@@ -2751,11 +2689,11 @@ async fn test_dataset_deleted() {
 
                 // 50ms: deleting "foo" in QUEUED state
                 harness.advance_time(Duration::milliseconds(50)).await;
-                harness.delete_dataset(&foo_id).await;
+                harness.issue_dataset_deleted(&foo_id).await;
 
                 // 120ms: deleting "bar" in SCHEDULED state
                 harness.advance_time(Duration::milliseconds(70)).await;
-                harness.delete_dataset(&bar_id).await;
+                harness.issue_dataset_deleted(&bar_id).await;
 
                 // 140ms: finish
                 harness.advance_time(Duration::milliseconds(20)).await;
@@ -2843,31 +2781,28 @@ async fn test_dataset_deleted() {
 
 #[test_log::test(tokio::test)]
 async fn test_task_completions_trigger_next_loop_on_success() {
-    let harness = FlowHarness::new().await;
+    let harness = FlowHarness::new();
 
-    let foo_create_result = harness
+    let foo_id = harness
         .create_root_dataset(odf::DatasetAlias {
             dataset_name: odf::DatasetName::new_unchecked("foo"),
             account_name: None,
         })
         .await;
-    let foo_id = foo_create_result.dataset_handle.id;
 
-    let bar_create_result = harness
+    let bar_id = harness
         .create_root_dataset(odf::DatasetAlias {
             dataset_name: odf::DatasetName::new_unchecked("bar"),
             account_name: None,
         })
         .await;
-    let bar_id = bar_create_result.dataset_handle.id;
 
-    let baz_create_result = harness
+    let baz_id = harness
         .create_root_dataset(odf::DatasetAlias {
             dataset_name: odf::DatasetName::new_unchecked("baz"),
             account_name: None,
         })
         .await;
-    let baz_id = baz_create_result.dataset_handle.id;
 
     for dataset_id in [&foo_id, &bar_id, &baz_id] {
         harness
@@ -3064,16 +2999,14 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
             },
         )),
         ..Default::default()
-    })
-    .await;
+    });
 
-    let foo_create_result = harness
+    let foo_id = harness
         .create_root_dataset(odf::DatasetAlias {
             dataset_name: odf::DatasetName::new_unchecked("foo"),
             account_name: None,
         })
         .await;
-    let foo_id = foo_create_result.dataset_handle.id;
 
     let bar_id = harness
         .create_derived_dataset(
@@ -3313,17 +3246,15 @@ async fn test_throttling_manual_triggers() {
         awaiting_step: Some(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS)),
         mandatory_throttling_period: Some(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS * 10)),
         ..Default::default()
-    })
-    .await;
+    });
 
     // Foo Flow
-    let foo_create_result = harness
+    let foo_id = harness
         .create_root_dataset(odf::DatasetAlias {
             dataset_name: odf::DatasetName::new_unchecked("foo"),
             account_name: None,
         })
         .await;
-    let foo_id = foo_create_result.dataset_handle.id;
     let foo_flow_key: FlowKey = FlowKeyDataset::new(foo_id.clone(), DatasetFlowType::Ingest).into();
 
     // Enforce dependency graph initialization
@@ -3440,9 +3371,7 @@ async fn test_throttling_manual_triggers() {
 async fn test_throttling_derived_dataset_with_2_parents() {
     let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
         awaiting_step: Some(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS)), // 10ms,
-        mandatory_throttling_period: Some(
-            Duration::milliseconds(SCHEDULING_ALIGNMENT_MS * 10),
-        ), /* 100ms */
+        mandatory_throttling_period: Some(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS * 10)), /* 100ms */
         mock_dataset_changes: Some(MockDatasetChangesService::with_increment_since(
             DatasetIntervalIncrement {
                 num_blocks: 2,
@@ -3450,25 +3379,21 @@ async fn test_throttling_derived_dataset_with_2_parents() {
                 updated_watermark: None,
             },
         )),
-        ..Default::default()
-    })
-    .await;
+    });
 
-    let foo_create_result = harness
+    let foo_id = harness
         .create_root_dataset(odf::DatasetAlias {
             dataset_name: odf::DatasetName::new_unchecked("foo"),
             account_name: None,
         })
         .await;
-    let foo_id = foo_create_result.dataset_handle.id;
 
-    let bar_create_result = harness
+    let bar_id = harness
         .create_root_dataset(odf::DatasetAlias {
             dataset_name: odf::DatasetName::new_unchecked("bar"),
             account_name: None,
         })
         .await;
-    let bar_id = bar_create_result.dataset_handle.id;
 
     let baz_id = harness
         .create_derived_dataset(
@@ -3933,16 +3858,14 @@ async fn test_batching_condition_records_reached() {
     let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
         mock_dataset_changes: Some(mock_dataset_changes),
         ..Default::default()
-    })
-    .await;
+    });
 
-    let foo_create_result = harness
+    let foo_id = harness
         .create_root_dataset(odf::DatasetAlias {
             dataset_name: odf::DatasetName::new_unchecked("foo"),
             account_name: None,
         })
         .await;
-    let foo_id = foo_create_result.dataset_handle.id;
 
     let bar_id = harness
         .create_derived_dataset(
@@ -4255,16 +4178,14 @@ async fn test_batching_condition_timeout() {
     let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
         mock_dataset_changes: Some(mock_dataset_changes),
         ..Default::default()
-    })
-    .await;
+    });
 
-    let foo_create_result = harness
+    let foo_id = harness
         .create_root_dataset(odf::DatasetAlias {
             dataset_name: odf::DatasetName::new_unchecked("foo"),
             account_name: None,
         })
         .await;
-    let foo_id = foo_create_result.dataset_handle.id;
 
     let bar_id = harness
         .create_derived_dataset(
@@ -4528,16 +4449,14 @@ async fn test_batching_condition_watermark() {
     let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
         mock_dataset_changes: Some(mock_dataset_changes),
         ..Default::default()
-    })
-    .await;
+    });
 
-    let foo_create_result = harness
+    let foo_id = harness
         .create_root_dataset(odf::DatasetAlias {
             dataset_name: odf::DatasetName::new_unchecked("foo"),
             account_name: None,
         })
         .await;
-    let foo_id = foo_create_result.dataset_handle.id;
 
     let bar_id = harness
         .create_derived_dataset(
@@ -4850,24 +4769,21 @@ async fn test_batching_condition_with_2_inputs() {
     let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
         mock_dataset_changes: Some(mock_dataset_changes),
         ..Default::default()
-    })
-    .await;
+    });
 
-    let foo_create_result = harness
+    let foo_id = harness
         .create_root_dataset(odf::DatasetAlias {
             dataset_name: odf::DatasetName::new_unchecked("foo"),
             account_name: None,
         })
         .await;
-    let foo_id = foo_create_result.dataset_handle.id;
 
-    let bar_create_result = harness
+    let bar_id = harness
         .create_root_dataset(odf::DatasetAlias {
             dataset_name: odf::DatasetName::new_unchecked("bar"),
             account_name: None,
         })
         .await;
-    let bar_id = bar_create_result.dataset_handle.id;
 
     let baz_id = harness
         .create_derived_dataset(
@@ -5337,47 +5253,24 @@ async fn test_list_all_flow_initiators() {
     let subject_foo = CurrentAccountSubject::logged(foo.get_id(), foo.account_name.clone(), false);
     let subject_bar = CurrentAccountSubject::logged(bar.get_id(), bar.account_name.clone(), false);
 
-    let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
-        predefined_accounts: vec![foo, bar],
-        tenancy_config: TenancyConfig::MultiTenant,
-        ..Default::default()
-    })
-    .await;
+    let harness = FlowHarness::new();
 
-    let foo_create_result = harness
-        .create_root_dataset_using_subject(
-            odf::DatasetAlias {
-                dataset_name: odf::DatasetName::new_unchecked("foo"),
-                account_name: Some(subject_foo.account_name().clone()),
-            },
-            subject_foo.clone(),
-        )
+    let foo_id = harness
+        .create_root_dataset(odf::DatasetAlias {
+            dataset_name: odf::DatasetName::new_unchecked("foo"),
+            account_name: Some(subject_foo.account_name().clone()),
+        })
         .await;
-    let foo_id = foo_create_result.dataset_handle.id;
 
-    let foo_account_id = harness
-        .auth_svc
-        .find_account_id_by_name(subject_foo.account_name())
-        .await
-        .unwrap()
-        .unwrap();
-    let bar_account_id = harness
-        .auth_svc
-        .find_account_id_by_name(subject_bar.account_name())
-        .await
-        .unwrap()
-        .unwrap();
+    let foo_account_id = odf::AccountID::new_seeded_ed25519(subject_foo.account_name().as_bytes());
+    let bar_account_id = odf::AccountID::new_seeded_ed25519(subject_bar.account_name().as_bytes());
 
-    let bar_create_result = harness
-        .create_root_dataset_using_subject(
-            odf::DatasetAlias {
-                dataset_name: odf::DatasetName::new_unchecked("bar"),
-                account_name: Some(subject_bar.account_name().clone()),
-            },
-            subject_bar,
-        )
+    let bar_id = harness
+        .create_root_dataset(odf::DatasetAlias {
+            dataset_name: odf::DatasetName::new_unchecked("bar"),
+            account_name: Some(subject_bar.account_name().clone()),
+        })
         .await;
-    let bar_id = bar_create_result.dataset_handle.id;
 
     harness.eager_initialization().await;
 
@@ -5498,58 +5391,34 @@ async fn test_list_all_datasets_with_flow() {
     let subject_foo = CurrentAccountSubject::logged(foo.get_id(), foo.account_name.clone(), false);
     let subject_bar = CurrentAccountSubject::logged(bar.get_id(), bar.account_name.clone(), false);
 
-    let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
-        predefined_accounts: vec![foo, bar],
-        tenancy_config: TenancyConfig::MultiTenant,
-        ..Default::default()
-    })
-    .await;
+    let harness = FlowHarness::new();
 
-    let foo_create_result = harness
-        .create_root_dataset_using_subject(
-            odf::DatasetAlias {
-                dataset_name: odf::DatasetName::new_unchecked("foo"),
-                account_name: Some(subject_foo.account_name().clone()),
-            },
-            subject_foo.clone(),
-        )
+    let foo_id = harness
+        .create_root_dataset(odf::DatasetAlias {
+            dataset_name: odf::DatasetName::new_unchecked("foo"),
+            account_name: Some(subject_foo.account_name().clone()),
+        })
         .await;
-    let foo_id = foo_create_result.dataset_handle.id;
 
     let _foo_bar_id = harness
-        .create_derived_dataset_using_subject(
+        .create_derived_dataset(
             odf::DatasetAlias {
                 dataset_name: odf::DatasetName::new_unchecked("foo.bar"),
                 account_name: Some(subject_foo.account_name().clone()),
             },
             vec![foo_id.clone()],
-            subject_foo.clone(),
         )
         .await;
 
-    let foo_account_id = harness
-        .auth_svc
-        .find_account_id_by_name(subject_foo.account_name())
-        .await
-        .unwrap()
-        .unwrap();
-    let bar_account_id = harness
-        .auth_svc
-        .find_account_id_by_name(subject_bar.account_name())
-        .await
-        .unwrap()
-        .unwrap();
+    let foo_account_id = odf::AccountID::new_seeded_ed25519(subject_foo.account_name().as_bytes());
+    let bar_account_id = odf::AccountID::new_seeded_ed25519(subject_bar.account_name().as_bytes());
 
-    let bar_create_result = harness
-        .create_root_dataset_using_subject(
-            odf::DatasetAlias {
-                dataset_name: odf::DatasetName::new_unchecked("bar"),
-                account_name: Some(subject_bar.account_name().clone()),
-            },
-            subject_bar,
-        )
+    let bar_id = harness
+        .create_root_dataset(odf::DatasetAlias {
+            dataset_name: odf::DatasetName::new_unchecked("bar"),
+            account_name: Some(subject_bar.account_name().clone()),
+        })
         .await;
-    let bar_id = bar_create_result.dataset_handle.id;
 
     harness.eager_initialization().await;
 
@@ -5688,16 +5557,15 @@ async fn test_list_all_datasets_with_flow() {
 
 #[test_log::test(tokio::test)]
 async fn test_abort_flow_before_scheduling_tasks() {
-    let harness = FlowHarness::new().await;
+    let harness = FlowHarness::new();
 
     // Create a "foo" root dataset, and configure ingestion schedule every 100ns
-    let foo_create_result = harness
+    let foo_id = harness
         .create_root_dataset(odf::DatasetAlias {
             dataset_name: odf::DatasetName::new_unchecked("foo"),
             account_name: None,
         })
         .await;
-    let foo_id = foo_create_result.dataset_handle.id;
 
     harness
         .set_dataset_flow_trigger(
@@ -5781,16 +5649,15 @@ async fn test_abort_flow_before_scheduling_tasks() {
 
 #[test_log::test(tokio::test)]
 async fn test_abort_flow_after_scheduling_still_waiting_for_executor() {
-    let harness = FlowHarness::new().await;
+    let harness = FlowHarness::new();
 
     // Create a "foo" root dataset, and configure ingestion schedule every 50ms
-    let foo_create_result = harness
+    let foo_id = harness
         .create_root_dataset(odf::DatasetAlias {
             dataset_name: odf::DatasetName::new_unchecked("foo"),
             account_name: None,
         })
         .await;
-    let foo_id = foo_create_result.dataset_handle.id;
 
     harness
         .set_dataset_flow_trigger(
@@ -5879,16 +5746,15 @@ async fn test_abort_flow_after_scheduling_still_waiting_for_executor() {
 
 #[test_log::test(tokio::test)]
 async fn test_abort_flow_after_task_running_has_started() {
-    let harness = FlowHarness::new().await;
+    let harness = FlowHarness::new();
 
     // Create a "foo" root dataset, and configure ingestion schedule every 50ms
-    let foo_create_result = harness
+    let foo_id = harness
         .create_root_dataset(odf::DatasetAlias {
             dataset_name: odf::DatasetName::new_unchecked("foo"),
             account_name: None,
         })
         .await;
-    let foo_id = foo_create_result.dataset_handle.id;
 
     harness
         .set_dataset_flow_trigger(
@@ -5966,16 +5832,15 @@ async fn test_abort_flow_after_task_running_has_started() {
 
 #[test_log::test(tokio::test)]
 async fn test_abort_flow_after_task_finishes() {
-    let harness = FlowHarness::new().await;
+    let harness = FlowHarness::new();
 
     // Create a "foo" root dataset, and configure ingestion schedule every 50ms
-    let foo_create_result = harness
+    let foo_id = harness
         .create_root_dataset(odf::DatasetAlias {
             dataset_name: odf::DatasetName::new_unchecked("foo"),
             account_name: None,
         })
         .await;
-    let foo_id = foo_create_result.dataset_handle.id;
 
     harness
         .set_dataset_flow_trigger(
@@ -6084,15 +5949,14 @@ async fn test_abort_flow_after_task_finishes() {
 
 #[test_log::test(tokio::test)]
 async fn test_respect_last_success_time_when_activate_configuration() {
-    let harness = FlowHarness::new().await;
+    let harness = FlowHarness::new();
 
-    let foo_create_result = harness
+    let foo_id = harness
         .create_root_dataset(odf::DatasetAlias {
             dataset_name: odf::DatasetName::new_unchecked("foo"),
             account_name: None,
         })
         .await;
-    let foo_id = foo_create_result.dataset_handle.id;
 
     let bar_id = harness
         .create_derived_dataset(
@@ -6288,16 +6152,15 @@ async fn test_respect_last_success_time_when_activate_configuration() {
 
 #[test_log::test(tokio::test)]
 async fn test_disable_trigger_on_flow_fail() {
-    let harness = FlowHarness::new().await;
+    let harness = FlowHarness::new();
 
     // Create a "foo" root dataset, and configure ingestion schedule every 60ms
-    let foo_create_result = harness
+    let foo_id = harness
         .create_root_dataset(odf::DatasetAlias {
             dataset_name: odf::DatasetName::new_unchecked("foo"),
             account_name: None,
         })
         .await;
-    let foo_id = foo_create_result.dataset_handle.id;
 
     harness
         .set_dataset_flow_ingest(
