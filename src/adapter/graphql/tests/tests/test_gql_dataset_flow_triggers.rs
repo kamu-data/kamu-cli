@@ -20,7 +20,7 @@ use kamu::{
 use kamu_core::{auth, DidGeneratorDefault, TenancyConfig};
 use kamu_datasets::CreateDatasetFromSnapshotUseCase;
 use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
-use kamu_datasets_services::CreateDatasetFromSnapshotUseCaseImpl;
+use kamu_datasets_services::{CreateDatasetFromSnapshotUseCaseImpl, CreateDatasetUseCaseImpl};
 use kamu_flow_system_inmem::{InMemoryFlowConfigurationEventStore, InMemoryFlowTriggerEventStore};
 use kamu_flow_system_services::FlowTriggerServiceImpl;
 use messaging_outbox::DummyOutboxImpl;
@@ -1065,6 +1065,7 @@ impl FlowTriggerHarness {
                 .add::<DatasetRegistrySoloUnitBridge>()
                 .add::<MetadataQueryServiceImpl>()
                 .add::<CreateDatasetFromSnapshotUseCaseImpl>()
+                .add::<CreateDatasetUseCaseImpl>()
                 .add::<ViewDatasetUseCaseImpl>()
                 .add::<SystemTimeSourceDefault>()
                 .add::<auth::AlwaysHappyDatasetActionAuthorizer>()

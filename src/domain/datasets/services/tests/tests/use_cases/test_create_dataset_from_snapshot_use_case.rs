@@ -17,8 +17,16 @@ use kamu::testing::{
     BaseUseCaseHarnessOptions,
 };
 use kamu_datasets::CreateDatasetFromSnapshotUseCase;
-use kamu_datasets_services::CreateDatasetFromSnapshotUseCaseImpl;
+use kamu_datasets_services::{
+    CreateDatasetFromSnapshotUseCaseImpl,
+    CreateDatasetUseCaseImpl,
+    DatasetEntryWriter,
+    DependencyGraphWriter,
+    MockDatasetEntryWriter,
+    MockDependencyGraphWriter,
+};
 use messaging_outbox::MockOutbox;
+use mockall::predicate::{always, eq};
 use odf::metadata::testing::MetadataFactory;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -27,11 +35,28 @@ use odf::metadata::testing::MetadataFactory;
 async fn test_create_root_dataset_from_snapshot() {
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
 
+    let mut mock_dataset_entry_writer = MockDatasetEntryWriter::new();
+    mock_dataset_entry_writer
+        .expect_create_entry()
+        .with(always(), always(), eq(alias_foo.dataset_name.clone()))
+        .once()
+        .returning(|_, _, _| Ok(()));
+
+    let mut mock_dependency_graph_writer = MockDependencyGraphWriter::new();
+    mock_dependency_graph_writer
+        .expect_create_dataset_node()
+        .once()
+        .returning(|_| Ok(()));
+
     // Expect only DatasetCreated message for "foo"
     let mut mock_outbox = MockOutbox::new();
     expect_outbox_dataset_created(&mut mock_outbox, 1);
 
-    let harness = CreateFromSnapshotUseCaseHarness::new(mock_outbox);
+    let harness = CreateFromSnapshotUseCaseHarness::new(
+        mock_dataset_entry_writer,
+        mock_dependency_graph_writer,
+        mock_outbox,
+    );
 
     let snapshot = MetadataFactory::dataset_snapshot()
         .name(alias_foo.clone())
@@ -53,13 +78,35 @@ async fn test_create_derived_dataset_from_snapshot() {
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
 
+    let mut mock_dataset_entry_writer = MockDatasetEntryWriter::new();
+    mock_dataset_entry_writer
+        .expect_create_entry()
+        .with(always(), always(), eq(alias_foo.dataset_name.clone()))
+        .once()
+        .returning(|_, _, _| Ok(()));
+    mock_dataset_entry_writer
+        .expect_create_entry()
+        .with(always(), always(), eq(alias_bar.dataset_name.clone()))
+        .once()
+        .returning(|_, _, _| Ok(()));
+
+    let mut mock_dependency_graph_writer = MockDependencyGraphWriter::new();
+    mock_dependency_graph_writer
+        .expect_create_dataset_node()
+        .times(2)
+        .returning(|_| Ok(()));
+
     // Expect DatasetCreated messages for "foo" and "bar"
     // Expect DatasetDependenciesUpdated message for "bar"
     let mut mock_outbox = MockOutbox::new();
     expect_outbox_dataset_created(&mut mock_outbox, 2);
     expect_outbox_dataset_dependencies_updated(&mut mock_outbox, 1);
 
-    let harness = CreateFromSnapshotUseCaseHarness::new(mock_outbox);
+    let harness = CreateFromSnapshotUseCaseHarness::new(
+        mock_dataset_entry_writer,
+        mock_dependency_graph_writer,
+        mock_outbox,
+    );
 
     let snapshot_root = MetadataFactory::dataset_snapshot()
         .name(alias_foo.clone())
@@ -103,12 +150,21 @@ struct CreateFromSnapshotUseCaseHarness {
 }
 
 impl CreateFromSnapshotUseCaseHarness {
-    fn new(mock_outbox: MockOutbox) -> Self {
+    fn new(
+        mock_dataset_entry_writer: MockDatasetEntryWriter,
+        mock_dependency_graph_writer: MockDependencyGraphWriter,
+        mock_outbox: MockOutbox,
+    ) -> Self {
         let base_harness =
             BaseUseCaseHarness::new(BaseUseCaseHarnessOptions::new().with_outbox(mock_outbox));
 
         let catalog = dill::CatalogBuilder::new_chained(base_harness.catalog())
             .add::<CreateDatasetFromSnapshotUseCaseImpl>()
+            .add::<CreateDatasetUseCaseImpl>()
+            .add_value(mock_dataset_entry_writer)
+            .bind::<dyn DatasetEntryWriter, MockDatasetEntryWriter>()
+            .add_value(mock_dependency_graph_writer)
+            .bind::<dyn DependencyGraphWriter, MockDependencyGraphWriter>()
             .build();
 
         let use_case = catalog.get_one().unwrap();

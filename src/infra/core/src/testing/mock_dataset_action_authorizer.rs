@@ -131,7 +131,7 @@ impl MockDatasetActionAuthorizer {
 
     fn expect_check_action_allowed_internal<P>(
         mut self,
-        dataset_handle_predicate: P,
+        dataset_id_predicate: P,
         action: DatasetAction,
         times: usize,
         success: bool,
@@ -141,7 +141,7 @@ impl MockDatasetActionAuthorizer {
     {
         if times > 0 {
             self.expect_check_action_allowed()
-                .with(dataset_handle_predicate, eq(action))
+                .with(dataset_id_predicate, eq(action))
                 .times(times)
                 .returning(move |dataset_id, action| {
                     if success {
@@ -152,7 +152,7 @@ impl MockDatasetActionAuthorizer {
                 });
         } else {
             self.expect_check_action_allowed()
-                .with(dataset_handle_predicate, eq(action))
+                .with(dataset_id_predicate, eq(action))
                 .never();
         }
 
