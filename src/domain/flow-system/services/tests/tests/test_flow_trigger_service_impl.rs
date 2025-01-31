@@ -15,26 +15,11 @@ use chrono::{Duration, Utc};
 use database_common_macros::transactional_method1;
 use dill::*;
 use futures::TryStreamExt;
-use kamu::*;
-use kamu_accounts::CurrentAccountSubject;
-use kamu_core::*;
-use kamu_datasets::{
-    CreateDatasetFromSnapshotUseCase,
-    DatasetLifecycleMessage,
-    DeleteDatasetUseCase,
-    MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
-};
-use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
-use kamu_datasets_services::{
-    CreateDatasetFromSnapshotUseCaseImpl,
-    DeleteDatasetUseCaseImpl,
-    DependencyGraphServiceImpl,
-};
+use kamu_datasets::{DatasetLifecycleMessage, MESSAGE_PRODUCER_KAMU_DATASET_SERVICE};
 use kamu_flow_system::*;
 use kamu_flow_system_inmem::*;
 use kamu_flow_system_services::*;
-use messaging_outbox::{register_message_dispatcher, Outbox, OutboxImmediateImpl};
-use odf::metadata::testing::MetadataFactory;
+use messaging_outbox::{register_message_dispatcher, Outbox, OutboxExt, OutboxImmediateImpl};
 use time_source::SystemTimeSourceDefault;
 
 use super::FlowTriggerTestListener;
@@ -46,8 +31,8 @@ async fn test_visibility() {
     let harness = FlowTriggerHarness::new();
     assert!(harness.list_enabled_triggers().await.is_empty());
 
-    let foo_id = harness.create_root_dataset("foo").await;
-    let bar_id = harness.create_root_dataset("bar").await;
+    let foo_id = odf::DatasetID::new_seeded_ed25519(b"foo");
+    let bar_id = odf::DatasetID::new_seeded_ed25519(b"bar");
 
     let foo_ingest_trigger = FlowTriggerRule::Schedule(Duration::weeks(1).into());
     harness
@@ -101,7 +86,7 @@ async fn test_pause_resume_individual_dataset_flows() {
     assert_eq!(0, harness.trigger_events_count());
 
     // Make a dataset and configure daily ingestion schedule
-    let foo_id = harness.create_root_dataset("foo").await;
+    let foo_id = odf::DatasetID::new_seeded_ed25519(b"foo");
     let foo_ingest_trigger = FlowTriggerRule::Schedule(Duration::weeks(1).into());
     harness
         .set_dataset_flow_trigger(
@@ -171,7 +156,7 @@ async fn test_pause_resume_all_dataset_flows() {
     assert_eq!(0, harness.trigger_events_count());
 
     // Make a dataset and configure ingestion and compaction schedule
-    let foo_id = harness.create_root_dataset("foo").await;
+    let foo_id = odf::DatasetID::new_seeded_ed25519(b"foo");
     let foo_ingest_trigger = FlowTriggerRule::Schedule(Duration::weeks(1).into());
     harness
         .set_dataset_flow_trigger(
@@ -322,7 +307,7 @@ async fn test_dataset_deleted() {
     assert!(harness.list_enabled_triggers().await.is_empty());
 
     // Make a dataset and configure ingest trigger
-    let foo_id = harness.create_root_dataset("foo").await;
+    let foo_id = odf::DatasetID::new_seeded_ed25519(b"foo");
     let foo_ingest_trigger = FlowTriggerRule::Schedule(Duration::weeks(1).into());
     harness
         .set_dataset_flow_trigger(
@@ -342,8 +327,8 @@ async fn test_dataset_deleted() {
         &foo_ingest_trigger,
     );
 
-    // Now, delete the dataset
-    harness.delete_dataset(&foo_id).await;
+    // Now, pretend the dataset was deleted
+    harness.issue_dataset_deleted(&foo_id).await;
 
     // The dataset should not be visible in the list of configs
     let configs = harness.list_enabled_triggers().await;
@@ -359,19 +344,15 @@ async fn test_dataset_deleted() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct FlowTriggerHarness {
-    _tmp_dir: tempfile::TempDir,
     catalog: Catalog,
     flow_trigger_service: Arc<dyn FlowTriggerService>,
     flow_trigger_event_store: Arc<dyn FlowTriggerEventStore>,
     trigger_listener: Arc<FlowTriggerTestListener>,
+    outbox: Arc<dyn Outbox>,
 }
 
 impl FlowTriggerHarness {
     fn new() -> Self {
-        let tmp_dir = tempfile::tempdir().unwrap();
-        let datasets_dir = tmp_dir.path().join("datasets");
-        std::fs::create_dir(&datasets_dir).unwrap();
-
         let catalog = {
             let mut b = CatalogBuilder::new();
 
@@ -380,22 +361,10 @@ impl FlowTriggerHarness {
                     .with_consumer_filter(messaging_outbox::ConsumerFilter::AllConsumers),
             )
             .bind::<dyn Outbox, OutboxImmediateImpl>()
-            .add::<DidGeneratorDefault>()
             .add::<FlowTriggerTestListener>()
             .add::<FlowTriggerServiceImpl>()
             .add::<InMemoryFlowTriggerEventStore>()
-            .add::<SystemTimeSourceDefault>()
-            .add_value(TenancyConfig::SingleTenant)
-            .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
-            .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
-            .bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
-            .add::<DatasetRegistrySoloUnitBridge>()
-            .add_value(CurrentAccountSubject::new_test())
-            .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
-            .add::<DependencyGraphServiceImpl>()
-            .add::<InMemoryDatasetDependencyRepository>()
-            .add::<CreateDatasetFromSnapshotUseCaseImpl>()
-            .add::<DeleteDatasetUseCaseImpl>();
+            .add::<SystemTimeSourceDefault>();
 
             database_common::NoOpDatabasePlugin::init_database_components(&mut b);
 
@@ -411,16 +380,12 @@ impl FlowTriggerHarness {
             b.build()
         };
 
-        let flow_trigger_service = catalog.get_one::<dyn FlowTriggerService>().unwrap();
-        let flow_trigger_event_store = catalog.get_one::<dyn FlowTriggerEventStore>().unwrap();
-        let flow_trigger_events_listener = catalog.get_one::<FlowTriggerTestListener>().unwrap();
-
         Self {
-            _tmp_dir: tmp_dir,
+            flow_trigger_service: catalog.get_one().unwrap(),
+            flow_trigger_event_store: catalog.get_one().unwrap(),
+            trigger_listener: catalog.get_one().unwrap(),
+            outbox: catalog.get_one().unwrap(),
             catalog,
-            flow_trigger_service,
-            flow_trigger_event_store,
-            trigger_listener: flow_trigger_events_listener,
         }
     }
 
@@ -439,8 +404,7 @@ impl FlowTriggerHarness {
         res
     }
 
-    #[transactional_method1(flow_trigger_service: Arc<dyn
-    FlowTriggerService>)]
+    #[transactional_method1(flow_trigger_service: Arc<dyn FlowTriggerService>)]
     async fn set_system_flow_schedule(
         &self,
         system_flow_type: SystemFlowType,
@@ -530,36 +494,6 @@ impl FlowTriggerHarness {
         flow_trigger.into()
     }
 
-    async fn create_root_dataset(&self, dataset_name: &str) -> odf::DatasetID {
-        let create_dataset_from_snapshot = self
-            .catalog
-            .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
-            .unwrap();
-
-        let result = create_dataset_from_snapshot
-            .execute(
-                MetadataFactory::dataset_snapshot()
-                    .name(dataset_name)
-                    .kind(odf::DatasetKind::Root)
-                    .push_event(MetadataFactory::set_polling_source().build())
-                    .build(),
-                Default::default(),
-            )
-            .await
-            .unwrap();
-
-        result.dataset_handle.id
-    }
-
-    async fn delete_dataset(&self, dataset_id: &odf::DatasetID) {
-        // Do the actual deletionResetDatasetUseCase
-        let delete_dataset = self.catalog.get_one::<dyn DeleteDatasetUseCase>().unwrap();
-        delete_dataset
-            .execute_via_ref(&(dataset_id.as_local_ref()))
-            .await
-            .unwrap();
-    }
-
     async fn pause_dataset_flow(
         &self,
         dataset_id: odf::DatasetID,
@@ -612,6 +546,16 @@ impl FlowTriggerHarness {
 
     fn trigger_events_count(&self) -> usize {
         self.trigger_listener.triggers_events_count()
+    }
+
+    async fn issue_dataset_deleted(&self, dataset_id: &odf::DatasetID) {
+        self.outbox
+            .post_message(
+                MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
+                DatasetLifecycleMessage::deleted(dataset_id.clone()),
+            )
+            .await
+            .unwrap();
     }
 }
 
