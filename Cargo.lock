@@ -6381,6 +6381,7 @@ dependencies = [
  "kamu-core",
  "kamu-datasets",
  "kamu-datasets-inmem",
+ "kamu-datasets-services",
  "messaging-outbox",
  "mockall",
  "oop",

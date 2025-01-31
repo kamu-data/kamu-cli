@@ -12,6 +12,7 @@ use internal_error::InternalError;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[cfg_attr(any(feature = "testing", test), mockall::automock)]
 #[async_trait::async_trait]
 pub trait DependencyGraphWriter: Send + Sync {
     async fn create_dataset_node(&self, dataset_id: &odf::DatasetID) -> Result<(), InternalError>;

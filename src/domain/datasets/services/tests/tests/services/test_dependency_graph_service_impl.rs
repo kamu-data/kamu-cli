@@ -27,6 +27,7 @@ use kamu_datasets::{
 use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
 use kamu_datasets_services::{
     CreateDatasetFromSnapshotUseCaseImpl,
+    CreateDatasetUseCaseImpl,
     DeleteDatasetUseCaseImpl,
     DependencyGraphServiceImpl,
 };
@@ -643,6 +644,7 @@ impl DependencyGraphHarness {
         .add::<DependencyGraphServiceImpl>()
         .add::<InMemoryDatasetDependencyRepository>()
         .add::<CreateDatasetFromSnapshotUseCaseImpl>()
+        .add::<CreateDatasetUseCaseImpl>()
         .add::<CommitDatasetEventUseCaseImpl>()
         .add::<DeleteDatasetUseCaseImpl>()
         .add::<ViewDatasetUseCaseImpl>();

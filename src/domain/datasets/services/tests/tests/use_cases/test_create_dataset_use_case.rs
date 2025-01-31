@@ -12,8 +12,15 @@ use std::sync::Arc;
 
 use kamu::testing::{expect_outbox_dataset_created, BaseUseCaseHarness, BaseUseCaseHarnessOptions};
 use kamu_datasets::CreateDatasetUseCase;
-use kamu_datasets_services::CreateDatasetUseCaseImpl;
+use kamu_datasets_services::{
+    CreateDatasetUseCaseImpl,
+    DatasetEntryWriter,
+    DependencyGraphWriter,
+    MockDatasetEntryWriter,
+    MockDependencyGraphWriter,
+};
 use messaging_outbox::MockOutbox;
+use mockall::predicate::{always, eq};
 use odf::metadata::testing::MetadataFactory;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -22,10 +29,27 @@ use odf::metadata::testing::MetadataFactory;
 async fn test_create_root_dataset() {
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
 
+    let mut mock_dataset_entry_writer = MockDatasetEntryWriter::new();
+    mock_dataset_entry_writer
+        .expect_create_entry()
+        .with(always(), always(), eq(alias_foo.dataset_name.clone()))
+        .once()
+        .returning(|_, _, _| Ok(()));
+
+    let mut mock_dependency_graph_writer = MockDependencyGraphWriter::new();
+    mock_dependency_graph_writer
+        .expect_create_dataset_node()
+        .once()
+        .returning(|_| Ok(()));
+
     let mut mock_outbox = MockOutbox::new();
     expect_outbox_dataset_created(&mut mock_outbox, 1);
 
-    let harness = CreateUseCaseHarness::new(mock_outbox);
+    let harness = CreateUseCaseHarness::new(
+        mock_dataset_entry_writer,
+        mock_dependency_graph_writer,
+        mock_outbox,
+    );
 
     harness
         .use_case
@@ -50,12 +74,20 @@ struct CreateUseCaseHarness {
 }
 
 impl CreateUseCaseHarness {
-    fn new(mock_outbox: MockOutbox) -> Self {
+    fn new(
+        mock_dataset_entry_writer: MockDatasetEntryWriter,
+        mock_dependency_graph_writer: MockDependencyGraphWriter,
+        mock_outbox: MockOutbox,
+    ) -> Self {
         let base_harness =
             BaseUseCaseHarness::new(BaseUseCaseHarnessOptions::new().with_outbox(mock_outbox));
 
         let catalog = dill::CatalogBuilder::new_chained(base_harness.catalog())
             .add::<CreateDatasetUseCaseImpl>()
+            .add_value(mock_dataset_entry_writer)
+            .bind::<dyn DatasetEntryWriter, MockDatasetEntryWriter>()
+            .add_value(mock_dependency_graph_writer)
+            .bind::<dyn DependencyGraphWriter, MockDependencyGraphWriter>()
             .build();
 
         let use_case = catalog.get_one::<dyn CreateDatasetUseCase>().unwrap();

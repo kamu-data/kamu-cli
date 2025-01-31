@@ -21,31 +21,43 @@ use kamu_core::MockDidGenerator;
 use kamu_datasets::{DatasetLifecycleMessage, DeleteDatasetUseCase};
 use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
 use kamu_datasets_services::{
+    DatasetEntryWriter,
     DeleteDatasetUseCaseImpl,
     DependencyGraphIndexer,
     DependencyGraphServiceImpl,
+    MockDatasetEntryWriter,
 };
 use messaging_outbox::{consume_deserialized_message, ConsumerFilter, Message, MockOutbox};
+use mockall::predicate::function;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
 async fn test_delete_dataset_success_via_ref() {
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
-    let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
+    let (_, foo_id) = odf::DatasetID::new_generated_ed25519();
 
     let mut mock_outbox = MockOutbox::new();
     expect_outbox_dataset_deleted(&mut mock_outbox, 1);
 
+    let mut mock_entry_writer = MockDatasetEntryWriter::new();
+    let foo_id_clone = foo_id.clone();
+    mock_entry_writer
+        .expect_remove_entry()
+        .with(function(move |hdl: &odf::DatasetHandle| {
+            hdl.id == foo_id_clone
+        }))
+        .once()
+        .returning(|_| Ok(()));
+
     let mock_authorizer =
-        MockDatasetActionAuthorizer::new().expect_check_write_dataset(&dataset_id_foo, 1, true);
+        MockDatasetActionAuthorizer::new().expect_check_write_dataset(&foo_id, 1, true);
 
     let harness = DeleteUseCaseHarness::new(
+        mock_entry_writer,
         mock_authorizer,
         mock_outbox,
-        Some(MockDidGenerator::predefined_dataset_ids(vec![
-            dataset_id_foo,
-        ])),
+        Some(MockDidGenerator::predefined_dataset_ids(vec![foo_id])),
     );
 
     harness.create_root_dataset(&alias_foo).await;
@@ -73,10 +85,17 @@ async fn test_delete_dataset_success_via_handle() {
     let mut mock_outbox = MockOutbox::new();
     expect_outbox_dataset_deleted(&mut mock_outbox, 1);
 
+    let mut mock_entry_writer = MockDatasetEntryWriter::new();
+    mock_entry_writer
+        .expect_remove_entry()
+        .once()
+        .returning(|_| Ok(()));
+
     let mock_authorizer =
         MockDatasetActionAuthorizer::new().expect_check_write_dataset(&dataset_id_foo, 1, true);
 
     let harness = DeleteUseCaseHarness::new(
+        mock_entry_writer,
         mock_authorizer,
         mock_outbox,
         Some(MockDidGenerator::predefined_dataset_ids(vec![
@@ -103,8 +122,12 @@ async fn test_delete_dataset_success_via_handle() {
 
 #[tokio::test]
 async fn test_delete_dataset_not_found() {
-    let harness =
-        DeleteUseCaseHarness::new(MockDatasetActionAuthorizer::new(), MockOutbox::new(), None);
+    let harness = DeleteUseCaseHarness::new(
+        MockDatasetEntryWriter::new(),
+        MockDatasetActionAuthorizer::new(),
+        MockOutbox::new(),
+        None,
+    );
 
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     assert_matches!(
@@ -124,6 +147,7 @@ async fn test_delete_unauthorized() {
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
     let harness = DeleteUseCaseHarness::new(
+        MockDatasetEntryWriter::new(),
         MockDatasetActionAuthorizer::new().expect_check_write_dataset(&dataset_id_foo, 1, false),
         MockOutbox::new(),
         Some(MockDidGenerator::predefined_dataset_ids(vec![
@@ -152,11 +176,21 @@ async fn test_delete_dataset_respects_dangling_refs() {
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
 
+    let mut mock_entry_writer = MockDatasetEntryWriter::new();
+    mock_entry_writer
+        .expect_remove_entry()
+        .times(2)
+        .returning(|_| Ok(()));
+
     let mut mock_outbox = MockOutbox::new();
     expect_outbox_dataset_deleted(&mut mock_outbox, 2);
 
-    let harness =
-        DeleteUseCaseHarness::new(MockDatasetActionAuthorizer::allowing(), mock_outbox, None);
+    let harness = DeleteUseCaseHarness::new(
+        mock_entry_writer,
+        MockDatasetActionAuthorizer::allowing(),
+        mock_outbox,
+        None,
+    );
 
     let root = harness.create_root_dataset(&alias_foo).await;
     let derived = harness
@@ -220,6 +254,7 @@ struct DeleteUseCaseHarness {
 
 impl DeleteUseCaseHarness {
     fn new(
+        mock_dataset_entry_writer: MockDatasetEntryWriter,
         mock_dataset_action_authorizer: MockDatasetActionAuthorizer,
         mock_outbox: MockOutbox,
         maybe_mock_did_generator: Option<MockDidGenerator>,
@@ -236,6 +271,8 @@ impl DeleteUseCaseHarness {
             .add::<DependencyGraphServiceImpl>()
             .add::<InMemoryDatasetDependencyRepository>()
             .add::<DependencyGraphIndexer>()
+            .add_value(mock_dataset_entry_writer)
+            .bind::<dyn DatasetEntryWriter, MockDatasetEntryWriter>()
             .build();
 
         let use_case = catalog.get_one().unwrap();

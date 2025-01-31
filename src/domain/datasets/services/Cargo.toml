@@ -22,7 +22,7 @@ doctest = false
 
 [features]
 default = []
-testing = []
+testing = ["dep:mockall"]
 
 
 [dependencies]
@@ -33,6 +33,7 @@ kamu-accounts = { workspace = true }
 kamu-core = { workspace = true }
 kamu-datasets = { workspace = true }
 messaging-outbox = { workspace = true }
+mockall = { optional = true, version = "0.13" }
 odf = { workspace = true, features = ["http", "lfs", "s3"] }
 time-source = { workspace = true }
 
@@ -59,6 +60,7 @@ kamu-accounts-inmem = { workspace = true }
 kamu-core = { workspace = true, features = ["testing"] }
 kamu-datasets = { workspace = true, features = ["testing"] }
 kamu-datasets-inmem = { workspace = true }
+kamu-datasets-services = { workspace = true, features = ["testing"]}
 odf = { workspace = true, features = ["testing"] }
 
 indoc = "2"

@@ -24,6 +24,7 @@ use kamu_datasets::{
 use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
 use kamu_datasets_services::{
     CreateDatasetFromSnapshotUseCaseImpl,
+    CreateDatasetUseCaseImpl,
     DeleteDatasetUseCaseImpl,
     DependencyGraphServiceImpl,
     RenameDatasetUseCaseImpl,
@@ -822,6 +823,7 @@ impl GraphQLDatasetsHarness {
                 )
                 .bind::<dyn Outbox, OutboxImmediateImpl>()
                 .add::<CreateDatasetFromSnapshotUseCaseImpl>()
+                .add::<CreateDatasetUseCaseImpl>()
                 .add::<RenameDatasetUseCaseImpl>()
                 .add::<DeleteDatasetUseCaseImpl>()
                 .add::<ViewDatasetUseCaseImpl>()
