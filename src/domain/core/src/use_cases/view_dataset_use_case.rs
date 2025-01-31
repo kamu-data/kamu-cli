@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashMap;
+
 use internal_error::InternalError;
 use odf::dataset::DatasetNotFoundError;
 use thiserror::Error;
@@ -36,7 +38,10 @@ pub struct ViewMultiResponse {
 }
 
 impl ViewMultiResponse {
-    pub fn into_inaccessible_input_datasets_message(self) -> String {
+    pub fn into_inaccessible_input_datasets_message(
+        self,
+        dataset_ref_alias_map: &HashMap<&odf::DatasetRef, &String>,
+    ) -> String {
         use itertools::Itertools;
 
         let inaccessible_dataset_refs_it = self
@@ -44,7 +49,13 @@ impl ViewMultiResponse {
             .into_iter()
             .map(|(dataset_ref, _)| dataset_ref);
         let joined_inaccessible_datasets = inaccessible_dataset_refs_it
-            .map(|dataset_ref| format!("'{dataset_ref}'"))
+            .map(|dataset_ref| {
+                if let Some(alias) = dataset_ref_alias_map.get(&dataset_ref) {
+                    format!("'{alias}'")
+                } else {
+                    format!("'{dataset_ref}'")
+                }
+            })
             .join(", ");
 
         format!("Some input dataset(s) are inaccessible: {joined_inaccessible_datasets}")

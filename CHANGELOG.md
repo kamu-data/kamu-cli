@@ -11,9 +11,14 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+### Unreleased
+### Fixed
+- Validation `SetTransform` event (input datasets): IDs are used for accessibility checks. 
+    Aliases are used only to generate an error message.
+
 ## [0.221.0] - 2025-01-29
 ### Added
-- GQL suport to query and update email on the currently logged account
+- GQL support to query and update email on the currently logged account
 - Account registration sends `AccountLifecycleEvent` to `Outbox`
 ### Changed
 - Emails are mandatory for Kamu accounts now:
@@ -380,7 +385,7 @@ Introduced `DatasetRegistry` abstraction, encapsulating listing and resolution o
 ### Changed
 - Outbox main loop was revised to minimize the number of transactions:
     - split outbox into planner and consumption jobs components
-    - planner analyzes current state and loads bunch of unprocessed messages within a 1 transaction only
+    - planner analyzes current state and loads a bunch of unprocessed messages within a 1 transaction only
     - consumption jobs invoke consumers and detect their failures
 - Detecting concurrent modifications in flow and task event stores
 - Improved and cleaned handling of flow abortions at different stages of processing

@@ -9,6 +9,7 @@
 
 #![allow(clippy::derivable_impls)]
 
+use std::collections::HashMap;
 use std::fmt::Display;
 
 use crate::*;
@@ -83,6 +84,21 @@ impl ExecuteTransformInput {
         } else {
             0
         }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// SetTransform
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl SetTransform {
+    pub fn as_dataset_ref_alias_map(&self) -> HashMap<&DatasetRef, &String> {
+        self.inputs.iter().fold(HashMap::new(), |mut acc, input| {
+            if let Some(alias) = input.alias.as_ref() {
+                acc.insert(&input.dataset_ref, alias);
+            };
+            acc
+        })
     }
 }
 
