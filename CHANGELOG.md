@@ -13,8 +13,10 @@ Recommendation: for ease of reading, use the following order:
 
 ### Unreleased
 ### Fixed
-- Validation `SetTransform` event (input datasets): IDs are used for accessibility checks. 
-    Aliases are used only to generate an error message.
+- Private Datasets:
+  - Validation `SetTransform` event (input datasets): IDs are used for accessibility checks. 
+      Aliases are used only to generate an error message.
+  - `OsoDatasetAuthorizer`: readiness to handle duplicates when filtering
 
 ## [0.221.0] - 2025-01-29
 ### Added
@@ -22,10 +24,10 @@ Recommendation: for ease of reading, use the following order:
 - Account registration sends `AccountLifecycleEvent` to `Outbox`
 ### Changed
 - Emails are mandatory for Kamu accounts now:
-   - predefined users need to specify an email in config
-   - predefined users are auto-synced at startup in case they existed before
-   - GitHub users are queried for primary verified email, even if it is not public
-   - migration code for the database existing users
+  - predefined users need to specify an email in config
+  - predefined users are auto-synced at startup in case they existed before
+  - GitHub users are queried for primary verified email, even if it is not public
+  - migration code for the database existing users
 
 ## [0.220.0] - 2025-01-27
 ### Changed

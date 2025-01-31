@@ -140,7 +140,7 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
             .get_multiple_dataset_resources(&dataset_ids)
             .await
             .int_err()?;
-        let mut dataset_handle_id_mapping =
+        let dataset_handle_id_mapping =
             dataset_handles
                 .into_iter()
                 .fold(HashMap::new(), |mut acc, hdl| {
@@ -156,11 +156,12 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
 
             if is_allowed {
                 let dataset_handle = dataset_handle_id_mapping
-                    // Thus we obtain the value without cloning
-                    .remove(&dataset_id)
+                    .get(&dataset_id)
                     .ok_or_else(|| {
-                        format!("Unexpectedly, dataset_handle was found: {dataset_id}").int_err()
-                    })?;
+                        format!("Unexpectedly, dataset_handle not was found: {dataset_id}")
+                            .int_err()
+                    })?
+                    .clone();
 
                 matched_dataset_handles.push(dataset_handle);
             }
@@ -188,7 +189,7 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
             .get_multiple_dataset_resources(&dataset_ids)
             .await
             .int_err()?;
-        let mut dataset_handle_id_mapping =
+        let dataset_handle_id_mapping =
             dataset_handles
                 .into_iter()
                 .fold(HashMap::new(), |mut acc, hdl| {
@@ -198,11 +199,11 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
 
         for (dataset_id, dataset_resource) in dataset_resources_resolution.resolved_resources {
             let dataset_handle = dataset_handle_id_mapping
-                // Thus we obtain the value without cloning
-                .remove(&dataset_id)
+                .get(&dataset_id)
                 .ok_or_else(|| {
-                    format!("Unexpectedly, dataset_handle was found: {dataset_id}").int_err()
-                })?;
+                    format!("Unexpectedly, dataset_handle not was found: {dataset_id}").int_err()
+                })?
+                .clone();
 
             let is_allowed = self
                 .kamu_auth_oso
