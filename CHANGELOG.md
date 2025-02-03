@@ -11,7 +11,12 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-### [0.221.1] - 2025-01-31
+## [Unreleased]
+### Changed
+- `kamu pull` command now can be called with passing `<remote_repo>/<dataset_name>` arg
+  and pull url will be combined automatically 
+
+## [0.221.1] - 2025-01-31
 ### Fixed
 - Private Datasets:
   - Validation `SetTransform` event (input datasets): IDs are used for accessibility checks. 
