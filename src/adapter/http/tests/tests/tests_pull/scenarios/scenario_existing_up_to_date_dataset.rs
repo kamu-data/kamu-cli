@@ -79,6 +79,8 @@ impl<TServerHarness: ServerSideHarness> SmartPullExistingUpToDateDatasetScenario
         )
         .await;
 
+        // TODO: local dataset entry creation
+
         let server_alias = odf::DatasetAlias::new(server_account_name, foo_name);
         let server_odf_url = server_harness.dataset_url(&server_alias);
         let server_dataset_ref = odf::DatasetRefRemote::from(&server_odf_url);

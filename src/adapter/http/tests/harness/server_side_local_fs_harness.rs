@@ -20,7 +20,6 @@ use kamu::{
     CommitDatasetEventUseCaseImpl,
     CompactionExecutorImpl,
     CompactionPlannerImpl,
-    DatasetRegistrySoloUnitBridge,
     DatasetStorageUnitLocalFs,
     EditDatasetUseCaseImpl,
     ObjectStoreBuilderLocalFs,
@@ -28,8 +27,14 @@ use kamu::{
     RemoteRepositoryRegistryImpl,
     ViewDatasetUseCaseImpl,
 };
-use kamu_accounts::testing::MockAuthenticationService;
-use kamu_accounts::{Account, AuthenticationService};
+use kamu_accounts::{Account, AccountConfig, JwtAuthenticationConfig, PredefinedAccountsConfig};
+use kamu_accounts_inmem::{InMemoryAccessTokenRepository, InMemoryAccountRepository};
+use kamu_accounts_services::{
+    AccessTokenServiceImpl,
+    AuthenticationServiceImpl,
+    LoginPasswordAuthProvider,
+    PredefinedAccountsRegistrator,
+};
 use kamu_core::{
     CompactionExecutor,
     CompactionPlanner,
@@ -38,10 +43,11 @@ use kamu_core::{
     TenancyConfig,
 };
 use kamu_datasets::{CreateDatasetFromSnapshotUseCase, CreateDatasetUseCase};
-use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
+use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEntryRepository};
 use kamu_datasets_services::{
     CreateDatasetFromSnapshotUseCaseImpl,
     CreateDatasetUseCaseImpl,
+    DatasetEntryServiceImpl,
     DependencyGraphServiceImpl,
 };
 use messaging_outbox::DummyOutboxImpl;
@@ -54,7 +60,6 @@ use super::{
     create_cli_user_catalog,
     create_web_user_catalog,
     make_server_account,
-    server_authentication_mock,
     ServerSideHarness,
     ServerSideHarnessOptions,
     TestAPIServer,
@@ -86,7 +91,7 @@ impl ServerSideLocalFsHarness {
         let cache_dir = tempdir.path().join("cache");
         std::fs::create_dir(&cache_dir).unwrap();
 
-        let account = make_server_account();
+        let account = make_server_account(options.tenancy_config);
 
         let time_source = SystemTimeSourceStub::new();
         let (base_catalog, listener) = {
@@ -98,6 +103,19 @@ impl ServerSideLocalFsHarness {
             let addr = SocketAddr::from(([127, 0, 0, 1], 0));
             let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
             let base_url_rest = format!("http://{}", listener.local_addr().unwrap());
+
+            let predefined_accounts_config = match options.tenancy_config {
+                TenancyConfig::SingleTenant => PredefinedAccountsConfig::single_tenant(),
+                TenancyConfig::MultiTenant => {
+                    let mut predefined_accounts_config = PredefinedAccountsConfig::new();
+                    predefined_accounts_config.predefined.push(
+                        AccountConfig::test_config_from_name(odf::AccountName::new_unchecked(
+                            SERVER_ACCOUNT_NAME,
+                        )),
+                    );
+                    predefined_accounts_config
+                }
+            };
 
             b.add_value(RunInfoDir::new(run_info_dir))
                 .add::<DidGeneratorDefault>()
@@ -111,9 +129,6 @@ impl ServerSideLocalFsHarness {
                 .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
                 .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
                 .bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
-                .add_value(server_authentication_mock(&account))
-                .add::<DatasetRegistrySoloUnitBridge>()
-                .bind::<dyn AuthenticationService, MockAuthenticationService>()
                 .add_value(ServerUrlConfig::new_test(Some(&base_url_rest)))
                 .add::<CompactionPlannerImpl>()
                 .add::<CompactionExecutorImpl>()
@@ -125,12 +140,26 @@ impl ServerSideLocalFsHarness {
                 .add::<CreateDatasetFromSnapshotUseCaseImpl>()
                 .add::<CommitDatasetEventUseCaseImpl>()
                 .add::<ViewDatasetUseCaseImpl>()
-                .add::<EditDatasetUseCaseImpl>();
+                .add::<EditDatasetUseCaseImpl>()
+                .add::<DatasetEntryServiceImpl>()
+                .add::<InMemoryDatasetEntryRepository>()
+                .add::<AuthenticationServiceImpl>()
+                .add::<InMemoryAccountRepository>()
+                .add::<AccessTokenServiceImpl>()
+                .add::<InMemoryAccessTokenRepository>()
+                .add_value(JwtAuthenticationConfig::default())
+                .add::<LoginPasswordAuthProvider>()
+                .add::<PredefinedAccountsRegistrator>()
+                .add_value(predefined_accounts_config);
 
             database_common::NoOpDatabasePlugin::init_database_components(&mut b);
 
             (b.build(), listener)
         };
+
+        init_on_startup::run_startup_jobs(&base_catalog)
+            .await
+            .unwrap();
 
         let api_server = TestAPIServer::new(
             create_web_user_catalog(&base_catalog, &options),
@@ -173,38 +202,38 @@ impl ServerSideHarness for ServerSideLocalFsHarness {
     }
 
     fn cli_dataset_registry(&self) -> Arc<dyn DatasetRegistry> {
-        let cli_catalog = create_cli_user_catalog(&self.base_catalog);
+        let cli_catalog = create_cli_user_catalog(&self.base_catalog, self.options.tenancy_config);
         cli_catalog.get_one::<dyn DatasetRegistry>().unwrap()
     }
 
     fn cli_create_dataset_use_case(&self) -> Arc<dyn CreateDatasetUseCase> {
-        let cli_catalog = create_cli_user_catalog(&self.base_catalog);
+        let cli_catalog = create_cli_user_catalog(&self.base_catalog, self.options.tenancy_config);
         cli_catalog.get_one::<dyn CreateDatasetUseCase>().unwrap()
     }
 
     fn cli_create_dataset_from_snapshot_use_case(
         &self,
     ) -> Arc<dyn CreateDatasetFromSnapshotUseCase> {
-        let cli_catalog = create_cli_user_catalog(&self.base_catalog);
+        let cli_catalog = create_cli_user_catalog(&self.base_catalog, self.options.tenancy_config);
         cli_catalog
             .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
             .unwrap()
     }
 
     fn cli_commit_dataset_event_use_case(&self) -> Arc<dyn CommitDatasetEventUseCase> {
-        let cli_catalog = create_cli_user_catalog(&self.base_catalog);
+        let cli_catalog = create_cli_user_catalog(&self.base_catalog, self.options.tenancy_config);
         cli_catalog
             .get_one::<dyn CommitDatasetEventUseCase>()
             .unwrap()
     }
 
     fn cli_compaction_planner(&self) -> Arc<dyn CompactionPlanner> {
-        let cli_catalog = create_cli_user_catalog(&self.base_catalog);
+        let cli_catalog = create_cli_user_catalog(&self.base_catalog, self.options.tenancy_config);
         cli_catalog.get_one::<dyn CompactionPlanner>().unwrap()
     }
 
     fn cli_compaction_executor(&self) -> Arc<dyn CompactionExecutor> {
-        let cli_catalog = create_cli_user_catalog(&self.base_catalog);
+        let cli_catalog = create_cli_user_catalog(&self.base_catalog, self.options.tenancy_config);
         cli_catalog.get_one::<dyn CompactionExecutor>().unwrap()
     }
 

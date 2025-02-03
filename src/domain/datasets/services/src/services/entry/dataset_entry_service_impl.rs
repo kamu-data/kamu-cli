@@ -15,7 +15,7 @@ use dill::{component, interface};
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_accounts::{
     AccountNotFoundByNameError,
-    AccountRepository,
+    AuthenticationService,
     CurrentAccountSubject,
     GetAccountByNameError,
 };
@@ -39,7 +39,7 @@ pub struct DatasetEntryServiceImpl {
     time_source: Arc<dyn SystemTimeSource>,
     dataset_entry_repo: Arc<dyn DatasetEntryRepository>,
     dataset_storage_unit: Arc<dyn odf::DatasetStorageUnit>,
-    account_repo: Arc<dyn AccountRepository>,
+    authentication_svc: Arc<dyn AuthenticationService>,
     current_account_subject: Arc<CurrentAccountSubject>,
     tenancy_config: Arc<TenancyConfig>,
     accounts_cache: Arc<RwLock<AccountsCache>>,
@@ -64,7 +64,7 @@ impl DatasetEntryServiceImpl {
         time_source: Arc<dyn SystemTimeSource>,
         dataset_entry_repo: Arc<dyn DatasetEntryRepository>,
         dataset_storage_unit: Arc<dyn odf::DatasetStorageUnit>,
-        account_repo: Arc<dyn AccountRepository>,
+        authentication_svc: Arc<dyn AuthenticationService>,
         current_account_subject: Arc<CurrentAccountSubject>,
         tenancy_config: Arc<TenancyConfig>,
     ) -> Self {
@@ -72,7 +72,7 @@ impl DatasetEntryServiceImpl {
             time_source,
             dataset_entry_repo,
             dataset_storage_unit,
-            account_repo,
+            authentication_svc,
             current_account_subject,
             tenancy_config,
             accounts_cache: Default::default(),
@@ -104,8 +104,8 @@ impl DatasetEntryServiceImpl {
         if !first_seen_account_ids.is_empty() {
             let account_ids = first_seen_account_ids.into_iter().collect::<Vec<_>>();
             let accounts = self
-                .account_repo
-                .get_accounts_by_ids(account_ids)
+                .authentication_svc
+                .accounts_by_ids(account_ids)
                 .await
                 .int_err()?;
 
@@ -153,10 +153,11 @@ impl DatasetEntryServiceImpl {
             Ok(name)
         } else {
             let account = self
-                .account_repo
-                .get_account_by_id(account_id)
+                .authentication_svc
+                .account_by_id(account_id)
                 .await
-                .int_err()?;
+                .int_err()?
+                .expect("Account must exist");
 
             let mut writable_accounts_cache = self.accounts_cache.write().await;
             writable_accounts_cache
@@ -185,7 +186,12 @@ impl DatasetEntryServiceImpl {
         if let Some(id) = maybe_cached_id {
             Ok(id)
         } else {
-            let account = self.account_repo.get_account_by_name(account_name).await?;
+            let maybe_account = self
+                .authentication_svc
+                .account_by_name(account_name)
+                .await?;
+            let account =
+                maybe_account.unwrap_or_else(|| panic!("Account '{}' unresolved", account_name));
 
             let mut writable_accounts_cache = self.accounts_cache.write().await;
             writable_accounts_cache

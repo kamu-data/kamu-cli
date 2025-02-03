@@ -19,13 +19,26 @@ use internal_error::{InternalError, ResultIntoInternal};
 use kamu::domain::*;
 use kamu::utils::simple_transfer_protocol::SimpleTransferProtocol;
 use kamu::*;
-use kamu_accounts::CurrentAccountSubject;
+use kamu_accounts::{
+    AccountConfig,
+    CurrentAccountSubject,
+    JwtAuthenticationConfig,
+    PredefinedAccountsConfig,
+};
+use kamu_accounts_inmem::{InMemoryAccessTokenRepository, InMemoryAccountRepository};
+use kamu_accounts_services::{
+    AccessTokenServiceImpl,
+    AuthenticationServiceImpl,
+    LoginPasswordAuthProvider,
+    PredefinedAccountsRegistrator,
+};
 use kamu_adapter_http::{OdfSmtpVersion, SmartTransferProtocolClientWs};
 use kamu_datasets::CreateDatasetFromSnapshotUseCase;
-use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
+use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEntryRepository};
 use kamu_datasets_services::{
     CreateDatasetFromSnapshotUseCaseImpl,
     CreateDatasetUseCaseImpl,
+    DatasetEntryServiceImpl,
     DatasetKeyValueServiceSysEnv,
     DependencyGraphServiceImpl,
 };
@@ -59,7 +72,7 @@ pub(crate) struct ClientSideHarnessOptions {
 }
 
 impl ClientSideHarness {
-    pub fn new(options: ClientSideHarnessOptions) -> Self {
+    pub async fn new(options: ClientSideHarnessOptions) -> Self {
         let tempdir = tempfile::tempdir().unwrap();
         let datasets_dir = tempdir.path().join("datasets");
         std::fs::create_dir(&datasets_dir).unwrap();
@@ -83,11 +96,27 @@ impl ClientSideHarness {
         b.add::<DependencyGraphServiceImpl>();
         b.add::<InMemoryDatasetDependencyRepository>();
 
-        b.add_value(CurrentAccountSubject::logged(
-            odf::AccountID::new_seeded_ed25519(CLIENT_ACCOUNT_NAME.as_bytes()),
-            odf::AccountName::new_unchecked(CLIENT_ACCOUNT_NAME),
-            false,
-        ));
+        match options.tenancy_config {
+            TenancyConfig::SingleTenant => {
+                b.add_value(CurrentAccountSubject::new_test());
+                b.add_value(PredefinedAccountsConfig::single_tenant());
+            }
+            TenancyConfig::MultiTenant => {
+                b.add_value(CurrentAccountSubject::logged(
+                    odf::AccountID::new_seeded_ed25519(CLIENT_ACCOUNT_NAME.as_bytes()),
+                    odf::AccountName::new_unchecked(CLIENT_ACCOUNT_NAME),
+                    false,
+                ));
+
+                let mut predefined_accounts_config = PredefinedAccountsConfig::new();
+                predefined_accounts_config
+                    .predefined
+                    .push(AccountConfig::test_config_from_name(
+                        odf::AccountName::new_unchecked(CLIENT_ACCOUNT_NAME),
+                    ));
+                b.add_value(predefined_accounts_config);
+            }
+        }
 
         b.add::<auth::AlwaysHappyDatasetActionAuthorizer>();
 
@@ -104,8 +133,7 @@ impl ClientSideHarness {
 
         b.add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
             .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
-            .bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
-            .add::<DatasetRegistrySoloUnitBridge>();
+            .bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>();
 
         b.add::<RemoteRepositoryRegistryImpl>();
 
@@ -153,6 +181,16 @@ impl ClientSideHarness {
         b.add::<PushDatasetUseCaseImpl>();
         b.add::<ViewDatasetUseCaseImpl>();
 
+        b.add::<DatasetEntryServiceImpl>();
+        b.add::<InMemoryDatasetEntryRepository>();
+        b.add::<AuthenticationServiceImpl>();
+        b.add::<InMemoryAccountRepository>();
+        b.add::<AccessTokenServiceImpl>();
+        b.add::<InMemoryAccessTokenRepository>();
+        b.add_value(JwtAuthenticationConfig::default());
+        b.add::<LoginPasswordAuthProvider>();
+        b.add::<PredefinedAccountsRegistrator>();
+
         b.add_value(ContainerRuntime::default());
         b.add_value(kamu::utils::ipfs_wrapper::IpfsClient::default());
         b.add_value(IpfsGateway::default());
@@ -160,6 +198,8 @@ impl ClientSideHarness {
         NoOpDatabasePlugin::init_database_components(&mut b);
 
         let catalog = b.build();
+
+        init_on_startup::run_startup_jobs(&catalog).await.unwrap();
 
         let pull_dataset_use_case = catalog.get_one::<dyn PullDatasetUseCase>().unwrap();
         let push_dataset_use_case = catalog.get_one::<dyn PushDatasetUseCase>().unwrap();
