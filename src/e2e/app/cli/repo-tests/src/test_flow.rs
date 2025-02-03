@@ -21,6 +21,7 @@ use kamu_cli_e2e_common::{
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_2,
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_3,
 };
+use kamu_cli_puppet::KamuCliPuppet;
 use kamu_flow_system::DatasetFlowType;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1175,6 +1176,224 @@ pub async fn test_trigger_flow_reset(mut kamu_api_server_client: KamuApiServerCl
             .map(|block| (block.sequence_number, block.event))
             .collect::<Vec<_>>()
     );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_flow_planing_failure(mut kamu_api_server_client: KamuApiServerClient) {
+    let temp_dir = tempfile::tempdir().unwrap();
+
+    let root_dataset_snapshot = indoc::formatdoc!(
+        r#"
+    kind: DatasetSnapshot
+    version: 1
+    content:
+      name: root-dataset
+      kind: Root
+      metadata:
+        - kind: SetPollingSource
+          fetch:
+            kind: FilesGlob
+            path: {}
+          read:
+            kind: Csv
+            header: true
+            schema:
+              - event_time TIMESTAMP
+              - city STRING
+              - population BIGINT
+          merge:
+            kind: Ledger
+            primaryKey:
+              - event_time
+              - city
+    "#,
+        temp_dir.path().join("chunk-*.csv").display()
+    )
+    .escape_default()
+    .to_string();
+
+    kamu_api_server_client.auth().login_as_kamu().await;
+
+    let CreateDatasetResponse {
+        dataset_id,
+        dataset_alias,
+    } = kamu_api_server_client
+        .dataset()
+        .create_dataset(&root_dataset_snapshot)
+        .await;
+
+    let kamu = KamuCliPuppet::new(kamu_api_server_client.get_workspace_path());
+    kamu.execute([
+        "repo",
+        "alias",
+        "add",
+        &dataset_alias.dataset_name,
+        "http://foo",
+        "--pull",
+    ])
+    .await
+    .success();
+
+    assert_matches!(
+        kamu_api_server_client
+            .flow()
+            .trigger(&dataset_id, DatasetFlowType::Ingest)
+            .await,
+        FlowTriggerResponse::Success(_)
+    );
+
+    kamu_api_server_client.flow().wait(&dataset_id).await;
+
+    kamu_api_server_client
+        .graphql_api_call_assert(
+            &get_dataset_list_flows_query(&dataset_id),
+            Ok(&indoc::indoc!(
+                r#"
+                {
+                  "datasets": {
+                    "__typename": "Datasets",
+                    "byId": {
+                      "__typename": "Dataset",
+                      "alias": "root-dataset",
+                      "flows": {
+                        "__typename": "DatasetFlows",
+                        "runs": {
+                          "__typename": "DatasetFlowRuns",
+                          "table": {
+                            "__typename": "FlowConnection",
+                            "edges": [
+                              {
+                                "__typename": "FlowEdge",
+                                "node": {
+                                  "__typename": "Flow",
+                                  "configSnapshot": null,
+                                  "description": {
+                                    "__typename": "FlowDescriptionDatasetPollingIngest",
+                                    "datasetId": $datasetId,
+                                    "ingestResult": null
+                                  },
+                                  "initiator": {
+                                    "__typename": "Account",
+                                    "accountName": "kamu",
+                                    "accountType": "USER",
+                                    "avatarUrl": "https://avatars.githubusercontent.com/u/50896974?s=200&v=4",
+                                    "displayName": "kamu",
+                                    "id": "did:odf:fed016b61ed2ab1b63a006b61ed2ab1b63a00b016d65607000000e0821aafbf163e6f",
+                                    "isAdmin": true
+                                  },
+                                  "outcome": {
+                                    "__typename": "FlowFailedError",
+                                    "reason": {
+                                      "__typename": "FlowFailureReasonGeneral",
+                                      "message": "FAILED"
+                                    }
+                                  },
+                                  "startCondition": null,
+                                  "status": "FINISHED",
+                                  "timing": {
+                                    "__typename": "FlowTimingRecords"
+                                  }
+                                }
+                              }
+                            ],
+                            "nodes": [
+                              {
+                                "__typename": "Flow",
+                                "configSnapshot": null,
+                                "description": {
+                                  "__typename": "FlowDescriptionDatasetPollingIngest",
+                                  "datasetId": $datasetId,
+                                  "ingestResult": null
+                                },
+                                "initiator": {
+                                  "__typename": "Account",
+                                  "accountName": "kamu",
+                                  "accountType": "USER",
+                                  "avatarUrl": "https://avatars.githubusercontent.com/u/50896974?s=200&v=4",
+                                  "displayName": "kamu",
+                                  "id": "did:odf:fed016b61ed2ab1b63a006b61ed2ab1b63a00b016d65607000000e0821aafbf163e6f",
+                                  "isAdmin": true
+                                },
+                                "outcome": {
+                                  "__typename": "FlowFailedError",
+                                  "reason": {
+                                    "__typename": "FlowFailureReasonGeneral",
+                                    "message": "FAILED"
+                                  }
+                                },
+                                "startCondition": null,
+                                "status": "FINISHED",
+                                "timing": {
+                                  "__typename": "FlowTimingRecords"
+                                }
+                              }
+                            ],
+                            "pageInfo": {
+                              "__typename": "PageBasedInfo",
+                              "currentPage": 0,
+                              "hasNextPage": false,
+                              "hasPreviousPage": false,
+                              "totalPages": 1
+                            },
+                            "totalCount": 1
+                          },
+                          "tiles": {
+                            "__typename": "FlowConnection",
+                            "nodes": [
+                              {
+                                "__typename": "Flow",
+                                "initiator": {
+                                  "__typename": "Account",
+                                  "accountName": "kamu"
+                                },
+                                "outcome": {
+                                  "__typename": "FlowFailedError",
+                                  "reason": {
+                                    "__typename": "FlowFailureReasonGeneral",
+                                    "message": "FAILED"
+                                  }
+                                },
+                                "status": "FINISHED",
+                                "timing": {
+                                  "__typename": "FlowTimingRecords"
+                                }
+                              }
+                            ],
+                            "totalCount": 1
+                          }
+                        }
+                      },
+                      "kind": "ROOT",
+                      "metadata": {
+                        "__typename": "DatasetMetadata",
+                        "currentPollingSource": {
+                          "__typename": "SetPollingSource",
+                          "fetch": {
+                            "__typename": "FetchStepFilesGlob",
+                            "cache": null,
+                            "eventTime": null,
+                            "order": null,
+                            "path": $tmpPath
+                          }
+                        },
+                        "currentTransform": null
+                      },
+                      "name": "root-dataset",
+                      "owner": {
+                        "__typename": "Account",
+                        "accountName": "kamu",
+                        "id": "did:odf:fed016b61ed2ab1b63a006b61ed2ab1b63a00b016d65607000000e0821aafbf163e6f"
+                      }
+                    }
+                  }
+                }
+                "#
+            ).replace("$datasetId", &format!("\"{dataset_id}\""))
+            .replace("$tmpPath", &format!("\"{}\"", temp_dir.path().join("chunk-*.csv").display()))
+          ),
+        )
+        .await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -18,6 +18,7 @@ use kamu::testing::{BaseRepoHarness, DummySmartTransferProtocolClient};
 use kamu::utils::ipfs_wrapper::IpfsClient;
 use kamu::utils::simple_transfer_protocol::SimpleTransferProtocol;
 use kamu::{
+    RemoteAliasResolverImpl,
     RemoteAliasesRegistryImpl,
     RemoteReposDir,
     RemoteRepositoryRegistryImpl,
@@ -246,6 +247,7 @@ impl RemoteStatusTestHarness {
             .add::<SyncServiceImpl>()
             .add::<SyncRequestBuilder>()
             .add::<DatasetFactoryImpl>()
+            .add::<RemoteAliasResolverImpl>()
             .add::<RemoteAliasesRegistryImpl>()
             .add::<odf::dataset::DummyOdfServerAccessTokenResolver>()
             .add_value(IpfsGateway::default())

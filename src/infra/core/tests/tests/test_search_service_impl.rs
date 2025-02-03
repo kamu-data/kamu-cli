@@ -49,6 +49,8 @@ async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
         .add::<odf::dataset::DummyOdfServerAccessTokenResolver>()
         .add::<DatasetFactoryImpl>()
         .add::<SyncServiceImpl>()
+        .add::<RemoteAliasesRegistryImpl>()
+        .add::<RemoteAliasResolverImpl>()
         .add::<SyncRequestBuilder>()
         .add::<DummySmartTransferProtocolClient>()
         .add::<SimpleTransferProtocol>()
