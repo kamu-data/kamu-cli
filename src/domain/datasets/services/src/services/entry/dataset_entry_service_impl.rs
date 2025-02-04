@@ -31,7 +31,7 @@ use thiserror::Error;
 use time_source::SystemTimeSource;
 use tokio::sync::RwLock;
 
-use super::DatasetEntryWriter;
+use super::{DatasetEntryWriter, RenameDatasetEntryError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -191,7 +191,7 @@ impl DatasetEntryServiceImpl {
                 .account_by_name(account_name)
                 .await?;
             let account =
-                maybe_account.unwrap_or_else(|| panic!("Account '{}' unresolved", account_name));
+                maybe_account.unwrap_or_else(|| panic!("Account '{account_name}' unresolved"));
 
             let mut writable_accounts_cache = self.accounts_cache.write().await;
             writable_accounts_cache
@@ -356,7 +356,20 @@ impl odf::dataset::DatasetHandleResolver for DatasetEntryServiceImpl {
                     .get_dataset_entry_by_owner_and_name(&owner_id, &alias.dataset_name)
                     .await
                 {
-                    Ok(entry) => Ok(odf::DatasetHandle::new(entry.id.clone(), alias.clone())),
+                    Ok(entry) => Ok(odf::DatasetHandle::new(
+                        entry.id.clone(),
+                        odf::DatasetAlias::new(
+                            match self.tenancy_config.as_ref() {
+                                TenancyConfig::SingleTenant => None,
+                                TenancyConfig::MultiTenant => Some(
+                                    // We know the name, but since the search is case-insensitive,
+                                    // we'd like to know the stored version rather than queried
+                                    self.resolve_account_name_by_id(&owner_id).await.int_err()?,
+                                ),
+                            },
+                            entry.name,
+                        ),
+                    )),
                     Err(GetDatasetEntryByNameError::NotFound(_)) => {
                         Err(odf::dataset::GetDatasetError::NotFound(
                             odf::dataset::DatasetNotFoundError {
@@ -521,11 +534,20 @@ impl DatasetEntryWriter for DatasetEntryServiceImpl {
         &self,
         dataset_handle: &odf::DatasetHandle,
         new_dataset_name: &odf::DatasetName,
-    ) -> Result<(), InternalError> {
+    ) -> Result<(), RenameDatasetEntryError> {
         self.dataset_entry_repo
             .update_dataset_entry_name(&dataset_handle.id, new_dataset_name)
             .await
-            .int_err()
+            .map_err(|e| match e {
+                UpdateDatasetEntryNameError::Internal(e) => RenameDatasetEntryError::Internal(e),
+                UpdateDatasetEntryNameError::NotFound(e) => {
+                    // should not happen normally, since we resolved the handle earlier
+                    RenameDatasetEntryError::Internal(e.int_err())
+                }
+                UpdateDatasetEntryNameError::NameCollision(e) => {
+                    RenameDatasetEntryError::NameCollision(e)
+                }
+            })
     }
 
     async fn remove_entry(&self, dataset_handle: &odf::DatasetHandle) -> Result<(), InternalError> {

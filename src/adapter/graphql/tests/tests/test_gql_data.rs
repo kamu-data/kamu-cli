@@ -28,8 +28,12 @@ use kamu_accounts_services::{
 };
 use kamu_core::*;
 use kamu_datasets::CreateDatasetUseCase;
-use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
-use kamu_datasets_services::{CreateDatasetUseCaseImpl, DependencyGraphServiceImpl};
+use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEntryRepository};
+use kamu_datasets_services::{
+    CreateDatasetUseCaseImpl,
+    DatasetEntryServiceImpl,
+    DependencyGraphServiceImpl,
+};
 use messaging_outbox::DummyOutboxImpl;
 use odf::metadata::testing::MetadataFactory;
 use serde_json::json;
@@ -85,7 +89,9 @@ async fn create_catalog_with_local_workspace(
             .add_value(JwtAuthenticationConfig::default())
             .add::<LoginPasswordAuthProvider>()
             .add::<PredefinedAccountsRegistrator>()
-            .add::<DatabaseTransactionRunner>();
+            .add::<DatabaseTransactionRunner>()
+            .add::<DatasetEntryServiceImpl>()
+            .add::<InMemoryDatasetEntryRepository>();
 
         NoOpDatabasePlugin::init_database_components(&mut b);
 

@@ -11,16 +11,19 @@ use async_graphql::value;
 use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use dill::Component;
 use indoc::indoc;
-use kamu::{
-    DatasetRegistrySoloUnitBridge,
-    DatasetStorageUnitLocalFs,
-    MetadataQueryServiceImpl,
-    ViewDatasetUseCaseImpl,
-};
+use kamu::{DatasetStorageUnitLocalFs, MetadataQueryServiceImpl, ViewDatasetUseCaseImpl};
+use kamu_accounts::JwtAuthenticationConfig;
+use kamu_accounts_inmem::InMemoryAccessTokenRepository;
+use kamu_accounts_services::{AccessTokenServiceImpl, AuthenticationServiceImpl};
 use kamu_core::{auth, DidGeneratorDefault, TenancyConfig};
 use kamu_datasets::CreateDatasetFromSnapshotUseCase;
-use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
-use kamu_datasets_services::{CreateDatasetFromSnapshotUseCaseImpl, DependencyGraphServiceImpl};
+use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEntryRepository};
+use kamu_datasets_services::{
+    CreateDatasetFromSnapshotUseCaseImpl,
+    CreateDatasetUseCaseImpl,
+    DatasetEntryServiceImpl,
+    DependencyGraphServiceImpl,
+};
 use kamu_flow_system_inmem::InMemoryFlowConfigurationEventStore;
 use kamu_flow_system_services::FlowConfigurationServiceImpl;
 use messaging_outbox::DummyOutboxImpl;
@@ -579,9 +582,9 @@ impl FlowConfigHarness {
                 .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
                 .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
                 .bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
-                .add::<DatasetRegistrySoloUnitBridge>()
                 .add::<MetadataQueryServiceImpl>()
                 .add::<CreateDatasetFromSnapshotUseCaseImpl>()
+                .add::<CreateDatasetUseCaseImpl>()
                 .add::<ViewDatasetUseCaseImpl>()
                 .add::<SystemTimeSourceDefault>()
                 .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
@@ -589,7 +592,13 @@ impl FlowConfigHarness {
                 .add::<InMemoryDatasetDependencyRepository>()
                 .add::<FlowConfigurationServiceImpl>()
                 .add::<InMemoryFlowConfigurationEventStore>()
-                .add::<DatabaseTransactionRunner>();
+                .add::<DatabaseTransactionRunner>()
+                .add::<DatasetEntryServiceImpl>()
+                .add::<InMemoryDatasetEntryRepository>()
+                .add::<AuthenticationServiceImpl>()
+                .add::<AccessTokenServiceImpl>()
+                .add::<InMemoryAccessTokenRepository>()
+                .add_value(JwtAuthenticationConfig::default());
 
             NoOpDatabasePlugin::init_database_components(&mut b);
 

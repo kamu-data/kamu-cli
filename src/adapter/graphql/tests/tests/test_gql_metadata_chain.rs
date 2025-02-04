@@ -14,12 +14,16 @@ use chrono::Utc;
 use dill::Component;
 use indoc::indoc;
 use kamu::*;
+use kamu_accounts::JwtAuthenticationConfig;
+use kamu_accounts_inmem::InMemoryAccessTokenRepository;
+use kamu_accounts_services::{AccessTokenServiceImpl, AuthenticationServiceImpl};
 use kamu_core::*;
 use kamu_datasets::{CreateDatasetFromSnapshotUseCase, CreateDatasetUseCase};
-use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
+use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEntryRepository};
 use kamu_datasets_services::{
     CreateDatasetFromSnapshotUseCaseImpl,
     CreateDatasetUseCaseImpl,
+    DatasetEntryServiceImpl,
     DependencyGraphServiceImpl,
 };
 use messaging_outbox::DummyOutboxImpl;
@@ -555,8 +559,13 @@ impl GraphQLMetadataChainHarness {
                 .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
                 .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
                 .bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
-                .add::<DatasetRegistrySoloUnitBridge>()
-                .add::<auth::AlwaysHappyDatasetActionAuthorizer>();
+                .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
+                .add::<DatasetEntryServiceImpl>()
+                .add::<InMemoryDatasetEntryRepository>()
+                .add::<AuthenticationServiceImpl>()
+                .add::<AccessTokenServiceImpl>()
+                .add::<InMemoryAccessTokenRepository>()
+                .add_value(JwtAuthenticationConfig::default());
 
             database_common::NoOpDatabasePlugin::init_database_components(&mut b);
 

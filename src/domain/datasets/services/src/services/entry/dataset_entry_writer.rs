@@ -8,6 +8,8 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::InternalError;
+use kamu_datasets::DatasetEntryNameCollisionError;
+use thiserror::Error;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -25,9 +27,24 @@ pub trait DatasetEntryWriter: Send + Sync {
         &self,
         dataset_handle: &odf::DatasetHandle,
         new_dataset_name: &odf::DatasetName,
-    ) -> Result<(), InternalError>;
+    ) -> Result<(), RenameDatasetEntryError>;
 
     async fn remove_entry(&self, dataset_handle: &odf::DatasetHandle) -> Result<(), InternalError>;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Error)]
+pub enum RenameDatasetEntryError {
+    #[error(transparent)]
+    NameCollision(#[from] DatasetEntryNameCollisionError),
+
+    #[error(transparent)]
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

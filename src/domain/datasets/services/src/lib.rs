@@ -9,6 +9,7 @@
 
 #![feature(let_chains)]
 #![feature(trait_upcasting)]
+#![feature(error_generic_member_access)]
 
 // Re-exports
 pub use kamu_datasets as domain;

@@ -11,12 +11,21 @@ use async_graphql::value;
 use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use dill::Component;
 use indoc::indoc;
-use kamu::{DatasetRegistrySoloUnitBridge, DatasetStorageUnitLocalFs, ViewDatasetUseCaseImpl};
+use kamu::{DatasetStorageUnitLocalFs, ViewDatasetUseCaseImpl};
+use kamu_accounts::JwtAuthenticationConfig;
+use kamu_accounts_inmem::InMemoryAccessTokenRepository;
+use kamu_accounts_services::{AccessTokenServiceImpl, AuthenticationServiceImpl};
 use kamu_core::{auth, DidGeneratorDefault, TenancyConfig};
 use kamu_datasets::{CreateDatasetFromSnapshotUseCase, DatasetEnvVarsConfig};
-use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEnvVarRepository};
+use kamu_datasets_inmem::{
+    InMemoryDatasetDependencyRepository,
+    InMemoryDatasetEntryRepository,
+    InMemoryDatasetEnvVarRepository,
+};
 use kamu_datasets_services::{
     CreateDatasetFromSnapshotUseCaseImpl,
+    CreateDatasetUseCaseImpl,
+    DatasetEntryServiceImpl,
     DatasetEnvVarServiceImpl,
     DependencyGraphServiceImpl,
 };
@@ -334,8 +343,8 @@ impl DatasetEnvVarsHarness {
                 .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
                 .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
                 .bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
-                .add::<DatasetRegistrySoloUnitBridge>()
                 .add::<CreateDatasetFromSnapshotUseCaseImpl>()
+                .add::<CreateDatasetUseCaseImpl>()
                 .add::<ViewDatasetUseCaseImpl>()
                 .add::<SystemTimeSourceDefault>()
                 .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
@@ -343,7 +352,13 @@ impl DatasetEnvVarsHarness {
                 .add::<InMemoryDatasetDependencyRepository>()
                 .add::<DatabaseTransactionRunner>()
                 .add::<DatasetEnvVarServiceImpl>()
-                .add::<InMemoryDatasetEnvVarRepository>();
+                .add::<InMemoryDatasetEnvVarRepository>()
+                .add::<DatasetEntryServiceImpl>()
+                .add::<InMemoryDatasetEntryRepository>()
+                .add::<AuthenticationServiceImpl>()
+                .add::<AccessTokenServiceImpl>()
+                .add::<InMemoryAccessTokenRepository>()
+                .add_value(JwtAuthenticationConfig::default());
 
             NoOpDatabasePlugin::init_database_components(&mut b);
 

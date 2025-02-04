@@ -15,10 +15,19 @@ use dill::*;
 use indoc::indoc;
 use internal_error::InternalError;
 use kamu::*;
+use kamu_accounts::JwtAuthenticationConfig;
+use kamu_accounts_inmem::InMemoryAccessTokenRepository;
+use kamu_accounts_services::{AccessTokenServiceImpl, AuthenticationServiceImpl};
 use kamu_core::utils::metadata_chain_comparator::CompareChainsResult;
 use kamu_core::*;
 use kamu_datasets::CreateDatasetFromSnapshotUseCase;
-use kamu_datasets_services::CreateDatasetFromSnapshotUseCaseImpl;
+use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEntryRepository};
+use kamu_datasets_services::{
+    CreateDatasetFromSnapshotUseCaseImpl,
+    CreateDatasetUseCaseImpl,
+    DatasetEntryServiceImpl,
+    DependencyGraphServiceImpl,
+};
 use messaging_outbox::DummyOutboxImpl;
 use odf::metadata::testing::MetadataFactory;
 use tempfile::TempDir;
@@ -150,13 +159,21 @@ impl PushStatusesTestHarness {
                 .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
                 .bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
                 .add::<CreateDatasetFromSnapshotUseCaseImpl>()
+                .add::<CreateDatasetUseCaseImpl>()
                 .add::<ViewDatasetUseCaseImpl>()
                 .add::<SystemTimeSourceDefault>()
-                .add::<DatasetRegistrySoloUnitBridge>()
                 .add_value(TenancyConfig::SingleTenant)
                 .add_value(FakeRemoteStatusService {})
                 .bind::<dyn RemoteStatusService, FakeRemoteStatusService>()
-                .add::<auth::AlwaysHappyDatasetActionAuthorizer>();
+                .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
+                .add::<DependencyGraphServiceImpl>()
+                .add::<InMemoryDatasetDependencyRepository>()
+                .add::<DatasetEntryServiceImpl>()
+                .add::<InMemoryDatasetEntryRepository>()
+                .add::<AuthenticationServiceImpl>()
+                .add::<AccessTokenServiceImpl>()
+                .add::<InMemoryAccessTokenRepository>()
+                .add_value(JwtAuthenticationConfig::default());
 
             NoOpDatabasePlugin::init_database_components(&mut b);
 

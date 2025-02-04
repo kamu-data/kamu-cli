@@ -14,7 +14,7 @@ use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer, DatasetActionUnaut
 use kamu_core::DatasetRegistry;
 use kamu_datasets::RenameDatasetUseCase;
 
-use crate::DatasetEntryWriter;
+use crate::{DatasetEntryWriter, RenameDatasetEntryError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -82,10 +82,24 @@ impl RenameDatasetUseCase for RenameDatasetUseCaseImpl {
                 }
             })?;
 
-        // TODO: error handling such as name collision should move to this level.
         self.dataset_entry_writer
             .rename_entry(&dataset_handle, new_name)
-            .await?;
+            .await
+            .map_err(|e| match e {
+                RenameDatasetEntryError::Internal(e) => {
+                    odf::dataset::RenameDatasetError::Internal(e)
+                }
+                RenameDatasetEntryError::NameCollision(e) => {
+                    odf::dataset::RenameDatasetError::NameCollision(
+                        odf::dataset::NameCollisionError {
+                            alias: odf::DatasetAlias::new(
+                                dataset_handle.alias.account_name.clone(),
+                                e.dataset_name,
+                            ),
+                        },
+                    )
+                }
+            })?;
 
         // TODO: once we get rid of aliases and unify repo storage,
         // there will be nothing to do at storage level on rename

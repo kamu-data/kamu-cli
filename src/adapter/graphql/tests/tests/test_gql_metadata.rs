@@ -12,10 +12,18 @@ use database_common::NoOpDatabasePlugin;
 use dill::*;
 use indoc::indoc;
 use kamu::*;
+use kamu_accounts::JwtAuthenticationConfig;
+use kamu_accounts_inmem::InMemoryAccessTokenRepository;
+use kamu_accounts_services::{AccessTokenServiceImpl, AuthenticationServiceImpl};
 use kamu_core::*;
 use kamu_datasets::CreateDatasetFromSnapshotUseCase;
-use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
-use kamu_datasets_services::{CreateDatasetFromSnapshotUseCaseImpl, DependencyGraphServiceImpl};
+use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEntryRepository};
+use kamu_datasets_services::{
+    CreateDatasetFromSnapshotUseCaseImpl,
+    CreateDatasetUseCaseImpl,
+    DatasetEntryServiceImpl,
+    DependencyGraphServiceImpl,
+};
 use messaging_outbox::DummyOutboxImpl;
 use odf::metadata::testing::MetadataFactory;
 use time_source::SystemTimeSourceDefault;
@@ -40,9 +48,9 @@ async fn test_current_push_sources() {
             .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
             .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
             .bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
-            .add::<DatasetRegistrySoloUnitBridge>()
             .add::<MetadataQueryServiceImpl>()
             .add::<CreateDatasetFromSnapshotUseCaseImpl>()
+            .add::<CreateDatasetUseCaseImpl>()
             .add::<ViewDatasetUseCaseImpl>()
             .add::<SystemTimeSourceDefault>()
             .add::<EngineProvisionerNull>()
@@ -50,7 +58,13 @@ async fn test_current_push_sources() {
             .add::<DataFormatRegistryImpl>()
             .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
             .add::<DependencyGraphServiceImpl>()
-            .add::<InMemoryDatasetDependencyRepository>();
+            .add::<InMemoryDatasetDependencyRepository>()
+            .add::<DatasetEntryServiceImpl>()
+            .add::<InMemoryDatasetEntryRepository>()
+            .add::<AuthenticationServiceImpl>()
+            .add::<AccessTokenServiceImpl>()
+            .add::<InMemoryAccessTokenRepository>()
+            .add_value(JwtAuthenticationConfig::default());
 
         NoOpDatabasePlugin::init_database_components(&mut b);
 
