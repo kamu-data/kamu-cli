@@ -16,9 +16,14 @@ use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use dill::Component;
 use kamu::domain::*;
 use kamu::*;
-use kamu_accounts::{CurrentAccountSubject, JwtAuthenticationConfig};
+use kamu_accounts::{CurrentAccountSubject, JwtAuthenticationConfig, PredefinedAccountsConfig};
 use kamu_accounts_inmem::{InMemoryAccessTokenRepository, InMemoryAccountRepository};
-use kamu_accounts_services::{AccessTokenServiceImpl, AuthenticationServiceImpl};
+use kamu_accounts_services::{
+    AccessTokenServiceImpl,
+    AuthenticationServiceImpl,
+    LoginPasswordAuthProvider,
+    PredefinedAccountsRegistrator,
+};
 use kamu_adapter_http::DatasetAuthorizationLayer;
 use kamu_datasets::CreateDatasetFromSnapshotUseCase;
 use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEntryRepository};
@@ -71,11 +76,16 @@ async fn setup_repo() -> RepoFixture {
         .add::<InMemoryAccountRepository>()
         .add::<AccessTokenServiceImpl>()
         .add::<InMemoryAccessTokenRepository>()
-        .add_value(JwtAuthenticationConfig::default());
+        .add_value(JwtAuthenticationConfig::default())
+        .add::<PredefinedAccountsRegistrator>()
+        .add_value(PredefinedAccountsConfig::single_tenant())
+        .add::<LoginPasswordAuthProvider>();
 
     NoOpDatabasePlugin::init_database_components(&mut b);
 
     let catalog = b.build();
+
+    init_on_startup::run_startup_jobs(&catalog).await.unwrap();
 
     let create_dataset_from_snapshot = catalog
         .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
