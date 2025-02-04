@@ -92,6 +92,16 @@ impl<TServerHarness: ServerSideHarness> SmartPushExistingDivergedDatasetScenario
         )
         .await;
 
+        server_harness
+            .cli_dataset_entry_writer()
+            .create_entry(
+                &client_create_result.dataset_handle.id,
+                &server_harness.server_account_id(),
+                &client_create_result.dataset_handle.alias.dataset_name,
+            )
+            .await
+            .unwrap();
+
         let client_dataset = client_harness
             .dataset_registry()
             .get_dataset_by_handle(&client_create_result.dataset_handle);

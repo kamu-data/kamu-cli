@@ -31,6 +31,7 @@ use kamu_accounts::{
 };
 use kamu_core::{CompactionExecutor, CompactionPlanner, DatasetRegistry, TenancyConfig};
 use kamu_datasets::{CreateDatasetFromSnapshotUseCase, CreateDatasetUseCase};
+use kamu_datasets_services::DatasetEntryWriter;
 use odf::dataset::DatasetLayout;
 use reqwest::Url;
 use time_source::SystemTimeSourceStub;
@@ -44,6 +45,8 @@ pub(crate) const SERVER_ACCOUNT_EMAIL_ADDRESS: &str = "kamu-server@example.com";
 
 #[async_trait::async_trait]
 pub(crate) trait ServerSideHarness {
+    fn server_account_id(&self) -> odf::AccountID;
+
     fn operating_account_name(&self) -> Option<odf::AccountName>;
 
     fn cli_dataset_registry(&self) -> Arc<dyn DatasetRegistry>;
@@ -59,6 +62,8 @@ pub(crate) trait ServerSideHarness {
     fn cli_compaction_planner(&self) -> Arc<dyn CompactionPlanner>;
 
     fn cli_compaction_executor(&self) -> Arc<dyn CompactionExecutor>;
+
+    fn cli_dataset_entry_writer(&self) -> Arc<dyn DatasetEntryWriter>;
 
     fn dataset_layout(&self, dataset_handle: &odf::DatasetHandle) -> DatasetLayout;
 

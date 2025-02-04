@@ -15,13 +15,17 @@ use dill::{CatalogBuilder, Component};
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu::domain::auth::DatasetAction;
 use kamu::testing::MockDatasetActionAuthorizer;
-use kamu::{DatasetRegistrySoloUnitBridge, DatasetStorageUnitLocalFs};
+use kamu::DatasetStorageUnitLocalFs;
 use kamu_accounts::testing::MockAuthenticationService;
 use kamu_accounts::*;
 use kamu_core::{DidGenerator, MockDidGenerator, TenancyConfig};
 use kamu_datasets::CreateDatasetUseCase;
-use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
-use kamu_datasets_services::{CreateDatasetUseCaseImpl, DependencyGraphServiceImpl};
+use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEntryRepository};
+use kamu_datasets_services::{
+    CreateDatasetUseCaseImpl,
+    DatasetEntryServiceImpl,
+    DependencyGraphServiceImpl,
+};
 use messaging_outbox::DummyOutboxImpl;
 use mockall::predicate::{eq, function};
 use odf::metadata::testing::MetadataFactory;
@@ -238,9 +242,10 @@ impl ServerHarness {
                 )
                 .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
                 .bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
-                .add::<DatasetRegistrySoloUnitBridge>()
                 .add::<CreateDatasetUseCaseImpl>()
-                .add::<DatabaseTransactionRunner>();
+                .add::<DatabaseTransactionRunner>()
+                .add::<DatasetEntryServiceImpl>()
+                .add::<InMemoryDatasetEntryRepository>();
 
             NoOpDatabasePlugin::init_database_components(&mut b);
 

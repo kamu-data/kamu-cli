@@ -34,7 +34,13 @@ use kamu::{
     ObjectStoreRegistryImpl,
     ViewDatasetUseCaseImpl,
 };
-use kamu_accounts::{Account, AccountConfig, JwtAuthenticationConfig, PredefinedAccountsConfig};
+use kamu_accounts::{
+    Account,
+    AccountConfig,
+    JwtAuthenticationConfig,
+    PredefinedAccountsConfig,
+    DEFAULT_ACCOUNT_ID,
+};
 use kamu_accounts_inmem::{InMemoryAccessTokenRepository, InMemoryAccountRepository};
 use kamu_accounts_services::{
     AccessTokenServiceImpl,
@@ -49,6 +55,7 @@ use kamu_datasets_services::{
     CreateDatasetFromSnapshotUseCaseImpl,
     CreateDatasetUseCaseImpl,
     DatasetEntryServiceImpl,
+    DatasetEntryWriter,
     DependencyGraphServiceImpl,
 };
 use messaging_outbox::DummyOutboxImpl;
@@ -107,6 +114,11 @@ impl ServerSideS3Harness {
             }
         };
 
+        let jwt_authentication_config = JwtAuthenticationConfig {
+            jwt_secret: "dummy".to_string(),
+            maybe_dummy_token_account: Some(account.clone()),
+        };
+
         let (base_catalog, listener) = {
             let addr = SocketAddr::from(([127, 0, 0, 1], 0));
             let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
@@ -144,7 +156,7 @@ impl ServerSideS3Harness {
                 .add::<InMemoryAccountRepository>()
                 .add::<AccessTokenServiceImpl>()
                 .add::<InMemoryAccessTokenRepository>()
-                .add_value(JwtAuthenticationConfig::default())
+                .add_value(jwt_authentication_config)
                 .add::<LoginPasswordAuthProvider>()
                 .add::<PredefinedAccountsRegistrator>()
                 .add_value(predefined_accounts_config);
@@ -182,6 +194,15 @@ impl ServerSideS3Harness {
 
 #[async_trait::async_trait]
 impl ServerSideHarness for ServerSideS3Harness {
+    fn server_account_id(&self) -> odf::AccountID {
+        match self.options.tenancy_config {
+            TenancyConfig::MultiTenant => {
+                odf::AccountID::new_seeded_ed25519(SERVER_ACCOUNT_NAME.as_bytes())
+            }
+            TenancyConfig::SingleTenant => DEFAULT_ACCOUNT_ID.clone(),
+        }
+    }
+
     fn operating_account_name(&self) -> Option<odf::AccountName> {
         match self.options.tenancy_config {
             TenancyConfig::MultiTenant => {
@@ -193,38 +214,39 @@ impl ServerSideHarness for ServerSideS3Harness {
 
     fn cli_dataset_registry(&self) -> Arc<dyn DatasetRegistry> {
         let cli_catalog = create_cli_user_catalog(&self.base_catalog, self.options.tenancy_config);
-        cli_catalog.get_one::<dyn DatasetRegistry>().unwrap()
+        cli_catalog.get_one().unwrap()
     }
 
     fn cli_create_dataset_use_case(&self) -> Arc<dyn CreateDatasetUseCase> {
         let cli_catalog = create_cli_user_catalog(&self.base_catalog, self.options.tenancy_config);
-        cli_catalog.get_one::<dyn CreateDatasetUseCase>().unwrap()
+        cli_catalog.get_one().unwrap()
     }
 
     fn cli_create_dataset_from_snapshot_use_case(
         &self,
     ) -> Arc<dyn CreateDatasetFromSnapshotUseCase> {
         let cli_catalog = create_cli_user_catalog(&self.base_catalog, self.options.tenancy_config);
-        cli_catalog
-            .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
-            .unwrap()
+        cli_catalog.get_one().unwrap()
     }
 
     fn cli_commit_dataset_event_use_case(&self) -> Arc<dyn CommitDatasetEventUseCase> {
         let cli_catalog = create_cli_user_catalog(&self.base_catalog, self.options.tenancy_config);
-        cli_catalog
-            .get_one::<dyn CommitDatasetEventUseCase>()
-            .unwrap()
+        cli_catalog.get_one().unwrap()
     }
 
     fn cli_compaction_planner(&self) -> Arc<dyn CompactionPlanner> {
         let cli_catalog = create_cli_user_catalog(&self.base_catalog, self.options.tenancy_config);
-        cli_catalog.get_one::<dyn CompactionPlanner>().unwrap()
+        cli_catalog.get_one().unwrap()
     }
 
     fn cli_compaction_executor(&self) -> Arc<dyn CompactionExecutor> {
         let cli_catalog = create_cli_user_catalog(&self.base_catalog, self.options.tenancy_config);
-        cli_catalog.get_one::<dyn CompactionExecutor>().unwrap()
+        cli_catalog.get_one().unwrap()
+    }
+
+    fn cli_dataset_entry_writer(&self) -> Arc<dyn DatasetEntryWriter> {
+        let cli_catalog = create_cli_user_catalog(&self.base_catalog, self.options.tenancy_config);
+        cli_catalog.get_one().unwrap()
     }
 
     fn dataset_url_with_scheme(&self, dataset_alias: &odf::DatasetAlias, scheme: &str) -> Url {

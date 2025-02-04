@@ -77,6 +77,16 @@ impl<TServerHarness: ServerSideHarness> SmartPushExistingEvolvedDatasetScenario<
         )
         .await;
 
+        server_harness
+            .cli_dataset_entry_writer()
+            .create_entry(
+                &client_create_result.dataset_handle.id,
+                &server_harness.server_account_id(),
+                &client_create_result.dataset_handle.alias.dataset_name,
+            )
+            .await
+            .unwrap();
+
         // Extend client-side dataset with new nodes
         let client_registry = client_harness.dataset_registry();
         let client_dataset_ref = make_dataset_ref(client_account_name.as_ref(), "foo");

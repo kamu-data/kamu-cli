@@ -9,6 +9,8 @@
 
 use random_names::get_random_name;
 
+use crate::Account;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 const ENV_VAR_KAMU_JWT_SECRET: &str = "KAMU_JWT_SECRET";
@@ -18,12 +20,14 @@ const ENV_VAR_KAMU_JWT_SECRET: &str = "KAMU_JWT_SECRET";
 #[derive(Default)]
 pub struct JwtAuthenticationConfig {
     pub jwt_secret: String,
+    pub maybe_dummy_token_account: Option<Account>,
 }
 
 impl JwtAuthenticationConfig {
     pub fn new(maybe_jwt_secret: Option<String>) -> Self {
         Self {
             jwt_secret: maybe_jwt_secret.unwrap_or_else(|| get_random_name(None, 64)),
+            maybe_dummy_token_account: None,
         }
     }
 
