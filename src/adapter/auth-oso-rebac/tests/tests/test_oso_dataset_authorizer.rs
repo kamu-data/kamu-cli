@@ -16,16 +16,22 @@ use kamu_accounts::{
     AccountConfig,
     AnonymousAccountReason,
     CurrentAccountSubject,
+    JwtAuthenticationConfig,
     PredefinedAccountsConfig,
 };
-use kamu_accounts_inmem::InMemoryAccountRepository;
-use kamu_accounts_services::{LoginPasswordAuthProvider, PredefinedAccountsRegistrator};
+use kamu_accounts_inmem::{InMemoryAccessTokenRepository, InMemoryAccountRepository};
+use kamu_accounts_services::{
+    AccessTokenServiceImpl,
+    AuthenticationServiceImpl,
+    LoginPasswordAuthProvider,
+    PredefinedAccountsRegistrator,
+};
 use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer, DatasetActionUnauthorizedError};
 use kamu_core::TenancyConfig;
 use kamu_datasets::{DatasetLifecycleMessage, MESSAGE_PRODUCER_KAMU_DATASET_SERVICE};
 use kamu_datasets_inmem::InMemoryDatasetEntryRepository;
-use kamu_datasets_services::DatasetEntryServiceImpl;
+use kamu_datasets_services::{DatasetEntryServiceImpl, DatasetEntryWriter};
 use messaging_outbox::{
     register_message_dispatcher,
     ConsumerFilter,
@@ -111,6 +117,7 @@ async fn test_guest_can_read_but_not_write_public_dataset() {
 #[allow(dead_code)]
 pub struct DatasetAuthorizerHarness {
     dataset_authorizer: Arc<dyn DatasetActionAuthorizer>,
+    dataset_entry_writer: Arc<dyn DatasetEntryWriter>,
     outbox: Arc<dyn Outbox>,
 }
 
@@ -154,6 +161,10 @@ impl DatasetAuthorizerHarness {
                 .add::<InMemoryDatasetEntryRepository>()
                 .add::<InMemoryAccountRepository>()
                 .add::<LoginPasswordAuthProvider>()
+                .add::<AuthenticationServiceImpl>()
+                .add::<AccessTokenServiceImpl>()
+                .add::<InMemoryAccessTokenRepository>()
+                .add_value(JwtAuthenticationConfig::default())
                 .bind::<dyn Outbox, OutboxImmediateImpl>();
 
             kamu_adapter_auth_oso_rebac::register_dependencies(&mut b);
@@ -179,6 +190,7 @@ impl DatasetAuthorizerHarness {
         Self {
             dataset_authorizer: catalog.get_one().unwrap(),
             outbox: catalog.get_one().unwrap(),
+            dataset_entry_writer: catalog.get_one().unwrap(),
         }
     }
 
@@ -198,13 +210,19 @@ impl DatasetAuthorizerHarness {
         visibility: odf::DatasetVisibility,
     ) -> odf::DatasetID {
         let dataset_id = dataset_id(&alias);
+        let account_id = account_id(&alias);
+
+        self.dataset_entry_writer
+            .create_entry(&dataset_id, &account_id, &alias.dataset_name)
+            .await
+            .unwrap();
 
         self.outbox
             .post_message(
                 MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
                 DatasetLifecycleMessage::created(
                     dataset_id.clone(),
-                    account_id(&alias),
+                    account_id,
                     visibility,
                     alias.dataset_name.clone(),
                 ),
