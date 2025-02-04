@@ -16,11 +16,18 @@ use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use dill::Component;
 use kamu::domain::*;
 use kamu::*;
-use kamu_accounts::CurrentAccountSubject;
+use kamu_accounts::{CurrentAccountSubject, JwtAuthenticationConfig};
+use kamu_accounts_inmem::{InMemoryAccessTokenRepository, InMemoryAccountRepository};
+use kamu_accounts_services::{AccessTokenServiceImpl, AuthenticationServiceImpl};
 use kamu_adapter_http::DatasetAuthorizationLayer;
 use kamu_datasets::CreateDatasetFromSnapshotUseCase;
-use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
-use kamu_datasets_services::{CreateDatasetFromSnapshotUseCaseImpl, DependencyGraphServiceImpl};
+use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEntryRepository};
+use kamu_datasets_services::{
+    CreateDatasetFromSnapshotUseCaseImpl,
+    CreateDatasetUseCaseImpl,
+    DatasetEntryServiceImpl,
+    DependencyGraphServiceImpl,
+};
 use messaging_outbox::DummyOutboxImpl;
 use odf::dataset::{DatasetFactoryImpl, IpfsGateway};
 use odf::metadata::testing::MetadataFactory;
@@ -53,11 +60,18 @@ async fn setup_repo() -> RepoFixture {
         .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
         .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
         .bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
-        .add::<DatasetRegistrySoloUnitBridge>()
         .add_value(CurrentAccountSubject::new_test())
         .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
         .add::<CreateDatasetFromSnapshotUseCaseImpl>()
-        .add::<DatabaseTransactionRunner>();
+        .add::<CreateDatasetUseCaseImpl>()
+        .add::<DatabaseTransactionRunner>()
+        .add::<DatasetEntryServiceImpl>()
+        .add::<InMemoryDatasetEntryRepository>()
+        .add::<AuthenticationServiceImpl>()
+        .add::<InMemoryAccountRepository>()
+        .add::<AccessTokenServiceImpl>()
+        .add::<InMemoryAccessTokenRepository>()
+        .add_value(JwtAuthenticationConfig::default());
 
     NoOpDatabasePlugin::init_database_components(&mut b);
 

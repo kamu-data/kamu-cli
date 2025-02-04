@@ -132,7 +132,10 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
                 .await?;
         }
 
-        Ok(create_dataset_result)
+        Ok(odf::CreateDatasetResult {
+            head: append_result.proposed_head,
+            ..create_dataset_result
+        })
     }
 }
 

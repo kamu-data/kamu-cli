@@ -39,6 +39,7 @@ use kamu_datasets_services::{
     CreateDatasetFromSnapshotUseCaseImpl,
     CreateDatasetUseCaseImpl,
     DatasetEntryServiceImpl,
+    DatasetEntryWriter,
     DatasetKeyValueServiceSysEnv,
     DependencyGraphServiceImpl,
 };
@@ -201,20 +202,19 @@ impl ClientSideHarness {
 
         init_on_startup::run_startup_jobs(&catalog).await.unwrap();
 
-        let pull_dataset_use_case = catalog.get_one::<dyn PullDatasetUseCase>().unwrap();
-        let push_dataset_use_case = catalog.get_one::<dyn PushDatasetUseCase>().unwrap();
-        let access_token_resolver = catalog
-            .get_one::<dyn odf::dataset::OdfServerAccessTokenResolver>()
-            .unwrap();
-
         Self {
             tempdir,
+            pull_dataset_use_case: catalog.get_one().unwrap(),
+            push_dataset_use_case: catalog.get_one().unwrap(),
+            access_token_resolver: catalog.get_one().unwrap(),
             catalog,
-            pull_dataset_use_case,
-            push_dataset_use_case,
-            access_token_resolver,
             options,
         }
+    }
+
+    pub fn client_account_id(&self) -> odf::AccountID {
+        let subject = self.catalog.get_one::<CurrentAccountSubject>().unwrap();
+        subject.account_id().clone()
     }
 
     pub fn operating_account_name(&self) -> Option<odf::AccountName> {
@@ -228,7 +228,7 @@ impl ClientSideHarness {
     }
 
     pub fn dataset_registry(&self) -> Arc<dyn DatasetRegistry> {
-        self.catalog.get_one::<dyn DatasetRegistry>().unwrap()
+        self.catalog.get_one().unwrap()
     }
 
     pub fn create_dataset_from_snapshot(&self) -> Arc<dyn CreateDatasetFromSnapshotUseCase> {
@@ -244,11 +244,15 @@ impl ClientSideHarness {
     }
 
     pub fn compaction_planner(&self) -> Arc<dyn CompactionPlanner> {
-        self.catalog.get_one::<dyn CompactionPlanner>().unwrap()
+        self.catalog.get_one().unwrap()
     }
 
     pub fn compaction_executor(&self) -> Arc<dyn CompactionExecutor> {
-        self.catalog.get_one::<dyn CompactionExecutor>().unwrap()
+        self.catalog.get_one().unwrap()
+    }
+
+    pub fn dataset_entry_writer(&self) -> Arc<dyn DatasetEntryWriter> {
+        self.catalog.get_one().unwrap()
     }
 
     // TODO: accept alias or handle

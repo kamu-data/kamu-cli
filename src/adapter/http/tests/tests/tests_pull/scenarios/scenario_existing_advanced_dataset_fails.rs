@@ -71,6 +71,16 @@ impl<TServerHarness: ServerSideHarness>
         )
         .await;
 
+        client_harness
+            .dataset_entry_writer()
+            .create_entry(
+                &server_create_result.dataset_handle.id,
+                &client_harness.client_account_id(),
+                &server_create_result.dataset_handle.alias.dataset_name,
+            )
+            .await
+            .unwrap();
+
         // Extend client-side dataset with new node
         let client_registry = client_harness.dataset_registry();
         client_registry
