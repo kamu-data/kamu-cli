@@ -10,6 +10,7 @@
 use std::sync::Arc;
 
 use dill::{component, interface};
+use internal_error::ErrorIntoInternal;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_datasets::{
     CreateDatasetUseCase,
@@ -19,7 +20,7 @@ use kamu_datasets::{
 };
 use messaging_outbox::{Outbox, OutboxExt};
 
-use crate::{DatasetEntryWriter, DependencyGraphWriter};
+use crate::{CreateDatasetEntryError, DatasetEntryWriter, DependencyGraphWriter};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -73,7 +74,25 @@ impl CreateDatasetUseCase for CreateDatasetUseCaseImpl {
                 &logged_account_id,
                 &dataset_alias.dataset_name,
             )
-            .await?;
+            .await
+            .map_err(|e| match e {
+                CreateDatasetEntryError::Internal(e) => {
+                    odf::dataset::CreateDatasetError::Internal(e)
+                }
+                CreateDatasetEntryError::DuplicateId(e) => {
+                    odf::dataset::CreateDatasetError::Internal(e.int_err())
+                }
+                CreateDatasetEntryError::NameCollision(e) => {
+                    odf::dataset::CreateDatasetError::NameCollision(
+                        odf::dataset::NameCollisionError {
+                            alias: odf::DatasetAlias::new(
+                                dataset_alias.account_name.clone(),
+                                e.dataset_name,
+                            ),
+                        },
+                    )
+                }
+            })?;
 
         self.dependency_graph_writer
             .create_dataset_node(&seed_block.event.dataset_id)

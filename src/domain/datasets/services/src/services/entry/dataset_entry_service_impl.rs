@@ -31,7 +31,7 @@ use thiserror::Error;
 use time_source::SystemTimeSource;
 use tokio::sync::RwLock;
 
-use super::{DatasetEntryWriter, RenameDatasetEntryError};
+use super::{CreateDatasetEntryError, DatasetEntryWriter, RenameDatasetEntryError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -523,11 +523,13 @@ impl DatasetEntryWriter for DatasetEntryServiceImpl {
         dataset_id: &odf::DatasetID,
         owner_account_id: &odf::AccountID,
         dataset_name: &odf::DatasetName,
-    ) -> Result<(), InternalError> {
+    ) -> Result<(), CreateDatasetEntryError> {
         match self.dataset_entry_repo.get_dataset_entry(dataset_id).await {
             Ok(_) => return Ok(()), // idempotent handling of duplicates
             Err(GetDatasetEntryError::NotFound(_)) => { /* happy case, create record */ }
-            Err(GetDatasetEntryError::Internal(e)) => return Err(e),
+            Err(GetDatasetEntryError::Internal(e)) => {
+                return Err(CreateDatasetEntryError::Internal(e))
+            }
         }
 
         let entry = DatasetEntry::new(
@@ -540,7 +542,13 @@ impl DatasetEntryWriter for DatasetEntryServiceImpl {
         self.dataset_entry_repo
             .save_dataset_entry(&entry)
             .await
-            .int_err()
+            .map_err(|e| match e {
+                SaveDatasetEntryError::Duplicate(e) => CreateDatasetEntryError::DuplicateId(e),
+                SaveDatasetEntryError::NameCollision(e) => {
+                    CreateDatasetEntryError::NameCollision(e)
+                }
+                SaveDatasetEntryError::Internal(e) => CreateDatasetEntryError::Internal(e),
+            })
     }
 
     async fn rename_entry(
