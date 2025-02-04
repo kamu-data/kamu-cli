@@ -18,7 +18,13 @@ use kamu::utils::ipfs_wrapper::IpfsClient;
 use kamu::utils::simple_transfer_protocol::SimpleTransferProtocol;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
-use kamu_datasets_services::CreateDatasetUseCaseImpl;
+use kamu_datasets_services::{
+    CreateDatasetUseCaseImpl,
+    DatasetEntryWriter,
+    DependencyGraphWriter,
+    MockDatasetEntryWriter,
+    MockDependencyGraphWriter,
+};
 use messaging_outbox::DummyOutboxImpl;
 use odf::dataset::testing::create_test_dataset_fron_snapshot;
 use odf::dataset::{DatasetFactoryImpl, IpfsGateway};
@@ -96,7 +102,23 @@ async fn do_test_sync(
         .add::<SimpleTransferProtocol>()
         .add::<CreateDatasetUseCaseImpl>()
         .add::<DummyOutboxImpl>()
+        .add_value(MockDatasetEntryWriter::new())
+        .bind::<dyn DatasetEntryWriter, MockDatasetEntryWriter>()
+        .add_value(MockDependencyGraphWriter::new())
+        .bind::<dyn DependencyGraphWriter, MockDependencyGraphWriter>()
         .build();
+
+    let mut mock_dataset_entry_writer_bar = MockDatasetEntryWriter::new();
+    mock_dataset_entry_writer_bar
+        .expect_create_entry()
+        .times(1)
+        .returning(|_, _, _| Ok(()));
+
+    let mut mock_dependency_graph_writer_bar = MockDependencyGraphWriter::new();
+    mock_dependency_graph_writer_bar
+        .expect_create_dataset_node()
+        .times(1)
+        .returning(|_| Ok(()));
 
     let catalog_bar = dill::CatalogBuilder::new()
         .add::<DidGeneratorDefault>()
@@ -121,6 +143,10 @@ async fn do_test_sync(
         .add::<SimpleTransferProtocol>()
         .add::<CreateDatasetUseCaseImpl>()
         .add::<DummyOutboxImpl>()
+        .add_value(mock_dataset_entry_writer_bar)
+        .bind::<dyn DatasetEntryWriter, MockDatasetEntryWriter>()
+        .add_value(mock_dependency_graph_writer_bar)
+        .bind::<dyn DependencyGraphWriter, MockDependencyGraphWriter>()
         .build();
 
     let sync_svc_foo = catalog_foo.get_one::<dyn SyncService>().unwrap();

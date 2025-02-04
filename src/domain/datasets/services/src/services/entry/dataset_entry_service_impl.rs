@@ -197,18 +197,24 @@ impl DatasetEntryServiceImpl {
                 .authentication_svc
                 .account_by_name(account_name)
                 .await?;
-            let account =
-                maybe_account.unwrap_or_else(|| panic!("Account '{account_name}' unresolved"));
 
-            let mut writable_accounts_cache = self.accounts_cache.write().await;
-            writable_accounts_cache
-                .id2names
-                .insert(account.id.clone(), account_name.clone());
-            writable_accounts_cache
-                .names2ids
-                .insert(account_name.clone(), account.id.clone());
+            if let Some(account) = maybe_account {
+                let mut writable_accounts_cache = self.accounts_cache.write().await;
+                writable_accounts_cache
+                    .id2names
+                    .insert(account.id.clone(), account_name.clone());
+                writable_accounts_cache
+                    .names2ids
+                    .insert(account_name.clone(), account.id.clone());
 
-            Ok(account.id)
+                Ok(account.id)
+            } else {
+                Err(ResolveAccountIdByNameError::NotFound(
+                    AccountNotFoundByNameError {
+                        account_name: account_name.clone(),
+                    },
+                ))
+            }
         }
     }
 
