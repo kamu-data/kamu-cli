@@ -13,68 +13,22 @@ use std::sync::{Arc, RwLock};
 use chrono::{DateTime, TimeZone, Utc};
 use dill::{CatalogBuilder, Component};
 use init_on_startup::InitOnStartup;
-use kamu_accounts::{Account, AccountRepository, CurrentAccountSubject};
+use kamu_accounts::testing::MockAuthenticationService;
+use kamu_accounts::{Account, AccountRepository, AuthenticationService, CurrentAccountSubject};
 use kamu_accounts_inmem::InMemoryAccountRepository;
 use kamu_core::{DatasetRegistry, TenancyConfig};
 use kamu_datasets::{
     DatasetEntry,
-    DatasetEntryNotFoundError,
+    DatasetEntryByNameNotFoundError,
     DatasetEntryRepository,
     DatasetLifecycleMessage,
-    GetDatasetEntryError,
+    GetDatasetEntryByNameError,
     MockDatasetEntryRepository,
     MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
 };
 use kamu_datasets_services::{DatasetEntryIndexer, DatasetEntryServiceImpl};
-use messaging_outbox::{register_message_dispatcher, Outbox, OutboxExt, OutboxImmediateImpl};
-use mockall::predicate::eq;
+use messaging_outbox::{register_message_dispatcher, Outbox, OutboxImmediateImpl};
 use time_source::{FakeSystemTimeSource, SystemTimeSource};
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test(tokio::test)]
-async fn test_correctly_handles_outbox_messages() {
-    let (_, dataset_id) = odf::DatasetID::new_generated_ed25519();
-    let (_, owner_account_id) = odf::AccountID::new_generated_ed25519();
-    let initial_dataset_name = odf::DatasetName::new_unchecked("initial-name");
-    let new_dataset_name = odf::DatasetName::new_unchecked("new-name");
-
-    let mut mock_dataset_entry_repository = MockDatasetEntryRepository::new();
-    DatasetEntryServiceHarness::add_get_dataset_entry_expectation(
-        &mut mock_dataset_entry_repository,
-        dataset_id.clone(),
-    );
-    DatasetEntryServiceHarness::add_save_dataset_entry_expectation(
-        &mut mock_dataset_entry_repository,
-        dataset_id.clone(),
-        owner_account_id.clone(),
-        initial_dataset_name.clone(),
-    );
-    DatasetEntryServiceHarness::add_update_dataset_entry_name_expectation(
-        &mut mock_dataset_entry_repository,
-        dataset_id.clone(),
-        new_dataset_name.clone(),
-    );
-    DatasetEntryServiceHarness::add_delete_dataset_entry_expectation(
-        &mut mock_dataset_entry_repository,
-        dataset_id.clone(),
-    );
-
-    let harness = DatasetEntryServiceHarness::new(
-        mock_dataset_entry_repository,
-        odf::dataset::MockDatasetStorageUnit::new(),
-    );
-
-    harness
-        .mimic_dataset_created(
-            dataset_id.clone(),
-            owner_account_id.clone(),
-            initial_dataset_name.clone(),
-        )
-        .await;
-
-    harness.mimic_dataset_deleted(dataset_id).await;
-}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -120,14 +74,18 @@ async fn test_indexes_datasets_correctly() {
     DatasetEntryServiceHarness::add_dataset_entries_count_expectation(
         &mut mock_dataset_entry_repository,
     );
+
     let dataset_entry_collector = Arc::new(RwLock::new(Vec::new()));
     DatasetEntryServiceHarness::add_save_dataset_entry_expectation_with_state(
         &mut mock_dataset_entry_repository,
         dataset_entry_collector.clone(),
     );
 
-    let harness =
-        DatasetEntryServiceHarness::new(mock_dataset_entry_repository, mock_dataset_repository);
+    let harness = DatasetEntryServiceHarness::new(
+        mock_dataset_entry_repository,
+        mock_dataset_repository,
+        MockAuthenticationService::new(),
+    );
 
     let (_, owner_account_id_1) = odf::AccountID::new_generated_ed25519();
     harness
@@ -181,9 +139,34 @@ async fn test_indexes_datasets_correctly() {
 
 #[test_log::test(tokio::test)]
 async fn test_try_to_resolve_non_existing_dataset() {
+    let mut mock_authentication_service = MockAuthenticationService::new();
+    mock_authentication_service
+        .expect_account_by_name()
+        .times(1)
+        .returning(|_| {
+            Ok(Some(Account::test(
+                odf::AccountID::new_seeded_ed25519("foo".as_bytes()),
+                "foo",
+            )))
+        });
+
+    let mut mock_dataset_entry_repo = MockDatasetEntryRepository::new();
+    mock_dataset_entry_repo
+        .expect_get_dataset_entry_by_owner_and_name()
+        .times(1)
+        .returning(|_, _| {
+            Err(GetDatasetEntryByNameError::NotFound(
+                DatasetEntryByNameNotFoundError {
+                    owner_id: odf::AccountID::new_seeded_ed25519("foo".as_bytes()),
+                    dataset_name: odf::DatasetName::new_unchecked("foo"),
+                },
+            ))
+        });
+
     let harness = DatasetEntryServiceHarness::new(
-        MockDatasetEntryRepository::new(),
+        mock_dataset_entry_repo,
         odf::dataset::MockDatasetStorageUnit::new(),
+        mock_authentication_service,
     );
 
     let dataset_ref = odf::DatasetAlias::new(
@@ -209,9 +192,31 @@ async fn test_try_to_resolve_non_existing_dataset() {
 async fn test_try_to_resolve_all_datasets_for_non_existing_user() {
     use futures::TryStreamExt;
 
+    let mut mock_authentication_service = MockAuthenticationService::new();
+    mock_authentication_service
+        .expect_account_by_name()
+        .times(1)
+        .returning(|_| {
+            Ok(Some(Account::test(
+                odf::AccountID::new_seeded_ed25519("foo".as_bytes()),
+                "foo",
+            )))
+        });
+
+    let mut mock_dataset_entry_repo = MockDatasetEntryRepository::new();
+    mock_dataset_entry_repo
+        .expect_dataset_entries_count_by_owner_id()
+        .times(1)
+        .returning(|_| Ok(0));
+    mock_dataset_entry_repo
+        .expect_get_dataset_entries_by_owner_id()
+        .times(1)
+        .returning(|_, _| Box::pin(futures::stream::empty()));
+
     let harness = DatasetEntryServiceHarness::new(
-        MockDatasetEntryRepository::new(),
+        mock_dataset_entry_repo,
         odf::dataset::MockDatasetStorageUnit::new(),
+        mock_authentication_service,
     );
 
     let resolve_dataset_result = harness
@@ -226,7 +231,6 @@ async fn test_try_to_resolve_all_datasets_for_non_existing_user() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct DatasetEntryServiceHarness {
-    outbox: Arc<dyn Outbox>,
     dataset_entry_indexer: Arc<DatasetEntryIndexer>,
     account_repo: Arc<dyn AccountRepository>,
     dataset_registry: Arc<dyn DatasetRegistry>,
@@ -236,6 +240,7 @@ impl DatasetEntryServiceHarness {
     fn new(
         mock_dataset_entry_repository: MockDatasetEntryRepository,
         mock_dataset_repository: odf::dataset::MockDatasetStorageUnit,
+        mock_authentication_service: MockAuthenticationService,
     ) -> Self {
         let catalog = {
             let mut b = CatalogBuilder::new();
@@ -271,6 +276,9 @@ impl DatasetEntryServiceHarness {
 
             b.add_value(TenancyConfig::SingleTenant);
 
+            b.add_value(mock_authentication_service);
+            b.bind::<dyn AuthenticationService, MockAuthenticationService>();
+
             register_message_dispatcher::<DatasetLifecycleMessage>(
                 &mut b,
                 MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
@@ -280,45 +288,10 @@ impl DatasetEntryServiceHarness {
         };
 
         Self {
-            outbox: catalog.get_one().unwrap(),
             dataset_entry_indexer: catalog.get_one().unwrap(),
             account_repo: catalog.get_one().unwrap(),
             dataset_registry: catalog.get_one().unwrap(),
         }
-    }
-
-    // Outbox: mimic messages
-
-    async fn mimic_dataset_created(
-        &self,
-        dataset_id: odf::DatasetID,
-        owner_account_id: odf::AccountID,
-        dataset_name: odf::DatasetName,
-    ) {
-        let private_visibility = odf::DatasetVisibility::Private;
-
-        self.outbox
-            .post_message(
-                MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
-                DatasetLifecycleMessage::created(
-                    dataset_id,
-                    owner_account_id,
-                    private_visibility,
-                    dataset_name,
-                ),
-            )
-            .await
-            .unwrap();
-    }
-
-    async fn mimic_dataset_deleted(&self, dataset_id: odf::DatasetID) {
-        self.outbox
-            .post_message(
-                MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
-                DatasetLifecycleMessage::deleted(dataset_id),
-            )
-            .await
-            .unwrap();
     }
 
     // Expectation: MockDatasetEntryRepository
@@ -336,64 +309,6 @@ impl DatasetEntryServiceHarness {
 
                 Ok(())
             });
-    }
-
-    fn add_update_dataset_entry_name_expectation(
-        mock_dataset_entry_repository: &mut MockDatasetEntryRepository,
-        dataset_id: odf::DatasetID,
-        new_dataset_name: odf::DatasetName,
-    ) {
-        mock_dataset_entry_repository
-            .expect_update_dataset_entry_name()
-            .with(eq(dataset_id), eq(new_dataset_name))
-            .times(1)
-            .returning(|_, _| Ok(()));
-    }
-
-    fn add_delete_dataset_entry_expectation(
-        mock_dataset_entry_repository: &mut MockDatasetEntryRepository,
-        dataset_id: odf::DatasetID,
-    ) {
-        mock_dataset_entry_repository
-            .expect_delete_dataset_entry()
-            .with(eq(dataset_id))
-            .times(1)
-            .returning(|_| Ok(()));
-    }
-
-    fn add_get_dataset_entry_expectation(
-        mock_dataset_entry_repository: &mut MockDatasetEntryRepository,
-        dataset_id: odf::DatasetID,
-    ) {
-        mock_dataset_entry_repository
-            .expect_get_dataset_entry()
-            .with(eq(dataset_id.clone()))
-            .times(1)
-            .returning(move |_| {
-                Err(GetDatasetEntryError::NotFound(DatasetEntryNotFoundError {
-                    dataset_id: dataset_id.clone(),
-                }))
-            });
-    }
-
-    fn add_save_dataset_entry_expectation(
-        mock_dataset_entry_repository: &mut MockDatasetEntryRepository,
-        dataset_id: odf::DatasetID,
-        owner_account_id: odf::AccountID,
-        dataset_name: odf::DatasetName,
-    ) {
-        let expected_entry = DatasetEntry::new(
-            dataset_id,
-            owner_account_id,
-            dataset_name,
-            frozen_time_point(),
-        );
-
-        mock_dataset_entry_repository
-            .expect_save_dataset_entry()
-            .with(eq(expected_entry))
-            .times(1)
-            .returning(|_| Ok(()));
     }
 
     fn add_dataset_entries_count_expectation(
