@@ -30,7 +30,7 @@ impl DatasetData {
     /// Total number of records in this dataset
     #[tracing::instrument(level = "info", skip_all)]
     async fn num_records_total(&self, ctx: &Context<'_>) -> Result<u64> {
-        let resolved_dataset = get_dataset(ctx, &self.dataset_handle)?;
+        let resolved_dataset = get_dataset(ctx, &self.dataset_handle);
         let summary = resolved_dataset
             .get_summary(odf::dataset::GetSummaryOpts::default())
             .await
@@ -42,7 +42,7 @@ impl DatasetData {
     /// caching
     #[tracing::instrument(level = "info", skip_all)]
     async fn estimated_size(&self, ctx: &Context<'_>) -> Result<u64> {
-        let resolved_dataset = get_dataset(ctx, &self.dataset_handle)?;
+        let resolved_dataset = get_dataset(ctx, &self.dataset_handle);
         let summary = resolved_dataset
             .get_summary(odf::dataset::GetSummaryOpts::default())
             .await

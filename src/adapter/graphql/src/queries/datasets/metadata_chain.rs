@@ -44,7 +44,7 @@ impl MetadataChain {
     /// Returns all named metadata block references
     #[tracing::instrument(level = "info", skip_all)]
     async fn refs(&self, ctx: &Context<'_>) -> Result<Vec<BlockRef>> {
-        let resolved_dataset = get_dataset(ctx, &self.dataset_handle)?;
+        let resolved_dataset = get_dataset(ctx, &self.dataset_handle);
         Ok(vec![BlockRef {
             name: "head".to_owned(),
             block_hash: resolved_dataset
@@ -63,7 +63,7 @@ impl MetadataChain {
         ctx: &Context<'_>,
         hash: Multihash,
     ) -> Result<Option<MetadataBlockExtended>> {
-        let resolved_dataset = get_dataset(ctx, &self.dataset_handle)?;
+        let resolved_dataset = get_dataset(ctx, &self.dataset_handle);
         let block = resolved_dataset
             .as_metadata_chain()
             .try_get_block(&hash)
@@ -85,7 +85,7 @@ impl MetadataChain {
     ) -> Result<Option<String>> {
         use odf::metadata::serde::MetadataBlockSerializer;
 
-        let resolved_dataset = get_dataset(ctx, &self.dataset_handle)?;
+        let resolved_dataset = get_dataset(ctx, &self.dataset_handle);
         match resolved_dataset
             .as_metadata_chain()
             .try_get_block(&hash)
@@ -113,7 +113,7 @@ impl MetadataChain {
         page: Option<usize>,
         per_page: Option<usize>,
     ) -> Result<MetadataBlockConnection> {
-        let resolved_dataset = get_dataset(ctx, &self.dataset_handle)?;
+        let resolved_dataset = get_dataset(ctx, &self.dataset_handle);
 
         let page = page.unwrap_or(0);
         let per_page = per_page.unwrap_or(Self::DEFAULT_BLOCKS_PER_PAGE);

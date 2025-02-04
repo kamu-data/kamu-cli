@@ -124,16 +124,16 @@ impl AuthenticationServiceImpl {
         if access_token == DUMMY_ODF_ACCESS_TOKEN {
             if let Some(dummy_account) = self.maybe_dummy_token_account.as_ref() {
                 return Ok(AccessTokenType::DummyToken(dummy_account.clone()));
-            } else {
-                tracing::error!("Obtained dummy ODF access token unexpectedly");
-                #[derive(Debug, Error)]
-                #[error("Obtained dummy ODF access token unexpectedly")]
-                struct DummyOdfAccessTokenError {}
-
-                return Err(AccessTokenError::Invalid(Box::new(
-                    DummyOdfAccessTokenError {},
-                )));
             }
+
+            tracing::error!("Obtained dummy ODF access token unexpectedly");
+            #[derive(Debug, Error)]
+            #[error("Obtained dummy ODF access token unexpectedly")]
+            struct DummyOdfAccessTokenError {}
+
+            return Err(AccessTokenError::Invalid(Box::new(
+                DummyOdfAccessTokenError {},
+            )));
         }
         if access_token.len() > 2 && &access_token[..2] == ACCESS_TOKEN_PREFIX {
             return KamuAccessToken::decode(access_token)

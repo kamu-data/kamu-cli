@@ -72,7 +72,7 @@ impl DatasetFlowRunsMut {
         //   i.e., root datasets with push sources require input data to arrive
 
         let flow_query_service = from_catalog_n!(ctx, dyn fs::FlowQueryService);
-        let logged_account = utils::get_logged_account(ctx)?;
+        let logged_account = utils::get_logged_account(ctx);
 
         let flow_run_snapshot = match FlowRunConfiguration::try_into_snapshot(
             ctx,

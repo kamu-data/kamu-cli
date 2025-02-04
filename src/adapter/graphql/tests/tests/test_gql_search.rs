@@ -8,13 +8,26 @@
 // by the Apache License, Version 2.0.
 
 use async_graphql::*;
+use database_common::NoOpDatabasePlugin;
 use dill::Component;
 use kamu::*;
-use kamu_accounts::CurrentAccountSubject;
+use kamu_accounts::{CurrentAccountSubject, JwtAuthenticationConfig, PredefinedAccountsConfig};
+use kamu_accounts_inmem::{InMemoryAccessTokenRepository, InMemoryAccountRepository};
+use kamu_accounts_services::{
+    AccessTokenServiceImpl,
+    AuthenticationServiceImpl,
+    LoginPasswordAuthProvider,
+    PredefinedAccountsRegistrator,
+};
 use kamu_core::*;
 use kamu_datasets::CreateDatasetFromSnapshotUseCase;
-use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
-use kamu_datasets_services::{CreateDatasetFromSnapshotUseCaseImpl, DependencyGraphServiceImpl};
+use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEntryRepository};
+use kamu_datasets_services::{
+    CreateDatasetFromSnapshotUseCaseImpl,
+    CreateDatasetUseCaseImpl,
+    DatasetEntryServiceImpl,
+    DependencyGraphServiceImpl,
+};
 use messaging_outbox::DummyOutboxImpl;
 use odf::metadata::testing::MetadataFactory;
 use time_source::SystemTimeSourceDefault;
@@ -27,8 +40,8 @@ async fn test_search_query() {
     let datasets_dir = tempdir.path().join("datasets");
     std::fs::create_dir(&datasets_dir).unwrap();
 
-    let cat = dill::CatalogBuilder::new()
-        .add::<DidGeneratorDefault>()
+    let mut b = dill::CatalogBuilder::new();
+    b.add::<DidGeneratorDefault>()
         .add::<SystemTimeSourceDefault>()
         .add::<DummyOutboxImpl>()
         .add::<DependencyGraphServiceImpl>()
@@ -39,11 +52,26 @@ async fn test_search_query() {
         .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
         .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
         .bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
-        .add::<DatasetRegistrySoloUnitBridge>()
         .add::<CreateDatasetFromSnapshotUseCaseImpl>()
-        .build();
+        .add::<CreateDatasetUseCaseImpl>()
+        .add::<DatasetEntryServiceImpl>()
+        .add::<InMemoryDatasetEntryRepository>()
+        .add::<AuthenticationServiceImpl>()
+        .add::<InMemoryAccountRepository>()
+        .add::<AccessTokenServiceImpl>()
+        .add::<InMemoryAccessTokenRepository>()
+        .add_value(JwtAuthenticationConfig::default())
+        .add_value(PredefinedAccountsConfig::single_tenant())
+        .add::<PredefinedAccountsRegistrator>()
+        .add::<LoginPasswordAuthProvider>();
 
-    let create_dataset_from_snapshot = cat
+    NoOpDatabasePlugin::init_database_components(&mut b);
+
+    let catalog = b.build();
+
+    init_on_startup::run_startup_jobs(&catalog).await.unwrap();
+
+    let create_dataset_from_snapshot = catalog
         .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
         .unwrap();
     create_dataset_from_snapshot
@@ -83,7 +111,7 @@ async fn test_search_query() {
                   }
                 ",
             )
-            .data(cat.clone()),
+            .data(catalog.clone()),
         )
         .await;
     assert!(res.is_ok());
@@ -128,7 +156,7 @@ async fn test_search_query() {
                   }
                 ",
             )
-            .data(cat.clone()),
+            .data(catalog.clone()),
         )
         .await;
     assert!(res.is_ok());
@@ -180,7 +208,7 @@ async fn test_search_query() {
                 }
                 ",
             )
-            .data(cat),
+            .data(catalog),
         )
         .await;
     assert!(res.is_ok());

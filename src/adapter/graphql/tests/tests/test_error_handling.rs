@@ -9,8 +9,9 @@
 
 use dill::Component;
 use indoc::indoc;
-use kamu::{DatasetRegistrySoloUnitBridge, DatasetStorageUnitLocalFs};
+use kamu::{DatasetRegistrySoloUnitBridge, DatasetStorageUnitLocalFs, ViewDatasetUseCaseImpl};
 use kamu_accounts::CurrentAccountSubject;
+use kamu_core::auth::AlwaysHappyDatasetActionAuthorizer;
 use kamu_core::TenancyConfig;
 use time_source::SystemTimeSourceDefault;
 
@@ -71,6 +72,8 @@ async fn test_internal_error() {
         )
         .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
         .add::<DatasetRegistrySoloUnitBridge>()
+        .add::<ViewDatasetUseCaseImpl>()
+        .add::<AlwaysHappyDatasetActionAuthorizer>()
         .build();
 
     let schema = kamu_adapter_graphql::schema_quiet();

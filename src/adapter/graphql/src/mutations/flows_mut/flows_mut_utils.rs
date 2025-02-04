@@ -78,7 +78,7 @@ pub(crate) async fn ensure_expected_dataset_kind(
     let dataset_flow_type: kamu_flow_system::DatasetFlowType = dataset_flow_type.into();
     match dataset_flow_type.dataset_kind_restriction() {
         Some(expected_kind) => {
-            let resolved_dataset = utils::get_dataset(ctx, dataset_handle)?;
+            let resolved_dataset = utils::get_dataset(ctx, dataset_handle);
 
             let dataset_kind = resolved_dataset
                 .get_summary(odf::dataset::GetSummaryOpts::default())

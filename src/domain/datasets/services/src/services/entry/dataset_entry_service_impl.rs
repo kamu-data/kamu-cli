@@ -103,11 +103,18 @@ impl DatasetEntryServiceImpl {
         // Query first seen accounts and fill the table
         if !first_seen_account_ids.is_empty() {
             let account_ids = first_seen_account_ids.into_iter().collect::<Vec<_>>();
+            let num_account_ids = account_ids.len();
+
             let accounts = self
                 .authentication_svc
                 .accounts_by_ids(account_ids)
                 .await
                 .int_err()?;
+
+            assert!(
+                accounts.len() == num_account_ids,
+                "Number of accounts must match number of requested ids"
+            );
 
             let mut writable_accounts_cache = self.accounts_cache.write().await;
             for account in accounts {
