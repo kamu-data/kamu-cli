@@ -6524,8 +6524,6 @@ dependencies = [
  "internal-error",
  "kamu",
  "kamu-accounts",
- "kamu-accounts-inmem",
- "kamu-accounts-services",
  "kamu-core",
  "kamu-datasets",
  "kamu-datasets-inmem",
