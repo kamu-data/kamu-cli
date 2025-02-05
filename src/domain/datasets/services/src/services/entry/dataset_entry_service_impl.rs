@@ -31,7 +31,6 @@ use thiserror::Error;
 use time_source::SystemTimeSource;
 
 use super::{CreateDatasetEntryError, DatasetEntryWriter, RenameDatasetEntryError};
-use crate::DatabaseBackedDataset;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -539,12 +538,9 @@ impl DatasetRegistry for DatasetEntryServiceImpl {
         } else {
             // Note: in future we will be resolving storage repository,
             // but for now we have just a single one
-            let storage_dataset = self
+            let dataset = self
                 .dataset_storage_unit
                 .get_stored_dataset_by_handle(dataset_handle);
-
-            // Wrap storage dataset with database-backed functions
-            let dataset = Arc::new(DatabaseBackedDataset::new(storage_dataset));
 
             writable_cache
                 .datasets

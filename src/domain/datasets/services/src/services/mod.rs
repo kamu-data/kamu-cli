@@ -7,12 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod caching;
 mod entry;
 mod env;
 mod graph;
 
-pub use caching::*;
 pub use entry::*;
 pub use env::*;
 pub use graph::*;
