@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::collections::{HashMap, HashSet};
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
 use database_common::{EntityPageListing, EntityPageStreamer, PaginationOpts};
 use dill::{component, interface};
@@ -29,7 +29,6 @@ use kamu_core::{
 use kamu_datasets::*;
 use thiserror::Error;
 use time_source::SystemTimeSource;
-use tokio::sync::RwLock;
 
 use super::{CreateDatasetEntryError, DatasetEntryWriter, RenameDatasetEntryError};
 
@@ -42,7 +41,15 @@ pub struct DatasetEntryServiceImpl {
     authentication_svc: Arc<dyn AuthenticationService>,
     current_account_subject: Arc<CurrentAccountSubject>,
     tenancy_config: Arc<TenancyConfig>,
-    accounts_cache: Arc<RwLock<AccountsCache>>,
+    cache: Arc<RwLock<Cache>>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Default)]
+struct Cache {
+    accounts: AccountsCache,
+    datasets: DatasetsCache,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -51,6 +58,13 @@ pub struct DatasetEntryServiceImpl {
 struct AccountsCache {
     id2names: HashMap<odf::AccountID, odf::AccountName>,
     names2ids: HashMap<odf::AccountName, odf::AccountID>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Default)]
+struct DatasetsCache {
+    datasets_by_id: HashMap<odf::DatasetID, Arc<dyn odf::Dataset>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -75,7 +89,7 @@ impl DatasetEntryServiceImpl {
             authentication_svc,
             current_account_subject,
             tenancy_config,
-            accounts_cache: Default::default(),
+            cache: Arc::new(RwLock::new(Cache::default())),
         }
     }
 
@@ -85,11 +99,12 @@ impl DatasetEntryServiceImpl {
     ) -> Result<Vec<odf::DatasetHandle>, ListDatasetEntriesError> {
         // Select which accounts haven't been processed yet
         let first_seen_account_ids = {
-            let readable_accounts_cache = self.accounts_cache.read().await;
+            let readable_cache = &self.cache.read().unwrap();
 
             let mut first_seen_account_ids = HashSet::new();
             for entry in &entries {
-                if !readable_accounts_cache
+                if !readable_cache
+                    .accounts
                     .id2names
                     .contains_key(&entry.owner_id)
                 {
@@ -116,12 +131,14 @@ impl DatasetEntryServiceImpl {
                 "Number of accounts must match number of requested ids"
             );
 
-            let mut writable_accounts_cache = self.accounts_cache.write().await;
+            let mut writable_cache = self.cache.write().unwrap();
             for account in accounts {
-                writable_accounts_cache
+                writable_cache
+                    .accounts
                     .id2names
                     .insert(account.id.clone(), account.account_name.clone());
-                writable_accounts_cache
+                writable_cache
+                    .accounts
                     .names2ids
                     .insert(account.account_name, account.id);
             }
@@ -129,10 +146,10 @@ impl DatasetEntryServiceImpl {
 
         // Convert the entries to handles
         let mut handles = Vec::new();
-        let readable_accounts_cache = self.accounts_cache.read().await;
+        let readable_cache = self.cache.read().unwrap();
         for entry in &entries {
             // By now we should now the account name
-            let maybe_owner_name = readable_accounts_cache.id2names.get(&entry.owner_id);
+            let maybe_owner_name = readable_cache.accounts.id2names.get(&entry.owner_id);
             if let Some(owner_name) = maybe_owner_name {
                 // Form DatasetHandle
                 handles.push(odf::DatasetHandle::new(
@@ -152,8 +169,8 @@ impl DatasetEntryServiceImpl {
         account_id: &odf::AccountID,
     ) -> Result<odf::AccountName, InternalError> {
         let maybe_cached_name = {
-            let readable_accounts_cache = self.accounts_cache.read().await;
-            readable_accounts_cache.id2names.get(account_id).cloned()
+            let readable_cache = self.cache.read().unwrap();
+            readable_cache.accounts.id2names.get(account_id).cloned()
         };
 
         if let Some(name) = maybe_cached_name {
@@ -166,11 +183,13 @@ impl DatasetEntryServiceImpl {
                 .int_err()?
                 .expect("Account must exist");
 
-            let mut writable_accounts_cache = self.accounts_cache.write().await;
-            writable_accounts_cache
+            let mut writable_cache = self.cache.write().unwrap();
+            writable_cache
+                .accounts
                 .id2names
                 .insert(account_id.clone(), account.account_name.clone());
-            writable_accounts_cache
+            writable_cache
+                .accounts
                 .names2ids
                 .insert(account.account_name.clone(), account_id.clone());
 
@@ -186,8 +205,8 @@ impl DatasetEntryServiceImpl {
             .unwrap_or_else(|| self.current_account_subject.account_name_or_default());
 
         let maybe_cached_id = {
-            let readable_accounts_cache = self.accounts_cache.read().await;
-            readable_accounts_cache.names2ids.get(account_name).cloned()
+            let readable_cache = self.cache.read().unwrap();
+            readable_cache.accounts.names2ids.get(account_name).cloned()
         };
 
         if let Some(id) = maybe_cached_id {
@@ -199,11 +218,13 @@ impl DatasetEntryServiceImpl {
                 .await?;
 
             if let Some(account) = maybe_account {
-                let mut writable_accounts_cache = self.accounts_cache.write().await;
-                writable_accounts_cache
+                let mut writable_cache = self.cache.write().unwrap();
+                writable_cache
+                    .accounts
                     .id2names
                     .insert(account.id.clone(), account_name.clone());
-                writable_accounts_cache
+                writable_cache
+                    .accounts
                     .names2ids
                     .insert(account_name.clone(), account.id.clone());
 
@@ -507,9 +528,27 @@ impl DatasetRegistry for DatasetEntryServiceImpl {
     // Note: in future we will be resolving storage repository,
     // but for now we have just a single one
     fn get_dataset_by_handle(&self, dataset_handle: &odf::DatasetHandle) -> ResolvedDataset {
-        let dataset = self
-            .dataset_storage_unit
-            .get_stored_dataset_by_handle(dataset_handle);
+        let writable_cache = &mut self.cache.write().unwrap();
+        let dataset = if let Some(dataset) = writable_cache
+            .datasets
+            .datasets_by_id
+            .get(&dataset_handle.id)
+        {
+            dataset.clone()
+        } else {
+            // Note: in future we will be resolving storage repository,
+            // but for now we have just a single one
+            let dataset = self
+                .dataset_storage_unit
+                .get_stored_dataset_by_handle(dataset_handle);
+            writable_cache
+                .datasets
+                .datasets_by_id
+                .insert(dataset_handle.id.clone(), dataset.clone());
+
+            dataset
+        };
+
         ResolvedDataset::new(dataset, dataset_handle.clone())
     }
 }
