@@ -101,7 +101,6 @@ impl Dataset {
         Ok(summary.kind.into())
     }
 
-    // TODO: Private Datasets: tests
     /// Returns the visibility of dataset
     async fn visibility(&self, ctx: &Context<'_>) -> Result<DatasetVisibilityOutput> {
         let rebac_svc = from_catalog_n!(ctx, dyn kamu_auth_rebac::RebacService);
