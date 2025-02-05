@@ -37,6 +37,7 @@ impl KamuAuthOso {
         Self { oso: Arc::new(oso) }
     }
 
+    #[tracing::instrument(level = "debug", skip_all)]
     fn load_oso() -> Result<Oso, OsoError> {
         // TODO: Private Datasets: make a patch for OSO:
         //       - remove extra allocations (check tracing logs)
