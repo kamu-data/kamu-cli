@@ -833,7 +833,6 @@ impl IngestTestHarness {
         )
         .await
         .unwrap()
-        .create_dataset_result
     }
 
     async fn dataset_data_helper(&self, dataset_alias: &odf::DatasetAlias) -> DatasetDataHelper {

@@ -640,7 +640,6 @@ impl From<SetRefError> for SetChainRefError {
 pub struct AppendResult {
     pub existing_head: Option<Multihash>,
     pub proposed_head: Multihash,
-    pub new_upstream_ids: Vec<DatasetID>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

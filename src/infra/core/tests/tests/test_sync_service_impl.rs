@@ -192,7 +192,6 @@ async fn do_test_sync(
     )
     .await
     .unwrap()
-    .create_dataset_result
     .head;
 
     // Initial sync ///////////////////////////////////////////////////////////

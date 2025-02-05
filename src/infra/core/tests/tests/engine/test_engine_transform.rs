@@ -359,8 +359,7 @@ async fn test_transform_common(transform: odf::metadata::Transform, test_retract
         harness.time_source.now(),
     )
     .await
-    .unwrap()
-    .create_dataset_result;
+    .unwrap();
 
     let root_target = ResolvedDataset::from(&root_created);
 
@@ -400,8 +399,7 @@ async fn test_transform_common(transform: odf::metadata::Transform, test_retract
         harness.time_source.now(),
     )
     .await
-    .unwrap()
-    .create_dataset_result;
+    .unwrap();
 
     let deriv_helper = DatasetHelper::new(deriv_created.dataset.clone(), harness.tempdir.path());
     let deriv_data_helper = DatasetDataHelper::new(deriv_created.dataset.clone());
@@ -729,8 +727,7 @@ async fn test_transform_empty_inputs() {
         harness.time_source.now(),
     )
     .await
-    .unwrap()
-    .create_dataset_result;
+    .unwrap();
 
     ///////////////////////////////////////////////////////////////////////////
     // Derivative setup
@@ -760,8 +757,7 @@ async fn test_transform_empty_inputs() {
         harness.time_source.now(),
     )
     .await
-    .unwrap()
-    .create_dataset_result;
+    .unwrap();
 
     // let deriv_helper = DatasetHelper::new(dataset.clone(),
     // harness.tempdir.path()); let deriv_data_helper =

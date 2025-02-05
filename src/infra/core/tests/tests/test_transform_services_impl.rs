@@ -113,7 +113,6 @@ impl TransformTestHarness {
         )
         .await
         .unwrap()
-        .create_dataset_result
         .dataset_handle
     }
 
@@ -140,8 +139,7 @@ impl TransformTestHarness {
             self.system_time_source.now(),
         )
         .await
-        .unwrap()
-        .create_dataset_result;
+        .unwrap();
 
         (create_result, transform)
     }
@@ -716,8 +714,7 @@ async fn test_transform_with_compaction_retry() {
         harness.system_time_source.now(),
     )
     .await
-    .unwrap()
-    .create_dataset_result;
+    .unwrap();
 
     let data_str = indoc!(
         "

@@ -20,7 +20,7 @@ pub async fn create_test_dataset_fron_snapshot(
     mut snapshot: DatasetSnapshot,
     dataset_id: DatasetID,
     system_time: DateTime<Utc>,
-) -> Result<CreateDatasetFromSnapshotResult, CreateDatasetFromSnapshotError> {
+) -> Result<CreateDatasetResult, CreateDatasetFromSnapshotError> {
     // Validate / resolve metadata events from the snapshot
     normalize_and_validate_dataset_snapshot(dataset_handle_resolver, &mut snapshot).await?;
 
@@ -65,12 +65,9 @@ pub async fn create_test_dataset_fron_snapshot(
         .await
         .int_err()?;
 
-    Ok(CreateDatasetFromSnapshotResult {
-        create_dataset_result: CreateDatasetResult {
-            head: append_result.proposed_head,
-            ..create_dataset_result
-        },
-        new_upstream_ids: append_result.new_upstream_ids,
+    Ok(CreateDatasetResult {
+        head: append_result.proposed_head,
+        ..create_dataset_result
     })
 }
 

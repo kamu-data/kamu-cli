@@ -1255,7 +1255,6 @@ impl CompactTestHarness {
         )
         .await
         .unwrap()
-        .create_dataset_result
     }
 
     async fn create_test_root_dataset(&self) -> odf::CreateDatasetResult {

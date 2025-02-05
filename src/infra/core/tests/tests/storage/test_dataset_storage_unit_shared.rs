@@ -143,8 +143,7 @@ pub async fn test_create_and_get_case_insensetive_dataset<
         time_source.now(),
     )
     .await
-    .unwrap()
-    .create_dataset_result;
+    .unwrap();
 
     // Assert dataset_name eq to new alias and account_name eq to old existing one
     assert_eq!(
@@ -229,8 +228,7 @@ pub async fn test_create_dataset_same_name_multiple_tenants<
         time_source.now(),
     )
     .await
-    .unwrap()
-    .create_dataset_result;
+    .unwrap();
 
     let create_result_her = create_test_dataset_fron_snapshot(
         &dataset_registry,
@@ -240,8 +238,7 @@ pub async fn test_create_dataset_same_name_multiple_tenants<
         time_source.now(),
     )
     .await
-    .unwrap()
-    .create_dataset_result;
+    .unwrap();
 
     assert_eq!(create_result_her.dataset_handle.alias, dataset_alias_her);
     assert_eq!(create_result_my.dataset_handle.alias, dataset_alias_my);
@@ -324,8 +321,7 @@ pub async fn test_create_dataset_from_snapshot<
         time_source.now(),
     )
     .await
-    .unwrap()
-    .create_dataset_result;
+    .unwrap();
 
     let hdl = storage_unit
         .resolve_stored_dataset_handle_by_ref(&create_result.dataset_handle.into())
@@ -414,19 +410,13 @@ pub async fn test_rename_dataset<
 
     assert_matches!(
         storage_unit
-            .rename_dataset(
-                &create_result_foo.create_dataset_result.dataset_handle,
-                &alias_bar.dataset_name
-            )
+            .rename_dataset(&create_result_foo.dataset_handle, &alias_bar.dataset_name)
             .await,
         Err(odf::dataset::RenameDatasetError::NameCollision(_))
     );
 
     storage_unit
-        .rename_dataset(
-            &create_result_foo.create_dataset_result.dataset_handle,
-            &alias_baz.dataset_name,
-        )
+        .rename_dataset(&create_result_foo.dataset_handle, &alias_baz.dataset_name)
         .await
         .unwrap();
 
@@ -480,8 +470,7 @@ pub async fn test_rename_dataset_same_name_multiple_tenants<
         time_source.now(),
     )
     .await
-    .unwrap()
-    .create_dataset_result;
+    .unwrap();
 
     let create_result_her_bar = create_test_dataset_fron_snapshot(
         &dataset_registry,
@@ -495,8 +484,7 @@ pub async fn test_rename_dataset_same_name_multiple_tenants<
         time_source.now(),
     )
     .await
-    .unwrap()
-    .create_dataset_result;
+    .unwrap();
 
     let create_result_my_baz = create_test_dataset_fron_snapshot(
         &dataset_registry,
@@ -510,8 +498,7 @@ pub async fn test_rename_dataset_same_name_multiple_tenants<
         time_source.now(),
     )
     .await
-    .unwrap()
-    .create_dataset_result;
+    .unwrap();
 
     storage_unit
         .rename_dataset(
@@ -590,8 +577,7 @@ pub async fn test_delete_dataset<
         time_source.now(),
     )
     .await
-    .unwrap()
-    .create_dataset_result;
+    .unwrap();
 
     assert!(storage_unit
         .resolve_stored_dataset_handle_by_ref(&alias_foo.as_local_ref())

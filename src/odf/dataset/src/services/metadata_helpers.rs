@@ -43,19 +43,8 @@ pub async fn append_metadata_to_dataset(
     let chain = dataset.as_metadata_chain();
     let mut head = current_head.clone();
     let mut sequence_number = 1;
-    let mut new_upstream_ids: Vec<DatasetID> = vec![];
 
     for event in metadata {
-        if let MetadataEvent::SetTransform(transform) = &event {
-            // Collect only the latest upstream dataset IDs
-            new_upstream_ids.clear();
-            for new_input in &transform.inputs {
-                // Note: We already resolved all references to IDs above in
-                // `resolve_transform_inputs`
-                new_upstream_ids.push(new_input.dataset_ref.id().cloned().unwrap());
-            }
-        }
-
         head = chain
             .append(
                 MetadataBlock {
@@ -77,7 +66,6 @@ pub async fn append_metadata_to_dataset(
     Ok(AppendResult {
         existing_head: Some(current_head.clone()),
         proposed_head: head,
-        new_upstream_ids,
     })
 }
 

@@ -130,7 +130,6 @@ impl Default for CommitOpts<'_> {
 pub struct CommitResult {
     pub old_head: Option<Multihash>,
     pub new_head: Multihash,
-    pub new_upstream_ids: Vec<DatasetID>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

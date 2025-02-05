@@ -119,7 +119,7 @@ impl BaseRepoHarness {
             .push_event(MetadataFactory::set_polling_source().build())
             .build();
 
-        let result = create_test_dataset_fron_snapshot(
+        create_test_dataset_fron_snapshot(
             self.dataset_registry.as_ref(),
             self.dataset_storage_unit_writer.as_ref(),
             snapshot,
@@ -127,9 +127,7 @@ impl BaseRepoHarness {
             self.system_time_source.now(),
         )
         .await
-        .unwrap();
-
-        result.create_dataset_result
+        .unwrap()
     }
 
     pub async fn create_derived_dataset(
@@ -137,7 +135,7 @@ impl BaseRepoHarness {
         alias: &odf::DatasetAlias,
         input_dataset_refs: Vec<odf::DatasetRef>,
     ) -> odf::CreateDatasetResult {
-        let result = create_test_dataset_fron_snapshot(
+        create_test_dataset_fron_snapshot(
             self.dataset_registry.as_ref(),
             self.dataset_storage_unit_writer.as_ref(),
             MetadataFactory::dataset_snapshot()
@@ -153,9 +151,7 @@ impl BaseRepoHarness {
             self.system_time_source.now(),
         )
         .await
-        .unwrap();
-
-        result.create_dataset_result
+        .unwrap()
     }
 
     pub async fn num_blocks(&self, target: ResolvedDataset) -> usize {

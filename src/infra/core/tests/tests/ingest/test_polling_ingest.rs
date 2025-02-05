@@ -1285,7 +1285,6 @@ impl IngestTestHarness {
         )
         .await
         .unwrap()
-        .create_dataset_result
     }
 
     async fn ingest(

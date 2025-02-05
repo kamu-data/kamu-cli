@@ -437,21 +437,6 @@ where
             0
         };
 
-        let mut new_upstream_ids: Vec<DatasetID> = vec![];
-        if opts.update_block_ref
-            && let MetadataEvent::SetTransform(transform) = &event
-        {
-            for new_input in &transform.inputs {
-                if let Some(id) = new_input.dataset_ref.id() {
-                    new_upstream_ids.push(id.clone());
-                } else {
-                    // Normally all references must be resolved to IDs already.
-                    // We continue here while expecting MetadataChain to reject
-                    // this event.
-                }
-            }
-        }
-
         let block = MetadataBlock {
             prev_block_hash: prev_block_hash.clone(),
             sequence_number,
@@ -478,7 +463,6 @@ where
         Ok(CommitResult {
             old_head: prev_block_hash,
             new_head,
-            new_upstream_ids,
         })
     }
 

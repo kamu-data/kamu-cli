@@ -132,8 +132,7 @@ async fn test_engine_io_common<
         time_source.now(),
     )
     .await
-    .unwrap()
-    .create_dataset_result;
+    .unwrap();
 
     let root_target = ResolvedDataset::from(&root_created);
 
@@ -175,8 +174,7 @@ async fn test_engine_io_common<
         time_source.now(),
     )
     .await
-    .unwrap()
-    .create_dataset_result;
+    .unwrap();
 
     let block_hash = match transform_helper.transform_dataset(&deriv_created).await {
         TransformResult::Updated { new_head, .. } => new_head,
