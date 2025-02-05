@@ -8,25 +8,21 @@
 // by the Apache License, Version 2.0.
 
 use std::collections::VecDeque;
-use std::sync::Arc;
 
 use dill::{component, interface};
-use internal_error::ResultIntoInternal;
 use kamu_core::AppendDatasetMetadataBatchUseCase;
-use kamu_datasets::{DatasetLifecycleMessage, MESSAGE_PRODUCER_KAMU_DATASET_SERVICE};
-use messaging_outbox::{Outbox, OutboxExt};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct AppendDatasetMetadataBatchUseCaseImpl {
-    outbox: Arc<dyn Outbox>,
+    // TODO
 }
 
 #[component(pub)]
 #[interface(dyn AppendDatasetMetadataBatchUseCase)]
 impl AppendDatasetMetadataBatchUseCaseImpl {
-    pub fn new(outbox: Arc<dyn Outbox>) -> Self {
-        Self { outbox }
+    pub fn new() -> Self {
+        Self {}
     }
 }
 
@@ -53,24 +49,8 @@ impl AppendDatasetMetadataBatchUseCase for AppendDatasetMetadataBatchUseCaseImpl
 
         let metadata_chain = dataset.as_metadata_chain();
 
-        let mut new_upstream_ids: Vec<odf::DatasetID> = vec![];
-
         for (hash, block) in new_blocks {
             tracing::debug!(sequence_numer = %block.sequence_number, hash = %hash, "Appending block");
-
-            if let odf::MetadataEvent::SetTransform(transform) = &block.event {
-                // Collect only the latest upstream dataset IDs
-                new_upstream_ids.clear();
-                for new_input in &transform.inputs {
-                    if let Some(id) = new_input.dataset_ref.id() {
-                        new_upstream_ids.push(id.clone());
-                    } else {
-                        // Input references must be resolved to IDs here, but we
-                        // ignore the errors and let the metadata chain reject
-                        // this event
-                    }
-                }
-            }
 
             metadata_chain
                 .append(
@@ -98,23 +78,6 @@ impl AppendDatasetMetadataBatchUseCase for AppendDatasetMetadataBatchUseCaseImpl
                 },
             )
             .await?;
-
-        if !new_upstream_ids.is_empty() {
-            let summary = dataset
-                .get_summary(odf::dataset::GetSummaryOpts::default())
-                .await
-                .int_err()?;
-
-            self.outbox
-                .post_message(
-                    MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
-                    DatasetLifecycleMessage::dependencies_updated(
-                        summary.id.clone(),
-                        new_upstream_ids,
-                    ),
-                )
-                .await?;
-        }
 
         Ok(())
     }

@@ -13,8 +13,6 @@ use dill::{component, interface};
 use internal_error::ErrorIntoInternal;
 use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer};
 use kamu_core::{CommitDatasetEventUseCase, DatasetRegistry, ViewMultiResponse};
-use kamu_datasets::{DatasetLifecycleMessage, MESSAGE_PRODUCER_KAMU_DATASET_SERVICE};
-use messaging_outbox::{Outbox, OutboxExt};
 use odf::dataset::{AppendError, InvalidEventError};
 use odf::metadata::EnumWithVariants;
 
@@ -27,19 +25,16 @@ use crate::utils::access_dataset_helper::{AccessDatasetHelper, DatasetAccessErro
 pub struct CommitDatasetEventUseCaseImpl {
     dataset_registry: Arc<dyn DatasetRegistry>,
     dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
-    outbox: Arc<dyn Outbox>,
 }
 
 impl CommitDatasetEventUseCaseImpl {
     pub fn new(
         dataset_registry: Arc<dyn DatasetRegistry>,
         dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
-        outbox: Arc<dyn Outbox>,
     ) -> Self {
         Self {
             dataset_registry,
             dataset_action_authorizer,
-            outbox,
         }
     }
 
@@ -109,18 +104,6 @@ impl CommitDatasetEventUseCase for CommitDatasetEventUseCaseImpl {
         let resolved_dataset = self.dataset_registry.get_dataset_by_handle(dataset_handle);
 
         let commit_result = resolved_dataset.commit_event(event, opts).await?;
-
-        if !commit_result.new_upstream_ids.is_empty() {
-            self.outbox
-                .post_message(
-                    MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
-                    DatasetLifecycleMessage::dependencies_updated(
-                        dataset_handle.id.clone(),
-                        commit_result.new_upstream_ids.clone(),
-                    ),
-                )
-                .await?;
-        }
 
         Ok(commit_result)
     }

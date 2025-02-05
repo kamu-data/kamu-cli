@@ -12,15 +12,9 @@ use std::collections::VecDeque;
 use std::sync::Arc;
 
 use chrono::Utc;
-use kamu::testing::{
-    expect_outbox_dataset_dependencies_updated,
-    BaseRepoHarness,
-    BaseUseCaseHarness,
-    BaseUseCaseHarnessOptions,
-};
+use kamu::testing::{BaseRepoHarness, BaseUseCaseHarness, BaseUseCaseHarnessOptions};
 use kamu::AppendDatasetMetadataBatchUseCaseImpl;
 use kamu_core::AppendDatasetMetadataBatchUseCase;
-use messaging_outbox::MockOutbox;
 use odf::metadata::testing::MetadataFactory;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -29,9 +23,7 @@ use odf::metadata::testing::MetadataFactory;
 async fn test_append_dataset_metadata_batch() {
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
 
-    let mock_outbox = MockOutbox::new();
-
-    let harness = AppendDatasetMetadataBatchUseCaseHarness::new(mock_outbox);
+    let harness = AppendDatasetMetadataBatchUseCaseHarness::new();
     let foo = harness.create_root_dataset(&alias_foo).await;
 
     let set_info_block = odf::MetadataBlock {
@@ -69,10 +61,7 @@ async fn test_append_dataset_metadata_batch_with_new_dependencies() {
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
 
-    let mut mock_outbox = MockOutbox::new();
-    expect_outbox_dataset_dependencies_updated(&mut mock_outbox, 1);
-
-    let harness = AppendDatasetMetadataBatchUseCaseHarness::new(mock_outbox);
+    let harness = AppendDatasetMetadataBatchUseCaseHarness::new();
     let foo = harness.create_root_dataset(&alias_foo).await;
     let bar = harness
         .create_derived_dataset(&alias_bar, vec![foo.dataset_handle.as_local_ref()])
@@ -108,9 +97,8 @@ struct AppendDatasetMetadataBatchUseCaseHarness {
 }
 
 impl AppendDatasetMetadataBatchUseCaseHarness {
-    fn new(mock_outbox: MockOutbox) -> Self {
-        let base_harness =
-            BaseUseCaseHarness::new(BaseUseCaseHarnessOptions::new().with_outbox(mock_outbox));
+    fn new() -> Self {
+        let base_harness = BaseUseCaseHarness::new(BaseUseCaseHarnessOptions::new());
 
         let catalog = dill::CatalogBuilder::new_chained(base_harness.catalog())
             .add::<AppendDatasetMetadataBatchUseCaseImpl>()

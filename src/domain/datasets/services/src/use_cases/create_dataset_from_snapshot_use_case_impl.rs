@@ -16,10 +16,7 @@ use kamu_datasets::{
     CreateDatasetFromSnapshotUseCase,
     CreateDatasetUseCase,
     CreateDatasetUseCaseOptions,
-    DatasetLifecycleMessage,
-    MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
 };
-use messaging_outbox::{Outbox, OutboxExt};
 use time_source::SystemTimeSource;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -32,7 +29,6 @@ pub struct CreateDatasetFromSnapshotUseCaseImpl {
     did_generator: Arc<dyn DidGenerator>,
     dataset_registry: Arc<dyn DatasetRegistry>,
     dataset_storage_unit_writer: Arc<dyn odf::DatasetStorageUnitWriter>,
-    outbox: Arc<dyn Outbox>,
 }
 
 impl CreateDatasetFromSnapshotUseCaseImpl {
@@ -42,7 +38,6 @@ impl CreateDatasetFromSnapshotUseCaseImpl {
         did_generator: Arc<dyn DidGenerator>,
         dataset_registry: Arc<dyn DatasetRegistry>,
         dataset_storage_unit_writer: Arc<dyn odf::DatasetStorageUnitWriter>,
-        outbox: Arc<dyn Outbox>,
     ) -> Self {
         Self {
             create_dataset_use_case,
@@ -50,7 +45,6 @@ impl CreateDatasetFromSnapshotUseCaseImpl {
             did_generator,
             dataset_registry,
             dataset_storage_unit_writer,
-            outbox,
         }
     }
 }
@@ -118,19 +112,6 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
             )
             .await
             .int_err()?;
-
-        // Notify of dependencies
-        if !append_result.new_upstream_ids.is_empty() {
-            self.outbox
-                .post_message(
-                    MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
-                    DatasetLifecycleMessage::dependencies_updated(
-                        create_dataset_result.dataset_handle.id.clone(),
-                        append_result.new_upstream_ids,
-                    ),
-                )
-                .await?;
-        }
 
         Ok(odf::CreateDatasetResult {
             head: append_result.proposed_head,

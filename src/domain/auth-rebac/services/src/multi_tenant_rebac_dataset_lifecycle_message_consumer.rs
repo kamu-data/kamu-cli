@@ -107,11 +107,6 @@ impl MessageConsumerT<DatasetLifecycleMessage> for MultiTenantRebacDatasetLifecy
             DatasetLifecycleMessage::Deleted(message) => {
                 self.handle_dataset_lifecycle_deleted_message(message).await
             }
-
-            DatasetLifecycleMessage::DependenciesUpdated(_) => {
-                // No action required
-                Ok(())
-            }
         }
     }
 }

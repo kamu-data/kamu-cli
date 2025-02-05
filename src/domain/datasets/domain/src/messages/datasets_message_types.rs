@@ -19,7 +19,6 @@ const DATASET_LIFECYCLE_OUTBOX_VERSION: u32 = 1;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum DatasetLifecycleMessage {
     Created(DatasetLifecycleMessageCreated),
-    DependenciesUpdated(DatasetLifecycleMessageDependenciesUpdated),
     Deleted(DatasetLifecycleMessageDeleted),
 }
 
@@ -35,16 +34,6 @@ impl DatasetLifecycleMessage {
             owner_account_id,
             dataset_visibility,
             dataset_name,
-        })
-    }
-
-    pub fn dependencies_updated(
-        dataset_id: odf::DatasetID,
-        new_upstream_ids: Vec<odf::DatasetID>,
-    ) -> Self {
-        Self::DependenciesUpdated(DatasetLifecycleMessageDependenciesUpdated {
-            dataset_id,
-            new_upstream_ids,
         })
     }
 
@@ -73,26 +62,8 @@ pub struct DatasetLifecycleMessageCreated {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct DatasetLifecycleMessageDependenciesUpdated {
-    pub dataset_id: odf::DatasetID,
-    pub new_upstream_ids: Vec<odf::DatasetID>,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DatasetLifecycleMessageDeleted {
     pub dataset_id: odf::DatasetID,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct DatasetLifecycleMessageRenamed {
-    pub dataset_id: odf::DatasetID,
-    pub owner_account_id: odf::AccountID,
-    pub old_dataset_name: odf::DatasetName,
-    pub new_dataset_name: odf::DatasetName,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

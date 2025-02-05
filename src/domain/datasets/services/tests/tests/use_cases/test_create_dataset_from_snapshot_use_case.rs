@@ -10,12 +10,7 @@
 use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
-use kamu::testing::{
-    expect_outbox_dataset_created,
-    expect_outbox_dataset_dependencies_updated,
-    BaseUseCaseHarness,
-    BaseUseCaseHarnessOptions,
-};
+use kamu::testing::{expect_outbox_dataset_created, BaseUseCaseHarness, BaseUseCaseHarnessOptions};
 use kamu_datasets::CreateDatasetFromSnapshotUseCase;
 use kamu_datasets_services::{
     CreateDatasetFromSnapshotUseCaseImpl,
@@ -97,10 +92,8 @@ async fn test_create_derived_dataset_from_snapshot() {
         .returning(|_| Ok(()));
 
     // Expect DatasetCreated messages for "foo" and "bar"
-    // Expect DatasetDependenciesUpdated message for "bar"
     let mut mock_outbox = MockOutbox::new();
     expect_outbox_dataset_created(&mut mock_outbox, 2);
-    expect_outbox_dataset_dependencies_updated(&mut mock_outbox, 1);
 
     let harness = CreateFromSnapshotUseCaseHarness::new(
         mock_dataset_entry_writer,

@@ -386,8 +386,7 @@ impl MessageConsumerT<DatasetLifecycleMessage> for FlowTriggerServiceImpl {
                 }
             }
 
-            DatasetLifecycleMessage::Created(_)
-            | DatasetLifecycleMessage::DependenciesUpdated(_) => {
+            DatasetLifecycleMessage::Created(_) => {
                 // no action required
             }
         }

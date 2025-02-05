@@ -20,24 +20,12 @@ use kamu_core::{
     DependencyOrder,
     GetDependenciesError,
 };
-use kamu_datasets::{
-    DatasetDependencies,
-    DatasetDependencyRepository,
-    DatasetLifecycleMessage,
-    MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
-};
-use messaging_outbox::{
-    MessageConsumer,
-    MessageConsumerMeta,
-    MessageConsumerT,
-    MessageDeliveryMechanism,
-};
+use kamu_datasets::{DatasetDependencies, DatasetDependencyRepository};
 use petgraph::stable_graph::{NodeIndex, StableDiGraph};
 use petgraph::visit::{depth_first_search, Bfs, DfsEvent, Reversed};
 use petgraph::Direction;
 
 use super::DependencyGraphWriter;
-use crate::MESSAGE_CONSUMER_KAMU_DEPENDENCY_GRAPH_SERVICE;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -85,13 +73,6 @@ impl State {
 #[component(pub)]
 #[interface(dyn DependencyGraphService)]
 #[interface(dyn DependencyGraphWriter)]
-#[interface(dyn MessageConsumer)]
-#[interface(dyn MessageConsumerT<DatasetLifecycleMessage>)]
-#[meta(MessageConsumerMeta {
-    consumer_name: MESSAGE_CONSUMER_KAMU_DEPENDENCY_GRAPH_SERVICE,
-    feeding_producers: &[MESSAGE_PRODUCER_KAMU_DATASET_SERVICE],
-    delivery: MessageDeliveryMechanism::Immediate,
- })]
 #[scope(Singleton)]
 impl DependencyGraphServiceImpl {
     pub fn new() -> Self {
@@ -461,45 +442,6 @@ impl DependencyGraphWriter for DependencyGraphServiceImpl {
 
         for added_id in added_dependencies {
             self.add_dependency(&mut state, added_id, dataset_id);
-        }
-
-        Ok(())
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-impl MessageConsumer for DependencyGraphServiceImpl {}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[async_trait::async_trait]
-impl MessageConsumerT<DatasetLifecycleMessage> for DependencyGraphServiceImpl {
-    #[tracing::instrument(
-        level = "debug",
-        skip_all,
-        name = "DependencyGraphServiceImpl[DatasetLifecycleMessage]"
-    )]
-    async fn consume_message(
-        &self,
-        catalog: &Catalog,
-        message: &DatasetLifecycleMessage,
-    ) -> Result<(), InternalError> {
-        tracing::debug!(received_message = ?message, "Received dataset lifecycle message");
-
-        match message {
-            DatasetLifecycleMessage::Created(_) | DatasetLifecycleMessage::Deleted(_) => {
-                // Nothing to do
-            }
-
-            DatasetLifecycleMessage::DependenciesUpdated(message) => {
-                self.update_dataset_node_dependencies(
-                    catalog,
-                    &message.dataset_id,
-                    message.new_upstream_ids.clone(),
-                )
-                .await?;
-            }
         }
 
         Ok(())

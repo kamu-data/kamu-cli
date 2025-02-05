@@ -10,15 +10,9 @@
 use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
-use kamu::testing::{
-    expect_outbox_dataset_dependencies_updated,
-    BaseUseCaseHarness,
-    BaseUseCaseHarnessOptions,
-    MockDatasetActionAuthorizer,
-};
+use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions, MockDatasetActionAuthorizer};
 use kamu::CommitDatasetEventUseCaseImpl;
 use kamu_core::{CommitDatasetEventUseCase, MockDidGenerator};
-use messaging_outbox::MockOutbox;
 use odf::metadata::testing::MetadataFactory;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -31,11 +25,8 @@ async fn test_commit_dataset_event() {
     let mock_authorizer =
         MockDatasetActionAuthorizer::new().expect_check_write_dataset(&dataset_id_foo, 1, true);
 
-    let mock_outbox = MockOutbox::new();
-
     let harness = CommitDatasetEventUseCaseHarness::new(
         mock_authorizer,
-        mock_outbox,
         MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo]),
     );
     let foo = harness.create_root_dataset(&alias_foo).await;
@@ -61,11 +52,8 @@ async fn test_commit_event_unauthorized() {
     let mock_authorizer =
         MockDatasetActionAuthorizer::new().expect_check_write_dataset(&dataset_id_foo, 1, false);
 
-    let mock_outbox = MockOutbox::new();
-
     let harness = CommitDatasetEventUseCaseHarness::new(
         mock_authorizer,
-        mock_outbox,
         MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo]),
     );
     let foo = harness.create_root_dataset(&alias_foo).await;
@@ -93,14 +81,12 @@ async fn test_commit_event_with_new_dependencies() {
     let mock_authorizer = MockDatasetActionAuthorizer::new()
         .expect_check_write_dataset(&dataset_id_bar, 1, true)
         .expect_check_read_dataset(&dataset_id_foo, 1, true);
-    let mut mock_outbox = MockOutbox::new();
-    expect_outbox_dataset_dependencies_updated(&mut mock_outbox, 1);
 
     let harness = CommitDatasetEventUseCaseHarness::new(
         mock_authorizer,
-        mock_outbox,
         MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo, dataset_id_bar]),
     );
+
     let foo = harness.create_root_dataset(&alias_foo).await;
     let bar = harness
         .create_derived_dataset(&alias_bar, vec![foo.dataset_handle.as_local_ref()])
@@ -135,13 +121,11 @@ struct CommitDatasetEventUseCaseHarness {
 impl CommitDatasetEventUseCaseHarness {
     fn new(
         mock_dataset_action_authorizer: MockDatasetActionAuthorizer,
-        mock_outbox: MockOutbox,
         mock_did_generator: MockDidGenerator,
     ) -> Self {
         let base_harness = BaseUseCaseHarness::new(
             BaseUseCaseHarnessOptions::new()
                 .with_authorizer(mock_dataset_action_authorizer)
-                .with_outbox(mock_outbox)
                 .with_maybe_mock_did_generator(Some(mock_did_generator)),
         );
 
