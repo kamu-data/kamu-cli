@@ -70,8 +70,10 @@ pub(crate) struct BaseUseCaseHarness {
 
 impl BaseUseCaseHarness {
     pub(crate) fn new(options: BaseUseCaseHarnessOptions) -> Self {
-        let base_repo_harness =
-            BaseRepoHarness::new(options.tenancy_config, options.maybe_mock_did_generator);
+        let base_repo_harness = BaseRepoHarness::builder()
+            .tenancy_config(options.tenancy_config)
+            .maybe_mock_did_generator(options.maybe_mock_did_generator)
+            .build();
 
         let catalog = dill::CatalogBuilder::new_chained(base_repo_harness.catalog())
             .add_value(options.mock_dataset_action_authorizer)

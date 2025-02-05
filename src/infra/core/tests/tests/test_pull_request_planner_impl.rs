@@ -665,7 +665,9 @@ struct PullTestHarness {
 
 impl PullTestHarness {
     fn new(tenancy_config: TenancyConfig) -> Self {
-        let base_repo_harness = BaseRepoHarness::new(tenancy_config, None);
+        let base_repo_harness = BaseRepoHarness::builder()
+            .tenancy_config(tenancy_config)
+            .build();
 
         let calls = Arc::new(Mutex::new(Vec::new()));
 

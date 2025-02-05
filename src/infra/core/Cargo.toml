@@ -29,6 +29,7 @@ ingest-ftp = ["dep:curl", "dep:curl-sys"]
 ingest-mqtt = ["dep:rumqttc"]
 query-extensions-json = ["dep:datafusion-functions-json"]
 testing = [
+    "dep:bon",
     "dep:mockall",
     "kamu-core/testing",
     "odf/testing",
@@ -131,6 +132,7 @@ alloy = { optional = true, version = "0.9", default-features = false, features =
     "provider-http",
     "provider-ws",
 ] }
+bon = { optional = true, version = "3", default-features = false }
 # TODO: Using curl brings a lot of overhead including compiling and linking openssl
 # We should replace it with reqwest + a separate FTP client or drop FTP support in favor of container-based ingest.
 curl = { optional = true, version = "0.4", features = [
@@ -158,6 +160,7 @@ kamu-datasets-inmem = { workspace = true }
 odf = { workspace = true, features = ["testing"] }
 test-utils = { workspace = true }
 
+bon = { version = "3", default-features = false }
 criterion = { version = "0.5", features = ["async_tokio"] }
 datafusion = { version = "44", default-features = false, features = [
     "parquet",
