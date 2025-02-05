@@ -38,7 +38,6 @@ testing = [
 
 [dependencies]
 # Kamu
-async-utils = { workspace = true }
 container-runtime = { workspace = true }
 file-utils = { workspace = true }
 init-on-startup = { workspace = true }
@@ -48,7 +47,10 @@ kamu-core = { workspace = true }
 kamu-datasets = { workspace = true }
 kamu-ingest-datafusion = { workspace = true }
 messaging-outbox = { workspace = true }
-odf = { workspace = true }
+odf = { workspace = true, default-features = false, features = [
+    "lfs",
+    "s3"
+] }
 random-names = { workspace = true }
 s3-utils = { workspace = true }
 time-source = { workspace = true }
@@ -77,16 +79,11 @@ zip = "2"
 
 # Data
 datafusion = { version = "44", default-features = false }
-digest = "0.10"
 object_store = { version = "0.11", features = ["aws"] }
 sha3 = "0.10"
 
 # Repositories
-aws-config = { version = "1" }
-aws-sdk-s3 = { version = "1" }
-aws-smithy-types = { version = "1" }
 aws-credential-types = { version = "1" }
-hickory-resolver = "0.24"                # TODO: Needed for DNSLink resolution with IPFS
 http = "1"
 
 # Utils
@@ -101,9 +98,6 @@ dill = "0.11"
 futures = "0.3"
 glob = "0.3" # Used for glob fetch
 itertools = "0.14"
-libc = "0.2" # Signal names
-like = { version = "0.3", default-features = false }
-pin-project = "1"
 rand = "0.8"
 regex = "1"
 tempfile = "3"
@@ -113,18 +107,8 @@ tokio = { version = "1", default-features = false, features = [
     "process",
 ] }
 tokio-stream = "0.1"
-tokio-util = { version = "0.7", default-features = false, features = [
-    "codec",
-    "compat",
-    "io",
-] }
 tracing = "0.1"
 url = { version = "2", features = ["serde"] }
-
-# Http file server
-tower = "0.5"
-tower-http = { version = "0.6", features = ["fs", "trace"] }
-axum = "0.7"
 
 # Optional dependencies
 alloy = { optional = true, version = "0.9", default-features = false, features = [
