@@ -29,6 +29,11 @@ impl BaseUseCaseHarnessOptions {
         Self::default()
     }
 
+    pub(crate) fn with_tenancy_config(mut self, tenancy_config: TenancyConfig) -> Self {
+        self.tenancy_config = tenancy_config;
+        self
+    }
+
     pub(crate) fn with_authorizer(
         mut self,
         mock_dataset_action_authorizer: MockDatasetActionAuthorizer,
