@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::sync::Arc;
+
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use file_utils::OwnedFile;
@@ -20,7 +22,7 @@ use url::Url;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct DatasetImpl<MetaChain, DataRepo, CheckpointRepo, InfoRepo> {
-    metadata_chain: MetaChain,
+    metadata_chain: Arc<MetaChain>,
     data_repo: DataRepo,
     checkpoint_repo: CheckpointRepo,
     info_repo: InfoRepo,
@@ -32,7 +34,7 @@ pub struct DatasetImpl<MetaChain, DataRepo, CheckpointRepo, InfoRepo> {
 impl<MetaChain, DataRepo, CheckpointRepo, InfoRepo>
     DatasetImpl<MetaChain, DataRepo, CheckpointRepo, InfoRepo>
 where
-    MetaChain: MetadataChain + Sync + Send,
+    MetaChain: MetadataChain + Sync + Send + 'static,
     DataRepo: ObjectRepository + Sync + Send,
     CheckpointRepo: ObjectRepository + Sync + Send,
     InfoRepo: NamedObjectRepository + Sync + Send,
@@ -45,7 +47,7 @@ where
         storage_internal_url: Url,
     ) -> Self {
         Self {
-            metadata_chain,
+            metadata_chain: Arc::new(metadata_chain),
             data_repo,
             checkpoint_repo,
             info_repo,
@@ -367,7 +369,7 @@ impl UpdateSummaryIncrement {
 impl<MetaChain, DataRepo, CheckpointRepo, InfoRepo> Dataset
     for DatasetImpl<MetaChain, DataRepo, CheckpointRepo, InfoRepo>
 where
-    MetaChain: MetadataChain + Sync + Send,
+    MetaChain: MetadataChain + Sync + Send + 'static,
     DataRepo: ObjectRepository + Sync + Send,
     CheckpointRepo: ObjectRepository + Sync + Send,
     InfoRepo: NamedObjectRepository + Sync + Send,
@@ -596,7 +598,11 @@ where
     }
 
     fn as_metadata_chain(&self) -> &dyn MetadataChain {
-        &self.metadata_chain
+        self.metadata_chain.as_ref()
+    }
+
+    fn as_metadata_chain_ptr(&self) -> Arc<dyn MetadataChain> {
+        self.metadata_chain.clone()
     }
 
     fn as_data_repo(&self) -> &dyn ObjectRepository {

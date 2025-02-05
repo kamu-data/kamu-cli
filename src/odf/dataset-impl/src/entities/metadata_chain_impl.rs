@@ -60,99 +60,23 @@ where
         self.ref_repo.get(r.as_str()).await
     }
 
+    async fn contains_block(&self, hash: &Multihash) -> Result<bool, ContainsBlockError> {
+        self.meta_block_repo.contains_block(hash).await
+    }
+
+    async fn get_block_size(&self, hash: &Multihash) -> Result<u64, GetBlockDataError> {
+        self.meta_block_repo.get_block_size(hash).await
+    }
+
+    async fn get_block_bytes(&self, hash: &Multihash) -> Result<bytes::Bytes, GetBlockDataError> {
+        self.meta_block_repo.get_block_bytes(hash).await
+    }
+
     async fn get_block(&self, hash: &Multihash) -> Result<MetadataBlock, GetBlockError> {
         self.meta_block_repo
             .get_block(hash)
             .await
             .map_err(Into::into)
-    }
-
-    async fn contains_block(&self, hash: &Multihash) -> Result<bool, ContainsBlockError> {
-        self.meta_block_repo.contains_block(hash).await
-    }
-
-    fn iter_blocks_interval<'a>(
-        &'a self,
-        head_hash: &'a Multihash,
-        tail_hash: Option<&'a Multihash>,
-        ignore_missing_tail: bool,
-    ) -> DynMetadataStream<'a> {
-        Box::pin(async_stream::try_stream! {
-            let mut current = Some(head_hash.clone());
-
-            while current.is_some() && current.as_ref() != tail_hash {
-                let block = self.get_block(current.as_ref().unwrap()).await?;
-                let next = block.prev_block_hash.clone();
-                yield (current.take().unwrap(), block);
-                current = next;
-            }
-
-            if !ignore_missing_tail && current.is_none() && tail_hash.is_some() {
-                Err(IterBlocksError::InvalidInterval(InvalidIntervalError {
-                    head: head_hash.clone(),
-                    tail: tail_hash.cloned().unwrap(),
-                }))?;
-            }
-        })
-    }
-
-    fn iter_blocks_interval_inclusive<'a>(
-        &'a self,
-        head_hash: &'a Multihash,
-        tail_hash: &'a Multihash,
-        ignore_missing_tail: bool,
-    ) -> DynMetadataStream<'a> {
-        Box::pin(async_stream::try_stream! {
-            let mut current = head_hash.clone();
-
-            loop {
-                let block = self.get_block(&current).await?;
-                let next = block.prev_block_hash.clone();
-                let done = current == *tail_hash;
-                yield (current.clone(), block);
-                if done || next.is_none() {
-                    break;
-                }
-                current = next.unwrap();
-            }
-
-            if !ignore_missing_tail && current != *tail_hash {
-                Err(IterBlocksError::InvalidInterval(InvalidIntervalError {
-                    head: head_hash.clone(),
-                    tail: tail_hash.clone(),
-                }))?;
-            }
-        })
-    }
-
-    fn iter_blocks_interval_ref<'a>(
-        &'a self,
-        head: &'a BlockRef,
-        tail: Option<&'a BlockRef>,
-    ) -> DynMetadataStream<'a> {
-        Box::pin(async_stream::try_stream! {
-            let head_hash = self.resolve_ref(head).await?;
-            let tail_hash = match tail {
-                None => None,
-                Some(r) => Some(self.resolve_ref(r).await?),
-            };
-
-            let mut current = Some(head_hash.clone());
-
-            while current.is_some() && current != tail_hash {
-                let block = self.get_block(current.as_ref().unwrap()).await?;
-                let next = block.prev_block_hash.clone();
-                yield (current.take().unwrap(), block);
-                current = next;
-            }
-
-            if current.is_none() && tail_hash.is_some() {
-                Err(IterBlocksError::InvalidInterval(InvalidIntervalError {
-                    head: head_hash,
-                    tail: tail_hash.unwrap()
-                }))?;
-            }
-        })
     }
 
     async fn set_ref<'a>(
@@ -284,14 +208,6 @@ where
         }
 
         Ok(res.hash)
-    }
-
-    fn as_reference_repo(&self) -> &dyn ReferenceRepository {
-        &self.ref_repo
-    }
-
-    fn as_metadata_block_repository(&self) -> &dyn MetadataBlockRepository {
-        &self.meta_block_repo
     }
 }
 

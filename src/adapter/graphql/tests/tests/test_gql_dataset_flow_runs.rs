@@ -441,6 +441,7 @@ async fn test_trigger_reset_root_dataset_flow() {
 
     let create_root_result = harness.create_root_dataset().await;
 
+    use odf::dataset::MetadataChainExt;
     let root_dataset_blocks: Vec<_> = create_root_result
         .dataset
         .as_metadata_chain()
@@ -641,6 +642,8 @@ async fn test_trigger_reset_root_dataset_flow_with_invalid_head() {
             }
         })
     );
+
+    use odf::dataset::MetadataChainExt;
 
     let root_dataset_blocks: Vec<_> = create_root_result
         .dataset

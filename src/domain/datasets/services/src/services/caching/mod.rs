@@ -7,12 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod caching;
-mod entry;
-mod env;
-mod graph;
+mod db_backed_dataset;
+mod db_backed_metadata_chain;
 
-pub use caching::*;
-pub use entry::*;
-pub use env::*;
-pub use graph::*;
+pub use db_backed_dataset::*;
+pub use db_backed_metadata_chain::*;

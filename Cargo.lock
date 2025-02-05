@@ -6240,6 +6240,7 @@ version = "0.222.0"
 dependencies = [
  "async-stream",
  "async-trait",
+ "bytes",
  "chrono",
  "container-runtime",
  "datafusion",
@@ -6373,9 +6374,11 @@ version = "0.222.0"
 dependencies = [
  "async-stream",
  "async-trait",
+ "bytes",
  "chrono",
  "database-common",
  "dill",
+ "file-utils",
  "futures",
  "indoc 2.0.5",
  "init-on-startup",
@@ -6401,6 +6404,7 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "tracing",
+ "url",
  "uuid",
 ]
 
@@ -7828,7 +7832,9 @@ dependencies = [
 name = "opendatafabric-dataset"
 version = "0.222.0"
 dependencies = [
+ "async-stream",
  "async-trait",
+ "bytes",
  "chrono",
  "dill",
  "file-utils",
@@ -7852,6 +7858,7 @@ version = "0.222.0"
 dependencies = [
  "async-stream",
  "async-trait",
+ "bytes",
  "chrono",
  "dill",
  "file-utils",

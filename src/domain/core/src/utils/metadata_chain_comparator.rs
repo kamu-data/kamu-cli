@@ -33,6 +33,7 @@ impl MetadataChainComparator {
         rhs_head: Option<&odf::Multihash>,
         listener: &dyn CompareChainsListener,
     ) -> Result<CompareChainsResult, CompareChainsError> {
+        use odf::dataset::MetadataChainExt;
         use odf::MetadataChain;
 
         // When source and destination point to the same block, chains are equal, no
@@ -168,7 +169,8 @@ impl MetadataChainComparator {
         let ahead_size = ahead_sequence_number - expected_common_sequence_number;
         ahead_chain.expecting_to_read_blocks(ahead_size);
 
-        use odf::MetadataChain;
+        use odf::dataset::MetadataChainExt;
+
         let ahead_blocks: Vec<odf::dataset::HashedMetadataBlock> = ahead_chain
             .iter_blocks_interval(ahead_head, None, false)
             .take(usize::try_from(ahead_size).unwrap())
@@ -235,7 +237,7 @@ impl MetadataChainComparator {
             );
         }
 
-        use odf::MetadataChain;
+        use odf::dataset::MetadataChainExt;
         let mut lhs_stream = lhs_chain.iter_blocks_interval(lhs_head, None, false);
         let mut rhs_stream = rhs_chain.iter_blocks_interval(rhs_head, None, false);
 
@@ -413,14 +415,6 @@ impl odf::MetadataChain for MetadataChainWithStats<'_> {
         self.chain.resolve_ref(r).await
     }
 
-    async fn get_block(
-        &self,
-        hash: &odf::Multihash,
-    ) -> Result<odf::MetadataBlock, odf::storage::GetBlockError> {
-        (self.on_read)(1);
-        self.chain.get_block(hash).await
-    }
-
     async fn contains_block(
         &self,
         hash: &odf::Multihash,
@@ -429,47 +423,28 @@ impl odf::MetadataChain for MetadataChainWithStats<'_> {
         self.chain.contains_block(hash).await
     }
 
-    fn iter_blocks_interval<'b>(
-        &'b self,
-        head: &'b odf::Multihash,
-        tail: Option<&'b odf::Multihash>,
-        ignore_missing_tail: bool,
-    ) -> odf::dataset::DynMetadataStream<'b> {
-        Box::pin(
-            self.chain
-                .iter_blocks_interval(head, tail, ignore_missing_tail)
-                .map(|v| {
-                    (self.on_read)(1);
-                    v
-                }),
-        )
+    async fn get_block_size(
+        &self,
+        hash: &odf::Multihash,
+    ) -> Result<u64, odf::storage::GetBlockDataError> {
+        (self.on_read)(1);
+        self.chain.get_block_size(hash).await
     }
 
-    fn iter_blocks_interval_inclusive<'b>(
-        &'b self,
-        head: &'b odf::Multihash,
-        tail: &'b odf::Multihash,
-        ignore_missing_tail: bool,
-    ) -> odf::dataset::DynMetadataStream<'b> {
-        Box::pin(
-            self.chain
-                .iter_blocks_interval_inclusive(head, tail, ignore_missing_tail)
-                .map(|v| {
-                    (self.on_read)(1);
-                    v
-                }),
-        )
+    async fn get_block_bytes(
+        &self,
+        hash: &odf::Multihash,
+    ) -> Result<bytes::Bytes, odf::storage::GetBlockDataError> {
+        (self.on_read)(1);
+        self.chain.get_block_bytes(hash).await
     }
 
-    fn iter_blocks_interval_ref<'b>(
-        &'b self,
-        head: &'b odf::BlockRef,
-        tail: Option<&'b odf::BlockRef>,
-    ) -> odf::dataset::DynMetadataStream<'b> {
-        Box::pin(self.chain.iter_blocks_interval_ref(head, tail).map(|v| {
-            (self.on_read)(1);
-            v
-        }))
+    async fn get_block(
+        &self,
+        hash: &odf::Multihash,
+    ) -> Result<odf::MetadataBlock, odf::storage::GetBlockError> {
+        (self.on_read)(1);
+        self.chain.get_block(hash).await
     }
 
     async fn set_ref<'b>(
@@ -487,14 +462,6 @@ impl odf::MetadataChain for MetadataChainWithStats<'_> {
         opts: odf::dataset::AppendOpts<'b>,
     ) -> Result<odf::Multihash, odf::dataset::AppendError> {
         self.chain.append(block, opts).await
-    }
-
-    fn as_reference_repo(&self) -> &dyn odf::storage::ReferenceRepository {
-        self.chain.as_reference_repo()
-    }
-
-    fn as_metadata_block_repository(&self) -> &dyn odf::storage::MetadataBlockRepository {
-        self.chain.as_metadata_block_repository()
     }
 }
 

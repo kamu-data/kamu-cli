@@ -55,8 +55,7 @@ impl DatasetChangesServiceImpl {
     ) -> Result<odf::Multihash, GetIncrementError> {
         resolved_dataset
             .as_metadata_chain()
-            .as_reference_repo()
-            .get(odf::BlockRef::Head.as_str())
+            .resolve_ref(&odf::dataset::BlockRef::Head)
             .await
             .map_err(|e| match e {
                 odf::storage::GetRefError::Access(e) => GetIncrementError::Access(e),
@@ -81,6 +80,7 @@ impl DatasetChangesServiceImpl {
         let mut latest_watermark = None;
 
         // Scan blocks (from new head to old head)
+        use odf::dataset::MetadataChainExt;
         let mut block_stream = resolved_dataset
             .as_metadata_chain()
             .iter_blocks_interval(new_head, old_head, false);

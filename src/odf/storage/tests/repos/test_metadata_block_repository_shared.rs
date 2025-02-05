@@ -35,7 +35,7 @@ pub async fn test_insert_block(repo: &dyn MetadataBlockRepository) {
     assert_matches!(repo.get_block(&hash).await, Ok(gotten_block) if gotten_block == block);
     assert_matches!(repo.get_block(&hash).await, Ok(gotten_block) if gotten_block == block);
     assert_matches!(repo.get_block_size(&hash).await, Ok(gotten_block_size) if gotten_block_size == block_size);
-    assert_matches!(repo.get_block_data(&hash).await, Ok(gotten_block_data) if gotten_block_data == block_data);
+    assert_matches!(repo.get_block_bytes(&hash).await, Ok(gotten_block_data) if gotten_block_data == block_data);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
