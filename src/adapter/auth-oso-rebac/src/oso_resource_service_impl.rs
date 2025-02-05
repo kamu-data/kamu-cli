@@ -228,6 +228,7 @@ impl OsoResourceServiceImpl {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Debug)]
 pub struct DatasetResourcesResolution {
     pub resolved_resources: Vec<(odf::DatasetID, DatasetResource)>,
     pub unresolved_resources: Vec<odf::DatasetID>,
