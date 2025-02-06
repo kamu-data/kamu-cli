@@ -64,12 +64,13 @@ impl AccessTokenServiceImpl {
 
     async fn notify_access_token_created(
         &self,
-        composed_token: String,
+        token_name: String,
+        account_id: odf::AccountID,
     ) -> Result<(), InternalError> {
         self.outbox
             .post_message(
                 MESSAGE_PRODUCER_KAMU_ACCESS_TOKEN_SERVICE,
-                AccessTokenLifecycleMessage::created(composed_token),
+                AccessTokenLifecycleMessage::created(token_name, account_id),
             )
             .await
     }
@@ -97,7 +98,7 @@ impl AccessTokenService for AccessTokenServiceImpl {
             })
             .await?;
 
-        self.notify_access_token_created(kamu_access_token.composed_token.clone())
+        self.notify_access_token_created(token_name.to_owned(), account_id.clone())
             .await?;
 
         Ok(kamu_access_token)

@@ -27,8 +27,11 @@ pub enum AccessTokenLifecycleMessage {
 }
 
 impl AccessTokenLifecycleMessage {
-    pub fn created(composed_token: String) -> Self {
-        Self::Created(AccessTokenLifecycleMessageCreated { composed_token })
+    pub fn created(token_name: String, owner_id: odf::AccountID) -> Self {
+        Self::Created(AccessTokenLifecycleMessageCreated {
+            token_name,
+            owner_id,
+        })
     }
 }
 
@@ -44,5 +47,6 @@ impl Message for AccessTokenLifecycleMessage {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AccessTokenLifecycleMessageCreated {
-    pub composed_token: String,
+    pub token_name: String,
+    pub owner_id: odf::AccountID,
 }
