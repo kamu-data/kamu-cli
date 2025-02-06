@@ -24,6 +24,7 @@ use kamu::{
 };
 use kamu_accounts::testing::MockAuthenticationService;
 use kamu_accounts::*;
+use kamu_core::auth::DatasetActionUnauthorizedError;
 use kamu_core::{DidGenerator, MockDidGenerator, TenancyConfig};
 use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
 use kamu_datasets_services::DependencyGraphServiceImpl;
@@ -330,7 +331,7 @@ impl ServerHarness {
                 if should_authorize {
                     Ok(())
                 } else {
-                    Err(MockDatasetActionAuthorizer::denying_error(
+                    Err(DatasetActionUnauthorizedError::not_enough_permissions(
                         dataset_id.as_local_ref(),
                         action,
                     ))

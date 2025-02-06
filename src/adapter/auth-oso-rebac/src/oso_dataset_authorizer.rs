@@ -96,14 +96,9 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
             .is_allowed(user_actor, action.to_string(), dataset_resource)
         {
             Ok(allowed) if allowed => Ok(()),
-            Ok(_not_allowed) => Err(DatasetActionUnauthorizedError::Access(
-                odf::AccessError::Forbidden(
-                    DatasetActionNotEnoughPermissionsError {
-                        action,
-                        dataset_ref: dataset_id.as_local_ref(),
-                    }
-                    .into(),
-                ),
+            Ok(_not_allowed) => Err(DatasetActionUnauthorizedError::not_enough_permissions(
+                dataset_id.as_local_ref(),
+                action,
             )),
             Err(e) => Err(DatasetActionUnauthorizedError::Internal(e.int_err())),
         }
@@ -215,13 +210,7 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
                 let dataset_ref = dataset_handle.as_local_ref();
                 unmatched_results.push((
                     dataset_handle,
-                    DatasetActionUnauthorizedError::Access(odf::AccessError::Forbidden(
-                        DatasetActionNotEnoughPermissionsError {
-                            action,
-                            dataset_ref,
-                        }
-                        .into(),
-                    )),
+                    DatasetActionUnauthorizedError::not_enough_permissions(dataset_ref, action),
                 ));
             }
         }
@@ -259,13 +248,7 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
                 let dataset_ref = dataset_id.as_local_ref();
                 unauthorized_ids_with_errors.push((
                     dataset_id,
-                    DatasetActionUnauthorizedError::Access(odf::AccessError::Forbidden(
-                        DatasetActionNotEnoughPermissionsError {
-                            action,
-                            dataset_ref,
-                        }
-                        .into(),
-                    )),
+                    DatasetActionUnauthorizedError::not_enough_permissions(dataset_ref, action),
                 ));
             }
         }

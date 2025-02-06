@@ -15,7 +15,6 @@ use kamu_core::auth::{
     ClassifyByAllowanceResponse,
     DatasetAction,
     DatasetActionAuthorizer,
-    DatasetActionNotEnoughPermissionsError,
     DatasetActionUnauthorizedError,
 };
 use mockall::predicate::{always, eq, function};
@@ -60,25 +59,15 @@ mockall::mock! {
 }
 
 impl MockDatasetActionAuthorizer {
-    pub fn denying_error(
-        dataset_ref: odf::DatasetRef,
-        action: DatasetAction,
-    ) -> DatasetActionUnauthorizedError {
-        DatasetActionUnauthorizedError::Access(odf::AccessError::Forbidden(
-            DatasetActionNotEnoughPermissionsError {
-                action,
-                dataset_ref,
-            }
-            .into(),
-        ))
-    }
-
     pub fn denying() -> Self {
         let mut mock_dataset_action_authorizer = MockDatasetActionAuthorizer::new();
         mock_dataset_action_authorizer
             .expect_check_action_allowed()
             .returning(|dataset_id, action| {
-                Err(Self::denying_error(dataset_id.as_local_ref(), action))
+                Err(DatasetActionUnauthorizedError::not_enough_permissions(
+                    dataset_id.as_local_ref(),
+                    action,
+                ))
             });
         mock_dataset_action_authorizer
     }
@@ -147,7 +136,10 @@ impl MockDatasetActionAuthorizer {
                     if success {
                         Ok(())
                     } else {
-                        Err(Self::denying_error(dataset_id.as_local_ref(), action))
+                        Err(DatasetActionUnauthorizedError::not_enough_permissions(
+                            dataset_id.as_local_ref(),
+                            action,
+                        ))
                     }
                 });
         } else {
@@ -176,7 +168,10 @@ impl MockDatasetActionAuthorizer {
                     if authorized.contains(&handle.alias) {
                         good.push(handle);
                     } else {
-                        let error = Self::denying_error(handle.as_local_ref(), action);
+                        let error = DatasetActionUnauthorizedError::not_enough_permissions(
+                            handle.as_local_ref(),
+                            action,
+                        );
                         bad.push((handle, error));
                     }
                 }

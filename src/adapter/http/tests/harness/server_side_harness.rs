@@ -27,6 +27,7 @@ use kamu::domain::{
 use kamu::testing::MockDatasetActionAuthorizer;
 use kamu_accounts::testing::MockAuthenticationService;
 use kamu_accounts::{Account, AccountType, CurrentAccountSubject, PROVIDER_PASSWORD};
+use kamu_core::auth::DatasetActionUnauthorizedError;
 use kamu_core::{CompactionExecutor, CompactionPlanner, DatasetRegistry, TenancyConfig};
 use odf::dataset::DatasetLayout;
 use reqwest::Url;
@@ -136,7 +137,7 @@ pub(crate) fn create_web_user_catalog(
             .expect_check_action_allowed()
             .returning(|dataset_id, action| {
                 if action == DatasetAction::Write {
-                    Err(MockDatasetActionAuthorizer::denying_error(
+                    Err(DatasetActionUnauthorizedError::not_enough_permissions(
                         dataset_id.as_local_ref(),
                         action,
                     ))
