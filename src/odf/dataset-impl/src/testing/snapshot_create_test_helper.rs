@@ -33,7 +33,7 @@ pub async fn create_test_dataset_fron_snapshot(
         .await?;
 
     // Append snapshot metadata
-    let append_result = match append_metadata_to_dataset(
+    let append_result = match append_snapshot_metadata_to_dataset(
         snapshot.metadata,
         create_dataset_result.dataset.as_ref(),
         &create_dataset_result.head,

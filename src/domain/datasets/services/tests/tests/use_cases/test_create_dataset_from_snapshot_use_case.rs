@@ -90,6 +90,10 @@ async fn test_create_derived_dataset_from_snapshot() {
         .expect_create_dataset_node()
         .times(2)
         .returning(|_| Ok(()));
+    mock_dependency_graph_writer
+        .expect_update_dataset_node_dependencies()
+        .times(1)
+        .returning(|_, _, _| Ok(()));
 
     // Expect DatasetCreated messages for "foo" and "bar"
     let mut mock_outbox = MockOutbox::new();

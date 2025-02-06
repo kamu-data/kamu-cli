@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use dill::{component, interface};
+use dill::{component, interface, Catalog};
 use internal_error::ResultIntoInternal;
 use kamu_core::{DatasetRegistry, DidGenerator};
 use kamu_datasets::{
@@ -19,32 +19,40 @@ use kamu_datasets::{
 };
 use time_source::SystemTimeSource;
 
+use crate::DependencyGraphWriter;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
 #[interface(dyn CreateDatasetFromSnapshotUseCase)]
 pub struct CreateDatasetFromSnapshotUseCaseImpl {
+    catalog: Catalog,
     create_dataset_use_case: Arc<dyn CreateDatasetUseCase>,
     system_time_source: Arc<dyn SystemTimeSource>,
     did_generator: Arc<dyn DidGenerator>,
     dataset_registry: Arc<dyn DatasetRegistry>,
     dataset_storage_unit_writer: Arc<dyn odf::DatasetStorageUnitWriter>,
+    dependency_graph_writer: Arc<dyn DependencyGraphWriter>,
 }
 
 impl CreateDatasetFromSnapshotUseCaseImpl {
     pub fn new(
+        catalog: Catalog,
         create_dataset_use_case: Arc<dyn CreateDatasetUseCase>,
         system_time_source: Arc<dyn SystemTimeSource>,
         did_generator: Arc<dyn DidGenerator>,
         dataset_registry: Arc<dyn DatasetRegistry>,
         dataset_storage_unit_writer: Arc<dyn odf::DatasetStorageUnitWriter>,
+        dependency_graph_writer: Arc<dyn DependencyGraphWriter>,
     ) -> Self {
         Self {
+            catalog,
             create_dataset_use_case,
             system_time_source,
             did_generator,
             dataset_registry,
             dataset_storage_unit_writer,
+            dependency_graph_writer,
         }
     }
 }
@@ -79,8 +87,26 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
             )
             .await?;
 
+        // Analyze dependencies
+        let mut new_upstream_ids: Vec<odf::DatasetID> = vec![];
+        for event in &snapshot.metadata {
+            if let odf::MetadataEvent::SetTransform(set_transform) = event {
+                // Collect only the latest upstream dataset IDs
+                new_upstream_ids.clear();
+                for new_input in &set_transform.inputs {
+                    if let Some(id) = new_input.dataset_ref.id() {
+                        new_upstream_ids.push(id.clone());
+                    } else {
+                        // Input references must be resolved to IDs here, but we
+                        // ignore the errors and let the metadata chain reject
+                        // this event
+                    }
+                }
+            }
+        }
+
         // Append snapshot metadata
-        let append_result = match odf::dataset::append_metadata_to_dataset(
+        let append_result = match odf::dataset::append_snapshot_metadata_to_dataset(
             snapshot.metadata,
             create_dataset_result.dataset.as_ref(),
             &create_dataset_result.head,
@@ -112,6 +138,18 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
             )
             .await
             .int_err()?;
+
+        // Notify dependency graph of changes
+        // Careful! Before we had a transaction in between
+        if !new_upstream_ids.is_empty() {
+            self.dependency_graph_writer
+                .update_dataset_node_dependencies(
+                    &self.catalog,
+                    &create_dataset_result.dataset_handle.id,
+                    new_upstream_ids,
+                )
+                .await?;
+        }
 
         Ok(odf::CreateDatasetResult {
             head: append_result.proposed_head,

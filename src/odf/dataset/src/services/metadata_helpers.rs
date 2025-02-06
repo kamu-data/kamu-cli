@@ -34,7 +34,7 @@ pub fn make_seed_block(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn append_metadata_to_dataset(
+pub async fn append_snapshot_metadata_to_dataset(
     metadata: Vec<MetadataEvent>,
     dataset: &dyn Dataset,
     current_head: &Multihash,

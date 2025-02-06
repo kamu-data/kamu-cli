@@ -24,7 +24,7 @@ use kamu_accounts_services::{
     PredefinedAccountsRegistrator,
 };
 use kamu_datasets::CreateDatasetFromSnapshotUseCase;
-use kamu_datasets_inmem::InMemoryDatasetEntryRepository;
+use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEntryRepository};
 use kamu_datasets_services::{
     CreateDatasetFromSnapshotUseCaseImpl,
     CreateDatasetUseCaseImpl,
@@ -386,6 +386,7 @@ impl TestHarness {
                 .add::<InMemoryAccessTokenRepository>()
                 .add_value(JwtAuthenticationConfig::default())
                 .add::<DependencyGraphServiceImpl>()
+                .add::<InMemoryDatasetDependencyRepository>()
                 .add_value(PredefinedAccountsConfig::single_tenant())
                 .add::<PredefinedAccountsRegistrator>()
                 .add::<LoginPasswordAuthProvider>();
