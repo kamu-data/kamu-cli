@@ -11,7 +11,7 @@ use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
 use kamu::ViewDatasetUseCaseImpl;
-use kamu_accounts::testing::CurrentAccountSubjectHelper;
+use kamu_accounts::testing::CurrentAccountSubjectTestHelper;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::testing::{OwnerByAliasDatasetActionAuthorizer, ViewMultiResponseTestHelper};
 use kamu_core::{TenancyConfig, ViewDatasetUseCase, ViewDatasetUseCaseError};
@@ -23,9 +23,9 @@ use crate::tests::use_cases::*;
 #[tokio::test]
 async fn test_try_to_view_a_nonexistent_dataset() {
     let subjects = [
-        CurrentAccountSubjectHelper::anonymous(),
-        CurrentAccountSubjectHelper::logged("alice"),
-        CurrentAccountSubjectHelper::logged("bob"),
+        CurrentAccountSubjectTestHelper::anonymous(),
+        CurrentAccountSubjectTestHelper::logged("alice"),
+        CurrentAccountSubjectTestHelper::logged("bob"),
     ];
 
     let nonexistent_dataset_alias = odf::metadata::testing::alias("alice", "foo");
@@ -52,15 +52,15 @@ async fn test_view_single_dataset() {
         AccessDenied,
     }
 
-    let owner_subject = CurrentAccountSubjectHelper::logged("alice");
+    let owner_subject = CurrentAccountSubjectTestHelper::logged("alice");
     let subjects_with_expected_results = [
         (
-            CurrentAccountSubjectHelper::anonymous(),
+            CurrentAccountSubjectTestHelper::anonymous(),
             ExpectedResult::AccessDenied,
         ),
         (owner_subject, ExpectedResult::Ok),
         (
-            CurrentAccountSubjectHelper::logged("bob"),
+            CurrentAccountSubjectTestHelper::logged("bob"),
             ExpectedResult::AccessDenied,
         ),
     ];
@@ -97,7 +97,7 @@ async fn test_view_single_dataset() {
 async fn test_view_multi_datasets() {
     let subjects_with_expected_results = [
         (
-            CurrentAccountSubjectHelper::anonymous(),
+            CurrentAccountSubjectTestHelper::anonymous(),
             indoc::indoc!(
                 r#"
                 viewable_resolved_refs:
@@ -110,7 +110,7 @@ async fn test_view_multi_datasets() {
             ),
         ),
         (
-            CurrentAccountSubjectHelper::logged("alice"),
+            CurrentAccountSubjectTestHelper::logged("alice"),
             indoc::indoc!(
                 r#"
                 viewable_resolved_refs:
@@ -123,7 +123,7 @@ async fn test_view_multi_datasets() {
             ),
         ),
         (
-            CurrentAccountSubjectHelper::logged("bob"),
+            CurrentAccountSubjectTestHelper::logged("bob"),
             indoc::indoc!(
                 r#"
                 viewable_resolved_refs:

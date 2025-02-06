@@ -11,9 +11,9 @@ use crate::{AnonymousAccountReason, CurrentAccountSubject};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct CurrentAccountSubjectHelper {}
+pub struct CurrentAccountSubjectTestHelper {}
 
-impl CurrentAccountSubjectHelper {
+impl CurrentAccountSubjectTestHelper {
     pub fn logged(account_name: &str) -> CurrentAccountSubject {
         let account_name = odf::AccountName::new_unchecked(account_name);
         let account_id = odf::AccountID::new_seeded_ed25519(account_name.as_bytes());
