@@ -11,8 +11,10 @@ use std::sync::Arc;
 
 use database_common::PaginationOpts;
 use dill::*;
+use internal_error::InternalError;
 use kamu_accounts::{
     AccessToken,
+    AccessTokenLifecycleMessage,
     AccessTokenListing,
     AccessTokenRepository,
     AccessTokenService,
@@ -22,7 +24,9 @@ use kamu_accounts::{
     GetAccessTokenError,
     KamuAccessToken,
     RevokeTokenError,
+    MESSAGE_PRODUCER_KAMU_ACCESS_TOKEN_SERVICE,
 };
+use messaging_outbox::{Outbox, OutboxExt};
 use time_source::SystemTimeSource;
 use uuid::Uuid;
 
@@ -37,6 +41,7 @@ pub const ENCODED_ACCESS_TOKEN_LENGTH: usize = 61;
 pub struct AccessTokenServiceImpl {
     access_token_repository: Arc<dyn AccessTokenRepository>,
     time_source: Arc<dyn SystemTimeSource>,
+    outbox: Arc<dyn Outbox>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -48,11 +53,25 @@ impl AccessTokenServiceImpl {
     pub fn new(
         access_token_repository: Arc<dyn AccessTokenRepository>,
         time_source: Arc<dyn SystemTimeSource>,
+        outbox: Arc<dyn Outbox>,
     ) -> Self {
         Self {
             access_token_repository,
             time_source,
+            outbox,
         }
+    }
+
+    async fn notify_access_token_created(
+        &self,
+        composed_token: String,
+    ) -> Result<(), InternalError> {
+        self.outbox
+            .post_message(
+                MESSAGE_PRODUCER_KAMU_ACCESS_TOKEN_SERVICE,
+                AccessTokenLifecycleMessage::created(composed_token),
+            )
+            .await
     }
 }
 
@@ -76,6 +95,9 @@ impl AccessTokenService for AccessTokenServiceImpl {
                 revoked_at: None,
                 account_id: account_id.clone(),
             })
+            .await?;
+
+        self.notify_access_token_created(kamu_access_token.composed_token.clone())
             .await?;
 
         Ok(kamu_access_token)
