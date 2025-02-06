@@ -11,7 +11,7 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## [Unreleased]
+## [0.222.0] - 2025-02-06
 ### Added
 - New `AccessTokenLifecycleMessage` outbox message which produced during access token   creation
 ### Changed
