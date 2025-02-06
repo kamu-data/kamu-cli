@@ -22,6 +22,7 @@ mod test_verify_dataset_use_case;
 
 mod base_use_case_harness;
 mod outbox_expectation_helpers;
+mod test_edit_dataset_use_case;
 mod test_view_dataset_use_case;
 
 pub(crate) use base_use_case_harness::*;

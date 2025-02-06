@@ -61,6 +61,8 @@ impl ResetDatasetUseCase for ResetDatasetUseCaseImpl {
         maybe_new_head: Option<&odf::Multihash>,
         maybe_old_head: Option<&odf::Multihash>,
     ) -> Result<ResetResult, ResetError> {
+        // todo use access helper
+
         // Permission check
         self.dataset_action_authorizer
             .check_action_allowed(&dataset_handle.id, DatasetAction::Write)

@@ -85,6 +85,7 @@ impl RenameDatasetUseCase for RenameDatasetUseCaseImpl {
             }
         }?;
 
+        // todo use access helper
         self.dataset_action_authorizer
             .check_action_allowed(&dataset_handle.id, DatasetAction::Write)
             .await

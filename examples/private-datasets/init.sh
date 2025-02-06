@@ -2,6 +2,8 @@
 
 set -euo pipefail
 
+rm -rf ./.kamu
+
 kamu init --multi-tenant --exists-ok
 cp -f .kamuconfig .kamu/
 
