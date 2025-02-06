@@ -12,6 +12,8 @@ Recommendation: for ease of reading, use the following order:
 -->
 
 ## [Unreleased]
+### Added
+- New `AccessTokenLifecycleMessage` outbox message which produced during access token   creation
 ### Changed
 - `kamu pull` command now can be called with passing `<remote_repo>/<dataset_name>` arg
   and pull url will be combined automatically 

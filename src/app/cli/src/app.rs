@@ -593,6 +593,10 @@ pub fn configure_server_catalog(base_catalog: &Catalog) -> CatalogBuilder {
         &mut b,
         MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERVICE,
     );
+    register_message_dispatcher::<AccessTokenLifecycleMessage>(
+        &mut b,
+        MESSAGE_PRODUCER_KAMU_ACCESS_TOKEN_SERVICE,
+    );
 
     b
 }
