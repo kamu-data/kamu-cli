@@ -6296,6 +6296,7 @@ dependencies = [
  "database-common",
  "futures",
  "internal-error",
+ "itertools 0.14.0",
  "merge",
  "messaging-outbox",
  "mockall",

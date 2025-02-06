@@ -8,11 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer, DatasetActionAuthorizerExt};
-use kamu_core::{
-    ViewDatasetUseCase,
-    ViewDatasetUseCaseError,
-    {self as domain},
-};
+use kamu_datasets::{ViewDatasetUseCase, ViewDatasetUseCaseError};
 
 use crate::prelude::*;
 use crate::queries::*;
@@ -79,7 +75,7 @@ impl Datasets {
     ) -> Result<DatasetConnection> {
         let (dataset_registry, dataset_action_authorizer) = from_catalog_n!(
             ctx,
-            dyn domain::DatasetRegistry,
+            dyn kamu_core::DatasetRegistry,
             dyn DatasetActionAuthorizer
         );
 

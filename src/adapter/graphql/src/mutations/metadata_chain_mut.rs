@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_core::CommitDatasetEventUseCase;
+use kamu_datasets::CommitDatasetEventUseCase;
 
 use crate::prelude::*;
 use crate::utils::make_dataset_access_error;
@@ -60,11 +60,7 @@ impl MetadataChainMut {
         let commit_dataset_event = from_catalog_n!(ctx, dyn CommitDatasetEventUseCase);
 
         let result = match commit_dataset_event
-            .execute(
-                &self.dataset_handle,
-                event,
-                odf::dataset::CommitOpts::default(),
-            )
+            .execute(&self.dataset_handle, event)
             .await
         {
             Ok(result) => CommitResult::Success(CommitResultSuccess {

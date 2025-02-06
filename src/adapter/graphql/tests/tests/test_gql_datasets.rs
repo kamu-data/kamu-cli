@@ -30,6 +30,7 @@ use kamu_datasets_services::{
     DeleteDatasetUseCaseImpl,
     DependencyGraphServiceImpl,
     RenameDatasetUseCaseImpl,
+    ViewDatasetUseCaseImpl,
 };
 use messaging_outbox::{register_message_dispatcher, Outbox, OutboxImmediateImpl};
 use odf::metadata::testing::MetadataFactory;

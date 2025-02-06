@@ -19,30 +19,13 @@ use internal_error::{InternalError, ResultIntoInternal};
 use kamu::domain::*;
 use kamu::utils::simple_transfer_protocol::SimpleTransferProtocol;
 use kamu::*;
-use kamu_accounts::{
-    AccountConfig,
-    CurrentAccountSubject,
-    JwtAuthenticationConfig,
-    PredefinedAccountsConfig,
-};
+use kamu_accounts::*;
 use kamu_accounts_inmem::{InMemoryAccessTokenRepository, InMemoryAccountRepository};
-use kamu_accounts_services::{
-    AccessTokenServiceImpl,
-    AuthenticationServiceImpl,
-    LoginPasswordAuthProvider,
-    PredefinedAccountsRegistrator,
-};
+use kamu_accounts_services::*;
 use kamu_adapter_http::{OdfSmtpVersion, SmartTransferProtocolClientWs};
-use kamu_datasets::CreateDatasetFromSnapshotUseCase;
+use kamu_datasets::*;
 use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEntryRepository};
-use kamu_datasets_services::{
-    CreateDatasetFromSnapshotUseCaseImpl,
-    CreateDatasetUseCaseImpl,
-    DatasetEntryServiceImpl,
-    DatasetEntryWriter,
-    DatasetKeyValueServiceSysEnv,
-    DependencyGraphServiceImpl,
-};
+use kamu_datasets_services::*;
 use messaging_outbox::DummyOutboxImpl;
 use odf::dataset::{DatasetFactoryImpl, DatasetLayout, IpfsGateway};
 use tempfile::TempDir;

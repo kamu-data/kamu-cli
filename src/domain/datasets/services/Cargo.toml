@@ -22,7 +22,7 @@ doctest = false
 
 [features]
 default = []
-testing = ["dep:mockall"]
+testing = ["dep:mockall", "dep:serde_json"]
 
 
 [dependencies]
@@ -35,6 +35,7 @@ kamu-core = { workspace = true }
 kamu-datasets = { workspace = true }
 messaging-outbox = { workspace = true }
 mockall = { optional = true, version = "0.13" }
+serde_json = { optional = true, version = "1" }
 odf = { workspace = true, features = ["http", "lfs", "s3"] }
 time-source = { workspace = true }
 

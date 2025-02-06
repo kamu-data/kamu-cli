@@ -11,7 +11,7 @@ use async_graphql::value;
 use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use dill::Component;
 use indoc::indoc;
-use kamu::{DatasetStorageUnitLocalFs, ViewDatasetUseCaseImpl};
+use kamu::DatasetStorageUnitLocalFs;
 use kamu_accounts::JwtAuthenticationConfig;
 use kamu_accounts_inmem::InMemoryAccessTokenRepository;
 use kamu_accounts_services::{AccessTokenServiceImpl, AuthenticationServiceImpl};
@@ -28,6 +28,7 @@ use kamu_datasets_services::{
     DatasetEntryServiceImpl,
     DatasetEnvVarServiceImpl,
     DependencyGraphServiceImpl,
+    ViewDatasetUseCaseImpl,
 };
 use messaging_outbox::DummyOutboxImpl;
 use odf::metadata::testing::MetadataFactory;

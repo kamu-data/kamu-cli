@@ -21,10 +21,12 @@ use kamu_core::*;
 use kamu_datasets::{CreateDatasetFromSnapshotUseCase, CreateDatasetUseCase};
 use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEntryRepository};
 use kamu_datasets_services::{
+    CommitDatasetEventUseCaseImpl,
     CreateDatasetFromSnapshotUseCaseImpl,
     CreateDatasetUseCaseImpl,
     DatasetEntryServiceImpl,
     DependencyGraphServiceImpl,
+    ViewDatasetUseCaseImpl,
 };
 use messaging_outbox::DummyOutboxImpl;
 use odf::metadata::testing::MetadataFactory;

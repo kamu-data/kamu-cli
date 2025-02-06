@@ -19,7 +19,6 @@ mod mock_sync_service;
 mod mock_transform_elaboration_service;
 mod mock_transform_execution_service;
 mod mock_transform_request_planner;
-mod outbox_expectation_helpers;
 mod parquet_reader_helper;
 mod parquet_writer_helper;
 
@@ -35,6 +34,5 @@ pub use mock_sync_service::*;
 pub use mock_transform_elaboration_service::*;
 pub use mock_transform_execution_service::*;
 pub use mock_transform_request_planner::*;
-pub use outbox_expectation_helpers::*;
 pub use parquet_reader_helper::*;
 pub use parquet_writer_helper::*;

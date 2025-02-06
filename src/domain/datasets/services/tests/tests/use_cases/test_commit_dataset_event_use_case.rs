@@ -11,8 +11,13 @@ use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
 use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions, MockDatasetActionAuthorizer};
-use kamu::CommitDatasetEventUseCaseImpl;
-use kamu_core::{CommitDatasetEventUseCase, MockDidGenerator};
+use kamu_core::MockDidGenerator;
+use kamu_datasets::CommitDatasetEventUseCase;
+use kamu_datasets_services::{
+    CommitDatasetEventUseCaseImpl,
+    DependencyGraphWriter,
+    MockDependencyGraphWriter,
+};
 use odf::metadata::testing::MetadataFactory;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -28,6 +33,7 @@ async fn test_commit_dataset_event() {
     let harness = CommitDatasetEventUseCaseHarness::new(
         mock_authorizer,
         MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo]),
+        MockDependencyGraphWriter::new(),
     );
     let foo = harness.create_root_dataset(&alias_foo).await;
 
@@ -36,7 +42,6 @@ async fn test_commit_dataset_event() {
         .execute(
             &foo.dataset_handle,
             odf::MetadataEvent::SetInfo(MetadataFactory::set_info().description("test").build()),
-            odf::dataset::CommitOpts::default(),
         )
         .await;
     assert_matches!(res, Ok(_));
@@ -55,6 +60,7 @@ async fn test_commit_event_unauthorized() {
     let harness = CommitDatasetEventUseCaseHarness::new(
         mock_authorizer,
         MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo]),
+        MockDependencyGraphWriter::new(),
     );
     let foo = harness.create_root_dataset(&alias_foo).await;
 
@@ -63,7 +69,6 @@ async fn test_commit_event_unauthorized() {
         .execute(
             &foo.dataset_handle,
             odf::MetadataEvent::SetInfo(MetadataFactory::set_info().description("test").build()),
-            odf::dataset::CommitOpts::default(),
         )
         .await;
     assert_matches!(res, Err(odf::dataset::CommitError::Access(_)));
@@ -82,9 +87,16 @@ async fn test_commit_event_with_new_dependencies() {
         .expect_check_write_dataset(&dataset_id_bar, 1, true)
         .expect_check_read_dataset(&dataset_id_foo, 1, true);
 
+    let mut mock_dependency_writer = MockDependencyGraphWriter::new();
+    mock_dependency_writer
+        .expect_update_dataset_node_dependencies()
+        .once()
+        .returning(|_, _, _| Ok(()));
+
     let harness = CommitDatasetEventUseCaseHarness::new(
         mock_authorizer,
         MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo, dataset_id_bar]),
+        mock_dependency_writer,
     );
 
     let foo = harness.create_root_dataset(&alias_foo).await;
@@ -104,7 +116,6 @@ async fn test_commit_event_with_new_dependencies() {
                     )])
                     .build(),
             ),
-            odf::dataset::CommitOpts::default(),
         )
         .await;
     assert_matches!(res, Ok(_));
@@ -122,6 +133,7 @@ impl CommitDatasetEventUseCaseHarness {
     fn new(
         mock_dataset_action_authorizer: MockDatasetActionAuthorizer,
         mock_did_generator: MockDidGenerator,
+        mock_dependency_graph_writer: MockDependencyGraphWriter,
     ) -> Self {
         let base_harness = BaseUseCaseHarness::new(
             BaseUseCaseHarnessOptions::new()
@@ -131,6 +143,8 @@ impl CommitDatasetEventUseCaseHarness {
 
         let catalog = dill::CatalogBuilder::new_chained(base_harness.catalog())
             .add::<CommitDatasetEventUseCaseImpl>()
+            .add_value(mock_dependency_graph_writer)
+            .bind::<dyn DependencyGraphWriter, MockDependencyGraphWriter>()
             .build();
 
         let use_case = catalog.get_one::<dyn CommitDatasetEventUseCase>().unwrap();

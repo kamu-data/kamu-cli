@@ -15,7 +15,6 @@ pub trait CommitDatasetEventUseCase: Send + Sync {
         &self,
         dataset_handle: &odf::DatasetHandle,
         event: odf::MetadataEvent,
-        opts: odf::dataset::CommitOpts<'_>,
     ) -> Result<odf::dataset::CommitResult, odf::dataset::CommitError>;
 }
 

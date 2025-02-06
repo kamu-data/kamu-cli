@@ -16,7 +16,7 @@ use dill::Component;
 use futures::TryStreamExt;
 use indoc::indoc;
 use kamu::testing::MockDatasetChangesService;
-use kamu::{DatasetStorageUnitLocalFs, MetadataQueryServiceImpl, ViewDatasetUseCaseImpl};
+use kamu::{DatasetStorageUnitLocalFs, MetadataQueryServiceImpl};
 use kamu_accounts::{
     CurrentAccountSubject,
     JwtAuthenticationConfig,
@@ -47,6 +47,7 @@ use kamu_datasets_services::{
     CreateDatasetUseCaseImpl,
     DatasetEntryServiceImpl,
     DependencyGraphServiceImpl,
+    ViewDatasetUseCaseImpl,
 };
 use kamu_flow_system::{
     Flow,

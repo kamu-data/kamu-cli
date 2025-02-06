@@ -14,50 +14,15 @@ use std::sync::Arc;
 
 use dill::Component;
 use internal_error::{InternalError, ResultIntoInternal};
-use kamu::domain::{
-    CommitDatasetEventUseCase,
-    CompactionExecutor,
-    CompactionPlanner,
-    ObjectStoreBuilder,
-    RunInfoDir,
-    ServerUrlConfig,
-};
-use kamu::{
-    AppendDatasetMetadataBatchUseCaseImpl,
-    CommitDatasetEventUseCaseImpl,
-    CompactionExecutorImpl,
-    CompactionPlannerImpl,
-    DatasetStorageUnitS3,
-    EditDatasetUseCaseImpl,
-    ObjectStoreBuilderLocalFs,
-    ObjectStoreBuilderS3,
-    ObjectStoreRegistryImpl,
-    ViewDatasetUseCaseImpl,
-};
-use kamu_accounts::{
-    Account,
-    AccountConfig,
-    JwtAuthenticationConfig,
-    PredefinedAccountsConfig,
-    DEFAULT_ACCOUNT_ID,
-};
+use kamu::domain::*;
+use kamu::*;
+use kamu_accounts::*;
 use kamu_accounts_inmem::{InMemoryAccessTokenRepository, InMemoryAccountRepository};
-use kamu_accounts_services::{
-    AccessTokenServiceImpl,
-    AuthenticationServiceImpl,
-    LoginPasswordAuthProvider,
-    PredefinedAccountsRegistrator,
-};
+use kamu_accounts_services::*;
 use kamu_core::{DatasetRegistry, DidGeneratorDefault, TenancyConfig};
-use kamu_datasets::{CreateDatasetFromSnapshotUseCase, CreateDatasetUseCase};
+use kamu_datasets::*;
 use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEntryRepository};
-use kamu_datasets_services::{
-    CreateDatasetFromSnapshotUseCaseImpl,
-    CreateDatasetUseCaseImpl,
-    DatasetEntryServiceImpl,
-    DatasetEntryWriter,
-    DependencyGraphServiceImpl,
-};
+use kamu_datasets_services::*;
 use messaging_outbox::DummyOutboxImpl;
 use odf::dataset::DatasetLayout;
 use s3_utils::S3Context;

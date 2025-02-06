@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_core::CommitDatasetEventUseCase;
+use kamu_datasets::CommitDatasetEventUseCase;
 use odf::dataset::MetadataChainExt as _;
 
 use super::{CommitResultAppendError, CommitResultSuccess, NoChanges};
@@ -105,11 +105,7 @@ impl DatasetMetadataMut {
         let commit_event = from_catalog_n!(ctx, dyn CommitDatasetEventUseCase);
 
         let result = match commit_event
-            .execute(
-                &self.dataset_handle,
-                event.into(),
-                odf::dataset::CommitOpts::default(),
-            )
+            .execute(&self.dataset_handle, event.into())
             .await
         {
             Ok(result) => UpdateReadmeResult::Success(CommitResultSuccess {

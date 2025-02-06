@@ -8,7 +8,8 @@
 // by the Apache License, Version 2.0.
 
 use chrono::prelude::*;
-use kamu_core::{ServerUrlConfig, ViewDatasetUseCase, ViewDatasetUseCaseError};
+use kamu_core::ServerUrlConfig;
+use kamu_datasets::{ViewDatasetUseCase, ViewDatasetUseCaseError};
 
 use crate::prelude::*;
 use crate::queries::*;

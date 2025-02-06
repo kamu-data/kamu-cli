@@ -107,7 +107,6 @@ impl<TServerHarness: ServerSideHarness>
                         .description("updated description")
                         .build(),
                 ),
-                odf::dataset::CommitOpts::default(),
             )
             .await
             .unwrap();

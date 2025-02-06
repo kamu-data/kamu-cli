@@ -18,6 +18,7 @@ mod jobs;
 mod messages;
 mod services;
 mod use_cases;
+pub(crate) mod utils;
 
 #[cfg(feature = "testing")]
 pub mod testing;

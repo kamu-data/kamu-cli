@@ -139,8 +139,8 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
             .await
             .int_err()?;
 
-        // Notify dependency graph of changes
-        // Careful! Before we had a transaction in between
+        // Note: modify dependencies only after `set_ref` succeeds.
+        // TODO: the dependencies should be updated as a part of HEAD change
         if !new_upstream_ids.is_empty() {
             self.dependency_graph_writer
                 .update_dataset_node_dependencies(

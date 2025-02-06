@@ -8,5 +8,7 @@
 // by the Apache License, Version 2.0.
 
 mod fake_dataset_entry_service;
+mod outbox_expectation_helpers;
 
 pub use fake_dataset_entry_service::*;
+pub use outbox_expectation_helpers::*;

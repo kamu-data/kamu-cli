@@ -11,8 +11,8 @@ use std::sync::Arc;
 
 use internal_error::{ErrorIntoInternal, InternalError};
 use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer, DatasetActionUnauthorizedError};
-use kamu_core::{
-    DatasetRegistry,
+use kamu_core::DatasetRegistry;
+use kamu_datasets::{
     EditDatasetUseCaseError,
     EditMultiResponse,
     ViewDatasetUseCaseError,

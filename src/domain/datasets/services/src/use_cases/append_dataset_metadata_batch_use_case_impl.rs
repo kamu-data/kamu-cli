@@ -8,21 +8,29 @@
 // by the Apache License, Version 2.0.
 
 use std::collections::VecDeque;
+use std::sync::Arc;
 
-use dill::{component, interface};
-use kamu_core::AppendDatasetMetadataBatchUseCase;
+use dill::{component, interface, Catalog};
+use internal_error::ResultIntoInternal;
+use kamu_datasets::AppendDatasetMetadataBatchUseCase;
+
+use crate::DependencyGraphWriter;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct AppendDatasetMetadataBatchUseCaseImpl {
-    // TODO
+    catalog: Catalog,
+    dependency_graph_writer: Arc<dyn DependencyGraphWriter>,
 }
 
 #[component(pub)]
 #[interface(dyn AppendDatasetMetadataBatchUseCase)]
 impl AppendDatasetMetadataBatchUseCaseImpl {
-    pub fn new() -> Self {
-        Self {}
+    pub fn new(catalog: Catalog, dependency_graph_writer: Arc<dyn DependencyGraphWriter>) -> Self {
+        Self {
+            catalog,
+            dependency_graph_writer,
+        }
     }
 }
 
@@ -49,8 +57,27 @@ impl AppendDatasetMetadataBatchUseCase for AppendDatasetMetadataBatchUseCaseImpl
 
         let metadata_chain = dataset.as_metadata_chain();
 
+        let mut new_upstream_ids: Vec<odf::DatasetID> = vec![];
+        let mut dependencies_modified = false;
+
         for (hash, block) in new_blocks {
             tracing::debug!(sequence_numer = %block.sequence_number, hash = %hash, "Appending block");
+
+            if let odf::MetadataEvent::SetTransform(transform) = &block.event {
+                // Collect only the latest upstream dataset IDs
+                dependencies_modified = true;
+                new_upstream_ids.clear();
+
+                for new_input in &transform.inputs {
+                    if let Some(id) = new_input.dataset_ref.id() {
+                        new_upstream_ids.push(id.clone());
+                    } else {
+                        // Input references must be resolved to IDs here, but we
+                        // ignore the errors and let the metadata chain reject
+                        // this event
+                    }
+                }
+            }
 
             metadata_chain
                 .append(
@@ -78,6 +105,19 @@ impl AppendDatasetMetadataBatchUseCase for AppendDatasetMetadataBatchUseCaseImpl
                 },
             )
             .await?;
+
+        // Note: modify dependencies only after `set_ref` succeeds.
+        // TODO: the dependencies should be updated as a part of HEAD change
+        if dependencies_modified {
+            let summary = dataset
+                .get_summary(odf::dataset::GetSummaryOpts::default())
+                .await
+                .int_err()?;
+
+            self.dependency_graph_writer
+                .update_dataset_node_dependencies(&self.catalog, &summary.id, new_upstream_ids)
+                .await?;
+        }
 
         Ok(())
     }

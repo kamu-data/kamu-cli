@@ -14,19 +14,8 @@ use std::sync::Arc;
 
 use dill::Component;
 use internal_error::{InternalError, ResultIntoInternal};
-use kamu::domain::{CacheDir, CommitDatasetEventUseCase, RunInfoDir, ServerUrlConfig};
-use kamu::{
-    AppendDatasetMetadataBatchUseCaseImpl,
-    CommitDatasetEventUseCaseImpl,
-    CompactionExecutorImpl,
-    CompactionPlannerImpl,
-    DatasetStorageUnitLocalFs,
-    EditDatasetUseCaseImpl,
-    ObjectStoreBuilderLocalFs,
-    ObjectStoreRegistryImpl,
-    RemoteRepositoryRegistryImpl,
-    ViewDatasetUseCaseImpl,
-};
+use kamu::domain::{CacheDir, RunInfoDir, ServerUrlConfig};
+use kamu::*;
 use kamu_accounts::{
     Account,
     AccountConfig,
@@ -35,12 +24,7 @@ use kamu_accounts::{
     DEFAULT_ACCOUNT_ID,
 };
 use kamu_accounts_inmem::{InMemoryAccessTokenRepository, InMemoryAccountRepository};
-use kamu_accounts_services::{
-    AccessTokenServiceImpl,
-    AuthenticationServiceImpl,
-    LoginPasswordAuthProvider,
-    PredefinedAccountsRegistrator,
-};
+use kamu_accounts_services::*;
 use kamu_core::{
     CompactionExecutor,
     CompactionPlanner,
@@ -48,15 +32,9 @@ use kamu_core::{
     DidGeneratorDefault,
     TenancyConfig,
 };
-use kamu_datasets::{CreateDatasetFromSnapshotUseCase, CreateDatasetUseCase};
+use kamu_datasets::*;
 use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEntryRepository};
-use kamu_datasets_services::{
-    CreateDatasetFromSnapshotUseCaseImpl,
-    CreateDatasetUseCaseImpl,
-    DatasetEntryServiceImpl,
-    DatasetEntryWriter,
-    DependencyGraphServiceImpl,
-};
+use kamu_datasets_services::*;
 use messaging_outbox::DummyOutboxImpl;
 use odf::dataset::DatasetLayout;
 use tempfile::TempDir;

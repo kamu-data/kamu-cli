@@ -12,7 +12,8 @@ use std::sync::Arc;
 use dill::{component, interface};
 use internal_error::InternalError;
 use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer};
-use kamu_core::{DatasetRegistry, EditDatasetUseCase, EditDatasetUseCaseError, EditMultiResponse};
+use kamu_core::DatasetRegistry;
+use kamu_datasets::{EditDatasetUseCase, EditDatasetUseCaseError, EditMultiResponse};
 
 use crate::utils::access_dataset_helper::AccessDatasetHelper;
 

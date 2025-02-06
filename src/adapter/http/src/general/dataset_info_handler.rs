@@ -14,7 +14,7 @@ use dill::Catalog;
 use http_common::*;
 use internal_error::ErrorIntoInternal;
 use kamu_accounts::AuthenticationService;
-use kamu_core::{ViewDatasetUseCase, ViewDatasetUseCaseError};
+use kamu_datasets::{ViewDatasetUseCase, ViewDatasetUseCaseError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

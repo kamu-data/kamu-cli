@@ -16,7 +16,11 @@ use headers::Header;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu::utils::smart_transfer_protocol::{SmartTransferProtocolClient, TransferOptions};
 use kamu_core::*;
-use kamu_datasets::{CreateDatasetUseCase, CreateDatasetUseCaseOptions};
+use kamu_datasets::{
+    AppendDatasetMetadataBatchUseCase,
+    CreateDatasetUseCase,
+    CreateDatasetUseCaseOptions,
+};
 use odf::metadata::AsTypedBlock as _;
 use serde::de::DeserializeOwned;
 use serde::Serialize;

@@ -9,10 +9,11 @@
 
 use dill::Component;
 use indoc::indoc;
-use kamu::{DatasetRegistrySoloUnitBridge, DatasetStorageUnitLocalFs, ViewDatasetUseCaseImpl};
+use kamu::{DatasetRegistrySoloUnitBridge, DatasetStorageUnitLocalFs};
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::auth::AlwaysHappyDatasetActionAuthorizer;
 use kamu_core::TenancyConfig;
+use kamu_datasets_services::ViewDatasetUseCaseImpl;
 use time_source::SystemTimeSourceDefault;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

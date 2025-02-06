@@ -101,7 +101,6 @@ impl<TServerHarness: ServerSideHarness> SmartPullExistingEvolvedDatasetScenario<
                         .description("updated description")
                         .build(),
                 ),
-                odf::dataset::CommitOpts::default(),
             )
             .await
             .unwrap();

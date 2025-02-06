@@ -14,25 +14,10 @@ use dill::Component;
 use futures::{future, StreamExt};
 use internal_error::ResultIntoInternal;
 use kamu::testing::BaseRepoHarness;
-use kamu::*;
 use kamu_core::*;
-use kamu_datasets::{
-    CreateDatasetFromSnapshotUseCase,
-    DatasetDependencies,
-    DatasetDependencyRepository,
-    DatasetLifecycleMessage,
-    DeleteDatasetUseCase,
-    MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
-};
+use kamu_datasets::*;
 use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
-use kamu_datasets_services::{
-    CreateDatasetFromSnapshotUseCaseImpl,
-    CreateDatasetUseCaseImpl,
-    DatasetEntryWriter,
-    DeleteDatasetUseCaseImpl,
-    DependencyGraphServiceImpl,
-    MockDatasetEntryWriter,
-};
+use kamu_datasets_services::*;
 use messaging_outbox::{register_message_dispatcher, Outbox, OutboxImmediateImpl};
 use odf::metadata::testing::MetadataFactory;
 
@@ -1113,7 +1098,6 @@ impl DependencyGraphHarness {
                         .inputs_from_refs_and_aliases(id_aliases)
                         .build(),
                 ),
-                Default::default(),
             )
             .await
             .unwrap();

@@ -10,8 +10,9 @@
 use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
-use kamu::testing::{expect_outbox_dataset_created, BaseUseCaseHarness, BaseUseCaseHarnessOptions};
+use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions};
 use kamu_datasets::CreateDatasetFromSnapshotUseCase;
+use kamu_datasets_services::testing::expect_outbox_dataset_created;
 use kamu_datasets_services::{
     CreateDatasetFromSnapshotUseCaseImpl,
     CreateDatasetUseCaseImpl,

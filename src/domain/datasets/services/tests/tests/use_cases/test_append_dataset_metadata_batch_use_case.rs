@@ -13,8 +13,12 @@ use std::sync::Arc;
 
 use chrono::Utc;
 use kamu::testing::{BaseRepoHarness, BaseUseCaseHarness, BaseUseCaseHarnessOptions};
-use kamu::AppendDatasetMetadataBatchUseCaseImpl;
-use kamu_core::AppendDatasetMetadataBatchUseCase;
+use kamu_datasets::AppendDatasetMetadataBatchUseCase;
+use kamu_datasets_services::{
+    AppendDatasetMetadataBatchUseCaseImpl,
+    DependencyGraphWriter,
+    MockDependencyGraphWriter,
+};
 use odf::metadata::testing::MetadataFactory;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -23,7 +27,7 @@ use odf::metadata::testing::MetadataFactory;
 async fn test_append_dataset_metadata_batch() {
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
 
-    let harness = AppendDatasetMetadataBatchUseCaseHarness::new();
+    let harness = AppendDatasetMetadataBatchUseCaseHarness::new(MockDependencyGraphWriter::new());
     let foo = harness.create_root_dataset(&alias_foo).await;
 
     let set_info_block = odf::MetadataBlock {
@@ -61,7 +65,13 @@ async fn test_append_dataset_metadata_batch_with_new_dependencies() {
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
 
-    let harness = AppendDatasetMetadataBatchUseCaseHarness::new();
+    let mut mock_dependency_writer = MockDependencyGraphWriter::new();
+    mock_dependency_writer
+        .expect_update_dataset_node_dependencies()
+        .once()
+        .returning(|_, _, _| Ok(()));
+
+    let harness = AppendDatasetMetadataBatchUseCaseHarness::new(mock_dependency_writer);
     let foo = harness.create_root_dataset(&alias_foo).await;
     let bar = harness
         .create_derived_dataset(&alias_bar, vec![foo.dataset_handle.as_local_ref()])
@@ -97,11 +107,13 @@ struct AppendDatasetMetadataBatchUseCaseHarness {
 }
 
 impl AppendDatasetMetadataBatchUseCaseHarness {
-    fn new() -> Self {
+    fn new(mock_dependency_graph_writer: MockDependencyGraphWriter) -> Self {
         let base_harness = BaseUseCaseHarness::new(BaseUseCaseHarnessOptions::new());
 
         let catalog = dill::CatalogBuilder::new_chained(base_harness.catalog())
             .add::<AppendDatasetMetadataBatchUseCaseImpl>()
+            .add_value(mock_dependency_graph_writer)
+            .bind::<dyn DependencyGraphWriter, MockDependencyGraphWriter>()
             .build();
 
         let use_case = catalog

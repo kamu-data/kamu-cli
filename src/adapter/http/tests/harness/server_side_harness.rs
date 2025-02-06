@@ -19,7 +19,6 @@ use kamu::domain::auth::{
     DatasetAction,
     DatasetActionAuthorizer,
 };
-use kamu::domain::CommitDatasetEventUseCase;
 use kamu::testing::MockDatasetActionAuthorizer;
 use kamu_accounts::{
     Account,
@@ -30,7 +29,11 @@ use kamu_accounts::{
     PROVIDER_PASSWORD,
 };
 use kamu_core::{CompactionExecutor, CompactionPlanner, DatasetRegistry, TenancyConfig};
-use kamu_datasets::{CreateDatasetFromSnapshotUseCase, CreateDatasetUseCase};
+use kamu_datasets::{
+    CommitDatasetEventUseCase,
+    CreateDatasetFromSnapshotUseCase,
+    CreateDatasetUseCase,
+};
 use kamu_datasets_services::DatasetEntryWriter;
 use odf::dataset::DatasetLayout;
 use reqwest::Url;

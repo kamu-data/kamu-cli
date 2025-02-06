@@ -454,10 +454,7 @@ pub fn configure_base_catalog(
     b.add::<kamu::utils::simple_transfer_protocol::SimpleTransferProtocol>();
     b.add::<kamu_adapter_http::SmartTransferProtocolClientWs>();
 
-    b.add::<AppendDatasetMetadataBatchUseCaseImpl>();
-    b.add::<CommitDatasetEventUseCaseImpl>();
     b.add::<CompactDatasetUseCaseImpl>();
-    b.add::<EditDatasetUseCaseImpl>();
     b.add::<GetDatasetDownstreamDependenciesUseCaseImpl>();
     b.add::<GetDatasetUpstreamDependenciesUseCaseImpl>();
     b.add::<PullDatasetUseCaseImpl>();
@@ -465,12 +462,15 @@ pub fn configure_base_catalog(
     b.add::<ResetDatasetUseCaseImpl>();
     b.add::<SetWatermarkUseCaseImpl>();
     b.add::<VerifyDatasetUseCaseImpl>();
-    b.add::<ViewDatasetUseCaseImpl>();
 
+    b.add::<kamu_datasets_services::AppendDatasetMetadataBatchUseCaseImpl>();
+    b.add::<kamu_datasets_services::CommitDatasetEventUseCaseImpl>();
+    b.add::<kamu_datasets_services::EditDatasetUseCaseImpl>();
     b.add::<kamu_datasets_services::CreateDatasetFromSnapshotUseCaseImpl>();
     b.add::<kamu_datasets_services::CreateDatasetUseCaseImpl>();
     b.add::<kamu_datasets_services::DeleteDatasetUseCaseImpl>();
     b.add::<kamu_datasets_services::RenameDatasetUseCaseImpl>();
+    b.add::<kamu_datasets_services::ViewDatasetUseCaseImpl>();
 
     b.add::<kamu_accounts_services::LoginPasswordAuthProvider>();
 

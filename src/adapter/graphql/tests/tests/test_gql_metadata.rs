@@ -23,6 +23,7 @@ use kamu_datasets_services::{
     CreateDatasetUseCaseImpl,
     DatasetEntryServiceImpl,
     DependencyGraphServiceImpl,
+    ViewDatasetUseCaseImpl,
 };
 use messaging_outbox::DummyOutboxImpl;
 use odf::metadata::testing::MetadataFactory;

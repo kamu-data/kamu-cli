@@ -11,15 +11,11 @@ use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
 use dill::Catalog;
-use kamu::testing::{
-    expect_outbox_dataset_deleted,
-    BaseUseCaseHarness,
-    BaseUseCaseHarnessOptions,
-    MockDatasetActionAuthorizer,
-};
+use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions, MockDatasetActionAuthorizer};
 use kamu_core::MockDidGenerator;
 use kamu_datasets::{DatasetLifecycleMessage, DeleteDatasetUseCase};
 use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
+use kamu_datasets_services::testing::expect_outbox_dataset_deleted;
 use kamu_datasets_services::{
     DatasetEntryWriter,
     DeleteDatasetUseCaseImpl,
