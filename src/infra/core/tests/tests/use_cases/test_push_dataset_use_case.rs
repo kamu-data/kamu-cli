@@ -345,7 +345,8 @@ struct PushUseCaseHarness {
 impl PushUseCaseHarness {
     fn new(mock_dataset_action_authorizer: MockDatasetActionAuthorizer) -> Self {
         let base_harness = BaseUseCaseHarness::new(
-            BaseUseCaseHarnessOptions::new().with_authorizer(mock_dataset_action_authorizer),
+            BaseUseCaseHarnessOptions::new()
+                .with_maybe_authorizer(Some(mock_dataset_action_authorizer)),
         );
 
         let repos_dir = base_harness.temp_dir_path().join("repos");

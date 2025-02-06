@@ -102,6 +102,7 @@ pub struct AccountConfig {
 }
 
 impl AccountConfig {
+    #[cfg(any(feature = "testing", test))]
     pub fn test_config_from_name(account_name: odf::AccountName) -> Self {
         let email = Email::parse(&format!("{}@example.com", account_name.as_str())).unwrap();
         Self {

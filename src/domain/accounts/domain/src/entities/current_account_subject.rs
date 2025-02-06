@@ -48,6 +48,7 @@ impl CurrentAccountSubject {
         })
     }
 
+    #[cfg(any(feature = "testing", test))]
     pub fn new_test() -> Self {
         let is_admin = false;
 
@@ -64,6 +65,13 @@ impl CurrentAccountSubject {
                 panic!("Anonymous account misused");
             }
             CurrentAccountSubject::Logged(l) => &l.account_name,
+        }
+    }
+
+    pub fn maybe_account_name(&self) -> Option<&odf::AccountName> {
+        match self {
+            CurrentAccountSubject::Logged(l) => Some(&l.account_name),
+            CurrentAccountSubject::Anonymous(_) => None,
         }
     }
 

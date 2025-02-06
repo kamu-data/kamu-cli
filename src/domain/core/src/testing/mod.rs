@@ -7,8 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod current_account_subject_helper;
-mod mock_authentication_service;
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub use current_account_subject_helper::*;
-pub use mock_authentication_service::*;
+mod owner_by_alias_dataset_action_authorizer;
+mod view_multi_response_test_helper;
+
+pub use owner_by_alias_dataset_action_authorizer::*;
+pub use view_multi_response_test_helper::*;

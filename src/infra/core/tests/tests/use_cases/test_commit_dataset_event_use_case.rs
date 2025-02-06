@@ -137,7 +137,7 @@ impl CommitDatasetEventUseCaseHarness {
     ) -> Self {
         let base_harness = BaseUseCaseHarness::new(
             BaseUseCaseHarnessOptions::new()
-                .with_authorizer(mock_dataset_action_authorizer)
+                .with_maybe_authorizer(Some(mock_dataset_action_authorizer))
                 .with_outbox(mock_outbox)
                 .with_maybe_mock_did_generator(Some(mock_did_generator)),
         );

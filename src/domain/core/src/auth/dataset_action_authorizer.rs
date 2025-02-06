@@ -117,6 +117,18 @@ pub enum DatasetActionUnauthorizedError {
     Internal(#[from] InternalError),
 }
 
+impl DatasetActionUnauthorizedError {
+    pub fn not_enough_permissions(dataset_ref: odf::DatasetRef, action: DatasetAction) -> Self {
+        Self::Access(odf::AccessError::Forbidden(
+            DatasetActionNotEnoughPermissionsError {
+                action,
+                dataset_ref,
+            }
+            .into(),
+        ))
+    }
+}
+
 #[derive(Debug, Error)]
 #[error("User has no '{action}' permission in dataset '{dataset_ref}'")]
 pub struct DatasetActionNotEnoughPermissionsError {

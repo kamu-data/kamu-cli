@@ -659,7 +659,8 @@ struct PullUseCaseHarness {
 impl PullUseCaseHarness {
     fn new(mocks: PullUseCaseHarnessMocks) -> Self {
         let base_harness = BaseUseCaseHarness::new(
-            BaseUseCaseHarnessOptions::new().with_authorizer(mocks.mock_dataset_action_authorizer),
+            BaseUseCaseHarnessOptions::new()
+                .with_maybe_authorizer(Some(mocks.mock_dataset_action_authorizer)),
         );
 
         let repos_dir = base_harness.temp_dir_path().join("repos");

@@ -31,6 +31,7 @@ query-extensions-json = ["dep:datafusion-functions-json"]
 testing = [
     "dep:bon",
     "dep:mockall",
+    "kamu-accounts/testing",
     "kamu-core/testing",
     "odf/testing",
 ]
@@ -138,6 +139,7 @@ libc = "0.2" # For getting uid:gid
 
 [dev-dependencies]
 kamu = { workspace = true, features = ["testing"] }
+kamu-accounts = { workspace = true, features = ["testing"] }
 kamu-core = { workspace = true, features = ["testing"] }
 kamu-datasets-services = { workspace = true }
 kamu-datasets-inmem = { workspace = true }
