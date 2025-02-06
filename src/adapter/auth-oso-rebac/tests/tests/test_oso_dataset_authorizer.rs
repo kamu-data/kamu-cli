@@ -12,12 +12,8 @@ use std::collections::HashSet;
 use std::sync::Arc;
 
 use dill::Component;
-use kamu_accounts::{
-    AccountConfig,
-    AnonymousAccountReason,
-    CurrentAccountSubject,
-    PredefinedAccountsConfig,
-};
+use kamu_accounts::testing::CurrentAccountSubjectTestHelper;
+use kamu_accounts::{AccountConfig, CurrentAccountSubject, PredefinedAccountsConfig};
 use kamu_accounts_inmem::InMemoryAccountRepository;
 use kamu_accounts_services::{LoginPasswordAuthProvider, PredefinedAccountsRegistrator};
 use kamu_auth_rebac_inmem::InMemoryRebacRepository;
@@ -42,9 +38,10 @@ use time_source::SystemTimeSourceDefault;
 
 #[test_log::test(tokio::test)]
 async fn test_owner_can_read_and_write_private_dataset() {
-    let harness = DatasetAuthorizerHarness::new(logged("john")).await;
+    let harness =
+        DatasetAuthorizerHarness::new(CurrentAccountSubjectTestHelper::logged("john")).await;
     let dataset_id = harness
-        .create_private_dataset(dataset_alias("john/foo"))
+        .create_private_dataset(odf::metadata::testing::alias("john", "foo"))
         .await;
 
     let read_result = harness
@@ -75,9 +72,9 @@ async fn test_owner_can_read_and_write_private_dataset() {
 
 #[test_log::test(tokio::test)]
 async fn test_guest_can_read_but_not_write_public_dataset() {
-    let harness = DatasetAuthorizerHarness::new(anonymous()).await;
+    let harness = DatasetAuthorizerHarness::new(CurrentAccountSubjectTestHelper::anonymous()).await;
     let dataset_id = harness
-        .create_public_dataset(dataset_alias("john/foo"))
+        .create_public_dataset(odf::metadata::testing::alias("john", "foo"))
         .await;
 
     let read_result = harness
@@ -222,22 +219,6 @@ impl DatasetAuthorizerHarness {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Helpers
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-fn logged(account_name: &str) -> CurrentAccountSubject {
-    CurrentAccountSubject::logged(
-        odf::AccountID::new_seeded_ed25519(account_name.as_bytes()),
-        odf::AccountName::new_unchecked(account_name),
-        false,
-    )
-}
-
-fn anonymous() -> CurrentAccountSubject {
-    CurrentAccountSubject::anonymous(AnonymousAccountReason::NoAuthenticationProvided)
-}
-
-fn dataset_alias(raw_alias: &str) -> odf::DatasetAlias {
-    odf::DatasetAlias::try_from(raw_alias).unwrap()
-}
 
 fn dataset_id(alias: &odf::DatasetAlias) -> odf::DatasetID {
     odf::DatasetID::new_seeded_ed25519(alias.to_string().as_bytes())
