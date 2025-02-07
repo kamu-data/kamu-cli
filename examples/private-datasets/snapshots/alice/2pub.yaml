@@ -13,8 +13,16 @@ content:
         engine: datafusion
         queries:
           - query: |
-              SELECT *
+              SELECT match_time,
+                     match_id,
+                     player_id,
+                     score
               FROM "alice/1pub2"
               UNION ALL
-              SELECT *
+              SELECT match_time,
+                     match_id,
+                     player_id,
+                     score
               FROM "alice/1priv2"
+    - kind: SetVocab
+      eventTimeColumn: match_time

@@ -12,5 +12,10 @@ content:
         engine: datafusion
         queries:
           - query: |
-              SELECT *
+              SELECT match_time,
+                     match_id,
+                     player_id,
+                     score
               FROM "alice/4pub"
+    - kind: SetVocab
+      eventTimeColumn: match_time
