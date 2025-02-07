@@ -11,14 +11,6 @@ use async_graphql::*;
 use database_common::NoOpDatabasePlugin;
 use dill::Component;
 use kamu::*;
-use kamu_accounts::{CurrentAccountSubject, JwtAuthenticationConfig, PredefinedAccountsConfig};
-use kamu_accounts_inmem::{InMemoryAccessTokenRepository, InMemoryAccountRepository};
-use kamu_accounts_services::{
-    AccessTokenServiceImpl,
-    AuthenticationServiceImpl,
-    LoginPasswordAuthProvider,
-    PredefinedAccountsRegistrator,
-};
 use kamu_core::*;
 use kamu_datasets::CreateDatasetFromSnapshotUseCase;
 use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEntryRepository};
@@ -31,6 +23,8 @@ use kamu_datasets_services::{
 use messaging_outbox::DummyOutboxImpl;
 use odf::metadata::testing::MetadataFactory;
 use time_source::SystemTimeSourceDefault;
+
+use crate::utils::authentication_catalogs;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -46,7 +40,6 @@ async fn test_search_query() {
         .add::<DummyOutboxImpl>()
         .add::<DependencyGraphServiceImpl>()
         .add::<InMemoryDatasetDependencyRepository>()
-        .add_value(CurrentAccountSubject::new_test())
         .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
         .add_value(TenancyConfig::SingleTenant)
         .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
@@ -55,23 +48,14 @@ async fn test_search_query() {
         .add::<CreateDatasetFromSnapshotUseCaseImpl>()
         .add::<CreateDatasetUseCaseImpl>()
         .add::<DatasetEntryServiceImpl>()
-        .add::<InMemoryDatasetEntryRepository>()
-        .add::<AuthenticationServiceImpl>()
-        .add::<InMemoryAccountRepository>()
-        .add::<AccessTokenServiceImpl>()
-        .add::<InMemoryAccessTokenRepository>()
-        .add_value(JwtAuthenticationConfig::default())
-        .add_value(PredefinedAccountsConfig::single_tenant())
-        .add::<PredefinedAccountsRegistrator>()
-        .add::<LoginPasswordAuthProvider>();
+        .add::<InMemoryDatasetEntryRepository>();
 
     NoOpDatabasePlugin::init_database_components(&mut b);
 
-    let catalog = b.build();
+    let base_catalog = b.build();
+    let (_, catalog_authorized) = authentication_catalogs(&base_catalog).await;
 
-    init_on_startup::run_startup_jobs(&catalog).await.unwrap();
-
-    let create_dataset_from_snapshot = catalog
+    let create_dataset_from_snapshot = catalog_authorized
         .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
         .unwrap();
     create_dataset_from_snapshot
@@ -111,7 +95,7 @@ async fn test_search_query() {
                   }
                 ",
             )
-            .data(catalog.clone()),
+            .data(catalog_authorized.clone()),
         )
         .await;
     assert!(res.is_ok());
@@ -156,7 +140,7 @@ async fn test_search_query() {
                   }
                 ",
             )
-            .data(catalog.clone()),
+            .data(catalog_authorized.clone()),
         )
         .await;
     assert!(res.is_ok());
@@ -208,7 +192,7 @@ async fn test_search_query() {
                 }
                 ",
             )
-            .data(catalog),
+            .data(catalog_authorized),
         )
         .await;
     assert!(res.is_ok());

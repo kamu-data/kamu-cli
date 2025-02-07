@@ -13,16 +13,14 @@ use std::sync::{Arc, RwLock};
 use chrono::{DateTime, TimeZone, Utc};
 use dill::{CatalogBuilder, Component};
 use init_on_startup::InitOnStartup;
-use kamu_accounts::testing::MockAuthenticationService;
-use kamu_accounts::{Account, AccountRepository, AuthenticationService, CurrentAccountSubject};
+use kamu_accounts::{Account, AccountRepository, CurrentAccountSubject};
 use kamu_accounts_inmem::InMemoryAccountRepository;
+use kamu_accounts_services::AccountServiceImpl;
 use kamu_core::{DatasetRegistry, TenancyConfig};
 use kamu_datasets::{
     DatasetEntry,
-    DatasetEntryByNameNotFoundError,
     DatasetEntryRepository,
     DatasetLifecycleMessage,
-    GetDatasetEntryByNameError,
     MockDatasetEntryRepository,
     MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
 };
@@ -81,11 +79,8 @@ async fn test_indexes_datasets_correctly() {
         dataset_entry_collector.clone(),
     );
 
-    let harness = DatasetEntryServiceHarness::new(
-        mock_dataset_entry_repository,
-        mock_dataset_repository,
-        MockAuthenticationService::new(),
-    );
+    let harness =
+        DatasetEntryServiceHarness::new(mock_dataset_entry_repository, mock_dataset_repository);
 
     let (_, owner_account_id_1) = odf::AccountID::new_generated_ed25519();
     harness
@@ -139,23 +134,9 @@ async fn test_indexes_datasets_correctly() {
 
 #[test_log::test(tokio::test)]
 async fn test_try_to_resolve_non_existing_dataset() {
-    let mut mock_dataset_entry_repo = MockDatasetEntryRepository::new();
-    mock_dataset_entry_repo
-        .expect_get_dataset_entry_by_owner_and_name()
-        .times(1)
-        .returning(|_, _| {
-            Err(GetDatasetEntryByNameError::NotFound(
-                DatasetEntryByNameNotFoundError {
-                    owner_id: odf::AccountID::new_seeded_ed25519("foo".as_bytes()),
-                    dataset_name: odf::DatasetName::new_unchecked("foo"),
-                },
-            ))
-        });
-
     let harness = DatasetEntryServiceHarness::new(
-        mock_dataset_entry_repo,
+        MockDatasetEntryRepository::new(),
         odf::dataset::MockDatasetStorageUnit::new(),
-        MockAuthenticationService::new(),
     );
 
     let dataset_ref = odf::DatasetAlias::new(
@@ -181,20 +162,9 @@ async fn test_try_to_resolve_non_existing_dataset() {
 async fn test_try_to_resolve_all_datasets_for_non_existing_user() {
     use futures::TryStreamExt;
 
-    let mut mock_dataset_entry_repo = MockDatasetEntryRepository::new();
-    mock_dataset_entry_repo
-        .expect_dataset_entries_count_by_owner_id()
-        .times(1)
-        .returning(|_| Ok(0));
-    mock_dataset_entry_repo
-        .expect_get_dataset_entries_by_owner_id()
-        .times(1)
-        .returning(|_, _| Box::pin(futures::stream::empty()));
-
     let harness = DatasetEntryServiceHarness::new(
-        mock_dataset_entry_repo,
+        MockDatasetEntryRepository::new(),
         odf::dataset::MockDatasetStorageUnit::new(),
-        MockAuthenticationService::new(),
     );
 
     let resolve_dataset_result = harness
@@ -218,7 +188,6 @@ impl DatasetEntryServiceHarness {
     fn new(
         mock_dataset_entry_repository: MockDatasetEntryRepository,
         mock_dataset_repository: odf::dataset::MockDatasetStorageUnit,
-        mock_authentication_service: MockAuthenticationService,
     ) -> Self {
         let catalog = {
             let mut b = CatalogBuilder::new();
@@ -240,9 +209,8 @@ impl DatasetEntryServiceHarness {
             b.add_value(odf::MockDatasetStorageUnitWriter::new());
             b.bind::<dyn odf::DatasetStorageUnitWriter, odf::MockDatasetStorageUnitWriter>();
 
-            let account_repository = InMemoryAccountRepository::new();
-            b.add_value(account_repository);
-            b.bind::<dyn AccountRepository, InMemoryAccountRepository>();
+            b.add::<InMemoryAccountRepository>();
+            b.add::<AccountServiceImpl>();
 
             b.add_builder(
                 OutboxImmediateImpl::builder()
@@ -253,9 +221,6 @@ impl DatasetEntryServiceHarness {
             b.add_value(CurrentAccountSubject::new_test());
 
             b.add_value(TenancyConfig::SingleTenant);
-
-            b.add_value(mock_authentication_service);
-            b.bind::<dyn AuthenticationService, MockAuthenticationService>();
 
             register_message_dispatcher::<DatasetLifecycleMessage>(
                 &mut b,

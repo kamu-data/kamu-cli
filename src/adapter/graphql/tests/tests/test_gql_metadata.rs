@@ -12,9 +12,6 @@ use database_common::NoOpDatabasePlugin;
 use dill::*;
 use indoc::indoc;
 use kamu::*;
-use kamu_accounts::JwtAuthenticationConfig;
-use kamu_accounts_inmem::InMemoryAccessTokenRepository;
-use kamu_accounts_services::{AccessTokenServiceImpl, AuthenticationServiceImpl};
 use kamu_core::*;
 use kamu_datasets::CreateDatasetFromSnapshotUseCase;
 use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEntryRepository};
@@ -61,11 +58,7 @@ async fn test_current_push_sources() {
             .add::<DependencyGraphServiceImpl>()
             .add::<InMemoryDatasetDependencyRepository>()
             .add::<DatasetEntryServiceImpl>()
-            .add::<InMemoryDatasetEntryRepository>()
-            .add::<AuthenticationServiceImpl>()
-            .add::<AccessTokenServiceImpl>()
-            .add::<InMemoryAccessTokenRepository>()
-            .add_value(JwtAuthenticationConfig::default());
+            .add::<InMemoryDatasetEntryRepository>();
 
         NoOpDatabasePlugin::init_database_components(&mut b);
 

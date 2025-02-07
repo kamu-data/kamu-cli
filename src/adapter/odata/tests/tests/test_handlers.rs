@@ -15,11 +15,10 @@ use dill::*;
 use indoc::indoc;
 use kamu::domain::*;
 use kamu::*;
-use kamu_accounts::{CurrentAccountSubject, JwtAuthenticationConfig, PredefinedAccountsConfig};
-use kamu_accounts_inmem::{InMemoryAccessTokenRepository, InMemoryAccountRepository};
+use kamu_accounts::{CurrentAccountSubject, PredefinedAccountsConfig};
+use kamu_accounts_inmem::InMemoryAccountRepository;
 use kamu_accounts_services::{
-    AccessTokenServiceImpl,
-    AuthenticationServiceImpl,
+    AccountServiceImpl,
     LoginPasswordAuthProvider,
     PredefinedAccountsRegistrator,
 };
@@ -380,16 +379,13 @@ impl TestHarness {
                 .add_value(ServerUrlConfig::new_test(None))
                 .add::<DatasetEntryServiceImpl>()
                 .add::<InMemoryDatasetEntryRepository>()
-                .add::<AuthenticationServiceImpl>()
-                .add::<InMemoryAccountRepository>()
-                .add::<AccessTokenServiceImpl>()
-                .add::<InMemoryAccessTokenRepository>()
-                .add_value(JwtAuthenticationConfig::default())
                 .add::<DependencyGraphServiceImpl>()
                 .add::<InMemoryDatasetDependencyRepository>()
                 .add_value(PredefinedAccountsConfig::single_tenant())
                 .add::<PredefinedAccountsRegistrator>()
-                .add::<LoginPasswordAuthProvider>();
+                .add::<LoginPasswordAuthProvider>()
+                .add::<AccountServiceImpl>()
+                .add::<InMemoryAccountRepository>();
 
             NoOpDatabasePlugin::init_database_components(&mut b);
 

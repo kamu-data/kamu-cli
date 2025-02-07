@@ -9,13 +9,7 @@
 
 use async_graphql::value;
 use database_common::NoOpDatabasePlugin;
-use kamu_accounts::testing::MockAuthenticationService;
-use kamu_accounts::{
-    AuthenticationService,
-    DEFAULT_ACCOUNT_ID,
-    DEFAULT_ACCOUNT_NAME_STR,
-    DUMMY_EMAIL_ADDRESS,
-};
+use kamu_accounts::{DEFAULT_ACCOUNT_ID, DEFAULT_ACCOUNT_NAME_STR, DUMMY_EMAIL_ADDRESS};
 
 use crate::utils::authentication_catalogs;
 
@@ -25,7 +19,7 @@ use crate::utils::authentication_catalogs;
 async fn test_account_by_id() {
     let invalid_account_id = odf::AccountID::new_seeded_ed25519(b"I don't exist");
 
-    let harness = GraphQLAccountsHarness::new(MockAuthenticationService::new());
+    let harness = GraphQLAccountsHarness::new().await;
 
     let schema = kamu_adapter_graphql::schema_quiet();
     let res = schema
@@ -42,7 +36,7 @@ async fn test_account_by_id() {
                 "#,
                 *DEFAULT_ACCOUNT_ID
             ))
-            .data(harness.catalog.clone()),
+            .data(harness.catalog_anonymous.clone()),
         )
         .await;
 
@@ -71,7 +65,7 @@ async fn test_account_by_id() {
                 }}
                 "#,
             ))
-            .data(harness.catalog.clone()),
+            .data(harness.catalog_anonymous),
         )
         .await;
 
@@ -90,7 +84,7 @@ async fn test_account_by_id() {
 
 #[test_log::test(tokio::test)]
 async fn test_account_by_name() {
-    let harness = GraphQLAccountsHarness::new(MockAuthenticationService::new());
+    let harness = GraphQLAccountsHarness::new().await;
 
     let schema = kamu_adapter_graphql::schema_quiet();
     let res = schema
@@ -106,7 +100,7 @@ async fn test_account_by_name() {
                 }}
                 "#,
             ))
-            .data(harness.catalog.clone()),
+            .data(harness.catalog_anonymous.clone()),
         )
         .await;
 
@@ -136,7 +130,7 @@ async fn test_account_by_name() {
                 "#,
                 "unknown",
             ))
-            .data(harness.catalog.clone()),
+            .data(harness.catalog_anonymous.clone()),
         )
         .await;
 
@@ -164,7 +158,7 @@ async fn test_account_by_name() {
                 "#,
                 DEFAULT_ACCOUNT_NAME_STR.to_ascii_uppercase(),
             ))
-            .data(harness.catalog),
+            .data(harness.catalog_anonymous),
         )
         .await;
 
@@ -185,8 +179,7 @@ async fn test_account_by_name() {
 
 #[test_log::test(tokio::test)]
 async fn test_account_attributes() {
-    let harness = GraphQLAccountsHarness::new(MockAuthenticationService::new());
-    let (catalog_anonymous, catalog_authorized) = authentication_catalogs(&harness.catalog).await;
+    let harness = GraphQLAccountsHarness::new().await;
 
     let schema = kamu_adapter_graphql::schema_quiet();
     let res = schema
@@ -209,7 +202,7 @@ async fn test_account_attributes() {
                 "#,
                 *DEFAULT_ACCOUNT_ID
             ))
-            .data(catalog_authorized.clone()),
+            .data(harness.catalog_authorized),
         )
         .await;
 
@@ -250,7 +243,7 @@ async fn test_account_attributes() {
                 "#,
                 *DEFAULT_ACCOUNT_ID
             ))
-            .data(catalog_anonymous.clone()),
+            .data(harness.catalog_anonymous.clone()),
         )
         .await;
 
@@ -285,7 +278,7 @@ async fn test_account_attributes() {
                 "#,
                 *DEFAULT_ACCOUNT_ID
             ))
-            .data(catalog_anonymous.clone()),
+            .data(harness.catalog_anonymous),
         )
         .await;
 
@@ -298,8 +291,7 @@ async fn test_account_attributes() {
 
 #[test_log::test(tokio::test)]
 async fn test_update_email_success() {
-    let harness = GraphQLAccountsHarness::new(MockAuthenticationService::new());
-    let (_, catalog_authorized) = authentication_catalogs(&harness.catalog).await;
+    let harness = GraphQLAccountsHarness::new().await;
 
     let schema = kamu_adapter_graphql::schema_quiet();
     let res = schema
@@ -321,7 +313,7 @@ async fn test_update_email_success() {
                 "#,
                 *DEFAULT_ACCOUNT_ID, "wasya@example.com"
             ))
-            .data(catalog_authorized.clone()),
+            .data(harness.catalog_authorized),
         )
         .await;
 
@@ -345,8 +337,7 @@ async fn test_update_email_success() {
 
 #[test_log::test(tokio::test)]
 async fn test_update_email_bad_email() {
-    let harness = GraphQLAccountsHarness::new(MockAuthenticationService::new());
-    let (_, catalog_authorized) = authentication_catalogs(&harness.catalog).await;
+    let harness = GraphQLAccountsHarness::new().await;
 
     let schema = kamu_adapter_graphql::schema_quiet();
     let res = schema
@@ -365,7 +356,7 @@ async fn test_update_email_bad_email() {
                 "#,
                 *DEFAULT_ACCOUNT_ID, "wasya#example.com"
             ))
-            .data(catalog_authorized.clone()),
+            .data(harness.catalog_authorized),
         )
         .await;
 
@@ -388,8 +379,7 @@ async fn test_update_email_bad_email() {
 
 #[test_log::test(tokio::test)]
 async fn test_update_email_unauthorized() {
-    let harness = GraphQLAccountsHarness::new(MockAuthenticationService::new());
-    let (catalog_anonymous, _) = authentication_catalogs(&harness.catalog).await;
+    let harness = GraphQLAccountsHarness::new().await;
 
     let schema = kamu_adapter_graphql::schema_quiet();
     let res = schema
@@ -408,7 +398,7 @@ async fn test_update_email_unauthorized() {
                 "#,
                 *DEFAULT_ACCOUNT_ID, "wasya#example.com"
             ))
-            .data(catalog_anonymous.clone()),
+            .data(harness.catalog_anonymous),
         )
         .await;
 
@@ -420,20 +410,23 @@ async fn test_update_email_unauthorized() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct GraphQLAccountsHarness {
-    catalog: dill::Catalog,
+    catalog_anonymous: dill::Catalog,
+    catalog_authorized: dill::Catalog,
 }
 
 impl GraphQLAccountsHarness {
-    pub fn new(mock_authentication_service: MockAuthenticationService) -> Self {
+    pub async fn new() -> Self {
         let mut b = dill::CatalogBuilder::new();
-        b.add_value(mock_authentication_service)
-            .bind::<dyn AuthenticationService, MockAuthenticationService>();
-
         NoOpDatabasePlugin::init_database_components(&mut b);
 
         let catalog = b.build();
 
-        Self { catalog }
+        let (catalog_anonymous, catalog_authorized) = authentication_catalogs(&catalog).await;
+
+        Self {
+            catalog_anonymous,
+            catalog_authorized,
+        }
     }
 }
 

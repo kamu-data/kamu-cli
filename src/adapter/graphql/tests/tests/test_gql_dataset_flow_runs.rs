@@ -19,13 +19,10 @@ use kamu::testing::MockDatasetChangesService;
 use kamu::{DatasetStorageUnitLocalFs, MetadataQueryServiceImpl};
 use kamu_accounts::{
     CurrentAccountSubject,
-    JwtAuthenticationConfig,
     LoggedAccount,
     DEFAULT_ACCOUNT_ID,
     DEFAULT_ACCOUNT_NAME_STR,
 };
-use kamu_accounts_inmem::InMemoryAccessTokenRepository;
-use kamu_accounts_services::{AccessTokenServiceImpl, AuthenticationServiceImpl};
 use kamu_core::{
     auth,
     CompactionResult,
@@ -36,11 +33,7 @@ use kamu_core::{
     ResetResult,
     TenancyConfig,
 };
-use kamu_datasets::{
-    CreateDatasetFromSnapshotUseCase,
-    DatasetLifecycleMessage,
-    MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
-};
+use kamu_datasets::CreateDatasetFromSnapshotUseCase;
 use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEntryRepository};
 use kamu_datasets_services::{
     CreateDatasetFromSnapshotUseCaseImpl,
@@ -3092,7 +3085,6 @@ async fn test_config_snapshot_returned_correctly() {
 
 struct FlowRunsHarness {
     _tempdir: tempfile::TempDir,
-    _catalog_base: dill::Catalog,
     catalog_anonymous: dill::Catalog,
     catalog_authorized: dill::Catalog,
 }
@@ -3142,10 +3134,6 @@ impl FlowRunsHarness {
             ))
             .add::<TaskSchedulerImpl>()
             .add::<InMemoryTaskEventStore>()
-            .add::<AuthenticationServiceImpl>()
-            .add::<AccessTokenServiceImpl>()
-            .add::<InMemoryAccessTokenRepository>()
-            .add_value(JwtAuthenticationConfig::default())
             .add::<DatasetEntryServiceImpl>()
             .add::<InMemoryDatasetEntryRepository>()
             .add::<DatabaseTransactionRunner>();
@@ -3153,10 +3141,6 @@ impl FlowRunsHarness {
             NoOpDatabasePlugin::init_database_components(&mut b);
             kamu_flow_system_services::register_dependencies(&mut b);
 
-            register_message_dispatcher::<DatasetLifecycleMessage>(
-                &mut b,
-                MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
-            );
             register_message_dispatcher::<ts::TaskProgressMessage>(
                 &mut b,
                 ts::MESSAGE_PRODUCER_KAMU_TASK_AGENT,
@@ -3178,7 +3162,6 @@ impl FlowRunsHarness {
 
         Self {
             _tempdir: tempdir,
-            _catalog_base: catalog_base,
             catalog_anonymous,
             catalog_authorized,
         }

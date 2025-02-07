@@ -12,9 +12,6 @@ use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use dill::Component;
 use indoc::indoc;
 use kamu::{DatasetStorageUnitLocalFs, MetadataQueryServiceImpl};
-use kamu_accounts::JwtAuthenticationConfig;
-use kamu_accounts_inmem::InMemoryAccessTokenRepository;
-use kamu_accounts_services::{AccessTokenServiceImpl, AuthenticationServiceImpl};
 use kamu_core::{auth, DidGeneratorDefault, TenancyConfig};
 use kamu_datasets::CreateDatasetFromSnapshotUseCase;
 use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEntryRepository};
@@ -1046,7 +1043,6 @@ async fn test_anonymous_setters_fail() {
 
 struct FlowTriggerHarness {
     _tempdir: tempfile::TempDir,
-    _catalog_base: dill::Catalog,
     catalog_anonymous: dill::Catalog,
     catalog_authorized: dill::Catalog,
 }
@@ -1079,11 +1075,7 @@ impl FlowTriggerHarness {
                 .add::<InMemoryFlowConfigurationEventStore>()
                 .add::<DatabaseTransactionRunner>()
                 .add::<DatasetEntryServiceImpl>()
-                .add::<InMemoryDatasetEntryRepository>()
-                .add::<AuthenticationServiceImpl>()
-                .add::<AccessTokenServiceImpl>()
-                .add::<InMemoryAccessTokenRepository>()
-                .add_value(JwtAuthenticationConfig::default());
+                .add::<InMemoryDatasetEntryRepository>();
 
             NoOpDatabasePlugin::init_database_components(&mut b);
 
@@ -1095,7 +1087,6 @@ impl FlowTriggerHarness {
 
         Self {
             _tempdir: tempdir,
-            _catalog_base: catalog_base,
             catalog_anonymous,
             catalog_authorized,
         }

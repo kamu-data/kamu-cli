@@ -19,10 +19,9 @@ use file_utils::OwnedFile;
 use kamu::testing::ParquetWriterHelper;
 use kamu::*;
 use kamu_accounts::*;
-use kamu_accounts_inmem::{InMemoryAccessTokenRepository, InMemoryAccountRepository};
+use kamu_accounts_inmem::InMemoryAccountRepository;
 use kamu_accounts_services::{
-    AccessTokenServiceImpl,
-    AuthenticationServiceImpl,
+    AccountServiceImpl,
     LoginPasswordAuthProvider,
     PredefinedAccountsRegistrator,
 };
@@ -82,16 +81,13 @@ async fn create_catalog_with_local_workspace(
             .add::<ObjectStoreRegistryImpl>()
             .add::<ObjectStoreBuilderLocalFs>()
             .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
-            .add::<AuthenticationServiceImpl>()
-            .add::<AccessTokenServiceImpl>()
-            .add::<InMemoryAccessTokenRepository>()
-            .add::<InMemoryAccountRepository>()
-            .add_value(JwtAuthenticationConfig::default())
             .add::<LoginPasswordAuthProvider>()
             .add::<PredefinedAccountsRegistrator>()
             .add::<DatabaseTransactionRunner>()
             .add::<DatasetEntryServiceImpl>()
-            .add::<InMemoryDatasetEntryRepository>();
+            .add::<InMemoryDatasetEntryRepository>()
+            .add::<AccountServiceImpl>()
+            .add::<InMemoryAccountRepository>();
 
         NoOpDatabasePlugin::init_database_components(&mut b);
 

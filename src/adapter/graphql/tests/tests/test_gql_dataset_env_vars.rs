@@ -12,9 +12,6 @@ use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use dill::Component;
 use indoc::indoc;
 use kamu::DatasetStorageUnitLocalFs;
-use kamu_accounts::JwtAuthenticationConfig;
-use kamu_accounts_inmem::InMemoryAccessTokenRepository;
-use kamu_accounts_services::{AccessTokenServiceImpl, AuthenticationServiceImpl};
 use kamu_core::{auth, DidGeneratorDefault, TenancyConfig};
 use kamu_datasets::{CreateDatasetFromSnapshotUseCase, DatasetEnvVarsConfig};
 use kamu_datasets_inmem::{
@@ -324,7 +321,6 @@ async fn test_modify_dataset_env_var() {
 
 struct DatasetEnvVarsHarness {
     _tempdir: tempfile::TempDir,
-    _catalog_anonymous: dill::Catalog,
     catalog_authorized: dill::Catalog,
 }
 
@@ -355,22 +351,17 @@ impl DatasetEnvVarsHarness {
                 .add::<DatasetEnvVarServiceImpl>()
                 .add::<InMemoryDatasetEnvVarRepository>()
                 .add::<DatasetEntryServiceImpl>()
-                .add::<InMemoryDatasetEntryRepository>()
-                .add::<AuthenticationServiceImpl>()
-                .add::<AccessTokenServiceImpl>()
-                .add::<InMemoryAccessTokenRepository>()
-                .add_value(JwtAuthenticationConfig::default());
+                .add::<InMemoryDatasetEntryRepository>();
 
             NoOpDatabasePlugin::init_database_components(&mut b);
 
             b.build()
         };
 
-        let (catalog_anonymous, catalog_authorized) = authentication_catalogs(&catalog_base).await;
+        let (_, catalog_authorized) = authentication_catalogs(&catalog_base).await;
 
         Self {
             _tempdir: tempdir,
-            _catalog_anonymous: catalog_anonymous,
             catalog_authorized,
         }
     }

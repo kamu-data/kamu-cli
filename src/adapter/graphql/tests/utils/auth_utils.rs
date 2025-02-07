@@ -9,7 +9,11 @@
 
 use kamu_accounts::*;
 use kamu_accounts_inmem::InMemoryAccountRepository;
-use kamu_accounts_services::{LoginPasswordAuthProvider, PredefinedAccountsRegistrator};
+use kamu_accounts_services::{
+    AccountServiceImpl,
+    LoginPasswordAuthProvider,
+    PredefinedAccountsRegistrator,
+};
 use kamu_adapter_graphql::ANONYMOUS_ACCESS_FORBIDDEN_MESSAGE;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -34,6 +38,7 @@ pub async fn authentication_catalogs(
         .add::<LoginPasswordAuthProvider>()
         .add::<PredefinedAccountsRegistrator>()
         .add::<InMemoryAccountRepository>()
+        .add::<AccountServiceImpl>()
         .add_value(predefined_accounts_config)
         .build();
 

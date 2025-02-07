@@ -12,16 +12,10 @@ use dill::Component;
 use indoc::indoc;
 use kamu::*;
 use kamu_accounts::*;
-use kamu_accounts_inmem::InMemoryAccessTokenRepository;
-use kamu_accounts_services::{AccessTokenServiceImpl, AuthenticationServiceImpl};
 use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 use kamu_auth_rebac_services::{MultiTenantRebacDatasetLifecycleMessageConsumer, RebacServiceImpl};
 use kamu_core::*;
-use kamu_datasets::{
-    CreateDatasetFromSnapshotUseCase,
-    DatasetLifecycleMessage,
-    MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
-};
+use kamu_datasets::CreateDatasetFromSnapshotUseCase;
 use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEntryRepository};
 use kamu_datasets_services::{
     CreateDatasetFromSnapshotUseCaseImpl,
@@ -32,7 +26,7 @@ use kamu_datasets_services::{
     RenameDatasetUseCaseImpl,
     ViewDatasetUseCaseImpl,
 };
-use messaging_outbox::{register_message_dispatcher, Outbox, OutboxImmediateImpl};
+use messaging_outbox::DummyOutboxImpl;
 use odf::metadata::testing::MetadataFactory;
 use time_source::SystemTimeSourceDefault;
 
@@ -757,11 +751,7 @@ impl GraphQLDatasetsHarness {
 
             b.add::<SystemTimeSourceDefault>()
                 .add::<DidGeneratorDefault>()
-                .add_builder(
-                    OutboxImmediateImpl::builder()
-                        .with_consumer_filter(messaging_outbox::ConsumerFilter::AllConsumers),
-                )
-                .bind::<dyn Outbox, OutboxImmediateImpl>()
+                .add::<DummyOutboxImpl>()
                 .add::<CreateDatasetFromSnapshotUseCaseImpl>()
                 .add::<CreateDatasetUseCaseImpl>()
                 .add::<RenameDatasetUseCaseImpl>()
@@ -782,22 +772,13 @@ impl GraphQLDatasetsHarness {
                 })
                 .add::<InMemoryRebacRepository>()
                 .add::<DatasetEntryServiceImpl>()
-                .add::<InMemoryDatasetEntryRepository>()
-                .add::<AuthenticationServiceImpl>()
-                .add::<AccessTokenServiceImpl>()
-                .add::<InMemoryAccessTokenRepository>()
-                .add_value(JwtAuthenticationConfig::default());
+                .add::<InMemoryDatasetEntryRepository>();
 
             if tenancy_config == TenancyConfig::MultiTenant {
                 b.add::<MultiTenantRebacDatasetLifecycleMessageConsumer>();
             }
 
             NoOpDatabasePlugin::init_database_components(&mut b);
-
-            register_message_dispatcher::<DatasetLifecycleMessage>(
-                &mut b,
-                MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
-            );
 
             b.build()
         };

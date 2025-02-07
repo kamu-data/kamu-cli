@@ -16,13 +16,11 @@ use kamu_accounts::{
     AccountConfig,
     AnonymousAccountReason,
     CurrentAccountSubject,
-    JwtAuthenticationConfig,
     PredefinedAccountsConfig,
 };
-use kamu_accounts_inmem::{InMemoryAccessTokenRepository, InMemoryAccountRepository};
+use kamu_accounts_inmem::InMemoryAccountRepository;
 use kamu_accounts_services::{
-    AccessTokenServiceImpl,
-    AuthenticationServiceImpl,
+    AccountServiceImpl,
     LoginPasswordAuthProvider,
     PredefinedAccountsRegistrator,
 };
@@ -154,18 +152,15 @@ impl DatasetAuthorizerHarness {
                     OutboxImmediateImpl::builder()
                         .with_consumer_filter(ConsumerFilter::AllConsumers),
                 )
+                .bind::<dyn Outbox, OutboxImmediateImpl>()
                 .add_value(odf::dataset::MockDatasetStorageUnit::new())
                 .bind::<dyn odf::DatasetStorageUnit, odf::dataset::MockDatasetStorageUnit>()
                 .add_value(tenancy_config)
                 .add::<DatasetEntryServiceImpl>()
                 .add::<InMemoryDatasetEntryRepository>()
+                .add::<AccountServiceImpl>()
                 .add::<InMemoryAccountRepository>()
-                .add::<LoginPasswordAuthProvider>()
-                .add::<AuthenticationServiceImpl>()
-                .add::<AccessTokenServiceImpl>()
-                .add::<InMemoryAccessTokenRepository>()
-                .add_value(JwtAuthenticationConfig::default())
-                .bind::<dyn Outbox, OutboxImmediateImpl>();
+                .add::<LoginPasswordAuthProvider>();
 
             kamu_adapter_auth_oso_rebac::register_dependencies(&mut b);
 

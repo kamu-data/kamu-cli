@@ -16,15 +16,9 @@ use dill::Component;
 use indoc::indoc;
 use kamu::testing::{MockDatasetActionAuthorizer, MockDatasetChangesService};
 use kamu::{DatasetStorageUnitLocalFs, MetadataQueryServiceImpl};
-use kamu_accounts::{JwtAuthenticationConfig, DEFAULT_ACCOUNT_NAME, DEFAULT_ACCOUNT_NAME_STR};
-use kamu_accounts_inmem::InMemoryAccessTokenRepository;
-use kamu_accounts_services::{AccessTokenServiceImpl, AuthenticationServiceImpl};
+use kamu_accounts::{DEFAULT_ACCOUNT_NAME, DEFAULT_ACCOUNT_NAME_STR};
 use kamu_core::*;
-use kamu_datasets::{
-    CreateDatasetFromSnapshotUseCase,
-    DatasetLifecycleMessage,
-    MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
-};
+use kamu_datasets::CreateDatasetFromSnapshotUseCase;
 use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEntryRepository};
 use kamu_datasets_services::{
     CreateDatasetFromSnapshotUseCaseImpl,
@@ -41,7 +35,7 @@ use kamu_flow_system_inmem::{
 };
 use kamu_task_system_inmem::InMemoryTaskEventStore;
 use kamu_task_system_services::TaskSchedulerImpl;
-use messaging_outbox::{register_message_dispatcher, Outbox, OutboxImmediateImpl};
+use messaging_outbox::DummyOutboxImpl;
 use odf::metadata::testing::MetadataFactory;
 use time_source::SystemTimeSourceDefault;
 
@@ -625,7 +619,6 @@ struct FlowTriggerHarnessOverrides {
 struct FlowTriggerHarness {
     _tempdir: tempfile::TempDir,
     _catalog_base: dill::Catalog,
-    _catalog_anonymous: dill::Catalog,
     catalog_authorized: dill::Catalog,
 }
 
@@ -642,11 +635,8 @@ impl FlowTriggerHarness {
         let catalog_base = {
             let mut b = dill::CatalogBuilder::new();
 
-            b.add_builder(
-                messaging_outbox::OutboxImmediateImpl::builder()
-                    .with_consumer_filter(messaging_outbox::ConsumerFilter::AllConsumers),
-            )
-            .bind::<dyn Outbox, OutboxImmediateImpl>()
+            b
+            .add::<DummyOutboxImpl>()
             .add::<DidGeneratorDefault>()
             .add_value(TenancyConfig::MultiTenant)
             .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
@@ -660,10 +650,6 @@ impl FlowTriggerHarness {
             .bind::<dyn DatasetChangesService, MockDatasetChangesService>()
             .add::<SystemTimeSourceDefault>()
             .add_value(mock_dataset_action_authorizer)
-            .add::<AuthenticationServiceImpl>()
-            .add::<AccessTokenServiceImpl>()
-            .add::<InMemoryAccessTokenRepository>()
-            .add_value(JwtAuthenticationConfig::default())
             .bind::<dyn kamu::domain::auth::DatasetActionAuthorizer, MockDatasetActionAuthorizer>()
             .add::<DependencyGraphServiceImpl>()
             .add::<InMemoryDatasetDependencyRepository>()
@@ -683,25 +669,14 @@ impl FlowTriggerHarness {
             NoOpDatabasePlugin::init_database_components(&mut b);
             kamu_flow_system_services::register_dependencies(&mut b);
 
-            register_message_dispatcher::<DatasetLifecycleMessage>(
-                &mut b,
-                MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
-            );
-
             b.build()
         };
 
-        // Init dataset with no sources
-        let (catalog_anonymous, catalog_authorized) = authentication_catalogs(&catalog_base).await;
-
-        init_on_startup::run_startup_jobs(&catalog_authorized)
-            .await
-            .unwrap();
+        let (_, catalog_authorized) = authentication_catalogs(&catalog_base).await;
 
         Self {
             _tempdir: tempdir,
             _catalog_base: catalog_base,
-            _catalog_anonymous: catalog_anonymous,
             catalog_authorized,
         }
     }
