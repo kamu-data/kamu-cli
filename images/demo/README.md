@@ -36,3 +36,30 @@ To shutdown the environment do:
 ```shell
 docker compose down
 ```
+
+## Updating images in the registry
+
+In this section, we will look at how to build images locally and send them to the registry.
+
+1. Update `DEMO_VERSION` in the [Makefile](./Makefile)
+2. Prepare the build environment:
+   ```shell
+   # Optional: if image building was previously performed, skip this step
+   make prepare-multi-arch-build
+
+   make clean
+   ```
+3. `kamu-cli-demo-minio`  image:
+    - Building & pushing:
+      ```shell
+      make minio-data
+      make minio-multi-arch
+      ```
+    - Check in the registry ([kamu-cli-demo-minio](https://github.com/kamu-data/kamu-cli/pkgs/container/kamu-cli-demo-minio)) that the new version of the image is uploaded.
+4. `kamu-cli-demo-jupyter` image:
+    - Building & pushing:
+      ```shell
+      make jupyter-multi-arch
+      ```
+    - Check in the registry ([kamu-cli-demo-jupyter](https://github.com/kamu-data/kamu-cli/pkgs/container/kamu-cli-demo-jupyter)) that the new version of the image is uploaded.
+    - ⚠️ Begin the procedure of deploying the new image
