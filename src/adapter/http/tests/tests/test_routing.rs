@@ -16,11 +16,10 @@ use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use dill::Component;
 use kamu::domain::*;
 use kamu::*;
-use kamu_accounts::{CurrentAccountSubject, JwtAuthenticationConfig, PredefinedAccountsConfig};
-use kamu_accounts_inmem::{InMemoryAccessTokenRepository, InMemoryAccountRepository};
+use kamu_accounts::{CurrentAccountSubject, PredefinedAccountsConfig};
+use kamu_accounts_inmem::InMemoryAccountRepository;
 use kamu_accounts_services::{
-    AccessTokenServiceImpl,
-    AuthenticationServiceImpl,
+    AccountServiceImpl,
     LoginPasswordAuthProvider,
     PredefinedAccountsRegistrator,
 };
@@ -72,11 +71,8 @@ async fn setup_repo() -> RepoFixture {
         .add::<DatabaseTransactionRunner>()
         .add::<DatasetEntryServiceImpl>()
         .add::<InMemoryDatasetEntryRepository>()
-        .add::<AuthenticationServiceImpl>()
+        .add::<AccountServiceImpl>()
         .add::<InMemoryAccountRepository>()
-        .add::<AccessTokenServiceImpl>()
-        .add::<InMemoryAccessTokenRepository>()
-        .add_value(JwtAuthenticationConfig::default())
         .add::<PredefinedAccountsRegistrator>()
         .add_value(PredefinedAccountsConfig::single_tenant())
         .add::<LoginPasswordAuthProvider>();

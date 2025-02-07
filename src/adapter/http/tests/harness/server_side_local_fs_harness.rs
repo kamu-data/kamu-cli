@@ -134,6 +134,7 @@ impl ServerSideLocalFsHarness {
                 .add::<DatasetEntryServiceImpl>()
                 .add::<InMemoryDatasetEntryRepository>()
                 .add::<AuthenticationServiceImpl>()
+                .add::<AccountServiceImpl>()
                 .add::<InMemoryAccountRepository>()
                 .add::<AccessTokenServiceImpl>()
                 .add::<InMemoryAccessTokenRepository>()

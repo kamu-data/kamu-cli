@@ -118,6 +118,7 @@ impl ServerSideS3Harness {
                 .add::<DatasetEntryServiceImpl>()
                 .add::<InMemoryDatasetEntryRepository>()
                 .add::<AuthenticationServiceImpl>()
+                .add::<AccountServiceImpl>()
                 .add::<InMemoryAccountRepository>()
                 .add::<AccessTokenServiceImpl>()
                 .add::<InMemoryAccessTokenRepository>()

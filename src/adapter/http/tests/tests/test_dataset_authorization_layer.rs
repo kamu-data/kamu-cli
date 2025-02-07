@@ -18,6 +18,8 @@ use kamu::testing::MockDatasetActionAuthorizer;
 use kamu::DatasetStorageUnitLocalFs;
 use kamu_accounts::testing::MockAuthenticationService;
 use kamu_accounts::*;
+use kamu_accounts_inmem::InMemoryAccountRepository;
+use kamu_accounts_services::AccountServiceImpl;
 use kamu_core::{DidGenerator, MockDidGenerator, TenancyConfig};
 use kamu_datasets::CreateDatasetUseCase;
 use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEntryRepository};
@@ -245,12 +247,21 @@ impl ServerHarness {
                 .add::<CreateDatasetUseCaseImpl>()
                 .add::<DatabaseTransactionRunner>()
                 .add::<DatasetEntryServiceImpl>()
-                .add::<InMemoryDatasetEntryRepository>();
+                .add::<InMemoryDatasetEntryRepository>()
+                .add::<AccountServiceImpl>()
+                .add::<InMemoryAccountRepository>();
 
             NoOpDatabasePlugin::init_database_components(&mut b);
 
             b.build()
         };
+
+        base_catalog
+            .get_one::<dyn AccountRepository>()
+            .unwrap()
+            .create_account(&Account::dummy())
+            .await
+            .unwrap();
 
         let catalog_system = CatalogBuilder::new_chained(&base_catalog)
             .add_value(CurrentAccountSubject::new_test())

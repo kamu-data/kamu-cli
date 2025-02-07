@@ -20,7 +20,7 @@ use kamu::domain::*;
 use kamu::utils::simple_transfer_protocol::SimpleTransferProtocol;
 use kamu::*;
 use kamu_accounts::*;
-use kamu_accounts_inmem::{InMemoryAccessTokenRepository, InMemoryAccountRepository};
+use kamu_accounts_inmem::InMemoryAccountRepository;
 use kamu_accounts_services::*;
 use kamu_adapter_http::{OdfSmtpVersion, SmartTransferProtocolClientWs};
 use kamu_datasets::*;
@@ -167,11 +167,8 @@ impl ClientSideHarness {
 
         b.add::<DatasetEntryServiceImpl>();
         b.add::<InMemoryDatasetEntryRepository>();
-        b.add::<AuthenticationServiceImpl>();
+        b.add::<AccountServiceImpl>();
         b.add::<InMemoryAccountRepository>();
-        b.add::<AccessTokenServiceImpl>();
-        b.add::<InMemoryAccessTokenRepository>();
-        b.add_value(JwtAuthenticationConfig::default());
         b.add::<LoginPasswordAuthProvider>();
         b.add::<PredefinedAccountsRegistrator>();
 
