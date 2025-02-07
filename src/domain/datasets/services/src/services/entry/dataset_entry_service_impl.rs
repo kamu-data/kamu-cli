@@ -15,7 +15,7 @@ use dill::{component, interface};
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_accounts::{
     AccountNotFoundByNameError,
-    AuthenticationService,
+    AccountService,
     CurrentAccountSubject,
     GetAccountByNameError,
 };
@@ -38,7 +38,7 @@ pub struct DatasetEntryServiceImpl {
     time_source: Arc<dyn SystemTimeSource>,
     dataset_entry_repo: Arc<dyn DatasetEntryRepository>,
     dataset_storage_unit: Arc<dyn odf::DatasetStorageUnit>,
-    authentication_svc: Arc<dyn AuthenticationService>,
+    account_svc: Arc<dyn AccountService>,
     current_account_subject: Arc<CurrentAccountSubject>,
     tenancy_config: Arc<TenancyConfig>,
     cache: Arc<RwLock<Cache>>,
@@ -78,7 +78,7 @@ impl DatasetEntryServiceImpl {
         time_source: Arc<dyn SystemTimeSource>,
         dataset_entry_repo: Arc<dyn DatasetEntryRepository>,
         dataset_storage_unit: Arc<dyn odf::DatasetStorageUnit>,
-        authentication_svc: Arc<dyn AuthenticationService>,
+        account_svc: Arc<dyn AccountService>,
         current_account_subject: Arc<CurrentAccountSubject>,
         tenancy_config: Arc<TenancyConfig>,
     ) -> Self {
@@ -86,7 +86,7 @@ impl DatasetEntryServiceImpl {
             time_source,
             dataset_entry_repo,
             dataset_storage_unit,
-            authentication_svc,
+            account_svc,
             current_account_subject,
             tenancy_config,
             cache: Arc::new(RwLock::new(Cache::default())),
@@ -121,7 +121,7 @@ impl DatasetEntryServiceImpl {
             let num_account_ids = account_ids.len();
 
             let accounts = self
-                .authentication_svc
+                .account_svc
                 .accounts_by_ids(account_ids)
                 .await
                 .int_err()?;
@@ -177,7 +177,7 @@ impl DatasetEntryServiceImpl {
             Ok(name)
         } else {
             let account = self
-                .authentication_svc
+                .account_svc
                 .account_by_id(account_id)
                 .await
                 .int_err()?
@@ -212,10 +212,7 @@ impl DatasetEntryServiceImpl {
         if let Some(id) = maybe_cached_id {
             Ok(id)
         } else {
-            let maybe_account = self
-                .authentication_svc
-                .account_by_name(account_name)
-                .await?;
+            let maybe_account = self.account_svc.account_by_name(account_name).await?;
 
             if let Some(account) = maybe_account {
                 let mut writable_cache = self.cache.write().unwrap();

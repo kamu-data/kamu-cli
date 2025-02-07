@@ -139,17 +139,6 @@ async fn test_indexes_datasets_correctly() {
 
 #[test_log::test(tokio::test)]
 async fn test_try_to_resolve_non_existing_dataset() {
-    let mut mock_authentication_service = MockAuthenticationService::new();
-    mock_authentication_service
-        .expect_account_by_name()
-        .times(1)
-        .returning(|_| {
-            Ok(Some(Account::test(
-                odf::AccountID::new_seeded_ed25519("foo".as_bytes()),
-                "foo",
-            )))
-        });
-
     let mut mock_dataset_entry_repo = MockDatasetEntryRepository::new();
     mock_dataset_entry_repo
         .expect_get_dataset_entry_by_owner_and_name()
@@ -166,7 +155,7 @@ async fn test_try_to_resolve_non_existing_dataset() {
     let harness = DatasetEntryServiceHarness::new(
         mock_dataset_entry_repo,
         odf::dataset::MockDatasetStorageUnit::new(),
-        mock_authentication_service,
+        MockAuthenticationService::new(),
     );
 
     let dataset_ref = odf::DatasetAlias::new(
@@ -192,17 +181,6 @@ async fn test_try_to_resolve_non_existing_dataset() {
 async fn test_try_to_resolve_all_datasets_for_non_existing_user() {
     use futures::TryStreamExt;
 
-    let mut mock_authentication_service = MockAuthenticationService::new();
-    mock_authentication_service
-        .expect_account_by_name()
-        .times(1)
-        .returning(|_| {
-            Ok(Some(Account::test(
-                odf::AccountID::new_seeded_ed25519("foo".as_bytes()),
-                "foo",
-            )))
-        });
-
     let mut mock_dataset_entry_repo = MockDatasetEntryRepository::new();
     mock_dataset_entry_repo
         .expect_dataset_entries_count_by_owner_id()
@@ -216,7 +194,7 @@ async fn test_try_to_resolve_all_datasets_for_non_existing_user() {
     let harness = DatasetEntryServiceHarness::new(
         mock_dataset_entry_repo,
         odf::dataset::MockDatasetStorageUnit::new(),
-        mock_authentication_service,
+        MockAuthenticationService::new(),
     );
 
     let resolve_dataset_result = harness

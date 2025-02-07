@@ -11,14 +11,11 @@ use async_graphql::value;
 use database_common::NoOpDatabasePlugin;
 use kamu_accounts::testing::MockAuthenticationService;
 use kamu_accounts::{
-    Account,
     AuthenticationService,
     DEFAULT_ACCOUNT_ID,
-    DEFAULT_ACCOUNT_NAME,
     DEFAULT_ACCOUNT_NAME_STR,
     DUMMY_EMAIL_ADDRESS,
 };
-use mockall::predicate::eq;
 
 use crate::utils::authentication_catalogs;
 
@@ -28,17 +25,7 @@ use crate::utils::authentication_catalogs;
 async fn test_account_by_id() {
     let invalid_account_id = odf::AccountID::new_seeded_ed25519(b"I don't exist");
 
-    let mut mock_authentication_service = MockAuthenticationService::new();
-    mock_authentication_service
-        .expect_find_account_name_by_id()
-        .with(eq(DEFAULT_ACCOUNT_ID.clone()))
-        .returning(|_| Ok(Some(DEFAULT_ACCOUNT_NAME.clone())));
-    mock_authentication_service
-        .expect_find_account_name_by_id()
-        .with(eq(invalid_account_id.clone()))
-        .returning(|_| Ok(None));
-
-    let harness = GraphQLAccountsHarness::new(mock_authentication_service);
+    let harness = GraphQLAccountsHarness::new(MockAuthenticationService::new());
 
     let schema = kamu_adapter_graphql::schema_quiet();
     let res = schema
@@ -103,17 +90,7 @@ async fn test_account_by_id() {
 
 #[test_log::test(tokio::test)]
 async fn test_account_by_name() {
-    let mut mock_authentication_service = MockAuthenticationService::new();
-    mock_authentication_service
-        .expect_account_by_name()
-        .with(eq(DEFAULT_ACCOUNT_NAME.clone()))
-        .returning(|_| Ok(Some(Account::dummy())));
-    mock_authentication_service
-        .expect_account_by_name()
-        .with(eq(odf::AccountName::new_unchecked("unknown")))
-        .returning(|_| Ok(None));
-
-    let harness = GraphQLAccountsHarness::new(mock_authentication_service);
+    let harness = GraphQLAccountsHarness::new(MockAuthenticationService::new());
 
     let schema = kamu_adapter_graphql::schema_quiet();
     let res = schema
@@ -208,17 +185,7 @@ async fn test_account_by_name() {
 
 #[test_log::test(tokio::test)]
 async fn test_account_attributes() {
-    let mut mock_authentication_service = MockAuthenticationService::new();
-    mock_authentication_service
-        .expect_find_account_name_by_id()
-        .with(eq(DEFAULT_ACCOUNT_ID.clone()))
-        .returning(|_| Ok(Some(DEFAULT_ACCOUNT_NAME.clone())));
-    mock_authentication_service
-        .expect_account_by_id()
-        .with(eq(DEFAULT_ACCOUNT_ID.clone()))
-        .returning(|_| Ok(Some(Account::dummy())));
-
-    let harness = GraphQLAccountsHarness::new(mock_authentication_service);
+    let harness = GraphQLAccountsHarness::new(MockAuthenticationService::new());
     let (catalog_anonymous, catalog_authorized) = authentication_catalogs(&harness.catalog).await;
 
     let schema = kamu_adapter_graphql::schema_quiet();
@@ -331,17 +298,7 @@ async fn test_account_attributes() {
 
 #[test_log::test(tokio::test)]
 async fn test_update_email_success() {
-    let mut mock_authentication_service = MockAuthenticationService::new();
-    mock_authentication_service
-        .expect_find_account_name_by_id()
-        .with(eq(DEFAULT_ACCOUNT_ID.clone()))
-        .returning(|_| Ok(Some(DEFAULT_ACCOUNT_NAME.clone())));
-    mock_authentication_service
-        .expect_account_by_id()
-        .with(eq(DEFAULT_ACCOUNT_ID.clone()))
-        .returning(|_| Ok(Some(Account::dummy())));
-
-    let harness = GraphQLAccountsHarness::new(mock_authentication_service);
+    let harness = GraphQLAccountsHarness::new(MockAuthenticationService::new());
     let (_, catalog_authorized) = authentication_catalogs(&harness.catalog).await;
 
     let schema = kamu_adapter_graphql::schema_quiet();
@@ -388,17 +345,7 @@ async fn test_update_email_success() {
 
 #[test_log::test(tokio::test)]
 async fn test_update_email_bad_email() {
-    let mut mock_authentication_service = MockAuthenticationService::new();
-    mock_authentication_service
-        .expect_find_account_name_by_id()
-        .with(eq(DEFAULT_ACCOUNT_ID.clone()))
-        .returning(|_| Ok(Some(DEFAULT_ACCOUNT_NAME.clone())));
-    mock_authentication_service
-        .expect_account_by_id()
-        .with(eq(DEFAULT_ACCOUNT_ID.clone()))
-        .returning(|_| Ok(Some(Account::dummy())));
-
-    let harness = GraphQLAccountsHarness::new(mock_authentication_service);
+    let harness = GraphQLAccountsHarness::new(MockAuthenticationService::new());
     let (_, catalog_authorized) = authentication_catalogs(&harness.catalog).await;
 
     let schema = kamu_adapter_graphql::schema_quiet();
@@ -441,13 +388,7 @@ async fn test_update_email_bad_email() {
 
 #[test_log::test(tokio::test)]
 async fn test_update_email_unauthorized() {
-    let mut mock_authentication_service = MockAuthenticationService::new();
-    mock_authentication_service
-        .expect_find_account_name_by_id()
-        .with(eq(DEFAULT_ACCOUNT_ID.clone()))
-        .returning(|_| Ok(Some(DEFAULT_ACCOUNT_NAME.clone())));
-
-    let harness = GraphQLAccountsHarness::new(mock_authentication_service);
+    let harness = GraphQLAccountsHarness::new(MockAuthenticationService::new());
     let (catalog_anonymous, _) = authentication_catalogs(&harness.catalog).await;
 
     let schema = kamu_adapter_graphql::schema_quiet();

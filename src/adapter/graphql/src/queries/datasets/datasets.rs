@@ -116,12 +116,10 @@ impl Datasets {
         page: Option<usize>,
         per_page: Option<usize>,
     ) -> Result<DatasetConnection> {
-        let authentication_service = from_catalog_n!(ctx, dyn kamu_accounts::AuthenticationService);
+        let account_service = from_catalog_n!(ctx, dyn kamu_accounts::AccountService);
 
         let account_id: odf::AccountID = account_id.into();
-        let maybe_account_name = authentication_service
-            .find_account_name_by_id(&account_id)
-            .await?;
+        let maybe_account_name = account_service.find_account_name_by_id(&account_id).await?;
 
         if let Some(account_name) = maybe_account_name {
             self.by_account_impl(

@@ -164,10 +164,12 @@ impl AuthenticationServiceImpl {
                 let account_id = odf::AccountID::from_did_str(&token_data.claims.sub)
                     .map_err(|e| GetAccountInfoError::Internal(e.int_err()))?;
 
-                match self.account_by_id(&account_id).await {
-                    Ok(Some(account)) => Ok(account),
-                    Ok(None) => Err(GetAccountInfoError::AccountUnresolved),
-                    Err(e) => Err(GetAccountInfoError::Internal(e)),
+                match self.account_repository.get_account_by_id(&account_id).await {
+                    Ok(account) => Ok(account),
+                    Err(GetAccountByIdError::NotFound(_)) => {
+                        Err(GetAccountInfoError::AccountUnresolved)
+                    }
+                    Err(GetAccountByIdError::Internal(e)) => Err(GetAccountInfoError::Internal(e)),
                 }
             }
             AccessTokenType::KamuAccessToken(kamu_access_token) => self
@@ -279,66 +281,5 @@ impl AuthenticationService for AuthenticationServiceImpl {
 
     async fn account_by_token(&self, access_token: String) -> Result<Account, GetAccountInfoError> {
         self.account_by_token_impl(&access_token).await
-    }
-
-    async fn account_by_id(
-        &self,
-        account_id: &odf::AccountID,
-    ) -> Result<Option<Account>, InternalError> {
-        match self.account_repository.get_account_by_id(account_id).await {
-            Ok(account) => Ok(Some(account.clone())),
-            Err(GetAccountByIdError::NotFound(_)) => Ok(None),
-            Err(GetAccountByIdError::Internal(e)) => Err(e),
-        }
-    }
-
-    async fn accounts_by_ids(
-        &self,
-        account_ids: Vec<odf::AccountID>,
-    ) -> Result<Vec<Account>, InternalError> {
-        self.account_repository
-            .get_accounts_by_ids(account_ids)
-            .await
-            .int_err()
-    }
-
-    async fn account_by_name(
-        &self,
-        account_name: &odf::AccountName,
-    ) -> Result<Option<Account>, InternalError> {
-        match self
-            .account_repository
-            .get_account_by_name(account_name)
-            .await
-        {
-            Ok(account) => Ok(Some(account.clone())),
-            Err(GetAccountByNameError::NotFound(_)) => Ok(None),
-            Err(GetAccountByNameError::Internal(e)) => Err(e),
-        }
-    }
-
-    async fn find_account_id_by_name(
-        &self,
-        account_name: &odf::AccountName,
-    ) -> Result<Option<odf::AccountID>, InternalError> {
-        match self
-            .account_repository
-            .find_account_id_by_name(account_name)
-            .await
-        {
-            Ok(maybe_account_id) => Ok(maybe_account_id),
-            Err(FindAccountIdByNameError::Internal(e)) => Err(e),
-        }
-    }
-
-    async fn find_account_name_by_id(
-        &self,
-        account_id: &odf::AccountID,
-    ) -> Result<Option<odf::AccountName>, InternalError> {
-        match self.account_repository.get_account_by_id(account_id).await {
-            Ok(account) => Ok(Some(account.account_name.clone())),
-            Err(GetAccountByIdError::NotFound(_)) => Ok(None),
-            Err(GetAccountByIdError::Internal(e)) => Err(e),
-        }
     }
 }

@@ -11,12 +11,14 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use dill::*;
-use internal_error::ResultIntoInternal;
+use internal_error::{InternalError, ResultIntoInternal};
 use kamu_accounts::{
     Account,
     AccountRepository,
     AccountService,
+    FindAccountIdByNameError,
     GetAccountByIdError,
+    GetAccountByNameError,
     GetAccountMapError,
 };
 
@@ -38,6 +40,27 @@ impl AccountServiceImpl {
 
 #[async_trait::async_trait]
 impl AccountService for AccountServiceImpl {
+    async fn account_by_id(
+        &self,
+        account_id: &odf::AccountID,
+    ) -> Result<Option<Account>, InternalError> {
+        match self.account_repo.get_account_by_id(account_id).await {
+            Ok(account) => Ok(Some(account.clone())),
+            Err(GetAccountByIdError::NotFound(_)) => Ok(None),
+            Err(GetAccountByIdError::Internal(e)) => Err(e),
+        }
+    }
+
+    async fn accounts_by_ids(
+        &self,
+        account_ids: Vec<odf::AccountID>,
+    ) -> Result<Vec<Account>, InternalError> {
+        self.account_repo
+            .get_accounts_by_ids(account_ids)
+            .await
+            .int_err()
+    }
+
     async fn get_account_map(
         &self,
         account_ids: Vec<odf::AccountID>,
@@ -60,6 +83,42 @@ impl AccountService for AccountServiceImpl {
         .int_err()?;
 
         Ok(account_map)
+    }
+
+    async fn account_by_name(
+        &self,
+        account_name: &odf::AccountName,
+    ) -> Result<Option<Account>, InternalError> {
+        match self.account_repo.get_account_by_name(account_name).await {
+            Ok(account) => Ok(Some(account.clone())),
+            Err(GetAccountByNameError::NotFound(_)) => Ok(None),
+            Err(GetAccountByNameError::Internal(e)) => Err(e),
+        }
+    }
+
+    async fn find_account_id_by_name(
+        &self,
+        account_name: &odf::AccountName,
+    ) -> Result<Option<odf::AccountID>, InternalError> {
+        match self
+            .account_repo
+            .find_account_id_by_name(account_name)
+            .await
+        {
+            Ok(maybe_account_id) => Ok(maybe_account_id),
+            Err(FindAccountIdByNameError::Internal(e)) => Err(e),
+        }
+    }
+
+    async fn find_account_name_by_id(
+        &self,
+        account_id: &odf::AccountID,
+    ) -> Result<Option<odf::AccountName>, InternalError> {
+        match self.account_repo.get_account_by_id(account_id).await {
+            Ok(account) => Ok(Some(account.account_name.clone())),
+            Err(GetAccountByIdError::NotFound(_)) => Ok(None),
+            Err(GetAccountByIdError::Internal(e)) => Err(e),
+        }
     }
 }
 
