@@ -97,8 +97,8 @@ async fn setup_server<IdExt, Extractor>(
 )
 where
     IdExt: Fn(Extractor) -> odf::DatasetRef,
-    IdExt: Clone + Send + 'static,
-    Extractor: FromRequestParts<()> + Send + 'static,
+    IdExt: Clone + Send + Sync + 'static,
+    Extractor: FromRequestParts<()> + Send + Sync + 'static,
     <Extractor as FromRequestParts<()>>::Rejection: std::fmt::Debug,
 {
     let (router, _api) = OpenApiRouter::new()
@@ -158,11 +158,33 @@ async fn test_routing_root() {
     let repo = setup_repo().await;
 
     let dataset_ref = repo.created_dataset.dataset_handle.as_local_ref();
-    let (server, local_addr) =
-        setup_server(repo.catalog, "/", move |_: axum::extract::OriginalUri| {
-            dataset_ref.clone()
-        })
-        .await;
+
+    // Cannot reuse setup_server as we need to use `merge` instead of `nest` for
+    // root-level
+    let (router, _api) = OpenApiRouter::new()
+        .merge(
+            kamu_adapter_http::smart_transfer_protocol_router()
+                .layer(DatasetAuthorizationLayer::default())
+                .layer(kamu_adapter_http::DatasetResolverLayer::new(
+                    move |_: axum::extract::OriginalUri| dataset_ref.clone(),
+                    |_| false, /* does not matter for routing tests */
+                ))
+                .layer(axum::extract::Extension(repo.catalog)),
+        )
+        .layer(
+            tower::ServiceBuilder::new().layer(
+                tower_http::cors::CorsLayer::new()
+                    .allow_origin(tower_http::cors::Any)
+                    .allow_methods(vec![http::Method::GET, http::Method::POST])
+                    .allow_headers(tower_http::cors::Any),
+            ),
+        )
+        .split_for_parts();
+
+    let addr = SocketAddr::from((IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 0));
+    let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
+    let local_addr = listener.local_addr().unwrap();
+    let server = axum::serve(listener, router.into_make_service()).into_future();
 
     let dataset_url = url::Url::parse(&format!("http://{local_addr}/")).unwrap();
 
@@ -184,7 +206,7 @@ async fn test_routing_dataset_id() {
 
     let (server, local_addr) = setup_server(
         repo.catalog,
-        "/:dataset_id",
+        "/{dataset_id}",
         |Path(p): Path<DatasetByID>| p.dataset_id.as_local_ref(),
     )
     .await;
@@ -214,7 +236,7 @@ async fn test_routing_dataset_name() {
 
     let (server, local_addr) = setup_server(
         repo.catalog,
-        "/:dataset_name",
+        "/{dataset_name}",
         |Path(p): Path<DatasetByName>| {
             odf::DatasetAlias::new(None, p.dataset_name).into_local_ref()
         },
@@ -238,7 +260,7 @@ async fn test_routing_dataset_name_case_insensetive() {
 
     let (server, local_addr) = setup_server(
         repo.catalog,
-        "/:dataset_name",
+        "/{dataset_name}",
         |Path(p): Path<DatasetByName>| {
             odf::DatasetAlias::new(None, p.dataset_name).into_local_ref()
         },
@@ -276,7 +298,7 @@ async fn test_routing_dataset_account_and_name() {
 
     let (server, local_addr) = setup_server(
         repo.catalog,
-        "/:account_name/:dataset_name",
+        "/{account_name}/{dataset_name}",
         |Path(p): Path<DatasetByAccountAndName>| {
             // TODO: Ignoring account name until DatasetRepository supports multi-tenancy
             odf::DatasetAlias::new(None, p.dataset_name).into_local_ref()
@@ -305,7 +327,7 @@ async fn test_routing_err_invalid_identity_format() {
 
     let (server, local_addr) = setup_server(
         repo.catalog,
-        "/:dataset_id",
+        "/{dataset_id}",
         |Path(p): Path<DatasetByID>| p.dataset_id.into_local_ref(),
     )
     .await;
@@ -328,7 +350,7 @@ async fn test_routing_err_dataset_not_found() {
 
     let (server, local_addr) = setup_server(
         repo.catalog,
-        "/:dataset_name",
+        "/{dataset_name}",
         |Path(p): Path<DatasetByName>| odf::DatasetAlias::new(None, p.dataset_name).as_local_ref(),
     )
     .await;

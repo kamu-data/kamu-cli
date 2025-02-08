@@ -18,10 +18,20 @@ workspace = true
 
 
 [dependencies]
-chrono = { version = "0.4", default-features = false, features = ["std", "clock"] }
+chrono = { version = "0.4", default-features = false, features = [
+    "std",
+    "clock",
+] }
 clap = { version = "4", default-features = false, features = ["std"] }
-regex = { version = "1", default-features = false, features = ["std", "unicode"] }
-reqwest = { version = "0.12", features = ["blocking", "json"] }
+regex = { version = "1", default-features = false, features = [
+    "std",
+    "unicode",
+] }
+reqwest = { version = "0.12", default-features = false, features = [
+    "rustls-tls",
+    "blocking",
+    "json",
+] }
 semver = { version = "1", default-features = false }
 serde = { version = "1", default-features = false, features = ["derive"] }
 toml = { version = "0.8", default-features = false, features = ["parse"] }

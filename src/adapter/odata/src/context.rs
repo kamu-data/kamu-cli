@@ -19,7 +19,6 @@
 use std::sync::Arc;
 
 use auth::{DatasetAction, DatasetActionAuthorizer};
-use axum::async_trait;
 use chrono::{DateTime, Utc};
 use datafusion::arrow::datatypes::{Schema, SchemaRef};
 use datafusion::dataframe::DataFrame;
@@ -59,7 +58,7 @@ impl ODataServiceContext {
     }
 }
 
-#[async_trait]
+#[async_trait::async_trait]
 impl ServiceContext for ODataServiceContext {
     fn service_base_url(&self) -> String {
         self.service_base_url.clone()
@@ -132,7 +131,7 @@ impl ODataCollectionContext {
     }
 }
 
-#[async_trait]
+#[async_trait::async_trait]
 impl CollectionContext for ODataCollectionContext {
     fn addr(&self) -> Result<&CollectionAddr, ODataError> {
         Ok(&self.addr)

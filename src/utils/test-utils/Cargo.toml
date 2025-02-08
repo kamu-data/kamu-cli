@@ -24,7 +24,7 @@ doctest = false
 [dependencies]
 container-runtime = { workspace = true }
 
-axum = "0.7"
+axum = "0.8"
 rand = "0.8"
 tempfile = "3"
 tokio = { version = "1", default-features = false }

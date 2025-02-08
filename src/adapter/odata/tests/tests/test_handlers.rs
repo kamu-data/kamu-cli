@@ -113,8 +113,8 @@ async fn test_metadata_handler() {
                 <Key><PropertyRef Name="offset"/></Key>
                 <Property Name="offset" Type="Edm.Int64" Nullable="false"/>
                 <Property Name="op" Type="Edm.Int32" Nullable="false"/>
-                <Property Name="system_time" Type="Edm.DateTime" Nullable="false"/>
-                <Property Name="date" Type="Edm.DateTime" Nullable="true"/>
+                <Property Name="system_time" Type="Edm.DateTimeOffset" Nullable="false"/>
+                <Property Name="date" Type="Edm.DateTimeOffset" Nullable="true"/>
                 <Property Name="city" Type="Edm.String" Nullable="true"/>
                 <Property Name="population" Type="Edm.Int64" Nullable="true"/>
                 </EntityType>
@@ -178,8 +178,8 @@ async fn test_collection_handler() {
                 <m:properties>
                 <d:offset m:type="Edm.Int64">0</d:offset>
                 <d:op m:type="Edm.Int32">0</d:op>
-                <d:system_time m:type="Edm.DateTime">2050-01-01T12:00:00.000Z</d:system_time>
-                <d:date m:type="Edm.DateTime">2020-01-01T00:00:00.000Z</d:date>
+                <d:system_time m:type="Edm.DateTimeOffset">2050-01-01T12:00:00.000Z</d:system_time>
+                <d:date m:type="Edm.DateTimeOffset">2020-01-01T00:00:00.000Z</d:date>
                 <d:city m:type="Edm.String">A</d:city>
                 <d:population m:type="Edm.Int64">1000</d:population>
                 </m:properties>
@@ -196,8 +196,8 @@ async fn test_collection_handler() {
                 <m:properties>
                 <d:offset m:type="Edm.Int64">1</d:offset>
                 <d:op m:type="Edm.Int32">0</d:op>
-                <d:system_time m:type="Edm.DateTime">2050-01-01T12:00:00.000Z</d:system_time>
-                <d:date m:type="Edm.DateTime">2020-01-01T00:00:00.000Z</d:date>
+                <d:system_time m:type="Edm.DateTimeOffset">2050-01-01T12:00:00.000Z</d:system_time>
+                <d:date m:type="Edm.DateTimeOffset">2020-01-01T00:00:00.000Z</d:date>
                 <d:city m:type="Edm.String">B</d:city>
                 <d:population m:type="Edm.Int64">2000</d:population>
                 </m:properties>
@@ -213,8 +213,8 @@ async fn test_collection_handler() {
                 <content type="application/xml">
                 <m:properties>
                 <d:offset m:type="Edm.Int64">2</d:offset>
-                <d:op m:type="Edm.Int32">0</d:op><d:system_time m:type="Edm.DateTime">2050-01-01T12:00:00.000Z</d:system_time>
-                <d:date m:type="Edm.DateTime">2020-01-01T00:00:00.000Z</d:date>
+                <d:op m:type="Edm.Int32">0</d:op><d:system_time m:type="Edm.DateTimeOffset">2050-01-01T12:00:00.000Z</d:system_time>
+                <d:date m:type="Edm.DateTimeOffset">2020-01-01T00:00:00.000Z</d:date>
                 <d:city m:type="Edm.String">C</d:city><d:population m:type="Edm.Int64">3000</d:population>
                 </m:properties>
                 </content>
@@ -271,8 +271,8 @@ async fn test_collection_handler_by_id() {
                 <content type="application/xml">
                 <m:properties>
                 <d:offset m:type="Edm.Int64">2</d:offset>
-                <d:op m:type="Edm.Int32">0</d:op><d:system_time m:type="Edm.DateTime">2050-01-01T12:00:00.000Z</d:system_time>
-                <d:date m:type="Edm.DateTime">2020-01-01T00:00:00.000Z</d:date>
+                <d:op m:type="Edm.Int32">0</d:op><d:system_time m:type="Edm.DateTimeOffset">2050-01-01T12:00:00.000Z</d:system_time>
+                <d:date m:type="Edm.DateTimeOffset">2020-01-01T00:00:00.000Z</d:date>
                 <d:city m:type="Edm.String">C</d:city><d:population m:type="Edm.Int64">3000</d:population>
                 </m:properties>
                 </content>
