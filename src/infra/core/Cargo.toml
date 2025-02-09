@@ -77,7 +77,7 @@ ringbuf = "0.3"
 zip = "2"
 
 # Data
-datafusion = { version = "44", default-features = false }
+datafusion = { version = "45", default-features = false }
 digest = "0.10"
 object_store = { version = "0.11", features = ["aws"] }
 sha3 = "0.10"
@@ -141,8 +141,8 @@ curl = { optional = true, version = "0.4", features = [
     "static-ssl",
 ] }
 curl-sys = { optional = true, version = "0.4" }
-datafusion-ethers = { optional = true, version = "44" }
-datafusion-functions-json = { optional = true, version = "0.44" }
+datafusion-ethers = { optional = true, version = "45" }
+datafusion-functions-json = { optional = true, version = "0.45" }
 rumqttc = { optional = true, version = "0.24" }
 mockall = { optional = true, version = "0.13", default-features = false }
 oop = { optional = true, version = "0.0.2" }
@@ -162,7 +162,7 @@ odf = { workspace = true, features = ["testing"] }
 test-utils = { workspace = true }
 
 criterion = { version = "0.5", features = ["async_tokio"] }
-datafusion = { version = "44", default-features = false, features = [
+datafusion = { version = "45", default-features = false, features = [
     "parquet",
 ] }
 filetime = "0.2"

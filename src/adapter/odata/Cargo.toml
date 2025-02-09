@@ -37,8 +37,8 @@ odf = { workspace = true, default-features = false, features = [
 async-trait = { version = "0.1", default-features = false }
 axum = { version = "0.8", default-features = false, features = [] }
 chrono = { version = "0.4", default-features = false }
-datafusion = { version = "44", default-features = false }
-datafusion-odata = { version = "44", default-features = false }
+datafusion = { version = "45", default-features = false }
+datafusion-odata = { version = "45", default-features = false }
 dill = "0.11"
 futures = { version = "0.3", default-features = false }
 http = "1"

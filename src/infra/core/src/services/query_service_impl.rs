@@ -67,11 +67,6 @@ impl QueryServiceImpl {
         // options in transform DTOs)
         cfg.options_mut().sql_parser.enable_ident_normalization = false;
 
-        // TODO: Disabling Utf8View types due to unresolved issues
-        // See: https://github.com/apache/datafusion/issues/13510
-        // See: https://github.com/apache/datafusion/issues/13504
-        cfg.options_mut().execution.parquet.schema_force_view_types = false;
-
         let runtime = Arc::new(
             RuntimeEnvBuilder::new()
                 .with_object_store_registry(
