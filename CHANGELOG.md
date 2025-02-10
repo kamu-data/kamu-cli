@@ -24,7 +24,8 @@ Recommendation: for ease of reading, use the following order:
 - Moved several account-related routines from `AuthenticationService` to `AccountService`, 
   the authentication services has focus only on JWT token and login flows
 - Upgraded to `datafusion v45` (#1063)
-
+### Fixed
+- GQL metadata query now correctly returns dataset aliases for `SetTransform` event in multi-tenant mode
 
 ## [0.222.0] - 2025-02-06
 ### Added

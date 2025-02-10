@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
+use kamu_core::DatasetRegistry;
 
 use crate::prelude::*;
 use crate::queries::Account;
@@ -88,5 +89,39 @@ impl From<odf::metadata::serde::UnsupportedVersionError> for MetadataManifestUns
             supported_version_from: e.supported_version_range.0 as i32,
             supported_version_to: e.supported_version_range.1 as i32,
         }
+    }
+}
+
+impl SetTransform {
+    pub async fn try_from_odf(
+        ctx: &Context<'_>,
+        v: odf::metadata::SetTransform,
+    ) -> Result<Self, InternalError> {
+        let input_ids_list: Vec<odf::DatasetID> = v
+            .inputs
+            .iter()
+            .map(|input| input.dataset_ref.id().unwrap().clone())
+            .collect();
+        let dataset_registry = from_catalog_n!(ctx, dyn DatasetRegistry);
+        let dataset_infos = dataset_registry
+            .resolve_multiple_dataset_handles_by_ids(input_ids_list)
+            .await
+            .int_err()?;
+
+        if !dataset_infos.unresolved_datasets.is_empty() {
+            return InternalError::bail("Unable to resolve input datasets");
+        };
+        let inputs = dataset_infos
+            .resolved_handles
+            .iter()
+            .map(|dataset_handle| TransformInput {
+                dataset_ref: dataset_handle.id.as_local_ref().into(),
+                alias: dataset_handle.alias.clone().to_string(),
+            })
+            .collect();
+        Ok(Self {
+            inputs,
+            transform: v.transform.into(),
+        })
     }
 }

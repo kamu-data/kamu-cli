@@ -14,7 +14,7 @@ use chrono::Duration;
 use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use dill::Component;
 use indoc::indoc;
-use kamu::testing::{MockDatasetActionAuthorizer, MockDatasetChangesService};
+use kamu::testing::MockDatasetChangesService;
 use kamu::{DatasetStorageUnitLocalFs, MetadataQueryServiceImpl};
 use kamu_accounts::{DEFAULT_ACCOUNT_NAME, DEFAULT_ACCOUNT_NAME_STR};
 use kamu_core::*;
@@ -49,12 +49,7 @@ async fn test_list_account_flows() {
     let foo_dataset_alias =
         odf::DatasetAlias::new(Some(DEFAULT_ACCOUNT_NAME.clone()), foo_dataset_name.clone());
 
-    let mock_dataset_action_authorizer = MockDatasetActionAuthorizer::allowing();
-    let harness = FlowTriggerHarness::with_overrides(FlowTriggerHarnessOverrides {
-        mock_dataset_action_authorizer: Some(mock_dataset_action_authorizer),
-        ..Default::default()
-    })
-    .await;
+    let harness = FlowTriggerHarness::new().await;
 
     let create_result = harness.create_root_dataset(foo_dataset_alias).await;
     let schema = kamu_adapter_graphql::schema_quiet();
@@ -129,12 +124,7 @@ async fn test_list_account_flows() {
 
 #[test_log::test(tokio::test)]
 async fn test_list_datasets_with_flow() {
-    let mock_dataset_action_authorizer = MockDatasetActionAuthorizer::allowing();
-    let harness = FlowTriggerHarness::with_overrides(FlowTriggerHarnessOverrides {
-        mock_dataset_action_authorizer: Some(mock_dataset_action_authorizer),
-        ..Default::default()
-    })
-    .await;
+    let harness = FlowTriggerHarness::new().await;
 
     let foo_dataset_name = odf::DatasetName::new_unchecked("foo");
     let foo_dataset_alias =
@@ -240,12 +230,7 @@ async fn test_pause_resume_account_flows() {
         odf::DatasetName::new_unchecked("foo"),
     );
 
-    let mock_dataset_action_authorizer = MockDatasetActionAuthorizer::allowing();
-    let harness = FlowTriggerHarness::with_overrides(FlowTriggerHarnessOverrides {
-        mock_dataset_action_authorizer: Some(mock_dataset_action_authorizer),
-        ..Default::default()
-    })
-    .await;
+    let harness = FlowTriggerHarness::new().await;
 
     let foo_create_result = harness.create_root_dataset(foo_dataset_alias).await;
 
@@ -444,12 +429,7 @@ async fn test_account_triggers_all_paused() {
         odf::DatasetName::new_unchecked("bar"),
     );
 
-    let mock_dataset_action_authorizer = MockDatasetActionAuthorizer::allowing();
-    let harness = FlowTriggerHarness::with_overrides(FlowTriggerHarnessOverrides {
-        mock_dataset_action_authorizer: Some(mock_dataset_action_authorizer),
-        ..Default::default()
-    })
-    .await;
+    let harness = FlowTriggerHarness::new().await;
 
     let foo_create_result = harness.create_root_dataset(foo_dataset_alias).await;
     let bar_create_result = harness.create_root_dataset(bar_dataset_alias).await;
@@ -610,12 +590,6 @@ async fn test_account_triggers_all_paused() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Default)]
-struct FlowTriggerHarnessOverrides {
-    dataset_changes_mock: Option<MockDatasetChangesService>,
-    mock_dataset_action_authorizer: Option<MockDatasetActionAuthorizer>,
-}
-
 struct FlowTriggerHarness {
     _tempdir: tempfile::TempDir,
     _catalog_base: dill::Catalog,
@@ -623,48 +597,42 @@ struct FlowTriggerHarness {
 }
 
 impl FlowTriggerHarness {
-    async fn with_overrides(overrides: FlowTriggerHarnessOverrides) -> Self {
+    async fn new() -> Self {
         let tempdir = tempfile::tempdir().unwrap();
         let datasets_dir = tempdir.path().join("datasets");
         std::fs::create_dir(&datasets_dir).unwrap();
 
-        let dataset_changes_mock = overrides.dataset_changes_mock.unwrap_or_default();
-        let mock_dataset_action_authorizer =
-            overrides.mock_dataset_action_authorizer.unwrap_or_default();
-
         let catalog_base = {
             let mut b = dill::CatalogBuilder::new();
 
-            b
-            .add::<DummyOutboxImpl>()
-            .add::<DidGeneratorDefault>()
-            .add_value(TenancyConfig::MultiTenant)
-            .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
-            .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
-            .bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
-            .add::<MetadataQueryServiceImpl>()
-            .add::<CreateDatasetFromSnapshotUseCaseImpl>()
-            .add::<CreateDatasetUseCaseImpl>()
-            .add::<ViewDatasetUseCaseImpl>()
-            .add_value(dataset_changes_mock)
-            .bind::<dyn DatasetChangesService, MockDatasetChangesService>()
-            .add::<SystemTimeSourceDefault>()
-            .add_value(mock_dataset_action_authorizer)
-            .bind::<dyn kamu::domain::auth::DatasetActionAuthorizer, MockDatasetActionAuthorizer>()
-            .add::<DependencyGraphServiceImpl>()
-            .add::<InMemoryDatasetDependencyRepository>()
-            .add::<InMemoryFlowConfigurationEventStore>()
-            .add::<InMemoryFlowTriggerEventStore>()
-            .add::<InMemoryFlowEventStore>()
-            .add_value(FlowAgentConfig::new(
-                Duration::seconds(1),
-                Duration::minutes(1),
-            ))
-            .add::<TaskSchedulerImpl>()
-            .add::<InMemoryTaskEventStore>()
-            .add::<DatasetEntryServiceImpl>()
-            .add::<InMemoryDatasetEntryRepository>()
-            .add::<DatabaseTransactionRunner>();
+            b.add::<DummyOutboxImpl>()
+                .add::<DidGeneratorDefault>()
+                .add_value(TenancyConfig::MultiTenant)
+                .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
+                .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
+                .bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
+                .add::<MetadataQueryServiceImpl>()
+                .add::<CreateDatasetFromSnapshotUseCaseImpl>()
+                .add::<CreateDatasetUseCaseImpl>()
+                .add::<ViewDatasetUseCaseImpl>()
+                .add_value(MockDatasetChangesService::default())
+                .bind::<dyn DatasetChangesService, MockDatasetChangesService>()
+                .add::<SystemTimeSourceDefault>()
+                .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
+                .add::<DependencyGraphServiceImpl>()
+                .add::<InMemoryDatasetDependencyRepository>()
+                .add::<InMemoryFlowConfigurationEventStore>()
+                .add::<InMemoryFlowTriggerEventStore>()
+                .add::<InMemoryFlowEventStore>()
+                .add_value(FlowAgentConfig::new(
+                    Duration::seconds(1),
+                    Duration::minutes(1),
+                ))
+                .add::<TaskSchedulerImpl>()
+                .add::<InMemoryTaskEventStore>()
+                .add::<DatasetEntryServiceImpl>()
+                .add::<InMemoryDatasetEntryRepository>()
+                .add::<DatabaseTransactionRunner>();
 
             NoOpDatabasePlugin::init_database_components(&mut b);
             kamu_flow_system_services::register_dependencies(&mut b);
