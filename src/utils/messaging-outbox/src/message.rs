@@ -10,6 +10,7 @@
 use serde::{Deserialize, Serialize};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub trait Message: Clone + Serialize + for<'a> Deserialize<'a> + Send + Sync {
     // Version of outbox message which will be bumped only if the structure contains
     // breaking changes in the message structure

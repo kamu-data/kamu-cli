@@ -151,7 +151,7 @@ The scripts are stored in `./migrations/<db-engine>/` folders, and they are uniq
 The migration commands should be launched within database-specific crate folders, such as `./src/database/sqlx-postgres`. Alternatively, you will need to define `DATABASE_URL` variable manually.
 
 Typical commands to work with migrations include:
-* `sqlx migrate add --source <migrations_dir_path> <descriptoin>` to add a new migration
+* `sqlx migrate add --source <migrations_dir_path> <description>` to add a new migration
 * `sqlx migrate run --source <migrations_dir_path>` to apply migrations to the database
 * `sqlx migrate info --source <migrations_dir_path> ` to print information about currently applied migration within the database
 
