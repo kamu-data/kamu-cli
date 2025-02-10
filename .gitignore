@@ -1,4 +1,5 @@
-/target
+target/
+
 /examples/**/.kamu
 /examples/**/.ipynb_checkpoints
 /images/demo/**/.kamu
