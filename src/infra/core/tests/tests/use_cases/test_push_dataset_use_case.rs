@@ -22,6 +22,7 @@ use kamu::utils::simple_transfer_protocol::SimpleTransferProtocol;
 use kamu::*;
 use kamu_core::auth::DatasetAction;
 use kamu_core::*;
+use kamu_datasets::CreateDatasetResult;
 use odf::dataset::{DatasetFactoryImpl, IpfsGateway};
 use tempfile::TempDir;
 use url::Url;
@@ -394,10 +395,7 @@ impl PushUseCaseHarness {
         }
     }
 
-    async fn get_remote_aliases(
-        &self,
-        created: &odf::CreateDatasetResult,
-    ) -> Box<dyn RemoteAliases> {
+    async fn get_remote_aliases(&self, created: &CreateDatasetResult) -> Box<dyn RemoteAliases> {
         self.remote_aliases_registry
             .get_remote_aliases(&created.dataset_handle)
             .await

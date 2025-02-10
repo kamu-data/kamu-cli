@@ -135,23 +135,23 @@ pub struct InvalidDatasetKindError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl From<odf::storage::GetRefError> for CompactionPlanningError {
-    fn from(v: odf::storage::GetRefError) -> Self {
+impl From<odf::GetRefError> for CompactionPlanningError {
+    fn from(v: odf::GetRefError) -> Self {
         match v {
-            odf::storage::GetRefError::NotFound(e) => Self::Internal(e.int_err()),
-            odf::storage::GetRefError::Access(e) => Self::Access(e),
-            odf::storage::GetRefError::Internal(e) => Self::Internal(e),
+            odf::GetRefError::NotFound(e) => Self::Internal(e.int_err()),
+            odf::GetRefError::Access(e) => Self::Access(e),
+            odf::GetRefError::Internal(e) => Self::Internal(e),
         }
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl From<odf::dataset::IterBlocksError> for CompactionPlanningError {
-    fn from(v: odf::dataset::IterBlocksError) -> Self {
+impl From<odf::IterBlocksError> for CompactionPlanningError {
+    fn from(v: odf::IterBlocksError) -> Self {
         match v {
-            odf::dataset::IterBlocksError::Access(e) => Self::Access(e),
-            odf::dataset::IterBlocksError::Internal(e) => Self::Internal(e),
+            odf::IterBlocksError::Access(e) => Self::Access(e),
+            odf::IterBlocksError::Internal(e) => Self::Internal(e),
             _ => CompactionPlanningError::Internal(v.int_err()),
         }
     }

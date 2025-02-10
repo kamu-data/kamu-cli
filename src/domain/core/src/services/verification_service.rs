@@ -171,7 +171,7 @@ pub enum VerificationError {
     DatasetNotFound(
         #[from]
         #[backtrace]
-        odf::dataset::DatasetNotFoundError,
+        odf::DatasetNotFoundError,
     ),
     #[error(transparent)]
     RefNotFound(
@@ -241,39 +241,35 @@ pub enum VerificationError {
     ),
 }
 
-impl From<odf::dataset::GetDatasetError> for VerificationError {
-    fn from(v: odf::dataset::GetDatasetError) -> Self {
+impl From<odf::DatasetRefUnresolvedError> for VerificationError {
+    fn from(v: odf::DatasetRefUnresolvedError) -> Self {
         match v {
-            odf::dataset::GetDatasetError::NotFound(e) => VerificationError::DatasetNotFound(e),
-            odf::dataset::GetDatasetError::Internal(e) => VerificationError::Internal(e),
+            odf::DatasetRefUnresolvedError::NotFound(e) => VerificationError::DatasetNotFound(e),
+            odf::DatasetRefUnresolvedError::Internal(e) => VerificationError::Internal(e),
         }
     }
 }
 
-impl From<odf::storage::GetRefError> for VerificationError {
-    fn from(v: odf::storage::GetRefError) -> Self {
+impl From<odf::GetRefError> for VerificationError {
+    fn from(v: odf::GetRefError) -> Self {
         match v {
-            odf::storage::GetRefError::NotFound(e) => VerificationError::RefNotFound(e),
-            odf::storage::GetRefError::Access(e) => VerificationError::Internal(e.int_err()),
-            odf::storage::GetRefError::Internal(e) => VerificationError::Internal(e),
+            odf::GetRefError::NotFound(e) => VerificationError::RefNotFound(e),
+            odf::GetRefError::Access(e) => VerificationError::Internal(e.int_err()),
+            odf::GetRefError::Internal(e) => VerificationError::Internal(e),
         }
     }
 }
 
-impl From<odf::dataset::IterBlocksError> for VerificationError {
-    fn from(v: odf::dataset::IterBlocksError) -> Self {
+impl From<odf::IterBlocksError> for VerificationError {
+    fn from(v: odf::IterBlocksError) -> Self {
         match v {
-            odf::dataset::IterBlocksError::RefNotFound(e) => VerificationError::RefNotFound(e),
-            odf::dataset::IterBlocksError::BlockNotFound(e) => VerificationError::BlockNotFound(e),
-            odf::dataset::IterBlocksError::BlockVersion(e) => VerificationError::BlockVersion(e),
-            odf::dataset::IterBlocksError::BlockMalformed(e) => {
-                VerificationError::BlockMalformed(e)
-            }
-            odf::dataset::IterBlocksError::InvalidInterval(e) => {
-                VerificationError::InvalidInterval(e)
-            }
-            odf::dataset::IterBlocksError::Access(e) => VerificationError::Internal(e.int_err()),
-            odf::dataset::IterBlocksError::Internal(e) => VerificationError::Internal(e),
+            odf::IterBlocksError::RefNotFound(e) => VerificationError::RefNotFound(e),
+            odf::IterBlocksError::BlockNotFound(e) => VerificationError::BlockNotFound(e),
+            odf::IterBlocksError::BlockVersion(e) => VerificationError::BlockVersion(e),
+            odf::IterBlocksError::BlockMalformed(e) => VerificationError::BlockMalformed(e),
+            odf::IterBlocksError::InvalidInterval(e) => VerificationError::InvalidInterval(e),
+            odf::IterBlocksError::Access(e) => VerificationError::Internal(e.int_err()),
+            odf::IterBlocksError::Internal(e) => VerificationError::Internal(e),
         }
     }
 }
@@ -287,14 +283,14 @@ impl From<auth::DatasetActionUnauthorizedError> for VerificationError {
     }
 }
 
-impl From<odf::storage::GetBlockError> for VerificationError {
-    fn from(v: odf::storage::GetBlockError) -> Self {
+impl From<odf::GetBlockError> for VerificationError {
+    fn from(v: odf::GetBlockError) -> Self {
         match v {
-            odf::storage::GetBlockError::NotFound(e) => Self::BlockNotFound(e),
-            odf::storage::GetBlockError::BlockVersion(e) => Self::BlockVersion(e),
-            odf::storage::GetBlockError::BlockMalformed(e) => Self::BlockMalformed(e),
-            odf::storage::GetBlockError::Access(e) => Self::Internal(e.int_err()),
-            odf::storage::GetBlockError::Internal(e) => Self::Internal(e),
+            odf::GetBlockError::NotFound(e) => Self::BlockNotFound(e),
+            odf::GetBlockError::BlockVersion(e) => Self::BlockVersion(e),
+            odf::GetBlockError::BlockMalformed(e) => Self::BlockMalformed(e),
+            odf::GetBlockError::Access(e) => Self::Internal(e.int_err()),
+            odf::GetBlockError::Internal(e) => Self::Internal(e),
         }
     }
 }

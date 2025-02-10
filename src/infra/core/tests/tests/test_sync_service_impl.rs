@@ -41,20 +41,13 @@ const FILE_DATA_ARRAY_SIZE: usize = 32;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-async fn assert_in_sync(
-    dataset_repo_lhs: &DatasetStorageUnitLocalFs,
-    dataset_repo_rhs: &DatasetStorageUnitLocalFs,
-    lhs: impl Into<odf::DatasetRef>,
-    rhs: impl Into<odf::DatasetRef>,
+fn assert_in_sync(
+    dataset_repo_lhs: &odf::dataset::DatasetStorageUnitLocalFs,
+    dataset_repo_rhs: &odf::dataset::DatasetStorageUnitLocalFs,
+    dataset_id: &odf::DatasetID,
 ) {
-    let lhs_layout = dataset_repo_lhs
-        .get_dataset_layout(&lhs.into())
-        .await
-        .unwrap();
-    let rhs_layout = dataset_repo_rhs
-        .get_dataset_layout(&rhs.into())
-        .await
-        .unwrap();
+    let lhs_layout = dataset_repo_lhs.get_dataset_layout(dataset_id).unwrap();
+    let rhs_layout = dataset_repo_rhs.get_dataset_layout(dataset_id).unwrap();
     DatasetTestHelper::assert_datasets_in_sync(&lhs_layout, &rhs_layout);
 }
 
@@ -86,9 +79,9 @@ async fn do_test_sync(
         .add_value(ipfs_client.clone())
         .add_value(CurrentAccountSubject::new_test())
         .add_value(TenancyConfig::SingleTenant)
-        .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir_foo))
-        .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
-        .bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
+        .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder().with_root(datasets_dir_foo))
+        .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
+        .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>()
         .add::<DatasetRegistrySoloUnitBridge>()
         .add_value(RemoteReposDir::new(tmp_workspace_dir_foo.join("repos")))
         .add::<RemoteRepositoryRegistryImpl>()
@@ -127,9 +120,9 @@ async fn do_test_sync(
         .add_value(ipfs_client.clone())
         .add_value(CurrentAccountSubject::new_test())
         .add_value(TenancyConfig::SingleTenant)
-        .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir_bar))
-        .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
-        .bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
+        .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder().with_root(datasets_dir_bar))
+        .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
+        .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>()
         .add::<DatasetRegistrySoloUnitBridge>()
         .add_value(RemoteReposDir::new(tmp_workspace_dir_bar.join("repos")))
         .add::<RemoteRepositoryRegistryImpl>()
@@ -151,14 +144,18 @@ async fn do_test_sync(
 
     let sync_svc_foo = catalog_foo.get_one::<dyn SyncService>().unwrap();
     let sync_request_builder_foo = catalog_foo.get_one::<SyncRequestBuilder>().unwrap();
-    let storage_unit_foo = catalog_foo.get_one::<DatasetStorageUnitLocalFs>().unwrap();
+    let storage_unit_foo = catalog_foo
+        .get_one::<odf::dataset::DatasetStorageUnitLocalFs>()
+        .unwrap();
     let dataset_registry_foo = catalog_foo.get_one::<dyn DatasetRegistry>().unwrap();
     let did_generator_foo = catalog_foo.get_one::<dyn DidGenerator>().unwrap();
     let time_source_foo = catalog_foo.get_one::<dyn SystemTimeSource>().unwrap();
 
     let sync_svc_bar = catalog_bar.get_one::<dyn SyncService>().unwrap();
     let sync_request_builder_bar = catalog_bar.get_one::<SyncRequestBuilder>().unwrap();
-    let storage_unit_bar = catalog_bar.get_one::<DatasetStorageUnitLocalFs>().unwrap();
+    let storage_unit_bar = catalog_bar
+        .get_one::<odf::dataset::DatasetStorageUnitLocalFs>()
+        .unwrap();
     let dataset_registry_bar = catalog_bar.get_one::<dyn DatasetRegistry>().unwrap();
 
     // Dataset does not exist locally / remotely
@@ -183,7 +180,7 @@ async fn do_test_sync(
         .push_event(MetadataFactory::set_data_schema().build())
         .build();
 
-    let b1 = create_test_dataset_from_snapshot(
+    let stored_foo = create_test_dataset_from_snapshot(
         dataset_registry_foo.as_ref(),
         storage_unit_foo.as_ref(),
         snapshot,
@@ -191,8 +188,8 @@ async fn do_test_sync(
         time_source_foo.now(),
     )
     .await
-    .unwrap()
-    .head;
+    .unwrap();
+    let b1 = stored_foo.head;
 
     // Initial sync ///////////////////////////////////////////////////////////
     assert_matches!(
@@ -244,13 +241,7 @@ async fn do_test_sync(
         } if new_head == b1
     );
 
-    assert_in_sync(
-        &storage_unit_foo,
-        &storage_unit_bar,
-        &dataset_alias_foo,
-        &dataset_alias_bar,
-    )
-    .await;
+    assert_in_sync(&storage_unit_foo, &storage_unit_bar, &stored_foo.dataset_id);
 
     // Subsequent sync ////////////////////////////////////////////////////////
     let _b2 = DatasetTestHelper::append_random_data(
@@ -330,13 +321,7 @@ async fn do_test_sync(
         } if old_head.as_ref() == Some(&b1) && new_head == b3
     );
 
-    assert_in_sync(
-        &storage_unit_foo,
-        &storage_unit_bar,
-        &dataset_alias_foo,
-        &dataset_alias_bar,
-    )
-    .await;
+    assert_in_sync(&storage_unit_foo, &storage_unit_bar, &stored_foo.dataset_id);
 
     // Up to date /////////////////////////////////////////////////////////////
     let sync_result = sync_svc_foo
@@ -365,13 +350,7 @@ async fn do_test_sync(
         .unwrap();
     assert_matches!(sync_result, SyncResult::UpToDate);
 
-    assert_in_sync(
-        &storage_unit_foo,
-        &storage_unit_bar,
-        &dataset_alias_foo,
-        &dataset_alias_bar,
-    )
-    .await;
+    assert_in_sync(&storage_unit_foo, &storage_unit_bar, &stored_foo.dataset_id);
 
     // Datasets out-of-sync on push //////////////////////////////////////////////
 
@@ -574,8 +553,11 @@ async fn do_test_sync(
         )
         .await;
 
-        let dir_files =
-            std::fs::read_dir(tmp_workspace_dir_foo.join("datasets/foo/checkpoints")).unwrap();
+        let dir_files = std::fs::read_dir(tmp_workspace_dir_foo.join(format!(
+            "datasets/{}/checkpoints",
+            stored_foo.dataset_id.as_multibase().to_stack_string(),
+        )))
+        .unwrap();
         for file_info in dir_files {
             std::fs::remove_file(file_info.unwrap().path()).unwrap();
         }

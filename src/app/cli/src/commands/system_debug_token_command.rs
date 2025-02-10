@@ -32,10 +32,6 @@ impl DebugTokenCommand {
 
 #[async_trait::async_trait(?Send)]
 impl Command for DebugTokenCommand {
-    fn needs_workspace(&self) -> bool {
-        false
-    }
-
     async fn run(&mut self) -> Result<(), CLIError> {
         let token = self
             .auth_service

@@ -37,8 +37,8 @@ use crate::{mock_engine_provisioner, TransformTestHelper};
 async fn test_dataset_compact() {
     let harness = CompactTestHarness::new();
 
-    let created = harness.create_test_root_dataset().await;
-    let dataset_ref = created.dataset_handle.as_local_ref();
+    let target = harness.create_test_root_dataset().await;
+    let dataset_ref = target.get_handle().as_local_ref();
 
     let data_helper = harness.dataset_data_helper(&dataset_ref).await;
 
@@ -55,10 +55,11 @@ async fn test_dataset_compact() {
         "
     );
 
-    harness.ingest_data(data_str.to_string(), &created).await;
+    harness
+        .ingest_data(data_str.to_string(), target.clone())
+        .await;
 
-    let prev_head = created
-        .dataset
+    let prev_head = target
         .as_metadata_chain()
         .resolve_ref(&odf::BlockRef::Head)
         .await
@@ -66,15 +67,14 @@ async fn test_dataset_compact() {
 
     assert_matches!(
         harness
-            .compact_dataset(&created, CompactionOptions::default())
+            .compact_dataset(target.clone(), CompactionOptions::default())
             .await,
         Ok(CompactionResult::NothingToDo)
     );
 
     assert_eq!(
         prev_head,
-        created
-            .dataset
+        target
             .as_metadata_chain()
             .resolve_ref(&odf::BlockRef::Head)
             .await
@@ -97,13 +97,15 @@ async fn test_dataset_compact() {
         "
     );
 
-    harness.ingest_data(data_str.to_string(), &created).await;
+    harness
+        .ingest_data(data_str.to_string(), target.clone())
+        .await;
 
     let old_blocks = harness.get_dataset_blocks(&dataset_ref).await;
 
     assert_matches!(
         harness
-            .compact_dataset(&created, CompactionOptions::default())
+            .compact_dataset(target.clone(), CompactionOptions::default())
             .await,
         Ok(CompactionResult::Success {
             new_head,
@@ -113,7 +115,7 @@ async fn test_dataset_compact() {
         }) if new_head != old_head,
     );
 
-    assert!(harness.verify_dataset(&created).await);
+    assert!(harness.verify_dataset(target).await);
 
     data_helper
         .assert_last_data_eq(
@@ -171,8 +173,8 @@ async fn test_dataset_compact_s3() {
     let s3 = LocalS3Server::new().await;
     let harness = CompactTestHarness::new_s3(&s3).await;
 
-    let created = harness.create_test_root_dataset().await;
-    let dataset_ref = created.dataset_handle.as_local_ref();
+    let target = harness.create_test_root_dataset().await;
+    let dataset_ref = target.get_handle().as_local_ref();
 
     // Round 1: Compaction is a no-op
     //
@@ -187,10 +189,11 @@ async fn test_dataset_compact_s3() {
         "
     );
 
-    harness.ingest_data(data_str.to_string(), &created).await;
+    harness
+        .ingest_data(data_str.to_string(), target.clone())
+        .await;
 
-    let prev_head = created
-        .dataset
+    let prev_head = target
         .as_metadata_chain()
         .resolve_ref(&odf::BlockRef::Head)
         .await
@@ -198,15 +201,14 @@ async fn test_dataset_compact_s3() {
 
     assert_matches!(
         harness
-            .compact_dataset(&created, CompactionOptions::default())
+            .compact_dataset(target.clone(), CompactionOptions::default())
             .await,
         Ok(CompactionResult::NothingToDo)
     );
 
     assert_eq!(
         prev_head,
-        created
-            .dataset
+        target
             .as_metadata_chain()
             .resolve_ref(&odf::BlockRef::Head)
             .await
@@ -229,13 +231,15 @@ async fn test_dataset_compact_s3() {
         "
     );
 
-    harness.ingest_data(data_str.to_string(), &created).await;
+    harness
+        .ingest_data(data_str.to_string(), target.clone())
+        .await;
 
     let old_blocks = harness.get_dataset_blocks(&dataset_ref).await;
 
     assert_matches!(
         harness
-        .compact_dataset(&created, CompactionOptions::default())
+        .compact_dataset(target.clone(), CompactionOptions::default())
         .await,
         Ok(CompactionResult::Success {
             new_head,
@@ -245,7 +249,7 @@ async fn test_dataset_compact_s3() {
         }) if new_head != old_head,
     );
 
-    assert!(harness.verify_dataset(&created).await);
+    assert!(harness.verify_dataset(target).await);
 
     let new_blocks = harness.get_dataset_blocks(&dataset_ref).await;
 
@@ -271,8 +275,8 @@ async fn test_dataset_compact_s3() {
 async fn test_dataset_compaction_watermark_only_blocks() {
     let harness = CompactTestHarness::new();
 
-    let created = harness.create_test_root_dataset().await;
-    let dataset_ref = created.dataset_handle.as_local_ref();
+    let target = harness.create_test_root_dataset().await;
+    let dataset_ref = target.get_handle().as_local_ref();
 
     let data_helper = harness.dataset_data_helper(&dataset_ref).await;
 
@@ -287,10 +291,11 @@ async fn test_dataset_compaction_watermark_only_blocks() {
         "
     );
 
-    harness.ingest_data(data_str.to_string(), &created).await;
+    harness
+        .ingest_data(data_str.to_string(), target.clone())
+        .await;
 
-    created
-        .dataset
+    target
         .commit_add_data(
             odf::dataset::AddDataParams {
                 prev_checkpoint: None,
@@ -318,10 +323,11 @@ async fn test_dataset_compaction_watermark_only_blocks() {
         "
     );
 
-    harness.ingest_data(data_str.to_string(), &created).await;
+    harness
+        .ingest_data(data_str.to_string(), target.clone())
+        .await;
 
-    created
-        .dataset
+    target
         .commit_add_data(
             odf::dataset::AddDataParams {
                 prev_checkpoint: None,
@@ -348,7 +354,7 @@ async fn test_dataset_compaction_watermark_only_blocks() {
 
     // After: ... <- add_data(6 records, wm2, src2)
     let res = harness
-        .compact_dataset(&created, CompactionOptions::default())
+        .compact_dataset(target.clone(), CompactionOptions::default())
         .await
         .unwrap();
 
@@ -405,8 +411,7 @@ async fn test_dataset_compaction_watermark_only_blocks() {
         .unwrap();
 
     use odf::metadata::AsTypedBlock;
-    let new_add_data = created
-        .dataset
+    let new_add_data = target
         .as_metadata_chain()
         .get_block(&new_head)
         .await
@@ -435,8 +440,8 @@ async fn test_dataset_compaction_watermark_only_blocks() {
 async fn test_dataset_compaction_limits() {
     let harness = CompactTestHarness::new();
 
-    let created = harness.create_test_root_dataset().await;
-    let dataset_ref = created.dataset_handle.as_local_ref();
+    let target = harness.create_test_root_dataset().await;
+    let dataset_ref = target.get_handle().as_local_ref();
 
     let data_helper = harness.dataset_data_helper(&dataset_ref).await;
     let data_str = indoc!(
@@ -448,7 +453,9 @@ async fn test_dataset_compaction_limits() {
         "
     );
 
-    harness.ingest_data(data_str.to_string(), &created).await;
+    harness
+        .ingest_data(data_str.to_string(), target.clone())
+        .await;
 
     let data_str = indoc!(
         "
@@ -459,7 +466,9 @@ async fn test_dataset_compaction_limits() {
         "
     );
 
-    harness.ingest_data(data_str.to_string(), &created).await;
+    harness
+        .ingest_data(data_str.to_string(), target.clone())
+        .await;
 
     let data_str = indoc!(
         "
@@ -473,7 +482,9 @@ async fn test_dataset_compaction_limits() {
         "
     );
 
-    harness.ingest_data(data_str.to_string(), &created).await;
+    harness
+        .ingest_data(data_str.to_string(), target.clone())
+        .await;
 
     let data_str = indoc!(
         "
@@ -484,7 +495,9 @@ async fn test_dataset_compaction_limits() {
         "
     );
 
-    harness.ingest_data(data_str.to_string(), &created).await;
+    harness
+        .ingest_data(data_str.to_string(), target.clone())
+        .await;
 
     let data_str = indoc!(
         "
@@ -493,7 +506,9 @@ async fn test_dataset_compaction_limits() {
         "
     );
 
-    harness.ingest_data(data_str.to_string(), &created).await;
+    harness
+        .ingest_data(data_str.to_string(), target.clone())
+        .await;
 
     // Initial state:
     // seed <- add_push_source <- set_vocab <- set_schema <- add_data(3r) <-
@@ -503,7 +518,7 @@ async fn test_dataset_compaction_limits() {
     assert_matches!(
         harness
             .compact_dataset(
-                &created,
+                target.clone(),
                 CompactionOptions {
                     max_slice_records: Some(6),
                     ..CompactionOptions::default()
@@ -517,7 +532,7 @@ async fn test_dataset_compaction_limits() {
             old_num_blocks: 9
         }) if new_head != old_head,
     );
-    assert!(harness.verify_dataset(&created).await);
+    assert!(harness.verify_dataset(target).await);
 
     data_helper
             .assert_last_data_eq(
@@ -592,8 +607,8 @@ async fn test_dataset_compaction_limits() {
 async fn test_dataset_compaction_keep_all_non_data_blocks() {
     let harness = CompactTestHarness::new();
 
-    let created = harness.create_test_root_dataset().await;
-    let dataset_ref = created.dataset_handle.as_local_ref();
+    let target = harness.create_test_root_dataset().await;
+    let dataset_ref = target.get_handle().as_local_ref();
 
     let data_helper = harness.dataset_data_helper(&dataset_ref).await;
     let data_str = indoc!(
@@ -605,7 +620,9 @@ async fn test_dataset_compaction_keep_all_non_data_blocks() {
         "
     );
 
-    harness.ingest_data(data_str.to_string(), &created).await;
+    harness
+        .ingest_data(data_str.to_string(), target.clone())
+        .await;
 
     let data_str = indoc!(
         "
@@ -616,11 +633,11 @@ async fn test_dataset_compaction_keep_all_non_data_blocks() {
         "
     );
 
-    harness.ingest_data(data_str.to_string(), &created).await;
-
-    let current_head = harness
-        .get_dataset_head(&created.dataset_handle.as_local_ref())
+    harness
+        .ingest_data(data_str.to_string(), target.clone())
         .await;
+
+    let current_head = harness.get_dataset_head(&dataset_ref).await;
     harness
         .commit_set_licence_block(&dataset_ref, &current_head)
         .await;
@@ -634,7 +651,9 @@ async fn test_dataset_compaction_keep_all_non_data_blocks() {
         "
     );
 
-    harness.ingest_data(data_str.to_string(), &created).await;
+    harness
+        .ingest_data(data_str.to_string(), target.clone())
+        .await;
 
     let data_str = indoc!(
         "
@@ -645,7 +664,9 @@ async fn test_dataset_compaction_keep_all_non_data_blocks() {
         "
     );
 
-    harness.ingest_data(data_str.to_string(), &created).await;
+    harness
+        .ingest_data(data_str.to_string(), target.clone())
+        .await;
 
     // seed <- add_push_source <- set_vocab <- set_schema <- add_data(3r) <-
     // add_data(3r) <- set_licence <- add_data(3r) <- add_data(3r)
@@ -654,7 +675,7 @@ async fn test_dataset_compaction_keep_all_non_data_blocks() {
     assert_matches!(
         harness
             .compact_dataset(
-                &created,
+                target.clone(),
                 CompactionOptions::default(),
             )
             .await,
@@ -665,7 +686,7 @@ async fn test_dataset_compaction_keep_all_non_data_blocks() {
             old_num_blocks: 9
         }) if new_head != old_head,
     );
-    assert!(harness.verify_dataset(&created).await);
+    assert!(harness.verify_dataset(target).await);
 
     data_helper
         .assert_last_data_eq(
@@ -733,8 +754,8 @@ async fn test_dataset_compaction_keep_all_non_data_blocks() {
 async fn test_dataset_compaction_derive_error() {
     let harness = CompactTestHarness::new();
 
-    let created = harness
-        .create_dataset(
+    let stored = harness
+        .store_dataset(
             MetadataFactory::dataset_snapshot()
                 .name("derive.foo")
                 .kind(odf::DatasetKind::Derivative)
@@ -743,9 +764,14 @@ async fn test_dataset_compaction_derive_error() {
         )
         .await;
 
+    let target = ResolvedDataset::from_stored(
+        &stored,
+        &odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("derive.foo")),
+    );
+
     assert_matches!(
         harness
-            .compact_dataset(&created, CompactionOptions::default(),)
+            .compact_dataset(target, CompactionOptions::default(),)
             .await,
         Err(CompactionError::Planning(
             CompactionPlanningError::InvalidDatasetKind(_)
@@ -760,10 +786,10 @@ async fn test_dataset_compaction_derive_error() {
 async fn test_large_dataset_compact() {
     let harness = CompactTestHarness::new();
 
-    let created = harness.create_test_root_dataset().await;
-    let dataset_ref = created.dataset_handle.as_local_ref();
+    let target = harness.create_test_root_dataset().await;
+    let dataset_ref = target.get_handle().as_local_ref();
 
-    harness.ingest_multiple_blocks(&created, 100, 2).await;
+    harness.ingest_multiple_blocks(target.clone(), 100, 2).await;
 
     let data_helper = harness.dataset_data_helper(&dataset_ref).await;
 
@@ -802,7 +828,7 @@ async fn test_large_dataset_compact() {
     assert_matches!(
         harness
             .compact_dataset(
-                &created,
+                target.clone(),
                 CompactionOptions {
                     max_slice_records: Some(10),
                     max_slice_size: None,
@@ -817,7 +843,7 @@ async fn test_large_dataset_compact() {
             old_num_blocks: 104
         }) if new_head != old_head,
     );
-    assert!(harness.verify_dataset(&created).await);
+    assert!(harness.verify_dataset(target).await);
 
     let new_blocks = harness.get_dataset_blocks(&dataset_ref).await;
 
@@ -881,10 +907,12 @@ async fn test_compact_offsets_are_sequential_impl() {
     testing_logger::setup();
     let harness = CompactTestHarness::new();
 
-    let created = harness.create_test_root_dataset().await;
-    let dataset_ref = created.dataset_handle.as_local_ref();
+    let target = harness.create_test_root_dataset().await;
+    let dataset_ref = target.get_handle().as_local_ref();
 
-    harness.ingest_multiple_blocks(&created, 10, 10000).await;
+    harness
+        .ingest_multiple_blocks(target.clone(), 10, 10000)
+        .await;
 
     let data_helper = harness.dataset_data_helper(&dataset_ref).await;
 
@@ -895,7 +923,7 @@ async fn test_compact_offsets_are_sequential_impl() {
     assert_matches!(
         harness
             .compact_dataset(
-                &created,
+                target,
                 CompactionOptions {
                     max_slice_records: Some(u64::MAX),
                     max_slice_size: Some(u64::MAX),
@@ -949,9 +977,9 @@ async fn test_compact_offsets_are_sequential_impl() {
 async fn test_dataset_keep_metadata_only_compact() {
     let harness = CompactTestHarness::new();
 
-    let created_root = harness.create_test_root_dataset().await;
-    let created_derived = harness.create_test_derived_dataset().await;
-    let derived_dataset_ref = created_derived.dataset_handle.as_local_ref();
+    let target_root = harness.create_test_root_dataset().await;
+    let target_derived = harness.create_test_derived_dataset().await;
+    let derived_dataset_ref = target_derived.get_handle().as_local_ref();
 
     let data_str = indoc!(
         "
@@ -963,11 +991,10 @@ async fn test_dataset_keep_metadata_only_compact() {
     );
 
     harness
-        .ingest_data(data_str.to_string(), &created_root)
+        .ingest_data(data_str.to_string(), target_root.clone())
         .await;
 
-    let prev_head = created_derived
-        .dataset
+    let prev_head = target_derived
         .as_metadata_chain()
         .resolve_ref(&odf::BlockRef::Head)
         .await
@@ -976,7 +1003,7 @@ async fn test_dataset_keep_metadata_only_compact() {
     assert_matches!(
         harness
             .compact_dataset(
-                &created_derived,
+                target_derived.clone(),
                 CompactionOptions {
                     keep_metadata_only: true,
                     ..CompactionOptions::default()
@@ -988,8 +1015,7 @@ async fn test_dataset_keep_metadata_only_compact() {
 
     assert_eq!(
         prev_head,
-        created_derived
-            .dataset
+        target_derived
             .as_metadata_chain()
             .resolve_ref(&odf::BlockRef::Head)
             .await
@@ -1003,14 +1029,14 @@ async fn test_dataset_keep_metadata_only_compact() {
     // After: seed <- set_transform
     let res = harness
         .transform_helper
-        .transform_dataset(&created_derived)
+        .transform_dataset(target_derived.clone())
         .await;
     assert_matches!(res, TransformResult::Updated { .. });
 
     assert_matches!(
         harness
             .compact_dataset(
-                &created_derived,
+                target_derived.clone(),
                 CompactionOptions {
                     keep_metadata_only: true,
                     ..CompactionOptions::default()
@@ -1025,7 +1051,7 @@ async fn test_dataset_keep_metadata_only_compact() {
         }) if new_head != old_head,
     );
 
-    assert!(harness.verify_dataset(&created_derived).await);
+    assert!(harness.verify_dataset(target_derived).await);
     assert!(
         !harness
             .check_is_data_slices_exist(&derived_dataset_ref)
@@ -1049,13 +1075,13 @@ async fn test_dataset_keep_metadata_only_compact() {
     );
 
     harness
-        .ingest_data(data_str.to_string(), &created_root)
+        .ingest_data(data_str.to_string(), target_root.clone())
         .await;
 
     assert_matches!(
         harness
             .compact_dataset(
-                &created_root,
+                target_root.clone(),
                 CompactionOptions {
                     keep_metadata_only: true,
                     ..CompactionOptions::default()
@@ -1070,7 +1096,7 @@ async fn test_dataset_keep_metadata_only_compact() {
         }) if new_head != old_head,
     );
 
-    assert!(harness.verify_dataset(&created_root).await);
+    assert!(harness.verify_dataset(target_root).await);
     assert!(
         !harness
             .check_is_data_slices_exist(&derived_dataset_ref)
@@ -1113,9 +1139,9 @@ impl CompactTestHarness {
             .add_value(RunInfoDir::new(run_info_dir))
             .add_value(CurrentAccountSubject::new_test())
             .add_value(TenancyConfig::SingleTenant)
-            .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
-            .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
-            .bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
+            .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
+            .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
+            .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>()
             .add::<DatasetRegistrySoloUnitBridge>()
             .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
             .add_value(SystemTimeSourceStub::new_set(current_date_time))
@@ -1165,9 +1191,11 @@ impl CompactTestHarness {
             .add::<DidGeneratorDefault>()
             .add_builder(run_info_dir.clone())
             .add_value(TenancyConfig::SingleTenant)
-            .add_builder(DatasetStorageUnitS3::builder().with_s3_context(s3_context.clone()))
-            .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitS3>()
-            .bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitS3>()
+            .add_builder(
+                odf::dataset::DatasetStorageUnitS3::builder().with_s3_context(s3_context.clone()),
+            )
+            .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitS3>()
+            .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitS3>()
             .add::<DatasetRegistrySoloUnitBridge>()
             .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
             .add_value(SystemTimeSourceStub::new_set(current_date_time))
@@ -1241,10 +1269,10 @@ impl CompactTestHarness {
             .unwrap()
     }
 
-    async fn create_dataset(
+    async fn store_dataset(
         &self,
         dataset_snapshot: odf::DatasetSnapshot,
-    ) -> odf::CreateDatasetResult {
+    ) -> odf::dataset::StoreDatasetResult {
         create_test_dataset_from_snapshot(
             self.dataset_registry.as_ref(),
             self.dataset_storage_unit_writer.as_ref(),
@@ -1256,63 +1284,74 @@ impl CompactTestHarness {
         .unwrap()
     }
 
-    async fn create_test_root_dataset(&self) -> odf::CreateDatasetResult {
-        self.create_dataset(
-            MetadataFactory::dataset_snapshot()
-                .name("foo")
-                .kind(odf::DatasetKind::Root)
-                .push_event(
-                    MetadataFactory::add_push_source()
-                        .read(odf::metadata::ReadStepCsv {
-                            header: Some(true),
-                            schema: Some(
-                                ["date TIMESTAMP", "city STRING", "population BIGINT"]
-                                    .iter()
-                                    .map(|s| (*s).to_string())
-                                    .collect(),
-                            ),
-                            ..odf::metadata::ReadStepCsv::default()
-                        })
-                        .merge(odf::metadata::MergeStrategyLedger {
-                            primary_key: vec!["date".to_string(), "city".to_string()],
-                        })
-                        .build(),
-                )
-                .push_event(odf::metadata::SetVocab {
-                    event_time_column: Some("date".to_string()),
-                    ..Default::default()
-                })
-                .build(),
-        )
-        .await
+    async fn create_test_root_dataset(&self) -> ResolvedDataset {
+        let dataset_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+
+        let store_result = self
+            .store_dataset(
+                MetadataFactory::dataset_snapshot()
+                    .name("foo")
+                    .kind(odf::DatasetKind::Root)
+                    .push_event(
+                        MetadataFactory::add_push_source()
+                            .read(odf::metadata::ReadStepCsv {
+                                header: Some(true),
+                                schema: Some(
+                                    ["date TIMESTAMP", "city STRING", "population BIGINT"]
+                                        .iter()
+                                        .map(|s| (*s).to_string())
+                                        .collect(),
+                                ),
+                                ..odf::metadata::ReadStepCsv::default()
+                            })
+                            .merge(odf::metadata::MergeStrategyLedger {
+                                primary_key: vec!["date".to_string(), "city".to_string()],
+                            })
+                            .build(),
+                    )
+                    .push_event(odf::metadata::SetVocab {
+                        event_time_column: Some("date".to_string()),
+                        ..Default::default()
+                    })
+                    .build(),
+            )
+            .await;
+
+        ResolvedDataset::from_stored(&store_result, &dataset_alias)
     }
 
-    async fn create_test_derived_dataset(&self) -> odf::CreateDatasetResult {
-        self.create_dataset(
-            MetadataFactory::dataset_snapshot()
-                .name("foo-derivative")
-                .kind(odf::DatasetKind::Derivative)
-                .push_event(
-                    MetadataFactory::set_transform()
-                        .inputs_from_refs(["foo"])
-                        .transform(
-                            MetadataFactory::transform()
-                                .engine("datafusion")
-                                .query(
-                                    "SELECT
+    async fn create_test_derived_dataset(&self) -> ResolvedDataset {
+        let dataset_alias =
+            odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo-derivative"));
+
+        let store_result = self
+            .store_dataset(
+                MetadataFactory::dataset_snapshot()
+                    .name("foo-derivative")
+                    .kind(odf::DatasetKind::Derivative)
+                    .push_event(
+                        MetadataFactory::set_transform()
+                            .inputs_from_refs(["foo"])
+                            .transform(
+                                MetadataFactory::transform()
+                                    .engine("datafusion")
+                                    .query(
+                                        "SELECT
                                         op,
                                         event_time,
                                         city,
                                         cast(population * 10 as int) as population_x10
                                     FROM root",
-                                )
-                                .build(),
-                        )
-                        .build(),
-                )
-                .build(),
-        )
-        .await
+                                    )
+                                    .build(),
+                            )
+                            .build(),
+                    )
+                    .build(),
+            )
+            .await;
+
+        ResolvedDataset::from_stored(&store_result, &dataset_alias)
     }
 
     async fn dataset_data_helper(&self, dataset_ref: &odf::DatasetRef) -> DatasetDataHelper {
@@ -1327,7 +1366,7 @@ impl CompactTestHarness {
 
     async fn ingest_multiple_blocks(
         &self,
-        dataset_created: &odf::CreateDatasetResult,
+        target: ResolvedDataset,
         blocks: i64,
         records_per_block: i64,
     ) {
@@ -1352,15 +1391,13 @@ impl CompactTestHarness {
 
                 event_time += chrono::Duration::minutes(1);
             }
-            self.ingest_data(String::from_utf8(data).unwrap(), dataset_created)
+            self.ingest_data(String::from_utf8(data).unwrap(), target.clone())
                 .await;
         }
     }
 
-    async fn ingest_data(&self, data_str: String, dataset_created: &odf::CreateDatasetResult) {
+    async fn ingest_data(&self, data_str: String, target: ResolvedDataset) {
         let data = std::io::Cursor::new(data_str);
-
-        let target = ResolvedDataset::from(dataset_created);
 
         let ingest_plan = self
             .push_ingest_planner
@@ -1452,12 +1489,12 @@ impl CompactTestHarness {
         assert_eq!(data.offset_interval, *expected);
     }
 
-    async fn verify_dataset(&self, dataset_create_result: &odf::CreateDatasetResult) -> bool {
+    async fn verify_dataset(&self, target: ResolvedDataset) -> bool {
         let result = self
             .verification_svc
             .verify(
                 VerificationRequest {
-                    target: ResolvedDataset::from(dataset_create_result),
+                    target,
                     block_range: (None, None),
                     options: VerificationOptions::default(),
                 },
@@ -1470,25 +1507,17 @@ impl CompactTestHarness {
 
     async fn compact_dataset(
         &self,
-        dataset_create_result: &odf::CreateDatasetResult,
+        target: ResolvedDataset,
         compaction_options: CompactionOptions,
     ) -> Result<CompactionResult, CompactionError> {
         let compaction_plan = self
             .compaction_planner
-            .plan_compaction(
-                ResolvedDataset::from(dataset_create_result),
-                compaction_options,
-                None,
-            )
+            .plan_compaction(target.clone(), compaction_options, None)
             .await?;
 
         let result = self
             .compaction_executor
-            .execute(
-                ResolvedDataset::from(dataset_create_result),
-                compaction_plan,
-                None,
-            )
+            .execute(target, compaction_plan, None)
             .await?;
 
         Ok(result)

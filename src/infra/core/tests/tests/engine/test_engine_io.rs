@@ -40,7 +40,11 @@ async fn test_engine_io_common<
     let run_info_dir = Arc::new(RunInfoDir::new(run_info_dir.to_path_buf()));
     let cache_dir = Arc::new(CacheDir::new(cache_dir.to_path_buf()));
 
-    let dataset_registry = DatasetRegistrySoloUnitBridge::new(storage_unit.clone());
+    let dataset_registry = DatasetRegistrySoloUnitBridge::new(
+        storage_unit.clone(),
+        Arc::new(CurrentAccountSubject::new_test()),
+        Arc::new(TenancyConfig::SingleTenant),
+    );
 
     let engine_provisioner = Arc::new(EngineProvisionerLocal::new(
         EngineProvisionerLocalConfig::default(),
@@ -71,7 +75,11 @@ async fn test_engine_io_common<
     );
 
     let transform_helper = TransformTestHelper::build(
-        Arc::new(DatasetRegistrySoloUnitBridge::new(storage_unit.clone())),
+        Arc::new(DatasetRegistrySoloUnitBridge::new(
+            storage_unit.clone(),
+            Arc::new(CurrentAccountSubject::new_test()),
+            Arc::new(TenancyConfig::SingleTenant),
+        )),
         time_source.clone(),
         Arc::new(CompactionPlannerImpl {}),
         Arc::new(CompactionExecutorImpl::new(
@@ -124,7 +132,7 @@ async fn test_engine_io_common<
 
     let root_alias = root_snapshot.name.clone();
 
-    let root_created = create_test_dataset_from_snapshot(
+    let root_stored = create_test_dataset_from_snapshot(
         &dataset_registry,
         storage_unit.as_ref(),
         root_snapshot,
@@ -134,7 +142,7 @@ async fn test_engine_io_common<
     .await
     .unwrap();
 
-    let root_target = ResolvedDataset::from(&root_created);
+    let root_target = ResolvedDataset::from_stored(&root_stored, &root_alias);
 
     let root_metadata_state =
         DataWriterMetadataState::build(root_target.clone(), &odf::BlockRef::Head, None)
@@ -166,7 +174,9 @@ async fn test_engine_io_common<
         )
         .build();
 
-    let deriv_created = create_test_dataset_from_snapshot(
+    let deriv_alias = deriv_snapshot.name.clone();
+
+    let deriv_stored = create_test_dataset_from_snapshot(
         &dataset_registry,
         storage_unit.as_ref(),
         deriv_snapshot,
@@ -176,13 +186,18 @@ async fn test_engine_io_common<
     .await
     .unwrap();
 
-    let block_hash = match transform_helper.transform_dataset(&deriv_created).await {
+    let deriv_target = ResolvedDataset::from_stored(&deriv_stored, &deriv_alias);
+
+    let block_hash = match transform_helper
+        .transform_dataset(deriv_target.clone())
+        .await
+    {
         TransformResult::Updated { new_head, .. } => new_head,
         v => panic!("Unexpected result: {v:?}"),
     };
 
     use odf::metadata::IntoDataStreamBlock;
-    let block = deriv_created
+    let block = deriv_stored
         .dataset
         .as_metadata_chain()
         .get_block(&block_hash)
@@ -230,12 +245,15 @@ async fn test_engine_io_common<
         .await
         .unwrap();
 
-    let block_hash = match transform_helper.transform_dataset(&deriv_created).await {
+    let block_hash = match transform_helper
+        .transform_dataset(deriv_target.clone())
+        .await
+    {
         TransformResult::Updated { new_head, .. } => new_head,
         v => panic!("Unexpected result: {v:?}"),
     };
 
-    let block = deriv_created
+    let block = deriv_stored
         .dataset
         .as_metadata_chain()
         .get_block(&block_hash)
@@ -253,7 +271,7 @@ async fn test_engine_io_common<
     // Verify
     ///////////////////////////////////////////////////////////////////////////
 
-    let verify_result = transform_helper.verify_transform(&deriv_created).await;
+    let verify_result = transform_helper.verify_transform(deriv_target).await;
     assert_matches!(verify_result, Ok(()));
 }
 
@@ -277,11 +295,13 @@ async fn test_engine_io_local_file_mount() {
         .add::<DatasetKeyValueServiceSysEnv>()
         .add_value(CurrentAccountSubject::new_test())
         .add_value(TenancyConfig::SingleTenant)
-        .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
-        .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
+        .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
+        .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
         .build();
 
-    let storage_unit = catalog.get_one::<DatasetStorageUnitLocalFs>().unwrap();
+    let storage_unit = catalog
+        .get_one::<odf::dataset::DatasetStorageUnitLocalFs>()
+        .unwrap();
     let did_generator = catalog.get_one::<dyn DidGenerator>().unwrap();
 
     test_engine_io_common(
@@ -320,11 +340,15 @@ async fn test_engine_io_s3_to_local_file_mount_proxy() {
         .add::<kamu_core::auth::AlwaysHappyDatasetActionAuthorizer>()
         .add_value(CurrentAccountSubject::new_test())
         .add_value(TenancyConfig::SingleTenant)
-        .add_builder(DatasetStorageUnitS3::builder().with_s3_context(s3_context.clone()))
-        .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitS3>()
+        .add_builder(
+            odf::dataset::DatasetStorageUnitS3::builder().with_s3_context(s3_context.clone()),
+        )
+        .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitS3>()
         .build();
 
-    let storage_unit = catalog.get_one::<DatasetStorageUnitS3>().unwrap();
+    let storage_unit = catalog
+        .get_one::<odf::dataset::DatasetStorageUnitS3>()
+        .unwrap();
     let did_generator = catalog.get_one::<dyn DidGenerator>().unwrap();
 
     test_engine_io_common(

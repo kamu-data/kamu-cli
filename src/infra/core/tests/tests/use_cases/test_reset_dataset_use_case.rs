@@ -36,7 +36,12 @@ async fn test_reset_success() {
         .await
         .unwrap();
 
-    assert_eq!(harness.num_blocks(ResolvedDataset::from(&foo)).await, 3);
+    assert_eq!(
+        harness
+            .num_blocks(ResolvedDataset::from_created(&foo))
+            .await,
+        3
+    );
 
     let reset_result = harness
         .use_case
@@ -45,7 +50,12 @@ async fn test_reset_success() {
         .unwrap();
 
     assert_eq!(reset_result.new_head, foo.head);
-    assert_eq!(harness.num_blocks(ResolvedDataset::from(&foo)).await, 2);
+    assert_eq!(
+        harness
+            .num_blocks(ResolvedDataset::from_created(&foo))
+            .await,
+        2
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

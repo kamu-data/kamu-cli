@@ -151,7 +151,7 @@ impl PullRequestPlannerImpl {
             }
         };
 
-        let target = self.dataset_registry.get_dataset_by_handle(&hdl);
+        let target = self.dataset_registry.get_dataset_by_handle(&hdl).await;
         match DataWriterMetadataState::build(target.clone(), &odf::BlockRef::Head, None).await {
             Ok(metadata_state) => Ok(PullIngestItem {
                 depth: pi.depth,
@@ -179,7 +179,7 @@ impl PullRequestPlannerImpl {
             }
         };
 
-        let target = self.dataset_registry.get_dataset_by_handle(&hdl);
+        let target = self.dataset_registry.get_dataset_by_handle(&hdl).await;
 
         match self
             .transform_request_planner
@@ -470,6 +470,7 @@ impl<'a> PullGraphDepthFirstTraversal<'a> {
             let summary = self
                 .dataset_registry
                 .get_dataset_by_handle(&local_handle)
+                .await
                 .get_summary(odf::dataset::GetSummaryOpts::default())
                 .await
                 .int_err()?;
@@ -520,7 +521,7 @@ impl<'a> PullGraphDepthFirstTraversal<'a> {
                 {
                     Some(hdl) => Some(hdl),
                     None => {
-                        return Err(PullError::NotFound(odf::dataset::DatasetNotFoundError {
+                        return Err(PullError::NotFound(odf::DatasetNotFoundError {
                             dataset_ref: local_ref.clone(),
                         }))
                     }
@@ -610,7 +611,7 @@ impl<'a> PullGraphDepthFirstTraversal<'a> {
                     if let Some(alias) = local_ref.alias() {
                         alias.clone()
                     } else {
-                        return Err(PullError::NotFound(odf::dataset::DatasetNotFoundError {
+                        return Err(PullError::NotFound(odf::DatasetNotFoundError {
                             dataset_ref: local_ref.clone(),
                         }));
                     }

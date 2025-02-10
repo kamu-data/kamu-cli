@@ -14,6 +14,7 @@ use std::path::PathBuf;
 use internal_error::{BoxedError, InternalError};
 use kamu::domain::engine::normalize_logs;
 use kamu::domain::*;
+use kamu_datasets::DeleteDatasetError;
 use odf::utils::data::format::WriterError;
 use thiserror::Error;
 
@@ -168,11 +169,11 @@ impl From<WriterError> for CLIError {
 // TODO: Replace with traits that distinguish critical and non-critical errors
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl From<odf::dataset::GetDatasetError> for CLIError {
-    fn from(v: odf::dataset::GetDatasetError) -> Self {
+impl From<odf::DatasetRefUnresolvedError> for CLIError {
+    fn from(v: odf::DatasetRefUnresolvedError) -> Self {
         match v {
-            e @ odf::dataset::GetDatasetError::NotFound(_) => Self::failure(e),
-            e @ odf::dataset::GetDatasetError::Internal(_) => Self::critical(e),
+            e @ odf::DatasetRefUnresolvedError::NotFound(_) => Self::failure(e),
+            e @ odf::DatasetRefUnresolvedError::Internal(_) => Self::critical(e),
         }
     }
 }
@@ -185,13 +186,13 @@ impl From<GetAliasesError> for CLIError {
     }
 }
 
-impl From<odf::dataset::DeleteDatasetError> for CLIError {
-    fn from(v: odf::dataset::DeleteDatasetError) -> Self {
+impl From<DeleteDatasetError> for CLIError {
+    fn from(v: DeleteDatasetError) -> Self {
         match v {
-            e @ (odf::dataset::DeleteDatasetError::NotFound(_)
-            | odf::dataset::DeleteDatasetError::DanglingReference(_)
-            | odf::dataset::DeleteDatasetError::Access(_)) => Self::failure(e),
-            e @ odf::dataset::DeleteDatasetError::Internal(_) => Self::critical(e),
+            e @ (DeleteDatasetError::NotFound(_)
+            | DeleteDatasetError::DanglingReference(_)
+            | DeleteDatasetError::Access(_)) => Self::failure(e),
+            e @ DeleteDatasetError::Internal(_) => Self::critical(e),
         }
     }
 }
@@ -202,16 +203,16 @@ impl From<odf::dataset::GetSummaryError> for CLIError {
     }
 }
 
-impl From<odf::storage::GetRefError> for CLIError {
-    fn from(e: odf::storage::GetRefError) -> Self {
+impl From<odf::GetRefError> for CLIError {
+    fn from(e: odf::GetRefError) -> Self {
         Self::critical(e)
     }
 }
 
-impl From<odf::dataset::IterBlocksError> for CLIError {
-    fn from(v: odf::dataset::IterBlocksError) -> Self {
+impl From<odf::IterBlocksError> for CLIError {
+    fn from(v: odf::IterBlocksError) -> Self {
         match v {
-            e @ odf::dataset::IterBlocksError::BlockVersion(_) => Self::failure(e),
+            e @ odf::IterBlocksError::BlockVersion(_) => Self::failure(e),
             _ => Self::critical(v),
         }
     }

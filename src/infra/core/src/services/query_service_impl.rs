@@ -190,7 +190,7 @@ impl QueryServiceImpl {
                     // SECURITY: We expect that access permissions will be validated during
                     // the query execution and that we're not leaking information here if the user
                     // doesn't have access to this dataset.
-                    let resolved_dataset = self.dataset_registry.get_dataset_by_handle(&hdl);
+                    let resolved_dataset = self.dataset_registry.get_dataset_by_handle(&hdl).await;
 
                     let block_hash = resolved_dataset
                         .as_metadata_chain()
@@ -319,7 +319,10 @@ impl QueryServiceImpl {
             .check_action_allowed(&dataset_handle.id, DatasetAction::Read)
             .await?;
 
-        Ok(self.dataset_registry.get_dataset_by_handle(&dataset_handle))
+        Ok(self
+            .dataset_registry
+            .get_dataset_by_handle(&dataset_handle)
+            .await)
     }
 }
 

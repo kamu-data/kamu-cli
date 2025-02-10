@@ -9,7 +9,6 @@
 
 use std::sync::Arc;
 
-use async_trait::async_trait;
 use internal_error::InternalError;
 use url::Url;
 
@@ -17,7 +16,7 @@ use crate::Dataset;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[async_trait]
+#[async_trait::async_trait]
 pub trait DatasetFactory: Send + Sync {
     async fn get_dataset(
         &self,

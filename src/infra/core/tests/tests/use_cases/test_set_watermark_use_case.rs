@@ -14,6 +14,7 @@ use chrono::{DateTime, TimeDelta, Utc};
 use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions, MockDatasetActionAuthorizer};
 use kamu::*;
 use kamu_core::*;
+use kamu_datasets::CreateDatasetResult;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -101,10 +102,10 @@ impl SetWatermarkUseCaseHarness {
 
     async fn current_watermark(
         &self,
-        created_result: &odf::CreateDatasetResult,
+        created_result: &CreateDatasetResult,
     ) -> Option<DateTime<Utc>> {
         self.metadata_query_svc
-            .try_get_current_watermark(ResolvedDataset::from(created_result))
+            .try_get_current_watermark(ResolvedDataset::from_created(created_result))
             .await
             .unwrap()
     }

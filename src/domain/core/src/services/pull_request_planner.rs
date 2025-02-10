@@ -393,7 +393,7 @@ pub enum PullError {
     NotFound(
         #[from]
         #[backtrace]
-        odf::dataset::DatasetNotFoundError,
+        odf::DatasetNotFoundError,
     ),
 
     #[error("Cannot choose between multiple pull aliases")]

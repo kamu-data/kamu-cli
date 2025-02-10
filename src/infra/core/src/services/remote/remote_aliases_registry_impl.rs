@@ -70,7 +70,10 @@ impl RemoteAliasesRegistry for RemoteAliasesRegistryImpl {
         &self,
         dataset_handle: &odf::DatasetHandle,
     ) -> Result<Box<dyn RemoteAliases>, GetAliasesError> {
-        let resolved_dataset = self.dataset_registry.get_dataset_by_handle(dataset_handle);
+        let resolved_dataset = self
+            .dataset_registry
+            .get_dataset_by_handle(dataset_handle)
+            .await;
 
         let config = Self::read_config(resolved_dataset.as_ref()).await?;
         tracing::debug!(?config, "Loaded dataset config");

@@ -14,7 +14,6 @@ use chrono::{DateTime, TimeZone, Utc};
 use datafusion::prelude::*;
 use dill::Component;
 use indoc::indoc;
-use kamu::DatasetStorageUnitLocalFs;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::*;
 use kamu_ingest_datafusion::*;
@@ -1221,16 +1220,19 @@ impl Harness {
             .add::<SystemTimeSourceDefault>()
             .add_value(CurrentAccountSubject::new_test())
             .add_value(TenancyConfig::SingleTenant)
-            .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
-            .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
+            .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
+            .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
             .build();
 
-        let storage_unit = catalog.get_one::<DatasetStorageUnitLocalFs>().unwrap();
+        let storage_unit = catalog
+            .get_one::<odf::dataset::DatasetStorageUnitLocalFs>()
+            .unwrap();
+
+        let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
 
         use odf::dataset::DatasetStorageUnitWriter;
-        let foo_created = storage_unit
-            .create_dataset(
-                &odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo")),
+        let foo_stored = storage_unit
+            .store_dataset(
                 MetadataFactory::metadata_block(
                     MetadataFactory::seed(odf::DatasetKind::Root).build(),
                 )
@@ -1241,7 +1243,7 @@ impl Harness {
             .unwrap();
 
         for event in dataset_events {
-            foo_created
+            foo_stored
                 .dataset
                 .commit_event(
                     event,
@@ -1254,7 +1256,7 @@ impl Harness {
                 .unwrap();
         }
 
-        let foo_target = ResolvedDataset::from(&foo_created);
+        let foo_target = ResolvedDataset::from_stored(&foo_stored, &foo_alias);
 
         let ctx = SessionContext::new_with_config(SessionConfig::new().with_target_partitions(1));
 

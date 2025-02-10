@@ -161,10 +161,6 @@ impl NewDatasetCommand {
 
 #[async_trait::async_trait(?Send)]
 impl Command for NewDatasetCommand {
-    fn needs_workspace(&self) -> bool {
-        false
-    }
-
     // TODO: link to documentation
     async fn run(&mut self) -> Result<(), CLIError> {
         let path = self.output_path.clone().unwrap_or_else(|| {

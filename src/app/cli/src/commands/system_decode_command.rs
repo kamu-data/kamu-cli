@@ -28,10 +28,6 @@ impl SystemDecodeCommand {
 
 #[async_trait::async_trait(?Send)]
 impl Command for SystemDecodeCommand {
-    fn needs_workspace(&self) -> bool {
-        false
-    }
-
     async fn run(&mut self) -> Result<(), CLIError> {
         let data: Vec<u8> = if self.stdin {
             let mut buf = Vec::new();

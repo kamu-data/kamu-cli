@@ -249,9 +249,9 @@ impl TestHarness {
             .add::<kamu_core::auth::AlwaysHappyDatasetActionAuthorizer>()
             .add_value(CurrentAccountSubject::new_test())
             .add_value(TenancyConfig::SingleTenant)
-            .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
-            .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
-            .bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
+            .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
+            .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
+            .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>()
             .add::<DatasetRegistrySoloUnitBridge>()
             .add_value(EngineProvisionerLocalConfig::default())
             .add::<EngineProvisionerLocal>()
@@ -291,11 +291,8 @@ impl TestHarness {
         }
     }
 
-    async fn build_metadata_state(
-        &self,
-        created: &odf::CreateDatasetResult,
-    ) -> DataWriterMetadataState {
-        DataWriterMetadataState::build(ResolvedDataset::from(created), &odf::BlockRef::Head, None)
+    async fn build_metadata_state(&self, target: ResolvedDataset) -> DataWriterMetadataState {
+        DataWriterMetadataState::build(target, &odf::BlockRef::Head, None)
             .await
             .unwrap()
     }
@@ -351,7 +348,7 @@ async fn test_transform_common(transform: odf::metadata::Transform, test_retract
 
     let root_alias = root_snapshot.name.clone();
 
-    let root_created = create_test_dataset_from_snapshot(
+    let root_stored = create_test_dataset_from_snapshot(
         harness.dataset_registry.as_ref(),
         harness.dataset_storage_unit_writer.as_ref(),
         root_snapshot,
@@ -361,9 +358,9 @@ async fn test_transform_common(transform: odf::metadata::Transform, test_retract
     .await
     .unwrap();
 
-    let root_target = ResolvedDataset::from(&root_created);
+    let root_target = ResolvedDataset::from_stored(&root_stored, &root_alias);
 
-    let root_metadata_state = harness.build_metadata_state(&root_created).await;
+    let root_metadata_state = harness.build_metadata_state(root_target.clone()).await;
 
     harness
         .ingest_svc
@@ -391,7 +388,9 @@ async fn test_transform_common(transform: odf::metadata::Transform, test_retract
         )
         .build();
 
-    let deriv_created = create_test_dataset_from_snapshot(
+    let deriv_alias = deriv_snapshot.name.clone();
+
+    let deriv_stored = create_test_dataset_from_snapshot(
         harness.dataset_registry.as_ref(),
         harness.dataset_storage_unit_writer.as_ref(),
         deriv_snapshot,
@@ -401,8 +400,10 @@ async fn test_transform_common(transform: odf::metadata::Transform, test_retract
     .await
     .unwrap();
 
-    let deriv_helper = DatasetHelper::new(deriv_created.dataset.clone(), harness.tempdir.path());
-    let deriv_data_helper = DatasetDataHelper::new(deriv_created.dataset.clone());
+    let deriv_target = ResolvedDataset::from_stored(&deriv_stored, &deriv_alias);
+
+    let deriv_helper = DatasetHelper::new(deriv_stored.dataset.clone(), harness.tempdir.path());
+    let deriv_data_helper = DatasetDataHelper::new(deriv_stored.dataset.clone());
 
     harness
         .time_source
@@ -410,7 +411,7 @@ async fn test_transform_common(transform: odf::metadata::Transform, test_retract
 
     let res = harness
         .transform_helper
-        .transform_dataset(&deriv_created)
+        .transform_dataset(deriv_target.clone())
         .await;
     assert_matches!(res, TransformResult::Updated { .. });
 
@@ -471,7 +472,7 @@ async fn test_transform_common(transform: odf::metadata::Transform, test_retract
     )
     .unwrap();
 
-    let root_metadata_state = harness.build_metadata_state(&root_created).await;
+    let root_metadata_state = harness.build_metadata_state(root_target.clone()).await;
 
     harness
         .ingest_svc
@@ -490,7 +491,7 @@ async fn test_transform_common(transform: odf::metadata::Transform, test_retract
 
     let res = harness
         .transform_helper
-        .transform_dataset(&deriv_created)
+        .transform_dataset(deriv_target.clone())
         .await;
     assert_matches!(res, TransformResult::Updated { .. });
 
@@ -541,7 +542,7 @@ async fn test_transform_common(transform: odf::metadata::Transform, test_retract
 
     let verify_result = harness
         .transform_helper
-        .verify_transform(&deriv_created)
+        .verify_transform(deriv_target.clone())
         .await;
 
     assert_matches!(verify_result, Ok(()));
@@ -556,7 +557,7 @@ async fn test_transform_common(transform: odf::metadata::Transform, test_retract
 
     let verify_result = harness
         .transform_helper
-        .verify_transform(&deriv_created)
+        .verify_transform(deriv_target)
         .await;
 
     assert_matches!(
@@ -716,7 +717,7 @@ async fn test_transform_empty_inputs() {
     // Root setup
     ///////////////////////////////////////////////////////////////////////////
 
-    let root = create_test_dataset_from_snapshot(
+    let root_stored = create_test_dataset_from_snapshot(
         harness.dataset_registry.as_ref(),
         harness.dataset_storage_unit_writer.as_ref(),
         MetadataFactory::dataset_snapshot()
@@ -729,6 +730,10 @@ async fn test_transform_empty_inputs() {
     .await
     .unwrap();
 
+    let root_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("root"));
+
+    let root_target = ResolvedDataset::from_stored(&root_stored, &root_alias);
+
     ///////////////////////////////////////////////////////////////////////////
     // Derivative setup
     ///////////////////////////////////////////////////////////////////////////
@@ -738,7 +743,10 @@ async fn test_transform_empty_inputs() {
         .kind(odf::DatasetKind::Derivative)
         .push_event(
             MetadataFactory::set_transform()
-                .inputs_from_refs([&root.dataset_handle.alias])
+                .inputs_from_refs([&odf::DatasetAlias::new(
+                    None,
+                    odf::DatasetName::new_unchecked("root"),
+                )])
                 .transform(
                     MetadataFactory::transform()
                         .engine("datafusion")
@@ -749,7 +757,9 @@ async fn test_transform_empty_inputs() {
         )
         .build();
 
-    let deriv = create_test_dataset_from_snapshot(
+    let deriv_alias = deriv_snapshot.name.clone();
+
+    let deriv_stored = create_test_dataset_from_snapshot(
         harness.dataset_registry.as_ref(),
         harness.dataset_storage_unit_writer.as_ref(),
         deriv_snapshot,
@@ -759,6 +769,8 @@ async fn test_transform_empty_inputs() {
     .await
     .unwrap();
 
+    let deriv_target = ResolvedDataset::from_stored(&deriv_stored, &deriv_alias);
+
     // let deriv_helper = DatasetHelper::new(dataset.clone(),
     // harness.tempdir.path()); let deriv_data_helper =
     // DatasetDataHelper::new(dataset);
@@ -767,14 +779,18 @@ async fn test_transform_empty_inputs() {
     // 1: Input doesn't have schema yet - skip update completely
     ///////////////////////////////////////////////////////////////////////////
 
-    let res = harness.transform_helper.transform_dataset(&deriv).await;
+    let res = harness
+        .transform_helper
+        .transform_dataset(deriv_target.clone())
+        .await;
     assert_matches!(res, TransformResult::UpToDate);
 
     ///////////////////////////////////////////////////////////////////////////
     // 2: Input has schema, but no data - transorm will establish output schema
     ///////////////////////////////////////////////////////////////////////////
 
-    root.dataset
+    root_stored
+        .dataset
         .commit_event(
             MetadataFactory::add_push_source()
                 .read(odf::metadata::ReadStepNdJson {
@@ -796,18 +812,14 @@ async fn test_transform_empty_inputs() {
 
     let ingest_plan = harness
         .push_ingest_planner
-        .plan_ingest(
-            ResolvedDataset::from(&root),
-            None,
-            PushIngestOpts::default(),
-        )
+        .plan_ingest(root_target.clone(), None, PushIngestOpts::default())
         .await
         .unwrap();
 
     let ingest_result = harness
         .push_ingest_executor
         .ingest_from_stream(
-            ResolvedDataset::from(&root),
+            root_target.clone(),
             ingest_plan,
             Box::new(tokio::io::BufReader::new(std::io::Cursor::new(b""))),
             None,
@@ -817,10 +829,13 @@ async fn test_transform_empty_inputs() {
 
     assert_matches!(ingest_result, PushIngestResult::Updated { .. });
 
-    let res = harness.transform_helper.transform_dataset(&deriv).await;
+    let res = harness
+        .transform_helper
+        .transform_dataset(deriv_target.clone())
+        .await;
     assert_matches!(res, TransformResult::Updated { .. });
 
-    let deriv_helper = DatasetDataHelper::new(deriv.dataset.clone());
+    let deriv_helper = DatasetDataHelper::new(deriv_stored.dataset.clone());
 
     deriv_helper
         .assert_latest_set_schema_eq(indoc!(
@@ -846,18 +861,14 @@ async fn test_transform_empty_inputs() {
 
     let ingest_plan = harness
         .push_ingest_planner
-        .plan_ingest(
-            ResolvedDataset::from(&root),
-            None,
-            PushIngestOpts::default(),
-        )
+        .plan_ingest(root_target.clone(), None, PushIngestOpts::default())
         .await
         .unwrap();
 
     let ingest_result = harness
         .push_ingest_executor
         .ingest_from_stream(
-            ResolvedDataset::from(&root),
+            root_target.clone(),
             ingest_plan,
             Box::new(tokio::io::BufReader::new(std::io::Cursor::new(
                 br#"{"city": "A", "population": 100}"#,
@@ -869,7 +880,10 @@ async fn test_transform_empty_inputs() {
 
     assert_matches!(ingest_result, PushIngestResult::Updated { .. });
 
-    let res = harness.transform_helper.transform_dataset(&deriv).await;
+    let res = harness
+        .transform_helper
+        .transform_dataset(deriv_target)
+        .await;
     assert_matches!(res, TransformResult::Updated { .. });
 
     deriv_helper
@@ -899,3 +913,5 @@ async fn test_transform_empty_inputs() {
         )
         .await;
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -59,7 +59,7 @@ impl<TServerHarness: ServerSideHarness>
             .unwrap();
 
         let client_dataset_layout =
-            client_harness.dataset_layout(&client_create_result.dataset_handle.id, "foo");
+            client_harness.dataset_layout(&client_create_result.dataset_handle.id);
 
         let client_dataset_ref = make_dataset_ref(client_account_name.as_ref(), "foo");
 

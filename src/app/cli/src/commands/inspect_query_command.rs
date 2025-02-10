@@ -45,7 +45,10 @@ impl InspectQueryCommand {
         output: &mut impl Write,
         dataset_handle: &odf::DatasetHandle,
     ) -> Result<(), CLIError> {
-        let resolved_dataset = self.dataset_registry.get_dataset_by_handle(dataset_handle);
+        let resolved_dataset = self
+            .dataset_registry
+            .get_dataset_by_handle(dataset_handle)
+            .await;
 
         use odf::dataset::MetadataChainExt as _;
         let mut blocks = resolved_dataset.as_metadata_chain().iter_blocks();

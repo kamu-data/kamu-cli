@@ -174,7 +174,7 @@ impl DatasetFactoryImpl {
     pub async fn get_s3_from_url(
         base_url: Url,
         maybe_s3_metrics: Option<Arc<S3Metrics>>,
-    ) -> Result<impl Dataset, InternalError> {
+    ) -> impl Dataset {
         // TODO: PERF: We should ensure optimal credential reuse.
         //             Perhaps in future we should create a cache of S3Contexts keyed
         //             by an endpoint.
@@ -183,7 +183,7 @@ impl DatasetFactoryImpl {
             s3_context = s3_context.with_metrics(metrics);
         }
 
-        Ok(DatasetImpl::new(
+        DatasetImpl::new(
             MetadataChainImpl::new(
                 MetadataBlockRepositoryCachingInMem::new(MetadataBlockRepositoryImpl::new(
                     ObjectRepositoryS3Sha3::new(s3_context.sub_context("blocks/")),
@@ -196,7 +196,7 @@ impl DatasetFactoryImpl {
             ObjectRepositoryS3Sha3::new(s3_context.sub_context("checkpoints/")),
             NamedObjectRepositoryS3::new(s3_context.into_sub_context("info/")),
             base_url,
-        ))
+        )
     }
 
     #[cfg(feature = "http")]
@@ -370,7 +370,7 @@ impl DatasetFactory for DatasetFactoryImpl {
             }
             #[cfg(feature = "s3")]
             "s3" | "s3+http" | "s3+https" => {
-                let ds = Self::get_s3_from_url(url.clone(), self.maybe_s3_metrics.clone()).await?;
+                let ds = Self::get_s3_from_url(url.clone(), self.maybe_s3_metrics.clone()).await;
                 Ok(Arc::new(ds))
             }
             _ => Err(UnsupportedProtocolError {

@@ -119,11 +119,6 @@ pub trait Command {
         std::any::type_name::<Self>()
     }
 
-    /// Whether the command requires an initialized workspace
-    fn needs_workspace(&self) -> bool {
-        true
-    }
-
     /// Will be called before running to perform various argument sanity checks
     async fn validate_args(&self) -> Result<(), CLIError> {
         Ok(())

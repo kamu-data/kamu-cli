@@ -18,6 +18,7 @@ use kamu_adapter_http::{
     UploadToken,
     UploadTokenBase64Json,
 };
+use kamu_datasets::CreateDatasetResult;
 use serde_json::json;
 use url::Url;
 use uuid::Uuid;
@@ -629,7 +630,7 @@ impl DataIngestHarness {
         &(self.server_harness.server_account().id)
     }
 
-    async fn create_population_dataset(&self, with_schema: bool) -> odf::CreateDatasetResult {
+    async fn create_population_dataset(&self, with_schema: bool) -> CreateDatasetResult {
         self.server_harness
             .cli_create_dataset_from_snapshot_use_case()
             .execute(

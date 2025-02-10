@@ -159,7 +159,7 @@ where
                                 Ok(resolved_dataset) => {
                                     Ok(CheckResult::CheckedDataset(resolved_dataset))
                                 }
-                                Err(odf::dataset::GetDatasetError::NotFound(err)) => {
+                                Err(odf::DatasetRefUnresolvedError::NotFound(err)) => {
                                     tracing::warn!("Dataset not found: {:?}", err);
                                     Ok(CheckResult::ErrorResponse(not_found_response()))
                                 }

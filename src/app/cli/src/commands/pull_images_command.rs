@@ -40,10 +40,6 @@ impl PullImagesCommand {
 
 #[async_trait::async_trait(?Send)]
 impl Command for PullImagesCommand {
-    fn needs_workspace(&self) -> bool {
-        false
-    }
-
     async fn run(&mut self) -> Result<(), CLIError> {
         let mut images = vec![
             self.engine_config.spark_image.as_str(),

@@ -15,7 +15,7 @@ use kamu::*;
 use kamu_accounts::testing::MockAuthenticationService;
 use kamu_accounts::{AuthenticationService, DEFAULT_ACCOUNT_NAME};
 use kamu_core::*;
-use kamu_datasets::CreateDatasetFromSnapshotUseCase;
+use kamu_datasets::{CreateDatasetFromSnapshotUseCase, CreateDatasetResult};
 use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEntryRepository};
 use kamu_datasets_services::{
     CreateDatasetFromSnapshotUseCaseImpl,
@@ -206,9 +206,12 @@ impl DatasetMetadataHarness {
                 .add::<ObjectStoreRegistryImpl>()
                 .add::<DataFormatRegistryImpl>()
                 .add_value(TenancyConfig::MultiTenant)
-                .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
-                .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
-                .bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
+                .add_builder(
+                    odf::dataset::DatasetStorageUnitLocalFs::builder().with_root(datasets_dir),
+                )
+                .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
+                .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>(
+                )
                 .add_value(MockAuthenticationService::built_in())
                 .bind::<dyn AuthenticationService, MockAuthenticationService>()
                 .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
@@ -230,7 +233,7 @@ impl DatasetMetadataHarness {
         }
     }
 
-    async fn create_root_dataset(&self) -> odf::CreateDatasetResult {
+    async fn create_root_dataset(&self) -> CreateDatasetResult {
         let create_dataset_from_snapshot = self
             .catalog_authorized
             .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
@@ -251,7 +254,7 @@ impl DatasetMetadataHarness {
             .unwrap()
     }
 
-    async fn create_derived_dataset(&self) -> odf::CreateDatasetResult {
+    async fn create_derived_dataset(&self) -> CreateDatasetResult {
         let create_dataset_from_snapshot = self
             .catalog_authorized
             .get_one::<dyn CreateDatasetFromSnapshotUseCase>()

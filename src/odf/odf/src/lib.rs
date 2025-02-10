@@ -11,12 +11,14 @@
 pub use odf_dataset::MockDatasetStorageUnitWriter;
 pub use odf_dataset::{
     BlockRef,
-    CreateDatasetResult,
     Dataset,
+    DatasetNotFoundError,
+    DatasetRefUnresolvedError,
     DatasetStorageUnit,
     DatasetStorageUnitWriter,
     DatasetSummary,
     DatasetVisibility,
+    IterBlocksError,
     MetadataChain,
 };
 pub use odf_metadata::{
@@ -44,6 +46,7 @@ pub use odf_metadata::{
     Multihash,
     RepoName,
 };
+pub use odf_storage::{GetBlockError, GetRefError};
 
 pub mod metadata {
     pub use odf_metadata::*;

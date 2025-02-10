@@ -43,7 +43,9 @@ async fn test_no_watermark_initially() {
         .await;
 
     assert_eq!(
-        harness.current_watermark(ResolvedDataset::from(&foo)).await,
+        harness
+            .current_watermark(ResolvedDataset::from_created(&foo))
+            .await,
         None,
     );
 }
@@ -61,56 +63,89 @@ async fn test_set_watermark() {
         ))
         .await;
 
-    assert_eq!(harness.num_blocks(ResolvedDataset::from(&foo)).await, 2);
+    assert_eq!(
+        harness
+            .num_blocks(ResolvedDataset::from_created(&foo))
+            .await,
+        2
+    );
 
     let watermark_1 = Utc.with_ymd_and_hms(2000, 1, 2, 0, 0, 0).unwrap();
     assert_matches!(
         harness
-            .set_watermark(ResolvedDataset::from(&foo), watermark_1)
+            .set_watermark(ResolvedDataset::from_created(&foo), watermark_1)
             .await,
         Ok(SetWatermarkResult::Updated { .. })
     );
-    assert_eq!(harness.num_blocks(ResolvedDataset::from(&foo)).await, 3);
     assert_eq!(
-        harness.current_watermark(ResolvedDataset::from(&foo)).await,
+        harness
+            .num_blocks(ResolvedDataset::from_created(&foo))
+            .await,
+        3
+    );
+    assert_eq!(
+        harness
+            .current_watermark(ResolvedDataset::from_created(&foo))
+            .await,
         Some(watermark_1),
     );
 
     let watermark_2 = Utc.with_ymd_and_hms(2000, 1, 3, 0, 0, 0).unwrap();
     assert_matches!(
         harness
-            .set_watermark(ResolvedDataset::from(&foo), watermark_2)
+            .set_watermark(ResolvedDataset::from_created(&foo), watermark_2)
             .await,
         Ok(SetWatermarkResult::Updated { .. })
     );
-    assert_eq!(harness.num_blocks(ResolvedDataset::from(&foo)).await, 4);
     assert_eq!(
-        harness.current_watermark(ResolvedDataset::from(&foo)).await,
+        harness
+            .num_blocks(ResolvedDataset::from_created(&foo))
+            .await,
+        4
+    );
+    assert_eq!(
+        harness
+            .current_watermark(ResolvedDataset::from_created(&foo))
+            .await,
         Some(watermark_2),
     );
 
     assert_matches!(
         harness
-            .set_watermark(ResolvedDataset::from(&foo), watermark_2)
+            .set_watermark(ResolvedDataset::from_created(&foo), watermark_2)
             .await,
         Ok(SetWatermarkResult::UpToDate)
     );
-    assert_eq!(harness.num_blocks(ResolvedDataset::from(&foo)).await, 4);
     assert_eq!(
-        harness.current_watermark(ResolvedDataset::from(&foo)).await,
+        harness
+            .num_blocks(ResolvedDataset::from_created(&foo))
+            .await,
+        4
+    );
+    assert_eq!(
+        harness
+            .current_watermark(ResolvedDataset::from_created(&foo))
+            .await,
         Some(watermark_2),
     );
 
     let watermark_3 = Utc.with_ymd_and_hms(2000, 1, 2, 0, 0, 0).unwrap();
     assert_matches!(
         harness
-            .set_watermark(ResolvedDataset::from(&foo), watermark_3)
+            .set_watermark(ResolvedDataset::from_created(&foo), watermark_3)
             .await,
         Ok(SetWatermarkResult::UpToDate)
     );
-    assert_eq!(harness.num_blocks(ResolvedDataset::from(&foo)).await, 4);
     assert_eq!(
-        harness.current_watermark(ResolvedDataset::from(&foo)).await,
+        harness
+            .num_blocks(ResolvedDataset::from_created(&foo))
+            .await,
+        4
+    );
+    assert_eq!(
+        harness
+            .current_watermark(ResolvedDataset::from_created(&foo))
+            .await,
         Some(watermark_2),
     );
 }
@@ -138,7 +173,7 @@ async fn test_set_watermark_rejects_on_derivative() {
     assert_matches!(
         harness
             .set_watermark(
-                ResolvedDataset::from(&derived),
+                ResolvedDataset::from_created(&derived),
                 Utc.with_ymd_and_hms(2000, 1, 2, 0, 0, 0).unwrap()
             )
             .await,
@@ -147,10 +182,15 @@ async fn test_set_watermark_rejects_on_derivative() {
         ))
     );
 
-    assert_eq!(harness.num_blocks(ResolvedDataset::from(&derived)).await, 2);
     assert_eq!(
         harness
-            .current_watermark(ResolvedDataset::from(&derived))
+            .num_blocks(ResolvedDataset::from_created(&derived))
+            .await,
+        2
+    );
+    assert_eq!(
+        harness
+            .current_watermark(ResolvedDataset::from_created(&derived))
             .await,
         None,
     );

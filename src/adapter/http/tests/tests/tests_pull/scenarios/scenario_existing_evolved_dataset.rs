@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use kamu_datasets::CreateDatasetResult;
 use odf::dataset::DatasetLayout;
 use odf::metadata::testing::MetadataFactory;
 
@@ -27,7 +28,7 @@ pub(crate) struct SmartPullExistingEvolvedDatasetScenario<TServerHarness: Server
     pub server_dataset_layout: DatasetLayout,
     pub client_dataset_layout: DatasetLayout,
     pub server_dataset_ref: odf::DatasetRefRemote,
-    pub server_create_result: odf::CreateDatasetResult,
+    pub server_create_result: CreateDatasetResult,
     pub server_commit_result: odf::dataset::CommitResult,
 }
 
@@ -61,7 +62,7 @@ impl<TServerHarness: ServerSideHarness> SmartPullExistingEvolvedDatasetScenario<
             server_harness.dataset_layout(&server_create_result.dataset_handle);
 
         let client_dataset_layout =
-            client_harness.dataset_layout(&server_create_result.dataset_handle.id, "foo");
+            client_harness.dataset_layout(&server_create_result.dataset_handle.id);
 
         // Hard folder synchronization
         copy_dataset_files(&server_dataset_layout, &client_dataset_layout).unwrap();

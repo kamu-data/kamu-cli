@@ -13,6 +13,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use chrono::Utc;
+use futures::TryStreamExt;
 use kamu::domain::*;
 use kamu::testing::{BaseRepoHarness, *};
 use kamu::utils::ipfs_wrapper::IpfsClient;
@@ -148,20 +149,43 @@ async fn create_graph_remote(
     datasets: Vec<(odf::DatasetAlias, Vec<odf::DatasetAlias>)>,
     to_import: Vec<odf::DatasetAlias>,
 ) -> tempfile::TempDir {
-    let tmp_repo_dir = tempfile::tempdir().unwrap();
+    // First, create a temporary managed repository, and fill it with datasets.
+    // It will have a unified id-based structure
+    let tmp_registry_dir = tempfile::tempdir().unwrap();
 
-    let remote_dataset_repo = Arc::new(DatasetStorageUnitLocalFs::new(
-        tmp_repo_dir.path().to_owned(),
-        Arc::new(CurrentAccountSubject::new_test()),
-        Arc::new(TenancyConfig::SingleTenant),
+    let tmp_storage_unit = Arc::new(odf::dataset::DatasetStorageUnitLocalFs::new(
+        tmp_registry_dir.path().to_owned(),
     ));
 
-    let dataset_registry = DatasetRegistrySoloUnitBridge::new(remote_dataset_repo.clone());
+    let tmp_dataset_registry = DatasetRegistrySoloUnitBridge::new(
+        tmp_storage_unit.clone(),
+        Arc::new(CurrentAccountSubject::new_test()),
+        Arc::new(TenancyConfig::SingleTenant),
+    );
 
-    create_graph(&dataset_registry, remote_dataset_repo.as_ref(), datasets).await;
+    create_graph(&tmp_dataset_registry, tmp_storage_unit.as_ref(), datasets).await;
 
+    // Now, let's organize a simple local FS remote repo by copying those datasets.
+    // Unlike unified structure, this one is single-tenant and name-based.
+    let tmp_repo_dir = tempfile::tempdir().unwrap();
+
+    {
+        let mut hdl_stream = tmp_dataset_registry.all_dataset_handles();
+        while let Some(hdl) = hdl_stream.try_next().await.unwrap() {
+            let src_path = tmp_registry_dir
+                .path()
+                .join(hdl.id.as_multibase().to_stack_string());
+            let src_dataset_layout = odf::dataset::DatasetLayout::new(src_path);
+
+            let dst_path = tmp_repo_dir.path().join(hdl.alias.dataset_name);
+            let dst_dataset_layout = odf::dataset::DatasetLayout::new(dst_path);
+
+            copy_dataset_files(&src_dataset_layout, &dst_dataset_layout).unwrap();
+        }
+    }
+
+    // Register a remote repository pointing to this formed directory
     let tmp_repo_name = odf::RepoName::new_unchecked(remote_repo_name);
-
     harness
         .remote_repo_reg
         .add_repository(
@@ -170,6 +194,7 @@ async fn create_graph_remote(
         )
         .unwrap();
 
+    // Start syncing with main repository
     for import_alias in to_import {
         harness
             .sync_service
@@ -193,6 +218,31 @@ async fn create_graph_remote(
     }
 
     tmp_repo_dir
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn copy_folder_recursively(src: &std::path::Path, dst: &std::path::Path) -> std::io::Result<()> {
+    if src.exists() {
+        std::fs::create_dir_all(dst)?;
+        let copy_options = fs_extra::dir::CopyOptions::new().content_only(true);
+        fs_extra::dir::copy(src, dst, &copy_options).unwrap();
+    }
+    Ok(())
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn copy_dataset_files(
+    src_layout: &odf::dataset::DatasetLayout,
+    dst_layout: &odf::dataset::DatasetLayout,
+) -> std::io::Result<()> {
+    // Don't copy `info`
+    copy_folder_recursively(&src_layout.blocks_dir, &dst_layout.blocks_dir)?;
+    copy_folder_recursively(&src_layout.checkpoints_dir, &dst_layout.checkpoints_dir)?;
+    copy_folder_recursively(&src_layout.data_dir, &dst_layout.data_dir)?;
+    copy_folder_recursively(&src_layout.refs_dir, &dst_layout.refs_dir)?;
+    Ok(())
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

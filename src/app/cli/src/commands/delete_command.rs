@@ -13,7 +13,7 @@ use futures::{StreamExt, TryStreamExt};
 use internal_error::ResultIntoInternal;
 use kamu::domain::*;
 use kamu::utils::datasets_filtering::filter_datasets_by_local_pattern;
-use kamu_datasets::DeleteDatasetUseCase;
+use kamu_datasets::{DeleteDatasetError, DeleteDatasetUseCase};
 
 use super::{CLIError, Command};
 use crate::ConfirmDeleteService;
@@ -134,10 +134,8 @@ impl Command for DeleteCommand {
                 .await
             {
                 Ok(_) => Ok(()),
-                Err(odf::dataset::DeleteDatasetError::DanglingReference(e)) => {
-                    Err(CLIError::failure(e))
-                }
-                Err(odf::dataset::DeleteDatasetError::Access(e)) => Err(CLIError::failure(e)),
+                Err(DeleteDatasetError::DanglingReference(e)) => Err(CLIError::failure(e)),
+                Err(DeleteDatasetError::Access(e)) => Err(CLIError::failure(e)),
                 Err(e) => Err(CLIError::critical(e)),
             }?;
         }
