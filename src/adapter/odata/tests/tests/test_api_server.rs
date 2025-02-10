@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::future::IntoFuture;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
 use dill::Catalog;
@@ -16,7 +17,7 @@ use utoipa_axum::router::OpenApiRouter;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct TestAPIServer {
-    server: axum::serve::Serve<axum::routing::IntoMakeService<axum::Router>, axum::Router>,
+    server_future: Box<dyn std::future::Future<Output = Result<(), std::io::Error>> + Unpin>,
     local_addr: SocketAddr,
 }
 
@@ -51,9 +52,13 @@ impl TestAPIServer {
 
         let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
         let local_addr = listener.local_addr().unwrap();
-        let server = axum::serve(listener, router.into_make_service());
+        let server_future =
+            Box::new(axum::serve(listener, router.into_make_service()).into_future());
 
-        Self { server, local_addr }
+        Self {
+            server_future,
+            local_addr,
+        }
     }
 
     pub fn local_addr(&self) -> &SocketAddr {
@@ -61,7 +66,7 @@ impl TestAPIServer {
     }
 
     pub async fn run(self) -> Result<(), std::io::Error> {
-        self.server.await
+        self.server_future.await
     }
 }
 

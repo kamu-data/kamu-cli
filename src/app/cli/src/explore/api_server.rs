@@ -36,12 +36,11 @@ use super::{UIConfiguration, UIFeatureFlags};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct APIServer {
-    server: axum::serve::Serve<axum::routing::IntoMakeService<axum::Router>, axum::Router>,
+    server_future: Pin<Box<dyn std::future::Future<Output = Result<(), std::io::Error>>>>,
     local_addr: SocketAddr,
     task_agent: Arc<dyn TaskAgent>,
     flow_agent: Arc<dyn FlowAgent>,
     outbox_agent: Arc<OutboxAgent>,
-    maybe_shutdown_notify: Option<Arc<Notify>>,
 }
 
 impl APIServer {
@@ -161,8 +160,8 @@ impl APIServer {
         )
         .nest(
             match tenancy_config {
-                TenancyConfig::MultiTenant => "/:account_name/:dataset_name",
-                TenancyConfig::SingleTenant => "/:dataset_name",
+                TenancyConfig::MultiTenant => "/{account_name}/{dataset_name}",
+                TenancyConfig::SingleTenant => "/{dataset_name}",
             },
             kamu_adapter_http::add_dataset_resolver_layer(
                 OpenApiRouter::new()
@@ -221,13 +220,25 @@ impl APIServer {
 
         let server = axum::serve(listener, router.into_make_service());
 
+        let server_future: Pin<Box<dyn Future<Output = _>>> =
+            if let Some(shutdown_notify) = maybe_shutdown_notify {
+                Box::pin(async move {
+                    server
+                        .with_graceful_shutdown(async move {
+                            shutdown_notify.notified().await;
+                        })
+                        .await
+                })
+            } else {
+                Box::pin(server.into_future())
+            };
+
         Ok(Self {
-            server,
+            server_future,
             local_addr,
             task_agent,
             flow_agent,
             outbox_agent,
-            maybe_shutdown_notify,
         })
     }
 
@@ -236,22 +247,8 @@ impl APIServer {
     }
 
     pub async fn run(self) -> Result<(), InternalError> {
-        let server_run_fut: Pin<Box<dyn Future<Output = _>>> =
-            if let Some(shutdown_notify) = self.maybe_shutdown_notify {
-                Box::pin(async move {
-                    let server_with_graceful_shutdown =
-                        self.server.with_graceful_shutdown(async move {
-                            shutdown_notify.notified().await;
-                        });
-
-                    server_with_graceful_shutdown.await
-                })
-            } else {
-                Box::pin(self.server.into_future())
-            };
-
         tokio::select! {
-            res = server_run_fut => { res.int_err() },
+            res = self.server_future => { res.int_err() },
             res = self.outbox_agent.run() => { res.int_err() },
             res = self.task_agent.run() => { res.int_err() },
             res = self.flow_agent.run() => { res.int_err() }

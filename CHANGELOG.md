@@ -57,10 +57,10 @@ Recommendation: for ease of reading, use the following order:
   - GQL, `TransformInput::input_dataset()`: dataset may not be accessible
   - GQL, `MetadataChainMut::commit_event`: added check of dataset inputs for availability for `SetTransform`
   - HTTP: added access check for the dataset router (`DatasetAuthorizationMiddleware`), affected:
-    - `POST /:dataset/ingest`
-    - `GET /:dataset/metadata`
-    - `GET /:dataset/tail`
-  - HTTP, `GET /datasets/:id`: access check corrected
+    - `POST /{dataset}/ingest`
+    - `GET /{dataset}/metadata`
+    - `GET /{dataset}/tail`
+  - HTTP, `GET /datasets/{id}`: access check corrected
   - HTTP: replaced access errors with not found errors
   - CLI, `kamu pull`: replaced access errors with not found errors
 - Continued work on use cases extracting:
@@ -1249,7 +1249,7 @@ Introduced `DatasetRegistry` abstraction, encapsulating listing and resolution o
 - New `kamu ingest` command allows you to push data into a root dataset, examples:
   - `kamu ingest my.dataset data-2023-*.json` - to push from files
   - `echo '{"city": "Vancouver", "population": 675218}' | kamu ingest cities --stdin`
-- New `/:dataset/ingest` REST endpoint also allows you to push data via API, example:
+- New `/{dataset}/ingest` REST endpoint also allows you to push data via API, example:
   - Run API server and get JWT token: `kamu ui --http-port 8080 --get-token`
   - Push data: `echo '[{...}]' | curl -v -X POST http://localhost:8080/freezer/ingest -H 'Authorization:  Bearer <token>'`
 - The `kamu ui` command now supports `--get-token` flag to print out the access token upon server start that you can use to experiment with API

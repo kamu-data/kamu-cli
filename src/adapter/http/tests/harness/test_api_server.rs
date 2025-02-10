@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::future::IntoFuture;
 use std::net::SocketAddr;
 
 use dill::Catalog;
@@ -18,7 +19,7 @@ use utoipa_axum::routes;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct TestAPIServer {
-    server: axum::serve::Serve<axum::routing::IntoMakeService<axum::Router>, axum::Router>,
+    server_future: Box<dyn std::future::Future<Output = Result<(), std::io::Error>> + Unpin + Send>,
     local_addr: SocketAddr,
 }
 
@@ -42,8 +43,8 @@ impl TestAPIServer {
             .merge(kamu_adapter_http::general::root_router())
             .nest(
                 match tenancy_config {
-                    TenancyConfig::MultiTenant => "/:account_name/:dataset_name",
-                    TenancyConfig::SingleTenant => "/:dataset_name",
+                    TenancyConfig::MultiTenant => "/{account_name}/{dataset_name}",
+                    TenancyConfig::SingleTenant => "/{dataset_name}",
                 },
                 kamu_adapter_http::add_dataset_resolver_layer(
                     OpenApiRouter::new()
@@ -68,9 +69,13 @@ impl TestAPIServer {
 
         let local_addr = listener.local_addr().unwrap();
 
-        let server = axum::serve(listener, router.into_make_service());
+        let server_future =
+            Box::new(axum::serve(listener, router.into_make_service()).into_future());
 
-        Self { server, local_addr }
+        Self {
+            server_future,
+            local_addr,
+        }
     }
 
     pub fn local_addr(&self) -> &SocketAddr {
@@ -78,7 +83,7 @@ impl TestAPIServer {
     }
 
     pub async fn run(self) -> Result<(), std::io::Error> {
-        self.server.await
+        self.server_future.await
     }
 }
 
