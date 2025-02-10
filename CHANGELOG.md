@@ -11,6 +11,20 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Unreleased]
+### Changed
+- Restructured responsibilities between core and dataset domains upon key dataset CRUD use cases:
+   - 8 use cases moved from `core` to `kamu-datasets` domain
+   - no longer using outbox for "Renamed" and "DependenciesUpdated" events in datasets, 
+     these became internal aspect inside `kamu-datasets` domain
+   - simplified creation and commit result structures as they no longer transport new dependencies
+   - revised many integration tests:
+       - flow system no longer uses real datasets
+       - HTTP and GQL use real accounts and dataset entries
+- Moved several account-related routines from `AuthenticationService` to `AccountService`, 
+  the authentication services has focus only on JWT token and login flows
+
+
 ## [0.222.0] - 2025-02-06
 ### Added
 - New `AccessTokenLifecycleMessage` outbox message which produced during access token   creation
