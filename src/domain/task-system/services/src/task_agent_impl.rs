@@ -68,7 +68,7 @@ impl TaskAgentImpl {
 
     #[transactional_method1(task_event_store: Arc<dyn TaskEventStore>)]
     async fn recover_running_tasks(&self) -> Result<(), InternalError> {
-        // Recovering tasks means we are re-queing tasks that started running, but got
+        // Recovering tasks means we are re-queuing tasks that started running, but got
         // aborted due to server shutdown or crash
 
         // Total number of running tasks
