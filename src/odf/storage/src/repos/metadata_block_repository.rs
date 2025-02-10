@@ -31,7 +31,7 @@ pub trait MetadataBlockRepository: Send + Sync {
 
     async fn get_block(&self, hash: &Multihash) -> Result<MetadataBlock, GetBlockError>;
 
-    async fn get_block_data(&self, hash: &Multihash) -> Result<Bytes, GetBlockDataError>;
+    async fn get_block_bytes(&self, hash: &Multihash) -> Result<Bytes, GetBlockDataError>;
 
     async fn get_block_size(&self, hash: &Multihash) -> Result<u64, GetBlockDataError>;
 

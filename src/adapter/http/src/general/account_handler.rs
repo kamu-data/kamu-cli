@@ -12,7 +12,7 @@ use axum::response::Json;
 use database_common_macros::transactional_handler;
 use dill::Catalog;
 use http_common::*;
-use kamu_accounts::{Account, AuthenticationService, CurrentAccountSubject};
+use kamu_accounts::{Account, AccountService, CurrentAccountSubject};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -61,8 +61,8 @@ async fn get_account(catalog: &Catalog) -> Result<Json<AccountResponse>, ApiErro
     match current_account_subject.as_ref() {
         CurrentAccountSubject::Anonymous(_) => Err(ApiError::new_unauthorized()),
         CurrentAccountSubject::Logged(account) => {
-            let auth_service = catalog.get_one::<dyn AuthenticationService>().unwrap();
-            let full_account_info = auth_service
+            let account_service = catalog.get_one::<dyn AccountService>().unwrap();
+            let full_account_info = account_service
                 .account_by_id(&account.account_id)
                 .await?
                 .unwrap();

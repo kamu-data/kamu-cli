@@ -8,15 +8,23 @@
 // by the Apache License, Version 2.0.
 
 use async_graphql::*;
+use database_common::NoOpDatabasePlugin;
 use dill::Component;
 use kamu::*;
-use kamu_accounts::CurrentAccountSubject;
 use kamu_core::*;
-use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
-use kamu_datasets_services::DependencyGraphServiceImpl;
+use kamu_datasets::CreateDatasetFromSnapshotUseCase;
+use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEntryRepository};
+use kamu_datasets_services::{
+    CreateDatasetFromSnapshotUseCaseImpl,
+    CreateDatasetUseCaseImpl,
+    DatasetEntryServiceImpl,
+    DependencyGraphServiceImpl,
+};
 use messaging_outbox::DummyOutboxImpl;
 use odf::metadata::testing::MetadataFactory;
 use time_source::SystemTimeSourceDefault;
+
+use crate::utils::authentication_catalogs;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -26,23 +34,28 @@ async fn test_search_query() {
     let datasets_dir = tempdir.path().join("datasets");
     std::fs::create_dir(&datasets_dir).unwrap();
 
-    let cat = dill::CatalogBuilder::new()
-        .add::<DidGeneratorDefault>()
+    let mut b = dill::CatalogBuilder::new();
+    b.add::<DidGeneratorDefault>()
         .add::<SystemTimeSourceDefault>()
         .add::<DummyOutboxImpl>()
         .add::<DependencyGraphServiceImpl>()
         .add::<InMemoryDatasetDependencyRepository>()
-        .add_value(CurrentAccountSubject::new_test())
         .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
         .add_value(TenancyConfig::SingleTenant)
         .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
         .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
-        .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
-        .add::<DatasetRegistrySoloUnitBridge>()
+        .bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
         .add::<CreateDatasetFromSnapshotUseCaseImpl>()
-        .build();
+        .add::<CreateDatasetUseCaseImpl>()
+        .add::<DatasetEntryServiceImpl>()
+        .add::<InMemoryDatasetEntryRepository>();
 
-    let create_dataset_from_snapshot = cat
+    NoOpDatabasePlugin::init_database_components(&mut b);
+
+    let base_catalog = b.build();
+    let (_, catalog_authorized) = authentication_catalogs(&base_catalog).await;
+
+    let create_dataset_from_snapshot = catalog_authorized
         .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
         .unwrap();
     create_dataset_from_snapshot
@@ -82,7 +95,7 @@ async fn test_search_query() {
                   }
                 ",
             )
-            .data(cat.clone()),
+            .data(catalog_authorized.clone()),
         )
         .await;
     assert!(res.is_ok());
@@ -127,7 +140,7 @@ async fn test_search_query() {
                   }
                 ",
             )
-            .data(cat.clone()),
+            .data(catalog_authorized.clone()),
         )
         .await;
     assert!(res.is_ok());
@@ -179,7 +192,7 @@ async fn test_search_query() {
                 }
                 ",
             )
-            .data(cat),
+            .data(catalog_authorized),
         )
         .await;
     assert!(res.is_ok());

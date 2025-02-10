@@ -19,15 +19,22 @@ use kamu::domain::auth::{
     DatasetAction,
     DatasetActionAuthorizer,
 };
-use kamu::domain::{
+use kamu::testing::MockDatasetActionAuthorizer;
+use kamu_accounts::{
+    Account,
+    AccountType,
+    CurrentAccountSubject,
+    DEFAULT_ACCOUNT_ID,
+    DEFAULT_ACCOUNT_NAME,
+    PROVIDER_PASSWORD,
+};
+use kamu_core::{CompactionExecutor, CompactionPlanner, DatasetRegistry, TenancyConfig};
+use kamu_datasets::{
     CommitDatasetEventUseCase,
     CreateDatasetFromSnapshotUseCase,
     CreateDatasetUseCase,
 };
-use kamu::testing::MockDatasetActionAuthorizer;
-use kamu_accounts::testing::MockAuthenticationService;
-use kamu_accounts::{Account, AccountType, CurrentAccountSubject, PROVIDER_PASSWORD};
-use kamu_core::{CompactionExecutor, CompactionPlanner, DatasetRegistry, TenancyConfig};
+use kamu_datasets_services::DatasetEntryWriter;
 use odf::dataset::DatasetLayout;
 use reqwest::Url;
 use time_source::SystemTimeSourceStub;
@@ -41,6 +48,8 @@ pub(crate) const SERVER_ACCOUNT_EMAIL_ADDRESS: &str = "kamu-server@example.com";
 
 #[async_trait::async_trait]
 pub(crate) trait ServerSideHarness {
+    fn server_account_id(&self) -> odf::AccountID;
+
     fn operating_account_name(&self) -> Option<odf::AccountName>;
 
     fn cli_dataset_registry(&self) -> Arc<dyn DatasetRegistry>;
@@ -56,6 +65,8 @@ pub(crate) trait ServerSideHarness {
     fn cli_compaction_planner(&self) -> Arc<dyn CompactionPlanner>;
 
     fn cli_compaction_executor(&self) -> Arc<dyn CompactionExecutor>;
+
+    fn cli_dataset_entry_writer(&self) -> Arc<dyn DatasetEntryWriter>;
 
     fn dataset_layout(&self, dataset_handle: &odf::DatasetHandle) -> DatasetLayout;
 
@@ -84,39 +95,47 @@ pub(crate) struct ServerSideHarnessOptions {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn server_authentication_mock(account: &Account) -> MockAuthenticationService {
-    MockAuthenticationService::resolving_token(
-        odf::dataset::DUMMY_ODF_ACCESS_TOKEN,
-        account.clone(),
-    )
-}
-
-pub(crate) fn make_server_account() -> Account {
-    Account {
-        id: odf::AccountID::new_seeded_ed25519(SERVER_ACCOUNT_NAME.as_bytes()),
-        account_name: odf::AccountName::new_unchecked(SERVER_ACCOUNT_NAME),
-        account_type: AccountType::User,
-        display_name: SERVER_ACCOUNT_NAME.to_string(),
-        email: Email::parse(SERVER_ACCOUNT_EMAIL_ADDRESS).unwrap(),
-        avatar_url: None,
-        registered_at: Utc::now(),
-        is_admin: false,
-        provider: String::from(PROVIDER_PASSWORD),
-        provider_identity_key: String::from(SERVER_ACCOUNT_NAME),
+pub(crate) fn make_server_account(tenancy_config: TenancyConfig) -> Account {
+    match tenancy_config {
+        TenancyConfig::MultiTenant => Account {
+            id: odf::AccountID::new_seeded_ed25519(SERVER_ACCOUNT_NAME.as_bytes()),
+            account_name: odf::AccountName::new_unchecked(SERVER_ACCOUNT_NAME),
+            account_type: AccountType::User,
+            display_name: SERVER_ACCOUNT_NAME.to_string(),
+            email: Email::parse(SERVER_ACCOUNT_EMAIL_ADDRESS).unwrap(),
+            avatar_url: None,
+            registered_at: Utc::now(),
+            is_admin: false,
+            provider: String::from(PROVIDER_PASSWORD),
+            provider_identity_key: String::from(SERVER_ACCOUNT_NAME),
+        },
+        TenancyConfig::SingleTenant => Account::dummy(),
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn create_cli_user_catalog(base_catalog: &dill::Catalog) -> dill::Catalog {
+pub(crate) fn create_cli_user_catalog(
+    base_catalog: &dill::Catalog,
+    tenancy_config: TenancyConfig,
+) -> dill::Catalog {
     let is_admin = false;
 
-    dill::CatalogBuilder::new_chained(base_catalog)
-        .add_value(CurrentAccountSubject::logged(
+    let current_account_subject = match tenancy_config {
+        TenancyConfig::SingleTenant => CurrentAccountSubject::logged(
+            DEFAULT_ACCOUNT_ID.clone(),
+            DEFAULT_ACCOUNT_NAME.clone(),
+            is_admin,
+        ),
+        TenancyConfig::MultiTenant => CurrentAccountSubject::logged(
             odf::AccountID::new_seeded_ed25519(SERVER_ACCOUNT_NAME.as_bytes()),
             odf::AccountName::new_unchecked(SERVER_ACCOUNT_NAME),
             is_admin,
-        ))
+        ),
+    };
+
+    dill::CatalogBuilder::new_chained(base_catalog)
+        .add_value(current_account_subject)
         .add::<AlwaysHappyDatasetActionAuthorizer>()
         .build()
 }

@@ -16,10 +16,22 @@ use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use dill::Component;
 use kamu::domain::*;
 use kamu::*;
-use kamu_accounts::CurrentAccountSubject;
+use kamu_accounts::{CurrentAccountSubject, PredefinedAccountsConfig};
+use kamu_accounts_inmem::InMemoryAccountRepository;
+use kamu_accounts_services::{
+    AccountServiceImpl,
+    LoginPasswordAuthProvider,
+    PredefinedAccountsRegistrator,
+};
 use kamu_adapter_http::DatasetAuthorizationLayer;
-use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
-use kamu_datasets_services::DependencyGraphServiceImpl;
+use kamu_datasets::CreateDatasetFromSnapshotUseCase;
+use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEntryRepository};
+use kamu_datasets_services::{
+    CreateDatasetFromSnapshotUseCaseImpl,
+    CreateDatasetUseCaseImpl,
+    DatasetEntryServiceImpl,
+    DependencyGraphServiceImpl,
+};
 use messaging_outbox::DummyOutboxImpl;
 use odf::dataset::{DatasetFactoryImpl, IpfsGateway};
 use odf::metadata::testing::MetadataFactory;
@@ -51,16 +63,25 @@ async fn setup_repo() -> RepoFixture {
         .add_value(TenancyConfig::SingleTenant)
         .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
         .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
-        .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
-        .add::<DatasetRegistrySoloUnitBridge>()
+        .bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
         .add_value(CurrentAccountSubject::new_test())
         .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
         .add::<CreateDatasetFromSnapshotUseCaseImpl>()
-        .add::<DatabaseTransactionRunner>();
+        .add::<CreateDatasetUseCaseImpl>()
+        .add::<DatabaseTransactionRunner>()
+        .add::<DatasetEntryServiceImpl>()
+        .add::<InMemoryDatasetEntryRepository>()
+        .add::<AccountServiceImpl>()
+        .add::<InMemoryAccountRepository>()
+        .add::<PredefinedAccountsRegistrator>()
+        .add_value(PredefinedAccountsConfig::single_tenant())
+        .add::<LoginPasswordAuthProvider>();
 
     NoOpDatabasePlugin::init_database_components(&mut b);
 
     let catalog = b.build();
+
+    init_on_startup::run_startup_jobs(&catalog).await.unwrap();
 
     let create_dataset_from_snapshot = catalog
         .get_one::<dyn CreateDatasetFromSnapshotUseCase>()

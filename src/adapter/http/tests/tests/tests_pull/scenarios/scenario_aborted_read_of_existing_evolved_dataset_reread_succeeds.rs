@@ -78,6 +78,16 @@ impl<TServerHarness: ServerSideHarness>
         )
         .await;
 
+        client_harness
+            .dataset_entry_writer()
+            .create_entry(
+                &server_create_result.dataset_handle.id,
+                &client_harness.client_account_id(),
+                &server_create_result.dataset_handle.alias.dataset_name,
+            )
+            .await
+            .unwrap();
+
         // Extend server-side dataset with new nodes
 
         let server_repo = server_harness.cli_dataset_registry();
@@ -97,7 +107,6 @@ impl<TServerHarness: ServerSideHarness>
                         .description("updated description")
                         .build(),
                 ),
-                odf::dataset::CommitOpts::default(),
             )
             .await
             .unwrap();

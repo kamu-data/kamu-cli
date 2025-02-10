@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 mod base_repo_harness;
+mod base_use_case_harness;
 mod dataset_data_helper;
 mod dataset_test_helper;
 mod dummy_smart_transfer_protocol_client;
@@ -22,6 +23,7 @@ mod parquet_reader_helper;
 mod parquet_writer_helper;
 
 pub use base_repo_harness::*;
+pub use base_use_case_harness::*;
 pub use dataset_data_helper::*;
 pub use dataset_test_helper::*;
 pub use dummy_smart_transfer_protocol_client::*;

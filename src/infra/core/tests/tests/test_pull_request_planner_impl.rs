@@ -12,16 +12,24 @@ use std::convert::TryFrom;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+use chrono::Utc;
 use kamu::domain::*;
 use kamu::testing::{BaseRepoHarness, *};
 use kamu::utils::ipfs_wrapper::IpfsClient;
 use kamu::utils::simple_transfer_protocol::SimpleTransferProtocol;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
+use kamu_datasets_services::{
+    CreateDatasetUseCaseImpl,
+    DatasetEntryWriter,
+    DependencyGraphWriter,
+    MockDatasetEntryWriter,
+    MockDependencyGraphWriter,
+};
 use messaging_outbox::DummyOutboxImpl;
+use odf::dataset::testing::create_test_dataset_fron_snapshot;
 use odf::dataset::{DatasetFactoryImpl, IpfsGateway};
 use odf::metadata::testing::MetadataFactory;
-use time_source::SystemTimeSourceDefault;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -97,31 +105,35 @@ macro_rules! refs {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 async fn create_graph(
-    dataset_storage_unit_writer: &dyn DatasetStorageUnitWriter,
+    dataset_registry: &dyn DatasetRegistry,
+    dataset_storage_unit: &dyn odf::DatasetStorageUnitWriter,
     datasets: Vec<(odf::DatasetAlias, Vec<odf::DatasetAlias>)>,
 ) {
     for (dataset_alias, deps) in datasets {
-        dataset_storage_unit_writer
-            .create_dataset_from_snapshot(
-                MetadataFactory::dataset_snapshot()
-                    .name(dataset_alias)
-                    .kind(if deps.is_empty() {
-                        odf::DatasetKind::Root
-                    } else {
-                        odf::DatasetKind::Derivative
-                    })
-                    .push_event::<odf::MetadataEvent>(if deps.is_empty() {
-                        MetadataFactory::set_polling_source().build().into()
-                    } else {
-                        MetadataFactory::set_transform()
-                            .inputs_from_refs(deps)
-                            .build()
-                            .into()
-                    })
-                    .build(),
-            )
-            .await
-            .unwrap();
+        create_test_dataset_fron_snapshot(
+            dataset_registry,
+            dataset_storage_unit,
+            MetadataFactory::dataset_snapshot()
+                .name(dataset_alias)
+                .kind(if deps.is_empty() {
+                    odf::DatasetKind::Root
+                } else {
+                    odf::DatasetKind::Derivative
+                })
+                .push_event::<odf::MetadataEvent>(if deps.is_empty() {
+                    MetadataFactory::set_polling_source().build().into()
+                } else {
+                    MetadataFactory::set_transform()
+                        .inputs_from_refs(deps)
+                        .build()
+                        .into()
+                })
+                .build(),
+            odf::DatasetID::new_generated_ed25519().1,
+            Utc::now(),
+        )
+        .await
+        .unwrap();
     }
 }
 
@@ -138,15 +150,15 @@ async fn create_graph_remote(
 ) -> tempfile::TempDir {
     let tmp_repo_dir = tempfile::tempdir().unwrap();
 
-    let remote_dataset_repo = DatasetStorageUnitLocalFs::new(
+    let remote_dataset_repo = Arc::new(DatasetStorageUnitLocalFs::new(
         tmp_repo_dir.path().to_owned(),
         Arc::new(CurrentAccountSubject::new_test()),
         Arc::new(TenancyConfig::SingleTenant),
-        Arc::new(SystemTimeSourceDefault),
-        Arc::new(DidGeneratorDefault),
-    );
+    ));
 
-    create_graph(&remote_dataset_repo, datasets).await;
+    let dataset_registry = DatasetRegistrySoloUnitBridge::new(remote_dataset_repo.clone());
+
+    create_graph(&dataset_registry, remote_dataset_repo.as_ref(), datasets).await;
 
     let tmp_repo_name = odf::RepoName::new_unchecked(remote_repo_name);
 
@@ -187,10 +199,15 @@ async fn create_graph_remote(
 
 #[test_log::test(tokio::test)]
 async fn test_pull_batching_chain() {
-    let harness = PullTestHarness::new(TenancyConfig::SingleTenant);
+    let harness = PullTestHarness::new(
+        TenancyConfig::SingleTenant,
+        MockDatasetEntryWriter::new(),
+        MockDependencyGraphWriter::new(),
+    );
 
     // A - B - C
     create_graph(
+        harness.dataset_registry(),
         harness.dataset_storage_unit_writer(),
         vec![
             (n!("a"), names![]),
@@ -242,10 +259,15 @@ async fn test_pull_batching_chain() {
 
 #[test_log::test(tokio::test)]
 async fn test_pull_batching_chain_multi_tenant() {
-    let harness = PullTestHarness::new(TenancyConfig::MultiTenant);
+    let harness = PullTestHarness::new(
+        TenancyConfig::MultiTenant,
+        MockDatasetEntryWriter::new(),
+        MockDependencyGraphWriter::new(),
+    );
 
     // XA - YB - ZC
     create_graph(
+        harness.dataset_registry(),
         harness.dataset_storage_unit_writer(),
         vec![
             (mn!("x/a"), mnames![]),
@@ -297,7 +319,11 @@ async fn test_pull_batching_chain_multi_tenant() {
 
 #[test_log::test(tokio::test)]
 async fn test_pull_batching_complex() {
-    let harness = PullTestHarness::new(TenancyConfig::SingleTenant);
+    let harness = PullTestHarness::new(
+        TenancyConfig::SingleTenant,
+        MockDatasetEntryWriter::new(),
+        MockDependencyGraphWriter::new(),
+    );
 
     //    / C \
     // A <     > > E
@@ -305,6 +331,7 @@ async fn test_pull_batching_complex() {
     //         /
     // B - - -/
     create_graph(
+        harness.dataset_registry(),
         harness.dataset_storage_unit_writer(),
         vec![
             (n!("a"), names![]),
@@ -359,7 +386,23 @@ async fn test_pull_batching_complex() {
 
 #[test_log::test(tokio::test)]
 async fn test_pull_batching_complex_with_remote() {
-    let harness = PullTestHarness::new(TenancyConfig::SingleTenant);
+    let mut mock_dataset_entry_writer = MockDatasetEntryWriter::new();
+    mock_dataset_entry_writer
+        .expect_create_entry()
+        .times(1)
+        .returning(|_, _, _| Ok(()));
+
+    let mut mock_dependency_graph_writer = MockDependencyGraphWriter::new();
+    mock_dependency_graph_writer
+        .expect_create_dataset_node()
+        .times(1)
+        .returning(|_| Ok(()));
+
+    let harness = PullTestHarness::new(
+        TenancyConfig::SingleTenant,
+        mock_dataset_entry_writer,
+        mock_dependency_graph_writer,
+    );
 
     // (A) - (E) - F - G
     // (B) --/    /   /
@@ -377,6 +420,7 @@ async fn test_pull_batching_complex_with_remote() {
     )
     .await;
     create_graph(
+        harness.dataset_registry(),
         harness.dataset_storage_unit_writer(),
         vec![
             (n!("c"), names![]),
@@ -508,7 +552,11 @@ async fn test_pull_batching_complex_with_remote() {
 
 #[tokio::test]
 async fn test_sync_from() {
-    let harness = PullTestHarness::new(TenancyConfig::SingleTenant);
+    let harness = PullTestHarness::new(
+        TenancyConfig::SingleTenant,
+        MockDatasetEntryWriter::new(),
+        MockDependencyGraphWriter::new(),
+    );
 
     let _remote_tmp_dir =
         create_graph_remote("kamu.dev", &harness, vec![(n!("foo"), names![])], names!()).await;
@@ -537,7 +585,11 @@ async fn test_sync_from() {
 
 #[tokio::test]
 async fn test_sync_from_url_and_local_ref() {
-    let harness = PullTestHarness::new(TenancyConfig::SingleTenant);
+    let harness = PullTestHarness::new(
+        TenancyConfig::SingleTenant,
+        MockDatasetEntryWriter::new(),
+        MockDependencyGraphWriter::new(),
+    );
 
     let _remote_tmp_dir =
         create_graph_remote("kamu.dev", &harness, vec![(n!("bar"), names![])], names!()).await;
@@ -566,7 +618,11 @@ async fn test_sync_from_url_and_local_ref() {
 
 #[tokio::test]
 async fn test_sync_from_url_and_local_multi_tenant_ref() {
-    let harness = PullTestHarness::new(TenancyConfig::MultiTenant);
+    let harness = PullTestHarness::new(
+        TenancyConfig::MultiTenant,
+        MockDatasetEntryWriter::new(),
+        MockDependencyGraphWriter::new(),
+    );
 
     let _remote_tmp_dir =
         create_graph_remote("kamu.dev", &harness, vec![(n!("bar"), names![])], names!()).await;
@@ -595,7 +651,11 @@ async fn test_sync_from_url_and_local_multi_tenant_ref() {
 
 #[tokio::test]
 async fn test_sync_from_url_only() {
-    let harness = PullTestHarness::new(TenancyConfig::SingleTenant);
+    let harness = PullTestHarness::new(
+        TenancyConfig::SingleTenant,
+        MockDatasetEntryWriter::new(),
+        MockDependencyGraphWriter::new(),
+    );
 
     let _remote_tmp_dir =
         create_graph_remote("kamu.dev", &harness, vec![(n!("bar"), names![])], names!()).await;
@@ -624,7 +684,11 @@ async fn test_sync_from_url_only() {
 
 #[tokio::test]
 async fn test_sync_from_url_only_multi_tenant_case() {
-    let harness = PullTestHarness::new(TenancyConfig::MultiTenant);
+    let harness = PullTestHarness::new(
+        TenancyConfig::MultiTenant,
+        MockDatasetEntryWriter::new(),
+        MockDependencyGraphWriter::new(),
+    );
 
     let _remote_tmp_dir =
         create_graph_remote("kamu.dev", &harness, vec![(n!("bar"), names![])], names!()).await;
@@ -664,7 +728,11 @@ struct PullTestHarness {
 }
 
 impl PullTestHarness {
-    fn new(tenancy_config: TenancyConfig) -> Self {
+    fn new(
+        tenancy_config: TenancyConfig,
+        mock_dataset_entry_writer: MockDatasetEntryWriter,
+        mock_dependency_graph_writer: MockDependencyGraphWriter,
+    ) -> Self {
         let base_repo_harness = BaseRepoHarness::new(tenancy_config, None);
 
         let calls = Arc::new(Mutex::new(Vec::new()));
@@ -690,6 +758,10 @@ impl PullTestHarness {
             .add::<DummyOutboxImpl>()
             .add_value(IpfsClient::default())
             .add_value(IpfsGateway::default())
+            .add_value(mock_dataset_entry_writer)
+            .bind::<dyn DatasetEntryWriter, MockDatasetEntryWriter>()
+            .add_value(mock_dependency_graph_writer)
+            .bind::<dyn DependencyGraphWriter, MockDependencyGraphWriter>()
             .build();
 
         Self {

@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use kamu_accounts::{
-    AuthenticationService,
+    AccountService,
     CurrentAccountSubject,
     DEFAULT_ACCOUNT_ID,
     DEFAULT_ACCOUNT_NAME,
@@ -59,9 +59,9 @@ impl Account {
         ctx: &Context<'_>,
         account_id: odf::AccountID,
     ) -> Result<Self, InternalError> {
-        let authentication_service = from_catalog_n!(ctx, dyn AuthenticationService);
+        let account_service = from_catalog_n!(ctx, dyn AccountService);
 
-        let account_name = authentication_service
+        let account_name = account_service
             .find_account_name_by_id(&account_id)
             .await?
             .expect("Account must exist");
@@ -74,11 +74,9 @@ impl Account {
         ctx: &Context<'_>,
         account_name: odf::AccountName,
     ) -> Result<Option<Self>, InternalError> {
-        let authentication_service = from_catalog_n!(ctx, dyn AuthenticationService);
+        let account_service = from_catalog_n!(ctx, dyn AccountService);
 
-        let maybe_account = authentication_service
-            .account_by_name(&account_name)
-            .await?;
+        let maybe_account = account_service.account_by_name(&account_name).await?;
 
         Ok(maybe_account.map(Self::from_account))
     }
@@ -110,11 +108,9 @@ impl Account {
 
     #[graphql(skip)]
     async fn resolve_full_account_info(&self, ctx: &Context<'_>) -> Result<kamu_accounts::Account> {
-        let authentication_service = from_catalog_n!(ctx, dyn AuthenticationService);
+        let account_service = from_catalog_n!(ctx, dyn AccountService);
 
-        let maybe_account_info = authentication_service
-            .account_by_id(&self.account_id)
-            .await?;
+        let maybe_account_info = account_service.account_by_id(&self.account_id).await?;
 
         maybe_account_info.ok_or_else(|| {
             GqlError::Gql(

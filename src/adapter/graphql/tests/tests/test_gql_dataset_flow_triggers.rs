@@ -11,16 +11,17 @@ use async_graphql::value;
 use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use dill::Component;
 use indoc::indoc;
-use kamu::{
+use kamu::{DatasetStorageUnitLocalFs, MetadataQueryServiceImpl};
+use kamu_core::{auth, DidGeneratorDefault, TenancyConfig};
+use kamu_datasets::CreateDatasetFromSnapshotUseCase;
+use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEntryRepository};
+use kamu_datasets_services::{
     CreateDatasetFromSnapshotUseCaseImpl,
-    DatasetRegistrySoloUnitBridge,
-    DatasetStorageUnitLocalFs,
-    DatasetStorageUnitWriter,
-    MetadataQueryServiceImpl,
+    CreateDatasetUseCaseImpl,
+    DatasetEntryServiceImpl,
+    DependencyGraphServiceImpl,
     ViewDatasetUseCaseImpl,
 };
-use kamu_core::{auth, CreateDatasetFromSnapshotUseCase, DidGeneratorDefault, TenancyConfig};
-use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
 use kamu_flow_system_inmem::{InMemoryFlowConfigurationEventStore, InMemoryFlowTriggerEventStore};
 use kamu_flow_system_services::FlowTriggerServiceImpl;
 use messaging_outbox::DummyOutboxImpl;
@@ -1042,7 +1043,6 @@ async fn test_anonymous_setters_fail() {
 
 struct FlowTriggerHarness {
     _tempdir: tempfile::TempDir,
-    _catalog_base: dill::Catalog,
     catalog_anonymous: dill::Catalog,
     catalog_authorized: dill::Catalog,
 }
@@ -1061,18 +1061,21 @@ impl FlowTriggerHarness {
                 .add_value(TenancyConfig::SingleTenant)
                 .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
                 .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
-                .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
-                .add::<DatasetRegistrySoloUnitBridge>()
+                .bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
                 .add::<MetadataQueryServiceImpl>()
                 .add::<CreateDatasetFromSnapshotUseCaseImpl>()
+                .add::<CreateDatasetUseCaseImpl>()
                 .add::<ViewDatasetUseCaseImpl>()
                 .add::<SystemTimeSourceDefault>()
                 .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
+                .add::<DependencyGraphServiceImpl>()
                 .add::<InMemoryDatasetDependencyRepository>()
                 .add::<FlowTriggerServiceImpl>()
                 .add::<InMemoryFlowTriggerEventStore>()
                 .add::<InMemoryFlowConfigurationEventStore>()
-                .add::<DatabaseTransactionRunner>();
+                .add::<DatabaseTransactionRunner>()
+                .add::<DatasetEntryServiceImpl>()
+                .add::<InMemoryDatasetEntryRepository>();
 
             NoOpDatabasePlugin::init_database_components(&mut b);
 
@@ -1084,7 +1087,6 @@ impl FlowTriggerHarness {
 
         Self {
             _tempdir: tempdir,
-            _catalog_base: catalog_base,
             catalog_anonymous,
             catalog_authorized,
         }

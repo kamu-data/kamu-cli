@@ -13,16 +13,11 @@ use std::sync::Arc;
 
 use dill::*;
 use futures::TryStreamExt;
-use kamu::*;
-use kamu_accounts::CurrentAccountSubject;
-use kamu_core::*;
-use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
-use kamu_datasets_services::DependencyGraphServiceImpl;
+use kamu_datasets::{DatasetLifecycleMessage, MESSAGE_PRODUCER_KAMU_DATASET_SERVICE};
 use kamu_flow_system::*;
 use kamu_flow_system_inmem::*;
 use kamu_flow_system_services::*;
-use messaging_outbox::{register_message_dispatcher, Outbox, OutboxImmediateImpl};
-use odf::metadata::testing::MetadataFactory;
+use messaging_outbox::{register_message_dispatcher, Outbox, OutboxExt, OutboxImmediateImpl};
 use time_source::SystemTimeSourceDefault;
 
 use super::FlowConfigTestListener;
@@ -34,8 +29,8 @@ async fn test_visibility() {
     let harness = FlowConfigurationHarness::new();
     assert!(harness.list_active_configurations().await.is_empty());
 
-    let foo_id = harness.create_root_dataset("foo").await;
-    let bar_id = harness.create_root_dataset("bar").await;
+    let foo_id = odf::DatasetID::new_seeded_ed25519(b"foo");
+    let bar_id = odf::DatasetID::new_seeded_ed25519(b"bar");
 
     let foo_ingest_config = FlowConfigurationRule::IngestRule(IngestRule {
         fetch_uncacheable: false,
@@ -99,7 +94,7 @@ async fn test_modify() {
     assert_eq!(0, harness.configuration_events_count());
 
     // Make a dataset and configure compaction config
-    let foo_id = harness.create_root_dataset("foo").await;
+    let foo_id = odf::DatasetID::new_seeded_ed25519(b"foo");
     let foo_compaction_config = FlowConfigurationRule::CompactionRule(CompactionRule::Full(
         CompactionRuleFull::new_checked(1, 2, false).unwrap(),
     ));
@@ -152,7 +147,7 @@ async fn test_dataset_deleted() {
     assert!(harness.list_active_configurations().await.is_empty());
 
     // Make a dataset and configure ingest rule
-    let foo_id = harness.create_root_dataset("foo").await;
+    let foo_id = odf::DatasetID::new_seeded_ed25519(b"foo");
     let foo_ingest_config = FlowConfigurationRule::IngestRule(IngestRule {
         fetch_uncacheable: true,
     });
@@ -174,8 +169,8 @@ async fn test_dataset_deleted() {
         &foo_ingest_config,
     );
 
-    // Now, delete the dataset
-    harness.delete_dataset(&foo_id).await;
+    // Now, pretend dataset was deleted
+    harness.issue_dataset_deleted(&foo_id).await;
 
     // The dataset should not be visible in the list of configs
     let configs = harness.list_active_configurations().await;
@@ -194,20 +189,16 @@ async fn test_dataset_deleted() {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 struct FlowConfigurationHarness {
-    _tmp_dir: tempfile::TempDir,
-    catalog: Catalog,
     flow_configuration_service: Arc<dyn FlowConfigurationService>,
     flow_configuration_event_store: Arc<dyn FlowConfigurationEventStore>,
     config_listener: Arc<FlowConfigTestListener>,
+    outbox: Arc<dyn Outbox>,
 }
 
 impl FlowConfigurationHarness {
     fn new() -> Self {
-        let tmp_dir = tempfile::tempdir().unwrap();
-        let datasets_dir = tmp_dir.path().join("datasets");
-        std::fs::create_dir(&datasets_dir).unwrap();
-
         let catalog = {
             let mut b = CatalogBuilder::new();
 
@@ -216,28 +207,16 @@ impl FlowConfigurationHarness {
                     .with_consumer_filter(messaging_outbox::ConsumerFilter::AllConsumers),
             )
             .bind::<dyn Outbox, OutboxImmediateImpl>()
-            .add::<DidGeneratorDefault>()
             .add::<FlowConfigTestListener>()
             .add::<FlowConfigurationServiceImpl>()
             .add::<InMemoryFlowConfigurationEventStore>()
-            .add::<SystemTimeSourceDefault>()
-            .add_value(TenancyConfig::SingleTenant)
-            .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
-            .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
-            .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
-            .add::<DatasetRegistrySoloUnitBridge>()
-            .add_value(CurrentAccountSubject::new_test())
-            .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
-            .add::<DependencyGraphServiceImpl>()
-            .add::<InMemoryDatasetDependencyRepository>()
-            .add::<CreateDatasetFromSnapshotUseCaseImpl>()
-            .add::<DeleteDatasetUseCaseImpl>();
+            .add::<SystemTimeSourceDefault>();
 
             database_common::NoOpDatabasePlugin::init_database_components(&mut b);
 
             register_message_dispatcher::<DatasetLifecycleMessage>(
                 &mut b,
-                MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
+                MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
             );
             register_message_dispatcher::<FlowConfigurationUpdatedMessage>(
                 &mut b,
@@ -247,18 +226,11 @@ impl FlowConfigurationHarness {
             b.build()
         };
 
-        let flow_configuration_service = catalog.get_one::<dyn FlowConfigurationService>().unwrap();
-        let flow_configuration_event_store = catalog
-            .get_one::<dyn FlowConfigurationEventStore>()
-            .unwrap();
-        let flow_config_events_listener = catalog.get_one::<FlowConfigTestListener>().unwrap();
-
         Self {
-            _tmp_dir: tmp_dir,
-            catalog,
-            flow_configuration_service,
-            flow_configuration_event_store,
-            config_listener: flow_config_events_listener,
+            flow_configuration_service: catalog.get_one().unwrap(),
+            flow_configuration_event_store: catalog.get_one().unwrap(),
+            config_listener: catalog.get_one().unwrap(),
+            outbox: catalog.get_one().unwrap(),
         }
     }
 
@@ -322,38 +294,18 @@ impl FlowConfigurationHarness {
         flow_configuration.into()
     }
 
-    async fn create_root_dataset(&self, dataset_name: &str) -> odf::DatasetID {
-        let create_dataset_from_snapshot = self
-            .catalog
-            .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
-            .unwrap();
+    fn configuration_events_count(&self) -> usize {
+        self.config_listener.configuration_events_count()
+    }
 
-        let result = create_dataset_from_snapshot
-            .execute(
-                MetadataFactory::dataset_snapshot()
-                    .name(dataset_name)
-                    .kind(odf::DatasetKind::Root)
-                    .push_event(MetadataFactory::set_polling_source().build())
-                    .build(),
-                Default::default(),
+    async fn issue_dataset_deleted(&self, dataset_id: &odf::DatasetID) {
+        self.outbox
+            .post_message(
+                MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
+                DatasetLifecycleMessage::deleted(dataset_id.clone()),
             )
             .await
             .unwrap();
-
-        result.dataset_handle.id
-    }
-
-    async fn delete_dataset(&self, dataset_id: &odf::DatasetID) {
-        // Do the actual deletion
-        let delete_dataset = self.catalog.get_one::<dyn DeleteDatasetUseCase>().unwrap();
-        delete_dataset
-            .execute_via_ref(&(dataset_id.as_local_ref()))
-            .await
-            .unwrap();
-    }
-
-    fn configuration_events_count(&self) -> usize {
-        self.config_listener.configuration_events_count()
     }
 }
 

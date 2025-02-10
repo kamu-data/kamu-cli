@@ -19,16 +19,21 @@ use file_utils::OwnedFile;
 use kamu::testing::ParquetWriterHelper;
 use kamu::*;
 use kamu_accounts::*;
-use kamu_accounts_inmem::{InMemoryAccessTokenRepository, InMemoryAccountRepository};
+use kamu_accounts_inmem::InMemoryAccountRepository;
 use kamu_accounts_services::{
-    AccessTokenServiceImpl,
-    AuthenticationServiceImpl,
+    AccountServiceImpl,
     LoginPasswordAuthProvider,
     PredefinedAccountsRegistrator,
 };
 use kamu_core::*;
-use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
-use kamu_datasets_services::DependencyGraphServiceImpl;
+use kamu_datasets::CreateDatasetUseCase;
+use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEntryRepository};
+use kamu_datasets_services::{
+    CreateDatasetUseCaseImpl,
+    DatasetEntryServiceImpl,
+    DependencyGraphServiceImpl,
+    ViewDatasetUseCaseImpl,
+};
 use messaging_outbox::DummyOutboxImpl;
 use odf::metadata::testing::MetadataFactory;
 use serde_json::json;
@@ -67,8 +72,7 @@ async fn create_catalog_with_local_workspace(
             .add_value(tenancy_config)
             .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
             .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
-            .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
-            .add::<DatasetRegistrySoloUnitBridge>()
+            .bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
             .add::<CreateDatasetUseCaseImpl>()
             .add::<ViewDatasetUseCaseImpl>()
             .add::<DummyOutboxImpl>()
@@ -77,14 +81,13 @@ async fn create_catalog_with_local_workspace(
             .add::<ObjectStoreRegistryImpl>()
             .add::<ObjectStoreBuilderLocalFs>()
             .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
-            .add::<AuthenticationServiceImpl>()
-            .add::<AccessTokenServiceImpl>()
-            .add::<InMemoryAccessTokenRepository>()
-            .add::<InMemoryAccountRepository>()
-            .add_value(JwtAuthenticationConfig::default())
             .add::<LoginPasswordAuthProvider>()
             .add::<PredefinedAccountsRegistrator>()
-            .add::<DatabaseTransactionRunner>();
+            .add::<DatabaseTransactionRunner>()
+            .add::<DatasetEntryServiceImpl>()
+            .add::<InMemoryDatasetEntryRepository>()
+            .add::<AccountServiceImpl>()
+            .add::<InMemoryAccountRepository>();
 
         NoOpDatabasePlugin::init_database_components(&mut b);
 

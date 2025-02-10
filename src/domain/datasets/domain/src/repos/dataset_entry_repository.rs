@@ -203,7 +203,7 @@ pub enum UpdateDatasetEntryNameError {
 }
 
 #[derive(Error, Debug)]
-#[error("Dataset entry with name {dataset_name} for same owner already exists")]
+#[error("Dataset entry with name '{dataset_name}' for same owner already exists")]
 pub struct DatasetEntryNameCollisionError {
     pub dataset_name: odf::DatasetName,
 }

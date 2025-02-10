@@ -40,7 +40,8 @@ async fn test_smart_pull_unauthenticated() {
         ClientSideHarness::new(ClientSideHarnessOptions {
             tenancy_config: TenancyConfig::SingleTenant,
             authenticated_remotely: false,
-        }),
+        })
+        .await,
         ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
             tenancy_config: TenancyConfig::SingleTenant,
             authorized_writes: true,
@@ -86,7 +87,8 @@ async fn test_smart_pull_incompatible_version_err() {
         ClientSideHarness::new(ClientSideHarnessOptions {
             tenancy_config: TenancyConfig::MultiTenant,
             authenticated_remotely: true,
-        }),
+        })
+        .await,
         ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
             tenancy_config: TenancyConfig::MultiTenant,
             authorized_writes: true,

@@ -13,8 +13,15 @@ use dill::*;
 use indoc::indoc;
 use kamu::*;
 use kamu_core::*;
-use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
-use kamu_datasets_services::DependencyGraphServiceImpl;
+use kamu_datasets::CreateDatasetFromSnapshotUseCase;
+use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEntryRepository};
+use kamu_datasets_services::{
+    CreateDatasetFromSnapshotUseCaseImpl,
+    CreateDatasetUseCaseImpl,
+    DatasetEntryServiceImpl,
+    DependencyGraphServiceImpl,
+    ViewDatasetUseCaseImpl,
+};
 use messaging_outbox::DummyOutboxImpl;
 use odf::metadata::testing::MetadataFactory;
 use time_source::SystemTimeSourceDefault;
@@ -38,10 +45,10 @@ async fn test_current_push_sources() {
             .add_value(TenancyConfig::SingleTenant)
             .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
             .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
-            .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
-            .add::<DatasetRegistrySoloUnitBridge>()
+            .bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
             .add::<MetadataQueryServiceImpl>()
             .add::<CreateDatasetFromSnapshotUseCaseImpl>()
+            .add::<CreateDatasetUseCaseImpl>()
             .add::<ViewDatasetUseCaseImpl>()
             .add::<SystemTimeSourceDefault>()
             .add::<EngineProvisionerNull>()
@@ -49,7 +56,9 @@ async fn test_current_push_sources() {
             .add::<DataFormatRegistryImpl>()
             .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
             .add::<DependencyGraphServiceImpl>()
-            .add::<InMemoryDatasetDependencyRepository>();
+            .add::<InMemoryDatasetDependencyRepository>()
+            .add::<DatasetEntryServiceImpl>()
+            .add::<InMemoryDatasetEntryRepository>();
 
         NoOpDatabasePlugin::init_database_components(&mut b);
 

@@ -45,12 +45,12 @@ where
     }
 
     async fn get_block(&self, hash: &Multihash) -> Result<MetadataBlock, GetBlockError> {
-        let block_data = self.get_block_data(hash).await?;
+        let block_data = self.get_block_bytes(hash).await?;
 
         deserialize_metadata_block(hash, &block_data)
     }
 
-    async fn get_block_data(&self, hash: &Multihash) -> Result<Bytes, GetBlockDataError> {
+    async fn get_block_bytes(&self, hash: &Multihash) -> Result<Bytes, GetBlockDataError> {
         self.obj_repo.get_bytes(hash).await.map_err(Into::into)
     }
 

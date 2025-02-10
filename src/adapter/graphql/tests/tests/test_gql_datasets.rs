@@ -11,15 +11,22 @@ use database_common::NoOpDatabasePlugin;
 use dill::Component;
 use indoc::indoc;
 use kamu::*;
-use kamu_accounts::testing::MockAuthenticationService;
 use kamu_accounts::*;
 use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 use kamu_auth_rebac_services::{MultiTenantRebacDatasetLifecycleMessageConsumer, RebacServiceImpl};
 use kamu_core::*;
-use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
-use kamu_datasets_services::DependencyGraphServiceImpl;
-use messaging_outbox::{register_message_dispatcher, Outbox, OutboxImmediateImpl};
-use mockall::predicate::eq;
+use kamu_datasets::CreateDatasetFromSnapshotUseCase;
+use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEntryRepository};
+use kamu_datasets_services::{
+    CreateDatasetFromSnapshotUseCaseImpl,
+    CreateDatasetUseCaseImpl,
+    DatasetEntryServiceImpl,
+    DeleteDatasetUseCaseImpl,
+    DependencyGraphServiceImpl,
+    RenameDatasetUseCaseImpl,
+    ViewDatasetUseCaseImpl,
+};
+use messaging_outbox::DummyOutboxImpl;
 use odf::metadata::testing::MetadataFactory;
 use time_source::SystemTimeSourceDefault;
 
@@ -31,18 +38,7 @@ use crate::utils::{authentication_catalogs, expect_anonymous_access_error};
 
 macro_rules! test_dataset_create_empty_without_visibility {
     ($tenancy_config:expr) => {
-        let mut mock_authentication_service = MockAuthenticationService::new();
-        mock_authentication_service
-            .expect_account_by_name()
-            .with(eq(DEFAULT_ACCOUNT_NAME.clone()))
-            .returning(|_| {
-                Ok(Some(Account::dummy()))
-            });
-        let harness = GraphQLDatasetsHarness::new_custom_authentication(
-            mock_authentication_service,
-            $tenancy_config,
-        )
-        .await;
+        let harness = GraphQLDatasetsHarness::new($tenancy_config).await;
 
         let request_code = indoc::indoc!(
             r#"
@@ -84,18 +80,7 @@ macro_rules! test_dataset_create_empty_without_visibility {
 
 macro_rules! test_dataset_create_empty_public {
     ($tenancy_config:expr) => {
-        let mut mock_authentication_service = MockAuthenticationService::new();
-        mock_authentication_service
-            .expect_account_by_name()
-            .with(eq(DEFAULT_ACCOUNT_NAME.clone()))
-            .returning(|_| {
-                Ok(Some(Account::dummy()))
-            });
-        let harness = GraphQLDatasetsHarness::new_custom_authentication(
-            mock_authentication_service,
-            $tenancy_config,
-        )
-        .await;
+        let harness = GraphQLDatasetsHarness::new($tenancy_config).await;
 
         let request_code = indoc::indoc!(
             r#"
@@ -213,17 +198,7 @@ async fn test_dataset_by_id() {
 async fn test_dataset_by_account_and_name_case_insensitive() {
     let account_name = odf::AccountName::new_unchecked("KaMu");
 
-    let mut mock_authentication_service = MockAuthenticationService::new();
-    mock_authentication_service
-        .expect_account_by_name()
-        .with(eq(account_name.clone()))
-        .returning(|_| Ok(Some(Account::dummy())));
-
-    let harness = GraphQLDatasetsHarness::new_custom_authentication(
-        mock_authentication_service,
-        TenancyConfig::MultiTenant,
-    )
-    .await;
+    let harness = GraphQLDatasetsHarness::new(TenancyConfig::MultiTenant).await;
 
     harness
         .create_root_dataset(
@@ -270,17 +245,7 @@ async fn test_dataset_by_account_and_name_case_insensitive() {
 
 #[test_log::test(tokio::test)]
 async fn test_dataset_by_account_id() {
-    let mut mock_authentication_service = MockAuthenticationService::new();
-    mock_authentication_service
-        .expect_find_account_name_by_id()
-        .with(eq(DEFAULT_ACCOUNT_ID.clone()))
-        .returning(|_| Ok(Some(DEFAULT_ACCOUNT_NAME.clone())));
-
-    let harness = GraphQLDatasetsHarness::new_custom_authentication(
-        mock_authentication_service,
-        TenancyConfig::SingleTenant,
-    )
-    .await;
+    let harness = GraphQLDatasetsHarness::new(TenancyConfig::SingleTenant).await;
     harness
         .create_root_dataset(None, odf::DatasetName::new_unchecked("Foo"))
         .await;
@@ -358,20 +323,7 @@ async fn test_dataset_create_empty_public_mt() {
 
 #[test_log::test(tokio::test)]
 async fn test_dataset_create_from_snapshot() {
-    let mut mock_authentication_service = MockAuthenticationService::built_in();
-    mock_authentication_service
-        .expect_account_by_name()
-        .returning(|_| {
-            Ok(Some(Account::test(
-                odf::AccountID::new(odf::metadata::DidOdf::new_seeded_ed25519(&[1, 2, 3])),
-                "kamu",
-            )))
-        });
-    let harness = GraphQLDatasetsHarness::new_custom_authentication(
-        mock_authentication_service,
-        TenancyConfig::MultiTenant,
-    )
-    .await;
+    let harness = GraphQLDatasetsHarness::new(TenancyConfig::MultiTenant).await;
 
     let snapshot = MetadataFactory::dataset_snapshot()
         .name("foo")
@@ -790,13 +742,6 @@ struct GraphQLDatasetsHarness {
 
 impl GraphQLDatasetsHarness {
     pub async fn new(tenancy_config: TenancyConfig) -> Self {
-        Self::new_custom_authentication(MockAuthenticationService::built_in(), tenancy_config).await
-    }
-
-    pub async fn new_custom_authentication(
-        mock_authentication_service: MockAuthenticationService,
-        tenancy_config: TenancyConfig,
-    ) -> Self {
         let tempdir = tempfile::tempdir().unwrap();
         let datasets_dir = tempdir.path().join("datasets");
         std::fs::create_dir(&datasets_dir).unwrap();
@@ -806,12 +751,9 @@ impl GraphQLDatasetsHarness {
 
             b.add::<SystemTimeSourceDefault>()
                 .add::<DidGeneratorDefault>()
-                .add_builder(
-                    OutboxImmediateImpl::builder()
-                        .with_consumer_filter(messaging_outbox::ConsumerFilter::AllConsumers),
-                )
-                .bind::<dyn Outbox, OutboxImmediateImpl>()
+                .add::<DummyOutboxImpl>()
                 .add::<CreateDatasetFromSnapshotUseCaseImpl>()
+                .add::<CreateDatasetUseCaseImpl>()
                 .add::<RenameDatasetUseCaseImpl>()
                 .add::<DeleteDatasetUseCaseImpl>()
                 .add::<ViewDatasetUseCaseImpl>()
@@ -820,10 +762,7 @@ impl GraphQLDatasetsHarness {
                 .add_value(tenancy_config)
                 .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
                 .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
-                .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
-                .add::<DatasetRegistrySoloUnitBridge>()
-                .add_value(mock_authentication_service)
-                .bind::<dyn AuthenticationService, MockAuthenticationService>()
+                .bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
                 .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
                 .add::<RebacServiceImpl>()
                 .add_value(kamu_auth_rebac_services::DefaultAccountProperties { is_admin: false })
@@ -831,18 +770,15 @@ impl GraphQLDatasetsHarness {
                     allows_anonymous_read: false,
                     allows_public_read: false,
                 })
-                .add::<InMemoryRebacRepository>();
+                .add::<InMemoryRebacRepository>()
+                .add::<DatasetEntryServiceImpl>()
+                .add::<InMemoryDatasetEntryRepository>();
 
             if tenancy_config == TenancyConfig::MultiTenant {
                 b.add::<MultiTenantRebacDatasetLifecycleMessageConsumer>();
             }
 
             NoOpDatabasePlugin::init_database_components(&mut b);
-
-            register_message_dispatcher::<DatasetLifecycleMessage>(
-                &mut b,
-                MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
-            );
 
             b.build()
         };

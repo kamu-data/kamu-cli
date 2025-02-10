@@ -18,11 +18,19 @@ use kamu::utils::ipfs_wrapper::IpfsClient;
 use kamu::utils::simple_transfer_protocol::SimpleTransferProtocol;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
+use kamu_datasets_services::{
+    CreateDatasetUseCaseImpl,
+    DatasetEntryWriter,
+    DependencyGraphWriter,
+    MockDatasetEntryWriter,
+    MockDependencyGraphWriter,
+};
 use messaging_outbox::DummyOutboxImpl;
+use odf::dataset::testing::create_test_dataset_fron_snapshot;
 use odf::dataset::{DatasetFactoryImpl, IpfsGateway};
 use odf::metadata::testing::MetadataFactory;
 use test_utils::{HttpFileServer, LocalS3Server};
-use time_source::SystemTimeSourceDefault;
+use time_source::{SystemTimeSource, SystemTimeSourceDefault};
 use url::Url;
 
 use crate::utils::IpfsDaemon;
@@ -80,7 +88,7 @@ async fn do_test_sync(
         .add_value(TenancyConfig::SingleTenant)
         .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir_foo))
         .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
-        .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
+        .bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
         .add::<DatasetRegistrySoloUnitBridge>()
         .add_value(RemoteReposDir::new(tmp_workspace_dir_foo.join("repos")))
         .add::<RemoteRepositoryRegistryImpl>()
@@ -94,7 +102,23 @@ async fn do_test_sync(
         .add::<SimpleTransferProtocol>()
         .add::<CreateDatasetUseCaseImpl>()
         .add::<DummyOutboxImpl>()
+        .add_value(MockDatasetEntryWriter::new())
+        .bind::<dyn DatasetEntryWriter, MockDatasetEntryWriter>()
+        .add_value(MockDependencyGraphWriter::new())
+        .bind::<dyn DependencyGraphWriter, MockDependencyGraphWriter>()
         .build();
+
+    let mut mock_dataset_entry_writer_bar = MockDatasetEntryWriter::new();
+    mock_dataset_entry_writer_bar
+        .expect_create_entry()
+        .times(1)
+        .returning(|_, _, _| Ok(()));
+
+    let mut mock_dependency_graph_writer_bar = MockDependencyGraphWriter::new();
+    mock_dependency_graph_writer_bar
+        .expect_create_dataset_node()
+        .times(1)
+        .returning(|_| Ok(()));
 
     let catalog_bar = dill::CatalogBuilder::new()
         .add::<DidGeneratorDefault>()
@@ -105,7 +129,7 @@ async fn do_test_sync(
         .add_value(TenancyConfig::SingleTenant)
         .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir_bar))
         .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
-        .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
+        .bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
         .add::<DatasetRegistrySoloUnitBridge>()
         .add_value(RemoteReposDir::new(tmp_workspace_dir_bar.join("repos")))
         .add::<RemoteRepositoryRegistryImpl>()
@@ -119,12 +143,18 @@ async fn do_test_sync(
         .add::<SimpleTransferProtocol>()
         .add::<CreateDatasetUseCaseImpl>()
         .add::<DummyOutboxImpl>()
+        .add_value(mock_dataset_entry_writer_bar)
+        .bind::<dyn DatasetEntryWriter, MockDatasetEntryWriter>()
+        .add_value(mock_dependency_graph_writer_bar)
+        .bind::<dyn DependencyGraphWriter, MockDependencyGraphWriter>()
         .build();
 
     let sync_svc_foo = catalog_foo.get_one::<dyn SyncService>().unwrap();
     let sync_request_builder_foo = catalog_foo.get_one::<SyncRequestBuilder>().unwrap();
     let storage_unit_foo = catalog_foo.get_one::<DatasetStorageUnitLocalFs>().unwrap();
     let dataset_registry_foo = catalog_foo.get_one::<dyn DatasetRegistry>().unwrap();
+    let did_generator_foo = catalog_foo.get_one::<dyn DidGenerator>().unwrap();
+    let time_source_foo = catalog_foo.get_one::<dyn SystemTimeSource>().unwrap();
 
     let sync_svc_bar = catalog_bar.get_one::<dyn SyncService>().unwrap();
     let sync_request_builder_bar = catalog_bar.get_one::<SyncRequestBuilder>().unwrap();
@@ -153,12 +183,16 @@ async fn do_test_sync(
         .push_event(MetadataFactory::set_data_schema().build())
         .build();
 
-    let b1 = storage_unit_foo
-        .create_dataset_from_snapshot(snapshot)
-        .await
-        .unwrap()
-        .create_dataset_result
-        .head;
+    let b1 = create_test_dataset_fron_snapshot(
+        dataset_registry_foo.as_ref(),
+        storage_unit_foo.as_ref(),
+        snapshot,
+        did_generator_foo.generate_dataset_id(),
+        time_source_foo.now(),
+    )
+    .await
+    .unwrap()
+    .head;
 
     // Initial sync ///////////////////////////////////////////////////////////
     assert_matches!(

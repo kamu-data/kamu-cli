@@ -47,12 +47,12 @@ macro_rules! from_catalog_n {
     ($gql_ctx:ident, $T:ty ) => {{
         let catalog = $gql_ctx.data::<dill::Catalog>().unwrap();
 
-        catalog.get_one::<$T>().int_err()?
+        catalog.get_one::<$T>().unwrap()
     }};
     ($gql_ctx:ident, $T:ty, $($Ts:ty),+) => {{
         let catalog = $gql_ctx.data::<dill::Catalog>().unwrap();
 
-        ( catalog.get_one::<$T>().int_err()?, $( catalog.get_one::<$Ts>().int_err()? ),+ )
+        ( catalog.get_one::<$T>().unwrap(), $( catalog.get_one::<$Ts>().unwrap() ),+ )
     }};
 }
 
@@ -83,20 +83,18 @@ pub(crate) use unsafe_from_catalog_n;
 pub(crate) fn get_dataset(
     ctx: &Context<'_>,
     dataset_handle: &odf::DatasetHandle,
-) -> Result<ResolvedDataset, InternalError> {
+) -> ResolvedDataset {
     let dataset_registry = from_catalog_n!(ctx, dyn DatasetRegistry);
-    let resolved_dataset = dataset_registry.get_dataset_by_handle(dataset_handle);
-
-    Ok(resolved_dataset)
+    dataset_registry.get_dataset_by_handle(dataset_handle)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn get_logged_account(ctx: &Context<'_>) -> Result<LoggedAccount, InternalError> {
+pub(crate) fn get_logged_account(ctx: &Context<'_>) -> LoggedAccount {
     let current_account_subject = from_catalog_n!(ctx, CurrentAccountSubject);
 
     match current_account_subject.as_ref() {
-        CurrentAccountSubject::Logged(la) => Ok(la.clone()),
+        CurrentAccountSubject::Logged(la) => la.clone(),
         CurrentAccountSubject::Anonymous(_) => {
             unreachable!("We are not expecting anonymous accounts")
         }

@@ -47,7 +47,7 @@ async fn test_insert_block_cached_if_no_error() {
             Err(GetBlockError::NotFound(BlockNotFoundError { hash }))
         });
     wrapped_mock_repo
-        .expect_get_block_data()
+        .expect_get_block_bytes()
         // We guarantee that the block will be taken from the cache
         //
         // Two calls, these are checks for a block before insert in
@@ -82,7 +82,7 @@ mockall::mock! {
 
         async fn get_block(&self, hash: &Multihash) -> Result<MetadataBlock, GetBlockError>;
 
-        async fn get_block_data(&self, hash: &Multihash) -> Result<Bytes, GetBlockDataError>;
+        async fn get_block_bytes(&self, hash: &Multihash) -> Result<Bytes, GetBlockDataError>;
 
         async fn get_block_size(&self, hash: &Multihash) -> Result<u64, GetBlockDataError>;
 

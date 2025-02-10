@@ -14,19 +14,20 @@ use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use dill::{CatalogBuilder, Component};
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu::domain::auth::DatasetAction;
-use kamu::domain::CreateDatasetUseCase;
 use kamu::testing::MockDatasetActionAuthorizer;
-use kamu::{
-    CreateDatasetUseCaseImpl,
-    DatasetRegistrySoloUnitBridge,
-    DatasetStorageUnitLocalFs,
-    DatasetStorageUnitWriter,
-};
+use kamu::DatasetStorageUnitLocalFs;
 use kamu_accounts::testing::MockAuthenticationService;
 use kamu_accounts::*;
+use kamu_accounts_inmem::InMemoryAccountRepository;
+use kamu_accounts_services::AccountServiceImpl;
 use kamu_core::{DidGenerator, MockDidGenerator, TenancyConfig};
-use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
-use kamu_datasets_services::DependencyGraphServiceImpl;
+use kamu_datasets::CreateDatasetUseCase;
+use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEntryRepository};
+use kamu_datasets_services::{
+    CreateDatasetUseCaseImpl,
+    DatasetEntryServiceImpl,
+    DependencyGraphServiceImpl,
+};
 use messaging_outbox::DummyOutboxImpl;
 use mockall::predicate::{eq, function};
 use odf::metadata::testing::MetadataFactory;
@@ -242,15 +243,25 @@ impl ServerHarness {
                         .with_root(datasets_dir),
                 )
                 .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
-                .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
-                .add::<DatasetRegistrySoloUnitBridge>()
+                .bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
                 .add::<CreateDatasetUseCaseImpl>()
-                .add::<DatabaseTransactionRunner>();
+                .add::<DatabaseTransactionRunner>()
+                .add::<DatasetEntryServiceImpl>()
+                .add::<InMemoryDatasetEntryRepository>()
+                .add::<AccountServiceImpl>()
+                .add::<InMemoryAccountRepository>();
 
             NoOpDatabasePlugin::init_database_components(&mut b);
 
             b.build()
         };
+
+        base_catalog
+            .get_one::<dyn AccountRepository>()
+            .unwrap()
+            .create_account(&Account::dummy())
+            .await
+            .unwrap();
 
         let catalog_system = CatalogBuilder::new_chained(&base_catalog)
             .add_value(CurrentAccountSubject::new_test())

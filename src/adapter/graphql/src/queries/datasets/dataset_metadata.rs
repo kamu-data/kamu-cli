@@ -40,7 +40,7 @@ impl DatasetMetadata {
 
     /// Last recorded watermark
     async fn current_watermark(&self, ctx: &Context<'_>) -> Result<Option<DateTime<Utc>>> {
-        let resolved_dataset = get_dataset(ctx, &self.dataset_handle)?;
+        let resolved_dataset = get_dataset(ctx, &self.dataset_handle);
 
         Ok(resolved_dataset
             .as_metadata_chain()
@@ -196,7 +196,7 @@ impl DatasetMetadata {
 
     /// Current descriptive information about the dataset
     async fn current_info(&self, ctx: &Context<'_>) -> Result<SetInfo> {
-        let resolved_dataset = get_dataset(ctx, &self.dataset_handle)?;
+        let resolved_dataset = get_dataset(ctx, &self.dataset_handle);
 
         Ok(resolved_dataset
             .as_metadata_chain()
@@ -216,7 +216,7 @@ impl DatasetMetadata {
     /// Current readme file as discovered from attachments associated with the
     /// dataset
     async fn current_readme(&self, ctx: &Context<'_>) -> Result<Option<String>> {
-        let resolved_dataset = get_dataset(ctx, &self.dataset_handle)?;
+        let resolved_dataset = get_dataset(ctx, &self.dataset_handle);
 
         Ok(resolved_dataset
             .as_metadata_chain()
@@ -237,7 +237,7 @@ impl DatasetMetadata {
 
     /// Current license associated with the dataset
     async fn current_license(&self, ctx: &Context<'_>) -> Result<Option<SetLicense>> {
-        let resolved_dataset = get_dataset(ctx, &self.dataset_handle)?;
+        let resolved_dataset = get_dataset(ctx, &self.dataset_handle);
 
         Ok(resolved_dataset
             .as_metadata_chain()
@@ -250,7 +250,7 @@ impl DatasetMetadata {
 
     /// Current vocabulary associated with the dataset
     async fn current_vocab(&self, ctx: &Context<'_>) -> Result<Option<SetVocab>> {
-        let resolved_dataset = get_dataset(ctx, &self.dataset_handle)?;
+        let resolved_dataset = get_dataset(ctx, &self.dataset_handle);
 
         Ok(resolved_dataset
             .as_metadata_chain()

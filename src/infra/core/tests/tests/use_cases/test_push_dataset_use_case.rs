@@ -11,7 +11,12 @@ use std::assert_matches::assert_matches;
 use std::collections::HashSet;
 use std::sync::Arc;
 
-use kamu::testing::{DummySmartTransferProtocolClient, MockDatasetActionAuthorizer};
+use kamu::testing::{
+    BaseUseCaseHarness,
+    BaseUseCaseHarnessOptions,
+    DummySmartTransferProtocolClient,
+    MockDatasetActionAuthorizer,
+};
 use kamu::utils::ipfs_wrapper::IpfsClient;
 use kamu::utils::simple_transfer_protocol::SimpleTransferProtocol;
 use kamu::*;
@@ -20,8 +25,6 @@ use kamu_core::*;
 use odf::dataset::{DatasetFactoryImpl, IpfsGateway};
 use tempfile::TempDir;
 use url::Url;
-
-use super::{BaseUseCaseHarness, BaseUseCaseHarnessOptions};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

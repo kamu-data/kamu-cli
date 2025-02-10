@@ -15,7 +15,21 @@ use dill::*;
 use indoc::indoc;
 use kamu::domain::*;
 use kamu::*;
-use kamu_accounts::CurrentAccountSubject;
+use kamu_accounts::{CurrentAccountSubject, PredefinedAccountsConfig};
+use kamu_accounts_inmem::InMemoryAccountRepository;
+use kamu_accounts_services::{
+    AccountServiceImpl,
+    LoginPasswordAuthProvider,
+    PredefinedAccountsRegistrator,
+};
+use kamu_datasets::CreateDatasetFromSnapshotUseCase;
+use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEntryRepository};
+use kamu_datasets_services::{
+    CreateDatasetFromSnapshotUseCaseImpl,
+    CreateDatasetUseCaseImpl,
+    DatasetEntryServiceImpl,
+    DependencyGraphServiceImpl,
+};
 use messaging_outbox::DummyOutboxImpl;
 use odf::metadata::testing::MetadataFactory;
 use time_source::{SystemTimeSource, SystemTimeSourceStub};
@@ -351,9 +365,9 @@ impl TestHarness {
                 .add_value(TenancyConfig::SingleTenant)
                 .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
                 .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
-                .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
-                .add::<DatasetRegistrySoloUnitBridge>()
+                .bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
                 .add::<CreateDatasetFromSnapshotUseCaseImpl>()
+                .add::<CreateDatasetUseCaseImpl>()
                 .add_value(SystemTimeSourceStub::new_set(
                     Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap(),
                 ))
@@ -362,24 +376,32 @@ impl TestHarness {
                 .add::<PushIngestExecutorImpl>()
                 .add::<PushIngestPlannerImpl>()
                 .add::<QueryServiceImpl>()
-                .add_value(ServerUrlConfig::new_test(None));
+                .add_value(ServerUrlConfig::new_test(None))
+                .add::<DatasetEntryServiceImpl>()
+                .add::<InMemoryDatasetEntryRepository>()
+                .add::<DependencyGraphServiceImpl>()
+                .add::<InMemoryDatasetDependencyRepository>()
+                .add_value(PredefinedAccountsConfig::single_tenant())
+                .add::<PredefinedAccountsRegistrator>()
+                .add::<LoginPasswordAuthProvider>()
+                .add::<AccountServiceImpl>()
+                .add::<InMemoryAccountRepository>();
 
             NoOpDatabasePlugin::init_database_components(&mut b);
 
             b.build()
         };
 
-        let push_ingest_planner = catalog.get_one::<dyn PushIngestPlanner>().unwrap();
-        let push_ingest_executor = catalog.get_one::<dyn PushIngestExecutor>().unwrap();
+        init_on_startup::run_startup_jobs(&catalog).await.unwrap();
 
         let api_server =
             TestAPIServer::new(catalog.clone(), None, None, TenancyConfig::SingleTenant).await;
 
         Self {
             temp_dir,
+            push_ingest_planner: catalog.get_one().unwrap(),
+            push_ingest_executor: catalog.get_one().unwrap(),
             catalog,
-            push_ingest_planner,
-            push_ingest_executor,
             api_server,
         }
     }

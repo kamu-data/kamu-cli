@@ -53,7 +53,7 @@ where
     WrappedRepo: MetadataBlockRepository + Sync + Send,
 {
     async fn contains_block(&self, hash: &Multihash) -> Result<bool, ContainsBlockError> {
-        match self.get_block_data(hash).await {
+        match self.get_block_bytes(hash).await {
             Ok(_) => Ok(true),
             Err(e) => match e {
                 GetBlockDataError::NotFound(_) => Ok(false),
@@ -77,7 +77,7 @@ where
             },
             // No cached value
             None => {
-                let get_block_data_result = self.wrapped.get_block_data(hash).await;
+                let get_block_data_result = self.wrapped.get_block_bytes(hash).await;
 
                 match get_block_data_result {
                     Ok(block_data) => {
@@ -97,14 +97,14 @@ where
         }
     }
 
-    async fn get_block_data(&self, hash: &Multihash) -> Result<Bytes, GetBlockDataError> {
+    async fn get_block_bytes(&self, hash: &Multihash) -> Result<Bytes, GetBlockDataError> {
         if let Some(cached_value) = self.cache.get(hash) {
             return Ok(cached_value.block_data.clone());
         };
 
-        let get_block_data_result = self.wrapped.get_block_data(hash).await;
+        let get_block_bytes_result = self.wrapped.get_block_bytes(hash).await;
 
-        if let Ok(block_data) = &get_block_data_result {
+        if let Ok(block_data) = &get_block_bytes_result {
             let cache_value = CachedValue {
                 block_data: block_data.clone(),
                 deserialized_block: None,
@@ -113,11 +113,11 @@ where
             self.cache.insert(hash.clone(), cache_value);
         }
 
-        get_block_data_result
+        get_block_bytes_result
     }
 
     async fn get_block_size(&self, hash: &Multihash) -> Result<u64, GetBlockDataError> {
-        let block_data = self.get_block_data(hash).await?;
+        let block_data = self.get_block_bytes(hash).await?;
         let size = u64::try_from(block_data.len()).unwrap();
 
         Ok(size)

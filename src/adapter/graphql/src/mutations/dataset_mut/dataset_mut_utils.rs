@@ -19,7 +19,7 @@ pub(crate) async fn ensure_account_is_owner_or_admin(
     dataset_handle: &odf::DatasetHandle,
 ) -> Result<()> {
     let dataset_entry_service = from_catalog_n!(ctx, dyn DatasetEntryService);
-    let logged_account = utils::get_logged_account(ctx)?;
+    let logged_account = utils::get_logged_account(ctx);
 
     if logged_account.is_admin {
         return Ok(());

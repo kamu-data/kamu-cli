@@ -58,6 +58,15 @@ impl CurrentAccountSubject {
         )
     }
 
+    pub fn account_id(&self) -> &odf::AccountID {
+        match self {
+            CurrentAccountSubject::Anonymous(_) => {
+                panic!("Anonymous account misused");
+            }
+            CurrentAccountSubject::Logged(l) => &l.account_id,
+        }
+    }
+
     pub fn account_name(&self) -> &odf::AccountName {
         match self {
             CurrentAccountSubject::Anonymous(_) => {

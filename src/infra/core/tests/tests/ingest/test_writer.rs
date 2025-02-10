@@ -14,7 +14,7 @@ use chrono::{DateTime, TimeZone, Utc};
 use datafusion::prelude::*;
 use dill::Component;
 use indoc::indoc;
-use kamu::{DatasetStorageUnitLocalFs, DatasetStorageUnitWriter};
+use kamu::DatasetStorageUnitLocalFs;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::*;
 use kamu_ingest_datafusion::*;
@@ -1227,6 +1227,7 @@ impl Harness {
 
         let storage_unit = catalog.get_one::<DatasetStorageUnitLocalFs>().unwrap();
 
+        use odf::dataset::DatasetStorageUnitWriter;
         let foo_created = storage_unit
             .create_dataset(
                 &odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo")),

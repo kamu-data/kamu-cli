@@ -18,12 +18,10 @@ pub struct Accounts;
 impl Accounts {
     /// Returns account by its ID
     async fn by_id(&self, ctx: &Context<'_>, account_id: AccountID) -> Result<Option<Account>> {
-        let authentication_service = from_catalog_n!(ctx, dyn kamu_accounts::AuthenticationService);
+        let account_service = from_catalog_n!(ctx, dyn kamu_accounts::AccountService);
 
         let account_id: odf::AccountID = account_id.into();
-        let maybe_account_name = authentication_service
-            .find_account_name_by_id(&account_id)
-            .await?;
+        let maybe_account_name = account_service.find_account_name_by_id(&account_id).await?;
 
         Ok(maybe_account_name
             .map(|account_name| Account::new(account_id.into(), account_name.into())))
@@ -31,13 +29,11 @@ impl Accounts {
 
     /// Returns account by its name
     async fn by_name(&self, ctx: &Context<'_>, name: AccountName) -> Result<Option<Account>> {
-        let authentication_service = from_catalog_n!(ctx, dyn kamu_accounts::AuthenticationService);
+        let account_service = from_catalog_n!(ctx, dyn kamu_accounts::AccountService);
 
         let account_name: odf::AccountName = name.into();
 
-        let maybe_account = authentication_service
-            .account_by_name(&account_name)
-            .await?;
+        let maybe_account = account_service.account_by_name(&account_name).await?;
         Ok(maybe_account.map(Account::from_account))
     }
 }

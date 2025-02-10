@@ -15,7 +15,7 @@ use odf_metadata::*;
 use thiserror::Error;
 use tokio_stream::Stream;
 
-use crate::{AppendError, Dataset};
+use crate::{AppendError, Dataset, ValidateDatasetSnapshotError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -59,13 +59,6 @@ impl CreateDatasetResult {
             head,
         }
     }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub struct CreateDatasetFromSnapshotResult {
-    pub create_dataset_result: CreateDatasetResult,
-    pub new_upstream_ids: Vec<DatasetID>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -227,6 +220,22 @@ impl From<AppendError> for CreateDatasetFromSnapshotError {
                 Self::Internal(v.int_err())
             }
             AppendError::Internal(e) => Self::Internal(e),
+        }
+    }
+}
+
+impl From<ValidateDatasetSnapshotError> for CreateDatasetFromSnapshotError {
+    fn from(v: ValidateDatasetSnapshotError) -> Self {
+        match v {
+            ValidateDatasetSnapshotError::InvalidSnapshot(e) => {
+                CreateDatasetFromSnapshotError::InvalidSnapshot(e)
+            }
+            ValidateDatasetSnapshotError::MissingInputs(e) => {
+                CreateDatasetFromSnapshotError::MissingInputs(e)
+            }
+            ValidateDatasetSnapshotError::Internal(e) => {
+                CreateDatasetFromSnapshotError::Internal(e)
+            }
         }
     }
 }

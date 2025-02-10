@@ -13,8 +13,8 @@ use database_common_macros::transactional_handler;
 use dill::Catalog;
 use http_common::*;
 use internal_error::ErrorIntoInternal;
-use kamu_accounts::AuthenticationService;
-use kamu_core::{ViewDatasetUseCase, ViewDatasetUseCaseError};
+use kamu_accounts::AccountService;
+use kamu_datasets::{ViewDatasetUseCase, ViewDatasetUseCaseError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -107,8 +107,8 @@ async fn get_dataset_by_id(
     // TODO: Private Datasets: Use the real owner_id, not the alias name
     //       Context: In the case of single-tenant, we have None
     let account_id = if let Some(account_name) = dataset_handle.alias.account_name.as_ref() {
-        let auth_service = catalog.get_one::<dyn AuthenticationService>().unwrap();
-        auth_service
+        let account_service = catalog.get_one::<dyn AccountService>().unwrap();
+        account_service
             .account_by_name(account_name)
             .await?
             .map(|account| account.id)
