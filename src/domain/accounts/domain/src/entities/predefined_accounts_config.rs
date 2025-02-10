@@ -45,23 +45,19 @@ impl PredefinedAccountsConfig {
 
     pub fn single_tenant() -> Self {
         Self {
-            predefined: vec![Self::single_tenant_account_config()],
-        }
-    }
-
-    pub fn single_tenant_account_config() -> AccountConfig {
-        AccountConfig {
-            id: Some(DEFAULT_ACCOUNT_ID.clone()),
-            account_name: DEFAULT_ACCOUNT_NAME.clone(),
-            password: None,
-            account_type: AccountType::User,
-            display_name: None,
-            avatar_url: Some(String::from(DEFAULT_AVATAR_URL)),
-            is_admin: true,
-            registered_at: Utc::now(),
-            provider: String::from(PROVIDER_PASSWORD),
-            email: DUMMY_EMAIL_ADDRESS.clone(),
-            treat_datasets_as_public: true,
+            predefined: vec![AccountConfig {
+                id: Some(DEFAULT_ACCOUNT_ID.clone()),
+                account_name: DEFAULT_ACCOUNT_NAME.clone(),
+                password: None,
+                account_type: AccountType::User,
+                display_name: None,
+                avatar_url: Some(String::from(DEFAULT_AVATAR_URL)),
+                is_admin: true,
+                registered_at: Utc::now(),
+                provider: String::from(PROVIDER_PASSWORD),
+                email: DUMMY_EMAIL_ADDRESS.clone(),
+                treat_datasets_as_public: true,
+            }],
         }
     }
 

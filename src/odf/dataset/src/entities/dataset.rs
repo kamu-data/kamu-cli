@@ -7,8 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::sync::Arc;
-
 use ::serde::{Deserialize, Serialize};
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
@@ -70,7 +68,6 @@ pub trait Dataset: Send + Sync {
     fn get_storage_internal_url(&self) -> &Url;
 
     fn as_metadata_chain(&self) -> &dyn MetadataChain;
-    fn as_metadata_chain_ptr(&self) -> Arc<dyn MetadataChain>;
 
     fn as_data_repo(&self) -> &dyn ObjectRepository;
     fn as_checkpoint_repo(&self) -> &dyn ObjectRepository;

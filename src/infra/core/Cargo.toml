@@ -31,6 +31,7 @@ query-extensions-json = ["dep:datafusion-functions-json"]
 testing = [
     "dep:mockall",
     "dep:oop",
+    "dep:messaging-outbox",
     "kamu-core/testing",
     "odf/testing",
 ]
@@ -47,7 +48,7 @@ kamu-accounts = { workspace = true }
 kamu-core = { workspace = true }
 kamu-datasets = { workspace = true }
 kamu-ingest-datafusion = { workspace = true }
-messaging-outbox = { workspace = true }
+messaging-outbox = { optional = true, workspace = true }
 odf = { workspace = true }
 random-names = { workspace = true }
 s3-utils = { workspace = true }

@@ -7,8 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::sync::Arc;
-
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use file_utils::OwnedFile;
@@ -22,7 +20,7 @@ use url::Url;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct DatasetImpl<MetaChain, DataRepo, CheckpointRepo, InfoRepo> {
-    metadata_chain: Arc<MetaChain>,
+    metadata_chain: MetaChain,
     data_repo: DataRepo,
     checkpoint_repo: CheckpointRepo,
     info_repo: InfoRepo,
@@ -47,7 +45,7 @@ where
         storage_internal_url: Url,
     ) -> Self {
         Self {
-            metadata_chain: Arc::new(metadata_chain),
+            metadata_chain,
             data_repo,
             checkpoint_repo,
             info_repo,
@@ -582,11 +580,7 @@ where
     }
 
     fn as_metadata_chain(&self) -> &dyn MetadataChain {
-        self.metadata_chain.as_ref()
-    }
-
-    fn as_metadata_chain_ptr(&self) -> Arc<dyn MetadataChain> {
-        self.metadata_chain.clone()
+        &self.metadata_chain
     }
 
     fn as_data_repo(&self) -> &dyn ObjectRepository {
