@@ -23,6 +23,7 @@ Recommendation: for ease of reading, use the following order:
        - HTTP and GQL use real accounts and dataset entries
 - Moved several account-related routines from `AuthenticationService` to `AccountService`, 
   the authentication services has focus only on JWT token and login flows
+- Upgraded to `datafusion v45` (#1063)
 
 
 ## [0.222.0] - 2025-02-06
