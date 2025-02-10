@@ -108,10 +108,7 @@ impl SetTransform {
             .await
             .int_err()?;
 
-        if !dataset_infos.unresolved_datasets.is_empty() {
-            return InternalError::bail("Unable to resolve input datasets");
-        };
-        let inputs = dataset_infos
+        let mut accessible_inputs: Vec<_> = dataset_infos
             .resolved_handles
             .iter()
             .map(|dataset_handle| TransformInput {
@@ -119,8 +116,27 @@ impl SetTransform {
                 alias: dataset_handle.alias.clone().to_string(),
             })
             .collect();
+
+        accessible_inputs.extend(dataset_infos.unresolved_datasets.into_iter().map(
+            |(dataset_id, _)| {
+                let original_input_info_maybe = v.inputs.iter().find(|input| {
+                    input.dataset_ref.id().unwrap().as_local_ref() == dataset_id.as_local_ref()
+                });
+                if let Some(original_input_info) = original_input_info_maybe {
+                    TransformInput {
+                        dataset_ref: original_input_info.dataset_ref.clone().into(),
+                        alias: original_input_info.alias.clone().unwrap(),
+                    }
+                } else {
+                    TransformInput {
+                        dataset_ref: dataset_id.into_local_ref().into(),
+                        alias: String::new(),
+                    }
+                }
+            },
+        ));
         Ok(Self {
-            inputs,
+            inputs: accessible_inputs,
             transform: v.transform.into(),
         })
     }
