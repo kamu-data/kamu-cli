@@ -83,4 +83,5 @@ pretty_assertions = { version = "1" }
 tempfile = "3"
 test-group = { version = "1" }
 test-log = { version = "0.2", features = ["trace"] }
+thiserror = "2"
 tokio = { version = "1", default-features = false, features = [] }

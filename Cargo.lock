@@ -5768,6 +5768,7 @@ dependencies = [
  "tempfile",
  "test-group",
  "test-log",
+ "thiserror 2.0.11",
  "time-source",
  "tokio",
  "tracing",
