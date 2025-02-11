@@ -191,7 +191,11 @@ impl DatasetMetadata {
         let target = dataset_registry.get_dataset_by_handle(&self.dataset_handle);
         let source = metadata_query_service.get_active_transform(target).await?;
 
-        Ok(source.map(|(_hash, block)| block.event.into()))
+        if let Some((_hash, block)) = source {
+            Ok(Some(SetTransform::try_from_odf(ctx, block.event).await?))
+        } else {
+            Ok(None)
+        }
     }
 
     /// Current descriptive information about the dataset
