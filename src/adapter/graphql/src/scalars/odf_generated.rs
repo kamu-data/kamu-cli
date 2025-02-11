@@ -135,8 +135,8 @@ pub struct Checkpoint {
     pub size: u64,
 }
 
-impl From<odf::Checkpoint> for Checkpoint {
-    fn from(v: odf::Checkpoint) -> Self {
+impl From<odf::metadata::Checkpoint> for Checkpoint {
+    fn from(v: odf::metadata::Checkpoint) -> Self {
         Self {
             physical_hash: v.physical_hash.into(),
             size: v.size.into(),
@@ -157,8 +157,8 @@ pub struct DataSlice {
     pub size: u64,
 }
 
-impl From<odf::DataSlice> for DataSlice {
-    fn from(v: odf::DataSlice) -> Self {
+impl From<odf::metadata::DataSlice> for DataSlice {
+    fn from(v: odf::metadata::DataSlice) -> Self {
         Self {
             logical_hash: v.logical_hash.into(),
             physical_hash: v.physical_hash.into(),
