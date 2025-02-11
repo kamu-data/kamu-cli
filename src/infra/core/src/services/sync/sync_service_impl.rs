@@ -431,7 +431,8 @@ impl SyncServiceImpl {
             // * -> ipfs
             (_, SyncRef::Remote(dst_remote)) if dst_remote.url.scheme() == "ipfs" => {
                 Err(odf::dataset::UnsupportedProtocolError {
-                    url: dst_remote.url.as_ref().clone(),
+                    url: Box::new(dst_remote.url.as_ref().clone()),
+                    entity_kind: "dataset",
                     message: Some(
                         concat!(
                             "Cannot sync to ipfs://{CID} URLs since IPFS ",
@@ -449,7 +450,8 @@ impl SyncServiceImpl {
                 if dst_remote.url.scheme() == "ipns" =>
             {
                 Err(odf::dataset::UnsupportedProtocolError {
-                    url: dst_remote.url.as_ref().clone(),
+                    url: Box::new(dst_remote.url.as_ref().clone()),
+                    entity_kind: "dataset",
                     message: Some(
                         concat!(
                             "Syncing from a remote repository directly to IPFS ",
@@ -471,7 +473,8 @@ impl SyncServiceImpl {
                             .await
                     }
                     _ => Err(odf::dataset::UnsupportedProtocolError {
-                        url: dst_remote.url.as_ref().clone(),
+                        url: Box::new(dst_remote.url.as_ref().clone()),
+                        entity_kind: "dataset",
                         message: Some(
                             concat!(
                                 "Cannot use a sub-path when syncing to ipns:// URL. ",
@@ -488,7 +491,8 @@ impl SyncServiceImpl {
                 if src_remote.url.is_odf_protocol() && dst_remote.url.is_odf_protocol() =>
             {
                 Err(odf::dataset::UnsupportedProtocolError {
-                    url: dst_remote.url.as_ref().clone(),
+                    url: Box::new(dst_remote.url.as_ref().clone()),
+                    entity_kind: "dataset",
                     message: Some(
                         concat!(
                             "Syncing from a remote ODF repository directly to remote ODF ",

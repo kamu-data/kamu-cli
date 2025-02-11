@@ -392,6 +392,8 @@ pub fn configure_base_catalog(
     b.bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>();
     b.bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>();
 
+    b.add::<DatasetStorageUnitFactoryImpl>();
+
     b.add::<odf::dataset::DatasetFactoryImpl>();
 
     b.add::<RemoteRepositoryRegistryImpl>();
