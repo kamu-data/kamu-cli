@@ -151,7 +151,7 @@ async fn create_graph_remote(
     let tmp_repo_dir = tempfile::tempdir().unwrap();
 
     let remote_dataset_repo = Arc::new(DatasetStorageUnitLocalFs::new(
-        tmp_repo_dir.path().to_owned(),
+        tmp_repo_dir.path().join("datasets").clone(),
         Arc::new(CurrentAccountSubject::new_test()),
         Arc::new(TenancyConfig::SingleTenant),
     ));
