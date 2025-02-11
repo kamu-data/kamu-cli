@@ -156,7 +156,7 @@ async fn test_read_initial_config_and_queue_without_waiting() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_read_initial_config_shouldnt_queue_in_recovery_case() {
+async fn test_read_initial_config_should_not_queue_in_recovery_case() {
     let harness = FlowHarness::new();
 
     // Create a "foo" root dataset
@@ -1026,7 +1026,7 @@ async fn test_manual_trigger_reset() {
                     ))),
                     expected_logical_plan: LogicalPlan::ResetDataset(LogicalPlanResetDataset {
                       dataset_id: foo_id.clone(),
-                      // By default should reset to seed block
+                      // By default, should reset to seed block
                       new_head_hash: Some(odf::Multihash::from_digest_sha3_256(b"new-slice")),
                       old_head_hash: Some(odf::Multihash::from_digest_sha3_256(b"old-slice")),
                       recursive: false,
@@ -2465,7 +2465,7 @@ async fn test_respect_last_success_time_when_schedule_resumes() {
 
           // Main simulation script
           let main_handle = async {
-              // Initially both "foo" isscheduled without waiting.
+              // Initially both "foo" is scheduled without waiting.
               // "foo":
               //  - flow 0: task 0 starts at 10ms, finishes at 20ms
               //  - next flow 2 queued for 120ms (20ms initiated + 100ms period)
@@ -3555,7 +3555,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
         // Main simulation script
         let main_handle = async {
           // Stage 0: initial auto-polling
-          //  - all 3 datasets auto-polled at 0ms, flows 0,1,2 correspondongly
+          //  - all 3 datasets auto-polled at 0ms, flows 0,1,2 correspondingly
           //  - foo:
           //     - task 0 starts at 10ms, finishes at 20ms, flow 0 completes at 20ms
           //     - flow 3 queued for 120ns: 20ms initiated + max(period 50ms, throttling 100ms)
