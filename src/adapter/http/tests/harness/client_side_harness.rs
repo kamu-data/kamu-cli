@@ -236,14 +236,10 @@ impl ClientSideHarness {
     }
 
     // TODO: accept alias or handle
-    pub fn dataset_layout(&self, dataset_id: &odf::DatasetID, dataset_name: &str) -> DatasetLayout {
-        let root_path = match self.options.tenancy_config {
-            TenancyConfig::MultiTenant => self
-                .internal_datasets_folder_path()
-                .join(CLIENT_ACCOUNT_NAME)
-                .join(dataset_id.as_multibase().to_stack_string()),
-            TenancyConfig::SingleTenant => self.internal_datasets_folder_path().join(dataset_name),
-        };
+    pub fn dataset_layout(&self, dataset_id: &odf::DatasetID) -> DatasetLayout {
+        let root_path = self
+            .internal_datasets_folder_path()
+            .join(dataset_id.as_multibase().to_stack_string());
         DatasetLayout::new(root_path.as_path())
     }
 
