@@ -1,5 +1,5 @@
 ODF_SPEC_DIR=../open-data-fabric
-ODF_CRATE_DIR=./src/domain/opendatafabric
+ODF_METADATA_CRATE_DIR=./src/odf/metadata
 LICENSE_HEADER=docs/license_header.txt
 TEST_LOG_PARAMS=RUST_LOG_SPAN_EVENTS=new,close RUST_LOG=debug
 
@@ -249,42 +249,42 @@ endef
 
 .PHONY: codegen-odf-serde
 codegen-odf-serde:
-	python $(ODF_SPEC_DIR)/tools/jsonschema_to_flatbuffers.py $(ODF_SPEC_DIR)/schemas > $(ODF_CRATE_DIR)/schemas/odf.fbs
-	flatc -o $(ODF_CRATE_DIR)/src/serde/flatbuffers --rust --gen-onefile $(ODF_CRATE_DIR)/schemas/odf.fbs
-	mv $(ODF_CRATE_DIR)/src/serde/flatbuffers/odf_generated.rs $(ODF_CRATE_DIR)/src/serde/flatbuffers/proxies_generated.rs
-	$(call insert_text_into_beginning, "#![allow(clippy::all)]\n#![allow(clippy::pedantic)]", "$(ODF_CRATE_DIR)/src/serde/flatbuffers/proxies_generated.rs")
-	rustfmt $(ODF_CRATE_DIR)/src/serde/flatbuffers/proxies_generated.rs
+	python $(ODF_SPEC_DIR)/tools/jsonschema_to_flatbuffers.py $(ODF_SPEC_DIR)/schemas > $(ODF_METADATA_CRATE_DIR)/schemas/odf.fbs
+	flatc -o $(ODF_METADATA_CRATE_DIR)/src/serde/flatbuffers --rust --gen-onefile $(ODF_METADATA_CRATE_DIR)/schemas/odf.fbs
+	mv $(ODF_METADATA_CRATE_DIR)/src/serde/flatbuffers/odf_generated.rs $(ODF_METADATA_CRATE_DIR)/src/serde/flatbuffers/proxies_generated.rs
+	$(call insert_text_into_beginning, "#![allow(clippy::all)]\n#![allow(clippy::pedantic)]", "$(ODF_METADATA_CRATE_DIR)/src/serde/flatbuffers/proxies_generated.rs")
+	rustfmt $(ODF_METADATA_CRATE_DIR)/src/serde/flatbuffers/proxies_generated.rs
 
 	python $(ODF_SPEC_DIR)/tools/jsonschema_to_rust_dtos.py $(ODF_SPEC_DIR)/schemas \
-		| rustfmt > $(ODF_CRATE_DIR)/src/dtos/dtos_generated.rs
+		| rustfmt > $(ODF_METADATA_CRATE_DIR)/src/dtos/dtos_generated.rs
 	python $(ODF_SPEC_DIR)/tools/jsonschema_to_rust_dto_enum_flags.py $(ODF_SPEC_DIR)/schemas \
-		| rustfmt > $(ODF_CRATE_DIR)/src/dtos/dtos_enum_flags_generated.rs
+		| rustfmt > $(ODF_METADATA_CRATE_DIR)/src/dtos/dtos_enum_flags_generated.rs
 	python $(ODF_SPEC_DIR)/tools/jsonschema_to_rust_serde_yaml.py $(ODF_SPEC_DIR)/schemas \
-		| rustfmt > $(ODF_CRATE_DIR)/src/serde/yaml/derivations_generated.rs
+		| rustfmt > $(ODF_METADATA_CRATE_DIR)/src/serde/yaml/derivations_generated.rs
 	python $(ODF_SPEC_DIR)/tools/jsonschema_to_rust_flatbuffers.py $(ODF_SPEC_DIR)/schemas \
-		| rustfmt > $(ODF_CRATE_DIR)/src/serde/flatbuffers/convertors_generated.rs
+		| rustfmt > $(ODF_METADATA_CRATE_DIR)/src/serde/flatbuffers/convertors_generated.rs
 
-	$(call add_license_header, "$(ODF_CRATE_DIR)/src/serde/flatbuffers/proxies_generated.rs")
-	$(call add_license_header, "$(ODF_CRATE_DIR)/src/dtos/dtos_generated.rs")
-	$(call add_license_header, "$(ODF_CRATE_DIR)/src/dtos/dtos_enum_flags_generated.rs")
-	$(call add_license_header, "$(ODF_CRATE_DIR)/src/serde/yaml/derivations_generated.rs")
-	$(call add_license_header, "$(ODF_CRATE_DIR)/src/serde/flatbuffers/convertors_generated.rs")
+	$(call add_license_header, "$(ODF_METADATA_CRATE_DIR)/src/serde/flatbuffers/proxies_generated.rs")
+	$(call add_license_header, "$(ODF_METADATA_CRATE_DIR)/src/dtos/dtos_generated.rs")
+	$(call add_license_header, "$(ODF_METADATA_CRATE_DIR)/src/dtos/dtos_enum_flags_generated.rs")
+	$(call add_license_header, "$(ODF_METADATA_CRATE_DIR)/src/serde/yaml/derivations_generated.rs")
+	$(call add_license_header, "$(ODF_METADATA_CRATE_DIR)/src/serde/flatbuffers/convertors_generated.rs")
 
 
 .PHONY: codegen-engine-tonic
 codegen-engine-tonic:
 	protoc \
-		-I $(ODF_CRATE_DIR)/schemas \
-		$(ODF_CRATE_DIR)/schemas/engine.proto \
-		--prost_out=$(ODF_CRATE_DIR)/src/engine/grpc_generated \
-		--tonic_out=$(ODF_CRATE_DIR)/src/engine/grpc_generated \
+		-I $(ODF_METADATA_CRATE_DIR)/schemas \
+		$(ODF_METADATA_CRATE_DIR)/schemas/engine.proto \
+		--prost_out=$(ODF_METADATA_CRATE_DIR)/src/engine/grpc_generated \
+		--tonic_out=$(ODF_METADATA_CRATE_DIR)/src/engine/grpc_generated \
 		--tonic_opt=compile_well_known_types
 
-	rustfmt $(ODF_CRATE_DIR)/src/engine/grpc_generated/engine.rs
-	rustfmt $(ODF_CRATE_DIR)/src/engine/grpc_generated/engine.tonic.rs
+	rustfmt $(ODF_METADATA_CRATE_DIR)/src/engine/grpc_generated/engine.rs
+	rustfmt $(ODF_METADATA_CRATE_DIR)/src/engine/grpc_generated/engine.tonic.rs
 
-	$(call add_license_header, "$(ODF_CRATE_DIR)/src/engine/grpc_generated/engine.rs")
-	$(call add_license_header, "$(ODF_CRATE_DIR)/src/engine/grpc_generated/engine.tonic.rs")
+	$(call add_license_header, "$(ODF_METADATA_CRATE_DIR)/src/engine/grpc_generated/engine.rs")
+	$(call add_license_header, "$(ODF_METADATA_CRATE_DIR)/src/engine/grpc_generated/engine.tonic.rs")
 
 
 .PHONY: codegen-graphql
