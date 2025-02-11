@@ -66,7 +66,7 @@ impl<TServerHarness: ServerSideHarness> SmartPullNewDatasetScenario<TServerHarne
         .await;
 
         let client_dataset_layout =
-            client_harness.dataset_layout(&server_create_result.dataset_handle.id, "foo");
+            client_harness.dataset_layout(&server_create_result.dataset_handle.id);
 
         let server_alias =
             odf::DatasetAlias::new(server_account_name, odf::DatasetName::new_unchecked("foo"));
