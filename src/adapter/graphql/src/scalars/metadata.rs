@@ -119,19 +119,16 @@ impl SetTransform {
 
         accessible_inputs.extend(dataset_infos.unresolved_datasets.into_iter().map(
             |(dataset_id, _)| {
-                let original_input_info_maybe = v.inputs.iter().find(|input| {
-                    input.dataset_ref.id().unwrap().as_local_ref() == dataset_id.as_local_ref()
-                });
-                if let Some(original_input_info) = original_input_info_maybe {
-                    TransformInput {
-                        dataset_ref: original_input_info.dataset_ref.clone().into(),
-                        alias: original_input_info.alias.clone().unwrap(),
-                    }
-                } else {
-                    TransformInput {
-                        dataset_ref: dataset_id.clone().into_local_ref().into(),
-                        alias: dataset_id.into_local_ref().to_string(),
-                    }
+                let original_input_info = v
+                    .inputs
+                    .iter()
+                    .find(|input| {
+                        input.dataset_ref.id().unwrap().as_local_ref() == dataset_id.as_local_ref()
+                    })
+                    .unwrap();
+                TransformInput {
+                    dataset_ref: original_input_info.dataset_ref.clone().into(),
+                    alias: original_input_info.alias.clone().unwrap(),
                 }
             },
         ));
