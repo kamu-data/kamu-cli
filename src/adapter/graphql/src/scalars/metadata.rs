@@ -129,8 +129,8 @@ impl SetTransform {
                     }
                 } else {
                     TransformInput {
-                        dataset_ref: dataset_id.into_local_ref().into(),
-                        alias: String::new(),
+                        dataset_ref: dataset_id.clone().into_local_ref().into(),
+                        alias: dataset_id.into_local_ref().to_string(),
                     }
                 }
             },
