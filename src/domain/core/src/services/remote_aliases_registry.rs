@@ -96,6 +96,8 @@ pub enum ResolveAliasError {
     AmbiguousAlias,
     #[error("Repositories list is empty")]
     EmptyRepositoryList,
+    #[error("Alias could not be resolved")]
+    UnresolvedAlias,
     #[error(transparent)]
     Internal(
         #[from]
@@ -121,6 +123,7 @@ impl From<ResolveAliasError> for PushError {
             }
             ResolveAliasError::EmptyRepositoryList => Self::NoTarget,
             ResolveAliasError::RepositoryNotFound(e) => Self::DestinationNotFound(e),
+            ResolveAliasError::UnresolvedAlias => unreachable!(),
             ResolveAliasError::Internal(e) => Self::Internal(e),
         }
     }

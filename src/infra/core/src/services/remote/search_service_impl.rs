@@ -197,7 +197,8 @@ impl SearchServiceImpl {
             "odf+http" | "odf+https" => self.search_in_repo_odf(url, query, repo_name).await,
             _ => Err(odf::dataset::UnsupportedProtocolError {
                 message: None,
-                url: url.clone(),
+                entity_kind: "dataset",
+                url: Box::new(url.clone()),
             }
             .into()),
         }

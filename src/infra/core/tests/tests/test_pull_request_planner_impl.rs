@@ -762,6 +762,7 @@ impl PullTestHarness {
             .bind::<dyn DatasetEntryWriter, MockDatasetEntryWriter>()
             .add_value(mock_dependency_graph_writer)
             .bind::<dyn DependencyGraphWriter, MockDependencyGraphWriter>()
+            .add::<DatasetStorageUnitFactoryImpl>()
             .build();
 
         Self {

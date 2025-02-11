@@ -147,11 +147,11 @@ impl DatasetFactoryImpl {
     /// already have an established [S3Context] use
     /// [DatasetFactoryImpl::get_s3_from_context()] function instead.
     #[cfg(feature = "s3")]
-    pub async fn get_s3_from_url(base_url: Url) -> Result<impl Dataset, InternalError> {
+    pub async fn get_s3_from_url(base_url: Url) -> impl Dataset {
         // TODO: We should ensure optimal credential reuse. Perhaps in future we should
         // create a cache of S3Contexts keyed by an endpoint.
         let s3_context = S3Context::from_url(&base_url).await;
-        Ok(DatasetImpl::new(
+        DatasetImpl::new(
             MetadataChainImpl::new(
                 MetadataBlockRepositoryCachingInMem::new(MetadataBlockRepositoryImpl::new(
                     ObjectRepositoryS3Sha3::new(s3_context.sub_context("blocks/")),
@@ -164,7 +164,7 @@ impl DatasetFactoryImpl {
             ObjectRepositoryS3Sha3::new(s3_context.sub_context("checkpoints/")),
             NamedObjectRepositoryS3::new(s3_context.into_sub_context("info/")),
             base_url,
-        ))
+        )
     }
 
     #[cfg(feature = "http")]
@@ -338,12 +338,13 @@ impl DatasetFactory for DatasetFactoryImpl {
             }
             #[cfg(feature = "s3")]
             "s3" | "s3+http" | "s3+https" => {
-                let ds = Self::get_s3_from_url(url.clone()).await?;
+                let ds = Self::get_s3_from_url(url.clone()).await;
                 Ok(Arc::new(ds))
             }
             _ => Err(UnsupportedProtocolError {
                 message: None,
-                url: url.clone(),
+                entity_kind: "dataset",
+                url: Box::new(url.clone()),
             }
             .into()),
         }
