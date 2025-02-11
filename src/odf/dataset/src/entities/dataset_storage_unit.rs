@@ -14,6 +14,7 @@ use internal_error::{ErrorIntoInternal, InternalError};
 use odf_metadata::*;
 use thiserror::Error;
 use tokio_stream::Stream;
+use url::Url;
 
 use crate::{AppendError, Dataset, ValidateDatasetSnapshotError};
 
@@ -23,6 +24,8 @@ use crate::{AppendError, Dataset, ValidateDatasetSnapshotError};
 #[cfg_attr(feature = "testing", mockall::automock)]
 #[async_trait::async_trait]
 pub trait DatasetStorageUnit: Sync + Send {
+    fn potential_internal_url_for(&self, dataset_id: &DatasetID) -> Url;
+
     async fn resolve_stored_dataset_handle_by_ref(
         &self,
         dataset_ref: &DatasetRef,

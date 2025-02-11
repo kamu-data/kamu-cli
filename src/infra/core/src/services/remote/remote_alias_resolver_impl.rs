@@ -13,6 +13,7 @@ use std::sync::Arc;
 use dill::*;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_core::*;
+use odf::DatasetHandle;
 use url::Url;
 
 use crate::UrlExt;
@@ -236,6 +237,11 @@ impl RemoteAliasResolver for RemoteAliasResolverImpl {
                     let transfer_url = remote_repo.url.clone().odf_to_transport_protocol()?;
                     self.resolve_pull_url_from_odf_transfer_url(alias, &transfer_url)
                         .await
+                } else if remote_repo.url.is_http_protocol() {
+                    Ok(remote_repo
+                        .url
+                        .join(&format!("{}/", alias.local_alias()))
+                        .unwrap())
                 } else {
                     let storage_unit = self
                         .dataset_storage_unit_factory
@@ -247,12 +253,12 @@ impl RemoteAliasResolver for RemoteAliasResolverImpl {
                         .resolve_stored_dataset_handle_by_ref(&local_ref_in_repo)
                         .await
                     {
-                        Ok(hdl) => Ok(remote_repo
-                            .url
-                            .join(&format!("{}/", hdl.id.as_multibase().to_stack_string()))
-                            .unwrap()),
+                        Ok(hdl) => {
+                            let dataset = storage_unit.get_stored_dataset_by_handle(&hdl);
+                            Ok(dataset.get_storage_internal_url().clone())
+                        }
                         Err(odf::dataset::GetDatasetError::NotFound(_)) => {
-                            Err(ResolveAliasError::UnresolvedAlias)
+                            Err(ResolveAliasError::UnresolvedAlias(alias.clone()))
                         }
                         Err(odf::dataset::GetDatasetError::Internal(e)) => {
                             Err(ResolveAliasError::Internal(e))
@@ -262,19 +268,47 @@ impl RemoteAliasResolver for RemoteAliasResolverImpl {
             }
             odf::DatasetRefRemote::Handle(odf::metadata::DatasetHandleRemote { alias, id }) => {
                 let remote_repo = self.remote_repo_reg.get_repository(&alias.repo_name)?;
-                if !remote_repo.url.is_odf_protocol() {
-                    return Ok(remote_repo
+                if remote_repo.url.is_odf_protocol() {
+                    let transfer_url = remote_repo.url.clone().odf_to_transport_protocol()?;
+                    self.resolve_pull_url_from_odf_transfer_url(alias, &transfer_url)
+                        .await
+                } else if remote_repo.url.is_http_protocol() {
+                    Ok(remote_repo
                         .url
-                        .join(&format!("{}/", id.as_multibase().to_stack_string()))
-                        .unwrap());
+                        .join(&format!("{}/", alias.local_alias()))
+                        .unwrap())
+                } else {
+                    let storage_unit = self
+                        .dataset_storage_unit_factory
+                        .get_storage_unit(&remote_repo.url, alias.account_name.is_some())
+                        .await
+                        .int_err()?;
+                    let dataset = storage_unit.get_stored_dataset_by_handle(&DatasetHandle::new(
+                        id.clone(),
+                        alias.local_alias(),
+                    ));
+                    Ok(dataset.get_storage_internal_url().clone())
                 }
-
-                let transfer_url = remote_repo.url.clone().odf_to_transport_protocol()?;
-
-                self.resolve_pull_url_from_odf_transfer_url(alias, &transfer_url)
-                    .await
             }
         }
+    }
+
+    async fn build_new_remote_dataset_url(
+        &self,
+        repo_name: &odf::RepoName,
+        account_name: Option<&odf::AccountName>,
+        dataset_id: &odf::DatasetID,
+    ) -> Result<url::Url, InternalError> {
+        let remote_repo = self.remote_repo_reg.get_repository(repo_name).int_err()?;
+
+        let storage_unit = self
+            .dataset_storage_unit_factory
+            .get_storage_unit(&remote_repo.url, account_name.is_some())
+            .await
+            .int_err()?;
+
+        let url = storage_unit.potential_internal_url_for(dataset_id);
+        Ok(url)
     }
 }
 
