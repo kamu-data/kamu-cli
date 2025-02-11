@@ -12,17 +12,18 @@ use std::sync::Arc;
 use internal_error::InternalError;
 use url::Url;
 
-use crate::Dataset;
+use super::UnsupportedProtocolError;
+use crate::DatasetStorageUnit;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait DatasetFactory: Send + Sync {
-    async fn get_dataset(
+pub trait DatasetStorageUnitFactory: Send + Sync {
+    async fn get_storage_unit(
         &self,
         url: &Url,
-        create_if_not_exists: bool,
-    ) -> Result<Arc<dyn Dataset>, BuildDatasetError>;
+        is_multi_tenant: bool,
+    ) -> Result<Arc<dyn DatasetStorageUnit>, BuildDatasetStorageUnitError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -30,7 +31,7 @@ pub trait DatasetFactory: Send + Sync {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(thiserror::Error, Debug)]
-pub enum BuildDatasetError {
+pub enum BuildDatasetStorageUnitError {
     #[error(transparent)]
     UnsupportedProtocol(#[from] UnsupportedProtocolError),
     #[error(transparent)]
@@ -42,26 +43,3 @@ pub enum BuildDatasetError {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(thiserror::Error, Debug)]
-pub struct UnsupportedProtocolError {
-    pub message: Option<String>,
-    pub entity_kind: &'static str,
-    pub url: Box<Url>,
-}
-
-impl std::fmt::Display for UnsupportedProtocolError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if let Some(msg) = &self.message {
-            write!(f, "{msg}")
-        } else {
-            write!(
-                f,
-                "Unsupported protocol {} when accessing {} at {}",
-                self.url.scheme(),
-                self.entity_kind,
-                self.url
-            )
-        }
-    }
-}
