@@ -92,6 +92,7 @@ impl DatasetStorageUnitLocalFs {
         let mut datasets = self.stored_dataset_handles();
         while let Some(hdl) = datasets.next().await {
             let hdl = hdl?;
+            println!("hdl.alias={}, normalized = {}", hdl.alias, normalized_alias);
             if hdl.alias == normalized_alias {
                 return Ok(hdl);
             }

@@ -50,6 +50,7 @@ async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
         .add_value(kamu::utils::ipfs_wrapper::IpfsClient::default())
         .add::<odf::dataset::DummyOdfServerAccessTokenResolver>()
         .add::<DatasetFactoryImpl>()
+        .add::<DatasetStorageUnitFactoryImpl>()
         .add::<SyncServiceImpl>()
         .add::<RemoteAliasesRegistryImpl>()
         .add::<RemoteAliasResolverImpl>()

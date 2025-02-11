@@ -137,6 +137,8 @@ impl ClientSideHarness {
 
         b.add::<DatasetFactoryImpl>();
 
+        b.add::<DatasetStorageUnitFactoryImpl>();
+
         b.add::<SmartTransferProtocolClientWs>();
         b.add::<SimpleTransferProtocol>();
 

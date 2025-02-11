@@ -23,6 +23,7 @@ pub struct RemoteAliasResolverImpl {
     remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
     access_token_resolver: Arc<dyn odf::dataset::OdfServerAccessTokenResolver>,
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
+    dataset_storage_unit_factory: Arc<dyn odf::dataset::DatasetStorageUnitFactory>,
 }
 
 #[component(pub)]
@@ -32,11 +33,13 @@ impl RemoteAliasResolverImpl {
         remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
         access_token_resolver: Arc<dyn odf::dataset::OdfServerAccessTokenResolver>,
         remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
+        dataset_storage_unit_factory: Arc<dyn odf::dataset::DatasetStorageUnitFactory>,
     ) -> Self {
         Self {
             remote_repo_reg,
             access_token_resolver,
             remote_alias_reg,
+            dataset_storage_unit_factory,
         }
     }
 
@@ -100,6 +103,32 @@ impl RemoteAliasResolverImpl {
             dataset_handle.alias.dataset_name.clone()
         };
         Ok(result)
+    }
+
+    async fn resolve_pull_url_from_odf_transfer_url(
+        &self,
+        alias: &odf::DatasetAliasRemote,
+        odf_transfer_url: &Url,
+    ) -> Result<url::Url, ResolveAliasError> {
+        let account_name = if alias.account_name.is_some() {
+            alias.account_name.clone()
+        } else {
+            let access_token_maybe = self
+                .access_token_resolver
+                .resolve_odf_dataset_access_token(odf_transfer_url);
+            RemoteAliasResolverApiHelper::resolve_remote_account_name(
+                odf_transfer_url,
+                access_token_maybe.as_ref(),
+            )
+            .await
+            .int_err()?
+        };
+
+        let mut remote_url =
+            self.combine_remote_url(odf_transfer_url, account_name.as_ref(), &alias.dataset_name)?;
+        remote_url.ensure_trailing_slash();
+
+        Ok(remote_url)
     }
 }
 
@@ -192,6 +221,7 @@ impl RemoteAliasResolver for RemoteAliasResolverImpl {
         remote_ref: &odf::DatasetRefRemote,
     ) -> Result<url::Url, ResolveAliasError> {
         match remote_ref {
+            // TODO: maybe it's resolveble now?
             odf::DatasetRefRemote::ID(_, _) => Err(ResolveAliasError::Internal(
                 "Syncing remote dataset by ID is not yet supported".int_err(),
             )),
@@ -200,40 +230,49 @@ impl RemoteAliasResolver for RemoteAliasResolverImpl {
                 dataset_url.ensure_trailing_slash();
                 Ok(dataset_url)
             }
-            odf::DatasetRefRemote::Alias(alias)
-            | odf::DatasetRefRemote::Handle(odf::metadata::DatasetHandleRemote { alias, .. }) => {
+            odf::DatasetRefRemote::Alias(alias) => {
+                let remote_repo = self.remote_repo_reg.get_repository(&alias.repo_name)?;
+                if remote_repo.url.is_odf_protocol() {
+                    let transfer_url = remote_repo.url.clone().odf_to_transport_protocol()?;
+                    self.resolve_pull_url_from_odf_transfer_url(alias, &transfer_url)
+                        .await
+                } else {
+                    let storage_unit = self
+                        .dataset_storage_unit_factory
+                        .get_storage_unit(&remote_repo.url, alias.account_name.is_some())
+                        .await
+                        .int_err()?;
+                    let local_ref_in_repo = alias.local_alias().as_local_ref();
+                    match storage_unit
+                        .resolve_stored_dataset_handle_by_ref(&local_ref_in_repo)
+                        .await
+                    {
+                        Ok(hdl) => Ok(remote_repo
+                            .url
+                            .join(&format!("{}/", hdl.id.as_multibase().to_stack_string()))
+                            .unwrap()),
+                        Err(odf::dataset::GetDatasetError::NotFound(_)) => {
+                            Err(ResolveAliasError::UnresolvedAlias)
+                        }
+                        Err(odf::dataset::GetDatasetError::Internal(e)) => {
+                            Err(ResolveAliasError::Internal(e))
+                        }
+                    }
+                }
+            }
+            odf::DatasetRefRemote::Handle(odf::metadata::DatasetHandleRemote { alias, id }) => {
                 let remote_repo = self.remote_repo_reg.get_repository(&alias.repo_name)?;
                 if !remote_repo.url.is_odf_protocol() {
                     return Ok(remote_repo
                         .url
-                        .join(&format!("{}/", alias.local_alias()))
+                        .join(&format!("{}/", id.as_multibase().to_stack_string()))
                         .unwrap());
                 }
 
                 let transfer_url = remote_repo.url.clone().odf_to_transport_protocol()?;
 
-                let account_name = if alias.account_name.is_some() {
-                    alias.account_name.clone()
-                } else {
-                    let access_token_maybe = self
-                        .access_token_resolver
-                        .resolve_odf_dataset_access_token(&transfer_url);
-                    RemoteAliasResolverApiHelper::resolve_remote_account_name(
-                        &transfer_url,
-                        access_token_maybe.as_ref(),
-                    )
+                self.resolve_pull_url_from_odf_transfer_url(alias, &transfer_url)
                     .await
-                    .int_err()?
-                };
-
-                let mut remote_url = self.combine_remote_url(
-                    &transfer_url,
-                    account_name.as_ref(),
-                    &alias.dataset_name,
-                )?;
-                remote_url.ensure_trailing_slash();
-
-                Ok(remote_url)
             }
         }
     }
