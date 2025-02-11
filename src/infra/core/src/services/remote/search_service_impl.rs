@@ -12,57 +12,29 @@ use std::sync::Arc;
 use dill::*;
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_core::*;
-use s3_utils::S3Context;
+use odf::dataset::DatasetStorageUnitFactory;
 use serde_json::json;
 use url::Url;
 
 pub struct SearchServiceImpl {
     remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
+    dataset_storage_unit_factory: Arc<dyn DatasetStorageUnitFactory>,
 }
 
 #[component(pub)]
 #[interface(dyn SearchService)]
 impl SearchServiceImpl {
-    pub fn new(remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>) -> Self {
-        Self { remote_repo_reg }
-    }
-
-    fn search_in_repo_localfs(
-        &self,
-        url: &Url,
-        query: Option<&str>,
-        repo_name: &odf::RepoName,
-    ) -> Result<Vec<SearchResultDataset>, SearchError> {
-        let mut datasets = Vec::new();
-
-        let path = url
-            .to_file_path()
-            .map_err(|_| "Invalid path URL")
-            .int_err()?;
-        let query = query.unwrap_or_default();
-        for entry in std::fs::read_dir(path).int_err()? {
-            if let Some(file_name) = entry.int_err()?.file_name().to_str() {
-                if query.is_empty() || file_name.contains(query) {
-                    datasets.push(SearchResultDataset {
-                        id: None,
-                        alias: odf::DatasetAliasRemote::new(
-                            repo_name.clone(),
-                            None,
-                            odf::DatasetName::try_from(file_name).int_err()?,
-                        ),
-                        kind: None,
-                        num_blocks: None,
-                        num_records: None,
-                        estimated_size: None,
-                    });
-                }
-            }
+    pub fn new(
+        remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
+        dataset_storage_unit_factory: Arc<dyn DatasetStorageUnitFactory>,
+    ) -> Self {
+        Self {
+            remote_repo_reg,
+            dataset_storage_unit_factory,
         }
-
-        Ok(datasets)
     }
 
-    async fn search_in_repo_s3(
+    async fn search_in_repo_storage_unit(
         &self,
         url: &Url,
         query: Option<&str>,
@@ -70,23 +42,30 @@ impl SearchServiceImpl {
     ) -> Result<Vec<SearchResultDataset>, SearchError> {
         let mut datasets = Vec::new();
 
-        let s3_context = S3Context::from_url(url).await;
-        let folders_common_prefixes = s3_context.bucket_list_folders().await?;
+        let storage_unit = self
+            .dataset_storage_unit_factory
+            .get_storage_unit(url, false)
+            .await
+            .map_err(|e| match e {
+                odf::dataset::BuildDatasetStorageUnitError::UnsupportedProtocol(e) => {
+                    SearchError::UnsupportedProtocol(e)
+                }
+                odf::dataset::BuildDatasetStorageUnitError::Internal(e) => SearchError::Internal(e),
+            })?;
 
         let query = query.unwrap_or_default();
 
-        for prefix in folders_common_prefixes {
-            let mut prefix = prefix.prefix.unwrap();
-            while prefix.ends_with('/') {
-                prefix.pop();
-            }
-
-            let name = odf::DatasetName::try_from(prefix).int_err()?;
-
-            if query.is_empty() || name.contains(query) {
+        use futures::TryStreamExt;
+        let mut stored_handles_stream = storage_unit.stored_dataset_handles();
+        while let Some(stored_hdl) = stored_handles_stream.try_next().await.int_err()? {
+            if query.is_empty() || stored_hdl.alias.dataset_name.contains(query) {
                 datasets.push(SearchResultDataset {
-                    id: None,
-                    alias: odf::DatasetAliasRemote::new(repo_name.clone(), None, name),
+                    id: Some(stored_hdl.id),
+                    alias: odf::DatasetAliasRemote::new(
+                        repo_name.clone(),
+                        stored_hdl.alias.account_name,
+                        stored_hdl.alias.dataset_name,
+                    ),
                     kind: None,
                     num_blocks: None,
                     num_records: None,
@@ -192,8 +171,10 @@ impl SearchServiceImpl {
         repo_name: &odf::RepoName,
     ) -> Result<Vec<SearchResultDataset>, SearchError> {
         match url.scheme() {
-            "file" => self.search_in_repo_localfs(url, query, repo_name),
-            "s3" | "s3+http" | "s3+https" => self.search_in_repo_s3(url, query, repo_name).await,
+            "file" | "s3" | "s3+http" | "s3+https" => {
+                self.search_in_repo_storage_unit(url, query, repo_name)
+                    .await
+            }
             "odf+http" | "odf+https" => self.search_in_repo_odf(url, query, repo_name).await,
             _ => Err(odf::dataset::UnsupportedProtocolError {
                 message: None,

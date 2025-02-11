@@ -85,13 +85,15 @@ impl odf::dataset::DatasetStorageUnitFactory for DatasetStorageUnitFactoryImpl {
             "file" => {
                 let path = url
                     .to_file_path()
-                    .map_err(|_| "Invalid file url".int_err())?;
+                    .map_err(|_| "Invalid file url".int_err())?
+                    .join("datasets/");
                 Ok(self.get_local_fs(&path, tenancy_config))
             }
-            // TODO: http (for simple protocol)
             "s3" | "s3+http" | "s3+https" => {
                 Ok(self.get_s3_from_url(url.clone(), tenancy_config).await)
             }
+
+            // TODO: http (for simple protocol)
             _ => Err(odf::dataset::UnsupportedProtocolError {
                 message: None,
                 entity_kind: "repository",

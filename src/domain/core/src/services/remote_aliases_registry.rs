@@ -54,6 +54,13 @@ pub trait RemoteAliasResolver: Send + Sync {
         &self,
         remote_ref: &odf::DatasetRefRemote,
     ) -> Result<url::Url, ResolveAliasError>;
+
+    async fn build_new_remote_dataset_url(
+        &self,
+        repo_name: &odf::RepoName,
+        account_name: Option<&odf::AccountName>,
+        dataset_id: &odf::DatasetID,
+    ) -> Result<url::Url, InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -97,7 +104,7 @@ pub enum ResolveAliasError {
     #[error("Repositories list is empty")]
     EmptyRepositoryList,
     #[error("Alias could not be resolved")]
-    UnresolvedAlias,
+    UnresolvedAlias(odf::DatasetAliasRemote),
     #[error(transparent)]
     Internal(
         #[from]
@@ -123,7 +130,7 @@ impl From<ResolveAliasError> for PushError {
             }
             ResolveAliasError::EmptyRepositoryList => Self::NoTarget,
             ResolveAliasError::RepositoryNotFound(e) => Self::DestinationNotFound(e),
-            ResolveAliasError::UnresolvedAlias => unreachable!(),
+            ResolveAliasError::UnresolvedAlias(_) => unreachable!(),
             ResolveAliasError::Internal(e) => Self::Internal(e),
         }
     }

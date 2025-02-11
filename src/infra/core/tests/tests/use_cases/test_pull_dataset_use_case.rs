@@ -733,6 +733,7 @@ impl PullUseCaseHarness {
         let dst_path = self
             .remote_tmp_dir
             .path()
+            .join("datasets")
             .join(dataset_id.as_multibase().to_stack_string());
 
         tokio::fs::create_dir_all(&dst_path).await.unwrap();
