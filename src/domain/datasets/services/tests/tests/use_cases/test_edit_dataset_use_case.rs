@@ -10,13 +10,13 @@
 use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
-use kamu::{EditDatasetUseCaseImpl, ViewDatasetUseCaseImpl};
+use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions};
 use kamu_accounts::testing::CurrentAccountSubjectTestHelper;
 use kamu_accounts::CurrentAccountSubject;
-use kamu_core::testing::{OwnerByAliasDatasetActionAuthorizer, ViewMultiResponseTestHelper};
-use kamu_core::{EditDatasetUseCase, TenancyConfig, ViewDatasetUseCase, ViewDatasetUseCaseError};
-
-use crate::tests::use_cases::*;
+use kamu_core::testing::{EditMultiResponseTestHelper, OwnerByAliasDatasetActionAuthorizer};
+use kamu_core::TenancyConfig;
+use kamu_datasets::{EditDatasetUseCase, EditDatasetUseCaseError};
+use kamu_datasets_services::EditDatasetUseCaseImpl;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -31,14 +31,14 @@ async fn test_try_to_edit_a_nonexistent_dataset() {
     let nonexistent_dataset_alias = odf::metadata::testing::alias("alice", "foo");
 
     for subject in subjects {
-        let harness = ViewDatasetUseCaseHarness::new(subject);
+        let harness = EditDatasetUseCaseHarness::new(subject);
 
         assert_matches!(
             harness
                 .use_case
                 .execute(&nonexistent_dataset_alias.as_local_ref())
                 .await,
-            Err(ViewDatasetUseCaseError::NotFound(_))
+            Err(EditDatasetUseCaseError::NotFound(_))
         );
     }
 }
@@ -68,7 +68,7 @@ async fn test_edit_single_dataset() {
     let dataset_alias = odf::metadata::testing::alias("alice", "foo");
 
     for (subject, expected_result) in subjects_with_expected_results {
-        let harness = ViewDatasetUseCaseHarness::new(subject);
+        let harness = EditDatasetUseCaseHarness::new(subject);
 
         harness
             .base_harness
@@ -85,7 +85,7 @@ async fn test_edit_single_dataset() {
                 assert_matches!(res, Ok(_));
             }
             ExpectedResult::AccessDenied => {
-                assert_matches!(res, Err(ViewDatasetUseCaseError::Access(_)));
+                assert_matches!(res, Err(EditDatasetUseCaseError::Access(_)));
             }
         }
     }
@@ -100,7 +100,7 @@ async fn test_edit_multi_datasets() {
             CurrentAccountSubjectTestHelper::anonymous(),
             indoc::indoc!(
                 r#"
-                viewable_resolved_refs:
+                editable_resolved_refs:
 
                 inaccessible_refs:
                 - alice/dataset-1: Forbidden
@@ -113,7 +113,7 @@ async fn test_edit_multi_datasets() {
             CurrentAccountSubjectTestHelper::logged("alice"),
             indoc::indoc!(
                 r#"
-                viewable_resolved_refs:
+                editable_resolved_refs:
                 - alice/dataset-1
                 - alice/dataset-2
 
@@ -126,7 +126,7 @@ async fn test_edit_multi_datasets() {
             CurrentAccountSubjectTestHelper::logged("bob"),
             indoc::indoc!(
                 r#"
-                viewable_resolved_refs:
+                editable_resolved_refs:
                 - bob/dataset-3
 
                 inaccessible_refs:
@@ -144,7 +144,7 @@ async fn test_edit_multi_datasets() {
     ];
 
     for (subject, expected_result) in subjects_with_expected_results {
-        let harness = ViewDatasetUseCaseHarness::new(subject);
+        let harness = EditDatasetUseCaseHarness::new(subject);
 
         for dataset_alias in &dataset_aliases {
             harness
@@ -167,7 +167,7 @@ async fn test_edit_multi_datasets() {
 
         pretty_assertions::assert_eq!(
             expected_result,
-            ViewMultiResponseTestHelper::report(res.unwrap())
+            EditMultiResponseTestHelper::report(res.unwrap())
         );
     }
 }
@@ -177,19 +177,13 @@ async fn test_edit_multi_datasets() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[oop::extend(BaseUseCaseHarness, base_harness)]
-struct ViewDatasetUseCaseHarness {
-    _temp_dir: tempfile::TempDir,
+struct EditDatasetUseCaseHarness {
     base_harness: BaseUseCaseHarness,
     pub use_case: Arc<dyn EditDatasetUseCase>,
 }
 
-impl ViewDatasetUseCaseHarness {
+impl EditDatasetUseCaseHarness {
     fn new(current_account_subject: CurrentAccountSubject) -> Self {
-        let temp_dir = tempfile::tempdir().unwrap();
-        {
-            let datasets_dir = temp_dir.path().join("datasets");
-            std::fs::create_dir(&datasets_dir).unwrap();
-        }
         let owner_account_name = current_account_subject.maybe_account_name().cloned();
 
         let base_harness = BaseUseCaseHarness::new(
@@ -205,7 +199,6 @@ impl ViewDatasetUseCaseHarness {
             .build();
 
         Self {
-            _temp_dir: temp_dir,
             base_harness,
             use_case: catalog.get_one().unwrap(),
         }
