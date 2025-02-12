@@ -102,12 +102,14 @@ impl Command for SystemDiagnoseCommand {
                 verify_dataset_use_case: self.verify_dataset_use_case.clone(),
             }));
         }
+        let mut is_err = false;
 
         for diagnostic_check in &diagnostic_checks {
             write!(out, "{}... ", diagnostic_check.name())?;
             match diagnostic_check.run().await {
                 Ok(_) => writeln!(out, "{}", style(SUCCESS_MESSAGE).green())?,
                 Err(err) => {
+                    is_err = true;
                     writeln!(out, "{}", style(FAILED_MESSAGE).red())?;
                     writeln!(out, "{}", style(err.to_string()).red())?;
                 }
@@ -116,6 +118,14 @@ impl Command for SystemDiagnoseCommand {
 
         if !self.workspace_svc.is_in_workspace() {
             writeln!(out, "{}", style("Directory is not kamu workspace").yellow())?;
+            writeln!(
+                out,
+                "{}",
+                style("Run `kamu init` command to initialize a new workspace").yellow()
+            )?;
+        }
+        if !is_err {
+            writeln!(out, "{}", style("Kamu installation is healthy").green())?;
         }
         Ok(())
     }
