@@ -229,7 +229,11 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
     }
 
     // Startup initializations
-    run_startup_initializations(&cli_catalog).await?;
+    run_startup_initializations(
+        &cli_catalog,
+        workspace_svc.is_in_workspace() && is_workspace_upgrade_needed,
+    )
+    .await?;
 
     let is_transactional =
         maybe_db_connection_settings.is_some() && cli_commands::command_needs_transaction(&args);
@@ -603,10 +607,23 @@ pub fn configure_server_catalog(base_catalog: &Catalog) -> CatalogBuilder {
     b
 }
 
-async fn run_startup_initializations(catalog: &Catalog) -> Result<(), CLIError> {
-    let init_result = init_on_startup::run_startup_jobs(catalog)
-        .await
-        .map_err(CLIError::critical);
+async fn run_startup_initializations(
+    catalog: &Catalog,
+    storage_needs_upgrade: bool,
+) -> Result<(), CLIError> {
+    let init_result = init_on_startup::run_startup_jobs(
+        catalog,
+        init_on_startup::RunStartupJobOpts {
+            storage_needs_upgrade,
+        },
+    )
+    .await
+    .map_err(|e| match e {
+        init_on_startup::StartupJobsError::StorageNeedsUpgrade(_) => {
+            CLIError::usage_error_from(WorkspaceUpgradeRequired)
+        }
+        _ => CLIError::failure(e),
+    });
 
     if let Err(e) = init_result {
         tracing::error!(

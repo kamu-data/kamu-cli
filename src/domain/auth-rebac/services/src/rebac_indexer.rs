@@ -47,6 +47,7 @@ pub struct RebacIndexer {
         JOB_KAMU_DATASETS_DATASET_ENTRY_INDEXER
     ],
     requires_transaction: true,
+    requires_up_to_date_storage: false,
 })]
 impl RebacIndexer {
     pub fn new(
