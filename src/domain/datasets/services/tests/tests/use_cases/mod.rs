@@ -13,3 +13,4 @@ mod test_create_dataset_from_snapshot_use_case;
 mod test_create_dataset_use_case;
 mod test_delete_dataset_use_case;
 mod test_rename_dataset_use_case;
+mod test_view_dataset_use_case;

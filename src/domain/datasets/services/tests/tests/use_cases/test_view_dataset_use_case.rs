@@ -10,13 +10,13 @@
 use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
-use kamu::ViewDatasetUseCaseImpl;
+use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions};
 use kamu_accounts::testing::CurrentAccountSubjectTestHelper;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::testing::{OwnerByAliasDatasetActionAuthorizer, ViewMultiResponseTestHelper};
-use kamu_core::{TenancyConfig, ViewDatasetUseCase, ViewDatasetUseCaseError};
-
-use crate::tests::use_cases::*;
+use kamu_core::TenancyConfig;
+use kamu_datasets::{ViewDatasetUseCase, ViewDatasetUseCaseError};
+use kamu_datasets_services::ViewDatasetUseCaseImpl;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -178,18 +178,12 @@ async fn test_view_multi_datasets() {
 
 #[oop::extend(BaseUseCaseHarness, base_harness)]
 struct ViewDatasetUseCaseHarness {
-    _temp_dir: tempfile::TempDir,
     base_harness: BaseUseCaseHarness,
     pub use_case: Arc<dyn ViewDatasetUseCase>,
 }
 
 impl ViewDatasetUseCaseHarness {
     fn new(current_account_subject: CurrentAccountSubject) -> Self {
-        let temp_dir = tempfile::tempdir().unwrap();
-        {
-            let datasets_dir = temp_dir.path().join("datasets");
-            std::fs::create_dir(&datasets_dir).unwrap();
-        }
         let owner_account_name = current_account_subject.maybe_account_name().cloned();
 
         let base_harness = BaseUseCaseHarness::new(
@@ -205,7 +199,6 @@ impl ViewDatasetUseCaseHarness {
             .build();
 
         Self {
-            _temp_dir: temp_dir,
             base_harness,
             use_case: catalog.get_one().unwrap(),
         }
