@@ -37,7 +37,7 @@ impl AccountService {
         predefined_accounts_config: &PredefinedAccountsConfig,
     ) -> CurrentAccountIndication {
         let (current_account, user_name, specified_explicitly) = {
-            let default_account_name = AccountService::default_account_name(tenancy_config);
+            let default_account_name = Self::default_account_name(tenancy_config);
 
             if let Some(account) = account {
                 (
@@ -51,7 +51,7 @@ impl AccountService {
                     true,
                 )
             } else {
-                let default_user_name = AccountService::default_user_name(tenancy_config);
+                let default_user_name = Self::default_user_name(tenancy_config);
 
                 (default_account_name, default_user_name, false)
             }
