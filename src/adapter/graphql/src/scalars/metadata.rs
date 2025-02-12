@@ -28,20 +28,23 @@ pub struct MetadataBlockExtended {
 }
 
 impl MetadataBlockExtended {
-    pub fn new<H: Into<Multihash>, B: Into<MetadataBlock>>(
+    pub async fn new<H: Into<Multihash>>(
+        ctx: &Context<'_>,
         block_hash: H,
-        block: B,
+        block: odf::metadata::MetadataBlock,
         author: Account,
-    ) -> Self {
-        let b = block.into();
-        Self {
+    ) -> Result<Self, InternalError> {
+        let b: MetadataBlock = MetadataBlock::with_extended_aliases(ctx, block)
+            .await?
+            .into();
+        Ok(Self {
             block_hash: block_hash.into(),
             prev_block_hash: b.prev_block_hash,
             system_time: b.system_time,
             author,
             event: b.event,
             sequence_number: b.sequence_number,
-        }
+        })
     }
 }
 
@@ -92,11 +95,13 @@ impl From<odf::metadata::serde::UnsupportedVersionError> for MetadataManifestUns
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 impl SetTransform {
-    pub async fn try_from_odf(
+    pub async fn with_extended_aliases(
         ctx: &Context<'_>,
         v: odf::metadata::SetTransform,
-    ) -> Result<Self, InternalError> {
+    ) -> Result<odf::metadata::SetTransform, InternalError> {
         let input_ids_list: Vec<odf::DatasetID> = v
             .inputs
             .iter()
@@ -111,9 +116,9 @@ impl SetTransform {
         let mut accessible_inputs: Vec<_> = dataset_infos
             .resolved_handles
             .iter()
-            .map(|dataset_handle| TransformInput {
-                dataset_ref: dataset_handle.id.as_local_ref().into(),
-                alias: dataset_handle.alias.clone().to_string(),
+            .map(|dataset_handle| odf::metadata::TransformInput {
+                dataset_ref: dataset_handle.id.as_local_ref(),
+                alias: Some(dataset_handle.alias.clone().to_string()),
             })
             .collect();
 
@@ -126,15 +131,47 @@ impl SetTransform {
                         input.dataset_ref.id().unwrap().as_local_ref() == dataset_id.as_local_ref()
                     })
                     .unwrap();
-                TransformInput {
-                    dataset_ref: original_input_info.dataset_ref.clone().into(),
-                    alias: original_input_info.alias.clone().unwrap(),
+                odf::metadata::TransformInput {
+                    dataset_ref: original_input_info.dataset_ref.clone(),
+                    alias: original_input_info.alias.clone(),
                 }
             },
         ));
-        Ok(Self {
+        Ok(odf::metadata::SetTransform {
             inputs: accessible_inputs,
-            transform: v.transform.into(),
+            transform: v.transform,
+        })
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl MetadataBlock {
+    pub async fn with_extended_aliases(
+        ctx: &Context<'_>,
+        v: odf::metadata::MetadataBlock,
+    ) -> Result<odf::metadata::MetadataBlock, InternalError> {
+        Ok(odf::metadata::MetadataBlock {
+            system_time: v.system_time,
+            prev_block_hash: v.prev_block_hash,
+            sequence_number: v.sequence_number,
+            event: MetadataEvent::with_extended_aliases(ctx, v.event).await?,
+        })
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl MetadataEvent {
+    async fn with_extended_aliases(
+        ctx: &Context<'_>,
+        event: odf::metadata::MetadataEvent,
+    ) -> Result<odf::metadata::MetadataEvent, InternalError> {
+        Ok(match event {
+            odf::metadata::MetadataEvent::SetTransform(v) => {
+                SetTransform::with_extended_aliases(ctx, v).await?.into()
+            }
+            _ => event,
         })
     }
 }

@@ -14,6 +14,7 @@ use chrono::Utc;
 use dill::Component;
 use indoc::indoc;
 use kamu::*;
+use kamu_accounts::DEFAULT_ACCOUNT_NAME;
 use kamu_core::*;
 use kamu_datasets::{CreateDatasetFromSnapshotUseCase, CreateDatasetUseCase};
 use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEntryRepository};
@@ -529,6 +530,86 @@ async fn assert_attachments_eq(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_log::test(tokio::test)]
+async fn test_metadata_chain_set_transform_event() {
+    let harness = GraphQLMetadataChainHarness::new(TenancyConfig::MultiTenant).await;
+    let create_root_result = harness
+        .create_root_dataset(Some(DEFAULT_ACCOUNT_NAME.clone()))
+        .await;
+
+    let create_derived_result = harness
+        .create_derived_dataset(Some(DEFAULT_ACCOUNT_NAME.clone()))
+        .await;
+
+    let request_code = indoc!(
+        r#"
+        {
+            datasets {
+                byId (datasetId: "<id>") {
+                    metadata {
+                        chain {
+                            blocks (
+                                page: 0,
+                                perPage: 10,
+                            ) {
+                                nodes {
+                                    event {
+                                        __typename
+                                        ... on SetTransform {
+                                            inputs {
+                                                datasetRef
+                                                alias
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        "#
+    )
+    .replace("<id>", &create_derived_result.dataset_handle.id.to_string());
+
+    let schema = kamu_adapter_graphql::schema_quiet();
+    let res = schema
+        .execute(async_graphql::Request::new(request_code.clone()).data(harness.catalog_authorized))
+        .await;
+    assert!(res.is_ok(), "{res:?}");
+    assert_eq!(
+        res.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "metadata": {
+                        "chain": {
+                            "blocks": {
+                                "nodes": [{
+                                    "event": {
+                                        "__typename": "SetTransform",
+                                        "inputs": [{
+                                            "datasetRef": create_root_result.dataset_handle.id.to_string(),
+                                            "alias": "kamu/foo",
+                                        }]
+                                    }
+                                }, {
+                                    "event": {
+                                        "__typename": "Seed",
+                                    }
+                                }]
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 struct GraphQLMetadataChainHarness {
     _tempdir: tempfile::TempDir,
     catalog_authorized: dill::Catalog,
@@ -577,5 +658,61 @@ impl GraphQLMetadataChainHarness {
             catalog_authorized,
             did_generator,
         }
+    }
+
+    async fn create_root_dataset(
+        &self,
+        account_name: Option<odf::AccountName>,
+    ) -> odf::CreateDatasetResult {
+        let create_dataset_from_snapshot = self
+            .catalog_authorized
+            .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
+            .unwrap();
+
+        create_dataset_from_snapshot
+            .execute(
+                MetadataFactory::dataset_snapshot()
+                    .kind(odf::DatasetKind::Root)
+                    .name(odf::DatasetAlias::new(
+                        account_name,
+                        odf::DatasetName::new_unchecked("foo"),
+                    ))
+                    .build(),
+                Default::default(),
+            )
+            .await
+            .unwrap()
+    }
+
+    async fn create_derived_dataset(
+        &self,
+        account_name: Option<odf::AccountName>,
+    ) -> odf::CreateDatasetResult {
+        let create_dataset_from_snapshot = self
+            .catalog_authorized
+            .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
+            .unwrap();
+
+        create_dataset_from_snapshot
+            .execute(
+                MetadataFactory::dataset_snapshot()
+                    .name(odf::DatasetAlias::new(
+                        account_name,
+                        odf::DatasetName::new_unchecked("bar"),
+                    ))
+                    .kind(odf::DatasetKind::Derivative)
+                    .push_event(
+                        MetadataFactory::set_transform()
+                            .inputs_from_refs([odf::DatasetAlias::new(
+                                Some(DEFAULT_ACCOUNT_NAME.clone()),
+                                odf::DatasetName::new_unchecked("foo"),
+                            )])
+                            .build(),
+                    )
+                    .build(),
+                Default::default(),
+            )
+            .await
+            .unwrap()
     }
 }
