@@ -21,6 +21,7 @@ use kamu_accounts::testing::MockAuthenticationService;
 use kamu_accounts::*;
 use kamu_accounts_inmem::InMemoryAccountRepository;
 use kamu_accounts_services::AccountServiceImpl;
+use kamu_core::auth::DatasetActionUnauthorizedError;
 use kamu_core::{DidGenerator, MockDidGenerator, TenancyConfig};
 use kamu_datasets::CreateDatasetUseCase;
 use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEntryRepository};

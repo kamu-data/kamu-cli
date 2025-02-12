@@ -7,8 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 use std::sync::Arc;
 
 use chrono::Utc;
@@ -28,6 +26,7 @@ use kamu_accounts::{
     DEFAULT_ACCOUNT_NAME,
     PROVIDER_PASSWORD,
 };
+use kamu_core::auth::DatasetActionUnauthorizedError;
 use kamu_core::{CompactionExecutor, CompactionPlanner, DatasetRegistry, TenancyConfig};
 use kamu_datasets::{
     CommitDatasetEventUseCase,
