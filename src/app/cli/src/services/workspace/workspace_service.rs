@@ -157,7 +157,10 @@ impl WorkspaceService {
                 WorkspaceVersion::V2_DatasetConfig => self.upgrade_2_to_3(),
                 WorkspaceVersion::V3_SavepointCreatedAt => self.upgrade_3_to_4(),
                 WorkspaceVersion::V4_SavepointZeroCopy => self.upgrade_4_to_5(),
-                WorkspaceVersion::V5_BreakingMetadataChanges => panic!("Already of latest version"),
+                WorkspaceVersion::V5_BreakingMetadataChanges => self.upgrade_5_to_6(),
+                WorkspaceVersion::V6_DatasetRepositoryUnification => {
+                    panic!("Already of latest version")
+                }
                 WorkspaceVersion::Unknown(_) => {
                     Err(WorkspaceFutureVersionError::new(current_version, new_version).into())
                 }
@@ -254,6 +257,10 @@ impl WorkspaceService {
              of our releases.",
         )
         .into())
+    }
+
+    fn upgrade_5_to_6(&self) -> Result<(), WorkspaceUpgradeError> {
+        unimplemented!()
     }
 }
 
