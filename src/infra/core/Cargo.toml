@@ -142,13 +142,15 @@ libc = "0.2" # For getting uid:gid
 
 
 [dev-dependencies]
-kamu = { workspace = true, features = ["testing"] }
-kamu-accounts = { workspace = true, features = ["testing"] }
-kamu-core = { workspace = true, features = ["testing"] }
-kamu-datasets-services = { workspace = true, features = ["testing"] }
-kamu-datasets-inmem = { workspace = true }
-odf = { workspace = true, features = ["testing"] }
-test-utils = { workspace = true }
+kamu = { workspace = true, default-features = false, features = ["testing"] }
+kamu-accounts = { workspace = true, default-features = false, features = ["testing"] }
+kamu-accounts-inmem = { workspace = true, default-features = false }
+kamu-accounts-services = { workspace = true, default-features = false }
+kamu-core = { workspace = true, default-features = false, features = ["testing"] }
+kamu-datasets-services = { workspace = true, default-features = false, features = ["testing"] }
+kamu-datasets-inmem = { workspace = true, default-features = false }
+odf = { workspace = true, default-features = false, features = ["testing"] }
+test-utils = { workspace = true, default-features = false }
 
 bon = { version = "3", default-features = false }
 criterion = { version = "0.5", features = ["async_tokio"] }

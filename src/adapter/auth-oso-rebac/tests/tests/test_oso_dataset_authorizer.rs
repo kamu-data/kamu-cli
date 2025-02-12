@@ -42,7 +42,7 @@ async fn test_owner_can_read_and_write_private_dataset() {
     let harness =
         DatasetAuthorizerHarness::new(CurrentAccountSubjectTestHelper::logged("john")).await;
     let dataset_id = harness
-        .create_private_dataset(odf::metadata::testing::alias("john", "foo"))
+        .create_private_dataset(odf::metadata::testing::alias(&"john", &"foo"))
         .await;
 
     let read_result = harness
@@ -75,7 +75,7 @@ async fn test_owner_can_read_and_write_private_dataset() {
 async fn test_guest_can_read_but_not_write_public_dataset() {
     let harness = DatasetAuthorizerHarness::new(CurrentAccountSubjectTestHelper::anonymous()).await;
     let dataset_id = harness
-        .create_public_dataset(odf::metadata::testing::alias("john", "foo"))
+        .create_public_dataset(odf::metadata::testing::alias(&"john", &"foo"))
         .await;
 
     let read_result = harness

@@ -34,7 +34,6 @@ argon2 = { version = "0.5" }
 async-trait = { version = "0.1", default-features = false }
 chrono = { version = "0.4", default-features = false }
 dill = "0.11"
-futures = { version = "0.3", default-features = false }
 jsonwebtoken = "9"
 password-hash = { version = "0.5", default-features = false }
 serde = "1"
@@ -48,7 +47,6 @@ uuid = { version = "1", default-features = false }
 [dev-dependencies]
 kamu-accounts = { workspace = true, default-features = false, features = ["testing"] }
 kamu-accounts-inmem = { workspace = true }
-email-utils = { workspace = true }
 
 mockall = "0.13"
 test-log = { version = "0.2", features = ["trace"] }

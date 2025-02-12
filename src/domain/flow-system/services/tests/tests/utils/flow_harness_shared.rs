@@ -167,11 +167,10 @@ impl FlowHarness {
 
     pub async fn create_root_dataset(&self, dataset_alias: odf::DatasetAlias) -> odf::DatasetID {
         let dataset_id = odf::DatasetID::new_generated_ed25519().1;
-
-        let owner_id = match dataset_alias.account_name {
-            Some(acocunt_name) => odf::AccountID::new_seeded_ed25519(acocunt_name.as_bytes()),
-            None => odf::AccountID::new_seeded_ed25519(DEFAULT_ACCOUNT_NAME_STR.as_bytes()),
-        };
+        let owner_id = odf::metadata::testing::account_id_by_maybe_name(
+            &dataset_alias.account_name,
+            DEFAULT_ACCOUNT_NAME_STR,
+        );
 
         self.fake_dataset_entry_service.add_entry(DatasetEntry {
             created_at: self.fake_system_time_source.now(),
@@ -194,11 +193,10 @@ impl FlowHarness {
         input_ids: Vec<odf::DatasetID>,
     ) -> odf::DatasetID {
         let dataset_id = odf::DatasetID::new_generated_ed25519().1;
-
-        let owner_id = match dataset_alias.account_name {
-            Some(acocunt_name) => odf::AccountID::new_seeded_ed25519(acocunt_name.as_bytes()),
-            None => odf::AccountID::new_seeded_ed25519(DEFAULT_ACCOUNT_NAME_STR.as_bytes()),
-        };
+        let owner_id = odf::metadata::testing::account_id_by_maybe_name(
+            &dataset_alias.account_name,
+            DEFAULT_ACCOUNT_NAME_STR,
+        );
 
         self.fake_dataset_entry_service.add_entry(DatasetEntry {
             created_at: self.fake_system_time_source.now(),

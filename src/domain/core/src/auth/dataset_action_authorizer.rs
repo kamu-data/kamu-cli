@@ -217,7 +217,7 @@ where
 
 // TODO: Private Datasets: use classify_datasets_by_allowance() name
 //       after migration
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct ClassifyByAllowanceIdsResponse {
     pub authorized_ids: Vec<odf::DatasetID>,
     pub unauthorized_ids_with_errors: Vec<(odf::DatasetID, DatasetActionUnauthorizedError)>,

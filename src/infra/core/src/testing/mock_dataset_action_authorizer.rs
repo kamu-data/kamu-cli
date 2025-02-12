@@ -184,6 +184,37 @@ impl MockDatasetActionAuthorizer {
 
         self
     }
+
+    pub fn make_expect_classify_dataset_ids_by_allowance(
+        mut self,
+        action: DatasetAction,
+        times: usize,
+        authorized: HashSet<odf::DatasetID>,
+    ) -> Self {
+        self.expect_classify_dataset_ids_by_allowance()
+            .with(always(), eq(action))
+            .times(times)
+            .returning(move |dataset_ids, action| {
+                let res = dataset_ids.into_iter().fold(
+                    ClassifyByAllowanceIdsResponse::default(),
+                    |mut acc, dataset_id| {
+                        if authorized.contains(&dataset_id) {
+                            acc.authorized_ids.push(dataset_id);
+                        } else {
+                            let error = DatasetActionUnauthorizedError::not_enough_permissions(
+                                dataset_id.as_local_ref(),
+                                action,
+                            );
+                            acc.unauthorized_ids_with_errors.push((dataset_id, error));
+                        }
+                        acc
+                    },
+                );
+                Ok(res)
+            });
+
+        self
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

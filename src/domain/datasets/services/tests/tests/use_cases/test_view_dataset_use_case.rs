@@ -28,7 +28,7 @@ async fn test_try_to_view_a_nonexistent_dataset() {
         CurrentAccountSubjectTestHelper::logged("bob"),
     ];
 
-    let nonexistent_dataset_alias = odf::metadata::testing::alias("alice", "foo");
+    let nonexistent_dataset_alias = odf::metadata::testing::alias(&"alice", &"foo");
 
     for subject in subjects {
         let harness = ViewDatasetUseCaseHarness::new(subject);
@@ -65,7 +65,7 @@ async fn test_view_single_dataset() {
         ),
     ];
 
-    let dataset_alias = odf::metadata::testing::alias("alice", "foo");
+    let dataset_alias = odf::metadata::testing::alias(&"alice", &"foo");
 
     for (subject, expected_result) in subjects_with_expected_results {
         let harness = ViewDatasetUseCaseHarness::new(subject);
@@ -137,10 +137,12 @@ async fn test_view_multi_datasets() {
         ),
     ];
 
+    use odf::metadata::testing::alias;
+
     let dataset_aliases = [
-        odf::metadata::testing::alias("alice", "dataset-1"),
-        odf::metadata::testing::alias("alice", "dataset-2"),
-        odf::metadata::testing::alias("bob", "dataset-3"),
+        alias(&"alice", &"dataset-1"),
+        alias(&"alice", &"dataset-2"),
+        alias(&"bob", &"dataset-3"),
     ];
 
     for (subject, expected_result) in subjects_with_expected_results {
