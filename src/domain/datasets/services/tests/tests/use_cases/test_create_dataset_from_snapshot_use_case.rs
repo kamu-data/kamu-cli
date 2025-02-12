@@ -141,9 +141,9 @@ async fn test_create_derived_dataset_from_snapshot() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[oop::extend(BaseUseCaseHarness, base_harness)]
+#[oop::extend(BaseUseCaseHarness, base_use_case_harness)]
 struct CreateFromSnapshotUseCaseHarness {
-    base_harness: BaseUseCaseHarness,
+    base_use_case_harness: BaseUseCaseHarness,
     use_case: Arc<dyn CreateDatasetFromSnapshotUseCase>,
 }
 
@@ -153,10 +153,10 @@ impl CreateFromSnapshotUseCaseHarness {
         mock_dependency_graph_writer: MockDependencyGraphWriter,
         mock_outbox: MockOutbox,
     ) -> Self {
-        let base_harness =
+        let base_use_case_harness =
             BaseUseCaseHarness::new(BaseUseCaseHarnessOptions::new().with_outbox(mock_outbox));
 
-        let catalog = dill::CatalogBuilder::new_chained(base_harness.catalog())
+        let catalog = dill::CatalogBuilder::new_chained(base_use_case_harness.catalog())
             .add::<CreateDatasetFromSnapshotUseCaseImpl>()
             .add::<CreateDatasetUseCaseImpl>()
             .add_value(mock_dataset_entry_writer)
@@ -168,7 +168,7 @@ impl CreateFromSnapshotUseCaseHarness {
         let use_case = catalog.get_one().unwrap();
 
         Self {
-            base_harness,
+            base_use_case_harness,
             use_case,
         }
     }

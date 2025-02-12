@@ -240,9 +240,9 @@ async fn test_delete_dataset_respects_dangling_refs() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[oop::extend(BaseUseCaseHarness, base_harness)]
+#[oop::extend(BaseUseCaseHarness, base_use_case_harness)]
 struct DeleteUseCaseHarness {
-    base_harness: BaseUseCaseHarness,
+    base_use_case_harness: BaseUseCaseHarness,
     catalog: Catalog,
     use_case: Arc<dyn DeleteDatasetUseCase>,
     indexer: Arc<DependencyGraphIndexer>,
@@ -255,14 +255,14 @@ impl DeleteUseCaseHarness {
         mock_outbox: MockOutbox,
         maybe_mock_did_generator: Option<MockDidGenerator>,
     ) -> Self {
-        let base_harness = BaseUseCaseHarness::new(
+        let base_use_case_harness = BaseUseCaseHarness::new(
             BaseUseCaseHarnessOptions::new()
                 .with_maybe_authorizer(Some(mock_dataset_action_authorizer))
                 .with_outbox(mock_outbox)
                 .with_maybe_mock_did_generator(maybe_mock_did_generator),
         );
 
-        let catalog = dill::CatalogBuilder::new_chained(base_harness.catalog())
+        let catalog = dill::CatalogBuilder::new_chained(base_use_case_harness.catalog())
             .add::<DeleteDatasetUseCaseImpl>()
             .add::<DependencyGraphServiceImpl>()
             .add::<InMemoryDatasetDependencyRepository>()
@@ -275,7 +275,7 @@ impl DeleteUseCaseHarness {
         let indexer = catalog.get_one().unwrap();
 
         Self {
-            base_harness,
+            base_use_case_harness,
             catalog,
             use_case,
             indexer,

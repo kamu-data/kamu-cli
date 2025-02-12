@@ -124,9 +124,9 @@ async fn test_rename_dataset_unauthorized() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[oop::extend(BaseUseCaseHarness, base_harness)]
+#[oop::extend(BaseUseCaseHarness, base_use_case_harness)]
 struct RenameUseCaseHarness {
-    base_harness: BaseUseCaseHarness,
+    base_use_case_harness: BaseUseCaseHarness,
     use_case: Arc<dyn RenameDatasetUseCase>,
 }
 
@@ -136,13 +136,13 @@ impl RenameUseCaseHarness {
         mock_dataset_action_authorizer: MockDatasetActionAuthorizer,
         maybe_mock_did_generator: Option<MockDidGenerator>,
     ) -> Self {
-        let base_harness = BaseUseCaseHarness::new(
+        let base_use_case_harness = BaseUseCaseHarness::new(
             BaseUseCaseHarnessOptions::new()
                 .with_maybe_authorizer(Some(mock_dataset_action_authorizer))
                 .with_maybe_mock_did_generator(maybe_mock_did_generator),
         );
 
-        let catalog = dill::CatalogBuilder::new_chained(base_harness.catalog())
+        let catalog = dill::CatalogBuilder::new_chained(base_use_case_harness.catalog())
             .add::<RenameDatasetUseCaseImpl>()
             .add_value(mock_dataset_entry_writer)
             .bind::<dyn DatasetEntryWriter, MockDatasetEntryWriter>()
@@ -151,7 +151,7 @@ impl RenameUseCaseHarness {
         let use_case = catalog.get_one::<dyn RenameDatasetUseCase>().unwrap();
 
         Self {
-            base_harness,
+            base_use_case_harness,
             use_case,
         }
     }

@@ -71,7 +71,7 @@ async fn test_view_single_dataset() {
         let harness = ViewDatasetUseCaseHarness::new(subject);
 
         harness
-            .base_harness
+            .base_use_case_harness
             .create_root_dataset(&dataset_alias)
             .await;
 
@@ -148,7 +148,7 @@ async fn test_view_multi_datasets() {
 
         for dataset_alias in &dataset_aliases {
             harness
-                .base_harness
+                .base_use_case_harness
                 .create_root_dataset(dataset_alias)
                 .await;
         }
@@ -176,9 +176,9 @@ async fn test_view_multi_datasets() {
 // Harness
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[oop::extend(BaseUseCaseHarness, base_harness)]
+#[oop::extend(BaseUseCaseHarness, base_use_case_harness)]
 struct ViewDatasetUseCaseHarness {
-    base_harness: BaseUseCaseHarness,
+    base_use_case_harness: BaseUseCaseHarness,
     pub use_case: Arc<dyn ViewDatasetUseCase>,
 }
 
@@ -186,20 +186,20 @@ impl ViewDatasetUseCaseHarness {
     fn new(current_account_subject: CurrentAccountSubject) -> Self {
         let owner_account_name = current_account_subject.maybe_account_name().cloned();
 
-        let base_harness = BaseUseCaseHarness::new(
+        let base_use_case_harness = BaseUseCaseHarness::new(
             BaseUseCaseHarnessOptions::new()
                 .with_tenancy_config(TenancyConfig::MultiTenant)
                 .with_current_account_subject(current_account_subject),
         );
 
-        let catalog = dill::CatalogBuilder::new_chained(base_harness.catalog())
+        let catalog = dill::CatalogBuilder::new_chained(base_use_case_harness.catalog())
             .add::<ViewDatasetUseCaseImpl>()
             .add::<OwnerByAliasDatasetActionAuthorizer>()
             .add_value(owner_account_name)
             .build();
 
         Self {
-            base_harness,
+            base_use_case_harness,
             use_case: catalog.get_one().unwrap(),
         }
     }
