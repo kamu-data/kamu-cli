@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod current_account_subject_helper;
 mod mock_authentication_service;
 
+pub use current_account_subject_helper::*;
 pub use mock_authentication_service::*;

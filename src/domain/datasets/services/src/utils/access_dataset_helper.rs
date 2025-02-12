@@ -73,7 +73,7 @@ impl<'a> AccessDatasetHelper<'a> {
         action: DatasetAction,
     ) -> Result<AccessMultiDatasetResponse, InternalError> {
         let mut multi_result = AccessMultiDatasetResponse {
-            viewable_resolved_refs: Vec::with_capacity(dataset_refs.len()),
+            accessible_resolved_refs: Vec::with_capacity(dataset_refs.len()),
             inaccessible_refs: vec![],
         };
 
@@ -82,7 +82,7 @@ impl<'a> AccessDatasetHelper<'a> {
             match self.access_dataset(&dataset_ref, action).await {
                 Ok(handle) => {
                     multi_result
-                        .viewable_resolved_refs
+                        .accessible_resolved_refs
                         .push((dataset_ref, handle));
                 }
                 Err(e) => match e {
@@ -102,14 +102,14 @@ impl<'a> AccessDatasetHelper<'a> {
 
 #[derive(Debug)]
 pub(crate) struct AccessMultiDatasetResponse {
-    pub viewable_resolved_refs: Vec<(odf::DatasetRef, odf::DatasetHandle)>,
+    pub accessible_resolved_refs: Vec<(odf::DatasetRef, odf::DatasetHandle)>,
     pub inaccessible_refs: Vec<(odf::DatasetRef, DatasetAccessError)>,
 }
 
 impl From<AccessMultiDatasetResponse> for ViewMultiResponse {
     fn from(v: AccessMultiDatasetResponse) -> Self {
         Self {
-            viewable_resolved_refs: v.viewable_resolved_refs,
+            viewable_resolved_refs: v.accessible_resolved_refs,
             inaccessible_refs: v
                 .inaccessible_refs
                 .into_iter()
@@ -122,7 +122,7 @@ impl From<AccessMultiDatasetResponse> for ViewMultiResponse {
 impl From<AccessMultiDatasetResponse> for EditMultiResponse {
     fn from(v: AccessMultiDatasetResponse) -> Self {
         Self {
-            viewable_resolved_refs: v.viewable_resolved_refs,
+            editable_resolved_refs: v.accessible_resolved_refs,
             inaccessible_refs: v
                 .inaccessible_refs
                 .into_iter()

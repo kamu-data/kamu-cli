@@ -10,6 +10,7 @@
 use std::path::Path;
 use std::sync::Arc;
 
+use bon::bon;
 use dill::{Catalog, Component};
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::{
@@ -41,10 +42,13 @@ pub struct BaseRepoHarness {
     dataset_storage_unit_writer: Arc<dyn odf::DatasetStorageUnitWriter>,
 }
 
+#[bon]
 impl BaseRepoHarness {
+    #[builder]
     pub fn new(
         tenancy_config: TenancyConfig,
-        maybe_mock_did_generator: Option<MockDidGenerator>,
+        mock_did_generator: Option<MockDidGenerator>,
+        current_account_subject: Option<CurrentAccountSubject>,
     ) -> Self {
         let temp_dir = tempfile::tempdir().unwrap();
 
@@ -63,10 +67,15 @@ impl BaseRepoHarness {
                 .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
                 .bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
                 .add::<DatasetRegistrySoloUnitBridge>()
-                .add_value(CurrentAccountSubject::new_test())
                 .add::<SystemTimeSourceDefault>();
 
-            if let Some(mock_did_generator) = maybe_mock_did_generator {
+            if let Some(current_account_subject) = current_account_subject {
+                b.add_value(current_account_subject);
+            } else {
+                b.add_value(CurrentAccountSubject::new_test());
+            }
+
+            if let Some(mock_did_generator) = mock_did_generator {
                 b.add_value(mock_did_generator)
                     .bind::<dyn DidGenerator, MockDidGenerator>();
             } else {

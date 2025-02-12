@@ -686,7 +686,9 @@ impl DependencyGraphHarness {
         tenancy_config: TenancyConfig,
         mock_dataset_entry_writer: MockDatasetEntryWriter,
     ) -> Self {
-        let base_repo_harness = BaseRepoHarness::new(tenancy_config, None);
+        let base_repo_harness = BaseRepoHarness::builder()
+            .tenancy_config(tenancy_config)
+            .build();
 
         let mut b = dill::CatalogBuilder::new_chained(base_repo_harness.catalog());
         b.add_builder(

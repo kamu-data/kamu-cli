@@ -182,15 +182,15 @@ impl From<&DatasetHandle> for DatasetRef {
     }
 }
 
-impl std::cmp::Ord for DatasetRef {
+impl Ord for DatasetRef {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         let l = (self.account_name(), self.dataset_name(), self.id());
-        let r = (self.account_name(), self.dataset_name(), other.id());
+        let r = (other.account_name(), other.dataset_name(), other.id());
         l.cmp(&r)
     }
 }
 
-impl std::cmp::PartialOrd for DatasetRef {
+impl PartialOrd for DatasetRef {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
     }

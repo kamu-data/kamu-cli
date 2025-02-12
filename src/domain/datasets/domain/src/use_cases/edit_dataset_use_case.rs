@@ -13,7 +13,6 @@ use thiserror::Error;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// TODO: Private Datasets: tests
 #[async_trait::async_trait]
 pub trait EditDatasetUseCase: Send + Sync {
     async fn execute(
@@ -31,7 +30,7 @@ pub trait EditDatasetUseCase: Send + Sync {
 
 #[derive(Debug)]
 pub struct EditMultiResponse {
-    pub viewable_resolved_refs: Vec<(odf::DatasetRef, odf::DatasetHandle)>,
+    pub editable_resolved_refs: Vec<(odf::DatasetRef, odf::DatasetHandle)>,
     pub inaccessible_refs: Vec<(odf::DatasetRef, EditDatasetUseCaseError)>,
 }
 

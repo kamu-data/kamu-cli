@@ -168,7 +168,9 @@ struct WatermarkTestHarness {
 
 impl WatermarkTestHarness {
     fn new(tenancy_config: TenancyConfig) -> Self {
-        let base_repo_harness = BaseRepoHarness::new(tenancy_config, None);
+        let base_repo_harness = BaseRepoHarness::builder()
+            .tenancy_config(tenancy_config)
+            .build();
 
         let catalog = dill::CatalogBuilder::new_chained(base_repo_harness.catalog())
             .add::<RemoteAliasesRegistryImpl>()

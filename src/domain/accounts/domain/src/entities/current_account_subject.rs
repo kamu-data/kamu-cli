@@ -7,7 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::{DEFAULT_ACCOUNT_ID, DEFAULT_ACCOUNT_NAME};
+#[cfg(any(feature = "testing", test))]
+use crate::DEFAULT_ACCOUNT_ID;
+use crate::DEFAULT_ACCOUNT_NAME;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -48,6 +50,7 @@ impl CurrentAccountSubject {
         })
     }
 
+    #[cfg(any(feature = "testing", test))]
     pub fn new_test() -> Self {
         let is_admin = false;
 
@@ -73,6 +76,13 @@ impl CurrentAccountSubject {
                 panic!("Anonymous account misused");
             }
             CurrentAccountSubject::Logged(l) => &l.account_name,
+        }
+    }
+
+    pub fn maybe_account_name(&self) -> Option<&odf::AccountName> {
+        match self {
+            CurrentAccountSubject::Logged(l) => Some(&l.account_name),
+            CurrentAccountSubject::Anonymous(_) => None,
         }
     }
 
