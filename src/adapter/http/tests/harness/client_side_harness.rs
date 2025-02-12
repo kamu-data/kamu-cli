@@ -182,7 +182,9 @@ impl ClientSideHarness {
 
         let catalog = b.build();
 
-        init_on_startup::run_startup_jobs(&catalog).await.unwrap();
+        init_on_startup::run_startup_jobs(&catalog, init_on_startup::RunStartupJobOpts::default())
+            .await
+            .unwrap();
 
         Self {
             tempdir,

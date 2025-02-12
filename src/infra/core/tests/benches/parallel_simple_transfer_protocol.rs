@@ -88,7 +88,9 @@ async fn setup_dataset(
         .add::<SimpleTransferProtocol>()
         .build();
 
-    init_on_startup::run_startup_jobs(&catalog).await.unwrap();
+    init_on_startup::run_startup_jobs(&catalog, init_on_startup::RunStartupJobOpts::default())
+        .await
+        .unwrap();
 
     let sync_svc = catalog.get_one::<dyn SyncService>().unwrap();
     let sync_request_builder = catalog.get_one::<SyncRequestBuilder>().unwrap();

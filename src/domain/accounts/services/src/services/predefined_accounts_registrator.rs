@@ -31,6 +31,7 @@ pub struct PredefinedAccountsRegistrator {
     job_name: JOB_KAMU_ACCOUNTS_PREDEFINED_ACCOUNTS_REGISTRATOR,
     depends_on: &[],
     requires_transaction: true,
+    requires_up_to_date_storage: false,
 })]
 impl PredefinedAccountsRegistrator {
     pub fn new(

@@ -78,7 +78,9 @@ impl Harness {
             b.build()
         };
 
-        init_on_startup::run_startup_jobs(&catalog).await.unwrap();
+        init_on_startup::run_startup_jobs(&catalog, init_on_startup::RunStartupJobOpts::default())
+            .await
+            .unwrap();
 
         let authentication_service = catalog.get_one::<AuthenticationServiceImpl>().unwrap();
 
