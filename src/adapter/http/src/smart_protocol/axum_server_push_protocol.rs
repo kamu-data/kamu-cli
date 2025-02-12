@@ -14,9 +14,9 @@ use std::time::Duration;
 use database_common::DatabaseTransactionRunner;
 use dill::Catalog;
 use internal_error::ErrorIntoInternal;
-use kamu_core::{
+use kamu_core::CorruptedSourceError;
+use kamu_datasets::{
     AppendDatasetMetadataBatchUseCase,
-    CorruptedSourceError,
     CreateDatasetUseCase,
     CreateDatasetUseCaseOptions,
 };

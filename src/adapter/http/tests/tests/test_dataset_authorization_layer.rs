@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::future::IntoFuture;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::str::FromStr;
 
@@ -14,20 +15,20 @@ use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use dill::{CatalogBuilder, Component};
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu::domain::auth::DatasetAction;
-use kamu::domain::CreateDatasetUseCase;
 use kamu::testing::MockDatasetActionAuthorizer;
-use kamu::{
-    CreateDatasetUseCaseImpl,
-    DatasetRegistrySoloUnitBridge,
-    DatasetStorageUnitLocalFs,
-    DatasetStorageUnitWriter,
-};
+use kamu::DatasetStorageUnitLocalFs;
 use kamu_accounts::testing::MockAuthenticationService;
 use kamu_accounts::*;
-use kamu_core::auth::DatasetActionUnauthorizedError;
+use kamu_accounts_inmem::InMemoryAccountRepository;
+use kamu_accounts_services::AccountServiceImpl;
 use kamu_core::{DidGenerator, MockDidGenerator, TenancyConfig};
-use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
-use kamu_datasets_services::DependencyGraphServiceImpl;
+use kamu_datasets::CreateDatasetUseCase;
+use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEntryRepository};
+use kamu_datasets_services::{
+    CreateDatasetUseCaseImpl,
+    DatasetEntryServiceImpl,
+    DependencyGraphServiceImpl,
+};
 use messaging_outbox::DummyOutboxImpl;
 use mockall::predicate::{eq, function};
 use odf::metadata::testing::MetadataFactory;
@@ -204,7 +205,7 @@ const UNSAFE_METHODS: [http::Method; 4] = [
 
 #[allow(dead_code)]
 struct ServerHarness {
-    server: axum::serve::Serve<axum::routing::IntoMakeService<axum::Router>, axum::Router>,
+    server_future: Box<dyn std::future::Future<Output = Result<(), std::io::Error>> + Unpin>,
     local_addr: SocketAddr,
     _temp_dir: tempfile::TempDir,
 }
@@ -243,15 +244,25 @@ impl ServerHarness {
                         .with_root(datasets_dir),
                 )
                 .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
-                .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
-                .add::<DatasetRegistrySoloUnitBridge>()
+                .bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
                 .add::<CreateDatasetUseCaseImpl>()
-                .add::<DatabaseTransactionRunner>();
+                .add::<DatabaseTransactionRunner>()
+                .add::<DatasetEntryServiceImpl>()
+                .add::<InMemoryDatasetEntryRepository>()
+                .add::<AccountServiceImpl>()
+                .add::<InMemoryAccountRepository>();
 
             NoOpDatabasePlugin::init_database_components(&mut b);
 
             b.build()
         };
+
+        base_catalog
+            .get_one::<dyn AccountRepository>()
+            .unwrap()
+            .create_account(&Account::dummy())
+            .await
+            .unwrap();
 
         let catalog_system = CatalogBuilder::new_chained(&base_catalog)
             .add_value(CurrentAccountSubject::new_test())
@@ -307,10 +318,10 @@ impl ServerHarness {
         let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
         let local_addr = listener.local_addr().unwrap();
 
-        let server = axum::serve(listener, app.into_make_service());
+        let server_future = Box::new(axum::serve(listener, app.into_make_service()).into_future());
 
         Self {
-            server,
+            server_future,
             local_addr,
             _temp_dir: temp_dir,
         }
@@ -342,7 +353,7 @@ impl ServerHarness {
     }
 
     pub async fn api_server_run(self) -> Result<(), InternalError> {
-        self.server.await.int_err()
+        self.server_future.await.int_err()
     }
 
     pub async fn check_access(

@@ -17,6 +17,7 @@ use futures::TryStreamExt;
 use headers::Header as _;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_core::*;
+use odf::dataset::MetadataChainExt;
 use tar::Header;
 use thiserror::Error;
 use url::Url;
@@ -79,11 +80,7 @@ pub async fn prepare_dataset_transfer_plan(
     while let Some((hash, block)) = block_stream.try_next().await? {
         blocks_count += 1;
 
-        bytes_in_blocks += metadata_chain
-            .as_metadata_block_repository()
-            .get_block_size(&hash)
-            .await
-            .int_err()?;
+        bytes_in_blocks += metadata_chain.get_block_size(&hash).await.int_err()?;
 
         match block.event {
             odf::MetadataEvent::AddData(add_data) => {
@@ -152,11 +149,7 @@ pub async fn prepare_dataset_metadata_batch(
     for (hash, _) in blocks_for_transfer.iter().rev() {
         num_blocks += 1;
 
-        let block_bytes: Bytes = metadata_chain
-            .as_metadata_block_repository()
-            .get_block_data(hash)
-            .await
-            .int_err()?;
+        let block_bytes: Bytes = metadata_chain.get_block_bytes(hash).await.int_err()?;
 
         let block_data: &[u8] = &block_bytes;
 

@@ -9,11 +9,19 @@
 
 use async_graphql::value;
 use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
+use dill::Component;
 use indoc::indoc;
 use kamu_accounts::testing::{MockAuthenticationService, DUMMY_LOGIN_METHOD};
-use kamu_accounts::{AuthenticationService, DEFAULT_ACCOUNT_ID, DEFAULT_ACCOUNT_NAME_STR};
+use kamu_accounts::{
+    AccessTokenLifecycleMessage,
+    AuthenticationService,
+    DEFAULT_ACCOUNT_ID,
+    DEFAULT_ACCOUNT_NAME_STR,
+    MESSAGE_PRODUCER_KAMU_ACCESS_TOKEN_SERVICE,
+};
 use kamu_accounts_inmem::InMemoryAccessTokenRepository;
 use kamu_accounts_services::AccessTokenServiceImpl;
+use messaging_outbox::{register_message_dispatcher, Outbox, OutboxImmediateImpl};
 use time_source::SystemTimeSourceDefault;
 
 use crate::utils::authentication_catalogs;
@@ -347,9 +355,18 @@ impl AuthGQLHarness {
                 .add::<SystemTimeSourceDefault>()
                 .add::<AccessTokenServiceImpl>()
                 .add::<InMemoryAccessTokenRepository>()
+                .add_builder(
+                    messaging_outbox::OutboxImmediateImpl::builder()
+                        .with_consumer_filter(messaging_outbox::ConsumerFilter::AllConsumers),
+                )
+                .bind::<dyn Outbox, OutboxImmediateImpl>()
                 .add::<DatabaseTransactionRunner>();
 
             NoOpDatabasePlugin::init_database_components(&mut b);
+            register_message_dispatcher::<AccessTokenLifecycleMessage>(
+                &mut b,
+                MESSAGE_PRODUCER_KAMU_ACCESS_TOKEN_SERVICE,
+            );
 
             b.build()
         };

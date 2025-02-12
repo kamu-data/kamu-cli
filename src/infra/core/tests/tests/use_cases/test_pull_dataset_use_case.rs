@@ -11,15 +11,13 @@ use std::assert_matches::assert_matches;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
-use kamu::testing::*;
+use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions, *};
 use kamu::*;
 use kamu_core::auth::DatasetAction;
 use kamu_core::*;
 use odf::dataset::{DatasetFactoryImpl, IpfsGateway};
 use tempfile::TempDir;
 use url::Url;
-
-use super::{BaseUseCaseHarness, BaseUseCaseHarnessOptions};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -680,6 +678,7 @@ impl PullUseCaseHarness {
             .bind::<dyn SyncService, MockSyncService>()
             .add::<SyncRequestBuilder>()
             .add::<DatasetFactoryImpl>()
+            .add::<RemoteAliasResolverImpl>()
             .add::<RemoteAliasesRegistryImpl>()
             .add_value(RemoteRepositoryRegistryImpl::create(repos_dir).unwrap())
             .bind::<dyn RemoteRepositoryRegistry, RemoteRepositoryRegistryImpl>()

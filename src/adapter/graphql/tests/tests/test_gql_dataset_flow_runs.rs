@@ -16,37 +16,32 @@ use dill::Component;
 use futures::TryStreamExt;
 use indoc::indoc;
 use kamu::testing::MockDatasetChangesService;
-use kamu::{
-    CreateDatasetFromSnapshotUseCaseImpl,
-    DatasetStorageUnitLocalFs,
-    DatasetStorageUnitWriter,
-    MetadataQueryServiceImpl,
-    ViewDatasetUseCaseImpl,
-};
+use kamu::{DatasetStorageUnitLocalFs, MetadataQueryServiceImpl};
 use kamu_accounts::{
     CurrentAccountSubject,
-    JwtAuthenticationConfig,
     LoggedAccount,
     DEFAULT_ACCOUNT_ID,
     DEFAULT_ACCOUNT_NAME_STR,
 };
-use kamu_accounts_inmem::InMemoryAccessTokenRepository;
-use kamu_accounts_services::{AccessTokenServiceImpl, AuthenticationServiceImpl};
 use kamu_core::{
     auth,
     CompactionResult,
-    CreateDatasetFromSnapshotUseCase,
     DatasetChangesService,
     DatasetIntervalIncrement,
-    DatasetLifecycleMessage,
     DidGeneratorDefault,
     PullResult,
     ResetResult,
     TenancyConfig,
-    MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
 };
+use kamu_datasets::CreateDatasetFromSnapshotUseCase;
 use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEntryRepository};
-use kamu_datasets_services::{DatasetEntryServiceImpl, DependencyGraphServiceImpl};
+use kamu_datasets_services::{
+    CreateDatasetFromSnapshotUseCaseImpl,
+    CreateDatasetUseCaseImpl,
+    DatasetEntryServiceImpl,
+    DependencyGraphServiceImpl,
+    ViewDatasetUseCaseImpl,
+};
 use kamu_flow_system::{
     Flow,
     FlowAgentConfig,
@@ -440,6 +435,7 @@ async fn test_trigger_reset_root_dataset_flow() {
 
     let create_root_result = harness.create_root_dataset().await;
 
+    use odf::dataset::MetadataChainExt;
     let root_dataset_blocks: Vec<_> = create_root_result
         .dataset
         .as_metadata_chain()
@@ -640,6 +636,8 @@ async fn test_trigger_reset_root_dataset_flow_with_invalid_head() {
             }
         })
     );
+
+    use odf::dataset::MetadataChainExt;
 
     let root_dataset_blocks: Vec<_> = create_root_result
         .dataset
@@ -3087,7 +3085,6 @@ async fn test_config_snapshot_returned_correctly() {
 
 struct FlowRunsHarness {
     _tempdir: tempfile::TempDir,
-    _catalog_base: dill::Catalog,
     catalog_anonymous: dill::Catalog,
     catalog_authorized: dill::Catalog,
 }
@@ -3117,9 +3114,10 @@ impl FlowRunsHarness {
             .add_value(TenancyConfig::SingleTenant)
             .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
             .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
-            .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
+            .bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
             .add::<MetadataQueryServiceImpl>()
             .add::<CreateDatasetFromSnapshotUseCaseImpl>()
+            .add::<CreateDatasetUseCaseImpl>()
             .add::<ViewDatasetUseCaseImpl>()
             .add_value(dataset_changes_mock)
             .bind::<dyn DatasetChangesService, MockDatasetChangesService>()
@@ -3136,10 +3134,6 @@ impl FlowRunsHarness {
             ))
             .add::<TaskSchedulerImpl>()
             .add::<InMemoryTaskEventStore>()
-            .add::<AuthenticationServiceImpl>()
-            .add::<AccessTokenServiceImpl>()
-            .add::<InMemoryAccessTokenRepository>()
-            .add_value(JwtAuthenticationConfig::default())
             .add::<DatasetEntryServiceImpl>()
             .add::<InMemoryDatasetEntryRepository>()
             .add::<DatabaseTransactionRunner>();
@@ -3147,10 +3141,6 @@ impl FlowRunsHarness {
             NoOpDatabasePlugin::init_database_components(&mut b);
             kamu_flow_system_services::register_dependencies(&mut b);
 
-            register_message_dispatcher::<DatasetLifecycleMessage>(
-                &mut b,
-                MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
-            );
             register_message_dispatcher::<ts::TaskProgressMessage>(
                 &mut b,
                 ts::MESSAGE_PRODUCER_KAMU_TASK_AGENT,
@@ -3172,7 +3162,6 @@ impl FlowRunsHarness {
 
         Self {
             _tempdir: tempdir,
-            _catalog_base: catalog_base,
             catalog_anonymous,
             catalog_authorized,
         }

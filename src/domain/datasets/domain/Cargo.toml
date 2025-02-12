@@ -30,12 +30,14 @@ testing = ["dep:mockall"]
 [dependencies]
 database-common = { workspace = true }
 internal-error = { workspace = true }
+messaging-outbox = { workspace = true }
 odf = { workspace = true }
 
 aes-gcm = { version = "0.10.3" }
 async-trait = { version = "0.1", default-features = false }
 chrono = { version = "0.4", default-features = false }
 futures = { version = "0.3", default-features = false }
+itertools = "0.14"
 merge = "0.1"
 secrecy = "0.10"
 serde = "1"
@@ -52,4 +54,3 @@ mockall = { optional = true, version = "0.13", default-features = false }
 
 
 [dev-dependencies]
-mockall = { version = "0.13", default-features = false }

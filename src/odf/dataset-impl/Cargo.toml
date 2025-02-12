@@ -43,6 +43,7 @@ s3-utils = { workspace = true }
 
 async-stream = "0.3"
 async-trait = "0.1"
+bytes = "1"
 chrono = { version = "0.4", default-features = false}
 dill = { version = "0.11", default-features = false }
 http = { version = "1", default-features = false }

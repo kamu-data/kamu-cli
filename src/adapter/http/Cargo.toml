@@ -36,6 +36,7 @@ http-common = { workspace = true }
 # TODO: Adapters should depend only on kamu-domain crate and be implementation-agnostic
 kamu = { workspace = true }
 kamu-accounts = { workspace = true }
+kamu-datasets = { workspace = true }
 kamu-core = { workspace = true, features = ["utoipa"] }
 odf = { workspace = true, features = ["http", "lfs", "s3", "utoipa"] }
 s3-utils = { workspace = true }
@@ -43,14 +44,17 @@ time-source = { workspace = true }
 
 aws-sdk-s3 = { version = "1" }
 
-axum = { version = "0.7", features = ["ws", "multipart"] }
-axum-extra = { version = "0.9", features = ["async-read-body", "typed-header"] }
+axum = { version = "0.8", features = ["ws", "multipart"] }
+axum-extra = { version = "0.10", features = [
+    "async-read-body",
+    "typed-header",
+] }
 async-trait = "0.1"
 base64 = { version = "0.22", default-features = false }
 bytes = "1"
 canonical_json = { version = "0.5.0", default-features = false }
 chrono = { version = "0.4", features = ["serde"] }
-datafusion = { version = "44", default-features = false } # TODO: Currently needed for type conversions but ideally should be encapsulated by kamu-core
+datafusion = { version = "45", default-features = false } # TODO: Currently needed for type conversions but ideally should be encapsulated by kamu-core
 dill = "0.11"
 ed25519-dalek = { version = "2", default-features = false, features = [
     "std",
@@ -91,8 +95,8 @@ tokio-tungstenite = { version = "0.26", features = [
 tower = "0.5"
 tracing = "0.1"
 url = { version = "2", features = ["serde"] }
-utoipa = { version = "=5.3.0", default-features = false, features = [] }
-utoipa-axum = { version = "=0.1.3", default-features = false, features = [] }
+utoipa = { version = "5", default-features = false, features = [] }
+utoipa-axum = { version = "0.2", default-features = false, features = [] }
 uuid = { version = "1", default-features = false, features = ["v4"] }
 
 # Optional

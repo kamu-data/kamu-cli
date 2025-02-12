@@ -22,6 +22,7 @@ use kamu::testing::DatasetDataHelper;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::auth;
+use odf::dataset::testing::create_test_dataset_fron_snapshot;
 use odf::metadata::testing::MetadataFactory;
 use s3_utils::S3Context;
 use test_utils::LocalS3Server;
@@ -1081,8 +1082,9 @@ async fn test_dataset_keep_metadata_only_compact() {
 
 struct CompactTestHarness {
     _temp_dir: tempfile::TempDir,
+    did_generator: Arc<dyn DidGenerator>,
     dataset_registry: Arc<dyn DatasetRegistry>,
-    dataset_storage_unit_writer: Arc<dyn DatasetStorageUnitWriter>,
+    dataset_storage_unit_writer: Arc<dyn odf::DatasetStorageUnitWriter>,
     compaction_planner: Arc<dyn CompactionPlanner>,
     compaction_executor: Arc<dyn CompactionExecutor>,
     push_ingest_planner: Arc<dyn PushIngestPlanner>,
@@ -1113,7 +1115,7 @@ impl CompactTestHarness {
             .add_value(TenancyConfig::SingleTenant)
             .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
             .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
-            .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
+            .bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
             .add::<DatasetRegistrySoloUnitBridge>()
             .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
             .add_value(SystemTimeSourceStub::new_set(current_date_time))
@@ -1139,6 +1141,7 @@ impl CompactTestHarness {
 
         Self {
             _temp_dir: temp_dir,
+            did_generator: catalog.get_one().unwrap(),
             dataset_registry: catalog.get_one().unwrap(),
             dataset_storage_unit_writer: catalog.get_one().unwrap(),
             compaction_planner: catalog.get_one().unwrap(),
@@ -1165,7 +1168,7 @@ impl CompactTestHarness {
             .add_value(TenancyConfig::SingleTenant)
             .add_builder(DatasetStorageUnitS3::builder().with_s3_context(s3_context.clone()))
             .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitS3>()
-            .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitS3>()
+            .bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitS3>()
             .add::<DatasetRegistrySoloUnitBridge>()
             .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
             .add_value(SystemTimeSourceStub::new_set(current_date_time))
@@ -1193,6 +1196,7 @@ impl CompactTestHarness {
 
         Self {
             _temp_dir: temp_dir,
+            did_generator: catalog.get_one().unwrap(),
             dataset_registry: catalog.get_one().unwrap(),
             dataset_storage_unit_writer: catalog.get_one().unwrap(),
             compaction_planner: catalog.get_one().unwrap(),
@@ -1228,6 +1232,7 @@ impl CompactTestHarness {
             .unwrap();
         let head = self.get_dataset_head(dataset_ref).await;
 
+        use odf::dataset::MetadataChainExt;
         resolved_dataset
             .as_metadata_chain()
             .iter_blocks_interval(&head, None, false)
@@ -1241,11 +1246,15 @@ impl CompactTestHarness {
         &self,
         dataset_snapshot: odf::DatasetSnapshot,
     ) -> odf::CreateDatasetResult {
-        self.dataset_storage_unit_writer
-            .create_dataset_from_snapshot(dataset_snapshot)
-            .await
-            .unwrap()
-            .create_dataset_result
+        create_test_dataset_fron_snapshot(
+            self.dataset_registry.as_ref(),
+            self.dataset_storage_unit_writer.as_ref(),
+            dataset_snapshot,
+            self.did_generator.generate_dataset_id(),
+            self.current_date_time,
+        )
+        .await
+        .unwrap()
     }
 
     async fn create_test_root_dataset(&self) -> odf::CreateDatasetResult {

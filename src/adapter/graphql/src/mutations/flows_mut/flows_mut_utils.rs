@@ -7,9 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_core::{DatasetRegistry, ViewDatasetUseCase};
+use kamu_core::DatasetRegistry;
+use kamu_datasets::ViewDatasetUseCase;
 use kamu_flow_system as fs;
-use odf::metadata::TransformInputExt;
 
 use super::FlowNotFound;
 use crate::prelude::*;
@@ -79,7 +79,7 @@ pub(crate) async fn ensure_expected_dataset_kind(
     let dataset_flow_type: kamu_flow_system::DatasetFlowType = dataset_flow_type.into();
     match dataset_flow_type.dataset_kind_restriction() {
         Some(expected_kind) => {
-            let resolved_dataset = utils::get_dataset(ctx, dataset_handle)?;
+            let resolved_dataset = utils::get_dataset(ctx, dataset_handle);
 
             let dataset_kind = resolved_dataset
                 .get_summary(odf::dataset::GetSummaryOpts::default())
@@ -135,20 +135,23 @@ pub(crate) async fn ensure_flow_preconditions(
 
             match source_res {
                 Some((_, set_transform_block)) => {
-                    let mut inputs_dataset_refs =
-                        Vec::with_capacity(set_transform_block.event.inputs.len());
-                    for input in set_transform_block.event.inputs {
-                        let input_dataset_ref = input.as_sanitized_dataset_ref()?;
-                        inputs_dataset_refs.push(input_dataset_ref);
-                    }
+                    let set_transform = set_transform_block.event;
+                    let inputs_dataset_refs = set_transform
+                        .inputs
+                        .iter()
+                        .map(|input| input.dataset_ref.clone())
+                        .collect::<Vec<_>>();
 
                     let view_result = view_dataset_use_case
                         .execute_multi(inputs_dataset_refs)
                         .await?;
 
                     if !view_result.inaccessible_refs.is_empty() {
+                        let dataset_ref_alias_map = set_transform.as_dataset_ref_alias_map();
+
                         return Ok(Some(FlowPreconditionsNotMet {
-                            preconditions: view_result.into_inaccessible_input_datasets_message(),
+                            preconditions: view_result
+                                .into_inaccessible_input_datasets_message(&dataset_ref_alias_map),
                         }));
                     }
                 }

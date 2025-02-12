@@ -30,7 +30,8 @@ async fn test_smart_push_new_dataset_unauthenticated() {
         ClientSideHarness::new(ClientSideHarnessOptions {
             tenancy_config: TenancyConfig::SingleTenant,
             authenticated_remotely: false,
-        }),
+        })
+        .await,
         ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
             tenancy_config: TenancyConfig::MultiTenant,
             authorized_writes: true,
@@ -76,7 +77,8 @@ async fn test_smart_push_new_dataset_wrong_user() {
         ClientSideHarness::new(ClientSideHarnessOptions {
             tenancy_config: TenancyConfig::SingleTenant,
             authenticated_remotely: true,
-        }),
+        })
+        .await,
         ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
             tenancy_config: TenancyConfig::MultiTenant,
             authorized_writes: true,
@@ -127,7 +129,8 @@ async fn test_smart_push_existing_dataset_unauthenticated() {
         ClientSideHarness::new(ClientSideHarnessOptions {
             tenancy_config: TenancyConfig::SingleTenant,
             authenticated_remotely: false,
-        }),
+        })
+        .await,
         ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
             tenancy_config: TenancyConfig::MultiTenant,
             authorized_writes: false,
@@ -168,7 +171,8 @@ async fn test_smart_push_existing_dataset_unauthorized() {
         ClientSideHarness::new(ClientSideHarnessOptions {
             tenancy_config: TenancyConfig::SingleTenant,
             authenticated_remotely: true,
-        }),
+        })
+        .await,
         ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
             tenancy_config: TenancyConfig::MultiTenant,
             authorized_writes: false,
@@ -209,7 +213,8 @@ async fn test_smart_push_existing_ref_collision() {
         ClientSideHarness::new(ClientSideHarnessOptions {
             tenancy_config: TenancyConfig::MultiTenant,
             authenticated_remotely: true,
-        }),
+        })
+        .await,
         ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
             tenancy_config: TenancyConfig::MultiTenant,
             authorized_writes: true,
@@ -250,7 +255,8 @@ async fn test_smart_push_incompatible_version_err() {
         ClientSideHarness::new(ClientSideHarnessOptions {
             tenancy_config: TenancyConfig::MultiTenant,
             authenticated_remotely: true,
-        }),
+        })
+        .await,
         ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
             tenancy_config: TenancyConfig::MultiTenant,
             authorized_writes: true,

@@ -19,10 +19,13 @@ use internal_error::{InternalError, ResultIntoInternal};
 use kamu::domain::*;
 use kamu::utils::simple_transfer_protocol::SimpleTransferProtocol;
 use kamu::*;
-use kamu_accounts::CurrentAccountSubject;
+use kamu_accounts::*;
+use kamu_accounts_inmem::InMemoryAccountRepository;
+use kamu_accounts_services::*;
 use kamu_adapter_http::{OdfSmtpVersion, SmartTransferProtocolClientWs};
-use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
-use kamu_datasets_services::{DatasetKeyValueServiceSysEnv, DependencyGraphServiceImpl};
+use kamu_datasets::*;
+use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEntryRepository};
+use kamu_datasets_services::*;
 use messaging_outbox::DummyOutboxImpl;
 use odf::dataset::{DatasetFactoryImpl, DatasetLayout, IpfsGateway};
 use tempfile::TempDir;
@@ -53,7 +56,7 @@ pub(crate) struct ClientSideHarnessOptions {
 }
 
 impl ClientSideHarness {
-    pub fn new(options: ClientSideHarnessOptions) -> Self {
+    pub async fn new(options: ClientSideHarnessOptions) -> Self {
         let tempdir = tempfile::tempdir().unwrap();
         let datasets_dir = tempdir.path().join("datasets");
         std::fs::create_dir(&datasets_dir).unwrap();
@@ -77,11 +80,27 @@ impl ClientSideHarness {
         b.add::<DependencyGraphServiceImpl>();
         b.add::<InMemoryDatasetDependencyRepository>();
 
-        b.add_value(CurrentAccountSubject::logged(
-            odf::AccountID::new_seeded_ed25519(CLIENT_ACCOUNT_NAME.as_bytes()),
-            odf::AccountName::new_unchecked(CLIENT_ACCOUNT_NAME),
-            false,
-        ));
+        match options.tenancy_config {
+            TenancyConfig::SingleTenant => {
+                b.add_value(CurrentAccountSubject::new_test());
+                b.add_value(PredefinedAccountsConfig::single_tenant());
+            }
+            TenancyConfig::MultiTenant => {
+                b.add_value(CurrentAccountSubject::logged(
+                    odf::AccountID::new_seeded_ed25519(CLIENT_ACCOUNT_NAME.as_bytes()),
+                    odf::AccountName::new_unchecked(CLIENT_ACCOUNT_NAME),
+                    false,
+                ));
+
+                let mut predefined_accounts_config = PredefinedAccountsConfig::new();
+                predefined_accounts_config
+                    .predefined
+                    .push(AccountConfig::test_config_from_name(
+                        odf::AccountName::new_unchecked(CLIENT_ACCOUNT_NAME),
+                    ));
+                b.add_value(predefined_accounts_config);
+            }
+        }
 
         b.add::<auth::AlwaysHappyDatasetActionAuthorizer>();
 
@@ -98,8 +117,7 @@ impl ClientSideHarness {
 
         b.add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
             .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
-            .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
-            .add::<DatasetRegistrySoloUnitBridge>();
+            .bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>();
 
         b.add::<RemoteRepositoryRegistryImpl>();
 
@@ -147,6 +165,13 @@ impl ClientSideHarness {
         b.add::<PushDatasetUseCaseImpl>();
         b.add::<ViewDatasetUseCaseImpl>();
 
+        b.add::<DatasetEntryServiceImpl>();
+        b.add::<InMemoryDatasetEntryRepository>();
+        b.add::<AccountServiceImpl>();
+        b.add::<InMemoryAccountRepository>();
+        b.add::<LoginPasswordAuthProvider>();
+        b.add::<PredefinedAccountsRegistrator>();
+
         b.add_value(ContainerRuntime::default());
         b.add_value(kamu::utils::ipfs_wrapper::IpfsClient::default());
         b.add_value(IpfsGateway::default());
@@ -155,20 +180,21 @@ impl ClientSideHarness {
 
         let catalog = b.build();
 
-        let pull_dataset_use_case = catalog.get_one::<dyn PullDatasetUseCase>().unwrap();
-        let push_dataset_use_case = catalog.get_one::<dyn PushDatasetUseCase>().unwrap();
-        let access_token_resolver = catalog
-            .get_one::<dyn odf::dataset::OdfServerAccessTokenResolver>()
-            .unwrap();
+        init_on_startup::run_startup_jobs(&catalog).await.unwrap();
 
         Self {
             tempdir,
+            pull_dataset_use_case: catalog.get_one().unwrap(),
+            push_dataset_use_case: catalog.get_one().unwrap(),
+            access_token_resolver: catalog.get_one().unwrap(),
             catalog,
-            pull_dataset_use_case,
-            push_dataset_use_case,
-            access_token_resolver,
             options,
         }
+    }
+
+    pub fn client_account_id(&self) -> odf::AccountID {
+        let subject = self.catalog.get_one::<CurrentAccountSubject>().unwrap();
+        subject.account_id().clone()
     }
 
     pub fn operating_account_name(&self) -> Option<odf::AccountName> {
@@ -182,7 +208,7 @@ impl ClientSideHarness {
     }
 
     pub fn dataset_registry(&self) -> Arc<dyn DatasetRegistry> {
-        self.catalog.get_one::<dyn DatasetRegistry>().unwrap()
+        self.catalog.get_one().unwrap()
     }
 
     pub fn create_dataset_from_snapshot(&self) -> Arc<dyn CreateDatasetFromSnapshotUseCase> {
@@ -198,11 +224,15 @@ impl ClientSideHarness {
     }
 
     pub fn compaction_planner(&self) -> Arc<dyn CompactionPlanner> {
-        self.catalog.get_one::<dyn CompactionPlanner>().unwrap()
+        self.catalog.get_one().unwrap()
     }
 
     pub fn compaction_executor(&self) -> Arc<dyn CompactionExecutor> {
-        self.catalog.get_one::<dyn CompactionExecutor>().unwrap()
+        self.catalog.get_one().unwrap()
+    }
+
+    pub fn dataset_entry_writer(&self) -> Arc<dyn DatasetEntryWriter> {
+        self.catalog.get_one().unwrap()
     }
 
     // TODO: accept alias or handle

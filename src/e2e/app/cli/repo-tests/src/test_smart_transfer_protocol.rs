@@ -99,7 +99,7 @@ pub async fn test_simple_push_to_s3_smart_pull_mt_mt(kamu: KamuCliPuppet) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-test_smart_transfer_protocol_permutations!(test_smart_push_to_registered_repo_smart_pull);
+test_smart_transfer_protocol_permutations!(test_smart_push_pull_with_registered_repo_smart_pull);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Implementations
@@ -1328,7 +1328,7 @@ async fn test_simple_push_to_s3_smart_pull(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-async fn test_smart_push_to_registered_repo_smart_pull(
+async fn test_smart_push_pull_with_registered_repo_smart_pull(
     mut kamu_api_server_client: KamuApiServerClient,
     is_push_workspace_multi_tenant: bool,
     is_pull_workspace_multi_tenant: bool,
@@ -1379,7 +1379,7 @@ async fn test_smart_push_to_registered_repo_smart_pull(
             .await
             .success();
 
-        // 2.3. Push the dataset to the API server without too argument
+        // 2.3. Push the dataset to the API server without to argument
         kamu_in_push_workspace
             .assert_success_command_execution(
                 [
@@ -1399,9 +1399,32 @@ async fn test_smart_push_to_registered_repo_smart_pull(
         let kamu_in_pull_workspace =
             KamuCliPuppet::new_workspace_tmp(is_pull_workspace_multi_tenant).await;
 
+        // 3.2. Login to the API server
+        // It will register new repo
+        kamu_in_pull_workspace
+            .execute([
+                "login",
+                kamu_api_server_client.get_base_url().as_str(),
+                "--access-token",
+                token.as_str(),
+            ])
+            .await
+            .success();
+
+        // ToDo: fix this behavior in scope of separation of pull and update commands
+        let dataset_ref = if is_pull_workspace_multi_tenant {
+            kamu_api_server_dataset_endpoint.as_str()
+        } else {
+            &format!(
+                "{}/{}",
+                kamu_api_server_client.get_base_url().host_str().unwrap(),
+                dataset_alias.dataset_name
+            )
+        };
+
         kamu_in_pull_workspace
             .assert_success_command_execution(
-                ["pull", kamu_api_server_dataset_endpoint.as_str()],
+                ["pull", dataset_ref],
                 None,
                 Some([r#"1 dataset\(s\) updated"#]),
             )

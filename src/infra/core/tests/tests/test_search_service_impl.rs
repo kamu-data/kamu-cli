@@ -15,11 +15,13 @@ use kamu::testing::*;
 use kamu::utils::simple_transfer_protocol::SimpleTransferProtocol;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
+use kamu_datasets_services::CreateDatasetUseCaseImpl;
 use messaging_outbox::DummyOutboxImpl;
+use odf::dataset::testing::create_test_dataset_fron_snapshot;
 use odf::dataset::{DatasetFactoryImpl, IpfsGateway};
 use odf::metadata::testing::MetadataFactory;
 use test_utils::LocalS3Server;
-use time_source::SystemTimeSourceDefault;
+use time_source::{SystemTimeSource, SystemTimeSourceDefault};
 use url::Url;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -39,7 +41,7 @@ async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
         .add_value(TenancyConfig::SingleTenant)
         .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
         .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
-        .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
+        .bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
         .add::<DatasetRegistrySoloUnitBridge>()
         .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
         .add_value(RemoteRepositoryRegistryImpl::create(tmp_workspace_dir.join("repos")).unwrap())
@@ -49,6 +51,8 @@ async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
         .add::<odf::dataset::DummyOdfServerAccessTokenResolver>()
         .add::<DatasetFactoryImpl>()
         .add::<SyncServiceImpl>()
+        .add::<RemoteAliasesRegistryImpl>()
+        .add::<RemoteAliasResolverImpl>()
         .add::<SyncRequestBuilder>()
         .add::<DummySmartTransferProtocolClient>()
         .add::<SimpleTransferProtocol>()
@@ -57,8 +61,13 @@ async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
         .add::<DummyOutboxImpl>()
         .build();
 
+    let did_generator = catalog.get_one::<dyn DidGenerator>().unwrap();
+    let time_source = catalog.get_one::<dyn SystemTimeSource>().unwrap();
     let remote_repo_reg = catalog.get_one::<dyn RemoteRepositoryRegistry>().unwrap();
-    let dataset_storage_unit_writer = catalog.get_one::<dyn DatasetStorageUnitWriter>().unwrap();
+    let dataset_registry = catalog.get_one::<dyn DatasetRegistry>().unwrap();
+    let dataset_storage_unit_writer = catalog
+        .get_one::<dyn odf::DatasetStorageUnitWriter>()
+        .unwrap();
     let sync_svc = catalog.get_one::<dyn SyncService>().unwrap();
     let sync_request_builder = catalog.get_one::<SyncRequestBuilder>().unwrap();
     let search_svc = catalog.get_one::<dyn SearchService>().unwrap();
@@ -69,16 +78,19 @@ async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
         .unwrap();
 
     // Add and sync dataset
-    dataset_storage_unit_writer
-        .create_dataset_from_snapshot(
-            MetadataFactory::dataset_snapshot()
-                .name(dataset_local_alias.clone())
-                .kind(odf::DatasetKind::Root)
-                .push_event(MetadataFactory::set_polling_source().build())
-                .build(),
-        )
-        .await
-        .unwrap();
+    create_test_dataset_fron_snapshot(
+        dataset_registry.as_ref(),
+        dataset_storage_unit_writer.as_ref(),
+        MetadataFactory::dataset_snapshot()
+            .name(dataset_local_alias.clone())
+            .kind(odf::DatasetKind::Root)
+            .push_event(MetadataFactory::set_polling_source().build())
+            .build(),
+        did_generator.generate_dataset_id(),
+        time_source.now(),
+    )
+    .await
+    .unwrap();
 
     sync_svc
         .sync(

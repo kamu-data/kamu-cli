@@ -11,17 +11,22 @@ use async_graphql::value;
 use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use dill::Component;
 use indoc::indoc;
-use kamu::{
+use kamu::DatasetStorageUnitLocalFs;
+use kamu_core::{auth, DidGeneratorDefault, TenancyConfig};
+use kamu_datasets::{CreateDatasetFromSnapshotUseCase, DatasetEnvVarsConfig};
+use kamu_datasets_inmem::{
+    InMemoryDatasetDependencyRepository,
+    InMemoryDatasetEntryRepository,
+    InMemoryDatasetEnvVarRepository,
+};
+use kamu_datasets_services::{
     CreateDatasetFromSnapshotUseCaseImpl,
-    DatasetRegistrySoloUnitBridge,
-    DatasetStorageUnitLocalFs,
-    DatasetStorageUnitWriter,
+    CreateDatasetUseCaseImpl,
+    DatasetEntryServiceImpl,
+    DatasetEnvVarServiceImpl,
+    DependencyGraphServiceImpl,
     ViewDatasetUseCaseImpl,
 };
-use kamu_core::{auth, CreateDatasetFromSnapshotUseCase, DidGeneratorDefault, TenancyConfig};
-use kamu_datasets::DatasetEnvVarsConfig;
-use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEnvVarRepository};
-use kamu_datasets_services::{DatasetEnvVarServiceImpl, DependencyGraphServiceImpl};
 use messaging_outbox::DummyOutboxImpl;
 use odf::metadata::testing::MetadataFactory;
 use time_source::SystemTimeSourceDefault;
@@ -316,7 +321,6 @@ async fn test_modify_dataset_env_var() {
 
 struct DatasetEnvVarsHarness {
     _tempdir: tempfile::TempDir,
-    _catalog_anonymous: dill::Catalog,
     catalog_authorized: dill::Catalog,
 }
 
@@ -335,9 +339,9 @@ impl DatasetEnvVarsHarness {
                 .add_value(TenancyConfig::SingleTenant)
                 .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
                 .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
-                .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
-                .add::<DatasetRegistrySoloUnitBridge>()
+                .bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
                 .add::<CreateDatasetFromSnapshotUseCaseImpl>()
+                .add::<CreateDatasetUseCaseImpl>()
                 .add::<ViewDatasetUseCaseImpl>()
                 .add::<SystemTimeSourceDefault>()
                 .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
@@ -345,18 +349,19 @@ impl DatasetEnvVarsHarness {
                 .add::<InMemoryDatasetDependencyRepository>()
                 .add::<DatabaseTransactionRunner>()
                 .add::<DatasetEnvVarServiceImpl>()
-                .add::<InMemoryDatasetEnvVarRepository>();
+                .add::<InMemoryDatasetEnvVarRepository>()
+                .add::<DatasetEntryServiceImpl>()
+                .add::<InMemoryDatasetEntryRepository>();
 
             NoOpDatabasePlugin::init_database_components(&mut b);
 
             b.build()
         };
 
-        let (catalog_anonymous, catalog_authorized) = authentication_catalogs(&catalog_base).await;
+        let (_, catalog_authorized) = authentication_catalogs(&catalog_base).await;
 
         Self {
             _tempdir: tempdir,
-            _catalog_anonymous: catalog_anonymous,
             catalog_authorized,
         }
     }

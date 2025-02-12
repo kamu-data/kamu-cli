@@ -193,15 +193,6 @@ pub fn new_session_context(object_store_registry: Arc<dyn ObjectStoreRegistry>) 
     // options in transform DTOs)
     config.options_mut().sql_parser.enable_ident_normalization = false;
 
-    // TODO: Disabling Utf8View types due to unresolved issues
-    // See: https://github.com/apache/datafusion/issues/13510
-    // See: https://github.com/apache/datafusion/issues/13504
-    config
-        .options_mut()
-        .execution
-        .parquet
-        .schema_force_view_types = false;
-
     let runtime = Arc::new(
         RuntimeEnvBuilder::new()
             .with_object_store_registry(object_store_registry.as_datafusion_registry())

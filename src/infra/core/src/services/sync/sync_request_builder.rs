@@ -10,11 +10,12 @@
 use std::sync::Arc;
 
 use dill::component;
-use internal_error::ErrorIntoInternal;
+use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_core::{
     DatasetAnyRefUnresolvedError,
     DatasetRegistry,
     DatasetRegistryExt,
+    RemoteAliasResolver,
     RemoteRepositoryRegistry,
     SyncError,
     SyncRef,
@@ -32,6 +33,7 @@ pub struct SyncRequestBuilder {
     dataset_registry: Arc<dyn DatasetRegistry>,
     dataset_factory: Arc<dyn odf::dataset::DatasetFactory>,
     remote_repo_registry: Arc<dyn RemoteRepositoryRegistry>,
+    remote_alias_resolver: Arc<dyn RemoteAliasResolver>,
 }
 
 impl SyncRequestBuilder {
@@ -39,11 +41,13 @@ impl SyncRequestBuilder {
         dataset_registry: Arc<dyn DatasetRegistry>,
         dataset_factory: Arc<dyn odf::dataset::DatasetFactory>,
         remote_repo_registry: Arc<dyn RemoteRepositoryRegistry>,
+        remote_alias_resolver: Arc<dyn RemoteAliasResolver>,
     ) -> Self {
         Self {
             dataset_registry,
             dataset_factory,
             remote_repo_registry,
+            remote_alias_resolver,
         }
     }
 
@@ -80,10 +84,12 @@ impl SyncRequestBuilder {
                 Ok(SyncRef::Local(resolved_dataset))
             }
             Err(remote_ref) => {
-                let remote_dataset_url = Arc::new(resolve_remote_dataset_url(
-                    self.remote_repo_registry.as_ref(),
-                    &remote_ref,
-                )?);
+                let remote_dataset_url = Arc::new(
+                    self.remote_alias_resolver
+                        .resolve_pull_url(&remote_ref)
+                        .await
+                        .int_err()?,
+                );
                 let dataset = self
                     .dataset_factory
                     .get_dataset(remote_dataset_url.as_ref(), false)
@@ -120,10 +126,12 @@ impl SyncRequestBuilder {
                 Err(err) => Err(err.into()),
             },
             Err(remote_ref) => {
-                let remote_dataset_url = Arc::new(resolve_remote_dataset_url(
-                    self.remote_repo_registry.as_ref(),
-                    &remote_ref,
-                )?);
+                let remote_dataset_url = Arc::new(
+                    self.remote_alias_resolver
+                        .resolve_pull_url(&remote_ref)
+                        .await
+                        .int_err()?,
+                );
                 let dataset = self
                     .dataset_factory
                     .get_dataset(remote_dataset_url.as_ref(), create_if_not_exists)

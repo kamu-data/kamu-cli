@@ -113,22 +113,22 @@ read_input = "0.8"                                                # Basic user i
 webbrowser = "1"                                                  # For opening URLs in default system browser
 
 # APIs
-arrow-flight = { version = "53", features = ["flight-sql-experimental"] }
+arrow-flight = { version = "54", features = ["flight-sql-experimental"] }
 async-graphql = { version = "7", features = [
     "chrono",
     "url",
     "apollo_tracing",
 ] }
 async-graphql-axum = "7"
-axum = { version = "0.7", features = ["ws"] }
+axum = { version = "0.8", features = ["ws"] }
 http = "1"
 reqwest = { version = "0.12", default-features = false }
 serde_json = "1"
 tonic = { version = "0.12", default-features = false }
 tower = "0.5"
 tower-http = { version = "0.6", features = ["trace", "cors"] }
-utoipa = { version = "=5.3.0", default-features = true, features = ["macros"] }
-utoipa-axum = { version = "=0.1.3", default-features = true, features = [] }
+utoipa = { version = "5", default-features = true, features = ["macros"] }
+utoipa-axum = { version = "0.2", default-features = true, features = [] }
 
 # Web UI
 rust-embed = { optional = true, version = "8", features = [
@@ -163,7 +163,7 @@ tracing-bunyan-formatter = "0.3"
 async-trait = "0.1"
 chrono = "0.4"
 cfg-if = "1" # Conditional compilation
-datafusion = { version = "44", default-features = false, features = [
+datafusion = { version = "45", default-features = false, features = [
     "crypto_expressions",
     "encoding_expressions",
     "parquet",

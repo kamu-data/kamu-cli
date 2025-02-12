@@ -15,18 +15,13 @@ use crate::ResolvedDataset;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait DatasetRegistry: Send + Sync {
+pub trait DatasetRegistry: odf::dataset::DatasetHandleResolver {
     fn all_dataset_handles(&self) -> odf::dataset::DatasetHandleStream<'_>;
 
     fn all_dataset_handles_by_owner(
         &self,
         owner_name: &odf::AccountName,
     ) -> odf::dataset::DatasetHandleStream<'_>;
-
-    async fn resolve_dataset_handle_by_ref(
-        &self,
-        dataset_ref: &odf::DatasetRef,
-    ) -> Result<odf::DatasetHandle, odf::dataset::GetDatasetError>;
 
     async fn resolve_multiple_dataset_handles_by_ids(
         &self,

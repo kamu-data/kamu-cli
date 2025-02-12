@@ -7,10 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+#![feature(trait_upcasting)]
+
 use std::path::Path;
 use std::str::FromStr;
 use std::sync::Arc;
 
+use chrono::Utc;
 use criterion::{criterion_group, criterion_main, Criterion};
 use dill::*;
 use kamu::domain::*;
@@ -23,7 +26,6 @@ use kamu::utils::simple_transfer_protocol::{
 use kamu::{
     DatasetRegistrySoloUnitBridge,
     DatasetStorageUnitLocalFs,
-    DatasetStorageUnitWriter,
     RemoteReposDir,
     RemoteRepositoryRegistryImpl,
     SyncRequestBuilder,
@@ -32,6 +34,7 @@ use kamu::{
 use kamu_accounts::CurrentAccountSubject;
 use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
 use kamu_datasets_services::DependencyGraphServiceImpl;
+use odf::dataset::testing::create_test_dataset_fron_snapshot;
 use odf::dataset::{DatasetFactoryImpl, IpfsGateway};
 use odf::metadata::testing::MetadataFactory;
 use test_utils::HttpFileServer;
@@ -71,7 +74,7 @@ async fn setup_dataset(
         .add_value(TenancyConfig::SingleTenant)
         .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
         .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
-        .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
+        .bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
         .add::<DatasetRegistrySoloUnitBridge>()
         .add_value(RemoteReposDir::new(repos_dir))
         .add::<RemoteRepositoryRegistryImpl>()
@@ -90,7 +93,9 @@ async fn setup_dataset(
     let sync_svc = catalog.get_one::<dyn SyncService>().unwrap();
     let sync_request_builder = catalog.get_one::<SyncRequestBuilder>().unwrap();
     let dataset_registry = catalog.get_one::<dyn DatasetRegistry>().unwrap();
-    let dataset_storage_unit_writer = catalog.get_one::<dyn DatasetStorageUnitWriter>().unwrap();
+    let dataset_storage_unit_writer = catalog
+        .get_one::<dyn odf::DatasetStorageUnitWriter>()
+        .unwrap();
 
     // Add dataset
     let snapshot = MetadataFactory::dataset_snapshot()
@@ -99,12 +104,15 @@ async fn setup_dataset(
         .push_event(MetadataFactory::set_data_schema().build())
         .build();
 
-    let _ = dataset_storage_unit_writer
-        .create_dataset_from_snapshot(snapshot)
-        .await
-        .unwrap()
-        .create_dataset_result
-        .head;
+    let _ = create_test_dataset_fron_snapshot(
+        dataset_registry.as_ref(),
+        dataset_storage_unit_writer.as_ref(),
+        snapshot,
+        odf::DatasetID::new_generated_ed25519().1,
+        Utc::now(),
+    )
+    .await
+    .unwrap();
 
     append_data_to_dataset(
         AMOUNT_OF_BLOCKS_TO_APPEND,

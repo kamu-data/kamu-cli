@@ -28,7 +28,8 @@ deny = [
     # This is a temporary approach until we deny by default with some exceptions
     { name = "alloy", deny-multiple-versions = true },
     { name = "arrow", deny-multiple-versions = true },
-    { name = "axum", deny-multiple-versions = true },
+    # TODO: Re-enable lint once tonic upgrades to axum 0.8
+    # { name = "axum", deny-multiple-versions = true },
     { name = "aws-config", deny-multiple-versions = true },
     { name = "clap", deny-multiple-versions = true },
     { name = "datafusion", deny-multiple-versions = true },
@@ -41,6 +42,7 @@ deny = [
     { name = "prost", deny-multiple-versions = true },
     { name = "reqwest", deny-multiple-versions = true },
     # { name = "rustls", deny-multiple-versions = true },
+    { name = "native-tls", reason = "We use rustls throughout the project" },
     { name = "sqlx", deny-multiple-versions = true },
     { name = "tokio", deny-multiple-versions = true },
     { name = "tonic", deny-multiple-versions = true },

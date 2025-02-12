@@ -12,11 +12,11 @@ use std::sync::Arc;
 use dill::{component, interface, meta, Catalog};
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_auth_rebac::{DatasetPropertyName, RebacService};
-use kamu_core::{
+use kamu_datasets::{
     DatasetLifecycleMessage,
     DatasetLifecycleMessageCreated,
     DatasetLifecycleMessageDeleted,
-    MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
+    MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
 };
 use messaging_outbox::{
     MessageConsumer,
@@ -39,7 +39,7 @@ pub struct MultiTenantRebacDatasetLifecycleMessageConsumer {
 #[meta(MessageConsumerMeta {
     consumer_name: MESSAGE_CONSUMER_KAMU_REBAC_SERVICE,
     feeding_producers: &[
-        MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
+        MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
     ],
     delivery: MessageDeliveryMechanism::Immediate,
 })]
@@ -106,12 +106,6 @@ impl MessageConsumerT<DatasetLifecycleMessage> for MultiTenantRebacDatasetLifecy
 
             DatasetLifecycleMessage::Deleted(message) => {
                 self.handle_dataset_lifecycle_deleted_message(message).await
-            }
-
-            DatasetLifecycleMessage::DependenciesUpdated(_)
-            | DatasetLifecycleMessage::Renamed(_) => {
-                // No action required
-                Ok(())
             }
         }
     }

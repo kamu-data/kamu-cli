@@ -15,8 +15,16 @@ use dill::Component;
 use indoc::indoc;
 use kamu::*;
 use kamu_core::*;
-use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
-use kamu_datasets_services::DependencyGraphServiceImpl;
+use kamu_datasets::{CreateDatasetFromSnapshotUseCase, CreateDatasetUseCase};
+use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEntryRepository};
+use kamu_datasets_services::{
+    CommitDatasetEventUseCaseImpl,
+    CreateDatasetFromSnapshotUseCaseImpl,
+    CreateDatasetUseCaseImpl,
+    DatasetEntryServiceImpl,
+    DependencyGraphServiceImpl,
+    ViewDatasetUseCaseImpl,
+};
 use messaging_outbox::DummyOutboxImpl;
 use odf::metadata::testing::MetadataFactory;
 use time_source::SystemTimeSourceDefault;
@@ -37,12 +45,11 @@ async fn test_metadata_chain_events() {
     let create_result = create_dataset
         .execute(
             &"foo".try_into().unwrap(),
-            odf::MetadataBlockTyped {
-                system_time: Utc::now(),
-                prev_block_hash: None,
-                event: MetadataFactory::seed(odf::DatasetKind::Root).build(),
-                sequence_number: 0,
-            },
+            odf::dataset::make_seed_block(
+                harness.did_generator.generate_dataset_id(),
+                odf::DatasetKind::Root,
+                Utc::now(),
+            ),
             Default::default(),
         )
         .await
@@ -526,6 +533,7 @@ struct GraphQLMetadataChainHarness {
     _tempdir: tempfile::TempDir,
     catalog_authorized: dill::Catalog,
     catalog_anonymous: dill::Catalog,
+    did_generator: Arc<dyn DidGenerator>,
 }
 
 impl GraphQLMetadataChainHarness {
@@ -549,9 +557,10 @@ impl GraphQLMetadataChainHarness {
                 .add_value(tenancy_config)
                 .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
                 .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
-                .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
-                .add::<DatasetRegistrySoloUnitBridge>()
-                .add::<auth::AlwaysHappyDatasetActionAuthorizer>();
+                .bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
+                .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
+                .add::<DatasetEntryServiceImpl>()
+                .add::<InMemoryDatasetEntryRepository>();
 
             database_common::NoOpDatabasePlugin::init_database_components(&mut b);
 
@@ -560,10 +569,13 @@ impl GraphQLMetadataChainHarness {
 
         let (catalog_anonymous, catalog_authorized) = authentication_catalogs(&base_catalog).await;
 
+        let did_generator = base_catalog.get_one::<dyn DidGenerator>().unwrap();
+
         Self {
             _tempdir: tempdir,
             catalog_anonymous,
             catalog_authorized,
+            did_generator,
         }
     }
 }

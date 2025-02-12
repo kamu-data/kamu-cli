@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use database_common::PaginationOpts;
 use dill::*;
-use kamu_core::DatasetLifecycleMessage;
+use kamu_datasets::DatasetLifecycleMessage;
 use kamu_flow_system::*;
 use messaging_outbox::{MessageConsumer, MessageConsumerT};
 use time_source::SystemTimeSource;
@@ -196,9 +196,7 @@ impl MessageConsumerT<DatasetLifecycleMessage> for FlowConfigurationServiceImpl 
                 }
             }
 
-            DatasetLifecycleMessage::Created(_)
-            | DatasetLifecycleMessage::DependenciesUpdated(_)
-            | DatasetLifecycleMessage::Renamed(_) => {
+            DatasetLifecycleMessage::Created(_) => {
                 // no action required
             }
         }

@@ -14,37 +14,15 @@ use std::sync::Arc;
 
 use dill::Component;
 use internal_error::{InternalError, ResultIntoInternal};
-use kamu::domain::{
-    CommitDatasetEventUseCase,
-    CompactionExecutor,
-    CompactionPlanner,
-    CreateDatasetFromSnapshotUseCase,
-    CreateDatasetUseCase,
-    ObjectStoreBuilder,
-    RunInfoDir,
-    ServerUrlConfig,
-};
-use kamu::{
-    AppendDatasetMetadataBatchUseCaseImpl,
-    CommitDatasetEventUseCaseImpl,
-    CompactionExecutorImpl,
-    CompactionPlannerImpl,
-    CreateDatasetFromSnapshotUseCaseImpl,
-    CreateDatasetUseCaseImpl,
-    DatasetRegistrySoloUnitBridge,
-    DatasetStorageUnitS3,
-    DatasetStorageUnitWriter,
-    EditDatasetUseCaseImpl,
-    ObjectStoreBuilderLocalFs,
-    ObjectStoreBuilderS3,
-    ObjectStoreRegistryImpl,
-    ViewDatasetUseCaseImpl,
-};
-use kamu_accounts::testing::MockAuthenticationService;
-use kamu_accounts::{Account, AuthenticationService};
+use kamu::domain::*;
+use kamu::*;
+use kamu_accounts::*;
+use kamu_accounts_inmem::{InMemoryAccessTokenRepository, InMemoryAccountRepository};
+use kamu_accounts_services::*;
 use kamu_core::{DatasetRegistry, DidGeneratorDefault, TenancyConfig};
-use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
-use kamu_datasets_services::DependencyGraphServiceImpl;
+use kamu_datasets::*;
+use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEntryRepository};
+use kamu_datasets_services::*;
 use messaging_outbox::DummyOutboxImpl;
 use odf::dataset::DatasetLayout;
 use s3_utils::S3Context;
@@ -56,7 +34,6 @@ use super::{
     create_cli_user_catalog,
     create_web_user_catalog,
     make_server_account,
-    server_authentication_mock,
     ServerSideHarness,
     ServerSideHarnessOptions,
     TestAPIServer,
@@ -87,7 +64,25 @@ impl ServerSideS3Harness {
 
         let time_source = SystemTimeSourceStub::new();
 
-        let account = make_server_account();
+        let account = make_server_account(options.tenancy_config);
+
+        let predefined_accounts_config = match options.tenancy_config {
+            TenancyConfig::SingleTenant => PredefinedAccountsConfig::single_tenant(),
+            TenancyConfig::MultiTenant => {
+                let mut predefined_accounts_config = PredefinedAccountsConfig::new();
+                predefined_accounts_config
+                    .predefined
+                    .push(AccountConfig::test_config_from_name(
+                        odf::AccountName::new_unchecked(SERVER_ACCOUNT_NAME),
+                    ));
+                predefined_accounts_config
+            }
+        };
+
+        let jwt_authentication_config = JwtAuthenticationConfig {
+            jwt_secret: "dummy".to_string(),
+            maybe_dummy_token_account: Some(account.clone()),
+        };
 
         let (base_catalog, listener) = {
             let addr = SocketAddr::from(([127, 0, 0, 1], 0));
@@ -106,10 +101,7 @@ impl ServerSideS3Harness {
                 .add_value(options.tenancy_config)
                 .add_builder(DatasetStorageUnitS3::builder().with_s3_context(s3_context.clone()))
                 .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitS3>()
-                .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitS3>()
-                .add::<DatasetRegistrySoloUnitBridge>()
-                .add_value(server_authentication_mock(&account))
-                .bind::<dyn AuthenticationService, MockAuthenticationService>()
+                .bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitS3>()
                 .add_value(ServerUrlConfig::new_test(Some(&base_url_rest)))
                 .add::<CompactionPlannerImpl>()
                 .add::<CompactionExecutorImpl>()
@@ -122,12 +114,27 @@ impl ServerSideS3Harness {
                 .add::<CreateDatasetFromSnapshotUseCaseImpl>()
                 .add::<CommitDatasetEventUseCaseImpl>()
                 .add::<ViewDatasetUseCaseImpl>()
-                .add::<EditDatasetUseCaseImpl>();
+                .add::<EditDatasetUseCaseImpl>()
+                .add::<DatasetEntryServiceImpl>()
+                .add::<InMemoryDatasetEntryRepository>()
+                .add::<AuthenticationServiceImpl>()
+                .add::<AccountServiceImpl>()
+                .add::<InMemoryAccountRepository>()
+                .add::<AccessTokenServiceImpl>()
+                .add::<InMemoryAccessTokenRepository>()
+                .add_value(jwt_authentication_config)
+                .add::<LoginPasswordAuthProvider>()
+                .add::<PredefinedAccountsRegistrator>()
+                .add_value(predefined_accounts_config);
 
             database_common::NoOpDatabasePlugin::init_database_components(&mut b);
 
             (b.build(), listener)
         };
+
+        init_on_startup::run_startup_jobs(&base_catalog)
+            .await
+            .unwrap();
 
         let api_server = TestAPIServer::new(
             create_web_user_catalog(&base_catalog, &options),
@@ -153,6 +160,15 @@ impl ServerSideS3Harness {
 
 #[async_trait::async_trait]
 impl ServerSideHarness for ServerSideS3Harness {
+    fn server_account_id(&self) -> odf::AccountID {
+        match self.options.tenancy_config {
+            TenancyConfig::MultiTenant => {
+                odf::AccountID::new_seeded_ed25519(SERVER_ACCOUNT_NAME.as_bytes())
+            }
+            TenancyConfig::SingleTenant => DEFAULT_ACCOUNT_ID.clone(),
+        }
+    }
+
     fn operating_account_name(&self) -> Option<odf::AccountName> {
         match self.options.tenancy_config {
             TenancyConfig::MultiTenant => {
@@ -163,39 +179,40 @@ impl ServerSideHarness for ServerSideS3Harness {
     }
 
     fn cli_dataset_registry(&self) -> Arc<dyn DatasetRegistry> {
-        let cli_catalog = create_cli_user_catalog(&self.base_catalog);
-        cli_catalog.get_one::<dyn DatasetRegistry>().unwrap()
+        let cli_catalog = create_cli_user_catalog(&self.base_catalog, self.options.tenancy_config);
+        cli_catalog.get_one().unwrap()
     }
 
     fn cli_create_dataset_use_case(&self) -> Arc<dyn CreateDatasetUseCase> {
-        let cli_catalog = create_cli_user_catalog(&self.base_catalog);
-        cli_catalog.get_one::<dyn CreateDatasetUseCase>().unwrap()
+        let cli_catalog = create_cli_user_catalog(&self.base_catalog, self.options.tenancy_config);
+        cli_catalog.get_one().unwrap()
     }
 
     fn cli_create_dataset_from_snapshot_use_case(
         &self,
     ) -> Arc<dyn CreateDatasetFromSnapshotUseCase> {
-        let cli_catalog = create_cli_user_catalog(&self.base_catalog);
-        cli_catalog
-            .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
-            .unwrap()
+        let cli_catalog = create_cli_user_catalog(&self.base_catalog, self.options.tenancy_config);
+        cli_catalog.get_one().unwrap()
     }
 
     fn cli_commit_dataset_event_use_case(&self) -> Arc<dyn CommitDatasetEventUseCase> {
-        let cli_catalog = create_cli_user_catalog(&self.base_catalog);
-        cli_catalog
-            .get_one::<dyn CommitDatasetEventUseCase>()
-            .unwrap()
+        let cli_catalog = create_cli_user_catalog(&self.base_catalog, self.options.tenancy_config);
+        cli_catalog.get_one().unwrap()
     }
 
     fn cli_compaction_planner(&self) -> Arc<dyn CompactionPlanner> {
-        let cli_catalog = create_cli_user_catalog(&self.base_catalog);
-        cli_catalog.get_one::<dyn CompactionPlanner>().unwrap()
+        let cli_catalog = create_cli_user_catalog(&self.base_catalog, self.options.tenancy_config);
+        cli_catalog.get_one().unwrap()
     }
 
     fn cli_compaction_executor(&self) -> Arc<dyn CompactionExecutor> {
-        let cli_catalog = create_cli_user_catalog(&self.base_catalog);
-        cli_catalog.get_one::<dyn CompactionExecutor>().unwrap()
+        let cli_catalog = create_cli_user_catalog(&self.base_catalog, self.options.tenancy_config);
+        cli_catalog.get_one().unwrap()
+    }
+
+    fn cli_dataset_entry_writer(&self) -> Arc<dyn DatasetEntryWriter> {
+        let cli_catalog = create_cli_user_catalog(&self.base_catalog, self.options.tenancy_config);
+        cli_catalog.get_one().unwrap()
     }
 
     fn dataset_url_with_scheme(&self, dataset_alias: &odf::DatasetAlias, scheme: &str) -> Url {

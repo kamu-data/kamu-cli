@@ -122,11 +122,6 @@ impl FetchService {
         // options in transform DTOs)
         cfg.options_mut().sql_parser.enable_ident_normalization = false;
 
-        // TODO: Disabling Utf8View types due to unresolved issues
-        // See: https://github.com/apache/datafusion/issues/13510
-        // See: https://github.com/apache/datafusion/issues/13504
-        cfg.options_mut().execution.parquet.schema_force_view_types = false;
-
         let mut ctx = SessionContext::new_with_config(cfg);
         datafusion_ethers::udf::register_all(&mut ctx).unwrap();
         ctx.register_catalog(

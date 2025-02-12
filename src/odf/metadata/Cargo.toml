@@ -42,7 +42,7 @@ digest = "0.10"
 thiserror = { version = "2", default-features = false, features = ["std"] }
 bitflags = { version = "2", default-features = false }
 
-datafusion = { optional = true, version = "44", default-features = false }
+datafusion = { optional = true, version = "45", default-features = false }
 rand = { optional = true, version = "0.8", default-features =  false }
 
 like = { version = "0.3", default-features = false }
@@ -69,11 +69,9 @@ prost = "0.13"
 tonic = "0.12"
 
 # Optional
-arrow = { optional = true, version = "53", default-features = false, features = [
-    "ipc",
-] }
+arrow = { optional = true, version = "54", default-features = false, features = ["ipc"] }
 sqlx = { optional = true, version = "0.8", default-features = false }
-utoipa = { optional = true, version = "=5.3.0", default-features = false, features = [
+utoipa = { optional = true, version = "5", default-features = false, features = [
 ] }
 serde_json = { optional = true, version = "1", default-features = false }
 

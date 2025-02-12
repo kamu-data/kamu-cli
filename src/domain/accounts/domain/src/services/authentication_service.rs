@@ -26,31 +26,6 @@ pub trait AuthenticationService: Sync + Send {
     ) -> Result<LoginResponse, LoginError>;
 
     async fn account_by_token(&self, access_token: String) -> Result<Account, GetAccountInfoError>;
-
-    async fn account_by_id(
-        &self,
-        account_id: &odf::AccountID,
-    ) -> Result<Option<Account>, InternalError>;
-
-    async fn accounts_by_ids(
-        &self,
-        account_ids: Vec<odf::AccountID>,
-    ) -> Result<Vec<Account>, InternalError>;
-
-    async fn account_by_name(
-        &self,
-        account_name: &odf::AccountName,
-    ) -> Result<Option<Account>, InternalError>;
-
-    async fn find_account_id_by_name(
-        &self,
-        account_name: &odf::AccountName,
-    ) -> Result<Option<odf::AccountID>, InternalError>;
-
-    async fn find_account_name_by_id(
-        &self,
-        account_id: &odf::AccountID,
-    ) -> Result<Option<odf::AccountName>, InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

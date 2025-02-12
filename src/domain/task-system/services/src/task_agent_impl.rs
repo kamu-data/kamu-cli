@@ -68,7 +68,7 @@ impl TaskAgentImpl {
 
     #[transactional_method1(task_event_store: Arc<dyn TaskEventStore>)]
     async fn recover_running_tasks(&self) -> Result<(), InternalError> {
-        // Recovering tasks means we are re-queing tasks that started running, but got
+        // Recovering tasks means we are re-queuing tasks that started running, but got
         // aborted due to server shutdown or crash
 
         // Total number of running tasks
@@ -149,7 +149,7 @@ impl TaskAgentImpl {
         );
 
         // Prepare task definition (requires transaction)
-        let task_definition = DatabaseTransactionRunner::new(self.catalog.clone())
+        let task_definition = match DatabaseTransactionRunner::new(self.catalog.clone())
             .transactional_with(
                 |task_definition_planner: Arc<dyn TaskDefinitionPlanner>| async move {
                     task_definition_planner
@@ -157,7 +157,19 @@ impl TaskAgentImpl {
                         .await
                 },
             )
-            .await?;
+            .await
+        {
+            Ok(task_definition) => task_definition,
+            Err(e) => {
+                tracing::error!(
+                    task = ?task,
+                    error = ?e,
+                    error_msg = %e,
+                    "Task definition preparation failed"
+                );
+                return Ok(TaskOutcome::Failed(TaskError::Empty));
+            }
+        };
 
         // Run task via definition
         let task_run_result = self.task_runner.run_task(task_definition).await;

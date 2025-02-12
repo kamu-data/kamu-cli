@@ -22,6 +22,7 @@ pub struct TaskRunnerImpl {
     transform_executor: Arc<dyn TransformExecutor>,
     reset_executor: Arc<dyn ResetExecutor>,
     compaction_executor: Arc<dyn CompactionExecutor>,
+    sync_service: Arc<dyn SyncService>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -35,6 +36,7 @@ impl TaskRunnerImpl {
         transform_executor: Arc<dyn TransformExecutor>,
         reset_executor: Arc<dyn ResetExecutor>,
         compaction_executor: Arc<dyn CompactionExecutor>,
+        sync_service: Arc<dyn SyncService>,
     ) -> Self {
         Self {
             polling_ingest_service,
@@ -42,6 +44,7 @@ impl TaskRunnerImpl {
             transform_executor,
             reset_executor,
             compaction_executor,
+            sync_service,
         }
     }
 
@@ -74,13 +77,28 @@ impl TaskRunnerImpl {
                 self.run_transform_update(transform_item).await
             }
             PullPlanIterationJob::Sync(sync_item) => {
-                // TODO: either initiate a sync job, or create a specialized error
-                tracing::error!(
-                    ?sync_item,
-                    "Attempted to launch sync job for dataset update"
-                );
-                Ok(TaskOutcome::Failed(TaskError::Empty))
+                self.run_sync_update(
+                    *sync_item.sync_request,
+                    task_update.pull_options.sync_options,
+                )
+                .await
             }
+        }
+    }
+
+    async fn run_sync_update(
+        &self,
+        sync_request: SyncRequest,
+        sync_opts: SyncOptions,
+    ) -> Result<TaskOutcome, InternalError> {
+        let sync_response = self.sync_service.sync(sync_request, sync_opts, None).await;
+        match sync_response {
+            Ok(sync_result) => Ok(TaskOutcome::Success(TaskResult::UpdateDatasetResult(
+                TaskUpdateDatasetResult {
+                    pull_result: sync_result.into(),
+                },
+            ))),
+            Err(_) => Ok(TaskOutcome::Failed(TaskError::Empty)),
         }
     }
 

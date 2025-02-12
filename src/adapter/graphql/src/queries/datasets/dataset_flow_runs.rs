@@ -11,7 +11,7 @@ use std::collections::HashSet;
 
 use database_common::PaginationOpts;
 use futures::TryStreamExt;
-use kamu_accounts::AuthenticationService;
+use kamu_accounts::AccountService;
 use kamu_flow_system as fs;
 
 use crate::mutations::{check_if_flow_belongs_to_dataset, FlowInDatasetError, FlowNotFound};
@@ -127,9 +127,9 @@ impl DatasetFlowRuns {
             .try_collect()
             .await?;
 
-        let authentication_service = from_catalog_n!(ctx, dyn AuthenticationService);
+        let account_service = from_catalog_n!(ctx, dyn AccountService);
 
-        let matched_flow_initiators: Vec<_> = authentication_service
+        let matched_flow_initiators: Vec<_> = account_service
             .accounts_by_ids(flow_initiator_ids)
             .await?
             .into_iter()

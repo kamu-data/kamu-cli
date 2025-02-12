@@ -23,20 +23,23 @@ use kamu_core::{
     RunInfoDir,
     TenancyConfig,
 };
+use odf::dataset::testing::create_test_dataset_fron_snapshot;
 use odf::metadata::serde::flatbuffers::FlatbuffersMetadataBlockSerializer;
 use odf::metadata::serde::MetadataBlockSerializer;
 use odf::metadata::testing::MetadataFactory;
-use time_source::SystemTimeSourceDefault;
+use time_source::{SystemTimeSource, SystemTimeSourceDefault};
 
-use crate::{DatasetRegistrySoloUnitBridge, DatasetStorageUnitLocalFs, DatasetStorageUnitWriter};
+use crate::{DatasetRegistrySoloUnitBridge, DatasetStorageUnitLocalFs};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct BaseRepoHarness {
     temp_dir: tempfile::TempDir,
     catalog: Catalog,
+    did_generator: Arc<dyn DidGenerator>,
+    system_time_source: Arc<dyn SystemTimeSource>,
     dataset_registry: Arc<dyn DatasetRegistry>,
-    dataset_storage_unit_writer: Arc<dyn DatasetStorageUnitWriter>,
+    dataset_storage_unit_writer: Arc<dyn odf::DatasetStorageUnitWriter>,
 }
 
 #[bon]
@@ -62,7 +65,7 @@ impl BaseRepoHarness {
                 .add_value(tenancy_config)
                 .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
                 .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
-                .bind::<dyn DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
+                .bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
                 .add::<DatasetRegistrySoloUnitBridge>()
                 .add::<SystemTimeSourceDefault>();
 
@@ -84,6 +87,8 @@ impl BaseRepoHarness {
 
         Self {
             temp_dir,
+            did_generator: catalog.get_one().unwrap(),
+            system_time_source: catalog.get_one().unwrap(),
             dataset_registry: catalog.get_one().unwrap(),
             dataset_storage_unit_writer: catalog.get_one().unwrap(),
             catalog,
@@ -102,7 +107,7 @@ impl BaseRepoHarness {
         self.dataset_registry.as_ref()
     }
 
-    pub fn dataset_storage_unit_writer(&self) -> &dyn DatasetStorageUnitWriter {
+    pub fn dataset_storage_unit_writer(&self) -> &dyn odf::DatasetStorageUnitWriter {
         self.dataset_storage_unit_writer.as_ref()
     }
 
@@ -123,13 +128,15 @@ impl BaseRepoHarness {
             .push_event(MetadataFactory::set_polling_source().build())
             .build();
 
-        let result = self
-            .dataset_storage_unit_writer
-            .create_dataset_from_snapshot(snapshot)
-            .await
-            .unwrap();
-
-        result.create_dataset_result
+        create_test_dataset_fron_snapshot(
+            self.dataset_registry.as_ref(),
+            self.dataset_storage_unit_writer.as_ref(),
+            snapshot,
+            self.did_generator.generate_dataset_id(),
+            self.system_time_source.now(),
+        )
+        .await
+        .unwrap()
     }
 
     pub async fn create_derived_dataset(
@@ -137,21 +144,23 @@ impl BaseRepoHarness {
         alias: &odf::DatasetAlias,
         input_dataset_refs: Vec<odf::DatasetRef>,
     ) -> odf::CreateDatasetResult {
-        self.dataset_storage_unit_writer
-            .create_dataset_from_snapshot(
-                MetadataFactory::dataset_snapshot()
-                    .name(alias.clone())
-                    .kind(odf::DatasetKind::Derivative)
-                    .push_event(
-                        MetadataFactory::set_transform()
-                            .inputs_from_refs(input_dataset_refs)
-                            .build(),
-                    )
-                    .build(),
-            )
-            .await
-            .unwrap()
-            .create_dataset_result
+        create_test_dataset_fron_snapshot(
+            self.dataset_registry.as_ref(),
+            self.dataset_storage_unit_writer.as_ref(),
+            MetadataFactory::dataset_snapshot()
+                .name(alias.clone())
+                .kind(odf::DatasetKind::Derivative)
+                .push_event(
+                    MetadataFactory::set_transform()
+                        .inputs_from_refs(input_dataset_refs)
+                        .build(),
+                )
+                .build(),
+            self.did_generator.generate_dataset_id(),
+            self.system_time_source.now(),
+        )
+        .await
+        .unwrap()
     }
 
     pub async fn num_blocks(&self, target: ResolvedDataset) -> usize {

@@ -29,7 +29,7 @@ pub const DEFAULT_ODF_FRONTEND_URL: &str = "https://platform.demo.kamu.dev";
 pub const DEFAULT_ODF_BACKEND_URL: &str = "https://api.demo.kamu.dev";
 
 struct WebServer {
-    server: axum::serve::Serve<axum::routing::IntoMakeService<axum::Router>, axum::Router>,
+    server_future: Box<dyn std::future::Future<Output = Result<(), std::io::Error>> + Unpin>,
     local_addr: SocketAddr,
 }
 
@@ -102,9 +102,12 @@ impl LoginService {
             )
             .with_state(response_tx);
 
-        let server = axum::serve(listener, app.into_make_service());
+        let server_future = Box::new(axum::serve(listener, app.into_make_service()).into_future());
 
-        Ok(WebServer { server, local_addr })
+        Ok(WebServer {
+            server_future,
+            local_addr,
+        })
     }
 
     async fn obtain_callback_response(
@@ -112,7 +115,7 @@ impl LoginService {
         mut response_rx: tokio::sync::mpsc::Receiver<FrontendLoginCallbackResponse>,
     ) -> Result<Option<FrontendLoginCallbackResponse>, InternalError> {
         let ctrlc_rx = ctrlc_channel().int_err()?;
-        let cli_web_server = cli_web_server.server.into_future();
+        let cli_web_server = cli_web_server.server_future;
 
         tokio::select! {
             maybe_login_response = response_rx.recv() => {

@@ -15,16 +15,17 @@ use dill::Component;
 use kamu_accounts::testing::CurrentAccountSubjectTestHelper;
 use kamu_accounts::{AccountConfig, CurrentAccountSubject, PredefinedAccountsConfig};
 use kamu_accounts_inmem::InMemoryAccountRepository;
-use kamu_accounts_services::{LoginPasswordAuthProvider, PredefinedAccountsRegistrator};
+use kamu_accounts_services::{
+    AccountServiceImpl,
+    LoginPasswordAuthProvider,
+    PredefinedAccountsRegistrator,
+};
 use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer, DatasetActionUnauthorizedError};
-use kamu_core::{
-    DatasetLifecycleMessage,
-    TenancyConfig,
-    MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
-};
+use kamu_core::TenancyConfig;
+use kamu_datasets::{DatasetLifecycleMessage, MESSAGE_PRODUCER_KAMU_DATASET_SERVICE};
 use kamu_datasets_inmem::InMemoryDatasetEntryRepository;
-use kamu_datasets_services::DatasetEntryServiceImpl;
+use kamu_datasets_services::{DatasetEntryServiceImpl, DatasetEntryWriter};
 use messaging_outbox::{
     register_message_dispatcher,
     ConsumerFilter,
@@ -111,6 +112,7 @@ async fn test_guest_can_read_but_not_write_public_dataset() {
 #[allow(dead_code)]
 pub struct DatasetAuthorizerHarness {
     dataset_authorizer: Arc<dyn DatasetActionAuthorizer>,
+    dataset_entry_writer: Arc<dyn DatasetEntryWriter>,
     outbox: Arc<dyn Outbox>,
 }
 
@@ -147,20 +149,21 @@ impl DatasetAuthorizerHarness {
                     OutboxImmediateImpl::builder()
                         .with_consumer_filter(ConsumerFilter::AllConsumers),
                 )
+                .bind::<dyn Outbox, OutboxImmediateImpl>()
                 .add_value(odf::dataset::MockDatasetStorageUnit::new())
                 .bind::<dyn odf::DatasetStorageUnit, odf::dataset::MockDatasetStorageUnit>()
                 .add_value(tenancy_config)
                 .add::<DatasetEntryServiceImpl>()
                 .add::<InMemoryDatasetEntryRepository>()
+                .add::<AccountServiceImpl>()
                 .add::<InMemoryAccountRepository>()
-                .add::<LoginPasswordAuthProvider>()
-                .bind::<dyn Outbox, OutboxImmediateImpl>();
+                .add::<LoginPasswordAuthProvider>();
 
             kamu_adapter_auth_oso_rebac::register_dependencies(&mut b);
 
             register_message_dispatcher::<DatasetLifecycleMessage>(
                 &mut b,
-                MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
+                MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
             );
 
             b.build()
@@ -179,6 +182,7 @@ impl DatasetAuthorizerHarness {
         Self {
             dataset_authorizer: catalog.get_one().unwrap(),
             outbox: catalog.get_one().unwrap(),
+            dataset_entry_writer: catalog.get_one().unwrap(),
         }
     }
 
@@ -198,13 +202,19 @@ impl DatasetAuthorizerHarness {
         visibility: odf::DatasetVisibility,
     ) -> odf::DatasetID {
         let dataset_id = dataset_id(&alias);
+        let account_id = account_id(&alias);
+
+        self.dataset_entry_writer
+            .create_entry(&dataset_id, &account_id, &alias.dataset_name)
+            .await
+            .unwrap();
 
         self.outbox
             .post_message(
-                MESSAGE_PRODUCER_KAMU_CORE_DATASET_SERVICE,
+                MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
                 DatasetLifecycleMessage::created(
                     dataset_id.clone(),
-                    account_id(&alias),
+                    account_id,
                     visibility,
                     alias.dataset_name.clone(),
                 ),

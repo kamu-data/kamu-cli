@@ -11,7 +11,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 use dill::*;
-use internal_error::{InternalError, ResultIntoInternal};
+use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_core::*;
 use url::Url;
 
@@ -186,6 +186,57 @@ impl RemoteAliasResolver for RemoteAliasResolverImpl {
             account_name,
         ));
     }
+
+    async fn resolve_pull_url(
+        &self,
+        remote_ref: &odf::DatasetRefRemote,
+    ) -> Result<url::Url, ResolveAliasError> {
+        match remote_ref {
+            odf::DatasetRefRemote::ID(_, _) => Err(ResolveAliasError::Internal(
+                "Syncing remote dataset by ID is not yet supported".int_err(),
+            )),
+            odf::DatasetRefRemote::Url(url) => {
+                let mut dataset_url = url.as_ref().clone();
+                dataset_url.ensure_trailing_slash();
+                Ok(dataset_url)
+            }
+            odf::DatasetRefRemote::Alias(alias)
+            | odf::DatasetRefRemote::Handle(odf::metadata::DatasetHandleRemote { alias, .. }) => {
+                let remote_repo = self.remote_repo_reg.get_repository(&alias.repo_name)?;
+                if !remote_repo.url.is_odf_protocol() {
+                    return Ok(remote_repo
+                        .url
+                        .join(&format!("{}/", alias.local_alias()))
+                        .unwrap());
+                }
+
+                let transfer_url = remote_repo.url.clone().odf_to_transport_protocol()?;
+
+                let account_name = if alias.account_name.is_some() {
+                    alias.account_name.clone()
+                } else {
+                    let access_token_maybe = self
+                        .access_token_resolver
+                        .resolve_odf_dataset_access_token(&transfer_url);
+                    RemoteAliasResolverApiHelper::resolve_remote_account_name(
+                        &transfer_url,
+                        access_token_maybe.as_ref(),
+                    )
+                    .await
+                    .int_err()?
+                };
+
+                let mut remote_url = self.combine_remote_url(
+                    &transfer_url,
+                    account_name.as_ref(),
+                    &alias.dataset_name,
+                )?;
+                remote_url.ensure_trailing_slash();
+
+                Ok(remote_url)
+            }
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -241,6 +292,7 @@ impl RemoteAliasResolverApiHelper {
             .send()
             .await
             .int_err()?;
+
         if account_response.status().is_client_error() {
             return Ok(None);
         }

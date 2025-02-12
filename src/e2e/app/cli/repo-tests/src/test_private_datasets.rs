@@ -1326,7 +1326,7 @@ pub async fn test_a_dataset_that_has_a_private_dependency_can_only_be_pulled_in_
         None,
         Some([
             r#"Failed to update 1 dataset\(s\)"#,
-            r#"Failed to pull public-derivative-dataset-2: Dataset not found: alice/private-root-dataset"#
+            r#"Failed to pull bob/public-derivative-dataset-2: Dataset not found: alice/private-root-dataset"#
         ]),
     )
         .await;

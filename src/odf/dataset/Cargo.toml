@@ -31,7 +31,9 @@ internal-error = { workspace = true }
 odf-metadata = { workspace = true }
 odf-storage = { workspace = true }
 
+async-stream = "0.3"
 async-trait = { version = "0.1", default-features = false }
+bytes = "1"
 chrono = { version = "0.4", features = ["serde"] }
 dill = { version = "0.11", default-features = false }
 futures = { version = "0.3", default-features = false }

@@ -68,7 +68,7 @@ impl DatasetMut {
             }));
         }
 
-        let rename_dataset = from_catalog_n!(ctx, dyn domain::RenameDatasetUseCase);
+        let rename_dataset = from_catalog_n!(ctx, dyn kamu_datasets::RenameDatasetUseCase);
         match rename_dataset
             .execute(&self.dataset_handle.as_local_ref(), &new_name)
             .await
@@ -95,7 +95,7 @@ impl DatasetMut {
     /// Delete the dataset
     #[graphql(guard = "LoggedInGuard::new()")]
     async fn delete(&self, ctx: &Context<'_>) -> Result<DeleteResult> {
-        let delete_dataset = from_catalog_n!(ctx, dyn domain::DeleteDatasetUseCase);
+        let delete_dataset = from_catalog_n!(ctx, dyn kamu_datasets::DeleteDatasetUseCase);
         match delete_dataset
             .execute_via_handle(&self.dataset_handle)
             .await

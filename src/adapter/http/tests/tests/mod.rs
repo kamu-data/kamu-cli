@@ -38,7 +38,7 @@ macro_rules! test_client_server_local_fs_harness_permutations {
                     ClientSideHarness::new(ClientSideHarnessOptions {
                         tenancy_config: TenancyConfig::SingleTenant,
                         authenticated_remotely: true
-                    }),
+                    }).await,
                     ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
                         tenancy_config: TenancyConfig::SingleTenant,
                         authorized_writes: true,
@@ -56,7 +56,7 @@ macro_rules! test_client_server_local_fs_harness_permutations {
                     ClientSideHarness::new(ClientSideHarnessOptions {
                         tenancy_config: TenancyConfig::SingleTenant,
                         authenticated_remotely: true
-                    }),
+                    }).await,
                     ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
                         tenancy_config: TenancyConfig::MultiTenant,
                         authorized_writes: true,
@@ -74,7 +74,7 @@ macro_rules! test_client_server_local_fs_harness_permutations {
                     ClientSideHarness::new(ClientSideHarnessOptions {
                         tenancy_config: TenancyConfig::MultiTenant,
                         authenticated_remotely: true
-                    }),
+                    }).await,
                     ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
                         tenancy_config: TenancyConfig::SingleTenant,
                         authorized_writes: true,
@@ -92,7 +92,7 @@ macro_rules! test_client_server_local_fs_harness_permutations {
                     ClientSideHarness::new(ClientSideHarnessOptions {
                         tenancy_config: TenancyConfig::MultiTenant,
                         authenticated_remotely: true
-                    }),
+                    }).await,
                     ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
                         tenancy_config: TenancyConfig::MultiTenant,
                         authorized_writes: true,
@@ -120,7 +120,7 @@ macro_rules! test_client_server_s3_harness_permutations {
                     ClientSideHarness::new(ClientSideHarnessOptions {
                         tenancy_config: TenancyConfig::SingleTenant,
                         authenticated_remotely: true
-                    }),
+                    }).await,
                     ServerSideS3Harness::new(ServerSideHarnessOptions {
                         tenancy_config: TenancyConfig::SingleTenant,
                         authorized_writes: true,
@@ -139,7 +139,7 @@ macro_rules! test_client_server_s3_harness_permutations {
                     ClientSideHarness::new(ClientSideHarnessOptions {
                         tenancy_config: TenancyConfig::SingleTenant,
                          authenticated_remotely: true
-                    }),
+                    }).await,
                     ServerSideS3Harness::new(ServerSideHarnessOptions {
                         tenancy_config: TenancyConfig::MultiTenant,
                         authorized_writes: true,
