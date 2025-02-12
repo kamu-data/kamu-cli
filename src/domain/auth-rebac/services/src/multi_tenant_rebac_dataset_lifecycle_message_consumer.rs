@@ -25,12 +25,13 @@ use messaging_outbox::{
     MessageDeliveryMechanism,
 };
 
-use crate::{RebacServiceImpl, MESSAGE_CONSUMER_KAMU_REBAC_SERVICE};
+use crate::{DefaultDatasetProperties, MESSAGE_CONSUMER_KAMU_REBAC_SERVICE};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct MultiTenantRebacDatasetLifecycleMessageConsumer {
-    rebac_service: Arc<RebacServiceImpl>,
+    rebac_service: Arc<dyn RebacService>,
+    default_dataset_properties: Arc<DefaultDatasetProperties>,
 }
 
 #[component(pub)]
@@ -44,20 +45,26 @@ pub struct MultiTenantRebacDatasetLifecycleMessageConsumer {
     delivery: MessageDeliveryMechanism::Immediate,
 })]
 impl MultiTenantRebacDatasetLifecycleMessageConsumer {
-    pub fn new(rebac_service: Arc<RebacServiceImpl>) -> Self {
-        Self { rebac_service }
+    pub fn new(
+        rebac_service: Arc<dyn RebacService>,
+        default_dataset_properties: Arc<DefaultDatasetProperties>,
+    ) -> Self {
+        Self {
+            rebac_service,
+            default_dataset_properties,
+        }
     }
 
     async fn handle_dataset_lifecycle_created_message(
         &self,
         message: &DatasetLifecycleMessageCreated,
     ) -> Result<(), InternalError> {
-        let allows = message.dataset_visibility.is_public();
-
+        // TODO: Private Datasets: batch setting of properties?
         for (name, value) in [
-            DatasetPropertyName::allows_public_read(allows),
-            // TODO: Private Datasets: Read from a specific environment's config
-            DatasetPropertyName::allows_anonymous_read(allows),
+            DatasetPropertyName::allows_public_read(message.dataset_visibility.is_public()),
+            DatasetPropertyName::allows_anonymous_read(
+                self.default_dataset_properties.allows_anonymous_read,
+            ),
         ] {
             self.rebac_service
                 .set_dataset_property(&message.dataset_id, name, &value)
