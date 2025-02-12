@@ -13,7 +13,7 @@ use std::marker::PhantomData;
 use std::sync::Arc;
 
 use dill::*;
-use internal_error::ResultIntoInternal;
+use internal_error::{InternalError, ResultIntoInternal};
 use kamu_core::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -179,8 +179,8 @@ impl<W: Write + Send, S: DotStyle + Send> LineageVisitor for DotVisitor<W, S> {
 
     fn exit(&mut self, _dataset: &NodeInfo<'_>) {}
 
-    fn done(&mut self) {
-        writeln!(self.writer, "}}").unwrap();
+    fn done(&mut self) -> Result<(), InternalError> {
+        writeln!(self.writer, "}}").int_err()
     }
 }
 
