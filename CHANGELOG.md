@@ -27,6 +27,7 @@ Recommendation: for ease of reading, use the following order:
 ### Fixed
 - GQL metadata query now correctly returns dataset aliases for `SetTransform` event in multi-tenant mode
 - Handle panic errors in `kamu inspect lineage -- browse` command
+- Improved result messages for `kamu system diagnose` command
 
 ## [0.222.0] - 2025-02-06
 ### Added
