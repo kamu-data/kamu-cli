@@ -26,6 +26,7 @@ Recommendation: for ease of reading, use the following order:
 - Upgraded to `datafusion v45` (#1063)
 ### Fixed
 - GQL metadata query now correctly returns dataset aliases for `SetTransform` event in multi-tenant mode
+- Handle panic errors in `kamu inspect lineage -- browse` command
 
 ## [0.222.0] - 2025-02-06
 ### Added

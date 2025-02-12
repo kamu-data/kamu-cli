@@ -32,7 +32,7 @@ pub trait LineageVisitor: Send {
     fn begin(&mut self);
     fn enter(&mut self, dataset: &NodeInfo<'_>) -> bool;
     fn exit(&mut self, dataset: &NodeInfo<'_>);
-    fn done(&mut self);
+    fn done(&mut self) -> Result<(), InternalError>;
 }
 
 #[derive(Debug, Clone)]
