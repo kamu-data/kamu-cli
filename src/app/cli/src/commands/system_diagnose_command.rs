@@ -125,7 +125,7 @@ impl Command for SystemDiagnoseCommand {
             )?;
         }
         if !is_err {
-            writeln!(out, "{}", style("Kamu installation is healthy").green())?;
+            writeln!(out, "{}", style("Kamu environment is healthy").green())?;
         }
         Ok(())
     }
