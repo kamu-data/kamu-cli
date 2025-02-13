@@ -225,7 +225,7 @@ pub async fn test_a_private_dataset_is_available_only_to_the_owner_or_admin_in_t
     //     - public-dataset
     //     - private-will-not-be-found
     //     - public-will-not-be-found
-    let private_dataset_alias = odf::metadata::testing::alias("alice", "private-dataset");
+    let private_dataset_alias = odf::metadata::testing::alias(&"alice", &"private-dataset");
     let CreateDatasetResponse {
         dataset_id: private_dataset_id,
         ..
@@ -238,7 +238,7 @@ pub async fn test_a_private_dataset_is_available_only_to_the_owner_or_admin_in_t
             odf::DatasetVisibility::Private,
         )
         .await;
-    let public_dataset_alias = odf::metadata::testing::alias("alice", "public-dataset");
+    let public_dataset_alias = odf::metadata::testing::alias(&"alice", &"public-dataset");
     let CreateDatasetResponse {
         dataset_id: public_dataset_id,
         ..
@@ -485,8 +485,7 @@ pub async fn test_a_private_dataset_is_available_only_to_the_owner_or_admin_in_a
         .login_with_password("admin", "admin")
         .await;
 
-    let private_dataset_alias =
-        odf::metadata::testing::alias(owner_name.as_str(), "private-dataset");
+    let private_dataset_alias = odf::metadata::testing::alias(&owner_name, &"private-dataset");
     let CreateDatasetResponse {
         dataset_id: private_dataset_id,
         ..
@@ -499,7 +498,7 @@ pub async fn test_a_private_dataset_is_available_only_to_the_owner_or_admin_in_a
             odf::DatasetVisibility::Private,
         )
         .await;
-    let public_dataset_alias = odf::metadata::testing::alias(owner_name.as_str(), "public-dataset");
+    let public_dataset_alias = odf::metadata::testing::alias(&owner_name, &"public-dataset");
     let CreateDatasetResponse {
         dataset_id: public_dataset_id,
         ..
@@ -600,7 +599,7 @@ pub async fn test_a_private_dataset_as_a_downstream_dependency_is_visible_only_t
     //                                 └───┤ alice/public-derivative-dataset  │
     //                                     └──────────────────────────────────┘
     //
-    let public_root_dataset_alias = odf::metadata::testing::alias("alice", "public-root-dataset");
+    let public_root_dataset_alias = odf::metadata::testing::alias(&"alice", &"public-root-dataset");
     let CreateDatasetResponse {
         dataset_id: public_root_dataset_id,
         ..
@@ -614,7 +613,7 @@ pub async fn test_a_private_dataset_as_a_downstream_dependency_is_visible_only_t
         )
         .await;
     let private_derivative_dataset_alias =
-        odf::metadata::testing::alias("alice", "private-derivative-dataset");
+        odf::metadata::testing::alias(&"alice", &"private-derivative-dataset");
     let CreateDatasetResponse {
         dataset_id: private_derivative_dataset_id,
         ..
@@ -634,7 +633,7 @@ pub async fn test_a_private_dataset_as_a_downstream_dependency_is_visible_only_t
         )
         .await;
     let public_derivative_dataset_alias =
-        odf::metadata::testing::alias("alice", "public-derivative-dataset");
+        odf::metadata::testing::alias(&"alice", &"public-derivative-dataset");
     let CreateDatasetResponse {
         dataset_id: public_derivative_dataset_id,
         ..
@@ -759,7 +758,7 @@ pub async fn test_a_private_dataset_as_an_upstream_dependency_is_visible_only_to
     // │ alice/private-root-dataset ├◄──┘
     // └────────────────────────────┘
     //
-    let public_root_dataset_alias = odf::metadata::testing::alias("alice", "public-root-dataset");
+    let public_root_dataset_alias = odf::metadata::testing::alias(&"alice", &"public-root-dataset");
     let CreateDatasetResponse {
         dataset_id: public_root_dataset_id,
         ..
@@ -772,7 +771,8 @@ pub async fn test_a_private_dataset_as_an_upstream_dependency_is_visible_only_to
             odf::DatasetVisibility::Public,
         )
         .await;
-    let private_root_dataset_alias = odf::metadata::testing::alias("alice", "private-root-dataset");
+    let private_root_dataset_alias =
+        odf::metadata::testing::alias(&"alice", &"private-root-dataset");
     let CreateDatasetResponse {
         dataset_id: private_root_dataset_id,
         ..
@@ -786,7 +786,7 @@ pub async fn test_a_private_dataset_as_an_upstream_dependency_is_visible_only_to
         )
         .await;
     let public_derivative_dataset_alias =
-        odf::metadata::testing::alias("alice", "public-derivative-dataset");
+        odf::metadata::testing::alias(&"alice", &"public-derivative-dataset");
     let CreateDatasetResponse {
         dataset_id: public_derivative_dataset_id,
         ..
@@ -904,7 +904,7 @@ pub async fn test_a_private_dataset_can_only_be_pulled_by_the_owner_or_admin(
         .login_with_password(owner_name.as_str(), "alice")
         .await;
 
-    let private_dataset_alias = odf::metadata::testing::alias("alice", "private-dataset");
+    let private_dataset_alias = odf::metadata::testing::alias(&"alice", &"private-dataset");
     owner_client
         .dataset()
         .create_dataset_from_snapshot_with_visibility(
@@ -1098,7 +1098,7 @@ pub async fn test_a_public_derivative_dataset_that_has_a_private_dependency_can_
     // │ alice/private-root-dataset ├◄──┘
     // └────────────────────────────┘
     //
-    let public_root_dataset_alias = odf::metadata::testing::alias("alice", "public-root-dataset");
+    let public_root_dataset_alias = odf::metadata::testing::alias(&"alice", &"public-root-dataset");
     let CreateDatasetResponse {
         dataset_id: _public_root_dataset_id,
         ..
@@ -1111,7 +1111,8 @@ pub async fn test_a_public_derivative_dataset_that_has_a_private_dependency_can_
             odf::DatasetVisibility::Public,
         )
         .await;
-    let private_root_dataset_alias = odf::metadata::testing::alias("alice", "private-root-dataset");
+    let private_root_dataset_alias =
+        odf::metadata::testing::alias(&"alice", &"private-root-dataset");
     let CreateDatasetResponse {
         dataset_id: _private_root_dataset_id,
         ..
@@ -1125,7 +1126,7 @@ pub async fn test_a_public_derivative_dataset_that_has_a_private_dependency_can_
         )
         .await;
     let public_derivative_dataset_alias =
-        odf::metadata::testing::alias("alice", "public-derivative-dataset");
+        odf::metadata::testing::alias(&"alice", &"public-derivative-dataset");
     owner_client
         .dataset()
         .create_dataset_from_snapshot_with_visibility(
@@ -1233,16 +1234,13 @@ pub async fn test_a_dataset_that_has_a_private_dependency_can_only_be_pulled_in_
     let bob = odf::AccountName::new_unchecked("bob");
     let admin = odf::AccountName::new_unchecked("admin");
 
-    let alice_public_root_dataset_alias =
-        odf::metadata::testing::alias(alice.as_str(), "public-root-dataset");
-    let alice_private_root_dataset_alias =
-        odf::metadata::testing::alias(alice.as_str(), "private-root-dataset");
-    let alice_public_derivative_dataset_alias =
-        odf::metadata::testing::alias(bob.as_str(), "public-derivative-dataset-1");
-    let bob_public_derivative_dataset_alias =
-        odf::metadata::testing::alias(bob.as_str(), "public-derivative-dataset-2");
-    let admin_public_derivative_dataset_alias =
-        odf::metadata::testing::alias(bob.as_str(), "public-derivative-dataset-3");
+    use odf::metadata::testing::alias;
+
+    let alice_public_root_dataset_alias = alias(&alice, &"public-root-dataset");
+    let alice_private_root_dataset_alias = alias(&alice, &"private-root-dataset");
+    let alice_public_derivative_dataset_alias = alias(&bob, &"public-derivative-dataset-1");
+    let bob_public_derivative_dataset_alias = alias(&bob, &"public-derivative-dataset-2");
+    let admin_public_derivative_dataset_alias = alias(&bob, &"public-derivative-dataset-3");
 
     // Alice
 

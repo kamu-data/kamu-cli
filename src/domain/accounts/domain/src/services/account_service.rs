@@ -16,12 +16,8 @@ use crate::Account;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// TODO: Private Datasets: merge with AuthenticationService?
-// TODO: Private Datasets: tests
 #[async_trait::async_trait]
 pub trait AccountService: Sync + Send {
-    // TODO: Private Datasets: extract to AccountRegistry?
-
     async fn account_by_id(
         &self,
         account_id: &odf::AccountID,

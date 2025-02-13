@@ -7,12 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::cmp::Ordering;
+
 use internal_error::InternalError;
 use thiserror::Error;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// TODO: Private Datasets: tests
 #[async_trait::async_trait]
 pub trait GetDatasetDownstreamDependenciesUseCase: Send + Sync {
     async fn execute(
@@ -23,17 +24,26 @@ pub trait GetDatasetDownstreamDependenciesUseCase: Send + Sync {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct ResolvedDatasetDependency {
     pub dataset_handle: odf::DatasetHandle,
     pub owner_id: odf::AccountID,
     pub owner_name: odf::AccountName,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum DatasetDependency {
     Resolved(ResolvedDatasetDependency),
     Unresolved(odf::DatasetID),
+}
+
+impl DatasetDependency {
+    pub fn id(&self) -> &odf::DatasetID {
+        match self {
+            DatasetDependency::Resolved(r) => &r.dataset_handle.id,
+            DatasetDependency::Unresolved(id) => id,
+        }
+    }
 }
 
 impl DatasetDependency {
@@ -47,6 +57,18 @@ impl DatasetDependency {
             owner_id,
             owner_name,
         })
+    }
+}
+
+impl PartialOrd for DatasetDependency {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for DatasetDependency {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.id().cmp(other.id())
     }
 }
 

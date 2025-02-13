@@ -352,6 +352,15 @@ impl DatasetEntryService for DatasetEntryServiceImpl {
     ) -> Result<DatasetEntry, GetDatasetEntryError> {
         self.dataset_entry_repo.get_dataset_entry(dataset_id).await
     }
+
+    async fn get_multiple_entries(
+        &self,
+        dataset_ids: &[odf::DatasetID],
+    ) -> Result<DatasetEntriesResolution, GetMultipleDatasetEntriesError> {
+        self.dataset_entry_repo
+            .get_multiple_dataset_entries(dataset_ids)
+            .await
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

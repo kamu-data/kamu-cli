@@ -183,7 +183,7 @@ impl RebacRepository for SqliteRebacRepository {
             .map_err(GetEntityPropertiesError::Internal)
     }
 
-    async fn get_entity_properties_by_ids(
+    async fn get_entities_properties(
         &self,
         entities: &[Entity],
     ) -> Result<Vec<(Entity, PropertyName, PropertyValue)>, GetEntityPropertiesError> {

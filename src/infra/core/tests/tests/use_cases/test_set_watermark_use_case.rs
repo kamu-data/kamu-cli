@@ -66,9 +66,9 @@ async fn test_set_watermark_unauthorized() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[oop::extend(BaseUseCaseHarness, base_harness)]
+#[oop::extend(BaseUseCaseHarness, base_use_case_harness)]
 struct SetWatermarkUseCaseHarness {
-    base_harness: BaseUseCaseHarness,
+    base_use_case_harness: BaseUseCaseHarness,
     use_case: Arc<dyn SetWatermarkUseCase>,
     metadata_query_svc: Arc<dyn MetadataQueryService>,
 }
@@ -78,13 +78,13 @@ impl SetWatermarkUseCaseHarness {
         mock_dataset_action_authorizer: MockDatasetActionAuthorizer,
         mock_did_generator: MockDidGenerator,
     ) -> Self {
-        let base_harness = BaseUseCaseHarness::new(
+        let base_use_case_harness = BaseUseCaseHarness::new(
             BaseUseCaseHarnessOptions::new()
-                .with_authorizer(mock_dataset_action_authorizer)
+                .with_maybe_authorizer(Some(mock_dataset_action_authorizer))
                 .with_maybe_mock_did_generator(Some(mock_did_generator)),
         );
 
-        let catalog = dill::CatalogBuilder::new_chained(base_harness.catalog())
+        let catalog = dill::CatalogBuilder::new_chained(base_use_case_harness.catalog())
             .add::<SetWatermarkUseCaseImpl>()
             .add::<SetWatermarkPlannerImpl>()
             .add::<SetWatermarkExecutorImpl>()
@@ -93,7 +93,7 @@ impl SetWatermarkUseCaseHarness {
             .build();
 
         Self {
-            base_harness,
+            base_use_case_harness,
             use_case: catalog.get_one().unwrap(),
             metadata_query_svc: catalog.get_one().unwrap(),
         }

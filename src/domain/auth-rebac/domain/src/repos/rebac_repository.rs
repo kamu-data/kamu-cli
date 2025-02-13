@@ -17,7 +17,6 @@ use crate::{Entity, EntityType, EntityWithRelation, PropertyName, PropertyValue,
 #[async_trait::async_trait]
 pub trait RebacRepository: Send + Sync {
     // Properties
-    // TODO: Private Datasets: tests
     async fn properties_count(&self) -> Result<usize, PropertiesCountError>;
 
     async fn set_entity_property(
@@ -43,8 +42,7 @@ pub trait RebacRepository: Send + Sync {
         entity: &Entity,
     ) -> Result<Vec<(PropertyName, PropertyValue)>, GetEntityPropertiesError>;
 
-    // TODO: Private Datasets: tests
-    async fn get_entity_properties_by_ids(
+    async fn get_entities_properties(
         &self,
         entities: &[Entity],
     ) -> Result<Vec<(Entity, PropertyName, PropertyValue)>, GetEntityPropertiesError>;

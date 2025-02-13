@@ -20,7 +20,7 @@ use kamu_core::{
     GetDatasetDownstreamDependenciesUseCase,
     TenancyConfig,
 };
-use kamu_datasets::DatasetEntryRepository;
+use kamu_datasets::DatasetEntryService;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -30,7 +30,7 @@ pub struct GetDatasetDownstreamDependenciesUseCaseImpl {
     tenancy_config: Arc<TenancyConfig>,
     dependency_graph_service: Arc<dyn DependencyGraphService>,
     dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
-    dataset_entry_repository: Arc<dyn DatasetEntryRepository>,
+    dataset_entry_service: Arc<dyn DatasetEntryService>,
     account_service: Arc<dyn AccountService>,
 }
 
@@ -39,14 +39,14 @@ impl GetDatasetDownstreamDependenciesUseCaseImpl {
         tenancy_config: Arc<TenancyConfig>,
         dependency_graph_service: Arc<dyn DependencyGraphService>,
         dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
-        dataset_entry_repository: Arc<dyn DatasetEntryRepository>,
+        dataset_entry_service: Arc<dyn DatasetEntryService>,
         account_service: Arc<dyn AccountService>,
     ) -> Self {
         Self {
             tenancy_config,
             dependency_graph_service,
             dataset_action_authorizer,
-            dataset_entry_repository,
+            dataset_entry_service,
             account_service,
         }
     }
@@ -85,8 +85,8 @@ impl GetDatasetDownstreamDependenciesUseCase for GetDatasetDownstreamDependencie
             .authorized_ids;
 
         let dataset_entries_resolution = self
-            .dataset_entry_repository
-            .get_multiple_dataset_entries(&authorized_ids)
+            .dataset_entry_service
+            .get_multiple_entries(&authorized_ids)
             .await
             .int_err()?;
 

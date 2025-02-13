@@ -68,9 +68,9 @@ async fn test_create_root_dataset() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[oop::extend(BaseUseCaseHarness, base_harness)]
+#[oop::extend(BaseUseCaseHarness, base_use_case_harness)]
 struct CreateUseCaseHarness {
-    base_harness: BaseUseCaseHarness,
+    base_use_case_harness: BaseUseCaseHarness,
     use_case: Arc<dyn CreateDatasetUseCase>,
 }
 
@@ -80,10 +80,10 @@ impl CreateUseCaseHarness {
         mock_dependency_graph_writer: MockDependencyGraphWriter,
         mock_outbox: MockOutbox,
     ) -> Self {
-        let base_harness =
+        let base_use_case_harness =
             BaseUseCaseHarness::new(BaseUseCaseHarnessOptions::new().with_outbox(mock_outbox));
 
-        let catalog = dill::CatalogBuilder::new_chained(base_harness.catalog())
+        let catalog = dill::CatalogBuilder::new_chained(base_use_case_harness.catalog())
             .add::<CreateDatasetUseCaseImpl>()
             .add_value(mock_dataset_entry_writer)
             .bind::<dyn DatasetEntryWriter, MockDatasetEntryWriter>()
@@ -94,7 +94,7 @@ impl CreateUseCaseHarness {
         let use_case = catalog.get_one::<dyn CreateDatasetUseCase>().unwrap();
 
         Self {
-            base_harness,
+            base_use_case_harness,
             use_case,
         }
     }

@@ -12,11 +12,13 @@ use std::sync::{Arc, Mutex};
 
 use dill::{component, interface, scope, Singleton};
 use kamu_datasets::{
+    DatasetEntriesResolution,
     DatasetEntry,
     DatasetEntryNotFoundError,
     DatasetEntryService,
     DatasetEntryStream,
     GetDatasetEntryError,
+    GetMultipleDatasetEntriesError,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -96,6 +98,28 @@ impl DatasetEntryService for FakeDatasetEntryService {
                 })
             })
             .cloned()
+    }
+
+    async fn get_multiple_entries(
+        &self,
+        dataset_ids: &[odf::DatasetID],
+    ) -> Result<DatasetEntriesResolution, GetMultipleDatasetEntriesError> {
+        let guard = self.state.lock().unwrap();
+
+        let res = dataset_ids.iter().fold(
+            DatasetEntriesResolution::default(),
+            |mut acc, dataset_id| {
+                if let Some(dataset_entry) = guard.all_entries_by_id.get(dataset_id) {
+                    acc.resolved_entries.push(dataset_entry.clone());
+                } else {
+                    acc.unresolved_entries.push(dataset_id.clone());
+                }
+
+                acc
+            },
+        );
+
+        Ok(res)
     }
 }
 

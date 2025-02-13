@@ -24,27 +24,23 @@ pub trait DatasetActionAuthorizer: Sync + Send {
         action: DatasetAction,
     ) -> Result<(), DatasetActionUnauthorizedError>;
 
-    // TODO: Private Datasets: tests
     async fn get_allowed_actions(
         &self,
         dataset_id: &odf::DatasetID,
     ) -> Result<HashSet<DatasetAction>, InternalError>;
 
-    // TODO: Private Datasets: tests
     async fn filter_datasets_allowing(
         &self,
         dataset_handles: Vec<odf::DatasetHandle>,
         action: DatasetAction,
     ) -> Result<Vec<odf::DatasetHandle>, InternalError>;
 
-    // TODO: Private Datasets: tests
     async fn classify_dataset_handles_by_allowance(
         &self,
         dataset_handles: Vec<odf::DatasetHandle>,
         action: DatasetAction,
     ) -> Result<ClassifyByAllowanceResponse, InternalError>;
 
-    // TODO: Private Datasets: tests
     async fn classify_dataset_ids_by_allowance(
         &self,
         dataset_ids: Vec<odf::DatasetID>,
@@ -115,6 +111,18 @@ pub enum DatasetActionUnauthorizedError {
 
     #[error(transparent)]
     Internal(#[from] InternalError),
+}
+
+impl DatasetActionUnauthorizedError {
+    pub fn not_enough_permissions(dataset_ref: odf::DatasetRef, action: DatasetAction) -> Self {
+        Self::Access(odf::AccessError::Forbidden(
+            DatasetActionNotEnoughPermissionsError {
+                action,
+                dataset_ref,
+            }
+            .into(),
+        ))
+    }
 }
 
 #[derive(Debug, Error)]
@@ -205,10 +213,24 @@ where
 
 // TODO: Private Datasets: use classify_datasets_by_allowance() name
 //       after migration
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct ClassifyByAllowanceIdsResponse {
     pub authorized_ids: Vec<odf::DatasetID>,
     pub unauthorized_ids_with_errors: Vec<(odf::DatasetID, DatasetActionUnauthorizedError)>,
+}
+
+#[cfg(any(feature = "testing", test))]
+impl From<ClassifyByAllowanceResponse> for ClassifyByAllowanceIdsResponse {
+    fn from(v: ClassifyByAllowanceResponse) -> Self {
+        Self {
+            authorized_ids: v.authorized_handles.into_iter().map(|h| h.id).collect(),
+            unauthorized_ids_with_errors: v
+                .unauthorized_handles_with_errors
+                .into_iter()
+                .map(|(h, e)| (h.id, e))
+                .collect(),
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

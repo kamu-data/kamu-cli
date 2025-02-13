@@ -809,7 +809,9 @@ struct DatasetChangesHarness {
 
 impl DatasetChangesHarness {
     fn new() -> Self {
-        let base_repo_harness = BaseRepoHarness::new(TenancyConfig::SingleTenant, None);
+        let base_repo_harness = BaseRepoHarness::builder()
+            .tenancy_config(TenancyConfig::SingleTenant)
+            .build();
 
         let catalog = dill::CatalogBuilder::new_chained(base_repo_harness.catalog())
             .add::<DatasetChangesServiceImpl>()

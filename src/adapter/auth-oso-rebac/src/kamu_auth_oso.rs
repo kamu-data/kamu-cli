@@ -22,8 +22,10 @@ pub struct KamuAuthOso {
     pub oso: Arc<Oso>,
 }
 
-// TODO: Private Datasets: move from stateless component to stateful
-//                         (do not parse Polar every time)
+// TODO: Private Datasets: `KamuAuthOso`: move from stateless component to
+//       stateful
+//       https://github.com/kamu-data/kamu-cli/issues/1056
+//       (do not parse Polar every time)
 #[component(pub)]
 impl KamuAuthOso {
     pub fn new() -> Self {
@@ -37,9 +39,10 @@ impl KamuAuthOso {
         Self { oso: Arc::new(oso) }
     }
 
+    #[tracing::instrument(level = "debug", skip_all)]
     fn load_oso() -> Result<Oso, OsoError> {
         // TODO: Private Datasets: make a patch for OSO:
-        //       - remove extra allocations (check tracing logs)
+        //       - optional: remove extra allocations (check tracing logs)
         //       - add removing/updating for cached instances
         let mut oso = Oso::new();
 

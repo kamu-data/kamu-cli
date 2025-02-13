@@ -25,3 +25,4 @@ doctest = false
 kamu-auth-rebac = { workspace = true }
 
 dill = "0.11"
+pretty_assertions = { version = "1" }

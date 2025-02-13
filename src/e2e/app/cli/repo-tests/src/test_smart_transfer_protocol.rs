@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::assert_matches::assert_matches;
 use std::str::FromStr;
 
 use chrono::DateTime;
@@ -1204,7 +1205,7 @@ async fn test_smart_push_visibility(
     let token = kamu_api_server_client.auth().login_as_e2e_user().await;
 
     // 2. Pushing the dataset to the API server
-    {
+    let dataset_id = {
         let kamu_in_push_workspace =
             KamuCliPuppet::new_workspace_tmp(is_push_workspace_multi_tenant).await;
 
@@ -1248,8 +1249,18 @@ async fn test_smart_push_visibility(
             )
             .await;
 
-        // TODO: Private Datasets: add visibility check
-    }
+        let mut datasets = kamu_in_push_workspace.list_datasets().await;
+        pretty_assertions::assert_eq!(1, datasets.len());
+        datasets.swap_remove(0).id
+    };
+
+    assert_matches!(
+        kamu_api_server_client
+            .dataset()
+            .get_visibility(&dataset_id)
+            .await,
+        Ok(odf::DatasetVisibility::Private)
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

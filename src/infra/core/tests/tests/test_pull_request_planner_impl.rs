@@ -733,7 +733,9 @@ impl PullTestHarness {
         mock_dataset_entry_writer: MockDatasetEntryWriter,
         mock_dependency_graph_writer: MockDependencyGraphWriter,
     ) -> Self {
-        let base_repo_harness = BaseRepoHarness::new(tenancy_config, None);
+        let base_repo_harness = BaseRepoHarness::builder()
+            .tenancy_config(tenancy_config)
+            .build();
 
         let calls = Arc::new(Mutex::new(Vec::new()));
 

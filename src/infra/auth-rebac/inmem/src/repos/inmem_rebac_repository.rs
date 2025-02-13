@@ -81,7 +81,10 @@ impl RebacRepository for InMemoryRebacRepository {
     async fn properties_count(&self) -> Result<usize, PropertiesCountError> {
         let readable_state = self.state.read().await;
 
-        let count = readable_state.entities_properties_map.len();
+        let count = readable_state
+            .entities_properties_map
+            .values()
+            .fold(0, |acc, properties| acc + properties.len());
 
         Ok(count)
     }
@@ -166,7 +169,7 @@ impl RebacRepository for InMemoryRebacRepository {
         Ok(properties)
     }
 
-    async fn get_entity_properties_by_ids(
+    async fn get_entities_properties(
         &self,
         entities: &[Entity],
     ) -> Result<Vec<(Entity, PropertyName, PropertyValue)>, GetEntityPropertiesError> {

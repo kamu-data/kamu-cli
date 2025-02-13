@@ -10,8 +10,6 @@
 use kamu_adapter_auth_oso_rebac::{DatasetResource, KamuAuthOso, UserActor};
 use kamu_core::auth::DatasetAction;
 
-// TODO: Private Datasets: cover all other schema branches
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 macro_rules! assert_allowed {

@@ -645,9 +645,9 @@ async fn test_pull_authorization_issue() {
 
 static REMOTE_REPO_NAME_STR: &str = "remote";
 
-#[oop::extend(BaseUseCaseHarness, base_harness)]
+#[oop::extend(BaseUseCaseHarness, base_use_case_harness)]
 struct PullUseCaseHarness {
-    base_harness: BaseUseCaseHarness,
+    base_use_case_harness: BaseUseCaseHarness,
     use_case: Arc<dyn PullDatasetUseCase>,
     remote_aliases_registry: Arc<dyn RemoteAliasesRegistry>,
     remote_repo_name: odf::RepoName,
@@ -656,14 +656,15 @@ struct PullUseCaseHarness {
 
 impl PullUseCaseHarness {
     fn new(mocks: PullUseCaseHarnessMocks) -> Self {
-        let base_harness = BaseUseCaseHarness::new(
-            BaseUseCaseHarnessOptions::new().with_authorizer(mocks.mock_dataset_action_authorizer),
+        let base_use_case_harness = BaseUseCaseHarness::new(
+            BaseUseCaseHarnessOptions::new()
+                .with_maybe_authorizer(Some(mocks.mock_dataset_action_authorizer)),
         );
 
-        let repos_dir = base_harness.temp_dir_path().join("repos");
+        let repos_dir = base_use_case_harness.temp_dir_path().join("repos");
         std::fs::create_dir(&repos_dir).unwrap();
 
-        let catalog = dill::CatalogBuilder::new_chained(base_harness.catalog())
+        let catalog = dill::CatalogBuilder::new_chained(base_use_case_harness.catalog())
             .add::<PullDatasetUseCaseImpl>()
             .add::<PullRequestPlannerImpl>()
             .add::<TransformRequestPlannerImpl>()
@@ -698,7 +699,7 @@ impl PullUseCaseHarness {
             .unwrap();
 
         Self {
-            base_harness,
+            base_use_case_harness,
             use_case,
             remote_aliases_registry,
             remote_repo_name,
@@ -718,7 +719,7 @@ impl PullUseCaseHarness {
 
     async fn copy_dataset_to_remote_repo(&self, dataset_alias: &odf::DatasetAlias) {
         let src_path = self
-            .base_harness
+            .base_use_case_harness
             .temp_dir_path()
             .join("datasets")
             .join(&dataset_alias.dataset_name);

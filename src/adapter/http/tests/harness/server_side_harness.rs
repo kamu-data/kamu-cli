@@ -7,8 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 use std::sync::Arc;
 
 use chrono::Utc;
@@ -28,6 +26,7 @@ use kamu_accounts::{
     DEFAULT_ACCOUNT_NAME,
     PROVIDER_PASSWORD,
 };
+use kamu_core::auth::DatasetActionUnauthorizedError;
 use kamu_core::{CompactionExecutor, CompactionPlanner, DatasetRegistry, TenancyConfig};
 use kamu_datasets::{
     CommitDatasetEventUseCase,
@@ -155,7 +154,7 @@ pub(crate) fn create_web_user_catalog(
             .expect_check_action_allowed()
             .returning(|dataset_id, action| {
                 if action == DatasetAction::Write {
-                    Err(MockDatasetActionAuthorizer::denying_error(
+                    Err(DatasetActionUnauthorizedError::not_enough_permissions(
                         dataset_id.as_local_ref(),
                         action,
                     ))

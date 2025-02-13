@@ -10,7 +10,13 @@
 use internal_error::{ErrorIntoInternal, InternalError};
 use thiserror::Error;
 
-use crate::{DatasetEntry, DatasetEntryStream, GetDatasetEntryError};
+use crate::{
+    DatasetEntriesResolution,
+    DatasetEntry,
+    DatasetEntryStream,
+    GetDatasetEntryError,
+    GetMultipleDatasetEntriesError,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -25,6 +31,11 @@ pub trait DatasetEntryService: Sync + Send {
         &self,
         dataset_id: &odf::DatasetID,
     ) -> Result<DatasetEntry, GetDatasetEntryError>;
+
+    async fn get_multiple_entries(
+        &self,
+        dataset_ids: &[odf::DatasetID],
+    ) -> Result<DatasetEntriesResolution, GetMultipleDatasetEntriesError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

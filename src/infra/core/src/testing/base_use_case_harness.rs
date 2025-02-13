@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use dill::Catalog;
+use kamu_accounts::CurrentAccountSubject;
 use kamu_core::auth::DatasetActionAuthorizer;
 use kamu_core::{MockDidGenerator, TenancyConfig};
 use messaging_outbox::{MockOutbox, Outbox};
@@ -18,9 +19,10 @@ use crate::testing::{BaseRepoHarness, MockDatasetActionAuthorizer};
 
 pub struct BaseUseCaseHarnessOptions {
     tenancy_config: TenancyConfig,
-    mock_dataset_action_authorizer: MockDatasetActionAuthorizer,
+    maybe_mock_dataset_action_authorizer: Option<MockDatasetActionAuthorizer>,
     mock_outbox: MockOutbox,
     maybe_mock_did_generator: Option<MockDidGenerator>,
+    current_account_subject: CurrentAccountSubject,
 }
 
 impl BaseUseCaseHarnessOptions {
@@ -28,11 +30,16 @@ impl BaseUseCaseHarnessOptions {
         Self::default()
     }
 
-    pub fn with_authorizer(
+    pub fn with_tenancy_config(mut self, tenancy_config: TenancyConfig) -> Self {
+        self.tenancy_config = tenancy_config;
+        self
+    }
+
+    pub fn with_maybe_authorizer(
         mut self,
-        mock_dataset_action_authorizer: MockDatasetActionAuthorizer,
+        mock_dataset_action_authorizer: Option<MockDatasetActionAuthorizer>,
     ) -> Self {
-        self.mock_dataset_action_authorizer = mock_dataset_action_authorizer;
+        self.maybe_mock_dataset_action_authorizer = mock_dataset_action_authorizer;
         self
     }
 
@@ -48,15 +55,24 @@ impl BaseUseCaseHarnessOptions {
         self.maybe_mock_did_generator = mock_did_generator;
         self
     }
+
+    pub fn with_current_account_subject(
+        mut self,
+        current_account_subject: CurrentAccountSubject,
+    ) -> Self {
+        self.current_account_subject = current_account_subject;
+        self
+    }
 }
 
 impl Default for BaseUseCaseHarnessOptions {
     fn default() -> Self {
         Self {
             tenancy_config: TenancyConfig::SingleTenant,
-            mock_dataset_action_authorizer: MockDatasetActionAuthorizer::new(),
+            maybe_mock_dataset_action_authorizer: None,
             mock_outbox: MockOutbox::new(),
             maybe_mock_did_generator: None,
+            current_account_subject: CurrentAccountSubject::new_test(),
         }
     }
 }
@@ -71,15 +87,26 @@ pub struct BaseUseCaseHarness {
 
 impl BaseUseCaseHarness {
     pub fn new(options: BaseUseCaseHarnessOptions) -> Self {
-        let base_repo_harness =
-            BaseRepoHarness::new(options.tenancy_config, options.maybe_mock_did_generator);
-
-        let catalog = dill::CatalogBuilder::new_chained(base_repo_harness.catalog())
-            .add_value(options.mock_dataset_action_authorizer)
-            .bind::<dyn DatasetActionAuthorizer, MockDatasetActionAuthorizer>()
-            .add_value(options.mock_outbox)
-            .bind::<dyn Outbox, MockOutbox>()
+        let base_repo_harness = BaseRepoHarness::builder()
+            .tenancy_config(options.tenancy_config)
+            .maybe_mock_did_generator(options.maybe_mock_did_generator)
+            .current_account_subject(options.current_account_subject)
             .build();
+
+        let catalog = {
+            let mut b = dill::CatalogBuilder::new_chained(base_repo_harness.catalog());
+            b.add_value(options.mock_outbox)
+                .bind::<dyn Outbox, MockOutbox>();
+
+            if let Some(mock_dataset_action_authorizer) =
+                options.maybe_mock_dataset_action_authorizer
+            {
+                b.add_value(mock_dataset_action_authorizer)
+                    .bind::<dyn DatasetActionAuthorizer, MockDatasetActionAuthorizer>();
+            }
+
+            b.build()
+        };
 
         Self {
             base_repo_harness,

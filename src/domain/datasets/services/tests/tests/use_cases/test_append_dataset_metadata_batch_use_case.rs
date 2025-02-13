@@ -100,17 +100,17 @@ async fn test_append_dataset_metadata_batch_with_new_dependencies() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[oop::extend(BaseUseCaseHarness, base_harness)]
+#[oop::extend(BaseUseCaseHarness, base_use_case_harness)]
 struct AppendDatasetMetadataBatchUseCaseHarness {
-    base_harness: BaseUseCaseHarness,
+    base_use_case_harness: BaseUseCaseHarness,
     use_case: Arc<dyn AppendDatasetMetadataBatchUseCase>,
 }
 
 impl AppendDatasetMetadataBatchUseCaseHarness {
     fn new(mock_dependency_graph_writer: MockDependencyGraphWriter) -> Self {
-        let base_harness = BaseUseCaseHarness::new(BaseUseCaseHarnessOptions::new());
+        let base_use_case_harness = BaseUseCaseHarness::new(BaseUseCaseHarnessOptions::new());
 
-        let catalog = dill::CatalogBuilder::new_chained(base_harness.catalog())
+        let catalog = dill::CatalogBuilder::new_chained(base_use_case_harness.catalog())
             .add::<AppendDatasetMetadataBatchUseCaseImpl>()
             .add_value(mock_dependency_graph_writer)
             .bind::<dyn DependencyGraphWriter, MockDependencyGraphWriter>()
@@ -121,7 +121,7 @@ impl AppendDatasetMetadataBatchUseCaseHarness {
             .unwrap();
 
         Self {
-            base_harness,
+            base_use_case_harness,
             use_case,
         }
     }

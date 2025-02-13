@@ -335,9 +335,9 @@ async fn test_push_multiple_mixed_authorization_issues() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[oop::extend(BaseUseCaseHarness, base_harness)]
+#[oop::extend(BaseUseCaseHarness, base_use_case_harness)]
 struct PushUseCaseHarness {
-    base_harness: BaseUseCaseHarness,
+    base_use_case_harness: BaseUseCaseHarness,
     use_case: Arc<dyn PushDatasetUseCase>,
     remote_aliases_registry: Arc<dyn RemoteAliasesRegistry>,
     remote_repo_name: odf::RepoName,
@@ -347,14 +347,15 @@ struct PushUseCaseHarness {
 
 impl PushUseCaseHarness {
     fn new(mock_dataset_action_authorizer: MockDatasetActionAuthorizer) -> Self {
-        let base_harness = BaseUseCaseHarness::new(
-            BaseUseCaseHarnessOptions::new().with_authorizer(mock_dataset_action_authorizer),
+        let base_use_case_harness = BaseUseCaseHarness::new(
+            BaseUseCaseHarnessOptions::new()
+                .with_maybe_authorizer(Some(mock_dataset_action_authorizer)),
         );
 
-        let repos_dir = base_harness.temp_dir_path().join("repos");
+        let repos_dir = base_use_case_harness.temp_dir_path().join("repos");
         std::fs::create_dir(&repos_dir).unwrap();
 
-        let catalog = dill::CatalogBuilder::new_chained(base_harness.catalog())
+        let catalog = dill::CatalogBuilder::new_chained(base_use_case_harness.catalog())
             .add::<PushDatasetUseCaseImpl>()
             .add::<PushRequestPlannerImpl>()
             .add::<SyncServiceImpl>()
@@ -384,7 +385,7 @@ impl PushUseCaseHarness {
             .unwrap();
 
         Self {
-            base_harness,
+            base_use_case_harness,
             use_case,
             remote_aliases_registry,
             remote_repo_name,
