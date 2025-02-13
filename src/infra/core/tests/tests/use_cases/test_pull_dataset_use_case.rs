@@ -493,7 +493,7 @@ async fn test_pull_all_owned() {
     let baz = harness.create_root_dataset(&alias_baz).await;
 
     harness
-        .copy_dataset_to_remote_repo(&baz.dataset_handle.id, &alias_foo.dataset_name)
+        .copy_dataset_to_remote_repo(&baz.dataset_handle.id, &alias_baz.dataset_name)
         .await;
     harness
         .get_remote_aliases(&baz)
