@@ -72,7 +72,6 @@ pub struct FlowAgentImpl {
     job_name: JOB_KAMU_FLOW_AGENT_RECOVERY,
     depends_on: &[],
     requires_transaction: false,
-    requires_up_to_date_storage: false,
 })]
 #[scope(Singleton)]
 impl FlowAgentImpl {

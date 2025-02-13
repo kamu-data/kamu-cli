@@ -81,9 +81,7 @@ impl Harness {
             b.build()
         };
 
-        init_on_startup::run_startup_jobs(&catalog, init_on_startup::RunStartupJobOpts::default())
-            .await
-            .unwrap();
+        init_on_startup::run_startup_jobs(&catalog).await.unwrap();
 
         let system_time_source_stub = catalog.get_one::<SystemTimeSourceStub>().unwrap();
 

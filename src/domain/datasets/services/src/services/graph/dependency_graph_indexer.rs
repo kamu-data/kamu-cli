@@ -37,7 +37,6 @@ pub struct DependencyGraphIndexer {
         JOB_KAMU_DATASETS_DATASET_ENTRY_INDEXER,
     ],
     requires_transaction: true,
-    requires_up_to_date_storage: true,
 })]
 impl DependencyGraphIndexer {
     pub fn new(
