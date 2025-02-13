@@ -180,13 +180,10 @@ fn extract_problematic_field(sql: &str, error_index: usize) -> Option<String> {
     let truncated = &sql[..error_index - 1];
 
     // Step 2: Find the last ',' or '(' before the error index
-    let last_separator = truncated.rfind(|c| c == ',' || c == '(')?;
+    let last_separator = truncated.rfind([',', '('])?;
 
     // Step 3: Extract the column definition
-    let column_part = truncated[(last_separator + 1)..].trim();
+    let column_definition = truncated[(last_separator + 1)..].trim();
 
-    // Step 4: Get only the column name (first word before space)
-    let column_name = column_part.split_whitespace().next()?;
-
-    Some(column_name.to_string())
+    Some(column_definition.to_string())
 }

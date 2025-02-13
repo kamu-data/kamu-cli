@@ -67,5 +67,5 @@ async fn test_parse_ddl_with_reserved_keyword() {
     )
     .await;
 
-    assert_matches!(result, Err(DataFusionError::Plan(err)) if err ==  "Argument key is invalid or a reserved keyword".to_string());
+    assert_matches!(result, Err(DataFusionError::Plan(err)) if err ==  *"Argument key TEXT is invalid or a reserved keyword");
 }
