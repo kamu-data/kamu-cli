@@ -218,7 +218,8 @@ impl RemoteAliasResolver for RemoteAliasResolverImpl {
         remote_ref: &odf::DatasetRefRemote,
     ) -> Result<url::Url, ResolveAliasError> {
         match remote_ref {
-            // TODO: maybe it's resolveble now?
+            // TODO: the reference can be resolved if using ODF protocol.
+            // However, it is still difficult with simple folder repositories without index.
             odf::DatasetRefRemote::ID(_, _) => Err(ResolveAliasError::Internal(
                 "Syncing remote dataset by ID is not yet supported".int_err(),
             )),
