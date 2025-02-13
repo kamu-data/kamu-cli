@@ -42,7 +42,10 @@ odf = { workspace = true, features = ["http", "lfs", "s3", "utoipa"] }
 s3-utils = { workspace = true }
 time-source = { workspace = true }
 
-aws-sdk-s3 = { version = "1" }
+# TODO: Remove the pined version after the fix:
+#       New checksum header seems to break presigned URLs
+#       https://github.com/awslabs/aws-sdk-rust/issues/1253
+aws-sdk-s3 = { version = "=1.68.0" }
 
 axum = { version = "0.8", features = ["ws", "multipart"] }
 axum-extra = { version = "0.10", features = [

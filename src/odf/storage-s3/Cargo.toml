@@ -29,9 +29,12 @@ odf-storage = { workspace = true }
 s3-utils = { workspace = true }
 
 async-trait = "0.1"
-aws-sdk-s3 = { version = "1" }
+# TODO: Remove the pined version after the fix:
+#       New checksum header seems to break presigned URLs
+#       https://github.com/awslabs/aws-sdk-rust/issues/1253
+aws-sdk-s3 = { version = "=1.68.0" }
 bytes = { version = "1", default-features = false }
-chrono = { version = "0.4", default-features = false}
+chrono = { version = "0.4", default-features = false }
 digest = "0.10"
 http = "1"
 
@@ -42,7 +45,7 @@ url = { version = "2", default-features = false }
 
 
 [dev-dependencies]
-odf-storage = { workspace = true, features = ["testing"]}
+odf-storage = { workspace = true, features = ["testing"] }
 
 rand = "0.8"
 test-log = { version = "0.2", features = ["trace"] }
