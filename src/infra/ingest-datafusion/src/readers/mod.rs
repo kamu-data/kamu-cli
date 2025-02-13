@@ -27,17 +27,13 @@ pub(crate) async fn from_ddl_schema(
     ctx: &datafusion::prelude::SessionContext,
     ddl_schema: Option<&Vec<String>>,
 ) -> Result<Option<datafusion::arrow::datatypes::Schema>, kamu_core::ingest::ReadError> {
-    use internal_error::*;
-
     let Some(ddl_schema) = ddl_schema else {
         return Ok(None);
     };
 
     let ddl = ddl_schema.join(", ");
 
-    let schema = odf::utils::schema::parse::parse_ddl_to_arrow_schema(ctx, &ddl, true)
-        .await
-        .int_err()?;
+    let schema = odf::utils::schema::parse::parse_ddl_to_arrow_schema(ctx, &ddl, true).await?;
 
     Ok(Some(schema))
 }

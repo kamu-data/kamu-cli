@@ -39,9 +39,12 @@ pub async fn parse_ddl_to_datafusion_schema(
         if let Some(err_index) = extract_column_index(&err)
             && let Some(invalid_field) = extract_problematic_field(&sql, err_index)
         {
-            return Err(DataFusionError::Plan(format!(
-                "Argument {invalid_field} is invalid or a reserved keyword"
-            )));
+            return Err(DataFusionError::SQL(
+                ParserError::ParserError(format!(
+                    "Argument '{invalid_field}' is invalid or a reserved keyword"
+                )),
+                None,
+            ));
         }
     }
 

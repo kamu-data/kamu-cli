@@ -10,6 +10,7 @@
 use std::assert_matches::assert_matches;
 
 use datafusion::error::DataFusionError;
+use datafusion::sql::sqlparser::parser::ParserError;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -67,5 +68,5 @@ async fn test_parse_ddl_with_reserved_keyword() {
     )
     .await;
 
-    assert_matches!(result, Err(DataFusionError::Plan(err)) if err ==  *"Argument key TEXT is invalid or a reserved keyword");
+    assert_matches!(result, Err(DataFusionError::SQL(ParserError::ParserError(err), _)) if err ==  *"Argument 'key TEXT' is invalid or a reserved keyword");
 }
