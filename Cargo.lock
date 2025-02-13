@@ -5940,6 +5940,7 @@ version = "0.222.0"
 dependencies = [
  "dill",
  "kamu-auth-rebac",
+ "pretty_assertions",
 ]
 
 [[package]]

@@ -66,12 +66,15 @@ pub async fn test_set_property(catalog: &Catalog) {
     );
     assert_matches!(rebac_repo.properties_count().await, Ok(1));
 
-    let expected_properties = vec![anon_read_property];
-
     assert_matches!(
         rebac_repo.get_entity_properties(&entity).await,
         Ok(actual_properties)
-            if expected_properties == actual_properties
+            if [anon_read_property.clone()] == *actual_properties
+    );
+    assert_matches!(
+        rebac_repo.get_entities_properties(&[entity.clone()]).await,
+        Ok(actual_properties)
+            if [(entity, anon_read_property.0, anon_read_property.1)] == *actual_properties
     );
 }
 
@@ -159,7 +162,31 @@ pub async fn test_delete_property_from_entity(catalog: &Catalog) {
                 expected_properties.sort();
                 actual_properties.sort();
 
-                assert_eq!(expected_properties, actual_properties);
+                pretty_assertions::assert_eq!(expected_properties, actual_properties);
+            }
+            Err(e) => {
+                panic!("A successful result was expected, but an error was received: {e}");
+            }
+        }
+        match rebac_repo.get_entities_properties(&[entity.clone()]).await {
+            Ok(mut actual_properties) => {
+                let mut expected_properties = vec![
+                    (
+                        entity.clone(),
+                        anon_read_property.0,
+                        anon_read_property.1.clone(),
+                    ),
+                    (
+                        entity.clone(),
+                        public_read_property.0,
+                        public_read_property.1.clone(),
+                    ),
+                ];
+
+                expected_properties.sort();
+                actual_properties.sort();
+
+                pretty_assertions::assert_eq!(expected_properties, actual_properties);
             }
             Err(e) => {
                 panic!("A successful result was expected, but an error was received: {e}");
@@ -183,12 +210,15 @@ pub async fn test_delete_property_from_entity(catalog: &Catalog) {
     );
     assert_matches!(rebac_repo.properties_count().await, Ok(1));
 
-    let expected_properties = vec![public_read_property];
-
     assert_matches!(
         rebac_repo.get_entity_properties(&entity).await,
         Ok(actual_properties)
-            if actual_properties == expected_properties
+            if [public_read_property.clone()] == *actual_properties
+    );
+    assert_matches!(
+        rebac_repo.get_entities_properties(&[entity.clone()]).await,
+        Ok(actual_properties)
+            if [(entity, public_read_property.0, public_read_property.1)] == *actual_properties
     );
 }
 
@@ -228,7 +258,27 @@ pub async fn test_delete_entity_properties(catalog: &Catalog) {
             expected_properties.sort();
             actual_properties.sort();
 
-            assert_eq!(expected_properties, actual_properties);
+            pretty_assertions::assert_eq!(expected_properties, actual_properties);
+        }
+        Err(e) => {
+            panic!("A successful result was expected, but an error was received: {e}");
+        }
+    }
+    match rebac_repo.get_entities_properties(&[entity.clone()]).await {
+        Ok(mut actual_properties) => {
+            let mut expected_properties = vec![
+                (entity.clone(), anon_read_property.0, anon_read_property.1),
+                (
+                    entity.clone(),
+                    public_read_property.0,
+                    public_read_property.1,
+                ),
+            ];
+
+            expected_properties.sort();
+            actual_properties.sort();
+
+            pretty_assertions::assert_eq!(expected_properties, actual_properties);
         }
         Err(e) => {
             panic!("A successful result was expected, but an error was received: {e}");
@@ -241,6 +291,11 @@ pub async fn test_delete_entity_properties(catalog: &Catalog) {
 
     assert_matches!(
         rebac_repo.get_entity_properties(&entity).await,
+        Ok(actual_properties)
+            if actual_properties.is_empty()
+    );
+    assert_matches!(
+        rebac_repo.get_entities_properties(&[entity.clone()]).await,
         Ok(actual_properties)
             if actual_properties.is_empty()
     );
@@ -483,7 +538,7 @@ async fn assert_get_relations(rebac_repo: &Arc<dyn RebacRepository>, state: &Cro
             Ok(mut actual_res) => {
                 actual_res.sort();
 
-                assert_eq!(object_entities, actual_res);
+                pretty_assertions::assert_eq!(object_entities, actual_res);
             }
             unexpected_res => {
                 panic!("Unexpected result: {unexpected_res:?}");
@@ -501,7 +556,7 @@ async fn assert_get_relations(rebac_repo: &Arc<dyn RebacRepository>, state: &Cro
                 Ok(mut actual_res) => {
                     actual_res.sort();
 
-                    assert_eq!(actual_res, object_entities);
+                    pretty_assertions::assert_eq!(object_entities, actual_res);
                 }
                 unexpected_res => {
                     panic!("Unexpected result: {unexpected_res:?}");
@@ -536,7 +591,7 @@ async fn assert_get_relations(rebac_repo: &Arc<dyn RebacRepository>, state: &Cro
 
                     let expected_relations = relation_map.get(dataset_id).unwrap();
 
-                    assert_eq!(&actual_relations, expected_relations);
+                    pretty_assertions::assert_eq!(expected_relations, &actual_relations);
                 }
                 unexpected_res => {
                     panic!("Unexpected result: {unexpected_res:?}");

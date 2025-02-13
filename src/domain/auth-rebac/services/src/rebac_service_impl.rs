@@ -221,7 +221,7 @@ impl RebacService for RebacServiceImpl {
 
         let entity_properties = self
             .rebac_repo
-            .get_entity_properties_by_ids(&dataset_entities)
+            .get_entities_properties(&dataset_entities)
             .await
             .int_err()?;
 

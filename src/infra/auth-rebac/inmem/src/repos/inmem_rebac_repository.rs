@@ -169,7 +169,7 @@ impl RebacRepository for InMemoryRebacRepository {
         Ok(properties)
     }
 
-    async fn get_entity_properties_by_ids(
+    async fn get_entities_properties(
         &self,
         entities: &[Entity],
     ) -> Result<Vec<(Entity, PropertyName, PropertyValue)>, GetEntityPropertiesError> {
