@@ -29,21 +29,18 @@ pub trait DatasetActionAuthorizer: Sync + Send {
         dataset_id: &odf::DatasetID,
     ) -> Result<HashSet<DatasetAction>, InternalError>;
 
-    // TODO: Private Datasets: tests
     async fn filter_datasets_allowing(
         &self,
         dataset_handles: Vec<odf::DatasetHandle>,
         action: DatasetAction,
     ) -> Result<Vec<odf::DatasetHandle>, InternalError>;
 
-    // TODO: Private Datasets: tests
     async fn classify_dataset_handles_by_allowance(
         &self,
         dataset_handles: Vec<odf::DatasetHandle>,
         action: DatasetAction,
     ) -> Result<ClassifyByAllowanceResponse, InternalError>;
 
-    // TODO: Private Datasets: tests
     async fn classify_dataset_ids_by_allowance(
         &self,
         dataset_ids: Vec<odf::DatasetID>,
@@ -220,6 +217,20 @@ where
 pub struct ClassifyByAllowanceIdsResponse {
     pub authorized_ids: Vec<odf::DatasetID>,
     pub unauthorized_ids_with_errors: Vec<(odf::DatasetID, DatasetActionUnauthorizedError)>,
+}
+
+#[cfg(any(feature = "testing", test))]
+impl From<ClassifyByAllowanceResponse> for ClassifyByAllowanceIdsResponse {
+    fn from(v: ClassifyByAllowanceResponse) -> Self {
+        Self {
+            authorized_ids: v.authorized_handles.into_iter().map(|h| h.id).collect(),
+            unauthorized_ids_with_errors: v
+                .unauthorized_handles_with_errors
+                .into_iter()
+                .map(|(h, e)| (h.id, e))
+                .collect(),
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
