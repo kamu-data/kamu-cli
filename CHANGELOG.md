@@ -12,6 +12,8 @@ Recommendation: for ease of reading, use the following order:
 -->
 
 ## [Unreleased]
+### Added
+- Increased test coverage of the code responsible for access checks
 ### Changed
 - Restructured responsibilities between core and dataset domains upon key dataset CRUD use cases:
    - 8 use cases moved from `core` to `kamu-datasets` domain
