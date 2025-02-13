@@ -24,7 +24,6 @@ pub trait DatasetActionAuthorizer: Sync + Send {
         action: DatasetAction,
     ) -> Result<(), DatasetActionUnauthorizedError>;
 
-    // TODO: Private Datasets: tests
     async fn get_allowed_actions(
         &self,
         dataset_id: &odf::DatasetID,
