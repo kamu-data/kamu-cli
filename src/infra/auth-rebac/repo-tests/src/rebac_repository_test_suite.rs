@@ -36,10 +36,13 @@ pub async fn test_try_get_properties_from_nonexistent_entity(catalog: &Catalog) 
 
     assert_matches!(rebac_repo.properties_count().await, Ok(0));
 
-    let res = rebac_repo.get_entity_properties(&nonexistent_entity).await;
-
     assert_matches!(
-        res,
+        rebac_repo.get_entity_properties(&nonexistent_entity).await,
+        Ok(actual_properties)
+            if actual_properties.is_empty()
+    );
+    assert_matches!(
+        rebac_repo.get_entities_properties(&[nonexistent_entity]).await,
         Ok(actual_properties)
             if actual_properties.is_empty()
     );
@@ -55,19 +58,18 @@ pub async fn test_set_property(catalog: &Catalog) {
     let anon_read_property = PropertyName::dataset_allows_anonymous_read(true);
 
     assert_matches!(rebac_repo.properties_count().await, Ok(0));
-
-    let set_res = rebac_repo
-        .set_entity_property(&entity, anon_read_property.0, &anon_read_property.1)
-        .await;
-
-    assert_matches!(set_res, Ok(_));
+    assert_matches!(
+        rebac_repo
+            .set_entity_property(&entity, anon_read_property.0, &anon_read_property.1)
+            .await,
+        Ok(_)
+    );
     assert_matches!(rebac_repo.properties_count().await, Ok(1));
 
-    let get_res = rebac_repo.get_entity_properties(&entity).await;
     let expected_properties = vec![anon_read_property];
 
     assert_matches!(
-        get_res,
+        rebac_repo.get_entity_properties(&entity).await,
         Ok(actual_properties)
             if expected_properties == actual_properties
     );
@@ -83,12 +85,8 @@ pub async fn test_try_delete_property_from_nonexistent_entity(catalog: &Catalog)
 
     assert_matches!(rebac_repo.properties_count().await, Ok(0));
 
-    let delete_res = rebac_repo
-        .delete_entity_property(&nonexistent_entity, property)
-        .await;
-
     assert_matches!(
-        delete_res,
+        rebac_repo.delete_entity_property(&nonexistent_entity, property).await,
         Err(DeleteEntityPropertyError::NotFound(e))
             if e.entity == nonexistent_entity
                 && e.property_name == property
@@ -105,21 +103,18 @@ pub async fn test_try_delete_nonexistent_property_from_entity(catalog: &Catalog)
     let anon_read_property = PropertyName::dataset_allows_anonymous_read(true);
 
     assert_matches!(rebac_repo.properties_count().await, Ok(0));
-
-    let set_res = rebac_repo
-        .set_entity_property(&entity, anon_read_property.0, &anon_read_property.1)
-        .await;
-
-    assert_matches!(set_res, Ok(_));
+    assert_matches!(
+        rebac_repo
+            .set_entity_property(&entity, anon_read_property.0, &anon_read_property.1)
+            .await,
+        Ok(_)
+    );
     assert_matches!(rebac_repo.properties_count().await, Ok(1));
 
     let nonexistent_property = DatasetPropertyName::AllowsPublicRead.into();
-    let delete_res = rebac_repo
-        .delete_entity_property(&entity, nonexistent_property)
-        .await;
 
     assert_matches!(
-        delete_res,
+        rebac_repo.delete_entity_property(&entity, nonexistent_property).await,
         Err(DeleteEntityPropertyError::NotFound(e))
             if e.entity == entity
                 && e.property_name == nonexistent_property
@@ -137,35 +132,31 @@ pub async fn test_delete_property_from_entity(catalog: &Catalog) {
 
     assert_matches!(rebac_repo.properties_count().await, Ok(0));
 
-    {
-        let set_res = rebac_repo
+    assert_matches!(
+        rebac_repo
             .set_entity_property(&entity, anon_read_property.0, &anon_read_property.1)
-            .await;
-
-        assert_matches!(set_res, Ok(_));
-        assert_matches!(rebac_repo.properties_count().await, Ok(1));
-    }
+            .await,
+        Ok(_)
+    );
+    assert_matches!(rebac_repo.properties_count().await, Ok(1));
 
     let public_read_property = PropertyName::dataset_allows_public_read(true);
 
-    {
-        let set_res = rebac_repo
+    assert_matches!(
+        rebac_repo
             .set_entity_property(&entity, public_read_property.0, &public_read_property.1)
-            .await;
-
-        assert_matches!(set_res, Ok(_));
-        assert_matches!(rebac_repo.properties_count().await, Ok(2));
-    }
+            .await,
+        Ok(_)
+    );
+    assert_matches!(rebac_repo.properties_count().await, Ok(2));
 
     {
-        let get_res = rebac_repo.get_entity_properties(&entity).await;
-        let mut expected_properties =
-            vec![anon_read_property.clone(), public_read_property.clone()];
-
-        expected_properties.sort();
-
-        match get_res {
+        match rebac_repo.get_entity_properties(&entity).await {
             Ok(mut actual_properties) => {
+                let mut expected_properties =
+                    vec![anon_read_property.clone(), public_read_property.clone()];
+
+                expected_properties.sort();
                 actual_properties.sort();
 
                 assert_eq!(expected_properties, actual_properties);
@@ -176,39 +167,29 @@ pub async fn test_delete_property_from_entity(catalog: &Catalog) {
         }
     }
 
-    {
-        let delete_res = rebac_repo
+    assert_matches!(
+        rebac_repo
             .delete_entity_property(&entity, anon_read_property.0)
-            .await;
+            .await,
+        Ok(_)
+    );
+    assert_matches!(rebac_repo.properties_count().await, Ok(1));
 
-        assert_matches!(delete_res, Ok(_));
-        assert_matches!(rebac_repo.properties_count().await, Ok(1));
-    }
+    assert_matches!(
+        rebac_repo.delete_entity_property(&entity, anon_read_property.0).await,
+        Err(DeleteEntityPropertyError::NotFound(e))
+            if e.entity == entity
+                && e.property_name == anon_read_property.0
+    );
+    assert_matches!(rebac_repo.properties_count().await, Ok(1));
 
-    {
-        let delete_res = rebac_repo
-            .delete_entity_property(&entity, anon_read_property.0)
-            .await;
+    let expected_properties = vec![public_read_property];
 
-        assert_matches!(
-            delete_res,
-            Err(DeleteEntityPropertyError::NotFound(e))
-                if e.entity == entity
-                    && e.property_name == anon_read_property.0
-        );
-        assert_matches!(rebac_repo.properties_count().await, Ok(1));
-    }
-
-    {
-        let get_res = rebac_repo.get_entity_properties(&entity).await;
-        let expected_properties = vec![public_read_property];
-
-        assert_matches!(
-            get_res,
-            Ok(actual_properties)
-                if actual_properties == expected_properties
-        );
-    }
+    assert_matches!(
+        rebac_repo.get_entity_properties(&entity).await,
+        Ok(actual_properties)
+            if actual_properties == expected_properties
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -221,74 +202,56 @@ pub async fn test_delete_entity_properties(catalog: &Catalog) {
 
     assert_matches!(rebac_repo.properties_count().await, Ok(0));
 
-    {
-        let set_res = rebac_repo
+    assert_matches!(
+        rebac_repo
             .set_entity_property(&entity, anon_read_property.0, &anon_read_property.1)
-            .await;
-
-        assert_matches!(set_res, Ok(_));
-        assert_matches!(rebac_repo.properties_count().await, Ok(1));
-    }
+            .await,
+        Ok(_)
+    );
+    assert_matches!(rebac_repo.properties_count().await, Ok(1));
 
     let public_read_property = PropertyName::dataset_allows_public_read(true);
 
-    {
-        let set_res = rebac_repo
+    assert_matches!(
+        rebac_repo
             .set_entity_property(&entity, public_read_property.0, &public_read_property.1)
-            .await;
+            .await,
+        Ok(_)
+    );
+    assert_matches!(rebac_repo.properties_count().await, Ok(2));
 
-        assert_matches!(set_res, Ok(_));
-        assert_matches!(rebac_repo.properties_count().await, Ok(2));
-    }
+    match rebac_repo.get_entity_properties(&entity).await {
+        Ok(mut actual_properties) => {
+            let mut expected_properties =
+                vec![anon_read_property.clone(), public_read_property.clone()];
 
-    {
-        let get_res = rebac_repo.get_entity_properties(&entity).await;
-        let mut expected_properties =
-            vec![anon_read_property.clone(), public_read_property.clone()];
+            expected_properties.sort();
+            actual_properties.sort();
 
-        expected_properties.sort();
-
-        match get_res {
-            Ok(mut actual_properties) => {
-                actual_properties.sort();
-
-                assert_eq!(expected_properties, actual_properties);
-            }
-            Err(e) => {
-                panic!("A successful result was expected, but an error was received: {e}");
-            }
+            assert_eq!(expected_properties, actual_properties);
         }
-        assert_matches!(rebac_repo.properties_count().await, Ok(2));
+        Err(e) => {
+            panic!("A successful result was expected, but an error was received: {e}");
+        }
     }
+    assert_matches!(rebac_repo.properties_count().await, Ok(2));
 
-    {
-        let delete_res = rebac_repo.delete_entity_properties(&entity).await;
+    assert_matches!(rebac_repo.delete_entity_properties(&entity).await, Ok(_));
+    assert_matches!(rebac_repo.properties_count().await, Ok(0));
 
-        assert_matches!(delete_res, Ok(_));
-        assert_matches!(rebac_repo.properties_count().await, Ok(0));
-    }
+    assert_matches!(
+        rebac_repo.get_entity_properties(&entity).await,
+        Ok(actual_properties)
+            if actual_properties.is_empty()
+    );
+    assert_matches!(rebac_repo.properties_count().await, Ok(0));
 
-    {
-        let get_res = rebac_repo.get_entity_properties(&entity).await;
-
-        assert_matches!(
-            get_res,
-            Ok(actual_properties)
-                if actual_properties.is_empty()
-        );
-        assert_matches!(rebac_repo.properties_count().await, Ok(0));
-    }
-
-    {
-        let delete_res = rebac_repo.delete_entity_properties(&entity).await;
-
-        assert_matches!(
-            delete_res,
-            Err(DeleteEntityPropertiesError::NotFound(e))
-                if e.entity == entity
-        );
-        assert_matches!(rebac_repo.properties_count().await, Ok(0));
-    }
+    assert_matches!(
+        rebac_repo.delete_entity_properties(&entity).await,
+        Err(DeleteEntityPropertiesError::NotFound(e))
+            if e.entity == entity
+    );
+    assert_matches!(rebac_repo.properties_count().await, Ok(0));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -300,26 +263,21 @@ pub async fn test_try_insert_duplicate_entities_relation(catalog: &Catalog) {
     let dataset = Entity::new_account("dataset");
     let relationship = Relation::account_is_a_dataset_reader();
 
-    {
-        let insert_res = rebac_repo
+    assert_matches!(
+        rebac_repo
             .insert_entities_relation(&account, relationship, &dataset)
-            .await;
-
-        assert_matches!(insert_res, Ok(()));
-    }
-    {
-        let insert_res = rebac_repo
+            .await,
+        Ok(())
+    );
+    assert_matches!(
+        rebac_repo
             .insert_entities_relation(&account, relationship, &dataset)
-            .await;
-
-        assert_matches!(
-            insert_res,
-            Err(InsertEntitiesRelationError::Duplicate(e))
-                if e.subject_entity == account
-                    && e.relationship == relationship
-                    && e.object_entity == dataset
-        );
-    }
+            .await,
+        Err(InsertEntitiesRelationError::Duplicate(e))
+            if e.subject_entity == account
+                && e.relationship == relationship
+                && e.object_entity == dataset
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -331,32 +289,28 @@ pub async fn test_delete_entities_relation(catalog: &Catalog) {
     let dataset = Entity::new_dataset("dataset");
     let relationship = Relation::account_is_a_dataset_reader();
 
-    let insert_res = rebac_repo
-        .insert_entities_relation(&account, relationship, &dataset)
-        .await;
+    assert_matches!(
+        rebac_repo
+            .insert_entities_relation(&account, relationship, &dataset)
+            .await,
+        Ok(())
+    );
 
-    assert_matches!(insert_res, Ok(()));
-
-    {
-        let delete_res = rebac_repo
+    assert_matches!(
+        rebac_repo
             .delete_entities_relation(&account, relationship, &dataset)
-            .await;
-
-        assert_matches!(delete_res, Ok(()));
-    }
-    {
-        let delete_res = rebac_repo
+            .await,
+        Ok(())
+    );
+    assert_matches!(
+        rebac_repo
             .delete_entities_relation(&account, relationship, &dataset)
-            .await;
-
-        assert_matches!(
-            delete_res,
-            Err(DeleteEntitiesRelationError::NotFound(e))
-                if e.subject_entity == account
-                    && e.relationship == relationship
-                    && e.object_entity == dataset
-        );
-    }
+            .await,
+        Err(DeleteEntitiesRelationError::NotFound(e))
+            if e.subject_entity == account
+                && e.relationship == relationship
+                && e.object_entity == dataset
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -388,11 +342,12 @@ pub async fn test_get_relations_crossover_test(catalog: &Catalog) {
             for dataset_id in dataset_ids {
                 let dataset = Entity::new_dataset(*dataset_id);
 
-                let insert_res = rebac_repo
-                    .insert_entities_relation(&account, *relation, &dataset)
-                    .await;
-
-                assert_matches!(insert_res, Ok(_));
+                assert_matches!(
+                    rebac_repo
+                        .insert_entities_relation(&account, *relation, &dataset)
+                        .await,
+                    Ok(_)
+                );
             }
         }
     }
@@ -407,11 +362,16 @@ pub async fn test_get_relations_crossover_test(catalog: &Catalog) {
         let account = Entity::new_account("account");
         let dataset1 = Entity::new_dataset("dataset1");
 
-        let delete_res = rebac_repo
-            .delete_entities_relation(&account, Relation::account_is_a_dataset_reader(), &dataset1)
-            .await;
-
-        assert_matches!(delete_res, Ok(()));
+        assert_matches!(
+            rebac_repo
+                .delete_entities_relation(
+                    &account,
+                    Relation::account_is_a_dataset_reader(),
+                    &dataset1
+                )
+                .await,
+            Ok(())
+        );
 
         let state = CrossoverTestState {
             account_id: "account",
@@ -431,11 +391,16 @@ pub async fn test_get_relations_crossover_test(catalog: &Catalog) {
         let account = Entity::new_account("account");
         let dataset2 = Entity::new_dataset("dataset2");
 
-        let delete_res = rebac_repo
-            .delete_entities_relation(&account, Relation::account_is_a_dataset_reader(), &dataset2)
-            .await;
-
-        assert_matches!(delete_res, Ok(()));
+        assert_matches!(
+            rebac_repo
+                .delete_entities_relation(
+                    &account,
+                    Relation::account_is_a_dataset_reader(),
+                    &dataset2
+                )
+                .await,
+            Ok(())
+        );
 
         let state = CrossoverTestState {
             account_id: "account",
@@ -455,11 +420,16 @@ pub async fn test_get_relations_crossover_test(catalog: &Catalog) {
         let account = Entity::new_account("account");
         let dataset3 = Entity::new_dataset("dataset3");
 
-        let delete_res = rebac_repo
-            .delete_entities_relation(&account, Relation::account_is_a_dataset_editor(), &dataset3)
-            .await;
-
-        assert_matches!(delete_res, Ok(()));
+        assert_matches!(
+            rebac_repo
+                .delete_entities_relation(
+                    &account,
+                    Relation::account_is_a_dataset_editor(),
+                    &dataset3
+                )
+                .await,
+            Ok(())
+        );
 
         let state = CrossoverTestState {
             account_id: "account",
@@ -476,11 +446,16 @@ pub async fn test_get_relations_crossover_test(catalog: &Catalog) {
         let account = Entity::new_account("account");
         let dataset1 = Entity::new_dataset("dataset1");
 
-        let delete_res = rebac_repo
-            .delete_entities_relation(&account, Relation::account_is_a_dataset_editor(), &dataset1)
-            .await;
-
-        assert_matches!(delete_res, Ok(()));
+        assert_matches!(
+            rebac_repo
+                .delete_entities_relation(
+                    &account,
+                    Relation::account_is_a_dataset_editor(),
+                    &dataset1
+                )
+                .await,
+            Ok(())
+        );
 
         let state = CrossoverTestState {
             account_id: "account",
@@ -504,9 +479,7 @@ async fn assert_get_relations(rebac_repo: &Arc<dyn RebacRepository>, state: &Cro
     object_entities.sort();
 
     {
-        let get_res = rebac_repo.get_subject_entity_relations(&account).await;
-
-        match get_res {
+        match rebac_repo.get_subject_entity_relations(&account).await {
             Ok(mut actual_res) => {
                 actual_res.sort();
 
@@ -521,11 +494,10 @@ async fn assert_get_relations(rebac_repo: &Arc<dyn RebacRepository>, state: &Cro
     // Check RebacRepository::get_subject_entity_relations_by_object_type()
     {
         {
-            let get_res = rebac_repo
+            match rebac_repo
                 .get_subject_entity_relations_by_object_type(&account, EntityType::Dataset)
-                .await;
-
-            match get_res {
+                .await
+            {
                 Ok(mut actual_res) => {
                     actual_res.sort();
 
@@ -538,12 +510,10 @@ async fn assert_get_relations(rebac_repo: &Arc<dyn RebacRepository>, state: &Cro
         }
         {
             // NOTE: We never have any EntityType::Account objects
-            let actual_res = rebac_repo
-                .get_subject_entity_relations_by_object_type(&account, EntityType::Account)
-                .await;
-
             assert_matches!(
-                actual_res,
+                rebac_repo
+                    .get_subject_entity_relations_by_object_type(&account, EntityType::Account)
+                    .await,
                 Ok(actual_object_relations)
                     if actual_object_relations.is_empty()
             );
@@ -557,15 +527,14 @@ async fn assert_get_relations(rebac_repo: &Arc<dyn RebacRepository>, state: &Cro
         for dataset_id in &state.dataset_ids_for_check {
             let dataset = Entity::new_dataset(*dataset_id);
 
-            let get_res = rebac_repo
+            match rebac_repo
                 .get_relations_between_entities(&account, &dataset)
-                .await;
-
-            let expected_relations = relation_map.get(dataset_id).unwrap();
-
-            match get_res {
+                .await
+            {
                 Ok(mut actual_relations) => {
                     actual_relations.sort();
+
+                    let expected_relations = relation_map.get(dataset_id).unwrap();
 
                     assert_eq!(&actual_relations, expected_relations);
                 }
