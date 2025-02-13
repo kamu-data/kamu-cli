@@ -11,7 +11,7 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## [Unreleased]
+## [0.223.0] - 2025-02-13
 ### Added
 - Increased test coverage of the code responsible for access checks
 ### Changed
