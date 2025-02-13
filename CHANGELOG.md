@@ -11,6 +11,10 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Unreleased]
+### Fixed
+- Improved error message for SQL parsing method for queries which includes invalid or reserved keywords
+
 ## [0.223.0] - 2025-02-13
 ### Added
 - Increased test coverage of the code responsible for access checks

@@ -12,6 +12,7 @@ use std::path::Path;
 
 use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::prelude::*;
+use datafusion::sql::sqlparser::parser::ParserError;
 use internal_error::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -37,6 +38,8 @@ pub trait Reader: Send + Sync {
 
 #[derive(thiserror::Error, Debug)]
 pub enum ReadError {
+    #[error(transparent)]
+    ParseError(#[from] ParseDdlError),
     #[error(transparent)]
     BadInput(#[from] BadInputError),
     #[error(transparent)]
@@ -67,6 +70,24 @@ impl BadInputError {
 
 #[derive(thiserror::Error, Debug)]
 #[error("{message}")]
+pub struct ParseDdlError {
+    message: String,
+    backtrace: Backtrace,
+}
+
+impl ParseDdlError {
+    pub fn new(message: impl Into<String>) -> Self {
+        Self {
+            message: message.into(),
+            backtrace: Backtrace::capture(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(thiserror::Error, Debug)]
+#[error("{message}")]
 pub struct UnsupportedError {
     message: String,
     backtrace: Backtrace,
@@ -77,6 +98,19 @@ impl UnsupportedError {
         Self {
             message: message.into(),
             backtrace: Backtrace::capture(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl From<datafusion::error::DataFusionError> for ReadError {
+    fn from(value: datafusion::error::DataFusionError) -> Self {
+        match value {
+            datafusion::error::DataFusionError::SQL(ParserError::ParserError(err), _) => {
+                Self::ParseError(ParseDdlError::new(err))
+            }
+            _ => Self::Internal(value.int_err()),
         }
     }
 }
