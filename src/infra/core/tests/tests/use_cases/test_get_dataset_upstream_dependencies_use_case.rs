@@ -30,7 +30,7 @@ use time_source::SystemTimeSource;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
-async fn test_all_downstream_dependencies_are_accessible() {
+async fn test_all_upstream_dependencies_are_accessible() {
     let alice = odf::AccountName::new_unchecked("alice");
     let bob = odf::AccountName::new_unchecked("bob");
 
@@ -39,28 +39,29 @@ async fn test_all_downstream_dependencies_are_accessible() {
     let alice_root_1_dataset_handle = handle(&alice, &"root-1");
     let alice_root_2_dataset_handle = handle(&alice, &"root-2");
     let bob_root_3_dataset_handle = handle(&bob, &"root-3");
-    let alice_derived_4_dataset_handle = handle(&alice, &"derived-4");
-    let alice_derived_5_dataset_handle = handle(&alice, &"derived-5");
-    let bob_derived_6_dataset_handle = handle(&bob, &"derived-6");
+    let bob_root_4_dataset_handle = handle(&bob, &"root-4");
+    let bob_root_5_dataset_handle = handle(&bob, &"root-5");
+    let alice_derived_6_dataset_handle = handle(&alice, &"derived-6");
+    let bob_derived_7_dataset_handle = handle(&bob, &"derived-7");
     //   ┌──────────────┐
     //   │ alice/root-1 │
     //   └──────────────┘
     // ┌───────────────────────────────────────────┐
     // │ Test use-case datasets                    │
-    // │                       ┌─────────────────┐ │
-    // │                    ┌──┤ alice/derived-4 │ │
-    // │                    │  └─────────────────┘ │
+    // │ ┌──────────────┐                          │
+    // │ │ alice/root-2 │◄──┐                      │
+    // │ └──────────────┘   │                      │
     // │ ┌──────────────┐   │  ┌─────────────────┐ │
-    // │ │ alice/root-2 │◄──┼──┤ alice/derived-5 │ │
+    // │ │  bob/root-3  │◄──┼──┤ alice/derived-6 │ │
     // │ └──────────────┘   │  └─────────────────┘ │
-    // │                    │  ┌─────────────────┐ │
-    // │                    └──┤  bob/derived-6  │ │
-    // │                       └─────────────────┘ │
+    // │ ┌──────────────┐   │                      │
+    // │ │  bob/root-4  │◄──┘                      │
+    // │ └──────────────┘                          │
     // └───────────────────────────────────────────┘
-    //   ┌──────────────┐
-    //   │  bob/root-3  │
-    //   └──────────────┘
-    let harness = GetDatasetDownstreamDependenciesUseCaseHarness::new(
+    //   ┌──────────────┐      ┌─────────────────┐
+    //   │  bob/root-5  │◄─────┤  bob/derived-7  │
+    //   └──────────────┘      └─────────────────┘
+    let harness = GetDatasetUpstreamDependenciesUseCaseHarness::new(
         MockDatasetActionAuthorizer::new().make_expect_classify_dataset_ids_by_allowance(
             DatasetAction::Read,
             1,
@@ -69,118 +70,10 @@ async fn test_all_downstream_dependencies_are_accessible() {
                 alice_root_1_dataset_handle.id.clone(),
                 alice_root_2_dataset_handle.id.clone(),
                 bob_root_3_dataset_handle.id.clone(),
-                alice_derived_4_dataset_handle.id.clone(),
-                alice_derived_5_dataset_handle.id.clone(),
-                bob_derived_6_dataset_handle.id.clone(),
-            ]
-            .into(),
-        ),
-        [alice.clone(), bob.clone()],
-    )
-    .await;
-
-    harness
-        .create_root_dataset(alice_root_1_dataset_handle.clone())
-        .await;
-    harness
-        .create_root_dataset(alice_root_2_dataset_handle)
-        .await;
-    harness.create_root_dataset(bob_root_3_dataset_handle).await;
-    harness
-        .create_derived_dataset(
-            bob_derived_6_dataset_handle.clone(),
-            vec![alice_root_1_dataset_handle.id.clone()],
-        )
-        .await;
-    harness
-        .create_derived_dataset(
-            alice_derived_4_dataset_handle.clone(),
-            vec![alice_root_1_dataset_handle.id.clone()],
-        )
-        .await;
-    harness
-        .create_derived_dataset(
-            alice_derived_5_dataset_handle.clone(),
-            vec![alice_root_1_dataset_handle.id.clone()],
-        )
-        .await;
-
-    let res = harness
-        .use_case
-        .execute(&alice_root_1_dataset_handle.id.clone())
-        .await;
-
-    assert!(res.is_ok(), "{res:?}");
-
-    let mut actual_res = res.unwrap();
-    actual_res.sort();
-
-    pretty_assertions::assert_eq!(
-        [
-            DatasetDependency::resolved(
-                alice_derived_4_dataset_handle,
-                odf::AccountID::new_seeded_ed25519(alice.as_bytes()),
-                alice.clone(),
-            ),
-            DatasetDependency::resolved(
-                alice_derived_5_dataset_handle,
-                odf::AccountID::new_seeded_ed25519(alice.as_bytes()),
-                alice,
-            ),
-            DatasetDependency::resolved(
-                bob_derived_6_dataset_handle,
-                odf::AccountID::new_seeded_ed25519(bob.as_bytes()),
-                bob,
-            ),
-        ],
-        *actual_res,
-    );
-}
-
-#[tokio::test]
-async fn test_inaccessible_downstream_dependencies_excluded() {
-    let alice = odf::AccountName::new_unchecked("alice");
-    let bob = odf::AccountName::new_unchecked("bob");
-
-    use odf::metadata::testing::handle;
-
-    let alice_root_1_dataset_handle = handle(&alice, &"root-1");
-    let alice_root_2_dataset_handle = handle(&alice, &"root-2");
-    let bob_root_3_dataset_handle = handle(&bob, &"root-3");
-    let alice_public_derived_4_dataset_handle = handle(&alice, &"public-derived-4");
-    let alice_private_derived_5_dataset_handle = handle(&alice, &"private-derived-5");
-    let bob_private_derived_6_dataset_handle = handle(&bob, &"private-derived-6");
-    //   ┌──────────────┐
-    //   │ alice/root-1 │
-    //   └──────────────┘
-    // ┌───────────────────────────────────────────────────┐
-    // │ Test use-case datasets                            │
-    // │ (accessible only "alice/public-derived-1")        │
-    // │                       ┌─────────────────────────┐ │
-    // │                    ┌──┤  alice/public-derived-4 │ │
-    // │                    │  └─────────────────────────┘ │
-    // │ ┌──────────────┐   │  ┌─────────────────────────┐ │
-    // │ │ alice/root-2 │◄──┼──┤ alice/private-derived-5 │ │
-    // │ └──────────────┘   │  └─────────────────────────┘ │
-    // │                    │  ┌─────────────────────────┐ │
-    // │                    └──┤  bob/private-derived-6  │ │
-    // │                       └─────────────────────────┘ │
-    // └───────────────────────────────────────────────────┘
-    //   ┌──────────────┐
-    //   │  bob/root-3  │
-    //   └──────────────┘
-    let harness = GetDatasetDownstreamDependenciesUseCaseHarness::new(
-        MockDatasetActionAuthorizer::new().make_expect_classify_dataset_ids_by_allowance(
-            DatasetAction::Read,
-            1,
-            [
-                alice_root_1_dataset_handle.id.clone(),
-                alice_root_2_dataset_handle.id.clone(),
-                bob_root_3_dataset_handle.id.clone(),
-                alice_public_derived_4_dataset_handle.id.clone(),
-                // Excluded:
-                // alice_private_derived_5_dataset_handle.id.clone(),
-                // bob_private_derived_6_dataset_handle.id.clone(),
+                bob_root_4_dataset_handle.id.clone(),
+                bob_root_5_dataset_handle.id.clone(),
+                alice_derived_6_dataset_handle.id.clone(),
+                bob_derived_7_dataset_handle.id.clone(),
             ]
             .into(),
         ),
@@ -194,29 +87,35 @@ async fn test_inaccessible_downstream_dependencies_excluded() {
     harness
         .create_root_dataset(alice_root_2_dataset_handle.clone())
         .await;
-    harness.create_root_dataset(bob_root_3_dataset_handle).await;
+    harness
+        .create_root_dataset(bob_root_3_dataset_handle.clone())
+        .await;
+    harness
+        .create_root_dataset(bob_root_4_dataset_handle.clone())
+        .await;
+    harness
+        .create_root_dataset(bob_root_5_dataset_handle.clone())
+        .await;
     harness
         .create_derived_dataset(
-            alice_public_derived_4_dataset_handle.clone(),
-            vec![alice_root_2_dataset_handle.id.clone()],
+            alice_derived_6_dataset_handle.clone(),
+            vec![
+                alice_root_2_dataset_handle.id.clone(),
+                bob_root_3_dataset_handle.id.clone(),
+                bob_root_4_dataset_handle.id.clone(),
+            ],
         )
         .await;
     harness
         .create_derived_dataset(
-            alice_private_derived_5_dataset_handle.clone(),
-            vec![alice_root_2_dataset_handle.id.clone()],
-        )
-        .await;
-    harness
-        .create_derived_dataset(
-            bob_private_derived_6_dataset_handle.clone(),
-            vec![alice_root_2_dataset_handle.id.clone()],
+            bob_derived_7_dataset_handle.clone(),
+            vec![bob_root_5_dataset_handle.id.clone()],
         )
         .await;
 
     let res = harness
         .use_case
-        .execute(&alice_root_2_dataset_handle.id.clone())
+        .execute(&alice_derived_6_dataset_handle.id.clone())
         .await;
 
     assert!(res.is_ok(), "{res:?}");
@@ -225,11 +124,132 @@ async fn test_inaccessible_downstream_dependencies_excluded() {
     actual_res.sort();
 
     pretty_assertions::assert_eq!(
-        [DatasetDependency::resolved(
-            alice_public_derived_4_dataset_handle,
-            odf::AccountID::new_seeded_ed25519(alice.as_bytes()),
-            alice.clone(),
-        )],
+        [
+            DatasetDependency::resolved(
+                alice_root_2_dataset_handle,
+                odf::AccountID::new_seeded_ed25519(alice.as_bytes()),
+                alice.clone(),
+            ),
+            DatasetDependency::resolved(
+                bob_root_3_dataset_handle,
+                odf::AccountID::new_seeded_ed25519(bob.as_bytes()),
+                bob.clone(),
+            ),
+            DatasetDependency::resolved(
+                bob_root_4_dataset_handle,
+                odf::AccountID::new_seeded_ed25519(bob.as_bytes()),
+                bob.clone(),
+            ),
+        ],
+        *actual_res,
+    );
+}
+
+#[tokio::test]
+async fn test_inaccessible_upstream_dependencies_present() {
+    let alice = odf::AccountName::new_unchecked("alice");
+    let bob = odf::AccountName::new_unchecked("bob");
+
+    use odf::metadata::testing::handle;
+
+    let alice_public_root_1_dataset_handle = handle(&alice, &"public-root-1");
+    let alice_public_root_2_dataset_handle = handle(&alice, &"public-root-2");
+    let bob_private_root_3_dataset_handle = handle(&bob, &"private-root-3");
+    let bob_private_root_4_dataset_handle = handle(&bob, &"private-root-4");
+    let bob_public_root_5_dataset_handle = handle(&bob, &"public-root-5");
+    let alice_derived_6_dataset_handle = handle(&alice, &"derived-6");
+    let bob_derived_7_dataset_handle = handle(&bob, &"derived-7");
+    //   ┌─────────────────────┐
+    //   │ alice/public-root-1 │
+    //   └─────────────────────┘
+    // ┌──────────────────────────────────────────────────┐
+    // │ Test use-case datasets                           │
+    // │ (accessible only "alice/public-root-2")          │
+    // │ ┌─────────────────────┐                          │
+    // │ │ alice/public-root-2 │◄──┐                      │
+    // │ └─────────────────────┘   │                      │
+    // │ ┌─────────────────────┐   │  ┌─────────────────┐ │
+    // │ │  bob/private-root-3 │◄──┼──┤ alice/derived-6 │ │
+    // │ └─────────────────────┘   │  └─────────────────┘ │
+    // │ ┌─────────────────────┐   │                      │
+    // │ │  bob/private-root-4 │◄──┘                      │
+    // │ └─────────────────────┘                          │
+    // └──────────────────────────────────────────────────┘
+    //   ┌─────────────────────┐      ┌─────────────────┐
+    //   │  bob/public-root-5  │◄─────┤  bob/derived-7  │
+    //   └─────────────────────┘      └─────────────────┘
+    let harness = GetDatasetUpstreamDependenciesUseCaseHarness::new(
+        MockDatasetActionAuthorizer::new().make_expect_classify_dataset_ids_by_allowance(
+            DatasetAction::Read,
+            1,
+            [
+                alice_public_root_1_dataset_handle.id.clone(),
+                alice_public_root_2_dataset_handle.id.clone(),
+                // Excluded:
+                // bob_private_root_3_dataset_handle.id.clone(),
+                // bob_private_root_4_dataset_handle.id.clone(),
+                bob_public_root_5_dataset_handle.id.clone(),
+                alice_derived_6_dataset_handle.id.clone(),
+                bob_derived_7_dataset_handle.id.clone(),
+            ]
+            .into(),
+        ),
+        [alice.clone(), bob.clone()],
+    )
+    .await;
+
+    harness
+        .create_root_dataset(alice_public_root_1_dataset_handle.clone())
+        .await;
+    harness
+        .create_root_dataset(alice_public_root_2_dataset_handle.clone())
+        .await;
+    harness
+        .create_root_dataset(bob_private_root_3_dataset_handle.clone())
+        .await;
+    harness
+        .create_root_dataset(bob_private_root_4_dataset_handle.clone())
+        .await;
+    harness
+        .create_root_dataset(bob_public_root_5_dataset_handle.clone())
+        .await;
+    harness
+        .create_derived_dataset(
+            alice_derived_6_dataset_handle.clone(),
+            vec![
+                alice_public_root_2_dataset_handle.id.clone(),
+                bob_private_root_3_dataset_handle.id.clone(),
+                bob_private_root_4_dataset_handle.id.clone(),
+            ],
+        )
+        .await;
+    harness
+        .create_derived_dataset(
+            bob_derived_7_dataset_handle.clone(),
+            vec![bob_public_root_5_dataset_handle.id.clone()],
+        )
+        .await;
+
+    let res = harness
+        .use_case
+        .execute(&alice_derived_6_dataset_handle.id.clone())
+        .await;
+
+    assert!(res.is_ok(), "{res:?}");
+
+    let mut actual_res = res.unwrap();
+    actual_res.sort();
+
+    pretty_assertions::assert_eq!(
+        [
+            DatasetDependency::resolved(
+                alice_public_root_2_dataset_handle,
+                odf::AccountID::new_seeded_ed25519(alice.as_bytes()),
+                alice.clone(),
+            ),
+            DatasetDependency::Unresolved(bob_private_root_4_dataset_handle.id),
+            DatasetDependency::Unresolved(bob_private_root_3_dataset_handle.id),
+        ],
         *actual_res,
     );
 }
@@ -237,16 +257,16 @@ async fn test_inaccessible_downstream_dependencies_excluded() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[oop::extend(BaseUseCaseHarness, base_use_case_harness)]
-struct GetDatasetDownstreamDependenciesUseCaseHarness {
+struct GetDatasetUpstreamDependenciesUseCaseHarness {
     base_use_case_harness: BaseUseCaseHarness,
-    use_case: Arc<dyn GetDatasetDownstreamDependenciesUseCase>,
+    use_case: Arc<dyn GetDatasetUpstreamDependenciesUseCase>,
     dependency_graph_writer: Arc<dyn DependencyGraphWriter>,
     fake_dataset_entry_service: Arc<FakeDatasetEntryService>,
     system_time_source: Arc<dyn SystemTimeSource>,
     catalog: Catalog,
 }
 
-impl GetDatasetDownstreamDependenciesUseCaseHarness {
+impl GetDatasetUpstreamDependenciesUseCaseHarness {
     async fn new(
         mock_dataset_action_authorizer: MockDatasetActionAuthorizer,
         predefined_account: impl IntoIterator<Item = odf::AccountName>,
@@ -258,7 +278,7 @@ impl GetDatasetDownstreamDependenciesUseCaseHarness {
         );
 
         let catalog = dill::CatalogBuilder::new_chained(base_use_case_harness.catalog())
-            .add::<GetDatasetDownstreamDependenciesUseCaseImpl>()
+            .add::<GetDatasetUpstreamDependenciesUseCaseImpl>()
             .add::<PredefinedAccountsRegistrator>()
             .add_value(PredefinedAccountsConfig {
                 predefined: predefined_account

@@ -9,6 +9,7 @@
 
 mod test_compact_dataset_use_case;
 mod test_get_dataset_downstream_dependencies_use_case;
+mod test_get_dataset_upstream_dependencies_use_case;
 mod test_pull_dataset_use_case;
 mod test_push_dataset_use_case;
 mod test_reset_dataset_use_case;

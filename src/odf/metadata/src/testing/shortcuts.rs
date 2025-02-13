@@ -12,15 +12,18 @@ use crate::{AccountID, AccountName, DatasetAlias, DatasetHandle, DatasetID, Data
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub fn handle(account: &impl AsRef<str>, dataset_name: &impl AsRef<str>) -> DatasetHandle {
+    let account_name = AccountName::new_unchecked(account.as_ref());
     let dataset_name = DatasetName::new_unchecked(dataset_name.as_ref());
-    let dataset_id = DatasetID::new_seeded_ed25519(dataset_name.as_bytes());
+    let dataset_id = {
+        let mut seed = Vec::new();
+        seed.extend(account_name.as_bytes());
+        seed.extend(dataset_name.as_bytes());
+        DatasetID::new_seeded_ed25519(&seed)
+    };
 
     DatasetHandle::new(
         dataset_id,
-        DatasetAlias::new(
-            Some(AccountName::new_unchecked(account.as_ref())),
-            dataset_name,
-        ),
+        DatasetAlias::new(Some(account_name), dataset_name),
     )
 }
 
