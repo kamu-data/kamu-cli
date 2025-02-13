@@ -190,7 +190,11 @@ impl DatasetMetadata {
         let source = metadata_query_service.get_active_transform(target).await?;
 
         if let Some((_hash, block)) = source {
-            Ok(Some(SetTransform::try_from_odf(ctx, block.event).await?))
+            Ok(Some(
+                SetTransform::with_extended_aliases(ctx, block.event)
+                    .await?
+                    .into(),
+            ))
         } else {
             Ok(None)
         }

@@ -12,6 +12,7 @@ use std::fmt::Write;
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use internal_error::{InternalError, ResultIntoInternal};
 use kamu::domain::*;
 use kamu::{DotStyle, DotVisitor};
 
@@ -123,9 +124,7 @@ impl Command for InspectLineageCommand {
                 .await
                 .map_err(CLIError::failure)?;
         }
-        visitor.done();
-
-        Ok(())
+        visitor.done().map_err(CLIError::failure)
     }
 }
 
@@ -212,10 +211,11 @@ impl LineageVisitor for ShellVisitor {
         }
     }
 
-    fn done(&mut self) {
+    fn done(&mut self) -> Result<(), InternalError> {
         for line in &self.buffer {
             println!("{line}");
         }
+        Ok(())
     }
 }
 
@@ -261,7 +261,9 @@ impl LineageVisitor for CsvVisitor {
 
     fn exit(&mut self, _dataset: &NodeInfo<'_>) {}
 
-    fn done(&mut self) {}
+    fn done(&mut self) -> Result<(), InternalError> {
+        Ok(())
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -301,15 +303,15 @@ impl<W: Write + Send> LineageVisitor for HtmlVisitor<W> {
         self.dot_visitor.exit(dataset);
     }
 
-    fn done(&mut self) {
-        self.dot_visitor.done();
+    fn done(&mut self) -> Result<(), InternalError> {
+        self.dot_visitor.done()?;
         let mut visitor = DotVisitor::new_with_style(String::new());
         std::mem::swap(&mut visitor, &mut self.dot_visitor);
         let dot = visitor.unwrap();
         let dot_encoded = urlencoding::encode(&dot);
 
         let html = Self::TEMPLATE.replace("<URL_ENCODED_DOT>", &dot_encoded);
-        write!(self.writer, "{html}").unwrap();
+        write!(self.writer, "{html}").int_err()
     }
 }
 
@@ -360,14 +362,14 @@ impl LineageVisitor for HtmlBrowseVisitor {
         self.html_visitor.exit(dataset);
     }
 
-    fn done(&mut self) {
-        self.html_visitor.done();
+    fn done(&mut self) -> Result<(), InternalError> {
+        self.html_visitor.done()?;
 
         let mut visitor = HtmlVisitor::new(String::new());
         std::mem::swap(&mut visitor, &mut self.html_visitor);
 
-        std::fs::write(&self.temp_path, visitor.unwrap()).unwrap();
-        webbrowser::open(url::Url::from_file_path(&self.temp_path).unwrap().as_ref()).unwrap();
+        std::fs::write(&self.temp_path, visitor.unwrap()).int_err()?;
+        webbrowser::open(url::Url::from_file_path(&self.temp_path).unwrap().as_ref()).int_err()
     }
 }
 

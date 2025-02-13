@@ -64,14 +64,18 @@ impl MetadataChain {
         hash: Multihash,
     ) -> Result<Option<MetadataBlockExtended>> {
         let resolved_dataset = get_dataset(ctx, &self.dataset_handle);
-        let block = resolved_dataset
+        let block_maybe = resolved_dataset
             .as_metadata_chain()
             .try_get_block(&hash)
             .await?;
         let account = Account::from_dataset_alias(ctx, &self.dataset_handle.alias)
             .await?
             .expect("Account must exist");
-        Ok(block.map(|b| MetadataBlockExtended::new(hash, b, account)))
+        Ok(if let Some(block) = block_maybe {
+            Some(MetadataBlockExtended::new(ctx, hash, block, account).await?)
+        } else {
+            None
+        })
     }
 
     /// Returns a metadata block corresponding to the specified hash and encoded
@@ -94,8 +98,9 @@ impl MetadataChain {
             None => Ok(None),
             Some(block) => match format {
                 MetadataManifestFormat::Yaml => {
+                    let block_content = MetadataBlock::with_extended_aliases(ctx, block).await?;
                     let ser = odf::metadata::serde::yaml::YamlMetadataBlockSerializer;
-                    let buffer = ser.write_manifest(&block).int_err()?;
+                    let buffer = ser.write_manifest(&block_content).int_err()?;
                     let content = std::str::from_utf8(&buffer).int_err()?;
                     Ok(Some(content.to_string()))
                 }
@@ -134,7 +139,7 @@ impl MetadataChain {
             let account = Account::from_dataset_alias(ctx, &self.dataset_handle.alias)
                 .await?
                 .expect("Account must exist");
-            let block = MetadataBlockExtended::new(hash, block, account);
+            let block = MetadataBlockExtended::new(ctx, hash, block, account).await?;
             nodes.push(block);
         }
 
