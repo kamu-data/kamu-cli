@@ -78,7 +78,7 @@ async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
         .unwrap();
 
     // Add and sync dataset
-    let foo_created = create_test_dataset_fron_snapshot(
+    let _ = create_test_dataset_fron_snapshot(
         dataset_registry.as_ref(),
         dataset_storage_unit_writer.as_ref(),
         MetadataFactory::dataset_snapshot()
@@ -116,7 +116,7 @@ async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
             .unwrap(),
         SearchResult {
             datasets: vec![SearchResultDataset {
-                id: Some(foo_created.dataset_handle.id.clone()),
+                id: None,
                 alias: dataset_remote_alias.clone(),
                 kind: None,
                 num_blocks: None,
@@ -133,7 +133,7 @@ async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
             .unwrap(),
         SearchResult {
             datasets: vec![SearchResultDataset {
-                id: Some(foo_created.dataset_handle.id),
+                id: None,
                 alias: dataset_remote_alias.clone(),
                 kind: None,
                 num_blocks: None,
@@ -165,7 +165,7 @@ async fn test_search_local_fs() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// #[test_group::group(containerized)]
+#[test_group::group(containerized)]
 #[test_log::test(tokio::test)]
 async fn test_search_s3() {
     let s3 = LocalS3Server::new().await;
