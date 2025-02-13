@@ -34,6 +34,8 @@ pub async fn test_try_get_properties_from_nonexistent_entity(catalog: &Catalog) 
 
     let nonexistent_entity = Entity::new_dataset("foo");
 
+    assert_matches!(rebac_repo.properties_count().await, Ok(0));
+
     let res = rebac_repo.get_entity_properties(&nonexistent_entity).await;
 
     assert_matches!(
@@ -41,6 +43,7 @@ pub async fn test_try_get_properties_from_nonexistent_entity(catalog: &Catalog) 
         Ok(actual_properties)
             if actual_properties.is_empty()
     );
+    assert_matches!(rebac_repo.properties_count().await, Ok(0));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -51,11 +54,14 @@ pub async fn test_set_property(catalog: &Catalog) {
     let entity = Entity::new_dataset("bar");
     let anon_read_property = PropertyName::dataset_allows_anonymous_read(true);
 
+    assert_matches!(rebac_repo.properties_count().await, Ok(0));
+
     let set_res = rebac_repo
         .set_entity_property(&entity, anon_read_property.0, &anon_read_property.1)
         .await;
 
     assert_matches!(set_res, Ok(_));
+    assert_matches!(rebac_repo.properties_count().await, Ok(1));
 
     let get_res = rebac_repo.get_entity_properties(&entity).await;
     let expected_properties = vec![anon_read_property];
@@ -75,6 +81,8 @@ pub async fn test_try_delete_property_from_nonexistent_entity(catalog: &Catalog)
     let nonexistent_entity = Entity::new_dataset("foo");
     let property = DatasetPropertyName::AllowsAnonymousRead.into();
 
+    assert_matches!(rebac_repo.properties_count().await, Ok(0));
+
     let delete_res = rebac_repo
         .delete_entity_property(&nonexistent_entity, property)
         .await;
@@ -85,6 +93,7 @@ pub async fn test_try_delete_property_from_nonexistent_entity(catalog: &Catalog)
             if e.entity == nonexistent_entity
                 && e.property_name == property
     );
+    assert_matches!(rebac_repo.properties_count().await, Ok(0));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -95,11 +104,14 @@ pub async fn test_try_delete_nonexistent_property_from_entity(catalog: &Catalog)
     let entity = Entity::new_dataset("bar");
     let anon_read_property = PropertyName::dataset_allows_anonymous_read(true);
 
+    assert_matches!(rebac_repo.properties_count().await, Ok(0));
+
     let set_res = rebac_repo
         .set_entity_property(&entity, anon_read_property.0, &anon_read_property.1)
         .await;
 
     assert_matches!(set_res, Ok(_));
+    assert_matches!(rebac_repo.properties_count().await, Ok(1));
 
     let nonexistent_property = DatasetPropertyName::AllowsPublicRead.into();
     let delete_res = rebac_repo
@@ -112,6 +124,7 @@ pub async fn test_try_delete_nonexistent_property_from_entity(catalog: &Catalog)
             if e.entity == entity
                 && e.property_name == nonexistent_property
     );
+    assert_matches!(rebac_repo.properties_count().await, Ok(1));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -122,12 +135,15 @@ pub async fn test_delete_property_from_entity(catalog: &Catalog) {
     let entity = Entity::new_dataset("bar");
     let anon_read_property = PropertyName::dataset_allows_anonymous_read(true);
 
+    assert_matches!(rebac_repo.properties_count().await, Ok(0));
+
     {
         let set_res = rebac_repo
             .set_entity_property(&entity, anon_read_property.0, &anon_read_property.1)
             .await;
 
         assert_matches!(set_res, Ok(_));
+        assert_matches!(rebac_repo.properties_count().await, Ok(1));
     }
 
     let public_read_property = PropertyName::dataset_allows_public_read(true);
@@ -138,6 +154,7 @@ pub async fn test_delete_property_from_entity(catalog: &Catalog) {
             .await;
 
         assert_matches!(set_res, Ok(_));
+        assert_matches!(rebac_repo.properties_count().await, Ok(2));
     }
 
     {
@@ -165,6 +182,7 @@ pub async fn test_delete_property_from_entity(catalog: &Catalog) {
             .await;
 
         assert_matches!(delete_res, Ok(_));
+        assert_matches!(rebac_repo.properties_count().await, Ok(1));
     }
 
     {
@@ -178,6 +196,7 @@ pub async fn test_delete_property_from_entity(catalog: &Catalog) {
                 if e.entity == entity
                     && e.property_name == anon_read_property.0
         );
+        assert_matches!(rebac_repo.properties_count().await, Ok(1));
     }
 
     {
@@ -200,12 +219,15 @@ pub async fn test_delete_entity_properties(catalog: &Catalog) {
     let entity = Entity::new_dataset("bar");
     let anon_read_property = PropertyName::dataset_allows_anonymous_read(true);
 
+    assert_matches!(rebac_repo.properties_count().await, Ok(0));
+
     {
         let set_res = rebac_repo
             .set_entity_property(&entity, anon_read_property.0, &anon_read_property.1)
             .await;
 
         assert_matches!(set_res, Ok(_));
+        assert_matches!(rebac_repo.properties_count().await, Ok(1));
     }
 
     let public_read_property = PropertyName::dataset_allows_public_read(true);
@@ -216,6 +238,7 @@ pub async fn test_delete_entity_properties(catalog: &Catalog) {
             .await;
 
         assert_matches!(set_res, Ok(_));
+        assert_matches!(rebac_repo.properties_count().await, Ok(2));
     }
 
     {
@@ -235,12 +258,14 @@ pub async fn test_delete_entity_properties(catalog: &Catalog) {
                 panic!("A successful result was expected, but an error was received: {e}");
             }
         }
+        assert_matches!(rebac_repo.properties_count().await, Ok(2));
     }
 
     {
         let delete_res = rebac_repo.delete_entity_properties(&entity).await;
 
         assert_matches!(delete_res, Ok(_));
+        assert_matches!(rebac_repo.properties_count().await, Ok(0));
     }
 
     {
@@ -251,6 +276,7 @@ pub async fn test_delete_entity_properties(catalog: &Catalog) {
             Ok(actual_properties)
                 if actual_properties.is_empty()
         );
+        assert_matches!(rebac_repo.properties_count().await, Ok(0));
     }
 
     {
@@ -261,6 +287,7 @@ pub async fn test_delete_entity_properties(catalog: &Catalog) {
             Err(DeleteEntityPropertiesError::NotFound(e))
                 if e.entity == entity
         );
+        assert_matches!(rebac_repo.properties_count().await, Ok(0));
     }
 }
 
