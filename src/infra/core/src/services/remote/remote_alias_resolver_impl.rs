@@ -13,7 +13,6 @@ use std::sync::Arc;
 use dill::*;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_core::*;
-use odf::DatasetHandle;
 use url::Url;
 
 use crate::UrlExt;
@@ -24,7 +23,6 @@ pub struct RemoteAliasResolverImpl {
     remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
     access_token_resolver: Arc<dyn odf::dataset::OdfServerAccessTokenResolver>,
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
-    dataset_storage_unit_factory: Arc<dyn odf::dataset::DatasetStorageUnitFactory>,
 }
 
 #[component(pub)]
@@ -34,13 +32,11 @@ impl RemoteAliasResolverImpl {
         remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
         access_token_resolver: Arc<dyn odf::dataset::OdfServerAccessTokenResolver>,
         remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
-        dataset_storage_unit_factory: Arc<dyn odf::dataset::DatasetStorageUnitFactory>,
     ) -> Self {
         Self {
             remote_repo_reg,
             access_token_resolver,
             remote_alias_reg,
-            dataset_storage_unit_factory,
         }
     }
 
@@ -231,84 +227,21 @@ impl RemoteAliasResolver for RemoteAliasResolverImpl {
                 dataset_url.ensure_trailing_slash();
                 Ok(dataset_url)
             }
-            odf::DatasetRefRemote::Alias(alias) => {
+            odf::DatasetRefRemote::Alias(alias)
+            | odf::DatasetRefRemote::Handle(odf::metadata::DatasetHandleRemote { alias, .. }) => {
                 let remote_repo = self.remote_repo_reg.get_repository(&alias.repo_name)?;
                 if remote_repo.url.is_odf_protocol() {
                     let transfer_url = remote_repo.url.clone().odf_to_transport_protocol()?;
                     self.resolve_pull_url_from_odf_transfer_url(alias, &transfer_url)
                         .await
-                } else if remote_repo.url.is_http_protocol() {
+                } else {
                     Ok(remote_repo
                         .url
                         .join(&format!("{}/", alias.local_alias()))
                         .unwrap())
-                } else {
-                    let storage_unit = self
-                        .dataset_storage_unit_factory
-                        .get_storage_unit(&remote_repo.url, alias.account_name.is_some())
-                        .await
-                        .int_err()?;
-                    let local_ref_in_repo = alias.local_alias().as_local_ref();
-                    match storage_unit
-                        .resolve_stored_dataset_handle_by_ref(&local_ref_in_repo)
-                        .await
-                    {
-                        Ok(hdl) => {
-                            let dataset = storage_unit.get_stored_dataset_by_handle(&hdl);
-                            Ok(dataset.get_storage_internal_url().clone())
-                        }
-                        Err(odf::dataset::GetDatasetError::NotFound(_)) => {
-                            Err(ResolveAliasError::UnresolvedAlias(alias.clone()))
-                        }
-                        Err(odf::dataset::GetDatasetError::Internal(e)) => {
-                            Err(ResolveAliasError::Internal(e))
-                        }
-                    }
-                }
-            }
-            odf::DatasetRefRemote::Handle(odf::metadata::DatasetHandleRemote { alias, id }) => {
-                let remote_repo = self.remote_repo_reg.get_repository(&alias.repo_name)?;
-                if remote_repo.url.is_odf_protocol() {
-                    let transfer_url = remote_repo.url.clone().odf_to_transport_protocol()?;
-                    self.resolve_pull_url_from_odf_transfer_url(alias, &transfer_url)
-                        .await
-                } else if remote_repo.url.is_http_protocol() {
-                    Ok(remote_repo
-                        .url
-                        .join(&format!("{}/", alias.local_alias()))
-                        .unwrap())
-                } else {
-                    let storage_unit = self
-                        .dataset_storage_unit_factory
-                        .get_storage_unit(&remote_repo.url, alias.account_name.is_some())
-                        .await
-                        .int_err()?;
-                    let dataset = storage_unit.get_stored_dataset_by_handle(&DatasetHandle::new(
-                        id.clone(),
-                        alias.local_alias(),
-                    ));
-                    Ok(dataset.get_storage_internal_url().clone())
                 }
             }
         }
-    }
-
-    async fn build_new_remote_dataset_url(
-        &self,
-        repo_name: &odf::RepoName,
-        account_name: Option<&odf::AccountName>,
-        dataset_id: &odf::DatasetID,
-    ) -> Result<url::Url, InternalError> {
-        let remote_repo = self.remote_repo_reg.get_repository(repo_name).int_err()?;
-
-        let storage_unit = self
-            .dataset_storage_unit_factory
-            .get_storage_unit(&remote_repo.url, account_name.is_some())
-            .await
-            .int_err()?;
-
-        let url = storage_unit.potential_internal_url_for(dataset_id);
-        Ok(url)
     }
 }
 

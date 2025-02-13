@@ -46,8 +46,7 @@ pub enum BuildDatasetError {
 #[derive(thiserror::Error, Debug)]
 pub struct UnsupportedProtocolError {
     pub message: Option<String>,
-    pub entity_kind: &'static str,
-    pub url: Box<Url>,
+    pub url: Url,
 }
 
 impl std::fmt::Display for UnsupportedProtocolError {
@@ -57,9 +56,8 @@ impl std::fmt::Display for UnsupportedProtocolError {
         } else {
             write!(
                 f,
-                "Unsupported protocol {} when accessing {} at {}",
+                "Unsupported protocol {} when accessing dataset at {}",
                 self.url.scheme(),
-                self.entity_kind,
                 self.url
             )
         }

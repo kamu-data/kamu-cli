@@ -27,9 +27,6 @@ use odf::storage::{
 use s3_utils::S3Context;
 use time_source::SystemTimeSource;
 use tokio::sync::Mutex;
-use url::Url;
-
-use crate::UrlExt;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -240,14 +237,6 @@ impl DatasetStorageUnitS3 {
 
 #[async_trait]
 impl odf::DatasetStorageUnit for DatasetStorageUnitS3 {
-    fn potential_internal_url_for(&self, dataset_id: &odf::DatasetID) -> Url {
-        let mut base_url = self.s3_context.make_url();
-        base_url.ensure_trailing_slash();
-        base_url
-            .join(format!("{}/", dataset_id.as_multibase().to_stack_string()).as_str())
-            .unwrap()
-    }
-
     async fn resolve_stored_dataset_handle_by_ref(
         &self,
         dataset_ref: &odf::DatasetRef,

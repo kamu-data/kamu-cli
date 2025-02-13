@@ -17,7 +17,6 @@ use kamu_core::{
     DatasetRegistryExt,
     RemoteAliasResolver,
     RemoteRepositoryRegistry,
-    ResolveAliasError,
     SyncError,
     SyncRef,
     SyncRefRemote,
@@ -62,7 +61,7 @@ impl SyncRequestBuilder {
         let src_sync_ref = self.resolve_source_sync_ref(&src_ref).await?;
 
         let dst_sync_ref = self
-            .resolve_dest_sync_ref(&dst_ref, &src_sync_ref, create_dst_if_not_exists)
+            .resolve_dest_sync_ref(&dst_ref, create_dst_if_not_exists)
             .await?;
 
         let sync_request = SyncRequest {
@@ -112,7 +111,6 @@ impl SyncRequestBuilder {
     async fn resolve_dest_sync_ref(
         &self,
         any_ref: &odf::DatasetRefAny,
-        src_sync_ref: &SyncRef,
         create_if_not_exists: bool,
     ) -> Result<SyncRef, SyncError> {
         match any_ref.as_local_ref(|repo| self.remote_repo_registry.get_repository(repo).is_ok()) {
@@ -152,44 +150,6 @@ impl SyncRequestBuilder {
                             dataset,
                             original_remote_ref: remote_ref,
                         }))
-                    }
-                    Err(ResolveAliasError::UnresolvedAlias(alias)) => {
-                        if create_if_not_exists
-                            && let SyncRef::Local(src_resolved_dataset) = src_sync_ref
-                        {
-                            let src_dataset_id = src_resolved_dataset.get_id();
-
-                            let new_remote_dataset_url = self
-                                .remote_alias_resolver
-                                .build_new_remote_dataset_url(
-                                    &alias.repo_name,
-                                    alias.account_name.as_ref(),
-                                    src_dataset_id,
-                                )
-                                .await?;
-
-                            let dataset = self
-                                .dataset_factory
-                                .get_dataset(&new_remote_dataset_url, true)
-                                .await?;
-
-                            dataset
-                                .as_info_repo()
-                                .set("alias", alias.local_alias().to_string().as_bytes())
-                                .await
-                                .int_err()?;
-
-                            Ok(SyncRef::Remote(SyncRefRemote {
-                                url: Arc::new(new_remote_dataset_url),
-                                dataset,
-                                original_remote_ref: remote_ref,
-                            }))
-                        } else {
-                            Err(DatasetAnyRefUnresolvedError {
-                                dataset_ref: any_ref.clone(),
-                            }
-                            .into())
-                        }
                     }
                     Err(e) => Err(SyncError::Internal(e.int_err())),
                 }
