@@ -7,6 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::assert_matches::assert_matches;
+
+use datafusion::error::DataFusionError;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[test_log::test(tokio::test)]
 async fn test_parse_ddl() {
     let ctx = datafusion::prelude::SessionContext::new();
@@ -27,6 +33,8 @@ message arrow_schema {
     );
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[test_log::test(tokio::test)]
 async fn test_parse_ddl_with_force_utc() {
     let ctx = datafusion::prelude::SessionContext::new();
@@ -45,4 +53,19 @@ message arrow_schema {
 }
         "#,
     );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_parse_ddl_with_reserved_keyword() {
+    let ctx = datafusion::prelude::SessionContext::new();
+    let result = opendatafabric_data_utils::schema::parse::parse_ddl_to_datafusion_schema(
+        &ctx,
+        "foo TEXT, key TEXT, bar TEXT",
+        false,
+    )
+    .await;
+
+    assert_matches!(result, Err(DataFusionError::Plan(err)) if err ==  "Argument key is invalid or a reserved keyword".to_string());
 }

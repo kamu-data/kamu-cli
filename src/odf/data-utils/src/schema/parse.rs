@@ -13,6 +13,8 @@ use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use datafusion::common::DFSchema;
 use datafusion::error::DataFusionError;
 use datafusion::prelude::SessionContext;
+use datafusion::sql::sqlparser::dialect::GenericDialect;
+use datafusion::sql::sqlparser::parser::{Parser, ParserError};
 
 /// Parses data type declarations into a `DataFusion` schema.
 ///
@@ -32,6 +34,16 @@ pub async fn parse_ddl_to_datafusion_schema(
 ) -> Result<DFSchema, DataFusionError> {
     // TODO: SEC: should we worry about SQL injections?
     let sql = format!("create table x ({ddl})");
+
+    if let Err(ParserError::ParserError(err)) = Parser::parse_sql(&GenericDialect {}, &sql) {
+        if let Some(err_index) = extract_column_index(&err)
+            && let Some(invalid_field) = extract_problematic_field(&sql, err_index)
+        {
+            return Err(DataFusionError::Plan(format!(
+                "Argument {invalid_field} is invalid or a reserved keyword"
+            )));
+        }
+    }
 
     let plan = ctx.state().create_logical_plan(&sql).await?;
 
@@ -150,4 +162,31 @@ fn force_utc_time_applies_rec(data_type: &DataType) -> bool {
         }
         _ => false,
     }
+}
+
+fn extract_column_index(error_message: &str) -> Option<usize> {
+    let column_marker = "Column: ";
+    let index = error_message.find(column_marker)?;
+
+    error_message[index + column_marker.len()..]
+        .split_whitespace()
+        .next()?
+        .parse::<usize>()
+        .ok()
+}
+
+fn extract_problematic_field(sql: &str, error_index: usize) -> Option<String> {
+    // Step 1: Get the substring up to the error index
+    let truncated = &sql[..error_index - 1];
+
+    // Step 2: Find the last ',' or '(' before the error index
+    let last_separator = truncated.rfind(|c| c == ',' || c == '(')?;
+
+    // Step 3: Extract the column definition
+    let column_part = truncated[(last_separator + 1)..].trim();
+
+    // Step 4: Get only the column name (first word before space)
+    let column_name = column_part.split_whitespace().next()?;
+
+    Some(column_name.to_string())
 }
