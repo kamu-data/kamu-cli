@@ -54,12 +54,9 @@ async fn test_pre_run_requeues_running_tasks() {
     assert_eq!(task_3.status(), TaskStatus::Queued);
 
     // A recovery must convert all Running into Queued
-    init_on_startup::run_startup_jobs(
-        &harness.catalog,
-        init_on_startup::RunStartupJobOpts::default(),
-    )
-    .await
-    .unwrap();
+    init_on_startup::run_startup_jobs(&harness.catalog)
+        .await
+        .unwrap();
 
     // 1, 2, 3 - Queued
     let task_1 = harness.get_task(task_id_1).await;

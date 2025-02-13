@@ -48,7 +48,6 @@ pub struct OutboxAgent {
     job_name: JOB_MESSAGING_OUTBOX_STARTUP,
     depends_on: &[],
     requires_transaction: false,
-    requires_up_to_date_storage: false,
 })]
 #[scope(Singleton)]
 impl OutboxAgent {

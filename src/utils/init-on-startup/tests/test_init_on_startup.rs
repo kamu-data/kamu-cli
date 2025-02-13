@@ -14,13 +14,7 @@ use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 
 use dill::*;
-use init_on_startup::{
-    run_startup_jobs,
-    InitOnStartup,
-    InitOnStartupMeta,
-    RunStartupJobOpts,
-    StartupJobsError,
-};
+use init_on_startup::{run_startup_jobs, InitOnStartup, InitOnStartupMeta, StartupJobsError};
 use internal_error::InternalError;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -67,7 +61,6 @@ macro_rules! test_startup_job {
             #[meta(InitOnStartupMeta {
                 job_name: $job_name,
                 requires_transaction: false,
-                requires_up_to_date_storage: false,
                 depends_on: $depends_on,
             })]
             #[scope(Singleton)]
@@ -105,9 +98,7 @@ async fn test_independent_jobs() {
         .add::<TestJobC>()
         .build();
 
-    run_startup_jobs(&catalog, RunStartupJobOpts::default())
-        .await
-        .unwrap();
+    run_startup_jobs(&catalog).await.unwrap();
 
     // The order of executions is random, but all 3 must be present
     let executions = catalog.get_one::<JobExecutions>().unwrap();
@@ -134,9 +125,7 @@ async fn test_linear_dependency() {
         .add::<TestJobC>()
         .build();
 
-    run_startup_jobs(&catalog, RunStartupJobOpts::default())
-        .await
-        .unwrap();
+    run_startup_jobs(&catalog).await.unwrap();
 
     // The order of executions must respect dependencies
     let executions = catalog.get_one::<JobExecutions>().unwrap();
@@ -161,9 +150,7 @@ async fn test_branching_dependency() {
         .add::<TestJobC>()
         .build();
 
-    run_startup_jobs(&catalog, RunStartupJobOpts::default())
-        .await
-        .unwrap();
+    run_startup_jobs(&catalog).await.unwrap();
 
     // Job A always runs first, while B & C may run in any order
     let executions = catalog.get_one::<JobExecutions>().unwrap();
@@ -186,7 +173,7 @@ async fn test_missing_dependency() {
         .add::<TestJobB>()
         .build();
 
-    let res = run_startup_jobs(&catalog, RunStartupJobOpts::default()).await;
+    let res = run_startup_jobs(&catalog).await;
     assert_matches!(res, Err(StartupJobsError::DependsOnUnresolved(x))
         if x.job_name == "TestJobB" && x.unresolved_depends_on == "TestJobA"
     );
@@ -207,7 +194,7 @@ async fn test_dependency_loop() {
         .add::<TestJobC>()
         .build();
 
-    let res = run_startup_jobs(&catalog, RunStartupJobOpts::default()).await;
+    let res = run_startup_jobs(&catalog).await;
     assert_matches!(res, Err(StartupJobsError::DependsOnLoop(_)));
 }
 
@@ -224,7 +211,7 @@ async fn test_non_unique_jobs() {
         .add::<TestJobA2>()
         .build();
 
-    let res = run_startup_jobs(&catalog, RunStartupJobOpts::default()).await;
+    let res = run_startup_jobs(&catalog).await;
     assert_matches!(res, Err(StartupJobsError::JobNameNonUnique(x)) if x.job_name == "A");
 }
 

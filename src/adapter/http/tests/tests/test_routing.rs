@@ -81,9 +81,7 @@ async fn setup_repo() -> RepoFixture {
 
     let catalog = b.build();
 
-    init_on_startup::run_startup_jobs(&catalog, init_on_startup::RunStartupJobOpts::default())
-        .await
-        .unwrap();
+    init_on_startup::run_startup_jobs(&catalog).await.unwrap();
 
     let create_dataset_from_snapshot = catalog
         .get_one::<dyn CreateDatasetFromSnapshotUseCase>()

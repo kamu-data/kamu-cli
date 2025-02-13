@@ -44,7 +44,6 @@ pub struct DatasetEntryIndexer {
         JOB_KAMU_ACCOUNTS_PREDEFINED_ACCOUNTS_REGISTRATOR,
     ],
     requires_transaction: true,
-    requires_up_to_date_storage: true,
 })]
 impl DatasetEntryIndexer {
     pub fn new(

@@ -51,12 +51,9 @@ pub async fn authentication_catalogs(
         .add_value(current_account_subject)
         .build();
 
-    init_on_startup::run_startup_jobs(
-        &catalog_authorized,
-        init_on_startup::RunStartupJobOpts::default(),
-    )
-    .await
-    .unwrap();
+    init_on_startup::run_startup_jobs(&catalog_authorized)
+        .await
+        .unwrap();
 
     (catalog_anonymous, catalog_authorized)
 }
