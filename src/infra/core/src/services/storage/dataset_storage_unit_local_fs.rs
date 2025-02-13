@@ -25,8 +25,6 @@ use odf::storage::{
 use odf::DatasetStorageUnit;
 use url::Url;
 
-use crate::UrlExt;
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct DatasetStorageUnitLocalFs {
@@ -230,14 +228,6 @@ impl DatasetStorageUnitLocalFs {
 
 #[async_trait]
 impl odf::DatasetStorageUnit for DatasetStorageUnitLocalFs {
-    fn potential_internal_url_for(&self, dataset_id: &odf::DatasetID) -> Url {
-        let mut base_url = Url::from_file_path(self.root.clone()).unwrap();
-        base_url.ensure_trailing_slash();
-        base_url
-            .join(format!("{}/", dataset_id.as_multibase().to_stack_string()).as_str())
-            .unwrap()
-    }
-
     // TODO: PERF: Cache data and speed up lookups by ID
     //
     // TODO: CONCURRENCY: Since resolving ID to Name currently requires accessing

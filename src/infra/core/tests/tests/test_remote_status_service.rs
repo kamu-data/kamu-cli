@@ -18,7 +18,6 @@ use kamu::testing::{BaseRepoHarness, DummySmartTransferProtocolClient};
 use kamu::utils::ipfs_wrapper::IpfsClient;
 use kamu::utils::simple_transfer_protocol::SimpleTransferProtocol;
 use kamu::{
-    DatasetStorageUnitFactoryImpl,
     RemoteAliasResolverImpl,
     RemoteAliasesRegistryImpl,
     RemoteReposDir,
@@ -259,7 +258,6 @@ impl RemoteStatusTestHarness {
             .add::<RemoteRepositoryRegistryImpl>()
             .add::<DummySmartTransferProtocolClient>()
             .add::<SimpleTransferProtocol>()
-            .add::<DatasetStorageUnitFactoryImpl>()
             .build();
 
         Self {

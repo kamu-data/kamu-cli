@@ -312,7 +312,6 @@ impl PushTestHarness {
             .add::<PushRequestPlannerImpl>()
             .add::<RemoteAliasResolverImpl>()
             .add::<RemoteAliasesRegistryImpl>()
-            .add::<DatasetStorageUnitFactoryImpl>()
             .build();
 
         let maybe_remote_repo_data = if create_remote_repo {

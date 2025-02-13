@@ -343,8 +343,7 @@ impl DatasetFactory for DatasetFactoryImpl {
             }
             _ => Err(UnsupportedProtocolError {
                 message: None,
-                entity_kind: "dataset",
-                url: Box::new(url.clone()),
+                url: url.clone(),
             }
             .into()),
         }

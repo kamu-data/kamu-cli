@@ -168,7 +168,7 @@ async fn test_pull_sync_success() {
     let foo = harness.create_root_dataset(&alias_foo).await;
 
     harness
-        .copy_dataset_to_remote_repo(&foo.dataset_handle.id)
+        .copy_dataset_to_remote_repo(&foo.dataset_handle.id, &alias_foo.dataset_name)
         .await;
 
     let aliases = harness.get_remote_aliases(&foo).await;
@@ -249,7 +249,7 @@ async fn test_pull_sync_success_without_saving_alias() {
     let foo = harness.create_root_dataset(&alias_foo).await;
 
     harness
-        .copy_dataset_to_remote_repo(&foo.dataset_handle.id)
+        .copy_dataset_to_remote_repo(&foo.dataset_handle.id, &alias_foo.dataset_name)
         .await;
 
     let aliases = harness.get_remote_aliases(&foo).await;
@@ -493,7 +493,7 @@ async fn test_pull_all_owned() {
     let baz = harness.create_root_dataset(&alias_baz).await;
 
     harness
-        .copy_dataset_to_remote_repo(&baz.dataset_handle.id)
+        .copy_dataset_to_remote_repo(&baz.dataset_handle.id, &alias_foo.dataset_name)
         .await;
     harness
         .get_remote_aliases(&baz)
@@ -684,7 +684,6 @@ impl PullUseCaseHarness {
             .bind::<dyn SyncService, MockSyncService>()
             .add::<SyncRequestBuilder>()
             .add::<DatasetFactoryImpl>()
-            .add::<DatasetStorageUnitFactoryImpl>()
             .add::<RemoteAliasResolverImpl>()
             .add::<RemoteAliasesRegistryImpl>()
             .add_value(RemoteRepositoryRegistryImpl::create(repos_dir).unwrap())
@@ -724,18 +723,18 @@ impl PullUseCaseHarness {
             .unwrap()
     }
 
-    async fn copy_dataset_to_remote_repo(&self, dataset_id: &odf::DatasetID) {
+    async fn copy_dataset_to_remote_repo(
+        &self,
+        dataset_id: &odf::DatasetID,
+        dataset_name: &odf::DatasetName,
+    ) {
         let src_path = self
             .base_use_case_harness
             .temp_dir_path()
             .join("datasets")
             .join(dataset_id.as_multibase().to_stack_string());
 
-        let dst_path = self
-            .remote_tmp_dir
-            .path()
-            .join("datasets")
-            .join(dataset_id.as_multibase().to_stack_string());
+        let dst_path = self.remote_tmp_dir.path().join(dataset_name);
 
         tokio::fs::create_dir_all(&dst_path).await.unwrap();
         let copy_options = fs_extra::dir::CopyOptions::new().content_only(true);
