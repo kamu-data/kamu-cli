@@ -33,7 +33,6 @@ pub struct InitOnStartupMeta {
     pub job_name: &'static str,
     pub depends_on: &'static [&'static str],
     pub requires_transaction: bool,
-    pub requires_up_to_date_storage: bool,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -48,9 +47,6 @@ pub enum StartupJobsError {
 
     #[error(transparent)]
     DependsOnLoop(StartupJobsDependsOnLoopError),
-
-    #[error(transparent)]
-    StorageNeedsUpgrade(StartupJobsStorageNeedsUpgradeError),
 
     #[error(transparent)]
     Internal(InternalError),
@@ -75,26 +71,10 @@ pub struct StartupJobsDependsOnLoopError {
     pub job_name: &'static str,
 }
 
-#[derive(Error, Debug)]
-#[error("Startup job name '{job_name}' requires an up-to-date storage")]
-pub struct StartupJobsStorageNeedsUpgradeError {
-    pub job_name: &'static str,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Default)]
-pub struct RunStartupJobOpts {
-    pub storage_needs_upgrade: bool,
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tracing::instrument(level = "debug", skip_all)]
-pub async fn run_startup_jobs(
-    catalog: &Catalog,
-    opts: RunStartupJobOpts,
-) -> Result<(), StartupJobsError> {
+pub async fn run_startup_jobs(catalog: &Catalog) -> Result<(), StartupJobsError> {
     let job_builders_by_name = {
         let mut job_builders_by_name = HashMap::new();
 
@@ -127,12 +107,6 @@ pub async fn run_startup_jobs(
         let (job_builder, job_metadata) = job_builders_by_name
             .get(job_name)
             .expect("Job builder must be present");
-
-        if job_metadata.requires_up_to_date_storage && opts.storage_needs_upgrade {
-            return Err(StartupJobsError::StorageNeedsUpgrade(
-                StartupJobsStorageNeedsUpgradeError { job_name },
-            ));
-        }
 
         if job_metadata.requires_transaction {
             DatabaseTransactionRunner::new(catalog.clone())

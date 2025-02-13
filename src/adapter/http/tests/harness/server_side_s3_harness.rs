@@ -132,12 +132,9 @@ impl ServerSideS3Harness {
             (b.build(), listener)
         };
 
-        init_on_startup::run_startup_jobs(
-            &base_catalog,
-            init_on_startup::RunStartupJobOpts::default(),
-        )
-        .await
-        .unwrap();
+        init_on_startup::run_startup_jobs(&base_catalog)
+            .await
+            .unwrap();
 
         let api_server = TestAPIServer::new(
             create_web_user_catalog(&base_catalog, &options),

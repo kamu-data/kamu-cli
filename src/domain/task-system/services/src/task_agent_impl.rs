@@ -35,7 +35,6 @@ pub struct TaskAgentImpl {
     job_name: JOB_KAMU_TASKS_AGENT_RECOVERY,
     depends_on: &[],
     requires_transaction: false,
-    requires_up_to_date_storage: false,
 })]
 #[scope(Singleton)]
 impl TaskAgentImpl {

@@ -12,6 +12,7 @@ use dill::Catalog;
 use kamu::domain::TenancyConfig;
 use kamu_accounts::CurrentAccountSubject;
 
+use crate::cli::SystemApiServerSubCommand;
 use crate::commands::*;
 use crate::{accounts, cli, odf_server, WorkspaceService};
 
@@ -541,6 +542,45 @@ pub fn command_needs_transaction(args: &cli::Cli) -> bool {
         cli::Command::Ui(_) => false,
         _ => true,
     }
+}
+
+pub fn command_needs_workspace(args: &cli::Cli) -> bool {
+    match &args.command {
+        cli::Command::Complete(_)
+        | cli::Command::Completions(_)
+        | cli::Command::Config(_)
+        | cli::Command::Init(_)
+        | cli::Command::New(_)
+        | cli::Command::Version(_) => false,
+
+        cli::Command::System(s) => match &s.subcommand {
+            cli::SystemSubCommand::ApiServer(a) => match &a.subcommand {
+                None | Some(SystemApiServerSubCommand::GqlQuery(_)) => true,
+                Some(SystemApiServerSubCommand::GqlSchema(_)) => false,
+            },
+            cli::SystemSubCommand::DebugToken(_)
+            | cli::SystemSubCommand::Decode(_)
+            | cli::SystemSubCommand::Diagnose(_)
+            | cli::SystemSubCommand::GenerateToken(_)
+            | cli::SystemSubCommand::Info(_)
+            | cli::SystemSubCommand::UpgradeWorkspace(_) => false,
+            _ => true,
+        },
+        cli::Command::Login(l) => !l.user,
+        _ => true,
+    }
+}
+
+pub fn command_needs_startup_jobs(args: &cli::Cli) -> bool {
+    if command_needs_workspace(args) {
+        return true;
+    }
+
+    if let cli::Command::Complete(_) = &args.command {
+        return true;
+    }
+
+    false
 }
 
 #[allow(clippy::match_like_matches_macro)]

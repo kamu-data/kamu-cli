@@ -20,10 +20,6 @@ impl APIServerGqlSchemaCommand {
 
 #[async_trait::async_trait(?Send)]
 impl Command for APIServerGqlSchemaCommand {
-    fn needs_workspace(&self) -> bool {
-        false
-    }
-
     async fn run(&mut self) -> Result<(), CLIError> {
         println!("{}", self.get_schema());
         Ok(())
