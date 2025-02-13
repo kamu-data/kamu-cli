@@ -281,10 +281,10 @@ async fn test_multi_datasets_matrix() {
     struct ExpectedResults<'a> {
         read_filter_datasets_allowing_result: Vec<odf::DatasetHandle>,
         write_filter_datasets_allowing_result: Vec<odf::DatasetHandle>,
-        read_classify_dataset_handles_by_allowance: &'a str,
-        write_classify_dataset_handles_by_allowance: &'a str,
-        read_classify_dataset_ids_by_allowance: &'a str,
-        write_classify_dataset_ids_by_allowance: &'a str,
+        read_classify_dataset_handles_by_allowance_result: &'a str,
+        write_classify_dataset_handles_by_allowance_result: &'a str,
+        read_classify_dataset_ids_by_allowance_result: &'a str,
+        write_classify_dataset_ids_by_allowance_result: &'a str,
     }
     use odf::metadata::testing::handle;
 
@@ -324,7 +324,7 @@ async fn test_multi_datasets_matrix() {
                     bob_public_dataset_4_handle.clone(),
                 ],
                 write_filter_datasets_allowing_result: vec![],
-                read_classify_dataset_handles_by_allowance: indoc::indoc!(
+                read_classify_dataset_handles_by_allowance_result: indoc::indoc!(
                     r#"
                     authorized:
                     - alice/public-dataset-2
@@ -335,7 +335,7 @@ async fn test_multi_datasets_matrix() {
                     - alice/private-dataset-1: Forbidden
                     "#
                 ),
-                write_classify_dataset_handles_by_allowance: indoc::indoc!(
+                write_classify_dataset_handles_by_allowance_result: indoc::indoc!(
                     r#"
                     authorized:
 
@@ -346,7 +346,7 @@ async fn test_multi_datasets_matrix() {
                     - alice/private-dataset-1: Forbidden
                     "#
                 ),
-                read_classify_dataset_ids_by_allowance: indoc::indoc!(
+                read_classify_dataset_ids_by_allowance_result: indoc::indoc!(
                     r#"
                     authorized:
                     - alice/public-dataset-2
@@ -357,7 +357,7 @@ async fn test_multi_datasets_matrix() {
                     - alice/private-dataset-1: Forbidden
                     "#
                 ),
-                write_classify_dataset_ids_by_allowance: indoc::indoc!(
+                write_classify_dataset_ids_by_allowance_result: indoc::indoc!(
                     r#"
                     authorized:
 
@@ -385,7 +385,7 @@ async fn test_multi_datasets_matrix() {
                     // bob_private_dataset_3_handle.clone(),
                     // bob_public_dataset_4_handle.clone(),
                 ],
-                read_classify_dataset_handles_by_allowance: indoc::indoc!(
+                read_classify_dataset_handles_by_allowance_result: indoc::indoc!(
                     r#"
                     authorized:
                     - alice/public-dataset-2
@@ -396,7 +396,7 @@ async fn test_multi_datasets_matrix() {
                     - bob/private-dataset-3: Forbidden
                     "#
                 ),
-                write_classify_dataset_handles_by_allowance: indoc::indoc!(
+                write_classify_dataset_handles_by_allowance_result: indoc::indoc!(
                     r#"
                     authorized:
                     - alice/public-dataset-2
@@ -407,7 +407,7 @@ async fn test_multi_datasets_matrix() {
                     - bob/private-dataset-3: Forbidden
                     "#
                 ),
-                read_classify_dataset_ids_by_allowance: indoc::indoc!(
+                read_classify_dataset_ids_by_allowance_result: indoc::indoc!(
                     r#"
                     authorized:
                     - alice/public-dataset-2
@@ -418,7 +418,7 @@ async fn test_multi_datasets_matrix() {
                     - bob/private-dataset-3: Forbidden
                     "#
                 ),
-                write_classify_dataset_ids_by_allowance: indoc::indoc!(
+                write_classify_dataset_ids_by_allowance_result: indoc::indoc!(
                     r#"
                     authorized:
                     - alice/public-dataset-2
@@ -446,7 +446,7 @@ async fn test_multi_datasets_matrix() {
                     bob_private_dataset_3_handle.clone(),
                     bob_public_dataset_4_handle.clone(),
                 ],
-                read_classify_dataset_handles_by_allowance: indoc::indoc!(
+                read_classify_dataset_handles_by_allowance_result: indoc::indoc!(
                     r#"
                     authorized:
                     - alice/public-dataset-2
@@ -457,7 +457,7 @@ async fn test_multi_datasets_matrix() {
                     unauthorized_with_errors:
                     "#
                 ),
-                write_classify_dataset_handles_by_allowance: indoc::indoc!(
+                write_classify_dataset_handles_by_allowance_result: indoc::indoc!(
                     r#"
                     authorized:
                     - alice/public-dataset-2
@@ -468,7 +468,7 @@ async fn test_multi_datasets_matrix() {
                     unauthorized_with_errors:
                     "#
                 ),
-                read_classify_dataset_ids_by_allowance: indoc::indoc!(
+                read_classify_dataset_ids_by_allowance_result: indoc::indoc!(
                     r#"
                     authorized:
                     - alice/public-dataset-2
@@ -479,7 +479,7 @@ async fn test_multi_datasets_matrix() {
                     unauthorized_with_errors:
                     "#
                 ),
-                write_classify_dataset_ids_by_allowance: indoc::indoc!(
+                write_classify_dataset_ids_by_allowance_result: indoc::indoc!(
                     r#"
                     authorized:
                     - alice/public-dataset-2
@@ -541,7 +541,7 @@ async fn test_multi_datasets_matrix() {
         );
 
         pretty_assertions::assert_eq!(
-            expected_results.read_classify_dataset_handles_by_allowance,
+            expected_results.read_classify_dataset_handles_by_allowance_result,
             ClassifyByAllowanceIdsResponseTestHelper::report(
                 harness
                     .dataset_authorizer
@@ -556,7 +556,7 @@ async fn test_multi_datasets_matrix() {
             ),
         );
         pretty_assertions::assert_eq!(
-            expected_results.write_classify_dataset_handles_by_allowance,
+            expected_results.write_classify_dataset_handles_by_allowance_result,
             ClassifyByAllowanceIdsResponseTestHelper::report(
                 harness
                     .dataset_authorizer
@@ -572,7 +572,7 @@ async fn test_multi_datasets_matrix() {
         );
 
         pretty_assertions::assert_eq!(
-            expected_results.read_classify_dataset_ids_by_allowance,
+            expected_results.read_classify_dataset_ids_by_allowance_result,
             ClassifyByAllowanceIdsResponseTestHelper::report(
                 harness
                     .dataset_authorizer
@@ -583,7 +583,7 @@ async fn test_multi_datasets_matrix() {
             ),
         );
         pretty_assertions::assert_eq!(
-            expected_results.write_classify_dataset_ids_by_allowance,
+            expected_results.write_classify_dataset_ids_by_allowance_result,
             ClassifyByAllowanceIdsResponseTestHelper::report(
                 harness
                     .dataset_authorizer
