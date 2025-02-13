@@ -557,8 +557,6 @@ pub trait UrlExt {
     fn is_odf_protocol(&self) -> bool;
     fn as_odf_protocol(&self) -> Result<Url, InternalError>;
 
-    fn is_http_protocol(&self) -> bool;
-
     /// Converts from odf+http(s) scheme to plain http(s)
     fn odf_to_transport_protocol(&self) -> Result<Url, InternalError>;
 }
@@ -577,10 +575,6 @@ impl UrlExt for Url {
 
     fn is_odf_protocol(&self) -> bool {
         self.scheme().starts_with("odf+")
-    }
-
-    fn is_http_protocol(&self) -> bool {
-        self.scheme().starts_with("http")
     }
 
     fn odf_to_transport_protocol(&self) -> Result<Url, InternalError> {
