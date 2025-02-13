@@ -53,7 +53,6 @@ impl OsoResourceServiceImplStateHolder {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// TODO: Private Datasets: add Service trait?
 pub struct OsoResourceServiceImpl {
     state_holder: Arc<OsoResourceServiceImplStateHolder>,
     dataset_entry_repo: Arc<dyn DatasetEntryRepository>,

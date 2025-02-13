@@ -22,6 +22,14 @@ impl CurrentAccountSubjectTestHelper {
         CurrentAccountSubject::logged(account_id, account_name, is_admin)
     }
 
+    pub fn logged_admin() -> CurrentAccountSubject {
+        let account_name = odf::AccountName::new_unchecked("admin");
+        let account_id = odf::AccountID::new_seeded_ed25519(account_name.as_bytes());
+        let is_admin = true;
+
+        CurrentAccountSubject::logged(account_id, account_name, is_admin)
+    }
+
     pub fn anonymous() -> CurrentAccountSubject {
         CurrentAccountSubject::anonymous(AnonymousAccountReason::NoAuthenticationProvided)
     }

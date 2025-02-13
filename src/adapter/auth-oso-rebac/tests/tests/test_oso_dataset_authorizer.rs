@@ -38,8 +38,9 @@ use time_source::SystemTimeSourceDefault;
 
 macro_rules! assert_single_dataset {
     (
-        setup = $harness: expr,
-        dataset_id = $dataset_id: expr,
+        setup:
+            $harness: expr,
+            dataset_id = $dataset_id: expr,
         expected:
             read_result = $( $expected_read_pattern:pat_param )|+ $( if $expected_read_guard: expr )?,
             write_result = $( $expected_write_pattern:pat_param )|+ $( if $expected_write_guard: expr )?,
@@ -74,17 +75,18 @@ macro_rules! assert_single_dataset {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_owner_can_read_and_write_own_private_dataset() {
+async fn test_owner_can_read_and_write_owned_private_dataset() {
     let harness =
         DatasetAuthorizerHarness::new(CurrentAccountSubjectTestHelper::logged("owner")).await;
 
-    let own_private_dataset_id = harness
+    let owned_private_dataset_id = harness
         .create_private_dataset(odf::metadata::testing::alias(&"owner", &"private-dataset"))
         .await;
 
     assert_single_dataset!(
-        setup = harness,
-        dataset_id = own_private_dataset_id,
+        setup:
+            harness,
+            dataset_id = owned_private_dataset_id,
         expected:
             read_result = Ok(()),
             write_result = Ok(()),
@@ -96,17 +98,18 @@ async fn test_owner_can_read_and_write_own_private_dataset() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_owner_can_read_and_write_own_public_dataset() {
+async fn test_owner_can_read_and_write_owned_public_dataset() {
     let harness =
         DatasetAuthorizerHarness::new(CurrentAccountSubjectTestHelper::logged("owner")).await;
 
-    let own_public_dataset_id = harness
+    let owned_public_dataset_id = harness
         .create_public_dataset(odf::metadata::testing::alias(&"owner", &"public-dataset"))
         .await;
 
     assert_single_dataset!(
-        setup = harness,
-        dataset_id = own_public_dataset_id,
+        setup:
+            harness,
+            dataset_id = owned_public_dataset_id,
         expected:
             read_result = Ok(()),
             write_result = Ok(()),
@@ -126,8 +129,9 @@ async fn test_guest_can_read_but_not_write_public_dataset() {
         .await;
 
     assert_single_dataset!(
-        setup = harness,
-        dataset_id = public_dataset_id,
+        setup:
+            harness,
+            dataset_id = public_dataset_id,
         expected:
             read_result = Ok(()),
             write_result = Err(DatasetActionUnauthorizedError::Access(odf::AccessError::Forbidden(_))),
@@ -141,13 +145,15 @@ async fn test_guest_can_read_but_not_write_public_dataset() {
 #[test_log::test(tokio::test)]
 async fn test_guest_can_not_read_and_write_private_dataset() {
     let harness = DatasetAuthorizerHarness::new(CurrentAccountSubjectTestHelper::anonymous()).await;
+
     let private_dataset_id = harness
         .create_private_dataset(odf::metadata::testing::alias(&"owner", &"private-dataset"))
         .await;
 
     assert_single_dataset!(
-        setup = harness,
-        dataset_id = private_dataset_id,
+        setup:
+            harness,
+            dataset_id = private_dataset_id,
         expected:
             read_result = Err(DatasetActionUnauthorizedError::Access(odf::AccessError::Forbidden(_))),
             write_result = Err(DatasetActionUnauthorizedError::Access(odf::AccessError::Forbidden(_))),
@@ -162,13 +168,15 @@ async fn test_guest_can_not_read_and_write_private_dataset() {
 async fn test_not_owner_can_read_but_not_write_public_dataset() {
     let harness =
         DatasetAuthorizerHarness::new(CurrentAccountSubjectTestHelper::logged("not-owner")).await;
-    let public_dataset_id = harness
+
+    let not_owned_public_dataset_id = harness
         .create_public_dataset(odf::metadata::testing::alias(&"owner", &"public-dataset"))
         .await;
 
     assert_single_dataset!(
-        setup = harness,
-        dataset_id = public_dataset_id,
+        setup:
+            harness,
+            dataset_id = not_owned_public_dataset_id,
         expected:
             read_result = Ok(()),
             write_result = Err(DatasetActionUnauthorizedError::Access(odf::AccessError::Forbidden(_))),
@@ -183,13 +191,15 @@ async fn test_not_owner_can_read_but_not_write_public_dataset() {
 async fn test_not_owner_can_not_read_and_write_private_dataset() {
     let harness =
         DatasetAuthorizerHarness::new(CurrentAccountSubjectTestHelper::logged("not-owner")).await;
-    let private_dataset_id = harness
+
+    let not_owned_private_dataset_id = harness
         .create_private_dataset(odf::metadata::testing::alias(&"owner", &"private-dataset"))
         .await;
 
     assert_single_dataset!(
-        setup = harness,
-        dataset_id = private_dataset_id,
+        setup:
+            harness,
+            dataset_id = not_owned_private_dataset_id,
         expected:
             read_result = Err(DatasetActionUnauthorizedError::Access(odf::AccessError::Forbidden(_))),
             write_result = Err(DatasetActionUnauthorizedError::Access(odf::AccessError::Forbidden(_))),
@@ -198,6 +208,54 @@ async fn test_not_owner_can_not_read_and_write_private_dataset() {
     );
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_admin_can_read_and_write_not_owned_public_dataset() {
+    let harness =
+        DatasetAuthorizerHarness::new(CurrentAccountSubjectTestHelper::logged_admin()).await;
+
+    let not_owned_public_dataset_id = harness
+        .create_public_dataset(odf::metadata::testing::alias(&"owner", &"public-dataset"))
+        .await;
+
+    assert_single_dataset!(
+        setup:
+            harness,
+            dataset_id = not_owned_public_dataset_id,
+        expected:
+            read_result = Ok(()),
+            write_result = Ok(()),
+            allowed_actions_result = Ok(actual_actions)
+                if actual_actions == [DatasetAction::Read, DatasetAction::Write].into()
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_admin_can_read_and_write_not_owned_private_dataset() {
+    let harness =
+        DatasetAuthorizerHarness::new(CurrentAccountSubjectTestHelper::logged_admin()).await;
+
+    let not_owned_private_dataset_id = harness
+        .create_private_dataset(odf::metadata::testing::alias(&"owner", &"private-dataset"))
+        .await;
+
+    assert_single_dataset!(
+        setup:
+            harness,
+            dataset_id = not_owned_private_dataset_id,
+        expected:
+            read_result = Ok(()),
+            write_result = Ok(()),
+            allowed_actions_result = Ok(actual_actions)
+                if actual_actions == [DatasetAction::Read, DatasetAction::Write].into()
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Harness
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct DatasetAuthorizerHarness {
@@ -211,11 +269,11 @@ impl DatasetAuthorizerHarness {
         let mut predefined_accounts_config = PredefinedAccountsConfig::new();
 
         if let CurrentAccountSubject::Logged(logged_account) = &current_account_subject {
-            predefined_accounts_config
-                .predefined
-                .push(AccountConfig::test_config_from_name(
-                    logged_account.account_name.clone(),
-                ));
+            let mut account_config =
+                AccountConfig::test_config_from_name(logged_account.account_name.clone());
+            account_config.is_admin = logged_account.is_admin;
+
+            predefined_accounts_config.predefined.push(account_config);
         }
 
         let catalog = {
