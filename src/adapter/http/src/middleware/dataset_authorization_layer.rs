@@ -140,10 +140,10 @@ where
                                     Ok(CheckResult::Proceed)
                                 }
                             }
-                            Err(odf::dataset::GetDatasetError::NotFound(_)) => {
+                            Err(odf::dataset::GetStoredDatasetError::NotFound(_)) => {
                                 Ok(CheckResult::Proceed)
                             }
-                            Err(odf::dataset::GetDatasetError::Internal(_)) => {
+                            Err(odf::dataset::GetStoredDatasetError::Internal(_)) => {
                                 Ok(CheckResult::ErrorResponse(internal_server_error_response()))
                             }
                         }

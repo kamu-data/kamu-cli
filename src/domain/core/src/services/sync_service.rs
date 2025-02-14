@@ -346,15 +346,15 @@ pub struct CorruptedSourceError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl From<odf::dataset::GetDatasetError> for SyncError {
-    fn from(v: odf::dataset::GetDatasetError) -> Self {
+impl From<odf::dataset::GetStoredDatasetError> for SyncError {
+    fn from(v: odf::dataset::GetStoredDatasetError) -> Self {
         match v {
-            odf::dataset::GetDatasetError::NotFound(e) => {
+            odf::dataset::GetStoredDatasetError::NotFound(e) => {
                 Self::DatasetNotFound(DatasetAnyRefUnresolvedError {
                     dataset_ref: e.dataset_ref.into(),
                 })
             }
-            odf::dataset::GetDatasetError::Internal(e) => Self::Internal(e),
+            odf::dataset::GetStoredDatasetError::Internal(e) => Self::Internal(e),
         }
     }
 }

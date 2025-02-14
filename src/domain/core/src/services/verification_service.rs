@@ -241,11 +241,13 @@ pub enum VerificationError {
     ),
 }
 
-impl From<odf::dataset::GetDatasetError> for VerificationError {
-    fn from(v: odf::dataset::GetDatasetError) -> Self {
+impl From<odf::dataset::GetStoredDatasetError> for VerificationError {
+    fn from(v: odf::dataset::GetStoredDatasetError) -> Self {
         match v {
-            odf::dataset::GetDatasetError::NotFound(e) => VerificationError::DatasetNotFound(e),
-            odf::dataset::GetDatasetError::Internal(e) => VerificationError::Internal(e),
+            odf::dataset::GetStoredDatasetError::NotFound(e) => {
+                VerificationError::DatasetNotFound(e)
+            }
+            odf::dataset::GetStoredDatasetError::Internal(e) => VerificationError::Internal(e),
         }
     }
 }

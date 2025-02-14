@@ -60,7 +60,10 @@ impl SetWatermarkUseCase for SetWatermarkUseCaseImpl {
             .await?;
 
         // Resolve dataset
-        let target = self.dataset_registry.get_dataset_by_handle(dataset_handle);
+        let target = self
+            .dataset_registry
+            .get_dataset_by_handle(dataset_handle)
+            .await;
 
         // Make a plan
         let plan = self

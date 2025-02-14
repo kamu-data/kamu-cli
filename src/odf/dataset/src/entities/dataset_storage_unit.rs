@@ -23,18 +23,12 @@ use crate::{AppendError, Dataset, ValidateDatasetSnapshotError};
 #[cfg_attr(feature = "testing", mockall::automock)]
 #[async_trait::async_trait]
 pub trait DatasetStorageUnit: Sync + Send {
-    // Deprecated
-    async fn resolve_stored_dataset_handle_by_ref(
-        &self,
-        dataset_ref: &DatasetRef,
-    ) -> Result<DatasetHandle, GetDatasetError>;
-
-    // Deprecated
-    fn stored_dataset_handles(&self) -> DatasetHandleStream<'_>;
-
     fn stored_dataset_ids(&self) -> DatasetIDStream<'_>;
 
-    fn get_stored_dataset_by_id(&self, dataset_id: &DatasetID) -> Arc<dyn Dataset>;
+    async fn get_stored_dataset_by_id(
+        &self,
+        dataset_id: &DatasetID,
+    ) -> Result<Arc<dyn Dataset>, GetStoredDatasetError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -154,7 +148,7 @@ impl InvalidSnapshotError {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
-pub enum GetDatasetError {
+pub enum GetStoredDatasetError {
     #[error(transparent)]
     NotFound(#[from] DatasetNotFoundError),
     #[error(transparent)]
@@ -264,11 +258,11 @@ pub enum RenameDatasetError {
     ),
 }
 
-impl From<GetDatasetError> for RenameDatasetError {
-    fn from(v: GetDatasetError) -> Self {
+impl From<GetStoredDatasetError> for RenameDatasetError {
+    fn from(v: GetStoredDatasetError) -> Self {
         match v {
-            GetDatasetError::NotFound(e) => Self::NotFound(e),
-            GetDatasetError::Internal(e) => Self::Internal(e),
+            GetStoredDatasetError::NotFound(e) => Self::NotFound(e),
+            GetStoredDatasetError::Internal(e) => Self::Internal(e),
         }
     }
 }

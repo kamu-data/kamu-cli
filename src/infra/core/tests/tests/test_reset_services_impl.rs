@@ -232,7 +232,7 @@ impl ResetTestHarness {
         block_hash: Option<&odf::Multihash>,
         old_head_maybe: Option<&odf::Multihash>,
     ) -> Result<ResetResult, ResetError> {
-        let target = self.resolve_dataset(dataset_handle);
+        let target = self.resolve_dataset(dataset_handle).await;
 
         let reset_plan = self
             .reset_planner
@@ -245,7 +245,7 @@ impl ResetTestHarness {
     }
 
     async fn get_dataset_head(&self, dataset_handle: &odf::DatasetHandle) -> odf::Multihash {
-        let resolved_dataset = self.resolve_dataset(dataset_handle);
+        let resolved_dataset = self.resolve_dataset(dataset_handle).await;
         resolved_dataset
             .as_metadata_chain()
             .resolve_ref(&odf::BlockRef::Head)
@@ -257,16 +257,17 @@ impl ResetTestHarness {
         &self,
         dataset_handle: &odf::DatasetHandle,
     ) -> odf::DatasetSummary {
-        let resolved_dataset = self.resolve_dataset(dataset_handle);
+        let resolved_dataset = self.resolve_dataset(dataset_handle).await;
         resolved_dataset
             .get_summary(odf::dataset::GetSummaryOpts::default())
             .await
             .unwrap()
     }
 
-    fn resolve_dataset(&self, dataset_handle: &odf::DatasetHandle) -> ResolvedDataset {
+    async fn resolve_dataset(&self, dataset_handle: &odf::DatasetHandle) -> ResolvedDataset {
         self.dataset_registry()
             .get_dataset_by_handle(dataset_handle)
+            .await
     }
 }
 

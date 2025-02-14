@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::GetDatasetError;
+use crate::GetStoredDatasetError;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -16,7 +16,7 @@ pub trait DatasetHandleResolver: Send + Sync {
     async fn resolve_dataset_handle_by_ref(
         &self,
         dataset_ref: &odf_metadata::DatasetRef,
-    ) -> Result<odf_metadata::DatasetHandle, GetDatasetError>;
+    ) -> Result<odf_metadata::DatasetHandle, GetStoredDatasetError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

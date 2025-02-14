@@ -78,11 +78,24 @@ impl DatasetEntryIndexer {
     async fn index_datasets(&self) -> Result<(), InternalError> {
         use futures::TryStreamExt;
 
-        let dataset_handles: Vec<_> = self
+        let dataset_ids: Vec<_> = self
             .dataset_storage_unit
-            .stored_dataset_handles()
+            .stored_dataset_ids()
             .try_collect()
             .await?;
+
+        let mut dataset_handles = Vec::with_capacity(dataset_ids.len());
+        for dataset_id in dataset_ids {
+            let dataset = self
+                .dataset_storage_unit
+                .get_stored_dataset_by_id(&dataset_id)
+                .await
+                .int_err()?;
+            let dataset_alias = odf::dataset::read_dataset_alias(dataset.as_ref())
+                .await
+                .int_err()?;
+            dataset_handles.push(odf::DatasetHandle::new(dataset_id, dataset_alias));
+        }
 
         let account_name_id_mapping = self.build_account_name_id_mapping(&dataset_handles).await?;
 

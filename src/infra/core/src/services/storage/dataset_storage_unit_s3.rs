@@ -24,6 +24,7 @@ use odf::storage::{
     MetadataBlockRepositoryImpl,
     ReferenceRepositoryImpl,
 };
+use odf::DatasetStorageUnit;
 use s3_utils::S3Context;
 use time_source::SystemTimeSource;
 use tokio::sync::Mutex;
@@ -46,8 +47,8 @@ impl DatasetStorageUnitS3 {
     /// # Arguments
     ///
     /// * `registry_cache` - when present in the catalog enables in-memory cache
-    ///   of the dataset IDs and aliases present in the repository, allowing to
-    ///   avoid expensive bucket scanning
+    ///   of the dataset IDs present in the repository, allowing to avoid
+    ///   expensive bucket scanning
     ///
     /// * `metadata_cache_local_fs_path` - when specified enables the local FS
     ///   cache of metadata blocks, allowing to dramatically reduce the number
@@ -125,16 +126,6 @@ impl DatasetStorageUnitS3 {
         self.s3_context.recursive_delete(dataset_key_prefix).await
     }
 
-    async fn resolve_dataset_alias(
-        &self,
-        dataset: &dyn odf::Dataset,
-    ) -> Result<odf::DatasetAlias, odf::storage::GetNamedError> {
-        let bytes = dataset.as_info_repo().get("alias").await?;
-        let dataset_alias_str = std::str::from_utf8(&bytes[..]).int_err()?.trim();
-        let dataset_alias = odf::DatasetAlias::try_from(dataset_alias_str).int_err()?;
-        Ok(dataset_alias)
-    }
-
     async fn save_dataset_alias(
         &self,
         dataset: &dyn odf::Dataset,
@@ -147,42 +138,6 @@ impl DatasetStorageUnitS3 {
             .int_err()?;
 
         Ok(())
-    }
-
-    #[tracing::instrument(level = "info", skip_all)]
-    async fn list_datasets_in_s3(&self) -> Result<Vec<odf::DatasetHandle>, InternalError> {
-        let mut res = Vec::new();
-
-        let folders_common_prefixes = self.s3_context.bucket_list_folders().await?;
-
-        for prefix in folders_common_prefixes {
-            let mut prefix = prefix.prefix.unwrap();
-            while prefix.ends_with('/') {
-                prefix.pop();
-            }
-
-            if let Ok(id) = odf::DatasetID::from_multibase_string(&prefix) {
-                let dataset = self.get_dataset_impl(&id);
-                let dataset_alias = match self.resolve_dataset_alias(dataset.as_ref()).await {
-                    Ok(alias) => Ok(alias),
-                    Err(odf::storage::GetNamedError::NotFound(_)) => {
-                        tracing::warn!(
-                            s3_prefix = prefix,
-                            "Found dataset entry without a valid alias - this is likely a result \
-                             of interrupted creation or a push - ignoring this entry and leaving \
-                             it to be cleaned up by GC."
-                        );
-                        continue;
-                    }
-                    Err(err) => Err(err),
-                }
-                .int_err()?;
-
-                res.push(odf::DatasetHandle::new(id, dataset_alias));
-            }
-        }
-
-        Ok(res)
     }
 
     #[tracing::instrument(level = "info", skip_all)]
@@ -205,24 +160,6 @@ impl DatasetStorageUnitS3 {
         Ok(res)
     }
 
-    async fn list_datasets_maybe_cached(&self) -> Result<Vec<odf::DatasetHandle>, InternalError> {
-        if let Some(cache) = &self.registry_cache {
-            let mut cache = cache.state.lock().await;
-
-            // Init cache
-            if cache.last_updated == DateTime::UNIX_EPOCH {
-                tracing::debug!("Initializing dataset registry cache");
-                cache.dataset_ids = self.list_dataset_ids_in_s3().await?;
-                cache.datasets = self.list_datasets_in_s3().await?;
-                cache.last_updated = self.system_time_source.now();
-            }
-
-            Ok(cache.datasets.clone())
-        } else {
-            self.list_datasets_in_s3().await
-        }
-    }
-
     async fn list_dataset_ids_maybe_cached(&self) -> Result<Vec<odf::DatasetID>, InternalError> {
         if let Some(cache) = &self.registry_cache {
             let mut cache = cache.state.lock().await;
@@ -231,7 +168,6 @@ impl DatasetStorageUnitS3 {
             if cache.last_updated == DateTime::UNIX_EPOCH {
                 tracing::debug!("Initializing dataset registry cache");
                 cache.dataset_ids = self.list_dataset_ids_in_s3().await?;
-                cache.datasets = self.list_datasets_in_s3().await?;
                 cache.last_updated = self.system_time_source.now();
             }
 
@@ -239,19 +175,6 @@ impl DatasetStorageUnitS3 {
         } else {
             self.list_dataset_ids_in_s3().await
         }
-    }
-
-    fn stream_datasets_if<'s>(
-        &'s self,
-        alias_filter: impl Fn(&odf::DatasetAlias) -> bool + Send + 's,
-    ) -> odf::dataset::DatasetHandleStream<'s> {
-        Box::pin(async_stream::try_stream! {
-            for hdl in self.list_datasets_maybe_cached().await? {
-                if alias_filter(&hdl.alias) {
-                    yield hdl;
-                }
-            }
-        })
     }
 
     fn normalize_alias(&self, alias: &odf::DatasetAlias) -> odf::DatasetAlias {
@@ -276,58 +199,24 @@ impl DatasetStorageUnitS3 {
 
 #[async_trait]
 impl odf::DatasetStorageUnit for DatasetStorageUnitS3 {
-    async fn resolve_stored_dataset_handle_by_ref(
+    async fn get_stored_dataset_by_id(
         &self,
-        dataset_ref: &odf::DatasetRef,
-    ) -> Result<odf::DatasetHandle, odf::dataset::GetDatasetError> {
-        match dataset_ref {
-            odf::DatasetRef::Handle(h) => Ok(h.clone()),
-            odf::DatasetRef::Alias(alias) => {
-                // TODO: this is really really slow and expensive!
-                let normalized_alias = self.normalize_alias(alias);
-                use futures::StreamExt;
-                let mut datasets = self.stored_dataset_handles();
-                while let Some(hdl) = datasets.next().await {
-                    let hdl = hdl?;
-                    if hdl.alias == normalized_alias {
-                        return Ok(hdl);
-                    }
-                }
-                Err(odf::dataset::GetDatasetError::NotFound(
-                    odf::dataset::DatasetNotFoundError {
-                        dataset_ref: dataset_ref.clone(),
-                    },
-                ))
-            }
-            odf::DatasetRef::ID(id) => {
-                if self
-                    .s3_context
-                    .bucket_path_exists(id.as_multibase().to_stack_string().as_str())
-                    .await?
-                {
-                    let dataset = self.get_dataset_impl(id);
-                    let dataset_alias = self
-                        .resolve_dataset_alias(dataset.as_ref())
-                        .await
-                        .int_err()?;
-                    Ok(odf::DatasetHandle::new(id.clone(), dataset_alias))
-                } else {
-                    Err(odf::dataset::GetDatasetError::NotFound(
-                        odf::dataset::DatasetNotFoundError {
-                            dataset_ref: dataset_ref.clone(),
-                        },
-                    ))
-                }
-            }
+        dataset_id: &odf::DatasetID,
+    ) -> Result<Arc<dyn odf::Dataset>, odf::dataset::GetStoredDatasetError> {
+        if self
+            .s3_context
+            .bucket_path_exists(dataset_id.as_multibase().to_stack_string().as_str())
+            .await?
+        {
+            let dataset = self.get_dataset_impl(dataset_id);
+            Ok(dataset)
+        } else {
+            Err(odf::dataset::GetStoredDatasetError::NotFound(
+                odf::dataset::DatasetNotFoundError {
+                    dataset_ref: dataset_id.as_local_ref(),
+                },
+            ))
         }
-    }
-
-    fn stored_dataset_handles(&self) -> odf::dataset::DatasetHandleStream<'_> {
-        self.stream_datasets_if(|_| true)
-    }
-
-    fn get_stored_dataset_by_id(&self, dataset_id: &odf::DatasetID) -> Arc<dyn odf::Dataset> {
-        self.get_dataset_impl(dataset_id)
     }
 
     fn stored_dataset_ids(&self) -> DatasetIDStream<'_> {
@@ -347,31 +236,30 @@ impl odf::DatasetStorageUnitWriter for DatasetStorageUnitS3 {
         dataset_alias: &odf::DatasetAlias,
         seed_block: odf::MetadataBlockTyped<odf::metadata::Seed>,
     ) -> Result<odf::CreateDatasetResult, odf::dataset::CreateDatasetError> {
+        // Check if a dataset with the same ID can be resolved successfully
         use odf::DatasetStorageUnit;
+        let maybe_existing_dataset = match self
+            .get_stored_dataset_by_id(&seed_block.event.dataset_id)
+            .await
+        {
+            Ok(existing_dataset) => Ok(Some(existing_dataset)),
+            Err(odf::dataset::GetStoredDatasetError::NotFound(_)) => Ok(None),
+            Err(odf::dataset::GetStoredDatasetError::Internal(e)) => {
+                Err(odf::dataset::CreateDatasetError::Internal(e))
+            }
+        }?;
 
         // TODO: AUTH: Introduce AccountActionAuthorizer to check whether the current
         // subject has permissions to create dataset under the account specified in the
         // dataset_alias.
         let dataset_alias = self.normalize_alias(dataset_alias);
 
-        // Check if a dataset with the same alias can be resolved successfully
-        let maybe_existing_dataset_handle = match self
-            .resolve_stored_dataset_handle_by_ref(&dataset_alias.as_local_ref())
-            .await
-        {
-            Ok(existing_handle) => Ok(Some(existing_handle)),
-            Err(odf::dataset::GetDatasetError::NotFound(_)) => Ok(None),
-            Err(odf::dataset::GetDatasetError::Internal(e)) => Err(e),
-        }?;
-
         // If so, there are 2 possibilities:
         // - Dataset was partially created before (no head yet) and was not GC'd - so we
         //   assume ownership
         // - Dataset existed before (has valid head) - we should error out with name
         //   collision
-        if let Some(existing_dataset_handle) = maybe_existing_dataset_handle {
-            let existing_dataset = self.get_stored_dataset_by_id(&existing_dataset_handle.id);
-
+        if let Some(existing_dataset) = maybe_existing_dataset {
             match existing_dataset
                 .as_metadata_chain()
                 .resolve_ref(&odf::BlockRef::Head)
@@ -379,9 +267,9 @@ impl odf::DatasetStorageUnitWriter for DatasetStorageUnitS3 {
             {
                 // Existing head
                 Ok(_) => {
-                    return Err(odf::dataset::CreateDatasetError::NameCollision(
-                        odf::dataset::NameCollisionError {
-                            alias: dataset_alias.clone(),
+                    return Err(odf::dataset::CreateDatasetError::RefCollision(
+                        odf::dataset::RefCollisionError {
+                            id: seed_block.event.dataset_id.clone(),
                         },
                     ));
                 }
@@ -405,12 +293,7 @@ impl odf::DatasetStorageUnitWriter for DatasetStorageUnitS3 {
             odf::DatasetHandle::new(seed_block.event.dataset_id.clone(), dataset_alias.clone());
         let dataset = self.get_dataset_impl(&dataset_handle.id);
 
-        // There are three possibilities at this point:
-        // - Dataset did not exist before - continue normally
-        // - Dataset was partially created before (no head yet) and was not GC'd - so we
-        //   assume ownership
-        // - Dataset existed before (has valid head) - we should error out with name
-        //   collision
+        // Set Head
         let head = match dataset
             .as_metadata_chain()
             .append(
@@ -425,27 +308,18 @@ impl odf::DatasetStorageUnitWriter for DatasetStorageUnitS3 {
             .await
         {
             Ok(head) => head,
-            Err(err) => {
-                return Err(match err {
-                    odf::dataset::AppendError::RefCASFailed(_) => {
-                        odf::dataset::CreateDatasetError::RefCollision(
-                            odf::dataset::RefCollisionError {
-                                id: dataset_handle.id,
-                            },
-                        )
-                    }
-                    _ => err.int_err().into(),
-                })
-            }
+            Err(err) => return Err(err.int_err().into()),
         };
 
+        // Save alias
+        // TODO: reconsuder if we need this
         self.save_dataset_alias(dataset.as_ref(), &dataset_alias)
             .await?;
 
         // Update cache if enabled
         if let Some(cache) = &self.registry_cache {
             let mut cache = cache.state.lock().await;
-            cache.datasets.push(dataset_handle.clone());
+            cache.dataset_ids.push(dataset_handle.id.clone());
         }
 
         tracing::info!(
@@ -462,67 +336,55 @@ impl odf::DatasetStorageUnitWriter for DatasetStorageUnitS3 {
         })
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(%dataset_handle, %new_name))]
+    #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id, %new_name))]
     async fn rename_dataset(
         &self,
-        dataset_handle: &odf::DatasetHandle,
+        dataset_id: &odf::DatasetID,
         new_name: &odf::DatasetName,
     ) -> Result<(), odf::dataset::RenameDatasetError> {
-        let dataset = self.get_dataset_impl(&dataset_handle.id);
+        // Ensure dataset content exists in S3
+        let dataset = self.get_dataset_impl(dataset_id);
+
+        // Read current alias
+        let current_alias = odf::dataset::read_dataset_alias(dataset.as_ref()).await?;
+
+        // Try writing updated alias
+        // TODO: reconsuder if we need this
 
         let new_alias =
-            odf::DatasetAlias::new(dataset_handle.alias.account_name.clone(), new_name.clone());
+            odf::DatasetAlias::new(current_alias.account_name.clone(), new_name.clone());
 
-        // Note: should collision check be moved to use case level?
-        use odf::DatasetStorageUnit;
-        match self
-            .resolve_stored_dataset_handle_by_ref(&new_alias.as_local_ref())
-            .await
-        {
-            Ok(_) => Err(odf::dataset::RenameDatasetError::NameCollision(
-                odf::dataset::NameCollisionError {
-                    alias: odf::DatasetAlias::new(
-                        dataset_handle.alias.account_name.clone(),
-                        new_name.clone(),
-                    ),
-                },
-            )),
-            Err(odf::dataset::GetDatasetError::Internal(e)) => {
-                Err(odf::dataset::RenameDatasetError::Internal(e))
-            }
-            Err(odf::dataset::GetDatasetError::NotFound(_)) => Ok(()),
-        }?;
-
-        // It's safe to rename dataset
         self.save_dataset_alias(dataset.as_ref(), &new_alias)
             .await?;
-
-        // Update cache if enabled
-        if let Some(cache) = &self.registry_cache {
-            let mut cache = cache.state.lock().await;
-            cache.datasets.retain(|h| h.id != dataset_handle.id);
-            cache.datasets.push(odf::DatasetHandle::new(
-                dataset_handle.id.clone(),
-                new_alias,
-            ));
-        }
 
         Ok(())
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(%dataset_handle))]
+    #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id))]
     async fn delete_dataset(
         &self,
-        dataset_handle: &odf::DatasetHandle,
+        dataset_id: &odf::DatasetID,
     ) -> Result<(), odf::dataset::DeleteDatasetError> {
-        self.delete_dataset_s3_objects(&dataset_handle.id)
+        let _ = self
+            .get_stored_dataset_by_id(dataset_id)
+            .await
+            .map_err(|e| match e {
+                odf::dataset::GetStoredDatasetError::NotFound(e) => {
+                    odf::dataset::DeleteDatasetError::NotFound(e)
+                }
+                odf::dataset::GetStoredDatasetError::Internal(e) => {
+                    odf::dataset::DeleteDatasetError::Internal(e)
+                }
+            })?;
+
+        self.delete_dataset_s3_objects(dataset_id)
             .await
             .map_err(odf::dataset::DeleteDatasetError::Internal)?;
 
         // Update cache if enabled
         if let Some(cache) = &self.registry_cache {
             let mut cache = cache.state.lock().await;
-            cache.datasets.retain(|h| h.id != dataset_handle.id);
+            cache.dataset_ids.retain(|id| id != dataset_id);
         }
 
         Ok(())
@@ -536,7 +398,6 @@ pub struct S3RegistryCache {
 }
 
 struct State {
-    datasets: Vec<odf::DatasetHandle>,
     dataset_ids: Vec<odf::DatasetID>,
     last_updated: DateTime<Utc>,
 }
@@ -547,7 +408,6 @@ impl S3RegistryCache {
     pub fn new() -> Self {
         Self {
             state: Arc::new(Mutex::new(State {
-                datasets: Vec::new(),
                 dataset_ids: Vec::new(),
                 last_updated: DateTime::UNIX_EPOCH,
             })),

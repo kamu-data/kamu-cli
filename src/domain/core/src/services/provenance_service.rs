@@ -95,11 +95,11 @@ pub enum GetLineageError {
     ),
 }
 
-impl From<odf::dataset::GetDatasetError> for GetLineageError {
-    fn from(v: odf::dataset::GetDatasetError) -> Self {
+impl From<odf::dataset::GetStoredDatasetError> for GetLineageError {
+    fn from(v: odf::dataset::GetStoredDatasetError) -> Self {
         match v {
-            odf::dataset::GetDatasetError::NotFound(e) => Self::NotFound(e),
-            odf::dataset::GetDatasetError::Internal(e) => Self::Internal(e),
+            odf::dataset::GetStoredDatasetError::NotFound(e) => Self::NotFound(e),
+            odf::dataset::GetStoredDatasetError::Internal(e) => Self::Internal(e),
         }
     }
 }
