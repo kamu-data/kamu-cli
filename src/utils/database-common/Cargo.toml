@@ -28,9 +28,14 @@ testing = []
 [dependencies]
 async-stream = "0.3"
 async-trait = "0.1"
-aws-config = "1"
-aws-credential-types = "1"
-aws-sdk-secretsmanager = "1"
+# TODO: Remove the pined versions after the fix:
+#       New checksum header seems to break presigned URLs
+#       https://github.com/awslabs/aws-sdk-rust/issues/1253
+# -->
+aws-config = "=1.5.13"
+aws-credential-types = "=1.2.1"
+aws-sdk-secretsmanager = "=1.57.0"
+# <--
 chrono = { version = "0.4", default-features = false }
 dill = "0.11"
 futures = { version = "0.3", default-features = false }
