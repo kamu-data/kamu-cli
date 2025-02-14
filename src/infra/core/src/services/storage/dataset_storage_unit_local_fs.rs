@@ -15,7 +15,7 @@ use dill::*;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_accounts::{CurrentAccountSubject, DEFAULT_ACCOUNT_NAME_STR};
 use kamu_core::TenancyConfig;
-use odf::dataset::{DatasetImpl, DatasetLayout, MetadataChainImpl};
+use odf::dataset::{DatasetIDStream, DatasetImpl, DatasetLayout, MetadataChainImpl};
 use odf::storage::lfs::{NamedObjectRepositoryLocalFS, ObjectRepositoryLocalFSSha3};
 use odf::storage::{
     MetadataBlockRepositoryCachingInMem,
@@ -174,21 +174,6 @@ impl DatasetStorageUnitLocalFs {
         Ok(dataset_alias)
     }
 
-    fn stream_datasets_if<'s>(
-        &'s self,
-        alias_filter: impl Fn(&odf::DatasetAlias) -> bool + Send + 's,
-    ) -> odf::dataset::DatasetHandleStream<'s> {
-        Box::pin(async_stream::try_stream! {
-            use futures::TryStreamExt;
-            let mut datasets_stream = self.stored_dataset_handles();
-            while let Some(hdl) = datasets_stream.try_next().await? {
-                if alias_filter(&hdl.alias) {
-                    yield hdl;
-                }
-            }
-        })
-    }
-
     fn canonical_dataset_alias(&self, raw_alias: &odf::DatasetAlias) -> odf::DatasetAlias {
         match self.tenancy_config.as_ref() {
             TenancyConfig::SingleTenant => raw_alias.clone(),
@@ -302,32 +287,32 @@ impl odf::DatasetStorageUnit for DatasetStorageUnitLocalFs {
         })
     }
 
-    fn stored_dataset_handles_by_owner(
-        &self,
-        account_name: &odf::AccountName,
-    ) -> odf::dataset::DatasetHandleStream<'_> {
-        if *self.tenancy_config == TenancyConfig::SingleTenant
-            && *account_name != DEFAULT_ACCOUNT_NAME_STR
-        {
-            return Box::pin(futures::stream::empty());
-        }
-
-        let account_name = account_name.clone();
-        self.stream_datasets_if(move |dataset_alias| {
-            if let Some(dataset_account_name) = &dataset_alias.account_name {
-                *dataset_account_name == account_name
-            } else {
-                true
-            }
-        })
+    fn get_stored_dataset_by_id(&self, dataset_id: &odf::DatasetID) -> Arc<dyn odf::Dataset> {
+        let layout = DatasetLayout::new(self.get_dataset_path(dataset_id));
+        Self::build_dataset(layout)
     }
 
-    fn get_stored_dataset_by_handle(
-        &self,
-        dataset_handle: &odf::DatasetHandle,
-    ) -> Arc<dyn odf::Dataset> {
-        let layout = DatasetLayout::new(self.get_dataset_path(&dataset_handle.id));
-        Self::build_dataset(layout)
+    fn stored_dataset_ids(&self) -> DatasetIDStream<'_> {
+        Box::pin(async_stream::try_stream! {
+            // While creating a workspace, the directory has not yet been created
+            if !self.root.exists() {
+                return;
+            }
+
+            let read_dataset_dir = std::fs::read_dir(&self.root).int_err()?;
+
+            for r_dataset_dir in read_dataset_dir {
+                let dataset_dir_entry = r_dataset_dir.int_err()?;
+                if let Some(s) = dataset_dir_entry.file_name().to_str() {
+                    if s.starts_with('.') {
+                        continue;
+                    }
+                }
+
+                let dataset_id = odf::DatasetID::from_multibase_string(dataset_dir_entry.file_name().to_str().unwrap()).int_err()?;
+                yield dataset_id;
+            }
+        })
     }
 }
 
@@ -367,7 +352,7 @@ impl odf::DatasetStorageUnitWriter for DatasetStorageUnitLocalFs {
         // - Dataset existed before (has valid head) - we should error out with name
         //   collision
         if let Some(existing_dataset_handle) = maybe_existing_dataset_handle {
-            let existing_dataset = self.get_stored_dataset_by_handle(&existing_dataset_handle);
+            let existing_dataset = self.get_stored_dataset_by_id(&existing_dataset_handle.id);
 
             match existing_dataset
                 .as_metadata_chain()

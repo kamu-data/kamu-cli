@@ -94,6 +94,7 @@ async fn test_create_dataset_same_name_multiple_tenants() {
         harness.storage_unit,
         harness.did_generator.as_ref(),
         harness.system_time_source.as_ref(),
+        TenancyConfig::SingleTenant,
     )
     .await;
 }
@@ -110,6 +111,7 @@ async fn test_create_dataset_from_snapshot() {
         harness.did_generator.as_ref(),
         harness.system_time_source.as_ref(),
         None,
+        TenancyConfig::SingleTenant,
     )
     .await;
 }
@@ -126,6 +128,7 @@ async fn test_create_dataset_from_snapshot_multi_tenant() {
         harness.did_generator.as_ref(),
         harness.system_time_source.as_ref(),
         Some(DEFAULT_ACCOUNT_NAME.clone()),
+        TenancyConfig::MultiTenant,
     )
     .await;
 }
@@ -142,6 +145,7 @@ async fn test_rename_dataset() {
         harness.did_generator.as_ref(),
         harness.system_time_source.as_ref(),
         None,
+        TenancyConfig::SingleTenant,
     )
     .await;
 }
@@ -158,6 +162,7 @@ async fn test_rename_dataset_multi_tenant() {
         harness.did_generator.as_ref(),
         harness.system_time_source.as_ref(),
         Some(DEFAULT_ACCOUNT_NAME.clone()),
+        TenancyConfig::MultiTenant,
     )
     .await;
 }
@@ -189,6 +194,7 @@ async fn test_delete_dataset() {
         harness.did_generator.as_ref(),
         harness.system_time_source.as_ref(),
         None,
+        TenancyConfig::SingleTenant,
     )
     .await;
 }
@@ -205,6 +211,7 @@ async fn test_delete_dataset_multi_tenant() {
         harness.did_generator.as_ref(),
         harness.system_time_source.as_ref(),
         Some(DEFAULT_ACCOUNT_NAME.clone()),
+        TenancyConfig::MultiTenant,
     )
     .await;
 }
@@ -220,6 +227,7 @@ async fn test_iterate_datasets() {
         harness.storage_unit,
         harness.did_generator.as_ref(),
         harness.system_time_source.as_ref(),
+        TenancyConfig::SingleTenant,
     )
     .await;
 }
@@ -235,6 +243,7 @@ async fn test_iterate_datasets_multi_tenant() {
         harness.storage_unit,
         harness.did_generator.as_ref(),
         harness.system_time_source.as_ref(),
+        TenancyConfig::MultiTenant,
     )
     .await;
 }
@@ -251,6 +260,7 @@ async fn test_create_and_get_case_insensetive_dataset() {
         harness.did_generator.as_ref(),
         harness.system_time_source.as_ref(),
         None,
+        TenancyConfig::SingleTenant,
     )
     .await;
 }
@@ -267,6 +277,7 @@ async fn test_create_and_get_case_insensetive_dataset_multi_tenant() {
         harness.did_generator.as_ref(),
         harness.system_time_source.as_ref(),
         Some(DEFAULT_ACCOUNT_NAME.clone()),
+        TenancyConfig::MultiTenant,
     )
     .await;
 }

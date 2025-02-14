@@ -23,25 +23,27 @@ use crate::{AppendError, Dataset, ValidateDatasetSnapshotError};
 #[cfg_attr(feature = "testing", mockall::automock)]
 #[async_trait::async_trait]
 pub trait DatasetStorageUnit: Sync + Send {
+    // Deprecated
     async fn resolve_stored_dataset_handle_by_ref(
         &self,
         dataset_ref: &DatasetRef,
     ) -> Result<DatasetHandle, GetDatasetError>;
 
+    // Deprecated
     fn stored_dataset_handles(&self) -> DatasetHandleStream<'_>;
 
-    fn stored_dataset_handles_by_owner(
-        &self,
-        account_name: &AccountName,
-    ) -> DatasetHandleStream<'_>;
+    fn stored_dataset_ids(&self) -> DatasetIDStream<'_>;
 
-    fn get_stored_dataset_by_handle(&self, dataset_handle: &DatasetHandle) -> Arc<dyn Dataset>;
+    fn get_stored_dataset_by_id(&self, dataset_id: &DatasetID) -> Arc<dyn Dataset>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub type DatasetHandleStream<'a> =
     Pin<Box<dyn Stream<Item = Result<DatasetHandle, InternalError>> + Send + 'a>>;
+
+pub type DatasetIDStream<'a> =
+    Pin<Box<dyn Stream<Item = Result<DatasetID, InternalError>> + Send + 'a>>;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
