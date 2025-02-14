@@ -169,6 +169,27 @@ pub struct CheckpointDef {
 implement_serde_as!(Checkpoint, CheckpointDef, "CheckpointDef");
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// CompressionFormat
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#compressionformat-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "CompressionFormat")]
+#[serde(deny_unknown_fields)]
+pub enum CompressionFormatDef {
+    #[serde(alias = "gzip")]
+    Gzip,
+    #[serde(alias = "zip")]
+    Zip,
+}
+
+implement_serde_as!(
+    CompressionFormat,
+    CompressionFormatDef,
+    "CompressionFormatDef"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // DataSlice
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#dataslice-schema
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -532,18 +553,6 @@ pub struct FetchStepEthereumLogsDef {
     pub signature: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(remote = "SourceOrdering")]
-#[serde(deny_unknown_fields)]
-pub enum SourceOrderingDef {
-    #[serde(alias = "byEventTime", alias = "byeventtime")]
-    ByEventTime,
-    #[serde(alias = "byName", alias = "byname")]
-    ByName,
-}
-
-implement_serde_as!(SourceOrdering, SourceOrderingDef, "SourceOrderingDef");
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // MergeStrategy
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#mergestrategy-schema
@@ -768,22 +777,6 @@ pub struct PrepStepDecompressDef {
 pub struct PrepStepPipeDef {
     pub command: Vec<String>,
 }
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(remote = "CompressionFormat")]
-#[serde(deny_unknown_fields)]
-pub enum CompressionFormatDef {
-    #[serde(alias = "gzip")]
-    Gzip,
-    #[serde(alias = "zip")]
-    Zip,
-}
-
-implement_serde_as!(
-    CompressionFormat,
-    CompressionFormatDef,
-    "CompressionFormatDef"
-);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // RawQueryRequest
@@ -1203,6 +1196,23 @@ implement_serde_as!(
 #[serde(remote = "SourceCachingForever")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct SourceCachingForeverDef {}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// SourceOrdering
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#sourceordering-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "SourceOrdering")]
+#[serde(deny_unknown_fields)]
+pub enum SourceOrderingDef {
+    #[serde(alias = "byEventTime", alias = "byeventtime")]
+    ByEventTime,
+    #[serde(alias = "byName", alias = "byname")]
+    ByName,
+}
+
+implement_serde_as!(SourceOrdering, SourceOrderingDef, "SourceOrderingDef");
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // SourceState

@@ -145,6 +145,35 @@ impl From<odf::metadata::Checkpoint> for Checkpoint {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// CompressionFormat
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#compressionformat-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CompressionFormat {
+    Gzip,
+    Zip,
+}
+
+impl From<odf::metadata::CompressionFormat> for CompressionFormat {
+    fn from(v: odf::metadata::CompressionFormat) -> Self {
+        match v {
+            odf::metadata::CompressionFormat::Gzip => Self::Gzip,
+            odf::metadata::CompressionFormat::Zip => Self::Zip,
+        }
+    }
+}
+
+impl Into<odf::metadata::CompressionFormat> for CompressionFormat {
+    fn into(self) -> odf::metadata::CompressionFormat {
+        match self {
+            Self::Gzip => odf::metadata::CompressionFormat::Gzip,
+            Self::Zip => odf::metadata::CompressionFormat::Zip,
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // DataSlice
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#dataslice-schema
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -533,30 +562,6 @@ impl From<odf::metadata::FetchStepEthereumLogs> for FetchStepEthereumLogs {
     }
 }
 
-#[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SourceOrdering {
-    ByEventTime,
-    ByName,
-}
-
-impl From<odf::metadata::SourceOrdering> for SourceOrdering {
-    fn from(v: odf::metadata::SourceOrdering) -> Self {
-        match v {
-            odf::metadata::SourceOrdering::ByEventTime => Self::ByEventTime,
-            odf::metadata::SourceOrdering::ByName => Self::ByName,
-        }
-    }
-}
-
-impl Into<odf::metadata::SourceOrdering> for SourceOrdering {
-    fn into(self) -> odf::metadata::SourceOrdering {
-        match self {
-            Self::ByEventTime => odf::metadata::SourceOrdering::ByEventTime,
-            Self::ByName => odf::metadata::SourceOrdering::ByName,
-        }
-    }
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // MergeStrategy
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#mergestrategy-schema
@@ -804,30 +809,6 @@ impl From<odf::metadata::PrepStepPipe> for PrepStepPipe {
     fn from(v: odf::metadata::PrepStepPipe) -> Self {
         Self {
             command: v.command.into_iter().map(Into::into).collect(),
-        }
-    }
-}
-
-#[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
-pub enum CompressionFormat {
-    Gzip,
-    Zip,
-}
-
-impl From<odf::metadata::CompressionFormat> for CompressionFormat {
-    fn from(v: odf::metadata::CompressionFormat) -> Self {
-        match v {
-            odf::metadata::CompressionFormat::Gzip => Self::Gzip,
-            odf::metadata::CompressionFormat::Zip => Self::Zip,
-        }
-    }
-}
-
-impl Into<odf::metadata::CompressionFormat> for CompressionFormat {
-    fn into(self) -> odf::metadata::CompressionFormat {
-        match self {
-            Self::Gzip => odf::metadata::CompressionFormat::Gzip,
-            Self::Zip => odf::metadata::CompressionFormat::Zip,
         }
     }
 }
@@ -1303,6 +1284,35 @@ pub struct SourceCachingForever {
 impl From<odf::metadata::SourceCachingForever> for SourceCachingForever {
     fn from(v: odf::metadata::SourceCachingForever) -> Self {
         Self { _dummy: None }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// SourceOrdering
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#sourceordering-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SourceOrdering {
+    ByEventTime,
+    ByName,
+}
+
+impl From<odf::metadata::SourceOrdering> for SourceOrdering {
+    fn from(v: odf::metadata::SourceOrdering) -> Self {
+        match v {
+            odf::metadata::SourceOrdering::ByEventTime => Self::ByEventTime,
+            odf::metadata::SourceOrdering::ByName => Self::ByName,
+        }
+    }
+}
+
+impl Into<odf::metadata::SourceOrdering> for SourceOrdering {
+    fn into(self) -> odf::metadata::SourceOrdering {
+        match self {
+            Self::ByEventTime => odf::metadata::SourceOrdering::ByEventTime,
+            Self::ByName => odf::metadata::SourceOrdering::ByName,
+        }
     }
 }
 

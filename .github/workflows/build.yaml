@@ -44,6 +44,32 @@ jobs:
           command: clippy
           args: --workspace --all-targets -- -D warnings
 
+  lint_codegen:
+    name: Lint / Codegen
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: kamu-data/kamu-cli
+          path: kamu-cli
+      - uses: actions/checkout@v4
+        with:
+          repository: open-data-fabric/open-data-fabric
+          path: open-data-fabric
+          ref: feature/rust-based-codegen
+      # TODO: Unclear how to make this action look for rust-toolchain in a subdirectory
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          components: rustfmt
+      # TODO: Extend to generate all artifacts that require flatc and protoc
+      - name: Generate artifacts
+        run: |
+          cd kamu-cli
+          make codegen-odf-flatbuffers-schema
+      - name: Check generated files
+        run: cd kamu-cli && git diff && git diff-index --quiet HEAD
+
   lint_deps:
     name: Lint / Dependencies
     runs-on: ubuntu-latest

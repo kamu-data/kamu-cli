@@ -104,6 +104,7 @@ impl_enum_with_variants!(Attachments);
 /// For attachments that are specified inline and are embedded in the metadata.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct AttachmentsEmbedded {
+    /// List of embedded items.
     pub items: Vec<AttachmentEmbedded>,
 }
 
@@ -121,6 +122,17 @@ pub struct Checkpoint {
     pub physical_hash: Multihash,
     /// Size of checkpoint file in bytes.
     pub size: u64,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// CompressionFormat
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#compressionformat-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum CompressionFormat {
+    Gzip,
+    Zip,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -430,12 +442,6 @@ pub struct FetchStepEthereumLogs {
 
 impl_enum_variant!(FetchStep::EthereumLogs(FetchStepEthereumLogs));
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum SourceOrdering {
-    ByEventTime,
-    ByName,
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // MergeStrategy
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#mergestrategy-schema
@@ -656,12 +662,6 @@ pub struct PrepStepPipe {
 
 impl_enum_variant!(PrepStep::Pipe(PrepStepPipe));
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum CompressionFormat {
-    Gzip,
-    Zip,
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // RawQueryRequest
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#rawqueryrequest-schema
@@ -695,11 +695,13 @@ pub enum RawQueryResponse {
 
 impl_enum_with_variants!(RawQueryResponse);
 
+/// Reports query progress
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct RawQueryResponseProgress {}
 
 impl_enum_variant!(RawQueryResponse::Progress(RawQueryResponseProgress));
 
+/// Query executed successfully
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct RawQueryResponseSuccess {
     /// Number of records produced by the query
@@ -708,6 +710,7 @@ pub struct RawQueryResponseSuccess {
 
 impl_enum_variant!(RawQueryResponse::Success(RawQueryResponseSuccess));
 
+/// Query did not pass validation
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct RawQueryResponseInvalidQuery {
     /// Explanation of an error
@@ -716,6 +719,7 @@ pub struct RawQueryResponseInvalidQuery {
 
 impl_enum_variant!(RawQueryResponse::InvalidQuery(RawQueryResponseInvalidQuery));
 
+/// Internal error during query execution
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct RawQueryResponseInternalError {
     /// Brief description of an error
@@ -955,6 +959,7 @@ pub struct SetLicense {
     pub name: String,
     /// License identifier from the SPDX License List.
     pub spdx_id: Option<String>,
+    /// URL where licensing terms can be found.
     pub website_url: String,
 }
 
@@ -1029,6 +1034,17 @@ impl_enum_with_variants!(SourceCaching);
 pub struct SourceCachingForever {}
 
 impl_enum_variant!(SourceCaching::Forever(SourceCachingForever));
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// SourceOrdering
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#sourceordering-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum SourceOrdering {
+    ByEventTime,
+    ByName,
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // SourceState
@@ -1187,6 +1203,8 @@ pub struct TransformRequestInput {
     pub data_paths: Vec<PathBuf>,
     /// TODO: replace with actual DDL or Parquet schema.
     pub schema_file: PathBuf,
+    /// Watermarks that should be injected into the stream to separate micro
+    /// batches for reproducibility.
     pub explicit_watermarks: Vec<Watermark>,
 }
 
@@ -1205,11 +1223,13 @@ pub enum TransformResponse {
 
 impl_enum_with_variants!(TransformResponse);
 
+/// Reports query progress
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct TransformResponseProgress {}
 
 impl_enum_variant!(TransformResponse::Progress(TransformResponseProgress));
 
+/// Query executed successfully
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct TransformResponseSuccess {
     /// Data slice produced by the transaction, if any.
@@ -1220,6 +1240,7 @@ pub struct TransformResponseSuccess {
 
 impl_enum_variant!(TransformResponse::Success(TransformResponseSuccess));
 
+/// Query did not pass validation
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct TransformResponseInvalidQuery {
     /// Explanation of an error
@@ -1230,6 +1251,7 @@ impl_enum_variant!(TransformResponse::InvalidQuery(
     TransformResponseInvalidQuery
 ));
 
+/// Internal error during query execution
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct TransformResponseInternalError {
     /// Brief description of an error
@@ -1250,6 +1272,8 @@ impl_enum_variant!(TransformResponse::InternalError(
 /// Represents a watermark in the event stream.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Watermark {
+    /// Moment in processing time when watermark was emitted.
     pub system_time: DateTime<Utc>,
+    /// Moment in event time which watermark has reached.
     pub event_time: DateTime<Utc>,
 }

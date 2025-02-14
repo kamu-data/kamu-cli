@@ -7,8 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::convert::TryFrom;
-
 use chrono::prelude::*;
 use digest::Digest;
 use opendatafabric_metadata::serde::flatbuffers::*;
@@ -17,8 +15,57 @@ use opendatafabric_metadata::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn get_test_events() -> [(MetadataEvent, &'static str); 6] {
+fn get_test_events() -> [(MetadataEvent, &'static str); 8] {
     [
+        (
+            MetadataEvent::AddData(AddData {
+                prev_checkpoint: None,
+                prev_offset: None,
+                new_data: None,
+                new_checkpoint: None,
+                new_watermark: None,
+                new_source_state: None,
+            }),
+            "73e2977b8beae4aef53670067c1173b9d68e69721908d080b84286ab366d1e14",
+        ),
+        (
+            MetadataEvent::AddData(AddData {
+                prev_checkpoint: Some(Multihash::from_digest_sha3_256(b"prev")),
+                prev_offset: Some(9),
+                new_data: None,
+                new_checkpoint: None,
+                new_watermark: None,
+                new_source_state: None,
+            }),
+            "32516689d582e02e77778af75a71b6d131a640d0bebed99b99d96b385cee915f",
+        ),
+        (
+            MetadataEvent::AddData(AddData {
+                prev_checkpoint: Some(Multihash::from_digest_sha3_256(b"prev")),
+                prev_offset: Some(9),
+                new_data: None,
+                new_checkpoint: None,
+                new_watermark: Some(Utc.with_ymd_and_hms(2020, 1, 1, 12, 0, 0).unwrap()),
+                new_source_state: None,
+            }),
+            "1ad91cabca81e1f1771f28070980bfdcf409e5f8a877b3976b611401d2998189",
+        ),
+        (
+            MetadataEvent::AddData(AddData {
+                prev_checkpoint: Some(Multihash::from_digest_sha3_256(b"prev")),
+                prev_offset: Some(9),
+                new_data: Some(DataSlice {
+                    logical_hash: Multihash::from_digest_sha3_256(b"logical"),
+                    physical_hash: Multihash::from_digest_sha3_256(b"physical"),
+                    offset_interval: OffsetInterval { start: 10, end: 99 },
+                    size: 100,
+                }),
+                new_checkpoint: None,
+                new_watermark: Some(Utc.with_ymd_and_hms(2020, 1, 1, 12, 0, 0).unwrap()),
+                new_source_state: None,
+            }),
+            "ec1d3f6aa39bb256fcae16d79a95705f614e26d9a86d393b6f9e6b19a60d0df6",
+        ),
         (
             MetadataEvent::SetPollingSource(SetPollingSource {
                 fetch: FetchStep::FilesGlob(FetchStepFilesGlob {
@@ -48,33 +95,6 @@ fn get_test_events() -> [(MetadataEvent, &'static str); 6] {
                 }),
             }),
             "18cc1680b3d36f63358b59d469d76dcbf71ddac3ea66a693ce4158cfc5dfb28d",
-        ),
-        (
-            MetadataEvent::AddData(AddData {
-                prev_checkpoint: None,
-                prev_offset: None,
-                new_data: None,
-                new_checkpoint: None,
-                new_watermark: None,
-                new_source_state: None,
-            }),
-            "73e2977b8beae4aef53670067c1173b9d68e69721908d080b84286ab366d1e14",
-        ),
-        (
-            MetadataEvent::AddData(AddData {
-                prev_checkpoint: None,
-                prev_offset: Some(9),
-                new_data: Some(DataSlice {
-                    logical_hash: Multihash::from_digest_sha3_256(b"logical"),
-                    physical_hash: Multihash::from_digest_sha3_256(b"physical"),
-                    offset_interval: OffsetInterval { start: 10, end: 99 },
-                    size: 100,
-                }),
-                new_checkpoint: None,
-                new_watermark: None,
-                new_source_state: None,
-            }),
-            "39426541aa50092a19daa39fd488cf0a6eaace03b2130440922f27916ef74a88",
         ),
         (
             MetadataEvent::AddData(AddData {
@@ -186,14 +206,14 @@ fn test_serde_metadata_block() {
 
 #[test]
 fn test_serializer_stability() {
-    for (event, hash_expected) in get_test_events() {
+    for (i, (event, hash_expected)) in get_test_events().into_iter().enumerate() {
         let buffer = FlatbuffersMetadataBlockSerializer
             .write_manifest(&wrap_into_block(event))
             .unwrap();
 
         let hash_actual = format!("{:x}", sha3::Sha3_256::digest(&buffer));
 
-        assert_eq!(hash_actual, hash_expected);
+        assert_eq!(hash_actual, hash_expected, "Case {i}");
     }
 }
 

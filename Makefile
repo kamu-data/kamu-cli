@@ -235,6 +235,10 @@ resources:
 # Codegen
 ###############################################################################
 
+define odf_codegen
+	cd $(ODF_SPEC_DIR) && cargo run -q -- codegen $(1) > $(realpath $(2))
+endef
+
 define add_license_header
 	cat $(LICENSE_HEADER) > tmp
 	cat $(1) >> tmp
@@ -246,31 +250,46 @@ define insert_text_into_beginning
 	mv tmp $(2)
 endef
 
-
-.PHONY: codegen-odf-serde
-codegen-odf-serde:
-	python $(ODF_SPEC_DIR)/tools/jsonschema_to_flatbuffers.py $(ODF_SPEC_DIR)/schemas > $(ODF_METADATA_CRATE_DIR)/schemas/odf.fbs
-	flatc -o $(ODF_METADATA_CRATE_DIR)/src/serde/flatbuffers --rust --gen-onefile $(ODF_METADATA_CRATE_DIR)/schemas/odf.fbs
-	mv $(ODF_METADATA_CRATE_DIR)/src/serde/flatbuffers/odf_generated.rs $(ODF_METADATA_CRATE_DIR)/src/serde/flatbuffers/proxies_generated.rs
-	$(call insert_text_into_beginning, "#![allow(clippy::all)]\n#![allow(clippy::pedantic)]", "$(ODF_METADATA_CRATE_DIR)/src/serde/flatbuffers/proxies_generated.rs")
-	rustfmt $(ODF_METADATA_CRATE_DIR)/src/serde/flatbuffers/proxies_generated.rs
-
+.PHONY: codegen-odf-dtos
+codegen-odf-dtos:
 	python $(ODF_SPEC_DIR)/tools/jsonschema_to_rust_dtos.py $(ODF_SPEC_DIR)/schemas \
 		| rustfmt > $(ODF_METADATA_CRATE_DIR)/src/dtos/dtos_generated.rs
 	python $(ODF_SPEC_DIR)/tools/jsonschema_to_rust_dto_enum_flags.py $(ODF_SPEC_DIR)/schemas \
 		| rustfmt > $(ODF_METADATA_CRATE_DIR)/src/dtos/dtos_enum_flags_generated.rs
-	python $(ODF_SPEC_DIR)/tools/jsonschema_to_rust_serde_yaml.py $(ODF_SPEC_DIR)/schemas \
-		| rustfmt > $(ODF_METADATA_CRATE_DIR)/src/serde/yaml/derivations_generated.rs
-	python $(ODF_SPEC_DIR)/tools/jsonschema_to_rust_flatbuffers.py $(ODF_SPEC_DIR)/schemas \
-		| rustfmt > $(ODF_METADATA_CRATE_DIR)/src/serde/flatbuffers/convertors_generated.rs
-
-	$(call add_license_header, "$(ODF_METADATA_CRATE_DIR)/src/serde/flatbuffers/proxies_generated.rs")
 	$(call add_license_header, "$(ODF_METADATA_CRATE_DIR)/src/dtos/dtos_generated.rs")
 	$(call add_license_header, "$(ODF_METADATA_CRATE_DIR)/src/dtos/dtos_enum_flags_generated.rs")
-	$(call add_license_header, "$(ODF_METADATA_CRATE_DIR)/src/serde/yaml/derivations_generated.rs")
+
+
+.PHONY: codegen-odf-flatbuffers-schema
+codegen-odf-flatbuffers-schema:
+	$(call odf_codegen, flatbuffers-schema, $(ODF_METADATA_CRATE_DIR)/schemas/odf.fbs)
+
+
+# Requires `flatbuffers` package
+# TODO: Consider using devbox to pin specific versions
+.PHONY: codegen-odf-serde-flatbuffers
+codegen-odf-serde-flatbuffers:
+	flatc -o $(ODF_METADATA_CRATE_DIR)/src/serde/flatbuffers --rust --gen-onefile $(ODF_METADATA_CRATE_DIR)/schemas/odf.fbs
+	mv $(ODF_METADATA_CRATE_DIR)/src/serde/flatbuffers/odf_generated.rs $(ODF_METADATA_CRATE_DIR)/src/serde/flatbuffers/proxies_generated.rs
+	$(call insert_text_into_beginning, "// Generated with flatc=$(shell flatc --version)", "$(ODF_METADATA_CRATE_DIR)/src/serde/flatbuffers/proxies_generated.rs")
+	$(call insert_text_into_beginning, "#![allow(clippy::all)]\n#![allow(clippy::pedantic)]", "$(ODF_METADATA_CRATE_DIR)/src/serde/flatbuffers/proxies_generated.rs")
+	rustfmt $(ODF_METADATA_CRATE_DIR)/src/serde/flatbuffers/proxies_generated.rs
+	$(call add_license_header, "$(ODF_METADATA_CRATE_DIR)/src/serde/flatbuffers/proxies_generated.rs")
+
+	python $(ODF_SPEC_DIR)/tools/jsonschema_to_rust_flatbuffers.py $(ODF_SPEC_DIR)/schemas \
+		| rustfmt > $(ODF_METADATA_CRATE_DIR)/src/serde/flatbuffers/convertors_generated.rs
 	$(call add_license_header, "$(ODF_METADATA_CRATE_DIR)/src/serde/flatbuffers/convertors_generated.rs")
 
 
+.PHONY: codegen-odf-serde-yaml
+codegen-odf-serde-yaml:
+	python $(ODF_SPEC_DIR)/tools/jsonschema_to_rust_serde_yaml.py $(ODF_SPEC_DIR)/schemas \
+		| rustfmt > $(ODF_METADATA_CRATE_DIR)/src/serde/yaml/derivations_generated.rs
+	$(call add_license_header, "$(ODF_METADATA_CRATE_DIR)/src/serde/yaml/derivations_generated.rs")
+
+
+# Requires `protobuf`, `protoc-gen-prost`, `protoc-gen-tonic` packages
+# TODO: Consider using devbox to pin specific versions
 .PHONY: codegen-engine-tonic
 codegen-engine-tonic:
 	protoc \
@@ -279,6 +298,10 @@ codegen-engine-tonic:
 		--prost_out=$(ODF_METADATA_CRATE_DIR)/src/engine/grpc_generated \
 		--tonic_out=$(ODF_METADATA_CRATE_DIR)/src/engine/grpc_generated \
 		--tonic_opt=compile_well_known_types
+
+	$(call insert_text_into_beginning, "// Generated with protoc=$(shell protoc --version)", "$(ODF_METADATA_CRATE_DIR)/src/engine/grpc_generated/engine.rs")
+	$(call insert_text_into_beginning, "// Generated with protoc-gen-prost=$(strip $(shell protoc-gen-prost --version))", "$(ODF_METADATA_CRATE_DIR)/src/engine/grpc_generated/engine.rs")
+	$(call insert_text_into_beginning, "// Generated with protoc-gen-tonic=$(strip $(shell protoc-gen-tonic --version))", "$(ODF_METADATA_CRATE_DIR)/src/engine/grpc_generated/engine.rs")
 
 	rustfmt $(ODF_METADATA_CRATE_DIR)/src/engine/grpc_generated/engine.rs
 	rustfmt $(ODF_METADATA_CRATE_DIR)/src/engine/grpc_generated/engine.tonic.rs
@@ -295,11 +318,18 @@ codegen-graphql:
 
 
 .PHONY: codegen
-codegen: codegen-odf-serde codegen-engine-tonic codegen-graphql
+codegen: codegen-odf-dtos \
+	codegen-odf-flatbuffers-schema \
+	codegen-odf-serde-flatbuffers \
+	codegen-odf-serde-yaml \
+	codegen-engine-tonic \
+	codegen-graphql
+
 
 .PHONY: codegen-graphql-schema
 codegen-graphql-schema:
 	cargo nextest run -p kamu-adapter-graphql update_graphql_schema
+
 
 .PHONY: codegen-cli-reference
 codegen-cli-reference:

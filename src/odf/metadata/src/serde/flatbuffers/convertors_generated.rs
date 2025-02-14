@@ -241,7 +241,7 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::Checkpoint {
         let physical_hash_offset = { fb.create_vector(&self.physical_hash.as_bytes().as_slice()) };
         let mut builder = fb::CheckpointBuilder::new(fb);
         builder.add_physical_hash(physical_hash_offset);
-        builder.add_size_(self.size);
+        builder.add_size(self.size);
         builder.finish()
     }
 }
@@ -253,7 +253,31 @@ impl<'fb> FlatbuffersDeserializable<fb::Checkpoint<'fb>> for odf::Checkpoint {
                 .physical_hash()
                 .map(|v| odf::Multihash::from_bytes(v.bytes()).unwrap())
                 .unwrap(),
-            size: proxy.size_(),
+            size: proxy.size(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// CompressionFormat
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#compressionformat-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl From<odf::CompressionFormat> for fb::CompressionFormat {
+    fn from(v: odf::CompressionFormat) -> Self {
+        match v {
+            odf::CompressionFormat::Gzip => fb::CompressionFormat::Gzip,
+            odf::CompressionFormat::Zip => fb::CompressionFormat::Zip,
+        }
+    }
+}
+
+impl Into<odf::CompressionFormat> for fb::CompressionFormat {
+    fn into(self) -> odf::CompressionFormat {
+        match self {
+            fb::CompressionFormat::Gzip => odf::CompressionFormat::Gzip,
+            fb::CompressionFormat::Zip => odf::CompressionFormat::Zip,
+            _ => panic!("Invalid enum value: {}", self.0),
         }
     }
 }
@@ -274,7 +298,7 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::DataSlice {
         builder.add_logical_hash(logical_hash_offset);
         builder.add_physical_hash(physical_hash_offset);
         builder.add_offset_interval(offset_interval_offset);
-        builder.add_size_(self.size);
+        builder.add_size(self.size);
         builder.finish()
     }
 }
@@ -294,7 +318,7 @@ impl<'fb> FlatbuffersDeserializable<fb::DataSlice<'fb>> for odf::DataSlice {
                 .offset_interval()
                 .map(|v| odf::OffsetInterval::deserialize(v))
                 .unwrap(),
-            size: proxy.size_(),
+            size: proxy.size(),
         }
     }
 }
@@ -899,25 +923,6 @@ impl<'fb> FlatbuffersDeserializable<fb::FetchStepEthereumLogs<'fb>> for odf::Fet
     }
 }
 
-impl From<odf::SourceOrdering> for fb::SourceOrdering {
-    fn from(v: odf::SourceOrdering) -> Self {
-        match v {
-            odf::SourceOrdering::ByEventTime => fb::SourceOrdering::ByEventTime,
-            odf::SourceOrdering::ByName => fb::SourceOrdering::ByName,
-        }
-    }
-}
-
-impl Into<odf::SourceOrdering> for fb::SourceOrdering {
-    fn into(self) -> odf::SourceOrdering {
-        match self {
-            fb::SourceOrdering::ByEventTime => odf::SourceOrdering::ByEventTime,
-            fb::SourceOrdering::ByName => odf::SourceOrdering::ByName,
-            _ => panic!("Invalid enum value: {}", self.0),
-        }
-    }
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // MergeStrategy
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#mergestrategy-schema
@@ -1383,25 +1388,6 @@ impl<'fb> FlatbuffersDeserializable<fb::PrepStepPipe<'fb>> for odf::PrepStepPipe
                 .command()
                 .map(|v| v.iter().map(|i| i.to_owned()).collect())
                 .unwrap(),
-        }
-    }
-}
-
-impl From<odf::CompressionFormat> for fb::CompressionFormat {
-    fn from(v: odf::CompressionFormat) -> Self {
-        match v {
-            odf::CompressionFormat::Gzip => fb::CompressionFormat::Gzip,
-            odf::CompressionFormat::Zip => fb::CompressionFormat::Zip,
-        }
-    }
-}
-
-impl Into<odf::CompressionFormat> for fb::CompressionFormat {
-    fn into(self) -> odf::CompressionFormat {
-        match self {
-            fb::CompressionFormat::Gzip => odf::CompressionFormat::Gzip,
-            fb::CompressionFormat::Zip => odf::CompressionFormat::Zip,
-            _ => panic!("Invalid enum value: {}", self.0),
         }
     }
 }
@@ -2261,6 +2247,30 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::SourceCachingForever {
 impl<'fb> FlatbuffersDeserializable<fb::SourceCachingForever<'fb>> for odf::SourceCachingForever {
     fn deserialize(proxy: fb::SourceCachingForever<'fb>) -> Self {
         odf::SourceCachingForever {}
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// SourceOrdering
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#sourceordering-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl From<odf::SourceOrdering> for fb::SourceOrdering {
+    fn from(v: odf::SourceOrdering) -> Self {
+        match v {
+            odf::SourceOrdering::ByEventTime => fb::SourceOrdering::ByEventTime,
+            odf::SourceOrdering::ByName => fb::SourceOrdering::ByName,
+        }
+    }
+}
+
+impl Into<odf::SourceOrdering> for fb::SourceOrdering {
+    fn into(self) -> odf::SourceOrdering {
+        match self {
+            fb::SourceOrdering::ByEventTime => odf::SourceOrdering::ByEventTime,
+            fb::SourceOrdering::ByName => odf::SourceOrdering::ByName,
+            _ => panic!("Invalid enum value: {}", self.0),
+        }
     }
 }
 
