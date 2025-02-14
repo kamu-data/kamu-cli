@@ -15,20 +15,26 @@ use kamu_core::{
     DatasetRegistry,
     GetMultipleDatasetsError,
     ResolvedDataset,
+    TenancyConfig,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct DatasetRegistrySoloUnitBridge {
     dataset_storage_unit: Arc<dyn odf::DatasetStorageUnit>,
+    tenancy_config: Arc<TenancyConfig>,
 }
 
 #[component(pub)]
 #[interface(dyn DatasetRegistry)]
 impl DatasetRegistrySoloUnitBridge {
-    pub fn new(dataset_storage_unit: Arc<dyn odf::DatasetStorageUnit>) -> Self {
+    pub fn new(
+        dataset_storage_unit: Arc<dyn odf::DatasetStorageUnit>,
+        tenancy_config: Arc<TenancyConfig>,
+    ) -> Self {
         Self {
             dataset_storage_unit,
+            tenancy_config,
         }
     }
 }
@@ -48,15 +54,40 @@ impl odf::dataset::DatasetHandleResolver for DatasetRegistrySoloUnitBridge {
 #[async_trait::async_trait]
 impl DatasetRegistry for DatasetRegistrySoloUnitBridge {
     fn all_dataset_handles(&self) -> odf::dataset::DatasetHandleStream<'_> {
-        self.dataset_storage_unit.stored_dataset_handles()
+        Box::pin(async_stream::try_stream! {
+            use futures::TryStreamExt;
+            let mut dataset_ids_stream = self.dataset_storage_unit.stored_dataset_ids();
+            while let Some(dataset_id) = dataset_ids_stream.try_next().await? {
+                let dataset = self.dataset_storage_unit.get_stored_dataset_by_id(&dataset_id);
+                let dataset_alias = odf::dataset::read_dataset_alias(dataset.as_ref()).await?;
+
+                yield odf::DatasetHandle::new(dataset_id, dataset_alias);
+            }
+        })
     }
 
     fn all_dataset_handles_by_owner(
         &self,
         owner_name: &odf::AccountName,
     ) -> odf::dataset::DatasetHandleStream<'_> {
-        self.dataset_storage_unit
-            .stored_dataset_handles_by_owner(owner_name)
+        let owner_name = owner_name.clone();
+        Box::pin(async_stream::try_stream! {
+            use futures::TryStreamExt;
+            let mut dataset_handles_stream = self.all_dataset_handles();
+            while let Some(hdl) = dataset_handles_stream.try_next().await? {
+                match self.tenancy_config.as_ref() {
+                    TenancyConfig::MultiTenant => {
+                        if hdl.alias.account_name.as_ref() == Some(&owner_name) {
+                            yield hdl;
+                        }
+                    }
+                    TenancyConfig::SingleTenant => {
+                        yield hdl;
+                    }
+                }
+
+            }
+        })
     }
 
     async fn resolve_multiple_dataset_handles_by_ids(
@@ -82,7 +113,7 @@ impl DatasetRegistry for DatasetRegistrySoloUnitBridge {
     fn get_dataset_by_handle(&self, dataset_handle: &odf::DatasetHandle) -> ResolvedDataset {
         let dataset = self
             .dataset_storage_unit
-            .get_stored_dataset_by_handle(dataset_handle);
+            .get_stored_dataset_by_id(&dataset_handle.id);
         ResolvedDataset::new(dataset, dataset_handle.clone())
     }
 }

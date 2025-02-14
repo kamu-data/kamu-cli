@@ -14,9 +14,9 @@ use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use dill::*;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
-use kamu_accounts::{CurrentAccountSubject, DEFAULT_ACCOUNT_NAME_STR};
+use kamu_accounts::CurrentAccountSubject;
 use kamu_core::TenancyConfig;
-use odf::dataset::{DatasetImpl, MetadataChainImpl};
+use odf::dataset::{DatasetIDStream, DatasetImpl, MetadataChainImpl};
 use odf::storage::lfs::ObjectRepositoryCachingLocalFs;
 use odf::storage::s3::{NamedObjectRepositoryS3, ObjectRepositoryS3Sha3};
 use odf::storage::{
@@ -185,6 +185,26 @@ impl DatasetStorageUnitS3 {
         Ok(res)
     }
 
+    #[tracing::instrument(level = "info", skip_all)]
+    async fn list_dataset_ids_in_s3(&self) -> Result<Vec<odf::DatasetID>, InternalError> {
+        let mut res = Vec::new();
+
+        let folders_common_prefixes = self.s3_context.bucket_list_folders().await?;
+
+        for prefix in folders_common_prefixes {
+            let mut prefix = prefix.prefix.unwrap();
+            while prefix.ends_with('/') {
+                prefix.pop();
+            }
+
+            if let Ok(id) = odf::DatasetID::from_multibase_string(&prefix) {
+                res.push(id);
+            }
+        }
+
+        Ok(res)
+    }
+
     async fn list_datasets_maybe_cached(&self) -> Result<Vec<odf::DatasetHandle>, InternalError> {
         if let Some(cache) = &self.registry_cache {
             let mut cache = cache.state.lock().await;
@@ -192,6 +212,7 @@ impl DatasetStorageUnitS3 {
             // Init cache
             if cache.last_updated == DateTime::UNIX_EPOCH {
                 tracing::debug!("Initializing dataset registry cache");
+                cache.dataset_ids = self.list_dataset_ids_in_s3().await?;
                 cache.datasets = self.list_datasets_in_s3().await?;
                 cache.last_updated = self.system_time_source.now();
             }
@@ -199,6 +220,24 @@ impl DatasetStorageUnitS3 {
             Ok(cache.datasets.clone())
         } else {
             self.list_datasets_in_s3().await
+        }
+    }
+
+    async fn list_dataset_ids_maybe_cached(&self) -> Result<Vec<odf::DatasetID>, InternalError> {
+        if let Some(cache) = &self.registry_cache {
+            let mut cache = cache.state.lock().await;
+
+            // Init cache
+            if cache.last_updated == DateTime::UNIX_EPOCH {
+                tracing::debug!("Initializing dataset registry cache");
+                cache.dataset_ids = self.list_dataset_ids_in_s3().await?;
+                cache.datasets = self.list_datasets_in_s3().await?;
+                cache.last_updated = self.system_time_source.now();
+            }
+
+            Ok(cache.dataset_ids.clone())
+        } else {
+            self.list_dataset_ids_in_s3().await
         }
     }
 
@@ -287,31 +326,16 @@ impl odf::DatasetStorageUnit for DatasetStorageUnitS3 {
         self.stream_datasets_if(|_| true)
     }
 
-    fn stored_dataset_handles_by_owner(
-        &self,
-        account_name: &odf::AccountName,
-    ) -> odf::dataset::DatasetHandleStream<'_> {
-        if *self.tenancy_config == TenancyConfig::SingleTenant
-            && *account_name != DEFAULT_ACCOUNT_NAME_STR
-        {
-            return Box::pin(futures::stream::empty());
-        }
-
-        let account_name = account_name.clone();
-        self.stream_datasets_if(move |dataset_alias| {
-            if let Some(dataset_account_name) = &dataset_alias.account_name {
-                *dataset_account_name == account_name
-            } else {
-                true
-            }
-        })
+    fn get_stored_dataset_by_id(&self, dataset_id: &odf::DatasetID) -> Arc<dyn odf::Dataset> {
+        self.get_dataset_impl(dataset_id)
     }
 
-    fn get_stored_dataset_by_handle(
-        &self,
-        dataset_handle: &odf::DatasetHandle,
-    ) -> Arc<dyn odf::Dataset> {
-        self.get_dataset_impl(&dataset_handle.id)
+    fn stored_dataset_ids(&self) -> DatasetIDStream<'_> {
+        Box::pin(async_stream::try_stream! {
+            for id in self.list_dataset_ids_maybe_cached().await? {
+                yield id;
+            }
+        })
     }
 }
 
@@ -346,7 +370,7 @@ impl odf::DatasetStorageUnitWriter for DatasetStorageUnitS3 {
         // - Dataset existed before (has valid head) - we should error out with name
         //   collision
         if let Some(existing_dataset_handle) = maybe_existing_dataset_handle {
-            let existing_dataset = self.get_stored_dataset_by_handle(&existing_dataset_handle);
+            let existing_dataset = self.get_stored_dataset_by_id(&existing_dataset_handle.id);
 
             match existing_dataset
                 .as_metadata_chain()
@@ -513,6 +537,7 @@ pub struct S3RegistryCache {
 
 struct State {
     datasets: Vec<odf::DatasetHandle>,
+    dataset_ids: Vec<odf::DatasetID>,
     last_updated: DateTime<Utc>,
 }
 
@@ -523,6 +548,7 @@ impl S3RegistryCache {
         Self {
             state: Arc::new(Mutex::new(State {
                 datasets: Vec::new(),
+                dataset_ids: Vec::new(),
                 last_updated: DateTime::UNIX_EPOCH,
             })),
         }

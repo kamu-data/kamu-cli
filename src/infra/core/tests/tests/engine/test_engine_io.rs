@@ -40,7 +40,10 @@ async fn test_engine_io_common<
     let run_info_dir = Arc::new(RunInfoDir::new(run_info_dir.to_path_buf()));
     let cache_dir = Arc::new(CacheDir::new(cache_dir.to_path_buf()));
 
-    let dataset_registry = DatasetRegistrySoloUnitBridge::new(storage_unit.clone());
+    let dataset_registry = DatasetRegistrySoloUnitBridge::new(
+        storage_unit.clone(),
+        Arc::new(TenancyConfig::SingleTenant),
+    );
 
     let engine_provisioner = Arc::new(EngineProvisionerLocal::new(
         EngineProvisionerLocalConfig::default(),
@@ -71,7 +74,10 @@ async fn test_engine_io_common<
     );
 
     let transform_helper = TransformTestHelper::build(
-        Arc::new(DatasetRegistrySoloUnitBridge::new(storage_unit.clone())),
+        Arc::new(DatasetRegistrySoloUnitBridge::new(
+            storage_unit.clone(),
+            Arc::new(TenancyConfig::SingleTenant),
+        )),
         time_source.clone(),
         Arc::new(CompactionPlannerImpl {}),
         Arc::new(CompactionExecutorImpl::new(

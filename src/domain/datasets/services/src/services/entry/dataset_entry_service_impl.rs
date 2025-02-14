@@ -546,7 +546,7 @@ impl DatasetRegistry for DatasetEntryServiceImpl {
             // but for now we have just a single one
             let dataset = self
                 .dataset_storage_unit
-                .get_stored_dataset_by_handle(dataset_handle);
+                .get_stored_dataset_by_id(&dataset_handle.id);
 
             writable_cache
                 .datasets
