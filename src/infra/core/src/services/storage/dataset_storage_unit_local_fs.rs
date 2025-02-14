@@ -440,7 +440,7 @@ impl odf::DatasetStorageUnitWriter for DatasetStorageUnitLocalFs {
             }
         };
 
-        self.save_dataset_alias(dataset.as_ref(), dataset_alias)
+        self.save_dataset_alias(dataset.as_ref(), &dataset_handle.alias)
             .await?;
 
         tracing::info!(
