@@ -851,6 +851,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
                 tracing::debug!("Push process aborted with error: {}", e);
                 return Err(match e {
                     PushClientError::RefCollision(err) => SyncError::RefCollision(err),
+                    PushClientError::NameCollision(err) => SyncError::NameCollision(err),
                     _ => SyncError::Internal(e.int_err()),
                 });
             }

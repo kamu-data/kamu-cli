@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -22,12 +22,15 @@ use odf::storage::{
     MetadataBlockRepositoryImpl,
     ReferenceRepositoryImpl,
 };
+use odf::DatasetStorageUnit;
 use url::Url;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct DatasetStorageUnitLocalFs {
-    storage_strategy: Box<dyn DatasetStorageStrategy>,
+    root: PathBuf,
+    tenancy_config: Arc<TenancyConfig>,
+    current_account_subject: Arc<CurrentAccountSubject>,
     thrash_lock: tokio::sync::Mutex<()>,
 }
 
@@ -35,24 +38,32 @@ pub struct DatasetStorageUnitLocalFs {
 
 #[component(pub)]
 impl DatasetStorageUnitLocalFs {
-    #[allow(clippy::needless_pass_by_value)]
     pub fn new(
         root: PathBuf,
         current_account_subject: Arc<CurrentAccountSubject>,
         tenancy_config: Arc<TenancyConfig>,
     ) -> Self {
         Self {
-            storage_strategy: match *tenancy_config {
-                TenancyConfig::MultiTenant => Box::new(DatasetMultiTenantStorageStrategy::new(
-                    root,
-                    current_account_subject,
-                )),
-                TenancyConfig::SingleTenant => {
-                    Box::new(DatasetSingleTenantStorageStrategy::new(root))
-                }
-            },
+            root,
+            current_account_subject,
+            tenancy_config,
             thrash_lock: tokio::sync::Mutex::new(()),
         }
+    }
+
+    // TODO: Used only for testing, but should be removed it in future to discourage
+    // file-based access
+    pub async fn get_dataset_layout(
+        &self,
+        dataset_ref: &odf::DatasetRef,
+    ) -> Result<DatasetLayout, odf::dataset::GetDatasetError> {
+        use odf::DatasetStorageUnit;
+        let dataset_handle = self
+            .resolve_stored_dataset_handle_by_ref(dataset_ref)
+            .await?;
+        Ok(DatasetLayout::new(
+            self.get_dataset_path(&dataset_handle.id),
+        ))
     }
 
     fn build_dataset(layout: DatasetLayout) -> Arc<dyn odf::Dataset> {
@@ -70,31 +81,146 @@ impl DatasetStorageUnitLocalFs {
         ))
     }
 
-    // TODO: Used only for testing, but should be removed it in future to discourage
-    // file-based access
-    pub async fn get_dataset_layout(
+    // TODO: PERF, avoid this
+    async fn resolve_dataset_by_alias(
         &self,
-        dataset_ref: &odf::DatasetRef,
-    ) -> Result<DatasetLayout, odf::dataset::GetDatasetError> {
-        use odf::DatasetStorageUnit;
-        let dataset_handle = self
-            .resolve_stored_dataset_handle_by_ref(dataset_ref)
-            .await?;
-        Ok(DatasetLayout::new(
-            self.storage_strategy.get_dataset_path(&dataset_handle),
+        alias: &odf::DatasetAlias,
+    ) -> Result<odf::DatasetHandle, ResolveDatasetError> {
+        let normalized_alias = self.normalize_alias(alias);
+
+        use futures::StreamExt;
+        let mut datasets = self.stored_dataset_handles();
+        while let Some(hdl) = datasets.next().await {
+            let hdl = hdl?;
+            if hdl.alias == normalized_alias {
+                return Ok(hdl);
+            }
+        }
+        Err(ResolveDatasetError::NotFound(
+            odf::dataset::DatasetNotFoundError {
+                dataset_ref: alias.as_local_ref(),
+            },
         ))
     }
 
-    fn get_canonical_path_param(dataset_path: &Path) -> Result<(PathBuf, String), InternalError> {
-        let canonical_dataset_path = std::fs::canonicalize(dataset_path).int_err()?;
-        let dataset_name_str = canonical_dataset_path
-            .file_name()
-            .unwrap()
-            .to_str()
-            .unwrap()
-            .to_string();
+    async fn resolve_dataset_by_id(
+        &self,
+        dataset_id: &odf::DatasetID,
+    ) -> Result<odf::DatasetHandle, ResolveDatasetError> {
+        let dataset_path = self.get_dataset_path(dataset_id);
+        if !dataset_path.exists() {
+            return Err(ResolveDatasetError::NotFound(
+                odf::dataset::DatasetNotFoundError {
+                    dataset_ref: dataset_id.as_local_ref(),
+                },
+            ));
+        }
+        let dataset_layout = DatasetLayout::new(self.get_dataset_path(dataset_id));
 
-        Ok((canonical_dataset_path, dataset_name_str))
+        let dataset = Self::build_dataset(dataset_layout);
+
+        let dataset_alias = match self.read_dataset_alias(dataset.as_ref()).await {
+            Ok(alias) => Ok(alias),
+            Err(err) => Err(err),
+        }
+        .int_err()?;
+
+        Ok(odf::DatasetHandle::new(dataset_id.clone(), dataset_alias))
+    }
+
+    fn normalize_alias(&self, alias: &odf::DatasetAlias) -> odf::DatasetAlias {
+        match self.tenancy_config.as_ref() {
+            TenancyConfig::SingleTenant => {
+                if alias.is_multi_tenant() {
+                    assert!(
+                        !alias.is_multi_tenant()
+                            || alias.account_name.as_ref().unwrap() == DEFAULT_ACCOUNT_NAME_STR,
+                        "Multi-tenant refs shouldn't have reached down to here with earlier \
+                         validations"
+                    );
+                }
+                alias.clone()
+            }
+            TenancyConfig::MultiTenant => {
+                if alias.is_multi_tenant() {
+                    alias.clone()
+                } else {
+                    match self.current_account_subject.as_ref() {
+                        CurrentAccountSubject::Anonymous(_) => {
+                            panic!("Anonymous account misused, use multi-tenant alias");
+                        }
+                        CurrentAccountSubject::Logged(l) => odf::DatasetAlias::new(
+                            Some(l.account_name.clone()),
+                            alias.dataset_name.clone(),
+                        ),
+                    }
+                }
+            }
+        }
+    }
+
+    fn get_dataset_path(&self, dataset_id: &odf::DatasetID) -> PathBuf {
+        self.root
+            .join(dataset_id.as_multibase().to_stack_string().as_str())
+    }
+
+    async fn read_dataset_alias(
+        &self,
+        dataset: &dyn odf::Dataset,
+    ) -> Result<odf::DatasetAlias, odf::storage::GetNamedError> {
+        let bytes = dataset.as_info_repo().get("alias").await?;
+        let dataset_alias_str = std::str::from_utf8(&bytes[..]).int_err()?.trim();
+        let dataset_alias = odf::DatasetAlias::try_from(dataset_alias_str).int_err()?;
+        Ok(dataset_alias)
+    }
+
+    fn stream_datasets_if<'s>(
+        &'s self,
+        alias_filter: impl Fn(&odf::DatasetAlias) -> bool + Send + 's,
+    ) -> odf::dataset::DatasetHandleStream<'s> {
+        Box::pin(async_stream::try_stream! {
+            use futures::TryStreamExt;
+            let mut datasets_stream = self.stored_dataset_handles();
+            while let Some(hdl) = datasets_stream.try_next().await? {
+                if alias_filter(&hdl.alias) {
+                    yield hdl;
+                }
+            }
+        })
+    }
+
+    fn canonical_dataset_alias(&self, raw_alias: &odf::DatasetAlias) -> odf::DatasetAlias {
+        match self.tenancy_config.as_ref() {
+            TenancyConfig::SingleTenant => raw_alias.clone(),
+            TenancyConfig::MultiTenant => {
+                let account_name = if raw_alias.is_multi_tenant() {
+                    raw_alias.account_name.as_ref().unwrap()
+                } else {
+                    match self.current_account_subject.as_ref() {
+                        CurrentAccountSubject::Anonymous(_) => {
+                            panic!("Anonymous account misused, use multi-tenant alias");
+                        }
+                        CurrentAccountSubject::Logged(l) => &l.account_name,
+                    }
+                };
+
+                odf::DatasetAlias::new(Some(account_name.clone()), raw_alias.dataset_name.clone())
+            }
+        }
+    }
+
+    async fn save_dataset_alias(
+        &self,
+        dataset: &dyn odf::Dataset,
+        dataset_alias: &odf::DatasetAlias,
+    ) -> Result<(), InternalError> {
+        dataset
+            .as_info_repo()
+            .set("alias", dataset_alias.to_string().as_bytes())
+            .await
+            .int_err()?;
+
+        Ok(())
     }
 }
 
@@ -120,17 +246,8 @@ impl odf::DatasetStorageUnit for DatasetStorageUnitLocalFs {
 
         match dataset_ref {
             odf::DatasetRef::Handle(h) => Ok(h.clone()),
-            odf::DatasetRef::Alias(alias) => self
-                .storage_strategy
-                .resolve_dataset_alias(alias)
-                .await
-                .map_err(|e| match e {
-                    ResolveDatasetError::Internal(e) => odf::dataset::GetDatasetError::Internal(e),
-                    ResolveDatasetError::NotFound(e) => odf::dataset::GetDatasetError::NotFound(e),
-                }),
-            odf::DatasetRef::ID(id) => {
-                self.storage_strategy
-                    .resolve_dataset_id(id)
+            odf::DatasetRef::Alias(alias) => {
+                self.resolve_dataset_by_alias(alias)
                     .await
                     .map_err(|e| match e {
                         ResolveDatasetError::Internal(e) => {
@@ -141,26 +258,75 @@ impl odf::DatasetStorageUnit for DatasetStorageUnitLocalFs {
                         }
                     })
             }
+            odf::DatasetRef::ID(id) => self.resolve_dataset_by_id(id).await.map_err(|e| match e {
+                ResolveDatasetError::Internal(e) => odf::dataset::GetDatasetError::Internal(e),
+                ResolveDatasetError::NotFound(e) => odf::dataset::GetDatasetError::NotFound(e),
+            }),
         }
     }
 
-    // TODO: PERF: Resolving handles currently involves reading summary files
+    // TODO: PERF: Resolving handles currently involves reading alias files
     fn stored_dataset_handles(&self) -> odf::dataset::DatasetHandleStream<'_> {
-        self.storage_strategy.get_all_datasets()
+        Box::pin(async_stream::try_stream! {
+            // While creating a workspace, the directory has not yet been created
+            if !self.root.exists() {
+                return;
+            }
+
+            let read_dataset_dir = std::fs::read_dir(&self.root).int_err()?;
+
+            for r_dataset_dir in read_dataset_dir {
+                let dataset_dir_entry = r_dataset_dir.int_err()?;
+                if let Some(s) = dataset_dir_entry.file_name().to_str() {
+                    if s.starts_with('.') {
+                        continue;
+                    }
+                }
+
+                let dataset_id = odf::DatasetID::from_multibase_string(dataset_dir_entry.file_name().to_str().unwrap()).int_err()?;
+                let dataset_layout = DatasetLayout::new(dataset_dir_entry.path());
+
+                let dataset = Self::build_dataset(dataset_layout);
+
+                let dataset_alias = match self.read_dataset_alias(dataset.as_ref()).await {
+                    Ok(alias) => Ok(alias),
+                    Err(odf::storage::GetNamedError::NotFound(_)) => {
+                        continue;
+                    }
+                    Err(err) => Err(err),
+                }
+                .int_err()?;
+
+                yield odf::DatasetHandle::new(dataset_id, dataset_alias);
+            }
+        })
     }
 
     fn stored_dataset_handles_by_owner(
         &self,
         account_name: &odf::AccountName,
     ) -> odf::dataset::DatasetHandleStream<'_> {
-        self.storage_strategy.get_datasets_by_owner(account_name)
+        if *self.tenancy_config == TenancyConfig::SingleTenant
+            && *account_name != DEFAULT_ACCOUNT_NAME_STR
+        {
+            return Box::pin(futures::stream::empty());
+        }
+
+        let account_name = account_name.clone();
+        self.stream_datasets_if(move |dataset_alias| {
+            if let Some(dataset_account_name) = &dataset_alias.account_name {
+                *dataset_account_name == account_name
+            } else {
+                true
+            }
+        })
     }
 
     fn get_stored_dataset_by_handle(
         &self,
         dataset_handle: &odf::DatasetHandle,
     ) -> Arc<dyn odf::Dataset> {
-        let layout = DatasetLayout::new(self.storage_strategy.get_dataset_path(dataset_handle));
+        let layout = DatasetLayout::new(self.get_dataset_path(&dataset_handle.id));
         Self::build_dataset(layout)
     }
 }
@@ -233,12 +399,10 @@ impl odf::DatasetStorageUnitWriter for DatasetStorageUnitLocalFs {
         // It's okay to create a new dataset by this point
         let dataset_handle = odf::DatasetHandle::new(
             seed_block.event.dataset_id.clone(),
-            self.storage_strategy
-                .canonical_dataset_alias(dataset_alias)
-                .int_err()?,
+            self.canonical_dataset_alias(dataset_alias),
         );
 
-        let dataset_path = self.storage_strategy.get_dataset_path(&dataset_handle);
+        let dataset_path = self.get_dataset_path(&dataset_handle.id);
         let layout = DatasetLayout::create(&dataset_path).int_err()?;
         let dataset = Self::build_dataset(layout);
 
@@ -276,8 +440,7 @@ impl odf::DatasetStorageUnitWriter for DatasetStorageUnitLocalFs {
             }
         };
 
-        self.storage_strategy
-            .handle_dataset_created(dataset.as_ref(), &dataset_handle.alias)
+        self.save_dataset_alias(dataset.as_ref(), &dataset_handle.alias)
             .await?;
 
         tracing::info!(
@@ -304,11 +467,7 @@ impl odf::DatasetStorageUnitWriter for DatasetStorageUnitLocalFs {
             odf::DatasetAlias::new(dataset_handle.alias.account_name.clone(), new_name.clone());
 
         // Note: should collision check be moved to use case level?
-        match self
-            .storage_strategy
-            .resolve_dataset_alias(&new_alias)
-            .await
-        {
+        match self.resolve_dataset_by_alias(&new_alias).await {
             Ok(_) => Err(odf::dataset::RenameDatasetError::NameCollision(
                 odf::dataset::NameCollisionError {
                     alias: odf::DatasetAlias::new(
@@ -323,8 +482,13 @@ impl odf::DatasetStorageUnitWriter for DatasetStorageUnitLocalFs {
             Err(ResolveDatasetError::NotFound(_)) => Ok(()),
         }?;
 
-        self.storage_strategy
-            .handle_dataset_renamed(dataset_handle, new_name)
+        let dataset_path = self.get_dataset_path(&dataset_handle.id);
+        let layout = DatasetLayout::new(dataset_path);
+        let dataset = DatasetStorageUnitLocalFs::build_dataset(layout);
+
+        let new_alias =
+            odf::DatasetAlias::new(dataset_handle.alias.account_name.clone(), new_name.clone());
+        self.save_dataset_alias(dataset.as_ref(), &new_alias)
             .await?;
 
         Ok(())
@@ -346,7 +510,7 @@ impl odf::DatasetStorageUnitWriter for DatasetStorageUnitLocalFs {
         // repo_info.datasets.remove(index);
         // self.write_repo_info(repo_info).await?;
 
-        let dataset_dir = self.storage_strategy.get_dataset_path(dataset_handle);
+        let dataset_dir = self.get_dataset_path(&dataset_handle.id);
         tokio::fs::remove_dir_all(dataset_dir).await.int_err()?;
 
         Ok(())
@@ -354,45 +518,6 @@ impl odf::DatasetStorageUnitWriter for DatasetStorageUnitLocalFs {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[async_trait]
-trait DatasetStorageStrategy: Sync + Send {
-    fn get_dataset_path(&self, dataset_handle: &odf::DatasetHandle) -> PathBuf;
-
-    fn get_all_datasets(&self) -> odf::dataset::DatasetHandleStream<'_>;
-
-    fn get_datasets_by_owner(
-        &self,
-        account_name: &odf::AccountName,
-    ) -> odf::dataset::DatasetHandleStream<'_>;
-
-    async fn resolve_dataset_alias(
-        &self,
-        dataset_alias: &odf::DatasetAlias,
-    ) -> Result<odf::DatasetHandle, ResolveDatasetError>;
-
-    async fn resolve_dataset_id(
-        &self,
-        dataset_id: &odf::DatasetID,
-    ) -> Result<odf::DatasetHandle, ResolveDatasetError>;
-
-    async fn handle_dataset_created(
-        &self,
-        dataset: &dyn odf::Dataset,
-        dataset_alias: &odf::DatasetAlias,
-    ) -> Result<(), InternalError>;
-
-    async fn handle_dataset_renamed(
-        &self,
-        dataset_handle: &odf::DatasetHandle,
-        new_name: &odf::DatasetName,
-    ) -> Result<(), InternalError>;
-
-    fn canonical_dataset_alias(
-        &self,
-        raw_alias: &odf::DatasetAlias,
-    ) -> Result<odf::DatasetAlias, ResolveDatasetError>;
-}
 
 #[derive(thiserror::Error, Debug)]
 enum ResolveDatasetError {
@@ -408,564 +533,6 @@ enum ResolveDatasetError {
         #[backtrace]
         InternalError,
     ),
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-struct DatasetSingleTenantStorageStrategy {
-    root: PathBuf,
-}
-
-impl DatasetSingleTenantStorageStrategy {
-    pub fn new(root: impl Into<PathBuf>) -> Self {
-        Self { root: root.into() }
-    }
-
-    fn dataset_name<'a>(&self, dataset_alias: &'a odf::DatasetAlias) -> &'a odf::DatasetName {
-        &dataset_alias.dataset_name
-    }
-
-    fn dataset_path_impl(&self, dataset_alias: &odf::DatasetAlias) -> PathBuf {
-        let dataset_name = self.dataset_name(dataset_alias);
-        self.root.join(dataset_name)
-    }
-
-    async fn attempt_resolving_summary_via_path(
-        &self,
-        dataset_path: &PathBuf,
-        dataset_alias: &odf::DatasetAlias,
-    ) -> Result<(odf::dataset::DatasetSummary, odf::DatasetAlias), ResolveDatasetError> {
-        let layout = DatasetLayout::new(dataset_path);
-        let dataset = DatasetStorageUnitLocalFs::build_dataset(layout);
-
-        let dataset_summary = dataset
-            .get_summary(odf::dataset::GetSummaryOpts::default())
-            .await
-            .map_err(|e| {
-                if let odf::dataset::GetSummaryError::EmptyDataset = e {
-                    ResolveDatasetError::NotFound(odf::dataset::DatasetNotFoundError {
-                        dataset_ref: dataset_alias.as_local_ref(),
-                    })
-                } else {
-                    ResolveDatasetError::Internal(e.int_err())
-                }
-            })?;
-
-        let (_, canonical_dataset_name) =
-            DatasetStorageUnitLocalFs::get_canonical_path_param(dataset_path)?;
-        let canonical_dataset_alias = odf::DatasetAlias {
-            dataset_name: odf::DatasetName::new_unchecked(canonical_dataset_name.as_str()),
-            account_name: None,
-        };
-
-        Ok((dataset_summary, canonical_dataset_alias))
-    }
-
-    async fn resolve_dataset_handle(
-        &self,
-        dataset_path: &PathBuf,
-        dataset_alias: &odf::DatasetAlias,
-    ) -> Result<odf::DatasetHandle, ResolveDatasetError> {
-        let (summary, canonical_dataset_alias) = self
-            .attempt_resolving_summary_via_path(dataset_path, dataset_alias)
-            .await?;
-
-        Ok(odf::DatasetHandle::new(
-            summary.id,
-            canonical_dataset_alias.clone(),
-        ))
-    }
-}
-
-#[async_trait]
-impl DatasetStorageStrategy for DatasetSingleTenantStorageStrategy {
-    fn get_dataset_path(&self, dataset_handle: &odf::DatasetHandle) -> PathBuf {
-        self.dataset_path_impl(&dataset_handle.alias)
-    }
-
-    fn get_all_datasets(&self) -> odf::dataset::DatasetHandleStream<'_> {
-        Box::pin(async_stream::try_stream! {
-            // While creating a workspace, the directory has not yet been created
-            if !self.root.exists() {
-                return;
-            }
-
-            let read_dataset_dir = std::fs::read_dir(&self.root).int_err()?;
-
-            for r_dataset_dir in read_dataset_dir {
-                let dataset_dir_entry = r_dataset_dir.int_err()?;
-                if let Some(s) = dataset_dir_entry.file_name().to_str() {
-                    if s.starts_with('.') {
-                        continue;
-                    }
-                }
-                let dataset_name = odf::DatasetName::try_from(&dataset_dir_entry.file_name()).int_err()?;
-                let dataset_alias = odf::DatasetAlias::new(None, dataset_name);
-                match self.resolve_dataset_handle(&dataset_dir_entry.path(), &dataset_alias).await {
-                    Ok(hdl) => { yield hdl; Ok(()) }
-                    Err(ResolveDatasetError::NotFound(_)) => Ok(()),
-                    Err(e) => Err(e.int_err())
-                }?;
-            }
-        })
-    }
-
-    fn get_datasets_by_owner(
-        &self,
-        account_name: &odf::AccountName,
-    ) -> odf::dataset::DatasetHandleStream<'_> {
-        if *account_name == DEFAULT_ACCOUNT_NAME_STR {
-            self.get_all_datasets()
-        } else {
-            Box::pin(futures::stream::empty())
-        }
-    }
-
-    async fn resolve_dataset_alias(
-        &self,
-        dataset_alias: &odf::DatasetAlias,
-    ) -> Result<odf::DatasetHandle, ResolveDatasetError> {
-        assert!(
-            !dataset_alias.is_multi_tenant()
-                || dataset_alias.account_name.as_ref().unwrap() == DEFAULT_ACCOUNT_NAME_STR,
-            "Multi-tenant refs shouldn't have reached down to here with earlier validations"
-        );
-
-        let dataset_path = self.dataset_path_impl(dataset_alias);
-        if !dataset_path.exists() {
-            use tokio_stream::StreamExt;
-
-            let mut all_datasets_stream = self.get_all_datasets();
-
-            while let Some(dataset_handle) = all_datasets_stream.try_next().await.unwrap() {
-                if &dataset_handle.alias == dataset_alias {
-                    return self
-                        .resolve_dataset_handle(
-                            &self.root.join(&dataset_handle.alias.dataset_name),
-                            &dataset_handle.alias,
-                        )
-                        .await;
-                }
-            }
-            return Err(ResolveDatasetError::NotFound(
-                odf::dataset::DatasetNotFoundError {
-                    dataset_ref: dataset_alias.as_local_ref(),
-                },
-            ));
-        }
-
-        self.resolve_dataset_handle(&dataset_path, dataset_alias)
-            .await
-    }
-
-    async fn resolve_dataset_id(
-        &self,
-        dataset_id: &odf::DatasetID,
-    ) -> Result<odf::DatasetHandle, ResolveDatasetError> {
-        let read_dataset_dir = std::fs::read_dir(&self.root).int_err()?;
-
-        for r_dataset_dir in read_dataset_dir {
-            let dataset_dir_entry = r_dataset_dir.int_err()?;
-            if let Some(s) = dataset_dir_entry.file_name().to_str() {
-                if s.starts_with('.') {
-                    continue;
-                }
-            }
-
-            let alias = odf::DatasetAlias::new(
-                None,
-                odf::DatasetName::try_from(&dataset_dir_entry.file_name()).int_err()?,
-            );
-
-            let dataset_path = self.dataset_path_impl(&alias);
-
-            let (summary, canonical_dataset_alias) = self
-                .attempt_resolving_summary_via_path(&dataset_path, &alias)
-                .await?;
-
-            if summary.id == *dataset_id {
-                return Ok(odf::DatasetHandle::new(summary.id, canonical_dataset_alias));
-            }
-        }
-
-        Err(ResolveDatasetError::NotFound(
-            odf::dataset::DatasetNotFoundError {
-                dataset_ref: dataset_id.as_local_ref(),
-            },
-        ))
-    }
-
-    async fn handle_dataset_created(
-        &self,
-        _dataset: &dyn odf::Dataset,
-        _dataset_alias: &odf::DatasetAlias,
-    ) -> Result<(), InternalError> {
-        // No extra action required in single-tenant mode
-        Ok(())
-    }
-
-    async fn handle_dataset_renamed(
-        &self,
-        dataset_handle: &odf::DatasetHandle,
-        new_name: &odf::DatasetName,
-    ) -> Result<(), InternalError> {
-        let old_dataset_path = self.get_dataset_path(dataset_handle);
-        let new_dataset_path = old_dataset_path.parent().unwrap().join(new_name);
-        std::fs::rename(old_dataset_path, new_dataset_path).int_err()?;
-        Ok(())
-    }
-
-    fn canonical_dataset_alias(
-        &self,
-        raw_alias: &odf::DatasetAlias,
-    ) -> Result<odf::DatasetAlias, ResolveDatasetError> {
-        Ok(raw_alias.clone())
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-struct DatasetMultiTenantStorageStrategy {
-    root: PathBuf,
-    current_account_subject: Arc<CurrentAccountSubject>,
-}
-
-impl DatasetMultiTenantStorageStrategy {
-    pub fn new(
-        root: impl Into<PathBuf>,
-        current_account_subject: Arc<CurrentAccountSubject>,
-    ) -> Self {
-        Self {
-            root: root.into(),
-            current_account_subject,
-        }
-    }
-
-    fn effective_account_name<'a>(
-        &'a self,
-        dataset_alias: &'a odf::DatasetAlias,
-    ) -> &'a odf::AccountName {
-        if dataset_alias.is_multi_tenant() {
-            dataset_alias.account_name.as_ref().unwrap()
-        } else {
-            match self.current_account_subject.as_ref() {
-                CurrentAccountSubject::Anonymous(_) => {
-                    panic!("Anonymous account misused, use multi-tenant alias");
-                }
-                CurrentAccountSubject::Logged(l) => &l.account_name,
-            }
-        }
-    }
-
-    async fn attempt_resolving_dataset_alias_via_path(
-        &self,
-        account_name: &odf::AccountName,
-        dataset_path: &PathBuf,
-        dataset_id: &odf::DatasetID,
-    ) -> Result<odf::DatasetAlias, ResolveDatasetError> {
-        let layout = DatasetLayout::new(dataset_path);
-        let dataset = DatasetStorageUnitLocalFs::build_dataset(layout);
-        match dataset.as_info_repo().get("alias").await {
-            Ok(bytes) => {
-                let dataset_alias_str = std::str::from_utf8(&bytes[..]).int_err()?.trim();
-                let mut dataset_alias = odf::DatasetAlias::try_from(dataset_alias_str).int_err()?;
-                if !dataset_alias.is_multi_tenant() {
-                    dataset_alias = odf::DatasetAlias::new(
-                        Some(account_name.clone()),
-                        dataset_alias.dataset_name,
-                    );
-                }
-                Ok(dataset_alias)
-            }
-            Err(odf::storage::GetNamedError::Internal(e)) => Err(ResolveDatasetError::Internal(e)),
-            Err(odf::storage::GetNamedError::Access(e)) => {
-                Err(ResolveDatasetError::Internal(e.int_err()))
-            }
-            Err(odf::storage::GetNamedError::NotFound(_)) => Err(ResolveDatasetError::NotFound(
-                odf::dataset::DatasetNotFoundError {
-                    dataset_ref: dataset_id.as_local_ref(),
-                },
-            )),
-        }
-    }
-
-    async fn save_dataset_alias(
-        &self,
-        dataset: &dyn odf::Dataset,
-        dataset_alias: &odf::DatasetAlias,
-    ) -> Result<(), InternalError> {
-        dataset
-            .as_info_repo()
-            .set("alias", dataset_alias.to_string().as_bytes())
-            .await
-            .int_err()?;
-
-        Ok(())
-    }
-
-    fn stream_account_datasets<'s>(
-        &'s self,
-        account_name: &'s odf::AccountName,
-        account_dir_path: PathBuf,
-    ) -> odf::dataset::DatasetHandleStream<'s> {
-        Box::pin(async_stream::try_stream! {
-            let read_dataset_dir = std::fs::read_dir(account_dir_path).int_err()?;
-
-            for r_dataset_dir in read_dataset_dir {
-                let dataset_dir_entry = r_dataset_dir.int_err()?;
-                if let Some(s) = dataset_dir_entry.file_name().to_str() {
-                    if s.starts_with('.') {
-                        continue;
-                    }
-                }
-                let dataset_file_name = String::from(dataset_dir_entry.file_name().to_str().unwrap());
-
-                let dataset_id =
-                    odf::DatasetID::from_did_str(format!("did:odf:{dataset_file_name}").as_str())
-                        .int_err()?;
-
-                let dataset_path = dataset_dir_entry.path();
-
-                match self
-                    .attempt_resolving_dataset_alias_via_path(account_name, &dataset_path, &dataset_id)
-                    .await
-                {
-                    Ok(dataset_alias) => {
-                        let dataset_handle = odf::DatasetHandle::new(dataset_id, dataset_alias);
-                        yield dataset_handle;
-                        Ok(())
-                    }
-                    Err(ResolveDatasetError::NotFound(_)) => Ok(()),
-                    Err(e) => Err(e.int_err()),
-                }?;
-            }
-        })
-    }
-
-    fn resolve_account_dir(
-        &self,
-        account_name: &odf::AccountName,
-    ) -> Result<(PathBuf, odf::AccountName), ResolveDatasetError> {
-        let account_dataset_dir_path = self.root.join(account_name);
-
-        if !account_dataset_dir_path.is_dir() {
-            let read_account_dirs = std::fs::read_dir(self.root.as_path()).int_err()?;
-
-            for read_account_dir in read_account_dirs {
-                let account_dir_name = odf::AccountName::new_unchecked(
-                    read_account_dir
-                        .int_err()?
-                        .file_name()
-                        .to_str()
-                        .unwrap_or(""),
-                );
-                if account_name == &account_dir_name {
-                    return Ok((self.root.join(&account_dir_name), account_dir_name));
-                }
-            }
-            return Ok((account_dataset_dir_path, account_name.clone()));
-        }
-
-        let (canonical_account_dataset_dir_path, canonical_account_name) =
-            DatasetStorageUnitLocalFs::get_canonical_path_param(&account_dataset_dir_path)?;
-
-        Ok((
-            canonical_account_dataset_dir_path,
-            odf::AccountName::new_unchecked(canonical_account_name.as_str()),
-        ))
-    }
-}
-
-#[async_trait]
-impl DatasetStorageStrategy for DatasetMultiTenantStorageStrategy {
-    fn get_dataset_path(&self, dataset_handle: &odf::DatasetHandle) -> PathBuf {
-        let account_name = self.effective_account_name(&dataset_handle.alias);
-
-        self.root
-            .join(account_name)
-            .join(dataset_handle.id.as_multibase().to_stack_string())
-    }
-
-    fn get_all_datasets(&self) -> odf::dataset::DatasetHandleStream<'_> {
-        Box::pin(async_stream::try_stream! {
-            // While creating a workspace, the directory has not yet been created
-            if !self.root.exists() {
-                return;
-            }
-
-            let read_account_dir = std::fs::read_dir(&self.root).int_err()?;
-
-            for r_account_dir in read_account_dir {
-                let account_dir_entry = r_account_dir.int_err()?;
-                if let Some(s) = account_dir_entry.file_name().to_str() {
-                    if s.starts_with('.') {
-                        continue;
-                    }
-                }
-                if !account_dir_entry.path().is_dir() {
-                    continue;
-                }
-
-                let account_name = odf::AccountName::try_from(&account_dir_entry.file_name()).int_err()?;
-                let mut account_datasets = self.stream_account_datasets(&account_name, account_dir_entry.path());
-
-                use tokio_stream::StreamExt;
-                while let Some(dataset_handle) = account_datasets.next().await {
-                    yield dataset_handle?;
-                }
-            }
-        })
-    }
-
-    fn get_datasets_by_owner(
-        &self,
-        account_name: &odf::AccountName,
-    ) -> odf::dataset::DatasetHandleStream<'_> {
-        let account_name = account_name.clone();
-        Box::pin(async_stream::try_stream! {
-            let account_dir_path = self.root.join(account_name.clone());
-            if !account_dir_path.is_dir() {
-                return;
-            }
-
-            let mut account_datasets = self.stream_account_datasets(&account_name, account_dir_path);
-
-            use tokio_stream::StreamExt;
-            while let Some(dataset_handle) = account_datasets.next().await {
-                yield dataset_handle?;
-            }
-        })
-    }
-
-    async fn resolve_dataset_alias(
-        &self,
-        dataset_alias: &odf::DatasetAlias,
-    ) -> Result<odf::DatasetHandle, ResolveDatasetError> {
-        let effective_account_name = self.effective_account_name(dataset_alias);
-        let (account_dataset_dir_path, _) = self.resolve_account_dir(effective_account_name)?;
-
-        if account_dataset_dir_path.is_dir() {
-            let read_dataset_dir = std::fs::read_dir(account_dataset_dir_path).map_err(|_| {
-                ResolveDatasetError::NotFound(odf::dataset::DatasetNotFoundError {
-                    dataset_ref: dataset_alias.as_local_ref(),
-                })
-            })?;
-
-            for r_dataset_dir in read_dataset_dir {
-                let dataset_dir_entry = r_dataset_dir.int_err()?;
-                if let Some(s) = dataset_dir_entry.file_name().to_str() {
-                    if s.starts_with('.') {
-                        continue;
-                    }
-                }
-
-                let dataset_file_name =
-                    String::from(dataset_dir_entry.file_name().to_str().unwrap());
-
-                let dataset_id =
-                    odf::DatasetID::from_did_str(format!("did:odf:{dataset_file_name}").as_str())
-                        .int_err()?;
-
-                let dataset_path = dataset_dir_entry.path();
-
-                let candidate_dataset_alias = self
-                    .attempt_resolving_dataset_alias_via_path(
-                        effective_account_name,
-                        &dataset_path,
-                        &dataset_id,
-                    )
-                    .await?;
-
-                if candidate_dataset_alias.dataset_name == dataset_alias.dataset_name {
-                    return Ok(odf::DatasetHandle::new(dataset_id, candidate_dataset_alias));
-                }
-            }
-        }
-
-        Err(ResolveDatasetError::NotFound(
-            odf::dataset::DatasetNotFoundError {
-                dataset_ref: dataset_alias.as_local_ref(),
-            },
-        ))
-    }
-
-    async fn resolve_dataset_id(
-        &self,
-        dataset_id: &odf::DatasetID,
-    ) -> Result<odf::DatasetHandle, ResolveDatasetError> {
-        let id_as_string = dataset_id.as_multibase().to_stack_string();
-        let read_account_dir = std::fs::read_dir(&self.root).int_err()?;
-
-        for r_account_dir in read_account_dir {
-            let account_dir_entry = r_account_dir.int_err()?;
-            if let Some(s) = account_dir_entry.file_name().to_str() {
-                if s.starts_with('.') {
-                    continue;
-                }
-            }
-
-            let account_name =
-                odf::AccountName::try_from(&account_dir_entry.file_name()).int_err()?;
-            let dataset_path = account_dir_entry.path().join(&id_as_string);
-            if dataset_path.exists() {
-                let dataset_alias = self
-                    .attempt_resolving_dataset_alias_via_path(
-                        &account_name,
-                        &dataset_path,
-                        dataset_id,
-                    )
-                    .await?;
-
-                return Ok(odf::DatasetHandle::new(
-                    dataset_id.to_owned(),
-                    dataset_alias,
-                ));
-            }
-        }
-
-        Err(ResolveDatasetError::NotFound(
-            odf::dataset::DatasetNotFoundError {
-                dataset_ref: dataset_id.as_local_ref(),
-            },
-        ))
-    }
-
-    async fn handle_dataset_created(
-        &self,
-        dataset: &dyn odf::Dataset,
-        dataset_alias: &odf::DatasetAlias,
-    ) -> Result<(), InternalError> {
-        self.save_dataset_alias(dataset, dataset_alias).await
-    }
-
-    async fn handle_dataset_renamed(
-        &self,
-        dataset_handle: &odf::DatasetHandle,
-        new_name: &odf::DatasetName,
-    ) -> Result<(), InternalError> {
-        let dataset_path = self.get_dataset_path(dataset_handle);
-        let layout = DatasetLayout::new(dataset_path);
-        let dataset = DatasetStorageUnitLocalFs::build_dataset(layout);
-
-        let new_alias =
-            odf::DatasetAlias::new(dataset_handle.alias.account_name.clone(), new_name.clone());
-        self.save_dataset_alias(dataset.as_ref(), &new_alias)
-            .await?;
-
-        Ok(())
-    }
-
-    fn canonical_dataset_alias(
-        &self,
-        raw_alias: &odf::DatasetAlias,
-    ) -> Result<odf::DatasetAlias, ResolveDatasetError> {
-        let account_name = self.effective_account_name(raw_alias);
-        let (_, canonical_account_name) = self.resolve_account_dir(account_name).int_err()?;
-        Ok(odf::DatasetAlias::new(
-            Some(canonical_account_name),
-            raw_alias.dataset_name.clone(),
-        ))
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

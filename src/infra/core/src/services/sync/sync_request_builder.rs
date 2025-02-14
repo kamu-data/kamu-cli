@@ -126,27 +126,33 @@ impl SyncRequestBuilder {
                 Err(err) => Err(err.into()),
             },
             Err(remote_ref) => {
-                let remote_dataset_url = Arc::new(
-                    self.remote_alias_resolver
-                        .resolve_pull_url(&remote_ref)
-                        .await
-                        .int_err()?,
-                );
-                let dataset = self
-                    .dataset_factory
-                    .get_dataset(remote_dataset_url.as_ref(), create_if_not_exists)
-                    .await?;
+                match self
+                    .remote_alias_resolver
+                    .resolve_pull_url(&remote_ref)
+                    .await
+                {
+                    Ok(remote_dataset_url) => {
+                        let dataset = self
+                            .dataset_factory
+                            .get_dataset(&remote_dataset_url, create_if_not_exists)
+                            .await?;
 
-                if !create_if_not_exists {
-                    self.ensure_dataset_head_present(remote_ref.as_any_ref(), dataset.as_ref())
-                        .await?;
+                        if !create_if_not_exists {
+                            self.ensure_dataset_head_present(
+                                remote_ref.as_any_ref(),
+                                dataset.as_ref(),
+                            )
+                            .await?;
+                        }
+
+                        Ok(SyncRef::Remote(SyncRefRemote {
+                            url: Arc::new(remote_dataset_url),
+                            dataset,
+                            original_remote_ref: remote_ref,
+                        }))
+                    }
+                    Err(e) => Err(SyncError::Internal(e.int_err())),
                 }
-
-                Ok(SyncRef::Remote(SyncRefRemote {
-                    url: remote_dataset_url,
-                    dataset,
-                    original_remote_ref: remote_ref,
-                }))
             }
         }
     }

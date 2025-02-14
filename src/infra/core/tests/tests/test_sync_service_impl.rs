@@ -183,7 +183,7 @@ async fn do_test_sync(
         .push_event(MetadataFactory::set_data_schema().build())
         .build();
 
-    let b1 = create_test_dataset_fron_snapshot(
+    let created_foo = create_test_dataset_fron_snapshot(
         dataset_registry_foo.as_ref(),
         storage_unit_foo.as_ref(),
         snapshot,
@@ -191,8 +191,8 @@ async fn do_test_sync(
         time_source_foo.now(),
     )
     .await
-    .unwrap()
-    .head;
+    .unwrap();
+    let b1 = created_foo.head;
 
     // Initial sync ///////////////////////////////////////////////////////////
     assert_matches!(
@@ -574,8 +574,15 @@ async fn do_test_sync(
         )
         .await;
 
-        let dir_files =
-            std::fs::read_dir(tmp_workspace_dir_foo.join("datasets/foo/checkpoints")).unwrap();
+        let dir_files = std::fs::read_dir(tmp_workspace_dir_foo.join(format!(
+                "datasets/{}/checkpoints",
+                created_foo
+                    .dataset_handle
+                    .id
+                    .as_multibase()
+                    .to_stack_string(),
+                )))
+        .unwrap();
         for file_info in dir_files {
             std::fs::remove_file(file_info.unwrap().path()).unwrap();
         }

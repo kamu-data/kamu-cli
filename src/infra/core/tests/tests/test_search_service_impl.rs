@@ -78,7 +78,7 @@ async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
         .unwrap();
 
     // Add and sync dataset
-    create_test_dataset_fron_snapshot(
+    let _ = create_test_dataset_fron_snapshot(
         dataset_registry.as_ref(),
         dataset_storage_unit_writer.as_ref(),
         MetadataFactory::dataset_snapshot()

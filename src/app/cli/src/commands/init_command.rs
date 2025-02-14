@@ -39,10 +39,6 @@ impl InitCommand {
 
 #[async_trait::async_trait(?Send)]
 impl Command for InitCommand {
-    fn needs_workspace(&self) -> bool {
-        false
-    }
-
     async fn run(&mut self) -> Result<(), CLIError> {
         if self.workspace_layout.root_dir.is_dir() {
             return if self.exists_ok {

@@ -215,6 +215,8 @@ pub enum SyncError {
     #[error(transparent)]
     RefCollision(#[from] odf::dataset::RefCollisionError),
     #[error(transparent)]
+    NameCollision(#[from] odf::dataset::NameCollisionError),
+    #[error(transparent)]
     CreateDatasetFailed(#[from] odf::dataset::CreateDatasetError),
     #[error(transparent)]
     UnsupportedProtocol(#[from] odf::dataset::UnsupportedProtocolError),

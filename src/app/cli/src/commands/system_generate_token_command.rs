@@ -41,10 +41,6 @@ impl GenerateTokenCommand {
 
 #[async_trait::async_trait(?Send)]
 impl Command for GenerateTokenCommand {
-    fn needs_workspace(&self) -> bool {
-        false
-    }
-
     async fn run(&mut self) -> Result<(), CLIError> {
         let subject = if let Some(subject) = &self.subject {
             odf::AccountID::from_did_str(subject).int_err()?
