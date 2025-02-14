@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use odf_metadata::{DatasetAlias, DatasetHandle, DatasetName, MetadataBlockTyped, Seed};
+use odf_metadata::{DatasetAlias, DatasetID, DatasetName, MetadataBlockTyped, Seed};
 
 use crate::{CreateDatasetError, CreateDatasetResult, DeleteDatasetError, RenameDatasetError};
 
@@ -24,14 +24,11 @@ pub trait DatasetStorageUnitWriter: Sync + Send {
 
     async fn rename_dataset(
         &self,
-        dataset_handle: &DatasetHandle,
+        dataset_id: &DatasetID,
         new_name: &DatasetName,
     ) -> Result<(), RenameDatasetError>;
 
-    async fn delete_dataset(
-        &self,
-        dataset_handle: &DatasetHandle,
-    ) -> Result<(), DeleteDatasetError>;
+    async fn delete_dataset(&self, dataset_id: &DatasetID) -> Result<(), DeleteDatasetError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

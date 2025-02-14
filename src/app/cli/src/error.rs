@@ -168,11 +168,11 @@ impl From<WriterError> for CLIError {
 // TODO: Replace with traits that distinguish critical and non-critical errors
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl From<odf::dataset::GetDatasetError> for CLIError {
-    fn from(v: odf::dataset::GetDatasetError) -> Self {
+impl From<odf::dataset::GetStoredDatasetError> for CLIError {
+    fn from(v: odf::dataset::GetStoredDatasetError) -> Self {
         match v {
-            e @ odf::dataset::GetDatasetError::NotFound(_) => Self::failure(e),
-            e @ odf::dataset::GetDatasetError::Internal(_) => Self::critical(e),
+            e @ odf::dataset::GetStoredDatasetError::NotFound(_) => Self::failure(e),
+            e @ odf::dataset::GetStoredDatasetError::Internal(_) => Self::critical(e),
         }
     }
 }

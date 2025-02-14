@@ -119,7 +119,7 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
                 // Attempt to clean up dataset
                 let _ = self
                     .dataset_storage_unit_writer
-                    .delete_dataset(&create_dataset_result.dataset_handle)
+                    .delete_dataset(&create_dataset_result.dataset_handle.id)
                     .await;
                 Err(e)
             }

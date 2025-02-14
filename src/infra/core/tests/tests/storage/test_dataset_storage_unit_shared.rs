@@ -34,7 +34,7 @@ pub async fn test_create_dataset<
             .await
             .err()
             .unwrap(),
-        odf::dataset::GetDatasetError::NotFound(_)
+        odf::dataset::GetStoredDatasetError::NotFound(_)
     );
 
     let create_result = storage_unit
@@ -50,8 +50,7 @@ pub async fn test_create_dataset<
 
     // We should see the dataset
     assert!(storage_unit
-        .resolve_stored_dataset_handle_by_ref(&dataset_alias.as_local_ref())
-        .await
+        .get_stored_dataset_by_id(&create_result.dataset_handle.id)
         .is_ok());
 
     // Now test name collision
@@ -92,7 +91,7 @@ pub async fn test_create_and_get_case_insensetive_dataset<
             .await
             .err()
             .unwrap(),
-        odf::dataset::GetDatasetError::NotFound(_)
+        odf::dataset::GetStoredDatasetError::NotFound(_)
     );
 
     let create_result = storage_unit
@@ -199,7 +198,7 @@ pub async fn test_create_dataset_same_name_multiple_tenants<
             .await
             .err()
             .unwrap(),
-        odf::dataset::GetDatasetError::NotFound(_)
+        odf::dataset::GetStoredDatasetError::NotFound(_)
     );
 
     assert_matches!(
@@ -208,7 +207,7 @@ pub async fn test_create_dataset_same_name_multiple_tenants<
             .await
             .err()
             .unwrap(),
-        odf::dataset::GetDatasetError::NotFound(_)
+        odf::dataset::GetStoredDatasetError::NotFound(_)
     );
 
     let snapshot_my = MetadataFactory::dataset_snapshot()
@@ -309,7 +308,7 @@ pub async fn test_create_dataset_from_snapshot<
             .await
             .err()
             .unwrap(),
-        odf::dataset::GetDatasetError::NotFound(_)
+        odf::dataset::GetStoredDatasetError::NotFound(_)
     );
 
     let snapshot = MetadataFactory::dataset_snapshot()
@@ -607,7 +606,7 @@ pub async fn test_delete_dataset<
             .await
             .err()
             .unwrap(),
-        odf::dataset::GetDatasetError::NotFound(_),
+        odf::dataset::GetStoredDatasetError::NotFound(_),
     );
 }
 
@@ -860,7 +859,7 @@ pub async fn test_create_multiple_datasets_with_same_id<
             .await
             .err()
             .unwrap(),
-        odf::dataset::GetDatasetError::NotFound(_)
+        odf::dataset::GetStoredDatasetError::NotFound(_)
     );
     let seed_block =
         MetadataFactory::metadata_block(MetadataFactory::seed(odf::DatasetKind::Root).build())

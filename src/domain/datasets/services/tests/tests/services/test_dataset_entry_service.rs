@@ -38,7 +38,10 @@ async fn test_indexes_datasets_correctly() {
     let (_, dataset_id_1) = odf::DatasetID::new_generated_ed25519();
     let (_, dataset_id_2) = odf::DatasetID::new_generated_ed25519();
     let (_, dataset_id_3) = odf::DatasetID::new_generated_ed25519();
-    let dataset_handles = vec![
+
+    // TODO: instead of mocking repository, create it artificially and obtain
+    // appropriate indexing
+    let _dataset_handles = [
         odf::DatasetHandle::new(
             dataset_id_1.clone(),
             odf::DatasetAlias::new(
@@ -65,7 +68,11 @@ async fn test_indexes_datasets_correctly() {
     let mut mock_dataset_repository = odf::dataset::MockDatasetStorageUnit::new();
     DatasetEntryServiceHarness::add_get_all_datasets_expectation(
         &mut mock_dataset_repository,
-        dataset_handles,
+        vec![
+            dataset_id_1.clone(),
+            dataset_id_2.clone(),
+            dataset_id_3.clone(),
+        ],
     );
 
     let mut mock_dataset_entry_repository = MockDatasetEntryRepository::new();
@@ -152,7 +159,7 @@ async fn test_try_to_resolve_non_existing_dataset() {
 
     assert_matches!(
         resolve_dataset_result,
-        Err(odf::dataset::GetDatasetError::NotFound(_))
+        Err(odf::dataset::GetStoredDatasetError::NotFound(_))
     );
 }
 
@@ -267,13 +274,13 @@ impl DatasetEntryServiceHarness {
 
     fn add_get_all_datasets_expectation(
         mock_dataset_repository: &mut odf::dataset::MockDatasetStorageUnit,
-        dataset_handles: Vec<odf::DatasetHandle>,
+        dataset_ids: Vec<odf::DatasetID>,
     ) {
         mock_dataset_repository
-            .expect_stored_dataset_handles()
+            .expect_stored_dataset_ids()
             .times(1)
             .returning(move || {
-                let stream = futures::stream::iter(dataset_handles.clone().into_iter().map(Ok));
+                let stream = futures::stream::iter(dataset_ids.clone().into_iter().map(Ok));
                 Box::pin(stream)
             });
     }

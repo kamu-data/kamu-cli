@@ -110,10 +110,10 @@ impl DeleteDatasetUseCase for DeleteDatasetUseCaseImpl {
             .await
         {
             Ok(h) => Ok(h),
-            Err(odf::dataset::GetDatasetError::NotFound(e)) => {
+            Err(odf::dataset::GetStoredDatasetError::NotFound(e)) => {
                 Err(odf::dataset::DeleteDatasetError::NotFound(e))
             }
-            Err(odf::dataset::GetDatasetError::Internal(e)) => {
+            Err(odf::dataset::GetStoredDatasetError::Internal(e)) => {
                 Err(odf::dataset::DeleteDatasetError::Internal(e))
             }
         }?;
@@ -154,7 +154,7 @@ impl DeleteDatasetUseCase for DeleteDatasetUseCaseImpl {
 
         // Do actual delete
         self.dataset_storage_unit_writer
-            .delete_dataset(dataset_handle)
+            .delete_dataset(&dataset_handle.id)
             .await?;
 
         // Remove graph node

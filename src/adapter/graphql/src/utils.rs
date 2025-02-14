@@ -80,12 +80,12 @@ pub(crate) use unsafe_from_catalog_n;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn get_dataset(
+pub(crate) async fn get_dataset(
     ctx: &Context<'_>,
     dataset_handle: &odf::DatasetHandle,
 ) -> ResolvedDataset {
     let dataset_registry = from_catalog_n!(ctx, dyn DatasetRegistry);
-    dataset_registry.get_dataset_by_handle(dataset_handle)
+    dataset_registry.get_dataset_by_handle(dataset_handle).await
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

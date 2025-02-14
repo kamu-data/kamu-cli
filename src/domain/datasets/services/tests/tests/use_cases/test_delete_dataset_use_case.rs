@@ -67,7 +67,7 @@ async fn test_delete_dataset_success_via_ref() {
 
     assert_matches!(
         harness.check_dataset_exists(&alias_foo).await,
-        Err(odf::dataset::GetDatasetError::NotFound(_))
+        Err(odf::dataset::GetStoredDatasetError::NotFound(_))
     );
 }
 
@@ -110,7 +110,7 @@ async fn test_delete_dataset_success_via_handle() {
 
     assert_matches!(
         harness.check_dataset_exists(&alias_foo).await,
-        Err(odf::dataset::GetDatasetError::NotFound(_))
+        Err(odf::dataset::GetStoredDatasetError::NotFound(_))
     );
 }
 
@@ -215,7 +215,7 @@ async fn test_delete_dataset_respects_dangling_refs() {
     assert_matches!(harness.check_dataset_exists(&alias_foo).await, Ok(_));
     assert_matches!(
         harness.check_dataset_exists(&alias_bar).await,
-        Err(odf::dataset::GetDatasetError::NotFound(_))
+        Err(odf::dataset::GetStoredDatasetError::NotFound(_))
     );
 
     harness
@@ -230,11 +230,11 @@ async fn test_delete_dataset_respects_dangling_refs() {
 
     assert_matches!(
         harness.check_dataset_exists(&alias_foo).await,
-        Err(odf::dataset::GetDatasetError::NotFound(_))
+        Err(odf::dataset::GetStoredDatasetError::NotFound(_))
     );
     assert_matches!(
         harness.check_dataset_exists(&alias_bar).await,
-        Err(odf::dataset::GetDatasetError::NotFound(_))
+        Err(odf::dataset::GetStoredDatasetError::NotFound(_))
     );
 }
 

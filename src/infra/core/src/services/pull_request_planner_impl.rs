@@ -151,7 +151,7 @@ impl PullRequestPlannerImpl {
             }
         };
 
-        let target = self.dataset_registry.get_dataset_by_handle(&hdl);
+        let target = self.dataset_registry.get_dataset_by_handle(&hdl).await;
         match DataWriterMetadataState::build(target.clone(), &odf::BlockRef::Head, None).await {
             Ok(metadata_state) => Ok(PullIngestItem {
                 depth: pi.depth,
@@ -179,7 +179,7 @@ impl PullRequestPlannerImpl {
             }
         };
 
-        let target = self.dataset_registry.get_dataset_by_handle(&hdl);
+        let target = self.dataset_registry.get_dataset_by_handle(&hdl).await;
 
         match self
             .transform_request_planner
@@ -470,6 +470,7 @@ impl<'a> PullGraphDepthFirstTraversal<'a> {
             let summary = self
                 .dataset_registry
                 .get_dataset_by_handle(&local_handle)
+                .await
                 .get_summary(odf::dataset::GetSummaryOpts::default())
                 .await
                 .int_err()?;

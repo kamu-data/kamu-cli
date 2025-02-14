@@ -208,7 +208,7 @@ async fn test_smart_push_existing_dataset_unauthorized() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_smart_push_existing_name_collision() {
+async fn test_smart_push_existing_ref_collision() {
     let scenario = SmartPushExistingRefCollisionScenarion::prepare(
         ClientSideHarness::new(ClientSideHarnessOptions {
             tenancy_config: TenancyConfig::MultiTenant,
@@ -240,7 +240,7 @@ async fn test_smart_push_existing_name_collision() {
         let dataset_result = &push_result.first().unwrap().result;
         match dataset_result {
             Ok(_) => panic!(),
-            Err(e) => assert_matches!(e, PushError::SyncError(SyncError::NameCollision(_))),
+            Err(e) => assert_matches!(e, PushError::SyncError(SyncError::RefCollision(_))),
         }
     };
 

@@ -187,11 +187,11 @@ pub enum VerifyTransformPlanError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl From<odf::dataset::GetDatasetError> for VerifyTransformPlanError {
-    fn from(v: odf::dataset::GetDatasetError) -> Self {
+impl From<odf::dataset::GetStoredDatasetError> for VerifyTransformPlanError {
+    fn from(v: odf::dataset::GetStoredDatasetError) -> Self {
         match v {
-            odf::dataset::GetDatasetError::NotFound(e) => Self::DatasetNotFound(e),
-            odf::dataset::GetDatasetError::Internal(e) => Self::Internal(e),
+            odf::dataset::GetStoredDatasetError::NotFound(e) => Self::DatasetNotFound(e),
+            odf::dataset::GetStoredDatasetError::Internal(e) => Self::Internal(e),
         }
     }
 }

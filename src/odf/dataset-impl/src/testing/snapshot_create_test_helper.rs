@@ -45,7 +45,7 @@ pub async fn create_test_dataset_from_snapshot(
         Err(e) => {
             // Attempt to clean up dataset
             let _ = storage_unit_writer
-                .delete_dataset(&create_dataset_result.dataset_handle)
+                .delete_dataset(&create_dataset_result.dataset_handle.id)
                 .await;
             Err(e)
         }

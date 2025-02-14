@@ -298,7 +298,7 @@ pub async fn dataset_push_ws_upgrade_handler(
             .transactional_with(|dataset_registry: Arc<dyn DatasetRegistry>| async move {
                 match dataset_registry.get_dataset_by_ref(&dataset_ref).await {
                     Ok(resolved_dataset) => Ok(Some((*resolved_dataset).clone())),
-                    Err(odf::dataset::GetDatasetError::NotFound(_)) => {
+                    Err(odf::dataset::GetStoredDatasetError::NotFound(_)) => {
                         // Make sure account in dataset ref being created and token account match
                         let CurrentAccountSubject::Logged(acc) = current_account_subject.as_ref()
                         else {

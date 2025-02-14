@@ -161,6 +161,7 @@ async fn create_graph_remote(
 
     let tmp_dataset_registry = DatasetRegistrySoloUnitBridge::new(
         tmp_storage_unit.clone(),
+        Arc::new(CurrentAccountSubject::new_test()),
         Arc::new(TenancyConfig::SingleTenant),
     );
 

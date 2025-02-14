@@ -79,7 +79,7 @@ pub(crate) async fn ensure_expected_dataset_kind(
     let dataset_flow_type: kamu_flow_system::DatasetFlowType = dataset_flow_type.into();
     match dataset_flow_type.dataset_kind_restriction() {
         Some(expected_kind) => {
-            let resolved_dataset = utils::get_dataset(ctx, dataset_handle);
+            let resolved_dataset = utils::get_dataset(ctx, dataset_handle).await;
 
             let dataset_kind = resolved_dataset
                 .get_summary(odf::dataset::GetSummaryOpts::default())
@@ -110,7 +110,7 @@ pub(crate) async fn ensure_flow_preconditions(
     flow_run_configuration: Option<&FlowRunConfiguration>,
 ) -> Result<Option<FlowPreconditionsNotMet>> {
     let dataset_registry = from_catalog_n!(ctx, dyn DatasetRegistry);
-    let target = dataset_registry.get_dataset_by_handle(dataset_handle);
+    let target = dataset_registry.get_dataset_by_handle(dataset_handle).await;
 
     match dataset_flow_type {
         DatasetFlowType::Ingest => {

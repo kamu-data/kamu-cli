@@ -13,25 +13,23 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use dill::*;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
-use kamu_accounts::{CurrentAccountSubject, DEFAULT_ACCOUNT_NAME_STR};
+use kamu_accounts::CurrentAccountSubject;
 use kamu_core::TenancyConfig;
-use odf::dataset::{DatasetIDStream, DatasetImpl, DatasetLayout, MetadataChainImpl};
+use odf::dataset::{DatasetIDStream, DatasetImpl, MetadataChainImpl};
 use odf::storage::lfs::{NamedObjectRepositoryLocalFS, ObjectRepositoryLocalFSSha3};
 use odf::storage::{
     MetadataBlockRepositoryCachingInMem,
     MetadataBlockRepositoryImpl,
     ReferenceRepositoryImpl,
 };
-use odf::DatasetStorageUnit;
 use url::Url;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct DatasetStorageUnitLocalFs {
     root: PathBuf,
-    tenancy_config: Arc<TenancyConfig>,
     current_account_subject: Arc<CurrentAccountSubject>,
-    thrash_lock: tokio::sync::Mutex<()>,
+    tenancy_config: Arc<TenancyConfig>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -47,26 +45,26 @@ impl DatasetStorageUnitLocalFs {
             root,
             current_account_subject,
             tenancy_config,
-            thrash_lock: tokio::sync::Mutex::new(()),
         }
     }
 
-    // TODO: Used only for testing, but should be removed it in future to discourage
-    // file-based access
-    pub async fn get_dataset_layout(
+    // TODO: Public only for testing
+    pub fn get_dataset_layout(
         &self,
-        dataset_ref: &odf::DatasetRef,
-    ) -> Result<DatasetLayout, odf::dataset::GetDatasetError> {
-        use odf::DatasetStorageUnit;
-        let dataset_handle = self
-            .resolve_stored_dataset_handle_by_ref(dataset_ref)
-            .await?;
-        Ok(DatasetLayout::new(
-            self.get_dataset_path(&dataset_handle.id),
-        ))
+        dataset_id: &odf::DatasetID,
+    ) -> Result<odf::dataset::DatasetLayout, odf::dataset::GetStoredDatasetError> {
+        let dataset_path = self.get_dataset_path(dataset_id);
+        if !dataset_path.exists() {
+            return Err(odf::dataset::GetStoredDatasetError::NotFound(
+                odf::dataset::DatasetNotFoundError {
+                    dataset_ref: dataset_id.as_local_ref(),
+                },
+            ));
+        }
+        Ok(odf::dataset::DatasetLayout::new(dataset_path))
     }
 
-    fn build_dataset(layout: DatasetLayout) -> Arc<dyn odf::Dataset> {
+    fn build_dataset(layout: odf::dataset::DatasetLayout) -> Arc<dyn odf::Dataset> {
         Arc::new(DatasetImpl::new(
             MetadataChainImpl::new(
                 MetadataBlockRepositoryCachingInMem::new(MetadataBlockRepositoryImpl::new(
@@ -81,97 +79,9 @@ impl DatasetStorageUnitLocalFs {
         ))
     }
 
-    // TODO: PERF, avoid this
-    async fn resolve_dataset_by_alias(
-        &self,
-        alias: &odf::DatasetAlias,
-    ) -> Result<odf::DatasetHandle, ResolveDatasetError> {
-        let normalized_alias = self.normalize_alias(alias);
-
-        use futures::StreamExt;
-        let mut datasets = self.stored_dataset_handles();
-        while let Some(hdl) = datasets.next().await {
-            let hdl = hdl?;
-            if hdl.alias == normalized_alias {
-                return Ok(hdl);
-            }
-        }
-        Err(ResolveDatasetError::NotFound(
-            odf::dataset::DatasetNotFoundError {
-                dataset_ref: alias.as_local_ref(),
-            },
-        ))
-    }
-
-    async fn resolve_dataset_by_id(
-        &self,
-        dataset_id: &odf::DatasetID,
-    ) -> Result<odf::DatasetHandle, ResolveDatasetError> {
-        let dataset_path = self.get_dataset_path(dataset_id);
-        if !dataset_path.exists() {
-            return Err(ResolveDatasetError::NotFound(
-                odf::dataset::DatasetNotFoundError {
-                    dataset_ref: dataset_id.as_local_ref(),
-                },
-            ));
-        }
-        let dataset_layout = DatasetLayout::new(self.get_dataset_path(dataset_id));
-
-        let dataset = Self::build_dataset(dataset_layout);
-
-        let dataset_alias = match self.read_dataset_alias(dataset.as_ref()).await {
-            Ok(alias) => Ok(alias),
-            Err(err) => Err(err),
-        }
-        .int_err()?;
-
-        Ok(odf::DatasetHandle::new(dataset_id.clone(), dataset_alias))
-    }
-
-    fn normalize_alias(&self, alias: &odf::DatasetAlias) -> odf::DatasetAlias {
-        match self.tenancy_config.as_ref() {
-            TenancyConfig::SingleTenant => {
-                if alias.is_multi_tenant() {
-                    assert!(
-                        !alias.is_multi_tenant()
-                            || alias.account_name.as_ref().unwrap() == DEFAULT_ACCOUNT_NAME_STR,
-                        "Multi-tenant refs shouldn't have reached down to here with earlier \
-                         validations"
-                    );
-                }
-                alias.clone()
-            }
-            TenancyConfig::MultiTenant => {
-                if alias.is_multi_tenant() {
-                    alias.clone()
-                } else {
-                    match self.current_account_subject.as_ref() {
-                        CurrentAccountSubject::Anonymous(_) => {
-                            panic!("Anonymous account misused, use multi-tenant alias");
-                        }
-                        CurrentAccountSubject::Logged(l) => odf::DatasetAlias::new(
-                            Some(l.account_name.clone()),
-                            alias.dataset_name.clone(),
-                        ),
-                    }
-                }
-            }
-        }
-    }
-
     fn get_dataset_path(&self, dataset_id: &odf::DatasetID) -> PathBuf {
         self.root
             .join(dataset_id.as_multibase().to_stack_string().as_str())
-    }
-
-    async fn read_dataset_alias(
-        &self,
-        dataset: &dyn odf::Dataset,
-    ) -> Result<odf::DatasetAlias, odf::storage::GetNamedError> {
-        let bytes = dataset.as_info_repo().get("alias").await?;
-        let dataset_alias_str = std::str::from_utf8(&bytes[..]).int_err()?.trim();
-        let dataset_alias = odf::DatasetAlias::try_from(dataset_alias_str).int_err()?;
-        Ok(dataset_alias)
     }
 
     fn canonical_dataset_alias(&self, raw_alias: &odf::DatasetAlias) -> odf::DatasetAlias {
@@ -213,83 +123,13 @@ impl DatasetStorageUnitLocalFs {
 
 #[async_trait]
 impl odf::DatasetStorageUnit for DatasetStorageUnitLocalFs {
-    // TODO: PERF: Cache data and speed up lookups by ID
-    //
-    // TODO: CONCURRENCY: Since resolving ID to Name currently requires accessing
-    // all summaries multiple threads calling this function or iterating all
-    // datasets can result in significant thrashing. We use a lock here until we
-    // have a better solution.
-    //
-    // Note that this lock does not prevent concurrent updates to summaries, only
-    // reduces the chances of it.
-    async fn resolve_stored_dataset_handle_by_ref(
+    async fn get_stored_dataset_by_id(
         &self,
-        dataset_ref: &odf::DatasetRef,
-    ) -> Result<odf::DatasetHandle, odf::dataset::GetDatasetError> {
-        // Anti-thrashing lock (see comment above)
-        let _lock_guard = self.thrash_lock.lock().await;
-
-        match dataset_ref {
-            odf::DatasetRef::Handle(h) => Ok(h.clone()),
-            odf::DatasetRef::Alias(alias) => {
-                self.resolve_dataset_by_alias(alias)
-                    .await
-                    .map_err(|e| match e {
-                        ResolveDatasetError::Internal(e) => {
-                            odf::dataset::GetDatasetError::Internal(e)
-                        }
-                        ResolveDatasetError::NotFound(e) => {
-                            odf::dataset::GetDatasetError::NotFound(e)
-                        }
-                    })
-            }
-            odf::DatasetRef::ID(id) => self.resolve_dataset_by_id(id).await.map_err(|e| match e {
-                ResolveDatasetError::Internal(e) => odf::dataset::GetDatasetError::Internal(e),
-                ResolveDatasetError::NotFound(e) => odf::dataset::GetDatasetError::NotFound(e),
-            }),
-        }
-    }
-
-    // TODO: PERF: Resolving handles currently involves reading alias files
-    fn stored_dataset_handles(&self) -> odf::dataset::DatasetHandleStream<'_> {
-        Box::pin(async_stream::try_stream! {
-            // While creating a workspace, the directory has not yet been created
-            if !self.root.exists() {
-                return;
-            }
-
-            let read_dataset_dir = std::fs::read_dir(&self.root).int_err()?;
-
-            for r_dataset_dir in read_dataset_dir {
-                let dataset_dir_entry = r_dataset_dir.int_err()?;
-                if let Some(s) = dataset_dir_entry.file_name().to_str() {
-                    if s.starts_with('.') {
-                        continue;
-                    }
-                }
-
-                let dataset_id = odf::DatasetID::from_multibase_string(dataset_dir_entry.file_name().to_str().unwrap()).int_err()?;
-                let dataset_layout = DatasetLayout::new(dataset_dir_entry.path());
-
-                let dataset = Self::build_dataset(dataset_layout);
-
-                let dataset_alias = match self.read_dataset_alias(dataset.as_ref()).await {
-                    Ok(alias) => Ok(alias),
-                    Err(odf::storage::GetNamedError::NotFound(_)) => {
-                        continue;
-                    }
-                    Err(err) => Err(err),
-                }
-                .int_err()?;
-
-                yield odf::DatasetHandle::new(dataset_id, dataset_alias);
-            }
-        })
-    }
-
-    fn get_stored_dataset_by_id(&self, dataset_id: &odf::DatasetID) -> Arc<dyn odf::Dataset> {
-        let layout = DatasetLayout::new(self.get_dataset_path(dataset_id));
-        Self::build_dataset(layout)
+        dataset_id: &odf::DatasetID,
+    ) -> Result<Arc<dyn odf::Dataset>, odf::dataset::GetStoredDatasetError> {
+        let layout = self.get_dataset_layout(dataset_id)?;
+        let dataset = Self::build_dataset(layout);
+        Ok(dataset)
     }
 
     fn stored_dataset_ids(&self) -> DatasetIDStream<'_> {
@@ -326,34 +166,25 @@ impl odf::DatasetStorageUnitWriter for DatasetStorageUnitLocalFs {
         dataset_alias: &odf::DatasetAlias,
         seed_block: odf::MetadataBlockTyped<odf::metadata::Seed>,
     ) -> Result<odf::CreateDatasetResult, odf::dataset::CreateDatasetError> {
-        // Check if a dataset with the same alias can be resolved successfully
+        // Check if a dataset with the same ID can be resolved successfully
         use odf::DatasetStorageUnit;
-        let maybe_existing_dataset_handle = match self
-            .resolve_stored_dataset_handle_by_ref(&dataset_alias.as_local_ref())
+        let maybe_existing_dataset = match self
+            .get_stored_dataset_by_id(&seed_block.event.dataset_id)
             .await
         {
-            Ok(existing_handle) => Ok(Some(existing_handle)),
-            // ToDo temporary fix, remove it on favor of
-            // https://github.com/kamu-data/kamu-cli/issues/342
-            Err(odf::dataset::GetDatasetError::NotFound(_)) => match self
-                .resolve_stored_dataset_handle_by_ref(&(seed_block.event.dataset_id.clone().into()))
-                .await
-            {
-                Ok(existing_handle) => Ok(Some(existing_handle)),
-                Err(odf::dataset::GetDatasetError::NotFound(_)) => Ok(None),
-                Err(odf::dataset::GetDatasetError::Internal(e)) => Err(e),
-            },
-            Err(odf::dataset::GetDatasetError::Internal(e)) => Err(e),
+            Ok(existing_dataset) => Ok(Some(existing_dataset)),
+            Err(odf::dataset::GetStoredDatasetError::NotFound(_)) => Ok(None),
+            Err(odf::dataset::GetStoredDatasetError::Internal(e)) => {
+                Err(odf::dataset::CreateDatasetError::Internal(e))
+            }
         }?;
 
         // If so, there are 2 possibilities:
         // - Dataset was partially created before (no head yet) and was not GC'd - so we
         //   assume ownership
-        // - Dataset existed before (has valid head) - we should error out with name
+        // - Dataset existed before (has valid head) - we should error out with ref
         //   collision
-        if let Some(existing_dataset_handle) = maybe_existing_dataset_handle {
-            let existing_dataset = self.get_stored_dataset_by_id(&existing_dataset_handle.id);
-
+        if let Some(existing_dataset) = maybe_existing_dataset {
             match existing_dataset
                 .as_metadata_chain()
                 .resolve_ref(&odf::BlockRef::Head)
@@ -361,9 +192,9 @@ impl odf::DatasetStorageUnitWriter for DatasetStorageUnitLocalFs {
             {
                 // Existing head
                 Ok(_) => {
-                    return Err(odf::dataset::CreateDatasetError::NameCollision(
-                        odf::dataset::NameCollisionError {
-                            alias: dataset_alias.clone(),
+                    return Err(odf::dataset::CreateDatasetError::RefCollision(
+                        odf::dataset::RefCollisionError {
+                            id: seed_block.event.dataset_id.clone(),
                         },
                     ));
                 }
@@ -387,16 +218,12 @@ impl odf::DatasetStorageUnitWriter for DatasetStorageUnitLocalFs {
             self.canonical_dataset_alias(dataset_alias),
         );
 
+        // Create dataset
         let dataset_path = self.get_dataset_path(&dataset_handle.id);
-        let layout = DatasetLayout::create(&dataset_path).int_err()?;
+        let layout = odf::dataset::DatasetLayout::create(&dataset_path).int_err()?;
         let dataset = Self::build_dataset(layout);
 
-        // There are three possibilities at this point:
-        // - Dataset did not exist before - continue normally
-        // - Dataset was partially created before (no head yet) and was not GC'd - so we
-        //   assume ownership
-        // - Dataset existed before (has valid head) - we should error out with name
-        //   collision
+        // Set Head
         let head = match dataset
             .as_metadata_chain()
             .append(
@@ -411,20 +238,11 @@ impl odf::DatasetStorageUnitWriter for DatasetStorageUnitLocalFs {
             .await
         {
             Ok(head) => head,
-            Err(err) => {
-                return Err(match err {
-                    odf::dataset::AppendError::RefCASFailed(_) => {
-                        odf::dataset::CreateDatasetError::RefCollision(
-                            odf::dataset::RefCollisionError {
-                                id: dataset_handle.id,
-                            },
-                        )
-                    }
-                    _ => err.int_err().into(),
-                })
-            }
+            Err(err) => return Err(err.int_err().into()),
         };
 
+        // Save alias
+        // TODO: reconsuder if we need this
         self.save_dataset_alias(dataset.as_ref(), &dataset_handle.alias)
             .await?;
 
@@ -442,82 +260,57 @@ impl odf::DatasetStorageUnitWriter for DatasetStorageUnitLocalFs {
         })
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(%dataset_handle, %new_name))]
+    #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id, %new_name))]
     async fn rename_dataset(
         &self,
-        dataset_handle: &odf::DatasetHandle,
+        dataset_id: &odf::DatasetID,
         new_name: &odf::DatasetName,
     ) -> Result<(), odf::dataset::RenameDatasetError> {
-        let new_alias =
-            odf::DatasetAlias::new(dataset_handle.alias.account_name.clone(), new_name.clone());
-
-        // Note: should collision check be moved to use case level?
-        match self.resolve_dataset_by_alias(&new_alias).await {
-            Ok(_) => Err(odf::dataset::RenameDatasetError::NameCollision(
-                odf::dataset::NameCollisionError {
-                    alias: odf::DatasetAlias::new(
-                        dataset_handle.alias.account_name.clone(),
-                        new_name.clone(),
-                    ),
-                },
-            )),
-            Err(ResolveDatasetError::Internal(e)) => {
-                Err(odf::dataset::RenameDatasetError::Internal(e))
+        // Ensure dataset folder exists on disk
+        let layout = self.get_dataset_layout(dataset_id).map_err(|e| match e {
+            odf::dataset::GetStoredDatasetError::NotFound(e) => {
+                odf::dataset::RenameDatasetError::NotFound(e)
             }
-            Err(ResolveDatasetError::NotFound(_)) => Ok(()),
-        }?;
+            odf::dataset::GetStoredDatasetError::Internal(e) => {
+                odf::dataset::RenameDatasetError::Internal(e)
+            }
+        })?;
 
-        let dataset_path = self.get_dataset_path(&dataset_handle.id);
-        let layout = DatasetLayout::new(dataset_path);
+        // Build dataset pointing to disk location
         let dataset = DatasetStorageUnitLocalFs::build_dataset(layout);
 
+        // Read current alias
+        let current_alias = odf::dataset::read_dataset_alias(dataset.as_ref()).await?;
+
+        // Try writing updated alias
+        // TODO: reconsuder if we need this
         let new_alias =
-            odf::DatasetAlias::new(dataset_handle.alias.account_name.clone(), new_name.clone());
+            odf::DatasetAlias::new(current_alias.account_name.clone(), new_name.clone());
         self.save_dataset_alias(dataset.as_ref(), &new_alias)
             .await?;
 
         Ok(())
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(%dataset_handle))]
+    #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id))]
     async fn delete_dataset(
         &self,
-        dataset_handle: &odf::DatasetHandle,
+        dataset_id: &odf::DatasetID,
     ) -> Result<(), odf::dataset::DeleteDatasetError> {
-        // // Update repo info
-        // let mut repo_info = self.read_repo_info().await?;
-        // let index = repo_info
-        //     .datasets
-        //     .iter()
-        //     .position(|d| d.name == dataset_handle.name)
-        //     .ok_or("Inconsistent repository info")
-        //     .int_err()?;
-        // repo_info.datasets.remove(index);
-        // self.write_repo_info(repo_info).await?;
+        // Ensure dataset folder exists on disk
+        let layout = self.get_dataset_layout(dataset_id).map_err(|e| match e {
+            odf::dataset::GetStoredDatasetError::NotFound(e) => {
+                odf::dataset::DeleteDatasetError::NotFound(e)
+            }
+            odf::dataset::GetStoredDatasetError::Internal(e) => {
+                odf::dataset::DeleteDatasetError::Internal(e)
+            }
+        })?;
 
-        let dataset_dir = self.get_dataset_path(&dataset_handle.id);
-        tokio::fs::remove_dir_all(dataset_dir).await.int_err()?;
+        tokio::fs::remove_dir_all(layout.root_dir).await.int_err()?;
 
         Ok(())
     }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(thiserror::Error, Debug)]
-enum ResolveDatasetError {
-    #[error(transparent)]
-    NotFound(
-        #[from]
-        #[backtrace]
-        odf::dataset::DatasetNotFoundError,
-    ),
-    #[error(transparent)]
-    Internal(
-        #[from]
-        #[backtrace]
-        InternalError,
-    ),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

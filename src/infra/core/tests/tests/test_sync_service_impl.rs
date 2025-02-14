@@ -41,20 +41,13 @@ const FILE_DATA_ARRAY_SIZE: usize = 32;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-async fn assert_in_sync(
+fn assert_in_sync(
     dataset_repo_lhs: &DatasetStorageUnitLocalFs,
     dataset_repo_rhs: &DatasetStorageUnitLocalFs,
-    lhs: impl Into<odf::DatasetRef>,
-    rhs: impl Into<odf::DatasetRef>,
+    dataset_id: &odf::DatasetID,
 ) {
-    let lhs_layout = dataset_repo_lhs
-        .get_dataset_layout(&lhs.into())
-        .await
-        .unwrap();
-    let rhs_layout = dataset_repo_rhs
-        .get_dataset_layout(&rhs.into())
-        .await
-        .unwrap();
+    let lhs_layout = dataset_repo_lhs.get_dataset_layout(dataset_id).unwrap();
+    let rhs_layout = dataset_repo_rhs.get_dataset_layout(dataset_id).unwrap();
     DatasetTestHelper::assert_datasets_in_sync(&lhs_layout, &rhs_layout);
 }
 
@@ -247,10 +240,8 @@ async fn do_test_sync(
     assert_in_sync(
         &storage_unit_foo,
         &storage_unit_bar,
-        &dataset_alias_foo,
-        &dataset_alias_bar,
-    )
-    .await;
+        &created_foo.dataset_handle.id,
+    );
 
     // Subsequent sync ////////////////////////////////////////////////////////
     let _b2 = DatasetTestHelper::append_random_data(
@@ -333,10 +324,8 @@ async fn do_test_sync(
     assert_in_sync(
         &storage_unit_foo,
         &storage_unit_bar,
-        &dataset_alias_foo,
-        &dataset_alias_bar,
-    )
-    .await;
+        &created_foo.dataset_handle.id,
+    );
 
     // Up to date /////////////////////////////////////////////////////////////
     let sync_result = sync_svc_foo
@@ -368,10 +357,8 @@ async fn do_test_sync(
     assert_in_sync(
         &storage_unit_foo,
         &storage_unit_bar,
-        &dataset_alias_foo,
-        &dataset_alias_bar,
-    )
-    .await;
+        &created_foo.dataset_handle.id,
+    );
 
     // Datasets out-of-sync on push //////////////////////////////////////////////
 

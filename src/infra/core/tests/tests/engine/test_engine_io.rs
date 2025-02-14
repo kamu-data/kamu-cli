@@ -42,6 +42,7 @@ async fn test_engine_io_common<
 
     let dataset_registry = DatasetRegistrySoloUnitBridge::new(
         storage_unit.clone(),
+        Arc::new(CurrentAccountSubject::new_test()),
         Arc::new(TenancyConfig::SingleTenant),
     );
 
@@ -76,6 +77,7 @@ async fn test_engine_io_common<
     let transform_helper = TransformTestHelper::build(
         Arc::new(DatasetRegistrySoloUnitBridge::new(
             storage_unit.clone(),
+            Arc::new(CurrentAccountSubject::new_test()),
             Arc::new(TenancyConfig::SingleTenant),
         )),
         time_source.clone(),

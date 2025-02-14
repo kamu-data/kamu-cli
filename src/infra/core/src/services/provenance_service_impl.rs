@@ -46,7 +46,10 @@ impl ProvenanceServiceImpl {
             .check_action_allowed(&dataset_handle.id, auth::DatasetAction::Read)
             .await?;
 
-        let resolved_dataset = self.dataset_registry.get_dataset_by_handle(dataset_handle);
+        let resolved_dataset = self
+            .dataset_registry
+            .get_dataset_by_handle(dataset_handle)
+            .await;
 
         let summary = resolved_dataset
             .get_summary(odf::dataset::GetSummaryOpts::default())

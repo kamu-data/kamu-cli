@@ -67,7 +67,10 @@ impl ResetDatasetUseCase for ResetDatasetUseCaseImpl {
             .await?;
 
         // Resolve dataset
-        let target = self.dataset_registry.get_dataset_by_handle(dataset_handle);
+        let target = self
+            .dataset_registry
+            .get_dataset_by_handle(dataset_handle)
+            .await;
 
         // Make a plan
         let reset_plan = self
