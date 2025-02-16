@@ -252,12 +252,9 @@ endef
 
 .PHONY: codegen-odf-dtos
 codegen-odf-dtos:
-	python $(ODF_SPEC_DIR)/tools/jsonschema_to_rust_dtos.py $(ODF_SPEC_DIR)/schemas \
-		| rustfmt > $(ODF_METADATA_CRATE_DIR)/src/dtos/dtos_generated.rs
-	python $(ODF_SPEC_DIR)/tools/jsonschema_to_rust_dto_enum_flags.py $(ODF_SPEC_DIR)/schemas \
-		| rustfmt > $(ODF_METADATA_CRATE_DIR)/src/dtos/dtos_enum_flags_generated.rs
+	$(call odf_codegen, rust-dtos, $(ODF_METADATA_CRATE_DIR)/src/dtos/dtos_generated.rs)
 	$(call add_license_header, "$(ODF_METADATA_CRATE_DIR)/src/dtos/dtos_generated.rs")
-	$(call add_license_header, "$(ODF_METADATA_CRATE_DIR)/src/dtos/dtos_enum_flags_generated.rs")
+	rustfmt $(ODF_METADATA_CRATE_DIR)/src/dtos/dtos_generated.rs
 
 
 .PHONY: codegen-odf-flatbuffers-schema
@@ -273,12 +270,12 @@ codegen-odf-serde-flatbuffers:
 	mv $(ODF_METADATA_CRATE_DIR)/src/serde/flatbuffers/odf_generated.rs $(ODF_METADATA_CRATE_DIR)/src/serde/flatbuffers/proxies_generated.rs
 	$(call insert_text_into_beginning, "// Generated with flatc=$(shell flatc --version)", "$(ODF_METADATA_CRATE_DIR)/src/serde/flatbuffers/proxies_generated.rs")
 	$(call insert_text_into_beginning, "#![allow(clippy::all)]\n#![allow(clippy::pedantic)]", "$(ODF_METADATA_CRATE_DIR)/src/serde/flatbuffers/proxies_generated.rs")
-	rustfmt $(ODF_METADATA_CRATE_DIR)/src/serde/flatbuffers/proxies_generated.rs
 	$(call add_license_header, "$(ODF_METADATA_CRATE_DIR)/src/serde/flatbuffers/proxies_generated.rs")
+	rustfmt $(ODF_METADATA_CRATE_DIR)/src/serde/flatbuffers/proxies_generated.rs
 
-	python $(ODF_SPEC_DIR)/tools/jsonschema_to_rust_flatbuffers.py $(ODF_SPEC_DIR)/schemas \
-		| rustfmt > $(ODF_METADATA_CRATE_DIR)/src/serde/flatbuffers/convertors_generated.rs
+	$(call odf_codegen, rust-flatbuffers, $(ODF_METADATA_CRATE_DIR)/src/serde/flatbuffers/convertors_generated.rs)
 	$(call add_license_header, "$(ODF_METADATA_CRATE_DIR)/src/serde/flatbuffers/convertors_generated.rs")
+	rustfmt $(ODF_METADATA_CRATE_DIR)/src/serde/flatbuffers/convertors_generated.rs
 
 
 .PHONY: codegen-odf-serde-yaml

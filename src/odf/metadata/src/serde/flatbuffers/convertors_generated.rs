@@ -200,6 +200,11 @@ impl<'fb> FlatbuffersEnumDeserializable<'fb, fb::Attachments> for odf::Attachmen
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// AttachmentsEmbedded
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#attachmentsembedded-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 impl<'fb> FlatbuffersSerializable<'fb> for odf::AttachmentsEmbedded {
     type OffsetT = WIPOffset<fb::AttachmentsEmbedded<'fb>>;
 
@@ -503,6 +508,11 @@ impl<'fb> FlatbuffersEnumDeserializable<'fb, fb::EventTimeSource> for odf::Event
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// EventTimeSourceFromMetadata
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#eventtimesourcefrommetadata-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 impl<'fb> FlatbuffersSerializable<'fb> for odf::EventTimeSourceFromMetadata {
     type OffsetT = WIPOffset<fb::EventTimeSourceFromMetadata<'fb>>;
 
@@ -519,6 +529,11 @@ impl<'fb> FlatbuffersDeserializable<fb::EventTimeSourceFromMetadata<'fb>>
         odf::EventTimeSourceFromMetadata {}
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// EventTimeSourceFromPath
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#eventtimesourcefrompath-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl<'fb> FlatbuffersSerializable<'fb> for odf::EventTimeSourceFromPath {
     type OffsetT = WIPOffset<fb::EventTimeSourceFromPath<'fb>>;
@@ -543,6 +558,11 @@ impl<'fb> FlatbuffersDeserializable<fb::EventTimeSourceFromPath<'fb>>
         }
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// EventTimeSourceFromSystemTime
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#eventtimesourcefromsystemtime-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl<'fb> FlatbuffersSerializable<'fb> for odf::EventTimeSourceFromSystemTime {
     type OffsetT = WIPOffset<fb::EventTimeSourceFromSystemTime<'fb>>;
@@ -731,87 +751,10 @@ impl<'fb> FlatbuffersEnumDeserializable<'fb, fb::FetchStep> for odf::FetchStep {
     }
 }
 
-impl<'fb> FlatbuffersSerializable<'fb> for odf::FetchStepUrl {
-    type OffsetT = WIPOffset<fb::FetchStepUrl<'fb>>;
-
-    fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
-        let url_offset = { fb.create_string(&self.url) };
-        let event_time_offset = self.event_time.as_ref().map(|v| v.serialize(fb));
-        let cache_offset = self.cache.as_ref().map(|v| v.serialize(fb));
-        let headers_offset = self.headers.as_ref().map(|v| {
-            let offsets: Vec<_> = v.iter().map(|i| i.serialize(fb)).collect();
-            fb.create_vector(&offsets)
-        });
-        let mut builder = fb::FetchStepUrlBuilder::new(fb);
-        builder.add_url(url_offset);
-        event_time_offset.map(|(e, off)| {
-            builder.add_event_time_type(e);
-            builder.add_event_time(off)
-        });
-        cache_offset.map(|(e, off)| {
-            builder.add_cache_type(e);
-            builder.add_cache(off)
-        });
-        headers_offset.map(|off| builder.add_headers(off));
-        builder.finish()
-    }
-}
-
-impl<'fb> FlatbuffersDeserializable<fb::FetchStepUrl<'fb>> for odf::FetchStepUrl {
-    fn deserialize(proxy: fb::FetchStepUrl<'fb>) -> Self {
-        odf::FetchStepUrl {
-            url: proxy.url().map(|v| v.to_owned()).unwrap(),
-            event_time: proxy
-                .event_time()
-                .map(|v| odf::EventTimeSource::deserialize(v, proxy.event_time_type())),
-            cache: proxy
-                .cache()
-                .map(|v| odf::SourceCaching::deserialize(v, proxy.cache_type())),
-            headers: proxy.headers().map(|v| {
-                v.iter()
-                    .map(|i| odf::RequestHeader::deserialize(i))
-                    .collect()
-            }),
-        }
-    }
-}
-
-impl<'fb> FlatbuffersSerializable<'fb> for odf::FetchStepFilesGlob {
-    type OffsetT = WIPOffset<fb::FetchStepFilesGlob<'fb>>;
-
-    fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
-        let path_offset = { fb.create_string(&self.path) };
-        let event_time_offset = self.event_time.as_ref().map(|v| v.serialize(fb));
-        let cache_offset = self.cache.as_ref().map(|v| v.serialize(fb));
-        let mut builder = fb::FetchStepFilesGlobBuilder::new(fb);
-        builder.add_path(path_offset);
-        event_time_offset.map(|(e, off)| {
-            builder.add_event_time_type(e);
-            builder.add_event_time(off)
-        });
-        cache_offset.map(|(e, off)| {
-            builder.add_cache_type(e);
-            builder.add_cache(off)
-        });
-        self.order.map(|v| builder.add_order(v.into()));
-        builder.finish()
-    }
-}
-
-impl<'fb> FlatbuffersDeserializable<fb::FetchStepFilesGlob<'fb>> for odf::FetchStepFilesGlob {
-    fn deserialize(proxy: fb::FetchStepFilesGlob<'fb>) -> Self {
-        odf::FetchStepFilesGlob {
-            path: proxy.path().map(|v| v.to_owned()).unwrap(),
-            event_time: proxy
-                .event_time()
-                .map(|v| odf::EventTimeSource::deserialize(v, proxy.event_time_type())),
-            cache: proxy
-                .cache()
-                .map(|v| odf::SourceCaching::deserialize(v, proxy.cache_type())),
-            order: proxy.order().map(|v| v.into()),
-        }
-    }
-}
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// FetchStepContainer
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#fetchstepcontainer-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl<'fb> FlatbuffersSerializable<'fb> for odf::FetchStepContainer {
     type OffsetT = WIPOffset<fb::FetchStepContainer<'fb>>;
@@ -856,6 +799,85 @@ impl<'fb> FlatbuffersDeserializable<fb::FetchStepContainer<'fb>> for odf::FetchS
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// FetchStepEthereumLogs
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#fetchstepethereumlogs-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl<'fb> FlatbuffersSerializable<'fb> for odf::FetchStepEthereumLogs {
+    type OffsetT = WIPOffset<fb::FetchStepEthereumLogs<'fb>>;
+
+    fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
+        let node_url_offset = self.node_url.as_ref().map(|v| fb.create_string(&v));
+        let filter_offset = self.filter.as_ref().map(|v| fb.create_string(&v));
+        let signature_offset = self.signature.as_ref().map(|v| fb.create_string(&v));
+        let mut builder = fb::FetchStepEthereumLogsBuilder::new(fb);
+        self.chain_id.map(|v| builder.add_chain_id(v));
+        node_url_offset.map(|off| builder.add_node_url(off));
+        filter_offset.map(|off| builder.add_filter(off));
+        signature_offset.map(|off| builder.add_signature(off));
+        builder.finish()
+    }
+}
+
+impl<'fb> FlatbuffersDeserializable<fb::FetchStepEthereumLogs<'fb>> for odf::FetchStepEthereumLogs {
+    fn deserialize(proxy: fb::FetchStepEthereumLogs<'fb>) -> Self {
+        odf::FetchStepEthereumLogs {
+            chain_id: proxy.chain_id().map(|v| v),
+            node_url: proxy.node_url().map(|v| v.to_owned()),
+            filter: proxy.filter().map(|v| v.to_owned()),
+            signature: proxy.signature().map(|v| v.to_owned()),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// FetchStepFilesGlob
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#fetchstepfilesglob-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl<'fb> FlatbuffersSerializable<'fb> for odf::FetchStepFilesGlob {
+    type OffsetT = WIPOffset<fb::FetchStepFilesGlob<'fb>>;
+
+    fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
+        let path_offset = { fb.create_string(&self.path) };
+        let event_time_offset = self.event_time.as_ref().map(|v| v.serialize(fb));
+        let cache_offset = self.cache.as_ref().map(|v| v.serialize(fb));
+        let mut builder = fb::FetchStepFilesGlobBuilder::new(fb);
+        builder.add_path(path_offset);
+        event_time_offset.map(|(e, off)| {
+            builder.add_event_time_type(e);
+            builder.add_event_time(off)
+        });
+        cache_offset.map(|(e, off)| {
+            builder.add_cache_type(e);
+            builder.add_cache(off)
+        });
+        self.order.map(|v| builder.add_order(v.into()));
+        builder.finish()
+    }
+}
+
+impl<'fb> FlatbuffersDeserializable<fb::FetchStepFilesGlob<'fb>> for odf::FetchStepFilesGlob {
+    fn deserialize(proxy: fb::FetchStepFilesGlob<'fb>) -> Self {
+        odf::FetchStepFilesGlob {
+            path: proxy.path().map(|v| v.to_owned()).unwrap(),
+            event_time: proxy
+                .event_time()
+                .map(|v| odf::EventTimeSource::deserialize(v, proxy.event_time_type())),
+            cache: proxy
+                .cache()
+                .map(|v| odf::SourceCaching::deserialize(v, proxy.cache_type())),
+            order: proxy.order().map(|v| v.into()),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// FetchStepMqtt
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#fetchstepmqtt-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 impl<'fb> FlatbuffersSerializable<'fb> for odf::FetchStepMqtt {
     type OffsetT = WIPOffset<fb::FetchStepMqtt<'fb>>;
 
@@ -896,29 +918,52 @@ impl<'fb> FlatbuffersDeserializable<fb::FetchStepMqtt<'fb>> for odf::FetchStepMq
     }
 }
 
-impl<'fb> FlatbuffersSerializable<'fb> for odf::FetchStepEthereumLogs {
-    type OffsetT = WIPOffset<fb::FetchStepEthereumLogs<'fb>>;
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// FetchStepUrl
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#fetchstepurl-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl<'fb> FlatbuffersSerializable<'fb> for odf::FetchStepUrl {
+    type OffsetT = WIPOffset<fb::FetchStepUrl<'fb>>;
 
     fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
-        let node_url_offset = self.node_url.as_ref().map(|v| fb.create_string(&v));
-        let filter_offset = self.filter.as_ref().map(|v| fb.create_string(&v));
-        let signature_offset = self.signature.as_ref().map(|v| fb.create_string(&v));
-        let mut builder = fb::FetchStepEthereumLogsBuilder::new(fb);
-        self.chain_id.map(|v| builder.add_chain_id(v));
-        node_url_offset.map(|off| builder.add_node_url(off));
-        filter_offset.map(|off| builder.add_filter(off));
-        signature_offset.map(|off| builder.add_signature(off));
+        let url_offset = { fb.create_string(&self.url) };
+        let event_time_offset = self.event_time.as_ref().map(|v| v.serialize(fb));
+        let cache_offset = self.cache.as_ref().map(|v| v.serialize(fb));
+        let headers_offset = self.headers.as_ref().map(|v| {
+            let offsets: Vec<_> = v.iter().map(|i| i.serialize(fb)).collect();
+            fb.create_vector(&offsets)
+        });
+        let mut builder = fb::FetchStepUrlBuilder::new(fb);
+        builder.add_url(url_offset);
+        event_time_offset.map(|(e, off)| {
+            builder.add_event_time_type(e);
+            builder.add_event_time(off)
+        });
+        cache_offset.map(|(e, off)| {
+            builder.add_cache_type(e);
+            builder.add_cache(off)
+        });
+        headers_offset.map(|off| builder.add_headers(off));
         builder.finish()
     }
 }
 
-impl<'fb> FlatbuffersDeserializable<fb::FetchStepEthereumLogs<'fb>> for odf::FetchStepEthereumLogs {
-    fn deserialize(proxy: fb::FetchStepEthereumLogs<'fb>) -> Self {
-        odf::FetchStepEthereumLogs {
-            chain_id: proxy.chain_id().map(|v| v),
-            node_url: proxy.node_url().map(|v| v.to_owned()),
-            filter: proxy.filter().map(|v| v.to_owned()),
-            signature: proxy.signature().map(|v| v.to_owned()),
+impl<'fb> FlatbuffersDeserializable<fb::FetchStepUrl<'fb>> for odf::FetchStepUrl {
+    fn deserialize(proxy: fb::FetchStepUrl<'fb>) -> Self {
+        odf::FetchStepUrl {
+            url: proxy.url().map(|v| v.to_owned()).unwrap(),
+            event_time: proxy
+                .event_time()
+                .map(|v| odf::EventTimeSource::deserialize(v, proxy.event_time_type())),
+            cache: proxy
+                .cache()
+                .map(|v| odf::SourceCaching::deserialize(v, proxy.cache_type())),
+            headers: proxy.headers().map(|v| {
+                v.iter()
+                    .map(|i| odf::RequestHeader::deserialize(i))
+                    .collect()
+            }),
         }
     }
 }
@@ -973,6 +1018,11 @@ impl<'fb> FlatbuffersEnumDeserializable<'fb, fb::MergeStrategy> for odf::MergeSt
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// MergeStrategyAppend
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#mergestrategyappend-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 impl<'fb> FlatbuffersSerializable<'fb> for odf::MergeStrategyAppend {
     type OffsetT = WIPOffset<fb::MergeStrategyAppend<'fb>>;
 
@@ -987,6 +1037,11 @@ impl<'fb> FlatbuffersDeserializable<fb::MergeStrategyAppend<'fb>> for odf::Merge
         odf::MergeStrategyAppend {}
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// MergeStrategyLedger
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#mergestrategyledger-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl<'fb> FlatbuffersSerializable<'fb> for odf::MergeStrategyLedger {
     type OffsetT = WIPOffset<fb::MergeStrategyLedger<'fb>>;
@@ -1016,6 +1071,11 @@ impl<'fb> FlatbuffersDeserializable<fb::MergeStrategyLedger<'fb>> for odf::Merge
         }
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// MergeStrategySnapshot
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#mergestrategysnapshot-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl<'fb> FlatbuffersSerializable<'fb> for odf::MergeStrategySnapshot {
     type OffsetT = WIPOffset<fb::MergeStrategySnapshot<'fb>>;
@@ -1346,6 +1406,11 @@ impl<'fb> FlatbuffersEnumDeserializable<'fb, fb::PrepStep> for odf::PrepStep {
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// PrepStepDecompress
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#prepstepdecompress-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 impl<'fb> FlatbuffersSerializable<'fb> for odf::PrepStepDecompress {
     type OffsetT = WIPOffset<fb::PrepStepDecompress<'fb>>;
 
@@ -1366,6 +1431,11 @@ impl<'fb> FlatbuffersDeserializable<fb::PrepStepDecompress<'fb>> for odf::PrepSt
         }
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// PrepStepPipe
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#prepsteppipe-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl<'fb> FlatbuffersSerializable<'fb> for odf::PrepStepPipe {
     type OffsetT = WIPOffset<fb::PrepStepPipe<'fb>>;
@@ -1497,42 +1567,39 @@ impl<'fb> FlatbuffersEnumDeserializable<'fb, fb::RawQueryResponse> for odf::RawQ
     }
 }
 
-impl<'fb> FlatbuffersSerializable<'fb> for odf::RawQueryResponseProgress {
-    type OffsetT = WIPOffset<fb::RawQueryResponseProgress<'fb>>;
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// RawQueryResponseInternalError
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#rawqueryresponseinternalerror-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl<'fb> FlatbuffersSerializable<'fb> for odf::RawQueryResponseInternalError {
+    type OffsetT = WIPOffset<fb::RawQueryResponseInternalError<'fb>>;
 
     fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
-        let mut builder = fb::RawQueryResponseProgressBuilder::new(fb);
+        let message_offset = { fb.create_string(&self.message) };
+        let backtrace_offset = self.backtrace.as_ref().map(|v| fb.create_string(&v));
+        let mut builder = fb::RawQueryResponseInternalErrorBuilder::new(fb);
+        builder.add_message(message_offset);
+        backtrace_offset.map(|off| builder.add_backtrace(off));
         builder.finish()
     }
 }
 
-impl<'fb> FlatbuffersDeserializable<fb::RawQueryResponseProgress<'fb>>
-    for odf::RawQueryResponseProgress
+impl<'fb> FlatbuffersDeserializable<fb::RawQueryResponseInternalError<'fb>>
+    for odf::RawQueryResponseInternalError
 {
-    fn deserialize(proxy: fb::RawQueryResponseProgress<'fb>) -> Self {
-        odf::RawQueryResponseProgress {}
-    }
-}
-
-impl<'fb> FlatbuffersSerializable<'fb> for odf::RawQueryResponseSuccess {
-    type OffsetT = WIPOffset<fb::RawQueryResponseSuccess<'fb>>;
-
-    fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
-        let mut builder = fb::RawQueryResponseSuccessBuilder::new(fb);
-        builder.add_num_records(self.num_records);
-        builder.finish()
-    }
-}
-
-impl<'fb> FlatbuffersDeserializable<fb::RawQueryResponseSuccess<'fb>>
-    for odf::RawQueryResponseSuccess
-{
-    fn deserialize(proxy: fb::RawQueryResponseSuccess<'fb>) -> Self {
-        odf::RawQueryResponseSuccess {
-            num_records: proxy.num_records(),
+    fn deserialize(proxy: fb::RawQueryResponseInternalError<'fb>) -> Self {
+        odf::RawQueryResponseInternalError {
+            message: proxy.message().map(|v| v.to_owned()).unwrap(),
+            backtrace: proxy.backtrace().map(|v| v.to_owned()),
         }
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// RawQueryResponseInvalidQuery
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#rawqueryresponseinvalidquery-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl<'fb> FlatbuffersSerializable<'fb> for odf::RawQueryResponseInvalidQuery {
     type OffsetT = WIPOffset<fb::RawQueryResponseInvalidQuery<'fb>>;
@@ -1555,26 +1622,49 @@ impl<'fb> FlatbuffersDeserializable<fb::RawQueryResponseInvalidQuery<'fb>>
     }
 }
 
-impl<'fb> FlatbuffersSerializable<'fb> for odf::RawQueryResponseInternalError {
-    type OffsetT = WIPOffset<fb::RawQueryResponseInternalError<'fb>>;
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// RawQueryResponseProgress
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#rawqueryresponseprogress-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl<'fb> FlatbuffersSerializable<'fb> for odf::RawQueryResponseProgress {
+    type OffsetT = WIPOffset<fb::RawQueryResponseProgress<'fb>>;
 
     fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
-        let message_offset = { fb.create_string(&self.message) };
-        let backtrace_offset = self.backtrace.as_ref().map(|v| fb.create_string(&v));
-        let mut builder = fb::RawQueryResponseInternalErrorBuilder::new(fb);
-        builder.add_message(message_offset);
-        backtrace_offset.map(|off| builder.add_backtrace(off));
+        let mut builder = fb::RawQueryResponseProgressBuilder::new(fb);
         builder.finish()
     }
 }
 
-impl<'fb> FlatbuffersDeserializable<fb::RawQueryResponseInternalError<'fb>>
-    for odf::RawQueryResponseInternalError
+impl<'fb> FlatbuffersDeserializable<fb::RawQueryResponseProgress<'fb>>
+    for odf::RawQueryResponseProgress
 {
-    fn deserialize(proxy: fb::RawQueryResponseInternalError<'fb>) -> Self {
-        odf::RawQueryResponseInternalError {
-            message: proxy.message().map(|v| v.to_owned()).unwrap(),
-            backtrace: proxy.backtrace().map(|v| v.to_owned()),
+    fn deserialize(proxy: fb::RawQueryResponseProgress<'fb>) -> Self {
+        odf::RawQueryResponseProgress {}
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// RawQueryResponseSuccess
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#rawqueryresponsesuccess-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl<'fb> FlatbuffersSerializable<'fb> for odf::RawQueryResponseSuccess {
+    type OffsetT = WIPOffset<fb::RawQueryResponseSuccess<'fb>>;
+
+    fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
+        let mut builder = fb::RawQueryResponseSuccessBuilder::new(fb);
+        builder.add_num_records(self.num_records);
+        builder.finish()
+    }
+}
+
+impl<'fb> FlatbuffersDeserializable<fb::RawQueryResponseSuccess<'fb>>
+    for odf::RawQueryResponseSuccess
+{
+    fn deserialize(proxy: fb::RawQueryResponseSuccess<'fb>) -> Self {
+        odf::RawQueryResponseSuccess {
+            num_records: proxy.num_records(),
         }
     }
 }
@@ -1661,6 +1751,11 @@ impl<'fb> FlatbuffersEnumDeserializable<'fb, fb::ReadStep> for odf::ReadStep {
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// ReadStepCsv
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstepcsv-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 impl<'fb> FlatbuffersSerializable<'fb> for odf::ReadStepCsv {
     type OffsetT = WIPOffset<fb::ReadStepCsv<'fb>>;
 
@@ -1710,29 +1805,10 @@ impl<'fb> FlatbuffersDeserializable<fb::ReadStepCsv<'fb>> for odf::ReadStepCsv {
     }
 }
 
-impl<'fb> FlatbuffersSerializable<'fb> for odf::ReadStepGeoJson {
-    type OffsetT = WIPOffset<fb::ReadStepGeoJson<'fb>>;
-
-    fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
-        let schema_offset = self.schema.as_ref().map(|v| {
-            let offsets: Vec<_> = v.iter().map(|i| fb.create_string(&i)).collect();
-            fb.create_vector(&offsets)
-        });
-        let mut builder = fb::ReadStepGeoJsonBuilder::new(fb);
-        schema_offset.map(|off| builder.add_schema(off));
-        builder.finish()
-    }
-}
-
-impl<'fb> FlatbuffersDeserializable<fb::ReadStepGeoJson<'fb>> for odf::ReadStepGeoJson {
-    fn deserialize(proxy: fb::ReadStepGeoJson<'fb>) -> Self {
-        odf::ReadStepGeoJson {
-            schema: proxy
-                .schema()
-                .map(|v| v.iter().map(|i| i.to_owned()).collect()),
-        }
-    }
-}
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// ReadStepEsriShapefile
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstepesrishapefile-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl<'fb> FlatbuffersSerializable<'fb> for odf::ReadStepEsriShapefile {
     type OffsetT = WIPOffset<fb::ReadStepEsriShapefile<'fb>>;
@@ -1761,29 +1837,39 @@ impl<'fb> FlatbuffersDeserializable<fb::ReadStepEsriShapefile<'fb>> for odf::Rea
     }
 }
 
-impl<'fb> FlatbuffersSerializable<'fb> for odf::ReadStepParquet {
-    type OffsetT = WIPOffset<fb::ReadStepParquet<'fb>>;
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// ReadStepGeoJson
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstepgeojson-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl<'fb> FlatbuffersSerializable<'fb> for odf::ReadStepGeoJson {
+    type OffsetT = WIPOffset<fb::ReadStepGeoJson<'fb>>;
 
     fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
         let schema_offset = self.schema.as_ref().map(|v| {
             let offsets: Vec<_> = v.iter().map(|i| fb.create_string(&i)).collect();
             fb.create_vector(&offsets)
         });
-        let mut builder = fb::ReadStepParquetBuilder::new(fb);
+        let mut builder = fb::ReadStepGeoJsonBuilder::new(fb);
         schema_offset.map(|off| builder.add_schema(off));
         builder.finish()
     }
 }
 
-impl<'fb> FlatbuffersDeserializable<fb::ReadStepParquet<'fb>> for odf::ReadStepParquet {
-    fn deserialize(proxy: fb::ReadStepParquet<'fb>) -> Self {
-        odf::ReadStepParquet {
+impl<'fb> FlatbuffersDeserializable<fb::ReadStepGeoJson<'fb>> for odf::ReadStepGeoJson {
+    fn deserialize(proxy: fb::ReadStepGeoJson<'fb>) -> Self {
+        odf::ReadStepGeoJson {
             schema: proxy
                 .schema()
                 .map(|v| v.iter().map(|i| i.to_owned()).collect()),
         }
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// ReadStepJson
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstepjson-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl<'fb> FlatbuffersSerializable<'fb> for odf::ReadStepJson {
     type OffsetT = WIPOffset<fb::ReadStepJson<'fb>>;
@@ -1821,6 +1907,40 @@ impl<'fb> FlatbuffersDeserializable<fb::ReadStepJson<'fb>> for odf::ReadStepJson
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// ReadStepNdGeoJson
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstepndgeojson-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl<'fb> FlatbuffersSerializable<'fb> for odf::ReadStepNdGeoJson {
+    type OffsetT = WIPOffset<fb::ReadStepNdGeoJson<'fb>>;
+
+    fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
+        let schema_offset = self.schema.as_ref().map(|v| {
+            let offsets: Vec<_> = v.iter().map(|i| fb.create_string(&i)).collect();
+            fb.create_vector(&offsets)
+        });
+        let mut builder = fb::ReadStepNdGeoJsonBuilder::new(fb);
+        schema_offset.map(|off| builder.add_schema(off));
+        builder.finish()
+    }
+}
+
+impl<'fb> FlatbuffersDeserializable<fb::ReadStepNdGeoJson<'fb>> for odf::ReadStepNdGeoJson {
+    fn deserialize(proxy: fb::ReadStepNdGeoJson<'fb>) -> Self {
+        odf::ReadStepNdGeoJson {
+            schema: proxy
+                .schema()
+                .map(|v| v.iter().map(|i| i.to_owned()).collect()),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// ReadStepNdJson
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstepndjson-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 impl<'fb> FlatbuffersSerializable<'fb> for odf::ReadStepNdJson {
     type OffsetT = WIPOffset<fb::ReadStepNdJson<'fb>>;
 
@@ -1854,23 +1974,28 @@ impl<'fb> FlatbuffersDeserializable<fb::ReadStepNdJson<'fb>> for odf::ReadStepNd
     }
 }
 
-impl<'fb> FlatbuffersSerializable<'fb> for odf::ReadStepNdGeoJson {
-    type OffsetT = WIPOffset<fb::ReadStepNdGeoJson<'fb>>;
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// ReadStepParquet
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstepparquet-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl<'fb> FlatbuffersSerializable<'fb> for odf::ReadStepParquet {
+    type OffsetT = WIPOffset<fb::ReadStepParquet<'fb>>;
 
     fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
         let schema_offset = self.schema.as_ref().map(|v| {
             let offsets: Vec<_> = v.iter().map(|i| fb.create_string(&i)).collect();
             fb.create_vector(&offsets)
         });
-        let mut builder = fb::ReadStepNdGeoJsonBuilder::new(fb);
+        let mut builder = fb::ReadStepParquetBuilder::new(fb);
         schema_offset.map(|off| builder.add_schema(off));
         builder.finish()
     }
 }
 
-impl<'fb> FlatbuffersDeserializable<fb::ReadStepNdGeoJson<'fb>> for odf::ReadStepNdGeoJson {
-    fn deserialize(proxy: fb::ReadStepNdGeoJson<'fb>) -> Self {
-        odf::ReadStepNdGeoJson {
+impl<'fb> FlatbuffersDeserializable<fb::ReadStepParquet<'fb>> for odf::ReadStepParquet {
+    fn deserialize(proxy: fb::ReadStepParquet<'fb>) -> Self {
+        odf::ReadStepParquet {
             schema: proxy
                 .schema()
                 .map(|v| v.iter().map(|i| i.to_owned()).collect()),
@@ -2235,6 +2360,11 @@ impl<'fb> FlatbuffersEnumDeserializable<'fb, fb::SourceCaching> for odf::SourceC
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// SourceCachingForever
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#sourcecachingforever-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 impl<'fb> FlatbuffersSerializable<'fb> for odf::SourceCachingForever {
     type OffsetT = WIPOffset<fb::SourceCachingForever<'fb>>;
 
@@ -2399,6 +2529,11 @@ impl<'fb> FlatbuffersEnumDeserializable<'fb, fb::Transform> for odf::Transform {
         }
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// TransformSql
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#transformsql-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl<'fb> FlatbuffersSerializable<'fb> for odf::TransformSql {
     type OffsetT = WIPOffset<fb::TransformSql<'fb>>;
@@ -2693,6 +2828,66 @@ impl<'fb> FlatbuffersEnumDeserializable<'fb, fb::TransformResponse> for odf::Tra
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// TransformResponseInternalError
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#transformresponseinternalerror-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl<'fb> FlatbuffersSerializable<'fb> for odf::TransformResponseInternalError {
+    type OffsetT = WIPOffset<fb::TransformResponseInternalError<'fb>>;
+
+    fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
+        let message_offset = { fb.create_string(&self.message) };
+        let backtrace_offset = self.backtrace.as_ref().map(|v| fb.create_string(&v));
+        let mut builder = fb::TransformResponseInternalErrorBuilder::new(fb);
+        builder.add_message(message_offset);
+        backtrace_offset.map(|off| builder.add_backtrace(off));
+        builder.finish()
+    }
+}
+
+impl<'fb> FlatbuffersDeserializable<fb::TransformResponseInternalError<'fb>>
+    for odf::TransformResponseInternalError
+{
+    fn deserialize(proxy: fb::TransformResponseInternalError<'fb>) -> Self {
+        odf::TransformResponseInternalError {
+            message: proxy.message().map(|v| v.to_owned()).unwrap(),
+            backtrace: proxy.backtrace().map(|v| v.to_owned()),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// TransformResponseInvalidQuery
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#transformresponseinvalidquery-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl<'fb> FlatbuffersSerializable<'fb> for odf::TransformResponseInvalidQuery {
+    type OffsetT = WIPOffset<fb::TransformResponseInvalidQuery<'fb>>;
+
+    fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
+        let message_offset = { fb.create_string(&self.message) };
+        let mut builder = fb::TransformResponseInvalidQueryBuilder::new(fb);
+        builder.add_message(message_offset);
+        builder.finish()
+    }
+}
+
+impl<'fb> FlatbuffersDeserializable<fb::TransformResponseInvalidQuery<'fb>>
+    for odf::TransformResponseInvalidQuery
+{
+    fn deserialize(proxy: fb::TransformResponseInvalidQuery<'fb>) -> Self {
+        odf::TransformResponseInvalidQuery {
+            message: proxy.message().map(|v| v.to_owned()).unwrap(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// TransformResponseProgress
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#transformresponseprogress-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 impl<'fb> FlatbuffersSerializable<'fb> for odf::TransformResponseProgress {
     type OffsetT = WIPOffset<fb::TransformResponseProgress<'fb>>;
 
@@ -2709,6 +2904,11 @@ impl<'fb> FlatbuffersDeserializable<fb::TransformResponseProgress<'fb>>
         odf::TransformResponseProgress {}
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// TransformResponseSuccess
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#transformresponsesuccess-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl<'fb> FlatbuffersSerializable<'fb> for odf::TransformResponseSuccess {
     type OffsetT = WIPOffset<fb::TransformResponseSuccess<'fb>>;
@@ -2732,51 +2932,6 @@ impl<'fb> FlatbuffersDeserializable<fb::TransformResponseSuccess<'fb>>
                 .new_offset_interval()
                 .map(|v| odf::OffsetInterval::deserialize(v)),
             new_watermark: proxy.new_watermark().map(|v| fb_to_datetime(v)),
-        }
-    }
-}
-
-impl<'fb> FlatbuffersSerializable<'fb> for odf::TransformResponseInvalidQuery {
-    type OffsetT = WIPOffset<fb::TransformResponseInvalidQuery<'fb>>;
-
-    fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
-        let message_offset = { fb.create_string(&self.message) };
-        let mut builder = fb::TransformResponseInvalidQueryBuilder::new(fb);
-        builder.add_message(message_offset);
-        builder.finish()
-    }
-}
-
-impl<'fb> FlatbuffersDeserializable<fb::TransformResponseInvalidQuery<'fb>>
-    for odf::TransformResponseInvalidQuery
-{
-    fn deserialize(proxy: fb::TransformResponseInvalidQuery<'fb>) -> Self {
-        odf::TransformResponseInvalidQuery {
-            message: proxy.message().map(|v| v.to_owned()).unwrap(),
-        }
-    }
-}
-
-impl<'fb> FlatbuffersSerializable<'fb> for odf::TransformResponseInternalError {
-    type OffsetT = WIPOffset<fb::TransformResponseInternalError<'fb>>;
-
-    fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
-        let message_offset = { fb.create_string(&self.message) };
-        let backtrace_offset = self.backtrace.as_ref().map(|v| fb.create_string(&v));
-        let mut builder = fb::TransformResponseInternalErrorBuilder::new(fb);
-        builder.add_message(message_offset);
-        backtrace_offset.map(|off| builder.add_backtrace(off));
-        builder.finish()
-    }
-}
-
-impl<'fb> FlatbuffersDeserializable<fb::TransformResponseInternalError<'fb>>
-    for odf::TransformResponseInternalError
-{
-    fn deserialize(proxy: fb::TransformResponseInternalError<'fb>) -> Self {
-        odf::TransformResponseInternalError {
-            message: proxy.message().map(|v| v.to_owned()).unwrap(),
-            backtrace: proxy.backtrace().map(|v| v.to_owned()),
         }
     }
 }
