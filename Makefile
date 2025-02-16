@@ -273,16 +273,16 @@ codegen-odf-serde-flatbuffers:
 	$(call add_license_header, "$(ODF_METADATA_CRATE_DIR)/src/serde/flatbuffers/proxies_generated.rs")
 	rustfmt $(ODF_METADATA_CRATE_DIR)/src/serde/flatbuffers/proxies_generated.rs
 
-	$(call odf_codegen, rust-flatbuffers, $(ODF_METADATA_CRATE_DIR)/src/serde/flatbuffers/convertors_generated.rs)
+	$(call odf_codegen, rust-serde-flatbuffers, $(ODF_METADATA_CRATE_DIR)/src/serde/flatbuffers/convertors_generated.rs)
 	$(call add_license_header, "$(ODF_METADATA_CRATE_DIR)/src/serde/flatbuffers/convertors_generated.rs")
 	rustfmt $(ODF_METADATA_CRATE_DIR)/src/serde/flatbuffers/convertors_generated.rs
 
 
 .PHONY: codegen-odf-serde-yaml
 codegen-odf-serde-yaml:
-	python $(ODF_SPEC_DIR)/tools/jsonschema_to_rust_serde_yaml.py $(ODF_SPEC_DIR)/schemas \
-		| rustfmt > $(ODF_METADATA_CRATE_DIR)/src/serde/yaml/derivations_generated.rs
+	$(call odf_codegen, rust-serde, $(ODF_METADATA_CRATE_DIR)/src/serde/yaml/derivations_generated.rs)
 	$(call add_license_header, "$(ODF_METADATA_CRATE_DIR)/src/serde/yaml/derivations_generated.rs")
+	rustfmt $(ODF_METADATA_CRATE_DIR)/src/serde/yaml/derivations_generated.rs
 
 
 # Requires `protobuf`, `protoc-gen-prost`, `protoc-gen-tonic` packages
@@ -309,9 +309,9 @@ codegen-engine-tonic:
 
 .PHONY: codegen-graphql
 codegen-graphql:
-	python $(ODF_SPEC_DIR)/tools/jsonschema_to_rust_gql.py $(ODF_SPEC_DIR)/schemas \
-		| rustfmt > src/adapter/graphql/src/scalars/odf_generated.rs
+	$(call odf_codegen, rust-graphql, src/adapter/graphql/src/scalars/odf_generated.rs)
 	$(call add_license_header, "src/adapter/graphql/src/scalars/odf_generated.rs")
+	rustfmt src/adapter/graphql/src/scalars/odf_generated.rs
 
 
 .PHONY: codegen
