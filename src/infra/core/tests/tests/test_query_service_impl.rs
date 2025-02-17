@@ -422,7 +422,7 @@ async fn test_dataset_tail_empty_dataset() {
         .create_dataset(
             &"foo".try_into().unwrap(),
             odf::dataset::make_seed_block(
-                did_generator.generate_dataset_id(),
+                did_generator.generate_dataset_id().0,
                 odf::DatasetKind::Root,
                 time_source.now(),
             ),

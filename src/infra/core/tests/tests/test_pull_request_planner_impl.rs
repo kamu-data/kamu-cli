@@ -27,7 +27,7 @@ use kamu_datasets_services::{
     MockDependencyGraphWriter,
 };
 use messaging_outbox::DummyOutboxImpl;
-use odf::dataset::testing::create_test_dataset_fron_snapshot;
+use odf::dataset::testing::create_test_dataset_from_snapshot;
 use odf::dataset::{DatasetFactoryImpl, IpfsGateway};
 use odf::metadata::testing::MetadataFactory;
 
@@ -110,7 +110,7 @@ async fn create_graph(
     datasets: Vec<(odf::DatasetAlias, Vec<odf::DatasetAlias>)>,
 ) {
     for (dataset_alias, deps) in datasets {
-        create_test_dataset_fron_snapshot(
+        create_test_dataset_from_snapshot(
             dataset_registry,
             dataset_storage_unit,
             MetadataFactory::dataset_snapshot()

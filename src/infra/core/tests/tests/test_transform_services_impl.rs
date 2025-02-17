@@ -18,7 +18,7 @@ use kamu::domain::engine::*;
 use kamu::domain::*;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
-use odf::dataset::testing::create_test_dataset_fron_snapshot;
+use odf::dataset::testing::create_test_dataset_from_snapshot;
 use odf::metadata::testing::MetadataFactory;
 use tempfile::TempDir;
 use time_source::{SystemTimeSource, SystemTimeSourceDefault};
@@ -104,11 +104,11 @@ impl TransformTestHarness {
             .push_event(MetadataFactory::set_data_schema().build())
             .build();
 
-        create_test_dataset_fron_snapshot(
+        create_test_dataset_from_snapshot(
             self.dataset_registry.as_ref(),
             self.dataset_storage_unit_writer.as_ref(),
             snapshot,
-            self.did_generator.generate_dataset_id(),
+            self.did_generator.generate_dataset_id().0,
             self.system_time_source.now(),
         )
         .await
@@ -131,11 +131,11 @@ impl TransformTestHarness {
             .push_event(MetadataFactory::set_data_schema().build())
             .build();
 
-        let create_result = create_test_dataset_fron_snapshot(
+        let create_result = create_test_dataset_from_snapshot(
             self.dataset_registry.as_ref(),
             self.dataset_storage_unit_writer.as_ref(),
             snapshot,
-            self.did_generator.generate_dataset_id(),
+            self.did_generator.generate_dataset_id().0,
             self.system_time_source.now(),
         )
         .await
@@ -682,7 +682,7 @@ async fn test_transform_with_compaction_retry() {
     );
     let root_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
 
-    let foo_created_result = create_test_dataset_fron_snapshot(
+    let foo_created_result = create_test_dataset_from_snapshot(
         harness.dataset_registry.as_ref(),
         harness.dataset_storage_unit_writer.as_ref(),
         MetadataFactory::dataset_snapshot()
@@ -710,7 +710,7 @@ async fn test_transform_with_compaction_retry() {
                 ..Default::default()
             })
             .build(),
-        harness.did_generator.generate_dataset_id(),
+        harness.did_generator.generate_dataset_id().0,
         harness.system_time_source.now(),
     )
     .await

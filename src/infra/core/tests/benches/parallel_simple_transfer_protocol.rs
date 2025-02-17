@@ -34,7 +34,7 @@ use kamu::{
 use kamu_accounts::CurrentAccountSubject;
 use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
 use kamu_datasets_services::DependencyGraphServiceImpl;
-use odf::dataset::testing::create_test_dataset_fron_snapshot;
+use odf::dataset::testing::create_test_dataset_from_snapshot;
 use odf::dataset::{DatasetFactoryImpl, IpfsGateway};
 use odf::metadata::testing::MetadataFactory;
 use test_utils::HttpFileServer;
@@ -104,7 +104,7 @@ async fn setup_dataset(
         .push_event(MetadataFactory::set_data_schema().build())
         .build();
 
-    let _ = create_test_dataset_fron_snapshot(
+    let _ = create_test_dataset_from_snapshot(
         dataset_registry.as_ref(),
         dataset_storage_unit_writer.as_ref(),
         snapshot,

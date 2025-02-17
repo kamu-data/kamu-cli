@@ -23,7 +23,7 @@ use kamu::testing::*;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_datasets_services::DatasetKeyValueServiceSysEnv;
-use odf::dataset::testing::create_test_dataset_fron_snapshot;
+use odf::dataset::testing::create_test_dataset_from_snapshot;
 use odf::metadata::testing::MetadataFactory;
 use time_source::{SystemTimeSource, SystemTimeSourceStub};
 
@@ -351,11 +351,11 @@ async fn test_transform_common(transform: odf::metadata::Transform, test_retract
 
     let root_alias = root_snapshot.name.clone();
 
-    let root_created = create_test_dataset_fron_snapshot(
+    let root_created = create_test_dataset_from_snapshot(
         harness.dataset_registry.as_ref(),
         harness.dataset_storage_unit_writer.as_ref(),
         root_snapshot,
-        harness.did_generator.generate_dataset_id(),
+        harness.did_generator.generate_dataset_id().0,
         harness.time_source.now(),
     )
     .await
@@ -391,11 +391,11 @@ async fn test_transform_common(transform: odf::metadata::Transform, test_retract
         )
         .build();
 
-    let deriv_created = create_test_dataset_fron_snapshot(
+    let deriv_created = create_test_dataset_from_snapshot(
         harness.dataset_registry.as_ref(),
         harness.dataset_storage_unit_writer.as_ref(),
         deriv_snapshot,
-        harness.did_generator.generate_dataset_id(),
+        harness.did_generator.generate_dataset_id().0,
         harness.time_source.now(),
     )
     .await
@@ -716,14 +716,14 @@ async fn test_transform_empty_inputs() {
     // Root setup
     ///////////////////////////////////////////////////////////////////////////
 
-    let root = create_test_dataset_fron_snapshot(
+    let root = create_test_dataset_from_snapshot(
         harness.dataset_registry.as_ref(),
         harness.dataset_storage_unit_writer.as_ref(),
         MetadataFactory::dataset_snapshot()
             .name("root")
             .kind(odf::DatasetKind::Root)
             .build(),
-        harness.did_generator.generate_dataset_id(),
+        harness.did_generator.generate_dataset_id().0,
         harness.time_source.now(),
     )
     .await
@@ -749,11 +749,11 @@ async fn test_transform_empty_inputs() {
         )
         .build();
 
-    let deriv = create_test_dataset_fron_snapshot(
+    let deriv = create_test_dataset_from_snapshot(
         harness.dataset_registry.as_ref(),
         harness.dataset_storage_unit_writer.as_ref(),
         deriv_snapshot,
-        harness.did_generator.generate_dataset_id(),
+        harness.did_generator.generate_dataset_id().0,
         harness.time_source.now(),
     )
     .await

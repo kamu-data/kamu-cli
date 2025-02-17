@@ -22,7 +22,7 @@ use kamu::testing::DatasetDataHelper;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::auth;
-use odf::dataset::testing::create_test_dataset_fron_snapshot;
+use odf::dataset::testing::create_test_dataset_from_snapshot;
 use odf::metadata::testing::MetadataFactory;
 use s3_utils::S3Context;
 use test_utils::LocalS3Server;
@@ -1246,11 +1246,11 @@ impl CompactTestHarness {
         &self,
         dataset_snapshot: odf::DatasetSnapshot,
     ) -> odf::CreateDatasetResult {
-        create_test_dataset_fron_snapshot(
+        create_test_dataset_from_snapshot(
             self.dataset_registry.as_ref(),
             self.dataset_storage_unit_writer.as_ref(),
             dataset_snapshot,
-            self.did_generator.generate_dataset_id(),
+            self.did_generator.generate_dataset_id().0,
             self.current_date_time,
         )
         .await

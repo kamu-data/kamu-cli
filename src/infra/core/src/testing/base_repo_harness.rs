@@ -23,7 +23,7 @@ use kamu_core::{
     RunInfoDir,
     TenancyConfig,
 };
-use odf::dataset::testing::create_test_dataset_fron_snapshot;
+use odf::dataset::testing::create_test_dataset_from_snapshot;
 use odf::metadata::serde::flatbuffers::FlatbuffersMetadataBlockSerializer;
 use odf::metadata::serde::MetadataBlockSerializer;
 use odf::metadata::testing::MetadataFactory;
@@ -128,11 +128,11 @@ impl BaseRepoHarness {
             .push_event(MetadataFactory::set_polling_source().build())
             .build();
 
-        create_test_dataset_fron_snapshot(
+        create_test_dataset_from_snapshot(
             self.dataset_registry.as_ref(),
             self.dataset_storage_unit_writer.as_ref(),
             snapshot,
-            self.did_generator.generate_dataset_id(),
+            self.did_generator.generate_dataset_id().0,
             self.system_time_source.now(),
         )
         .await
@@ -144,7 +144,7 @@ impl BaseRepoHarness {
         alias: &odf::DatasetAlias,
         input_dataset_refs: Vec<odf::DatasetRef>,
     ) -> odf::CreateDatasetResult {
-        create_test_dataset_fron_snapshot(
+        create_test_dataset_from_snapshot(
             self.dataset_registry.as_ref(),
             self.dataset_storage_unit_writer.as_ref(),
             MetadataFactory::dataset_snapshot()
@@ -156,7 +156,7 @@ impl BaseRepoHarness {
                         .build(),
                 )
                 .build(),
-            self.did_generator.generate_dataset_id(),
+            self.did_generator.generate_dataset_id().0,
             self.system_time_source.now(),
         )
         .await

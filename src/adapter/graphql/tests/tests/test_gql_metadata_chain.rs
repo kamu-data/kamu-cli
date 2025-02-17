@@ -47,7 +47,7 @@ async fn test_metadata_chain_events() {
         .execute(
             &"foo".try_into().unwrap(),
             odf::dataset::make_seed_block(
-                harness.did_generator.generate_dataset_id(),
+                harness.did_generator.generate_dataset_id().0,
                 odf::DatasetKind::Root,
                 Utc::now(),
             ),

@@ -14,7 +14,7 @@ use odf_metadata::{DatasetID, DatasetSnapshot};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn create_test_dataset_fron_snapshot(
+pub async fn create_test_dataset_from_snapshot(
     dataset_handle_resolver: &dyn DatasetHandleResolver,
     storage_unit_writer: &dyn DatasetStorageUnitWriter,
     mut snapshot: DatasetSnapshot,

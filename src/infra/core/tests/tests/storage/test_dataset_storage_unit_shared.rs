@@ -14,7 +14,7 @@ use itertools::Itertools;
 use kamu::DatasetRegistrySoloUnitBridge;
 use kamu_accounts::DEFAULT_ACCOUNT_NAME;
 use kamu_core::DidGenerator;
-use odf::dataset::testing::create_test_dataset_fron_snapshot;
+use odf::dataset::testing::create_test_dataset_from_snapshot;
 use odf::metadata::testing::MetadataFactory;
 use time_source::SystemTimeSource;
 
@@ -135,11 +135,11 @@ pub async fn test_create_and_get_case_insensetive_dataset<
         .push_event(MetadataFactory::set_polling_source().build())
         .build();
 
-    let create_result = create_test_dataset_fron_snapshot(
+    let create_result = create_test_dataset_from_snapshot(
         &dataset_registry,
         storage_unit.as_ref(),
         snapshot,
-        did_generator.generate_dataset_id(),
+        did_generator.generate_dataset_id().0,
         time_source.now(),
     )
     .await
@@ -220,21 +220,21 @@ pub async fn test_create_dataset_same_name_multiple_tenants<
         .push_event(MetadataFactory::set_polling_source().build())
         .build();
 
-    let create_result_my = create_test_dataset_fron_snapshot(
+    let create_result_my = create_test_dataset_from_snapshot(
         &dataset_registry,
         storage_unit.as_ref(),
         snapshot_my.clone(),
-        did_generator.generate_dataset_id(),
+        did_generator.generate_dataset_id().0,
         time_source.now(),
     )
     .await
     .unwrap();
 
-    let create_result_her = create_test_dataset_fron_snapshot(
+    let create_result_her = create_test_dataset_from_snapshot(
         &dataset_registry,
         storage_unit.as_ref(),
         snapshot_her.clone(),
-        did_generator.generate_dataset_id(),
+        did_generator.generate_dataset_id().0,
         time_source.now(),
     )
     .await
@@ -313,11 +313,11 @@ pub async fn test_create_dataset_from_snapshot<
         .push_event(MetadataFactory::set_polling_source().build())
         .build();
 
-    let create_result = create_test_dataset_fron_snapshot(
+    let create_result = create_test_dataset_from_snapshot(
         &dataset_registry,
         storage_unit.as_ref(),
         snapshot.clone(),
-        did_generator.generate_dataset_id(),
+        did_generator.generate_dataset_id().0,
         time_source.now(),
     )
     .await
@@ -338,11 +338,11 @@ pub async fn test_create_dataset_from_snapshot<
     assert_eq!(actual_head, create_result.head);
 
     assert_matches!(
-        create_test_dataset_fron_snapshot(
+        create_test_dataset_from_snapshot(
             &dataset_registry,
             storage_unit.as_ref(),
             snapshot,
-            did_generator.generate_dataset_id(),
+            did_generator.generate_dataset_id().0,
             time_source.now(),
         )
         .await
@@ -388,21 +388,21 @@ pub async fn test_rename_dataset<
         )
         .build();
 
-    let create_result_foo = create_test_dataset_fron_snapshot(
+    let create_result_foo = create_test_dataset_from_snapshot(
         &dataset_registry,
         storage_unit.as_ref(),
         snapshot_foo,
-        did_generator.generate_dataset_id(),
+        did_generator.generate_dataset_id().0,
         time_source.now(),
     )
     .await
     .unwrap();
 
-    create_test_dataset_fron_snapshot(
+    create_test_dataset_from_snapshot(
         &dataset_registry,
         storage_unit.as_ref(),
         snapshot_bar,
-        did_generator.generate_dataset_id(),
+        did_generator.generate_dataset_id().0,
         time_source.now(),
     )
     .await
@@ -458,7 +458,7 @@ pub async fn test_rename_dataset_same_name_multiple_tenants<
         odf::DatasetName::new_unchecked("baz"),
     );
 
-    let create_result_my_foo = create_test_dataset_fron_snapshot(
+    let create_result_my_foo = create_test_dataset_from_snapshot(
         &dataset_registry,
         storage_unit.as_ref(),
         MetadataFactory::dataset_snapshot()
@@ -466,13 +466,13 @@ pub async fn test_rename_dataset_same_name_multiple_tenants<
             .kind(odf::DatasetKind::Root)
             .push_event(MetadataFactory::set_polling_source().build())
             .build(),
-        did_generator.generate_dataset_id(),
+        did_generator.generate_dataset_id().0,
         time_source.now(),
     )
     .await
     .unwrap();
 
-    let create_result_her_bar = create_test_dataset_fron_snapshot(
+    let create_result_her_bar = create_test_dataset_from_snapshot(
         &dataset_registry,
         storage_unit.as_ref(),
         MetadataFactory::dataset_snapshot()
@@ -480,13 +480,13 @@ pub async fn test_rename_dataset_same_name_multiple_tenants<
             .kind(odf::DatasetKind::Root)
             .push_event(MetadataFactory::set_polling_source().build())
             .build(),
-        did_generator.generate_dataset_id(),
+        did_generator.generate_dataset_id().0,
         time_source.now(),
     )
     .await
     .unwrap();
 
-    let create_result_my_baz = create_test_dataset_fron_snapshot(
+    let create_result_my_baz = create_test_dataset_from_snapshot(
         &dataset_registry,
         storage_unit.as_ref(),
         MetadataFactory::dataset_snapshot()
@@ -494,7 +494,7 @@ pub async fn test_rename_dataset_same_name_multiple_tenants<
             .kind(odf::DatasetKind::Root)
             .push_event(MetadataFactory::set_polling_source().build())
             .build(),
-        did_generator.generate_dataset_id(),
+        did_generator.generate_dataset_id().0,
         time_source.now(),
     )
     .await
@@ -569,11 +569,11 @@ pub async fn test_delete_dataset<
         .push_event(MetadataFactory::set_polling_source().build())
         .build();
 
-    let create_result = create_test_dataset_fron_snapshot(
+    let create_result = create_test_dataset_from_snapshot(
         &dataset_registry,
         storage_unit.as_ref(),
         snapshot,
-        did_generator.generate_dataset_id(),
+        did_generator.generate_dataset_id().0,
         time_source.now(),
     )
     .await
@@ -629,21 +629,21 @@ pub async fn test_iterate_datasets<
         )
         .build();
 
-    create_test_dataset_fron_snapshot(
+    create_test_dataset_from_snapshot(
         &dataset_registry,
         storage_unit.as_ref(),
         snapshot_foo,
-        did_generator.generate_dataset_id(),
+        did_generator.generate_dataset_id().0,
         time_source.now(),
     )
     .await
     .unwrap();
 
-    create_test_dataset_fron_snapshot(
+    create_test_dataset_from_snapshot(
         &dataset_registry,
         storage_unit.as_ref(),
         snapshot_bar,
-        did_generator.generate_dataset_id(),
+        did_generator.generate_dataset_id().0,
         time_source.now(),
     )
     .await
@@ -733,41 +733,41 @@ pub async fn test_iterate_datasets_multi_tenant<
         )
         .build();
 
-    create_test_dataset_fron_snapshot(
+    create_test_dataset_from_snapshot(
         &dataset_registry,
         storage_unit.as_ref(),
         snapshot_my_foo,
-        did_generator.generate_dataset_id(),
+        did_generator.generate_dataset_id().0,
         time_source.now(),
     )
     .await
     .unwrap();
 
-    create_test_dataset_fron_snapshot(
+    create_test_dataset_from_snapshot(
         &dataset_registry,
         storage_unit.as_ref(),
         snapshot_my_baz,
-        did_generator.generate_dataset_id(),
+        did_generator.generate_dataset_id().0,
         time_source.now(),
     )
     .await
     .unwrap();
 
-    create_test_dataset_fron_snapshot(
+    create_test_dataset_from_snapshot(
         &dataset_registry,
         storage_unit.as_ref(),
         snapshot_her_foo,
-        did_generator.generate_dataset_id(),
+        did_generator.generate_dataset_id().0,
         time_source.now(),
     )
     .await
     .unwrap();
 
-    create_test_dataset_fron_snapshot(
+    create_test_dataset_from_snapshot(
         &dataset_registry,
         storage_unit.as_ref(),
         snapshot_her_bar,
-        did_generator.generate_dataset_id(),
+        did_generator.generate_dataset_id().0,
         time_source.now(),
     )
     .await

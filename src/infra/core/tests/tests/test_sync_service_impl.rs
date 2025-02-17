@@ -26,7 +26,7 @@ use kamu_datasets_services::{
     MockDependencyGraphWriter,
 };
 use messaging_outbox::DummyOutboxImpl;
-use odf::dataset::testing::create_test_dataset_fron_snapshot;
+use odf::dataset::testing::create_test_dataset_from_snapshot;
 use odf::dataset::{DatasetFactoryImpl, IpfsGateway};
 use odf::metadata::testing::MetadataFactory;
 use test_utils::{HttpFileServer, LocalS3Server};
@@ -183,11 +183,11 @@ async fn do_test_sync(
         .push_event(MetadataFactory::set_data_schema().build())
         .build();
 
-    let b1 = create_test_dataset_fron_snapshot(
+    let b1 = create_test_dataset_from_snapshot(
         dataset_registry_foo.as_ref(),
         storage_unit_foo.as_ref(),
         snapshot,
-        did_generator_foo.generate_dataset_id(),
+        did_generator_foo.generate_dataset_id().0,
         time_source_foo.now(),
     )
     .await

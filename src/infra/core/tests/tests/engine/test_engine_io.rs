@@ -18,7 +18,7 @@ use kamu::domain::*;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_datasets_services::DatasetKeyValueServiceSysEnv;
-use odf::dataset::testing::create_test_dataset_fron_snapshot;
+use odf::dataset::testing::create_test_dataset_from_snapshot;
 use odf::metadata::testing::MetadataFactory;
 use test_utils::LocalS3Server;
 use time_source::{SystemTimeSource, SystemTimeSourceDefault};
@@ -124,11 +124,11 @@ async fn test_engine_io_common<
 
     let root_alias = root_snapshot.name.clone();
 
-    let root_created = create_test_dataset_fron_snapshot(
+    let root_created = create_test_dataset_from_snapshot(
         &dataset_registry,
         storage_unit.as_ref(),
         root_snapshot,
-        did_generator.generate_dataset_id(),
+        did_generator.generate_dataset_id().0,
         time_source.now(),
     )
     .await
@@ -166,11 +166,11 @@ async fn test_engine_io_common<
         )
         .build();
 
-    let deriv_created = create_test_dataset_fron_snapshot(
+    let deriv_created = create_test_dataset_from_snapshot(
         &dataset_registry,
         storage_unit.as_ref(),
         deriv_snapshot,
-        did_generator.generate_dataset_id(),
+        did_generator.generate_dataset_id().0,
         time_source.now(),
     )
     .await

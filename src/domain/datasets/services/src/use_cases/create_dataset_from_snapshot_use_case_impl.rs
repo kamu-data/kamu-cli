@@ -79,7 +79,7 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
             .execute(
                 &snapshot.name,
                 odf::dataset::make_seed_block(
-                    self.did_generator.generate_dataset_id(),
+                    self.did_generator.generate_dataset_id().0,
                     snapshot.kind,
                     system_time,
                 ),

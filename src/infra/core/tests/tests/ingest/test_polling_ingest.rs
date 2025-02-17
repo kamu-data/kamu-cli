@@ -20,7 +20,7 @@ use kamu::testing::*;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_datasets_services::DatasetKeyValueServiceSysEnv;
-use odf::dataset::testing::create_test_dataset_fron_snapshot;
+use odf::dataset::testing::create_test_dataset_from_snapshot;
 use odf::metadata::testing::MetadataFactory;
 use tempfile::TempDir;
 use time_source::{SystemTimeSource, SystemTimeSourceStub};
@@ -1276,11 +1276,11 @@ impl IngestTestHarness {
         &self,
         dataset_snapshot: odf::DatasetSnapshot,
     ) -> odf::CreateDatasetResult {
-        create_test_dataset_fron_snapshot(
+        create_test_dataset_from_snapshot(
             self.dataset_registry.as_ref(),
             self.dataset_storage_unit_writer.as_ref(),
             dataset_snapshot,
-            self.did_generator.generate_dataset_id(),
+            self.did_generator.generate_dataset_id().0,
             self.time_source.now(),
         )
         .await
