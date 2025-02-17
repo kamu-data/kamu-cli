@@ -222,6 +222,7 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
         })
     }
 
+    #[tracing::instrument(level = "debug", skip_all, fields(dataset_ids=?dataset_ids, action=%action))]
     async fn classify_dataset_ids_by_allowance(
         &self,
         dataset_ids: Vec<odf::DatasetID>,
