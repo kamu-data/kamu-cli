@@ -63,9 +63,9 @@ fn main() {
 
     let current_date = chrono::Utc::now().naive_utc().date();
 
-    update_crates(&new_version);
-
     update_changelog(Path::new("CHANGELOG.md"), &new_version, current_date);
+
+    update_crates(&new_version);
 
     update_license(
         Path::new("LICENSE.txt"),
