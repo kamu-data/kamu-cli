@@ -115,9 +115,10 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
 
     prepare_run_dir(&workspace_layout.run_info_dir);
 
+    let is_in_workspace = workspace_svc.is_in_workspace();
     let is_init_command = maybe_init_command.is_some();
     let app_database_config =
-        get_app_database_config(&workspace_layout, &config, tenancy_config, is_init_command);
+        get_app_database_config(&workspace_layout, &config, is_in_workspace, is_init_command);
     let (database_config, maybe_temp_database_path) = app_database_config.into_inner();
     let maybe_db_connection_settings = database_config
         .as_ref()
@@ -134,12 +135,7 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
             is_e2e_testing,
         );
 
-        // TODO: Use SQLite database in single-tenant
-        //       https://github.com/kamu-data/kamu-cli/issues/981
-        //
-        //       After implementing this ticket, we need to use "is_init_command"
-        //       not "init_multi_tenant_workspace" here
-        let is_indexing_needed = init_multi_tenant_workspace || workspace_svc.is_in_workspace();
+        let is_indexing_needed = is_init_command || is_in_workspace;
         if is_indexing_needed {
             base_catalog_builder.add::<kamu_datasets_services::DatasetEntryIndexer>();
             base_catalog_builder.add::<kamu_datasets_services::DependencyGraphIndexer>();
@@ -223,7 +219,7 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
 
     let is_workspace_upgrade_needed = workspace_svc.is_upgrade_needed()?;
 
-    if workspace_svc.is_in_workspace() && !is_workspace_upgrade_needed {
+    if is_in_workspace && !is_workspace_upgrade_needed {
         // Evict cache
         cli_catalog.get_one::<GcService>()?.evict_cache()?;
     }
@@ -242,7 +238,7 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
             let mut command =
                 cli_commands::get_command(work_catalog, &maybe_transactional_cli_catalog, args)?;
 
-            if command.needs_workspace() && !workspace_svc.is_in_workspace() {
+            if command.needs_workspace() && !is_in_workspace {
                 Err(CLIError::usage_error_from(NotInWorkspace))?;
             }
             if command.needs_workspace() && is_workspace_upgrade_needed {

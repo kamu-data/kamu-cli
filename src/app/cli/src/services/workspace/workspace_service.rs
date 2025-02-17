@@ -31,8 +31,7 @@ pub struct WorkspaceService {
 #[dill::component(pub)]
 impl WorkspaceService {
     pub fn new(workspace_layout: Arc<WorkspaceLayout>, multi_tenant: bool) -> Self {
-        let workspace_config =
-            WorkspaceService::init_workspace_config(&workspace_layout, multi_tenant);
+        let workspace_config = Self::init_workspace_config(&workspace_layout, multi_tenant);
 
         Self {
             workspace_layout,

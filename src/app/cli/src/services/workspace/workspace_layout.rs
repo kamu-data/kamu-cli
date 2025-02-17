@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub const DEFAULT_MULTI_TENANT_SQLITE_DATABASE_NAME: &str = "workspace.sqlite.db";
+pub const DEFAULT_WORKSPACE_SQLITE_DATABASE_NAME: &str = "workspace.sqlite.db";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -77,9 +77,8 @@ impl WorkspaceLayout {
         Ok(ws)
     }
 
-    pub fn default_multi_tenant_database_path(&self) -> PathBuf {
-        self.root_dir
-            .join(DEFAULT_MULTI_TENANT_SQLITE_DATABASE_NAME)
+    pub fn default_workspace_database_path(&self) -> PathBuf {
+        self.root_dir.join(DEFAULT_WORKSPACE_SQLITE_DATABASE_NAME)
     }
 }
 
