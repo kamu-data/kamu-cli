@@ -13,7 +13,7 @@ use indoc::indoc;
 use kamu::*;
 use kamu_accounts::*;
 use kamu_auth_rebac_inmem::InMemoryRebacRepository;
-use kamu_auth_rebac_services::{MultiTenantRebacDatasetLifecycleMessageConsumer, RebacServiceImpl};
+use kamu_auth_rebac_services::{RebacDatasetLifecycleMessageConsumer, RebacServiceImpl};
 use kamu_core::*;
 use kamu_datasets::CreateDatasetFromSnapshotUseCase;
 use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEntryRepository};
@@ -772,11 +772,8 @@ impl GraphQLDatasetsHarness {
                 })
                 .add::<InMemoryRebacRepository>()
                 .add::<DatasetEntryServiceImpl>()
-                .add::<InMemoryDatasetEntryRepository>();
-
-            if tenancy_config == TenancyConfig::MultiTenant {
-                b.add::<MultiTenantRebacDatasetLifecycleMessageConsumer>();
-            }
+                .add::<InMemoryDatasetEntryRepository>()
+                .add::<RebacDatasetLifecycleMessageConsumer>();
 
             NoOpDatabasePlugin::init_database_components(&mut b);
 

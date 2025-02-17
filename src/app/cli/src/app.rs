@@ -496,6 +496,7 @@ pub fn configure_base_catalog(
 
     b.add::<DatabaseTransactionRunner>();
 
+    b.add::<kamu_auth_rebac_services::RebacDatasetLifecycleMessageConsumer>();
     b.add::<kamu_auth_rebac_services::RebacServiceImpl>();
     b.add_value(kamu_auth_rebac_services::DefaultAccountProperties { is_admin: false });
     b.add_value(kamu_auth_rebac_services::DefaultDatasetProperties {
@@ -512,10 +513,6 @@ pub fn configure_base_catalog(
             .unwrap(),
     );
     b.add::<kamu_adapter_flight_sql::KamuFlightSqlService>();
-
-    if tenancy_config == TenancyConfig::MultiTenant {
-        b.add::<kamu_auth_rebac_services::MultiTenantRebacDatasetLifecycleMessageConsumer>();
-    }
 
     b.add::<kamu_datasets_services::DatasetEntryServiceImpl>();
     b.add::<kamu_datasets_services::DependencyGraphServiceImpl>();

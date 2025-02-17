@@ -636,7 +636,7 @@ impl DatasetAuthorizerHarness {
                     allows_anonymous_read: false,
                     allows_public_read: false,
                 })
-                .add::<kamu_auth_rebac_services::MultiTenantRebacDatasetLifecycleMessageConsumer>()
+                .add::<kamu_auth_rebac_services::RebacDatasetLifecycleMessageConsumer>()
                 .add::<InMemoryRebacRepository>()
                 .add_builder(
                     OutboxImmediateImpl::builder()
