@@ -500,13 +500,20 @@ fn assert_execute_command_result<'a>(
     if let Some(expected_stderr_items) = maybe_expected_stderr {
         let stderr = std::str::from_utf8(&command_result.get_output().stderr).unwrap();
 
+        let mut stderr_search_index = 0;
         for expected_stderr_item_re in expected_stderr_items {
             let re = Regex::new(expected_stderr_item_re).unwrap();
 
-            assert!(
-                re.is_match(stderr),
-                "Expected found regex match:\n'{re}'\nUnexpected output:\n{stderr}",
-            );
+            if let Some(mat) = re.find(&stderr[stderr_search_index..]) {
+                stderr_search_index += mat.end();
+            } else {
+                assert!(
+                    re.is_match(stderr),
+                    "Expected found regex match:\n'{re}'\nUnexpected output:\n{stderr}",
+                );
+
+                panic!("Expected found regex match:\n'{re}'\nUnexpected output:\n{stderr}",);
+            }
         }
     }
 }

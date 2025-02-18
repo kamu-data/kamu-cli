@@ -19,12 +19,7 @@ pub async fn test_add_dataset_from_stdin(kamu: KamuCliPuppet) {
         ["add", "--stdin"],
         DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
         None,
-        Some([indoc::indoc!(
-            r#"
-            Added: player-scores
-            Added 1 dataset\(s\)
-            "#
-        )]),
+        Some(["Added: player-scores", r#"Added 1 dataset\(s\)"#]),
     )
     .await;
 
@@ -46,12 +41,7 @@ pub async fn test_add_dataset_with_name(kamu: KamuCliPuppet) {
         ["add", "--stdin", "--name", "player-scores-1"],
         DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
         None,
-        Some([indoc::indoc!(
-            r#"
-            Added: player-scores-1
-            Added 1 dataset\(s\)
-            "#
-        )]),
+        Some(["Added: player-scores", r#"Added 1 dataset\(s\)"#]),
     )
     .await;
 
@@ -72,12 +62,7 @@ pub async fn test_add_dataset_with_name(kamu: KamuCliPuppet) {
             snapshot_path.to_str().unwrap(),
         ],
         None,
-        Some([indoc::indoc!(
-            r#"
-            Added: player-scores-2
-            Added 1 dataset\(s\)
-            "#
-        )]),
+        Some(["Added: player-scores-2", r#"Added 1 dataset\(s\)"#]),
     )
     .await;
 
@@ -98,11 +83,7 @@ pub async fn test_add_dataset_with_replace(kamu: KamuCliPuppet) {
         ["add", "--stdin"],
         DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
         None,
-        Some([indoc::indoc!(
-            r#"
-            Added: player-scores
-            "#
-        )]),
+        Some(["Added: player-scores"]),
     )
     .await;
 
@@ -110,12 +91,10 @@ pub async fn test_add_dataset_with_replace(kamu: KamuCliPuppet) {
         ["add", "--stdin"],
         DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
         None,
-        Some([indoc::indoc!(
-            r#"
-            Skipped: player-scores: Already exists
-            Added 0 dataset\(s\)
-            "#
-        )]),
+        Some([
+            "Skipped: player-scores: Already exists",
+            r#"Added 0 dataset\(s\)"#,
+        ]),
     )
     .await;
 
@@ -123,12 +102,7 @@ pub async fn test_add_dataset_with_replace(kamu: KamuCliPuppet) {
         ["--yes", "add", "--stdin", "--replace"],
         DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
         None,
-        Some([indoc::indoc!(
-            r#"
-            Added: player-scores
-            Added 1 dataset\(s\)
-            "#
-        )]),
+        Some(["Added: player-scores", r#"Added 1 dataset\(s\)"#]),
     )
     .await;
 
@@ -198,13 +172,11 @@ pub async fn test_add_recursive(kamu: KamuCliPuppet) {
             kamu.workspace_path().as_os_str().to_str().unwrap(),
         ],
         None,
-        Some([indoc::indoc!(
-            r#"
-            Added: commented
-            Added: plain
-            Added 2 dataset\(s\)
-            "#
-        )]),
+        Some([
+            "Added: commented",
+            "Added: plain",
+            r#"Added 2 dataset\(s\)"#,
+        ]),
     )
     .await;
 
@@ -263,13 +235,11 @@ pub async fn test_add_with_circular_dependency(kamu: KamuCliPuppet) {
     kamu.assert_success_command_execution(
         ["-v", "add", "plain.yaml", "commented.yaml"],
         None,
-        Some([indoc::indoc!(
-            r#"
-            Added: plain
-            Skipped: plain: Already exists
-            Added 1 dataset\(s\)
-            "#
-        )]),
+        Some([
+            "Added: plain",
+            "Skipped: plain: Already exists",
+            r#"Added 1 dataset\(s\)"#,
+        ]),
     )
     .await;
 

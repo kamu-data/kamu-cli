@@ -133,12 +133,7 @@ async fn test_pull_env_var_template_default_value(kamu: KamuCliPuppet) {
         ["add", "--stdin"],
         DATASET_SNAPSHOT_STR,
         None,
-        Some([indoc::indoc!(
-            r#"
-            Added: test.pull-from-file
-            Added 1 dataset\(s\)
-            "#
-        )]),
+        Some(["Added: test.pull-from-file", r#"Added 1 dataset\(s\)"#]),
     )
     .await;
 
@@ -164,12 +159,7 @@ async fn test_pull_env_var_template_default_value_missing_values(kamu: KamuCliPu
         ["add", "--stdin"],
         DATASET_SNAPSHOT_STR,
         None,
-        Some([indoc::indoc!(
-            r#"
-            Added: test.pull-from-file
-            Added 1 dataset\(s\)
-            "#
-        )]),
+        Some(["Added: test.pull-from-file", r#"Added 1 dataset\(s\)"#]),
     )
     .await;
 
