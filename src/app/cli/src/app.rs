@@ -138,8 +138,7 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
             is_e2e_testing,
         );
 
-        let is_indexing_needed = is_init_command || is_in_workspace;
-        if is_indexing_needed {
+        if workspace_status.is_indexing_needed() {
             base_catalog_builder.add::<kamu_datasets_services::DatasetEntryIndexer>();
             base_catalog_builder.add::<kamu_datasets_services::DependencyGraphIndexer>();
             base_catalog_builder.add::<kamu_auth_rebac_services::RebacIndexer>();
@@ -851,6 +850,13 @@ impl WorkspaceStatus {
             WorkspaceStatus::NoWorkspace => None,
             WorkspaceStatus::AboutToBeCreated(tenancy_config)
             | WorkspaceStatus::Created(tenancy_config) => Some(tenancy_config),
+        }
+    }
+
+    fn is_indexing_needed(self) -> bool {
+        match self {
+            WorkspaceStatus::NoWorkspace => false,
+            WorkspaceStatus::AboutToBeCreated(_) | WorkspaceStatus::Created(_) => true,
         }
     }
 }
