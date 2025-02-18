@@ -13,7 +13,7 @@ use std::sync::Arc;
 use itertools::Itertools;
 use kamu::DatasetRegistrySoloUnitBridge;
 use kamu_core::{DidGenerator, TenancyConfig};
-use odf::dataset::testing::create_test_dataset_fron_snapshot;
+use odf::dataset::testing::create_test_dataset_from_snapshot;
 use odf::metadata::testing::MetadataFactory;
 use time_source::SystemTimeSource;
 

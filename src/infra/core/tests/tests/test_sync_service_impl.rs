@@ -176,7 +176,7 @@ async fn do_test_sync(
         .push_event(MetadataFactory::set_data_schema().build())
         .build();
 
-    let created_foo = create_test_dataset_fron_snapshot(
+    let created_foo = create_test_dataset_from_snapshot(
         dataset_registry_foo.as_ref(),
         storage_unit_foo.as_ref(),
         snapshot,
