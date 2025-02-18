@@ -132,7 +132,7 @@ async fn test_engine_io_common<
 
     let root_alias = root_snapshot.name.clone();
 
-    let root_created = create_test_dataset_from_snapshot(
+    let root_stored = create_test_dataset_from_snapshot(
         &dataset_registry,
         storage_unit.as_ref(),
         root_snapshot,
@@ -142,7 +142,7 @@ async fn test_engine_io_common<
     .await
     .unwrap();
 
-    let root_target = ResolvedDataset::from(&root_created);
+    let root_target = ResolvedDataset::from_stored(&root_stored, &root_alias);
 
     let root_metadata_state =
         DataWriterMetadataState::build(root_target.clone(), &odf::BlockRef::Head, None)
@@ -174,7 +174,9 @@ async fn test_engine_io_common<
         )
         .build();
 
-    let deriv_created = create_test_dataset_from_snapshot(
+    let deriv_alias = deriv_snapshot.name.clone();
+
+    let deriv_stored = create_test_dataset_from_snapshot(
         &dataset_registry,
         storage_unit.as_ref(),
         deriv_snapshot,
@@ -184,13 +186,18 @@ async fn test_engine_io_common<
     .await
     .unwrap();
 
-    let block_hash = match transform_helper.transform_dataset(&deriv_created).await {
+    let deriv_target = ResolvedDataset::from_stored(&deriv_stored, &deriv_alias);
+
+    let block_hash = match transform_helper
+        .transform_dataset(deriv_target.clone())
+        .await
+    {
         TransformResult::Updated { new_head, .. } => new_head,
         v => panic!("Unexpected result: {v:?}"),
     };
 
     use odf::metadata::IntoDataStreamBlock;
-    let block = deriv_created
+    let block = deriv_stored
         .dataset
         .as_metadata_chain()
         .get_block(&block_hash)
@@ -238,12 +245,15 @@ async fn test_engine_io_common<
         .await
         .unwrap();
 
-    let block_hash = match transform_helper.transform_dataset(&deriv_created).await {
+    let block_hash = match transform_helper
+        .transform_dataset(deriv_target.clone())
+        .await
+    {
         TransformResult::Updated { new_head, .. } => new_head,
         v => panic!("Unexpected result: {v:?}"),
     };
 
-    let block = deriv_created
+    let block = deriv_stored
         .dataset
         .as_metadata_chain()
         .get_block(&block_hash)
@@ -261,7 +271,7 @@ async fn test_engine_io_common<
     // Verify
     ///////////////////////////////////////////////////////////////////////////
 
-    let verify_result = transform_helper.verify_transform(&deriv_created).await;
+    let verify_result = transform_helper.verify_transform(deriv_target).await;
     assert_matches!(verify_result, Ok(()));
 }
 

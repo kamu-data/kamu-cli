@@ -194,12 +194,11 @@ impl odf::DatasetStorageUnit for DatasetStorageUnitS3 {
 
 #[async_trait]
 impl odf::DatasetStorageUnitWriter for DatasetStorageUnitS3 {
-    #[tracing::instrument(level = "debug", skip_all, fields(%dataset_alias, ?seed_block))]
+    #[tracing::instrument(level = "debug", skip_all, fields(?seed_block))]
     async fn store_dataset(
         &self,
-        dataset_alias: &odf::DatasetAlias,
         seed_block: odf::MetadataBlockTyped<odf::metadata::Seed>,
-    ) -> Result<odf::CreateDatasetResult, odf::dataset::StoreDatasetError> {
+    ) -> Result<odf::dataset::StoreDatasetResult, odf::dataset::StoreDatasetError> {
         // Check if a dataset with the same ID can be resolved successfully
         use odf::DatasetStorageUnit;
         let maybe_existing_dataset = match self
@@ -280,8 +279,8 @@ impl odf::DatasetStorageUnitWriter for DatasetStorageUnitS3 {
             "Created new dataset",
         );
 
-        Ok(odf::CreateDatasetResult {
-            dataset_handle: odf::DatasetHandle::new(dataset_id, dataset_alias.clone()),
+        Ok(odf::dataset::StoreDatasetResult {
+            dataset_id,
             dataset,
             head,
         })

@@ -15,6 +15,7 @@ use kamu_accounts::CurrentAccountSubject;
 use kamu_core::TenancyConfig;
 use kamu_datasets::{
     CreateDatasetError,
+    CreateDatasetResult,
     CreateDatasetUseCase,
     CreateDatasetUseCaseOptions,
     DatasetLifecycleMessage,
@@ -86,7 +87,7 @@ impl CreateDatasetUseCase for CreateDatasetUseCaseImpl {
         dataset_alias: &odf::DatasetAlias,
         seed_block: odf::MetadataBlockTyped<odf::metadata::Seed>,
         options: CreateDatasetUseCaseOptions,
-    ) -> Result<odf::CreateDatasetResult, CreateDatasetError> {
+    ) -> Result<CreateDatasetResult, CreateDatasetError> {
         let logged_account_id = match self.current_account_subject.as_ref() {
             CurrentAccountSubject::Anonymous(_) => {
                 panic!("Anonymous account cannot create dataset");
@@ -122,9 +123,9 @@ impl CreateDatasetUseCase for CreateDatasetUseCaseImpl {
 
         let canonical_alias = self.canonical_dataset_alias(dataset_alias);
 
-        let create_result = self
+        let store_result = self
             .dataset_storage_unit_writer
-            .store_dataset(&canonical_alias, seed_block)
+            .store_dataset(seed_block)
             .await
             .map_err(|e| match e {
                 odf::dataset::StoreDatasetError::RefCollision(e) => {
@@ -136,13 +137,13 @@ impl CreateDatasetUseCase for CreateDatasetUseCaseImpl {
         // Write dataset alias file
         // TODO: reconsider if we really need this
         // TODO: consider writing it after transaction completes
-        odf::dataset::write_dataset_alias(create_result.dataset.as_ref(), &canonical_alias).await?;
+        odf::dataset::write_dataset_alias(store_result.dataset.as_ref(), &canonical_alias).await?;
 
         self.outbox
             .post_message(
                 MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
                 DatasetLifecycleMessage::created(
-                    create_result.dataset_handle.id.clone(),
+                    store_result.dataset_id.clone(),
                     logged_account_id,
                     options.dataset_visibility,
                     dataset_alias.dataset_name.clone(),
@@ -150,7 +151,10 @@ impl CreateDatasetUseCase for CreateDatasetUseCaseImpl {
             )
             .await?;
 
-        Ok(create_result)
+        Ok(CreateDatasetResult::from_stored(
+            store_result,
+            canonical_alias,
+        ))
     }
 }
 

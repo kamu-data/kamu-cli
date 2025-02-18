@@ -1227,10 +1227,11 @@ impl Harness {
 
         let storage_unit = catalog.get_one::<DatasetStorageUnitLocalFs>().unwrap();
 
+        let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+
         use odf::dataset::DatasetStorageUnitWriter;
-        let foo_created = storage_unit
+        let foo_stored = storage_unit
             .store_dataset(
-                &odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo")),
                 MetadataFactory::metadata_block(
                     MetadataFactory::seed(odf::DatasetKind::Root).build(),
                 )
@@ -1241,7 +1242,7 @@ impl Harness {
             .unwrap();
 
         for event in dataset_events {
-            foo_created
+            foo_stored
                 .dataset
                 .commit_event(
                     event,
@@ -1254,7 +1255,7 @@ impl Harness {
                 .unwrap();
         }
 
-        let foo_target = ResolvedDataset::from(&foo_created);
+        let foo_target = ResolvedDataset::from_stored(&foo_stored, &foo_alias);
 
         let ctx = SessionContext::new_with_config(SessionConfig::new().with_target_partitions(1));
 

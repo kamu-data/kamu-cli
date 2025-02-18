@@ -176,7 +176,7 @@ async fn do_test_sync(
         .push_event(MetadataFactory::set_data_schema().build())
         .build();
 
-    let created_foo = create_test_dataset_from_snapshot(
+    let stored_foo = create_test_dataset_from_snapshot(
         dataset_registry_foo.as_ref(),
         storage_unit_foo.as_ref(),
         snapshot,
@@ -185,7 +185,7 @@ async fn do_test_sync(
     )
     .await
     .unwrap();
-    let b1 = created_foo.head;
+    let b1 = stored_foo.head;
 
     // Initial sync ///////////////////////////////////////////////////////////
     assert_matches!(
@@ -237,11 +237,7 @@ async fn do_test_sync(
         } if new_head == b1
     );
 
-    assert_in_sync(
-        &storage_unit_foo,
-        &storage_unit_bar,
-        &created_foo.dataset_handle.id,
-    );
+    assert_in_sync(&storage_unit_foo, &storage_unit_bar, &stored_foo.dataset_id);
 
     // Subsequent sync ////////////////////////////////////////////////////////
     let _b2 = DatasetTestHelper::append_random_data(
@@ -321,11 +317,7 @@ async fn do_test_sync(
         } if old_head.as_ref() == Some(&b1) && new_head == b3
     );
 
-    assert_in_sync(
-        &storage_unit_foo,
-        &storage_unit_bar,
-        &created_foo.dataset_handle.id,
-    );
+    assert_in_sync(&storage_unit_foo, &storage_unit_bar, &stored_foo.dataset_id);
 
     // Up to date /////////////////////////////////////////////////////////////
     let sync_result = sync_svc_foo
@@ -354,11 +346,7 @@ async fn do_test_sync(
         .unwrap();
     assert_matches!(sync_result, SyncResult::UpToDate);
 
-    assert_in_sync(
-        &storage_unit_foo,
-        &storage_unit_bar,
-        &created_foo.dataset_handle.id,
-    );
+    assert_in_sync(&storage_unit_foo, &storage_unit_bar, &stored_foo.dataset_id);
 
     // Datasets out-of-sync on push //////////////////////////////////////////////
 
@@ -562,13 +550,9 @@ async fn do_test_sync(
         .await;
 
         let dir_files = std::fs::read_dir(tmp_workspace_dir_foo.join(format!(
-                "datasets/{}/checkpoints",
-                created_foo
-                    .dataset_handle
-                    .id
-                    .as_multibase()
-                    .to_stack_string(),
-                )))
+            "datasets/{}/checkpoints",
+            stored_foo.dataset_id.as_multibase().to_stack_string(),
+        )))
         .unwrap();
         for file_info in dir_files {
             std::fs::remove_file(file_info.unwrap().path()).unwrap();

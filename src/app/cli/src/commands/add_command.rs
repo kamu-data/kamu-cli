@@ -14,6 +14,7 @@ use kamu::domain::*;
 use kamu_datasets::{
     CreateDatasetFromSnapshotError,
     CreateDatasetFromSnapshotUseCase,
+    CreateDatasetResult,
     CreateDatasetUseCaseOptions,
     DeleteDatasetUseCase,
 };
@@ -158,7 +159,7 @@ impl AddCommand {
         create_options: CreateDatasetUseCaseOptions,
     ) -> Vec<(
         odf::DatasetAlias,
-        Result<odf::CreateDatasetResult, CreateDatasetFromSnapshotError>,
+        Result<CreateDatasetResult, CreateDatasetFromSnapshotError>,
     )> {
         let snapshots_ordered =
             self.sort_snapshots_in_dependency_order(snapshots.into_iter().collect());

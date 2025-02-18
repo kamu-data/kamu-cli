@@ -15,7 +15,7 @@ use kamu_accounts::*;
 use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 use kamu_auth_rebac_services::{MultiTenantRebacDatasetLifecycleMessageConsumer, RebacServiceImpl};
 use kamu_core::*;
-use kamu_datasets::CreateDatasetFromSnapshotUseCase;
+use kamu_datasets::{CreateDatasetFromSnapshotUseCase, CreateDatasetResult};
 use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEntryRepository};
 use kamu_datasets_services::{
     CreateDatasetFromSnapshotUseCaseImpl,
@@ -796,7 +796,7 @@ impl GraphQLDatasetsHarness {
         &self,
         account_name: Option<odf::AccountName>,
         name: odf::DatasetName,
-    ) -> odf::CreateDatasetResult {
+    ) -> CreateDatasetResult {
         let create_dataset = self
             .catalog_authorized
             .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
@@ -819,7 +819,7 @@ impl GraphQLDatasetsHarness {
         &self,
         name: odf::DatasetName,
         input_dataset: &odf::DatasetHandle,
-    ) -> odf::CreateDatasetResult {
+    ) -> CreateDatasetResult {
         let create_dataset = self
             .catalog_authorized
             .get_one::<dyn CreateDatasetFromSnapshotUseCase>()

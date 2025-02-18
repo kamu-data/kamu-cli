@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use kamu::domain::*;
+use kamu_datasets::CreateDatasetResult;
 use odf::dataset::DatasetLayout;
 use odf::metadata::testing::MetadataFactory;
 
@@ -29,7 +30,7 @@ pub(crate) struct SmartPushExistingEvolvedDatasetScenario<TServerHarness: Server
     pub client_dataset_layout: DatasetLayout,
     pub server_dataset_ref: odf::DatasetRefRemote,
     pub client_dataset_ref: odf::DatasetRef,
-    pub client_create_result: odf::CreateDatasetResult,
+    pub client_create_result: CreateDatasetResult,
     pub client_commit_result: odf::dataset::CommitResult,
 }
 

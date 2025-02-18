@@ -124,7 +124,7 @@ impl Harness {
         let ctx = SessionContext::new();
         let mut writer = DataWriterDataFusion::from_metadata_chain(
             ctx.clone(),
-            ResolvedDataset::from(&create_result),
+            ResolvedDataset::from_created(&create_result),
             &odf::BlockRef::Head,
             None,
         )
