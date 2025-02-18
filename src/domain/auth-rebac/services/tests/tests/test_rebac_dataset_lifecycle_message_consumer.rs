@@ -13,7 +13,7 @@ use std::sync::Arc;
 use dill::{Catalog, CatalogBuilder};
 use kamu_auth_rebac::{DatasetProperties, Entity, RebacRepository, RebacService};
 use kamu_auth_rebac_inmem::InMemoryRebacRepository;
-use kamu_auth_rebac_services::{MultiTenantRebacDatasetLifecycleMessageConsumer, RebacServiceImpl};
+use kamu_auth_rebac_services::{RebacDatasetLifecycleMessageConsumer, RebacServiceImpl};
 use kamu_datasets::DatasetLifecycleMessage;
 use messaging_outbox::{consume_deserialized_message, ConsumerFilter, Message};
 
@@ -188,7 +188,7 @@ impl MultiTenantRebacDatasetLifecycleMessageConsumerHarness {
         let mut catalog_builder = CatalogBuilder::new();
 
         catalog_builder
-            .add::<MultiTenantRebacDatasetLifecycleMessageConsumer>()
+            .add::<RebacDatasetLifecycleMessageConsumer>()
             .add::<RebacServiceImpl>()
             .add_value(kamu_auth_rebac_services::DefaultAccountProperties { is_admin: false })
             .add_value(kamu_auth_rebac_services::DefaultDatasetProperties {

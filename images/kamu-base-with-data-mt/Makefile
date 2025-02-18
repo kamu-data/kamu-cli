@@ -22,3 +22,7 @@ workspace:
 	mkdir -p workspace && \
 	cd workspace/ && \
 	../init-workspace.py
+
+.PHONY: clean
+clean:
+	rm -rf workspace

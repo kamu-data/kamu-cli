@@ -11,9 +11,14 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## [Unreleased]
+## [0.224.0] - 2025-02-18
+### Added
+- The usage of local database (SQLite) is activated by default for all single tenant workspaces
 ### Fixed
 - Improved error message for SQL parsing method for queries which includes invalid or reserved keywords
+- Fixed false-positive panic ("There cannot be predefined users in a single-tenant workspace") 
+    if a `kamu` subcommand that doesn't require workspace found a multiuser `.kamuconfig`
+  - For example, before attempting to initialize a workspace or attempting to invoke autocomplete in shell 
 
 ## [0.223.0] - 2025-02-13
 ### Added

@@ -7,4 +7,4 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod test_multi_tenant_rebac_dataset_lifecycle_message_consumer;
+mod test_rebac_dataset_lifecycle_message_consumer;

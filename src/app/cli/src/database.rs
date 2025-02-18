@@ -12,12 +12,11 @@ use std::path::{Path, PathBuf};
 use database_common::*;
 use dill::{Catalog, CatalogBuilder, Component};
 use internal_error::{InternalError, ResultIntoInternal};
-use kamu::domain::TenancyConfig;
 use secrecy::SecretString;
 use tempfile::TempDir;
 
 use crate::config::{DatabaseConfig, DatabaseCredentialSourceConfig, RemoteDatabaseConfig};
-use crate::{config, WorkspaceLayout, DEFAULT_MULTI_TENANT_SQLITE_DATABASE_NAME};
+use crate::{config, WorkspaceLayout, WorkspaceStatus, DEFAULT_WORKSPACE_SQLITE_DATABASE_NAME};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -28,20 +27,18 @@ pub enum AppDatabaseConfig {
     /// The user has specified custom database settings
     Explicit(DatabaseConfig),
     /// No settings are specified, default settings will be used
-    DefaultMultiTenant(DatabaseConfig),
+    Default(DatabaseConfig),
     /// Since there is no workspace, we use a temporary directory to create the
     /// database
-    DefaultMultiTenantInitCommand(DatabaseConfig, OwnedTempPath),
+    DefaultInitCommand(DatabaseConfig, OwnedTempPath),
 }
 
 impl AppDatabaseConfig {
     pub fn into_inner(self) -> (Option<DatabaseConfig>, Option<OwnedTempPath>) {
         match self {
             AppDatabaseConfig::None => (None, None),
-            AppDatabaseConfig::Explicit(c) | AppDatabaseConfig::DefaultMultiTenant(c) => {
-                (Some(c), None)
-            }
-            AppDatabaseConfig::DefaultMultiTenantInitCommand(c, path) => (Some(c), Some(path)),
+            AppDatabaseConfig::Explicit(c) | AppDatabaseConfig::Default(c) => (Some(c), None),
+            AppDatabaseConfig::DefaultInitCommand(c, path) => (Some(c), Some(path)),
         }
     }
 }
@@ -51,34 +48,34 @@ impl AppDatabaseConfig {
 pub fn get_app_database_config(
     workspace_layout: &WorkspaceLayout,
     config: &config::CLIConfig,
-    tenancy_config: TenancyConfig,
-    init_command: bool,
+    workspace_status: WorkspaceStatus,
 ) -> AppDatabaseConfig {
+    if workspace_status == WorkspaceStatus::NoWorkspace {
+        return AppDatabaseConfig::None;
+    }
+
     if let Some(database_config) = config.database.clone() {
         return AppDatabaseConfig::Explicit(database_config);
     }
 
-    if tenancy_config == TenancyConfig::SingleTenant {
-        // Default for multi-tenant workspace only
-        return AppDatabaseConfig::None;
-    };
-
-    let database_path = workspace_layout.default_multi_tenant_database_path();
+    let database_path = workspace_layout.default_workspace_database_path();
     let database_not_exist = !database_path.exists();
 
     // Note: do not overwrite the database if present
-    if init_command && database_not_exist {
+    if let WorkspaceStatus::AboutToBeCreated(_) = workspace_status
+        && database_not_exist
+    {
         let temp_dir = tempfile::tempdir().unwrap();
         let database_path = temp_dir
             .as_ref()
-            .join(DEFAULT_MULTI_TENANT_SQLITE_DATABASE_NAME);
+            .join(DEFAULT_WORKSPACE_SQLITE_DATABASE_NAME);
         let config = DatabaseConfig::sqlite(&database_path);
         let temp_database_path = OwnedTempPath::new(database_path, temp_dir);
 
-        AppDatabaseConfig::DefaultMultiTenantInitCommand(config, temp_database_path)
+        AppDatabaseConfig::DefaultInitCommand(config, temp_database_path)
     } else {
         // Use already created database
-        AppDatabaseConfig::DefaultMultiTenant(DatabaseConfig::sqlite(&database_path))
+        AppDatabaseConfig::Default(DatabaseConfig::sqlite(&database_path))
     }
 }
 
@@ -91,7 +88,7 @@ pub async fn move_initial_database_to_workspace_if_needed(
     if let Some(temp_database_path) = maybe_temp_database_path {
         tokio::fs::copy(
             temp_database_path.path(),
-            workspace_layout.default_multi_tenant_database_path(),
+            workspace_layout.default_workspace_database_path(),
         )
         .await?;
     };

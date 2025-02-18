@@ -17,13 +17,13 @@ use kamu_cli::*;
 async fn test_system_info() {
     let container_runtime = Arc::new(ContainerRuntime::new(ContainerRuntimeConfig::default()));
     let multi_tenant = true;
-    let workpace_svc = Arc::new(WorkspaceService::new(
+    let workspace_svc = Arc::new(WorkspaceService::new(
         Arc::new(WorkspaceService::find_workspace()),
         multi_tenant,
     ));
 
     assert_matches!(
-        SystemInfo::collect(&container_runtime, &workpace_svc).await,
+        SystemInfo::collect(&container_runtime, &workspace_svc).await,
         SystemInfo {
             build: BuildInfo {
                 app_version: VERSION,

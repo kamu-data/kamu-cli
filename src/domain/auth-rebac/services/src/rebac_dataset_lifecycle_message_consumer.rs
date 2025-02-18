@@ -29,7 +29,7 @@ use crate::{DefaultDatasetProperties, MESSAGE_CONSUMER_KAMU_REBAC_SERVICE};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct MultiTenantRebacDatasetLifecycleMessageConsumer {
+pub struct RebacDatasetLifecycleMessageConsumer {
     rebac_service: Arc<dyn RebacService>,
     default_dataset_properties: Arc<DefaultDatasetProperties>,
 }
@@ -44,7 +44,7 @@ pub struct MultiTenantRebacDatasetLifecycleMessageConsumer {
     ],
     delivery: MessageDeliveryMechanism::Immediate,
 })]
-impl MultiTenantRebacDatasetLifecycleMessageConsumer {
+impl RebacDatasetLifecycleMessageConsumer {
     pub fn new(
         rebac_service: Arc<dyn RebacService>,
         default_dataset_properties: Arc<DefaultDatasetProperties>,
@@ -88,16 +88,16 @@ impl MultiTenantRebacDatasetLifecycleMessageConsumer {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl MessageConsumer for MultiTenantRebacDatasetLifecycleMessageConsumer {}
+impl MessageConsumer for RebacDatasetLifecycleMessageConsumer {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl MessageConsumerT<DatasetLifecycleMessage> for MultiTenantRebacDatasetLifecycleMessageConsumer {
+impl MessageConsumerT<DatasetLifecycleMessage> for RebacDatasetLifecycleMessageConsumer {
     #[tracing::instrument(
         level = "debug",
         skip_all,
-        name = "MultiTenantRebacDatasetLifecycleMessageConsumer[DatasetLifecycleMessage]"
+        name = "RebacDatasetLifecycleMessageConsumer[DatasetLifecycleMessage]"
     )]
     async fn consume_message(
         &self,
