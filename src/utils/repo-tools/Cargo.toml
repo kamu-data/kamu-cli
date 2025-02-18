@@ -23,6 +23,7 @@ chrono = { version = "0.4", default-features = false, features = [
     "clock",
 ] }
 clap = { version = "4", default-features = false, features = ["std"] }
+pretty_assertions = { version = "1" }
 regex = { version = "1", default-features = false, features = [
     "std",
     "unicode",
