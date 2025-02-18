@@ -186,6 +186,7 @@ impl odf::DatasetStorageUnit for DatasetStorageUnitS3 {
     fn stored_dataset_ids(&self) -> DatasetIDStream<'_> {
         Box::pin(async_stream::try_stream! {
             for id in self.list_dataset_ids_maybe_cached().await? {
+                // TODO: check HEAD exists
                 yield id;
             }
         })
@@ -293,6 +294,8 @@ impl odf::DatasetStorageUnitWriter for DatasetStorageUnitS3 {
     ) -> Result<(), odf::dataset::DeleteStoredDatasetError> {
         // Ensure key exists in S3
         let _ = self.get_stored_dataset_by_id(dataset_id).await?;
+
+        // IDEA: remove HEAD first
 
         // Remove all objects under the key
         self.delete_dataset_s3_objects(dataset_id)
