@@ -11,7 +11,7 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## [Unreleased]
+## [0.224.0] - 2025-02-18
 ### Added
 - The usage of local database (SQLite) is activated by default for all single tenant workspaces
 ### Fixed
