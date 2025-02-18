@@ -124,7 +124,10 @@ impl CommitDatasetEventUseCase for CommitDatasetEventUseCaseImpl {
             }
         }
 
-        let resolved_dataset = self.dataset_registry.get_dataset_by_handle(dataset_handle);
+        let resolved_dataset = self
+            .dataset_registry
+            .get_dataset_by_handle(dataset_handle)
+            .await;
 
         let commit_result = resolved_dataset
             .commit_event(event, odf::dataset::CommitOpts::default())

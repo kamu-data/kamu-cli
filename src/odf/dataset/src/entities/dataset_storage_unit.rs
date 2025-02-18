@@ -23,25 +23,21 @@ use crate::{AppendError, Dataset, ValidateDatasetSnapshotError};
 #[cfg_attr(feature = "testing", mockall::automock)]
 #[async_trait::async_trait]
 pub trait DatasetStorageUnit: Sync + Send {
-    async fn resolve_stored_dataset_handle_by_ref(
+    fn stored_dataset_ids(&self) -> DatasetIDStream<'_>;
+
+    async fn get_stored_dataset_by_id(
         &self,
-        dataset_ref: &DatasetRef,
-    ) -> Result<DatasetHandle, GetDatasetError>;
-
-    fn stored_dataset_handles(&self) -> DatasetHandleStream<'_>;
-
-    fn stored_dataset_handles_by_owner(
-        &self,
-        account_name: &AccountName,
-    ) -> DatasetHandleStream<'_>;
-
-    fn get_stored_dataset_by_handle(&self, dataset_handle: &DatasetHandle) -> Arc<dyn Dataset>;
+        dataset_id: &DatasetID,
+    ) -> Result<Arc<dyn Dataset>, GetStoredDatasetError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub type DatasetHandleStream<'a> =
     Pin<Box<dyn Stream<Item = Result<DatasetHandle, InternalError>> + Send + 'a>>;
+
+pub type DatasetIDStream<'a> =
+    Pin<Box<dyn Stream<Item = Result<DatasetID, InternalError>> + Send + 'a>>;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -152,7 +148,7 @@ impl InvalidSnapshotError {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
-pub enum GetDatasetError {
+pub enum GetStoredDatasetError {
     #[error(transparent)]
     NotFound(#[from] DatasetNotFoundError),
     #[error(transparent)]
@@ -262,11 +258,11 @@ pub enum RenameDatasetError {
     ),
 }
 
-impl From<GetDatasetError> for RenameDatasetError {
-    fn from(v: GetDatasetError) -> Self {
+impl From<GetStoredDatasetError> for RenameDatasetError {
+    fn from(v: GetStoredDatasetError) -> Self {
         match v {
-            GetDatasetError::NotFound(e) => Self::NotFound(e),
-            GetDatasetError::Internal(e) => Self::Internal(e),
+            GetStoredDatasetError::NotFound(e) => Self::NotFound(e),
+            GetStoredDatasetError::Internal(e) => Self::Internal(e),
         }
     }
 }

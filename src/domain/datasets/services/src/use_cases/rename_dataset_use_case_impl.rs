@@ -62,10 +62,10 @@ impl RenameDatasetUseCase for RenameDatasetUseCaseImpl {
             .await
         {
             Ok(h) => Ok(h),
-            Err(odf::dataset::GetDatasetError::NotFound(e)) => {
+            Err(odf::dataset::GetStoredDatasetError::NotFound(e)) => {
                 Err(odf::dataset::RenameDatasetError::NotFound(e))
             }
-            Err(odf::dataset::GetDatasetError::Internal(e)) => {
+            Err(odf::dataset::GetStoredDatasetError::Internal(e)) => {
                 Err(odf::dataset::RenameDatasetError::Internal(e))
             }
         }?;
@@ -104,7 +104,7 @@ impl RenameDatasetUseCase for RenameDatasetUseCaseImpl {
         // TODO: once we get rid of aliases and unify repo storage,
         // there will be nothing to do at storage level on rename
         self.dataset_storage_unit_writer
-            .rename_dataset(&dataset_handle, new_name)
+            .rename_dataset(&dataset_handle.id, new_name)
             .await?;
 
         Ok(())

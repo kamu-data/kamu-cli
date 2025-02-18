@@ -44,8 +44,10 @@ impl DatasetChangesServiceImpl {
             .get_dataset_by_ref(&dataset_id.as_local_ref())
             .await
             .map_err(|e| match e {
-                odf::dataset::GetDatasetError::NotFound(e) => GetIncrementError::DatasetNotFound(e),
-                odf::dataset::GetDatasetError::Internal(e) => GetIncrementError::Internal(e),
+                odf::dataset::GetStoredDatasetError::NotFound(e) => {
+                    GetIncrementError::DatasetNotFound(e)
+                }
+                odf::dataset::GetStoredDatasetError::Internal(e) => GetIncrementError::Internal(e),
             })
     }
 

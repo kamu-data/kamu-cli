@@ -262,7 +262,7 @@ impl ApiErrorCategorizable for PushIngestError {
     }
 }
 
-impl ApiErrorCategorizable for odf::dataset::GetDatasetError {
+impl ApiErrorCategorizable for odf::dataset::GetStoredDatasetError {
     fn categorize(&self) -> ApiErrorCategory<'_> {
         match &self {
             Self::Internal(e) => ApiErrorCategory::Internal(e),

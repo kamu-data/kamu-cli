@@ -145,11 +145,11 @@ pub enum PushError {
     ),
 }
 
-impl From<odf::dataset::GetDatasetError> for PushError {
-    fn from(v: odf::dataset::GetDatasetError) -> Self {
+impl From<odf::dataset::GetStoredDatasetError> for PushError {
+    fn from(v: odf::dataset::GetStoredDatasetError) -> Self {
         match v {
-            odf::dataset::GetDatasetError::NotFound(e) => e.into(),
-            odf::dataset::GetDatasetError::Internal(e) => e.into(),
+            odf::dataset::GetStoredDatasetError::NotFound(e) => e.into(),
+            odf::dataset::GetStoredDatasetError::Internal(e) => e.into(),
         }
     }
 }

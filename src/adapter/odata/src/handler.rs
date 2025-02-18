@@ -224,14 +224,14 @@ pub async fn odata_collection_handler_common(
         .await
     {
         Ok(hdl) => Ok(hdl),
-        Err(odf::dataset::GetDatasetError::NotFound(_)) => {
+        Err(odf::dataset::GetStoredDatasetError::NotFound(_)) => {
             return Err(ApiError::not_found_without_reason());
         }
         Err(e) => Err(e),
     }
     .unwrap();
 
-    let resolved_dataset = registry.get_dataset_by_handle(&dataset_handle);
+    let resolved_dataset = registry.get_dataset_by_handle(&dataset_handle).await;
 
     let ctx = ODataCollectionContext::new(catalog, addr, resolved_dataset);
     let response = datafusion_odata::handlers::odata_collection_handler(
