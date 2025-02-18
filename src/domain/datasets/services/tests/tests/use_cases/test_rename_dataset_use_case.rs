@@ -12,7 +12,7 @@ use std::sync::Arc;
 
 use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions, MockDatasetActionAuthorizer};
 use kamu_core::MockDidGenerator;
-use kamu_datasets::RenameDatasetUseCase;
+use kamu_datasets::{RenameDatasetError, RenameDatasetUseCase};
 use kamu_datasets_services::{
     DatasetEntryWriter,
     MockDatasetEntryWriter,
@@ -87,7 +87,7 @@ async fn test_rename_dataset_not_found() {
                 &odf::DatasetName::new_unchecked("bar")
             )
             .await,
-        Err(odf::dataset::RenameDatasetError::NotFound(_))
+        Err(RenameDatasetError::NotFound(_))
     );
 }
 
@@ -116,7 +116,7 @@ async fn test_rename_dataset_unauthorized() {
                 &odf::DatasetName::new_unchecked("bar")
             )
             .await,
-        Err(odf::dataset::RenameDatasetError::Access(_))
+        Err(RenameDatasetError::Access(_))
     );
 
     assert_matches!(harness.check_dataset_exists(&alias_foo).await, Ok(_));

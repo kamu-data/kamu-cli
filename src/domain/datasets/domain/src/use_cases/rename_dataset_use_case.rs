@@ -7,6 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use internal_error::InternalError;
+use thiserror::Error;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
@@ -15,7 +18,41 @@ pub trait RenameDatasetUseCase: Send + Sync {
         &self,
         dataset_ref: &odf::DatasetRef,
         new_name: &odf::DatasetName,
-    ) -> Result<(), odf::dataset::RenameDatasetError>;
+    ) -> Result<(), RenameDatasetError>;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum RenameDatasetError {
+    #[error(transparent)]
+    NotFound(#[from] odf::dataset::DatasetNotFoundError),
+
+    #[error(transparent)]
+    NameCollision(#[from] odf::dataset::NameCollisionError),
+
+    #[error(transparent)]
+    Access(
+        #[from]
+        #[backtrace]
+        odf::AccessError,
+    ),
+
+    #[error(transparent)]
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
+}
+
+impl From<odf::dataset::GetStoredDatasetError> for RenameDatasetError {
+    fn from(v: odf::dataset::GetStoredDatasetError) -> Self {
+        match v {
+            odf::dataset::GetStoredDatasetError::NotFound(e) => Self::NotFound(e),
+            odf::dataset::GetStoredDatasetError::Internal(e) => Self::Internal(e),
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

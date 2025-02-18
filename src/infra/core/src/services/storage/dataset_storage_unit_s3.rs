@@ -339,30 +339,6 @@ impl odf::DatasetStorageUnitWriter for DatasetStorageUnitS3 {
         })
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id, %new_name))]
-    async fn rename_dataset(
-        &self,
-        dataset_id: &odf::DatasetID,
-        new_name: &odf::DatasetName,
-    ) -> Result<(), odf::dataset::RenameDatasetError> {
-        // Ensure dataset content exists in S3
-        let dataset = self.get_dataset_impl(dataset_id);
-
-        // Read current alias
-        let current_alias = odf::dataset::read_dataset_alias(dataset.as_ref()).await?;
-
-        // Try writing updated alias
-        // TODO: reconsuder if we need this
-
-        let new_alias =
-            odf::DatasetAlias::new(current_alias.account_name.clone(), new_name.clone());
-
-        self.save_dataset_alias(dataset.as_ref(), &new_alias)
-            .await?;
-
-        Ok(())
-    }
-
     #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id))]
     async fn delete_dataset(
         &self,

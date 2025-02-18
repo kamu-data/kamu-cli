@@ -260,38 +260,6 @@ impl odf::DatasetStorageUnitWriter for DatasetStorageUnitLocalFs {
         })
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id, %new_name))]
-    async fn rename_dataset(
-        &self,
-        dataset_id: &odf::DatasetID,
-        new_name: &odf::DatasetName,
-    ) -> Result<(), odf::dataset::RenameDatasetError> {
-        // Ensure dataset folder exists on disk
-        let layout = self.get_dataset_layout(dataset_id).map_err(|e| match e {
-            odf::dataset::GetStoredDatasetError::NotFound(e) => {
-                odf::dataset::RenameDatasetError::NotFound(e)
-            }
-            odf::dataset::GetStoredDatasetError::Internal(e) => {
-                odf::dataset::RenameDatasetError::Internal(e)
-            }
-        })?;
-
-        // Build dataset pointing to disk location
-        let dataset = DatasetStorageUnitLocalFs::build_dataset(layout);
-
-        // Read current alias
-        let current_alias = odf::dataset::read_dataset_alias(dataset.as_ref()).await?;
-
-        // Try writing updated alias
-        // TODO: reconsuder if we need this
-        let new_alias =
-            odf::DatasetAlias::new(current_alias.account_name.clone(), new_name.clone());
-        self.save_dataset_alias(dataset.as_ref(), &new_alias)
-            .await?;
-
-        Ok(())
-    }
-
     #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id))]
     async fn delete_dataset(
         &self,
