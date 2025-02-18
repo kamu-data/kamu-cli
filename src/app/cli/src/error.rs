@@ -14,6 +14,7 @@ use std::path::PathBuf;
 use internal_error::{BoxedError, InternalError};
 use kamu::domain::engine::normalize_logs;
 use kamu::domain::*;
+use kamu_datasets::DeleteDatasetError;
 use odf::utils::data::format::WriterError;
 use thiserror::Error;
 
@@ -185,13 +186,13 @@ impl From<GetAliasesError> for CLIError {
     }
 }
 
-impl From<odf::dataset::DeleteDatasetError> for CLIError {
-    fn from(v: odf::dataset::DeleteDatasetError) -> Self {
+impl From<DeleteDatasetError> for CLIError {
+    fn from(v: DeleteDatasetError) -> Self {
         match v {
-            e @ (odf::dataset::DeleteDatasetError::NotFound(_)
-            | odf::dataset::DeleteDatasetError::DanglingReference(_)
-            | odf::dataset::DeleteDatasetError::Access(_)) => Self::failure(e),
-            e @ odf::dataset::DeleteDatasetError::Internal(_) => Self::critical(e),
+            e @ (DeleteDatasetError::NotFound(_)
+            | DeleteDatasetError::DanglingReference(_)
+            | DeleteDatasetError::Access(_)) => Self::failure(e),
+            e @ DeleteDatasetError::Internal(_) => Self::critical(e),
         }
     }
 }

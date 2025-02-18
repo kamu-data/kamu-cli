@@ -95,27 +95,6 @@ impl std::fmt::Display for MissingInputsError {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Clone, PartialEq, Eq, Debug)]
-pub struct DanglingReferenceError {
-    pub dataset_handle: DatasetHandle,
-    pub children: Vec<DatasetHandle>,
-}
-
-impl std::fmt::Display for DanglingReferenceError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Dataset {} is referenced by: ", self.dataset_handle)?;
-        for (i, h) in self.children.iter().enumerate() {
-            if i != 0 {
-                write!(f, ", ")?;
-            }
-            write!(f, "{h}")?;
-        }
-        Ok(())
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Error, Clone, PartialEq, Eq, Debug)]
 #[error("Dataset with name {alias} already exists")]
 pub struct NameCollisionError {
     pub alias: DatasetAlias,
@@ -151,6 +130,7 @@ impl InvalidSnapshotError {
 pub enum GetStoredDatasetError {
     #[error(transparent)]
     NotFound(#[from] DatasetNotFoundError),
+
     #[error(transparent)]
     Internal(
         #[from]
@@ -265,28 +245,6 @@ impl From<GetStoredDatasetError> for RenameDatasetError {
             GetStoredDatasetError::Internal(e) => Self::Internal(e),
         }
     }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Error, Debug)]
-pub enum DeleteDatasetError {
-    #[error(transparent)]
-    NotFound(#[from] DatasetNotFoundError),
-    #[error(transparent)]
-    DanglingReference(#[from] DanglingReferenceError),
-    #[error(transparent)]
-    Access(
-        #[from]
-        #[backtrace]
-        AccessError,
-    ),
-    #[error(transparent)]
-    Internal(
-        #[from]
-        #[backtrace]
-        InternalError,
-    ),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

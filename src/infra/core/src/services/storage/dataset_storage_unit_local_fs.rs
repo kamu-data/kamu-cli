@@ -296,19 +296,12 @@ impl odf::DatasetStorageUnitWriter for DatasetStorageUnitLocalFs {
     async fn delete_dataset(
         &self,
         dataset_id: &odf::DatasetID,
-    ) -> Result<(), odf::dataset::DeleteDatasetError> {
+    ) -> Result<(), odf::dataset::DeleteStoredDatasetError> {
         // Ensure dataset folder exists on disk
-        let layout = self.get_dataset_layout(dataset_id).map_err(|e| match e {
-            odf::dataset::GetStoredDatasetError::NotFound(e) => {
-                odf::dataset::DeleteDatasetError::NotFound(e)
-            }
-            odf::dataset::GetStoredDatasetError::Internal(e) => {
-                odf::dataset::DeleteDatasetError::Internal(e)
-            }
-        })?;
+        let layout = self.get_dataset_layout(dataset_id)?;
 
+        // Remove all stored files and the folder itself
         tokio::fs::remove_dir_all(layout.root_dir).await.int_err()?;
-
         Ok(())
     }
 }

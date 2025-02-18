@@ -13,7 +13,7 @@ use std::sync::Arc;
 use dill::Catalog;
 use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions, MockDatasetActionAuthorizer};
 use kamu_core::MockDidGenerator;
-use kamu_datasets::{DatasetLifecycleMessage, DeleteDatasetUseCase};
+use kamu_datasets::{DatasetLifecycleMessage, DeleteDatasetError, DeleteDatasetUseCase};
 use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
 use kamu_datasets_services::testing::expect_outbox_dataset_deleted;
 use kamu_datasets_services::{
@@ -131,7 +131,7 @@ async fn test_delete_dataset_not_found() {
             .use_case
             .execute_via_ref(&alias_foo.as_local_ref())
             .await,
-        Err(odf::dataset::DeleteDatasetError::NotFound(_))
+        Err(DeleteDatasetError::NotFound(_))
     );
 }
 
@@ -159,7 +159,7 @@ async fn test_delete_unauthorized() {
             .use_case
             .execute_via_handle(&foo.dataset_handle)
             .await,
-        Err(odf::dataset::DeleteDatasetError::Access(_))
+        Err(DeleteDatasetError::Access(_))
     );
 
     assert_matches!(harness.check_dataset_exists(&alias_foo).await, Ok(_));
@@ -196,7 +196,7 @@ async fn test_delete_dataset_respects_dangling_refs() {
 
     assert_matches!(
         harness.use_case.execute_via_handle(&root.dataset_handle).await,
-        Err(odf::dataset::DeleteDatasetError::DanglingReference(e)) if e.children == vec![derived.dataset_handle.clone()]
+        Err(DeleteDatasetError::DanglingReference(e)) if e.children == vec![derived.dataset_handle.clone()]
     );
 
     assert_matches!(harness.check_dataset_exists(&alias_foo).await, Ok(_));
