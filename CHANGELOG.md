@@ -12,6 +12,8 @@ Recommendation: for ease of reading, use the following order:
 -->
 
 ## [Unreleased]
+### Added
+- The usage of local database (SQLite) is activated by default for all single tenant workspaces
 ### Fixed
 - Improved error message for SQL parsing method for queries which includes invalid or reserved keywords
 
