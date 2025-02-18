@@ -105,6 +105,12 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
     } else {
         TenancyConfig::SingleTenant
     };
+    let is_in_workspace = workspace_svc.is_in_workspace();
+    let workspace_status = match (maybe_init_command.is_some(), is_in_workspace) {
+        (false, false) => WorkspaceStatus::NoWorkspace,
+        (true, false) => WorkspaceStatus::AboutToBeCreated(tenancy_config),
+        (_, true) => WorkspaceStatus::Created(tenancy_config),
+    };
 
     let config = load_config(&workspace_layout);
     let current_account = AccountService::current_account_indication(
@@ -115,7 +121,6 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
 
     prepare_run_dir(&workspace_layout.run_info_dir);
 
-    let is_in_workspace = workspace_svc.is_in_workspace();
     let is_init_command = maybe_init_command.is_some();
     let app_database_config =
         get_app_database_config(&workspace_layout, &config, is_in_workspace, is_init_command);
@@ -172,7 +177,7 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
         register_config_in_catalog(
             &config,
             &mut base_catalog_builder,
-            tenancy_config,
+            workspace_status,
             is_e2e_testing,
         );
 
@@ -626,7 +631,7 @@ fn load_config(workspace_layout: &WorkspaceLayout) -> config::CLIConfig {
 pub fn register_config_in_catalog(
     config: &config::CLIConfig,
     catalog_builder: &mut CatalogBuilder,
-    tenancy_config: TenancyConfig,
+    workspace_status: WorkspaceStatus,
     is_e2e_testing: bool,
 ) {
     let network_ns = config.engine.as_ref().unwrap().network_ns.unwrap();
@@ -751,37 +756,43 @@ pub fn register_config_in_catalog(
     catalog_builder.add_value(flight_sql_conf.to_session_auth_config());
     catalog_builder.add_value(flight_sql_conf.to_session_caching_config());
 
-    if tenancy_config == TenancyConfig::MultiTenant {
-        let mut implicit_user_config = PredefinedAccountsConfig::new();
-        implicit_user_config.predefined.push(
-            AccountConfig::test_config_from_name(odf::AccountName::new_unchecked(
-                AccountService::default_account_name(TenancyConfig::MultiTenant).as_str(),
-            ))
-            .set_display_name(AccountService::default_user_name(
-                TenancyConfig::MultiTenant,
-            )),
-        );
-
-        if is_e2e_testing {
-            let e2e_user_config =
-                AccountConfig::test_config_from_name(odf::AccountName::new_unchecked("e2e-user"));
-
-            implicit_user_config.predefined.push(e2e_user_config);
-        }
-
-        use merge::Merge;
-        let mut user_config = config.users.clone().unwrap();
-        user_config.merge(implicit_user_config);
-        catalog_builder.add_value(user_config);
-    } else {
-        if let Some(users) = &config.users {
-            assert!(
-                users.predefined.is_empty(),
-                "There cannot be predefined users in a single-tenant workspace"
+    if let Some(tenancy_config) = workspace_status.into_tenancy_config() {
+        if tenancy_config == TenancyConfig::MultiTenant {
+            let mut implicit_user_config = PredefinedAccountsConfig::new();
+            implicit_user_config.predefined.push(
+                AccountConfig::test_config_from_name(odf::AccountName::new_unchecked(
+                    AccountService::default_account_name(TenancyConfig::MultiTenant).as_str(),
+                ))
+                .set_display_name(AccountService::default_user_name(
+                    TenancyConfig::MultiTenant,
+                )),
             );
-        }
 
-        catalog_builder.add_value(PredefinedAccountsConfig::single_tenant());
+            if is_e2e_testing {
+                let e2e_user_config = AccountConfig::test_config_from_name(
+                    odf::AccountName::new_unchecked("e2e-user"),
+                );
+
+                implicit_user_config.predefined.push(e2e_user_config);
+            }
+
+            use merge::Merge;
+            let mut user_config = config.users.clone().unwrap();
+            user_config.merge(implicit_user_config);
+            catalog_builder.add_value(user_config);
+        } else {
+            if let Some(users) = &config.users {
+                assert!(
+                    users.predefined.is_empty(),
+                    "There cannot be predefined users in a single-tenant workspace"
+                );
+            }
+
+            catalog_builder.add_value(PredefinedAccountsConfig::single_tenant());
+        }
+    } else {
+        // No workspace
+        catalog_builder.add_value(PredefinedAccountsConfig::new());
     }
 
     let uploads_config = config.uploads.as_ref().unwrap();
@@ -827,6 +838,22 @@ pub fn register_config_in_catalog(
         Duration::seconds(outbox_config.awaiting_step_secs.unwrap()),
         outbox_config.batch_size.unwrap(),
     ));
+}
+
+pub enum WorkspaceStatus {
+    NoWorkspace,
+    AboutToBeCreated(TenancyConfig),
+    Created(TenancyConfig),
+}
+
+impl WorkspaceStatus {
+    fn into_tenancy_config(self) -> Option<TenancyConfig> {
+        match self {
+            WorkspaceStatus::NoWorkspace => None,
+            WorkspaceStatus::AboutToBeCreated(tenancy_config)
+            | WorkspaceStatus::Created(tenancy_config) => Some(tenancy_config),
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
