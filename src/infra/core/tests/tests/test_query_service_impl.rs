@@ -38,7 +38,7 @@ async fn create_test_dataset(catalog: &dill::Catalog, tempdir: &Path) -> odf::Cr
     let dataset_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
 
     let create_result = dataset_storage_unit_writer
-        .create_dataset(
+        .store_dataset(
             &dataset_alias,
             MetadataFactory::metadata_block(MetadataFactory::seed(odf::DatasetKind::Root).build())
                 .build_typed(),
@@ -419,7 +419,7 @@ async fn test_dataset_tail_empty_dataset() {
         .unwrap();
 
     dataset_storage_unit_writer
-        .create_dataset(
+        .store_dataset(
             &"foo".try_into().unwrap(),
             odf::dataset::make_seed_block(
                 did_generator.generate_dataset_id().0,
@@ -704,7 +704,7 @@ async fn test_sql_statement_with_state_simple() {
     // Dataset init
     let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let foo_create = dataset_storage_unit_writer
-        .create_dataset(
+        .store_dataset(
             &foo_alias,
             MetadataFactory::metadata_block(MetadataFactory::seed(odf::DatasetKind::Root).build())
                 .build_typed(),
@@ -935,7 +935,7 @@ async fn test_sql_statement_with_state_cte() {
     // Dataset `foo`
     let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let foo_created = dataset_storage_unit_writer
-        .create_dataset(
+        .store_dataset(
             &foo_alias,
             MetadataFactory::metadata_block(
                 MetadataFactory::seed(odf::DatasetKind::Root)
@@ -989,7 +989,7 @@ async fn test_sql_statement_with_state_cte() {
     // Dataset `bar`
     let bar_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
     let bar_created = dataset_storage_unit_writer
-        .create_dataset(
+        .store_dataset(
             &bar_alias,
             MetadataFactory::metadata_block(
                 MetadataFactory::seed(odf::DatasetKind::Root)

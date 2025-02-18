@@ -278,7 +278,7 @@ impl RemoteStatusTestHarness {
                 .build_typed();
 
         self.dataset_storage_unit_writer()
-            .create_dataset(&local_alias, seed_block)
+            .store_dataset(&local_alias, seed_block)
             .await
             .unwrap()
     }

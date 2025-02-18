@@ -215,9 +215,9 @@ pub enum SyncError {
     #[error(transparent)]
     RefCollision(#[from] odf::dataset::RefCollisionError),
     #[error(transparent)]
-    NameCollision(#[from] odf::dataset::NameCollisionError),
+    NameCollision(#[from] kamu_datasets::NameCollisionError),
     #[error(transparent)]
-    CreateDatasetFailed(#[from] odf::dataset::CreateDatasetError),
+    CreateDatasetFailed(#[from] kamu_datasets::CreateDatasetError),
     #[error(transparent)]
     UnsupportedProtocol(#[from] odf::dataset::UnsupportedProtocolError),
     #[error(transparent)]

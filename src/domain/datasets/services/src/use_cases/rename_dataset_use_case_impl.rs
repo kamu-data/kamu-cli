@@ -12,7 +12,7 @@ use std::sync::Arc;
 use dill::{component, interface};
 use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer, DatasetActionUnauthorizedError};
 use kamu_core::DatasetRegistry;
-use kamu_datasets::{RenameDatasetError, RenameDatasetUseCase};
+use kamu_datasets::{NameCollisionError, RenameDatasetError, RenameDatasetUseCase};
 
 use crate::{DatasetEntryWriter, RenameDatasetEntryError};
 
@@ -84,7 +84,7 @@ impl RenameDatasetUseCase for RenameDatasetUseCaseImpl {
             .map_err(|e| match e {
                 RenameDatasetEntryError::Internal(e) => RenameDatasetError::Internal(e),
                 RenameDatasetEntryError::NameCollision(e) => {
-                    RenameDatasetError::NameCollision(odf::dataset::NameCollisionError {
+                    RenameDatasetError::NameCollision(NameCollisionError {
                         alias: odf::DatasetAlias::new(
                             dataset_handle.alias.account_name.clone(),
                             e.dataset_name,

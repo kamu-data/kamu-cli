@@ -20,6 +20,7 @@ use kamu_datasets::{
     AppendDatasetMetadataBatchUseCase,
     CreateDatasetUseCase,
     CreateDatasetUseCaseOptions,
+    NameCollisionError,
 };
 use odf::metadata::AsTypedBlock as _;
 use serde::de::DeserializeOwned;
@@ -331,7 +332,7 @@ impl WsSmartTransferProtocolClient {
                         })
                     }
                     DatasetPushObjectsTransferError::NameCollision(err) => {
-                        PushClientError::NameCollision(odf::dataset::NameCollisionError {
+                        PushClientError::NameCollision(NameCollisionError {
                             alias: err.dataset_alias,
                         })
                     }

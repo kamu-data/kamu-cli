@@ -7,6 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use internal_error::InternalError;
+use thiserror::Error;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
@@ -16,7 +19,7 @@ pub trait CreateDatasetUseCase: Send + Sync {
         dataset_alias: &odf::DatasetAlias,
         seed_block: odf::MetadataBlockTyped<odf::metadata::Seed>,
         options: CreateDatasetUseCaseOptions,
-    ) -> Result<odf::CreateDatasetResult, odf::dataset::CreateDatasetError>;
+    ) -> Result<odf::CreateDatasetResult, CreateDatasetError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -24,6 +27,35 @@ pub trait CreateDatasetUseCase: Send + Sync {
 #[derive(Debug, Copy, Clone, Default)]
 pub struct CreateDatasetUseCaseOptions {
     pub dataset_visibility: odf::DatasetVisibility,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum CreateDatasetError {
+    #[error("Dataset is empty")]
+    EmptyDataset,
+
+    #[error(transparent)]
+    NameCollision(#[from] NameCollisionError),
+
+    #[error(transparent)]
+    RefCollision(#[from] odf::dataset::RefCollisionError),
+
+    #[error(transparent)]
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Clone, PartialEq, Eq, Debug)]
+#[error("Dataset with name {alias} already exists")]
+pub struct NameCollisionError {
+    pub alias: odf::DatasetAlias,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

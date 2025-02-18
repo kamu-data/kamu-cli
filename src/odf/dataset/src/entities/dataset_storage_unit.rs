@@ -10,12 +10,12 @@
 use std::pin::Pin;
 use std::sync::Arc;
 
-use internal_error::{ErrorIntoInternal, InternalError};
+use internal_error::InternalError;
 use odf_metadata::*;
 use thiserror::Error;
 use tokio_stream::Stream;
 
-use crate::{AppendError, Dataset, ValidateDatasetSnapshotError};
+use crate::Dataset;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -33,6 +33,7 @@ pub trait DatasetStorageUnit: Sync + Send {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// TODO: move from here
 pub type DatasetHandleStream<'a> =
     Pin<Box<dyn Stream<Item = Result<DatasetHandle, InternalError>> + Send + 'a>>;
 
@@ -41,6 +42,7 @@ pub type DatasetIDStream<'a> =
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// TODO: redesign, split between use cases and storage
 pub struct CreateDatasetResult {
     pub dataset_handle: DatasetHandle,
     pub dataset: Arc<dyn Dataset>,
@@ -64,64 +66,8 @@ impl CreateDatasetResult {
 #[derive(Error, Clone, PartialEq, Eq, Debug)]
 #[error("Dataset not found: {dataset_ref}")]
 pub struct DatasetNotFoundError {
+    // TODO: only ID-based errors are normal here
     pub dataset_ref: DatasetRef,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Error, Clone, PartialEq, Eq, Debug)]
-pub struct MissingInputsError {
-    pub dataset_ref: DatasetRef,
-    pub missing_inputs: Vec<DatasetRef>,
-}
-
-impl std::fmt::Display for MissingInputsError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "Dataset {} is referencing non-existing inputs: ",
-            self.dataset_ref
-        )?;
-        for (i, h) in self.missing_inputs.iter().enumerate() {
-            if i != 0 {
-                write!(f, ", ")?;
-            }
-            write!(f, "{h}")?;
-        }
-        Ok(())
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Error, Clone, PartialEq, Eq, Debug)]
-#[error("Dataset with name {alias} already exists")]
-pub struct NameCollisionError {
-    pub alias: DatasetAlias,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Error, Clone, PartialEq, Eq, Debug)]
-#[error("Dataset with id {id} already exists")]
-pub struct RefCollisionError {
-    pub id: DatasetID,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Error, Clone, PartialEq, Eq, Debug)]
-#[error("Invalid snapshot: {reason}")]
-pub struct InvalidSnapshotError {
-    pub reason: String,
-}
-
-impl InvalidSnapshotError {
-    pub fn new(reason: impl Into<String>) -> Self {
-        Self {
-            reason: reason.into(),
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -137,83 +83,6 @@ pub enum GetStoredDatasetError {
         #[backtrace]
         InternalError,
     ),
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Error, Debug)]
-pub enum CreateDatasetError {
-    #[error("Dataset is empty")]
-    EmptyDataset,
-    #[error(transparent)]
-    NameCollision(#[from] NameCollisionError),
-    #[error(transparent)]
-    RefCollision(#[from] RefCollisionError),
-    #[error(transparent)]
-    Internal(
-        #[from]
-        #[backtrace]
-        InternalError,
-    ),
-}
-
-#[derive(Error, Debug)]
-pub enum CreateDatasetFromSnapshotError {
-    #[error(transparent)]
-    InvalidSnapshot(#[from] InvalidSnapshotError),
-    #[error(transparent)]
-    MissingInputs(#[from] MissingInputsError),
-    #[error(transparent)]
-    NameCollision(#[from] NameCollisionError),
-    #[error(transparent)]
-    RefCollision(#[from] RefCollisionError),
-    #[error(transparent)]
-    Internal(
-        #[from]
-        #[backtrace]
-        InternalError,
-    ),
-}
-
-impl From<CreateDatasetError> for CreateDatasetFromSnapshotError {
-    fn from(v: CreateDatasetError) -> Self {
-        match v {
-            CreateDatasetError::EmptyDataset => unreachable!(),
-            CreateDatasetError::NameCollision(e) => Self::NameCollision(e),
-            CreateDatasetError::RefCollision(e) => Self::RefCollision(e),
-            CreateDatasetError::Internal(e) => Self::Internal(e),
-        }
-    }
-}
-
-impl From<AppendError> for CreateDatasetFromSnapshotError {
-    fn from(v: AppendError) -> Self {
-        match v {
-            AppendError::InvalidBlock(e) => {
-                Self::InvalidSnapshot(InvalidSnapshotError::new(e.to_string()))
-            }
-            AppendError::RefCASFailed(_) | AppendError::Access(_) | AppendError::RefNotFound(_) => {
-                Self::Internal(v.int_err())
-            }
-            AppendError::Internal(e) => Self::Internal(e),
-        }
-    }
-}
-
-impl From<ValidateDatasetSnapshotError> for CreateDatasetFromSnapshotError {
-    fn from(v: ValidateDatasetSnapshotError) -> Self {
-        match v {
-            ValidateDatasetSnapshotError::InvalidSnapshot(e) => {
-                CreateDatasetFromSnapshotError::InvalidSnapshot(e)
-            }
-            ValidateDatasetSnapshotError::MissingInputs(e) => {
-                CreateDatasetFromSnapshotError::MissingInputs(e)
-            }
-            ValidateDatasetSnapshotError::Internal(e) => {
-                CreateDatasetFromSnapshotError::Internal(e)
-            }
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
