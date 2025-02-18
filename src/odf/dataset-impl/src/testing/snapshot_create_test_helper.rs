@@ -26,6 +26,9 @@ pub async fn create_test_dataset_from_snapshot(
         .await
         .int_err()?;
 
+    // Remember alias
+    let alias = snapshot.name.clone();
+
     // Create dataset in the storage unit
     let store_dataset_result = storage_unit_writer
         .store_dataset(make_seed_block(dataset_id, snapshot.kind, system_time))
@@ -65,6 +68,10 @@ pub async fn create_test_dataset_from_snapshot(
         )
         .await
         .int_err()?;
+
+    write_dataset_alias(store_dataset_result.dataset.as_ref(), &alias)
+        .await
+        .unwrap();
 
     Ok(StoreDatasetResult {
         head: append_result.proposed_head,
