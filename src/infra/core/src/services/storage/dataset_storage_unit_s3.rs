@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashSet;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -141,8 +142,8 @@ impl DatasetStorageUnitS3 {
     }
 
     #[tracing::instrument(level = "info", skip_all)]
-    async fn list_dataset_ids_in_s3(&self) -> Result<Vec<odf::DatasetID>, InternalError> {
-        let mut res = Vec::new();
+    async fn list_dataset_ids_in_s3(&self) -> Result<HashSet<odf::DatasetID>, InternalError> {
+        let mut res = HashSet::new();
 
         let folders_common_prefixes = self.s3_context.bucket_list_folders().await?;
 
@@ -153,14 +154,16 @@ impl DatasetStorageUnitS3 {
             }
 
             if let Ok(id) = odf::DatasetID::from_multibase_string(&prefix) {
-                res.push(id);
+                res.insert(id);
             }
         }
 
         Ok(res)
     }
 
-    async fn list_dataset_ids_maybe_cached(&self) -> Result<Vec<odf::DatasetID>, InternalError> {
+    async fn list_dataset_ids_maybe_cached(
+        &self,
+    ) -> Result<HashSet<odf::DatasetID>, InternalError> {
         if let Some(cache) = &self.registry_cache {
             let mut cache = cache.state.lock().await;
 
@@ -319,7 +322,7 @@ impl odf::DatasetStorageUnitWriter for DatasetStorageUnitS3 {
         // Update cache if enabled
         if let Some(cache) = &self.registry_cache {
             let mut cache = cache.state.lock().await;
-            cache.dataset_ids.push(dataset_handle.id.clone());
+            cache.dataset_ids.insert(dataset_handle.id.clone());
         }
 
         tracing::info!(
@@ -364,27 +367,19 @@ impl odf::DatasetStorageUnitWriter for DatasetStorageUnitS3 {
     async fn delete_dataset(
         &self,
         dataset_id: &odf::DatasetID,
-    ) -> Result<(), odf::dataset::DeleteDatasetError> {
-        let _ = self
-            .get_stored_dataset_by_id(dataset_id)
-            .await
-            .map_err(|e| match e {
-                odf::dataset::GetStoredDatasetError::NotFound(e) => {
-                    odf::dataset::DeleteDatasetError::NotFound(e)
-                }
-                odf::dataset::GetStoredDatasetError::Internal(e) => {
-                    odf::dataset::DeleteDatasetError::Internal(e)
-                }
-            })?;
+    ) -> Result<(), odf::dataset::DeleteStoredDatasetError> {
+        // Ensure key exists in S3
+        let _ = self.get_stored_dataset_by_id(dataset_id).await?;
 
+        // Remove all objects under the key
         self.delete_dataset_s3_objects(dataset_id)
             .await
-            .map_err(odf::dataset::DeleteDatasetError::Internal)?;
+            .map_err(odf::dataset::DeleteStoredDatasetError::Internal)?;
 
         // Update cache if enabled
         if let Some(cache) = &self.registry_cache {
             let mut cache = cache.state.lock().await;
-            cache.dataset_ids.retain(|id| id != dataset_id);
+            cache.dataset_ids.remove(dataset_id);
         }
 
         Ok(())
@@ -398,7 +393,7 @@ pub struct S3RegistryCache {
 }
 
 struct State {
-    dataset_ids: Vec<odf::DatasetID>,
+    dataset_ids: HashSet<odf::DatasetID>,
     last_updated: DateTime<Utc>,
 }
 
@@ -408,7 +403,7 @@ impl S3RegistryCache {
     pub fn new() -> Self {
         Self {
             state: Arc::new(Mutex::new(State {
-                dataset_ids: Vec::new(),
+                dataset_ids: HashSet::new(),
                 last_updated: DateTime::UNIX_EPOCH,
             })),
         }

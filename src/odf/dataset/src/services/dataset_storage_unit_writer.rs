@@ -7,9 +7,17 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use internal_error::InternalError;
 use odf_metadata::{DatasetAlias, DatasetID, DatasetName, MetadataBlockTyped, Seed};
+use thiserror::Error;
 
-use crate::{CreateDatasetError, CreateDatasetResult, DeleteDatasetError, RenameDatasetError};
+use crate::{
+    CreateDatasetError,
+    CreateDatasetResult,
+    DatasetNotFoundError,
+    GetStoredDatasetError,
+    RenameDatasetError,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -28,7 +36,31 @@ pub trait DatasetStorageUnitWriter: Sync + Send {
         new_name: &DatasetName,
     ) -> Result<(), RenameDatasetError>;
 
-    async fn delete_dataset(&self, dataset_id: &DatasetID) -> Result<(), DeleteDatasetError>;
+    async fn delete_dataset(&self, dataset_id: &DatasetID) -> Result<(), DeleteStoredDatasetError>;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum DeleteStoredDatasetError {
+    #[error(transparent)]
+    NotFound(#[from] DatasetNotFoundError),
+
+    #[error(transparent)]
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
+}
+
+impl From<GetStoredDatasetError> for DeleteStoredDatasetError {
+    fn from(value: GetStoredDatasetError) -> Self {
+        match value {
+            GetStoredDatasetError::NotFound(e) => Self::NotFound(e),
+            GetStoredDatasetError::Internal(e) => Self::Internal(e),
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
