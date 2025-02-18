@@ -104,6 +104,9 @@ impl odf::DatasetStorageUnit for DatasetStorageUnitLocalFs {
                 }
 
                 let dataset_id = odf::DatasetID::from_multibase_string(dataset_dir_entry.file_name().to_str().unwrap()).int_err()?;
+
+                // TODO: check HEAD exists
+
                 yield dataset_id;
             }
         })
@@ -211,6 +214,8 @@ impl odf::DatasetStorageUnitWriter for DatasetStorageUnitLocalFs {
     ) -> Result<(), odf::dataset::DeleteStoredDatasetError> {
         // Ensure dataset folder exists on disk
         let layout = self.get_dataset_layout(dataset_id)?;
+
+        // IDEA: remove HEAD first
 
         // Remove all stored files and the folder itself
         tokio::fs::remove_dir_all(layout.root_dir).await.int_err()?;

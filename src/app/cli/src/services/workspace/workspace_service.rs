@@ -293,6 +293,7 @@ impl WorkspaceService {
                             format!(
                                 "{}/{}",
                                 account_dir_entry.file_name().to_str().unwrap(),
+                                // FIX: should use dataset name
                                 dataset_dir_entry.file_name().to_str().unwrap()
                             ),
                         )
