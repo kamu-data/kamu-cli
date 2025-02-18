@@ -16,7 +16,7 @@ use secrecy::SecretString;
 use tempfile::TempDir;
 
 use crate::config::{DatabaseConfig, DatabaseCredentialSourceConfig, RemoteDatabaseConfig};
-use crate::{config, WorkspaceLayout, DEFAULT_WORKSPACE_SQLITE_DATABASE_NAME};
+use crate::{config, WorkspaceLayout, WorkspaceStatus, DEFAULT_WORKSPACE_SQLITE_DATABASE_NAME};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -48,10 +48,9 @@ impl AppDatabaseConfig {
 pub fn get_app_database_config(
     workspace_layout: &WorkspaceLayout,
     config: &config::CLIConfig,
-    is_in_workspace: bool,
-    init_command: bool,
+    workspace_status: WorkspaceStatus,
 ) -> AppDatabaseConfig {
-    if !init_command && !is_in_workspace {
+    if workspace_status == WorkspaceStatus::NoWorkspace {
         return AppDatabaseConfig::None;
     }
 
@@ -63,7 +62,9 @@ pub fn get_app_database_config(
     let database_not_exist = !database_path.exists();
 
     // Note: do not overwrite the database if present
-    if init_command && database_not_exist {
+    if let WorkspaceStatus::AboutToBeCreated(_) = workspace_status
+        && database_not_exist
+    {
         let temp_dir = tempfile::tempdir().unwrap();
         let database_path = temp_dir
             .as_ref()
