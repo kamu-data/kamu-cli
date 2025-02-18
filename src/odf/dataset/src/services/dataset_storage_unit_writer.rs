@@ -7,11 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::sync::Arc;
+
 use internal_error::InternalError;
-use odf_metadata::{DatasetAlias, DatasetID, MetadataBlockTyped, Seed};
+use odf_metadata::{DatasetID, MetadataBlockTyped, Multihash, Seed};
 use thiserror::Error;
 
-use crate::{CreateDatasetResult, DatasetNotFoundError, GetStoredDatasetError};
+use crate::{Dataset, DatasetNotFoundError, GetStoredDatasetError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -20,11 +22,28 @@ use crate::{CreateDatasetResult, DatasetNotFoundError, GetStoredDatasetError};
 pub trait DatasetStorageUnitWriter: Sync + Send {
     async fn store_dataset(
         &self,
-        dataset_alias: &DatasetAlias,
         seed_block: MetadataBlockTyped<Seed>,
-    ) -> Result<CreateDatasetResult, StoreDatasetError>;
+    ) -> Result<StoreDatasetResult, StoreDatasetError>;
 
     async fn delete_dataset(&self, dataset_id: &DatasetID) -> Result<(), DeleteStoredDatasetError>;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct StoreDatasetResult {
+    pub dataset_id: DatasetID,
+    pub dataset: Arc<dyn Dataset>,
+    pub head: Multihash,
+}
+
+impl StoreDatasetResult {
+    pub fn new(dataset_id: DatasetID, dataset: Arc<dyn Dataset>, head: Multihash) -> Self {
+        Self {
+            dataset_id,
+            dataset,
+            head,
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

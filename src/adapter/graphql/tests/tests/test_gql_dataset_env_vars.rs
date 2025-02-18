@@ -13,7 +13,7 @@ use dill::Component;
 use indoc::indoc;
 use kamu::DatasetStorageUnitLocalFs;
 use kamu_core::{auth, DidGeneratorDefault, TenancyConfig};
-use kamu_datasets::{CreateDatasetFromSnapshotUseCase, DatasetEnvVarsConfig};
+use kamu_datasets::{CreateDatasetFromSnapshotUseCase, CreateDatasetResult, DatasetEnvVarsConfig};
 use kamu_datasets_inmem::{
     InMemoryDatasetDependencyRepository,
     InMemoryDatasetEntryRepository,
@@ -366,7 +366,7 @@ impl DatasetEnvVarsHarness {
         }
     }
 
-    async fn create_dataset(&self) -> odf::CreateDatasetResult {
+    async fn create_dataset(&self) -> CreateDatasetResult {
         let create_dataset_from_snapshot = self
             .catalog_authorized
             .get_one::<dyn CreateDatasetFromSnapshotUseCase>()

@@ -23,7 +23,7 @@ use kamu_accounts_services::{
     LoginPasswordAuthProvider,
     PredefinedAccountsRegistrator,
 };
-use kamu_datasets::CreateDatasetFromSnapshotUseCase;
+use kamu_datasets::{CreateDatasetFromSnapshotUseCase, CreateDatasetResult};
 use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEntryRepository};
 use kamu_datasets_services::{
     CreateDatasetFromSnapshotUseCaseImpl,
@@ -432,7 +432,7 @@ impl TestHarness {
         }
     }
 
-    async fn create_simple_dataset(&self) -> odf::CreateDatasetResult {
+    async fn create_simple_dataset(&self) -> CreateDatasetResult {
         let create_dataset_from_snapshot = self
             .catalog
             .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
@@ -488,8 +488,8 @@ impl TestHarness {
         ds
     }
 
-    async fn ingest_from_url(&self, created: &odf::CreateDatasetResult, url: Url) {
-        let target = ResolvedDataset::from(created);
+    async fn ingest_from_url(&self, created: &CreateDatasetResult, url: Url) {
+        let target = ResolvedDataset::from_created(created);
 
         let ingest_plan = self
             .push_ingest_planner

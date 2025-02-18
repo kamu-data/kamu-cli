@@ -15,7 +15,7 @@ use kamu::*;
 use kamu_accounts::testing::MockAuthenticationService;
 use kamu_accounts::{AuthenticationService, DEFAULT_ACCOUNT_NAME};
 use kamu_core::*;
-use kamu_datasets::CreateDatasetFromSnapshotUseCase;
+use kamu_datasets::{CreateDatasetFromSnapshotUseCase, CreateDatasetResult};
 use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEntryRepository};
 use kamu_datasets_services::{
     CreateDatasetFromSnapshotUseCaseImpl,
@@ -230,7 +230,7 @@ impl DatasetMetadataHarness {
         }
     }
 
-    async fn create_root_dataset(&self) -> odf::CreateDatasetResult {
+    async fn create_root_dataset(&self) -> CreateDatasetResult {
         let create_dataset_from_snapshot = self
             .catalog_authorized
             .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
@@ -251,7 +251,7 @@ impl DatasetMetadataHarness {
             .unwrap()
     }
 
-    async fn create_derived_dataset(&self) -> odf::CreateDatasetResult {
+    async fn create_derived_dataset(&self) -> CreateDatasetResult {
         let create_dataset_from_snapshot = self
             .catalog_authorized
             .get_one::<dyn CreateDatasetFromSnapshotUseCase>()

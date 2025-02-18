@@ -24,7 +24,7 @@ use kamu_accounts_services::{
     PredefinedAccountsRegistrator,
 };
 use kamu_adapter_http::DatasetAuthorizationLayer;
-use kamu_datasets::CreateDatasetFromSnapshotUseCase;
+use kamu_datasets::{CreateDatasetFromSnapshotUseCase, CreateDatasetResult};
 use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEntryRepository};
 use kamu_datasets_services::{
     CreateDatasetFromSnapshotUseCaseImpl,
@@ -46,7 +46,7 @@ use crate::harness::await_client_server_flow;
 struct RepoFixture {
     tmp_dir: tempfile::TempDir,
     catalog: dill::Catalog,
-    created_dataset: odf::CreateDatasetResult,
+    created_dataset: CreateDatasetResult,
 }
 
 async fn setup_repo() -> RepoFixture {

@@ -10,7 +10,12 @@
 use internal_error::{ErrorIntoInternal, InternalError};
 use thiserror::Error;
 
-use crate::{CreateDatasetError, CreateDatasetUseCaseOptions, NameCollisionError};
+use crate::{
+    CreateDatasetError,
+    CreateDatasetResult,
+    CreateDatasetUseCaseOptions,
+    NameCollisionError,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -20,7 +25,7 @@ pub trait CreateDatasetFromSnapshotUseCase: Send + Sync {
         &self,
         snapshot: odf::DatasetSnapshot,
         options: CreateDatasetUseCaseOptions,
-    ) -> Result<odf::CreateDatasetResult, CreateDatasetFromSnapshotError>;
+    ) -> Result<CreateDatasetResult, CreateDatasetFromSnapshotError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

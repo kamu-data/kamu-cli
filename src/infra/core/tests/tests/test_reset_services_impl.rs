@@ -202,18 +202,17 @@ impl ResetTestHarness {
         )
         .build_typed();
 
-        let create_result = self
+        let dataset_alias = odf::DatasetAlias::new(None, dataset_name.clone());
+
+        let stored = self
             .dataset_storage_unit_writer()
-            .store_dataset(
-                &odf::DatasetAlias::new(None, dataset_name.clone()),
-                seed_block,
-            )
+            .store_dataset(seed_block)
             .await
             .unwrap();
 
-        let dataset_handle = create_result.dataset_handle;
-        let hash_seed_block = create_result.head;
-        let hash_polling_source_block = create_result
+        let dataset_handle = odf::DatasetHandle::new(stored.dataset_id, dataset_alias);
+        let hash_seed_block = stored.head;
+        let hash_polling_source_block = stored
             .dataset
             .commit_event(
                 odf::MetadataEvent::SetPollingSource(MetadataFactory::set_polling_source().build()),

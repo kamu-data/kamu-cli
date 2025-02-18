@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use kamu_datasets::CreateDatasetResult;
 use odf::dataset::DatasetLayout;
 use odf::metadata::testing::MetadataFactory;
 
@@ -21,7 +22,7 @@ pub(crate) struct SmartPushNewEmptyDatasetScenario<TServerHarness: ServerSideHar
     pub client_dataset_layout: DatasetLayout,
     pub server_dataset_ref: odf::DatasetRefRemote,
     pub client_dataset_ref: odf::DatasetRef,
-    pub client_create_result: odf::CreateDatasetResult,
+    pub client_create_result: CreateDatasetResult,
 }
 
 impl<TServerHarness: ServerSideHarness> SmartPushNewEmptyDatasetScenario<TServerHarness> {

@@ -13,7 +13,7 @@ use dill::Component;
 use indoc::indoc;
 use kamu::{DatasetStorageUnitLocalFs, MetadataQueryServiceImpl};
 use kamu_core::{auth, DidGeneratorDefault, TenancyConfig};
-use kamu_datasets::CreateDatasetFromSnapshotUseCase;
+use kamu_datasets::{CreateDatasetFromSnapshotUseCase, CreateDatasetResult};
 use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEntryRepository};
 use kamu_datasets_services::{
     CreateDatasetFromSnapshotUseCaseImpl,
@@ -1092,7 +1092,7 @@ impl FlowTriggerHarness {
         }
     }
 
-    async fn create_root_dataset(&self) -> odf::CreateDatasetResult {
+    async fn create_root_dataset(&self) -> CreateDatasetResult {
         let create_dataset_from_snapshot = self
             .catalog_authorized
             .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
@@ -1111,7 +1111,7 @@ impl FlowTriggerHarness {
             .unwrap()
     }
 
-    async fn create_root_dataset_no_source(&self) -> odf::CreateDatasetResult {
+    async fn create_root_dataset_no_source(&self) -> CreateDatasetResult {
         let create_dataset_from_snapshot = self
             .catalog_authorized
             .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
@@ -1129,7 +1129,7 @@ impl FlowTriggerHarness {
             .unwrap()
     }
 
-    async fn create_derived_dataset(&self) -> odf::CreateDatasetResult {
+    async fn create_derived_dataset(&self) -> CreateDatasetResult {
         let create_dataset_from_snapshot = self
             .catalog_authorized
             .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
@@ -1152,7 +1152,7 @@ impl FlowTriggerHarness {
             .unwrap()
     }
 
-    async fn create_derived_dataset_no_transform(&self) -> odf::CreateDatasetResult {
+    async fn create_derived_dataset_no_transform(&self) -> CreateDatasetResult {
         let create_dataset_from_snapshot = self
             .catalog_authorized
             .get_one::<dyn CreateDatasetFromSnapshotUseCase>()

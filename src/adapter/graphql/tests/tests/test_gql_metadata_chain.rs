@@ -16,7 +16,7 @@ use indoc::indoc;
 use kamu::*;
 use kamu_accounts::DEFAULT_ACCOUNT_NAME;
 use kamu_core::*;
-use kamu_datasets::{CreateDatasetFromSnapshotUseCase, CreateDatasetUseCase};
+use kamu_datasets::{CreateDatasetFromSnapshotUseCase, CreateDatasetResult, CreateDatasetUseCase};
 use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEntryRepository};
 use kamu_datasets_services::{
     CommitDatasetEventUseCaseImpl,
@@ -663,7 +663,7 @@ impl GraphQLMetadataChainHarness {
     async fn create_root_dataset(
         &self,
         account_name: Option<odf::AccountName>,
-    ) -> odf::CreateDatasetResult {
+    ) -> CreateDatasetResult {
         let create_dataset_from_snapshot = self
             .catalog_authorized
             .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
@@ -687,7 +687,7 @@ impl GraphQLMetadataChainHarness {
     async fn create_derived_dataset(
         &self,
         account_name: Option<odf::AccountName>,
-    ) -> odf::CreateDatasetResult {
+    ) -> CreateDatasetResult {
         let create_dataset_from_snapshot = self
             .catalog_authorized
             .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
