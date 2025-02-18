@@ -272,19 +272,11 @@ impl RemoteStatusTestHarness {
     }
 
     async fn create_dataset(&self) -> CreateDatasetResult {
-        let local_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("local"));
-
-        let seed_block =
-            MetadataFactory::metadata_block(MetadataFactory::seed(odf::DatasetKind::Root).build())
-                .build_typed();
-
-        let stored = self
-            .dataset_storage_unit_writer()
-            .store_dataset(seed_block)
-            .await
-            .unwrap();
-
-        CreateDatasetResult::from_stored(stored, local_alias)
+        self.create_root_dataset(&odf::DatasetAlias::new(
+            None,
+            odf::DatasetName::new_unchecked("local"),
+        ))
+        .await
     }
 
     async fn push_dataset(&self, handle: &odf::DatasetHandle) -> odf::DatasetRefRemote {
