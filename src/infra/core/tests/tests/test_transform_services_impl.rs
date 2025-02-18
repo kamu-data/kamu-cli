@@ -341,7 +341,7 @@ async fn test_get_verification_plan_one_to_one() {
     let root_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let root_create_result = harness
         .dataset_storage_unit_writer
-        .create_dataset(
+        .store_dataset(
             &root_alias,
             MetadataFactory::metadata_block(
                 MetadataFactory::seed(odf::DatasetKind::Root)
@@ -374,7 +374,7 @@ async fn test_get_verification_plan_one_to_one() {
     let deriv_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
     let deriv_create_result = harness
         .dataset_storage_unit_writer
-        .create_dataset(
+        .store_dataset(
             &deriv_alias,
             MetadataFactory::metadata_block(
                 MetadataFactory::seed(odf::DatasetKind::Derivative)

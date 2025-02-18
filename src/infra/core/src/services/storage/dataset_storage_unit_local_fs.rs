@@ -12,9 +12,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use dill::*;
-use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
-use kamu_accounts::CurrentAccountSubject;
-use kamu_core::TenancyConfig;
+use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use odf::dataset::{DatasetIDStream, DatasetImpl, MetadataChainImpl};
 use odf::storage::lfs::{NamedObjectRepositoryLocalFS, ObjectRepositoryLocalFSSha3};
 use odf::storage::{
@@ -28,24 +26,14 @@ use url::Url;
 
 pub struct DatasetStorageUnitLocalFs {
     root: PathBuf,
-    current_account_subject: Arc<CurrentAccountSubject>,
-    tenancy_config: Arc<TenancyConfig>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
 impl DatasetStorageUnitLocalFs {
-    pub fn new(
-        root: PathBuf,
-        current_account_subject: Arc<CurrentAccountSubject>,
-        tenancy_config: Arc<TenancyConfig>,
-    ) -> Self {
-        Self {
-            root,
-            current_account_subject,
-            tenancy_config,
-        }
+    pub fn new(root: PathBuf) -> Self {
+        Self { root }
     }
 
     // TODO: Public only for testing
@@ -82,40 +70,6 @@ impl DatasetStorageUnitLocalFs {
     fn get_dataset_path(&self, dataset_id: &odf::DatasetID) -> PathBuf {
         self.root
             .join(dataset_id.as_multibase().to_stack_string().as_str())
-    }
-
-    fn canonical_dataset_alias(&self, raw_alias: &odf::DatasetAlias) -> odf::DatasetAlias {
-        match self.tenancy_config.as_ref() {
-            TenancyConfig::SingleTenant => raw_alias.clone(),
-            TenancyConfig::MultiTenant => {
-                let account_name = if raw_alias.is_multi_tenant() {
-                    raw_alias.account_name.as_ref().unwrap()
-                } else {
-                    match self.current_account_subject.as_ref() {
-                        CurrentAccountSubject::Anonymous(_) => {
-                            panic!("Anonymous account misused, use multi-tenant alias");
-                        }
-                        CurrentAccountSubject::Logged(l) => &l.account_name,
-                    }
-                };
-
-                odf::DatasetAlias::new(Some(account_name.clone()), raw_alias.dataset_name.clone())
-            }
-        }
-    }
-
-    async fn save_dataset_alias(
-        &self,
-        dataset: &dyn odf::Dataset,
-        dataset_alias: &odf::DatasetAlias,
-    ) -> Result<(), InternalError> {
-        dataset
-            .as_info_repo()
-            .set("alias", dataset_alias.to_string().as_bytes())
-            .await
-            .int_err()?;
-
-        Ok(())
     }
 }
 
@@ -161,11 +115,11 @@ impl odf::DatasetStorageUnit for DatasetStorageUnitLocalFs {
 #[async_trait]
 impl odf::DatasetStorageUnitWriter for DatasetStorageUnitLocalFs {
     #[tracing::instrument(level = "debug", skip_all, fields(%dataset_alias, ?seed_block))]
-    async fn create_dataset(
+    async fn store_dataset(
         &self,
         dataset_alias: &odf::DatasetAlias,
         seed_block: odf::MetadataBlockTyped<odf::metadata::Seed>,
-    ) -> Result<odf::CreateDatasetResult, odf::dataset::CreateDatasetError> {
+    ) -> Result<odf::CreateDatasetResult, odf::dataset::StoreDatasetError> {
         // Check if a dataset with the same ID can be resolved successfully
         use odf::DatasetStorageUnit;
         let maybe_existing_dataset = match self
@@ -175,7 +129,7 @@ impl odf::DatasetStorageUnitWriter for DatasetStorageUnitLocalFs {
             Ok(existing_dataset) => Ok(Some(existing_dataset)),
             Err(odf::dataset::GetStoredDatasetError::NotFound(_)) => Ok(None),
             Err(odf::dataset::GetStoredDatasetError::Internal(e)) => {
-                Err(odf::dataset::CreateDatasetError::Internal(e))
+                Err(odf::dataset::StoreDatasetError::Internal(e))
             }
         }?;
 
@@ -192,7 +146,7 @@ impl odf::DatasetStorageUnitWriter for DatasetStorageUnitLocalFs {
             {
                 // Existing head
                 Ok(_) => {
-                    return Err(odf::dataset::CreateDatasetError::RefCollision(
+                    return Err(odf::dataset::StoreDatasetError::RefCollision(
                         odf::dataset::RefCollisionError {
                             id: seed_block.event.dataset_id.clone(),
                         },
@@ -204,22 +158,19 @@ impl odf::DatasetStorageUnitWriter for DatasetStorageUnitLocalFs {
 
                 // Errors...
                 Err(odf::storage::GetRefError::Access(e)) => {
-                    return Err(odf::dataset::CreateDatasetError::Internal(e.int_err()))
+                    return Err(odf::dataset::StoreDatasetError::Internal(e.int_err()))
                 }
                 Err(odf::storage::GetRefError::Internal(e)) => {
-                    return Err(odf::dataset::CreateDatasetError::Internal(e))
+                    return Err(odf::dataset::StoreDatasetError::Internal(e))
                 }
             }
         }
 
         // It's okay to create a new dataset by this point
-        let dataset_handle = odf::DatasetHandle::new(
-            seed_block.event.dataset_id.clone(),
-            self.canonical_dataset_alias(dataset_alias),
-        );
+        let dataset_id = seed_block.event.dataset_id.clone();
 
         // Create dataset
-        let dataset_path = self.get_dataset_path(&dataset_handle.id);
+        let dataset_path = self.get_dataset_path(&dataset_id);
         let layout = odf::dataset::DatasetLayout::create(&dataset_path).int_err()?;
         let dataset = Self::build_dataset(layout);
 
@@ -241,20 +192,14 @@ impl odf::DatasetStorageUnitWriter for DatasetStorageUnitLocalFs {
             Err(err) => return Err(err.int_err().into()),
         };
 
-        // Save alias
-        // TODO: reconsuder if we need this
-        self.save_dataset_alias(dataset.as_ref(), &dataset_handle.alias)
-            .await?;
-
         tracing::info!(
-            id = %dataset_handle.id,
-            alias = %dataset_handle.alias,
+            id = %dataset_id,
             %head,
             "Created new dataset",
         );
 
         Ok(odf::CreateDatasetResult {
-            dataset_handle,
+            dataset_handle: odf::DatasetHandle::new(dataset_id, dataset_alias.clone()),
             dataset,
             head,
         })

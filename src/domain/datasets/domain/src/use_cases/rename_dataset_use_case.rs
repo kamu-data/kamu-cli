@@ -10,6 +10,8 @@
 use internal_error::InternalError;
 use thiserror::Error;
 
+use crate::NameCollisionError;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
@@ -29,7 +31,7 @@ pub enum RenameDatasetError {
     NotFound(#[from] odf::dataset::DatasetNotFoundError),
 
     #[error(transparent)]
-    NameCollision(#[from] odf::dataset::NameCollisionError),
+    NameCollision(#[from] NameCollisionError),
 
     #[error(transparent)]
     Access(

@@ -204,7 +204,7 @@ impl ResetTestHarness {
 
         let create_result = self
             .dataset_storage_unit_writer()
-            .create_dataset(
+            .store_dataset(
                 &odf::DatasetAlias::new(None, dataset_name.clone()),
                 seed_block,
             )

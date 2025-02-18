@@ -11,20 +11,35 @@ use internal_error::InternalError;
 use odf_metadata::{DatasetAlias, DatasetID, MetadataBlockTyped, Seed};
 use thiserror::Error;
 
-use crate::{CreateDatasetError, CreateDatasetResult, DatasetNotFoundError, GetStoredDatasetError};
+use crate::{CreateDatasetResult, DatasetNotFoundError, GetStoredDatasetError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[cfg_attr(any(feature = "testing", test), mockall::automock)]
 #[async_trait::async_trait]
 pub trait DatasetStorageUnitWriter: Sync + Send {
-    async fn create_dataset(
+    async fn store_dataset(
         &self,
         dataset_alias: &DatasetAlias,
         seed_block: MetadataBlockTyped<Seed>,
-    ) -> Result<CreateDatasetResult, CreateDatasetError>;
+    ) -> Result<CreateDatasetResult, StoreDatasetError>;
 
     async fn delete_dataset(&self, dataset_id: &DatasetID) -> Result<(), DeleteStoredDatasetError>;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum StoreDatasetError {
+    #[error(transparent)]
+    RefCollision(#[from] RefCollisionError),
+
+    #[error(transparent)]
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -49,6 +64,14 @@ impl From<GetStoredDatasetError> for DeleteStoredDatasetError {
             GetStoredDatasetError::Internal(e) => Self::Internal(e),
         }
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Clone, PartialEq, Eq, Debug)]
+#[error("Dataset with id {id} already exists")]
+pub struct RefCollisionError {
+    pub id: DatasetID,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

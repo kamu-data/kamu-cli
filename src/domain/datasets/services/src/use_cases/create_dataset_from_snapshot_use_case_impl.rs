@@ -13,6 +13,7 @@ use dill::{component, interface, Catalog};
 use internal_error::ResultIntoInternal;
 use kamu_core::{DatasetRegistry, DidGenerator};
 use kamu_datasets::{
+    CreateDatasetFromSnapshotError,
     CreateDatasetFromSnapshotUseCase,
     CreateDatasetUseCase,
     CreateDatasetUseCaseOptions,
@@ -64,7 +65,7 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
         &self,
         mut snapshot: odf::DatasetSnapshot,
         options: CreateDatasetUseCaseOptions,
-    ) -> Result<odf::CreateDatasetResult, odf::dataset::CreateDatasetFromSnapshotError> {
+    ) -> Result<odf::CreateDatasetResult, CreateDatasetFromSnapshotError> {
         // Validate / resolve metadata events from the snapshot
         odf::dataset::normalize_and_validate_dataset_snapshot(
             self.dataset_registry.as_ref(),

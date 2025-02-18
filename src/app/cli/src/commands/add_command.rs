@@ -12,6 +12,7 @@ use std::sync::Arc;
 
 use kamu::domain::*;
 use kamu_datasets::{
+    CreateDatasetFromSnapshotError,
     CreateDatasetFromSnapshotUseCase,
     CreateDatasetUseCaseOptions,
     DeleteDatasetUseCase,
@@ -157,7 +158,7 @@ impl AddCommand {
         create_options: CreateDatasetUseCaseOptions,
     ) -> Vec<(
         odf::DatasetAlias,
-        Result<odf::CreateDatasetResult, odf::dataset::CreateDatasetFromSnapshotError>,
+        Result<odf::CreateDatasetResult, CreateDatasetFromSnapshotError>,
     )> {
         let snapshots_ordered =
             self.sort_snapshots_in_dependency_order(snapshots.into_iter().collect());
@@ -327,7 +328,7 @@ impl Command for AddCommand {
                         eprintln!("{}: {}", console::style("Added").green(), id);
                     }
                 }
-                Err(odf::dataset::CreateDatasetFromSnapshotError::NameCollision(_)) => {
+                Err(CreateDatasetFromSnapshotError::NameCollision(_)) => {
                     if !self.output_config.quiet {
                         eprintln!(
                             "{}: {}: Already exists",

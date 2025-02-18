@@ -155,8 +155,6 @@ async fn create_graph_remote(
 
     let tmp_storage_unit = Arc::new(DatasetStorageUnitLocalFs::new(
         tmp_registry_dir.path().to_owned(),
-        Arc::new(CurrentAccountSubject::new_test()),
-        Arc::new(TenancyConfig::SingleTenant),
     ));
 
     let tmp_dataset_registry = DatasetRegistrySoloUnitBridge::new(

@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
-use internal_error::ResultIntoInternal;
+use internal_error::{InternalError, ResultIntoInternal};
 use odf_dataset::*;
 use odf_metadata::{DatasetID, DatasetSnapshot};
 
@@ -20,17 +20,20 @@ pub async fn create_test_dataset_from_snapshot(
     mut snapshot: DatasetSnapshot,
     dataset_id: DatasetID,
     system_time: DateTime<Utc>,
-) -> Result<CreateDatasetResult, CreateDatasetFromSnapshotError> {
+) -> Result<CreateDatasetResult, InternalError> {
     // Validate / resolve metadata events from the snapshot
-    normalize_and_validate_dataset_snapshot(dataset_handle_resolver, &mut snapshot).await?;
+    normalize_and_validate_dataset_snapshot(dataset_handle_resolver, &mut snapshot)
+        .await
+        .int_err()?;
 
     // Create dataset in the storage unit
     let create_dataset_result = storage_unit_writer
-        .create_dataset(
+        .store_dataset(
             &snapshot.name,
             make_seed_block(dataset_id, snapshot.kind, system_time),
         )
-        .await?;
+        .await
+        .int_err()?;
 
     // Append snapshot metadata
     let append_result = match append_snapshot_metadata_to_dataset(
@@ -49,7 +52,8 @@ pub async fn create_test_dataset_from_snapshot(
                 .await;
             Err(e)
         }
-    }?;
+    }
+    .int_err()?;
 
     // Commit HEAD
     let chain = create_dataset_result.dataset.as_metadata_chain();

@@ -1229,7 +1229,7 @@ impl Harness {
 
         use odf::dataset::DatasetStorageUnitWriter;
         let foo_created = storage_unit
-            .create_dataset(
+            .store_dataset(
                 &odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo")),
                 MetadataFactory::metadata_block(
                     MetadataFactory::seed(odf::DatasetKind::Root).build(),
