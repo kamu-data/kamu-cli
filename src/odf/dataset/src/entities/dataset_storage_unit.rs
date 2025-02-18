@@ -217,34 +217,3 @@ impl From<ValidateDatasetSnapshotError> for CreateDatasetFromSnapshotError {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Error, Debug)]
-pub enum RenameDatasetError {
-    #[error(transparent)]
-    NotFound(#[from] DatasetNotFoundError),
-    #[error(transparent)]
-    NameCollision(#[from] NameCollisionError),
-    #[error(transparent)]
-    Access(
-        #[from]
-        #[backtrace]
-        AccessError,
-    ),
-    #[error(transparent)]
-    Internal(
-        #[from]
-        #[backtrace]
-        InternalError,
-    ),
-}
-
-impl From<GetStoredDatasetError> for RenameDatasetError {
-    fn from(v: GetStoredDatasetError) -> Self {
-        match v {
-            GetStoredDatasetError::NotFound(e) => Self::NotFound(e),
-            GetStoredDatasetError::Internal(e) => Self::Internal(e),
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

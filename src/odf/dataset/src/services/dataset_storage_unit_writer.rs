@@ -8,16 +8,10 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::InternalError;
-use odf_metadata::{DatasetAlias, DatasetID, DatasetName, MetadataBlockTyped, Seed};
+use odf_metadata::{DatasetAlias, DatasetID, MetadataBlockTyped, Seed};
 use thiserror::Error;
 
-use crate::{
-    CreateDatasetError,
-    CreateDatasetResult,
-    DatasetNotFoundError,
-    GetStoredDatasetError,
-    RenameDatasetError,
-};
+use crate::{CreateDatasetError, CreateDatasetResult, DatasetNotFoundError, GetStoredDatasetError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -29,12 +23,6 @@ pub trait DatasetStorageUnitWriter: Sync + Send {
         dataset_alias: &DatasetAlias,
         seed_block: MetadataBlockTyped<Seed>,
     ) -> Result<CreateDatasetResult, CreateDatasetError>;
-
-    async fn rename_dataset(
-        &self,
-        dataset_id: &DatasetID,
-        new_name: &DatasetName,
-    ) -> Result<(), RenameDatasetError>;
 
     async fn delete_dataset(&self, dataset_id: &DatasetID) -> Result<(), DeleteStoredDatasetError>;
 }

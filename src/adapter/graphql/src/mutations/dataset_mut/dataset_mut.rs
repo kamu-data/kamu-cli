@@ -9,7 +9,7 @@
 
 use chrono::{DateTime, Utc};
 use kamu_core::{self as domain, SetWatermarkPlanningError, SetWatermarkUseCase};
-use kamu_datasets::DeleteDatasetError;
+use kamu_datasets::{DeleteDatasetError, RenameDatasetError};
 
 use crate::mutations::{
     ensure_account_is_owner_or_admin,
@@ -78,18 +78,18 @@ impl DatasetMut {
                 old_name: self.dataset_handle.alias.dataset_name.clone().into(),
                 new_name,
             })),
-            Err(odf::dataset::RenameDatasetError::NameCollision(e)) => {
+            Err(RenameDatasetError::NameCollision(e)) => {
                 Ok(RenameResult::NameCollision(RenameResultNameCollision {
                     colliding_alias: e.alias.into(),
                 }))
             }
-            Err(odf::dataset::RenameDatasetError::Access(_)) => Err(GqlError::Gql(
+            Err(RenameDatasetError::Access(_)) => Err(GqlError::Gql(
                 Error::new("Dataset access error")
                     .extend_with(|_, eev| eev.set("alias", self.dataset_handle.alias.to_string())),
             )),
             // "Not found" should not be reachable, since we've just resolved the dataset by ID
-            Err(odf::dataset::RenameDatasetError::NotFound(e)) => Err(e.int_err().into()),
-            Err(odf::dataset::RenameDatasetError::Internal(e)) => Err(e.into()),
+            Err(RenameDatasetError::NotFound(e)) => Err(e.int_err().into()),
+            Err(RenameDatasetError::Internal(e)) => Err(e.into()),
         }
     }
 
