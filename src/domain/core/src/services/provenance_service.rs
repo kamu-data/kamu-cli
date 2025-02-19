@@ -80,13 +80,15 @@ pub struct LineageOptions {}
 #[derive(Debug, Error)]
 pub enum GetLineageError {
     #[error(transparent)]
-    NotFound(#[from] odf::dataset::DatasetNotFoundError),
+    NotFound(#[from] odf::DatasetNotFoundError),
+
     #[error(transparent)]
     Access(
         #[from]
         #[backtrace]
         odf::AccessError,
     ),
+
     #[error(transparent)]
     Internal(
         #[from]
@@ -95,11 +97,11 @@ pub enum GetLineageError {
     ),
 }
 
-impl From<odf::dataset::GetStoredDatasetError> for GetLineageError {
-    fn from(v: odf::dataset::GetStoredDatasetError) -> Self {
+impl From<odf::DatasetRefUnresolvedError> for GetLineageError {
+    fn from(v: odf::DatasetRefUnresolvedError) -> Self {
         match v {
-            odf::dataset::GetStoredDatasetError::NotFound(e) => Self::NotFound(e),
-            odf::dataset::GetStoredDatasetError::Internal(e) => Self::Internal(e),
+            odf::DatasetRefUnresolvedError::NotFound(e) => Self::NotFound(e),
+            odf::DatasetRefUnresolvedError::Internal(e) => Self::Internal(e),
         }
     }
 }

@@ -218,12 +218,12 @@ impl SimpleTransferProtocol {
     ) -> Result<odf::Multihash, SyncError> {
         match src_chain.resolve_ref(&odf::BlockRef::Head).await {
             Ok(head) => Ok(head),
-            Err(odf::storage::GetRefError::NotFound(_)) => Err(DatasetAnyRefUnresolvedError {
+            Err(odf::GetRefError::NotFound(_)) => Err(DatasetAnyRefUnresolvedError {
                 dataset_ref: src_ref.clone(),
             }
             .into()),
-            Err(odf::storage::GetRefError::Access(e)) => Err(SyncError::Access(e)),
-            Err(odf::storage::GetRefError::Internal(e)) => Err(SyncError::Internal(e)),
+            Err(odf::GetRefError::Access(e)) => Err(SyncError::Access(e)),
+            Err(odf::GetRefError::Internal(e)) => Err(SyncError::Internal(e)),
         }
     }
 
@@ -233,33 +233,33 @@ impl SimpleTransferProtocol {
     ) -> Result<Option<odf::Multihash>, SyncError> {
         match dst_chain.resolve_ref(&odf::BlockRef::Head).await {
             Ok(h) => Ok(Some(h)),
-            Err(odf::storage::GetRefError::NotFound(_)) => Ok(None),
-            Err(odf::storage::GetRefError::Access(e)) => Err(SyncError::Access(e)),
-            Err(odf::storage::GetRefError::Internal(e)) => Err(SyncError::Internal(e)),
+            Err(odf::GetRefError::NotFound(_)) => Ok(None),
+            Err(odf::GetRefError::Access(e)) => Err(SyncError::Access(e)),
+            Err(odf::GetRefError::Internal(e)) => Err(SyncError::Internal(e)),
         }
     }
 
-    fn map_block_iteration_error(e: odf::dataset::IterBlocksError) -> SyncError {
+    fn map_block_iteration_error(e: odf::IterBlocksError) -> SyncError {
         match e {
-            odf::dataset::IterBlocksError::RefNotFound(e) => SyncError::Internal(e.int_err()),
-            odf::dataset::IterBlocksError::BlockNotFound(e) => CorruptedSourceError {
+            odf::IterBlocksError::RefNotFound(e) => SyncError::Internal(e.int_err()),
+            odf::IterBlocksError::BlockNotFound(e) => CorruptedSourceError {
                 message: "Source metadata chain is broken".to_owned(),
                 source: Some(e.into()),
             }
             .into(),
-            odf::dataset::IterBlocksError::BlockVersion(e) => CorruptedSourceError {
+            odf::IterBlocksError::BlockVersion(e) => CorruptedSourceError {
                 message: "Source metadata chain is broken".to_owned(),
                 source: Some(e.into()),
             }
             .into(),
-            odf::dataset::IterBlocksError::BlockMalformed(e) => CorruptedSourceError {
+            odf::IterBlocksError::BlockMalformed(e) => CorruptedSourceError {
                 message: "Source metadata chain is broken".to_owned(),
                 source: Some(e.into()),
             }
             .into(),
-            odf::dataset::IterBlocksError::InvalidInterval(_) => unreachable!(),
-            odf::dataset::IterBlocksError::Access(e) => SyncError::Access(e),
-            odf::dataset::IterBlocksError::Internal(e) => SyncError::Internal(e),
+            odf::IterBlocksError::InvalidInterval(_) => unreachable!(),
+            odf::IterBlocksError::Access(e) => SyncError::Access(e),
+            odf::IterBlocksError::Internal(e) => SyncError::Internal(e),
         }
     }
 

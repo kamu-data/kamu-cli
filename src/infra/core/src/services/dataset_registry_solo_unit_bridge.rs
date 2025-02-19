@@ -80,7 +80,7 @@ impl odf::dataset::DatasetHandleResolver for DatasetRegistrySoloUnitBridge {
     async fn resolve_dataset_handle_by_ref(
         &self,
         dataset_ref: &odf::DatasetRef,
-    ) -> Result<odf::DatasetHandle, odf::dataset::GetStoredDatasetError> {
+    ) -> Result<odf::DatasetHandle, odf::DatasetRefUnresolvedError> {
         match dataset_ref {
             odf::DatasetRef::Handle(h) => Ok(h.clone()),
             odf::DatasetRef::Alias(alias) => {
@@ -94,8 +94,8 @@ impl odf::dataset::DatasetHandleResolver for DatasetRegistrySoloUnitBridge {
                         return Ok(hdl);
                     }
                 }
-                Err(odf::dataset::GetStoredDatasetError::NotFound(
-                    odf::dataset::DatasetNotFoundError {
+                Err(odf::DatasetRefUnresolvedError::NotFound(
+                    odf::DatasetNotFoundError {
                         dataset_ref: alias.as_local_ref(),
                     },
                 ))
@@ -104,7 +104,8 @@ impl odf::dataset::DatasetHandleResolver for DatasetRegistrySoloUnitBridge {
                 let dataset = self
                     .dataset_storage_unit
                     .get_stored_dataset_by_id(dataset_id)
-                    .await?;
+                    .await
+                    .map_err(odf::DatasetRefUnresolvedError::from)?;
                 let dataset_alias = odf::dataset::read_dataset_alias(dataset.as_ref()).await?;
                 Ok(odf::DatasetHandle::new(dataset_id.clone(), dataset_alias))
             }

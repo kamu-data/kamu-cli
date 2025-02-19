@@ -30,7 +30,7 @@ pub trait DeleteDatasetUseCase: Send + Sync {
 #[derive(Error, Debug)]
 pub enum DeleteDatasetError {
     #[error(transparent)]
-    NotFound(#[from] odf::dataset::DatasetNotFoundError),
+    NotFound(#[from] odf::DatasetNotFoundError),
 
     #[error(transparent)]
     DanglingReference(#[from] DanglingReferenceError),
@@ -76,7 +76,7 @@ impl std::fmt::Display for DanglingReferenceError {
 impl From<odf::dataset::DeleteStoredDatasetError> for DeleteDatasetError {
     fn from(value: odf::dataset::DeleteStoredDatasetError) -> Self {
         match value {
-            odf::dataset::DeleteStoredDatasetError::NotFound(e) => Self::NotFound(e),
+            odf::dataset::DeleteStoredDatasetError::UnresolvedId(e) => Self::NotFound(e.into()),
             odf::dataset::DeleteStoredDatasetError::Internal(e) => Self::Internal(e),
         }
     }

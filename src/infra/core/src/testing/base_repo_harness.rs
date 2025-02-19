@@ -116,7 +116,7 @@ impl BaseRepoHarness {
     pub async fn check_dataset_exists(
         &self,
         alias: &odf::DatasetAlias,
-    ) -> Result<(), odf::dataset::GetStoredDatasetError> {
+    ) -> Result<(), odf::DatasetRefUnresolvedError> {
         self.dataset_registry
             .get_dataset_by_ref(&alias.as_local_ref())
             .await?;

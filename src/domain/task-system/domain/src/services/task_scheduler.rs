@@ -72,7 +72,7 @@ pub enum CancelTaskError {
 #[derive(thiserror::Error, Debug)]
 pub enum ListTasksByDatasetError {
     #[error(transparent)]
-    DatasetNotFound(#[from] odf::dataset::DatasetNotFoundError),
+    DatasetNotFound(#[from] odf::DatasetNotFoundError),
     #[error(transparent)]
     Internal(#[from] InternalError),
 }

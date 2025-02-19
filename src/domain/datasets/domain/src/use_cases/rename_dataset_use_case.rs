@@ -28,7 +28,7 @@ pub trait RenameDatasetUseCase: Send + Sync {
 #[derive(Error, Debug)]
 pub enum RenameDatasetError {
     #[error(transparent)]
-    NotFound(#[from] odf::dataset::DatasetNotFoundError),
+    NotFound(#[from] odf::DatasetNotFoundError),
 
     #[error(transparent)]
     NameCollision(#[from] NameCollisionError),
@@ -51,7 +51,7 @@ pub enum RenameDatasetError {
 impl From<odf::dataset::GetStoredDatasetError> for RenameDatasetError {
     fn from(v: odf::dataset::GetStoredDatasetError) -> Self {
         match v {
-            odf::dataset::GetStoredDatasetError::NotFound(e) => Self::NotFound(e),
+            odf::dataset::GetStoredDatasetError::UnresolvedId(e) => Self::NotFound(e.into()),
             odf::dataset::GetStoredDatasetError::Internal(e) => Self::Internal(e),
         }
     }

@@ -147,7 +147,7 @@ pub(crate) async fn get_transform_input_from_query_input(
             .try_collect()
             .await
             .map_err(|chain_err| match chain_err {
-                odf::dataset::IterBlocksError::InvalidInterval(err) => {
+                odf::IterBlocksError::InvalidInterval(err) => {
                     GetTransformInputError::InvalidInputInterval(InvalidInputIntervalError {
                         head: err.head,
                         tail: err.tail,

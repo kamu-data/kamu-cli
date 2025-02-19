@@ -60,7 +60,7 @@ impl std::ops::AddAssign for DatasetIntervalIncrement {
 #[derive(Error, Debug)]
 pub enum GetIncrementError {
     #[error(transparent)]
-    DatasetNotFound(odf::dataset::DatasetNotFoundError),
+    DatasetNotFound(odf::DatasetNotFoundError),
 
     #[error(transparent)]
     RefNotFound(odf::storage::RefNotFoundError),

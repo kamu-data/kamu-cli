@@ -13,7 +13,7 @@ use internal_error::InternalError;
 use odf_metadata::{DatasetID, MetadataBlockTyped, Multihash, Seed};
 use thiserror::Error;
 
-use crate::{Dataset, DatasetNotFoundError, GetStoredDatasetError};
+use crate::{Dataset, DatasetUnresolvedIdError, GetStoredDatasetError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -66,7 +66,7 @@ pub enum StoreDatasetError {
 #[derive(Error, Debug)]
 pub enum DeleteStoredDatasetError {
     #[error(transparent)]
-    NotFound(#[from] DatasetNotFoundError),
+    UnresolvedId(#[from] DatasetUnresolvedIdError),
 
     #[error(transparent)]
     Internal(
@@ -79,7 +79,7 @@ pub enum DeleteStoredDatasetError {
 impl From<GetStoredDatasetError> for DeleteStoredDatasetError {
     fn from(value: GetStoredDatasetError) -> Self {
         match value {
-            GetStoredDatasetError::NotFound(e) => Self::NotFound(e),
+            GetStoredDatasetError::UnresolvedId(e) => Self::UnresolvedId(e),
             GetStoredDatasetError::Internal(e) => Self::Internal(e),
         }
     }

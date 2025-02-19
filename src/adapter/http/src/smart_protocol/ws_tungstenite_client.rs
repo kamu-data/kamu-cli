@@ -568,9 +568,9 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
                 .await
             {
                 Ok(head) => Ok(Some(head)),
-                Err(odf::storage::GetRefError::NotFound(_)) => Ok(None),
-                Err(odf::storage::GetRefError::Access(e)) => Err(SyncError::Access(e)),
-                Err(odf::storage::GetRefError::Internal(e)) => Err(SyncError::Internal(e)),
+                Err(odf::GetRefError::NotFound(_)) => Ok(None),
+                Err(odf::GetRefError::Access(e)) => Err(SyncError::Access(e)),
+                Err(odf::GetRefError::Internal(e)) => Err(SyncError::Internal(e)),
             }?
         } else {
             None

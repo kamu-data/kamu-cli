@@ -297,7 +297,7 @@ impl AxumServerPushProtocolInstance {
                 .await
             {
                 Ok(head) => Some(head),
-                Err(odf::storage::GetRefError::NotFound(_)) => None,
+                Err(odf::GetRefError::NotFound(_)) => None,
                 Err(e) => {
                     return Err(PushServerError::Internal(
                         e.protocol_int_err(PushPhase::InitialRequest),

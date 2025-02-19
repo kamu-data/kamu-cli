@@ -67,8 +67,8 @@ impl RemoteStatusServiceImpl {
         let rhs_chain = rhs_ds.as_metadata_chain();
         let rhs_head = match rhs_chain.resolve_ref(&odf::BlockRef::Head).await {
             Ok(head) => head,
-            Err(odf::storage::GetRefError::Access(e)) => return Err(StatusCheckError::Access(e)),
-            Err(odf::storage::GetRefError::NotFound(_)) => {
+            Err(odf::GetRefError::Access(e)) => return Err(StatusCheckError::Access(e)),
+            Err(odf::GetRefError::NotFound(_)) => {
                 return Err(StatusCheckError::RemoteDatasetNotFound)
             }
             Err(e) => return Err(StatusCheckError::Internal(e.int_err())),

@@ -168,9 +168,11 @@ impl DatasetStorageUnit for DatasetStorageUnitS3 {
             let dataset = self.get_dataset_impl(dataset_id);
             Ok(dataset)
         } else {
-            Err(GetStoredDatasetError::NotFound(DatasetNotFoundError {
-                dataset_ref: dataset_id.as_local_ref(),
-            }))
+            Err(GetStoredDatasetError::UnresolvedId(
+                DatasetUnresolvedIdError {
+                    dataset_id: dataset_id.clone(),
+                },
+            ))
         }
     }
 
@@ -210,7 +212,7 @@ impl DatasetStorageUnitWriter for DatasetStorageUnitS3 {
             .await
         {
             Ok(existing_dataset) => Ok(Some(existing_dataset)),
-            Err(GetStoredDatasetError::NotFound(_)) => Ok(None),
+            Err(GetStoredDatasetError::UnresolvedId(_)) => Ok(None),
             Err(GetStoredDatasetError::Internal(e)) => Err(StoreDatasetError::Internal(e)),
         }?;
 

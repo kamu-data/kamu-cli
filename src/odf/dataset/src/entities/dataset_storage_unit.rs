@@ -34,10 +34,9 @@ pub trait DatasetStorageUnit: Sync + Send {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Clone, PartialEq, Eq, Debug)]
-#[error("Dataset not found: {dataset_ref}")]
-pub struct DatasetNotFoundError {
-    // TODO: only ID-based errors are normal here
-    pub dataset_ref: DatasetRef,
+#[error("Dataset id unresolved: {dataset_id}")]
+pub struct DatasetUnresolvedIdError {
+    pub dataset_id: DatasetID,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -45,7 +44,7 @@ pub struct DatasetNotFoundError {
 #[derive(Error, Debug)]
 pub enum GetStoredDatasetError {
     #[error(transparent)]
-    NotFound(#[from] DatasetNotFoundError),
+    UnresolvedId(#[from] DatasetUnresolvedIdError),
 
     #[error(transparent)]
     Internal(

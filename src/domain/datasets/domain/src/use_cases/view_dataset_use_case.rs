@@ -10,7 +10,6 @@
 use std::collections::HashMap;
 
 use internal_error::InternalError;
-use odf::dataset::DatasetNotFoundError;
 use thiserror::Error;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -66,7 +65,7 @@ impl ViewMultiResponse {
 #[derive(Error, Debug)]
 pub enum ViewDatasetUseCaseError {
     #[error(transparent)]
-    NotFound(#[from] DatasetNotFoundError),
+    NotFound(#[from] odf::DatasetNotFoundError),
 
     #[error(transparent)]
     Access(

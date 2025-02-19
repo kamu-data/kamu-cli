@@ -90,10 +90,8 @@ impl PushCommand {
                 Ok(hdl) => dataset_handles.push(hdl),
                 Err(e) => {
                     let push_error = match e {
-                        odf::dataset::GetStoredDatasetError::NotFound(e) => {
-                            PushError::SourceNotFound(e)
-                        }
-                        odf::dataset::GetStoredDatasetError::Internal(e) => PushError::Internal(e),
+                        odf::DatasetRefUnresolvedError::NotFound(e) => PushError::SourceNotFound(e),
+                        odf::DatasetRefUnresolvedError::Internal(e) => PushError::Internal(e),
                     };
                     error_responses.push(PushResponse {
                         local_handle: None,

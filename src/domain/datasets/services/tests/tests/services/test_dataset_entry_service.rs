@@ -170,7 +170,7 @@ async fn test_try_to_resolve_non_existing_dataset() {
 
     assert_matches!(
         resolve_dataset_result,
-        Err(odf::dataset::GetStoredDatasetError::NotFound(_))
+        Err(odf::DatasetRefUnresolvedError::NotFound(_))
     );
 }
 

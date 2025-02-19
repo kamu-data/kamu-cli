@@ -521,7 +521,7 @@ impl<'a> PullGraphDepthFirstTraversal<'a> {
                 {
                     Some(hdl) => Some(hdl),
                     None => {
-                        return Err(PullError::NotFound(odf::dataset::DatasetNotFoundError {
+                        return Err(PullError::NotFound(odf::DatasetNotFoundError {
                             dataset_ref: local_ref.clone(),
                         }))
                     }
@@ -611,7 +611,7 @@ impl<'a> PullGraphDepthFirstTraversal<'a> {
                     if let Some(alias) = local_ref.alias() {
                         alias.clone()
                     } else {
-                        return Err(PullError::NotFound(odf::dataset::DatasetNotFoundError {
+                        return Err(PullError::NotFound(odf::DatasetNotFoundError {
                             dataset_ref: local_ref.clone(),
                         }));
                     }

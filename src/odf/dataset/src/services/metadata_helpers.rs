@@ -201,12 +201,12 @@ async fn resolve_transform_inputs(
             .await
         {
             Ok(hdl) => Ok(hdl),
-            Err(GetStoredDatasetError::NotFound(_)) => {
+            Err(DatasetRefUnresolvedError::NotFound(_)) => {
                 // Accumulate errors to report as one
                 missing_inputs.push(input.dataset_ref.clone());
                 continue;
             }
-            Err(GetStoredDatasetError::Internal(e)) => {
+            Err(DatasetRefUnresolvedError::Internal(e)) => {
                 Err(ValidateDatasetSnapshotError::Internal(e))
             }
         }?;

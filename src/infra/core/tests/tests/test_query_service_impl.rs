@@ -670,7 +670,7 @@ async fn test_sql_statement_alias_not_found() {
 
     assert_matches!(
         result,
-        Err(QueryError::DatasetNotFound(odf::dataset::DatasetNotFoundError {
+        Err(QueryError::DatasetNotFound(odf::DatasetNotFoundError {
             dataset_ref,
         })) if dataset_ref == odf::DatasetID::new_seeded_ed25519(b"does-not-exist").as_local_ref()
     );

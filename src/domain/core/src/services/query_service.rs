@@ -195,32 +195,37 @@ pub enum QueryError {
     DatasetNotFound(
         #[from]
         #[backtrace]
-        odf::dataset::DatasetNotFoundError,
+        odf::DatasetNotFoundError,
     ),
+
     #[error(transparent)]
     DatasetBlockNotFound(
         #[from]
         #[backtrace]
         DatasetBlockNotFoundError,
     ),
+
     #[error(transparent)]
     DatasetSchemaNotAvailable(
         #[from]
         #[backtrace]
         DatasetSchemaNotAvailableError,
     ),
+
     #[error(transparent)]
     DataFusionError(
         #[from]
         #[backtrace]
         DataFusionError,
     ),
+
     #[error(transparent)]
     Access(
         #[from]
         #[backtrace]
-        odf::metadata::AccessError,
+        odf::AccessError,
     ),
+
     #[error(transparent)]
     Internal(
         #[from]
@@ -280,11 +285,11 @@ pub struct DatasetSchemaNotAvailableError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl From<odf::dataset::GetStoredDatasetError> for QueryError {
-    fn from(v: odf::dataset::GetStoredDatasetError) -> Self {
+impl From<odf::DatasetRefUnresolvedError> for QueryError {
+    fn from(v: odf::DatasetRefUnresolvedError) -> Self {
         match v {
-            odf::dataset::GetStoredDatasetError::NotFound(e) => Self::DatasetNotFound(e),
-            odf::dataset::GetStoredDatasetError::Internal(e) => Self::Internal(e),
+            odf::DatasetRefUnresolvedError::NotFound(e) => Self::DatasetNotFound(e),
+            odf::DatasetRefUnresolvedError::Internal(e) => Self::Internal(e),
         }
     }
 }

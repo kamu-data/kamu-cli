@@ -42,9 +42,11 @@ impl DatasetStorageUnitLocalFs {
     ) -> Result<DatasetLayout, GetStoredDatasetError> {
         let dataset_path = self.get_dataset_path(dataset_id);
         if !dataset_path.exists() {
-            return Err(GetStoredDatasetError::NotFound(DatasetNotFoundError {
-                dataset_ref: dataset_id.as_local_ref(),
-            }));
+            return Err(GetStoredDatasetError::UnresolvedId(
+                DatasetUnresolvedIdError {
+                    dataset_id: dataset_id.clone(),
+                },
+            ));
         }
         Ok(DatasetLayout::new(dataset_path))
     }
@@ -139,7 +141,7 @@ impl DatasetStorageUnitWriter for DatasetStorageUnitLocalFs {
             .await
         {
             Ok(existing_dataset) => Ok(Some(existing_dataset)),
-            Err(GetStoredDatasetError::NotFound(_)) => Ok(None),
+            Err(GetStoredDatasetError::UnresolvedId(_)) => Ok(None),
             Err(GetStoredDatasetError::Internal(e)) => Err(StoreDatasetError::Internal(e)),
         }?;
 

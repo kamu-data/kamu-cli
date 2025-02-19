@@ -371,7 +371,7 @@ impl odf::dataset::DatasetHandleResolver for DatasetEntryServiceImpl {
     async fn resolve_dataset_handle_by_ref(
         &self,
         dataset_ref: &odf::DatasetRef,
-    ) -> Result<odf::DatasetHandle, odf::dataset::GetStoredDatasetError> {
+    ) -> Result<odf::DatasetHandle, odf::DatasetRefUnresolvedError> {
         match dataset_ref {
             odf::DatasetRef::Handle(h) => Ok(h.clone()),
             odf::DatasetRef::Alias(alias) => {
@@ -380,14 +380,12 @@ impl odf::dataset::DatasetHandleResolver for DatasetEntryServiceImpl {
                     .await
                     .map_err(|e| match e {
                         ResolveAccountIdByNameError::NotFound(_) => {
-                            odf::dataset::GetStoredDatasetError::NotFound(
-                                odf::dataset::DatasetNotFoundError {
-                                    dataset_ref: dataset_ref.clone(),
-                                },
-                            )
+                            odf::DatasetRefUnresolvedError::NotFound(odf::DatasetNotFoundError {
+                                dataset_ref: dataset_ref.clone(),
+                            })
                         }
                         ResolveAccountIdByNameError::Internal(e) => {
-                            odf::dataset::GetStoredDatasetError::Internal(e)
+                            odf::DatasetRefUnresolvedError::Internal(e)
                         }
                     })?;
 
@@ -410,15 +408,13 @@ impl odf::dataset::DatasetHandleResolver for DatasetEntryServiceImpl {
                             entry.name,
                         ),
                     )),
-                    Err(GetDatasetEntryByNameError::NotFound(_)) => {
-                        Err(odf::dataset::GetStoredDatasetError::NotFound(
-                            odf::dataset::DatasetNotFoundError {
-                                dataset_ref: dataset_ref.clone(),
-                            },
-                        ))
-                    }
+                    Err(GetDatasetEntryByNameError::NotFound(_)) => Err(
+                        odf::DatasetRefUnresolvedError::NotFound(odf::DatasetNotFoundError {
+                            dataset_ref: dataset_ref.clone(),
+                        }),
+                    ),
                     Err(GetDatasetEntryByNameError::Internal(e)) => {
-                        Err(odf::dataset::GetStoredDatasetError::Internal(e))
+                        Err(odf::DatasetRefUnresolvedError::Internal(e))
                     }
                 }
             }
@@ -431,15 +427,13 @@ impl odf::dataset::DatasetHandleResolver for DatasetEntryServiceImpl {
                             .make_alias(owner_name, entry.name.clone()),
                     ))
                 }
-                Err(GetDatasetEntryError::NotFound(_)) => {
-                    Err(odf::dataset::GetStoredDatasetError::NotFound(
-                        odf::dataset::DatasetNotFoundError {
-                            dataset_ref: dataset_ref.clone(),
-                        },
-                    ))
-                }
+                Err(GetDatasetEntryError::NotFound(_)) => Err(
+                    odf::DatasetRefUnresolvedError::NotFound(odf::DatasetNotFoundError {
+                        dataset_ref: dataset_ref.clone(),
+                    }),
+                ),
                 Err(GetDatasetEntryError::Internal(e)) => {
-                    Err(odf::dataset::GetStoredDatasetError::Internal(e))
+                    Err(odf::DatasetRefUnresolvedError::Internal(e))
                 }
             },
         }
@@ -520,11 +514,9 @@ impl DatasetRegistry for DatasetEntryServiceImpl {
             .map(|id| {
                 (
                     id.clone(),
-                    odf::dataset::GetStoredDatasetError::NotFound(
-                        odf::dataset::DatasetNotFoundError {
-                            dataset_ref: id.into_local_ref(),
-                        },
-                    ),
+                    odf::DatasetRefUnresolvedError::NotFound(odf::DatasetNotFoundError {
+                        dataset_ref: id.into_local_ref(),
+                    }),
                 )
             })
             .collect();

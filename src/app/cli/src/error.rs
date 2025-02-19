@@ -169,11 +169,11 @@ impl From<WriterError> for CLIError {
 // TODO: Replace with traits that distinguish critical and non-critical errors
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl From<odf::dataset::GetStoredDatasetError> for CLIError {
-    fn from(v: odf::dataset::GetStoredDatasetError) -> Self {
+impl From<odf::DatasetRefUnresolvedError> for CLIError {
+    fn from(v: odf::DatasetRefUnresolvedError) -> Self {
         match v {
-            e @ odf::dataset::GetStoredDatasetError::NotFound(_) => Self::failure(e),
-            e @ odf::dataset::GetStoredDatasetError::Internal(_) => Self::critical(e),
+            e @ odf::DatasetRefUnresolvedError::NotFound(_) => Self::failure(e),
+            e @ odf::DatasetRefUnresolvedError::Internal(_) => Self::critical(e),
         }
     }
 }
@@ -203,16 +203,16 @@ impl From<odf::dataset::GetSummaryError> for CLIError {
     }
 }
 
-impl From<odf::storage::GetRefError> for CLIError {
-    fn from(e: odf::storage::GetRefError) -> Self {
+impl From<odf::GetRefError> for CLIError {
+    fn from(e: odf::GetRefError) -> Self {
         Self::critical(e)
     }
 }
 
-impl From<odf::dataset::IterBlocksError> for CLIError {
-    fn from(v: odf::dataset::IterBlocksError) -> Self {
+impl From<odf::IterBlocksError> for CLIError {
+    fn from(v: odf::IterBlocksError) -> Self {
         match v {
-            e @ odf::dataset::IterBlocksError::BlockVersion(_) => Self::failure(e),
+            e @ odf::IterBlocksError::BlockVersion(_) => Self::failure(e),
             _ => Self::critical(v),
         }
     }

@@ -45,7 +45,7 @@ pub trait DatasetRegistryExt: DatasetRegistry {
     async fn get_dataset_by_ref(
         &self,
         dataset_ref: &odf::DatasetRef,
-    ) -> Result<ResolvedDataset, odf::dataset::GetStoredDatasetError>;
+    ) -> Result<ResolvedDataset, odf::DatasetRefUnresolvedError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -62,15 +62,15 @@ where
     ) -> Result<Option<odf::DatasetHandle>, InternalError> {
         match self.resolve_dataset_handle_by_ref(dataset_ref).await {
             Ok(hdl) => Ok(Some(hdl)),
-            Err(odf::dataset::GetStoredDatasetError::NotFound(_)) => Ok(None),
-            Err(odf::dataset::GetStoredDatasetError::Internal(e)) => Err(e),
+            Err(odf::DatasetRefUnresolvedError::NotFound(_)) => Ok(None),
+            Err(odf::DatasetRefUnresolvedError::Internal(e)) => Err(e),
         }
     }
 
     async fn get_dataset_by_ref(
         &self,
         dataset_ref: &odf::DatasetRef,
-    ) -> Result<ResolvedDataset, odf::dataset::GetStoredDatasetError> {
+    ) -> Result<ResolvedDataset, odf::DatasetRefUnresolvedError> {
         let dataset_handle = self.resolve_dataset_handle_by_ref(dataset_ref).await?;
         let dataset = self.get_dataset_by_handle(&dataset_handle).await;
         Ok(dataset)
@@ -82,7 +82,7 @@ where
 #[derive(Default)]
 pub struct DatasetHandlesResolution {
     pub resolved_handles: Vec<odf::DatasetHandle>,
-    pub unresolved_datasets: Vec<(odf::DatasetID, odf::dataset::GetStoredDatasetError)>,
+    pub unresolved_datasets: Vec<(odf::DatasetID, odf::DatasetRefUnresolvedError)>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

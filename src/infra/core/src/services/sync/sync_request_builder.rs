@@ -116,7 +116,7 @@ impl SyncRequestBuilder {
         match any_ref.as_local_ref(|repo| self.remote_repo_registry.get_repository(repo).is_ok()) {
             Ok(local_ref) => match self.dataset_registry.get_dataset_by_ref(&local_ref).await {
                 Ok(resolved_dataset) => Ok(SyncRef::Local(resolved_dataset)),
-                Err(odf::dataset::GetStoredDatasetError::NotFound(_)) if create_if_not_exists => {
+                Err(odf::DatasetRefUnresolvedError::NotFound(_)) if create_if_not_exists => {
                     if let Some(alias) = local_ref.alias() {
                         Ok(SyncRef::LocalNew(alias.clone()))
                     } else {
@@ -168,11 +168,11 @@ impl SyncRequestBuilder {
             .await
         {
             Ok(_) => Ok(()),
-            Err(odf::storage::GetRefError::NotFound(_)) => {
+            Err(odf::GetRefError::NotFound(_)) => {
                 Err(DatasetAnyRefUnresolvedError { dataset_ref }.into())
             }
-            Err(odf::storage::GetRefError::Access(e)) => Err(SyncError::Access(e)),
-            Err(odf::storage::GetRefError::Internal(e)) => Err(SyncError::Internal(e)),
+            Err(odf::GetRefError::Access(e)) => Err(SyncError::Access(e)),
+            Err(odf::GetRefError::Internal(e)) => Err(SyncError::Internal(e)),
         }
     }
 }

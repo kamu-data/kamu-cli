@@ -112,10 +112,10 @@ impl DeleteDatasetUseCase for DeleteDatasetUseCaseImpl {
             .await
         {
             Ok(h) => Ok(h),
-            Err(odf::dataset::GetStoredDatasetError::NotFound(e)) => {
+            Err(odf::DatasetRefUnresolvedError::NotFound(e)) => {
                 Err(DeleteDatasetError::NotFound(e))
             }
-            Err(odf::dataset::GetStoredDatasetError::Internal(e)) => {
+            Err(odf::DatasetRefUnresolvedError::Internal(e)) => {
                 Err(DeleteDatasetError::Internal(e))
             }
         }?;

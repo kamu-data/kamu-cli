@@ -119,39 +119,35 @@ pub enum PushError {
     SourceNotFound(
         #[from]
         #[backtrace]
-        odf::dataset::DatasetNotFoundError,
+        odf::DatasetNotFoundError,
     ),
+
     #[error("Destination is not specified and there is no associated push alias")]
     NoTarget,
+
     #[error(transparent)]
     DestinationNotFound(
         #[from]
         #[backtrace]
         RepositoryNotFoundError,
     ),
+
     #[error("Cannot choose between multiple push aliases")]
     AmbiguousTarget,
+
     #[error(transparent)]
     SyncError(
         #[from]
         #[backtrace]
         SyncError,
     ),
+
     #[error(transparent)]
     Internal(
         #[from]
         #[backtrace]
         InternalError,
     ),
-}
-
-impl From<odf::dataset::GetStoredDatasetError> for PushError {
-    fn from(v: odf::dataset::GetStoredDatasetError) -> Self {
-        match v {
-            odf::dataset::GetStoredDatasetError::NotFound(e) => e.into(),
-            odf::dataset::GetStoredDatasetError::Internal(e) => e.into(),
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
