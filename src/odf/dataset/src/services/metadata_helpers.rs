@@ -250,7 +250,6 @@ pub enum ValidateDatasetSnapshotError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// TODO: move to use case level
 #[derive(Error, Clone, PartialEq, Eq, Debug)]
 #[error("Invalid snapshot: {reason}")]
 pub struct InvalidSnapshotError {
@@ -267,7 +266,6 @@ impl InvalidSnapshotError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// TODO: move to use case level
 #[derive(Error, Clone, PartialEq, Eq, Debug)]
 pub struct MissingInputsError {
     pub dataset_ref: DatasetRef,

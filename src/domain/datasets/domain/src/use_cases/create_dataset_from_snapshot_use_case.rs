@@ -30,7 +30,6 @@ pub trait CreateDatasetFromSnapshotUseCase: Send + Sync {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// TODO: move to use case level
 #[derive(Error, Debug)]
 pub enum CreateDatasetFromSnapshotError {
     #[error(transparent)]
