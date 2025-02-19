@@ -34,7 +34,7 @@ impl NamedObjectRepositoryInMemory {
 
 #[async_trait]
 impl NamedObjectRepository for NamedObjectRepositoryInMemory {
-    #[tracing::instrument(level = "debug", skip_all, fields(%name))]
+    #[tracing::instrument(level = "debug", name = "NamedObjectRepositoryInMemory::get", skip_all, fields(%name))]
     async fn get(&self, name: &str) -> Result<Bytes, GetNamedError> {
         let objects_by_name = self.objects_by_name.lock().unwrap();
         let res = objects_by_name.get(name);
@@ -46,14 +46,14 @@ impl NamedObjectRepository for NamedObjectRepositoryInMemory {
         }
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(%name))]
+    #[tracing::instrument(level = "debug", name = "NamedObjectRepositoryInMemory::set", skip_all, fields(%name))]
     async fn set(&self, name: &str, data: &[u8]) -> Result<(), SetNamedError> {
         let mut objects_by_name = self.objects_by_name.lock().unwrap();
         objects_by_name.insert(String::from(name), Bytes::copy_from_slice(data));
         Ok(())
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(%name))]
+    #[tracing::instrument(level = "debug", name = "NamedObjectRepositoryInMemory::delete", skip_all, fields(%name))]
     async fn delete(&self, name: &str) -> Result<(), DeleteNamedError> {
         let mut objects_by_name = self.objects_by_name.lock().unwrap();
         objects_by_name.remove(name);
