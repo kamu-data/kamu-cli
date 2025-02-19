@@ -15,18 +15,16 @@ use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use dill::*;
 use internal_error::{ErrorIntoInternal, InternalError};
-use odf::dataset::{DatasetIDStream, DatasetImpl, MetadataChainImpl};
-use odf::storage::lfs::ObjectRepositoryCachingLocalFs;
-use odf::storage::s3::{NamedObjectRepositoryS3, ObjectRepositoryS3Sha3};
-use odf::storage::{
-    MetadataBlockRepositoryCachingInMem,
-    MetadataBlockRepositoryImpl,
-    ReferenceRepositoryImpl,
-};
-use odf::DatasetStorageUnit;
+use odf_dataset::*;
+use odf_metadata::*;
+use odf_storage::*;
+use odf_storage_lfs::ObjectRepositoryCachingLocalFs;
+use odf_storage_s3::{NamedObjectRepositoryS3, ObjectRepositoryS3Sha3};
 use s3_utils::S3Context;
 use time_source::SystemTimeSource;
 use tokio::sync::Mutex;
+
+use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -64,7 +62,7 @@ impl DatasetStorageUnitS3 {
         }
     }
 
-    fn get_dataset_impl(&self, dataset_id: &odf::DatasetID) -> Arc<dyn odf::Dataset> {
+    fn get_dataset_impl(&self, dataset_id: &DatasetID) -> Arc<dyn Dataset> {
         let s3_context = self
             .s3_context
             .sub_context(&format!("{}/", &dataset_id.as_multibase()));
@@ -109,10 +107,7 @@ impl DatasetStorageUnitS3 {
         }
     }
 
-    async fn delete_dataset_s3_objects(
-        &self,
-        dataset_id: &odf::DatasetID,
-    ) -> Result<(), InternalError> {
+    async fn delete_dataset_s3_objects(&self, dataset_id: &DatasetID) -> Result<(), InternalError> {
         let dataset_key_prefix = self
             .s3_context
             .get_key(&dataset_id.as_multibase().to_stack_string());
@@ -120,7 +115,7 @@ impl DatasetStorageUnitS3 {
     }
 
     #[tracing::instrument(level = "info", skip_all)]
-    async fn list_dataset_ids_in_s3(&self) -> Result<HashSet<odf::DatasetID>, InternalError> {
+    async fn list_dataset_ids_in_s3(&self) -> Result<HashSet<DatasetID>, InternalError> {
         let mut res = HashSet::new();
 
         let folders_common_prefixes = self.s3_context.bucket_list_folders().await?;
@@ -131,7 +126,7 @@ impl DatasetStorageUnitS3 {
                 prefix.pop();
             }
 
-            if let Ok(id) = odf::DatasetID::from_multibase_string(&prefix) {
+            if let Ok(id) = DatasetID::from_multibase_string(&prefix) {
                 res.insert(id);
             }
         }
@@ -139,9 +134,7 @@ impl DatasetStorageUnitS3 {
         Ok(res)
     }
 
-    async fn list_dataset_ids_maybe_cached(
-        &self,
-    ) -> Result<HashSet<odf::DatasetID>, InternalError> {
+    async fn list_dataset_ids_maybe_cached(&self) -> Result<HashSet<DatasetID>, InternalError> {
         if let Some(cache) = &self.registry_cache {
             let mut cache = cache.state.lock().await;
 
@@ -162,11 +155,11 @@ impl DatasetStorageUnitS3 {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait]
-impl odf::DatasetStorageUnit for DatasetStorageUnitS3 {
+impl DatasetStorageUnit for DatasetStorageUnitS3 {
     async fn get_stored_dataset_by_id(
         &self,
-        dataset_id: &odf::DatasetID,
-    ) -> Result<Arc<dyn odf::Dataset>, odf::dataset::GetStoredDatasetError> {
+        dataset_id: &DatasetID,
+    ) -> Result<Arc<dyn Dataset>, GetStoredDatasetError> {
         if self
             .s3_context
             .bucket_path_exists(dataset_id.as_multibase().to_stack_string().as_str())
@@ -175,11 +168,9 @@ impl odf::DatasetStorageUnit for DatasetStorageUnitS3 {
             let dataset = self.get_dataset_impl(dataset_id);
             Ok(dataset)
         } else {
-            Err(odf::dataset::GetStoredDatasetError::NotFound(
-                odf::dataset::DatasetNotFoundError {
-                    dataset_ref: dataset_id.as_local_ref(),
-                },
-            ))
+            Err(GetStoredDatasetError::NotFound(DatasetNotFoundError {
+                dataset_ref: dataset_id.as_local_ref(),
+            }))
         }
     }
 
@@ -194,23 +185,21 @@ impl odf::DatasetStorageUnit for DatasetStorageUnitS3 {
 }
 
 #[async_trait]
-impl odf::DatasetStorageUnitWriter for DatasetStorageUnitS3 {
+impl DatasetStorageUnitWriter for DatasetStorageUnitS3 {
     #[tracing::instrument(level = "debug", skip_all, fields(?seed_block))]
     async fn store_dataset(
         &self,
-        seed_block: odf::MetadataBlockTyped<odf::metadata::Seed>,
-    ) -> Result<odf::dataset::StoreDatasetResult, odf::dataset::StoreDatasetError> {
+        seed_block: MetadataBlockTyped<Seed>,
+    ) -> Result<StoreDatasetResult, StoreDatasetError> {
         // Check if a dataset with the same ID can be resolved successfully
-        use odf::DatasetStorageUnit;
+        use DatasetStorageUnit;
         let maybe_existing_dataset = match self
             .get_stored_dataset_by_id(&seed_block.event.dataset_id)
             .await
         {
             Ok(existing_dataset) => Ok(Some(existing_dataset)),
-            Err(odf::dataset::GetStoredDatasetError::NotFound(_)) => Ok(None),
-            Err(odf::dataset::GetStoredDatasetError::Internal(e)) => {
-                Err(odf::dataset::StoreDatasetError::Internal(e))
-            }
+            Err(GetStoredDatasetError::NotFound(_)) => Ok(None),
+            Err(GetStoredDatasetError::Internal(e)) => Err(StoreDatasetError::Internal(e)),
         }?;
 
         // If so, there are 2 possibilities:
@@ -221,28 +210,24 @@ impl odf::DatasetStorageUnitWriter for DatasetStorageUnitS3 {
         if let Some(existing_dataset) = maybe_existing_dataset {
             match existing_dataset
                 .as_metadata_chain()
-                .resolve_ref(&odf::BlockRef::Head)
+                .resolve_ref(&BlockRef::Head)
                 .await
             {
                 // Existing head
                 Ok(_) => {
-                    return Err(odf::dataset::StoreDatasetError::RefCollision(
-                        odf::dataset::RefCollisionError {
-                            id: seed_block.event.dataset_id.clone(),
-                        },
-                    ));
+                    return Err(StoreDatasetError::RefCollision(RefCollisionError {
+                        id: seed_block.event.dataset_id.clone(),
+                    }));
                 }
 
                 // No head, so continue creating
-                Err(odf::storage::GetRefError::NotFound(_)) => {}
+                Err(GetRefError::NotFound(_)) => {}
 
                 // Errors...
-                Err(odf::storage::GetRefError::Access(e)) => {
-                    return Err(odf::dataset::StoreDatasetError::Internal(e.int_err()))
+                Err(GetRefError::Access(e)) => {
+                    return Err(StoreDatasetError::Internal(e.int_err()))
                 }
-                Err(odf::storage::GetRefError::Internal(e)) => {
-                    return Err(odf::dataset::StoreDatasetError::Internal(e))
-                }
+                Err(GetRefError::Internal(e)) => return Err(StoreDatasetError::Internal(e)),
             }
         }
 
@@ -255,11 +240,11 @@ impl odf::DatasetStorageUnitWriter for DatasetStorageUnitS3 {
             .as_metadata_chain()
             .append(
                 seed_block.into(),
-                odf::dataset::AppendOpts {
+                AppendOpts {
                     // We are using head ref CAS to detect previous existence of a dataset
                     // as atomically as possible
                     check_ref_is: Some(None),
-                    ..odf::dataset::AppendOpts::default()
+                    ..AppendOpts::default()
                 },
             )
             .await
@@ -280,7 +265,7 @@ impl odf::DatasetStorageUnitWriter for DatasetStorageUnitS3 {
             "Created new dataset",
         );
 
-        Ok(odf::dataset::StoreDatasetResult {
+        Ok(StoreDatasetResult {
             dataset_id,
             dataset,
             head,
@@ -288,10 +273,7 @@ impl odf::DatasetStorageUnitWriter for DatasetStorageUnitS3 {
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id))]
-    async fn delete_dataset(
-        &self,
-        dataset_id: &odf::DatasetID,
-    ) -> Result<(), odf::dataset::DeleteStoredDatasetError> {
+    async fn delete_dataset(&self, dataset_id: &DatasetID) -> Result<(), DeleteStoredDatasetError> {
         // Ensure key exists in S3
         let _ = self.get_stored_dataset_by_id(dataset_id).await?;
 
@@ -300,7 +282,7 @@ impl odf::DatasetStorageUnitWriter for DatasetStorageUnitS3 {
         // Remove all objects under the key
         self.delete_dataset_s3_objects(dataset_id)
             .await
-            .map_err(odf::dataset::DeleteStoredDatasetError::Internal)?;
+            .map_err(DeleteStoredDatasetError::Internal)?;
 
         // Update cache if enabled
         if let Some(cache) = &self.registry_cache {
@@ -319,7 +301,7 @@ pub struct S3RegistryCache {
 }
 
 struct State {
-    dataset_ids: HashSet<odf::DatasetID>,
+    dataset_ids: HashSet<DatasetID>,
     last_updated: DateTime<Utc>,
 }
 

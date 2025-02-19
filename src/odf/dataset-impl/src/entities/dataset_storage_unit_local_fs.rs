@@ -13,14 +13,13 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use dill::*;
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
-use odf::dataset::{DatasetIDStream, DatasetImpl, MetadataChainImpl};
-use odf::storage::lfs::{NamedObjectRepositoryLocalFS, ObjectRepositoryLocalFSSha3};
-use odf::storage::{
-    MetadataBlockRepositoryCachingInMem,
-    MetadataBlockRepositoryImpl,
-    ReferenceRepositoryImpl,
-};
+use odf_dataset::*;
+use odf_metadata::*;
+use odf_storage::*;
+use odf_storage_lfs::{NamedObjectRepositoryLocalFS, ObjectRepositoryLocalFSSha3};
 use url::Url;
+
+use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -39,20 +38,18 @@ impl DatasetStorageUnitLocalFs {
     // TODO: Public only for testing
     pub fn get_dataset_layout(
         &self,
-        dataset_id: &odf::DatasetID,
-    ) -> Result<odf::dataset::DatasetLayout, odf::dataset::GetStoredDatasetError> {
+        dataset_id: &DatasetID,
+    ) -> Result<DatasetLayout, GetStoredDatasetError> {
         let dataset_path = self.get_dataset_path(dataset_id);
         if !dataset_path.exists() {
-            return Err(odf::dataset::GetStoredDatasetError::NotFound(
-                odf::dataset::DatasetNotFoundError {
-                    dataset_ref: dataset_id.as_local_ref(),
-                },
-            ));
+            return Err(GetStoredDatasetError::NotFound(DatasetNotFoundError {
+                dataset_ref: dataset_id.as_local_ref(),
+            }));
         }
-        Ok(odf::dataset::DatasetLayout::new(dataset_path))
+        Ok(DatasetLayout::new(dataset_path))
     }
 
-    fn build_dataset(layout: odf::dataset::DatasetLayout) -> Arc<dyn odf::Dataset> {
+    fn build_dataset(layout: DatasetLayout) -> Arc<dyn Dataset> {
         Arc::new(DatasetImpl::new(
             MetadataChainImpl::new(
                 MetadataBlockRepositoryCachingInMem::new(MetadataBlockRepositoryImpl::new(
@@ -67,7 +64,7 @@ impl DatasetStorageUnitLocalFs {
         ))
     }
 
-    fn get_dataset_path(&self, dataset_id: &odf::DatasetID) -> PathBuf {
+    fn get_dataset_path(&self, dataset_id: &DatasetID) -> PathBuf {
         self.root
             .join(dataset_id.as_multibase().to_stack_string().as_str())
     }
@@ -76,11 +73,11 @@ impl DatasetStorageUnitLocalFs {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait]
-impl odf::DatasetStorageUnit for DatasetStorageUnitLocalFs {
+impl DatasetStorageUnit for DatasetStorageUnitLocalFs {
     async fn get_stored_dataset_by_id(
         &self,
-        dataset_id: &odf::DatasetID,
-    ) -> Result<Arc<dyn odf::Dataset>, odf::dataset::GetStoredDatasetError> {
+        dataset_id: &DatasetID,
+    ) -> Result<Arc<dyn Dataset>, GetStoredDatasetError> {
         let layout = self.get_dataset_layout(dataset_id)?;
         let dataset = Self::build_dataset(layout);
         Ok(dataset)
@@ -103,7 +100,7 @@ impl odf::DatasetStorageUnit for DatasetStorageUnitLocalFs {
                     }
                 }
 
-                let dataset_id = odf::DatasetID::from_multibase_string(dataset_dir_entry.file_name().to_str().unwrap()).int_err()?;
+                let dataset_id = DatasetID::from_multibase_string(dataset_dir_entry.file_name().to_str().unwrap()).int_err()?;
 
                 // TODO: check HEAD exists
 
@@ -116,23 +113,21 @@ impl odf::DatasetStorageUnit for DatasetStorageUnitLocalFs {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait]
-impl odf::DatasetStorageUnitWriter for DatasetStorageUnitLocalFs {
+impl DatasetStorageUnitWriter for DatasetStorageUnitLocalFs {
     #[tracing::instrument(level = "debug", skip_all, fields(?seed_block))]
     async fn store_dataset(
         &self,
-        seed_block: odf::MetadataBlockTyped<odf::metadata::Seed>,
-    ) -> Result<odf::dataset::StoreDatasetResult, odf::dataset::StoreDatasetError> {
+        seed_block: MetadataBlockTyped<Seed>,
+    ) -> Result<StoreDatasetResult, StoreDatasetError> {
         // Check if a dataset with the same ID can be resolved successfully
-        use odf::DatasetStorageUnit;
+        use DatasetStorageUnit;
         let maybe_existing_dataset = match self
             .get_stored_dataset_by_id(&seed_block.event.dataset_id)
             .await
         {
             Ok(existing_dataset) => Ok(Some(existing_dataset)),
-            Err(odf::dataset::GetStoredDatasetError::NotFound(_)) => Ok(None),
-            Err(odf::dataset::GetStoredDatasetError::Internal(e)) => {
-                Err(odf::dataset::StoreDatasetError::Internal(e))
-            }
+            Err(GetStoredDatasetError::NotFound(_)) => Ok(None),
+            Err(GetStoredDatasetError::Internal(e)) => Err(StoreDatasetError::Internal(e)),
         }?;
 
         // If so, there are 2 possibilities:
@@ -143,28 +138,24 @@ impl odf::DatasetStorageUnitWriter for DatasetStorageUnitLocalFs {
         if let Some(existing_dataset) = maybe_existing_dataset {
             match existing_dataset
                 .as_metadata_chain()
-                .resolve_ref(&odf::BlockRef::Head)
+                .resolve_ref(&BlockRef::Head)
                 .await
             {
                 // Existing head
                 Ok(_) => {
-                    return Err(odf::dataset::StoreDatasetError::RefCollision(
-                        odf::dataset::RefCollisionError {
-                            id: seed_block.event.dataset_id.clone(),
-                        },
-                    ));
+                    return Err(StoreDatasetError::RefCollision(RefCollisionError {
+                        id: seed_block.event.dataset_id.clone(),
+                    }));
                 }
 
                 // No head, so continue creating
-                Err(odf::storage::GetRefError::NotFound(_)) => {}
+                Err(GetRefError::NotFound(_)) => {}
 
                 // Errors...
-                Err(odf::storage::GetRefError::Access(e)) => {
-                    return Err(odf::dataset::StoreDatasetError::Internal(e.int_err()))
+                Err(GetRefError::Access(e)) => {
+                    return Err(StoreDatasetError::Internal(e.int_err()))
                 }
-                Err(odf::storage::GetRefError::Internal(e)) => {
-                    return Err(odf::dataset::StoreDatasetError::Internal(e))
-                }
+                Err(GetRefError::Internal(e)) => return Err(StoreDatasetError::Internal(e)),
             }
         }
 
@@ -173,7 +164,7 @@ impl odf::DatasetStorageUnitWriter for DatasetStorageUnitLocalFs {
 
         // Create dataset
         let dataset_path = self.get_dataset_path(&dataset_id);
-        let layout = odf::dataset::DatasetLayout::create(&dataset_path).int_err()?;
+        let layout = DatasetLayout::create(&dataset_path).int_err()?;
         let dataset = Self::build_dataset(layout);
 
         // Set Head
@@ -181,11 +172,11 @@ impl odf::DatasetStorageUnitWriter for DatasetStorageUnitLocalFs {
             .as_metadata_chain()
             .append(
                 seed_block.into(),
-                odf::dataset::AppendOpts {
+                AppendOpts {
                     // We are using head ref CAS to detect previous existence of a dataset
                     // as atomically as possible
                     check_ref_is: Some(None),
-                    ..odf::dataset::AppendOpts::default()
+                    ..AppendOpts::default()
                 },
             )
             .await
@@ -200,7 +191,7 @@ impl odf::DatasetStorageUnitWriter for DatasetStorageUnitLocalFs {
             "Created new dataset",
         );
 
-        Ok(odf::dataset::StoreDatasetResult {
+        Ok(StoreDatasetResult {
             dataset_id,
             dataset,
             head,
@@ -208,10 +199,7 @@ impl odf::DatasetStorageUnitWriter for DatasetStorageUnitLocalFs {
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id))]
-    async fn delete_dataset(
-        &self,
-        dataset_id: &odf::DatasetID,
-    ) -> Result<(), odf::dataset::DeleteStoredDatasetError> {
+    async fn delete_dataset(&self, dataset_id: &DatasetID) -> Result<(), DeleteStoredDatasetError> {
         // Ensure dataset folder exists on disk
         let layout = self.get_dataset_layout(dataset_id)?;
 

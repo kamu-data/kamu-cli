@@ -153,7 +153,7 @@ async fn create_graph_remote(
     // It will have a unified id-based structure
     let tmp_registry_dir = tempfile::tempdir().unwrap();
 
-    let tmp_storage_unit = Arc::new(DatasetStorageUnitLocalFs::new(
+    let tmp_storage_unit = Arc::new(odf::dataset::DatasetStorageUnitLocalFs::new(
         tmp_registry_dir.path().to_owned(),
     ));
 

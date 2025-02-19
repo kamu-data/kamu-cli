@@ -14,7 +14,6 @@ use database_common::NoOpDatabasePlugin;
 use dill::*;
 use indoc::indoc;
 use internal_error::InternalError;
-use kamu::*;
 use kamu_core::utils::metadata_chain_comparator::CompareChainsResult;
 use kamu_core::*;
 use kamu_datasets::CreateDatasetFromSnapshotUseCase;
@@ -153,9 +152,12 @@ impl PushStatusesTestHarness {
             b.add_value(RunInfoDir::new(tempdir.path().join("run")))
                 .add::<DidGeneratorDefault>()
                 .add::<DummyOutboxImpl>()
-                .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
-                .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
-                .bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
+                .add_builder(
+                    odf::dataset::DatasetStorageUnitLocalFs::builder().with_root(datasets_dir),
+                )
+                .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
+                .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>(
+                )
                 .add::<CreateDatasetFromSnapshotUseCaseImpl>()
                 .add::<CreateDatasetUseCaseImpl>()
                 .add::<ViewDatasetUseCaseImpl>()

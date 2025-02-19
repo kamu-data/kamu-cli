@@ -42,8 +42,8 @@ const FILE_DATA_ARRAY_SIZE: usize = 32;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 fn assert_in_sync(
-    dataset_repo_lhs: &DatasetStorageUnitLocalFs,
-    dataset_repo_rhs: &DatasetStorageUnitLocalFs,
+    dataset_repo_lhs: &odf::dataset::DatasetStorageUnitLocalFs,
+    dataset_repo_rhs: &odf::dataset::DatasetStorageUnitLocalFs,
     dataset_id: &odf::DatasetID,
 ) {
     let lhs_layout = dataset_repo_lhs.get_dataset_layout(dataset_id).unwrap();
@@ -79,9 +79,9 @@ async fn do_test_sync(
         .add_value(ipfs_client.clone())
         .add_value(CurrentAccountSubject::new_test())
         .add_value(TenancyConfig::SingleTenant)
-        .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir_foo))
-        .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
-        .bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
+        .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder().with_root(datasets_dir_foo))
+        .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
+        .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>()
         .add::<DatasetRegistrySoloUnitBridge>()
         .add_value(RemoteReposDir::new(tmp_workspace_dir_foo.join("repos")))
         .add::<RemoteRepositoryRegistryImpl>()
@@ -120,9 +120,9 @@ async fn do_test_sync(
         .add_value(ipfs_client.clone())
         .add_value(CurrentAccountSubject::new_test())
         .add_value(TenancyConfig::SingleTenant)
-        .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir_bar))
-        .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
-        .bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
+        .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder().with_root(datasets_dir_bar))
+        .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
+        .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>()
         .add::<DatasetRegistrySoloUnitBridge>()
         .add_value(RemoteReposDir::new(tmp_workspace_dir_bar.join("repos")))
         .add::<RemoteRepositoryRegistryImpl>()
@@ -144,14 +144,18 @@ async fn do_test_sync(
 
     let sync_svc_foo = catalog_foo.get_one::<dyn SyncService>().unwrap();
     let sync_request_builder_foo = catalog_foo.get_one::<SyncRequestBuilder>().unwrap();
-    let storage_unit_foo = catalog_foo.get_one::<DatasetStorageUnitLocalFs>().unwrap();
+    let storage_unit_foo = catalog_foo
+        .get_one::<odf::dataset::DatasetStorageUnitLocalFs>()
+        .unwrap();
     let dataset_registry_foo = catalog_foo.get_one::<dyn DatasetRegistry>().unwrap();
     let did_generator_foo = catalog_foo.get_one::<dyn DidGenerator>().unwrap();
     let time_source_foo = catalog_foo.get_one::<dyn SystemTimeSource>().unwrap();
 
     let sync_svc_bar = catalog_bar.get_one::<dyn SyncService>().unwrap();
     let sync_request_builder_bar = catalog_bar.get_one::<SyncRequestBuilder>().unwrap();
-    let storage_unit_bar = catalog_bar.get_one::<DatasetStorageUnitLocalFs>().unwrap();
+    let storage_unit_bar = catalog_bar
+        .get_one::<odf::dataset::DatasetStorageUnitLocalFs>()
+        .unwrap();
     let dataset_registry_bar = catalog_bar.get_one::<dyn DatasetRegistry>().unwrap();
 
     // Dataset does not exist locally / remotely

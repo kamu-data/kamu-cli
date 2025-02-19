@@ -14,7 +14,6 @@ use chrono::{DateTime, TimeZone, Utc};
 use datafusion::prelude::*;
 use dill::Component;
 use indoc::indoc;
-use kamu::DatasetStorageUnitLocalFs;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::*;
 use kamu_ingest_datafusion::*;
@@ -1221,11 +1220,13 @@ impl Harness {
             .add::<SystemTimeSourceDefault>()
             .add_value(CurrentAccountSubject::new_test())
             .add_value(TenancyConfig::SingleTenant)
-            .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
-            .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
+            .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
+            .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
             .build();
 
-        let storage_unit = catalog.get_one::<DatasetStorageUnitLocalFs>().unwrap();
+        let storage_unit = catalog
+            .get_one::<odf::dataset::DatasetStorageUnitLocalFs>()
+            .unwrap();
 
         let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
 

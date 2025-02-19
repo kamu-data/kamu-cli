@@ -25,7 +25,6 @@ use kamu::utils::simple_transfer_protocol::{
 };
 use kamu::{
     DatasetRegistrySoloUnitBridge,
-    DatasetStorageUnitLocalFs,
     RemoteReposDir,
     RemoteRepositoryRegistryImpl,
     SyncRequestBuilder,
@@ -72,9 +71,9 @@ async fn setup_dataset(
         .add_value(ipfs_client)
         .add_value(CurrentAccountSubject::new_test())
         .add_value(TenancyConfig::SingleTenant)
-        .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
-        .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
-        .bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
+        .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
+        .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
+        .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>()
         .add::<DatasetRegistrySoloUnitBridge>()
         .add_value(RemoteReposDir::new(repos_dir))
         .add::<RemoteRepositoryRegistryImpl>()

@@ -396,10 +396,11 @@ pub fn configure_base_catalog(
     b.add::<DidGeneratorDefault>();
 
     b.add_builder(
-        DatasetStorageUnitLocalFs::builder().with_root(workspace_layout.datasets_dir.clone()),
+        odf::dataset::DatasetStorageUnitLocalFs::builder()
+            .with_root(workspace_layout.datasets_dir.clone()),
     );
-    b.bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>();
-    b.bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>();
+    b.bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>();
+    b.bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>();
 
     b.add::<odf::dataset::DatasetFactoryImpl>();
 

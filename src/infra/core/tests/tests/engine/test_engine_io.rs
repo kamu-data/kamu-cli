@@ -295,11 +295,13 @@ async fn test_engine_io_local_file_mount() {
         .add::<DatasetKeyValueServiceSysEnv>()
         .add_value(CurrentAccountSubject::new_test())
         .add_value(TenancyConfig::SingleTenant)
-        .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
-        .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
+        .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
+        .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
         .build();
 
-    let storage_unit = catalog.get_one::<DatasetStorageUnitLocalFs>().unwrap();
+    let storage_unit = catalog
+        .get_one::<odf::dataset::DatasetStorageUnitLocalFs>()
+        .unwrap();
     let did_generator = catalog.get_one::<dyn DidGenerator>().unwrap();
 
     test_engine_io_common(
@@ -338,11 +340,15 @@ async fn test_engine_io_s3_to_local_file_mount_proxy() {
         .add::<kamu_core::auth::AlwaysHappyDatasetActionAuthorizer>()
         .add_value(CurrentAccountSubject::new_test())
         .add_value(TenancyConfig::SingleTenant)
-        .add_builder(DatasetStorageUnitS3::builder().with_s3_context(s3_context.clone()))
-        .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitS3>()
+        .add_builder(
+            odf::dataset::DatasetStorageUnitS3::builder().with_s3_context(s3_context.clone()),
+        )
+        .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitS3>()
         .build();
 
-    let storage_unit = catalog.get_one::<DatasetStorageUnitS3>().unwrap();
+    let storage_unit = catalog
+        .get_one::<odf::dataset::DatasetStorageUnitS3>()
+        .unwrap();
     let did_generator = catalog.get_one::<dyn DidGenerator>().unwrap();
 
     test_engine_io_common(

@@ -10,7 +10,7 @@
 use dill::{component, interface, Component};
 use indoc::indoc;
 use internal_error::{ErrorIntoInternal, InternalError};
-use kamu::{DatasetRegistrySoloUnitBridge, DatasetStorageUnitLocalFs};
+use kamu::DatasetRegistrySoloUnitBridge;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::auth::AlwaysHappyDatasetActionAuthorizer;
 use kamu_core::TenancyConfig;
@@ -96,9 +96,10 @@ async fn test_internal_error() {
         .add_value(CurrentAccountSubject::new_test())
         .add_value(TenancyConfig::SingleTenant)
         .add_builder(
-            DatasetStorageUnitLocalFs::builder().with_root(tempdir.path().join("datasets")),
+            odf::dataset::DatasetStorageUnitLocalFs::builder()
+                .with_root(tempdir.path().join("datasets")),
         )
-        .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
+        .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
         .add::<DatasetRegistrySoloUnitBridge>()
         .add::<ErrorViewDatasetUseCaseImpl>()
         .add::<AlwaysHappyDatasetActionAuthorizer>()

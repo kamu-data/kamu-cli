@@ -16,7 +16,7 @@ use dill::Component;
 use futures::TryStreamExt;
 use indoc::indoc;
 use kamu::testing::MockDatasetChangesService;
-use kamu::{DatasetStorageUnitLocalFs, MetadataQueryServiceImpl};
+use kamu::MetadataQueryServiceImpl;
 use kamu_accounts::{
     CurrentAccountSubject,
     LoggedAccount,
@@ -3112,9 +3112,9 @@ impl FlowRunsHarness {
             .bind::<dyn Outbox, OutboxImmediateImpl>()
             .add::<DidGeneratorDefault>()
             .add_value(TenancyConfig::SingleTenant)
-            .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
-            .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
-            .bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
+            .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
+            .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
+            .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>()
             .add::<MetadataQueryServiceImpl>()
             .add::<CreateDatasetFromSnapshotUseCaseImpl>()
             .add::<CreateDatasetUseCaseImpl>()

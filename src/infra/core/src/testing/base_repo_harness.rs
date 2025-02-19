@@ -25,12 +25,13 @@ use kamu_core::{
 };
 use kamu_datasets::CreateDatasetResult;
 use odf::dataset::testing::create_test_dataset_from_snapshot;
+use odf::dataset::DatasetStorageUnitLocalFs;
 use odf::metadata::serde::flatbuffers::FlatbuffersMetadataBlockSerializer;
 use odf::metadata::serde::MetadataBlockSerializer;
 use odf::metadata::testing::MetadataFactory;
 use time_source::{SystemTimeSource, SystemTimeSourceDefault};
 
-use crate::{DatasetRegistrySoloUnitBridge, DatasetStorageUnitLocalFs};
+use crate::DatasetRegistrySoloUnitBridge;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

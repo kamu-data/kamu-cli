@@ -14,7 +14,6 @@ use std::sync::{Arc, RwLock};
 use chrono::{DateTime, TimeZone, Utc};
 use dill::{CatalogBuilder, Component};
 use init_on_startup::InitOnStartup;
-use kamu::DatasetStorageUnitLocalFs;
 use kamu_accounts::{Account, AccountRepository, CurrentAccountSubject};
 use kamu_accounts_inmem::InMemoryAccountRepository;
 use kamu_accounts_services::AccountServiceImpl;
@@ -211,6 +210,7 @@ impl DatasetEntryServiceHarness {
         let catalog = {
             let mut b = CatalogBuilder::new();
 
+            use odf::dataset::DatasetStorageUnitLocalFs;
             b.add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir));
             b.bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>();
             b.bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>();
