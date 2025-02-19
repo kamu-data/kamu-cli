@@ -284,6 +284,8 @@ impl WorkspaceService {
 
                         let dataset_current_path = dataset_dir_entry.path();
                         let dataset_id = self.read_dataset_id_from(&dataset_current_path).await?;
+                        let dataset_alias =
+                            self.read_dataset_alias_from(&dataset_current_path).await?;
                         let migrated_path =
                             self.move_dataset_to_v6_location(&dataset_current_path, &dataset_id)?;
 
@@ -292,8 +294,7 @@ impl WorkspaceService {
                             format!(
                                 "{}/{}",
                                 account_dir_entry.file_name().to_str().unwrap(),
-                                // FIX: should use dataset name
-                                dataset_dir_entry.file_name().to_str().unwrap()
+                                dataset_alias.dataset_name.to_string()
                             ),
                         )
                         .int_err()?;
@@ -342,6 +343,16 @@ impl WorkspaceService {
             .int_err()?;
 
         Ok(dataset_summary.id)
+    }
+
+    async fn read_dataset_alias_from(
+        &self,
+        dataset_dir_path: &std::path::Path,
+    ) -> Result<odf::DatasetAlias, InternalError> {
+        let dataset = odf::dataset::DatasetFactoryImpl::get_local_fs(
+            odf::dataset::DatasetLayout::new(dataset_dir_path),
+        );
+        odf::dataset::read_dataset_alias(&dataset).await
     }
 
     fn move_dataset_to_v6_location(
