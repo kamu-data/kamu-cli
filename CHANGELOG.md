@@ -15,7 +15,7 @@ Recommendation: for ease of reading, use the following order:
 ### Added
 - Added [common-macros](src/utils/common-macros) crate containing macros of general use
 ### Changed
-- Improved/added trace for repositories to contain not only the method name but also the structure name
+- Improved/added trace for repositories & GQL to contain not only the method name but also the structure name
 
 ## [0.224.0] - 2025-02-18
 ### Added
