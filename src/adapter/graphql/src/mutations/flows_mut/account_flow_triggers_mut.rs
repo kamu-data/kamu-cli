@@ -20,6 +20,7 @@ pub struct AccountFlowTriggersMut {
     account: Account,
 }
 
+#[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
 #[Object]
 impl AccountFlowTriggersMut {
     #[graphql(skip)]
@@ -38,6 +39,7 @@ impl AccountFlowTriggersMut {
         Ok(dataset_ids)
     }
 
+    #[tracing::instrument(level = "info", name = AccountFlowTriggersMut_resume_account_dataset_flows, skip_all)]
     async fn resume_account_dataset_flows(&self, ctx: &Context<'_>) -> Result<bool> {
         let flow_trigger_service = from_catalog_n!(ctx, dyn FlowTriggerService);
 
@@ -52,6 +54,7 @@ impl AccountFlowTriggersMut {
         Ok(true)
     }
 
+    #[tracing::instrument(level = "info", name = AccountFlowTriggersMut_pause_account_dataset_flows, skip_all)]
     async fn pause_account_dataset_flows(&self, ctx: &Context<'_>) -> Result<bool> {
         let flow_trigger_service = from_catalog_n!(ctx, dyn FlowTriggerService);
 

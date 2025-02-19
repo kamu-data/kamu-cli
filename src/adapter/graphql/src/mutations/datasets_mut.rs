@@ -20,9 +20,11 @@ pub struct DatasetsMut;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
 #[Object]
 impl DatasetsMut {
     /// Returns a mutable dataset by its ID
+    #[tracing::instrument(level = "info", name = DatasetsMut_by_id, skip_all, fields(%dataset_id))]
     async fn by_id(&self, ctx: &Context<'_>, dataset_id: DatasetID) -> Result<Option<DatasetMut>> {
         let dataset_registry = from_catalog_n!(ctx, dyn kamu_core::DatasetRegistry);
         let hdl = dataset_registry
@@ -32,6 +34,7 @@ impl DatasetsMut {
     }
 
     /// Creates a new empty dataset
+    #[tracing::instrument(level = "info", name = DatasetsMut_create_empty, skip_all)]
     #[graphql(guard = "LoggedInGuard::new()")]
     async fn create_empty(
         &self,
@@ -66,6 +69,7 @@ impl DatasetsMut {
     }
 
     /// Creates a new dataset from provided DatasetSnapshot manifest
+    #[tracing::instrument(level = "info", name = DatasetsMut_create_from_snapshot, skip_all)]
     #[graphql(guard = "LoggedInGuard::new()")]
     async fn create_from_snapshot(
         &self,

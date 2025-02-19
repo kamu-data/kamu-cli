@@ -18,9 +18,11 @@ use crate::utils::{check_logged_account_id_match, check_logged_account_name_matc
 
 pub struct AccountsMut;
 
+#[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
 #[Object]
 impl AccountsMut {
     /// Returns a mutable account by its id
+    #[tracing::instrument(level = "info", name = AccountsMut_by_id, skip_all, fields(%account_id))]
     async fn by_id(&self, ctx: &Context<'_>, account_id: AccountID) -> Result<Option<AccountMut>> {
         check_logged_account_id_match(ctx, &account_id)?;
 
@@ -31,6 +33,7 @@ impl AccountsMut {
     }
 
     /// Returns a mutable account by its name
+    #[tracing::instrument(level = "info", name = AccountsMut_by_name, skip_all, fields(%account_name))]
     async fn by_name(
         &self,
         ctx: &Context<'_>,

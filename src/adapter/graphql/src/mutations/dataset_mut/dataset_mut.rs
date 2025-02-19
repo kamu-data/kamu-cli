@@ -28,6 +28,7 @@ pub struct DatasetMut {
     dataset_handle: odf::DatasetHandle,
 }
 
+#[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
 #[Object]
 impl DatasetMut {
     #[graphql(skip)]
@@ -55,6 +56,7 @@ impl DatasetMut {
 
     /// Rename the dataset
     #[graphql(guard = "LoggedInGuard::new()")]
+    #[tracing::instrument(level = "info", name = DatasetMut_rename, skip_all)]
     async fn rename(&self, ctx: &Context<'_>, new_name: DatasetName) -> Result<RenameResult> {
         if self
             .dataset_handle
@@ -94,6 +96,7 @@ impl DatasetMut {
 
     /// Delete the dataset
     #[graphql(guard = "LoggedInGuard::new()")]
+    #[tracing::instrument(level = "info", name = DatasetMut_delete, skip_all)]
     async fn delete(&self, ctx: &Context<'_>) -> Result<DeleteResult> {
         let delete_dataset = from_catalog_n!(ctx, dyn kamu_datasets::DeleteDatasetUseCase);
         match delete_dataset
@@ -125,6 +128,7 @@ impl DatasetMut {
 
     /// Manually advances the watermark of a root dataset
     #[graphql(guard = "LoggedInGuard::new()")]
+    #[tracing::instrument(level = "info", name = DatasetMut_set_watermark, skip_all)]
     async fn set_watermark(
         &self,
         ctx: &Context<'_>,
@@ -156,6 +160,7 @@ impl DatasetMut {
 
     /// Set visibility for the dataset
     #[graphql(guard = "LoggedInGuard::new()")]
+    #[tracing::instrument(level = "info", name = DatasetMut_set_visibility, skip_all)]
     async fn set_visibility(
         &self,
         ctx: &Context<'_>,
