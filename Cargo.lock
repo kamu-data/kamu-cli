@@ -5729,6 +5729,7 @@ dependencies = [
  "async-graphql",
  "async-trait",
  "chrono",
+ "common-macros",
  "database-common",
  "datafusion",
  "dill",

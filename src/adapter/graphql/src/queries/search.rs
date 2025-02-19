@@ -21,11 +21,13 @@ use crate::utils::from_catalog_n;
 
 pub struct Search;
 
+#[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
 #[Object]
 impl Search {
     const DEFAULT_RESULTS_PER_PAGE: usize = 15;
 
     /// Perform search across all resources
+    #[tracing::instrument(level = "info", name = Search_query, skip_all, fields(?page, ?per_page))]
     async fn query(
         &self,
         ctx: &Context<'_>,
