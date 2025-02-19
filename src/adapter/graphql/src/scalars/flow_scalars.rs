@@ -88,7 +88,7 @@ impl From<fs::FlowTimingRecords> for FlowTimingRecords {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Enum, Copy, Clone, Eq, PartialEq)]
+#[derive(Enum, Debug, Copy, Clone, Eq, PartialEq)]
 #[graphql(remote = "kamu_flow_system::FlowStatus")]
 pub enum FlowStatus {
     Waiting,

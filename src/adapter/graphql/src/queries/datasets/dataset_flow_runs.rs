@@ -187,7 +187,7 @@ pub struct DatasetFlowFilters {
     by_initiator: Option<InitiatorFilterInput>,
 }
 
-#[derive(OneofObject)]
+#[derive(OneofObject, Debug)]
 pub enum InitiatorFilterInput {
     System(bool),
     Accounts(Vec<AccountID>),
