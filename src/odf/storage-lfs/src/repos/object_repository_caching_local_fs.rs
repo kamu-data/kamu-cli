@@ -53,6 +53,7 @@ impl<WrappedRepo> ObjectRepositoryCachingLocalFs<WrappedRepo> {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[common_macros::method_names_consts]
 #[async_trait]
 impl<WrappedRepo> ObjectRepository for ObjectRepositoryCachingLocalFs<WrappedRepo>
 where
@@ -62,7 +63,7 @@ where
         self.wrapped.protocol()
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(%hash))]
+    #[tracing::instrument(level = "debug", name = ObjectRepositoryCachingLocalFs_contains, skip_all, fields(%hash))]
     async fn contains(&self, hash: &Multihash) -> Result<bool, ContainsError> {
         let cache_path = self.cache_path(hash);
         if cache_path.is_file() {
@@ -72,7 +73,7 @@ where
         }
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(%hash))]
+    #[tracing::instrument(level = "debug", name = ObjectRepositoryCachingLocalFs_get_size, skip_all, fields(%hash))]
     async fn get_size(&self, hash: &Multihash) -> Result<u64, GetError> {
         let cache_path = self.cache_path(hash);
         match std::fs::metadata(&cache_path) {
@@ -82,7 +83,7 @@ where
         }
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(%hash))]
+    #[tracing::instrument(level = "debug", name = ObjectRepositoryCachingLocalFs_get_bytes, skip_all, fields(%hash))]
     async fn get_bytes(&self, hash: &Multihash) -> Result<Bytes, GetError> {
         let cache_path = self.cache_path(hash);
         match std::fs::read(&cache_path) {
@@ -97,7 +98,7 @@ where
         }
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(%hash))]
+    #[tracing::instrument(level = "debug", name = ObjectRepositoryCachingLocalFs_get_stream, skip_all, fields(%hash))]
     async fn get_stream(&self, hash: &Multihash) -> Result<Box<AsyncReadObj>, GetError> {
         let cache_path = self.cache_path(hash);
 
@@ -139,7 +140,7 @@ where
         self.wrapped.get_external_upload_url(hash, opts).await
     }
 
-    #[tracing::instrument(level = "debug", skip_all)]
+    #[tracing::instrument(level = "debug", name = ObjectRepositoryCachingLocalFs_insert_bytes, skip_all)]
     async fn insert_bytes<'a>(
         &'a self,
         data: &'a [u8],
@@ -152,7 +153,7 @@ where
         Ok(res)
     }
 
-    #[tracing::instrument(level = "debug", skip_all)]
+    #[tracing::instrument(level = "debug", name = ObjectRepositoryCachingLocalFs_insert_stream, skip_all)]
     async fn insert_stream<'a>(
         &'a self,
         src: Box<AsyncReadObj>,
@@ -162,7 +163,7 @@ where
         self.wrapped.insert_stream(src, options).await
     }
 
-    #[tracing::instrument(level = "debug", skip_all)]
+    #[tracing::instrument(level = "debug", name = ObjectRepositoryCachingLocalFs_insert_file_move, skip_all)]
     async fn insert_file_move<'a>(
         &'a self,
         src: &Path,
@@ -172,7 +173,7 @@ where
         self.wrapped.insert_file_move(src, options).await
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(%hash))]
+    #[tracing::instrument(level = "debug", name = ObjectRepositoryCachingLocalFs_delete, skip_all, fields(%hash))]
     async fn delete(&self, hash: &Multihash) -> Result<(), DeleteError> {
         let cache_path = self.cache_path(hash);
         match std::fs::remove_file(&cache_path) {
@@ -183,3 +184,5 @@ where
         self.wrapped.delete(hash).await
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

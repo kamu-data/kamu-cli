@@ -32,6 +32,7 @@ pub struct MetadataChain {
     dataset_handle: odf::DatasetHandle,
 }
 
+#[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
 #[Object]
 impl MetadataChain {
     const DEFAULT_BLOCKS_PER_PAGE: usize = 20;
@@ -42,7 +43,7 @@ impl MetadataChain {
     }
 
     /// Returns all named metadata block references
-    #[tracing::instrument(level = "info", skip_all)]
+    #[tracing::instrument(level = "info", name = MetadataChain_refs, skip_all)]
     async fn refs(&self, ctx: &Context<'_>) -> Result<Vec<BlockRef>> {
         let resolved_dataset = get_dataset(ctx, &self.dataset_handle);
         Ok(vec![BlockRef {
@@ -57,7 +58,7 @@ impl MetadataChain {
     }
 
     /// Returns a metadata block corresponding to the specified hash
-    #[tracing::instrument(level = "info", skip_all)]
+    #[tracing::instrument(level = "info", name = MetadataChain_block_by_hash, skip_all)]
     async fn block_by_hash(
         &self,
         ctx: &Context<'_>,
@@ -80,7 +81,7 @@ impl MetadataChain {
 
     /// Returns a metadata block corresponding to the specified hash and encoded
     /// in desired format
-    #[tracing::instrument(level = "info", skip_all)]
+    #[tracing::instrument(level = "info", name = MetadataChain_block_by_hash_encoded, skip_all)]
     async fn block_by_hash_encoded(
         &self,
         ctx: &Context<'_>,
@@ -111,7 +112,7 @@ impl MetadataChain {
     // TODO: Add ref parameter (defaulting to "head")
     // TODO: Support before/after style iteration
     /// Iterates all metadata blocks in the reverse chronological order
-    #[tracing::instrument(level = "info", skip_all)]
+    #[tracing::instrument(level = "info", name = MetadataChain_blocks, skip_all, fields(?page, ?per_page))]
     async fn blocks(
         &self,
         ctx: &Context<'_>,

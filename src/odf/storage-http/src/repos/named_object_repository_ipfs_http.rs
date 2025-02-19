@@ -39,9 +39,10 @@ impl NamedObjectRepositoryIpfsHttp {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[common_macros::method_names_consts]
 #[async_trait]
 impl NamedObjectRepository for NamedObjectRepositoryIpfsHttp {
-    #[tracing::instrument(level = "debug", skip_all, fields(%name))]
+    #[tracing::instrument(level = "debug", name = NamedObjectRepositoryIpfsHttp_get, skip_all, fields(%name))]
     async fn get(&self, name: &str) -> Result<Bytes, GetNamedError> {
         let url = self.base_url.join(name).int_err()?;
 

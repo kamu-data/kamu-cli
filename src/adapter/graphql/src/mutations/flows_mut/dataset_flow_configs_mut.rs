@@ -33,6 +33,7 @@ pub struct DatasetFlowConfigsMut {
     dataset_handle: odf::DatasetHandle,
 }
 
+#[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
 #[Object]
 impl DatasetFlowConfigsMut {
     #[graphql(skip)]
@@ -40,6 +41,7 @@ impl DatasetFlowConfigsMut {
         Self { dataset_handle }
     }
 
+    #[tracing::instrument(level = "info", name = DatasetFlowConfigsMut_set_config, skip_all)]
     #[graphql(guard = "LoggedInGuard::new()")]
     async fn set_config(
         &self,

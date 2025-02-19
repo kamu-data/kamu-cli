@@ -21,6 +21,7 @@ pub struct MetadataChainMut {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
 #[Object]
 impl MetadataChainMut {
     #[graphql(skip)]
@@ -29,7 +30,7 @@ impl MetadataChainMut {
     }
 
     /// Commits new event to the metadata chain
-    #[tracing::instrument(level = "info", skip_all)]
+    #[tracing::instrument(level = "info", name = MetadataChainMut_commit_event, skip_all)]
     #[graphql(guard = "LoggedInGuard::new()")]
     async fn commit_event(
         &self,

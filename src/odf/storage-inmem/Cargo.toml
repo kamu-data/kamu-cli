@@ -23,7 +23,7 @@ doctest = false
 
 [dependencies]
 async-utils = { workspace = true }
-internal-error = { workspace = true }
+common-macros = { workspace = true }
 odf-metadata = { workspace = true }
 odf-storage = { workspace = true }
 

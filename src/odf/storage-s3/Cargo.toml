@@ -23,6 +23,7 @@ doctest = false
 
 [dependencies]
 async-utils = { workspace = true }
+common-macros = { workspace = true }
 internal-error = { workspace = true }
 odf-metadata = { workspace = true }
 odf-storage = { workspace = true }
@@ -31,7 +32,7 @@ s3-utils = { workspace = true }
 async-trait = "0.1"
 aws-sdk-s3 = { version = "1" }
 bytes = { version = "1", default-features = false }
-chrono = { version = "0.4", default-features = false}
+chrono = { version = "0.4", default-features = false }
 digest = "0.10"
 http = "1"
 
@@ -42,7 +43,7 @@ url = { version = "2", default-features = false }
 
 
 [dev-dependencies]
-odf-storage = { workspace = true, features = ["testing"]}
+odf-storage = { workspace = true, features = ["testing"] }
 
 rand = "0.8"
 test-log = { version = "0.2", features = ["trace"] }

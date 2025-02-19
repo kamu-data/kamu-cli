@@ -2,6 +2,7 @@
 members = [
     # Utils
     "src/utils/async-utils",
+    "src/utils/common-macros",
     "src/utils/container-runtime",
     "src/utils/database-common",
     "src/utils/database-common-macros",
@@ -109,6 +110,7 @@ kamu-cli = { version = "0.224.0", path = "src/app/cli", default-features = false
 
 # Utils
 async-utils = { version = "0.224.0", path = "src/utils/async-utils", default-features = false }
+common-macros = { version = "0.224.0", path = "src/utils/common-macros", default-features = false }
 container-runtime = { version = "0.224.0", path = "src/utils/container-runtime", default-features = false }
 database-common = { version = "0.224.0", path = "src/utils/database-common", default-features = false }
 database-common-macros = { version = "0.224.0", path = "src/utils/database-common-macros", default-features = false }
@@ -140,16 +142,16 @@ kamu-flow-system = { version = "0.224.0", path = "src/domain/flow-system/domain"
 kamu-task-system = { version = "0.224.0", path = "src/domain/task-system/domain", default-features = false }
 
 ## Open Data Fabric
-odf = { version = "0.224.0", path = "src/odf/odf", default-features = false, package="opendatafabric" }
-odf-metadata = { version = "0.224.0", path = "src/odf/metadata", default-features = false, package = "opendatafabric-metadata"}
-odf-dataset = { version = "0.224.0", path = "src/odf/dataset", default-features = false, package="opendatafabric-dataset" }
-odf-data-utils = { version = "0.224.0", path = "src/odf/data-utils", default-features = false, package="opendatafabric-data-utils" }
-odf-dataset-impl = { version = "0.224.0", path = "src/odf/dataset-impl", default-features = false, package="opendatafabric-dataset-impl" }
-odf-storage = { version = "0.224.0", path = "src/odf/storage", default-features = false, package="opendatafabric-storage" }
-odf-storage-http = { version = "0.224.0", path = "src/odf/storage-http", default-features = false, package="opendatafabric-storage-http" }
-odf-storage-inmem = { version = "0.224.0", path = "src/odf/storage-inmem", default-features = false, package="opendatafabric-storage-inmem" }
-odf-storage-lfs = { version = "0.224.0", path = "src/odf/storage-lfs", default-features = false, package="opendatafabric-storage-lfs" }
-odf-storage-s3 = { version = "0.224.0", path = "src/odf/storage-s3", default-features = false, package="opendatafabric-storage-s3" }
+odf = { version = "0.224.0", path = "src/odf/odf", default-features = false, package = "opendatafabric" }
+odf-metadata = { version = "0.224.0", path = "src/odf/metadata", default-features = false, package = "opendatafabric-metadata" }
+odf-dataset = { version = "0.224.0", path = "src/odf/dataset", default-features = false, package = "opendatafabric-dataset" }
+odf-data-utils = { version = "0.224.0", path = "src/odf/data-utils", default-features = false, package = "opendatafabric-data-utils" }
+odf-dataset-impl = { version = "0.224.0", path = "src/odf/dataset-impl", default-features = false, package = "opendatafabric-dataset-impl" }
+odf-storage = { version = "0.224.0", path = "src/odf/storage", default-features = false, package = "opendatafabric-storage" }
+odf-storage-http = { version = "0.224.0", path = "src/odf/storage-http", default-features = false, package = "opendatafabric-storage-http" }
+odf-storage-inmem = { version = "0.224.0", path = "src/odf/storage-inmem", default-features = false, package = "opendatafabric-storage-inmem" }
+odf-storage-lfs = { version = "0.224.0", path = "src/odf/storage-lfs", default-features = false, package = "opendatafabric-storage-lfs" }
+odf-storage-s3 = { version = "0.224.0", path = "src/odf/storage-s3", default-features = false, package = "opendatafabric-storage-s3" }
 
 # Domain service layer
 kamu-accounts-services = { version = "0.224.0", path = "src/domain/accounts/services", default-features = false }

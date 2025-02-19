@@ -20,6 +20,7 @@ pub struct AccountFlowTriggers {
     account: AccountEntity,
 }
 
+#[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
 #[Object]
 impl AccountFlowTriggers {
     #[graphql(skip)]
@@ -28,6 +29,7 @@ impl AccountFlowTriggers {
     }
 
     /// Checks if all triggers of all datasets in account are disabled
+    #[tracing::instrument(level = "info", name = AccountFlowTriggers_all_paused, skip_all)]
     async fn all_paused(&self, ctx: &Context<'_>) -> Result<bool> {
         let (dataset_entry_service, flow_trigger_service) =
             from_catalog_n!(ctx, dyn DatasetEntryService, dyn FlowTriggerService);

@@ -25,6 +25,7 @@ pub struct DatasetEnvVarsMut {
     dataset_handle: odf::DatasetHandle,
 }
 
+#[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
 #[Object]
 impl DatasetEnvVarsMut {
     #[graphql(skip)]
@@ -32,6 +33,7 @@ impl DatasetEnvVarsMut {
         Self { dataset_handle }
     }
 
+    #[tracing::instrument(level = "info", name = DatasetEnvVarsMut_upsert_env_variable, skip_all)]
     async fn upsert_env_variable(
         &self,
         ctx: &Context<'_>,
@@ -75,6 +77,7 @@ impl DatasetEnvVarsMut {
         })
     }
 
+    #[tracing::instrument(level = "info", name = DatasetEnvVarsMut_delete_env_variable, skip_all)]
     async fn delete_env_variable(
         &self,
         ctx: &Context<'_>,

@@ -2525,6 +2525,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "common-macros"
+version = "0.224.0"
+dependencies = [
+ "quote",
+ "syn 2.0.96",
+]
+
+[[package]]
 name = "concurrent-queue"
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5420,6 +5428,7 @@ dependencies = [
  "bytes",
  "cfg-if",
  "chrono",
+ "common-macros",
  "container-runtime",
  "criterion",
  "curl",
@@ -5721,6 +5730,7 @@ dependencies = [
  "async-graphql",
  "async-trait",
  "chrono",
+ "common-macros",
  "database-common",
  "datafusion",
  "dill",
@@ -7952,6 +7962,7 @@ dependencies = [
  "async-trait",
  "async-utils",
  "bytes",
+ "common-macros",
  "futures",
  "http 1.2.0",
  "internal-error",
@@ -7974,7 +7985,7 @@ dependencies = [
  "async-trait",
  "async-utils",
  "bytes",
- "internal-error",
+ "common-macros",
  "opendatafabric-metadata",
  "opendatafabric-storage",
  "sha3",
@@ -7990,6 +8001,7 @@ dependencies = [
  "async-trait",
  "async-utils",
  "bytes",
+ "common-macros",
  "digest 0.10.7",
  "internal-error",
  "opendatafabric-data-utils",
@@ -8011,6 +8023,7 @@ dependencies = [
  "aws-sdk-s3",
  "bytes",
  "chrono",
+ "common-macros",
  "digest 0.10.7",
  "http 1.2.0",
  "internal-error",

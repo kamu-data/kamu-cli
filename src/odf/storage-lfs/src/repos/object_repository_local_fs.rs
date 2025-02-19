@@ -104,6 +104,7 @@ where
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[common_macros::method_names_consts]
 #[async_trait]
 impl<D, const C: u32> ObjectRepository for ObjectRepositoryLocalFS<D, C>
 where
@@ -116,7 +117,7 @@ where
         }
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(%hash))]
+    #[tracing::instrument(level = "debug", name = ObjectRepositoryLocalFS_contains, skip_all, fields(%hash))]
     async fn contains(&self, hash: &Multihash) -> Result<bool, ContainsError> {
         let path = self.get_path(hash);
 
@@ -125,7 +126,7 @@ where
         Ok(path.exists())
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(%hash))]
+    #[tracing::instrument(level = "debug", name = ObjectRepositoryLocalFS_get_size, skip_all, fields(%hash))]
     async fn get_size(&self, hash: &Multihash) -> Result<u64, GetError> {
         let path = self.get_path(hash);
 
@@ -140,7 +141,7 @@ where
         Ok(metadata.len())
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(%hash))]
+    #[tracing::instrument(level = "debug", name = ObjectRepositoryLocalFS_get_bytes, skip_all, fields(%hash))]
     async fn get_bytes(&self, hash: &Multihash) -> Result<Bytes, GetError> {
         let path = self.get_path(hash);
 
@@ -156,7 +157,7 @@ where
         Ok(Bytes::from(data))
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(%hash))]
+    #[tracing::instrument(level = "debug", name = ObjectRepositoryLocalFS_get_stream, skip_all, fields(%hash))]
     async fn get_stream(&self, hash: &Multihash) -> Result<Box<AsyncReadObj>, GetError> {
         let path = self.get_path(hash);
 
@@ -193,7 +194,7 @@ where
         Err(GetExternalUrlError::NotSupported)
     }
 
-    #[tracing::instrument(level = "debug", skip_all)]
+    #[tracing::instrument(level = "debug", name = ObjectRepositoryLocalFS_insert_bytes, skip_all)]
     async fn insert_bytes<'a>(
         &'a self,
         data: &'a [u8],
@@ -233,7 +234,7 @@ where
         Ok(InsertResult { hash })
     }
 
-    #[tracing::instrument(level = "debug", skip_all)]
+    #[tracing::instrument(level = "debug", name = ObjectRepositoryLocalFS_insert_stream, skip_all)]
     async fn insert_stream<'a>(
         &'a self,
         src: Box<AsyncReadObj>,
@@ -279,7 +280,7 @@ where
         Ok(InsertResult { hash })
     }
 
-    #[tracing::instrument(level = "debug", skip_all)]
+    #[tracing::instrument(level = "debug", name = ObjectRepositoryLocalFS_insert_file_move, skip_all)]
     async fn insert_file_move<'a>(
         &'a self,
         src: &Path,
@@ -315,7 +316,7 @@ where
         Ok(InsertResult { hash })
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(%hash))]
+    #[tracing::instrument(level = "debug", name = ObjectRepositoryLocalFS_delete, skip_all, fields(%hash))]
     async fn delete(&self, hash: &Multihash) -> Result<(), DeleteError> {
         let path = self.get_path(hash);
 
@@ -327,3 +328,5 @@ where
         Ok(())
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

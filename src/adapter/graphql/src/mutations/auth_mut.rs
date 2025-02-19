@@ -17,8 +17,10 @@ use crate::utils::{check_access_token_valid, check_logged_account_id_match};
 
 pub(crate) struct AuthMut;
 
+#[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
 #[Object]
 impl AuthMut {
+    #[tracing::instrument(level = "info", name = AuthMut_login, skip_all, fields(%login_method))]
     async fn login(
         &self,
         ctx: &Context<'_>,
@@ -37,6 +39,7 @@ impl AuthMut {
         }
     }
 
+    #[tracing::instrument(level = "info", name = AuthMut_account_details, skip_all)]
     async fn account_details(&self, ctx: &Context<'_>, access_token: String) -> Result<Account> {
         let authentication_service = from_catalog_n!(ctx, dyn kamu_accounts::AuthenticationService);
 
@@ -46,6 +49,7 @@ impl AuthMut {
         }
     }
 
+    #[tracing::instrument(level = "info", name = AuthMut_create_access_token, skip_all, fields(%account_id))]
     async fn create_access_token(
         &self,
         ctx: &Context<'_>,
@@ -74,6 +78,7 @@ impl AuthMut {
         }
     }
 
+    #[tracing::instrument(level = "info", name = AuthMut_revoke_access_token, skip_all)]
     async fn revoke_access_token(
         &self,
         ctx: &Context<'_>,

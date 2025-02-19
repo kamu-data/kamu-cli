@@ -29,7 +29,7 @@ pub struct KamuAuthOso {
 #[component(pub)]
 impl KamuAuthOso {
     pub fn new() -> Self {
-        let oso = match KamuAuthOso::load_oso() {
+        let oso = match Self::load_oso() {
             Ok(oso) => oso,
             Err(e) => {
                 panic!("Failed to initialize OSO: {e:?}");

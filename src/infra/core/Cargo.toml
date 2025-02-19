@@ -41,6 +41,7 @@ testing = [
 
 [dependencies]
 # Kamu
+common-macros = { workspace = true }
 container-runtime = { workspace = true }
 file-utils = { workspace = true }
 init-on-startup = { workspace = true }

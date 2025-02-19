@@ -27,6 +27,7 @@ pub struct DatasetFlowTriggersMut {
     dataset_handle: odf::DatasetHandle,
 }
 
+#[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
 #[Object]
 impl DatasetFlowTriggersMut {
     #[graphql(skip)]
@@ -34,6 +35,7 @@ impl DatasetFlowTriggersMut {
         Self { dataset_handle }
     }
 
+    #[tracing::instrument(level = "info", name = DatasetFlowTriggersMut_set_trigger, skip_all)]
     #[graphql(guard = "LoggedInGuard::new()")]
     async fn set_trigger(
         &self,
@@ -84,6 +86,7 @@ impl DatasetFlowTriggersMut {
         }))
     }
 
+    #[tracing::instrument(level = "info", name = DatasetFlowTriggersMut_pause_flows, skip_all)]
     #[graphql(guard = "LoggedInGuard::new()")]
     async fn pause_flows(
         &self,
@@ -105,6 +108,7 @@ impl DatasetFlowTriggersMut {
         Ok(true)
     }
 
+    #[tracing::instrument(level = "info", name = DatasetFlowTriggersMut_resume_flows, skip_all)]
     #[graphql(guard = "LoggedInGuard::new()")]
     async fn resume_flows(
         &self,

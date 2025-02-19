@@ -26,6 +26,7 @@ pub struct AccountFlowRuns {
     account: AccountEntity,
 }
 
+#[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
 #[Object]
 impl AccountFlowRuns {
     const DEFAULT_PER_PAGE: usize = 15;
@@ -35,6 +36,7 @@ impl AccountFlowRuns {
         Self { account }
     }
 
+    #[tracing::instrument(level = "info", name = AccountFlowRuns_list_flows, skip_all, fields(?page, ?per_page, ?filters))]
     async fn list_flows(
         &self,
         ctx: &Context<'_>,
@@ -97,6 +99,7 @@ impl AccountFlowRuns {
         ))
     }
 
+    #[tracing::instrument(level = "info", name = AccountFlowRuns_list_datasets_with_flow, skip_all)]
     async fn list_datasets_with_flow(&self, ctx: &Context<'_>) -> Result<DatasetConnection> {
         let flow_query_service = from_catalog_n!(ctx, dyn fs::FlowQueryService);
 
@@ -136,7 +139,7 @@ impl AccountFlowRuns {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(InputObject)]
+#[derive(InputObject, Debug)]
 pub struct AccountFlowFilters {
     by_flow_type: Option<DatasetFlowType>,
     by_status: Option<FlowStatus>,

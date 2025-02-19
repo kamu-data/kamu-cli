@@ -17,6 +17,7 @@ pub struct DatasetFlowConfigs {
     dataset_handle: odf::DatasetHandle,
 }
 
+#[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
 #[Object]
 impl DatasetFlowConfigs {
     #[graphql(skip)]
@@ -25,6 +26,7 @@ impl DatasetFlowConfigs {
     }
 
     /// Returns defined configuration for a flow of specified type
+    #[tracing::instrument(level = "info", name = DatasetFlowConfigs_by_type, skip_all, fields(?dataset_flow_type))]
     async fn by_type(
         &self,
         ctx: &Context<'_>,

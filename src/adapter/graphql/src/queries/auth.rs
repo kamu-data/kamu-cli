@@ -17,17 +17,20 @@ use crate::utils::check_logged_account_id_match;
 
 pub struct Auth;
 
+#[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
 #[Object]
 impl Auth {
     const DEFAULT_PER_PAGE: usize = 15;
 
     #[allow(clippy::unused_async)]
+    #[tracing::instrument(level = "info", name = Auth_enabled_login_methods, skip_all)]
     async fn enabled_login_methods(&self, ctx: &Context<'_>) -> Result<Vec<&'static str>> {
         let authentication_service = from_catalog_n!(ctx, dyn kamu_accounts::AuthenticationService);
 
         Ok(authentication_service.supported_login_methods())
     }
 
+    #[tracing::instrument(level = "info", name = Auth_list_access_tokens, skip_all, fields(%account_id, ?page, ?per_page))]
     async fn list_access_tokens(
         &self,
         ctx: &Context<'_>,

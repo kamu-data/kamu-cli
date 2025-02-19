@@ -18,6 +18,7 @@ pub struct AccountMut {
     account: Account,
 }
 
+#[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
 #[Object]
 impl AccountMut {
     #[graphql(skip)]
@@ -26,6 +27,7 @@ impl AccountMut {
     }
 
     /// Update account email
+    #[tracing::instrument(level = "info", name = AccountMut_update_email, skip_all)]
     pub async fn update_email(
         &self,
         ctx: &Context<'_>,

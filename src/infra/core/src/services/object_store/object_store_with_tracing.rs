@@ -27,17 +27,18 @@ impl<S> ObjectStoreWithTracing<S> {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[common_macros::method_names_consts]
 #[async_trait::async_trait]
 impl<S> ObjectStore for ObjectStoreWithTracing<S>
 where
     S: ObjectStore,
 {
-    #[tracing::instrument(level = "debug", skip_all, fields(%location))]
+    #[tracing::instrument(level = "debug", name = ObjectStoreWithTracing_put, skip_all, fields(%location))]
     async fn put(&self, location: &Path, payload: PutPayload) -> Result<PutResult> {
         self.0.put(location, payload).await
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(%location))]
+    #[tracing::instrument(level = "debug", name = ObjectStoreWithTracing_put_opts, skip_all, fields(%location))]
     async fn put_opts(
         &self,
         location: &Path,
@@ -47,12 +48,12 @@ where
         self.0.put_opts(location, payload, opts).await
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(%location))]
+    #[tracing::instrument(level = "debug", name = ObjectStoreWithTracing_put_multipart, skip_all, fields(%location))]
     async fn put_multipart(&self, location: &Path) -> Result<Box<dyn MultipartUpload>> {
         self.0.put_multipart(location).await
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(%location))]
+    #[tracing::instrument(level = "debug", name = ObjectStoreWithTracing_put_multipart_opts, skip_all, fields(%location))]
     async fn put_multipart_opts(
         &self,
         location: &Path,
@@ -61,37 +62,37 @@ where
         self.0.put_multipart_opts(location, opts).await
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(%location))]
+    #[tracing::instrument(level = "debug", name = ObjectStoreWithTracing_get, skip_all, fields(%location))]
     async fn get(&self, location: &Path) -> Result<GetResult> {
         self.0.get(location).await
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(%location))]
+    #[tracing::instrument(level = "debug", name = ObjectStoreWithTracing_get_opts, skip_all, fields(%location))]
     async fn get_opts(&self, location: &Path, options: GetOptions) -> Result<GetResult> {
         self.0.get_opts(location, options).await
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(%location, ?range))]
+    #[tracing::instrument(level = "debug", name = ObjectStoreWithTracing_get_range, skip_all, fields(%location, ?range))]
     async fn get_range(&self, location: &Path, range: Range<usize>) -> Result<Bytes> {
         self.0.get_range(location, range).await
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(%location, ?ranges))]
+    #[tracing::instrument(level = "debug", name = ObjectStoreWithTracing_get_ranges, skip_all, fields(%location, ?ranges))]
     async fn get_ranges(&self, location: &Path, ranges: &[Range<usize>]) -> Result<Vec<Bytes>> {
         self.0.get_ranges(location, ranges).await
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(%location))]
+    #[tracing::instrument(level = "debug", name = ObjectStoreWithTracing_head, skip_all, fields(%location))]
     async fn head(&self, location: &Path) -> Result<ObjectMeta> {
         self.0.head(location).await
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(%location))]
+    #[tracing::instrument(level = "debug", name = ObjectStoreWithTracing_delete, skip_all, fields(%location))]
     async fn delete(&self, location: &Path) -> Result<()> {
         self.0.delete(location).await
     }
 
-    #[tracing::instrument(level = "debug", skip_all)]
+    #[tracing::instrument(level = "debug", name = ObjectStoreWithTracing_delete_stream, skip_all)]
     fn delete_stream<'a>(
         &'a self,
         locations: BoxStream<'a, Result<Path>>,
@@ -99,12 +100,12 @@ where
         self.0.delete_stream(locations)
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(?prefix))]
+    #[tracing::instrument(level = "debug", name = ObjectStoreWithTracing_list, skip_all, fields(?prefix))]
     fn list(&self, prefix: Option<&Path>) -> BoxStream<'_, Result<ObjectMeta>> {
         self.0.list(prefix)
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(?prefix, %offset))]
+    #[tracing::instrument(level = "debug", name = ObjectStoreWithTracing_list_with_offset, skip_all, fields(?prefix, %offset))]
     fn list_with_offset(
         &self,
         prefix: Option<&Path>,
@@ -113,27 +114,27 @@ where
         self.0.list_with_offset(prefix, offset)
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(?prefix))]
+    #[tracing::instrument(level = "debug", name = ObjectStoreWithTracing_list_with_delimiter, skip_all, fields(?prefix))]
     async fn list_with_delimiter(&self, prefix: Option<&Path>) -> Result<ListResult> {
         self.0.list_with_delimiter(prefix).await
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(%from, %to))]
+    #[tracing::instrument(level = "debug", name = ObjectStoreWithTracing_copy, skip_all, fields(%from, %to))]
     async fn copy(&self, from: &Path, to: &Path) -> Result<()> {
         self.0.copy(from, to).await
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(%from, %to))]
+    #[tracing::instrument(level = "debug", name = ObjectStoreWithTracing_rename, skip_all, fields(%from, %to))]
     async fn rename(&self, from: &Path, to: &Path) -> Result<()> {
         self.0.rename(from, to).await
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(%from, %to))]
+    #[tracing::instrument(level = "debug", name = ObjectStoreWithTracing_copy_if_not_exists, skip_all, fields(%from, %to))]
     async fn copy_if_not_exists(&self, from: &Path, to: &Path) -> Result<()> {
         self.0.copy_if_not_exists(from, to).await
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(%from, %to))]
+    #[tracing::instrument(level = "debug", name = ObjectStoreWithTracing_rename_if_not_exists, skip_all, fields(%from, %to))]
     async fn rename_if_not_exists(&self, from: &Path, to: &Path) -> Result<()> {
         self.0.rename_if_not_exists(from, to).await
     }

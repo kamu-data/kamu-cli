@@ -19,6 +19,7 @@ pub struct DatasetEnvVars {
     dataset_handle: odf::DatasetHandle,
 }
 
+#[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
 #[Object]
 impl DatasetEnvVars {
     const DEFAULT_PER_PAGE: usize = 15;
@@ -28,6 +29,7 @@ impl DatasetEnvVars {
         Self { dataset_handle }
     }
 
+    #[tracing::instrument(level = "info", name = DatasetEnvVars_exposed_value, skip_all)]
     async fn exposed_value(
         &self,
         ctx: &Context<'_>,
@@ -47,6 +49,7 @@ impl DatasetEnvVars {
             .await?)
     }
 
+    #[tracing::instrument(level = "info", name = DatasetEnvVars_list_env_variables, skip_all, fields(?page, ?per_page))]
     async fn list_env_variables(
         &self,
         ctx: &Context<'_>,

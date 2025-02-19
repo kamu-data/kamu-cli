@@ -43,9 +43,10 @@ impl NamedObjectRepositoryLocalFS {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[common_macros::method_names_consts]
 #[async_trait]
 impl NamedObjectRepository for NamedObjectRepositoryLocalFS {
-    #[tracing::instrument(level = "debug", skip_all, fields(%name))]
+    #[tracing::instrument(level = "debug", name = NamedObjectRepositoryLocalFS_get, skip_all, fields(%name))]
     async fn get(&self, name: &str) -> Result<Bytes, GetNamedError> {
         let data = match tokio::fs::read(self.root.join(name)).await {
             Ok(data) => Ok(data),
@@ -60,7 +61,7 @@ impl NamedObjectRepository for NamedObjectRepositoryLocalFS {
         Ok(Bytes::from(data))
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(%name))]
+    #[tracing::instrument(level = "debug", name = NamedObjectRepositoryLocalFS_set, skip_all, fields(%name))]
     async fn set(&self, name: &str, data: &[u8]) -> Result<(), SetNamedError> {
         let staging_path = self.get_staging_path().int_err()?;
         tokio::fs::write(&staging_path, data).await.int_err()?;
@@ -70,7 +71,7 @@ impl NamedObjectRepository for NamedObjectRepositoryLocalFS {
         Ok(())
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(%name))]
+    #[tracing::instrument(level = "debug", name = NamedObjectRepositoryLocalFS_delete, skip_all, fields(%name))]
     async fn delete(&self, name: &str) -> Result<(), DeleteNamedError> {
         match std::fs::remove_file(self.root.join(name)) {
             Ok(_) => Ok(()),
@@ -79,3 +80,5 @@ impl NamedObjectRepository for NamedObjectRepositoryLocalFS {
         }
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

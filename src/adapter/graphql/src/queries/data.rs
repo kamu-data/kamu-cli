@@ -16,12 +16,13 @@ use crate::prelude::*;
 
 pub struct DataQueries;
 
+#[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
 #[Object]
 impl DataQueries {
     const DEFAULT_QUERY_LIMIT: u64 = 100;
 
     /// Executes a specified query and returns its result
-    #[tracing::instrument(level = "info", skip_all)]
+    #[tracing::instrument(level = "info", name = DataQueries_query, skip_all)]
     async fn query(
         &self,
         ctx: &Context<'_>,
@@ -87,6 +88,7 @@ impl DataQueries {
     }
 
     /// Lists engines known to the system and recommended for use
+    #[tracing::instrument(level = "info", name = DataQueries_known_engines, skip_all)]
     async fn known_engines(&self, ctx: &Context<'_>) -> Result<Vec<EngineDesc>> {
         let query_svc = from_catalog_n!(ctx, dyn domain::QueryService);
         Ok(query_svc

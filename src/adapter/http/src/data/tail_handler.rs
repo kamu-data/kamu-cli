@@ -33,7 +33,7 @@ use crate::DatasetAliasInPath;
     )
 )]
 #[transactional_handler]
-#[tracing::instrument(level = "info", skip_all, (%dataset_ref))]
+#[tracing::instrument(level = "info", skip_all, fields(%dataset_ref))]
 pub async fn dataset_tail_handler(
     Extension(catalog): Extension<Catalog>,
     Extension(dataset_ref): Extension<odf::DatasetRef>,
