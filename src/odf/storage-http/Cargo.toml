@@ -23,6 +23,7 @@ doctest = false
 
 [dependencies]
 async-utils = { workspace = true }
+common-macros = { workspace = true }
 internal-error = { workspace = true }
 odf-metadata = { workspace = true }
 odf-storage = { workspace = true }
@@ -32,13 +33,13 @@ bytes = { version = "1", default-features = false }
 futures = "0.3"
 http = "1"
 reqwest = { version = "0.12", default-features = false, features = ["stream"] }
-tokio-util = { version = "0.7", default-features = false, features = ["compat"]}
+tokio-util = { version = "0.7", default-features = false, features = ["compat"] }
 tracing = "0.1"
 url = { version = "2", default-features = false }
 
 
 [dev-dependencies]
-odf-storage = { workspace = true, features = ["testing"]}
+odf-storage = { workspace = true, features = ["testing"] }
 
 tokio = { version = "1", default-features = false }
 tempfile = "3"

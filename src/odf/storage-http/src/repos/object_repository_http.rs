@@ -45,13 +45,14 @@ impl ObjectRepositoryHttp {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[common_macros::method_names_consts]
 #[async_trait]
 impl ObjectRepository for ObjectRepositoryHttp {
     fn protocol(&self) -> ObjectRepositoryProtocol {
         ObjectRepositoryProtocol::Http
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(%hash))]
+    #[tracing::instrument(level = "debug", name = ObjectRepositoryHttp_contains, skip_all, fields(%hash))]
     async fn contains(&self, hash: &Multihash) -> Result<bool, ContainsError> {
         let url = self
             .base_url
@@ -85,7 +86,7 @@ impl ObjectRepository for ObjectRepositoryHttp {
         panic!("get_size unsupported for HTTP object repository");
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(%hash))]
+    #[tracing::instrument(level = "debug", name = ObjectRepositoryHttp_get_bytes, skip_all, fields(%hash))]
     async fn get_bytes(&self, hash: &Multihash) -> Result<Bytes, GetError> {
         let url = self
             .base_url
@@ -123,7 +124,7 @@ impl ObjectRepository for ObjectRepositoryHttp {
         Ok(data)
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(%hash))]
+    #[tracing::instrument(level = "debug", name = ObjectRepositoryHttp_get_stream, skip_all, fields(%hash))]
     async fn get_stream(&self, hash: &Multihash) -> Result<Box<AsyncReadObj>, GetError> {
         let url = self
             .base_url
