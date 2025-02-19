@@ -108,8 +108,6 @@ pub fn method_names_consts(attr: TokenStream, item: TokenStream) -> TokenStream 
                 value
             };
 
-            println!("!!! {struct_name}: {const_value}");
-
             quote! {
                 #[allow(dead_code)]
                 #[allow(non_upper_case_globals)]
