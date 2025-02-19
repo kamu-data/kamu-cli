@@ -49,6 +49,12 @@ impl Deref for AccountID {
     }
 }
 
+impl std::fmt::Display for AccountID {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
 #[Scalar]
 impl ScalarType for AccountID {
     fn parse(value: Value) -> InputValueResult<Self> {
@@ -88,6 +94,12 @@ impl Deref for AccountName {
     type Target = odf::AccountName;
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+impl std::fmt::Display for AccountName {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
     }
 }
 

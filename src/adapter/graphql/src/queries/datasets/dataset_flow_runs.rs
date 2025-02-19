@@ -24,6 +24,7 @@ pub struct DatasetFlowRuns {
     dataset_handle: odf::DatasetHandle,
 }
 
+#[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
 #[Object]
 impl DatasetFlowRuns {
     const DEFAULT_PER_PAGE: usize = 15;
@@ -33,6 +34,7 @@ impl DatasetFlowRuns {
         Self { dataset_handle }
     }
 
+    #[tracing::instrument(level = "info", name = DatasetFlowRuns_get_flow, skip_all, fields(%flow_id))]
     async fn get_flow(&self, ctx: &Context<'_>, flow_id: FlowID) -> Result<GetFlowResult> {
         if let Some(error) =
             check_if_flow_belongs_to_dataset(ctx, flow_id, &self.dataset_handle).await?
@@ -57,6 +59,7 @@ impl DatasetFlowRuns {
         }))
     }
 
+    #[tracing::instrument(level = "info", name = DatasetFlowRuns_list_flows, skip_all, fields(?page, ?per_page))]
     async fn list_flows(
         &self,
         ctx: &Context<'_>,
@@ -116,6 +119,7 @@ impl DatasetFlowRuns {
         ))
     }
 
+    #[tracing::instrument(level = "info", name = DatasetFlowRuns_list_flow_initiators, skip_all)]
     async fn list_flow_initiators(&self, ctx: &Context<'_>) -> Result<AccountConnection> {
         let flow_query_service = from_catalog_n!(ctx, dyn fs::FlowQueryService);
 

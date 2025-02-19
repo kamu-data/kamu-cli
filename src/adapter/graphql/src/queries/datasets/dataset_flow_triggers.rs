@@ -18,6 +18,7 @@ pub struct DatasetFlowTriggers {
     dataset_handle: odf::DatasetHandle,
 }
 
+#[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
 #[Object]
 impl DatasetFlowTriggers {
     #[graphql(skip)]
@@ -26,6 +27,7 @@ impl DatasetFlowTriggers {
     }
 
     /// Returns defined trigger for a flow of specified type
+    #[tracing::instrument(level = "info", name = DatasetFlowTriggers_by_type, skip_all, fields(?dataset_flow_type))]
     async fn by_type(
         &self,
         ctx: &Context<'_>,
@@ -46,6 +48,7 @@ impl DatasetFlowTriggers {
     }
 
     /// Checks if all triggers of this dataset are disabled
+    #[tracing::instrument(level = "info", name = DatasetFlowTriggers_all_paused, skip_all)]
     async fn all_paused(&self, ctx: &Context<'_>) -> Result<bool> {
         check_dataset_read_access(ctx, &self.dataset_handle).await?;
 

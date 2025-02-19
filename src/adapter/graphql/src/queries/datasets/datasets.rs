@@ -17,6 +17,7 @@ use crate::queries::*;
 
 pub struct Datasets;
 
+#[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
 #[Object]
 impl Datasets {
     const DEFAULT_PER_PAGE: usize = 15;
@@ -46,6 +47,7 @@ impl Datasets {
     }
 
     /// Returns dataset by its ID
+    #[tracing::instrument(level = "info", name = Datasets_by_id, skip_all, fields(%dataset_id))]
     async fn by_id(&self, ctx: &Context<'_>, dataset_id: DatasetID) -> Result<Option<Dataset>> {
         let dataset_id: odf::DatasetID = dataset_id.into();
 
@@ -53,6 +55,7 @@ impl Datasets {
     }
 
     /// Returns dataset by its owner and name
+    #[tracing::instrument(level = "info", name = Datasets_by_owner_and_name, skip_all, fields(%account_name, %dataset_name))]
     async fn by_owner_and_name(
         &self,
         ctx: &Context<'_>,
@@ -109,6 +112,7 @@ impl Datasets {
     }
 
     /// Returns datasets belonging to the specified account
+    #[tracing::instrument(level = "info", name = Datasets_by_account_id, skip_all, fields(%account_id, ?page, ?per_page))]
     async fn by_account_id(
         &self,
         ctx: &Context<'_>,
@@ -138,6 +142,7 @@ impl Datasets {
     }
 
     /// Returns datasets belonging to the specified account
+    #[tracing::instrument(level = "info", name = Datasets_by_account_name, skip_all, fields(%account_name, ?page, ?per_page))]
     async fn by_account_name(
         &self,
         ctx: &Context<'_>,

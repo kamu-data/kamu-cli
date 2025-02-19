@@ -26,6 +26,7 @@ pub struct DatasetMetadata {
     dataset_handle: odf::DatasetHandle,
 }
 
+#[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
 #[Object]
 impl DatasetMetadata {
     #[graphql(skip)]
@@ -39,6 +40,7 @@ impl DatasetMetadata {
     }
 
     /// Last recorded watermark
+    #[tracing::instrument(level = "info", name = DatasetMetadata_current_watermark, skip_all)]
     async fn current_watermark(&self, ctx: &Context<'_>) -> Result<Option<DateTime<Utc>>> {
         let resolved_dataset = get_dataset(ctx, &self.dataset_handle);
 
@@ -52,6 +54,7 @@ impl DatasetMetadata {
     }
 
     /// Latest data schema
+    #[tracing::instrument(level = "info", name = DatasetMetadata_current_schema, skip_all)]
     async fn current_schema(
         &self,
         ctx: &Context<'_>,
@@ -77,6 +80,7 @@ impl DatasetMetadata {
     }
 
     /// Current upstream dependencies of a dataset
+    #[tracing::instrument(level = "info", name = DatasetMetadata_current_upstream_dependencies, skip_all)]
     async fn current_upstream_dependencies(
         &self,
         ctx: &Context<'_>,
@@ -105,6 +109,7 @@ impl DatasetMetadata {
 
     // TODO: Convert to connection (page_based_connection!)
     /// Current downstream dependencies of a dataset
+    #[tracing::instrument(level = "info", name = DatasetMetadata_current_downstream_dependencies, skip_all)]
     async fn current_downstream_dependencies(
         &self,
         ctx: &Context<'_>,
@@ -132,6 +137,7 @@ impl DatasetMetadata {
     }
 
     /// Current polling source used by the root dataset
+    #[tracing::instrument(level = "info", name = DatasetMetadata_current_polling_source, skip_all)]
     async fn current_polling_source(&self, ctx: &Context<'_>) -> Result<Option<SetPollingSource>> {
         let (dataset_registry, metadata_query_service) = from_catalog_n!(
             ctx,
@@ -149,6 +155,7 @@ impl DatasetMetadata {
     }
 
     /// Current push sources used by the root dataset
+    #[tracing::instrument(level = "info", name = DatasetMetadata_current_push_sources, skip_all)]
     async fn current_push_sources(&self, ctx: &Context<'_>) -> Result<Vec<AddPushSource>> {
         let (metadata_query_service, dataset_registry) = from_catalog_n!(
             ctx,
@@ -171,6 +178,7 @@ impl DatasetMetadata {
     }
 
     /// Sync statuses of push remotes
+    #[tracing::instrument(level = "info", name = DatasetMetadata_push_sync_statuses, skip_all)]
     async fn push_sync_statuses(&self, ctx: &Context<'_>) -> Result<DatasetPushStatuses> {
         let service = from_catalog_n!(ctx, dyn kamu_core::RemoteStatusService);
         let statuses = service.check_remotes_status(&self.dataset_handle).await?;
@@ -179,6 +187,7 @@ impl DatasetMetadata {
     }
 
     /// Current transformation used by the derivative dataset
+    #[tracing::instrument(level = "info", name = DatasetMetadata_current_transform, skip_all)]
     async fn current_transform(&self, ctx: &Context<'_>) -> Result<Option<SetTransform>> {
         let (metadata_query_service, dataset_registry) = from_catalog_n!(
             ctx,
@@ -201,6 +210,7 @@ impl DatasetMetadata {
     }
 
     /// Current descriptive information about the dataset
+    #[tracing::instrument(level = "info", name = DatasetMetadata_current_info, skip_all)]
     async fn current_info(&self, ctx: &Context<'_>) -> Result<SetInfo> {
         let resolved_dataset = get_dataset(ctx, &self.dataset_handle);
 
@@ -221,6 +231,7 @@ impl DatasetMetadata {
 
     /// Current readme file as discovered from attachments associated with the
     /// dataset
+    #[tracing::instrument(level = "info", name = DatasetMetadata_current_readme, skip_all)]
     async fn current_readme(&self, ctx: &Context<'_>) -> Result<Option<String>> {
         let resolved_dataset = get_dataset(ctx, &self.dataset_handle);
 
@@ -242,6 +253,7 @@ impl DatasetMetadata {
     }
 
     /// Current license associated with the dataset
+    #[tracing::instrument(level = "info", name = DatasetMetadata_current_license, skip_all)]
     async fn current_license(&self, ctx: &Context<'_>) -> Result<Option<SetLicense>> {
         let resolved_dataset = get_dataset(ctx, &self.dataset_handle);
 
@@ -255,6 +267,7 @@ impl DatasetMetadata {
     }
 
     /// Current vocabulary associated with the dataset
+    #[tracing::instrument(level = "info", name = DatasetMetadata_current_vocab, skip_all)]
     async fn current_vocab(&self, ctx: &Context<'_>) -> Result<Option<SetVocab>> {
         let resolved_dataset = get_dataset(ctx, &self.dataset_handle);
 

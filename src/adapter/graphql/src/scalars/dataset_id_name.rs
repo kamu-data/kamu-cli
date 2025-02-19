@@ -44,6 +44,12 @@ impl Deref for DatasetID {
     }
 }
 
+impl std::fmt::Display for DatasetID {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
 #[Scalar]
 impl ScalarType for DatasetID {
     fn parse(value: Value) -> InputValueResult<Self> {

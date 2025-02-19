@@ -7,8 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::ops::Deref;
-
 use chrono::{DateTime, Utc};
 use kamu_flow_system as fs;
 
