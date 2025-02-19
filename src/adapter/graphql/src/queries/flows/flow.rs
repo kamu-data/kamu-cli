@@ -29,6 +29,7 @@ pub struct Flow {
     description: FlowDescription,
 }
 
+#[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
 #[Object]
 impl Flow {
     #[graphql(skip)]
@@ -80,6 +81,7 @@ impl Flow {
     }
 
     /// Associated tasks
+    #[tracing::instrument(level = "info", name = Flow_tasks, skip_all)]
     async fn tasks(&self, ctx: &Context<'_>) -> Result<Vec<Task>> {
         let mut tasks = Vec::new();
         for task_id in &self.flow_state.task_ids {
@@ -90,6 +92,7 @@ impl Flow {
     }
 
     /// History of flow events
+    #[tracing::instrument(level = "info", name = Flow_history, skip_all)]
     async fn history(&self, ctx: &Context<'_>) -> Result<Vec<FlowEvent>> {
         let flow_event_store = from_catalog_n!(ctx, dyn fs::FlowEventStore);
 
