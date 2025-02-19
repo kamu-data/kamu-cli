@@ -10,7 +10,7 @@
 use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
-use chrono::{TimeZone, Utc};
+use chrono::{DateTime, TimeZone, Utc};
 use dill::Component;
 use futures::TryStreamExt;
 use indoc::indoc;
@@ -97,7 +97,7 @@ impl TransformTestHarness {
         Self::new_custom(EngineProvisionerNull)
     }
 
-    pub async fn new_root(&self, name: &str) -> odf::DatasetHandle {
+    pub async fn new_root(&self, name: &str, system_time: DateTime<Utc>) -> ResolvedDataset {
         let snapshot = MetadataFactory::dataset_snapshot()
             .name(name)
             .kind(odf::DatasetKind::Root)
@@ -111,18 +111,19 @@ impl TransformTestHarness {
             self.dataset_storage_unit_writer.as_ref(),
             snapshot,
             self.did_generator.generate_dataset_id().0,
-            self.system_time_source.now(),
+            system_time,
         )
         .await
         .unwrap();
 
-        odf::DatasetHandle::new(stored.dataset_id, alias)
+        ResolvedDataset::from_stored(&stored, &alias)
     }
 
     async fn new_deriv(
         &self,
         name: &str,
         inputs: &[odf::DatasetAlias],
+        system_time: DateTime<Utc>,
     ) -> (ResolvedDataset, odf::metadata::SetTransform) {
         let transform = MetadataFactory::set_transform()
             .inputs_from_refs(inputs)
@@ -141,7 +142,7 @@ impl TransformTestHarness {
             self.dataset_storage_unit_writer.as_ref(),
             snapshot,
             self.did_generator.generate_dataset_id().0,
-            self.system_time_source.now(),
+            system_time,
         )
         .await
         .unwrap();
@@ -171,7 +172,7 @@ impl TransformTestHarness {
     // TODO: Simplify using writer
     pub async fn append_data_block(
         &self,
-        alias: &odf::DatasetAlias,
+        target: ResolvedDataset,
         records: u64,
     ) -> (
         odf::Multihash,
@@ -180,12 +181,7 @@ impl TransformTestHarness {
         use odf::dataset::{MetadataChainExt, TryStreamExtExt};
         use odf::metadata::{AsTypedBlock, EnumWithVariants};
 
-        let resolved_dataset = self
-            .dataset_registry
-            .get_dataset_by_ref(&alias.as_local_ref())
-            .await
-            .unwrap();
-        let chain = resolved_dataset.as_metadata_chain();
+        let chain = target.as_metadata_chain();
         let offset = chain
             .iter_blocks()
             .filter_map_ok(|(_, b)| b.event.into_variant::<odf::metadata::AddData>())
@@ -291,8 +287,16 @@ impl TransformTestHarness {
 async fn test_get_next_operation() {
     let harness = TransformTestHarness::new();
 
-    let foo = harness.new_root("foo").await;
-    let (bar_target, bar_source) = harness.new_deriv("bar", &[foo.alias.clone()]).await;
+    let foo_target = harness
+        .new_root("foo", harness.system_time_source.now())
+        .await;
+    let (bar_target, bar_source) = harness
+        .new_deriv(
+            "bar",
+            &[foo_target.get_alias().clone()],
+            harness.system_time_source.now(),
+        )
+        .await;
 
     // No data - no work
     let elaboration = harness
@@ -301,7 +305,7 @@ async fn test_get_next_operation() {
         .unwrap();
     assert_matches!(elaboration, TransformElaboration::UpToDate);
 
-    let (foo_head, foo_block) = harness.append_data_block(&foo.alias, 10).await;
+    let (foo_head, foo_block) = harness.append_data_block(foo_target.clone(), 10).await;
     let foo_slice = foo_block.event.new_data.as_ref().unwrap();
 
     let elaboration = harness
@@ -313,8 +317,8 @@ async fn test_get_next_operation() {
         TransformElaboration::Elaborated(TransformPlan { request: TransformRequestExt{ transform, inputs, .. }, datasets_map: _ } )
         if transform == bar_source.transform &&
         inputs == vec![TransformRequestInputExt {
-            dataset_handle: foo.clone(),
-            alias: foo.alias.dataset_name.to_string(),
+            dataset_handle: foo_target.get_handle().clone(),
+            alias: foo_target.get_alias().dataset_name.to_string(),
             vocab: odf::metadata::DatasetVocabulary::default(),
             prev_block_hash: None,
             new_block_hash: Some(foo_head),
@@ -338,91 +342,33 @@ async fn test_get_verification_plan_one_to_one() {
 
     // Create root dataset
     let t0 = Utc.with_ymd_and_hms(2020, 1, 1, 11, 0, 0).unwrap();
-    let root_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
-    let root_stored = harness
-        .dataset_storage_unit_writer
-        .store_dataset(
-            MetadataFactory::metadata_block(
-                MetadataFactory::seed(odf::DatasetKind::Root)
-                    .id_from(root_alias.dataset_name.as_str())
-                    .build(),
-            )
-            .system_time(t0)
-            .build_typed(),
-        )
+    let root_target = harness.new_root("foo", t0).await;
+    let root_head_schema = root_target
+        .as_metadata_chain()
+        .resolve_ref(&odf::BlockRef::Head)
         .await
         .unwrap();
-    let root_target = ResolvedDataset::from_stored(&root_stored, &root_alias);
 
-    let root_head_schema = root_stored
-        .dataset
-        .commit_event(
-            MetadataFactory::set_data_schema().build().into(),
-            odf::dataset::CommitOpts {
-                system_time: Some(t0),
-                ..odf::dataset::CommitOpts::default()
-            },
-        )
-        .await
-        .unwrap()
-        .new_head;
-
-    let root_hdl = root_target.get_handle();
     let root_initial_sequence_number = 1;
 
     // Create derivative
-    let deriv_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
-    let deriv_stored = harness
-        .dataset_storage_unit_writer
-        .store_dataset(
-            MetadataFactory::metadata_block(
-                MetadataFactory::seed(odf::DatasetKind::Derivative)
-                    .id_from(deriv_alias.dataset_name.as_str())
-                    .build(),
-            )
-            .system_time(t0)
-            .build_typed(),
-        )
-        .await
-        .unwrap();
-    let deriv_target = ResolvedDataset::from_stored(&deriv_stored, &deriv_alias);
+    let (deriv_target, _) = harness
+        .new_deriv("bar", &[root_target.get_alias().clone()], t0)
+        .await;
 
-    deriv_stored
-        .dataset
-        .commit_event(
-            MetadataFactory::set_transform()
-                .inputs_from_aliases_and_seeded_ids([&root_alias.dataset_name])
-                .build()
-                .into(),
-            odf::dataset::CommitOpts {
-                system_time: Some(t0),
-                ..odf::dataset::CommitOpts::default()
-            },
-        )
+    let deriv_head_schema = deriv_target
+        .as_metadata_chain()
+        .resolve_ref(&odf::BlockRef::Head)
         .await
         .unwrap();
 
-    let deriv_head_schema = deriv_stored
-        .dataset
-        .commit_event(
-            MetadataFactory::set_data_schema().build().into(),
-            odf::dataset::CommitOpts {
-                system_time: Some(t0),
-                ..odf::dataset::CommitOpts::default()
-            },
-        )
-        .await
-        .unwrap()
-        .new_head;
-
-    let deriv_hdl = deriv_target.get_handle();
     let deriv_initial_sequence_number = 2;
 
     // T1: Root data added
     let t1 = Utc.with_ymd_and_hms(2020, 1, 1, 12, 0, 0).unwrap();
     let root_head_t1 = harness
         .append_block(
-            root_hdl,
+            root_target.get_handle(),
             MetadataFactory::metadata_block(odf::metadata::AddData {
                 prev_checkpoint: None,
                 prev_offset: None,
@@ -443,8 +389,7 @@ async fn test_get_verification_plan_one_to_one() {
         .await;
 
     let root_head_t1_path = odf::utils::data::local_url::into_local_path(
-        root_stored
-            .dataset
+        root_target
             .as_data_repo()
             .get_internal_url(&root_head_t1)
             .await,
@@ -468,10 +413,10 @@ async fn test_get_verification_plan_one_to_one() {
 
     let deriv_head_t2 = harness
         .append_block(
-            deriv_hdl,
+            deriv_target.get_handle(),
             MetadataFactory::metadata_block(odf::metadata::ExecuteTransform {
                 query_inputs: vec![odf::metadata::ExecuteTransformInput {
-                    dataset_id: root_hdl.id.clone(),
+                    dataset_id: root_target.get_id().clone(),
                     prev_block_hash: None,
                     new_block_hash: Some(root_head_t1.clone()),
                     prev_offset: None,
@@ -498,7 +443,7 @@ async fn test_get_verification_plan_one_to_one() {
     let t3 = Utc.with_ymd_and_hms(2020, 1, 3, 12, 0, 0).unwrap();
     let root_head_t3 = harness
         .append_block(
-            root_hdl,
+            root_target.get_handle(),
             MetadataFactory::metadata_block(odf::metadata::AddData {
                 prev_checkpoint: None,
                 prev_offset: Some(99),
@@ -521,8 +466,7 @@ async fn test_get_verification_plan_one_to_one() {
         )
         .await;
     let root_head_t3_path = odf::utils::data::local_url::into_local_path(
-        root_stored
-            .dataset
+        root_target
             .as_data_repo()
             .get_internal_url(&root_head_t3)
             .await,
@@ -545,10 +489,10 @@ async fn test_get_verification_plan_one_to_one() {
     };
     let deriv_head_t4 = harness
         .append_block(
-            deriv_hdl,
+            deriv_target.get_handle(),
             MetadataFactory::metadata_block(odf::metadata::ExecuteTransform {
                 query_inputs: vec![odf::metadata::ExecuteTransformInput {
-                    dataset_id: root_hdl.id.clone(),
+                    dataset_id: root_target.get_id().clone(),
                     prev_block_hash: Some(root_head_t1.clone()),
                     new_block_hash: Some(root_head_t3.clone()),
                     prev_offset: Some(99),
@@ -578,7 +522,7 @@ async fn test_get_verification_plan_one_to_one() {
     let t5 = Utc.with_ymd_and_hms(2020, 1, 5, 12, 0, 0).unwrap();
     let root_head_t5 = harness
         .append_block(
-            root_hdl,
+            root_target.get_handle(),
             MetadataFactory::metadata_block(odf::metadata::AddData {
                 prev_checkpoint: None,
                 prev_offset: Some(109),
@@ -608,10 +552,10 @@ async fn test_get_verification_plan_one_to_one() {
     };
     let deriv_head_t6 = harness
         .append_block(
-            deriv_hdl,
+            deriv_target.get_handle(),
             MetadataFactory::metadata_block(odf::metadata::ExecuteTransform {
                 query_inputs: vec![odf::metadata::ExecuteTransformInput {
-                    dataset_id: root_hdl.id.clone(),
+                    dataset_id: root_target.get_id().clone(),
                     prev_block_hash: Some(root_head_t3.clone()),
                     new_block_hash: Some(root_head_t5.clone()),
                     prev_offset: Some(109),
@@ -643,7 +587,7 @@ async fn test_get_verification_plan_one_to_one() {
         .await
         .unwrap();
 
-    let deriv_chain = deriv_stored.dataset.as_metadata_chain();
+    let deriv_chain = deriv_target.as_metadata_chain();
 
     assert_eq!(operation.steps.len(), 3);
 
@@ -738,7 +682,13 @@ async fn test_transform_with_compaction_retry() {
         .ingest_data(data_str.to_string(), foo_target.clone())
         .await;
 
-    let (bar_target, _) = harness.new_deriv("bar", &[foo_alias.clone()]).await;
+    let (bar_target, _) = harness
+        .new_deriv(
+            "bar",
+            &[foo_alias.clone()],
+            harness.system_time_source.now(),
+        )
+        .await;
 
     let transform_result = harness
         .transform(bar_target.clone(), TransformOptions::default())
