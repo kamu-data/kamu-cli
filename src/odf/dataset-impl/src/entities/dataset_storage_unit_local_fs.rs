@@ -102,9 +102,22 @@ impl DatasetStorageUnit for DatasetStorageUnitLocalFs {
 
                 let dataset_id = DatasetID::from_multibase_string(dataset_dir_entry.file_name().to_str().unwrap()).int_err()?;
 
-                // TODO: check HEAD exists
+                // Head must exist and be properly set
+                let layout = DatasetLayout::create(dataset_dir_entry.path()).int_err()?;
+                let dataset = Self::build_dataset(layout);
+                let head_res = dataset.as_metadata_chain().resolve_ref(&BlockRef::Head).await;
+                match head_res {
+                    // Got head => good dataset
+                    Ok(_) => { yield dataset_id; Ok(()) }
 
-                yield dataset_id;
+                    // No head => garbage
+                    Err(GetRefError::NotFound(_)) => { /* skip, garbage */ Ok(())}
+
+                    // Other cases are propagated errors
+                    Err(GetRefError::Access(e)) => Err(e.int_err()),
+                    Err(GetRefError::Internal(e)) => Err(e)
+                }?;
+
             }
         })
     }
@@ -203,7 +216,10 @@ impl DatasetStorageUnitWriter for DatasetStorageUnitLocalFs {
         // Ensure dataset folder exists on disk
         let layout = self.get_dataset_layout(dataset_id)?;
 
-        // IDEA: remove HEAD first
+        // Remove HEAD file first, it will simplify potential concurrency issues
+        tokio::fs::remove_file(layout.refs_dir.join(BlockRef::Head.as_str()))
+            .await
+            .int_err()?;
 
         // Remove all stored files and the folder itself
         tokio::fs::remove_dir_all(layout.root_dir).await.int_err()?;

@@ -294,7 +294,7 @@ impl WorkspaceService {
                             format!(
                                 "{}/{}",
                                 account_dir_entry.file_name().to_str().unwrap(),
-                                dataset_alias.dataset_name.to_string()
+                                dataset_alias.dataset_name
                             ),
                         )
                         .int_err()?;

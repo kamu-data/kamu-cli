@@ -176,9 +176,21 @@ impl DatasetStorageUnit for DatasetStorageUnitS3 {
 
     fn stored_dataset_ids(&self) -> DatasetIDStream<'_> {
         Box::pin(async_stream::try_stream! {
-            for id in self.list_dataset_ids_maybe_cached().await? {
-                // TODO: check HEAD exists
-                yield id;
+            for dataset_id in self.list_dataset_ids_maybe_cached().await? {
+                // Head must exist, otherwise it's a garbage
+                let dataset = self.get_dataset_impl(&dataset_id);
+                let head_res = dataset.as_metadata_chain().resolve_ref(&BlockRef::Head).await;
+                match head_res {
+                    // Got head => good dataset
+                    Ok(_) => { yield dataset_id; Ok(()) }
+
+                    // No head => garbage
+                    Err(GetRefError::NotFound(_)) => { /* skip, garbage */ Ok(())}
+
+                    // Other cases are propagated errors
+                    Err(GetRefError::Access(e)) => Err(e.int_err()),
+                    Err(GetRefError::Internal(e)) => Err(e)
+                }?;
             }
         })
     }
@@ -277,7 +289,19 @@ impl DatasetStorageUnitWriter for DatasetStorageUnitS3 {
         // Ensure key exists in S3
         let _ = self.get_stored_dataset_by_id(dataset_id).await?;
 
-        // IDEA: remove HEAD first
+        // Remove HEAD object first, it will simplify potential concurrency issues
+        let head_key = self.s3_context.get_key(
+            format!(
+                "{}/refs/{}",
+                &dataset_id.as_multibase().to_stack_string(),
+                BlockRef::Head.as_str()
+            )
+            .as_str(),
+        );
+        self.s3_context
+            .delete_object(head_key)
+            .await
+            .map_err(|e| e.into_service_error().int_err())?;
 
         // Remove all objects under the key
         self.delete_dataset_s3_objects(dataset_id)
