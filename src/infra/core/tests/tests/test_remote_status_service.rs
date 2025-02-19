@@ -175,7 +175,7 @@ async fn test_check_remotes_status_remote_diverge() {
             )]))
             .build(),
     )
-    .prev(head, 0)
+    .prev(head, 1)
     .build();
 
     let _ = local_chain
@@ -315,7 +315,7 @@ impl RemoteStatusTestHarness {
 
     fn schema_block(root_hash: &odf::Multihash) -> odf::MetadataBlock {
         MetadataFactory::metadata_block(MetadataFactory::set_data_schema().build())
-            .prev(root_hash, 0)
+            .prev(root_hash, 1)
             .build()
     }
 }

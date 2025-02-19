@@ -73,4 +73,5 @@ mockall = "0.13"
 oop = "0.0.2"
 serde_json = "1"
 pretty_assertions = { version = "1" }
+tempfile = "3"
 test-log = { version = "0.2", features = ["trace"] }
