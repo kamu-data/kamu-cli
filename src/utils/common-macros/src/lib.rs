@@ -9,7 +9,8 @@
 
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::parse_macro_input;
+use syn::parse::{Parse, ParseStream};
+use syn::{parse_macro_input, Ident, ImplItem, LitStr, Token, Type};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -53,11 +54,25 @@ use syn::parse_macro_input;
 ///     pub fn load_oso() -> Result<Oso, OsoError> { /* ... */ }
 /// }
 /// ```
+///
+/// ```compile_fail
+/// /* 3. Macro combination with options */
+/// #[method_names_consts(const_value_prefix = "GQL: ")]
+/// #[Object]
+/// impl Search {
+///     // Logged as: "GQL: Search::query"
+///     #[tracing::instrument(level = "info", name = Search_query, skip_all)]
+///     async fn query(/* ... */) -> Result<SearchResultConnection> {
+///         /* ... */
+///     }
+/// }
 #[proc_macro_attribute]
-pub fn method_names_consts(_attr: TokenStream, item: TokenStream) -> TokenStream {
+pub fn method_names_consts(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let MethodNamesConstsOptions { const_value_prefix } =
+        parse_macro_input!(attr as MethodNamesConstsOptions);
     let input = parse_macro_input!(item as syn::ItemImpl);
 
-    let struct_name = if let syn::Type::Path(ref type_path) = *input.self_ty {
+    let struct_name = if let Type::Path(ref type_path) = *input.self_ty {
         type_path.path.segments.last().unwrap().ident.to_string()
     } else {
         panic!(r#"[method_names_consts] сan be applied only to `impl <Struct> {{}}` block"#);
@@ -67,7 +82,7 @@ pub fn method_names_consts(_attr: TokenStream, item: TokenStream) -> TokenStream
         .items
         .iter()
         .filter_map(|item| {
-            if let syn::ImplItem::Fn(method) = item {
+            if let ImplItem::Fn(method) = item {
                 Some(method.sig.ident.to_string())
             } else {
                 None
@@ -84,7 +99,14 @@ pub fn method_names_consts(_attr: TokenStream, item: TokenStream) -> TokenStream
         .iter()
         .map(|method_name| {
             let const_name_ident = quote::format_ident!("{struct_name}_{method_name}",);
-            let const_value = format!("{struct_name}::{method_name}");
+            let const_value = {
+                let mut value = String::new();
+                if let Some(const_value_prefix) = &const_value_prefix {
+                    value += &const_value_prefix.value();
+                };
+                value += &format!("{struct_name}::{method_name}");
+                value
+            };
 
             quote! {
                 #[allow(dead_code)]
@@ -101,6 +123,41 @@ pub fn method_names_consts(_attr: TokenStream, item: TokenStream) -> TokenStream
     };
 
     TokenStream::from(expanded)
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Default)]
+struct MethodNamesConstsOptions {
+    const_value_prefix: Option<LitStr>,
+}
+
+impl Parse for MethodNamesConstsOptions {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let mut options = Self::default();
+
+        while !input.is_empty() {
+            let key: Ident = input.parse()?;
+
+            input.parse::<Token![=]>()?;
+
+            match key.to_string().as_str() {
+                "const_value_prefix" => {
+                    let value: LitStr = input.parse()?;
+                    options.const_value_prefix = Some(value);
+                }
+                unexpected_key => panic!(
+                    "Unexpected key: {unexpected_key}\nAllowable values: \"const_value_prefix\"."
+                ),
+            };
+
+            if input.peek(Token![,]) {
+                input.parse::<Token![,]>()?;
+            }
+        }
+
+        Ok(options)
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
