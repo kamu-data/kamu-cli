@@ -8000,6 +8000,7 @@ dependencies = [
  "async-trait",
  "async-utils",
  "bytes",
+ "common-macros",
  "digest 0.10.7",
  "internal-error",
  "opendatafabric-data-utils",
