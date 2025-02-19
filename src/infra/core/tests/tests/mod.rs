@@ -9,8 +9,6 @@
 
 mod engine;
 mod ingest;
-// TODO: temp
-// mod storage;
 mod test_compaction_services_impl;
 mod test_dataset_changes_service_impl;
 mod test_datasets_filtering;
