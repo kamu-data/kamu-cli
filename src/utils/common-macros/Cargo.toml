@@ -1,0 +1,34 @@
+[package]
+name = "common-macros"
+description = "Macros of general use"
+version = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+authors = { workspace = true }
+readme = { workspace = true }
+license-file = { workspace = true }
+keywords = { workspace = true }
+include = { workspace = true }
+edition = { workspace = true }
+publish = { workspace = true }
+
+
+[lints]
+workspace = true
+
+
+[lib]
+proc-macro = true
+
+
+[dependencies]
+quote = "1"
+syn = { version = "2", default-features = false, features = [
+    "full",
+    "parsing",
+    "printing",
+    "proc-macro",
+] }
+
+
+[dev-dependencies]

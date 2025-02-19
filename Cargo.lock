@@ -2525,6 +2525,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "common-macros"
+version = "0.224.0"
+dependencies = [
+ "quote",
+ "syn 2.0.96",
+]
+
+[[package]]
 name = "concurrent-queue"
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
