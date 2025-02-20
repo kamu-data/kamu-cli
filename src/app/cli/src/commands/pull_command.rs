@@ -87,8 +87,8 @@ impl PullCommand {
     async fn sync_from(
         &self,
         listener: Option<Arc<dyn PullMultiListener>>,
+        local_name: &odf::DatasetName,
     ) -> Result<Vec<PullResponse>, CLIError> {
-        let local_name = self.as_name.as_ref().unwrap();
         let remote_ref = match self.refs[0].as_dataset_ref_any() {
             Some(dataset_ref_any) => dataset_ref_any.as_remote_ref(|_| true).map_err(|_| {
                 CLIError::usage_error("When using --as reference should point to a remote dataset")
@@ -198,8 +198,8 @@ impl PullCommand {
         &self,
         listener: Option<Arc<dyn PullMultiListener>>,
     ) -> Result<Vec<PullResponse>, CLIError> {
-        if self.as_name.is_some() {
-            self.sync_from(listener).await
+        if let Some(local_name) = &self.as_name {
+            self.sync_from(listener, local_name).await
         } else {
             let current_account_name = self.current_account_subject.account_name();
             self.pull_multi(listener, current_account_name).await
