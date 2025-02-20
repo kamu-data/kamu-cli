@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::{BTreeSet, HashMap};
 use std::sync::Arc;
 
 use database_common::PaginationOpts;
@@ -22,7 +22,6 @@ use tokio::sync::RwLock;
 struct State {
     rows: HashMap<odf::DatasetID, DatasetEntry>,
     rows_by_owner_and_name: HashMap<odf::AccountID, HashMap<odf::DatasetName, odf::DatasetID>>,
-    rows_by_name: BTreeMap<odf::DatasetName, DatasetEntry>,
     rows_by_owner: HashMap<odf::AccountID, BTreeSet<odf::DatasetID>>,
 }
 
@@ -31,7 +30,6 @@ impl State {
         Self {
             rows: HashMap::new(),
             rows_by_owner_and_name: HashMap::new(),
-            rows_by_name: BTreeMap::new(),
             rows_by_owner: HashMap::new(),
         }
     }
@@ -87,7 +85,7 @@ impl DatasetEntryRepository for InMemoryDatasetEntryRepository {
             let readable_state = self.state.read().await;
 
             readable_state
-                .rows_by_name
+                .rows
                 .values()
                 .skip(pagination.offset)
                 .take(pagination.limit)
@@ -226,10 +224,6 @@ impl DatasetEntryRepository for InMemoryDatasetEntryRepository {
             });
 
         writable_state
-            .rows_by_name
-            .insert(dataset_entry.name.clone(), dataset_entry.clone());
-
-        writable_state
             .rows_by_owner
             .entry(dataset_entry.owner_id.clone())
             .and_modify(|owner_dataset_ids| {
@@ -270,14 +264,6 @@ impl DatasetEntryRepository for InMemoryDatasetEntryRepository {
         owned_by_name.remove(&found_dataset_entry.name);
         owned_by_name.insert(new_name.clone(), found_dataset_entry.id.clone());
 
-        // Mirror the change in named collection
-        let mut entry = writable_state
-            .rows_by_name
-            .remove(&found_dataset_entry.name)
-            .expect("named record must be present");
-        entry.name = new_name.clone();
-        writable_state.rows_by_name.insert(new_name.clone(), entry);
-
         Ok(())
     }
 
@@ -290,7 +276,6 @@ impl DatasetEntryRepository for InMemoryDatasetEntryRepository {
 
             let maybe_removed_entry = writable_state.rows.remove(dataset_id);
             if let Some(removed_entry) = maybe_removed_entry {
-                writable_state.rows_by_name.remove(&removed_entry.name);
                 writable_state
                     .rows_by_owner
                     .get_mut(&removed_entry.owner_id)
