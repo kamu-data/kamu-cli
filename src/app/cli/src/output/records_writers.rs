@@ -35,7 +35,7 @@ macro_rules! format_typed {
             .downcast_ref::<fn($item_type) -> String>()
             .unwrap_or_else(|| {
                 panic!(
-                    "Expected formatter for type {} but for {} instead",
+                    "Expected formatter for type {} but got {} instead",
                     stringify!($item_type),
                     $actual_type,
                 )

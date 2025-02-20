@@ -172,6 +172,7 @@ pub fn get_command(
             Box::new(ListCommand::new(
                 cli_catalog.get_one()?,
                 cli_catalog.get_one()?,
+                cli_catalog.get_one()?,
                 accounts::AccountService::current_account_indication(
                     args.account,
                     tenancy_config,
@@ -295,6 +296,7 @@ pub fn get_command(
                     !c.no_alias,
                     c.force,
                     c.reset_derivatives_on_diverged_input,
+                    c.visibility.into(),
                 ))
             }
         }

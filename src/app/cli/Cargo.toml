@@ -93,6 +93,7 @@ kamu-messaging-outbox-inmem = { workspace = true }
 kamu-messaging-outbox-postgres = { workspace = true }
 kamu-messaging-outbox-sqlite = { workspace = true }
 
+kamu-auth-rebac = { workspace = true }
 kamu-auth-rebac-inmem = { workspace = true }
 kamu-auth-rebac-services = { workspace = true }
 kamu-auth-rebac-postgres = { workspace = true }

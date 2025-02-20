@@ -130,7 +130,9 @@ impl KamuCliPuppetExt for KamuCliPuppet {
 
         let stdout = std::str::from_utf8(&assert.get_output().stdout).unwrap();
 
-        serde_json::from_str(stdout).unwrap()
+        let mut res: Vec<DatasetRecord> = serde_json::from_str(stdout).unwrap();
+        res.sort_by(|a, b| a.name.cmp(&b.name));
+        res
     }
 
     async fn add_dataset(
@@ -452,6 +454,7 @@ pub struct DatasetRecord {
     pub blocks: usize,
     pub size: usize,
     pub watermark: Option<DateTime<Utc>>,
+    pub visibility: Option<odf::DatasetVisibility>,
 }
 
 #[derive(Debug, PartialEq, Eq, Deserialize)]

@@ -14,6 +14,7 @@ use database_common::NoOpDatabasePlugin;
 use dill::*;
 use indoc::indoc;
 use kamu::domain::*;
+use kamu::testing::MockDatasetActionAuthorizer;
 use kamu::*;
 use kamu_accounts::{CurrentAccountSubject, PredefinedAccountsConfig};
 use kamu_accounts_inmem::InMemoryAccountRepository;
@@ -29,6 +30,7 @@ use kamu_datasets_services::{
     CreateDatasetUseCaseImpl,
     DatasetEntryServiceImpl,
     DependencyGraphServiceImpl,
+    ViewDatasetUseCaseImpl,
 };
 use messaging_outbox::DummyOutboxImpl;
 use odf::metadata::testing::MetadataFactory;
@@ -247,7 +249,7 @@ async fn test_collection_handler() {
 
 #[test_group::group(engine, datafusion)]
 #[test_log::test(tokio::test)]
-async fn test_collection_handler_by_id() {
+async fn test_collection_handler_by_name() {
     let harness = TestHarness::new().await;
 
     harness.create_simple_dataset().await;
@@ -304,13 +306,36 @@ async fn test_collection_handler_by_id() {
 
 #[test_group::group(engine, datafusion)]
 #[test_log::test(tokio::test)]
-async fn test_collection_handler_by_id_not_found() {
+async fn test_collection_handler_by_name_not_found() {
     let harness = TestHarness::new().await;
 
     harness.create_simple_dataset().await;
 
     let collection_url = format!(
         "http://{}/odata/foo.bar(99999)",
+        harness.api_server.local_addr()
+    );
+
+    let client = async move {
+        let cl = reqwest::Client::new();
+        let res = cl.get(&collection_url).send().await.unwrap();
+        assert_eq!(res.status(), http::StatusCode::NOT_FOUND);
+    };
+
+    await_client_server_flow!(harness.api_server.run(), client);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_collection_handler_by_private_dataset_name_not_found() {
+    let harness = TestHarness::new_with_authorizer(MockDatasetActionAuthorizer::denying()).await;
+
+    harness.create_simple_dataset().await;
+
+    let collection_url = format!(
+        "http://{}/odata/foo.bar(2)",
         harness.api_server.local_addr()
     );
 
@@ -385,7 +410,8 @@ impl TestHarness {
                 .add::<PredefinedAccountsRegistrator>()
                 .add::<LoginPasswordAuthProvider>()
                 .add::<AccountServiceImpl>()
-                .add::<InMemoryAccountRepository>();
+                .add::<InMemoryAccountRepository>()
+                .add::<ViewDatasetUseCaseImpl>();
 
             NoOpDatabasePlugin::init_database_components(&mut b);
 
