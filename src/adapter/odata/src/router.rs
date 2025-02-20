@@ -29,8 +29,21 @@ pub fn router_single_tenant() -> OpenApiRouter {
 }
 
 pub fn router_multi_tenant() -> OpenApiRouter {
+    // TODO: FIXME: This is an ugly hack to support optional trailing slashes
     OpenApiRouter::new()
         .routes(routes!(odata_service_handler_mt))
+        .route(
+            "/{account_name}/",
+            axum::routing::get(odata_service_handler_mt),
+        )
         .routes(routes!(odata_metadata_handler_mt))
+        .route(
+            "/{account_name}/$metadata/",
+            axum::routing::get(odata_metadata_handler_mt),
+        )
         .routes(routes!(odata_collection_handler_mt))
+        .route(
+            "/{account_name}/{dataset_name}/",
+            axum::routing::get(odata_collection_handler_mt),
+        )
 }

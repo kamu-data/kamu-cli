@@ -11,6 +11,10 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Unreleased]
+### Fixed
+- Restoring OData API tolerance to trailing slashes
+
 ## [0.223.0] - 2025-02-13
 ### Added
 - Increased test coverage of the code responsible for access checks
