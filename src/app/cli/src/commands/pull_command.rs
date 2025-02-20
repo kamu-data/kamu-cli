@@ -18,7 +18,6 @@ use kamu::domain::auth::DatasetActionNotEnoughPermissionsError;
 use kamu::domain::*;
 use kamu::utils::datasets_filtering::filter_datasets_by_any_pattern;
 use kamu_accounts::CurrentAccountSubject;
-use odf::AccessError;
 
 use super::{BatchError, CLIError, Command};
 use crate::output::OutputConfig;
@@ -42,6 +41,7 @@ pub struct PullCommand {
     add_aliases: bool,
     force: bool,
     reset_derivatives_on_diverged_input: bool,
+    new_dataset_visibility: odf::DatasetVisibility,
 }
 
 impl PullCommand {
@@ -60,6 +60,7 @@ impl PullCommand {
         add_aliases: bool,
         force: bool,
         reset_derivatives_on_diverged_input: bool,
+        new_dataset_visibility: odf::DatasetVisibility,
     ) -> Self
     where
         I: IntoIterator<Item = odf::DatasetRefAnyPattern>,
@@ -79,6 +80,7 @@ impl PullCommand {
             add_aliases,
             force,
             reset_derivatives_on_diverged_input,
+            new_dataset_visibility,
         }
     }
 
@@ -114,6 +116,10 @@ impl PullCommand {
                 )],
                 PullOptions {
                     add_aliases: self.add_aliases,
+                    sync_options: SyncOptions {
+                        dataset_visibility: self.new_dataset_visibility,
+                        ..Default::default()
+                    },
                     ..Default::default()
                 },
                 listener,
@@ -155,6 +161,7 @@ impl PullCommand {
             },
             sync_options: SyncOptions {
                 force: self.force,
+                dataset_visibility: self.new_dataset_visibility,
                 ..SyncOptions::default()
             },
         };
@@ -975,7 +982,7 @@ impl SyncListener for PrettySyncProgress {
 
 fn sanitize_pull_error(original_pull_error: PullError) -> PullError {
     // Tricky way...
-    if let PullError::Access(AccessError::Forbidden(forbidden_error)) = &original_pull_error
+    if let PullError::Access(odf::AccessError::Forbidden(forbidden_error)) = &original_pull_error
         && let Some(permissions_error) =
             forbidden_error.downcast_ref::<DatasetActionNotEnoughPermissionsError>()
     {

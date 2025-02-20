@@ -107,7 +107,7 @@ pub struct SyncOptions {
     /// Force synchronization, even if revisions have diverged
     pub force: bool,
 
-    /// Dataset visibility, in case of initial pushing
+    /// Dataset visibility, in case of initial pushing or pulling
     pub dataset_visibility: odf::DatasetVisibility,
 }
 

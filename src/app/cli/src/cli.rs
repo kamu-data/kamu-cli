@@ -904,6 +904,16 @@ pub struct Pull {
     /// Local or remote dataset reference(s)
     #[arg(value_parser = parsers::dataset_ref_pattern_any)]
     pub dataset: Option<Vec<odf::DatasetRefAnyPattern>>,
+
+    /// Changing the visibility of the pulled dataset(s)
+    #[arg(
+        long,
+        value_name = "VIS",
+        value_enum,
+        default_value = "private",
+        hide = true
+    )]
+    pub visibility: parsers::DatasetVisibility,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
