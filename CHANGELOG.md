@@ -11,7 +11,7 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## [Unreleased]
+## [0.223.1] - 2025-02-20
 ### Fixed
 - Restoring OData API tolerance to trailing slashes
 
