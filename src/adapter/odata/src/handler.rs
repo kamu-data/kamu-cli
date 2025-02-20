@@ -25,6 +25,7 @@ use datafusion_odata::error::ODataError;
 use dill::Catalog;
 use http_common::ApiError;
 use kamu_core::*;
+use kamu_datasets::{ViewDatasetUseCase, ViewDatasetUseCaseError};
 
 use crate::context::*;
 
@@ -217,20 +218,22 @@ pub async fn odata_collection_handler_common(
         return Err(ApiError::not_found_without_reason());
     };
 
-    let registry: Arc<dyn DatasetRegistry> = catalog.get_one().unwrap();
+    let view_dataset_use_case: Arc<dyn ViewDatasetUseCase> = catalog.get_one().unwrap();
 
-    let dataset_handle = match registry
-        .resolve_dataset_handle_by_ref(&odf::DatasetAlias::new(account_name, dataset_name).into())
+    let requested_dataset_alias = odf::DatasetAlias::new(account_name, dataset_name);
+    let dataset_handle = match view_dataset_use_case
+        .execute(&requested_dataset_alias.into_local_ref())
         .await
     {
         Ok(hdl) => Ok(hdl),
-        Err(odf::dataset::GetDatasetError::NotFound(_)) => {
+        Err(ViewDatasetUseCaseError::NotFound(_) | ViewDatasetUseCaseError::Access(_)) => {
             return Err(ApiError::not_found_without_reason());
         }
         Err(e) => Err(e),
     }
     .unwrap();
 
+    let registry: Arc<dyn DatasetRegistry> = catalog.get_one().unwrap();
     let resolved_dataset = registry.get_dataset_by_handle(&dataset_handle);
 
     let ctx = ODataCollectionContext::new(catalog, addr, resolved_dataset);
