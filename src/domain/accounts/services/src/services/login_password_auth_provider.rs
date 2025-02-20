@@ -10,11 +10,10 @@
 use std::str::FromStr;
 use std::sync::Arc;
 
-use argon2::Argon2;
 use dill::*;
 use internal_error::{InternalError, ResultIntoInternal};
 use password_hash::rand_core::OsRng;
-use password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, SaltString};
+use password_hash::{PasswordHash, PasswordVerifier, SaltString};
 use serde::{Deserialize, Serialize};
 
 use crate::domain::*;
@@ -24,6 +23,7 @@ use crate::domain::*;
 pub struct LoginPasswordAuthProvider {
     account_repository: Arc<dyn AccountRepository>,
     password_hash_repository: Arc<dyn PasswordHashRepository>,
+    password_hashing_mode: PasswordHashingMode,
 }
 
 #[component(pub)]
@@ -33,10 +33,15 @@ impl LoginPasswordAuthProvider {
     pub fn new(
         account_repository: Arc<dyn AccountRepository>,
         password_hash_repository: Arc<dyn PasswordHashRepository>,
+        password_hashing_mode: Option<Arc<PasswordHashingMode>>,
     ) -> Self {
         Self {
             account_repository,
             password_hash_repository,
+            // When hashing mode is unspecified, safely assume default mode.
+            // Higher security by default is better than forgetting to configure
+            password_hashing_mode: password_hashing_mode
+                .map_or(PasswordHashingMode::Default, |mode| *mode),
         }
     }
 
@@ -45,17 +50,21 @@ impl LoginPasswordAuthProvider {
         account_name: &odf::AccountName,
         password: String,
     ) -> Result<(), InternalError> {
-        // Generate password hash: this is a compute-intensive operation, so spawn a
-        // blocking task
+        // Copy hashing mod
+        let hashing_mode = self.password_hashing_mode;
+
+        // Generate password hash: this is a compute-intensive operation,
+        // so spawn a blocking task
         let password_hash = tokio::task::spawn_blocking(move || {
             tracing::info_span!("Generate password hash").in_scope(|| {
                 // Generate random salt string
                 let salt = SaltString::generate(&mut OsRng);
 
-                // Argon2 with default params
-                let argon2 = Argon2::default();
+                // Setup Argon2 matching the hashing mode
+                let argon2 = Self::setup_argon2(hashing_mode);
 
                 // Hash password to PHC string
+                use argon2::PasswordHasher;
                 argon2
                     .hash_password(password.as_bytes(), &salt)
                     .unwrap()
@@ -72,6 +81,27 @@ impl LoginPasswordAuthProvider {
             .int_err()?;
 
         Ok(())
+    }
+
+    fn setup_argon2<'a>(password_hashing_mode: PasswordHashingMode) -> argon2::Argon2<'a> {
+        use argon2::*;
+        match password_hashing_mode {
+            // Use default Argon2 settings in production
+            PasswordHashingMode::Default => Argon2::default(),
+
+            // Use minimal Argon2 settings in test mode
+            PasswordHashingMode::Minimal => Argon2::new(
+                Algorithm::default(),
+                Version::default(),
+                Params::new(
+                    Params::MIN_M_COST,
+                    Params::MIN_T_COST,
+                    Params::MIN_P_COST,
+                    None,
+                )
+                .expect("Settings for testing hashing mode must be fine"),
+            ),
+        }
     }
 }
 
@@ -127,13 +157,18 @@ impl AuthenticationProvider for LoginPasswordAuthProvider {
             },
         };
 
+        // Copy hashing mode
+        let hashing_mode = self.password_hashing_mode;
+
         // Verify password hash: this is a compute-intensive operation,
         // so spawn a blocking task
         tokio::task::spawn_blocking(move || {
             tracing::info_span!("Verify password hash").in_scope(|| {
                 let password_hash = PasswordHash::new(password_hash.as_str()).unwrap();
 
-                Argon2::default()
+                // Setup Argon2 matching the hashing mode
+                let argon2 = Self::setup_argon2(hashing_mode);
+                argon2
                     .verify_password(
                         password_login_credentials.password.as_bytes(),
                         &password_hash,
@@ -170,6 +205,14 @@ impl AuthenticationProvider for LoginPasswordAuthProvider {
 pub struct PasswordLoginCredentials {
     pub login: String,
     pub password: String,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Copy, Clone)]
+pub enum PasswordHashingMode {
+    Default,
+    Minimal,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

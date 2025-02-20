@@ -175,6 +175,7 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
             &config,
             &mut base_catalog_builder,
             workspace_status,
+            args.password_hashing_mode,
             is_e2e_testing,
         );
 
@@ -641,6 +642,7 @@ pub fn register_config_in_catalog(
     config: &config::CLIConfig,
     catalog_builder: &mut CatalogBuilder,
     workspace_status: WorkspaceStatus,
+    password_hashing_mode: Option<cli::PasswordHashingMode>,
     is_e2e_testing: bool,
 ) {
     let network_ns = config.engine.as_ref().unwrap().network_ns.unwrap();
@@ -847,6 +849,15 @@ pub fn register_config_in_catalog(
         Duration::seconds(outbox_config.awaiting_step_secs.unwrap()),
         outbox_config.batch_size.unwrap(),
     ));
+
+    match password_hashing_mode {
+        Some(cli::PasswordHashingMode::Testing) => {
+            catalog_builder.add_value(kamu_accounts_services::PasswordHashingMode::Minimal);
+        }
+        Some(cli::PasswordHashingMode::Production) | None => {
+            catalog_builder.add_value(kamu_accounts_services::PasswordHashingMode::Default);
+        }
+    }
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
