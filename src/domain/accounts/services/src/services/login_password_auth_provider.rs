@@ -53,7 +53,17 @@ impl LoginPasswordAuthProvider {
                 let salt = SaltString::generate(&mut OsRng);
 
                 // Argon2 with default params
-                let argon2 = Argon2::default();
+                let argon2 = Argon2::new(
+                    argon2::Algorithm::default(),
+                    argon2::Version::default(),
+                    argon2::Params::new(
+                        argon2::Params::MIN_M_COST,
+                        argon2::Params::MIN_T_COST,
+                        argon2::Params::MIN_P_COST,
+                        None,
+                    )
+                    .expect("Must be okay"),
+                );
 
                 // Hash password to PHC string
                 argon2
