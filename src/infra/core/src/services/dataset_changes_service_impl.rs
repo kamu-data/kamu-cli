@@ -44,8 +44,10 @@ impl DatasetChangesServiceImpl {
             .get_dataset_by_ref(&dataset_id.as_local_ref())
             .await
             .map_err(|e| match e {
-                odf::dataset::GetDatasetError::NotFound(e) => GetIncrementError::DatasetNotFound(e),
-                odf::dataset::GetDatasetError::Internal(e) => GetIncrementError::Internal(e),
+                odf::DatasetRefUnresolvedError::NotFound(e) => {
+                    GetIncrementError::DatasetNotFound(e)
+                }
+                odf::DatasetRefUnresolvedError::Internal(e) => GetIncrementError::Internal(e),
             })
     }
 
@@ -58,9 +60,9 @@ impl DatasetChangesServiceImpl {
             .resolve_ref(&odf::dataset::BlockRef::Head)
             .await
             .map_err(|e| match e {
-                odf::storage::GetRefError::Access(e) => GetIncrementError::Access(e),
-                odf::storage::GetRefError::NotFound(e) => GetIncrementError::RefNotFound(e),
-                odf::storage::GetRefError::Internal(e) => GetIncrementError::Internal(e),
+                odf::GetRefError::Access(e) => GetIncrementError::Access(e),
+                odf::GetRefError::NotFound(e) => GetIncrementError::RefNotFound(e),
+                odf::GetRefError::Internal(e) => GetIncrementError::Internal(e),
             })
     }
 

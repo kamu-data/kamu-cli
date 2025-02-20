@@ -204,6 +204,8 @@ impl KamuCliPuppet {
             command.args(["--account", account.as_str()]);
         }
 
+        command.args(["--password-hashing-mode", "testing"]);
+
         command.args(cmd);
 
         if let Some(input) = options.input {

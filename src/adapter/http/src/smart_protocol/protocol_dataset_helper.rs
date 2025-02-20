@@ -49,10 +49,10 @@ pub enum PrepareDatasetTransferEstimateError {
     ),
 }
 
-impl From<odf::dataset::IterBlocksError> for PrepareDatasetTransferEstimateError {
-    fn from(v: odf::dataset::IterBlocksError) -> Self {
+impl From<odf::IterBlocksError> for PrepareDatasetTransferEstimateError {
+    fn from(v: odf::IterBlocksError) -> Self {
         match v {
-            odf::dataset::IterBlocksError::InvalidInterval(e) => Self::InvalidInterval(e),
+            odf::IterBlocksError::InvalidInterval(e) => Self::InvalidInterval(e),
             _ => Self::Internal(v.int_err()),
         }
     }
@@ -179,7 +179,7 @@ pub async fn prepare_dataset_metadata_batch(
 
 pub fn decode_metadata_batch(
     blocks_batch: &MetadataBlocksBatch,
-) -> Result<VecDeque<odf::dataset::HashedMetadataBlock>, odf::storage::GetBlockError> {
+) -> Result<VecDeque<odf::dataset::HashedMetadataBlock>, odf::GetBlockError> {
     let blocks_data = unpack_dataset_metadata_batch(blocks_batch);
 
     blocks_data
@@ -251,10 +251,10 @@ pub enum CollectMissingObjectReferencesFromIntervalError {
     ),
 }
 
-impl From<odf::dataset::IterBlocksError> for CollectMissingObjectReferencesFromIntervalError {
-    fn from(v: odf::dataset::IterBlocksError) -> Self {
+impl From<odf::IterBlocksError> for CollectMissingObjectReferencesFromIntervalError {
+    fn from(v: odf::IterBlocksError) -> Self {
         match v {
-            odf::dataset::IterBlocksError::InvalidInterval(e) => Self::InvalidInterval(e),
+            odf::IterBlocksError::InvalidInterval(e) => Self::InvalidInterval(e),
             _ => Self::Internal(v.int_err()),
         }
     }

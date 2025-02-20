@@ -12,10 +12,14 @@ use std::sync::Arc;
 use dill::{component, interface};
 use internal_error::ErrorIntoInternal;
 use kamu_accounts::CurrentAccountSubject;
+use kamu_core::TenancyConfig;
 use kamu_datasets::{
+    CreateDatasetError,
+    CreateDatasetResult,
     CreateDatasetUseCase,
     CreateDatasetUseCaseOptions,
     DatasetLifecycleMessage,
+    NameCollisionError,
     MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
 };
 use messaging_outbox::{Outbox, OutboxExt};
@@ -28,6 +32,7 @@ use crate::{CreateDatasetEntryError, DatasetEntryWriter, DependencyGraphWriter};
 #[interface(dyn CreateDatasetUseCase)]
 pub struct CreateDatasetUseCaseImpl {
     current_account_subject: Arc<CurrentAccountSubject>,
+    tenancy_config: Arc<TenancyConfig>,
     dataset_entry_writer: Arc<dyn DatasetEntryWriter>,
     dependency_graph_writer: Arc<dyn DependencyGraphWriter>,
     dataset_storage_unit_writer: Arc<dyn odf::DatasetStorageUnitWriter>,
@@ -37,6 +42,7 @@ pub struct CreateDatasetUseCaseImpl {
 impl CreateDatasetUseCaseImpl {
     pub fn new(
         current_account_subject: Arc<CurrentAccountSubject>,
+        tenancy_config: Arc<TenancyConfig>,
         dataset_entry_writer: Arc<dyn DatasetEntryWriter>,
         dependency_graph_writer: Arc<dyn DependencyGraphWriter>,
         dataset_storage_unit_writer: Arc<dyn odf::DatasetStorageUnitWriter>,
@@ -44,10 +50,31 @@ impl CreateDatasetUseCaseImpl {
     ) -> Self {
         Self {
             current_account_subject,
+            tenancy_config,
             dataset_entry_writer,
             dependency_graph_writer,
             dataset_storage_unit_writer,
             outbox,
+        }
+    }
+
+    fn canonical_dataset_alias(&self, raw_alias: &odf::DatasetAlias) -> odf::DatasetAlias {
+        match self.tenancy_config.as_ref() {
+            TenancyConfig::SingleTenant => raw_alias.clone(),
+            TenancyConfig::MultiTenant => {
+                let account_name = if raw_alias.is_multi_tenant() {
+                    raw_alias.account_name.as_ref().unwrap()
+                } else {
+                    match self.current_account_subject.as_ref() {
+                        CurrentAccountSubject::Anonymous(_) => {
+                            panic!("Anonymous account misused, use multi-tenant alias");
+                        }
+                        CurrentAccountSubject::Logged(l) => &l.account_name,
+                    }
+                };
+
+                odf::DatasetAlias::new(Some(account_name.clone()), raw_alias.dataset_name.clone())
+            }
         }
     }
 }
@@ -60,7 +87,7 @@ impl CreateDatasetUseCase for CreateDatasetUseCaseImpl {
         dataset_alias: &odf::DatasetAlias,
         seed_block: odf::MetadataBlockTyped<odf::metadata::Seed>,
         options: CreateDatasetUseCaseOptions,
-    ) -> Result<odf::CreateDatasetResult, odf::dataset::CreateDatasetError> {
+    ) -> Result<CreateDatasetResult, CreateDatasetError> {
         let logged_account_id = match self.current_account_subject.as_ref() {
             CurrentAccountSubject::Anonymous(_) => {
                 panic!("Anonymous account cannot create dataset");
@@ -76,21 +103,17 @@ impl CreateDatasetUseCase for CreateDatasetUseCaseImpl {
             )
             .await
             .map_err(|e| match e {
-                CreateDatasetEntryError::Internal(e) => {
-                    odf::dataset::CreateDatasetError::Internal(e)
-                }
+                CreateDatasetEntryError::Internal(e) => CreateDatasetError::Internal(e),
                 CreateDatasetEntryError::DuplicateId(e) => {
-                    odf::dataset::CreateDatasetError::Internal(e.int_err())
+                    CreateDatasetError::Internal(e.int_err())
                 }
                 CreateDatasetEntryError::NameCollision(e) => {
-                    odf::dataset::CreateDatasetError::NameCollision(
-                        odf::dataset::NameCollisionError {
-                            alias: odf::DatasetAlias::new(
-                                dataset_alias.account_name.clone(),
-                                e.dataset_name,
-                            ),
-                        },
-                    )
+                    CreateDatasetError::NameCollision(NameCollisionError {
+                        alias: odf::DatasetAlias::new(
+                            dataset_alias.account_name.clone(),
+                            e.dataset_name,
+                        ),
+                    })
                 }
             })?;
 
@@ -98,16 +121,29 @@ impl CreateDatasetUseCase for CreateDatasetUseCaseImpl {
             .create_dataset_node(&seed_block.event.dataset_id)
             .await?;
 
-        let create_result = self
+        let canonical_alias = self.canonical_dataset_alias(dataset_alias);
+
+        let store_result = self
             .dataset_storage_unit_writer
-            .create_dataset(dataset_alias, seed_block)
-            .await?;
+            .store_dataset(seed_block)
+            .await
+            .map_err(|e| match e {
+                odf::dataset::StoreDatasetError::RefCollision(e) => {
+                    CreateDatasetError::RefCollision(e)
+                }
+                odf::dataset::StoreDatasetError::Internal(e) => CreateDatasetError::Internal(e),
+            })?;
+
+        // Write dataset alias file
+        // TODO: reconsider if we really need this
+        // TODO: consider writing it after transaction completes
+        odf::dataset::write_dataset_alias(store_result.dataset.as_ref(), &canonical_alias).await?;
 
         self.outbox
             .post_message(
                 MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
                 DatasetLifecycleMessage::created(
-                    create_result.dataset_handle.id.clone(),
+                    store_result.dataset_id.clone(),
                     logged_account_id,
                     options.dataset_visibility,
                     dataset_alias.dataset_name.clone(),
@@ -115,7 +151,10 @@ impl CreateDatasetUseCase for CreateDatasetUseCaseImpl {
             )
             .await?;
 
-        Ok(create_result)
+        Ok(CreateDatasetResult::from_stored(
+            store_result,
+            canonical_alias,
+        ))
     }
 }
 

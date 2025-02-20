@@ -99,9 +99,12 @@ impl ServerSideS3Harness {
                 .add::<DependencyGraphServiceImpl>()
                 .add::<InMemoryDatasetDependencyRepository>()
                 .add_value(options.tenancy_config)
-                .add_builder(DatasetStorageUnitS3::builder().with_s3_context(s3_context.clone()))
-                .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitS3>()
-                .bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitS3>()
+                .add_builder(
+                    odf::dataset::DatasetStorageUnitS3::builder()
+                        .with_s3_context(s3_context.clone()),
+                )
+                .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitS3>()
+                .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitS3>()
                 .add_value(ServerUrlConfig::new_test(Some(&base_url_rest)))
                 .add::<CompactionPlannerImpl>()
                 .add::<CompactionExecutorImpl>()

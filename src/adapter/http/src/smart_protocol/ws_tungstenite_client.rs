@@ -20,6 +20,7 @@ use kamu_datasets::{
     AppendDatasetMetadataBatchUseCase,
     CreateDatasetUseCase,
     CreateDatasetUseCaseOptions,
+    NameCollisionError,
 };
 use odf::metadata::AsTypedBlock as _;
 use serde::de::DeserializeOwned;
@@ -331,7 +332,7 @@ impl WsSmartTransferProtocolClient {
                         })
                     }
                     DatasetPushObjectsTransferError::NameCollision(err) => {
-                        PushClientError::NameCollision(odf::dataset::NameCollisionError {
+                        PushClientError::NameCollision(NameCollisionError {
                             alias: err.dataset_alias,
                         })
                     }
@@ -567,9 +568,9 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
                 .await
             {
                 Ok(head) => Ok(Some(head)),
-                Err(odf::storage::GetRefError::NotFound(_)) => Ok(None),
-                Err(odf::storage::GetRefError::Access(e)) => Err(SyncError::Access(e)),
-                Err(odf::storage::GetRefError::Internal(e)) => Err(SyncError::Internal(e)),
+                Err(odf::GetRefError::NotFound(_)) => Ok(None),
+                Err(odf::GetRefError::Access(e)) => Err(SyncError::Access(e)),
+                Err(odf::GetRefError::Internal(e)) => Err(SyncError::Internal(e)),
             }?
         } else {
             None
@@ -851,6 +852,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
                 tracing::debug!("Push process aborted with error: {}", e);
                 return Err(match e {
                     PushClientError::RefCollision(err) => SyncError::RefCollision(err),
+                    PushClientError::NameCollision(err) => SyncError::NameCollision(err),
                     _ => SyncError::Internal(e.int_err()),
                 });
             }

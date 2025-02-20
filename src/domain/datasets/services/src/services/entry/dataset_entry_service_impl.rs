@@ -371,7 +371,7 @@ impl odf::dataset::DatasetHandleResolver for DatasetEntryServiceImpl {
     async fn resolve_dataset_handle_by_ref(
         &self,
         dataset_ref: &odf::DatasetRef,
-    ) -> Result<odf::DatasetHandle, odf::dataset::GetDatasetError> {
+    ) -> Result<odf::DatasetHandle, odf::DatasetRefUnresolvedError> {
         match dataset_ref {
             odf::DatasetRef::Handle(h) => Ok(h.clone()),
             odf::DatasetRef::Alias(alias) => {
@@ -380,14 +380,12 @@ impl odf::dataset::DatasetHandleResolver for DatasetEntryServiceImpl {
                     .await
                     .map_err(|e| match e {
                         ResolveAccountIdByNameError::NotFound(_) => {
-                            odf::dataset::GetDatasetError::NotFound(
-                                odf::dataset::DatasetNotFoundError {
-                                    dataset_ref: dataset_ref.clone(),
-                                },
-                            )
+                            odf::DatasetRefUnresolvedError::NotFound(odf::DatasetNotFoundError {
+                                dataset_ref: dataset_ref.clone(),
+                            })
                         }
                         ResolveAccountIdByNameError::Internal(e) => {
-                            odf::dataset::GetDatasetError::Internal(e)
+                            odf::DatasetRefUnresolvedError::Internal(e)
                         }
                     })?;
 
@@ -410,15 +408,13 @@ impl odf::dataset::DatasetHandleResolver for DatasetEntryServiceImpl {
                             entry.name,
                         ),
                     )),
-                    Err(GetDatasetEntryByNameError::NotFound(_)) => {
-                        Err(odf::dataset::GetDatasetError::NotFound(
-                            odf::dataset::DatasetNotFoundError {
-                                dataset_ref: dataset_ref.clone(),
-                            },
-                        ))
-                    }
+                    Err(GetDatasetEntryByNameError::NotFound(_)) => Err(
+                        odf::DatasetRefUnresolvedError::NotFound(odf::DatasetNotFoundError {
+                            dataset_ref: dataset_ref.clone(),
+                        }),
+                    ),
                     Err(GetDatasetEntryByNameError::Internal(e)) => {
-                        Err(odf::dataset::GetDatasetError::Internal(e))
+                        Err(odf::DatasetRefUnresolvedError::Internal(e))
                     }
                 }
             }
@@ -432,12 +428,12 @@ impl odf::dataset::DatasetHandleResolver for DatasetEntryServiceImpl {
                     ))
                 }
                 Err(GetDatasetEntryError::NotFound(_)) => Err(
-                    odf::dataset::GetDatasetError::NotFound(odf::dataset::DatasetNotFoundError {
+                    odf::DatasetRefUnresolvedError::NotFound(odf::DatasetNotFoundError {
                         dataset_ref: dataset_ref.clone(),
                     }),
                 ),
                 Err(GetDatasetEntryError::Internal(e)) => {
-                    Err(odf::dataset::GetDatasetError::Internal(e))
+                    Err(odf::DatasetRefUnresolvedError::Internal(e))
                 }
             },
         }
@@ -518,7 +514,7 @@ impl DatasetRegistry for DatasetEntryServiceImpl {
             .map(|id| {
                 (
                     id.clone(),
-                    odf::dataset::GetDatasetError::NotFound(odf::dataset::DatasetNotFoundError {
+                    odf::DatasetRefUnresolvedError::NotFound(odf::DatasetNotFoundError {
                         dataset_ref: id.into_local_ref(),
                     }),
                 )
@@ -533,30 +529,35 @@ impl DatasetRegistry for DatasetEntryServiceImpl {
 
     // Note: in future we will be resolving storage repository,
     // but for now we have just a single one
-    fn get_dataset_by_handle(&self, dataset_handle: &odf::DatasetHandle) -> ResolvedDataset {
-        let writable_cache = &mut self.cache.write().unwrap();
-        let dataset = if let Some(dataset) = writable_cache
-            .datasets
-            .datasets_by_id
-            .get(&dataset_handle.id)
-        {
-            dataset.clone()
+    async fn get_dataset_by_handle(&self, dataset_handle: &odf::DatasetHandle) -> ResolvedDataset {
+        let maybe_cached_dataset = {
+            let readable_cache = self.cache.read().unwrap();
+            readable_cache
+                .datasets
+                .datasets_by_id
+                .get(&dataset_handle.id)
+                .cloned()
+        };
+
+        if let Some(cached_dataset) = maybe_cached_dataset {
+            ResolvedDataset::new(cached_dataset, dataset_handle.clone())
         } else {
             // Note: in future we will be resolving storage repository,
             // but for now we have just a single one
             let dataset = self
                 .dataset_storage_unit
-                .get_stored_dataset_by_handle(dataset_handle);
+                .get_stored_dataset_by_id(&dataset_handle.id)
+                .await
+                .expect("Dataset must exist");
 
+            let writable_cache = &mut self.cache.write().unwrap();
             writable_cache
                 .datasets
                 .datasets_by_id
                 .insert(dataset_handle.id.clone(), dataset.clone());
 
-            dataset
-        };
-
-        ResolvedDataset::new(dataset, dataset_handle.clone())
+            ResolvedDataset::new(dataset, dataset_handle.clone())
+        }
     }
 }
 

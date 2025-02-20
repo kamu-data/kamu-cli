@@ -52,10 +52,6 @@ impl SystemInfoCommand {
 
 #[async_trait::async_trait(?Send)]
 impl Command for SystemInfoCommand {
-    fn needs_workspace(&self) -> bool {
-        false
-    }
-
     async fn run(&mut self) -> Result<(), CLIError> {
         write_output(
             SystemInfo::collect(&self.container_runtime, &self.workspace_svc).await,
@@ -87,10 +83,6 @@ impl VersionCommand {
 
 #[async_trait::async_trait(?Send)]
 impl Command for VersionCommand {
-    fn needs_workspace(&self) -> bool {
-        false
-    }
-
     async fn run(&mut self) -> Result<(), CLIError> {
         write_output(
             BuildInfo::collect(),

@@ -10,6 +10,7 @@
 use std::fmt::{self, Display};
 
 use internal_error::{BoxedError, InternalError};
+use kamu_datasets::NameCollisionError;
 use thiserror::Error;
 
 use super::phases::*;
@@ -172,7 +173,7 @@ pub enum PushServerError {
     RefCollision(odf::dataset::RefCollisionError),
 
     #[error(transparent)]
-    NameCollision(odf::dataset::NameCollisionError),
+    NameCollision(NameCollisionError),
 
     #[error(transparent)]
     Internal(PhaseInternalError),
@@ -195,7 +196,7 @@ pub enum PushClientError {
     RefCollision(odf::dataset::RefCollisionError),
 
     #[error(transparent)]
-    NameCollision(odf::dataset::NameCollisionError),
+    NameCollision(NameCollisionError),
 
     #[error(transparent)]
     Internal(

@@ -7,7 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::GetDatasetError;
+use internal_error::InternalError;
+use odf_metadata::DatasetRef;
+use thiserror::Error;
+
+use crate::{DatasetUnresolvedIdError, GetStoredDatasetError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -16,7 +20,47 @@ pub trait DatasetHandleResolver: Send + Sync {
     async fn resolve_dataset_handle_by_ref(
         &self,
         dataset_ref: &odf_metadata::DatasetRef,
-    ) -> Result<odf_metadata::DatasetHandle, GetDatasetError>;
+    ) -> Result<odf_metadata::DatasetHandle, DatasetRefUnresolvedError>;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum DatasetRefUnresolvedError {
+    #[error(transparent)]
+    NotFound(#[from] DatasetNotFoundError),
+
+    #[error(transparent)]
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
+}
+
+impl From<GetStoredDatasetError> for DatasetRefUnresolvedError {
+    fn from(value: GetStoredDatasetError) -> Self {
+        match value {
+            GetStoredDatasetError::UnresolvedId(e) => Self::NotFound(e.into()),
+            GetStoredDatasetError::Internal(e) => Self::Internal(e),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Clone, PartialEq, Eq, Debug)]
+#[error("Dataset not found: {dataset_ref}")]
+pub struct DatasetNotFoundError {
+    pub dataset_ref: DatasetRef,
+}
+
+impl From<DatasetUnresolvedIdError> for DatasetNotFoundError {
+    fn from(value: DatasetUnresolvedIdError) -> Self {
+        Self {
+            dataset_ref: value.dataset_id.as_local_ref(),
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

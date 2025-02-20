@@ -72,7 +72,10 @@ impl CompactDatasetUseCase for CompactDatasetUseCaseImpl {
             .await?;
 
         // Resolve dataset
-        let target = self.dataset_registry.get_dataset_by_handle(dataset_handle);
+        let target = self
+            .dataset_registry
+            .get_dataset_by_handle(dataset_handle)
+            .await;
 
         // Plan compacting
         let compaction_plan = self

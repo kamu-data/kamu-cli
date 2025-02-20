@@ -10,7 +10,6 @@
 use async_graphql::*;
 use database_common::NoOpDatabasePlugin;
 use dill::Component;
-use kamu::*;
 use kamu_core::*;
 use kamu_datasets::CreateDatasetFromSnapshotUseCase;
 use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEntryRepository};
@@ -42,9 +41,9 @@ async fn test_search_query() {
         .add::<InMemoryDatasetDependencyRepository>()
         .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
         .add_value(TenancyConfig::SingleTenant)
-        .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
-        .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
-        .bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
+        .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
+        .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
+        .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>()
         .add::<CreateDatasetFromSnapshotUseCaseImpl>()
         .add::<CreateDatasetUseCaseImpl>()
         .add::<DatasetEntryServiceImpl>()

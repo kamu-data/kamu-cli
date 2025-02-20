@@ -16,7 +16,7 @@ use dill::Component;
 use futures::TryStreamExt;
 use indoc::indoc;
 use kamu::testing::MockDatasetChangesService;
-use kamu::{DatasetStorageUnitLocalFs, MetadataQueryServiceImpl};
+use kamu::MetadataQueryServiceImpl;
 use kamu_accounts::{
     CurrentAccountSubject,
     LoggedAccount,
@@ -33,7 +33,7 @@ use kamu_core::{
     ResetResult,
     TenancyConfig,
 };
-use kamu_datasets::CreateDatasetFromSnapshotUseCase;
+use kamu_datasets::{CreateDatasetFromSnapshotUseCase, CreateDatasetResult};
 use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEntryRepository};
 use kamu_datasets_services::{
     CreateDatasetFromSnapshotUseCaseImpl,
@@ -2411,7 +2411,7 @@ async fn test_cancel_already_succeeded_flow() {
         dataset_changes_mock: None,
     })
     .await;
-    let create_result: odf::CreateDatasetResult = harness.create_root_dataset().await;
+    let create_result = harness.create_root_dataset().await;
 
     let mutation_code =
         FlowRunsHarness::trigger_flow_mutation(&create_result.dataset_handle.id, "INGEST");
@@ -2489,7 +2489,7 @@ async fn test_history_of_completed_flow() {
     })
     .await;
 
-    let create_result: odf::CreateDatasetResult = harness.create_root_dataset().await;
+    let create_result = harness.create_root_dataset().await;
 
     let mutation_code =
         FlowRunsHarness::trigger_flow_mutation(&create_result.dataset_handle.id, "INGEST");
@@ -3112,9 +3112,9 @@ impl FlowRunsHarness {
             .bind::<dyn Outbox, OutboxImmediateImpl>()
             .add::<DidGeneratorDefault>()
             .add_value(TenancyConfig::SingleTenant)
-            .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
-            .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
-            .bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
+            .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
+            .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
+            .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>()
             .add::<MetadataQueryServiceImpl>()
             .add::<CreateDatasetFromSnapshotUseCaseImpl>()
             .add::<CreateDatasetUseCaseImpl>()
@@ -3180,7 +3180,7 @@ impl FlowRunsHarness {
         }
     }
 
-    async fn create_root_dataset(&self) -> odf::CreateDatasetResult {
+    async fn create_root_dataset(&self) -> CreateDatasetResult {
         let create_dataset_from_snapshot = self
             .catalog_authorized
             .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
@@ -3199,7 +3199,7 @@ impl FlowRunsHarness {
             .unwrap()
     }
 
-    async fn create_root_dataset_no_source(&self) -> odf::CreateDatasetResult {
+    async fn create_root_dataset_no_source(&self) -> CreateDatasetResult {
         let create_dataset_from_snapshot = self
             .catalog_authorized
             .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
@@ -3217,7 +3217,7 @@ impl FlowRunsHarness {
             .unwrap()
     }
 
-    async fn create_derived_dataset(&self) -> odf::CreateDatasetResult {
+    async fn create_derived_dataset(&self) -> CreateDatasetResult {
         let create_dataset_from_snapshot = self
             .catalog_authorized
             .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
@@ -3240,7 +3240,7 @@ impl FlowRunsHarness {
             .unwrap()
     }
 
-    async fn create_derived_dataset_no_transform(&self) -> odf::CreateDatasetResult {
+    async fn create_derived_dataset_no_transform(&self) -> CreateDatasetResult {
         let create_dataset_from_snapshot = self
             .catalog_authorized
             .get_one::<dyn CreateDatasetFromSnapshotUseCase>()

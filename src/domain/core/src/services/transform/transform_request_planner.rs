@@ -127,56 +127,65 @@ pub enum VerifyTransformPlanError {
     DatasetNotFound(
         #[from]
         #[backtrace]
-        odf::dataset::DatasetNotFoundError,
+        odf::DatasetNotFoundError,
     ),
+
     #[error(transparent)]
     RefNotFound(
         #[from]
         #[backtrace]
         odf::storage::RefNotFoundError,
     ),
+
     #[error(transparent)]
     BlockNotFound(
         #[from]
         #[backtrace]
         odf::storage::BlockNotFoundError,
     ),
+
     #[error(transparent)]
     BlockVersion(
         #[from]
         #[backtrace]
         odf::storage::BlockVersionError,
     ),
+
     #[error(transparent)]
     BlockMalformed(
         #[from]
         #[backtrace]
         odf::storage::BlockMalformedError,
     ),
+
     #[error(transparent)]
     InvalidInterval(
         #[from]
         #[backtrace]
         odf::dataset::InvalidIntervalError,
     ),
+
     #[error(transparent)]
     InputSchemaNotDefined(
         #[from]
         #[backtrace]
         InputSchemaNotDefinedError,
     ),
+
     #[error(transparent)]
     InvalidInputInterval(
         #[from]
         #[backtrace]
         InvalidInputIntervalError,
     ),
+
     #[error(transparent)]
     Access(
         #[from]
         #[backtrace]
         odf::AccessError,
     ),
+
     #[error(transparent)]
     Internal(
         #[from]
@@ -187,37 +196,26 @@ pub enum VerifyTransformPlanError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl From<odf::dataset::GetDatasetError> for VerifyTransformPlanError {
-    fn from(v: odf::dataset::GetDatasetError) -> Self {
+impl From<odf::GetRefError> for VerifyTransformPlanError {
+    fn from(v: odf::GetRefError) -> Self {
         match v {
-            odf::dataset::GetDatasetError::NotFound(e) => Self::DatasetNotFound(e),
-            odf::dataset::GetDatasetError::Internal(e) => Self::Internal(e),
+            odf::GetRefError::NotFound(e) => Self::RefNotFound(e),
+            odf::GetRefError::Access(e) => Self::Access(e),
+            odf::GetRefError::Internal(e) => Self::Internal(e),
         }
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl From<odf::storage::GetRefError> for VerifyTransformPlanError {
-    fn from(v: odf::storage::GetRefError) -> Self {
+impl From<odf::GetBlockError> for VerifyTransformPlanError {
+    fn from(v: odf::GetBlockError) -> Self {
         match v {
-            odf::storage::GetRefError::NotFound(e) => Self::RefNotFound(e),
-            odf::storage::GetRefError::Access(e) => Self::Access(e),
-            odf::storage::GetRefError::Internal(e) => Self::Internal(e),
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-impl From<odf::storage::GetBlockError> for VerifyTransformPlanError {
-    fn from(v: odf::storage::GetBlockError) -> Self {
-        match v {
-            odf::storage::GetBlockError::NotFound(e) => Self::BlockNotFound(e),
-            odf::storage::GetBlockError::BlockVersion(e) => Self::BlockVersion(e),
-            odf::storage::GetBlockError::BlockMalformed(e) => Self::BlockMalformed(e),
-            odf::storage::GetBlockError::Access(e) => Self::Access(e),
-            odf::storage::GetBlockError::Internal(e) => Self::Internal(e),
+            odf::GetBlockError::NotFound(e) => Self::BlockNotFound(e),
+            odf::GetBlockError::BlockVersion(e) => Self::BlockVersion(e),
+            odf::GetBlockError::BlockMalformed(e) => Self::BlockMalformed(e),
+            odf::GetBlockError::Access(e) => Self::Access(e),
+            odf::GetBlockError::Internal(e) => Self::Internal(e),
         }
     }
 }

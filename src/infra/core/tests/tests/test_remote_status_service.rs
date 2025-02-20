@@ -28,6 +28,7 @@ use kamu::{
 };
 use kamu_core::utils::metadata_chain_comparator::CompareChainsResult;
 use kamu_core::*;
+use kamu_datasets::CreateDatasetResult;
 use odf::dataset::{DatasetFactoryImpl, IpfsGateway};
 use odf::metadata::testing::MetadataFactory;
 use url::Url;
@@ -174,7 +175,7 @@ async fn test_check_remotes_status_remote_diverge() {
             )]))
             .build(),
     )
-    .prev(head, 0)
+    .prev(head, 1)
     .build();
 
     let _ = local_chain
@@ -270,17 +271,12 @@ impl RemoteStatusTestHarness {
         }
     }
 
-    async fn create_dataset(&self) -> odf::CreateDatasetResult {
-        let local_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("local"));
-
-        let seed_block =
-            MetadataFactory::metadata_block(MetadataFactory::seed(odf::DatasetKind::Root).build())
-                .build_typed();
-
-        self.dataset_storage_unit_writer()
-            .create_dataset(&local_alias, seed_block)
-            .await
-            .unwrap()
+    async fn create_dataset(&self) -> CreateDatasetResult {
+        self.create_root_dataset(&odf::DatasetAlias::new(
+            None,
+            odf::DatasetName::new_unchecked("local"),
+        ))
+        .await
     }
 
     async fn push_dataset(&self, handle: &odf::DatasetHandle) -> odf::DatasetRefRemote {
@@ -319,7 +315,7 @@ impl RemoteStatusTestHarness {
 
     fn schema_block(root_hash: &odf::Multihash) -> odf::MetadataBlock {
         MetadataFactory::metadata_block(MetadataFactory::set_data_schema().build())
-            .prev(root_hash, 0)
+            .prev(root_hash, 1)
             .build()
     }
 }

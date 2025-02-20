@@ -40,6 +40,7 @@ odf-storage-http = { optional = true, workspace = true }
 odf-storage-lfs = { optional = true, workspace = true }
 odf-storage-s3 = { optional = true, workspace = true }
 s3-utils = { workspace = true }
+time-source = { workspace = true }
 
 async-stream = "0.3"
 async-trait = "0.1"

@@ -59,7 +59,7 @@ impl<TServerHarness: ServerSideHarness> SmartPushExistingDivergedDatasetScenario
             .unwrap();
 
         let client_dataset_layout =
-            client_harness.dataset_layout(&client_create_result.dataset_handle.id, "foo");
+            client_harness.dataset_layout(&client_create_result.dataset_handle.id);
 
         let client_dataset_ref = make_dataset_ref(client_account_name.as_ref(), "foo");
 
@@ -104,7 +104,8 @@ impl<TServerHarness: ServerSideHarness> SmartPushExistingDivergedDatasetScenario
 
         let client_dataset = client_harness
             .dataset_registry()
-            .get_dataset_by_handle(&client_create_result.dataset_handle);
+            .get_dataset_by_handle(&client_create_result.dataset_handle)
+            .await;
 
         // Compact at client side
         let compaction_planner = client_harness.compaction_planner();

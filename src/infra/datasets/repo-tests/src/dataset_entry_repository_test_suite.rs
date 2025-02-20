@@ -138,17 +138,19 @@ pub async fn test_stream_many_entries(catalog: &Catalog) {
             .await
             .try_collect::<Vec<_>>()
             .await;
-        let expected_dataset_entries = vec![
+        assert!(get_res.is_ok());
+
+        let mut actual_dataset_entries = get_res.unwrap();
+        actual_dataset_entries.sort_by(|e1, e2| e1.name.cmp(&e2.name));
+
+        let mut expected_dataset_entries = vec![
             dataset_entry_acc_1_1,
             dataset_entry_acc_1_2,
             dataset_entry_acc_2_3,
         ];
+        expected_dataset_entries.sort_by(|e1, e2| e1.name.cmp(&e2.name));
 
-        assert_matches!(
-            get_res,
-            Ok(actual_dataset_entries)
-                if actual_dataset_entries == expected_dataset_entries
-        );
+        assert_eq!(actual_dataset_entries, expected_dataset_entries);
     }
 }
 

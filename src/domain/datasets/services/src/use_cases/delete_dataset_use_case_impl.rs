@@ -14,7 +14,9 @@ use internal_error::ResultIntoInternal;
 use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer, DatasetActionUnauthorizedError};
 use kamu_core::{DatasetRegistry, DependencyGraphService};
 use kamu_datasets::{
+    DanglingReferenceError,
     DatasetLifecycleMessage,
+    DeleteDatasetError,
     DeleteDatasetUseCase,
     MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
 };
@@ -60,7 +62,7 @@ impl DeleteDatasetUseCaseImpl {
     async fn ensure_no_dangling_references(
         &self,
         dataset_handle: &odf::DatasetHandle,
-    ) -> Result<(), odf::dataset::DeleteDatasetError> {
+    ) -> Result<(), DeleteDatasetError> {
         use tokio_stream::StreamExt;
         let downstream_dataset_ids: Vec<_> = self
             .dependency_graph_service
@@ -81,7 +83,7 @@ impl DeleteDatasetUseCaseImpl {
                 children.push(hdl);
             }
 
-            return Err(odf::dataset::DanglingReferenceError {
+            return Err(DanglingReferenceError {
                 dataset_handle: dataset_handle.clone(),
                 children,
             }
@@ -103,18 +105,18 @@ impl DeleteDatasetUseCase for DeleteDatasetUseCaseImpl {
     async fn execute_via_ref(
         &self,
         dataset_ref: &odf::DatasetRef,
-    ) -> Result<(), odf::dataset::DeleteDatasetError> {
+    ) -> Result<(), DeleteDatasetError> {
         let dataset_handle = match self
             .dataset_registry
             .resolve_dataset_handle_by_ref(dataset_ref)
             .await
         {
             Ok(h) => Ok(h),
-            Err(odf::dataset::GetDatasetError::NotFound(e)) => {
-                Err(odf::dataset::DeleteDatasetError::NotFound(e))
+            Err(odf::DatasetRefUnresolvedError::NotFound(e)) => {
+                Err(DeleteDatasetError::NotFound(e))
             }
-            Err(odf::dataset::GetDatasetError::Internal(e)) => {
-                Err(odf::dataset::DeleteDatasetError::Internal(e))
+            Err(odf::DatasetRefUnresolvedError::Internal(e)) => {
+                Err(DeleteDatasetError::Internal(e))
             }
         }?;
 
@@ -130,18 +132,14 @@ impl DeleteDatasetUseCase for DeleteDatasetUseCaseImpl {
     async fn execute_via_handle(
         &self,
         dataset_handle: &odf::DatasetHandle,
-    ) -> Result<(), odf::dataset::DeleteDatasetError> {
+    ) -> Result<(), DeleteDatasetError> {
         // Permission check
         self.dataset_action_authorizer
             .check_action_allowed(&dataset_handle.id, DatasetAction::Write)
             .await
             .map_err(|e| match e {
-                DatasetActionUnauthorizedError::Access(e) => {
-                    odf::dataset::DeleteDatasetError::Access(e)
-                }
-                DatasetActionUnauthorizedError::Internal(e) => {
-                    odf::dataset::DeleteDatasetError::Internal(e)
-                }
+                DatasetActionUnauthorizedError::Access(e) => DeleteDatasetError::Access(e),
+                DatasetActionUnauthorizedError::Internal(e) => DeleteDatasetError::Internal(e),
             })?;
 
         // Validate against dangling ref
@@ -154,7 +152,7 @@ impl DeleteDatasetUseCase for DeleteDatasetUseCaseImpl {
 
         // Do actual delete
         self.dataset_storage_unit_writer
-            .delete_dataset(dataset_handle)
+            .delete_dataset(&dataset_handle.id)
             .await?;
 
         // Remove graph node

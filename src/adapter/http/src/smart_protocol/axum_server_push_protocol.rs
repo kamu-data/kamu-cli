@@ -17,6 +17,7 @@ use internal_error::ErrorIntoInternal;
 use kamu_core::CorruptedSourceError;
 use kamu_datasets::{
     AppendDatasetMetadataBatchUseCase,
+    CreateDatasetError,
     CreateDatasetUseCase,
     CreateDatasetUseCaseOptions,
 };
@@ -234,12 +235,12 @@ impl AxumServerPushProtocolInstance {
                     Ok(create_result) => {
                         self.maybe_dataset = Some(create_result.dataset);
                     }
-                    Err(odf::dataset::CreateDatasetError::RefCollision(err)) => {
+                    Err(CreateDatasetError::RefCollision(err)) => {
                         return Err(PushServerError::RefCollision(
                             odf::dataset::RefCollisionError { id: err.id },
                         ));
                     }
-                    Err(odf::dataset::CreateDatasetError::NameCollision(err)) => {
+                    Err(CreateDatasetError::NameCollision(err)) => {
                         return Err(PushServerError::NameCollision(err));
                     }
                     Err(e) => {
@@ -296,7 +297,7 @@ impl AxumServerPushProtocolInstance {
                 .await
             {
                 Ok(head) => Some(head),
-                Err(odf::storage::GetRefError::NotFound(_)) => None,
+                Err(odf::GetRefError::NotFound(_)) => None,
                 Err(e) => {
                     return Err(PushServerError::Internal(
                         e.protocol_int_err(PushPhase::InitialRequest),

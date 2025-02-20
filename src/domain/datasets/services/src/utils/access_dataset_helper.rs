@@ -18,7 +18,7 @@ use kamu_datasets::{
     ViewDatasetUseCaseError,
     ViewMultiResponse,
 };
-use odf::dataset::{DatasetNotFoundError, GetDatasetError};
+use odf::dataset::{DatasetNotFoundError, DatasetRefUnresolvedError};
 use thiserror::Error;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -51,7 +51,7 @@ impl<'a> AccessDatasetHelper<'a> {
         {
             Ok(handle) => Ok(handle),
             Err(e) => match e {
-                GetDatasetError::NotFound(e) => Err(DatasetAccessError::NotFound(e)),
+                DatasetRefUnresolvedError::NotFound(e) => Err(DatasetAccessError::NotFound(e)),
                 unexpected_error => Err(unexpected_error.int_err().into()),
             },
         }?;

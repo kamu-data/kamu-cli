@@ -13,9 +13,9 @@ use std::sync::Arc;
 use dill::*;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_core::{
-    DatasetIDStream,
     DatasetNodeNotFoundError,
     DatasetRegistry,
+    DependencyDatasetIDStream,
     DependencyGraphService,
     DependencyOrder,
     GetDependenciesError,
@@ -269,7 +269,7 @@ impl DependencyGraphService for DependencyGraphServiceImpl {
     async fn get_recursive_upstream_dependencies(
         &self,
         dataset_ids: Vec<odf::DatasetID>,
-    ) -> Result<DatasetIDStream, GetDependenciesError> {
+    ) -> Result<DependencyDatasetIDStream, GetDependenciesError> {
         let result = self
             .run_recursive_reversed_breadth_first_search(dataset_ids)
             .await?;
@@ -280,7 +280,7 @@ impl DependencyGraphService for DependencyGraphServiceImpl {
     async fn get_recursive_downstream_dependencies(
         &self,
         dataset_ids: Vec<odf::DatasetID>,
-    ) -> Result<DatasetIDStream, GetDependenciesError> {
+    ) -> Result<DependencyDatasetIDStream, GetDependenciesError> {
         let result = self.run_recursive_depth_first_search(dataset_ids).await?;
 
         Ok(Box::pin(tokio_stream::iter(result)))
@@ -291,7 +291,7 @@ impl DependencyGraphService for DependencyGraphServiceImpl {
     async fn get_downstream_dependencies(
         &self,
         dataset_id: &odf::DatasetID,
-    ) -> Result<DatasetIDStream, GetDependenciesError> {
+    ) -> Result<DependencyDatasetIDStream, GetDependenciesError> {
         let downstream_node_datasets: Vec<_> = {
             let state = self.state.read().await;
 
@@ -320,7 +320,7 @@ impl DependencyGraphService for DependencyGraphServiceImpl {
     async fn get_upstream_dependencies(
         &self,
         dataset_id: &odf::DatasetID,
-    ) -> Result<DatasetIDStream, GetDependenciesError> {
+    ) -> Result<DependencyDatasetIDStream, GetDependenciesError> {
         let upstream_node_datasets: Vec<_> = {
             let state = self.state.read().await;
 

@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::InternalError;
-use odf::dataset::DatasetNotFoundError;
 use thiserror::Error;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -39,7 +38,7 @@ pub struct EditMultiResponse {
 #[derive(Error, Debug)]
 pub enum EditDatasetUseCaseError {
     #[error(transparent)]
-    NotFound(#[from] DatasetNotFoundError),
+    NotFound(#[from] odf::DatasetNotFoundError),
 
     #[error(transparent)]
     Access(

@@ -175,6 +175,7 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
             &config,
             &mut base_catalog_builder,
             workspace_status,
+            args.password_hashing_mode,
             is_e2e_testing,
         );
 
@@ -226,71 +227,82 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
         cli_catalog.get_one::<GcService>()?.evict_cache()?;
     }
 
-    // Startup initializations
-    run_startup_initializations(&cli_catalog).await?;
+    // Some extra steps are necessary for commands that require workspace
+    let mut command_result: Result<(), CLIError> = if cli_commands::command_needs_workspace(&args) {
+        if !workspace_svc.is_in_workspace() {
+            Err(CLIError::usage_error_from(NotInWorkspace))
+        } else if is_workspace_upgrade_needed {
+            Err(CLIError::usage_error_from(WorkspaceUpgradeRequired))
+        } else if current_account.is_explicit() && tenancy_config == TenancyConfig::SingleTenant {
+            Err(CLIError::usage_error_from(NotInMultiTenantWorkspace))
+        } else {
+            Ok(())
+        }
+    } else {
+        Ok(())
+    };
 
-    let is_transactional =
-        maybe_db_connection_settings.is_some() && cli_commands::command_needs_transaction(&args);
-    let work_catalog = maybe_server_catalog.as_ref().unwrap_or(&base_catalog);
+    if command_result.is_ok() && cli_commands::command_needs_startup_jobs(&args) {
+        command_result = run_startup_initializations(&cli_catalog).await;
+    }
 
-    let mut command_result: Result<(), CLIError> = maybe_transactional(
-        is_transactional,
-        cli_catalog.clone(),
-        |maybe_transactional_cli_catalog: Catalog| async move {
-            let mut command =
-                cli_commands::get_command(work_catalog, &maybe_transactional_cli_catalog, args)?;
+    if command_result.is_ok() {
+        let is_transactional = maybe_db_connection_settings.is_some()
+            && cli_commands::command_needs_transaction(&args);
+        let work_catalog = maybe_server_catalog.as_ref().unwrap_or(&base_catalog);
 
-            if command.needs_workspace() && !is_in_workspace {
-                Err(CLIError::usage_error_from(NotInWorkspace))?;
-            }
-            if command.needs_workspace() && is_workspace_upgrade_needed {
-                Err(CLIError::usage_error_from(WorkspaceUpgradeRequired))?;
-            }
-            if current_account.is_explicit() && tenancy_config == TenancyConfig::SingleTenant {
-                Err(CLIError::usage_error_from(NotInMultiTenantWorkspace))?;
-            }
+        command_result = maybe_transactional(
+            is_transactional,
+            cli_catalog.clone(),
+            |maybe_transactional_cli_catalog: Catalog| async move {
+                let mut command = cli_commands::get_command(
+                    work_catalog,
+                    &maybe_transactional_cli_catalog,
+                    args,
+                )?;
 
-            command.validate_args().await?;
+                command.validate_args().await?;
 
-            let command_name = command.name();
+                let command_name = command.name();
 
-            command
-                .run()
-                .instrument(tracing::info_span!(
-                    "Running command",
-                    %is_transactional,
-                    %command_name,
-                ))
-                .await
-        },
-    )
-    .instrument(tracing::debug_span!("app::run_command"))
-    .await;
-
-    command_result = command_result
-        // If successful, then process the Outbox messages while they are present
-        .and_then_async(|_| async {
-            let outbox_agent = cli_catalog.get_one::<messaging_outbox::OutboxAgent>()?;
-            outbox_agent
-                .run_while_has_tasks()
-                .await
-                .map_err(CLIError::critical)
-        })
-        .instrument(tracing::debug_span!(
-            "Consume accumulated the Outbox messages"
-        ))
-        .await
-        // If we had a temporary directory, we move the database from it to the expected
-        // location.
-        .and_then_async(|_| async {
-            move_initial_database_to_workspace_if_needed(
-                &workspace_layout,
-                maybe_temp_database_path,
-            )
-            .await
-            .map_int_err(CLIError::critical)
-        })
+                command
+                    .run()
+                    .instrument(tracing::info_span!(
+                        "Running command",
+                        %is_transactional,
+                        %command_name,
+                    ))
+                    .await
+            },
+        )
+        .instrument(tracing::debug_span!("app::run_command"))
         .await;
+
+        command_result = command_result
+            // If successful, then process the Outbox messages while they are present
+            .and_then_async(|_| async {
+                let outbox_agent = cli_catalog.get_one::<messaging_outbox::OutboxAgent>()?;
+                outbox_agent
+                    .run_while_has_tasks()
+                    .await
+                    .map_err(CLIError::critical)
+            })
+            .instrument(tracing::debug_span!(
+                "Consume accumulated the Outbox messages"
+            ))
+            .await
+            // If we had a temporary directory, we move the database from it to the expected
+            // location.
+            .and_then_async(|_| async {
+                move_initial_database_to_workspace_if_needed(
+                    &workspace_layout,
+                    maybe_temp_database_path,
+                )
+                .await
+                .map_int_err(CLIError::critical)
+            })
+            .await;
+    }
 
     match &command_result {
         Ok(()) => {
@@ -385,10 +397,11 @@ pub fn configure_base_catalog(
     b.add::<DidGeneratorDefault>();
 
     b.add_builder(
-        DatasetStorageUnitLocalFs::builder().with_root(workspace_layout.datasets_dir.clone()),
+        odf::dataset::DatasetStorageUnitLocalFs::builder()
+            .with_root(workspace_layout.datasets_dir.clone()),
     );
-    b.bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>();
-    b.bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>();
+    b.bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>();
+    b.bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>();
 
     b.add::<odf::dataset::DatasetFactoryImpl>();
 
@@ -599,7 +612,7 @@ pub fn configure_server_catalog(base_catalog: &Catalog) -> CatalogBuilder {
 async fn run_startup_initializations(catalog: &Catalog) -> Result<(), CLIError> {
     let init_result = init_on_startup::run_startup_jobs(catalog)
         .await
-        .map_err(CLIError::critical);
+        .map_err(CLIError::failure);
 
     if let Err(e) = init_result {
         tracing::error!(
@@ -629,6 +642,7 @@ pub fn register_config_in_catalog(
     config: &config::CLIConfig,
     catalog_builder: &mut CatalogBuilder,
     workspace_status: WorkspaceStatus,
+    password_hashing_mode: Option<cli::PasswordHashingMode>,
     is_e2e_testing: bool,
 ) {
     let network_ns = config.engine.as_ref().unwrap().network_ns.unwrap();
@@ -835,6 +849,15 @@ pub fn register_config_in_catalog(
         Duration::seconds(outbox_config.awaiting_step_secs.unwrap()),
         outbox_config.batch_size.unwrap(),
     ));
+
+    match password_hashing_mode {
+        Some(cli::PasswordHashingMode::Testing) => {
+            catalog_builder.add_value(kamu_accounts_services::PasswordHashingMode::Minimal);
+        }
+        Some(cli::PasswordHashingMode::Production) | None => {
+            catalog_builder.add_value(kamu_accounts_services::PasswordHashingMode::Default);
+        }
+    }
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]

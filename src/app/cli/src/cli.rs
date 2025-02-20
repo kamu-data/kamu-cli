@@ -65,6 +65,10 @@ pub struct Cli {
     #[arg(long, short = 'a', hide = true)]
     pub account: Option<String>,
 
+    /// Specifies the hashing mode
+    #[arg(long, value_enum, hide = true)]
+    pub password_hashing_mode: Option<PasswordHashingMode>,
+
     /// E2E test interface: file path from which socket bound address will be
     /// read out
     #[arg(long, hide = true)]
@@ -72,6 +76,14 @@ pub struct Cli {
 
     #[command(subcommand)]
     pub command: Command,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, Copy, clap::ValueEnum)]
+pub enum PasswordHashingMode {
+    Production,
+    Testing,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::assert_matches::assert_matches;
+use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
 use chrono::{DateTime, TimeZone, Utc};
@@ -26,6 +27,7 @@ use kamu_datasets::{
 };
 use kamu_datasets_services::{DatasetEntryIndexer, DatasetEntryServiceImpl};
 use messaging_outbox::{register_message_dispatcher, Outbox, OutboxImmediateImpl};
+use odf::metadata::testing::MetadataFactory;
 use time_source::{FakeSystemTimeSource, SystemTimeSource};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -38,35 +40,6 @@ async fn test_indexes_datasets_correctly() {
     let (_, dataset_id_1) = odf::DatasetID::new_generated_ed25519();
     let (_, dataset_id_2) = odf::DatasetID::new_generated_ed25519();
     let (_, dataset_id_3) = odf::DatasetID::new_generated_ed25519();
-    let dataset_handles = vec![
-        odf::DatasetHandle::new(
-            dataset_id_1.clone(),
-            odf::DatasetAlias::new(
-                Some(odf::AccountName::new_unchecked("user1")),
-                odf::DatasetName::new_unchecked(dataset_name_1),
-            ),
-        ),
-        odf::DatasetHandle::new(
-            dataset_id_2.clone(),
-            odf::DatasetAlias::new(
-                Some(odf::AccountName::new_unchecked("user1")),
-                odf::DatasetName::new_unchecked(dataset_name_2),
-            ),
-        ),
-        odf::DatasetHandle::new(
-            dataset_id_3.clone(),
-            odf::DatasetAlias::new(
-                Some(odf::AccountName::new_unchecked("user2")),
-                odf::DatasetName::new_unchecked(dataset_name_3),
-            ),
-        ),
-    ];
-
-    let mut mock_dataset_repository = odf::dataset::MockDatasetStorageUnit::new();
-    DatasetEntryServiceHarness::add_get_all_datasets_expectation(
-        &mut mock_dataset_repository,
-        dataset_handles,
-    );
 
     let mut mock_dataset_entry_repository = MockDatasetEntryRepository::new();
     DatasetEntryServiceHarness::add_dataset_entries_count_expectation(
@@ -79,8 +52,7 @@ async fn test_indexes_datasets_correctly() {
         dataset_entry_collector.clone(),
     );
 
-    let harness =
-        DatasetEntryServiceHarness::new(mock_dataset_entry_repository, mock_dataset_repository);
+    let harness = DatasetEntryServiceHarness::new(mock_dataset_entry_repository);
 
     let (_, owner_account_id_1) = odf::AccountID::new_generated_ed25519();
     harness
@@ -94,6 +66,55 @@ async fn test_indexes_datasets_correctly() {
         .create_account(&Account::test(owner_account_id_2.clone(), "user2"))
         .await
         .unwrap();
+
+    // Create 3 datasets
+    let mut stored_by_id = HashMap::new();
+    for dataset_id in [&dataset_id_1, &dataset_id_2, &dataset_id_3] {
+        let stored = harness
+            .dataset_storage_unit_writer
+            .store_dataset(
+                MetadataFactory::metadata_block(
+                    MetadataFactory::seed(odf::DatasetKind::Root)
+                        .id(dataset_id.clone())
+                        .build(),
+                )
+                .build_typed(),
+            )
+            .await
+            .unwrap();
+        stored_by_id.insert(dataset_id.clone(), stored);
+    }
+
+    // Write aliases manually
+    odf::dataset::write_dataset_alias(
+        stored_by_id.get(&dataset_id_1).unwrap().dataset.as_ref(),
+        &odf::DatasetAlias::new(
+            Some(odf::AccountName::new_unchecked("user1")),
+            odf::DatasetName::new_unchecked(dataset_name_1),
+        ),
+    )
+    .await
+    .unwrap();
+
+    odf::dataset::write_dataset_alias(
+        stored_by_id.get(&dataset_id_2).unwrap().dataset.as_ref(),
+        &odf::DatasetAlias::new(
+            Some(odf::AccountName::new_unchecked("user1")),
+            odf::DatasetName::new_unchecked(dataset_name_2),
+        ),
+    )
+    .await
+    .unwrap();
+
+    odf::dataset::write_dataset_alias(
+        stored_by_id.get(&dataset_id_3).unwrap().dataset.as_ref(),
+        &odf::DatasetAlias::new(
+            Some(odf::AccountName::new_unchecked("user2")),
+            odf::DatasetName::new_unchecked(dataset_name_3),
+        ),
+    )
+    .await
+    .unwrap();
 
     harness
         .dataset_entry_indexer
@@ -134,10 +155,7 @@ async fn test_indexes_datasets_correctly() {
 
 #[test_log::test(tokio::test)]
 async fn test_try_to_resolve_non_existing_dataset() {
-    let harness = DatasetEntryServiceHarness::new(
-        MockDatasetEntryRepository::new(),
-        odf::dataset::MockDatasetStorageUnit::new(),
-    );
+    let harness = DatasetEntryServiceHarness::new(MockDatasetEntryRepository::new());
 
     let dataset_ref = odf::DatasetAlias::new(
         Some(odf::AccountName::new_unchecked("foo")),
@@ -152,7 +170,7 @@ async fn test_try_to_resolve_non_existing_dataset() {
 
     assert_matches!(
         resolve_dataset_result,
-        Err(odf::dataset::GetDatasetError::NotFound(_))
+        Err(odf::DatasetRefUnresolvedError::NotFound(_))
     );
 }
 
@@ -162,10 +180,7 @@ async fn test_try_to_resolve_non_existing_dataset() {
 async fn test_try_to_resolve_all_datasets_for_non_existing_user() {
     use futures::TryStreamExt;
 
-    let harness = DatasetEntryServiceHarness::new(
-        MockDatasetEntryRepository::new(),
-        odf::dataset::MockDatasetStorageUnit::new(),
-    );
+    let harness = DatasetEntryServiceHarness::new(MockDatasetEntryRepository::new());
 
     let resolve_dataset_result = harness
         .dataset_registry
@@ -179,18 +194,26 @@ async fn test_try_to_resolve_all_datasets_for_non_existing_user() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct DatasetEntryServiceHarness {
+    _tempdir: tempfile::TempDir,
     dataset_entry_indexer: Arc<DatasetEntryIndexer>,
     account_repo: Arc<dyn AccountRepository>,
     dataset_registry: Arc<dyn DatasetRegistry>,
+    dataset_storage_unit_writer: Arc<dyn odf::DatasetStorageUnitWriter>,
 }
 
 impl DatasetEntryServiceHarness {
-    fn new(
-        mock_dataset_entry_repository: MockDatasetEntryRepository,
-        mock_dataset_repository: odf::dataset::MockDatasetStorageUnit,
-    ) -> Self {
+    fn new(mock_dataset_entry_repository: MockDatasetEntryRepository) -> Self {
+        let tempdir = tempfile::tempdir().unwrap();
+        let datasets_dir = tempdir.path().join("datasets");
+        std::fs::create_dir(&datasets_dir).unwrap();
+
         let catalog = {
             let mut b = CatalogBuilder::new();
+
+            use odf::dataset::DatasetStorageUnitLocalFs;
+            b.add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir));
+            b.bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>();
+            b.bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>();
 
             b.add::<DatasetEntryServiceImpl>();
             b.add::<DatasetEntryIndexer>();
@@ -202,12 +225,6 @@ impl DatasetEntryServiceHarness {
             let fake_system_time_source = FakeSystemTimeSource::new(t);
             b.add_value(fake_system_time_source);
             b.bind::<dyn SystemTimeSource, FakeSystemTimeSource>();
-
-            b.add_value(mock_dataset_repository);
-            b.bind::<dyn odf::DatasetStorageUnit, odf::dataset::MockDatasetStorageUnit>();
-
-            b.add_value(odf::MockDatasetStorageUnitWriter::new());
-            b.bind::<dyn odf::DatasetStorageUnitWriter, odf::MockDatasetStorageUnitWriter>();
 
             b.add::<InMemoryAccountRepository>();
             b.add::<AccountServiceImpl>();
@@ -231,9 +248,11 @@ impl DatasetEntryServiceHarness {
         };
 
         Self {
+            _tempdir: tempdir,
             dataset_entry_indexer: catalog.get_one().unwrap(),
             account_repo: catalog.get_one().unwrap(),
             dataset_registry: catalog.get_one().unwrap(),
+            dataset_storage_unit_writer: catalog.get_one().unwrap(),
         }
     }
 
@@ -261,21 +280,6 @@ impl DatasetEntryServiceHarness {
             .expect_dataset_entries_count()
             .times(1)
             .returning(|| Ok(0));
-    }
-
-    // Expectation: odf::dataset::MockDatasetStorageUnit
-
-    fn add_get_all_datasets_expectation(
-        mock_dataset_repository: &mut odf::dataset::MockDatasetStorageUnit,
-        dataset_handles: Vec<odf::DatasetHandle>,
-    ) {
-        mock_dataset_repository
-            .expect_stored_dataset_handles()
-            .times(1)
-            .returning(move || {
-                let stream = futures::stream::iter(dataset_handles.clone().into_iter().map(Ok));
-                Box::pin(stream)
-            });
     }
 }
 

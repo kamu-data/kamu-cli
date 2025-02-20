@@ -278,7 +278,7 @@ impl Command for ListCommand {
         };
 
         for hdl in &datasets {
-            let resolved_dataset = self.dataset_registry.get_dataset_by_handle(hdl);
+            let resolved_dataset = self.dataset_registry.get_dataset_by_handle(hdl).await;
             let current_head = resolved_dataset
                 .as_metadata_chain()
                 .resolve_ref(&odf::BlockRef::Head)

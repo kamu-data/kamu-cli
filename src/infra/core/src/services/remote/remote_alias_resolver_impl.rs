@@ -101,6 +101,32 @@ impl RemoteAliasResolverImpl {
         };
         Ok(result)
     }
+
+    async fn resolve_pull_url_from_odf_transfer_url(
+        &self,
+        alias: &odf::DatasetAliasRemote,
+        odf_transfer_url: &Url,
+    ) -> Result<url::Url, ResolveAliasError> {
+        let account_name = if alias.account_name.is_some() {
+            alias.account_name.clone()
+        } else {
+            let access_token_maybe = self
+                .access_token_resolver
+                .resolve_odf_dataset_access_token(odf_transfer_url);
+            RemoteAliasResolverApiHelper::resolve_remote_account_name(
+                odf_transfer_url,
+                access_token_maybe.as_ref(),
+            )
+            .await
+            .int_err()?
+        };
+
+        let mut remote_url =
+            self.combine_remote_url(odf_transfer_url, account_name.as_ref(), &alias.dataset_name)?;
+        remote_url.ensure_trailing_slash();
+
+        Ok(remote_url)
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -192,6 +218,8 @@ impl RemoteAliasResolver for RemoteAliasResolverImpl {
         remote_ref: &odf::DatasetRefRemote,
     ) -> Result<url::Url, ResolveAliasError> {
         match remote_ref {
+            // TODO: the reference can be resolved if using ODF protocol.
+            // However, it is still difficult with simple folder repositories without index.
             odf::DatasetRefRemote::ID(_, _) => Err(ResolveAliasError::Internal(
                 "Syncing remote dataset by ID is not yet supported".int_err(),
             )),
@@ -203,37 +231,16 @@ impl RemoteAliasResolver for RemoteAliasResolverImpl {
             odf::DatasetRefRemote::Alias(alias)
             | odf::DatasetRefRemote::Handle(odf::metadata::DatasetHandleRemote { alias, .. }) => {
                 let remote_repo = self.remote_repo_reg.get_repository(&alias.repo_name)?;
-                if !remote_repo.url.is_odf_protocol() {
-                    return Ok(remote_repo
+                if remote_repo.url.is_odf_protocol() {
+                    let transfer_url = remote_repo.url.clone().odf_to_transport_protocol()?;
+                    self.resolve_pull_url_from_odf_transfer_url(alias, &transfer_url)
+                        .await
+                } else {
+                    Ok(remote_repo
                         .url
                         .join(&format!("{}/", alias.local_alias()))
-                        .unwrap());
+                        .unwrap())
                 }
-
-                let transfer_url = remote_repo.url.clone().odf_to_transport_protocol()?;
-
-                let account_name = if alias.account_name.is_some() {
-                    alias.account_name.clone()
-                } else {
-                    let access_token_maybe = self
-                        .access_token_resolver
-                        .resolve_odf_dataset_access_token(&transfer_url);
-                    RemoteAliasResolverApiHelper::resolve_remote_account_name(
-                        &transfer_url,
-                        access_token_maybe.as_ref(),
-                    )
-                    .await
-                    .int_err()?
-                };
-
-                let mut remote_url = self.combine_remote_url(
-                    &transfer_url,
-                    account_name.as_ref(),
-                    &alias.dataset_name,
-                )?;
-                remote_url.ensure_trailing_slash();
-
-                Ok(remote_url)
             }
         }
     }

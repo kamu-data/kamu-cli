@@ -16,11 +16,11 @@ use kamu_core::{DatasetRegistry, SearchError, SearchOptions, SearchService, Tena
 use tokio_stream::Stream;
 
 type FilteredDatasetHandleStream<'a> = Pin<
-    Box<dyn Stream<Item = Result<odf::DatasetHandle, odf::dataset::GetDatasetError>> + Send + 'a>,
+    Box<dyn Stream<Item = Result<odf::DatasetHandle, odf::DatasetRefUnresolvedError>> + Send + 'a>,
 >;
 
 type FilteredDatasetRefAnyStream<'a> = Pin<
-    Box<dyn Stream<Item = Result<odf::DatasetRefAny, odf::dataset::GetDatasetError>> + Send + 'a>,
+    Box<dyn Stream<Item = Result<odf::DatasetRefAny, odf::DatasetRefUnresolvedError>> + Send + 'a>,
 >;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -94,7 +94,7 @@ pub fn filter_datasets_by_any_pattern<'a>(
 
 fn get_static_datasets_stream(
     static_refs: Vec<odf::DatasetRefAnyPattern>,
-) -> impl Stream<Item = Result<odf::DatasetRefAny, odf::dataset::GetDatasetError>> + 'static {
+) -> impl Stream<Item = Result<odf::DatasetRefAny, odf::DatasetRefUnresolvedError>> + 'static {
     async_stream::try_stream! {
         for static_ref in static_refs {
             yield static_ref
@@ -110,7 +110,7 @@ fn get_remote_datasets_stream(
     search_svc: Arc<dyn SearchService>,
     remote_ref_patterns: Vec<odf::DatasetRefAnyPattern>,
     is_multitenant_mode: bool,
-) -> impl Stream<Item = Result<odf::DatasetRefAny, odf::dataset::GetDatasetError>> + 'static {
+) -> impl Stream<Item = Result<odf::DatasetRefAny, odf::DatasetRefUnresolvedError>> + 'static {
     async_stream::try_stream! {
         for remote_ref_pattern in &remote_ref_patterns {
             // TODO: potentially low performance solution,as it will always fully scan a remote repo.
@@ -124,7 +124,7 @@ fn get_remote_datasets_stream(
             let remote_datasets: Vec<_> = match search_svc.search(None, search_options).await {
                 Err(err) => match err {
                     SearchError::RepositoryNotFound(_) => vec![],
-                    _ => Err(odf::dataset::GetDatasetError::Internal(InternalError::new(err)))?,
+                    _ => Err(odf::DatasetRefUnresolvedError::Internal(InternalError::new(err)))?,
                 },
                 Ok(result) => result.datasets,
             };
@@ -166,7 +166,7 @@ pub fn get_local_datasets_stream<'a>(
     dataset_registry: &'a dyn DatasetRegistry,
     dataset_ref_patterns: Vec<odf::DatasetRefAnyPattern>,
     current_account_name: &odf::AccountName,
-) -> impl Stream<Item = Result<odf::DatasetRefAny, odf::dataset::GetDatasetError>> + 'a {
+) -> impl Stream<Item = Result<odf::DatasetRefAny, odf::DatasetRefUnresolvedError>> + 'a {
     dataset_registry
         .all_dataset_handles_by_owner(current_account_name)
         .try_filter(move |dataset_handle| {

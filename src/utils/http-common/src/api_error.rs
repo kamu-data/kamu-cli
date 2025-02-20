@@ -262,7 +262,7 @@ impl ApiErrorCategorizable for PushIngestError {
     }
 }
 
-impl ApiErrorCategorizable for odf::dataset::GetDatasetError {
+impl ApiErrorCategorizable for odf::DatasetRefUnresolvedError {
     fn categorize(&self) -> ApiErrorCategory<'_> {
         match &self {
             Self::Internal(e) => ApiErrorCategory::Internal(e),
@@ -271,7 +271,7 @@ impl ApiErrorCategorizable for odf::dataset::GetDatasetError {
     }
 }
 
-impl ApiErrorCategorizable for odf::storage::GetRefError {
+impl ApiErrorCategorizable for odf::GetRefError {
     fn categorize(&self) -> ApiErrorCategory<'_> {
         match &self {
             Self::Access(e) => ApiErrorCategory::Access(e),
@@ -281,7 +281,7 @@ impl ApiErrorCategorizable for odf::storage::GetRefError {
     }
 }
 
-impl ApiErrorCategorizable for odf::storage::GetBlockError {
+impl ApiErrorCategorizable for odf::GetBlockError {
     fn categorize(&self) -> ApiErrorCategory<'_> {
         match &self {
             Self::Access(e) => ApiErrorCategory::Access(e),

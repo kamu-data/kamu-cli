@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::{BTreeSet, HashMap};
 use std::sync::Arc;
 
 use database_common::PaginationOpts;
@@ -21,7 +21,7 @@ use tokio::sync::RwLock;
 #[derive(Default)]
 struct State {
     rows: HashMap<odf::DatasetID, DatasetEntry>,
-    rows_by_name: BTreeMap<odf::DatasetName, DatasetEntry>,
+    rows_by_owner_and_name: HashMap<odf::AccountID, HashMap<odf::DatasetName, odf::DatasetID>>,
     rows_by_owner: HashMap<odf::AccountID, BTreeSet<odf::DatasetID>>,
 }
 
@@ -29,7 +29,7 @@ impl State {
     fn new() -> Self {
         Self {
             rows: HashMap::new(),
-            rows_by_name: BTreeMap::new(),
+            rows_by_owner_and_name: HashMap::new(),
             rows_by_owner: HashMap::new(),
         }
     }
@@ -85,7 +85,7 @@ impl DatasetEntryRepository for InMemoryDatasetEntryRepository {
             let readable_state = self.state.read().await;
 
             readable_state
-                .rows_by_name
+                .rows
                 .values()
                 .skip(pagination.offset)
                 .take(pagination.limit)
@@ -139,10 +139,20 @@ impl DatasetEntryRepository for InMemoryDatasetEntryRepository {
     ) -> Result<DatasetEntry, GetDatasetEntryByNameError> {
         let readable_state = self.state.read().await;
 
-        let maybe_dataset_entry = readable_state
-            .rows
-            .values()
-            .find(|dataset| dataset.owner_id == *owner_id && dataset.name == *name);
+        let maybe_dataset_entry = {
+            let maybe_dataset_id =
+                if let Some(owned_by_name) = readable_state.rows_by_owner_and_name.get(owner_id) {
+                    owned_by_name.get(name)
+                } else {
+                    None
+                };
+
+            if let Some(dataset_id) = maybe_dataset_id {
+                readable_state.rows.get(dataset_id)
+            } else {
+                None
+            }
+        };
 
         let Some(dataset_entry) = maybe_dataset_entry else {
             return Err(
@@ -184,12 +194,15 @@ impl DatasetEntryRepository for InMemoryDatasetEntryRepository {
     ) -> Result<(), SaveDatasetEntryError> {
         let mut writable_state = self.state.write().await;
 
-        for row in writable_state.rows.values() {
-            if row.id == dataset_entry.id {
-                return Err(SaveDatasetEntryErrorDuplicate::new(dataset_entry.id.clone()).into());
-            }
+        if writable_state.rows.contains_key(&dataset_entry.id) {
+            return Err(SaveDatasetEntryErrorDuplicate::new(dataset_entry.id.clone()).into());
+        }
 
-            if row.owner_id == dataset_entry.owner_id && row.name == dataset_entry.name {
+        if let Some(owned_by_name) = writable_state
+            .rows_by_owner_and_name
+            .get(&dataset_entry.owner_id)
+        {
+            if owned_by_name.contains_key(&dataset_entry.name) {
                 return Err(DatasetEntryNameCollisionError::new(dataset_entry.name.clone()).into());
             }
         }
@@ -199,8 +212,16 @@ impl DatasetEntryRepository for InMemoryDatasetEntryRepository {
             .insert(dataset_entry.id.clone(), dataset_entry.clone());
 
         writable_state
-            .rows_by_name
-            .insert(dataset_entry.name.clone(), dataset_entry.clone());
+            .rows_by_owner_and_name
+            .entry(dataset_entry.owner_id.clone())
+            .and_modify(|entries_by_name| {
+                entries_by_name.insert(dataset_entry.name.clone(), dataset_entry.id.clone());
+            })
+            .or_insert_with(|| {
+                let mut hm = HashMap::new();
+                hm.insert(dataset_entry.name.clone(), dataset_entry.id.clone());
+                hm
+            });
 
         writable_state
             .rows_by_owner
@@ -220,38 +241,28 @@ impl DatasetEntryRepository for InMemoryDatasetEntryRepository {
     ) -> Result<(), UpdateDatasetEntryNameError> {
         let mut writable_state = self.state.write().await;
 
-        let maybe_dataset_entry = writable_state.rows.get(dataset_id);
-
-        let Some(found_dataset_entry) = maybe_dataset_entry else {
+        let Some(found_dataset_entry) = writable_state.rows.get(dataset_id).cloned() else {
             return Err(DatasetEntryNotFoundError::new(dataset_id.clone()).into());
         };
 
-        let has_name_collision_detected = writable_state.rows.values().any(|dataset_entry| {
-            dataset_entry.id != *dataset_id
-                && dataset_entry.owner_id == found_dataset_entry.owner_id
-                && dataset_entry.name == *new_name
-        });
+        let owned_by_name = writable_state
+            .rows_by_owner_and_name
+            .get_mut(&found_dataset_entry.owner_id)
+            .expect("Owner datasets must be present");
 
+        let has_name_collision_detected = {
+            if let Some(existing_id) = owned_by_name.get(new_name) {
+                existing_id != dataset_id
+            } else {
+                false
+            }
+        };
         if has_name_collision_detected {
             return Err(DatasetEntryNameCollisionError::new(new_name.clone()).into());
         }
 
-        // To avoid frustrating the borrow checker, we have to do a second look-up.
-        // Safety: We're already guaranteed that the entry will be present.
-        let old_name = {
-            let found_dataset_entry = writable_state.rows.get_mut(dataset_id).unwrap();
-            let old_name = found_dataset_entry.name.clone();
-            found_dataset_entry.name = new_name.clone();
-            old_name
-        };
-
-        // Mirror the change in named collection
-        let mut entry = writable_state
-            .rows_by_name
-            .remove(&old_name)
-            .expect("named record must be present");
-        entry.name = new_name.clone();
-        writable_state.rows_by_name.insert(new_name.clone(), entry);
+        owned_by_name.remove(&found_dataset_entry.name);
+        owned_by_name.insert(new_name.clone(), found_dataset_entry.id.clone());
 
         Ok(())
     }
@@ -265,12 +276,17 @@ impl DatasetEntryRepository for InMemoryDatasetEntryRepository {
 
             let maybe_removed_entry = writable_state.rows.remove(dataset_id);
             if let Some(removed_entry) = maybe_removed_entry {
-                writable_state.rows_by_name.remove(&removed_entry.name);
                 writable_state
                     .rows_by_owner
                     .get_mut(&removed_entry.owner_id)
                     .unwrap()
                     .remove(&removed_entry.id);
+                if let Some(owned_by_name) = writable_state
+                    .rows_by_owner_and_name
+                    .get_mut(&removed_entry.owner_id)
+                {
+                    owned_by_name.remove(&removed_entry.name);
+                }
             } else {
                 return Err(DatasetEntryNotFoundError::new(dataset_id.clone()).into());
             }

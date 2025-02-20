@@ -280,3 +280,27 @@ impl DatasetVisibility {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn read_dataset_alias(dataset: &dyn Dataset) -> Result<DatasetAlias, InternalError> {
+    let bytes = dataset.as_info_repo().get("alias").await.int_err()?;
+    let alias_str = std::str::from_utf8(&bytes[..]).int_err()?.trim();
+    let alias = DatasetAlias::try_from(alias_str).int_err()?;
+    Ok(alias)
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn write_dataset_alias(
+    dataset: &dyn Dataset,
+    alias: &DatasetAlias,
+) -> Result<(), InternalError> {
+    dataset
+        .as_info_repo()
+        .set("alias", alias.to_string().as_bytes())
+        .await
+        .int_err()?;
+
+    Ok(())
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

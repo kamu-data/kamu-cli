@@ -9,6 +9,8 @@
 
 use std::sync::Arc;
 
+use kamu_datasets::CreateDatasetResult;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Clone)]
@@ -22,10 +24,23 @@ impl ResolvedDataset {
         Self { dataset, handle }
     }
 
-    pub fn from(create_dataset_result: &odf::CreateDatasetResult) -> Self {
+    pub fn from_created(create_dataset_result: &CreateDatasetResult) -> Self {
         Self {
             dataset: create_dataset_result.dataset.clone(),
             handle: create_dataset_result.dataset_handle.clone(),
+        }
+    }
+
+    pub fn from_stored(
+        store_dataset_result: &odf::dataset::StoreDatasetResult,
+        dataset_alias: &odf::DatasetAlias,
+    ) -> Self {
+        Self {
+            dataset: store_dataset_result.dataset.clone(),
+            handle: odf::DatasetHandle::new(
+                store_dataset_result.dataset_id.clone(),
+                dataset_alias.clone(),
+            ),
         }
     }
 

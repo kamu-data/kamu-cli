@@ -13,10 +13,9 @@ use async_graphql::*;
 use chrono::Utc;
 use dill::Component;
 use indoc::indoc;
-use kamu::*;
 use kamu_accounts::DEFAULT_ACCOUNT_NAME;
 use kamu_core::*;
-use kamu_datasets::{CreateDatasetFromSnapshotUseCase, CreateDatasetUseCase};
+use kamu_datasets::{CreateDatasetFromSnapshotUseCase, CreateDatasetResult, CreateDatasetUseCase};
 use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEntryRepository};
 use kamu_datasets_services::{
     CommitDatasetEventUseCaseImpl,
@@ -636,9 +635,12 @@ impl GraphQLMetadataChainHarness {
                 .add::<DependencyGraphServiceImpl>()
                 .add::<InMemoryDatasetDependencyRepository>()
                 .add_value(tenancy_config)
-                .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
-                .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
-                .bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
+                .add_builder(
+                    odf::dataset::DatasetStorageUnitLocalFs::builder().with_root(datasets_dir),
+                )
+                .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
+                .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>(
+                )
                 .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
                 .add::<DatasetEntryServiceImpl>()
                 .add::<InMemoryDatasetEntryRepository>();
@@ -663,7 +665,7 @@ impl GraphQLMetadataChainHarness {
     async fn create_root_dataset(
         &self,
         account_name: Option<odf::AccountName>,
-    ) -> odf::CreateDatasetResult {
+    ) -> CreateDatasetResult {
         let create_dataset_from_snapshot = self
             .catalog_authorized
             .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
@@ -687,7 +689,7 @@ impl GraphQLMetadataChainHarness {
     async fn create_derived_dataset(
         &self,
         account_name: Option<odf::AccountName>,
-    ) -> odf::CreateDatasetResult {
+    ) -> CreateDatasetResult {
         let create_dataset_from_snapshot = self
             .catalog_authorized
             .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
