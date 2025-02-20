@@ -20,9 +20,12 @@ use super::{CLIError, Command};
 use crate::output::*;
 use crate::{accounts, NotInMultiTenantWorkspace};
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub struct ListCommand {
     dataset_registry: Arc<dyn DatasetRegistry>,
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
+    rebac_service: Arc<dyn kamu_auth_rebac::RebacService>,
     current_account: accounts::CurrentAccountIndication,
     related_account: accounts::RelatedAccountIndication,
     output_config: Arc<OutputConfig>,
@@ -34,6 +37,7 @@ impl ListCommand {
     pub fn new(
         dataset_registry: Arc<dyn DatasetRegistry>,
         remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
+        rebac_service: Arc<dyn kamu_auth_rebac::RebacService>,
         current_account: accounts::CurrentAccountIndication,
         related_account: accounts::RelatedAccountIndication,
         output_config: Arc<OutputConfig>,
@@ -43,6 +47,7 @@ impl ListCommand {
         Self {
             dataset_registry,
             remote_alias_reg,
+            rebac_service,
             current_account,
             related_account,
             output_config,
@@ -90,7 +95,7 @@ impl ListCommand {
         })
     }
 
-    fn column_formats(&self, show_owners: bool) -> Vec<ColumnFormat> {
+    fn column_formats(&self, show_owners: bool, show_visibility: bool) -> Vec<ColumnFormat> {
         let mut cols: Vec<ColumnFormat> = Vec::new();
         if self.detail_level > 0 {
             cols.push(ColumnFormat::new().with_style_spec("l")); // id
@@ -99,6 +104,9 @@ impl ListCommand {
             cols.push(ColumnFormat::new().with_style_spec("l")); // owner
         }
         cols.push(ColumnFormat::new().with_style_spec("l")); // name
+        if show_visibility {
+            cols.push(ColumnFormat::new().with_style_spec("l")); // visibility
+        }
         cols.push(ColumnFormat::new().with_style_spec("c")); // kind
         if self.detail_level > 0 {
             cols.push(ColumnFormat::new().with_style_spec("l")); // head
@@ -140,7 +148,11 @@ impl ListCommand {
         cols
     }
 
-    fn schema_fields(&self, show_owners: bool) -> Vec<datafusion::arrow::datatypes::Field> {
+    fn schema_fields(
+        &self,
+        show_owners: bool,
+        show_visibility: bool,
+    ) -> Vec<datafusion::arrow::datatypes::Field> {
         use datafusion::arrow::datatypes::{DataType, Field, TimeUnit};
 
         let mut fields: Vec<Field> = Vec::new();
@@ -153,6 +165,9 @@ impl ListCommand {
             fields.push(Field::new("Owner", DataType::Utf8, false));
         }
         fields.push(Field::new("Name", DataType::Utf8, false));
+        if show_visibility {
+            fields.push(Field::new("Visibility", DataType::Utf8, false));
+        }
         fields.push(Field::new("Kind", DataType::Utf8, false));
         if self.detail_level > 0 {
             fields.push(Field::new("Head", DataType::Utf8, false));
@@ -199,6 +214,15 @@ impl ListCommand {
 
 #[async_trait::async_trait(?Send)]
 impl Command for ListCommand {
+    async fn validate_args(&self) -> Result<(), CLIError> {
+        if self.tenancy_config == TenancyConfig::SingleTenant && self.related_account.is_explicit()
+        {
+            return Err(CLIError::usage_error_from(NotInMultiTenantWorkspace));
+        }
+
+        Ok(())
+    }
+
     async fn run(&mut self) -> Result<(), CLIError> {
         use datafusion::arrow::array::{
             ArrayRef,
@@ -210,20 +234,17 @@ impl Command for ListCommand {
         use datafusion::arrow::record_batch::RecordBatch;
         use odf::dataset::MetadataChainExt;
 
-        let show_owners = if self.tenancy_config == TenancyConfig::MultiTenant {
-            self.current_account.is_explicit() || self.related_account.is_explicit()
-        } else if self.related_account.is_explicit() {
-            return Err(CLIError::usage_error_from(NotInMultiTenantWorkspace));
-        } else {
-            false
-        };
+        let show_owners = self.current_account.is_explicit() || self.related_account.is_explicit();
+        let show_visibility = self.tenancy_config == TenancyConfig::MultiTenant;
 
         // ToDo use Output writer trait
         let records_format = RecordsFormat::new()
             .with_default_column_format(ColumnFormat::default().with_null_value("-"))
-            .with_column_formats(self.column_formats(show_owners));
+            .with_column_formats(self.column_formats(show_owners, show_visibility));
 
-        let schema = Arc::new(Schema::new(self.schema_fields(show_owners)));
+        let schema = Arc::new(Schema::new(
+            self.schema_fields(show_owners, show_visibility),
+        ));
 
         let mut writer = self
             .output_config
@@ -232,6 +253,7 @@ impl Command for ListCommand {
         let mut id: Vec<String> = Vec::new();
         let mut name: Vec<String> = Vec::new();
         let mut owner: Vec<String> = Vec::new();
+        let mut visibility: Vec<String> = Vec::new();
         let mut kind: Vec<String> = Vec::new();
         let mut head: Vec<String> = Vec::new();
         let mut pulled: Vec<Option<i64>> = Vec::new();
@@ -242,6 +264,18 @@ impl Command for ListCommand {
 
         let mut datasets: Vec<_> = self.stream_datasets().try_collect().await?;
         datasets.sort_by(|a, b| a.alias.cmp(&b.alias));
+
+        let maybe_rebac_dataset_properties_map = if show_visibility {
+            let dataset_ids = datasets.iter().map(|h| h.id.clone()).collect::<Vec<_>>();
+            let map = self
+                .rebac_service
+                .get_dataset_properties_by_ids(&dataset_ids)
+                .await
+                .int_err()?;
+            Some(map)
+        } else {
+            None
+        };
 
         for hdl in &datasets {
             let resolved_dataset = self.dataset_registry.get_dataset_by_handle(hdl);
@@ -260,6 +294,17 @@ impl Command for ListCommand {
                     Some(name) => name.as_str(),
                     None => self.current_account.account_name.as_str(),
                 }));
+            }
+
+            if let Some(rebac_dataset_properties_map) = &maybe_rebac_dataset_properties_map {
+                // Safety: The map guarantees the pair presence
+                let dataset_properties = rebac_dataset_properties_map.get(&hdl.id).unwrap();
+                let value = if dataset_properties.allows_public_read {
+                    odf::DatasetVisibility::Public
+                } else {
+                    odf::DatasetVisibility::Private
+                };
+                visibility.push(value.to_string());
             }
 
             kind.push(self.get_kind(hdl, &summary).await?);
@@ -299,6 +344,9 @@ impl Command for ListCommand {
             columns.push(Arc::new(StringArray::from(owner)));
         }
         columns.push(Arc::new(StringArray::from(name)));
+        if show_visibility {
+            columns.push(Arc::new(StringArray::from(visibility)));
+        }
         columns.push(Arc::new(StringArray::from(kind)));
         if self.detail_level > 0 {
             columns.push(Arc::new(StringArray::from(head)));
@@ -325,3 +373,5 @@ impl Command for ListCommand {
         Ok(())
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

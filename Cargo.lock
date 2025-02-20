@@ -6045,6 +6045,7 @@ dependencies = [
  "kamu-adapter-http",
  "kamu-adapter-oauth",
  "kamu-adapter-odata",
+ "kamu-auth-rebac",
  "kamu-auth-rebac-inmem",
  "kamu-auth-rebac-postgres",
  "kamu-auth-rebac-services",

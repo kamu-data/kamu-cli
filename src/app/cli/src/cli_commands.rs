@@ -172,6 +172,7 @@ pub fn get_command(
             Box::new(ListCommand::new(
                 cli_catalog.get_one()?,
                 cli_catalog.get_one()?,
+                cli_catalog.get_one()?,
                 accounts::AccountService::current_account_indication(
                     args.account,
                     tenancy_config,
