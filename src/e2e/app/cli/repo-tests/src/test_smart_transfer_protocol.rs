@@ -64,6 +64,16 @@ pub async fn test_smart_pull_as_mt(kamu_api_server_client: KamuApiServerClient) 
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub async fn test_smart_pull_visibility_public_st(kamu_api_server_client: KamuApiServerClient) {
+    test_smart_pull_visibility_public(kamu_api_server_client, false).await;
+}
+
+pub async fn test_smart_pull_visibility_public_mt(kamu_api_server_client: KamuApiServerClient) {
+    test_smart_pull_visibility_public(kamu_api_server_client, true).await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 test_smart_transfer_protocol_permutations!(test_smart_push_all_smart_pull_all);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -255,6 +265,21 @@ async fn test_smart_push_smart_pull_sequence(
                 Some([r#"1 dataset\(s\) updated"#]),
             )
             .await;
+
+        if is_pull_workspace_multi_tenant {
+            pretty_assertions::assert_eq!(
+                [(
+                    dataset_alias.dataset_name,
+                    Some(odf::DatasetVisibility::Private)
+                )],
+                *kamu_in_pull_workspace
+                    .list_datasets()
+                    .await
+                    .into_iter()
+                    .map(|d| (d.name, d.visibility))
+                    .collect::<Vec<_>>()
+            );
+        }
     }
 }
 
@@ -409,6 +434,21 @@ async fn test_smart_push_force_smart_pull_force(
                 Some([r#"1 dataset\(s\) updated"#]),
             )
             .await;
+
+        if is_pull_workspace_multi_tenant {
+            pretty_assertions::assert_eq!(
+                [(
+                    dataset_alias.dataset_name,
+                    Some(odf::DatasetVisibility::Private)
+                )],
+                *kamu_in_pull_workspace
+                    .list_datasets()
+                    .await
+                    .into_iter()
+                    .map(|d| (d.name, d.visibility))
+                    .collect::<Vec<_>>()
+            );
+        }
     }
 }
 
@@ -580,6 +620,21 @@ async fn test_smart_push_no_alias_smart_pull_no_alias(
             )],
             actual_aliases
         );
+
+        if is_pull_workspace_multi_tenant {
+            pretty_assertions::assert_eq!(
+                [(
+                    dataset_alias.dataset_name,
+                    Some(odf::DatasetVisibility::Private)
+                )],
+                *kamu_in_pull_workspace
+                    .list_datasets()
+                    .await
+                    .into_iter()
+                    .map(|d| (d.name, d.visibility))
+                    .collect::<Vec<_>>()
+            );
+        }
     }
 }
 
@@ -623,14 +678,93 @@ async fn test_smart_pull_as(
             )
             .await;
 
-        let expected_dataset_list = kamu_in_pull_workspace
-            .list_datasets()
-            .await
-            .into_iter()
-            .map(|dataset| dataset.name)
-            .collect::<Vec<_>>();
+        if is_pull_workspace_multi_tenant {
+            pretty_assertions::assert_eq!(
+                [(new_dataset_name, Some(odf::DatasetVisibility::Private))],
+                *kamu_in_pull_workspace
+                    .list_datasets()
+                    .await
+                    .into_iter()
+                    .map(|d| (d.name, d.visibility))
+                    .collect::<Vec<_>>()
+            );
+        } else {
+            pretty_assertions::assert_eq!(
+                [new_dataset_name],
+                *kamu_in_pull_workspace
+                    .list_datasets()
+                    .await
+                    .into_iter()
+                    .map(|d| d.name)
+                    .collect::<Vec<_>>()
+            );
+        }
+    }
+}
 
-        pretty_assertions::assert_eq!(vec![new_dataset_name], expected_dataset_list);
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+async fn test_smart_pull_visibility_public(
+    mut kamu_api_server_client: KamuApiServerClient,
+    is_pull_workspace_multi_tenant: bool,
+) {
+    let dataset_alias = odf::DatasetAlias::new(
+        Some(E2E_USER_ACCOUNT_NAME.clone()),
+        DATASET_ROOT_PLAYER_NAME.clone(),
+    );
+    let kamu_api_server_dataset_endpoint = kamu_api_server_client
+        .dataset()
+        .get_odf_endpoint(&dataset_alias);
+
+    // 1. Grub a token
+    kamu_api_server_client.auth().login_as_e2e_user().await;
+
+    kamu_api_server_client
+        .dataset()
+        .create_player_scores_dataset_with_data()
+        .await;
+
+    {
+        let kamu_in_pull_workspace =
+            KamuCliPuppet::new_workspace_tmp(is_pull_workspace_multi_tenant).await;
+
+        kamu_in_pull_workspace
+            .assert_success_command_execution(
+                [
+                    "pull",
+                    kamu_api_server_dataset_endpoint.as_str(),
+                    "--visibility",
+                    "public",
+                ],
+                None,
+                Some([r#"1 dataset\(s\) updated"#]),
+            )
+            .await;
+
+        if is_pull_workspace_multi_tenant {
+            pretty_assertions::assert_eq!(
+                [(
+                    dataset_alias.dataset_name,
+                    Some(odf::DatasetVisibility::Public)
+                )],
+                *kamu_in_pull_workspace
+                    .list_datasets()
+                    .await
+                    .into_iter()
+                    .map(|d| (d.name, d.visibility))
+                    .collect::<Vec<_>>()
+            );
+        } else {
+            pretty_assertions::assert_eq!(
+                [dataset_alias.dataset_name],
+                *kamu_in_pull_workspace
+                    .list_datasets()
+                    .await
+                    .into_iter()
+                    .map(|d| d.name)
+                    .collect::<Vec<_>>()
+            );
+        }
     }
 }
 
@@ -912,18 +1046,39 @@ async fn test_smart_push_all_smart_pull_all(
 
         kamu_in_pull_workspace
             .assert_last_data_slice(
-                &odf::DatasetAlias::new(None, root_dataset_alias.dataset_name),
+                &odf::DatasetAlias::new(None, root_dataset_alias.dataset_name.clone()),
                 expected_schema,
                 expected_data,
             )
             .await;
         kamu_in_pull_workspace
             .assert_last_data_slice(
-                &odf::DatasetAlias::new(None, derivative_dataset_alias.dataset_name),
+                &odf::DatasetAlias::new(None, derivative_dataset_alias.dataset_name.clone()),
                 expected_derivative_schema,
                 expected_derivative_data,
             )
             .await;
+
+        if is_pull_workspace_multi_tenant {
+            pretty_assertions::assert_eq!(
+                [
+                    (
+                        derivative_dataset_alias.dataset_name,
+                        Some(odf::DatasetVisibility::Private)
+                    ),
+                    (
+                        root_dataset_alias.dataset_name,
+                        Some(odf::DatasetVisibility::Private)
+                    )
+                ],
+                *kamu_in_pull_workspace
+                    .list_datasets()
+                    .await
+                    .into_iter()
+                    .map(|d| (d.name, d.visibility))
+                    .collect::<Vec<_>>()
+            );
+        }
     }
 }
 
@@ -1172,18 +1327,39 @@ async fn test_smart_push_recursive_smart_pull_recursive(
 
         kamu_in_pull_workspace
             .assert_last_data_slice(
-                &odf::DatasetAlias::new(None, root_dataset_alias.dataset_name),
+                &odf::DatasetAlias::new(None, root_dataset_alias.dataset_name.clone()),
                 expected_schema,
                 expected_data,
             )
             .await;
         kamu_in_pull_workspace
             .assert_last_data_slice(
-                &odf::DatasetAlias::new(None, derivative_dataset_alias.dataset_name),
+                &odf::DatasetAlias::new(None, derivative_dataset_alias.dataset_name.clone()),
                 expected_derivative_schema,
                 expected_derivative_data,
             )
             .await;
+
+        if is_pull_workspace_multi_tenant {
+            pretty_assertions::assert_eq!(
+                [
+                    (
+                        derivative_dataset_alias.dataset_name,
+                        Some(odf::DatasetVisibility::Private)
+                    ),
+                    (
+                        root_dataset_alias.dataset_name,
+                        Some(odf::DatasetVisibility::Private)
+                    )
+                ],
+                *kamu_in_pull_workspace
+                    .list_datasets()
+                    .await
+                    .into_iter()
+                    .map(|d| (d.name, d.visibility))
+                    .collect::<Vec<_>>()
+            );
+        }
     }
 }
 
@@ -1334,6 +1510,21 @@ async fn test_simple_push_to_s3_smart_pull(
         );
         kamu.assert_last_data_slice(&dataset_alias, expected_schema, expected_data)
             .await;
+
+        if is_pull_workspace_multi_tenant {
+            pretty_assertions::assert_eq!(
+                [(
+                    dataset_alias.dataset_name,
+                    Some(odf::DatasetVisibility::Private)
+                ),],
+                *kamu_in_pull_workspace
+                    .list_datasets()
+                    .await
+                    .into_iter()
+                    .map(|d| (d.name, d.visibility))
+                    .collect::<Vec<_>>()
+            );
+        }
     }
 }
 
@@ -1440,6 +1631,21 @@ async fn test_smart_push_pull_with_registered_repo_smart_pull(
                 Some([r#"1 dataset\(s\) updated"#]),
             )
             .await;
+
+        if is_pull_workspace_multi_tenant {
+            pretty_assertions::assert_eq!(
+                [(
+                    dataset_alias.dataset_name,
+                    Some(odf::DatasetVisibility::Private)
+                ),],
+                *kamu_in_pull_workspace
+                    .list_datasets()
+                    .await
+                    .into_iter()
+                    .map(|d| (d.name, d.visibility))
+                    .collect::<Vec<_>>()
+            );
+        }
     }
 }
 
