@@ -11,6 +11,10 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## Unreleased
+### Added
+- Added prometheus metrics for AWS SDK S3 calls
+
 ## [0.225.0] - 2025-02-20
 ### Added
 - Added [common-macros](src/utils/common-macros) crate containing macros of general use
