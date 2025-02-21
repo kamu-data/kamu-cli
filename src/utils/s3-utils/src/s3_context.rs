@@ -18,7 +18,8 @@ use aws_sdk_s3::operation::delete_object::{DeleteObjectError, DeleteObjectOutput
 use aws_sdk_s3::operation::get_object::{GetObjectError, GetObjectOutput};
 use aws_sdk_s3::operation::head_object::{HeadObjectError, HeadObjectOutput};
 use aws_sdk_s3::operation::put_object::{PutObjectError, PutObjectOutput};
-use aws_sdk_s3::types::{CommonPrefix, Delete, ObjectIdentifier};
+use aws_sdk_s3::presigning::{PresignedRequest, PresigningConfig};
+use aws_sdk_s3::types::{CommonPrefix, Delete, ObjectCannedAcl, ObjectIdentifier};
 use aws_sdk_s3::Client;
 use internal_error::{InternalError, ResultIntoInternal, *};
 use url::Url;
@@ -38,11 +39,6 @@ pub struct S3Context {
 
 impl S3Context {
     const MAX_LISTED_OBJECTS: i32 = 1000;
-
-    #[inline]
-    pub fn client(&self) -> &Client {
-        &self.client
-    }
 
     #[inline]
     pub fn endpoint(&self) -> Option<&str> {
@@ -216,6 +212,19 @@ impl S3Context {
             .await
     }
 
+    pub async fn get_object_presigned_request(
+        &self,
+        key: impl Into<String>,
+        options: GetObjectOptions,
+    ) -> Result<PresignedRequest, SdkError<GetObjectError>> {
+        self.client
+            .get_object()
+            .bucket(self.bucket.as_ref())
+            .key(key)
+            .presigned(options.presigned_config)
+            .await
+    }
+
     pub async fn put_object(
         &self,
         key: String,
@@ -231,6 +240,20 @@ impl S3Context {
             .body(Vec::from(data).into())
             .content_length(size)
             .send()
+            .await
+    }
+
+    pub async fn put_object_presigned_request(
+        &self,
+        key: impl Into<String>,
+        options: PutObjectOptions,
+    ) -> Result<PresignedRequest, SdkError<PutObjectError>> {
+        self.client
+            .put_object()
+            .bucket(self.bucket.as_ref())
+            .key(key)
+            .set_acl(options.acl)
+            .presigned(options.presigned_config)
             .await
     }
 
@@ -417,6 +440,21 @@ impl S3Context {
 
         Ok(())
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(bon::Builder)]
+pub struct GetObjectOptions {
+    presigned_config: PresigningConfig,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(bon::Builder)]
+pub struct PutObjectOptions {
+    presigned_config: PresigningConfig,
+    acl: Option<ObjectCannedAcl>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
