@@ -28,10 +28,15 @@ use crate::S3Metrics;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-struct S3ContextState {
+struct S3ContextSharedState {
     endpoint: Option<String>,
     bucket: String,
     sdk_config: SdkConfig,
+}
+
+struct S3ContextState {
+    key_prefix: String,
+    url: Url,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -39,10 +44,9 @@ struct S3ContextState {
 #[derive(Clone)]
 pub struct S3Context {
     client: Client,
+    shared_state: Arc<S3ContextSharedState>,
     state: Arc<S3ContextState>,
     // Out of state, since it can change
-    key_prefix: Arc<String>,
-    url: Arc<Url>,
     maybe_metrics: Option<Arc<S3Metrics>>,
 }
 
@@ -66,22 +70,22 @@ impl S3Context {
 
     #[inline]
     pub fn endpoint(&self) -> Option<&str> {
-        self.state.endpoint.as_deref()
+        self.shared_state.endpoint.as_deref()
     }
 
     #[inline]
     pub fn bucket(&self) -> &str {
-        &self.state.bucket
+        &self.shared_state.bucket
     }
 
     #[inline]
     pub fn key_prefix(&self) -> &str {
-        &self.key_prefix
+        &self.state.key_prefix
     }
 
     #[inline]
     pub fn url(&self) -> &Url {
-        &self.url
+        &self.state.url
     }
 
     pub fn new(
@@ -99,13 +103,12 @@ impl S3Context {
 
         Self {
             client,
-            state: Arc::new(S3ContextState {
+            shared_state: Arc::new(S3ContextSharedState {
                 endpoint,
                 bucket,
                 sdk_config,
             }),
-            key_prefix: Arc::new(key_prefix),
-            url: Arc::new(url),
+            state: Arc::new(S3ContextState { key_prefix, url }),
             maybe_metrics: None,
         }
     }
@@ -123,12 +126,14 @@ impl S3Context {
             key_prefix.push('/');
         }
 
-        self.url = Arc::new(Self::make_url(
-            self.state.endpoint.as_deref(),
-            &self.state.bucket,
-            &key_prefix,
-        ));
-        self.key_prefix = Arc::new(key_prefix);
+        self.state = Arc::new(S3ContextState {
+            url: Self::make_url(
+                self.shared_state.endpoint.as_deref(),
+                &self.shared_state.bucket,
+                &key_prefix,
+            ),
+            key_prefix,
+        });
         self
     }
 
@@ -138,7 +143,7 @@ impl S3Context {
     }
 
     pub fn credentials_provider(&self) -> Option<SharedCredentialsProvider> {
-        self.state.sdk_config.credentials_provider()
+        self.shared_state.sdk_config.credentials_provider()
     }
 
     async fn from_items(endpoint: Option<String>, bucket: String, key_prefix: String) -> Self {
@@ -219,10 +224,10 @@ impl S3Context {
     }
 
     pub fn get_key(&self, sub_key: &str) -> String {
-        if self.key_prefix.is_empty() {
+        if self.state.key_prefix.is_empty() {
             sub_key.to_string()
         } else {
-            format!("{}{}", self.key_prefix, sub_key)
+            format!("{}{}", self.state.key_prefix, sub_key)
         }
     }
 
@@ -237,7 +242,7 @@ impl S3Context {
             let api_call_result = f().await;
             let elapsed = start.elapsed();
 
-            let metric_labels = [self.url.as_str(), sdk_method];
+            let metric_labels = [self.state.url.as_str(), sdk_method];
 
             metrics
                 .s3_api_request_time_s_hist
@@ -265,7 +270,7 @@ impl S3Context {
         self.api_call("head_object", || async {
             self.client
                 .head_object()
-                .bucket(self.state.bucket.clone())
+                .bucket(self.shared_state.bucket.clone())
                 .key(key)
                 .send()
                 .await
@@ -280,7 +285,7 @@ impl S3Context {
         self.api_call("get_object", || async {
             self.client
                 .get_object()
-                .bucket(self.state.bucket.clone())
+                .bucket(self.shared_state.bucket.clone())
                 .key(key)
                 .send()
                 .await
@@ -296,7 +301,7 @@ impl S3Context {
         self.api_call("get_object(presigned)", || async {
             self.client
                 .get_object()
-                .bucket(self.state.bucket.clone())
+                .bucket(self.shared_state.bucket.clone())
                 .key(key)
                 .presigned(options.presigned_config)
                 .await
@@ -314,7 +319,7 @@ impl S3Context {
 
             self.client
                 .put_object()
-                .bucket(self.state.bucket.clone())
+                .bucket(self.shared_state.bucket.clone())
                 .key(key)
                 // TODO: PERF: Avoid copying data into a buffer
                 .body(Vec::from(data).into())
@@ -333,7 +338,7 @@ impl S3Context {
         self.api_call("put_object(presigned)", || async {
             self.client
                 .put_object()
-                .bucket(self.state.bucket.clone())
+                .bucket(self.shared_state.bucket.clone())
                 .key(key)
                 .set_acl(options.acl)
                 .presigned(options.presigned_config)
@@ -359,7 +364,7 @@ impl S3Context {
 
             self.client
                 .put_object()
-                .bucket(self.state.bucket.clone())
+                .bucket(self.shared_state.bucket.clone())
                 .key(key)
                 .body(byte_stream)
                 .content_length(i64::try_from(size).unwrap())
@@ -376,7 +381,7 @@ impl S3Context {
         self.api_call("delete_object", || async {
             self.client
                 .delete_object()
-                .bucket(self.state.bucket.clone())
+                .bucket(self.shared_state.bucket.clone())
                 .key(key)
                 .send()
                 .await
@@ -389,7 +394,7 @@ impl S3Context {
             let listing = self
                 .client
                 .list_objects_v2()
-                .bucket(self.state.bucket.clone())
+                .bucket(self.shared_state.bucket.clone())
                 .prefix(self.get_key(key_prefix))
                 .max_keys(1)
                 .send()
@@ -408,7 +413,7 @@ impl S3Context {
             let list_objects_resp = self
                 .client
                 .list_objects_v2()
-                .bucket(self.state.bucket.clone())
+                .bucket(self.shared_state.bucket.clone())
                 .delimiter("/")
                 .send()
                 .await
@@ -433,7 +438,7 @@ impl S3Context {
                 .api_call("list_objects_v2(recursive_delete)", || async {
                     self.client
                         .list_objects_v2()
-                        .bucket(self.state.bucket.clone())
+                        .bucket(self.shared_state.bucket.clone())
                         .prefix(&key_prefix)
                         .max_keys(Self::MAX_LISTED_OBJECTS)
                         .send()
@@ -459,7 +464,7 @@ impl S3Context {
                 self.api_call("delete_objects(recursive_delete)", || async {
                     self.client
                         .delete_objects()
-                        .bucket(self.state.bucket.clone())
+                        .bucket(self.shared_state.bucket.clone())
                         .delete(delete_request)
                         .send()
                         .await
@@ -486,7 +491,7 @@ impl S3Context {
                 .api_call("list_objects_v2(recursive_move)", || async {
                     self.client
                         .list_objects_v2()
-                        .bucket(self.state.bucket.clone())
+                        .bucket(self.shared_state.bucket.clone())
                         .prefix(&old_key_prefix)
                         .max_keys(Self::MAX_LISTED_OBJECTS)
                         .send()
@@ -504,7 +509,7 @@ impl S3Context {
             if let Some(contents) = list_response.contents {
                 for obj in &contents {
                     let copy_source =
-                        format!("{}/{}", self.state.bucket, obj.key.as_ref().unwrap());
+                        format!("{}/{}", self.shared_state.bucket, obj.key.as_ref().unwrap());
                     let new_key = obj
                         .key
                         .as_ref()
@@ -514,7 +519,7 @@ impl S3Context {
                     self.api_call("copy_object(recursive_move)", || async {
                         self.client
                             .copy_object()
-                            .bucket(self.state.bucket.clone())
+                            .bucket(self.shared_state.bucket.clone())
                             .copy_source(copy_source)
                             .key(new_key)
                             .send()
@@ -538,7 +543,7 @@ impl S3Context {
                 self.api_call("delete_objects(recursive_move)", || async {
                     self.client
                         .delete_objects()
-                        .bucket(self.state.bucket.clone())
+                        .bucket(self.shared_state.bucket.clone())
                         .delete(delete_request)
                         .send()
                         .await
