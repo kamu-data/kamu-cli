@@ -26,13 +26,20 @@ use url::Url;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+struct S3ContextState {
+    endpoint: Option<String>,
+    bucket: String,
+    sdk_config: SdkConfig,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Clone)]
 pub struct S3Context {
     client: Client,
-    endpoint: Option<Arc<str>>,
-    bucket: Arc<str>,
-    key_prefix: Arc<str>,
-    sdk_config: Arc<SdkConfig>,
+    state: Arc<S3ContextState>,
+    // Out of state, since it can change
+    key_prefix: Arc<String>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -42,12 +49,12 @@ impl S3Context {
 
     #[inline]
     pub fn endpoint(&self) -> Option<&str> {
-        self.endpoint.as_deref()
+        self.state.endpoint.as_deref()
     }
 
     #[inline]
     pub fn bucket(&self) -> &str {
-        &self.bucket
+        &self.state.bucket
     }
 
     #[inline]
@@ -57,17 +64,19 @@ impl S3Context {
 
     pub fn new(
         client: Client,
-        endpoint: Option<impl AsRef<str>>,
-        bucket: impl AsRef<str>,
-        key_prefix: impl AsRef<str>,
-        sdk_config: Arc<SdkConfig>,
+        endpoint: Option<impl Into<String>>,
+        bucket: impl Into<String>,
+        key_prefix: impl Into<String>,
+        sdk_config: SdkConfig,
     ) -> Self {
         Self {
             client,
-            endpoint: endpoint.map(|s| s.as_ref().into()),
-            bucket: bucket.as_ref().into(),
-            key_prefix: key_prefix.as_ref().into(),
-            sdk_config,
+            state: Arc::new(S3ContextState {
+                endpoint: endpoint.map(Into::into),
+                bucket: bucket.into(),
+                sdk_config,
+            }),
+            key_prefix: Arc::new(key_prefix.into()),
         }
     }
 
@@ -83,12 +92,12 @@ impl S3Context {
         if !key_prefix.ends_with('/') {
             key_prefix.push('/');
         }
-        self.key_prefix = key_prefix.into();
+        self.key_prefix = Arc::new(key_prefix);
         self
     }
 
     pub fn credentials_provider(&self) -> Option<SharedCredentialsProvider> {
-        self.sdk_config.credentials_provider()
+        self.state.sdk_config.credentials_provider()
     }
 
     #[tracing::instrument(level = "info", name = "init_s3_context")]
@@ -115,7 +124,7 @@ impl S3Context {
         // TODO: PERF: Client construction is expensive and should only be done once
         let client = Client::from_conf(s3_config);
 
-        Self::new(client, endpoint, bucket, key_prefix, Arc::new(sdk_config))
+        Self::new(client, endpoint, bucket, key_prefix, sdk_config)
     }
 
     pub async fn from_url(url: &Url) -> Self {
@@ -165,12 +174,12 @@ impl S3Context {
     }
 
     pub fn make_url(&self) -> Url {
-        let context_url_str = match &self.endpoint {
+        let context_url_str = match &self.state.endpoint {
             Some(endpoint) => {
-                format!("s3+{}/{}/{}", endpoint, self.bucket, self.key_prefix)
+                format!("s3+{}/{}/{}", endpoint, self.state.bucket, self.key_prefix)
             }
             None => {
-                format!("s3://{}/{}", self.bucket, self.key_prefix)
+                format!("s3://{}/{}", self.state.bucket, self.key_prefix)
             }
         };
         Url::parse(context_url_str.as_str()).unwrap()
@@ -182,7 +191,7 @@ impl S3Context {
 
     pub fn get_key(&self, sub_key: &str) -> String {
         if self.key_prefix.is_empty() {
-            String::from(sub_key)
+            sub_key.to_string()
         } else {
             format!("{}{}", self.key_prefix, sub_key)
         }
@@ -194,7 +203,7 @@ impl S3Context {
     ) -> Result<HeadObjectOutput, SdkError<HeadObjectError>> {
         self.client
             .head_object()
-            .bucket(self.bucket.as_ref())
+            .bucket(self.state.bucket.clone())
             .key(key)
             .send()
             .await
@@ -206,7 +215,7 @@ impl S3Context {
     ) -> Result<GetObjectOutput, SdkError<GetObjectError>> {
         self.client
             .get_object()
-            .bucket(self.bucket.as_ref())
+            .bucket(self.state.bucket.clone())
             .key(key)
             .send()
             .await
@@ -219,7 +228,7 @@ impl S3Context {
     ) -> Result<PresignedRequest, SdkError<GetObjectError>> {
         self.client
             .get_object()
-            .bucket(self.bucket.as_ref())
+            .bucket(self.state.bucket.clone())
             .key(key)
             .presigned(options.presigned_config)
             .await
@@ -234,7 +243,7 @@ impl S3Context {
 
         self.client
             .put_object()
-            .bucket(self.bucket.as_ref())
+            .bucket(self.state.bucket.clone())
             .key(key)
             // TODO: PERF: Avoid copying data into a buffer
             .body(Vec::from(data).into())
@@ -250,7 +259,7 @@ impl S3Context {
     ) -> Result<PresignedRequest, SdkError<PutObjectError>> {
         self.client
             .put_object()
-            .bucket(self.bucket.as_ref())
+            .bucket(self.state.bucket.clone())
             .key(key)
             .set_acl(options.acl)
             .presigned(options.presigned_config)
@@ -273,7 +282,7 @@ impl S3Context {
 
         self.client
             .put_object()
-            .bucket(self.bucket.as_ref())
+            .bucket(self.state.bucket.clone())
             .key(key)
             .body(byte_stream)
             .content_length(i64::try_from(size).unwrap())
@@ -287,7 +296,7 @@ impl S3Context {
     ) -> Result<DeleteObjectOutput, SdkError<DeleteObjectError>> {
         self.client
             .delete_object()
-            .bucket(self.bucket.as_ref())
+            .bucket(self.state.bucket.clone())
             .key(key)
             .send()
             .await
@@ -297,7 +306,7 @@ impl S3Context {
         let listing = self
             .client
             .list_objects_v2()
-            .bucket(self.bucket.as_ref())
+            .bucket(self.state.bucket.clone())
             .prefix(self.get_key(key_prefix))
             .max_keys(1)
             .send()
@@ -313,7 +322,7 @@ impl S3Context {
         let list_objects_resp = self
             .client
             .list_objects_v2()
-            .bucket(self.bucket.as_ref())
+            .bucket(self.state.bucket.clone())
             .delimiter("/")
             .send()
             .await
@@ -335,7 +344,7 @@ impl S3Context {
             let list_response = self
                 .client
                 .list_objects_v2()
-                .bucket(self.bucket.as_ref())
+                .bucket(self.state.bucket.clone())
                 .prefix(&key_prefix)
                 .max_keys(Self::MAX_LISTED_OBJECTS)
                 .send()
@@ -352,7 +361,7 @@ impl S3Context {
                 has_next_page = list_response.is_truncated.unwrap_or_default();
                 self.client
                     .delete_objects()
-                    .bucket(self.bucket.as_ref())
+                    .bucket(self.state.bucket.clone())
                     .delete(
                         Delete::builder()
                             .set_objects(Some(object_identifiers))
@@ -382,7 +391,7 @@ impl S3Context {
             let list_response = self
                 .client
                 .list_objects_v2()
-                .bucket(self.bucket.as_ref())
+                .bucket(self.state.bucket.clone())
                 .prefix(&old_key_prefix)
                 .max_keys(Self::MAX_LISTED_OBJECTS)
                 .send()
@@ -398,15 +407,15 @@ impl S3Context {
             if let Some(contents) = list_response.contents {
                 for obj in &contents {
                     let copy_source =
-                        format!("{}/{}", self.bucket.clone(), obj.key.clone().unwrap());
+                        format!("{}/{}", self.state.bucket, obj.key.as_ref().unwrap());
                     let new_key = obj
                         .key
-                        .clone()
+                        .as_ref()
                         .unwrap()
                         .replace(old_key_prefix.as_str(), new_key_prefix.as_str());
                     self.client
                         .copy_object()
-                        .bucket(self.bucket.as_ref())
+                        .bucket(self.state.bucket.clone())
                         .copy_source(copy_source)
                         .key(new_key)
                         .send()
@@ -422,7 +431,7 @@ impl S3Context {
 
                 self.client
                     .delete_objects()
-                    .bucket(self.bucket.as_ref())
+                    .bucket(self.state.bucket.clone())
                     .delete(
                         Delete::builder()
                             .set_objects(Some(object_identifiers))
