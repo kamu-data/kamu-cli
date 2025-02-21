@@ -44,6 +44,7 @@ pub struct S3Context {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[common_macros::method_names_consts]
 impl S3Context {
     const MAX_LISTED_OBJECTS: i32 = 1000;
 
@@ -100,7 +101,6 @@ impl S3Context {
         self.state.sdk_config.credentials_provider()
     }
 
-    #[tracing::instrument(level = "info", name = "init_s3_context")]
     async fn from_items(endpoint: Option<String>, bucket: String, key_prefix: String) -> Self {
         // Note: Falling back to `unspecified` region as SDK errors out when the region
         // not set even if using custom endpoint
@@ -127,6 +127,7 @@ impl S3Context {
         Self::new(client, endpoint, bucket, key_prefix, sdk_config)
     }
 
+    #[tracing::instrument(level = "info", name = S3Context_from_url)]
     pub async fn from_url(url: &Url) -> Self {
         let (endpoint, bucket, key_prefix) = Self::split_url(url);
 
