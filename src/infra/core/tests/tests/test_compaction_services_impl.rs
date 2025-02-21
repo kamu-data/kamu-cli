@@ -1158,8 +1158,7 @@ impl CompactTestHarness {
     async fn new_s3(s3: &LocalS3Server) -> Self {
         let temp_dir = tempfile::tempdir().unwrap();
         let run_info_dir = Arc::new(RunInfoDir::new(temp_dir.path().join("run")));
-        let (endpoint, bucket, key_prefix) = S3Context::split_url(&s3.url);
-        let s3_context = S3Context::from_items(endpoint.clone(), bucket, key_prefix).await;
+        let s3_context = S3Context::from_url(&s3.url).await;
         let current_date_time = Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap();
 
         let catalog = dill::CatalogBuilder::new()

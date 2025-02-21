@@ -41,6 +41,7 @@ impl ObjectStoreBuilderS3 {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[common_macros::method_names_consts]
 impl ObjectStoreBuilder for ObjectStoreBuilderS3 {
     fn object_store_url(&self) -> Url {
         // TODO: This URL does not account for endpoint and it will collide in case we
@@ -48,7 +49,7 @@ impl ObjectStoreBuilder for ObjectStoreBuilderS3 {
         Url::parse(format!("s3://{}/", self.s3_context.bucket()).as_str()).unwrap()
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
+    #[tracing::instrument(level = "info", name = ObjectStoreBuilderS3_build_object_store, skip_all)]
     fn build_object_store(&self) -> Result<Arc<dyn object_store::ObjectStore>, InternalError> {
         tracing::info!(
             endpoint = self.s3_context.endpoint(),

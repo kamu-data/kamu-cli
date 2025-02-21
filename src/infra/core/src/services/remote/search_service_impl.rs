@@ -12,19 +12,28 @@ use std::sync::Arc;
 use dill::*;
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_core::*;
-use s3_utils::S3Context;
+use s3_utils::{S3Context, S3Metrics};
 use serde_json::json;
 use url::Url;
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub struct SearchServiceImpl {
     remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
+    maybe_s3_metrics: Option<Arc<S3Metrics>>,
 }
 
 #[component(pub)]
 #[interface(dyn SearchService)]
 impl SearchServiceImpl {
-    pub fn new(remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>) -> Self {
-        Self { remote_repo_reg }
+    pub fn new(
+        remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
+        maybe_s3_metrics: Option<Arc<S3Metrics>>,
+    ) -> Self {
+        Self {
+            remote_repo_reg,
+            maybe_s3_metrics,
+        }
     }
 
     fn search_in_repo_localfs(
@@ -70,7 +79,11 @@ impl SearchServiceImpl {
     ) -> Result<Vec<SearchResultDataset>, SearchError> {
         let mut datasets = Vec::new();
 
-        let s3_context = S3Context::from_url(url).await;
+        let mut s3_context = S3Context::from_url(url).await;
+        if let Some(metrics) = &self.maybe_s3_metrics {
+            s3_context = s3_context.with_metrics(metrics.clone());
+        }
+
         let folders_common_prefixes = s3_context.bucket_list_folders().await?;
 
         let query = query.unwrap_or_default();
@@ -294,3 +307,5 @@ enum DatasetKindDef {
     Root,
     Derivative,
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

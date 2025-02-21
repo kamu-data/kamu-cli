@@ -145,8 +145,7 @@ async fn create_catalog_with_s3_workspace(
     s3: &LocalS3Server,
     dataset_action_authorizer: MockDatasetActionAuthorizer,
 ) -> dill::Catalog {
-    let (endpoint, bucket, key_prefix) = S3Context::split_url(&s3.url);
-    let s3_context = S3Context::from_items(endpoint.clone(), bucket, key_prefix).await;
+    let s3_context = S3Context::from_url(&s3.url).await;
 
     dill::CatalogBuilder::new()
         .add::<DidGeneratorDefault>()

@@ -29,7 +29,6 @@ kamu-cli-e2e-common-macros = { workspace = true }
 kamu-cli-puppet = { workspace = true, default-features = false, features = [
     "extensions",
 ] }
-kamu-core = { workspace = true }
 kamu-flow-system = { workspace = true }
 odf = { workspace = true }
 

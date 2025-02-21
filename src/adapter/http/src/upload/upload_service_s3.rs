@@ -16,7 +16,7 @@ use bytes::Bytes;
 use dill::*;
 use internal_error::ErrorIntoInternal;
 use kamu_core::MediaType;
-use s3_utils::S3Context;
+use s3_utils::{PutObjectOptions, S3Context};
 use tokio::io::AsyncRead;
 use uuid::Uuid;
 
@@ -74,19 +74,20 @@ impl UploadService for UploadServiceS3 {
         let upload_id = Uuid::new_v4().simple().to_string();
         let file_key = self.make_file_key(owner_account_id, &upload_id, &file_name);
 
-        let presigned_conf = PresigningConfig::builder()
+        let presigned_config = PresigningConfig::builder()
             .expires_in(chrono::Duration::seconds(3600).to_std().unwrap())
             .build()
             .expect("Invalid presigning config");
 
         let presigned_request = self
             .s3_upload_context
-            .client()
-            .put_object()
-            .acl(ObjectCannedAcl::Private)
-            .bucket(self.s3_upload_context.bucket())
-            .key(file_key.clone())
-            .presigned(presigned_conf)
+            .put_object_presigned_request(
+                file_key,
+                PutObjectOptions::builder()
+                    .acl(ObjectCannedAcl::Private)
+                    .presigned_config(presigned_config)
+                    .build(),
+            )
             .await
             .map_err(ErrorIntoInternal::int_err)?;
 

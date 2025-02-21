@@ -8,5 +8,7 @@
 // by the Apache License, Version 2.0.
 
 mod s3_context;
+mod s3_metrics;
 
 pub use s3_context::*;
+pub use s3_metrics::*;

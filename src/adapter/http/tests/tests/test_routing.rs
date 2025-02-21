@@ -158,7 +158,7 @@ async fn setup_client(dataset_url: url::Url, head_expected: odf::Multihash) {
         .build();
 
     use odf::dataset::DatasetFactory as _;
-    let dataset = DatasetFactoryImpl::new(IpfsGateway::default(), catalog.get_one().unwrap())
+    let dataset = DatasetFactoryImpl::new(IpfsGateway::default(), catalog.get_one().unwrap(), None)
         .get_dataset(&dataset_url, false)
         .await
         .unwrap();
