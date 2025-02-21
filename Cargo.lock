@@ -6133,7 +6133,6 @@ dependencies = [
  "kamu-adapter-http",
  "kamu-cli-e2e-common-macros",
  "kamu-cli-puppet",
- "kamu-core",
  "kamu-flow-system",
  "lazy_static",
  "opendatafabric",

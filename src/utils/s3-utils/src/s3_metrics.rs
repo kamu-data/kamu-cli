@@ -16,13 +16,13 @@ use observability::metrics::MetricsProvider;
 pub struct S3Metrics {
     pub s3_api_call_count_successful_num_total: prometheus::IntCounterVec,
     pub s3_api_call_count_failed_num_total: prometheus::IntCounterVec,
+    pub s3_api_request_time_s_hist: prometheus::HistogramVec,
 }
 
 #[component(pub)]
 #[interface(dyn MetricsProvider)]
 #[scope(Singleton)]
 impl S3Metrics {
-    // TODO: kamu-cli#855: metric name prefix (application name)
     pub fn new(application: &str) -> Self {
         use prometheus::*;
 
@@ -43,6 +43,15 @@ impl S3Metrics {
                 &["storage_url", "sdk_method"],
             )
             .unwrap(),
+            s3_api_request_time_s_hist: HistogramVec::new(
+                HistogramOpts::new(
+                    format!("{application}_s3_api_request_time_s_hist"),
+                    "Histogram of AWS SDK S3 API request latencies (in seconds) by storage URL \
+                     and SDK method",
+                ),
+                &["storage_url", "sdk_method"],
+            )
+            .unwrap(),
         }
     }
 }
@@ -53,6 +62,7 @@ impl MetricsProvider for S3Metrics {
             self.s3_api_call_count_successful_num_total.clone(),
         ))?;
         reg.register(Box::new(self.s3_api_call_count_failed_num_total.clone()))?;
+        reg.register(Box::new(self.s3_api_request_time_s_hist.clone()))?;
 
         Ok(())
     }

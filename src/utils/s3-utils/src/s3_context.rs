@@ -212,22 +212,32 @@ impl S3Context {
         F: FnOnce() -> FFut,
         FFut: std::future::Future<Output = Result<R, E>>,
     {
-        let api_call_result = f().await;
-
         if let Some(metrics) = &self.maybe_metrics {
-            let api_call_metric = if api_call_result.is_ok() {
+            // A call with metrics fixation
+            let start = std::time::Instant::now();
+            let api_call_result = f().await;
+            let elapsed = start.elapsed();
+
+            // TODO: kamu-cli#855: storage
+            let metric_labels = ["TODO_STORAGE_URL", sdk_method];
+
+            metrics
+                .s3_api_request_time_s_hist
+                .with_label_values(&metric_labels)
+                .observe(elapsed.as_secs_f64());
+
+            let counter_metric = if api_call_result.is_ok() {
                 &metrics.s3_api_call_count_successful_num_total
             } else {
                 &metrics.s3_api_call_count_failed_num_total
             };
+            counter_metric.with_label_values(&metric_labels).inc();
 
-            // TODO: kamu-cli#855: storage
-            api_call_metric
-                .with_label_values(&["TODO_STORAGE_URL", sdk_method])
-                .inc();
+            api_call_result
+        } else {
+            // Just a call without metrics
+            f().await
         }
-
-        api_call_result
     }
 
     pub async fn head_object(
