@@ -24,6 +24,8 @@ use aws_sdk_s3::Client;
 use internal_error::{InternalError, ResultIntoInternal, *};
 use url::Url;
 
+use crate::S3Metrics;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct S3ContextState {
@@ -40,6 +42,7 @@ pub struct S3Context {
     state: Arc<S3ContextState>,
     // Out of state, since it can change
     key_prefix: Arc<String>,
+    maybe_metrics: Option<Arc<S3Metrics>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -78,6 +81,7 @@ impl S3Context {
                 sdk_config,
             }),
             key_prefix: Arc::new(key_prefix.into()),
+            maybe_metrics: None,
         }
     }
 
@@ -94,6 +98,11 @@ impl S3Context {
             key_prefix.push('/');
         }
         self.key_prefix = Arc::new(key_prefix);
+        self
+    }
+
+    pub fn with_metrics(mut self, metrics: Arc<S3Metrics>) -> Self {
+        self.maybe_metrics = Some(metrics);
         self
     }
 
@@ -198,16 +207,42 @@ impl S3Context {
         }
     }
 
+    pub async fn api_call<F, FFut, R, E>(&self, sdk_method: &str, f: F) -> Result<R, E>
+    where
+        F: FnOnce() -> FFut,
+        FFut: std::future::Future<Output = Result<R, E>>,
+    {
+        let api_call_result = f().await;
+
+        if let Some(metrics) = &self.maybe_metrics {
+            let api_call_metric = if api_call_result.is_ok() {
+                &metrics.s3_api_call_count_successful_num_total
+            } else {
+                &metrics.s3_api_call_count_failed_num_total
+            };
+
+            // TODO: storage
+            api_call_metric
+                .with_label_values(&["TODO_STORAGE_URL", sdk_method])
+                .inc();
+        }
+
+        api_call_result
+    }
+
     pub async fn head_object(
         &self,
         key: String,
     ) -> Result<HeadObjectOutput, SdkError<HeadObjectError>> {
-        self.client
-            .head_object()
-            .bucket(self.state.bucket.clone())
-            .key(key)
-            .send()
-            .await
+        self.api_call("head_object", || async move {
+            self.client
+                .head_object()
+                .bucket(self.state.bucket.clone())
+                .key(key)
+                .send()
+                .await
+        })
+        .await
     }
 
     pub async fn get_object(
