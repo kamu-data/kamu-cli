@@ -42,6 +42,7 @@ pub struct S3Context {
     state: Arc<S3ContextState>,
     // Out of state, since it can change
     key_prefix: Arc<String>,
+    url: Arc<Url>,
     maybe_metrics: Option<Arc<S3Metrics>>,
 }
 
@@ -50,6 +51,18 @@ pub struct S3Context {
 #[common_macros::method_names_consts]
 impl S3Context {
     const MAX_LISTED_OBJECTS: i32 = 1000;
+
+    fn make_url(endpoint: Option<&str>, bucket: &str, key_prefix: &str) -> Url {
+        let context_url_str = match endpoint {
+            Some(endpoint) => {
+                format!("s3+{endpoint}/{bucket}/{key_prefix}")
+            }
+            None => {
+                format!("s3://{bucket}/{key_prefix}")
+            }
+        };
+        Url::parse(context_url_str.as_str()).unwrap()
+    }
 
     #[inline]
     pub fn endpoint(&self) -> Option<&str> {
@@ -66,6 +79,11 @@ impl S3Context {
         &self.key_prefix
     }
 
+    #[inline]
+    pub fn url(&self) -> &Url {
+        &self.url
+    }
+
     pub fn new(
         client: Client,
         endpoint: Option<impl Into<String>>,
@@ -73,14 +91,21 @@ impl S3Context {
         key_prefix: impl Into<String>,
         sdk_config: SdkConfig,
     ) -> Self {
+        let endpoint = endpoint.map(Into::into);
+        let bucket = bucket.into();
+        let key_prefix = key_prefix.into();
+
+        let url = Self::make_url(endpoint.as_deref(), &bucket, &key_prefix);
+
         Self {
             client,
             state: Arc::new(S3ContextState {
-                endpoint: endpoint.map(Into::into),
-                bucket: bucket.into(),
+                endpoint,
+                bucket,
                 sdk_config,
             }),
-            key_prefix: Arc::new(key_prefix.into()),
+            key_prefix: Arc::new(key_prefix),
+            url: Arc::new(url),
             maybe_metrics: None,
         }
     }
@@ -97,6 +122,12 @@ impl S3Context {
         if !key_prefix.ends_with('/') {
             key_prefix.push('/');
         }
+
+        self.url = Arc::new(Self::make_url(
+            self.state.endpoint.as_deref(),
+            &self.state.bucket,
+            &key_prefix,
+        ));
         self.key_prefix = Arc::new(key_prefix);
         self
     }
@@ -183,18 +214,6 @@ impl S3Context {
         (endpoint, bucket, key_prefix)
     }
 
-    pub fn make_url(&self) -> Url {
-        let context_url_str = match &self.state.endpoint {
-            Some(endpoint) => {
-                format!("s3+{}/{}/{}", endpoint, self.state.bucket, self.key_prefix)
-            }
-            None => {
-                format!("s3://{}/{}", self.state.bucket, self.key_prefix)
-            }
-        };
-        Url::parse(context_url_str.as_str()).unwrap()
-    }
-
     pub fn region(&self) -> Option<&str> {
         self.client.config().region().map(AsRef::as_ref)
     }
@@ -218,8 +237,7 @@ impl S3Context {
             let api_call_result = f().await;
             let elapsed = start.elapsed();
 
-            // TODO: kamu-cli#855: storage
-            let metric_labels = ["TODO_STORAGE_URL", sdk_method];
+            let metric_labels = [self.url.as_str(), sdk_method];
 
             metrics
                 .s3_api_request_time_s_hist

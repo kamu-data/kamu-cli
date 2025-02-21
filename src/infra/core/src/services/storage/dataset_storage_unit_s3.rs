@@ -75,7 +75,7 @@ impl DatasetStorageUnitS3 {
             .s3_context
             .sub_context(&format!("{}/", &dataset_id.as_multibase()));
 
-        let s3_context_url = s3_context.make_url();
+        let s3_context_url = s3_context.url().clone();
 
         // TODO: Consider switching DatasetImpl to dynamic dispatch to simplify
         // configurability
