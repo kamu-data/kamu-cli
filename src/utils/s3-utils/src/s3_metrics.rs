@@ -22,14 +22,14 @@ pub struct S3Metrics {
 #[interface(dyn MetricsProvider)]
 #[scope(Singleton)]
 impl S3Metrics {
-    // todo metric name prefix (application name)
-    pub fn new() -> Self {
+    // TODO: kamu-cli#855: metric name prefix (application name)
+    pub fn new(application: &str) -> Self {
         use prometheus::*;
 
         Self {
             s3_api_call_count_successful_num_total: IntCounterVec::new(
                 Opts::new(
-                    "s3_api_call_count_processed_total",
+                    format!("{application}_s3_api_call_count_successful_num_total"),
                     "Number of successful AWS SDK S3 calls by storage URL and SDK method",
                 ),
                 &["storage_url", "sdk_method"],
@@ -37,7 +37,7 @@ impl S3Metrics {
             .unwrap(),
             s3_api_call_count_failed_num_total: IntCounterVec::new(
                 Opts::new(
-                    "s3_api_call_count_processed_total",
+                    format!("{application}_s3_api_call_count_failed_num_total"),
                     "Number of failed AWS SDK S3 calls by storage URL and SDK method",
                 ),
                 &["storage_url", "sdk_method"],

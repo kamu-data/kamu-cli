@@ -221,7 +221,7 @@ impl S3Context {
                 &metrics.s3_api_call_count_failed_num_total
             };
 
-            // TODO: storage
+            // TODO: kamu-cli#855: storage
             api_call_metric
                 .with_label_values(&["TODO_STORAGE_URL", sdk_method])
                 .inc();
