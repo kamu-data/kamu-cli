@@ -234,7 +234,7 @@ impl S3Context {
         &self,
         key: String,
     ) -> Result<HeadObjectOutput, SdkError<HeadObjectError>> {
-        self.api_call("head_object", || async move {
+        self.api_call("head_object", || async {
             self.client
                 .head_object()
                 .bucket(self.state.bucket.clone())
@@ -249,12 +249,15 @@ impl S3Context {
         &self,
         key: String,
     ) -> Result<GetObjectOutput, SdkError<GetObjectError>> {
-        self.client
-            .get_object()
-            .bucket(self.state.bucket.clone())
-            .key(key)
-            .send()
-            .await
+        self.api_call("get_object", || async {
+            self.client
+                .get_object()
+                .bucket(self.state.bucket.clone())
+                .key(key)
+                .send()
+                .await
+        })
+        .await
     }
 
     pub async fn get_object_presigned_request(
@@ -262,12 +265,15 @@ impl S3Context {
         key: impl Into<String>,
         options: GetObjectOptions,
     ) -> Result<PresignedRequest, SdkError<GetObjectError>> {
-        self.client
-            .get_object()
-            .bucket(self.state.bucket.clone())
-            .key(key)
-            .presigned(options.presigned_config)
-            .await
+        self.api_call("get_object(presigned)", || async {
+            self.client
+                .get_object()
+                .bucket(self.state.bucket.clone())
+                .key(key)
+                .presigned(options.presigned_config)
+                .await
+        })
+        .await
     }
 
     pub async fn put_object(
@@ -275,17 +281,20 @@ impl S3Context {
         key: String,
         data: &[u8],
     ) -> Result<PutObjectOutput, SdkError<PutObjectError>> {
-        let size = i64::try_from(data.len()).unwrap();
+        self.api_call("put_object", || async {
+            let size = i64::try_from(data.len()).unwrap();
 
-        self.client
-            .put_object()
-            .bucket(self.state.bucket.clone())
-            .key(key)
-            // TODO: PERF: Avoid copying data into a buffer
-            .body(Vec::from(data).into())
-            .content_length(size)
-            .send()
-            .await
+            self.client
+                .put_object()
+                .bucket(self.state.bucket.clone())
+                .key(key)
+                // TODO: PERF: Avoid copying data into a buffer
+                .body(Vec::from(data).into())
+                .content_length(size)
+                .send()
+                .await
+        })
+        .await
     }
 
     pub async fn put_object_presigned_request(
@@ -293,13 +302,16 @@ impl S3Context {
         key: impl Into<String>,
         options: PutObjectOptions,
     ) -> Result<PresignedRequest, SdkError<PutObjectError>> {
-        self.client
-            .put_object()
-            .bucket(self.state.bucket.clone())
-            .key(key)
-            .set_acl(options.acl)
-            .presigned(options.presigned_config)
-            .await
+        self.api_call("put_object(presigned)", || async {
+            self.client
+                .put_object()
+                .bucket(self.state.bucket.clone())
+                .key(key)
+                .set_acl(options.acl)
+                .presigned(options.presigned_config)
+                .await
+        })
+        .await
     }
 
     pub async fn put_object_stream(
@@ -308,69 +320,81 @@ impl S3Context {
         reader: Box<AsyncReadObj>,
         size: u64,
     ) -> Result<PutObjectOutput, SdkError<PutObjectError>> {
-        use aws_smithy_types::body::SdkBody;
-        use aws_smithy_types::byte_stream::ByteStream;
+        self.api_call("put_object(stream)", || async {
+            use aws_smithy_types::body::SdkBody;
+            use aws_smithy_types::byte_stream::ByteStream;
 
-        // FIXME: https://github.com/awslabs/aws-sdk-rust/issues/1030
-        let stream = tokio_util::io::ReaderStream::new(reader);
-        let body = reqwest::Body::wrap_stream(stream);
-        let byte_stream = ByteStream::new(SdkBody::from_body_1_x(body));
+            // FIXME: https://github.com/awslabs/aws-sdk-rust/issues/1030
+            let stream = tokio_util::io::ReaderStream::new(reader);
+            let body = reqwest::Body::wrap_stream(stream);
+            let byte_stream = ByteStream::new(SdkBody::from_body_1_x(body));
 
-        self.client
-            .put_object()
-            .bucket(self.state.bucket.clone())
-            .key(key)
-            .body(byte_stream)
-            .content_length(i64::try_from(size).unwrap())
-            .send()
-            .await
+            self.client
+                .put_object()
+                .bucket(self.state.bucket.clone())
+                .key(key)
+                .body(byte_stream)
+                .content_length(i64::try_from(size).unwrap())
+                .send()
+                .await
+        })
+        .await
     }
 
     pub async fn delete_object(
         &self,
         key: String,
     ) -> Result<DeleteObjectOutput, SdkError<DeleteObjectError>> {
-        self.client
-            .delete_object()
-            .bucket(self.state.bucket.clone())
-            .key(key)
-            .send()
-            .await
+        self.api_call("delete_object", || async {
+            self.client
+                .delete_object()
+                .bucket(self.state.bucket.clone())
+                .key(key)
+                .send()
+                .await
+        })
+        .await
     }
 
     pub async fn bucket_path_exists(&self, key_prefix: &str) -> Result<bool, InternalError> {
-        let listing = self
-            .client
-            .list_objects_v2()
-            .bucket(self.state.bucket.clone())
-            .prefix(self.get_key(key_prefix))
-            .max_keys(1)
-            .send()
-            .await;
+        self.api_call("list_objects_v2(bucket_path_exists)", || async {
+            let listing = self
+                .client
+                .list_objects_v2()
+                .bucket(self.state.bucket.clone())
+                .prefix(self.get_key(key_prefix))
+                .max_keys(1)
+                .send()
+                .await;
 
-        match listing {
-            Ok(resp) => Ok(resp.contents.is_some()),
-            Err(e) => Err(e.int_err()),
-        }
+            match listing {
+                Ok(resp) => Ok(resp.contents.is_some()),
+                Err(e) => Err(e.int_err()),
+            }
+        })
+        .await
     }
 
     pub async fn bucket_list_folders(&self) -> Result<Vec<CommonPrefix>, InternalError> {
-        let list_objects_resp = self
-            .client
-            .list_objects_v2()
-            .bucket(self.state.bucket.clone())
-            .delimiter("/")
-            .send()
-            .await
-            .int_err()?;
+        self.api_call("list_objects_v2(bucket_list_folders)", || async {
+            let list_objects_resp = self
+                .client
+                .list_objects_v2()
+                .bucket(self.state.bucket.clone())
+                .delimiter("/")
+                .send()
+                .await
+                .int_err()?;
 
-        // TODO: Support iteration
-        assert!(
-            !list_objects_resp.is_truncated.unwrap_or_default(),
-            "Cannot handle truncated response"
-        );
+            // TODO: Support iteration
+            assert!(
+                !list_objects_resp.is_truncated.unwrap_or_default(),
+                "Cannot handle truncated response"
+            );
 
-        Ok(list_objects_resp.common_prefixes.unwrap_or_default())
+            Ok(list_objects_resp.common_prefixes.unwrap_or_default())
+        })
+        .await
     }
 
     pub async fn recursive_delete(&self, key_prefix: String) -> Result<(), InternalError> {
@@ -378,36 +402,42 @@ impl S3Context {
         let mut has_next_page = true;
         while has_next_page {
             let list_response = self
-                .client
-                .list_objects_v2()
-                .bucket(self.state.bucket.clone())
-                .prefix(&key_prefix)
-                .max_keys(Self::MAX_LISTED_OBJECTS)
-                .send()
+                .api_call("list_objects_v2(recursive_delete)", || async {
+                    self.client
+                        .list_objects_v2()
+                        .bucket(self.state.bucket.clone())
+                        .prefix(&key_prefix)
+                        .max_keys(Self::MAX_LISTED_OBJECTS)
+                        .send()
+                        .await
+                })
                 .await
                 .int_err()?;
 
             if let Some(contents) = list_response.contents {
+                has_next_page = list_response.is_truncated.unwrap_or_default();
+
                 let object_identifiers = contents
                     .into_iter()
                     .map(|obj| ObjectIdentifier::builder().key(obj.key().unwrap()).build())
                     .collect::<Result<Vec<_>, _>>()
                     .int_err()?;
-
-                has_next_page = list_response.is_truncated.unwrap_or_default();
-                self.client
-                    .delete_objects()
-                    .bucket(self.state.bucket.clone())
-                    .delete(
-                        Delete::builder()
-                            .set_objects(Some(object_identifiers))
-                            .quiet(true)
-                            .build()
-                            .int_err()?,
-                    )
-                    .send()
-                    .await
+                let delete_request = Delete::builder()
+                    .set_objects(Some(object_identifiers))
+                    .quiet(true)
+                    .build()
                     .int_err()?;
+
+                self.api_call("delete_objects(recursive_delete)", || async {
+                    self.client
+                        .delete_objects()
+                        .bucket(self.state.bucket.clone())
+                        .delete(delete_request)
+                        .send()
+                        .await
+                })
+                .await
+                .int_err()?;
             } else {
                 has_next_page = false;
             }
@@ -425,12 +455,15 @@ impl S3Context {
         let mut has_next_page = true;
         while has_next_page {
             let list_response = self
-                .client
-                .list_objects_v2()
-                .bucket(self.state.bucket.clone())
-                .prefix(&old_key_prefix)
-                .max_keys(Self::MAX_LISTED_OBJECTS)
-                .send()
+                .api_call("list_objects_v2(recursive_move)", || async {
+                    self.client
+                        .list_objects_v2()
+                        .bucket(self.state.bucket.clone())
+                        .prefix(&old_key_prefix)
+                        .max_keys(Self::MAX_LISTED_OBJECTS)
+                        .send()
+                        .await
+                })
                 .await
                 .int_err()?;
 
@@ -449,14 +482,18 @@ impl S3Context {
                         .as_ref()
                         .unwrap()
                         .replace(old_key_prefix.as_str(), new_key_prefix.as_str());
-                    self.client
-                        .copy_object()
-                        .bucket(self.state.bucket.clone())
-                        .copy_source(copy_source)
-                        .key(new_key)
-                        .send()
-                        .await
-                        .int_err()?;
+
+                    self.api_call("copy_object(recursive_move)", || async {
+                        self.client
+                            .copy_object()
+                            .bucket(self.state.bucket.clone())
+                            .copy_source(copy_source)
+                            .key(new_key)
+                            .send()
+                            .await
+                    })
+                    .await
+                    .int_err()?;
                 }
 
                 let object_identifiers = contents
@@ -464,20 +501,22 @@ impl S3Context {
                     .map(|obj| ObjectIdentifier::builder().key(obj.key().unwrap()).build())
                     .collect::<Result<Vec<_>, _>>()
                     .int_err()?;
-
-                self.client
-                    .delete_objects()
-                    .bucket(self.state.bucket.clone())
-                    .delete(
-                        Delete::builder()
-                            .set_objects(Some(object_identifiers))
-                            .quiet(true)
-                            .build()
-                            .int_err()?,
-                    )
-                    .send()
-                    .await
+                let delete_request = Delete::builder()
+                    .set_objects(Some(object_identifiers))
+                    .quiet(true)
+                    .build()
                     .int_err()?;
+
+                self.api_call("delete_objects(recursive_move)", || async {
+                    self.client
+                        .delete_objects()
+                        .bucket(self.state.bucket.clone())
+                        .delete(delete_request)
+                        .send()
+                        .await
+                })
+                .await
+                .int_err()?;
             } else {
                 has_next_page = false;
             }
