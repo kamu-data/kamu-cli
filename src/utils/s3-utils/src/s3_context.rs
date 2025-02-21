@@ -101,7 +101,7 @@ impl S3Context {
     }
 
     #[tracing::instrument(level = "info", name = "init_s3_context")]
-    pub async fn from_items(endpoint: Option<String>, bucket: String, key_prefix: String) -> Self {
+    async fn from_items(endpoint: Option<String>, bucket: String, key_prefix: String) -> Self {
         // Note: Falling back to `unspecified` region as SDK errors out when the region
         // not set even if using custom endpoint
         let region_provider = aws_config::meta::region::RegionProviderChain::default_provider()
@@ -138,7 +138,7 @@ impl S3Context {
         Self::from_items(endpoint, bucket, key_prefix).await
     }
 
-    pub fn split_url(url: &Url) -> (Option<String>, String, String) {
+    fn split_url(url: &Url) -> (Option<String>, String, String) {
         // TODO: Support virtual hosted style URLs
         // See https://aws.amazon.com/blogs/aws/amazon-s3-path-deprecation-plan-the-rest-of-the-story/
         let (endpoint, path): (Option<String>, String) =
