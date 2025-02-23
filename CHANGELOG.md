@@ -11,7 +11,7 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## [Unreleased]
+## [0.225.1] - 2025-02-23
 ### Fixed
 - Fixed arrow `BinaryView` incorrectly being treated as incompatible with `Binary` fields during dataset schema compatibility checks (#1096)
 
