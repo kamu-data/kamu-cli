@@ -11,6 +11,10 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [0.226.0] - 2025-02-24
+### Changed
+- Unified dataset repository format
+
 ## [0.225.3] - 2025-02-24
 ### Fixed
 - E2E: `repo-tests` crate again contains the `kamu-cli` dependency, but as an optional one
