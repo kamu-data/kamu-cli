@@ -30,12 +30,13 @@ impl ObjectStoreBuilderLocalFs {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[common_macros::method_names_consts]
 impl ObjectStoreBuilder for ObjectStoreBuilderLocalFs {
     fn object_store_url(&self) -> Url {
         Url::parse("file://").unwrap()
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
+    #[tracing::instrument(level = "info", name = ObjectStoreBuilderLocalFs_build_object_store, skip_all)]
     fn build_object_store(&self) -> Result<Arc<dyn object_store::ObjectStore>, InternalError> {
         Ok(Arc::new(ObjectStoreWithTracing::new(
             object_store::local::LocalFileSystem::new(),

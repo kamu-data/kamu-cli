@@ -91,7 +91,7 @@ jobs:
             runs-on: ubuntu-latest
             cargo-flags: --profile ci --features ingest-ftp,web-ui
             nextest-flags: --cargo-profile ci --features ingest-ftp,web-ui
-            nextest-exclusions-main-set-tests: -E '!(test(::database::) | test(::spark::)| test(::flink::))'
+            nextest-exclusions-main-set-tests: -E '!(test(::database::) | test(::spark::) | test(::flink::))'
             nextest-exclusions-database-set-part: ''
             container-runtime: podman
             ipfs: true

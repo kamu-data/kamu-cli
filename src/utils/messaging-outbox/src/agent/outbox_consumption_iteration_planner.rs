@@ -174,7 +174,7 @@ impl OutboxConsumptionIterationPlanner {
                     .set(queue_length);
             }
 
-            // Determine earliest message ID that was processed by consumers
+            // Determine the earliest message ID that was processed by consumers
             let maybe_processed_boundary_id = self.determine_processed_boundary_id(
                 consumer_names,
                 &consumption_boundaries_by_consumer,

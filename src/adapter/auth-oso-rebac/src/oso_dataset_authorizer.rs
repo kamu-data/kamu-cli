@@ -117,7 +117,7 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
             .int_err()
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(dataset_handles=?dataset_handles, action=%action))]
+    #[tracing::instrument(level = "debug", skip_all, fields(?dataset_handles, %action))]
     async fn filter_datasets_allowing(
         &self,
         dataset_handles: Vec<odf::DatasetHandle>,
@@ -165,7 +165,7 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
         Ok(matched_dataset_handles)
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(dataset_handles=?dataset_handles, action=%action))]
+    #[tracing::instrument(level = "debug", skip_all, fields(?dataset_handles, %action))]
     async fn classify_dataset_handles_by_allowance(
         &self,
         dataset_handles: Vec<odf::DatasetHandle>,
@@ -222,7 +222,7 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
         })
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(dataset_ids=?dataset_ids, action=%action))]
+    #[tracing::instrument(level = "debug", skip_all, fields(?dataset_ids, %action))]
     async fn classify_dataset_ids_by_allowance(
         &self,
         dataset_ids: Vec<odf::DatasetID>,

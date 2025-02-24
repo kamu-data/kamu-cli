@@ -15,6 +15,7 @@ use thiserror::Error;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// TODO: PERF: use Cow for name arguments
 #[async_trait]
 pub trait NamedObjectRepository: Sync + Send {
     /// Resolves reference to the object hash it's pointing to

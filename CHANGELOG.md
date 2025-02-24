@@ -11,6 +11,10 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## Unreleased
+### Added
+- Added prometheus metrics for AWS SDK S3 calls
+
 ## [0.225.1] - 2025-02-23
 ### Fixed
 - Fixed arrow `BinaryView` incorrectly being treated as incompatible with `Binary` fields during dataset schema compatibility checks (#1096)

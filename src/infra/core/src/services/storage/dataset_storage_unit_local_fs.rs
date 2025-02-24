@@ -100,6 +100,7 @@ impl DatasetStorageUnitLocalFs {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[common_macros::method_names_consts]
 #[async_trait]
 impl odf::DatasetStorageUnit for DatasetStorageUnitLocalFs {
     // TODO: PERF: Cache data and speed up lookups by ID
@@ -111,6 +112,7 @@ impl odf::DatasetStorageUnit for DatasetStorageUnitLocalFs {
     //
     // Note that this lock does not prevent concurrent updates to summaries, only
     // reduces the chances of it.
+    #[tracing::instrument(level = "debug", name = DatasetStorageUnitLocalFs_resolve_stored_dataset_handle_by_ref, skip_all, fields(%dataset_ref))]
     async fn resolve_stored_dataset_handle_by_ref(
         &self,
         dataset_ref: &odf::DatasetRef,
@@ -145,10 +147,12 @@ impl odf::DatasetStorageUnit for DatasetStorageUnitLocalFs {
     }
 
     // TODO: PERF: Resolving handles currently involves reading summary files
+    #[tracing::instrument(level = "debug", name = DatasetStorageUnitLocalFs_stored_dataset_handles, skip_all)]
     fn stored_dataset_handles(&self) -> odf::dataset::DatasetHandleStream<'_> {
         self.storage_strategy.get_all_datasets()
     }
 
+    #[tracing::instrument(level = "debug", name = DatasetStorageUnitLocalFs_stored_dataset_handles_by_owner, skip_all, fields(%account_name))]
     fn stored_dataset_handles_by_owner(
         &self,
         account_name: &odf::AccountName,
@@ -156,6 +160,7 @@ impl odf::DatasetStorageUnit for DatasetStorageUnitLocalFs {
         self.storage_strategy.get_datasets_by_owner(account_name)
     }
 
+    #[tracing::instrument(level = "debug", name = DatasetStorageUnitLocalFs_get_stored_dataset_by_handle, skip_all, fields(%dataset_handle))]
     fn get_stored_dataset_by_handle(
         &self,
         dataset_handle: &odf::DatasetHandle,
@@ -167,9 +172,10 @@ impl odf::DatasetStorageUnit for DatasetStorageUnitLocalFs {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[common_macros::method_names_consts]
 #[async_trait]
 impl odf::DatasetStorageUnitWriter for DatasetStorageUnitLocalFs {
-    #[tracing::instrument(level = "debug", skip_all, fields(%dataset_alias, ?seed_block))]
+    #[tracing::instrument(level = "debug", name = DatasetStorageUnitLocalFs_create_dataset, skip_all, fields(%dataset_alias, ?seed_block))]
     async fn create_dataset(
         &self,
         dataset_alias: &odf::DatasetAlias,
@@ -294,7 +300,7 @@ impl odf::DatasetStorageUnitWriter for DatasetStorageUnitLocalFs {
         })
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(%dataset_handle, %new_name))]
+    #[tracing::instrument(level = "debug", name = DatasetStorageUnitLocalFs_rename_dataset, skip_all, fields(%dataset_handle, %new_name))]
     async fn rename_dataset(
         &self,
         dataset_handle: &odf::DatasetHandle,
@@ -330,7 +336,7 @@ impl odf::DatasetStorageUnitWriter for DatasetStorageUnitLocalFs {
         Ok(())
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(%dataset_handle))]
+    #[tracing::instrument(level = "debug", name = DatasetStorageUnitLocalFs_delete_dataset, skip_all, fields(%dataset_handle))]
     async fn delete_dataset(
         &self,
         dataset_handle: &odf::DatasetHandle,

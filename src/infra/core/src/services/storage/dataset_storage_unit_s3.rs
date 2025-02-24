@@ -75,7 +75,7 @@ impl DatasetStorageUnitS3 {
             .s3_context
             .sub_context(&format!("{}/", &dataset_id.as_multibase()));
 
-        let s3_context_url = s3_context.make_url();
+        let s3_context_url = s3_context.url().clone();
 
         // TODO: Consider switching DatasetImpl to dynamic dispatch to simplify
         // configurability
@@ -235,8 +235,10 @@ impl DatasetStorageUnitS3 {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[common_macros::method_names_consts]
 #[async_trait]
 impl odf::DatasetStorageUnit for DatasetStorageUnitS3 {
+    #[tracing::instrument(level = "debug", name = DatasetStorageUnitS3_resolve_stored_dataset_handle_by_ref, skip_all, fields(%dataset_ref))]
     async fn resolve_stored_dataset_handle_by_ref(
         &self,
         dataset_ref: &odf::DatasetRef,
@@ -283,10 +285,12 @@ impl odf::DatasetStorageUnit for DatasetStorageUnitS3 {
         }
     }
 
+    #[tracing::instrument(level = "debug", name = DatasetStorageUnitS3_stored_dataset_handles, skip_all)]
     fn stored_dataset_handles(&self) -> odf::dataset::DatasetHandleStream<'_> {
         self.stream_datasets_if(|_| true)
     }
 
+    #[tracing::instrument(level = "debug", name = DatasetStorageUnitS3_stored_dataset_handles_by_owner, skip_all, fields(%account_name))]
     fn stored_dataset_handles_by_owner(
         &self,
         account_name: &odf::AccountName,
@@ -307,6 +311,7 @@ impl odf::DatasetStorageUnit for DatasetStorageUnitS3 {
         })
     }
 
+    #[tracing::instrument(level = "debug", name = DatasetStorageUnitS3_get_stored_dataset_by_handle, skip_all, fields(%dataset_handle))]
     fn get_stored_dataset_by_handle(
         &self,
         dataset_handle: &odf::DatasetHandle,
@@ -315,9 +320,10 @@ impl odf::DatasetStorageUnit for DatasetStorageUnitS3 {
     }
 }
 
+#[common_macros::method_names_consts]
 #[async_trait]
 impl odf::DatasetStorageUnitWriter for DatasetStorageUnitS3 {
-    #[tracing::instrument(level = "debug", skip_all, fields(%dataset_alias, ?seed_block))]
+    #[tracing::instrument(level = "debug", name = DatasetStorageUnitS3_create_dataset, skip_all, fields(%dataset_alias, ?seed_block))]
     async fn create_dataset(
         &self,
         dataset_alias: &odf::DatasetAlias,
@@ -438,7 +444,7 @@ impl odf::DatasetStorageUnitWriter for DatasetStorageUnitS3 {
         })
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(%dataset_handle, %new_name))]
+    #[tracing::instrument(level = "debug", name = DatasetStorageUnitS3_rename_dataset, skip_all, fields(%dataset_handle, %new_name))]
     async fn rename_dataset(
         &self,
         dataset_handle: &odf::DatasetHandle,
@@ -486,7 +492,7 @@ impl odf::DatasetStorageUnitWriter for DatasetStorageUnitS3 {
         Ok(())
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(%dataset_handle))]
+    #[tracing::instrument(level = "debug", name = DatasetStorageUnitS3_delete_dataset, skip_all, fields(%dataset_handle))]
     async fn delete_dataset(
         &self,
         dataset_handle: &odf::DatasetHandle,
