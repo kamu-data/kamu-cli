@@ -62,9 +62,12 @@ url = { version = "2", default-features = false }
 
 
 [dev-dependencies]
-odf = { workspace = true, features = ["arrow", "lfs", "testing"]}
+odf = { workspace = true, features = ["arrow", "lfs", "s3", "testing"]}
+test-utils = { workspace = true }
 
+futures = "0.3"
 mockall = { version = "0.13", default-features = false }
 tempfile = "3"
 thiserror = { version = "2", default-features = false }
 test-log = { version = "0.2", features = ["trace"] }
+test-group = { version = "1" }
