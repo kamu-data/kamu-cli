@@ -15,6 +15,10 @@ Recommendation: for ease of reading, use the following order:
 ### Added
 - Added prometheus metrics for AWS SDK S3 calls
 
+## [0.225.1] - 2025-02-23
+### Fixed
+- Fixed arrow `BinaryView` incorrectly being treated as incompatible with `Binary` fields during dataset schema compatibility checks (#1096)
+
 ## [0.225.0] - 2025-02-20
 ### Added
 - Added [common-macros](src/utils/common-macros) crate containing macros of general use

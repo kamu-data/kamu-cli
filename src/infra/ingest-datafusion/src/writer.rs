@@ -14,7 +14,7 @@ use std::sync::Arc;
 
 use chrono::{DateTime, TimeZone, Utc};
 use datafusion::arrow::array::Array;
-use datafusion::arrow::datatypes::{DataType, Field, SchemaRef, TimeUnit};
+use datafusion::arrow::datatypes::{DataType, Field, Fields, SchemaRef, TimeUnit};
 use datafusion::common::DFSchema;
 use datafusion::config::{ParquetColumnOptions, ParquetOptions, TableParquetOptions};
 use datafusion::dataframe::DataFrameWriteOptions;
@@ -359,7 +359,7 @@ impl DataWriterDataFusion {
         prev_schema: &SchemaRef,
         new_schema: &SchemaRef,
     ) -> Result<(), IncompatibleSchemaError> {
-        if !Self::is_schema_equivalent(prev_schema, new_schema) {
+        if !Self::is_schema_equivalent(prev_schema.fields(), new_schema.fields()) {
             Err(IncompatibleSchemaError::new(
                 "Schema of the new slice differs from the schema defined by SetDataSchema event",
                 prev_schema.clone(),
@@ -370,26 +370,90 @@ impl DataWriterDataFusion {
         }
     }
 
-    fn is_schema_equivalent(lhs: &SchemaRef, rhs: &SchemaRef) -> bool {
-        lhs.fields().len() == rhs.fields().len()
+    fn is_schema_equivalent(lhs: &Fields, rhs: &Fields) -> bool {
+        lhs.len() == rhs.len()
             && lhs
-                .fields()
                 .iter()
-                .zip(rhs.fields().iter())
+                .zip(rhs.iter())
                 .all(|(l, r)| Self::is_schema_equivalent_rec(l, r))
     }
 
     fn is_schema_equivalent_rec(lhs: &Field, rhs: &Field) -> bool {
         // Rules:
         // - Ignore nullability (temporarily until we regain control over it)
-        // - Treat Utf8 equivalent to Utf8View
+        // - Treat "large" variants equivalent to regular variants
+        // - Treat view types equivalent to regular types
         if lhs.name() != rhs.name() || lhs.metadata() != rhs.metadata() {
             return false;
         }
+
+        // Avoid wildcard matching - we want compiler to force us re-check our
+        // assumptions whenever new type is added
         match (lhs.data_type(), rhs.data_type()) {
-            (l, r) if l == r => true,
-            (DataType::Utf8, DataType::Utf8View) | (DataType::Utf8View, DataType::Utf8) => true,
-            _ => false,
+            (
+                DataType::Null
+                | DataType::Boolean
+                | DataType::Int8
+                | DataType::Int16
+                | DataType::Int32
+                | DataType::Int64
+                | DataType::UInt8
+                | DataType::UInt16
+                | DataType::UInt32
+                | DataType::UInt64
+                | DataType::Float16
+                | DataType::Float32
+                | DataType::Float64
+                | DataType::Timestamp(_, _)
+                | DataType::Date32
+                | DataType::Date64
+                | DataType::Time32(_)
+                | DataType::Time64(_)
+                | DataType::Duration(_)
+                | DataType::Interval(_)
+                | DataType::FixedSizeBinary(_)
+                | DataType::FixedSizeList(_, _)
+                | DataType::Union(_, _)
+                | DataType::Dictionary(_, _)
+                | DataType::Decimal128(_, _)
+                | DataType::Decimal256(_, _)
+                | DataType::Map(_, _)
+                | DataType::RunEndEncoded(_, _),
+                _,
+            ) => lhs.data_type() == rhs.data_type(),
+            (
+                DataType::Binary | DataType::LargeBinary | DataType::BinaryView,
+                DataType::Binary | DataType::LargeBinary | DataType::BinaryView,
+            )
+            | (
+                DataType::Utf8 | DataType::LargeUtf8 | DataType::Utf8View,
+                DataType::Utf8 | DataType::LargeUtf8 | DataType::Utf8View,
+            ) => true,
+            (
+                DataType::List(l)
+                | DataType::ListView(l)
+                | DataType::LargeList(l)
+                | DataType::LargeListView(l),
+                DataType::List(r)
+                | DataType::ListView(r)
+                | DataType::LargeList(r)
+                | DataType::LargeListView(r),
+            ) => Self::is_schema_equivalent_rec(l, r),
+            (DataType::Struct(l), DataType::Struct(r)) => Self::is_schema_equivalent(l, r),
+            (
+                DataType::Utf8
+                | DataType::LargeUtf8
+                | DataType::Utf8View
+                | DataType::Binary
+                | DataType::LargeBinary
+                | DataType::BinaryView
+                | DataType::List(_)
+                | DataType::ListView(_)
+                | DataType::LargeList(_)
+                | DataType::LargeListView(_)
+                | DataType::Struct(_),
+                _,
+            ) => false,
         }
     }
 
