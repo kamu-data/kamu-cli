@@ -21,19 +21,14 @@ workspace = true
 doctest = false
 
 
-[package.metadata.cargo-udeps.ignore]
-normal = ["kamu-cli"]
-
-
 [dependencies]
-# We add a dependency to ensure kamu-cli is up to date before calling tests
-kamu-cli = { workspace = true }
+# We have only tests in this crate
 
 
 [dev-dependencies]
-database-common = { workspace = true,  default-features = false, features = ["testing"] }
+database-common = { workspace = true, default-features = false, features = ["testing"] }
 kamu-cli-e2e-common = { workspace = true }
-kamu-cli-e2e-repo-tests = { workspace = true }
+kamu-cli-e2e-repo-tests = { workspace = true, default-features = false, features = ["build-kamu-cli"] }
 
 indoc = "2"
 sqlx = { version = "0.8", default-features = false, features = [
