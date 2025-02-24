@@ -74,7 +74,7 @@ impl DatasetFactoryImpl {
     pub fn new(
         ipfs_gateway: IpfsGateway,
         access_token_resolver: Arc<dyn OdfServerAccessTokenResolver>,
-        maybe_s3_metrics: Option<Arc<S3Metrics>>,
+        maybe_s3_metrics: Option<Arc<s3_utils::S3Metrics>>,
     ) -> Self {
         Self {
             #[cfg(feature = "http")]

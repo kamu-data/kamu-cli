@@ -74,8 +74,10 @@ impl DatasetStorageUnitLocalFs {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[common_macros::method_names_consts]
 #[async_trait]
 impl DatasetStorageUnit for DatasetStorageUnitLocalFs {
+    #[tracing::instrument(level = "debug", name = DatasetStorageUnitLocalFs_get_stored_dataset_by_id, skip_all, fields(%dataset_id))]
     async fn get_stored_dataset_by_id(
         &self,
         dataset_id: &DatasetID,
@@ -85,6 +87,7 @@ impl DatasetStorageUnit for DatasetStorageUnitLocalFs {
         Ok(dataset)
     }
 
+    #[tracing::instrument(level = "debug", name = DatasetStorageUnitLocalFs_stored_dataset_ids, skip_all)]
     fn stored_dataset_ids(&self) -> DatasetIDStream<'_> {
         Box::pin(async_stream::try_stream! {
             // While creating a workspace, the directory has not yet been created
@@ -127,9 +130,10 @@ impl DatasetStorageUnit for DatasetStorageUnitLocalFs {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[common_macros::method_names_consts]
 #[async_trait]
 impl DatasetStorageUnitWriter for DatasetStorageUnitLocalFs {
-    #[tracing::instrument(level = "debug", skip_all, fields(?seed_block))]
+    #[tracing::instrument(level = "debug", name = DatasetStorageUnitLocalFs_store_dataset, skip_all, fields(?seed_block))]
     async fn store_dataset(
         &self,
         seed_block: MetadataBlockTyped<Seed>,
@@ -213,7 +217,7 @@ impl DatasetStorageUnitWriter for DatasetStorageUnitLocalFs {
         })
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id))]
+    #[tracing::instrument(level = "debug", name = DatasetStorageUnitLocalFs_delete_dataset, skip_all, fields(%dataset_id))]
     async fn delete_dataset(&self, dataset_id: &DatasetID) -> Result<(), DeleteStoredDatasetError> {
         // Ensure dataset folder exists on disk
         let layout = self.get_dataset_layout(dataset_id)?;

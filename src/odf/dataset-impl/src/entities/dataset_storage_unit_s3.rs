@@ -67,7 +67,7 @@ impl DatasetStorageUnitS3 {
             .s3_context
             .sub_context(&format!("{}/", &dataset_id.as_multibase()));
 
-        let s3_context_url = s3_context.make_url();
+        let s3_context_url = s3_context.url().clone();
 
         // TODO: Consider switching DatasetImpl to dynamic dispatch to simplify
         // configurability
@@ -154,8 +154,10 @@ impl DatasetStorageUnitS3 {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[common_macros::method_names_consts]
 #[async_trait]
 impl DatasetStorageUnit for DatasetStorageUnitS3 {
+    #[tracing::instrument(level = "debug", name = DatasetStorageUnitS3_get_stored_dataset_by_id, skip_all, fields(%dataset_id))]
     async fn get_stored_dataset_by_id(
         &self,
         dataset_id: &DatasetID,
@@ -176,6 +178,7 @@ impl DatasetStorageUnit for DatasetStorageUnitS3 {
         }
     }
 
+    #[tracing::instrument(level = "debug", name = DatasetStorageUnitS3_stored_dataset_ids, skip_all)]
     fn stored_dataset_ids(&self) -> DatasetIDStream<'_> {
         Box::pin(async_stream::try_stream! {
             for dataset_id in self.list_dataset_ids_maybe_cached().await? {
@@ -198,9 +201,10 @@ impl DatasetStorageUnit for DatasetStorageUnitS3 {
     }
 }
 
+#[common_macros::method_names_consts]
 #[async_trait]
 impl DatasetStorageUnitWriter for DatasetStorageUnitS3 {
-    #[tracing::instrument(level = "debug", skip_all, fields(?seed_block))]
+    #[tracing::instrument(level = "debug", name = DatasetStorageUnitS3_store_dataset, skip_all, fields(?seed_block))]
     async fn store_dataset(
         &self,
         seed_block: MetadataBlockTyped<Seed>,
@@ -286,7 +290,7 @@ impl DatasetStorageUnitWriter for DatasetStorageUnitS3 {
         })
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id))]
+    #[tracing::instrument(level = "debug", name = DatasetStorageUnitS3_delete_dataset, skip_all, fields(%dataset_id))]
     async fn delete_dataset(&self, dataset_id: &DatasetID) -> Result<(), DeleteStoredDatasetError> {
         // Ensure key exists in S3
         let _ = self.get_stored_dataset_by_id(dataset_id).await?;

@@ -7878,6 +7878,7 @@ dependencies = [
  "async-trait",
  "bytes",
  "chrono",
+ "common-macros",
  "dill",
  "file-utils",
  "hickory-resolver",

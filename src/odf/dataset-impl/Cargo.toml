@@ -30,6 +30,7 @@ testing = ["dep:mockall"]
 
 
 [dependencies]
+common-macros = { workspace = true }
 internal-error = { workspace = true }
 file-utils = { workspace = true }
 odf-dataset = { workspace = true }
