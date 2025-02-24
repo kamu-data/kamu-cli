@@ -21,8 +21,13 @@ workspace = true
 doctest = false
 
 
+[package.metadata.cargo-udeps.ignore]
+normal = ["kamu-cli"]
+
+
 [dependencies]
-# We have only tests in this crate
+# We add a dependency to ensure kamu-cli is up to date before calling tests
+kamu-cli = { workspace = true }
 
 
 [dev-dependencies]

@@ -16,7 +16,7 @@ use secrecy::SecretString;
 use tempfile::TempDir;
 
 use crate::config::{DatabaseConfig, DatabaseCredentialSourceConfig, RemoteDatabaseConfig};
-use crate::{config, WorkspaceLayout, WorkspaceStatus, DEFAULT_WORKSPACE_SQLITE_DATABASE_NAME};
+use crate::{config, WorkspaceLayout, WorkspaceStatus};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

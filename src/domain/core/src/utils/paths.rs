@@ -10,6 +10,12 @@
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub const KAMU_WORKSPACE_DIR_NAME: &str = ".kamu";
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// Newtype path wrapper that designates a directory meant for transient data
 /// that can be frequently cleaned up. This directory is suitable for writing
 /// operation logs or creating temporary files to pass some state to
@@ -48,7 +54,7 @@ impl Deref for RunInfoDir {
 }
 
 /// Newtype path wrapper that designates a directory meant for data that should
-/// be persisted for some unspecified time but can be safely clieaned up.
+/// be persisted for some unspecified time but can be safely cleaned up.
 ///
 /// TODO: This type should be replaced by a service
 pub struct CacheDir(PathBuf);

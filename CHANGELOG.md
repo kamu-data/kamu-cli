@@ -11,9 +11,11 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## Unreleased
+## [0.225.2] - 2025-02-24
 ### Added
 - Added prometheus metrics for AWS SDK S3 calls
+### Changed
+- Make `repo-tests` crate independent from `kamu-cli` crate
 
 ## [0.225.1] - 2025-02-23
 ### Fixed
