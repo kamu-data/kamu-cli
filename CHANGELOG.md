@@ -12,8 +12,25 @@ Recommendation: for ease of reading, use the following order:
 -->
 
 ## [0.226.0] - 2025-02-24
+### Added
+- Externally configurable Argon2 hashing mode (minimal settings to speedup e2e tests)
 ### Changed
-- Unified dataset repository format
+- Unified dataset repository format:
+  - both LFS and S3, regardless of tenancy config, now organize storage folders solely by dataset ID
+  - workspace migration to new repository format (v6) is fully automatic
+  - the role of "info/alias" file was reduced only for recovery purposes, 
+      the dataset alias resolutions now happen in database only
+  - ODF storage unit implementations (LFS, S3) only deal with dataset identifiers:
+    - no more dependency on accounts or tenancy configuration
+    - S3 cache now considers identifiers of stored datasets only
+    - moved them to ODF crate
+    - reading HEAD is a must for storage iteration
+    - removing HEAD is a first step of dataset deletion
+  - `kamu-datasets` domain now has own error and result structures layer, separate from ODF basics
+  - Rename operation does not touch a storage unit, became solely a database operation
+  - workspace version checking now takes startup job dependencies into account
+### Fixed
+- Less linear search in in-mem entry repository
 
 ## [0.225.3] - 2025-02-24
 ### Fixed
