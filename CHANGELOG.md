@@ -11,11 +11,17 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [0.225.3] - 2025-02-24
+### Fixed
+- E2E: `repo-tests` crate again contains the `kamu-cli` dependency, but as an optional one
+  - This way we can correctly reuse the tests in the `kamu-node` repository without affecting the build time
+  - It also fixes `make sqlx-prepate` developer command
+
 ## [0.225.2] - 2025-02-24
 ### Added
 - Added prometheus metrics for AWS SDK S3 calls
 ### Changed
-- Make `repo-tests` crate independent from `kamu-cli` crate
+- E2E: make `repo-tests` crate independent from `kamu-cli` crate
 
 ## [0.225.1] - 2025-02-23
 ### Fixed
@@ -24,8 +30,8 @@ Recommendation: for ease of reading, use the following order:
 ## [0.225.0] - 2025-02-20
 ### Added
 - Added [common-macros](src/utils/common-macros) crate containing macros of general use
-- `kamu list`: display dataset visibility in multi-tenant
-- `kamu pull`: added `--visibility private|public` argument to specify the created dataset visibility
+  - `kamu list`: display dataset visibility in multi-tenant
+  - `kamu pull`: added `--visibility private|public` argument to specify the created dataset visibility
 ### Changed
 - Improved/added trace for repositories & GQL to contain not only the method name but also the structure name
 ### Fixed
@@ -46,13 +52,13 @@ Recommendation: for ease of reading, use the following order:
 - Increased test coverage of the code responsible for access checks
 ### Changed
 - Restructured responsibilities between core and dataset domains upon key dataset CRUD use cases:
-   - 8 use cases moved from `core` to `kamu-datasets` domain
-   - no longer using outbox for "Renamed" and "DependenciesUpdated" events in datasets, 
-     these became internal aspect inside `kamu-datasets` domain
-   - simplified creation and commit result structures as they no longer transport new dependencies
-   - revised many integration tests:
-       - flow system no longer uses real datasets
-       - HTTP and GQL use real accounts and dataset entries
+  - 8 use cases moved from `core` to `kamu-datasets` domain
+  - no longer using outbox for "Renamed" and "DependenciesUpdated" events in datasets, 
+      these became internal aspect inside `kamu-datasets` domain
+  - simplified creation and commit result structures as they no longer transport new dependencies
+  - revised many integration tests:
+    - flow system no longer uses real datasets
+    - HTTP and GQL use real accounts and dataset entries
 - Moved several account-related routines from `AuthenticationService` to `AccountService`, 
   the authentication services has focus only on JWT token and login flows
 - Upgraded to `datafusion v45` (#1063)
