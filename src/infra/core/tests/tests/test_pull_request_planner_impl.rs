@@ -196,23 +196,26 @@ async fn create_graph_remote(
 
     // Start syncing with main repository
     for import_alias in to_import {
+        let remote_alias = import_alias.as_remote_alias(tmp_repo_name.clone());
         harness
             .sync_service
             .sync(
                 harness
                     .sync_request_builder
-                    .build_sync_request(
-                        import_alias
-                            .as_remote_alias(tmp_repo_name.clone())
-                            .into_any_ref(),
-                        import_alias.into_any_ref(),
-                        true,
-                    )
+                    .build_sync_request(remote_alias.as_any_ref(), import_alias.as_any_ref(), true)
                     .await
                     .unwrap(),
                 SyncOptions::default(),
                 None,
             )
+            .await
+            .unwrap();
+
+        // Add remote pull alias to E
+        harness
+            .get_remote_aliases(&import_alias.as_local_ref())
+            .await
+            .add(&remote_alias.as_remote_ref(), RemoteAliasKind::Pull)
             .await
             .unwrap();
     }
@@ -760,6 +763,104 @@ async fn test_sync_from_url_only_multi_tenant_case() {
             rr!("kamu.dev/bar").into(),
             n!("bar").into()
         ))]]
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_sync_from_url_same_id_different_aliases() {
+    let mut mock_dataset_entry_writer = MockDatasetEntryWriter::new();
+    mock_dataset_entry_writer
+        .expect_create_entry()
+        .times(1)
+        .returning(|_, _, _| Ok(()));
+
+    let mut mock_dependency_graph_writer = MockDependencyGraphWriter::new();
+    mock_dependency_graph_writer
+        .expect_create_dataset_node()
+        .times(1)
+        .returning(|_| Ok(()));
+
+    let harness = PullTestHarness::new(
+        TenancyConfig::SingleTenant,
+        mock_dataset_entry_writer,
+        mock_dependency_graph_writer,
+    );
+
+    let _remote_tmp_dir = create_graph_remote(
+        "kamu.dev",
+        &harness,
+        vec![(n!("bar"), names![])],
+        names!("bar"),
+    )
+    .await;
+
+    let res = harness
+        .pull_with_requests(
+            vec![PullRequest::Remote(PullRequestRemote {
+                maybe_local_alias: Some(n!("foo")),
+                remote_ref: rr!("kamu.dev/bar"),
+            })],
+            PullOptions::default(),
+        )
+        .await;
+    assert!(res.is_err());
+    let responses = res.err().unwrap();
+    assert_eq!(1, responses.len());
+    assert_matches!(
+        responses.first().unwrap().result,
+        Err(PullError::SaveUnderDifferentAlias(ref diff_alias))
+            if diff_alias.as_str() == "bar"
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_sync_from_same_url_different_accounts() {
+    let mut mock_dataset_entry_writer = MockDatasetEntryWriter::new();
+    mock_dataset_entry_writer
+        .expect_create_entry()
+        .times(1)
+        .returning(|_, _, _| Ok(()));
+
+    let mut mock_dependency_graph_writer = MockDependencyGraphWriter::new();
+    mock_dependency_graph_writer
+        .expect_create_dataset_node()
+        .times(1)
+        .returning(|_| Ok(()));
+
+    let harness = PullTestHarness::new(
+        TenancyConfig::MultiTenant,
+        mock_dataset_entry_writer,
+        mock_dependency_graph_writer,
+    );
+
+    let _remote_tmp_dir = create_graph_remote(
+        "kamu.dev",
+        &harness,
+        vec![(n!("bar"), names![])],
+        names!("bar"),
+    )
+    .await;
+
+    let res = harness
+        .pull_with_requests(
+            vec![PullRequest::Remote(PullRequestRemote {
+                maybe_local_alias: Some(n!("foo")),
+                remote_ref: rr!("kamu.dev/bar"),
+            })],
+            PullOptions::default(),
+        )
+        .await;
+    assert!(res.is_err());
+    let responses = res.err().unwrap();
+    assert_eq!(1, responses.len());
+    assert_matches!(
+        responses.first().unwrap().result,
+        Err(PullError::SaveUnderDifferentAlias(ref diff_alias))
+            if diff_alias.as_str() == "kamu/bar"
     );
 }
 

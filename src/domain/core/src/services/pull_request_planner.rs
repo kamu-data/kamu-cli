@@ -399,6 +399,9 @@ pub enum PullError {
     #[error("Cannot choose between multiple pull aliases")]
     AmbiguousSource,
 
+    #[error("The dataset was previously saved via '{0}' alias")]
+    SaveUnderDifferentAlias(String),
+
     #[error("{0}")]
     InvalidOperation(String),
 
