@@ -9,14 +9,11 @@
 
 use std::path::{Path, PathBuf};
 
+use database_common::DEFAULT_WORKSPACE_SQLITE_DATABASE_NAME;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu::domain::TenancyConfig;
 use odf::metadata::serde::yaml::Manifest;
 use serde::{Deserialize, Serialize};
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub const DEFAULT_WORKSPACE_SQLITE_DATABASE_NAME: &str = "workspace.sqlite.db";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

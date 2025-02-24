@@ -21,17 +21,12 @@ workspace = true
 doctest = false
 
 
-[package.metadata.cargo-udeps.ignore]
-normal = ["kamu-cli"]
-
-
 [dependencies]
 http-common = { workspace = true }
+database-common = { workspace = true, default-features = false }
 kamu = { workspace = true, features = ["testing"] }
 kamu-accounts = { workspace = true }
 kamu-adapter-http = { workspace = true }
-# We add a dependency to ensure kamu-cli is up to date before calling tests
-kamu-cli = { workspace = true }
 kamu-cli-e2e-common = { workspace = true }
 kamu-cli-puppet = { workspace = true, default-features = false, features = [
     "extensions",

@@ -6162,6 +6162,7 @@ name = "kamu-cli-e2e-inmem"
 version = "0.225.1"
 dependencies = [
  "indoc 2.0.5",
+ "kamu-cli",
  "kamu-cli-e2e-common",
  "kamu-cli-e2e-repo-tests",
  "test-group",
@@ -6175,6 +6176,7 @@ version = "0.225.1"
 dependencies = [
  "database-common",
  "indoc 2.0.5",
+ "kamu-cli",
  "kamu-cli-e2e-common",
  "kamu-cli-e2e-repo-tests",
  "sqlx",
@@ -6189,6 +6191,7 @@ version = "0.225.1"
 dependencies = [
  "database-common",
  "indoc 2.0.5",
+ "kamu-cli",
  "kamu-cli-e2e-common",
  "kamu-cli-e2e-repo-tests",
  "sqlx",
@@ -6202,13 +6205,13 @@ name = "kamu-cli-e2e-repo-tests"
 version = "0.225.1"
 dependencies = [
  "chrono",
+ "database-common",
  "datafusion",
  "http-common",
  "indoc 2.0.5",
  "kamu",
  "kamu-accounts",
  "kamu-adapter-http",
- "kamu-cli",
  "kamu-cli-e2e-common",
  "kamu-cli-puppet",
  "kamu-flow-system",
@@ -6229,6 +6232,7 @@ version = "0.225.1"
 dependencies = [
  "database-common",
  "indoc 2.0.5",
+ "kamu-cli",
  "kamu-cli-e2e-common",
  "kamu-cli-e2e-repo-tests",
  "sqlx",

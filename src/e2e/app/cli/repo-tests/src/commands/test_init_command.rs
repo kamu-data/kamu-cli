@@ -7,8 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu::domain::TenancyConfig;
-use kamu_cli::{DEFAULT_WORKSPACE_SQLITE_DATABASE_NAME, KAMU_WORKSPACE_DIR_NAME};
+use database_common::DEFAULT_WORKSPACE_SQLITE_DATABASE_NAME;
+use kamu::domain::{TenancyConfig, KAMU_WORKSPACE_DIR_NAME};
 use kamu_cli_puppet::extensions::KamuCliPuppetExt;
 use kamu_cli_puppet::KamuCliPuppet;
 

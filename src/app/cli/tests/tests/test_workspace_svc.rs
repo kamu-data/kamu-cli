@@ -11,6 +11,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 use file_utils::OwnedFile;
+use kamu::domain::KAMU_WORKSPACE_DIR_NAME;
 use kamu::testing::ParquetWriterHelper;
 use kamu::*;
 use kamu_cli::*;
