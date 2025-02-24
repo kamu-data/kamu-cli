@@ -104,7 +104,10 @@ impl IngestCommand {
             )));
         }
 
-        let resolved_dataset = self.dataset_registry.get_dataset_by_handle(dataset_handle);
+        let resolved_dataset = self
+            .dataset_registry
+            .get_dataset_by_handle(dataset_handle)
+            .await;
         let dataset_kind = resolved_dataset
             .get_summary(odf::dataset::GetSummaryOpts::default())
             .await
@@ -193,7 +196,10 @@ impl Command for IngestCommand {
 
         let mut updated = 0;
         for url in urls {
-            let target = self.dataset_registry.get_dataset_by_handle(&dataset_handle);
+            let target = self
+                .dataset_registry
+                .get_dataset_by_handle(&dataset_handle)
+                .await;
             let plan = self
                 .push_ingest_planner
                 .plan_ingest(

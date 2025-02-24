@@ -201,12 +201,14 @@ async fn resolve_transform_inputs(
             .await
         {
             Ok(hdl) => Ok(hdl),
-            Err(GetDatasetError::NotFound(_)) => {
+            Err(DatasetRefUnresolvedError::NotFound(_)) => {
                 // Accumulate errors to report as one
                 missing_inputs.push(input.dataset_ref.clone());
                 continue;
             }
-            Err(GetDatasetError::Internal(e)) => Err(ValidateDatasetSnapshotError::Internal(e)),
+            Err(DatasetRefUnresolvedError::Internal(e)) => {
+                Err(ValidateDatasetSnapshotError::Internal(e))
+            }
         }?;
 
         if input.alias.is_none() {
@@ -244,6 +246,47 @@ pub enum ValidateDatasetSnapshotError {
         #[backtrace]
         InternalError,
     ),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Clone, PartialEq, Eq, Debug)]
+#[error("Invalid snapshot: {reason}")]
+pub struct InvalidSnapshotError {
+    pub reason: String,
+}
+
+impl InvalidSnapshotError {
+    pub fn new(reason: impl Into<String>) -> Self {
+        Self {
+            reason: reason.into(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Clone, PartialEq, Eq, Debug)]
+pub struct MissingInputsError {
+    pub dataset_ref: DatasetRef,
+    pub missing_inputs: Vec<DatasetRef>,
+}
+
+impl std::fmt::Display for MissingInputsError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Dataset {} is referencing non-existing inputs: ",
+            self.dataset_ref
+        )?;
+        for (i, h) in self.missing_inputs.iter().enumerate() {
+            if i != 0 {
+                write!(f, ", ")?;
+            }
+            write!(f, "{h}")?;
+        }
+        Ok(())
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

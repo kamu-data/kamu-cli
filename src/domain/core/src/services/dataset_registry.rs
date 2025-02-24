@@ -28,7 +28,7 @@ pub trait DatasetRegistry: odf::dataset::DatasetHandleResolver {
         dataset_ids: Vec<odf::DatasetID>,
     ) -> Result<DatasetHandlesResolution, GetMultipleDatasetsError>;
 
-    fn get_dataset_by_handle(&self, dataset_handle: &odf::DatasetHandle) -> ResolvedDataset;
+    async fn get_dataset_by_handle(&self, dataset_handle: &odf::DatasetHandle) -> ResolvedDataset;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -45,7 +45,7 @@ pub trait DatasetRegistryExt: DatasetRegistry {
     async fn get_dataset_by_ref(
         &self,
         dataset_ref: &odf::DatasetRef,
-    ) -> Result<ResolvedDataset, odf::dataset::GetDatasetError>;
+    ) -> Result<ResolvedDataset, odf::DatasetRefUnresolvedError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -62,17 +62,17 @@ where
     ) -> Result<Option<odf::DatasetHandle>, InternalError> {
         match self.resolve_dataset_handle_by_ref(dataset_ref).await {
             Ok(hdl) => Ok(Some(hdl)),
-            Err(odf::dataset::GetDatasetError::NotFound(_)) => Ok(None),
-            Err(odf::dataset::GetDatasetError::Internal(e)) => Err(e),
+            Err(odf::DatasetRefUnresolvedError::NotFound(_)) => Ok(None),
+            Err(odf::DatasetRefUnresolvedError::Internal(e)) => Err(e),
         }
     }
 
     async fn get_dataset_by_ref(
         &self,
         dataset_ref: &odf::DatasetRef,
-    ) -> Result<ResolvedDataset, odf::dataset::GetDatasetError> {
+    ) -> Result<ResolvedDataset, odf::DatasetRefUnresolvedError> {
         let dataset_handle = self.resolve_dataset_handle_by_ref(dataset_ref).await?;
-        let dataset = self.get_dataset_by_handle(&dataset_handle);
+        let dataset = self.get_dataset_by_handle(&dataset_handle).await;
         Ok(dataset)
     }
 }
@@ -82,7 +82,7 @@ where
 #[derive(Default)]
 pub struct DatasetHandlesResolution {
     pub resolved_handles: Vec<odf::DatasetHandle>,
-    pub unresolved_datasets: Vec<(odf::DatasetID, odf::dataset::GetDatasetError)>,
+    pub unresolved_datasets: Vec<(odf::DatasetID, odf::DatasetRefUnresolvedError)>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -128,7 +128,10 @@ impl Command for LogCommand {
                 auth::DatasetActionUnauthorizedError::Internal(e) => CLIError::critical(e),
             })?;
 
-        let resolved_dataset = self.dataset_registry.get_dataset_by_handle(&dataset_handle);
+        let resolved_dataset = self
+            .dataset_registry
+            .get_dataset_by_handle(&dataset_handle)
+            .await;
 
         use odf::dataset::{MetadataChainExt, TryStreamExtExt};
 

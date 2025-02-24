@@ -78,7 +78,7 @@ impl<TServerHarness: ServerSideHarness> SmartPullExistingDivergedDatasetScenario
         }
 
         let client_dataset_layout =
-            client_harness.dataset_layout(&server_create_result.dataset_handle.id, "foo");
+            client_harness.dataset_layout(&server_create_result.dataset_handle.id);
 
         // Hard folder synchronization
         copy_dataset_files(&server_dataset_layout, &client_dataset_layout).unwrap();
@@ -102,7 +102,8 @@ impl<TServerHarness: ServerSideHarness> SmartPullExistingDivergedDatasetScenario
 
         let server_dataset = server_harness
             .cli_dataset_registry()
-            .get_dataset_by_handle(&server_create_result.dataset_handle);
+            .get_dataset_by_handle(&server_create_result.dataset_handle)
+            .await;
 
         let compaction_planner = server_harness.cli_compaction_planner();
         let compaction_execution_service = server_harness.cli_compaction_executor();

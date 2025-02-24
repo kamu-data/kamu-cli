@@ -70,7 +70,10 @@ impl VerifyDatasetUseCase for VerifyDatasetUseCaseImpl {
         };
 
         // Resolve dataset
-        let target = self.dataset_registry.get_dataset_by_handle(&request.target);
+        let target = self
+            .dataset_registry
+            .get_dataset_by_handle(&request.target)
+            .await;
 
         // Actual action
         self.verification_service
@@ -107,7 +110,10 @@ impl VerifyDatasetUseCase for VerifyDatasetUseCaseImpl {
                 .await;
             match res {
                 Ok(_) => authorized_requests.push(VerificationRequest {
-                    target: self.dataset_registry.get_dataset_by_handle(&request.target),
+                    target: self
+                        .dataset_registry
+                        .get_dataset_by_handle(&request.target)
+                        .await,
                     block_range: request.block_range,
                     options: request.options,
                 }),

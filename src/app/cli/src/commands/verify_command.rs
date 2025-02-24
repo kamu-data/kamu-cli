@@ -197,7 +197,7 @@ impl VerifyCommand {
                 continue;
             }
 
-            let resolved_dataset = self.dataset_registry.get_dataset_by_handle(&hdl);
+            let resolved_dataset = self.dataset_registry.get_dataset_by_handle(&hdl).await;
             let summary = resolved_dataset
                 .get_summary(odf::dataset::GetSummaryOpts::default())
                 .await

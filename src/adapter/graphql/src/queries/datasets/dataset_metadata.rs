@@ -42,7 +42,7 @@ impl DatasetMetadata {
     /// Last recorded watermark
     #[tracing::instrument(level = "info", name = DatasetMetadata_current_watermark, skip_all)]
     async fn current_watermark(&self, ctx: &Context<'_>) -> Result<Option<DateTime<Utc>>> {
-        let resolved_dataset = get_dataset(ctx, &self.dataset_handle);
+        let resolved_dataset = get_dataset(ctx, &self.dataset_handle).await;
 
         Ok(resolved_dataset
             .as_metadata_chain()
@@ -145,7 +145,9 @@ impl DatasetMetadata {
             dyn kamu_core::MetadataQueryService
         );
 
-        let target = dataset_registry.get_dataset_by_handle(&self.dataset_handle);
+        let target = dataset_registry
+            .get_dataset_by_handle(&self.dataset_handle)
+            .await;
         let source = metadata_query_service
             .get_active_polling_source(target)
             .await
@@ -163,7 +165,9 @@ impl DatasetMetadata {
             dyn kamu_core::DatasetRegistry
         );
 
-        let target = dataset_registry.get_dataset_by_handle(&self.dataset_handle);
+        let target = dataset_registry
+            .get_dataset_by_handle(&self.dataset_handle)
+            .await;
         let mut push_sources: Vec<AddPushSource> = metadata_query_service
             .get_active_push_sources(target)
             .await
@@ -195,7 +199,9 @@ impl DatasetMetadata {
             dyn kamu_core::DatasetRegistry
         );
 
-        let target = dataset_registry.get_dataset_by_handle(&self.dataset_handle);
+        let target = dataset_registry
+            .get_dataset_by_handle(&self.dataset_handle)
+            .await;
         let source = metadata_query_service.get_active_transform(target).await?;
 
         if let Some((_hash, block)) = source {
@@ -212,7 +218,7 @@ impl DatasetMetadata {
     /// Current descriptive information about the dataset
     #[tracing::instrument(level = "info", name = DatasetMetadata_current_info, skip_all)]
     async fn current_info(&self, ctx: &Context<'_>) -> Result<SetInfo> {
-        let resolved_dataset = get_dataset(ctx, &self.dataset_handle);
+        let resolved_dataset = get_dataset(ctx, &self.dataset_handle).await;
 
         Ok(resolved_dataset
             .as_metadata_chain()
@@ -233,7 +239,7 @@ impl DatasetMetadata {
     /// dataset
     #[tracing::instrument(level = "info", name = DatasetMetadata_current_readme, skip_all)]
     async fn current_readme(&self, ctx: &Context<'_>) -> Result<Option<String>> {
-        let resolved_dataset = get_dataset(ctx, &self.dataset_handle);
+        let resolved_dataset = get_dataset(ctx, &self.dataset_handle).await;
 
         Ok(resolved_dataset
             .as_metadata_chain()
@@ -255,7 +261,7 @@ impl DatasetMetadata {
     /// Current license associated with the dataset
     #[tracing::instrument(level = "info", name = DatasetMetadata_current_license, skip_all)]
     async fn current_license(&self, ctx: &Context<'_>) -> Result<Option<SetLicense>> {
-        let resolved_dataset = get_dataset(ctx, &self.dataset_handle);
+        let resolved_dataset = get_dataset(ctx, &self.dataset_handle).await;
 
         Ok(resolved_dataset
             .as_metadata_chain()
@@ -269,7 +275,7 @@ impl DatasetMetadata {
     /// Current vocabulary associated with the dataset
     #[tracing::instrument(level = "info", name = DatasetMetadata_current_vocab, skip_all)]
     async fn current_vocab(&self, ctx: &Context<'_>) -> Result<Option<SetVocab>> {
-        let resolved_dataset = get_dataset(ctx, &self.dataset_handle);
+        let resolved_dataset = get_dataset(ctx, &self.dataset_handle).await;
 
         Ok(resolved_dataset
             .as_metadata_chain()

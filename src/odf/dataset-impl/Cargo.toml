@@ -30,6 +30,7 @@ testing = ["dep:mockall"]
 
 
 [dependencies]
+common-macros = { workspace = true }
 internal-error = { workspace = true }
 file-utils = { workspace = true }
 odf-dataset = { workspace = true }
@@ -40,6 +41,7 @@ odf-storage-http = { optional = true, workspace = true }
 odf-storage-lfs = { optional = true, workspace = true }
 odf-storage-s3 = { optional = true, workspace = true }
 s3-utils = { workspace = true }
+time-source = { workspace = true }
 
 async-stream = "0.3"
 async-trait = "0.1"
@@ -60,9 +62,12 @@ url = { version = "2", default-features = false }
 
 
 [dev-dependencies]
-odf = { workspace = true, features = ["arrow", "lfs", "testing"]}
+odf = { workspace = true, features = ["arrow", "lfs", "s3", "testing"]}
+test-utils = { workspace = true }
 
+futures = "0.3"
 mockall = { version = "0.13", default-features = false }
 tempfile = "3"
 thiserror = { version = "2", default-features = false }
 test-log = { version = "0.2", features = ["trace"] }
+test-group = { version = "1" }

@@ -215,7 +215,9 @@ pub enum SyncError {
     #[error(transparent)]
     RefCollision(#[from] odf::dataset::RefCollisionError),
     #[error(transparent)]
-    CreateDatasetFailed(#[from] odf::dataset::CreateDatasetError),
+    NameCollision(#[from] kamu_datasets::NameCollisionError),
+    #[error(transparent)]
+    CreateDatasetFailed(#[from] kamu_datasets::CreateDatasetError),
     #[error(transparent)]
     UnsupportedProtocol(#[from] odf::dataset::UnsupportedProtocolError),
     #[error(transparent)]
@@ -344,15 +346,15 @@ pub struct CorruptedSourceError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl From<odf::dataset::GetDatasetError> for SyncError {
-    fn from(v: odf::dataset::GetDatasetError) -> Self {
+impl From<odf::DatasetRefUnresolvedError> for SyncError {
+    fn from(v: odf::DatasetRefUnresolvedError) -> Self {
         match v {
-            odf::dataset::GetDatasetError::NotFound(e) => {
+            odf::DatasetRefUnresolvedError::NotFound(e) => {
                 Self::DatasetNotFound(DatasetAnyRefUnresolvedError {
                     dataset_ref: e.dataset_ref.into(),
                 })
             }
-            odf::dataset::GetDatasetError::Internal(e) => Self::Internal(e),
+            odf::DatasetRefUnresolvedError::Internal(e) => Self::Internal(e),
         }
     }
 }

@@ -29,7 +29,9 @@ async fn test_compact_dataset_success() {
     let foo = harness.create_root_dataset(&alias_foo).await;
 
     assert_matches!(
-        harness.compact_dataset(ResolvedDataset::from(&foo)).await,
+        harness
+            .compact_dataset(ResolvedDataset::from_created(&foo))
+            .await,
         Ok(_)
     );
 }
@@ -55,8 +57,8 @@ async fn test_compact_multiple_datasets_success() {
 
     let mut responses = harness
         .compact_datasets(vec![
-            ResolvedDataset::from(&foo),
-            ResolvedDataset::from(&bar),
+            ResolvedDataset::from_created(&foo),
+            ResolvedDataset::from_created(&bar),
         ])
         .await;
 
@@ -94,7 +96,9 @@ async fn test_compact_dataset_unauthorized() {
     let foo = harness.create_root_dataset(&alias_foo).await;
 
     assert_matches!(
-        harness.compact_dataset(ResolvedDataset::from(&foo)).await,
+        harness
+            .compact_dataset(ResolvedDataset::from_created(&foo))
+            .await,
         Err(CompactionError::Access(_))
     );
 }
@@ -120,8 +124,8 @@ async fn test_compact_dataset_mixed_authorization_outcome() {
 
     let mut responses = harness
         .compact_datasets(vec![
-            ResolvedDataset::from(&foo),
-            ResolvedDataset::from(&bar),
+            ResolvedDataset::from_created(&foo),
+            ResolvedDataset::from_created(&bar),
         ])
         .await;
 

@@ -43,7 +43,7 @@ impl DatasetMetadataMut {
         ctx: &Context<'_>,
         content: Option<String>,
     ) -> Result<UpdateReadmeResult> {
-        let resolved_dataset = get_dataset(ctx, &self.dataset_handle);
+        let resolved_dataset = get_dataset(ctx, &self.dataset_handle).await;
 
         let old_attachments = resolved_dataset
             .as_metadata_chain()

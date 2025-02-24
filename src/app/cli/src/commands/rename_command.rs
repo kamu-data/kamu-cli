@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use kamu_datasets::RenameDatasetUseCase;
+use kamu_datasets::{RenameDatasetError, RenameDatasetUseCase};
 
 use super::{CLIError, Command};
 
@@ -50,9 +50,9 @@ impl Command for RenameCommand {
             .await
         {
             Ok(_) => Ok(()),
-            Err(odf::dataset::RenameDatasetError::NotFound(e)) => Err(CLIError::failure(e)),
-            Err(odf::dataset::RenameDatasetError::NameCollision(e)) => Err(CLIError::failure(e)),
-            Err(odf::dataset::RenameDatasetError::Access(e)) => Err(CLIError::failure(e)),
+            Err(RenameDatasetError::NotFound(e)) => Err(CLIError::failure(e)),
+            Err(RenameDatasetError::NameCollision(e)) => Err(CLIError::failure(e)),
+            Err(RenameDatasetError::Access(e)) => Err(CLIError::failure(e)),
             Err(e) => Err(CLIError::critical(e)),
         }?;
 

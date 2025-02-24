@@ -15,6 +15,7 @@ use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions, *};
 use kamu::*;
 use kamu_core::auth::DatasetAction;
 use kamu_core::*;
+use kamu_datasets::CreateDatasetResult;
 use odf::dataset::{DatasetFactoryImpl, IpfsGateway};
 use tempfile::TempDir;
 use url::Url;
@@ -167,7 +168,9 @@ async fn test_pull_sync_success() {
 
     let foo = harness.create_root_dataset(&alias_foo).await;
 
-    harness.copy_dataset_to_remote_repo(&alias_foo).await;
+    harness
+        .copy_dataset_to_remote_repo(&foo.dataset_handle.id, &alias_foo.dataset_name)
+        .await;
 
     let aliases = harness.get_remote_aliases(&foo).await;
     assert!(aliases.is_empty(RemoteAliasKind::Pull));
@@ -246,7 +249,9 @@ async fn test_pull_sync_success_without_saving_alias() {
 
     let foo = harness.create_root_dataset(&alias_foo).await;
 
-    harness.copy_dataset_to_remote_repo(&alias_foo).await;
+    harness
+        .copy_dataset_to_remote_repo(&foo.dataset_handle.id, &alias_foo.dataset_name)
+        .await;
 
     let aliases = harness.get_remote_aliases(&foo).await;
     assert!(aliases.is_empty(RemoteAliasKind::Pull));
@@ -488,7 +493,9 @@ async fn test_pull_all_owned() {
     let bar = harness.create_root_dataset(&alias_bar).await;
     let baz = harness.create_root_dataset(&alias_baz).await;
 
-    harness.copy_dataset_to_remote_repo(&alias_baz).await;
+    harness
+        .copy_dataset_to_remote_repo(&baz.dataset_handle.id, &alias_baz.dataset_name)
+        .await;
     harness
         .get_remote_aliases(&baz)
         .await
@@ -707,24 +714,25 @@ impl PullUseCaseHarness {
         }
     }
 
-    async fn get_remote_aliases(
-        &self,
-        created: &odf::CreateDatasetResult,
-    ) -> Box<dyn RemoteAliases> {
+    async fn get_remote_aliases(&self, created: &CreateDatasetResult) -> Box<dyn RemoteAliases> {
         self.remote_aliases_registry
             .get_remote_aliases(&created.dataset_handle)
             .await
             .unwrap()
     }
 
-    async fn copy_dataset_to_remote_repo(&self, dataset_alias: &odf::DatasetAlias) {
+    async fn copy_dataset_to_remote_repo(
+        &self,
+        dataset_id: &odf::DatasetID,
+        dataset_name: &odf::DatasetName,
+    ) {
         let src_path = self
             .base_use_case_harness
             .temp_dir_path()
             .join("datasets")
-            .join(&dataset_alias.dataset_name);
+            .join(dataset_id.as_multibase().to_stack_string());
 
-        let dst_path = self.remote_tmp_dir.path().join(&dataset_alias.dataset_name);
+        let dst_path = self.remote_tmp_dir.path().join(dataset_name);
 
         tokio::fs::create_dir_all(&dst_path).await.unwrap();
         let copy_options = fs_extra::dir::CopyOptions::new().content_only(true);

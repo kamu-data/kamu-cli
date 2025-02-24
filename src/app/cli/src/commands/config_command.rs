@@ -34,10 +34,6 @@ impl ConfigListCommand {
 
 #[async_trait::async_trait(?Send)]
 impl Command for ConfigListCommand {
-    fn needs_workspace(&self) -> bool {
-        false
-    }
-
     async fn run(&mut self) -> Result<(), CLIError> {
         let result = self.config_svc.list(
             if self.user {
@@ -83,10 +79,6 @@ impl ConfigGetCommand {
 
 #[async_trait::async_trait(?Send)]
 impl Command for ConfigGetCommand {
-    fn needs_workspace(&self) -> bool {
-        false
-    }
-
     async fn run(&mut self) -> Result<(), CLIError> {
         let scope = if self.user {
             ConfigScope::User
@@ -133,10 +125,6 @@ impl ConfigSetCommand {
 
 #[async_trait::async_trait(?Send)]
 impl Command for ConfigSetCommand {
-    fn needs_workspace(&self) -> bool {
-        false
-    }
-
     async fn run(&mut self) -> Result<(), CLIError> {
         let scope = if self.user {
             ConfigScope::User

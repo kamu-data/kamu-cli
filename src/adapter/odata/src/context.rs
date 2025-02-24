@@ -75,26 +75,28 @@ impl ServiceContext for ODataServiceContext {
         } else {
             registry.all_dataset_handles()
         };
-        let readable_dataset_handles_stream =
+        let mut readable_dataset_handles_stream =
             authorizer.filtered_datasets_stream(dataset_handles, DatasetAction::Read);
 
-        let collections = readable_dataset_handles_stream
-            .map_ok(|dataset_handle| {
-                let resolved_dataset = registry.get_dataset_by_handle(&dataset_handle);
-                let context: Arc<dyn CollectionContext> = Arc::new(ODataCollectionContext {
-                    catalog: self.catalog.clone(),
-                    addr: CollectionAddr {
-                        name: dataset_handle.alias.dataset_name.to_string(),
-                        key: None,
-                    },
-                    resolved_dataset,
-                    service_base_url: self.service_base_url.clone(),
-                });
-                context
-            })
-            .try_collect::<Vec<_>>()
+        let mut collections = Vec::new();
+        while let Some(hdl) = readable_dataset_handles_stream
+            .try_next()
             .await
-            .map_err(ODataError::internal)?;
+            .map_err(ODataError::internal)?
+        {
+            let resolved_dataset = registry.get_dataset_by_handle(&hdl).await;
+            let context: Arc<dyn CollectionContext> = Arc::new(ODataCollectionContext {
+                catalog: self.catalog.clone(),
+                addr: CollectionAddr {
+                    name: hdl.alias.dataset_name.to_string(),
+                    key: None,
+                },
+                resolved_dataset,
+                service_base_url: self.service_base_url.clone(),
+            });
+
+            collections.push(context);
+        }
 
         Ok(collections)
     }

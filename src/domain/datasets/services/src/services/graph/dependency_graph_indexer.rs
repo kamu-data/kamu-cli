@@ -71,6 +71,7 @@ impl DependencyGraphIndexer {
             let summary = self
                 .dataset_registry
                 .get_dataset_by_handle(&dataset_handle)
+                .await
                 .get_summary(odf::dataset::GetSummaryOpts::default())
                 .instrument(span)
                 .await

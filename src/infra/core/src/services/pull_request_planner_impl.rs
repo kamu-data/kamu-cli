@@ -151,7 +151,7 @@ impl PullRequestPlannerImpl {
             }
         };
 
-        let target = self.dataset_registry.get_dataset_by_handle(&hdl);
+        let target = self.dataset_registry.get_dataset_by_handle(&hdl).await;
         match DataWriterMetadataState::build(target.clone(), &odf::BlockRef::Head, None).await {
             Ok(metadata_state) => Ok(PullIngestItem {
                 depth: pi.depth,
@@ -179,7 +179,7 @@ impl PullRequestPlannerImpl {
             }
         };
 
-        let target = self.dataset_registry.get_dataset_by_handle(&hdl);
+        let target = self.dataset_registry.get_dataset_by_handle(&hdl).await;
 
         match self
             .transform_request_planner
@@ -470,6 +470,7 @@ impl<'a> PullGraphDepthFirstTraversal<'a> {
             let summary = self
                 .dataset_registry
                 .get_dataset_by_handle(&local_handle)
+                .await
                 .get_summary(odf::dataset::GetSummaryOpts::default())
                 .await
                 .int_err()?;
@@ -520,7 +521,7 @@ impl<'a> PullGraphDepthFirstTraversal<'a> {
                 {
                     Some(hdl) => Some(hdl),
                     None => {
-                        return Err(PullError::NotFound(odf::dataset::DatasetNotFoundError {
+                        return Err(PullError::NotFound(odf::DatasetNotFoundError {
                             dataset_ref: local_ref.clone(),
                         }))
                     }
@@ -535,8 +536,39 @@ impl<'a> PullGraphDepthFirstTraversal<'a> {
                     None
                 };
                 if maybe_local_handle.is_none() {
-                    self.try_inverse_lookup_dataset_by_pull_alias(&remote.remote_ref)
-                        .await?
+                    let maybe_resolved_local_handle = self
+                        .try_inverse_lookup_dataset_by_pull_alias(&remote.remote_ref)
+                        .await?;
+                    if let Some(resolved_local_handle) = &maybe_resolved_local_handle {
+                        // Ensure the alias belongs to same account
+                        if let Some(resolved_account_name) =
+                            &resolved_local_handle.alias.account_name
+                        {
+                            if let CurrentAccountSubject::Logged(l) =
+                                self.current_account_subject.as_ref()
+                            {
+                                if *resolved_account_name != l.account_name {
+                                    return Err(PullError::SaveUnderDifferentAlias(
+                                        resolved_local_handle.alias.to_string(),
+                                    ));
+                                }
+                            } else {
+                                unreachable!("User must be logged by this moment")
+                            }
+                        }
+
+                        // Ensure new alias is identical to the old one
+                        if let Some(local_alias) = &remote.maybe_local_alias
+                            && resolved_local_handle.alias != *local_alias
+                        {
+                            return Err(PullError::SaveUnderDifferentAlias(
+                                resolved_local_handle.alias.to_string(),
+                            ));
+                        }
+                        maybe_resolved_local_handle
+                    } else {
+                        None
+                    }
                 } else {
                     maybe_local_handle
                 }
@@ -572,12 +604,11 @@ impl<'a> PullGraphDepthFirstTraversal<'a> {
             }
         }
 
-        // No luck - now have to search through aliases (of current user)
-        if let CurrentAccountSubject::Logged(l) = self.current_account_subject.as_ref() {
+        // No luck - now have to search through aliases of all users
+        // TODO: implement effecient resolution of aliases
+        if let CurrentAccountSubject::Logged(_) = self.current_account_subject.as_ref() {
             use tokio_stream::StreamExt;
-            let mut datasets = self
-                .dataset_registry
-                .all_dataset_handles_by_owner(&l.account_name);
+            let mut datasets = self.dataset_registry.all_dataset_handles();
             while let Some(dataset_handle) = datasets.next().await {
                 let dataset_handle = dataset_handle?;
                 if self
@@ -590,6 +621,8 @@ impl<'a> PullGraphDepthFirstTraversal<'a> {
                     return Ok(Some(dataset_handle));
                 }
             }
+        } else {
+            unreachable!("User must be logged by this moment")
         }
 
         Ok(None)
@@ -610,7 +643,7 @@ impl<'a> PullGraphDepthFirstTraversal<'a> {
                     if let Some(alias) = local_ref.alias() {
                         alias.clone()
                     } else {
-                        return Err(PullError::NotFound(odf::dataset::DatasetNotFoundError {
+                        return Err(PullError::NotFound(odf::DatasetNotFoundError {
                             dataset_ref: local_ref.clone(),
                         }));
                     }

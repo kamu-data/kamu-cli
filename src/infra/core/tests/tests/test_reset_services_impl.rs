@@ -202,18 +202,17 @@ impl ResetTestHarness {
         )
         .build_typed();
 
-        let create_result = self
+        let dataset_alias = odf::DatasetAlias::new(None, dataset_name.clone());
+
+        let stored = self
             .dataset_storage_unit_writer()
-            .create_dataset(
-                &odf::DatasetAlias::new(None, dataset_name.clone()),
-                seed_block,
-            )
+            .store_dataset(seed_block)
             .await
             .unwrap();
 
-        let dataset_handle = create_result.dataset_handle;
-        let hash_seed_block = create_result.head;
-        let hash_polling_source_block = create_result
+        let dataset_handle = odf::DatasetHandle::new(stored.dataset_id, dataset_alias);
+        let hash_seed_block = stored.head;
+        let hash_polling_source_block = stored
             .dataset
             .commit_event(
                 odf::MetadataEvent::SetPollingSource(MetadataFactory::set_polling_source().build()),
@@ -232,7 +231,7 @@ impl ResetTestHarness {
         block_hash: Option<&odf::Multihash>,
         old_head_maybe: Option<&odf::Multihash>,
     ) -> Result<ResetResult, ResetError> {
-        let target = self.resolve_dataset(dataset_handle);
+        let target = self.resolve_dataset(dataset_handle).await;
 
         let reset_plan = self
             .reset_planner
@@ -245,7 +244,7 @@ impl ResetTestHarness {
     }
 
     async fn get_dataset_head(&self, dataset_handle: &odf::DatasetHandle) -> odf::Multihash {
-        let resolved_dataset = self.resolve_dataset(dataset_handle);
+        let resolved_dataset = self.resolve_dataset(dataset_handle).await;
         resolved_dataset
             .as_metadata_chain()
             .resolve_ref(&odf::BlockRef::Head)
@@ -257,16 +256,17 @@ impl ResetTestHarness {
         &self,
         dataset_handle: &odf::DatasetHandle,
     ) -> odf::DatasetSummary {
-        let resolved_dataset = self.resolve_dataset(dataset_handle);
+        let resolved_dataset = self.resolve_dataset(dataset_handle).await;
         resolved_dataset
             .get_summary(odf::dataset::GetSummaryOpts::default())
             .await
             .unwrap()
     }
 
-    fn resolve_dataset(&self, dataset_handle: &odf::DatasetHandle) -> ResolvedDataset {
+    async fn resolve_dataset(&self, dataset_handle: &odf::DatasetHandle) -> ResolvedDataset {
         self.dataset_registry()
             .get_dataset_by_handle(dataset_handle)
+            .await
     }
 }
 

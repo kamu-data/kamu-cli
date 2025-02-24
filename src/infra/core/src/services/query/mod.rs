@@ -144,7 +144,11 @@ impl KamuSchema {
                     .resolve_dataset_handle_by_ref(&id.as_local_ref())
                     .await
                     .int_err()?;
-                let resolved_dataset = self.inner.dataset_registry.get_dataset_by_handle(&hdl);
+                let resolved_dataset = self
+                    .inner
+                    .dataset_registry
+                    .get_dataset_by_handle(&hdl)
+                    .await;
 
                 tables.insert(
                     opts.alias.clone(),
@@ -174,7 +178,11 @@ impl KamuSchema {
                 );
 
             while let Some(Ok(hdl)) = readable_dataset_handles_stream.next().await {
-                let resolved_dataset = self.inner.dataset_registry.get_dataset_by_handle(&hdl);
+                let resolved_dataset = self
+                    .inner
+                    .dataset_registry
+                    .get_dataset_by_handle(&hdl)
+                    .await;
 
                 tables.insert(
                     hdl.alias.to_string(),

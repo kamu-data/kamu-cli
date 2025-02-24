@@ -116,9 +116,12 @@ impl ServerSideLocalFsHarness {
                 .add::<DependencyGraphServiceImpl>()
                 .add::<InMemoryDatasetDependencyRepository>()
                 .add_value(options.tenancy_config)
-                .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
-                .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
-                .bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
+                .add_builder(
+                    odf::dataset::DatasetStorageUnitLocalFs::builder().with_root(datasets_dir),
+                )
+                .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
+                .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>(
+                )
                 .add_value(ServerUrlConfig::new_test(Some(&base_url_rest)))
                 .add::<CompactionPlannerImpl>()
                 .add::<CompactionExecutorImpl>()
@@ -272,21 +275,9 @@ impl ServerSideHarness for ServerSideLocalFsHarness {
     }
 
     fn dataset_layout(&self, dataset_handle: &odf::DatasetHandle) -> DatasetLayout {
-        let root_path = match self.options.tenancy_config {
-            TenancyConfig::MultiTenant => self
-                .internal_datasets_folder_path()
-                .join(
-                    if let Some(account_name) = &dataset_handle.alias.account_name {
-                        account_name.to_string()
-                    } else {
-                        panic!("Account name not specified in alias");
-                    },
-                )
-                .join(dataset_handle.id.as_multibase().to_stack_string()),
-            TenancyConfig::SingleTenant => self
-                .internal_datasets_folder_path()
-                .join(dataset_handle.alias.dataset_name.clone()),
-        };
+        let root_path = self
+            .internal_datasets_folder_path()
+            .join(dataset_handle.id.as_multibase().to_stack_string());
         DatasetLayout::new(root_path.as_path())
     }
 

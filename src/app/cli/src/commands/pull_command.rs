@@ -987,7 +987,7 @@ fn sanitize_pull_error(original_pull_error: PullError) -> PullError {
             forbidden_error.downcast_ref::<DatasetActionNotEnoughPermissionsError>()
     {
         let dataset_ref = permissions_error.dataset_ref.clone();
-        return PullError::NotFound(odf::dataset::DatasetNotFoundError { dataset_ref });
+        return PullError::NotFound(odf::DatasetNotFoundError { dataset_ref });
     };
 
     // No miracle happened, giving away the error that was

@@ -168,13 +168,6 @@ impl LoginSilentCommand {
 
 #[async_trait::async_trait(?Send)]
 impl Command for LoginSilentCommand {
-    fn needs_workspace(&self) -> bool {
-        match self.scope {
-            odf_server::AccessTokenStoreScope::Workspace => true,
-            odf_server::AccessTokenStoreScope::User => false,
-        }
-    }
-
     async fn run(&mut self) -> Result<(), CLIError> {
         let odf_server_backend_url = self.get_server_url();
 

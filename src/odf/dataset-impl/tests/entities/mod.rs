@@ -9,3 +9,7 @@
 
 mod test_dataset_impl;
 mod test_metadata_chain_impl;
+
+mod test_dataset_storage_unit_local_fs;
+mod test_dataset_storage_unit_s3;
+mod test_dataset_storage_unit_shared;

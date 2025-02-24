@@ -167,9 +167,9 @@ impl SyncServiceImpl {
                 .await
             {
                 Ok(head) => Ok(Some(head)),
-                Err(odf::storage::GetRefError::NotFound(_)) => Ok(None),
-                Err(odf::storage::GetRefError::Access(e)) => Err(SyncError::Access(e)),
-                Err(odf::storage::GetRefError::Internal(e)) => Err(SyncError::Internal(e)),
+                Err(odf::GetRefError::NotFound(_)) => Ok(None),
+                Err(odf::GetRefError::Access(e)) => Err(SyncError::Access(e)),
+                Err(odf::GetRefError::Internal(e)) => Err(SyncError::Internal(e)),
             },
             Err(e) => Err(e.into()),
         }?;
@@ -265,9 +265,9 @@ impl SyncServiceImpl {
 
                             Ok((Some(old_cid), Some(dst_head), Some(chains_comparison)))
                         }
-                        Err(odf::storage::GetRefError::NotFound(_)) => Ok((None, None, None)),
-                        Err(odf::storage::GetRefError::Access(e)) => Err(SyncError::Access(e)),
-                        Err(odf::storage::GetRefError::Internal(e)) => Err(SyncError::Internal(e)),
+                        Err(odf::GetRefError::NotFound(_)) => Ok((None, None, None)),
+                        Err(odf::GetRefError::Access(e)) => Err(SyncError::Access(e)),
+                        Err(odf::GetRefError::Internal(e)) => Err(SyncError::Internal(e)),
                     }
                 }
             }?;
@@ -342,27 +342,25 @@ impl SyncServiceImpl {
                     .iter_blocks_interval(&src_head, None, false);
 
                 while let Some((_, _)) = block_stream.try_next().await.map_err(|e| match e {
-                    odf::dataset::IterBlocksError::RefNotFound(e) => {
-                        SyncError::Internal(e.int_err())
-                    }
-                    odf::dataset::IterBlocksError::BlockNotFound(e) => CorruptedSourceError {
+                    odf::IterBlocksError::RefNotFound(e) => SyncError::Internal(e.int_err()),
+                    odf::IterBlocksError::BlockNotFound(e) => CorruptedSourceError {
                         message: "Source metadata chain is broken".to_owned(),
                         source: Some(e.into()),
                     }
                     .into(),
-                    odf::dataset::IterBlocksError::BlockVersion(e) => CorruptedSourceError {
+                    odf::IterBlocksError::BlockVersion(e) => CorruptedSourceError {
                         message: "Source metadata chain is broken".to_owned(),
                         source: Some(e.into()),
                     }
                     .into(),
-                    odf::dataset::IterBlocksError::BlockMalformed(e) => CorruptedSourceError {
+                    odf::IterBlocksError::BlockMalformed(e) => CorruptedSourceError {
                         message: "Source metadata chain is broken".to_owned(),
                         source: Some(e.into()),
                     }
                     .into(),
-                    odf::dataset::IterBlocksError::InvalidInterval(_) => unreachable!(),
-                    odf::dataset::IterBlocksError::Access(e) => SyncError::Access(e),
-                    odf::dataset::IterBlocksError::Internal(e) => SyncError::Internal(e),
+                    odf::IterBlocksError::InvalidInterval(_) => unreachable!(),
+                    odf::IterBlocksError::Access(e) => SyncError::Access(e),
+                    odf::IterBlocksError::Internal(e) => SyncError::Internal(e),
                 })? {
                     num_blocks += 1;
                 }

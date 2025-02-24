@@ -1,55 +1,55 @@
 version: "3.8"
 
 networks:
-  kamu:
+    kamu:
 
 services:
-  jupyter:
-    image: ghcr.io/kamu-data/kamu-cli-demo-jupyter:0.17.2
-    # Unfortunately running podman within another container requires elevated permissions
-    privileged: true
-    command:
-      - "jupyter"
-      - "notebook"
-      - "--address=0.0.0.0"
-      - "--port=8765"
-      - "--NotebookApp.iopub_data_rate_limit=1000000000"
-    environment:
-      - AWS_ACCESS_KEY_ID=minio
-      - AWS_SECRET_ACCESS_KEY=minio123
-      # This is a free tier token - get one at https://etherscan.io/apis
-      - ETHERSCAN_API_KEY=MST1914HGG228XNGTVQFJRE86QYJ3A52NA
-      # TODO: Restore support for local Minio
-      - GITHUB_LOGIN=guest
-      - KAMU_NODE_URL=odf+https://node.demo.kamu.dev/
-      - KAMU_WEB_UI_URL=https://platform.demo.kamu.dev/
-    # volumes:
-    #   - ./podman-images:/var/lib/containers/shared:ro
-    #   - "./user-home/01 - Kamu Basics (COVID-19 example):/home/jovyan/01 - Kamu Basics (COVID-19 example)"
-    #   - "./user-home/02 - Web3 Data (Ethereum trading example):/home/jovyan/02 - Web3 Data (Ethereum trading example)"
-    #   - "./user-home/XX - Other Examples:/home/jovyan/XX - Other Examples"
-    networks:
-      - kamu
-    ports:
-      - "8765:8765"
-    depends_on:
-      - minio
+    jupyter:
+        image: ghcr.io/kamu-data/kamu-cli-demo-jupyter:0.17.3
+        # Unfortunately running podman within another container requires elevated permissions
+        privileged: true
+        command:
+            - "jupyter"
+            - "notebook"
+            - "--address=0.0.0.0"
+            - "--port=8765"
+            - "--NotebookApp.iopub_data_rate_limit=1000000000"
+        environment:
+            - AWS_ACCESS_KEY_ID=minio
+            - AWS_SECRET_ACCESS_KEY=minio123
+            # This is a free tier token - get one at https://etherscan.io/apis
+            - ETHERSCAN_API_KEY=MST1914HGG228XNGTVQFJRE86QYJ3A52NA
+            # TODO: Restore support for local Minio
+            - GITHUB_LOGIN=guest
+            - KAMU_NODE_URL=odf+https://node.demo.kamu.dev/
+            - KAMU_WEB_UI_URL=https://platform.demo.kamu.dev/
+        # volumes:
+        #   - ./podman-images:/var/lib/containers/shared:ro
+        #   - "./user-home/01 - Kamu Basics (COVID-19 example):/home/jovyan/01 - Kamu Basics (COVID-19 example)"
+        #   - "./user-home/02 - Web3 Data (Ethereum trading example):/home/jovyan/02 - Web3 Data (Ethereum trading example)"
+        #   - "./user-home/XX - Other Examples:/home/jovyan/XX - Other Examples"
+        networks:
+            - kamu
+        ports:
+            - "8765:8765"
+        depends_on:
+            - minio
 
-  minio:
-    image: ghcr.io/kamu-data/kamu-cli-demo-minio:0.17.1
-    command:
-      - "server"
-      - "--address"
-      - ":80"
-      - "/data"
-    environment:
-      - MINIO_ACCESS_KEY=minio
-      - MINIO_SECRET_KEY=minio123
-    # volumes:
-    #   - ./minio-data:/data
-    networks:
-      - kamu
-    expose:
-      - "80"
-    # ports:
-    #   - "9000:9000"
+    minio:
+        image: ghcr.io/kamu-data/kamu-cli-demo-minio:0.17.1
+        command:
+            - "server"
+            - "--address"
+            - ":80"
+            - "/data"
+        environment:
+            - MINIO_ACCESS_KEY=minio
+            - MINIO_SECRET_KEY=minio123
+        # volumes:
+        #   - ./minio-data:/data
+        networks:
+            - kamu
+        expose:
+            - "80"
+        # ports:
+        #   - "9000:9000"

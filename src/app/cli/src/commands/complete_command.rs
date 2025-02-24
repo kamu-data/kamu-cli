@@ -252,10 +252,6 @@ impl CompleteCommand {
 
 #[async_trait::async_trait(?Send)]
 impl Command for CompleteCommand {
-    fn needs_workspace(&self) -> bool {
-        false
-    }
-
     async fn run(&mut self) -> Result<(), CLIError> {
         self.complete(&mut std::io::stdout()).await
     }

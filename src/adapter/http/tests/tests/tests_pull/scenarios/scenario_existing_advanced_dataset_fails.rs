@@ -59,7 +59,7 @@ impl<TServerHarness: ServerSideHarness>
             server_harness.dataset_layout(&server_create_result.dataset_handle);
 
         let client_dataset_layout =
-            client_harness.dataset_layout(&server_create_result.dataset_handle.id, "foo");
+            client_harness.dataset_layout(&server_create_result.dataset_handle.id);
 
         // Hard folder synchronization
         copy_dataset_files(&server_dataset_layout, &client_dataset_layout).unwrap();

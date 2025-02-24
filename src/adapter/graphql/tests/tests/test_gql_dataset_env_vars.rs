@@ -11,9 +11,8 @@ use async_graphql::value;
 use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use dill::Component;
 use indoc::indoc;
-use kamu::DatasetStorageUnitLocalFs;
 use kamu_core::{auth, DidGeneratorDefault, TenancyConfig};
-use kamu_datasets::{CreateDatasetFromSnapshotUseCase, DatasetEnvVarsConfig};
+use kamu_datasets::{CreateDatasetFromSnapshotUseCase, CreateDatasetResult, DatasetEnvVarsConfig};
 use kamu_datasets_inmem::{
     InMemoryDatasetDependencyRepository,
     InMemoryDatasetEntryRepository,
@@ -337,9 +336,12 @@ impl DatasetEnvVarsHarness {
                 .add::<DidGeneratorDefault>()
                 .add_value(DatasetEnvVarsConfig::sample())
                 .add_value(TenancyConfig::SingleTenant)
-                .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
-                .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
-                .bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
+                .add_builder(
+                    odf::dataset::DatasetStorageUnitLocalFs::builder().with_root(datasets_dir),
+                )
+                .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
+                .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>(
+                )
                 .add::<CreateDatasetFromSnapshotUseCaseImpl>()
                 .add::<CreateDatasetUseCaseImpl>()
                 .add::<ViewDatasetUseCaseImpl>()
@@ -366,7 +368,7 @@ impl DatasetEnvVarsHarness {
         }
     }
 
-    async fn create_dataset(&self) -> odf::CreateDatasetResult {
+    async fn create_dataset(&self) -> CreateDatasetResult {
         let create_dataset_from_snapshot = self
             .catalog_authorized
             .get_one::<dyn CreateDatasetFromSnapshotUseCase>()

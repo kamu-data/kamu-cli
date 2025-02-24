@@ -53,7 +53,7 @@ async fn test_verify_data_consistency() {
             .verification_svc
             .verify(
                 VerificationRequest {
-                    target: ResolvedDataset::from(&bar),
+                    target: ResolvedDataset::from_created(&bar),
                     block_range: (None, None),
                     options: VerificationOptions {
                         check_integrity: true,
@@ -124,7 +124,7 @@ async fn test_verify_data_consistency() {
             .verification_svc
             .verify(
                 VerificationRequest {
-                    target: ResolvedDataset::from(&bar),
+                    target: ResolvedDataset::from_created(&bar),
                     block_range: (None, None),
                     options: VerificationOptions {
                         check_integrity: true,
@@ -160,7 +160,7 @@ async fn test_verify_data_consistency() {
     assert_matches!(
         harness.verification_svc.verify(
             VerificationRequest {
-                target: ResolvedDataset::from(&bar),
+                target: ResolvedDataset::from_created(&bar),
                 block_range: (None, None),
                 options: VerificationOptions {
                     check_integrity: true,

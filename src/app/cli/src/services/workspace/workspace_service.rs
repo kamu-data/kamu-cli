@@ -127,7 +127,7 @@ impl WorkspaceService {
     }
 
     /// Perform an upgrade of the workspace if necessary
-    pub fn upgrade(&self) -> Result<WorkspaceUpgradeResult, WorkspaceUpgradeError> {
+    pub async fn upgrade(&self) -> Result<WorkspaceUpgradeResult, WorkspaceUpgradeError> {
         let prev_version = self
             .workspace_version()?
             .expect("Upgrade called when not in workspace");
@@ -157,7 +157,10 @@ impl WorkspaceService {
                 WorkspaceVersion::V2_DatasetConfig => self.upgrade_2_to_3(),
                 WorkspaceVersion::V3_SavepointCreatedAt => self.upgrade_3_to_4(),
                 WorkspaceVersion::V4_SavepointZeroCopy => self.upgrade_4_to_5(),
-                WorkspaceVersion::V5_BreakingMetadataChanges => panic!("Already of latest version"),
+                WorkspaceVersion::V5_BreakingMetadataChanges => self.upgrade_5_to_6().await,
+                WorkspaceVersion::V6_DatasetRepositoryUnification => {
+                    panic!("Already of latest version")
+                }
                 WorkspaceVersion::Unknown(_) => {
                     Err(WorkspaceFutureVersionError::new(current_version, new_version).into())
                 }
@@ -254,6 +257,118 @@ impl WorkspaceService {
              of our releases.",
         )
         .into())
+    }
+
+    async fn upgrade_5_to_6(&self) -> Result<(), WorkspaceUpgradeError> {
+        if self.workspace_layout.datasets_dir.exists() {
+            if self.is_multi_tenant_workspace() {
+                for r_account_dir in self.workspace_layout.datasets_dir.read_dir().int_err()? {
+                    let account_dir_entry = r_account_dir.int_err()?;
+                    if let Some(s) = account_dir_entry.file_name().to_str() {
+                        if s.starts_with('.') {
+                            continue;
+                        }
+                    }
+                    if !account_dir_entry.path().is_dir() {
+                        continue;
+                    }
+
+                    let read_dataset_dir = std::fs::read_dir(account_dir_entry.path()).int_err()?;
+                    for r_dataset_dir in read_dataset_dir {
+                        let dataset_dir_entry = r_dataset_dir.int_err()?;
+                        if let Some(s) = dataset_dir_entry.file_name().to_str() {
+                            if s.starts_with('.') {
+                                continue;
+                            }
+                        }
+
+                        let dataset_current_path = dataset_dir_entry.path();
+                        let dataset_id = self.read_dataset_id_from(&dataset_current_path).await?;
+                        let dataset_alias =
+                            self.read_dataset_alias_from(&dataset_current_path).await?;
+                        let migrated_path =
+                            self.move_dataset_to_v6_location(&dataset_current_path, &dataset_id)?;
+
+                        std::fs::write(
+                            migrated_path.join("info/alias"),
+                            format!(
+                                "{}/{}",
+                                account_dir_entry.file_name().to_str().unwrap(),
+                                dataset_alias.dataset_name
+                            ),
+                        )
+                        .int_err()?;
+                    }
+
+                    std::fs::remove_dir(account_dir_entry.path()).int_err()?;
+                }
+            } else {
+                for res in self.workspace_layout.datasets_dir.read_dir().int_err()? {
+                    let dataset_dir_entry = res.int_err()?;
+                    if let Some(s) = dataset_dir_entry.file_name().to_str() {
+                        if s.starts_with('.') {
+                            continue;
+                        }
+                    }
+
+                    let dataset_current_path = dataset_dir_entry.path();
+                    let dataset_id = self.read_dataset_id_from(&dataset_current_path).await?;
+                    let migrated_path =
+                        self.move_dataset_to_v6_location(&dataset_current_path, &dataset_id)?;
+
+                    std::fs::write(
+                        migrated_path.join("info/alias"),
+                        dataset_dir_entry.file_name().to_str().unwrap(),
+                    )
+                    .int_err()?;
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn read_dataset_id_from(
+        &self,
+        dataset_dir_path: &std::path::Path,
+    ) -> Result<odf::DatasetID, InternalError> {
+        let dataset = odf::dataset::DatasetFactoryImpl::get_local_fs(
+            odf::dataset::DatasetLayout::new(dataset_dir_path),
+        );
+
+        use odf::Dataset;
+        let dataset_summary = dataset
+            .get_summary(odf::dataset::GetSummaryOpts::default())
+            .await
+            .int_err()?;
+
+        Ok(dataset_summary.id)
+    }
+
+    async fn read_dataset_alias_from(
+        &self,
+        dataset_dir_path: &std::path::Path,
+    ) -> Result<odf::DatasetAlias, InternalError> {
+        let dataset = odf::dataset::DatasetFactoryImpl::get_local_fs(
+            odf::dataset::DatasetLayout::new(dataset_dir_path),
+        );
+        odf::dataset::read_dataset_alias(&dataset).await
+    }
+
+    fn move_dataset_to_v6_location(
+        &self,
+        existing_path: &Path,
+        dataset_id: &odf::DatasetID,
+    ) -> Result<std::path::PathBuf, InternalError> {
+        let migrated_path = self
+            .workspace_layout
+            .datasets_dir
+            .as_path()
+            .join(dataset_id.as_multibase().to_stack_string());
+
+        std::fs::rename(existing_path, &migrated_path).int_err()?;
+
+        Ok(migrated_path)
     }
 }
 

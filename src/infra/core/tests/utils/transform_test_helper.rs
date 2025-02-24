@@ -65,19 +65,17 @@ impl TransformTestHelper {
         }
     }
 
-    pub async fn transform_dataset(&self, derived: &odf::CreateDatasetResult) -> TransformResult {
-        let deriv_target = ResolvedDataset::from(derived);
-
+    pub async fn transform_dataset(&self, derived_target: ResolvedDataset) -> TransformResult {
         let plan = self
             .transform_request_planner
-            .build_transform_preliminary_plan(deriv_target.clone())
+            .build_transform_preliminary_plan(derived_target.clone())
             .await
             .unwrap();
 
         let plan = match self
             .transform_elab_svc
             .elaborate_transform(
-                deriv_target.clone(),
+                derived_target.clone(),
                 plan,
                 TransformOptions::default(),
                 None,
@@ -90,7 +88,7 @@ impl TransformTestHelper {
         };
 
         self.transform_executor
-            .execute_transform(deriv_target, plan, None)
+            .execute_transform(derived_target, plan, None)
             .await
             .1
             .unwrap()
@@ -98,18 +96,16 @@ impl TransformTestHelper {
 
     pub async fn verify_transform(
         &self,
-        derived: &odf::CreateDatasetResult,
+        derived_target: ResolvedDataset,
     ) -> Result<(), VerifyTransformError> {
-        let deriv_target = ResolvedDataset::from(derived);
-
         let verify_plan = self
             .transform_request_planner
-            .build_transform_verification_plan(deriv_target.clone(), (None, None))
+            .build_transform_verification_plan(derived_target.clone(), (None, None))
             .await
             .map_err(VerifyTransformError::Plan)?;
 
         self.transform_executor
-            .execute_verify_transform(deriv_target, verify_plan, None)
+            .execute_verify_transform(derived_target, verify_plan, None)
             .await
             .map_err(VerifyTransformError::Execute)
     }

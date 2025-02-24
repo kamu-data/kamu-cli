@@ -28,7 +28,7 @@ async fn test_verify_success() {
 
     let foo = harness.create_root_dataset(&alias_foo).await;
     assert_matches!(
-        harness.verify_dataset(ResolvedDataset::from(&foo)).await,
+        harness.verify_dataset(ResolvedDataset::from_created(&foo)).await,
         VerificationResult {
             dataset_handle: Some(dataset_handle),
             outcome: Ok(()),
@@ -57,8 +57,8 @@ async fn test_verify_multiple_success() {
 
     let mut responses = harness
         .verify_datasets(vec![
-            ResolvedDataset::from(&foo),
-            ResolvedDataset::from(&bar),
+            ResolvedDataset::from_created(&foo),
+            ResolvedDataset::from_created(&bar),
         ])
         .await;
 
@@ -98,7 +98,7 @@ async fn test_verify_unauthorized() {
 
     let foo = harness.create_root_dataset(&alias_foo).await;
     assert_matches!(
-        harness.verify_dataset(ResolvedDataset::from(&foo)).await,
+        harness.verify_dataset(ResolvedDataset::from_created(&foo)).await,
         VerificationResult {
             dataset_handle: Some(dataset_handle),
             outcome: Err(VerificationError::Access(_)),
@@ -135,9 +135,9 @@ async fn test_verify_mixed_authorization_outcome() {
 
     let mut responses = harness
         .verify_datasets(vec![
-            ResolvedDataset::from(&foo),
-            ResolvedDataset::from(&bar),
-            ResolvedDataset::from(&baz),
+            ResolvedDataset::from_created(&foo),
+            ResolvedDataset::from_created(&bar),
+            ResolvedDataset::from_created(&baz),
         ])
         .await;
 

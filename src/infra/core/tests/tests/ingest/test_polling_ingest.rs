@@ -98,7 +98,9 @@ async fn test_ingest_polling_snapshot() {
 
     let dataset_alias = dataset_snapshot.name.clone();
 
-    let created = harness.create_dataset(dataset_snapshot).await;
+    let stored = harness.create_dataset(dataset_snapshot).await;
+    let target = ResolvedDataset::from_stored(&stored, &dataset_alias);
+
     let data_helper = harness.dataset_data_helper(&dataset_alias).await;
 
     // Round 1
@@ -115,7 +117,7 @@ async fn test_ingest_polling_snapshot() {
     )
     .unwrap();
 
-    harness.ingest(&created).await.unwrap();
+    harness.ingest(target.clone()).await.unwrap();
 
     data_helper
         .assert_last_data_eq(
@@ -173,7 +175,7 @@ async fn test_ingest_polling_snapshot() {
         .time_source
         .set(Utc.with_ymd_and_hms(2050, 2, 1, 12, 0, 0).unwrap());
 
-    harness.ingest(&created).await.unwrap();
+    harness.ingest(target.clone()).await.unwrap();
 
     data_helper
         .assert_last_data_records_eq(indoc!(
@@ -216,7 +218,7 @@ async fn test_ingest_polling_snapshot() {
         .time_source
         .set(Utc.with_ymd_and_hms(2050, 2, 1, 12, 0, 0).unwrap());
 
-    harness.ingest(&created).await.unwrap();
+    harness.ingest(target).await.unwrap();
     let event = data_helper
         .get_last_block_typed::<odf::metadata::AddData>()
         .await
@@ -275,7 +277,9 @@ async fn test_ingest_polling_ledger() {
 
     let dataset_alias = dataset_snapshot.name.clone();
 
-    let created = harness.create_dataset(dataset_snapshot).await;
+    let stored = harness.create_dataset(dataset_snapshot).await;
+    let target = ResolvedDataset::from_stored(&stored, &dataset_alias);
+
     let data_helper = harness.dataset_data_helper(&dataset_alias).await;
 
     // Round 1
@@ -292,7 +296,7 @@ async fn test_ingest_polling_ledger() {
     )
     .unwrap();
 
-    harness.ingest(&created).await.unwrap();
+    harness.ingest(target.clone()).await.unwrap();
     data_helper
         .assert_last_data_eq(
             indoc!(
@@ -345,7 +349,7 @@ async fn test_ingest_polling_ledger() {
     )
     .unwrap();
 
-    harness.ingest(&created).await.unwrap();
+    harness.ingest(target.clone()).await.unwrap();
 
     data_helper
         .assert_last_data_records_eq(indoc!(
@@ -381,7 +385,7 @@ async fn test_ingest_polling_ledger() {
     )
     .unwrap();
 
-    harness.ingest(&created).await.unwrap();
+    harness.ingest(target.clone()).await.unwrap();
 
     data_helper
         .assert_last_data_records_eq(indoc!(
@@ -417,7 +421,7 @@ async fn test_ingest_polling_ledger() {
     )
     .unwrap();
 
-    harness.ingest(&created).await.unwrap();
+    harness.ingest(target.clone()).await.unwrap();
     let event = data_helper
         .get_last_block_typed::<odf::metadata::AddData>()
         .await
@@ -433,7 +437,7 @@ async fn test_ingest_polling_ledger() {
     // Round 5 (empty data, commit only updates the source state)
     std::fs::write(&src_path, "").unwrap();
 
-    harness.ingest(&created).await.unwrap();
+    harness.ingest(target).await.unwrap();
     let event = data_helper
         .get_last_block_typed::<odf::metadata::AddData>()
         .await
@@ -494,11 +498,13 @@ async fn test_ingest_polling_empty_data() {
 
     let dataset_alias = dataset_snapshot.name.clone();
 
-    let created = harness.create_dataset(dataset_snapshot).await;
+    let stored = harness.create_dataset(dataset_snapshot).await;
+    let target = ResolvedDataset::from_stored(&stored, &dataset_alias);
+
     let data_helper = harness.dataset_data_helper(&dataset_alias).await;
 
     std::fs::write(&src_path, "").unwrap();
-    harness.ingest(&created).await.unwrap();
+    harness.ingest(target).await.unwrap();
 
     // Should only contain source state
     let event = data_helper
@@ -555,8 +561,9 @@ async fn test_ingest_polling_event_time_as_date() {
         .build();
 
     let dataset_alias = dataset_snapshot.name.clone();
+    let stored = harness.create_dataset(dataset_snapshot).await;
+    let target = ResolvedDataset::from_stored(&stored, &dataset_alias);
 
-    let created = harness.create_dataset(dataset_snapshot).await;
     let data_helper = harness.dataset_data_helper(&dataset_alias).await;
 
     std::fs::write(
@@ -572,7 +579,7 @@ async fn test_ingest_polling_event_time_as_date() {
     )
     .unwrap();
 
-    harness.ingest(&created).await.unwrap();
+    harness.ingest(target).await.unwrap();
 
     data_helper
         .assert_last_data_eq(
@@ -652,7 +659,10 @@ async fn test_ingest_polling_event_time_of_invalid_type() {
         })
         .build();
 
-    let created = harness.create_dataset(dataset_snapshot).await;
+    let dataset_alias = dataset_snapshot.name.clone();
+
+    let stored = harness.create_dataset(dataset_snapshot).await;
+    let target = ResolvedDataset::from_stored(&stored, &dataset_alias);
 
     std::fs::write(
         &src_path,
@@ -667,7 +677,7 @@ async fn test_ingest_polling_event_time_of_invalid_type() {
     )
     .unwrap();
 
-    let res = harness.ingest(&created).await;
+    let res = harness.ingest(target).await;
     assert_matches!(res, Err(PollingIngestError::BadInputSchema(_)));
 }
 
@@ -710,8 +720,9 @@ async fn test_ingest_polling_bad_column_names_preserve() {
         .build();
 
     let dataset_alias = dataset_snapshot.name.clone();
+    let stored = harness.create_dataset(dataset_snapshot).await;
+    let target = ResolvedDataset::from_stored(&stored, &dataset_alias);
 
-    let created = harness.create_dataset(dataset_snapshot).await;
     let data_helper = harness.dataset_data_helper(&dataset_alias).await;
 
     std::fs::write(
@@ -726,7 +737,7 @@ async fn test_ingest_polling_bad_column_names_preserve() {
     )
     .unwrap();
 
-    harness.ingest(&created).await.unwrap();
+    harness.ingest(target).await.unwrap();
     data_helper
         .assert_last_data_eq(
             indoc!(
@@ -802,8 +813,9 @@ async fn test_ingest_polling_bad_column_names_rename() {
         .build();
 
     let dataset_alias = dataset_snapshot.name.clone();
+    let stored = harness.create_dataset(dataset_snapshot).await;
+    let target = ResolvedDataset::from_stored(&stored, &dataset_alias);
 
-    let created = harness.create_dataset(dataset_snapshot).await;
     let data_helper = harness.dataset_data_helper(&dataset_alias).await;
 
     std::fs::write(
@@ -818,7 +830,7 @@ async fn test_ingest_polling_bad_column_names_rename() {
     )
     .unwrap();
 
-    harness.ingest(&created).await.unwrap();
+    harness.ingest(target).await.unwrap();
 
     data_helper
         .assert_last_data_eq(
@@ -895,8 +907,9 @@ async fn test_ingest_polling_schema_case_sensitivity() {
         .build();
 
     let dataset_alias = dataset_snapshot.name.clone();
+    let stored = harness.create_dataset(dataset_snapshot).await;
+    let target = ResolvedDataset::from_stored(&stored, &dataset_alias);
 
-    let created = harness.create_dataset(dataset_snapshot).await;
     let data_helper = harness.dataset_data_helper(&dataset_alias).await;
 
     // Round 1
@@ -913,7 +926,7 @@ async fn test_ingest_polling_schema_case_sensitivity() {
     )
     .unwrap();
 
-    harness.ingest(&created).await.unwrap();
+    harness.ingest(target.clone()).await.unwrap();
 
     data_helper
         .assert_last_data_eq(
@@ -972,7 +985,7 @@ async fn test_ingest_polling_schema_case_sensitivity() {
         .time_source
         .set(Utc.with_ymd_and_hms(2050, 1, 2, 12, 0, 0).unwrap());
 
-    harness.ingest(&created).await.unwrap();
+    harness.ingest(target.clone()).await.unwrap();
 
     data_helper
         .assert_last_data_records_eq(indoc!(
@@ -1015,7 +1028,7 @@ async fn test_ingest_polling_schema_case_sensitivity() {
         .time_source
         .set(Utc.with_ymd_and_hms(2050, 1, 3, 12, 0, 0).unwrap());
 
-    harness.ingest(&created).await.unwrap();
+    harness.ingest(target).await.unwrap();
     let event = data_helper
         .get_last_block_typed::<odf::metadata::AddData>()
         .await
@@ -1086,9 +1099,10 @@ async fn test_ingest_polling_preprocess_with_spark() {
         .build();
 
     let dataset_alias = dataset_snapshot.name.clone();
+    let stored = harness.create_dataset(dataset_snapshot).await;
+    let target = ResolvedDataset::from_stored(&stored, &dataset_alias);
 
-    let created = harness.create_dataset(dataset_snapshot).await;
-    harness.ingest(&created).await.unwrap();
+    harness.ingest(target).await.unwrap();
 
     let data_helper = harness.dataset_data_helper(&dataset_alias).await;
 
@@ -1178,9 +1192,10 @@ async fn test_ingest_polling_preprocess_with_flink() {
         .build();
 
     let dataset_alias = dataset_snapshot.name.clone();
+    let stored = harness.create_dataset(dataset_snapshot).await;
+    let target = ResolvedDataset::from_stored(&stored, &dataset_alias);
 
-    let created = harness.create_dataset(dataset_snapshot).await;
-    harness.ingest(&created).await.unwrap();
+    harness.ingest(target).await.unwrap();
 
     let data_helper = harness.dataset_data_helper(&dataset_alias).await;
 
@@ -1245,9 +1260,9 @@ impl IngestTestHarness {
             .add::<ObjectStoreBuilderLocalFs>()
             .add_value(CurrentAccountSubject::new_test())
             .add_value(TenancyConfig::SingleTenant)
-            .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
-            .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
-            .bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
+            .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
+            .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
+            .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>()
             .add::<DatasetRegistrySoloUnitBridge>()
             .add_value(EngineProvisionerLocalConfig::default())
             .add::<EngineProvisionerLocal>()
@@ -1275,7 +1290,7 @@ impl IngestTestHarness {
     async fn create_dataset(
         &self,
         dataset_snapshot: odf::DatasetSnapshot,
-    ) -> odf::CreateDatasetResult {
+    ) -> odf::dataset::StoreDatasetResult {
         create_test_dataset_from_snapshot(
             self.dataset_registry.as_ref(),
             self.dataset_storage_unit_writer.as_ref(),
@@ -1289,10 +1304,8 @@ impl IngestTestHarness {
 
     async fn ingest(
         &self,
-        created: &odf::CreateDatasetResult,
+        target: ResolvedDataset,
     ) -> Result<PollingIngestResult, PollingIngestError> {
-        let target = ResolvedDataset::from(created);
-
         let metadata_state =
             DataWriterMetadataState::build(target.clone(), &odf::BlockRef::Head, None)
                 .await

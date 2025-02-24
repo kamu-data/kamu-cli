@@ -7,13 +7,15 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use dill::Component;
+use dill::{component, interface, Component};
 use indoc::indoc;
-use kamu::{DatasetRegistrySoloUnitBridge, DatasetStorageUnitLocalFs};
+use internal_error::{ErrorIntoInternal, InternalError};
+use kamu::DatasetRegistrySoloUnitBridge;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::auth::AlwaysHappyDatasetActionAuthorizer;
 use kamu_core::TenancyConfig;
-use kamu_datasets_services::ViewDatasetUseCaseImpl;
+use kamu_datasets::{ViewDatasetUseCase, ViewDatasetUseCaseError, ViewMultiResponse};
+use thiserror::Error;
 use time_source::SystemTimeSourceDefault;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -62,6 +64,31 @@ async fn test_malformed_argument() {
 
 #[test_log::test(tokio::test)]
 async fn test_internal_error() {
+    #[component]
+    #[interface(dyn ViewDatasetUseCase)]
+    struct ErrorViewDatasetUseCaseImpl {}
+
+    #[async_trait::async_trait]
+    impl ViewDatasetUseCase for ErrorViewDatasetUseCaseImpl {
+        async fn execute(
+            &self,
+            _: &odf::DatasetRef,
+        ) -> Result<odf::DatasetHandle, ViewDatasetUseCaseError> {
+            #[derive(Debug, Error)]
+            #[error("I'm a dummy error that should not propagate through")]
+            struct DummyError {}
+
+            Err(ViewDatasetUseCaseError::Internal((DummyError {}).int_err()))
+        }
+
+        async fn execute_multi(
+            &self,
+            _: Vec<odf::DatasetRef>,
+        ) -> Result<ViewMultiResponse, InternalError> {
+            unimplemented!()
+        }
+    }
+
     let tempdir = tempfile::tempdir().unwrap();
 
     let cat = dill::CatalogBuilder::new()
@@ -69,11 +96,12 @@ async fn test_internal_error() {
         .add_value(CurrentAccountSubject::new_test())
         .add_value(TenancyConfig::SingleTenant)
         .add_builder(
-            DatasetStorageUnitLocalFs::builder().with_root(tempdir.path().join("datasets")),
+            odf::dataset::DatasetStorageUnitLocalFs::builder()
+                .with_root(tempdir.path().join("datasets")),
         )
-        .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
+        .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
         .add::<DatasetRegistrySoloUnitBridge>()
-        .add::<ViewDatasetUseCaseImpl>()
+        .add::<ErrorViewDatasetUseCaseImpl>()
         .add::<AlwaysHappyDatasetActionAuthorizer>()
         .build();
 

@@ -234,7 +234,7 @@ pub async fn odata_collection_handler_common(
     .unwrap();
 
     let registry: Arc<dyn DatasetRegistry> = catalog.get_one().unwrap();
-    let resolved_dataset = registry.get_dataset_by_handle(&dataset_handle);
+    let resolved_dataset = registry.get_dataset_by_handle(&dataset_handle).await;
 
     let ctx = ODataCollectionContext::new(catalog, addr, resolved_dataset);
     let response = datafusion_odata::handlers::odata_collection_handler(

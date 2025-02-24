@@ -19,27 +19,27 @@ pub trait DependencyGraphService: Sync + Send {
     async fn get_downstream_dependencies(
         &self,
         dataset_id: &odf::DatasetID,
-    ) -> Result<DatasetIDStream, GetDependenciesError>;
+    ) -> Result<DependencyDatasetIDStream, GetDependenciesError>;
 
     /// Iterates over 1st level of dataset's upstream dependencies
     async fn get_upstream_dependencies(
         &self,
         dataset_id: &odf::DatasetID,
-    ) -> Result<DatasetIDStream, GetDependenciesError>;
+    ) -> Result<DependencyDatasetIDStream, GetDependenciesError>;
 
     /// Iterates over all levels of dataset's upstream dependencies
     /// and return reversed result including passed parameters
     async fn get_recursive_upstream_dependencies(
         &self,
         dataset_ids: Vec<odf::DatasetID>,
-    ) -> Result<DatasetIDStream, GetDependenciesError>;
+    ) -> Result<DependencyDatasetIDStream, GetDependenciesError>;
 
     /// Iterates over all levels of dataset's downstream dependencies
     /// and return result including passed parameters
     async fn get_recursive_downstream_dependencies(
         &self,
         dataset_ids: Vec<odf::DatasetID>,
-    ) -> Result<DatasetIDStream, GetDependenciesError>;
+    ) -> Result<DependencyDatasetIDStream, GetDependenciesError>;
 
     /// Given a set of dataset IDs this will sort them in depth-first or
     /// breadth-first graph traversal order which is useful for operations that
@@ -54,7 +54,8 @@ pub trait DependencyGraphService: Sync + Send {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub type DatasetIDStream<'a> = std::pin::Pin<Box<dyn Stream<Item = odf::DatasetID> + Send + 'a>>;
+pub type DependencyDatasetIDStream<'a> =
+    std::pin::Pin<Box<dyn Stream<Item = odf::DatasetID> + Send + 'a>>;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

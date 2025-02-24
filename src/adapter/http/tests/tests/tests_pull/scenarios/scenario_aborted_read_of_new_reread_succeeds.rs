@@ -71,7 +71,7 @@ impl<TServerHarness: ServerSideHarness>
         .await;
 
         let client_dataset_layout =
-            client_harness.dataset_layout(&server_create_result.dataset_handle.id, "foo");
+            client_harness.dataset_layout(&server_create_result.dataset_handle.id);
 
         // Let's pretend that previous attempts uploaded some data files, but the rest
         // was discarded. To mimic this, artificially copy just the data folder,

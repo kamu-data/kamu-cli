@@ -326,56 +326,52 @@ pub enum CompareChainsError {
     ),
 }
 
-impl From<odf::storage::GetBlockError> for CompareChainsError {
-    fn from(v: odf::storage::GetBlockError) -> Self {
+impl From<odf::GetBlockError> for CompareChainsError {
+    fn from(v: odf::GetBlockError) -> Self {
         match v {
-            odf::storage::GetBlockError::NotFound(e) => Self::Corrupted(CorruptedSourceError {
+            odf::GetBlockError::NotFound(e) => Self::Corrupted(CorruptedSourceError {
                 message: "Metadata chain is broken".to_owned(),
                 source: Some(e.into()),
             }),
-            odf::storage::GetBlockError::BlockVersion(e) => Self::Corrupted(CorruptedSourceError {
+            odf::GetBlockError::BlockVersion(e) => Self::Corrupted(CorruptedSourceError {
                 message: "Metadata chain is broken".to_owned(),
                 source: Some(e.into()),
             }),
-            odf::storage::GetBlockError::BlockMalformed(e) => {
-                Self::Corrupted(CorruptedSourceError {
-                    message: "Metadata chain is broken".to_owned(),
-                    source: Some(e.into()),
-                })
-            }
-            odf::storage::GetBlockError::Access(e) => Self::Access(e),
-            odf::storage::GetBlockError::Internal(e) => Self::Internal(e),
+            odf::GetBlockError::BlockMalformed(e) => Self::Corrupted(CorruptedSourceError {
+                message: "Metadata chain is broken".to_owned(),
+                source: Some(e.into()),
+            }),
+            odf::GetBlockError::Access(e) => Self::Access(e),
+            odf::GetBlockError::Internal(e) => Self::Internal(e),
         }
     }
 }
 
-impl From<odf::dataset::IterBlocksError> for CompareChainsError {
-    fn from(v: odf::dataset::IterBlocksError) -> Self {
+impl From<odf::IterBlocksError> for CompareChainsError {
+    fn from(v: odf::IterBlocksError) -> Self {
         match v {
-            odf::dataset::IterBlocksError::RefNotFound(e) => {
-                CompareChainsError::Internal(e.int_err())
-            }
-            odf::dataset::IterBlocksError::BlockNotFound(e) => {
+            odf::IterBlocksError::RefNotFound(e) => CompareChainsError::Internal(e.int_err()),
+            odf::IterBlocksError::BlockNotFound(e) => {
                 CompareChainsError::Corrupted(CorruptedSourceError {
                     message: "Metadata chain is broken".to_owned(),
                     source: Some(e.into()),
                 })
             }
-            odf::dataset::IterBlocksError::BlockVersion(e) => {
+            odf::IterBlocksError::BlockVersion(e) => {
                 CompareChainsError::Corrupted(CorruptedSourceError {
                     message: "Metadata chain is broken".to_owned(),
                     source: Some(e.into()),
                 })
             }
-            odf::dataset::IterBlocksError::BlockMalformed(e) => {
+            odf::IterBlocksError::BlockMalformed(e) => {
                 CompareChainsError::Corrupted(CorruptedSourceError {
                     message: "Metadata chain is broken".to_owned(),
                     source: Some(e.into()),
                 })
             }
-            odf::dataset::IterBlocksError::InvalidInterval(_) => unreachable!(),
-            odf::dataset::IterBlocksError::Access(e) => CompareChainsError::Access(e),
-            odf::dataset::IterBlocksError::Internal(e) => CompareChainsError::Internal(e),
+            odf::IterBlocksError::InvalidInterval(_) => unreachable!(),
+            odf::IterBlocksError::Access(e) => CompareChainsError::Access(e),
+            odf::IterBlocksError::Internal(e) => CompareChainsError::Internal(e),
         }
     }
 }
@@ -408,10 +404,7 @@ impl<'a> MetadataChainWithStats<'a> {
 
 #[async_trait]
 impl odf::MetadataChain for MetadataChainWithStats<'_> {
-    async fn resolve_ref(
-        &self,
-        r: &odf::BlockRef,
-    ) -> Result<odf::Multihash, odf::storage::GetRefError> {
+    async fn resolve_ref(&self, r: &odf::BlockRef) -> Result<odf::Multihash, odf::GetRefError> {
         self.chain.resolve_ref(r).await
     }
 
@@ -442,7 +435,7 @@ impl odf::MetadataChain for MetadataChainWithStats<'_> {
     async fn get_block(
         &self,
         hash: &odf::Multihash,
-    ) -> Result<odf::MetadataBlock, odf::storage::GetBlockError> {
+    ) -> Result<odf::MetadataBlock, odf::GetBlockError> {
         (self.on_read)(1);
         self.chain.get_block(hash).await
     }
