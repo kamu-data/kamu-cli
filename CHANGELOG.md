@@ -11,10 +11,11 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## Unreleased
+## [0.225.3] - 2025-02-24
 ### Fixed
-- E2E: `repo-tests` crete again contains the `kamu-cli` dependency, but as an optional one
+- E2E: `repo-tests` crate again contains the `kamu-cli` dependency, but as an optional one
   - This way we can correctly reuse the tests in the `kamu-node` repository without affecting the build time
+  - It also fixes `make sqlx-prepate` developer command
 
 ## [0.225.2] - 2025-02-24
 ### Added
