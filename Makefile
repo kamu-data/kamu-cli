@@ -52,7 +52,7 @@ clippy:
 .PHONY: lint-openapi
 lint-openapi:
 	$(KAMU_CONTAINER_RUNTIME_TYPE) run --rm -t \
-		-v "${PWD}:/data:ro" \
+		-v "${PWD}:/data:ro,Z" \
   		ibmdevxsdk/openapi-validator:1.31.0 \
 		--config src/adapter/http/resources/openapi/linter-config.yaml \
 		--ruleset src/adapter/http/resources/openapi/linter-ruleset.yaml \

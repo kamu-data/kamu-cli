@@ -65,6 +65,7 @@ type DatasetImplLocalFS = DatasetImpl<
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[cfg(feature = "s3")]
 #[component(pub)]
 #[interface(dyn DatasetFactory)]
 impl DatasetFactoryImpl {
@@ -80,11 +81,31 @@ impl DatasetFactoryImpl {
             ipfs_gateway,
             #[cfg(feature = "http")]
             access_token_resolver,
-            #[cfg(feature = "s3")]
             maybe_s3_metrics,
         }
     }
+}
 
+#[cfg(not(feature = "s3"))]
+#[component(pub)]
+#[interface(dyn DatasetFactory)]
+impl DatasetFactoryImpl {
+    #[allow(clippy::needless_pass_by_value)]
+    #[allow(unused_variables)]
+    pub fn new(
+        ipfs_gateway: IpfsGateway,
+        access_token_resolver: Arc<dyn OdfServerAccessTokenResolver>,
+    ) -> Self {
+        Self {
+            #[cfg(feature = "http")]
+            ipfs_gateway,
+            #[cfg(feature = "http")]
+            access_token_resolver,
+        }
+    }
+}
+
+impl DatasetFactoryImpl {
     #[cfg(feature = "lfs")]
     pub fn get_local_fs(layout: DatasetLayout) -> DatasetImplLocalFS {
         DatasetImpl::new(
@@ -147,7 +168,7 @@ impl DatasetFactoryImpl {
 
     /// Creates new dataset proxy for an S3 URL
     ///
-    /// WARNING: This function will create a new [S3Context] that will do
+    /// WARNING: This function will create a new [`S3Context`] that will do
     /// credential resolution from scratch which can be very expensive.
     #[cfg(feature = "s3")]
     pub async fn get_s3_from_url(
