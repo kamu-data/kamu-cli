@@ -11,6 +11,10 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [0.226.1] - 2025-02-25
+### Changed
+- New Jupyter image 0.7.1, which can handle v6 workspace layout
+
 ## [0.226.0] - 2025-02-24
 ### Added
 - Externally configurable Argon2 hashing mode (minimal settings to speedup e2e tests)

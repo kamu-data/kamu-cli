@@ -1,6 +1,6 @@
 IMAGE_PLATFORMS = linux/amd64,linux/arm64
 IMAGE_REPO = ghcr.io/kamu-data
-IMAGE_JUPYTER_TAG = 0.7.0
+IMAGE_JUPYTER_TAG = 0.7.1
 
 KAMU_VERSION = $(shell cargo metadata --format-version 1 | jq -r '.packages[] | select( .name == "kamu") | .version')
 
