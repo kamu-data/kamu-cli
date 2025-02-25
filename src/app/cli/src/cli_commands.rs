@@ -297,7 +297,7 @@ pub fn get_command(
                     !c.no_alias,
                     c.force,
                     c.reset_derivatives_on_diverged_input,
-                    c.visibility.into(),
+                    c.visibility.map(Into::into),
                 ))
             }
         }

@@ -918,14 +918,8 @@ pub struct Pull {
     pub dataset: Option<Vec<odf::DatasetRefAnyPattern>>,
 
     /// Changing the visibility of the pulled dataset(s)
-    #[arg(
-        long,
-        value_name = "VIS",
-        value_enum,
-        default_value = "private",
-        hide = true
-    )]
-    pub visibility: parsers::DatasetVisibility,
+    #[arg(long, value_name = "VIS", value_enum, hide = true)]
+    pub visibility: Option<parsers::DatasetVisibility>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
