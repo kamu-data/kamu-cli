@@ -310,7 +310,7 @@ pub fn get_command(
             !c.no_alias,
             c.force,
             c.to,
-            c.visibility.into(),
+            c.visibility.map(Into::into),
             cli_catalog.get_one()?,
             tenancy_config,
         )),

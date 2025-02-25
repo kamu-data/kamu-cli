@@ -975,8 +975,8 @@ pub struct Push {
     pub force: bool,
 
     /// Changing the visibility of the initially pushed dataset(s)
-    #[arg(long, value_name = "VIS", value_enum, default_value = "private")]
-    pub visibility: parsers::DatasetVisibility,
+    #[arg(long, value_name = "VIS", value_enum)]
+    pub visibility: Option<parsers::DatasetVisibility>,
 
     /// Local or remote dataset reference(s)
     #[arg(value_parser = parsers::dataset_ref_pattern)]
