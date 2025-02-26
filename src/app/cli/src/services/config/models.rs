@@ -53,6 +53,10 @@ pub struct CLIConfig {
     #[merge(strategy = merge_recursive)]
     pub protocol: Option<ProtocolConfig>,
 
+    /// Configuration for flow system
+    #[merge(strategy = merge_recursive)]
+    pub flow_system: Option<FlowSystemConfig>,
+
     /// Source configuration
     #[merge(strategy = merge_recursive)]
     pub source: Option<SourceConfig>,
@@ -79,6 +83,7 @@ impl CLIConfig {
             source: None,
             users: None,
             uploads: None,
+            flow_system: None,
         }
     }
 
@@ -98,6 +103,7 @@ impl CLIConfig {
             source: Some(SourceConfig::sample()),
             users: Some(PredefinedAccountsConfig::sample()),
             uploads: Some(UploadsConfig::sample()),
+            flow_system: Some(FlowSystemConfig::sample()),
         }
     }
 }
@@ -115,6 +121,7 @@ impl Default for CLIConfig {
             source: Some(SourceConfig::default()),
             users: Some(PredefinedAccountsConfig::default()),
             uploads: Some(UploadsConfig::default()),
+            flow_system: Some(FlowSystemConfig::default()),
         }
     }
 }
@@ -877,6 +884,95 @@ impl Default for OutboxConfig {
         Self {
             awaiting_step_secs: Some(1),
             batch_size: Some(20),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Merge, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
+pub struct FlowSystemConfig {
+    #[merge(strategy = merge_recursive)]
+    pub flow_agent: Option<FlowAgentConfig>,
+
+    #[merge(strategy = merge_recursive)]
+    pub task_agent: Option<TaskAgentConfig>,
+}
+
+impl FlowSystemConfig {
+    pub fn sample() -> Self {
+        Self {
+            flow_agent: Some(FlowAgentConfig::sample()),
+            task_agent: Some(TaskAgentConfig::sample()),
+        }
+    }
+}
+
+impl Default for FlowSystemConfig {
+    fn default() -> Self {
+        Self {
+            flow_agent: Some(FlowAgentConfig::default()),
+            task_agent: Some(TaskAgentConfig::default()),
+        }
+    }
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Merge, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct FlowAgentConfig {
+    pub awaiting_step_secs: Option<i64>,
+    pub mandatory_throttling_period_secs: Option<i64>,
+}
+
+impl FlowAgentConfig {
+    pub fn new() -> Self {
+        Self {
+            awaiting_step_secs: None,
+            mandatory_throttling_period_secs: None,
+        }
+    }
+
+    fn sample() -> Self {
+        Self::default()
+    }
+}
+
+impl Default for FlowAgentConfig {
+    fn default() -> Self {
+        Self {
+            awaiting_step_secs: Some(1),
+            mandatory_throttling_period_secs: Some(60),
+        }
+    }
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Merge, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct TaskAgentConfig {
+    pub task_checking_interval_secs: Option<i64>,
+}
+
+impl TaskAgentConfig {
+    pub fn new() -> Self {
+        Self {
+            task_checking_interval_secs: None,
+        }
+    }
+
+    fn sample() -> Self {
+        Self::default()
+    }
+}
+
+impl Default for TaskAgentConfig {
+    fn default() -> Self {
+        Self {
+            task_checking_interval_secs: Some(1),
         }
     }
 }

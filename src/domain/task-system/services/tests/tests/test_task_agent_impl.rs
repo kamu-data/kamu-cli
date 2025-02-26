@@ -191,6 +191,7 @@ impl TaskAgentHarness {
             .add::<DatasetRegistrySoloUnitBridge>()
             .add_value(CurrentAccountSubject::new_test())
             .add_value(TenancyConfig::SingleTenant)
+            .add_value(TaskAgentConfig::new(chrono::Duration::seconds(1)))
             .add_value(DatasetEnvVarsConfig::sample());
 
         NoOpDatabasePlugin::init_database_components(&mut b);

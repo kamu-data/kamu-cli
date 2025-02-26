@@ -11,6 +11,10 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Unreleased]
+### Added
+- New ``FlowSystemConfig` structure in `CLIConfig` which allows to configure `flow_agent` and `task_agent` services with next options `awaiting_step_secs` and `mandatory_throttling_period_secs`
+
 ## [0.226.1] - 2025-02-25
 ### Changed
 - New Jupyter image 0.7.1, which can handle v6 workspace layout

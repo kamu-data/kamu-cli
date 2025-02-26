@@ -21,3 +21,20 @@ pub trait TaskAgent: Sync + Send {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug)]
+pub struct TaskAgentConfig {
+    /// Defines interval between task executor checks whether there are any new
+    /// tasks
+    pub task_checking_interval: chrono::Duration,
+}
+
+impl TaskAgentConfig {
+    pub fn new(task_checking_interval: chrono::Duration) -> Self {
+        Self {
+            task_checking_interval,
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

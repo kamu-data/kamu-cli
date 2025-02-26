@@ -576,10 +576,6 @@ pub fn configure_server_catalog(base_catalog: &Catalog) -> CatalogBuilder {
 
     kamu_task_system_services::register_dependencies(&mut b);
 
-    b.add_value(kamu_flow_system_inmem::domain::FlowAgentConfig::new(
-        Duration::seconds(1),
-        Duration::minutes(1),
-    ));
     kamu_flow_system_services::register_dependencies(&mut b);
 
     b.add::<UploadServiceLocal>();
@@ -650,11 +646,14 @@ pub fn register_config_in_catalog(
     // Register JupyterConfig used by some commands
     catalog_builder.add_value(config.frontend.as_ref().unwrap().jupyter.clone().unwrap());
 
+    // Container runtime configuration
     catalog_builder.add_value(ContainerRuntimeConfig {
         runtime: config.engine.as_ref().unwrap().runtime.unwrap(),
         network_ns,
     });
+    //
 
+    // Engine provisioner configuration
     catalog_builder.add_value(EngineProvisionerLocalConfig {
         max_concurrency: config.engine.as_ref().unwrap().max_concurrency,
         start_timeout: config
@@ -712,6 +711,7 @@ pub fn register_config_in_catalog(
             .clone()
             .unwrap(),
     });
+    //
 
     catalog_builder.add_value(config.source.as_ref().unwrap().to_infra_cfg());
     catalog_builder.add_value(
@@ -745,10 +745,13 @@ pub fn register_config_in_catalog(
             .to_infra_cfg(),
     );
 
+    // Identity configuration
     if let Some(identity_config) = config.identity.as_ref().unwrap().to_infra_cfg() {
         catalog_builder.add_value(identity_config);
     }
+    //
 
+    // IPFS configuration
     let ipfs_conf = config.protocol.as_ref().unwrap().ipfs.as_ref().unwrap();
 
     catalog_builder.add_value(odf::dataset::IpfsGateway {
@@ -756,7 +759,9 @@ pub fn register_config_in_catalog(
         pre_resolve_dnslink: ipfs_conf.pre_resolve_dnslink.unwrap(),
     });
     catalog_builder.add_value(kamu::utils::ipfs_wrapper::IpfsClient::default());
+    //
 
+    // Flight SQL configuration
     let flight_sql_conf = config
         .protocol
         .as_ref()
@@ -766,7 +771,9 @@ pub fn register_config_in_catalog(
         .unwrap();
     catalog_builder.add_value(flight_sql_conf.to_session_auth_config());
     catalog_builder.add_value(flight_sql_conf.to_session_caching_config());
+    //
 
+    // Tenancy configuration
     if let Some(tenancy_config) = workspace_status.into_tenancy_config() {
         if tenancy_config == TenancyConfig::MultiTenant {
             let mut implicit_user_config = PredefinedAccountsConfig::new();
@@ -805,12 +812,16 @@ pub fn register_config_in_catalog(
         // No workspace
         catalog_builder.add_value(PredefinedAccountsConfig::new());
     }
+    //
 
+    // Uploads configuration
     let uploads_config = config.uploads.as_ref().unwrap();
     catalog_builder.add_value(FileUploadLimitConfig::new_in_mb(
         uploads_config.max_file_size_in_mb.unwrap(),
     ));
+    //
 
+    // Dataset env vars configuration
     catalog_builder.add_value(config.dataset_env_vars.clone().unwrap());
 
     let dataset_env_vars_config = config.dataset_env_vars.as_ref().unwrap();
@@ -843,13 +854,17 @@ pub fn register_config_in_catalog(
             }
         }
     }
+    //
 
+    // Outbox configuration
     let outbox_config = config.outbox.as_ref().unwrap();
     catalog_builder.add_value(messaging_outbox::OutboxConfig::new(
         Duration::seconds(outbox_config.awaiting_step_secs.unwrap()),
         outbox_config.batch_size.unwrap(),
     ));
+    //
 
+    // Password hashing mode configuration
     match password_hashing_mode {
         Some(cli::PasswordHashingMode::Testing) => {
             catalog_builder.add_value(kamu_accounts_services::PasswordHashingMode::Minimal);
@@ -858,6 +873,22 @@ pub fn register_config_in_catalog(
             catalog_builder.add_value(kamu_accounts_services::PasswordHashingMode::Default);
         }
     }
+    //
+
+    // Flow system configuration
+    let kamu_flow_system_config = config.flow_system.as_ref().unwrap();
+    let flow_agent_config = kamu_flow_system_config.flow_agent.as_ref().unwrap();
+
+    catalog_builder.add_value(kamu_flow_system_inmem::domain::FlowAgentConfig::new(
+        Duration::seconds(flow_agent_config.awaiting_step_secs.unwrap()),
+        Duration::seconds(flow_agent_config.mandatory_throttling_period_secs.unwrap()),
+    ));
+
+    let task_agent_config = kamu_flow_system_config.task_agent.as_ref().unwrap();
+    catalog_builder.add_value(kamu_task_system_inmem::domain::TaskAgentConfig::new(
+        Duration::seconds(task_agent_config.task_checking_interval_secs.unwrap()),
+    ));
+    //
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
