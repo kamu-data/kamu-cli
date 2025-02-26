@@ -24,14 +24,15 @@ pub trait TaskAgent: Sync + Send {
 
 #[derive(Debug)]
 pub struct TaskAgentConfig {
-    /// Defines minimal time between 2 runs of the same flow configuration
-    pub mandatory_throttling_period: chrono::Duration,
+    /// Defines interval between task executor checks whether there are any new
+    /// tasks
+    pub task_checking_interval: chrono::Duration,
 }
 
 impl TaskAgentConfig {
-    pub fn new(mandatory_throttling_period: chrono::Duration) -> Self {
+    pub fn new(task_checking_interval: chrono::Duration) -> Self {
         Self {
-            mandatory_throttling_period,
+            task_checking_interval,
         }
     }
 }

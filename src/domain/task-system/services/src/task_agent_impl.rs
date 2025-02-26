@@ -118,7 +118,7 @@ impl TaskAgentImpl {
             }
 
             self.time_source
-                .sleep(self.agent_config.mandatory_throttling_period)
+                .sleep(self.agent_config.task_checking_interval)
                 .await;
         }
     }

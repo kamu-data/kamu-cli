@@ -886,7 +886,7 @@ pub fn register_config_in_catalog(
 
     let task_agent_config = kamu_flow_system_config.task_agent.as_ref().unwrap();
     catalog_builder.add_value(kamu_task_system_inmem::domain::TaskAgentConfig::new(
-        Duration::seconds(task_agent_config.mandatory_throttling_period_secs.unwrap()),
+        Duration::seconds(task_agent_config.task_checking_interval_secs.unwrap()),
     ));
     //
 }

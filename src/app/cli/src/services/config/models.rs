@@ -937,7 +937,7 @@ impl FlowAgentConfig {
     }
 
     fn sample() -> Self {
-        Self { ..Self::default() }
+        Self::default()
     }
 }
 
@@ -954,25 +954,25 @@ impl Default for FlowAgentConfig {
 #[derive(Debug, Clone, Merge, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct TaskAgentConfig {
-    pub mandatory_throttling_period_secs: Option<i64>,
+    pub task_checking_interval_secs: Option<i64>,
 }
 
 impl TaskAgentConfig {
     pub fn new() -> Self {
         Self {
-            mandatory_throttling_period_secs: None,
+            task_checking_interval_secs: None,
         }
     }
 
     fn sample() -> Self {
-        Self { ..Self::default() }
+        Self::default()
     }
 }
 
 impl Default for TaskAgentConfig {
     fn default() -> Self {
         Self {
-            mandatory_throttling_period_secs: Some(1),
+            task_checking_interval_secs: Some(1),
         }
     }
 }
