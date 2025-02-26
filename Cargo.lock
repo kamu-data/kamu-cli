@@ -6398,13 +6398,10 @@ dependencies = [
 name = "kamu-datasets-services"
 version = "0.226.1"
 dependencies = [
- "async-stream",
  "async-trait",
- "bytes",
  "chrono",
  "database-common",
  "dill",
- "file-utils",
  "futures",
  "indoc 2.0.5",
  "init-on-startup",
@@ -6432,7 +6429,6 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "tracing",
- "url",
  "uuid",
 ]
 
