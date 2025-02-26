@@ -186,7 +186,7 @@ pub struct Add {
     pub name: Option<odf::DatasetAlias>,
 
     /// Changing the visibility of the added dataset
-    #[arg(long, value_name = "VIS", value_enum, hide = true)]
+    #[arg(long, value_name = "VIS", value_enum)]
     pub visibility: Option<parsers::DatasetVisibility>,
 
     /// Dataset manifest reference(s) (path, or URL)
@@ -912,7 +912,7 @@ pub struct Pull {
     pub dataset: Option<Vec<odf::DatasetRefAnyPattern>>,
 
     /// Changing the visibility of the pulled dataset(s)
-    #[arg(long, value_name = "VIS", value_enum, hide = true)]
+    #[arg(long, value_name = "VIS", value_enum)]
     pub visibility: Option<parsers::DatasetVisibility>,
 }
 
