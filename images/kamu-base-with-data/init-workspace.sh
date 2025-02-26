@@ -3,7 +3,7 @@
 CONTRIB_URL=${CONTRIB_URL:-"s3://datasets.kamu.dev/odf/v2/contrib/"}
 EXAMPLES_URL=${EXAMPLES_URL:-"s3://datasets.kamu.dev/odf/v2/example/"}
 
-set -euo pipefail
+set -eu
 
 # Install kamu if its missing (KAMU_VERSION env var has to be set)
 if ! command -v kamu &> /dev/null
