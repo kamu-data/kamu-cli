@@ -31,7 +31,7 @@ pub struct PushCommand {
     add_aliases: bool,
     force: bool,
     to: Option<odf::DatasetPushTarget>,
-    dataset_visibility: odf::DatasetVisibility,
+    new_dataset_visibility: Option<odf::DatasetVisibility>,
     output_config: Arc<OutputConfig>,
     tenancy_config: TenancyConfig,
 }
@@ -46,7 +46,7 @@ impl PushCommand {
         add_aliases: bool,
         force: bool,
         to: Option<odf::DatasetPushTarget>,
-        dataset_visibility: odf::DatasetVisibility,
+        new_dataset_visibility: Option<odf::DatasetVisibility>,
         output_config: Arc<OutputConfig>,
         tenancy_config: TenancyConfig,
     ) -> Self
@@ -62,7 +62,7 @@ impl PushCommand {
             add_aliases,
             force,
             to,
-            dataset_visibility,
+            new_dataset_visibility,
             output_config,
             tenancy_config,
         }
@@ -125,7 +125,9 @@ impl PushCommand {
     fn sync_options(&self) -> SyncOptions {
         SyncOptions {
             force: self.force,
-            dataset_visibility: self.dataset_visibility,
+            dataset_visibility: self
+                .new_dataset_visibility
+                .unwrap_or(odf::DatasetVisibility::Private),
             ..SyncOptions::default()
         }
     }
@@ -185,7 +187,7 @@ impl Command for PushCommand {
                 );
             }
             if up_to_date != 0 {
-                if self.dataset_visibility != odf::DatasetVisibility::default() {
+                if self.new_dataset_visibility.is_some() {
                     eprintln!(
                         "{}",
                         s("Dataset(s) have already been pushed -- the visibility marker ignored")

@@ -16,6 +16,7 @@ use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_core::utils::metadata_chain_comparator::*;
 use kamu_core::*;
 use kamu_datasets::{CreateDatasetUseCase, CreateDatasetUseCaseOptions};
+use kamu_datasets_services::DependencyGraphWriter;
 use odf::dataset::MetadataChainImpl;
 use odf::storage::inmem::{NamedObjectRepositoryInMemory, ObjectRepositoryInMemory};
 use odf::storage::{MetadataBlockRepositoryImpl, ReferenceRepositoryImpl};
@@ -481,9 +482,29 @@ impl SimpleTransferProtocol {
             .try_for_each_concurrent(transfer_options.max_parallel_transfers, |future| future)
             .await?;
 
+        let mut new_upstream_ids: Vec<odf::DatasetID> = vec![];
+        let mut dependencies_modified = false;
+
         // Commit blocks
         for (hash, block) in blocks.into_iter().rev() {
             tracing::debug!(?hash, "Appending block");
+
+            if let odf::MetadataEvent::SetTransform(transform) = &block.event {
+                // Collect only the latest upstream dataset IDs
+                dependencies_modified = true;
+                new_upstream_ids.clear();
+
+                for new_input in &transform.inputs {
+                    if let Some(id) = new_input.dataset_ref.id() {
+                        new_upstream_ids.push(id.clone());
+                    } else {
+                        // Input references must be resolved to IDs here, but we
+                        // ignore the errors and let the metadata chain reject
+                        // this event
+                    }
+                }
+            }
+
             let sequence_number = block.sequence_number;
 
             match dst
@@ -564,6 +585,24 @@ impl SimpleTransferProtocol {
                 Err(SyncError::Internal(e.int_err()))
             }
         }?;
+
+        // Note: modify dependencies only after `set_ref` succeeds.
+        // TODO: the dependencies should be updated as a part of HEAD change
+        if dependencies_modified {
+            let summary = dst
+                .get_summary(odf::dataset::GetSummaryOpts::default())
+                .await
+                .int_err()?;
+
+            let dependency_graph_writer = self
+                .catalog
+                .get_one::<dyn DependencyGraphWriter>()
+                .int_err()?;
+
+            dependency_graph_writer
+                .update_dataset_node_dependencies(&self.catalog, &summary.id, new_upstream_ids)
+                .await?;
+        }
 
         Ok(())
     }

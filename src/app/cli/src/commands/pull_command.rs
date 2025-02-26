@@ -60,11 +60,14 @@ impl PullCommand {
         add_aliases: bool,
         force: bool,
         reset_derivatives_on_diverged_input: bool,
-        new_dataset_visibility: odf::DatasetVisibility,
+        maybe_new_dataset_visibility: Option<odf::DatasetVisibility>,
     ) -> Self
     where
         I: IntoIterator<Item = odf::DatasetRefAnyPattern>,
     {
+        let new_dataset_visibility = maybe_new_dataset_visibility
+            .unwrap_or_else(|| tenancy_config.default_dataset_visibility());
+
         Self {
             pull_dataset_use_case,
             dataset_registry,

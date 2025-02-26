@@ -27,7 +27,6 @@ testing = ["dep:mockall", "dep:serde_json"]
 
 [dependencies]
 database-common = { workspace = true }
-file-utils = { workspace = true }
 init-on-startup = { workspace = true }
 internal-error = { workspace = true }
 kamu-accounts = { workspace = true }
@@ -39,9 +38,7 @@ serde_json = { optional = true, version = "1" }
 odf = { workspace = true, features = ["http", "lfs", "s3"] }
 time-source = { workspace = true }
 
-async-stream = "0.3"
 async-trait = { version = "0.1", default-features = false }
-bytes = "1"
 chrono = { version = "0.4", default-features = false }
 dill = "0.11"
 futures = { version = "0.3", default-features = false }
@@ -53,7 +50,6 @@ thiserror = { version = "2", default-features = false }
 tokio = { version = "1", default-features = false }
 tokio-stream = { version = "0.1", default-features = false }
 tracing = { version = "0.1", default-features = false }
-url = "2"
 uuid = { version = "1", default-features = false }
 
 
@@ -65,7 +61,7 @@ kamu-accounts-services = { workspace = true }
 kamu-core = { workspace = true, features = ["testing"] }
 kamu-datasets = { workspace = true, features = ["testing"] }
 kamu-datasets-inmem = { workspace = true }
-kamu-datasets-services = { workspace = true, features = ["testing"]}
+kamu-datasets-services = { workspace = true, features = ["testing"] }
 odf = { workspace = true, features = ["testing"] }
 
 indoc = "2"

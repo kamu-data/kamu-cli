@@ -1,9 +1,9 @@
-#!/bin/sh
+#!/usr/bin/env sh
 
-EXTERNAL_URL="s3://datasets.kamu.dev/odf/v2/contrib/"
-EXAMPLES_URL="s3://datasets.kamu.dev/odf/v2/example/"
+CONTRIB_URL=${CONTRIB_URL:-"s3://datasets.kamu.dev/odf/v2/contrib/"}
+EXAMPLES_URL=${EXAMPLES_URL:-"s3://datasets.kamu.dev/odf/v2/example/"}
 
-set -e
+set -euo pipefail
 
 # Install kamu if its missing (KAMU_VERSION env var has to be set)
 if ! command -v kamu &> /dev/null
@@ -18,11 +18,11 @@ fi
 # Init workspace
 kamu init || true
 
-# External datasets first
-kamu pull --no-alias "${EXTERNAL_URL}co.alphavantage.tickers.daily.spy"
-kamu pull --no-alias "${EXTERNAL_URL}com.cryptocompare.ohlcv.eth-usd"
-kamu pull --no-alias "${EXTERNAL_URL}net.rocketpool.reth.tokens-minted"
-kamu pull --no-alias "${EXTERNAL_URL}net.rocketpool.reth.tokens-burned"
+# Contrib datasets first
+kamu pull --no-alias "${CONTRIB_URL}co.alphavantage.tickers.daily.spy"
+kamu pull --no-alias "${CONTRIB_URL}com.cryptocompare.ohlcv.eth-usd"
+kamu pull --no-alias "${CONTRIB_URL}net.rocketpool.reth.tokens-minted"
+kamu pull --no-alias "${CONTRIB_URL}net.rocketpool.reth.tokens-burned"
 
 # Example datasets
 datasets=`aws s3 ls ${EXAMPLES_URL} | awk '{print $2}' | awk -F '/' '/\// {print $1}'`

@@ -104,7 +104,10 @@ impl SyncServiceImpl {
                 validation,
                 trust_source_hashes,
                 opts.force,
-                SimpleProtocolTransferOptions::default(),
+                SimpleProtocolTransferOptions {
+                    visibility_for_created_dataset: opts.dataset_visibility,
+                    ..Default::default()
+                },
                 listener,
             )
             .await

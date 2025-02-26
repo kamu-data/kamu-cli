@@ -41,7 +41,7 @@ pub fn get_command(
             c.recursive,
             c.replace,
             c.stdin,
-            c.visibility.into(),
+            c.visibility.map(Into::into),
             cli_catalog.get_one()?,
             tenancy_config,
             cli_catalog.get_one()?,
@@ -297,7 +297,7 @@ pub fn get_command(
                     !c.no_alias,
                     c.force,
                     c.reset_derivatives_on_diverged_input,
-                    c.visibility.into(),
+                    c.visibility.map(Into::into),
                 ))
             }
         }
@@ -310,7 +310,7 @@ pub fn get_command(
             !c.no_alias,
             c.force,
             c.to,
-            c.visibility.into(),
+            c.visibility.map(Into::into),
             cli_catalog.get_one()?,
             tenancy_config,
         )),
