@@ -65,13 +65,8 @@ impl PullCommand {
     where
         I: IntoIterator<Item = odf::DatasetRefAnyPattern>,
     {
-        let new_dataset_visibility = maybe_new_dataset_visibility.unwrap_or_else(|| {
-            if tenancy_config == TenancyConfig::MultiTenant {
-                odf::DatasetVisibility::Private
-            } else {
-                odf::DatasetVisibility::Public
-            }
-        });
+        let new_dataset_visibility = maybe_new_dataset_visibility
+            .unwrap_or_else(|| tenancy_config.default_dataset_visibility());
 
         Self {
             pull_dataset_use_case,

@@ -186,14 +186,8 @@ pub struct Add {
     pub name: Option<odf::DatasetAlias>,
 
     /// Changing the visibility of the added dataset
-    #[arg(
-        long,
-        value_name = "VIS",
-        value_enum,
-        default_value = "private",
-        hide = true
-    )]
-    pub visibility: parsers::DatasetVisibility,
+    #[arg(long, value_name = "VIS", value_enum, hide = true)]
+    pub visibility: Option<parsers::DatasetVisibility>,
 
     /// Dataset manifest reference(s) (path, or URL)
     #[arg()]

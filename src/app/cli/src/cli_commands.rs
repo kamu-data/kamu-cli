@@ -41,7 +41,7 @@ pub fn get_command(
             c.recursive,
             c.replace,
             c.stdin,
-            c.visibility.into(),
+            c.visibility.map(Into::into),
             cli_catalog.get_one()?,
             tenancy_config,
             cli_catalog.get_one()?,

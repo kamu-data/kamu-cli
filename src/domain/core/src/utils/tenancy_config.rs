@@ -26,6 +26,13 @@ impl TenancyConfig {
             TenancyConfig::SingleTenant => odf::DatasetAlias::new(None, dataset_name),
         }
     }
+
+    pub fn default_dataset_visibility(&self) -> odf::DatasetVisibility {
+        match *self {
+            TenancyConfig::MultiTenant => odf::DatasetVisibility::Private,
+            TenancyConfig::SingleTenant => odf::DatasetVisibility::Public,
+        }
+    }
 }
 
 impl Default for TenancyConfig {

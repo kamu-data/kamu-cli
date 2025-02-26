@@ -746,8 +746,6 @@ Push local data into a repository
 * `-f`, `--force` — Overwrite remote version with local, even if revisions have diverged
 * `--visibility <VIS>` — Changing the visibility of the initially pushed dataset(s)
 
-  Default value: `private`
-
   Possible values: `private`, `public`
 
 
