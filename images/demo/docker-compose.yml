@@ -5,7 +5,7 @@ networks:
 
 services:
     jupyter:
-        image: ghcr.io/kamu-data/kamu-cli-demo-jupyter:0.17.3
+        image: ghcr.io/kamu-data/kamu-cli-demo-jupyter:0.17.5
         # Unfortunately running podman within another container requires elevated permissions
         privileged: true
         command:
