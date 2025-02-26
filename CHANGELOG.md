@@ -11,9 +11,18 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## [Unreleased]
+## Unreleased
 ### Added
-- New ``FlowSystemConfig` structure in `CLIConfig` which allows to configure `flow_agent` and `task_agent` services with next options `awaiting_step_secs` and `mandatory_throttling_period_secs`
+- New `FlowSystemConfig` structure in `CLIConfig` which allows 
+    to configure `flow_agent` and `task_agent` services 
+    with next options `awaiting_step_secs` and `mandatory_throttling_period_secs`
+### Fixed
+- Single-tenant mode:
+  - `kamu add`: public default visibility, unless otherwise specified
+  - `kamu pull`: public new default visibility, unless otherwise specified
+- Simple Transfer Protocol:
+  - Respect the visibility option
+  - Updating the dependency graph during block processing
 
 ## [0.226.1] - 2025-02-25
 ### Changed
