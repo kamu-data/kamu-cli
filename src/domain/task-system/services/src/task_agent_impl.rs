@@ -24,6 +24,7 @@ pub struct TaskAgentImpl {
     catalog: Catalog,
     task_runner: Arc<dyn TaskRunner>,
     time_source: Arc<dyn SystemTimeSource>,
+    agent_config: Arc<TaskAgentConfig>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -42,11 +43,13 @@ impl TaskAgentImpl {
         catalog: Catalog,
         task_runner: Arc<dyn TaskRunner>,
         time_source: Arc<dyn SystemTimeSource>,
+        agent_config: Arc<TaskAgentConfig>,
     ) -> Self {
         Self {
             catalog,
             task_runner,
             time_source,
+            agent_config,
         }
     }
 
@@ -114,7 +117,9 @@ impl TaskAgentImpl {
                 return Ok(task);
             }
 
-            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+            self.time_source
+                .sleep(self.agent_config.mandatory_throttling_period)
+                .await;
         }
     }
 
