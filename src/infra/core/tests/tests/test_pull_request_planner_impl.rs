@@ -450,6 +450,10 @@ async fn test_pull_batching_complex_with_remote() {
         .expect_create_dataset_node()
         .times(1)
         .returning(|_| Ok(()));
+    mock_dependency_graph_writer
+        .expect_update_dataset_node_dependencies()
+        .times(1)
+        .returning(|_, _, _| Ok(()));
 
     let harness = PullTestHarness::new(
         TenancyConfig::SingleTenant,
