@@ -11,7 +11,7 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## Unreleased
+## [0.226.2] - 2025-02-26
 ### Added
 - New `FlowSystemConfig` structure in `CLIConfig` which allows 
     to configure `flow_agent` and `task_agent` services 
