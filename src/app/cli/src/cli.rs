@@ -717,10 +717,6 @@ pub enum LoginSubCommand {
 /// token
 #[derive(Debug, clap::Args)]
 pub struct LoginOauth {
-    /// Store access token in the user home folder rather than in the workspace
-    #[arg(long)]
-    pub user: bool,
-
     /// Name of the OAuth provider, i.e. 'github'
     #[arg(index = 1)]
     pub provider: String,
@@ -738,10 +734,6 @@ pub struct LoginOauth {
 /// password
 #[derive(Debug, clap::Args)]
 pub struct LoginPassword {
-    /// Store access token in the user home folder rather than in the workspace
-    #[arg(long)]
-    pub user: bool,
-
     /// Specify user name
     #[arg(index = 1)]
     pub login: String,

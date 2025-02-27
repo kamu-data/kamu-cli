@@ -21,12 +21,25 @@ prepare-multi-arch-build:
 all-examples:
 	rsync -avu --delete --exclude=".*/" "../../examples/" "user-home/XX - Other Examples"
 
-# Build image for local testing purposes
-.PHONY: jupyter
-jupyter: all-examples
+# Build image for local testing purposes (using the release kamu-cli)
+.PHONY: jupyter-local
+jupyter-local: all-examples
 	docker build \
 		-f Dockerfile.jupyter \
 		--build-arg KAMU_VERSION=$(KAMU_VERSION) \
+		-t $(IMAGE_REPO)/kamu-cli-demo-jupyter:$(DEMO_VERSION) \
+		.
+
+# Build image for local testing purposes (using the local kamu-cli)
+.PHONY: jupyter-local-debug
+jupyter-local-debug: jupyter
+	mkdir -p ./tmp/
+	cargo build -p kamu-cli
+	cp -f ../../target/debug/kamu-cli ./tmp/kamu-cli
+	# We overwrite the local image: based on the name (--build-arg), which assign later (-t).
+	docker build \
+		-f Dockerfile.debug.jupyter \
+		--build-arg BASE_DEMO_JUPYTER_IMAGE=$(IMAGE_REPO)/kamu-cli-demo-jupyter:$(DEMO_VERSION) \
 		-t $(IMAGE_REPO)/kamu-cli-demo-jupyter:$(DEMO_VERSION) \
 		.
 
@@ -113,4 +126,4 @@ podman-images/:
 
 .PHONY: clean
 clean:
-	rm -rf minio-data podman-images
+	rm -rf minio-data podman-images tmp

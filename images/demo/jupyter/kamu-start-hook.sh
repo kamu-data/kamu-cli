@@ -4,7 +4,7 @@ set -eo pipefail
 
 # Login into Kamu Node if GitHub access token is provided
 if [ -n "${GITHUB_TOKEN}" ] && [ -n "${KAMU_NODE_URL}" ]; then
-    kamu login --repo-name kamu-node oauth --user github "${GITHUB_TOKEN}" "${KAMU_NODE_URL#odf+}"
+    kamu login --user --repo-name kamu-node oauth github "${GITHUB_TOKEN}" "${KAMU_NODE_URL#odf+}"
 fi
 
 # Patch notebooks with node and frontend URLs

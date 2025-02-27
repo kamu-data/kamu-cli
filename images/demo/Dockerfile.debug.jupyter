@@ -1,0 +1,4 @@
+ARG BASE_DEMO_JUPYTER_IMAGE
+FROM $BASE_DEMO_JUPYTER_IMAGE
+
+COPY ./tmp/kamu-cli /usr/local/bin/kamu

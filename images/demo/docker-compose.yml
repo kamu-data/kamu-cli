@@ -21,13 +21,14 @@ services:
             - ETHERSCAN_API_KEY=MST1914HGG228XNGTVQFJRE86QYJ3A52NA
             # TODO: Restore support for local Minio
             - GITHUB_LOGIN=guest
+            - GITHUB_TOKEN=
             - KAMU_NODE_URL=odf+https://node.demo.kamu.dev/
             - KAMU_WEB_UI_URL=https://platform.demo.kamu.dev/
         # volumes:
-        #   - ./podman-images:/var/lib/containers/shared:ro
-        #   - "./user-home/01 - Kamu Basics (COVID-19 example):/home/jovyan/01 - Kamu Basics (COVID-19 example)"
-        #   - "./user-home/02 - Web3 Data (Ethereum trading example):/home/jovyan/02 - Web3 Data (Ethereum trading example)"
-        #   - "./user-home/XX - Other Examples:/home/jovyan/XX - Other Examples"
+        #     - ./podman-images:/var/lib/containers/shared:ro
+        #     - "./user-home/01 - Kamu Basics (COVID-19 example):/home/jovyan/01 - Kamu Basics (COVID-19 example)"
+        #     - "./user-home/02 - Web3 Data (Ethereum trading example):/home/jovyan/02 - Web3 Data (Ethereum trading example)"
+        #     - "./user-home/XX - Other Examples:/home/jovyan/XX - Other Examples"
         networks:
             - kamu
         ports:
@@ -46,10 +47,10 @@ services:
             - MINIO_ACCESS_KEY=minio
             - MINIO_SECRET_KEY=minio123
         # volumes:
-        #   - ./minio-data:/data
+        #     - ./minio-data:/data
         networks:
             - kamu
         expose:
             - "80"
         # ports:
-        #   - "9000:9000"
+        #     - "9000:9000"
