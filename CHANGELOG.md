@@ -11,7 +11,7 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## Unreleased
+## [0.226.3] - 2025-02-27
 ### Changed
 - `kamu login`: only one argument `--user` (root) is left, other arguments (from subcommands) are removed 
 
