@@ -37,6 +37,54 @@ To shutdown the environment do:
 docker compose down
 ```
 
+## Local debugging
+
+This section will present various tricks, for modifying the local `kamu-cli-demo-jupyter` image. 
+
+After modification, we will also need to restart all components:
+```shell
+docker compose down && docker compose up
+```
+
+### Testing changes related to Jupyter
+
+In this case, we are interested in quickly testing an image that is frequently rebuilt. 
+The following command will do the trick:
+```shell
+make jupyter-local
+```
+
+### Testing with local kamu-cli
+
+The previous command uses the latest release `kamu-cli` inside Jupyter. 
+To replace the release version with our local debug version, run:
+```shell
+make jupyter-local-debug
+```
+
+### Authorization in the remote node
+
+In case of a real deployed [Demo environment](https://jupyter.demo.kamu.dev/), we as a user need to log in via GitHub.
+Testing locally usually, we don't need authorization (it is not performed by default).
+
+But if there's a need to work with the Demo `kamu-node` (e.g. send a dataset there), 
+you need to update the following environment variables in `docker-compose.yml`:
+```yaml
+# ...
+services:
+  # ...    
+  jupyter:
+    # ...
+    environment:
+      # ...
+      # Replace with your GitHub username
+      - GITHUB_LOGIN=guest
+      # Replace with the generated token
+      - GITHUB_TOKEN=
+      # ...
+```
+([Click to generate a `GITHUB_TOKEN` token with required scopes](https://github.com/settings/tokens/new?description=Kamu:%20local%20Jupyter%20(docker%20compose)&scopes=read:user,user:email)).
+
 ## Updating images in the registry
 
 In this section, we will look at how to build images locally and send them to the registry.

@@ -378,7 +378,7 @@ Our Jupyter demo at https://demo.kamu.dev includes a special Jupyter notebook im
 4. Run `make minio-data` - this will prepare example datasets to be included into `minio` image
 5. Prepare your `docker buildx` to build multi-platform images (see [instructions below](#building-multi-platform-images))
 6. Run `make minio-multi-arch` to build **and push** multi-arch `minio` image
-7. Setup github access token:
+7. Setup GitHub access token:
   7.1. Go to [Github access token page](https://github.com/settings/tokens/new?description=Upload%20Kamu%20packages&scopes=write%3Apackages) and generate 
     access token with `write:packages` permissions.
   7.2 Run `export CR_PAT=<your_token>`. To check everything is fine run `echo $CR_PAT | docker login ghcr.io -u <your_username>> --password-stdin`
