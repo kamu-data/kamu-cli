@@ -13,7 +13,9 @@ Recommendation: for ease of reading, use the following order:
 
 ## [0.226.3] - 2025-02-27
 ### Changed
-- `kamu login`: only one argument `--user` (root) is left, other arguments (from subcommands) are removed 
+- `kamu login`: only one argument `--user` (root) is left, other arguments (from subcommands) are removed
+### Fixed
+- Demo Jupyter start-up failure
 
 ## [0.226.2] - 2025-02-26
 ### Added
