@@ -299,6 +299,8 @@ pub struct CLIAccessTokenStore {
 #[interface(dyn AccessTokenStore)]
 impl CLIAccessTokenStore {
     pub fn new(workspace_layout: &WorkspaceLayout) -> Self {
+        // TODO: Respect `XDG_CONFIG_HOME` when working with configs
+        //       https://github.com/kamu-data/kamu-cli/issues/848
         let user_token_store_path = dirs::home_dir()
             .expect("Cannot determine user home directory")
             .join(KAMU_TOKEN_STORE);

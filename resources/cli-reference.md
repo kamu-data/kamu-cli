@@ -571,7 +571,7 @@ Authenticates with a remote ODF server interactively
 
 Performs non-interactive login to a remote Kamu server via OAuth provider token
 
-**Usage:** `kamu login oauth [OPTIONS] <PROVIDER> <ACCESS_TOKEN> [SERVER]`
+**Usage:** `kamu login oauth <PROVIDER> <ACCESS_TOKEN> [SERVER]`
 
 **Arguments:**
 
@@ -579,27 +579,19 @@ Performs non-interactive login to a remote Kamu server via OAuth provider token
 * `<ACCESS_TOKEN>` — OAuth provider access token
 * `<SERVER>` — ODF backend server URL (defaults to kamu.dev)
 
-**Options:**
-
-* `--user` — Store access token in the user home folder rather than in the workspace
-
 
 
 ## `kamu login password`
 
 Performs non-interactive login to a remote Kamu server via login and password
 
-**Usage:** `kamu login password [OPTIONS] <LOGIN> <PASSWORD> [SERVER]`
+**Usage:** `kamu login password <LOGIN> <PASSWORD> [SERVER]`
 
 **Arguments:**
 
 * `<LOGIN>` — Specify user name
 * `<PASSWORD>` — Specify password
 * `<SERVER>` — ODF backend server URL (defaults to kamu.dev)
-
-**Options:**
-
-* `--user` — Store access token in the user home folder rather than in the workspace
 
 
 

@@ -11,6 +11,10 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## Unreleased
+### Changed
+- `kamu login`: only one argument `--user` (root) is left, other arguments (from subcommands) are removed 
+
 ## [0.226.2] - 2025-02-26
 ### Added
 - New `FlowSystemConfig` structure in `CLIConfig` which allows 

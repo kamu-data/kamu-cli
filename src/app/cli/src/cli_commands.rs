@@ -201,7 +201,7 @@ pub fn get_command(
             Some(cli::LoginSubCommand::Oauth(sc)) => Box::new(LoginSilentCommand::new(
                 cli_catalog.get_one()?,
                 cli_catalog.get_one()?,
-                if sc.user {
+                if c.user {
                     odf_server::AccessTokenStoreScope::User
                 } else {
                     odf_server::AccessTokenStoreScope::Workspace
@@ -215,7 +215,7 @@ pub fn get_command(
             Some(cli::LoginSubCommand::Password(sc)) => Box::new(LoginSilentCommand::new(
                 cli_catalog.get_one()?,
                 cli_catalog.get_one()?,
-                if sc.user {
+                if c.user {
                     odf_server::AccessTokenStoreScope::User
                 } else {
                     odf_server::AccessTokenStoreScope::Workspace
