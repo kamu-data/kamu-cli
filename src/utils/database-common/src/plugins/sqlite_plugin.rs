@@ -45,6 +45,10 @@ impl SqlitePlugin {
             .await
             .expect("Migration failed");
 
+        // Do not accumulate changes related to migrations and save them to the database
+        // immediately
+        Self::force_wal_checkpoints_save(&sqlite_pool).await?;
+
         Ok(CatalogBuilder::new_chained(base_catalog)
             .add_value(sqlite_pool)
             .build())
@@ -54,7 +58,13 @@ impl SqlitePlugin {
     fn open_sqlite_pool(db_connection_settings: &DatabaseConnectionSettings) -> SqlitePool {
         let sqlite_options = SqliteConnectOptions::new()
             .filename(&db_connection_settings.host)
-            .create_if_missing(true);
+            .create_if_missing(true)
+            // Protection against locking, in case of parallel execution of kamu commands.
+            //
+            // Docs:
+            // - Write-Ahead Logging https://www.sqlite.org/wal.html
+            // - Pragma statements supported by SQLite https://www.sqlite.org/pragma.html#pragma_journal_mode
+            .pragma("journal_mode", "WAL");
 
         if db_connection_settings.max_lifetime_secs.is_some() {
             tracing::warn!("max_lifetime_secs is not supported for SQLite");
@@ -69,6 +79,22 @@ impl SqlitePlugin {
         SqlitePoolOptions::new()
             .max_connections(1)
             .connect_lazy_with(sqlite_options)
+    }
+
+    async fn force_wal_checkpoints_save(sqlite_pool: &SqlitePool) -> Result<(), DatabaseError> {
+        // Based on:
+        // java - Android sqlite flush WAL file contents into main database file
+        // https://stackoverflow.com/questions/30276789/android-sqlite-flush-wal-file-contents-into-main-database-file/69028219#69028219
+
+        use sqlx::{Acquire, Executor};
+
+        let mut pool = sqlite_pool.acquire().await?;
+        let connection_mut = pool.acquire().await?;
+        connection_mut
+            .execute("PRAGMA wal_checkpoint(full)")
+            .await?;
+
+        Ok(())
     }
 }
 
