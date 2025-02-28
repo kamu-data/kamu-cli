@@ -7,8 +7,19 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use crate::SetDatasetReferenceError;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub const MESSAGE_PRODUCER_KAMU_DATASET_SERVICE: &str = "dev.kamu.domain.datasets.DatasetService";
+#[async_trait::async_trait]
+pub trait DatasetReferenceService: Sync + Send {
+    async fn set_reference(
+        &self,
+        dataset_id: &odf::DatasetID,
+        block_ref: &odf::BlockRef,
+        maybe_prev_block_hash: Option<&odf::Multihash>,
+        new_block_hash: &odf::Multihash,
+    ) -> Result<(), SetDatasetReferenceError>;
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

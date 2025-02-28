@@ -9,7 +9,9 @@
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub const MESSAGE_CONSUMER_KAMU_DATASET_ENTRY_SERVICE: &str =
-    "dev.kamu.domain.datasets.DatasetEntryService";
+pub const MESSAGE_PRODUCER_KAMU_DATASET_SERVICE: &str = "dev.kamu.domain.datasets.DatasetService";
+
+pub const MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE: &str =
+    "dev.kamu.domain.datasets.DatasetReferenceService";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
