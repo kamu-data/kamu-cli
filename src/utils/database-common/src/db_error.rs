@@ -14,7 +14,7 @@ use thiserror::Error;
 #[derive(Error, Debug)]
 pub enum DatabaseError {
     #[error(transparent)]
-    SqlxError(sqlx::Error),
+    SqlxError(#[from] sqlx::Error),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
