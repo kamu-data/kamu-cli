@@ -15,7 +15,6 @@
 pub use kamu_datasets as domain;
 
 mod jobs;
-mod messages;
 mod services;
 mod use_cases;
 pub(crate) mod utils;
@@ -24,6 +23,5 @@ pub(crate) mod utils;
 pub mod testing;
 
 pub use jobs::*;
-pub use messages::*;
 pub use services::*;
 pub use use_cases::*;
