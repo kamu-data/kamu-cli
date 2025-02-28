@@ -19,6 +19,7 @@ const DATASET_LIFECYCLE_OUTBOX_VERSION: u32 = 1;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum DatasetLifecycleMessage {
     Created(DatasetLifecycleMessageCreated),
+    Renamed(DatasetLifecycleMessageRenamed),
     Deleted(DatasetLifecycleMessageDeleted),
 }
 
@@ -34,6 +35,13 @@ impl DatasetLifecycleMessage {
             owner_account_id,
             dataset_visibility,
             dataset_name,
+        })
+    }
+
+    pub fn renamed(dataset_id: odf::DatasetID, new_dataset_name: odf::DatasetName) -> Self {
+        Self::Renamed(DatasetLifecycleMessageRenamed {
+            dataset_id,
+            new_dataset_name,
         })
     }
 
@@ -57,6 +65,14 @@ pub struct DatasetLifecycleMessageCreated {
     #[serde(default)]
     pub dataset_visibility: odf::DatasetVisibility,
     pub dataset_name: odf::DatasetName,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DatasetLifecycleMessageRenamed {
+    pub dataset_id: odf::DatasetID,
+    pub new_dataset_name: odf::DatasetName,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

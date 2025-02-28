@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use std::collections::HashSet;
-use std::path::PathBuf;
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -18,21 +17,17 @@ use internal_error::{ErrorIntoInternal, InternalError};
 use odf_dataset::*;
 use odf_metadata::*;
 use odf_storage::*;
-use odf_storage_lfs::ObjectRepositoryCachingLocalFs;
-use odf_storage_s3::{NamedObjectRepositoryS3, ObjectRepositoryS3Sha3};
 use s3_utils::S3Context;
 use time_source::SystemTimeSource;
 use tokio::sync::Mutex;
-
-use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct DatasetStorageUnitS3 {
     s3_context: S3Context,
     registry_cache: Option<Arc<S3RegistryCache>>,
-    metadata_cache_local_fs_path: Option<Arc<PathBuf>>,
     system_time_source: Arc<dyn SystemTimeSource>,
+    dataset_s3_builder: Arc<dyn DatasetS3Builder>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -44,21 +39,17 @@ impl DatasetStorageUnitS3 {
     /// * `registry_cache` - when present in the catalog enables in-memory cache
     ///   of the dataset IDs present in the repository, allowing to avoid
     ///   expensive bucket scanning
-    ///
-    /// * `metadata_cache_local_fs_path` - when specified enables the local FS
-    ///   cache of metadata blocks, allowing to dramatically reduce the number
-    ///   of requests to S3
     pub fn new(
         s3_context: S3Context,
         registry_cache: Option<Arc<S3RegistryCache>>,
-        metadata_cache_local_fs_path: Option<Arc<PathBuf>>,
         system_time_source: Arc<dyn SystemTimeSource>,
+        dataset_s3_builder: Arc<dyn DatasetS3Builder>,
     ) -> Self {
         Self {
             s3_context,
             registry_cache,
-            metadata_cache_local_fs_path,
             system_time_source,
+            dataset_s3_builder,
         }
     }
 
@@ -67,44 +58,8 @@ impl DatasetStorageUnitS3 {
             .s3_context
             .sub_context(&format!("{}/", &dataset_id.as_multibase()));
 
-        let s3_context_url = s3_context.url().clone();
-
-        // TODO: Consider switching DatasetImpl to dynamic dispatch to simplify
-        // configurability
-        if let Some(metadata_cache_local_fs_path) = &self.metadata_cache_local_fs_path {
-            Arc::new(DatasetImpl::new(
-                MetadataChainImpl::new(
-                    MetadataBlockRepositoryCachingInMem::new(MetadataBlockRepositoryImpl::new(
-                        ObjectRepositoryCachingLocalFs::new(
-                            ObjectRepositoryS3Sha3::new(s3_context.sub_context("blocks/")),
-                            metadata_cache_local_fs_path.clone(),
-                        ),
-                    )),
-                    ReferenceRepositoryImpl::new(NamedObjectRepositoryS3::new(
-                        s3_context.sub_context("refs/"),
-                    )),
-                ),
-                ObjectRepositoryS3Sha3::new(s3_context.sub_context("data/")),
-                ObjectRepositoryS3Sha3::new(s3_context.sub_context("checkpoints/")),
-                NamedObjectRepositoryS3::new(s3_context.into_sub_context("info/")),
-                s3_context_url,
-            ))
-        } else {
-            Arc::new(DatasetImpl::new(
-                MetadataChainImpl::new(
-                    MetadataBlockRepositoryCachingInMem::new(MetadataBlockRepositoryImpl::new(
-                        ObjectRepositoryS3Sha3::new(s3_context.sub_context("blocks/")),
-                    )),
-                    ReferenceRepositoryImpl::new(NamedObjectRepositoryS3::new(
-                        s3_context.sub_context("refs/"),
-                    )),
-                ),
-                ObjectRepositoryS3Sha3::new(s3_context.sub_context("data/")),
-                ObjectRepositoryS3Sha3::new(s3_context.sub_context("checkpoints/")),
-                NamedObjectRepositoryS3::new(s3_context.into_sub_context("info/")),
-                s3_context_url,
-            ))
-        }
+        self.dataset_s3_builder
+            .build_s3_dataset(dataset_id, s3_context)
     }
 
     async fn delete_dataset_s3_objects(&self, dataset_id: &DatasetID) -> Result<(), InternalError> {
@@ -184,7 +139,7 @@ impl DatasetStorageUnit for DatasetStorageUnitS3 {
             for dataset_id in self.list_dataset_ids_maybe_cached().await? {
                 // Head must exist, otherwise it's a garbage
                 let dataset = self.get_dataset_impl(&dataset_id);
-                let head_res = dataset.as_metadata_chain().resolve_ref(&BlockRef::Head).await;
+                let head_res = dataset.as_metadata_chain().as_raw_ref_repo().get(BlockRef::Head.as_str()).await;
                 match head_res {
                     // Got head => good dataset
                     Ok(_) => { yield dataset_id; Ok(()) }
@@ -208,6 +163,7 @@ impl DatasetStorageUnitWriter for DatasetStorageUnitS3 {
     async fn store_dataset(
         &self,
         seed_block: MetadataBlockTyped<Seed>,
+        opts: StoreDatasetOpts,
     ) -> Result<StoreDatasetResult, StoreDatasetError> {
         // Check if a dataset with the same ID can be resolved successfully
         use DatasetStorageUnit;
@@ -228,7 +184,8 @@ impl DatasetStorageUnitWriter for DatasetStorageUnitS3 {
         if let Some(existing_dataset) = maybe_existing_dataset {
             match existing_dataset
                 .as_metadata_chain()
-                .resolve_ref(&BlockRef::Head)
+                .as_raw_ref_repo()
+                .get(BlockRef::Head.as_str())
                 .await
             {
                 // Existing head
@@ -253,8 +210,9 @@ impl DatasetStorageUnitWriter for DatasetStorageUnitS3 {
         let dataset_id = seed_block.event.dataset_id.clone();
         let dataset = self.get_dataset_impl(&dataset_id);
 
-        // Set Head
-        let head = match dataset
+        // Write seed block.
+        // Set HEAD only if specified in the options
+        let seed: Multihash = match dataset
             .as_metadata_chain()
             .append(
                 seed_block.into(),
@@ -262,12 +220,17 @@ impl DatasetStorageUnitWriter for DatasetStorageUnitS3 {
                     // We are using head ref CAS to detect previous existence of a dataset
                     // as atomically as possible
                     check_ref_is: Some(None),
+                    update_ref: if opts.set_head {
+                        Some(&BlockRef::Head)
+                    } else {
+                        None
+                    },
                     ..AppendOpts::default()
                 },
             )
             .await
         {
-            Ok(head) => head,
+            Ok(seed) => seed,
             Err(err) => return Err(err.int_err().into()),
         };
 
@@ -279,14 +242,14 @@ impl DatasetStorageUnitWriter for DatasetStorageUnitS3 {
 
         tracing::info!(
             id = %dataset_id,
-            %head,
+            %seed,
             "Created new dataset",
         );
 
         Ok(StoreDatasetResult {
             dataset_id,
             dataset,
-            head,
+            seed,
         })
     }
 

@@ -215,13 +215,31 @@ impl Command for IngestCommand {
                 .await
                 .map_err(CLIError::failure)?;
 
-            let result = self
+            let ingest_result = self
                 .push_ingest_executor
-                .ingest_from_url(target, plan, url, listener.clone())
+                .ingest_from_url(target.clone(), plan, url, listener.clone())
                 .await
                 .map_err(CLIError::failure)?;
 
-            match result {
+            if let PushIngestResult::Updated {
+                old_head, new_head, ..
+            } = &ingest_result
+            {
+                target
+                    .as_metadata_chain()
+                    .set_ref(
+                        &odf::BlockRef::Head,
+                        new_head,
+                        odf::dataset::SetRefOpts {
+                            validate_block_present: true,
+                            check_ref_is: Some(Some(old_head)),
+                        },
+                    )
+                    .await
+                    .unwrap();
+            }
+
+            match ingest_result {
                 PushIngestResult::UpToDate { .. } => (),
                 PushIngestResult::Updated { .. } => updated += 1,
             }

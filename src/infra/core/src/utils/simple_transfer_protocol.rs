@@ -24,7 +24,7 @@ use kamu_datasets::{
     CreateDatasetUseCaseOptions,
     SetRefCheckRefMode,
 };
-use odf::dataset::MetadataChainImpl;
+use odf::dataset::{MetadataChainImpl, MetadataChainReferenceRepositoryImpl};
 use odf::storage::inmem::{NamedObjectRepositoryInMemory, ObjectRepositoryInMemory};
 use odf::storage::{MetadataBlockRepositoryImpl, ReferenceRepositoryImpl};
 
@@ -89,7 +89,9 @@ impl SimpleTransferProtocol {
 
         let empty_chain = MetadataChainImpl::new(
             MetadataBlockRepositoryImpl::new(ObjectRepositoryInMemory::new()),
-            ReferenceRepositoryImpl::new(NamedObjectRepositoryInMemory::new()),
+            MetadataChainReferenceRepositoryImpl::new(ReferenceRepositoryImpl::new(
+                NamedObjectRepositoryInMemory::new(),
+            )),
         );
 
         let src_chain = src.as_metadata_chain();

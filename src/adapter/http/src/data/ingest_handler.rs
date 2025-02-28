@@ -14,7 +14,7 @@ use database_common_macros::transactional_handler;
 use dill::Catalog;
 use http::HeaderMap;
 use http_common::*;
-use internal_error::ErrorIntoInternal;
+use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_core::*;
 use time_source::SystemTimeSource;
 use tokio::io::AsyncRead;
@@ -160,14 +160,34 @@ pub async fn dataset_ingest_handler(
             PushIngestPlanningError::Internal(e) => e.api_err(),
         })?;
 
+    // TODO: push ingest use case
     let push_ingest_executor = catalog.get_one::<dyn PushIngestExecutor>().unwrap();
     match push_ingest_executor
-        .ingest_from_stream(target, ingest_plan, arguments.data_stream, None)
+        .ingest_from_stream(target.clone(), ingest_plan, arguments.data_stream, None)
         .await
     {
         // Per note above, we're not including any extra information about the result
         // of the ingest operation at this point to accommodate async execution
-        Ok(_) => Ok(()),
+        Ok(ingest_result) => {
+            if let PushIngestResult::Updated {
+                old_head, new_head, ..
+            } = ingest_result
+            {
+                target
+                    .as_metadata_chain()
+                    .set_ref(
+                        &odf::BlockRef::Head,
+                        &new_head,
+                        odf::dataset::SetRefOpts {
+                            validate_block_present: true,
+                            check_ref_is: Some(Some(&old_head)),
+                        },
+                    )
+                    .await
+                    .int_err()?;
+            }
+            Ok(())
+        }
         Err(PushIngestError::ReadError(e)) => Err(ApiError::bad_request(e)),
         Err(PushIngestError::UnsupportedMediaType(_)) => {
             Err(ApiError::new_unsupported_media_type())

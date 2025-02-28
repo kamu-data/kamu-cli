@@ -23,16 +23,11 @@ use kamu_accounts_services::{
     LoginPasswordAuthProvider,
     PredefinedAccountsRegistrator,
 };
-use kamu_datasets::{CreateDatasetFromSnapshotUseCase, CreateDatasetResult};
-use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEntryRepository};
-use kamu_datasets_services::{
-    CreateDatasetFromSnapshotUseCaseImpl,
-    CreateDatasetUseCaseImpl,
-    DatasetEntryServiceImpl,
-    DependencyGraphServiceImpl,
-    ViewDatasetUseCaseImpl,
-};
-use messaging_outbox::DummyOutboxImpl;
+use kamu_datasets::*;
+use kamu_datasets_inmem::*;
+use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
+use kamu_datasets_services::*;
+use messaging_outbox::{register_message_dispatcher, Outbox, OutboxImmediateImpl};
 use odf::metadata::testing::MetadataFactory;
 use time_source::{SystemTimeSource, SystemTimeSourceStub};
 use url::Url;
@@ -378,12 +373,16 @@ impl TestHarness {
             let mut b = dill::CatalogBuilder::new();
 
             b.add_value(RunInfoDir::new(run_info_dir))
+                .add_builder(
+                    messaging_outbox::OutboxImmediateImpl::builder()
+                        .with_consumer_filter(messaging_outbox::ConsumerFilter::AllConsumers),
+                )
+                .bind::<dyn Outbox, OutboxImmediateImpl>()
                 .add::<DidGeneratorDefault>()
                 .add_value(CacheDir::new(cache_dir))
                 .add::<ObjectStoreRegistryImpl>()
                 .add::<ObjectStoreBuilderLocalFs>()
                 .add::<DataFormatRegistryImpl>()
-                .add::<DummyOutboxImpl>()
                 .add_value(CurrentAccountSubject::new_test())
                 .add_value(dataset_action_authorizer)
                 .bind::<dyn auth::DatasetActionAuthorizer, TDatasetAuthorizer>()
@@ -394,8 +393,9 @@ impl TestHarness {
                 .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
                 .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>(
                 )
+                .add::<kamu_datasets_services::DatabaseBackedOdfDatasetLfsBuilderImpl>()
                 .add::<CreateDatasetFromSnapshotUseCaseImpl>()
-                .add::<CreateDatasetUseCaseImpl>()
+                .add::<CreateDatasetUseCaseHelper>()
                 .add_value(SystemTimeSourceStub::new_set(
                     Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap(),
                 ))
@@ -407,6 +407,8 @@ impl TestHarness {
                 .add_value(ServerUrlConfig::new_test(None))
                 .add::<DatasetEntryServiceImpl>()
                 .add::<InMemoryDatasetEntryRepository>()
+                .add::<DatasetReferenceServiceImpl>()
+                .add::<InMemoryDatasetReferenceRepository>()
                 .add::<DependencyGraphServiceImpl>()
                 .add::<InMemoryDatasetDependencyRepository>()
                 .add_value(PredefinedAccountsConfig::single_tenant())
@@ -417,6 +419,16 @@ impl TestHarness {
                 .add::<ViewDatasetUseCaseImpl>();
 
             NoOpDatabasePlugin::init_database_components(&mut b);
+
+            register_message_dispatcher::<DatasetLifecycleMessage>(
+                &mut b,
+                MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
+            );
+
+            register_message_dispatcher::<DatasetReferenceMessage>(
+                &mut b,
+                MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE,
+            );
 
             b.build()
         };
@@ -500,9 +512,28 @@ impl TestHarness {
             .await
             .unwrap();
 
-        self.push_ingest_executor
-            .ingest_from_url(target, ingest_plan, url, None)
+        let ingest_result = self
+            .push_ingest_executor
+            .ingest_from_url(target.clone(), ingest_plan, url, None)
             .await
             .unwrap();
+
+        if let PushIngestResult::Updated {
+            old_head, new_head, ..
+        } = &ingest_result
+        {
+            target
+                .as_metadata_chain()
+                .set_ref(
+                    &odf::BlockRef::Head,
+                    new_head,
+                    odf::dataset::SetRefOpts {
+                        validate_block_present: true,
+                        check_ref_is: Some(Some(old_head)),
+                    },
+                )
+                .await
+                .unwrap();
+        }
     }
 }

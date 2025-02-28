@@ -22,6 +22,9 @@ doctest = false
 
 
 [features]
+default = ["lfs"]
+lfs = []
+s3 = []
 testing = ["dep:mockall"]
 
 
@@ -30,6 +33,7 @@ file-utils = { workspace = true }
 internal-error = { workspace = true }
 odf-metadata = { workspace = true }
 odf-storage = { workspace = true }
+s3-utils = { workspace = true }
 
 async-stream = "0.3"
 async-trait = { version = "0.1", default-features = false }

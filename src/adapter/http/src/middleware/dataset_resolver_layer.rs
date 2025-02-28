@@ -18,7 +18,7 @@ use axum::response::Response;
 use axum::RequestExt;
 use database_common::DatabaseTransactionRunner;
 use internal_error::InternalError;
-use kamu_core::{DatasetRegistry, DatasetRegistryExt, ResolvedDataset};
+use kamu_core::{DatasetRegistry, DatasetRegistryExt};
 use tower::{Layer, Service};
 
 use crate::axum_utils::*;
@@ -143,7 +143,7 @@ where
                     .expect("Catalog not found in http server extensions");
 
                 enum CheckResult {
-                    CheckedDataset(ResolvedDataset),
+                    CheckedDataset(odf::DatasetHandle),
                     ErrorResponse(Response<Body>),
                 }
 
@@ -156,9 +156,9 @@ where
                                 .get_one::<dyn DatasetRegistry>()
                                 .unwrap();
                             match dataset_registry.get_dataset_by_ref(&dataset_ref).await {
-                                Ok(resolved_dataset) => {
-                                    Ok(CheckResult::CheckedDataset(resolved_dataset))
-                                }
+                                Ok(resolved_dataset) => Ok(CheckResult::CheckedDataset(
+                                    resolved_dataset.get_handle().clone(),
+                                )),
                                 Err(odf::DatasetRefUnresolvedError::NotFound(err)) => {
                                     tracing::warn!("Dataset not found: {:?}", err);
                                     Ok(CheckResult::ErrorResponse(not_found_response()))
@@ -172,8 +172,8 @@ where
                         .await;
 
                 match check_result {
-                    Ok(CheckResult::CheckedDataset(target)) => {
-                        request.extensions_mut().insert((*target).clone());
+                    Ok(CheckResult::CheckedDataset(hdl)) => {
+                        request.extensions_mut().insert(hdl);
                     }
                     Ok(CheckResult::ErrorResponse(r)) => return Ok(r),
                     Err(err) => {

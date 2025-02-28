@@ -10,21 +10,16 @@
 use std::sync::Arc;
 
 use dill::{component, interface};
-use internal_error::ErrorIntoInternal;
 use kamu_accounts::CurrentAccountSubject;
-use kamu_core::TenancyConfig;
+use kamu_core::ResolvedDataset;
 use kamu_datasets::{
     CreateDatasetError,
     CreateDatasetResult,
     CreateDatasetUseCase,
     CreateDatasetUseCaseOptions,
-    DatasetLifecycleMessage,
-    NameCollisionError,
-    MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
 };
-use messaging_outbox::{Outbox, OutboxExt};
 
-use crate::{CreateDatasetEntryError, DatasetEntryWriter, DependencyGraphWriter};
+use crate::utils::CreateDatasetUseCaseHelper;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -32,49 +27,17 @@ use crate::{CreateDatasetEntryError, DatasetEntryWriter, DependencyGraphWriter};
 #[interface(dyn CreateDatasetUseCase)]
 pub struct CreateDatasetUseCaseImpl {
     current_account_subject: Arc<CurrentAccountSubject>,
-    tenancy_config: Arc<TenancyConfig>,
-    dataset_entry_writer: Arc<dyn DatasetEntryWriter>,
-    dependency_graph_writer: Arc<dyn DependencyGraphWriter>,
-    dataset_storage_unit_writer: Arc<dyn odf::DatasetStorageUnitWriter>,
-    outbox: Arc<dyn Outbox>,
+    create_helper: Arc<CreateDatasetUseCaseHelper>,
 }
 
 impl CreateDatasetUseCaseImpl {
     pub fn new(
         current_account_subject: Arc<CurrentAccountSubject>,
-        tenancy_config: Arc<TenancyConfig>,
-        dataset_entry_writer: Arc<dyn DatasetEntryWriter>,
-        dependency_graph_writer: Arc<dyn DependencyGraphWriter>,
-        dataset_storage_unit_writer: Arc<dyn odf::DatasetStorageUnitWriter>,
-        outbox: Arc<dyn Outbox>,
+        create_helper: Arc<CreateDatasetUseCaseHelper>,
     ) -> Self {
         Self {
             current_account_subject,
-            tenancy_config,
-            dataset_entry_writer,
-            dependency_graph_writer,
-            dataset_storage_unit_writer,
-            outbox,
-        }
-    }
-
-    fn canonical_dataset_alias(&self, raw_alias: &odf::DatasetAlias) -> odf::DatasetAlias {
-        match self.tenancy_config.as_ref() {
-            TenancyConfig::SingleTenant => raw_alias.clone(),
-            TenancyConfig::MultiTenant => {
-                let account_name = if raw_alias.is_multi_tenant() {
-                    raw_alias.account_name.as_ref().unwrap()
-                } else {
-                    match self.current_account_subject.as_ref() {
-                        CurrentAccountSubject::Anonymous(_) => {
-                            panic!("Anonymous account misused, use multi-tenant alias");
-                        }
-                        CurrentAccountSubject::Logged(l) => &l.account_name,
-                    }
-                };
-
-                odf::DatasetAlias::new(Some(account_name.clone()), raw_alias.dataset_name.clone())
-            }
+            create_helper,
         }
     }
 }
@@ -88,6 +51,7 @@ impl CreateDatasetUseCase for CreateDatasetUseCaseImpl {
         seed_block: odf::MetadataBlockTyped<odf::metadata::Seed>,
         options: CreateDatasetUseCaseOptions,
     ) -> Result<CreateDatasetResult, CreateDatasetError> {
+        // There must be a logged in user
         let logged_account_id = match self.current_account_subject.as_ref() {
             CurrentAccountSubject::Anonymous(_) => {
                 panic!("Anonymous account cannot create dataset");
@@ -95,59 +59,39 @@ impl CreateDatasetUseCase for CreateDatasetUseCaseImpl {
             CurrentAccountSubject::Logged(l) => l.account_id.clone(),
         };
 
-        self.dataset_entry_writer
-            .create_entry(
+        // Adjust alias for current tenancy configuration
+        let canonical_alias = self.create_helper.canonical_dataset_alias(dataset_alias);
+
+        // Dataset entry goes first, this guarantees name collision check
+        self.create_helper
+            .create_dataset_entry(
                 &seed_block.event.dataset_id,
                 &logged_account_id,
-                &dataset_alias.dataset_name,
+                &canonical_alias,
             )
-            .await
-            .map_err(|e| match e {
-                CreateDatasetEntryError::Internal(e) => CreateDatasetError::Internal(e),
-                CreateDatasetEntryError::DuplicateId(e) => {
-                    CreateDatasetError::Internal(e.int_err())
-                }
-                CreateDatasetEntryError::NameCollision(e) => {
-                    CreateDatasetError::NameCollision(NameCollisionError {
-                        alias: odf::DatasetAlias::new(
-                            dataset_alias.account_name.clone(),
-                            e.dataset_name,
-                        ),
-                    })
-                }
-            })?;
-
-        self.dependency_graph_writer
-            .create_dataset_node(&seed_block.event.dataset_id)
             .await?;
 
-        let canonical_alias = self.canonical_dataset_alias(dataset_alias);
-
+        // Make storage level dataset (no HEAD yet)
         let store_result = self
-            .dataset_storage_unit_writer
-            .store_dataset(seed_block)
-            .await
-            .map_err(|e| match e {
-                odf::dataset::StoreDatasetError::RefCollision(e) => {
-                    CreateDatasetError::RefCollision(e)
-                }
-                odf::dataset::StoreDatasetError::Internal(e) => CreateDatasetError::Internal(e),
-            })?;
+            .create_helper
+            .store_dataset(&canonical_alias, seed_block)
+            .await?;
 
-        // Write dataset alias file
-        // TODO: reconsider if we really need this
-        // TODO: consider writing it after transaction completes
-        odf::dataset::write_dataset_alias(store_result.dataset.as_ref(), &canonical_alias).await?;
+        // Set initial dataset HEAD
+        self.create_helper
+            .set_created_head(
+                ResolvedDataset::from_stored(&store_result, &canonical_alias),
+                &store_result.seed,
+            )
+            .await?;
 
-        self.outbox
-            .post_message(
-                MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
-                DatasetLifecycleMessage::created(
-                    store_result.dataset_id.clone(),
-                    logged_account_id,
-                    options.dataset_visibility,
-                    dataset_alias.dataset_name.clone(),
-                ),
+        // Notify interested parties the dataset was created
+        self.create_helper
+            .notify_dataset_created(
+                &store_result.dataset_id,
+                &canonical_alias.dataset_name,
+                &logged_account_id,
+                options.dataset_visibility,
             )
             .await?;
 

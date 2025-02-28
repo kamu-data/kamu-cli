@@ -74,6 +74,18 @@ impl SyncRef {
             Self::Remote(remote_ref) => remote_ref.original_remote_ref.as_any_ref(),
         }
     }
+
+    pub fn detach_from_transaction(&self) {
+        if let Self::Local(r) = self {
+            r.detach_from_transaction();
+        }
+    }
+
+    pub fn reattach_to_transaction(&self, catalog: &dill::Catalog) {
+        if let Self::Local(r) = self {
+            r.reattach_to_transaction(catalog);
+        }
+    }
 }
 
 #[derive(Clone)]

@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use dill::*;
-use internal_error::ErrorIntoInternal;
+use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_core::*;
 use kamu_ingest_datafusion::DataWriterDataFusion;
 
@@ -51,10 +51,25 @@ impl SetWatermarkExecutor for SetWatermarkExecutorImpl {
             )
             .await
         {
-            Ok(res) => Ok(SetWatermarkResult::Updated {
-                old_head: Some(res.old_head),
-                new_head: res.new_head,
-            }),
+            Ok(res) => {
+                target
+                    .as_metadata_chain()
+                    .set_ref(
+                        &odf::BlockRef::Head,
+                        &res.new_head,
+                        odf::dataset::SetRefOpts {
+                            validate_block_present: true,
+                            check_ref_is: Some(Some(&res.old_head)),
+                        },
+                    )
+                    .await
+                    .int_err()?;
+
+                Ok(SetWatermarkResult::Updated {
+                    old_head: Some(res.old_head),
+                    new_head: res.new_head,
+                })
+            }
             Err(
                 WriteWatermarkError::EmptyCommit(_)
                 | WriteWatermarkError::CommitError(odf::dataset::CommitError::MetadataAppendError(

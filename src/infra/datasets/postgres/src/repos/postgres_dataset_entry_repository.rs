@@ -19,7 +19,7 @@ use kamu_datasets::*;
 
 pub struct PostgresDatasetEntryRepository {
     transaction: TransactionRefT<sqlx::Postgres>,
-    listeners: Vec<Arc<dyn DatasetEntryRemovalListener>>,
+    removal_listeners: Vec<Arc<dyn DatasetEntryRemovalListener>>,
 }
 
 #[component(pub)]
@@ -27,11 +27,11 @@ pub struct PostgresDatasetEntryRepository {
 impl PostgresDatasetEntryRepository {
     pub fn new(
         transaction: TransactionRef,
-        listeners: Vec<Arc<dyn DatasetEntryRemovalListener>>,
+        removal_listeners: Vec<Arc<dyn DatasetEntryRemovalListener>>,
     ) -> Self {
         Self {
             transaction: transaction.into(),
-            listeners,
+            removal_listeners,
         }
     }
 }
@@ -280,10 +280,32 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
     ) -> Result<(), SaveDatasetEntryError> {
         let mut tr = self.transaction.lock().await;
 
-        let connection_mut = tr.connection_mut().await?;
-
         let stack_dataset_id = dataset_entry.id.as_did_str().to_stack_string();
         let stack_owner_id = dataset_entry.owner_id.as_did_str().to_stack_string();
+
+        // Do not provoke conflict of unique violation at Postgres level, if we can
+        // avoid it. Note: any unique violation immediately marks the entire
+        // Postgres transaction as failed.
+        {
+            let connection_mut = tr.connection_mut().await?;
+
+            let conflict_result = sqlx::query!(
+                r#"
+                SELECT 1 as res FROM dataset_entries WHERE dataset_name = $1 AND owner_id = $2 LIMIT 1
+                "#,
+                dataset_entry.name.as_str(),
+                stack_owner_id.as_str(),
+            )
+            .fetch_optional(connection_mut)
+            .await
+            .int_err()?;
+
+            if conflict_result.is_some() {
+                return Err(DatasetEntryNameCollisionError::new(dataset_entry.name.clone()).into());
+            }
+        }
+
+        let connection_mut = tr.connection_mut().await?;
 
         sqlx::query!(
             r#"
@@ -299,7 +321,11 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
         .await
         .map_err(|e| match e {
             sqlx::Error::Database(e) if e.is_unique_violation() => {
+                // Although we did check the unique value in SELECT query above, with unlucky
+                // race conditions it's still possible to violate unique constraint
                 let postgres_error_message = e.message();
+                tracing::error!(postgres_error_message);
+
                 if postgres_error_message.contains("idx_dataset_entries_owner_id_dataset_name") {
                     DatasetEntryNameCollisionError::new(dataset_entry.name.clone()).into()
                 } else {
@@ -374,7 +400,7 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
             }
         }
 
-        for listener in &self.listeners {
+        for listener in &self.removal_listeners {
             listener
                 .on_dataset_entry_removed(dataset_id)
                 .await

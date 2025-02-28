@@ -8,11 +8,12 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::{ErrorIntoInternal, InternalError};
+use serde::{Deserialize, Serialize};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// References are named pointers to metadata blocks
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Debug)]
 pub enum BlockRef {
     Head,
 }

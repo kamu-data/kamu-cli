@@ -32,6 +32,7 @@ use kamu_datasets::{
     CommitDatasetEventUseCase,
     CreateDatasetFromSnapshotUseCase,
     CreateDatasetUseCase,
+    DatasetReferenceService,
 };
 use kamu_datasets_services::DatasetEntryWriter;
 use odf::dataset::DatasetLayout;
@@ -66,6 +67,8 @@ pub(crate) trait ServerSideHarness {
     fn cli_compaction_executor(&self) -> Arc<dyn CompactionExecutor>;
 
     fn cli_dataset_entry_writer(&self) -> Arc<dyn DatasetEntryWriter>;
+
+    fn cli_dataset_reference_service(&self) -> Arc<dyn DatasetReferenceService>;
 
     fn dataset_layout(&self, dataset_handle: &odf::DatasetHandle) -> DatasetLayout;
 

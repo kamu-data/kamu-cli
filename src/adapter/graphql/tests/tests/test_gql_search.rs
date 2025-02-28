@@ -8,21 +8,11 @@
 // by the Apache License, Version 2.0.
 
 use async_graphql::*;
-use database_common::NoOpDatabasePlugin;
 use kamu_core::*;
-use kamu_datasets::CreateDatasetFromSnapshotUseCase;
-use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEntryRepository};
-use kamu_datasets_services::{
-    CreateDatasetFromSnapshotUseCaseImpl,
-    CreateDatasetUseCaseImpl,
-    DatasetEntryServiceImpl,
-    DependencyGraphServiceImpl,
-};
-use messaging_outbox::DummyOutboxImpl;
+use kamu_datasets::*;
 use odf::metadata::testing::MetadataFactory;
-use time_source::SystemTimeSourceDefault;
 
-use crate::utils::authentication_catalogs;
+use crate::utils::{authentication_catalogs, BaseGQLDatasetHarness};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -271,50 +261,23 @@ async fn test_correct_dataset_order_in_response() {
 // Harness
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[oop::extend(BaseGQLDatasetHarness, base_gql_harness)]
 struct GqlSearchHarness {
-    _temp_dir: tempfile::TempDir,
+    base_gql_harness: BaseGQLDatasetHarness,
     catalog_authorized: dill::Catalog,
     schema: kamu_adapter_graphql::Schema,
 }
 
 impl GqlSearchHarness {
     pub async fn new() -> Self {
-        let temp_dir = tempfile::tempdir().unwrap();
-        let datasets_dir = temp_dir.path().join("datasets");
-        std::fs::create_dir(&datasets_dir).unwrap();
+        let base_gql_harness = BaseGQLDatasetHarness::new(TenancyConfig::SingleTenant);
 
-        let base_catalog = {
-            use dill::Component;
-
-            let mut b = dill::CatalogBuilder::new();
-            b.add::<DidGeneratorDefault>()
-                .add::<SystemTimeSourceDefault>()
-                .add::<DummyOutboxImpl>()
-                .add::<DependencyGraphServiceImpl>()
-                .add::<InMemoryDatasetDependencyRepository>()
-                .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
-                .add_value(TenancyConfig::SingleTenant)
-                .add_builder(
-                    odf::dataset::DatasetStorageUnitLocalFs::builder().with_root(datasets_dir),
-                )
-                .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
-                .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>(
-                )
-                .add::<CreateDatasetFromSnapshotUseCaseImpl>()
-                .add::<CreateDatasetUseCaseImpl>()
-                .add::<DatasetEntryServiceImpl>()
-                .add::<InMemoryDatasetEntryRepository>();
-
-            NoOpDatabasePlugin::init_database_components(&mut b);
-
-            b.build()
-        };
-
-        let (_catalog_anonymous, catalog_authorized) = authentication_catalogs(&base_catalog).await;
+        let (_catalog_anonymous, catalog_authorized) =
+            authentication_catalogs(base_gql_harness.catalog()).await;
         let schema = kamu_adapter_graphql::schema_quiet();
 
         Self {
-            _temp_dir: temp_dir,
+            base_gql_harness,
             catalog_authorized,
             schema,
         }

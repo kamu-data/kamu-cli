@@ -12,6 +12,9 @@
 pub const JOB_KAMU_DATASETS_DATASET_ENTRY_INDEXER: &str =
     "dev.kamu.domain.datasets.DatasetEntryIndexer";
 
+pub const JOB_KAMU_DATASETS_DATASET_REFERENCE_INDEXER: &str =
+    "dev.kamu.domain.datasets.DatasetReferenceIndexer";
+
 pub const JOB_KAMU_DATASETS_DEPENDENCY_GRAPH_INDEXER: &str =
     "dev.kamu.domain.datasets.DependencyGraphIndexer";
 

@@ -13,6 +13,7 @@ use odf_metadata::*;
 use odf_storage::*;
 
 use super::metadata_chain_validators::*;
+use super::MetadataChainReferenceRepository;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -28,22 +29,22 @@ pub(crate) use invalid_event;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct MetadataChainImpl<MetaBlockRepo, RefRepo> {
+pub struct MetadataChainImpl<MetaBlockRepo, MetaRefRepo> {
     meta_block_repo: MetaBlockRepo,
-    ref_repo: RefRepo,
+    meta_ref_repo: MetaRefRepo,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl<MetaBlockRepo, RefRepo> MetadataChainImpl<MetaBlockRepo, RefRepo>
+impl<MetaBlockRepo, MetaRefRepo> MetadataChainImpl<MetaBlockRepo, MetaRefRepo>
 where
     MetaBlockRepo: MetadataBlockRepository + Sync + Send,
-    RefRepo: ReferenceRepository + Sync + Send,
+    MetaRefRepo: MetadataChainReferenceRepository + Sync + Send,
 {
-    pub fn new(meta_block_repo: MetaBlockRepo, ref_repo: RefRepo) -> Self {
+    pub fn new(meta_block_repo: MetaBlockRepo, meta_ref_repo: MetaRefRepo) -> Self {
         Self {
             meta_block_repo,
-            ref_repo,
+            meta_ref_repo,
         }
     }
 }
@@ -51,13 +52,17 @@ where
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl<MetaBlockRepo, RefRepo> MetadataChain for MetadataChainImpl<MetaBlockRepo, RefRepo>
+impl<MetaBlockRepo, MetaRefRepo> MetadataChain for MetadataChainImpl<MetaBlockRepo, MetaRefRepo>
 where
     MetaBlockRepo: MetadataBlockRepository + Sync + Send,
-    RefRepo: ReferenceRepository + Sync + Send,
+    MetaRefRepo: MetadataChainReferenceRepository + Sync + Send,
 {
-    async fn resolve_ref(&self, r: &BlockRef) -> Result<Multihash, GetRefError> {
-        self.ref_repo.get(r.as_str()).await
+    fn detach_from_transaction(&self) {
+        self.meta_ref_repo.detach_from_transaction();
+    }
+
+    fn reattach_to_transaction(&self, catalog: &dill::Catalog) {
+        self.meta_ref_repo.reattach_to_transaction(catalog);
     }
 
     async fn contains_block(&self, hash: &Multihash) -> Result<bool, ContainsBlockError> {
@@ -77,46 +82,6 @@ where
             .get_block(hash)
             .await
             .map_err(Into::into)
-    }
-
-    async fn set_ref<'a>(
-        &'a self,
-        r: &BlockRef,
-        hash: &Multihash,
-        opts: SetRefOpts<'a>,
-    ) -> Result<(), SetChainRefError> {
-        if opts.validate_block_present {
-            match self.meta_block_repo.contains_block(hash).await {
-                Ok(true) => Ok(()),
-                Ok(false) => Err(SetChainRefError::BlockNotFound(BlockNotFoundError {
-                    hash: hash.clone(),
-                })),
-                Err(ContainsBlockError::Access(e)) => Err(SetChainRefError::Access(e)),
-                Err(ContainsBlockError::Internal(e)) => Err(SetChainRefError::Internal(e)),
-            }?;
-        }
-
-        // TODO: CONCURRENCY: Implement true CAS
-        if let Some(prev_expected) = opts.check_ref_is {
-            let prev_actual = match self.ref_repo.get(r.as_str()).await {
-                Ok(r) => Ok(Some(r)),
-                Err(GetRefError::NotFound(_)) => Ok(None),
-                Err(GetRefError::Access(e)) => Err(SetChainRefError::Access(e)),
-                Err(GetRefError::Internal(e)) => Err(SetChainRefError::Internal(e)),
-            }?;
-            if prev_expected != prev_actual.as_ref() {
-                return Err(RefCASError {
-                    reference: r.clone(),
-                    expected: prev_expected.cloned(),
-                    actual: prev_actual,
-                }
-                .into());
-            }
-        }
-
-        self.ref_repo.set(r.as_str(), hash).await?;
-
-        Ok(())
     }
 
     async fn append<'a>(
@@ -161,27 +126,13 @@ where
             }?;
         }
 
-        if opts.update_ref.is_some()
+        let check_ref_is = if opts.update_ref.is_some()
             && (opts.check_ref_is.is_some() || opts.check_ref_is_prev_block)
         {
-            let r = opts.update_ref.unwrap();
-            let expected = opts.check_ref_is.unwrap_or(block.prev_block_hash.as_ref());
-
-            let actual = match self.ref_repo.get(r.as_str()).await {
-                Ok(h) => Ok(Some(h)),
-                Err(GetRefError::NotFound(_)) => Ok(None),
-                Err(GetRefError::Access(e)) => Err(AppendError::Access(e)),
-                Err(GetRefError::Internal(e)) => Err(AppendError::Internal(e)),
-            }?;
-
-            if expected != actual.as_ref() {
-                return Err(AppendError::RefCASFailed(RefCASError {
-                    reference: r.clone(),
-                    expected: expected.cloned(),
-                    actual,
-                }));
-            }
-        }
+            opts.check_ref_is.or(Some(block.prev_block_hash.as_ref()))
+        } else {
+            None
+        };
 
         let res = self
             .meta_block_repo
@@ -203,11 +154,59 @@ where
         tracing::debug!(?block, "Successfully appended block");
 
         if let Some(r) = opts.update_ref {
-            tracing::debug!(?r, new_hash = %res.hash, "Updating reference");
-            self.ref_repo.set(r.as_str(), &res.hash).await?;
+            self.set_ref(
+                r,
+                &res.hash,
+                SetRefOpts {
+                    validate_block_present: false,
+                    check_ref_is,
+                },
+            )
+            .await
+            .map_err(|e| match e {
+                SetChainRefError::BlockNotFound(_) => {
+                    unreachable!("We've just created this block")
+                }
+                SetChainRefError::CASFailed(e) => AppendError::RefCASFailed(e),
+                SetChainRefError::Access(e) => AppendError::Access(e),
+                SetChainRefError::Internal(e) => AppendError::Internal(e),
+            })?;
         }
 
         Ok(res.hash)
+    }
+
+    async fn resolve_ref(&self, r: &BlockRef) -> Result<Multihash, GetRefError> {
+        self.meta_ref_repo.get_ref(r).await
+    }
+
+    #[tracing::instrument(level = "debug", skip_all, fields(r, hash, ?opts))]
+    async fn set_ref<'a>(
+        &'a self,
+        r: &BlockRef,
+        hash: &Multihash,
+        opts: SetRefOpts<'a>,
+    ) -> Result<(), SetChainRefError> {
+        if opts.validate_block_present {
+            match self.meta_block_repo.contains_block(hash).await {
+                Ok(true) => Ok(()),
+                Ok(false) => Err(SetChainRefError::BlockNotFound(BlockNotFoundError {
+                    hash: hash.clone(),
+                })),
+                Err(ContainsBlockError::Access(e)) => Err(SetChainRefError::Access(e)),
+                Err(ContainsBlockError::Internal(e)) => Err(SetChainRefError::Internal(e)),
+            }?;
+        }
+
+        self.meta_ref_repo
+            .set_ref(r, hash, opts.check_ref_is)
+            .await?;
+
+        Ok(())
+    }
+
+    fn as_raw_ref_repo(&self) -> &dyn ReferenceRepository {
+        self.meta_ref_repo.as_raw_ref_repo()
     }
 }
 

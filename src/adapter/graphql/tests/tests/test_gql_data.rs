@@ -10,11 +10,9 @@
 use std::path::Path;
 use std::sync::Arc;
 
-use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use datafusion::arrow::array::*;
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use datafusion::arrow::record_batch::RecordBatch;
-use dill::Component;
 use file_utils::OwnedFile;
 use kamu::testing::ParquetWriterHelper;
 use kamu::*;
@@ -26,18 +24,11 @@ use kamu_accounts_services::{
     PredefinedAccountsRegistrator,
 };
 use kamu_core::*;
-use kamu_datasets::CreateDatasetUseCase;
-use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEntryRepository};
-use kamu_datasets_services::{
-    CreateDatasetUseCaseImpl,
-    DatasetEntryServiceImpl,
-    DependencyGraphServiceImpl,
-    ViewDatasetUseCaseImpl,
-};
-use messaging_outbox::DummyOutboxImpl;
+use kamu_datasets::*;
 use odf::metadata::testing::MetadataFactory;
 use serde_json::json;
-use time_source::SystemTimeSourceDefault;
+
+use crate::utils::BaseGQLDatasetHarness;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -61,35 +52,20 @@ async fn create_catalog_with_local_workspace(
         panic!()
     }
 
-    let catalog = {
-        let mut b = dill::CatalogBuilder::new();
+    let base_gql_harness = BaseGQLDatasetHarness::new(tenancy_config);
 
-        b.add::<DependencyGraphServiceImpl>()
-            .add::<DidGeneratorDefault>()
-            .add::<InMemoryDatasetDependencyRepository>()
-            .add_value(current_account_subject)
+    let catalog = {
+        let mut b = dill::CatalogBuilder::new_chained(base_gql_harness.catalog());
+
+        b.add_value(current_account_subject)
             .add_value(predefined_accounts_config)
-            .add_value(tenancy_config)
-            .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
-            .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
-            .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>()
-            .add::<CreateDatasetUseCaseImpl>()
-            .add::<ViewDatasetUseCaseImpl>()
-            .add::<DummyOutboxImpl>()
-            .add::<SystemTimeSourceDefault>()
             .add::<QueryServiceImpl>()
             .add::<ObjectStoreRegistryImpl>()
             .add::<ObjectStoreBuilderLocalFs>()
-            .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
             .add::<LoginPasswordAuthProvider>()
             .add::<PredefinedAccountsRegistrator>()
-            .add::<DatabaseTransactionRunner>()
-            .add::<DatasetEntryServiceImpl>()
-            .add::<InMemoryDatasetEntryRepository>()
             .add::<AccountServiceImpl>()
             .add::<InMemoryAccountRepository>();
-
-        NoOpDatabasePlugin::init_database_components(&mut b);
 
         b.build()
     };

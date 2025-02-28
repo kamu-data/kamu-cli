@@ -219,19 +219,6 @@ impl CompactionExecutor for CompactionExecutorImpl {
             .commit_new_blocks(&target, &plan, new_file_paths)
             .await?;
 
-        tracing::debug!("Setting new head");
-        target
-            .as_metadata_chain()
-            .set_ref(
-                &odf::BlockRef::Head,
-                &new_head,
-                odf::dataset::SetRefOpts {
-                    validate_block_present: true,
-                    check_ref_is: None,
-                },
-            )
-            .await?;
-
         let res = CompactionResult::Success {
             old_head: plan.old_head,
             new_head,

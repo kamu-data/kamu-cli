@@ -7,29 +7,16 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::NoOpDatabasePlugin;
-use dill::Component;
 use indoc::indoc;
 use kamu_accounts::*;
 use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 use kamu_auth_rebac_services::{RebacDatasetLifecycleMessageConsumer, RebacServiceImpl};
 use kamu_core::*;
-use kamu_datasets::{CreateDatasetFromSnapshotUseCase, CreateDatasetResult};
-use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEntryRepository};
-use kamu_datasets_services::{
-    CreateDatasetFromSnapshotUseCaseImpl,
-    CreateDatasetUseCaseImpl,
-    DatasetEntryServiceImpl,
-    DeleteDatasetUseCaseImpl,
-    DependencyGraphServiceImpl,
-    RenameDatasetUseCaseImpl,
-    ViewDatasetUseCaseImpl,
-};
-use messaging_outbox::DummyOutboxImpl;
+use kamu_datasets::*;
+use kamu_datasets_services::*;
 use odf::metadata::testing::MetadataFactory;
-use time_source::SystemTimeSourceDefault;
 
-use crate::utils::{authentication_catalogs, expect_anonymous_access_error};
+use crate::utils::{authentication_catalogs, expect_anonymous_access_error, BaseGQLDatasetHarness};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Implementations
@@ -733,39 +720,22 @@ async fn test_dataset_view_permissions() {
 // Harness
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[oop::extend(BaseGQLDatasetHarness, base_gql_harness)]
 struct GraphQLDatasetsHarness {
-    _tempdir: tempfile::TempDir,
-    catalog_authorized: dill::Catalog,
+    base_gql_harness: BaseGQLDatasetHarness,
     catalog_anonymous: dill::Catalog,
+    catalog_authorized: dill::Catalog,
 }
 
 impl GraphQLDatasetsHarness {
     pub async fn new(tenancy_config: TenancyConfig) -> Self {
-        let tempdir = tempfile::tempdir().unwrap();
-        let datasets_dir = tempdir.path().join("datasets");
-        std::fs::create_dir(&datasets_dir).unwrap();
+        let base_gql_harness = BaseGQLDatasetHarness::new(tenancy_config);
 
         let base_catalog = {
-            let mut b = dill::CatalogBuilder::new();
+            let mut b = dill::CatalogBuilder::new_chained(base_gql_harness.catalog());
 
-            b.add::<SystemTimeSourceDefault>()
-                .add::<DidGeneratorDefault>()
-                .add::<DummyOutboxImpl>()
-                .add::<CreateDatasetFromSnapshotUseCaseImpl>()
-                .add::<CreateDatasetUseCaseImpl>()
-                .add::<RenameDatasetUseCaseImpl>()
+            b.add::<RenameDatasetUseCaseImpl>()
                 .add::<DeleteDatasetUseCaseImpl>()
-                .add::<ViewDatasetUseCaseImpl>()
-                .add::<DependencyGraphServiceImpl>()
-                .add::<InMemoryDatasetDependencyRepository>()
-                .add_value(tenancy_config)
-                .add_builder(
-                    odf::dataset::DatasetStorageUnitLocalFs::builder().with_root(datasets_dir),
-                )
-                .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
-                .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>(
-                )
-                .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
                 .add::<RebacServiceImpl>()
                 .add_value(kamu_auth_rebac_services::DefaultAccountProperties { is_admin: false })
                 .add_value(kamu_auth_rebac_services::DefaultDatasetProperties {
@@ -773,11 +743,7 @@ impl GraphQLDatasetsHarness {
                     allows_public_read: false,
                 })
                 .add::<InMemoryRebacRepository>()
-                .add::<DatasetEntryServiceImpl>()
-                .add::<InMemoryDatasetEntryRepository>()
                 .add::<RebacDatasetLifecycleMessageConsumer>();
-
-            NoOpDatabasePlugin::init_database_components(&mut b);
 
             b.build()
         };
@@ -785,7 +751,7 @@ impl GraphQLDatasetsHarness {
         let (catalog_anonymous, catalog_authorized) = authentication_catalogs(&base_catalog).await;
 
         Self {
-            _tempdir: tempdir,
+            base_gql_harness,
             catalog_anonymous,
             catalog_authorized,
         }

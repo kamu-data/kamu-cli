@@ -31,7 +31,10 @@ pub async fn create_test_dataset_from_snapshot(
 
     // Create dataset in the storage unit
     let store_dataset_result = storage_unit_writer
-        .store_dataset(make_seed_block(dataset_id, snapshot.kind, system_time))
+        .store_dataset(
+            make_seed_block(dataset_id, snapshot.kind, system_time),
+            StoreDatasetOpts::default(),
+        )
         .await
         .int_err()?;
 
@@ -39,7 +42,7 @@ pub async fn create_test_dataset_from_snapshot(
     let append_result = match append_snapshot_metadata_to_dataset(
         snapshot.metadata,
         store_dataset_result.dataset.as_ref(),
-        &store_dataset_result.head,
+        &store_dataset_result.seed,
         system_time,
     )
     .await
@@ -55,7 +58,7 @@ pub async fn create_test_dataset_from_snapshot(
     }
     .int_err()?;
 
-    // Commit HEAD
+    // Commit HEAD. Note: storage unit hasn't set any head yet
     let chain = store_dataset_result.dataset.as_metadata_chain();
     chain
         .set_ref(
@@ -63,7 +66,7 @@ pub async fn create_test_dataset_from_snapshot(
             &append_result.proposed_head,
             SetRefOpts {
                 validate_block_present: false,
-                check_ref_is: Some(Some(&store_dataset_result.head)),
+                check_ref_is: None,
             },
         )
         .await
@@ -74,7 +77,7 @@ pub async fn create_test_dataset_from_snapshot(
         .unwrap();
 
     Ok(StoreDatasetResult {
-        head: append_result.proposed_head,
+        seed: append_result.proposed_head,
         ..store_dataset_result
     })
 }

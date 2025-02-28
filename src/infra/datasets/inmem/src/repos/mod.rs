@@ -9,8 +9,10 @@
 
 mod inmem_dataset_dependency_repository;
 mod inmem_dataset_env_var_repository;
+mod inmem_dataset_reference_repository;
 mod inmem_dateset_entry_repository;
 
 pub use inmem_dataset_dependency_repository::*;
 pub use inmem_dataset_env_var_repository::*;
+pub use inmem_dataset_reference_repository::*;
 pub use inmem_dateset_entry_repository::*;

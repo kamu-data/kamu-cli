@@ -46,6 +46,11 @@ pub trait DatasetRegistryExt: DatasetRegistry {
         &self,
         dataset_ref: &odf::DatasetRef,
     ) -> Result<ResolvedDataset, odf::DatasetRefUnresolvedError>;
+
+    async fn get_dataset_by_id(
+        &self,
+        dataset_id: &odf::DatasetID,
+    ) -> Result<ResolvedDataset, odf::DatasetRefUnresolvedError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -72,6 +77,17 @@ where
         dataset_ref: &odf::DatasetRef,
     ) -> Result<ResolvedDataset, odf::DatasetRefUnresolvedError> {
         let dataset_handle = self.resolve_dataset_handle_by_ref(dataset_ref).await?;
+        let dataset = self.get_dataset_by_handle(&dataset_handle).await;
+        Ok(dataset)
+    }
+
+    async fn get_dataset_by_id(
+        &self,
+        dataset_id: &odf::DatasetID,
+    ) -> Result<ResolvedDataset, odf::DatasetRefUnresolvedError> {
+        let dataset_handle = self
+            .resolve_dataset_handle_by_ref(&dataset_id.as_local_ref())
+            .await?;
         let dataset = self.get_dataset_by_handle(&dataset_handle).await;
         Ok(dataset)
     }

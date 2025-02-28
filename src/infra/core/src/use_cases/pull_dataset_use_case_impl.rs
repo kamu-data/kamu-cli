@@ -346,6 +346,24 @@ impl PullDatasetUseCaseImpl {
             )
             .await;
 
+        if let Ok(PollingIngestResult::Updated {
+            old_head, new_head, ..
+        }) = &ingest_response
+        {
+            pii.target
+                .as_metadata_chain()
+                .set_ref(
+                    &odf::BlockRef::Head,
+                    new_head,
+                    odf::dataset::SetRefOpts {
+                        validate_block_present: true,
+                        check_ref_is: Some(Some(old_head)),
+                    },
+                )
+                .await
+                .int_err()?;
+        }
+
         Ok(PullResponse {
             maybe_original_request: pii.maybe_original_request,
             maybe_local_ref: Some(pii.target.get_handle().as_local_ref()),
@@ -366,6 +384,9 @@ impl PullDatasetUseCaseImpl {
     ) -> Result<PullResponse, InternalError> {
         // Remember original request
         let maybe_original_request = pti.maybe_original_request.clone();
+
+        // Remember original target
+        let pti_target = pti.target.clone();
 
         // Main transform run
         async fn run_transform(
@@ -414,6 +435,24 @@ impl PullDatasetUseCaseImpl {
             maybe_listener,
         )
         .await;
+
+        if let Ok(TransformResult::Updated {
+            old_head, new_head, ..
+        }) = &transform_result.1
+        {
+            pti_target
+                .as_metadata_chain()
+                .set_ref(
+                    &odf::BlockRef::Head,
+                    new_head,
+                    odf::dataset::SetRefOpts {
+                        validate_block_present: true,
+                        check_ref_is: Some(Some(old_head)),
+                    },
+                )
+                .await
+                .int_err()?;
+        }
 
         // Prepare response
         Ok(PullResponse {

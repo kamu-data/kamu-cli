@@ -26,7 +26,7 @@ use sqlx::Row;
 
 pub struct SqliteDatasetEntryRepository {
     transaction: TransactionRefT<sqlx::Sqlite>,
-    listeners: Vec<Arc<dyn DatasetEntryRemovalListener>>,
+    removal_listeners: Vec<Arc<dyn DatasetEntryRemovalListener>>,
 }
 
 #[component(pub)]
@@ -34,11 +34,11 @@ pub struct SqliteDatasetEntryRepository {
 impl SqliteDatasetEntryRepository {
     pub fn new(
         transaction: TransactionRef,
-        listeners: Vec<Arc<dyn DatasetEntryRemovalListener>>,
+        removal_listeners: Vec<Arc<dyn DatasetEntryRemovalListener>>,
     ) -> Self {
         Self {
             transaction: transaction.into(),
-            listeners,
+            removal_listeners,
         }
     }
 }
@@ -329,6 +329,7 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
         .map_err(|e| match e {
             sqlx::Error::Database(e) if e.is_unique_violation() => {
                 let sqlite_error_message = e.message();
+                tracing::error!(sqlite_error_message);
 
                 if sqlite_error_message.contains("dataset_entries.dataset_name") {
                     DatasetEntryNameCollisionError::new(dataset_entry.name.clone()).into()
@@ -406,7 +407,7 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
             }
         }
 
-        for listener in &self.listeners {
+        for listener in &self.removal_listeners {
             listener
                 .on_dataset_entry_removed(dataset_id)
                 .await

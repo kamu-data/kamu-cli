@@ -13,7 +13,7 @@ use dill::*;
 use futures::TryStreamExt;
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_core::*;
-use odf::dataset::MetadataChainImpl;
+use odf::dataset::{MetadataChainImpl, MetadataChainReferenceRepositoryImpl};
 use odf::storage::inmem::{NamedObjectRepositoryInMemory, ObjectRepositoryInMemory};
 use odf::storage::{MetadataBlockRepositoryImpl, ReferenceRepositoryImpl};
 
@@ -225,7 +225,9 @@ impl VerificationServiceImpl {
         // rules when adding blocks to new chain.
         let in_memory_chain = MetadataChainImpl::new(
             MetadataBlockRepositoryImpl::new(ObjectRepositoryInMemory::new()),
-            ReferenceRepositoryImpl::new(NamedObjectRepositoryInMemory::new()),
+            MetadataChainReferenceRepositoryImpl::new(ReferenceRepositoryImpl::new(
+                NamedObjectRepositoryInMemory::new(),
+            )),
         );
 
         for (block_hash, block) in blocks.into_iter().rev() {

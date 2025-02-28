@@ -12,6 +12,8 @@ use std::sync::Arc;
 use internal_error::InternalError;
 use thiserror::Error;
 
+use crate::DatasetReferenceCASError;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
@@ -56,8 +58,19 @@ impl CreateDatasetResult {
         Self {
             dataset_handle: odf::DatasetHandle::new(stored.dataset_id, alias),
             dataset: stored.dataset,
-            head: stored.head,
+            head: stored.seed,
         }
+    }
+}
+
+impl std::fmt::Debug for CreateDatasetResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "CreateDatasetResult(dataset_handle={:?}, head={:?}",
+            self.dataset_handle, self.head
+        )?;
+        Ok(())
     }
 }
 
@@ -73,6 +86,9 @@ pub enum CreateDatasetError {
 
     #[error(transparent)]
     RefCollision(#[from] odf::dataset::RefCollisionError),
+
+    #[error(transparent)]
+    CASFailed(#[from] Box<DatasetReferenceCASError>),
 
     #[error(transparent)]
     Internal(

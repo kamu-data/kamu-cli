@@ -22,7 +22,7 @@ use kamu_datasets::{
 };
 use messaging_outbox::{Outbox, OutboxExt};
 
-use crate::{DatasetEntryWriter, DependencyGraphWriter};
+use crate::DatasetEntryWriter;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -34,7 +34,6 @@ pub struct DeleteDatasetUseCaseImpl {
     dataset_storage_unit_writer: Arc<dyn odf::DatasetStorageUnitWriter>,
     dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
     dependency_graph_service: Arc<dyn DependencyGraphService>,
-    dependency_graph_writer: Arc<dyn DependencyGraphWriter>,
     outbox: Arc<dyn Outbox>,
 }
 
@@ -45,7 +44,6 @@ impl DeleteDatasetUseCaseImpl {
         dataset_storage_unit_writer: Arc<dyn odf::DatasetStorageUnitWriter>,
         dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
         dependency_graph_service: Arc<dyn DependencyGraphService>,
-        dependency_graph_writer: Arc<dyn DependencyGraphWriter>,
         outbox: Arc<dyn Outbox>,
     ) -> Self {
         Self {
@@ -54,7 +52,6 @@ impl DeleteDatasetUseCaseImpl {
             dataset_storage_unit_writer,
             dataset_action_authorizer,
             dependency_graph_service,
-            dependency_graph_writer,
             outbox,
         }
     }
@@ -73,21 +70,36 @@ impl DeleteDatasetUseCaseImpl {
             .await;
 
         if !downstream_dataset_ids.is_empty() {
-            let mut children = Vec::with_capacity(downstream_dataset_ids.len());
+            let mut dangling_children = Vec::with_capacity(downstream_dataset_ids.len());
             for downstream_dataset_id in downstream_dataset_ids {
-                let hdl = self
+                match self
                     .dataset_registry
                     .resolve_dataset_handle_by_ref(&downstream_dataset_id.as_local_ref())
                     .await
-                    .int_err()?;
-                children.push(hdl);
+                {
+                    Ok(hdl) => dangling_children.push(hdl),
+                    Err(odf::dataset::DatasetRefUnresolvedError::NotFound(_)) => {
+                        tracing::warn!(
+                            "Skipped unresolved downstream reference: {downstream_dataset_id}"
+                        );
+                        // Skip this not found error, as the dependency graph
+                        // in-memory is only updated at the end of the current
+                        // transaction, and in case of recursive or all delete
+                        // modes, we might have already deleted this dataset
+                    }
+                    Err(odf::dataset::DatasetRefUnresolvedError::Internal(e)) => {
+                        return Err(e.into())
+                    }
+                };
             }
 
-            return Err(DanglingReferenceError {
-                dataset_handle: dataset_handle.clone(),
-                children,
+            if !dangling_children.is_empty() {
+                return Err(DanglingReferenceError {
+                    dataset_handle: dataset_handle.clone(),
+                    children: dangling_children,
+                }
+                .into());
             }
-            .into());
         }
 
         Ok(())
@@ -153,11 +165,6 @@ impl DeleteDatasetUseCase for DeleteDatasetUseCaseImpl {
         // Do actual delete
         self.dataset_storage_unit_writer
             .delete_dataset(&dataset_handle.id)
-            .await?;
-
-        // Remove graph node
-        self.dependency_graph_writer
-            .remove_dataset_node(&dataset_handle.id)
             .await?;
 
         // Notify interested parties

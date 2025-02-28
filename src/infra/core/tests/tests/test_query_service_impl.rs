@@ -9,7 +9,7 @@
 
 use std::assert_matches::assert_matches;
 use std::collections::BTreeMap;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use chrono::Utc;
@@ -155,6 +155,8 @@ fn create_catalog_with_local_workspace(
         .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
         .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
         .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>()
+        .add::<odf::dataset::DatasetDefaultLfsBuilder>()
+        .bind::<dyn odf::dataset::DatasetLfsBuilder, odf::dataset::DatasetDefaultLfsBuilder>()
         .add::<DatasetRegistrySoloUnitBridge>()
         .add::<QueryServiceImpl>()
         .add::<ObjectStoreRegistryImpl>()
@@ -182,6 +184,8 @@ async fn create_catalog_with_s3_workspace(
         )
         .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitS3>()
         .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitS3>()
+        .add::<odf::dataset::DatasetDefaultS3Builder>()
+        .bind::<dyn odf::dataset::DatasetS3Builder, odf::dataset::DatasetDefaultS3Builder>()
         .add::<DatasetRegistrySoloUnitBridge>()
         .add::<QueryServiceImpl>()
         .add::<ObjectStoreRegistryImpl>()
@@ -709,43 +713,39 @@ async fn test_sql_statement_with_state_simple() {
     let (foo_stored, foo_alias) = create_empty_dataset(&catalog, "foo").await;
     let foo_id = &foo_stored.dataset_id;
 
+    let foo_target = ResolvedDataset::from_stored(&foo_stored, &foo_alias);
+
     let mut writer = DataWriterDataFusion::from_metadata_chain(
         ctx.clone(),
-        ResolvedDataset::from_stored(&foo_stored, &foo_alias),
+        foo_target.clone(),
         &odf::BlockRef::Head,
         None,
     )
     .await
     .unwrap();
 
-    writer
-        .write(
-            Some(
-                ctx.read_batch(
-                    RecordBatch::try_new(
-                        Arc::new(Schema::new(vec![
-                            Field::new("cat", DataType::Utf8, false),
-                            Field::new("num", DataType::UInt64, false),
-                        ])),
-                        vec![
-                            Arc::new(StringArray::from(vec!["a", "b"])),
-                            Arc::new(UInt64Array::from(vec![1, 2])),
-                        ],
-                    )
-                    .unwrap(),
+    write_data(
+        foo_target.clone(),
+        &mut writer,
+        Some(
+            ctx.read_batch(
+                RecordBatch::try_new(
+                    Arc::new(Schema::new(vec![
+                        Field::new("cat", DataType::Utf8, false),
+                        Field::new("num", DataType::UInt64, false),
+                    ])),
+                    vec![
+                        Arc::new(StringArray::from(vec!["a", "b"])),
+                        Arc::new(UInt64Array::from(vec![1, 2])),
+                    ],
                 )
                 .unwrap(),
-            ),
-            WriteDataOpts {
-                system_time: Utc::now(),
-                source_event_time: Utc::now(),
-                new_watermark: None,
-                new_source_state: None,
-                data_staging_path: tempdir.path().join(".temp-data.parquet"),
-            },
-        )
-        .await
-        .unwrap();
+            )
+            .unwrap(),
+        ),
+        tempdir.path().join(".temp-data.parquet"),
+    )
+    .await;
 
     // Query: initial
     let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
@@ -798,34 +798,28 @@ async fn test_sql_statement_with_state_simple() {
     );
 
     // Add more data
-    writer
-        .write(
-            Some(
-                ctx.read_batch(
-                    RecordBatch::try_new(
-                        Arc::new(Schema::new(vec![
-                            Field::new("cat", DataType::Utf8, false),
-                            Field::new("num", DataType::UInt64, false),
-                        ])),
-                        vec![
-                            Arc::new(StringArray::from(vec!["a", "b"])),
-                            Arc::new(UInt64Array::from(vec![2, 4])),
-                        ],
-                    )
-                    .unwrap(),
+    write_data(
+        foo_target,
+        &mut writer,
+        Some(
+            ctx.read_batch(
+                RecordBatch::try_new(
+                    Arc::new(Schema::new(vec![
+                        Field::new("cat", DataType::Utf8, false),
+                        Field::new("num", DataType::UInt64, false),
+                    ])),
+                    vec![
+                        Arc::new(StringArray::from(vec!["a", "b"])),
+                        Arc::new(UInt64Array::from(vec![2, 4])),
+                    ],
                 )
                 .unwrap(),
-            ),
-            WriteDataOpts {
-                system_time: Utc::now(),
-                source_event_time: Utc::now(),
-                new_watermark: None,
-                new_source_state: None,
-                data_staging_path: tempdir.path().join(".temp-data.parquet"),
-            },
-        )
-        .await
-        .unwrap();
+            )
+            .unwrap(),
+        ),
+        tempdir.path().join(".temp-data.parquet"),
+    )
+    .await;
 
     // Query: again with previous state info
     let res = query_svc
@@ -929,85 +923,77 @@ async fn test_sql_statement_with_state_cte() {
     let (foo_stored, foo_alias) = create_empty_dataset(&catalog, "foo").await;
     let foo_id = &foo_stored.dataset_id;
 
+    let foo_target = ResolvedDataset::from_stored(&foo_stored, &foo_alias);
+
     let mut writer_foo = DataWriterDataFusion::from_metadata_chain(
         ctx.clone(),
-        ResolvedDataset::from_stored(&foo_stored, &foo_alias),
+        foo_target.clone(),
         &odf::BlockRef::Head,
         None,
     )
     .await
     .unwrap();
 
-    writer_foo
-        .write(
-            Some(
-                ctx.read_batch(
-                    RecordBatch::try_new(
-                        Arc::new(Schema::new(vec![
-                            Field::new("cat", DataType::Utf8, false),
-                            Field::new("num", DataType::UInt64, false),
-                        ])),
-                        vec![
-                            Arc::new(StringArray::from(vec!["a", "b"])),
-                            Arc::new(UInt64Array::from(vec![1, 2])),
-                        ],
-                    )
-                    .unwrap(),
+    write_data(
+        foo_target.clone(),
+        &mut writer_foo,
+        Some(
+            ctx.read_batch(
+                RecordBatch::try_new(
+                    Arc::new(Schema::new(vec![
+                        Field::new("cat", DataType::Utf8, false),
+                        Field::new("num", DataType::UInt64, false),
+                    ])),
+                    vec![
+                        Arc::new(StringArray::from(vec!["a", "b"])),
+                        Arc::new(UInt64Array::from(vec![1, 2])),
+                    ],
                 )
                 .unwrap(),
-            ),
-            WriteDataOpts {
-                system_time: Utc::now(),
-                source_event_time: Utc::now(),
-                new_watermark: None,
-                new_source_state: None,
-                data_staging_path: tempdir.path().join(".temp-data.parquet"),
-            },
-        )
-        .await
-        .unwrap();
+            )
+            .unwrap(),
+        ),
+        tempdir.path().join(".temp-data.parquet"),
+    )
+    .await;
 
     // Dataset `bar`
     let (bar_stored, bar_alias) = create_empty_dataset(&catalog, "bar").await;
     let bar_id = &bar_stored.dataset_id;
 
+    let bar_target = ResolvedDataset::from_stored(&bar_stored, &bar_alias);
+
     let mut writer_bar = DataWriterDataFusion::from_metadata_chain(
         ctx.clone(),
-        ResolvedDataset::from_stored(&bar_stored, &bar_alias),
+        bar_target.clone(),
         &odf::BlockRef::Head,
         None,
     )
     .await
     .unwrap();
 
-    writer_bar
-        .write(
-            Some(
-                ctx.read_batch(
-                    RecordBatch::try_new(
-                        Arc::new(Schema::new(vec![
-                            Field::new("cat", DataType::Utf8, false),
-                            Field::new("num", DataType::UInt64, false),
-                        ])),
-                        vec![
-                            Arc::new(StringArray::from(vec!["b", "c"])),
-                            Arc::new(UInt64Array::from(vec![1, 2])),
-                        ],
-                    )
-                    .unwrap(),
+    write_data(
+        bar_target.clone(),
+        &mut writer_bar,
+        Some(
+            ctx.read_batch(
+                RecordBatch::try_new(
+                    Arc::new(Schema::new(vec![
+                        Field::new("cat", DataType::Utf8, false),
+                        Field::new("num", DataType::UInt64, false),
+                    ])),
+                    vec![
+                        Arc::new(StringArray::from(vec!["b", "c"])),
+                        Arc::new(UInt64Array::from(vec![1, 2])),
+                    ],
                 )
                 .unwrap(),
-            ),
-            WriteDataOpts {
-                system_time: Utc::now(),
-                source_event_time: Utc::now(),
-                new_watermark: None,
-                new_source_state: None,
-                data_staging_path: tempdir.path().join(".temp-data.parquet"),
-            },
-        )
-        .await
-        .unwrap();
+            )
+            .unwrap(),
+        ),
+        tempdir.path().join(".temp-data.parquet"),
+    )
+    .await;
 
     // Query: initial
     let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
@@ -1080,63 +1066,51 @@ async fn test_sql_statement_with_state_cte() {
     );
 
     // Add more data
-    writer_foo
-        .write(
-            Some(
-                ctx.read_batch(
-                    RecordBatch::try_new(
-                        Arc::new(Schema::new(vec![
-                            Field::new("cat", DataType::Utf8, false),
-                            Field::new("num", DataType::UInt64, false),
-                        ])),
-                        vec![
-                            Arc::new(StringArray::from(vec!["a", "b"])),
-                            Arc::new(UInt64Array::from(vec![1, 2])),
-                        ],
-                    )
-                    .unwrap(),
+    write_data(
+        foo_target,
+        &mut writer_foo,
+        Some(
+            ctx.read_batch(
+                RecordBatch::try_new(
+                    Arc::new(Schema::new(vec![
+                        Field::new("cat", DataType::Utf8, false),
+                        Field::new("num", DataType::UInt64, false),
+                    ])),
+                    vec![
+                        Arc::new(StringArray::from(vec!["a", "b"])),
+                        Arc::new(UInt64Array::from(vec![1, 2])),
+                    ],
                 )
                 .unwrap(),
-            ),
-            WriteDataOpts {
-                system_time: Utc::now(),
-                source_event_time: Utc::now(),
-                new_watermark: None,
-                new_source_state: None,
-                data_staging_path: tempdir.path().join(".temp-data.parquet"),
-            },
-        )
-        .await
-        .unwrap();
+            )
+            .unwrap(),
+        ),
+        tempdir.path().join(".temp-data.parquet"),
+    )
+    .await;
 
-    writer_bar
-        .write(
-            Some(
-                ctx.read_batch(
-                    RecordBatch::try_new(
-                        Arc::new(Schema::new(vec![
-                            Field::new("cat", DataType::Utf8, false),
-                            Field::new("num", DataType::UInt64, false),
-                        ])),
-                        vec![
-                            Arc::new(StringArray::from(vec!["b", "c"])),
-                            Arc::new(UInt64Array::from(vec![1, 2])),
-                        ],
-                    )
-                    .unwrap(),
+    write_data(
+        bar_target,
+        &mut writer_bar,
+        Some(
+            ctx.read_batch(
+                RecordBatch::try_new(
+                    Arc::new(Schema::new(vec![
+                        Field::new("cat", DataType::Utf8, false),
+                        Field::new("num", DataType::UInt64, false),
+                    ])),
+                    vec![
+                        Arc::new(StringArray::from(vec!["b", "c"])),
+                        Arc::new(UInt64Array::from(vec![1, 2])),
+                    ],
                 )
                 .unwrap(),
-            ),
-            WriteDataOpts {
-                system_time: Utc::now(),
-                source_event_time: Utc::now(),
-                new_watermark: None,
-                new_source_state: None,
-                data_staging_path: tempdir.path().join(".temp-data.parquet"),
-            },
-        )
-        .await
-        .unwrap();
+            )
+            .unwrap(),
+        ),
+        tempdir.path().join(".temp-data.parquet"),
+    )
+    .await;
 
     // Query: new data
     let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
@@ -1304,6 +1278,42 @@ async fn test_sql_statement_with_state_cte() {
         ),
     )
     .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+async fn write_data(
+    target: ResolvedDataset,
+    writer: &mut DataWriterDataFusion,
+    data: Option<datafusion::dataframe::DataFrame>,
+    data_staging_path: PathBuf,
+) {
+    let write_result = writer
+        .write(
+            data,
+            WriteDataOpts {
+                system_time: Utc::now(),
+                source_event_time: Utc::now(),
+                new_watermark: None,
+                new_source_state: None,
+                data_staging_path,
+            },
+        )
+        .await
+        .unwrap();
+
+    target
+        .as_metadata_chain()
+        .set_ref(
+            &odf::BlockRef::Head,
+            &write_result.new_head,
+            odf::dataset::SetRefOpts {
+                validate_block_present: true,
+                check_ref_is: Some(Some(&write_result.old_head)),
+            },
+        )
+        .await
+        .unwrap();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -9,6 +9,7 @@
 
 use std::sync::Arc;
 
+use database_common_macros::transactional_method;
 use dill::*;
 use internal_error::InternalError;
 use kamu_core::*;
@@ -17,6 +18,7 @@ use kamu_task_system::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct TaskRunnerImpl {
+    catalog: Catalog,
     polling_ingest_service: Arc<dyn PollingIngestService>,
     transform_elaboration_service: Arc<dyn TransformElaborationService>,
     transform_executor: Arc<dyn TransformExecutor>,
@@ -31,6 +33,7 @@ pub struct TaskRunnerImpl {
 #[interface(dyn TaskRunner)]
 impl TaskRunnerImpl {
     pub fn new(
+        catalog: Catalog,
         polling_ingest_service: Arc<dyn PollingIngestService>,
         transform_elaboration_service: Arc<dyn TransformElaborationService>,
         transform_executor: Arc<dyn TransformExecutor>,
@@ -39,6 +42,7 @@ impl TaskRunnerImpl {
         sync_service: Arc<dyn SyncService>,
     ) -> Self {
         Self {
+            catalog,
             polling_ingest_service,
             transform_elaboration_service,
             transform_executor,
@@ -86,11 +90,19 @@ impl TaskRunnerImpl {
         }
     }
 
+    #[transactional_method]
     async fn run_sync_update(
         &self,
         sync_request: SyncRequest,
         sync_opts: SyncOptions,
     ) -> Result<TaskOutcome, InternalError> {
+        sync_request
+            .src
+            .reattach_to_transaction(&transaction_catalog);
+        sync_request
+            .dst
+            .reattach_to_transaction(&transaction_catalog);
+
         let sync_response = self.sync_service.sync(sync_request, sync_opts, None).await;
         match sync_response {
             Ok(sync_result) => Ok(TaskOutcome::Success(TaskResult::UpdateDatasetResult(
@@ -110,18 +122,30 @@ impl TaskRunnerImpl {
         let ingest_response = self
             .polling_ingest_service
             .ingest(
-                ingest_item.target,
+                ingest_item.target.clone(),
                 ingest_item.metadata_state,
                 ingest_options,
                 None,
             )
             .await;
         match ingest_response {
-            Ok(ingest_result) => Ok(TaskOutcome::Success(TaskResult::UpdateDatasetResult(
-                TaskUpdateDatasetResult {
-                    pull_result: ingest_result.into(),
-                },
-            ))),
+            Ok(ingest_result) => {
+                // Do we have a new HEAD suggestion?
+                if let PollingIngestResult::Updated {
+                    old_head, new_head, ..
+                } = &ingest_result
+                {
+                    // Update the reference transactionally
+                    self.update_dataset_head(ingest_item.target, Some(old_head), new_head)
+                        .await?;
+                }
+
+                Ok(TaskOutcome::Success(TaskResult::UpdateDatasetResult(
+                    TaskUpdateDatasetResult {
+                        pull_result: ingest_result.into(),
+                    },
+                )))
+            }
             Err(_) => Ok(TaskOutcome::Failed(TaskError::Empty)),
         }
     }
@@ -159,15 +183,27 @@ impl TaskRunnerImpl {
             TransformElaboration::Elaborated(transform_plan) => {
                 let (_, execution_result) = self
                     .transform_executor
-                    .execute_transform(transform_item.target, transform_plan, None)
+                    .execute_transform(transform_item.target.clone(), transform_plan, None)
                     .await;
 
                 match execution_result {
-                    Ok(transform_result) => Ok(TaskOutcome::Success(
-                        TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
-                            pull_result: transform_result.into(),
-                        }),
-                    )),
+                    Ok(transform_result) => {
+                        if let TransformResult::Updated { old_head, new_head } = &transform_result {
+                            // Update the reference transactionally
+                            self.update_dataset_head(
+                                transform_item.target,
+                                Some(old_head),
+                                new_head,
+                            )
+                            .await?;
+                        }
+
+                        Ok(TaskOutcome::Success(TaskResult::UpdateDatasetResult(
+                            TaskUpdateDatasetResult {
+                                pull_result: transform_result.into(),
+                            },
+                        )))
+                    }
                     Err(e) => {
                         tracing::error!(error = ?e, "Transform execution failed");
                         Ok(TaskOutcome::Failed(TaskError::Empty))
@@ -179,10 +215,16 @@ impl TaskRunnerImpl {
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(?task_reset))]
+    #[transactional_method]
     async fn run_reset(
         &self,
         task_reset: TaskDefinitionReset,
     ) -> Result<TaskOutcome, InternalError> {
+        // Reattach the transaction
+        task_reset
+            .target
+            .reattach_to_transaction(&transaction_catalog);
+
         let reset_result_maybe = self
             .reset_executor
             .execute(task_reset.target, task_reset.reset_plan)
@@ -216,15 +258,36 @@ impl TaskRunnerImpl {
         &self,
         task_compact: TaskDefinitionHardCompact,
     ) -> Result<TaskOutcome, InternalError> {
+        // Run compaction execution without transaction
         let compaction_result = self
             .compaction_executor
-            .execute(task_compact.target, task_compact.compaction_plan, None)
+            .execute(
+                task_compact.target.clone(),
+                task_compact.compaction_plan,
+                None,
+            )
             .await;
 
+        // Handle result
         match compaction_result {
-            Ok(result) => Ok(TaskOutcome::Success(TaskResult::CompactionDatasetResult(
-                result.into(),
-            ))),
+            // Compaction finished without errors
+            Ok(compaction_result) => {
+                // Do we have a new HEAD suggestion?
+                if let CompactionResult::Success {
+                    old_head, new_head, ..
+                } = &compaction_result
+                {
+                    // Update the reference transactionally
+                    self.update_dataset_head(task_compact.target, Some(old_head), new_head)
+                        .await?;
+                }
+
+                Ok(TaskOutcome::Success(TaskResult::CompactionDatasetResult(
+                    compaction_result.into(),
+                )))
+            }
+
+            // Compaction failed
             Err(err) => {
                 tracing::error!(
                     error = ?err,
@@ -235,6 +298,30 @@ impl TaskRunnerImpl {
                 Ok(TaskOutcome::Failed(TaskError::Empty))
             }
         }
+    }
+
+    #[tracing::instrument(level = "debug", skip_all, fields(dataset_handle=%target.get_handle(), %new_head))]
+    #[transactional_method]
+    async fn update_dataset_head(
+        &self,
+        target: ResolvedDataset,
+        old_head: Option<&odf::Multihash>,
+        new_head: &odf::Multihash,
+    ) -> Result<(), InternalError> {
+        target.reattach_to_transaction(&transaction_catalog);
+
+        target
+            .as_metadata_chain()
+            .set_ref(
+                &odf::BlockRef::Head,
+                new_head,
+                odf::dataset::SetRefOpts {
+                    validate_block_present: true,
+                    check_ref_is: Some(old_head),
+                },
+            )
+            .await
+            .int_err()
     }
 }
 

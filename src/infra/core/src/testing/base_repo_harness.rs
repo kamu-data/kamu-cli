@@ -29,7 +29,7 @@ use odf::dataset::DatasetStorageUnitLocalFs;
 use odf::metadata::serde::flatbuffers::FlatbuffersMetadataBlockSerializer;
 use odf::metadata::serde::MetadataBlockSerializer;
 use odf::metadata::testing::MetadataFactory;
-use time_source::{SystemTimeSource, SystemTimeSourceDefault};
+use time_source::{SystemTimeSource, SystemTimeSourceDefault, SystemTimeSourceStub};
 
 use crate::DatasetRegistrySoloUnitBridge;
 
@@ -51,6 +51,7 @@ impl BaseRepoHarness {
         tenancy_config: TenancyConfig,
         mock_did_generator: Option<MockDidGenerator>,
         current_account_subject: Option<CurrentAccountSubject>,
+        system_time_source_stub: Option<SystemTimeSourceStub>,
     ) -> Self {
         let temp_dir = tempfile::tempdir().unwrap();
 
@@ -68,8 +69,9 @@ impl BaseRepoHarness {
                 .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
                 .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
                 .bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
-                .add::<DatasetRegistrySoloUnitBridge>()
-                .add::<SystemTimeSourceDefault>();
+                .add::<odf::dataset::DatasetDefaultLfsBuilder>()
+                .bind::<dyn odf::dataset::DatasetLfsBuilder, odf::dataset::DatasetDefaultLfsBuilder>()
+                .add::<DatasetRegistrySoloUnitBridge>();
 
             if let Some(current_account_subject) = current_account_subject {
                 b.add_value(current_account_subject);
@@ -82,6 +84,13 @@ impl BaseRepoHarness {
                     .bind::<dyn DidGenerator, MockDidGenerator>();
             } else {
                 b.add::<DidGeneratorDefault>();
+            }
+
+            if let Some(system_time_source_stub) = system_time_source_stub {
+                b.add_value(system_time_source_stub)
+                    .bind::<dyn SystemTimeSource, SystemTimeSourceStub>();
+            } else {
+                b.add::<SystemTimeSourceDefault>();
             }
 
             b.build()
@@ -111,6 +120,10 @@ impl BaseRepoHarness {
 
     pub fn dataset_storage_unit_writer(&self) -> &dyn odf::DatasetStorageUnitWriter {
         self.dataset_storage_unit_writer.as_ref()
+    }
+
+    pub fn system_time_source(&self) -> &dyn SystemTimeSource {
+        self.system_time_source.as_ref()
     }
 
     pub async fn check_dataset_exists(

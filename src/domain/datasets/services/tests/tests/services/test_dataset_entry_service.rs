@@ -70,6 +70,7 @@ async fn test_indexes_datasets_correctly() {
     // Create 3 datasets
     let mut stored_by_id = HashMap::new();
     for dataset_id in [&dataset_id_1, &dataset_id_2, &dataset_id_3] {
+        // Store the dataset
         let stored = harness
             .dataset_storage_unit_writer
             .store_dataset(
@@ -79,9 +80,11 @@ async fn test_indexes_datasets_correctly() {
                         .build(),
                 )
                 .build_typed(),
+                odf::dataset::StoreDatasetOpts { set_head: true },
             )
             .await
             .unwrap();
+
         stored_by_id.insert(dataset_id.clone(), stored);
     }
 
@@ -214,6 +217,8 @@ impl DatasetEntryServiceHarness {
             b.add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir));
             b.bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>();
             b.bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>();
+            b.add::<odf::dataset::DatasetDefaultLfsBuilder>();
+            b.bind::<dyn odf::dataset::DatasetLfsBuilder, odf::dataset::DatasetDefaultLfsBuilder>();
 
             b.add::<DatasetEntryServiceImpl>();
             b.add::<DatasetEntryIndexer>();

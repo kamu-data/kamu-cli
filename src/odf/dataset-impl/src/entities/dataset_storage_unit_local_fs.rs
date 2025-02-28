@@ -16,23 +16,23 @@ use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use odf_dataset::*;
 use odf_metadata::*;
 use odf_storage::*;
-use odf_storage_lfs::{NamedObjectRepositoryLocalFS, ObjectRepositoryLocalFSSha3};
-use url::Url;
-
-use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct DatasetStorageUnitLocalFs {
     root: PathBuf,
+    dataset_lfs_builder: Arc<dyn DatasetLfsBuilder>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
 impl DatasetStorageUnitLocalFs {
-    pub fn new(root: PathBuf) -> Self {
-        Self { root }
+    pub fn new(root: PathBuf, dataset_lfs_builder: Arc<dyn DatasetLfsBuilder>) -> Self {
+        Self {
+            root,
+            dataset_lfs_builder,
+        }
     }
 
     // TODO: Public only for testing
@@ -49,21 +49,6 @@ impl DatasetStorageUnitLocalFs {
             ));
         }
         Ok(DatasetLayout::new(dataset_path))
-    }
-
-    fn build_dataset(layout: DatasetLayout) -> Arc<dyn Dataset> {
-        Arc::new(DatasetImpl::new(
-            MetadataChainImpl::new(
-                MetadataBlockRepositoryCachingInMem::new(MetadataBlockRepositoryImpl::new(
-                    ObjectRepositoryLocalFSSha3::new(layout.blocks_dir),
-                )),
-                ReferenceRepositoryImpl::new(NamedObjectRepositoryLocalFS::new(layout.refs_dir)),
-            ),
-            ObjectRepositoryLocalFSSha3::new(layout.data_dir),
-            ObjectRepositoryLocalFSSha3::new(layout.checkpoints_dir),
-            NamedObjectRepositoryLocalFS::new(layout.info_dir),
-            Url::from_directory_path(&layout.root_dir).unwrap(),
-        ))
     }
 
     fn get_dataset_path(&self, dataset_id: &DatasetID) -> PathBuf {
@@ -83,7 +68,9 @@ impl DatasetStorageUnit for DatasetStorageUnitLocalFs {
         dataset_id: &DatasetID,
     ) -> Result<Arc<dyn Dataset>, GetStoredDatasetError> {
         let layout = self.get_dataset_layout(dataset_id)?;
-        let dataset = Self::build_dataset(layout);
+        let dataset = self
+            .dataset_lfs_builder
+            .build_lfs_dataset(dataset_id, layout);
         Ok(dataset)
     }
 
@@ -109,8 +96,8 @@ impl DatasetStorageUnit for DatasetStorageUnitLocalFs {
 
                 // Head must exist and be properly set
                 let layout = DatasetLayout::create(dataset_dir_entry.path()).int_err()?;
-                let dataset = Self::build_dataset(layout);
-                let head_res = dataset.as_metadata_chain().resolve_ref(&BlockRef::Head).await;
+                let dataset = self.dataset_lfs_builder.build_lfs_dataset(&dataset_id, layout);
+                let head_res = dataset.as_metadata_chain().as_raw_ref_repo().get(BlockRef::Head.as_str()).await;
                 match head_res {
                     // Got head => good dataset
                     Ok(_) => { yield dataset_id; Ok(()) }
@@ -137,6 +124,7 @@ impl DatasetStorageUnitWriter for DatasetStorageUnitLocalFs {
     async fn store_dataset(
         &self,
         seed_block: MetadataBlockTyped<Seed>,
+        opts: StoreDatasetOpts,
     ) -> Result<StoreDatasetResult, StoreDatasetError> {
         // Check if a dataset with the same ID can be resolved successfully
         use DatasetStorageUnit;
@@ -157,7 +145,8 @@ impl DatasetStorageUnitWriter for DatasetStorageUnitLocalFs {
         if let Some(existing_dataset) = maybe_existing_dataset {
             match existing_dataset
                 .as_metadata_chain()
-                .resolve_ref(&BlockRef::Head)
+                .as_raw_ref_repo()
+                .get(BlockRef::Head.as_str())
                 .await
             {
                 // Existing head
@@ -184,10 +173,13 @@ impl DatasetStorageUnitWriter for DatasetStorageUnitLocalFs {
         // Create dataset
         let dataset_path = self.get_dataset_path(&dataset_id);
         let layout = DatasetLayout::create(&dataset_path).int_err()?;
-        let dataset = Self::build_dataset(layout);
+        let dataset = self
+            .dataset_lfs_builder
+            .build_lfs_dataset(&dataset_id, layout);
 
-        // Set Head
-        let head = match dataset
+        // Write seed block
+        // Only set reference, if specified in the options
+        let seed = match dataset
             .as_metadata_chain()
             .append(
                 seed_block.into(),
@@ -195,25 +187,30 @@ impl DatasetStorageUnitWriter for DatasetStorageUnitLocalFs {
                     // We are using head ref CAS to detect previous existence of a dataset
                     // as atomically as possible
                     check_ref_is: Some(None),
+                    update_ref: if opts.set_head {
+                        Some(&BlockRef::Head)
+                    } else {
+                        None
+                    },
                     ..AppendOpts::default()
                 },
             )
             .await
         {
-            Ok(head) => head,
+            Ok(seed) => seed,
             Err(err) => return Err(err.int_err().into()),
         };
 
         tracing::info!(
             id = %dataset_id,
-            %head,
+            %seed,
             "Created new dataset",
         );
 
         Ok(StoreDatasetResult {
             dataset_id,
             dataset,
-            head,
+            seed,
         })
     }
 

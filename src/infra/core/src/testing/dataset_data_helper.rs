@@ -48,7 +48,8 @@ impl DatasetDataHelper {
         let hash = self
             .dataset
             .as_metadata_chain()
-            .resolve_ref(&odf::BlockRef::Head)
+            .as_raw_ref_repo()
+            .get(odf::BlockRef::Head.as_str())
             .await
             .unwrap();
         let block = self
@@ -68,7 +69,8 @@ impl DatasetDataHelper {
         let hash = self
             .dataset
             .as_metadata_chain()
-            .resolve_ref(&odf::BlockRef::Head)
+            .as_raw_ref_repo()
+            .get(odf::BlockRef::Head.as_str())
             .await
             .unwrap();
         let block = self

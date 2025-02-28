@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use internal_error::{ErrorIntoInternal, InternalError};
+use internal_error::InternalError;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -19,6 +19,8 @@ use crate::{CompactionListener, CompactionPlan, ResolvedDataset};
 
 #[async_trait::async_trait]
 pub trait CompactionExecutor: Send + Sync {
+    /// Executes the compacting accordingly to the plan.
+    /// Does not set the new HEAD, only writes the compacted block
     async fn execute(
         &self,
         target: ResolvedDataset,
@@ -53,18 +55,6 @@ pub enum CompactionExecutionError {
 
     #[error(transparent)]
     Internal(#[from] InternalError),
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-impl From<odf::dataset::SetChainRefError> for CompactionExecutionError {
-    fn from(v: odf::dataset::SetChainRefError) -> Self {
-        match v {
-            odf::dataset::SetChainRefError::Access(e) => Self::Access(e),
-            odf::dataset::SetChainRefError::Internal(e) => Self::Internal(e),
-            _ => Self::Internal(v.int_err()),
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

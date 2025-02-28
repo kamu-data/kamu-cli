@@ -49,12 +49,12 @@ impl Dataset {
         ctx: &Context<'_>,
         dataset_ref: &odf::DatasetRef,
     ) -> Result<TransformInputDataset> {
-        let view_dataset_use_case = from_catalog_n!(ctx, dyn ViewDatasetUseCase);
+        let view_dataset_use_case = from_catalog_n!(ctx, dyn kamu_datasets::ViewDatasetUseCase);
 
         let handle = match view_dataset_use_case.execute(dataset_ref).await {
             Ok(handle) => Ok(handle),
             Err(e) => match e {
-                ViewDatasetUseCaseError::Access(_) => {
+                kamu_datasets::ViewDatasetUseCaseError::Access(_) => {
                     return Ok(TransformInputDataset::not_accessible(dataset_ref.clone()))
                 }
                 unexpected_error => Err(unexpected_error.int_err()),
@@ -67,6 +67,31 @@ impl Dataset {
         let dataset = Dataset::new_access_checked(account, handle);
 
         Ok(TransformInputDataset::accessible(dataset))
+    }
+
+    #[graphql(skip)]
+    pub fn from_resolved_dataset(
+        owner: Account,
+        resolved_dataset: kamu_core::ResolvedDataset,
+    ) -> Self {
+        Self {
+            dataset_request_state: DatasetRequestState::new(resolved_dataset.get_handle().clone())
+                .with_owner(owner),
+        }
+    }
+
+    #[graphql(skip)]
+    async fn resolve_dataset(&self, ctx: &Context<'_>) -> Result<kamu_core::ResolvedDataset> {
+        let resolved_dataset = get_dataset(ctx, &self.dataset_handle).await;
+        Ok(resolved_dataset)
+    }
+
+    #[graphql(skip)]
+    #[inline]
+    async fn get_resolved_dataset(&self, ctx: &Context<'_>) -> Result<&kamu_core::ResolvedDataset> {
+        self.resolved_dataset
+            .get_or_try_init(|| self.resolve_dataset(ctx))
+            .await
     }
 
     /// Unique identifier of the dataset

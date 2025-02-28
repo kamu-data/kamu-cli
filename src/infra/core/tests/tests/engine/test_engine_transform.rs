@@ -222,7 +222,7 @@ struct TestHarness {
     tempdir: tempfile::TempDir,
     dataset_registry: Arc<dyn DatasetRegistry>,
     dataset_storage_unit_writer: Arc<dyn odf::DatasetStorageUnitWriter>,
-    ingest_svc: Arc<dyn PollingIngestService>,
+    polling_ingest_svc: Arc<dyn PollingIngestService>,
     push_ingest_planner: Arc<dyn PushIngestPlanner>,
     push_ingest_executor: Arc<dyn PushIngestExecutor>,
     transform_helper: TransformTestHelper,
@@ -252,6 +252,8 @@ impl TestHarness {
             .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
             .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
             .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>()
+            .add::<odf::dataset::DatasetDefaultLfsBuilder>()
+            .bind::<dyn odf::dataset::DatasetLfsBuilder, odf::dataset::DatasetDefaultLfsBuilder>()
             .add::<DatasetRegistrySoloUnitBridge>()
             .add_value(EngineProvisionerLocalConfig::default())
             .add::<EngineProvisionerLocal>()
@@ -282,7 +284,7 @@ impl TestHarness {
             tempdir,
             dataset_registry: catalog.get_one().unwrap(),
             dataset_storage_unit_writer: catalog.get_one().unwrap(),
-            ingest_svc: catalog.get_one().unwrap(),
+            polling_ingest_svc: catalog.get_one().unwrap(),
             push_ingest_planner: catalog.get_one().unwrap(),
             push_ingest_executor: catalog.get_one().unwrap(),
             time_source: catalog.get_one().unwrap(),
@@ -295,6 +297,74 @@ impl TestHarness {
         DataWriterMetadataState::build(target, &odf::BlockRef::Head, None)
             .await
             .unwrap()
+    }
+
+    async fn polling_ingest(
+        &self,
+        target: ResolvedDataset,
+        metadata_state: Box<DataWriterMetadataState>,
+    ) {
+        let ingest_result = self
+            .polling_ingest_svc
+            .ingest(
+                target.clone(),
+                metadata_state,
+                PollingIngestOptions::default(),
+                None,
+            )
+            .await
+            .unwrap();
+
+        if let PollingIngestResult::Updated {
+            old_head, new_head, ..
+        } = &ingest_result
+        {
+            target
+                .as_metadata_chain()
+                .set_ref(
+                    &odf::BlockRef::Head,
+                    new_head,
+                    odf::dataset::SetRefOpts {
+                        validate_block_present: true,
+                        check_ref_is: Some(Some(old_head)),
+                    },
+                )
+                .await
+                .unwrap();
+        }
+    }
+
+    async fn push_ingest(
+        &self,
+        target: ResolvedDataset,
+        ingest_plan: PushIngestPlan,
+        data: Box<dyn tokio::io::AsyncRead + Send + Unpin>,
+    ) -> PushIngestResult {
+        let ingest_result = self
+            .push_ingest_executor
+            .ingest_from_stream(target.clone(), ingest_plan, data, None)
+            .await
+            .unwrap();
+
+        if let PushIngestResult::Updated {
+            old_head, new_head, ..
+        } = &ingest_result
+        {
+            target
+                .as_metadata_chain()
+                .set_ref(
+                    &odf::BlockRef::Head,
+                    new_head,
+                    odf::dataset::SetRefOpts {
+                        validate_block_present: true,
+                        check_ref_is: Some(Some(old_head)),
+                    },
+                )
+                .await
+                .unwrap();
+        }
+
+        ingest_result
     }
 }
 
@@ -363,15 +433,8 @@ async fn test_transform_common(transform: odf::metadata::Transform, test_retract
     let root_metadata_state = harness.build_metadata_state(root_target.clone()).await;
 
     harness
-        .ingest_svc
-        .ingest(
-            root_target.clone(),
-            Box::new(root_metadata_state),
-            PollingIngestOptions::default(),
-            None,
-        )
-        .await
-        .unwrap();
+        .polling_ingest(root_target.clone(), Box::new(root_metadata_state))
+        .await;
 
     ///////////////////////////////////////////////////////////////////////////
     // Derivative setup
@@ -475,15 +538,8 @@ async fn test_transform_common(transform: odf::metadata::Transform, test_retract
     let root_metadata_state = harness.build_metadata_state(root_target.clone()).await;
 
     harness
-        .ingest_svc
-        .ingest(
-            root_target.clone(),
-            Box::new(root_metadata_state),
-            PollingIngestOptions::default(),
-            None,
-        )
-        .await
-        .unwrap();
+        .polling_ingest(root_target.clone(), Box::new(root_metadata_state))
+        .await;
 
     harness
         .time_source
@@ -817,16 +873,12 @@ async fn test_transform_empty_inputs() {
         .unwrap();
 
     let ingest_result = harness
-        .push_ingest_executor
-        .ingest_from_stream(
+        .push_ingest(
             root_target.clone(),
             ingest_plan,
             Box::new(tokio::io::BufReader::new(std::io::Cursor::new(b""))),
-            None,
         )
-        .await
-        .unwrap();
-
+        .await;
     assert_matches!(ingest_result, PushIngestResult::Updated { .. });
 
     let res = harness
@@ -866,18 +918,14 @@ async fn test_transform_empty_inputs() {
         .unwrap();
 
     let ingest_result = harness
-        .push_ingest_executor
-        .ingest_from_stream(
+        .push_ingest(
             root_target.clone(),
             ingest_plan,
             Box::new(tokio::io::BufReader::new(std::io::Cursor::new(
                 br#"{"city": "A", "population": 100}"#,
             ))),
-            None,
         )
-        .await
-        .unwrap();
-
+        .await;
     assert_matches!(ingest_result, PushIngestResult::Updated { .. });
 
     let res = harness

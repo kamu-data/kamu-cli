@@ -10,7 +10,7 @@
 use std::assert_matches::assert_matches;
 
 use kamu_core::utils::metadata_chain_comparator::*;
-use odf::dataset::MetadataChainImpl;
+use odf::dataset::{MetadataChainImpl, MetadataChainReferenceRepositoryImpl};
 use odf::metadata::testing::MetadataFactory;
 use odf::storage::inmem::{NamedObjectRepositoryInMemory, ObjectRepositoryInMemory};
 use odf::storage::{MetadataBlockRepositoryImpl, ReferenceRepositoryImpl};
@@ -19,9 +19,11 @@ use odf::storage::{MetadataBlockRepositoryImpl, ReferenceRepositoryImpl};
 
 fn init_chain() -> impl odf::MetadataChain {
     let meta_block_repo = MetadataBlockRepositoryImpl::new(ObjectRepositoryInMemory::new());
-    let ref_repo = ReferenceRepositoryImpl::new(NamedObjectRepositoryInMemory::new());
+    let meta_ref_repo = MetadataChainReferenceRepositoryImpl::new(ReferenceRepositoryImpl::new(
+        NamedObjectRepositoryInMemory::new(),
+    ));
 
-    MetadataChainImpl::new(meta_block_repo, ref_repo)
+    MetadataChainImpl::new(meta_block_repo, meta_ref_repo)
 }
 
 async fn push_block(chain: &dyn odf::MetadataChain, block: odf::MetadataBlock) -> odf::Multihash {

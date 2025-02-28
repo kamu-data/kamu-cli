@@ -7,24 +7,25 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use dill::Catalog;
-use internal_error::InternalError;
+use crate::{GetDatasetReferenceError, SetDatasetReferenceError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[cfg_attr(any(feature = "testing", test), mockall::automock)]
 #[async_trait::async_trait]
-pub trait DependencyGraphWriter: Send + Sync {
-    async fn create_dataset_node(&self, dataset_id: &odf::DatasetID) -> Result<(), InternalError>;
-
-    async fn remove_dataset_node(&self, dataset_id: &odf::DatasetID) -> Result<(), InternalError>;
-
-    async fn update_dataset_node_dependencies(
+pub trait DatasetReferenceService: Sync + Send {
+    async fn get_reference(
         &self,
-        catalog: &Catalog,
         dataset_id: &odf::DatasetID,
-        new_upstream_ids: Vec<odf::DatasetID>,
-    ) -> Result<(), InternalError>;
+        block_ref: &odf::BlockRef,
+    ) -> Result<odf::Multihash, GetDatasetReferenceError>;
+
+    async fn set_reference(
+        &self,
+        dataset_id: &odf::DatasetID,
+        block_ref: &odf::BlockRef,
+        maybe_prev_block_hash: Option<&odf::Multihash>,
+        new_block_hash: &odf::Multihash,
+    ) -> Result<(), SetDatasetReferenceError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
