@@ -153,7 +153,7 @@ impl AppendDatasetMetadataBatchUseCase for AppendDatasetMetadataBatchUseCaseImpl
             }
         }
 
-        // Safety: There are blocks, so we are guaranteed to have
+        // Safety: there are blocks, so we are guaranteed to have
         //         a hash of the last one.
         let new_head = new_head.as_ref().unwrap();
         metadata_chain
