@@ -21,6 +21,7 @@ use kamu::utils::simple_transfer_protocol::SimpleTransferProtocol;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_datasets_services::{
+    AppendDatasetMetadataBatchUseCaseImpl,
     CreateDatasetUseCaseImpl,
     DatasetEntryWriter,
     DependencyGraphWriter,
@@ -919,6 +920,7 @@ impl PullTestHarness {
             .bind::<dyn DatasetEntryWriter, MockDatasetEntryWriter>()
             .add_value(mock_dependency_graph_writer)
             .bind::<dyn DependencyGraphWriter, MockDependencyGraphWriter>()
+            .add::<AppendDatasetMetadataBatchUseCaseImpl>()
             .build();
 
         Self {

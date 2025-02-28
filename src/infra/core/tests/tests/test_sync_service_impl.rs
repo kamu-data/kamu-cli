@@ -19,6 +19,7 @@ use kamu::utils::simple_transfer_protocol::SimpleTransferProtocol;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_datasets_services::{
+    AppendDatasetMetadataBatchUseCaseImpl,
     CreateDatasetUseCaseImpl,
     DatasetEntryWriter,
     DependencyGraphWriter,
@@ -99,6 +100,7 @@ async fn do_test_sync(
         .bind::<dyn DatasetEntryWriter, MockDatasetEntryWriter>()
         .add_value(MockDependencyGraphWriter::new())
         .bind::<dyn DependencyGraphWriter, MockDependencyGraphWriter>()
+        .add::<AppendDatasetMetadataBatchUseCaseImpl>()
         .build();
 
     let mut mock_dataset_entry_writer_bar = MockDatasetEntryWriter::new();
@@ -140,6 +142,7 @@ async fn do_test_sync(
         .bind::<dyn DatasetEntryWriter, MockDatasetEntryWriter>()
         .add_value(mock_dependency_graph_writer_bar)
         .bind::<dyn DependencyGraphWriter, MockDependencyGraphWriter>()
+        .add::<AppendDatasetMetadataBatchUseCaseImpl>()
         .build();
 
     let sync_svc_foo = catalog_foo.get_one::<dyn SyncService>().unwrap();

@@ -292,24 +292,22 @@ pub async fn test_delete_warning(mut kamu_node_api_client: KamuApiServerClient) 
     let pull_1_2_url = Url::from_file_path(repo_path.join("pull-1-2")).unwrap();
     let pull_1_3_4_url = Url::from_file_path(repo_path.join("pull-1-3-4")).unwrap();
     let removed_url = Url::from_file_path(repo_path.join("removed")).unwrap();
-    let expected_out = indoc::formatdoc!(
-        r#"
-        player-scores dataset is out of sync with remote\(s\):
-         - ahead of '{}'
-         - diverged from '{}'
-         - behind '{}'
-         - could not check state of '{}'. Error: Remote dataset not found
-        "#,
-        regex::escape(pull_1_url.as_str()),
-        regex::escape(pull_1_2_url.as_str()),
-        regex::escape(pull_1_3_4_url.as_str()),
-        regex::escape(removed_url.as_str())
-    );
+
+    use regex::escape as e;
 
     kamu.assert_success_command_execution(
         ["--yes", "delete", "--all"],
         None,
-        Some([expected_out.as_str()]),
+        Some([
+            r#"player-scores dataset is out of sync with remote\(s\):"#,
+            &format!(r#" - ahead of '{}'"#, e(pull_1_url.as_str())),
+            &format!(r#" - diverged from '{}'"#, e(pull_1_2_url.as_str())),
+            &format!(r#" - behind '{}'"#, e(pull_1_3_4_url.as_str())),
+            &format!(
+                " - could not check state of '{}'. Error: Remote dataset not found",
+                e(removed_url.as_str())
+            ),
+        ]),
     )
     .await;
 }
