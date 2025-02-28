@@ -12,7 +12,7 @@ use internal_error::{ErrorIntoInternal, InternalError};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// References are named pointers to metadata blocks
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum BlockRef {
     Head,
 }

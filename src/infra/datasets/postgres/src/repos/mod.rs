@@ -10,7 +10,9 @@
 mod postgres_dataset_dependency_repository;
 mod postgres_dataset_entry_repository;
 mod postgres_dataset_env_var_repository;
+mod postgres_dataset_reference_repository;
 
 pub use postgres_dataset_dependency_repository::*;
 pub use postgres_dataset_entry_repository::*;
 pub use postgres_dataset_env_var_repository::*;
+pub use postgres_dataset_reference_repository::*;
