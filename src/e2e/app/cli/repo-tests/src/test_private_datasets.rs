@@ -932,7 +932,7 @@ pub async fn test_a_private_dataset_can_only_be_pulled_by_the_owner_or_admin(
                     Some([
                         r#"Failed to update 1 dataset\(s\)"#,
                         format!(
-                            r#"Failed to sync .*\/{0} from {1}: odf::Dataset {1}/ not found"#,
+                            r#"Failed to sync .*\/{0} from {1}: Dataset {1}/ not found"#,
                             private_dataset_alias.dataset_name.as_str(),
                             regex::escape(private_dataset_url.as_str())
                         )
@@ -953,7 +953,7 @@ pub async fn test_a_private_dataset_can_only_be_pulled_by_the_owner_or_admin(
                     Some([
                         r#"Failed to update 1 dataset\(s\)"#,
                         format!(
-                            r#"Failed to sync .*\/{0} from {1}: odf::Dataset {1}/ not found"#,
+                            r#"Failed to sync .*\/{0} from {1}: Dataset {1}/ not found"#,
                             private_dataset_alias.dataset_name.as_str(),
                             regex::escape(private_dataset_url.as_str())
                         )
@@ -1010,7 +1010,7 @@ pub async fn test_a_private_dataset_can_only_be_pulled_by_the_owner_or_admin(
                     Some([
                         r#"Failed to update 1 dataset\(s\)"#,
                         format!(
-                            r#"Failed to sync .*\/{0} from {1}: odf::Dataset {1}/ not found"#,
+                            r#"Failed to sync .*\/{0} from {1}: Dataset {1}/ not found"#,
                             private_dataset_alias.dataset_name.as_str(),
                             regex::escape(private_dataset_odf_url.as_str())
                         )
@@ -1031,7 +1031,7 @@ pub async fn test_a_private_dataset_can_only_be_pulled_by_the_owner_or_admin(
                     Some([
                         r#"Failed to update 1 dataset\(s\)"#,
                         format!(
-                            r#"Failed to sync .*\/{0} from {1}: odf::Dataset {1}/ not found"#,
+                            r#"Failed to sync .*\/{0} from {1}: Dataset {1}/ not found"#,
                             private_dataset_alias.dataset_name.as_str(),
                             regex::escape(private_dataset_odf_url.as_str())
                         )
