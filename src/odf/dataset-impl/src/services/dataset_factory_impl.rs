@@ -10,9 +10,9 @@
 use std::sync::Arc;
 
 use dill::*;
-#[cfg(any(feature = "http", feature = "s3"))]
+#[cfg(feature = "http")]
 use internal_error::InternalError;
-#[cfg(any(feature = "http", feature = "lfs", feature = "s3"))]
+#[cfg(any(feature = "http", feature = "lfs"))]
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use odf_dataset::*;
 #[cfg(any(feature = "http", feature = "lfs", feature = "s3"))]
