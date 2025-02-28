@@ -11,6 +11,10 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Unreleased]
+### Fixed
+- `kamu sql server`: correctly works inside containers(jupyter)
+
 ## [0.226.5] - 2025-03-10
 ### Fixed
 - Prometheus metrics, S3: fixed `storage_url` label values
@@ -25,6 +29,7 @@ Recommendation: for ease of reading, use the following order:
 - API server correctly logs unknown routes
 - GQL: `Search::query()`: fix regression resulting in unstable ordering of search results
 - Fix JSON encoding of `BinaryView` and `Utf8View` data (#1127)
+
 
 ## [0.226.3] - 2025-02-27
 ### Changed
