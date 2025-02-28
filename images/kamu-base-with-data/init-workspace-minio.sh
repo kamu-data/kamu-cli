@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 
 CONTRIB_URL=${CONTRIB_URL:-"s3+http://127.0.0.1:9000/contrib/"}
 EXAMPLES_URL=${EXAMPLES_URL:-"s3+http://127.0.0.1:9000/example/"}

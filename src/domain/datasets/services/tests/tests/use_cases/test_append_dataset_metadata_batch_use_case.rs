@@ -53,7 +53,11 @@ async fn test_append_dataset_metadata_batch() {
 
     let res = harness
         .use_case
-        .execute(foo.dataset.as_ref(), new_blocks, false)
+        .execute(
+            foo.dataset.as_ref(),
+            Box::new(new_blocks.into_iter()),
+            Default::default(),
+        )
         .await;
     assert_matches!(res, Ok(_));
 }
@@ -93,7 +97,11 @@ async fn test_append_dataset_metadata_batch_with_new_dependencies() {
 
     let res = harness
         .use_case
-        .execute(bar.dataset.as_ref(), new_blocks, false)
+        .execute(
+            bar.dataset.as_ref(),
+            Box::new(new_blocks.into_iter()),
+            Default::default(),
+        )
         .await;
     assert_matches!(res, Ok(_));
 }

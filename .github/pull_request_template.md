@@ -16,7 +16,7 @@ Closes: #issue
   - [ ] Workspace layout and metadata: ✅
     <!-- New version can read existing user configs -->
   - [ ] Configuration: ✅
-    <!-- Change does not includes new versions of any container images -->
+    <!-- Change does not include new versions of any container images -->
   - [ ] Container images: ✅
 - [ ] Observability:
     <!-- How will we know how the feature behaves in production, is it being used, is it working correctly? -->

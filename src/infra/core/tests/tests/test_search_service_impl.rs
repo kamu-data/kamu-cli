@@ -15,7 +15,11 @@ use kamu::testing::*;
 use kamu::utils::simple_transfer_protocol::SimpleTransferProtocol;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
-use kamu_datasets_services::CreateDatasetUseCaseImpl;
+use kamu_datasets_services::{
+    AppendDatasetMetadataBatchUseCaseImpl,
+    CreateDatasetUseCaseImpl,
+    DependencyGraphServiceImpl,
+};
 use messaging_outbox::DummyOutboxImpl;
 use odf::dataset::testing::create_test_dataset_from_snapshot;
 use odf::dataset::{DatasetFactoryImpl, IpfsGateway};
@@ -59,6 +63,8 @@ async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
         .add::<SearchServiceImpl>()
         .add::<CreateDatasetUseCaseImpl>()
         .add::<DummyOutboxImpl>()
+        .add::<AppendDatasetMetadataBatchUseCaseImpl>()
+        .add::<DependencyGraphServiceImpl>()
         .build();
 
     let did_generator = catalog.get_one::<dyn DidGenerator>().unwrap();

@@ -329,7 +329,7 @@ impl AsciiRenderer {
             odf::MetadataEvent::Seed(e) => {
                 self.render_property(output, 0, "Kind", "Seed")?;
                 self.render_property(output, 0, "DatasetKind", format!("{:?}", e.dataset_kind))?;
-                self.render_property(output, 0, "odf::DatasetID", &e.dataset_id)?;
+                self.render_property(output, 0, "DatasetID", &e.dataset_id)?;
             }
             odf::MetadataEvent::SetAttachments(e) => {
                 self.render_property(output, 0, "Kind", "SetAttachments")?;
