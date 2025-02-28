@@ -17,9 +17,11 @@ use internal_error::ErrorIntoInternal;
 use kamu_core::CorruptedSourceError;
 use kamu_datasets::{
     AppendDatasetMetadataBatchUseCase,
+    AppendDatasetMetadataBatchUseCaseOptions,
     CreateDatasetError,
     CreateDatasetUseCase,
     CreateDatasetUseCaseOptions,
+    SetRefCheckRefMode,
 };
 use tracing::Instrument;
 use url::Url;
@@ -92,7 +94,7 @@ impl AxumServerPushProtocolInstance {
                   "Push process aborted with internal error",
                 );
             }
-            Err(ref _e @ PushServerError::ReadFailed(ref err)) => {
+            Err(PushServerError::ReadFailed(err)) => {
                 if let ReadMessageError::IncompatibleVersion = err.read_error {
                     let payload = Err(DatasetPushRequestError::Internal(TransferInternalError {
                         phase: TransferPhase::Push(PushPhase::InitialRequest),
@@ -110,7 +112,7 @@ impl AxumServerPushProtocolInstance {
                     };
                 }
             }
-            Err(ref _e @ PushServerError::RefCollision(ref err)) => {
+            Err(PushServerError::RefCollision(err)) => {
                 let payload = DatasetPushObjectsTransferResponse::Err(
                     DatasetPushObjectsTransferError::RefCollision(
                         DatasetPushObjectsTransferRefCollisionError {
@@ -136,7 +138,7 @@ impl AxumServerPushProtocolInstance {
                   "Push process aborted with error",
                 );
             }
-            Err(ref _e @ PushServerError::NameCollision(ref err)) => {
+            Err(PushServerError::NameCollision(err)) => {
                 let payload = DatasetPushObjectsTransferResponse::Err(
                     DatasetPushObjectsTransferError::NameCollision(
                         DatasetPushObjectsTransferNameCollisionError {
@@ -471,7 +473,10 @@ impl AxumServerPushProtocolInstance {
             .transactional_with(
                 |append_dataset_metadata_batch: Arc<dyn AppendDatasetMetadataBatchUseCase>| async move {
                     append_dataset_metadata_batch
-                        .execute(dataset.as_ref(), new_blocks, force_update_if_diverged)
+                        .execute(dataset.as_ref(), Box::new(new_blocks.into_iter()), AppendDatasetMetadataBatchUseCaseOptions {
+                            set_ref_check_ref_mode: Some(SetRefCheckRefMode::ForceUpdateIfDiverged(force_update_if_diverged)),
+                            ..Default::default()
+                        })
                         .await
                 },
             )

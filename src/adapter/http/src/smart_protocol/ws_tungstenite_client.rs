@@ -18,9 +18,11 @@ use kamu::utils::smart_transfer_protocol::{SmartTransferProtocolClient, Transfer
 use kamu_core::*;
 use kamu_datasets::{
     AppendDatasetMetadataBatchUseCase,
+    AppendDatasetMetadataBatchUseCaseOptions,
     CreateDatasetUseCase,
     CreateDatasetUseCaseOptions,
     NameCollisionError,
+    SetRefCheckRefMode,
 };
 use odf::metadata::AsTypedBlock as _;
 use serde::de::DeserializeOwned;
@@ -690,16 +692,22 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
                     .await?;
             }
 
-            let dst_dataset = dst.clone();
-            let append_event = self
+            let append_dataset_metadata_batch_use_case = self
                 .catalog
                 .get_one::<dyn AppendDatasetMetadataBatchUseCase>()
                 .unwrap();
-            append_event
+            let dst_dataset = dst.clone();
+
+            append_dataset_metadata_batch_use_case
                 .execute(
                     dst_dataset.as_ref(),
-                    new_blocks,
-                    transfer_options.force_update_if_diverged,
+                    Box::new(new_blocks.into_iter()),
+                    AppendDatasetMetadataBatchUseCaseOptions {
+                        set_ref_check_ref_mode: Some(SetRefCheckRefMode::ForceUpdateIfDiverged(
+                            transfer_options.force_update_if_diverged,
+                        )),
+                        ..Default::default()
+                    },
                 )
                 .await
                 .int_err()?;
