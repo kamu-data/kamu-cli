@@ -81,7 +81,7 @@ impl SqlShellImpl {
                 .stderr(std::fs::File::create(&spark_stderr_path).int_err()?);
 
             container_builder = if let Some(p) = port {
-                container_builder.network("host").map_port_with_address(
+                container_builder.map_port_with_address(
                     address.map_or(String::from("127.0.0.1"), ToString::to_string),
                     p,
                     10000,

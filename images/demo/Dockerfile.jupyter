@@ -13,7 +13,7 @@ USER root
 # Podman & tools
 # Source: https://github.com/containers/podman/blob/056f492f59c333d521ebbbe186abde0278e815db/contrib/podmanimage/stable/Dockerfile
 RUN apt update && \
-    apt -y install ca-certificates curl wget gnupg unzip jq podman fuse-overlayfs && \
+    apt -y install ca-certificates curl wget gnupg unzip jq podman fuse-overlayfs catatonit && \
     apt-get clean && rm -rf /var/lib/apt/lists /var/cache/apt/archives
 
 COPY podman/containers.conf /etc/containers/containers.conf
