@@ -34,37 +34,8 @@ async fn test_search_query() {
 
     harness.create_datasets([alias(&"kamu", &"foo")]).await;
 
-    let schema = kamu_adapter_graphql::schema_quiet();
-    let res = schema
-        .execute(
-            Request::new(
-                "
-                {
-                    search {
-                      query(query: \"bar\") {
-                        nodes {
-                          __typename
-                          ... on Dataset {
-                            name
-                          }
-                        }
-                        totalCount
-                        pageInfo {
-                          totalPages
-                          hasNextPage
-                          hasPreviousPage
-                        }
-                      }
-                    }
-                  }
-                ",
-            )
-            .data(harness.catalog_authorized.clone()),
-        )
-        .await;
-    assert!(res.is_ok());
-    assert_eq!(
-        res.data,
+    pretty_assertions::assert_eq!(
+        harness.search_authorized("bar").await.data,
         value!({
             "search": {
                 "query": {
@@ -79,37 +50,8 @@ async fn test_search_query() {
             }
         })
     );
-
-    let res = schema
-        .execute(
-            Request::new(
-                "
-                {
-                    search {
-                      query(query: \"foo\") {
-                        nodes {
-                          __typename
-                          ... on Dataset {
-                            name
-                          }
-                        }
-                        totalCount
-                        pageInfo {
-                          totalPages
-                          hasNextPage
-                          hasPreviousPage
-                        }
-                      }
-                    }
-                  }
-                ",
-            )
-            .data(harness.catalog_authorized.clone()),
-        )
-        .await;
-    assert!(res.is_ok());
-    assert_eq!(
-        res.data,
+    pretty_assertions::assert_eq!(
+        harness.search_authorized("foo").await.data,
         value!({
             "search": {
                 "query": {
@@ -127,10 +69,9 @@ async fn test_search_query() {
             }
         })
     );
-
-    let res = schema
-        .execute(
-            Request::new(
+    pretty_assertions::assert_eq!(
+        harness
+            .execute_authorized(indoc::indoc!(
                 "
                 {
                   search {
@@ -154,14 +95,10 @@ async fn test_search_query() {
                     }
                   }
                 }
-                ",
-            )
-            .data(harness.catalog_authorized),
-        )
-        .await;
-    assert!(res.is_ok());
-    assert_eq!(
-        res.data,
+                "
+            ))
+            .await
+            .data,
         value!({
             "search": {
                 "query": {
@@ -191,7 +128,8 @@ async fn test_search_query() {
 
 struct GqlSearchHarness {
     _temp_dir: tempfile::TempDir,
-    pub catalog_authorized: dill::Catalog,
+    catalog_authorized: dill::Catalog,
+    schema: kamu_adapter_graphql::Schema,
 }
 
 impl GqlSearchHarness {
@@ -228,10 +166,12 @@ impl GqlSearchHarness {
         };
 
         let (_catalog_anonymous, catalog_authorized) = authentication_catalogs(&base_catalog).await;
+        let schema = kamu_adapter_graphql::schema_quiet();
 
         Self {
             _temp_dir: temp_dir,
             catalog_authorized,
+            schema,
         }
     }
 
@@ -257,6 +197,46 @@ impl GqlSearchHarness {
                 .await
                 .unwrap();
         }
+    }
+
+    pub async fn execute_authorized(&self, request: &str) -> Response {
+        let res = self
+            .schema
+            .execute(Request::new(request).data(self.catalog_authorized.clone()))
+            .await;
+
+        assert!(res.is_ok());
+
+        res
+    }
+
+    pub async fn search_authorized(&self, query: &str) -> Response {
+        self.execute_authorized(
+            &indoc::indoc!(
+                "
+                {
+                  search {
+                    query(query: \"<query>\") {
+                      nodes {
+                        __typename
+                        ... on Dataset {
+                          name
+                        }
+                      }
+                      totalCount
+                      pageInfo {
+                        totalPages
+                        hasNextPage
+                        hasPreviousPage
+                      }
+                    }
+                  }
+                }
+                "
+            )
+            .replace("<query>", query),
+        )
+        .await
     }
 }
 
