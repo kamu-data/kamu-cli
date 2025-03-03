@@ -27,7 +27,7 @@ use crate::utils::authentication_catalogs;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
-async fn test_search_query() {
+async fn test_single_dataset_search() {
     let harness = GqlSearchHarness::new().await;
 
     use odf::metadata::testing::alias;
@@ -35,14 +35,17 @@ async fn test_search_query() {
     harness.create_datasets([alias(&"kamu", &"foo")]).await;
 
     pretty_assertions::assert_eq!(
-        harness.search_authorized("bar").await.data,
+        harness
+            .search_authorized("bar", SearchOptions::default())
+            .await
+            .data,
         value!({
             "search": {
                 "query": {
                     "nodes": [],
-                    "totalCount": 0i32,
+                    "totalCount": 0,
                     "pageInfo": {
-                        "totalPages": 0i32,
+                        "totalPages": 0,
                         "hasNextPage": false,
                         "hasPreviousPage": false,
                     }
@@ -51,7 +54,10 @@ async fn test_search_query() {
         })
     );
     pretty_assertions::assert_eq!(
-        harness.search_authorized("foo").await.data,
+        harness
+            .search_authorized("foo", SearchOptions::default())
+            .await
+            .data,
         value!({
             "search": {
                 "query": {
@@ -59,9 +65,9 @@ async fn test_search_query() {
                         "__typename": "Dataset",
                         "name": "foo",
                     }],
-                    "totalCount": 1i32,
+                    "totalCount": 1,
                     "pageInfo": {
-                        "totalPages": 1i32,
+                        "totalPages": 1,
                         "hasNextPage": false,
                         "hasPreviousPage": false,
                     }
@@ -106,9 +112,9 @@ async fn test_search_query() {
                         "metadata": {
                           "chain": {
                             "blocks": {
-                              "totalCount": 2i32,
+                              "totalCount": 2,
                               "pageInfo": {
-                                "totalPages": 0i32,
+                                "totalPages": 0,
                                 "hasNextPage": false,
                                 "hasPreviousPage": false
                               }
@@ -120,6 +126,145 @@ async fn test_search_query() {
             }
         })
     );
+}
+
+#[tokio::test]
+async fn test_correct_dataset_order_in_response() {
+    let harness = GqlSearchHarness::new().await;
+
+    use odf::metadata::testing::alias;
+
+    harness
+        .create_datasets(
+            // NOTE: purposely random order
+            [
+                alias(&"kamu", &"dataset5"),
+                alias(&"kamu", &"dataset3"),
+                alias(&"kamu", &"dataset4"),
+                alias(&"kamu", &"dataset1"),
+                alias(&"kamu", &"dataset2"),
+            ],
+        )
+        .await;
+
+    // Run queries multiple times to ensure the search results stability
+    for _ in 0..5 {
+        // Search without pagination
+        pretty_assertions::assert_eq!(
+            harness
+                .search_authorized("dataset", SearchOptions::default())
+                .await
+                .data,
+            value!({
+                "search": {
+                    "query": {
+                        "nodes": [
+                            {
+                                "__typename": "Dataset",
+                                "name": "dataset1",
+                            },
+                            {
+                                "__typename": "Dataset",
+                                "name": "dataset2",
+                            },
+                            {
+                                "__typename": "Dataset",
+                                "name": "dataset3",
+                            },
+                            {
+                                "__typename": "Dataset",
+                                "name": "dataset4",
+                            },
+                            {
+                                "__typename": "Dataset",
+                                "name": "dataset5",
+                            },
+                        ],
+                        "totalCount": 5,
+                        "pageInfo": {
+                            "totalPages": 1,
+                            "hasNextPage": false,
+                            "hasPreviousPage": false,
+                        }
+                    }
+                }
+            })
+        );
+
+        // Checking with pagination
+        pretty_assertions::assert_eq!(
+            harness
+                .search_authorized(
+                    "dataset",
+                    SearchOptions {
+                        page: Some(0),
+                        per_page: Some(3),
+                    }
+                )
+                .await
+                .data,
+            value!({
+                "search": {
+                    "query": {
+                        "nodes": [
+                            {
+                                "__typename": "Dataset",
+                                "name": "dataset1",
+                            },
+                            {
+                                "__typename": "Dataset",
+                                "name": "dataset2",
+                            },
+                            {
+                                "__typename": "Dataset",
+                                "name": "dataset3",
+                            },
+                        ],
+                        "totalCount": 5,
+                        "pageInfo": {
+                            "totalPages": 2,
+                            "hasNextPage": true,
+                            "hasPreviousPage": false,
+                        }
+                    }
+                }
+            })
+        );
+        pretty_assertions::assert_eq!(
+            harness
+                .search_authorized(
+                    "dataset",
+                    SearchOptions {
+                        page: Some(1),
+                        per_page: Some(3),
+                    }
+                )
+                .await
+                .data,
+            value!({
+                "search": {
+                    "query": {
+                        "nodes": [
+                            {
+                                "__typename": "Dataset",
+                                "name": "dataset4",
+                            },
+                            {
+                                "__typename": "Dataset",
+                                "name": "dataset5",
+                            },
+                        ],
+                        "totalCount": 5,
+                        "pageInfo": {
+                            "totalPages": 2,
+                            "hasNextPage": false,
+                            "hasPreviousPage": true,
+                        }
+                    }
+                }
+            })
+        );
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -210,13 +355,24 @@ impl GqlSearchHarness {
         res
     }
 
-    pub async fn search_authorized(&self, query: &str) -> Response {
+    pub async fn search_authorized(&self, query: &str, options: SearchOptions) -> Response {
+        let extra_arguments = {
+            let mut s = String::new();
+            if let Some(value) = options.page {
+                s += &format!(", page: {value}",);
+            }
+            if let Some(value) = options.per_page {
+                s += &format!(", perPage: {value}");
+            }
+            s
+        };
+
         self.execute_authorized(
             &indoc::indoc!(
                 "
                 {
                   search {
-                    query(query: \"<query>\") {
+                    query(query: \"<query>\" <extra_arguments>) {
                       nodes {
                         __typename
                         ... on Dataset {
@@ -234,10 +390,19 @@ impl GqlSearchHarness {
                 }
                 "
             )
-            .replace("<query>", query),
+            .replace("<query>", query)
+            .replace("<extra_arguments>", &extra_arguments),
         )
         .await
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Default)]
+struct SearchOptions {
+    page: Option<usize>,
+    per_page: Option<usize>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
