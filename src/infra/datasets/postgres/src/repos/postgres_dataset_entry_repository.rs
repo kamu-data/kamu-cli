@@ -174,6 +174,7 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
                    created_at   as "created_at: _"
             FROM dataset_entries
             WHERE dataset_id = ANY($1)
+            ORDER BY created_at
             "#,
             &dataset_ids_search,
         )
