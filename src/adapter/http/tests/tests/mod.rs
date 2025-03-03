@@ -17,6 +17,7 @@ mod test_node_info;
 mod test_platform_login_validate;
 mod test_protocol_dataset_helpers;
 mod test_routing;
+mod test_unknown_handler;
 mod test_upload_local;
 mod test_upload_s3;
 mod tests_pull;
