@@ -7,21 +7,21 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use axum::http::{Uri, Version};
-use http::{HeaderMap, HeaderValue, StatusCode};
+use axum::http::{HeaderMap, HeaderValue, StatusCode, Uri, Version};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn unknown_handler(
+#[allow(clippy::unused_async)]
+#[tracing::instrument(
+    level = "warn",
+    name = "HTTP: fallback request",
+    skip_all,
+    fields(%uri, ?version, ?headers)
+)]
+pub async fn unknown_handler(
     uri: Uri,
     version: Version,
     headers: HeaderMap<HeaderValue>,
 ) -> impl axum::response::IntoResponse {
-    tracing::info!(
-        uri = %uri,
-        version = ?version,
-        headers = ?headers,
-        "Unknown HTTP request",
-    );
     (StatusCode::NOT_FOUND, "Not Found")
 }
