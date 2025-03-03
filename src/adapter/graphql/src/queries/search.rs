@@ -56,10 +56,11 @@ impl Search {
             });
         let readable_dataset_handles_stream = dataset_action_authorizer
             .filtered_datasets_stream(filtered_all_dataset_handles_stream, DatasetAction::Read);
-        let readable_dataset_handles = readable_dataset_handles_stream
+        let mut readable_dataset_handles = readable_dataset_handles_stream
             .filter_ok(|hdl| hdl.alias.dataset_name.contains(&query))
             .try_collect::<Vec<_>>()
             .await?;
+        readable_dataset_handles.sort_by(|a, b| a.alias.dataset_name.cmp(&b.alias.dataset_name));
 
         let total_count = readable_dataset_handles.len();
 
