@@ -9,7 +9,6 @@
 
 use async_graphql::*;
 use database_common::NoOpDatabasePlugin;
-use dill::Component;
 use kamu_core::*;
 use kamu_datasets::CreateDatasetFromSnapshotUseCase;
 use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEntryRepository};
@@ -29,50 +28,16 @@ use crate::utils::authentication_catalogs;
 
 #[tokio::test]
 async fn test_search_query() {
-    let tempdir = tempfile::tempdir().unwrap();
-    let datasets_dir = tempdir.path().join("datasets");
-    std::fs::create_dir(&datasets_dir).unwrap();
+    let harness = GqlSearchHarness::new().await;
 
-    let mut b = dill::CatalogBuilder::new();
-    b.add::<DidGeneratorDefault>()
-        .add::<SystemTimeSourceDefault>()
-        .add::<DummyOutboxImpl>()
-        .add::<DependencyGraphServiceImpl>()
-        .add::<InMemoryDatasetDependencyRepository>()
-        .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
-        .add_value(TenancyConfig::SingleTenant)
-        .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
-        .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
-        .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>()
-        .add::<CreateDatasetFromSnapshotUseCaseImpl>()
-        .add::<CreateDatasetUseCaseImpl>()
-        .add::<DatasetEntryServiceImpl>()
-        .add::<InMemoryDatasetEntryRepository>();
+    use odf::metadata::testing::alias;
 
-    NoOpDatabasePlugin::init_database_components(&mut b);
-
-    let base_catalog = b.build();
-    let (_, catalog_authorized) = authentication_catalogs(&base_catalog).await;
-
-    let create_dataset_from_snapshot = catalog_authorized
-        .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
-        .unwrap();
-    create_dataset_from_snapshot
-        .execute(
-            MetadataFactory::dataset_snapshot()
-                .name("foo")
-                .kind(odf::DatasetKind::Root)
-                .push_event(MetadataFactory::set_polling_source().build())
-                .build(),
-            Default::default(),
-        )
-        .await
-        .unwrap();
+    harness.create_datasets([alias(&"kamu", &"foo")]).await;
 
     let schema = kamu_adapter_graphql::schema_quiet();
     let res = schema
         .execute(
-            async_graphql::Request::new(
+            Request::new(
                 "
                 {
                     search {
@@ -94,7 +59,7 @@ async fn test_search_query() {
                   }
                 ",
             )
-            .data(catalog_authorized.clone()),
+            .data(harness.catalog_authorized.clone()),
         )
         .await;
     assert!(res.is_ok());
@@ -117,7 +82,7 @@ async fn test_search_query() {
 
     let res = schema
         .execute(
-            async_graphql::Request::new(
+            Request::new(
                 "
                 {
                     search {
@@ -139,7 +104,7 @@ async fn test_search_query() {
                   }
                 ",
             )
-            .data(catalog_authorized.clone()),
+            .data(harness.catalog_authorized.clone()),
         )
         .await;
     assert!(res.is_ok());
@@ -165,7 +130,7 @@ async fn test_search_query() {
 
     let res = schema
         .execute(
-            async_graphql::Request::new(
+            Request::new(
                 "
                 {
                   search {
@@ -191,7 +156,7 @@ async fn test_search_query() {
                 }
                 ",
             )
-            .data(catalog_authorized),
+            .data(harness.catalog_authorized),
         )
         .await;
     assert!(res.is_ok());
@@ -218,6 +183,81 @@ async fn test_search_query() {
             }
         })
     );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Harness
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+struct GqlSearchHarness {
+    _temp_dir: tempfile::TempDir,
+    pub catalog_authorized: dill::Catalog,
+}
+
+impl GqlSearchHarness {
+    pub async fn new() -> Self {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let datasets_dir = temp_dir.path().join("datasets");
+        std::fs::create_dir(&datasets_dir).unwrap();
+
+        let base_catalog = {
+            use dill::Component;
+
+            let mut b = dill::CatalogBuilder::new();
+            b.add::<DidGeneratorDefault>()
+                .add::<SystemTimeSourceDefault>()
+                .add::<DummyOutboxImpl>()
+                .add::<DependencyGraphServiceImpl>()
+                .add::<InMemoryDatasetDependencyRepository>()
+                .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
+                .add_value(TenancyConfig::SingleTenant)
+                .add_builder(
+                    odf::dataset::DatasetStorageUnitLocalFs::builder().with_root(datasets_dir),
+                )
+                .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
+                .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>(
+                )
+                .add::<CreateDatasetFromSnapshotUseCaseImpl>()
+                .add::<CreateDatasetUseCaseImpl>()
+                .add::<DatasetEntryServiceImpl>()
+                .add::<InMemoryDatasetEntryRepository>();
+
+            NoOpDatabasePlugin::init_database_components(&mut b);
+
+            b.build()
+        };
+
+        let (_catalog_anonymous, catalog_authorized) = authentication_catalogs(&base_catalog).await;
+
+        Self {
+            _temp_dir: temp_dir,
+            catalog_authorized,
+        }
+    }
+
+    pub async fn create_datasets(
+        &self,
+        dataset_aliases: impl IntoIterator<Item = odf::DatasetAlias>,
+    ) {
+        let create_dataset = self
+            .catalog_authorized
+            .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
+            .unwrap();
+
+        for dataset_alias in dataset_aliases {
+            create_dataset
+                .execute(
+                    MetadataFactory::dataset_snapshot()
+                        .name(dataset_alias)
+                        .kind(odf::DatasetKind::Root)
+                        .push_event(MetadataFactory::set_polling_source().build())
+                        .build(),
+                    Default::default(),
+                )
+                .await
+                .unwrap();
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

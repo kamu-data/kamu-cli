@@ -26,7 +26,7 @@ common-macros = { workspace = true }
 database-common = { workspace = true }
 email-utils = { workspace = true }
 internal-error = { workspace = true }
-odf = { workspace = true, features = ["arrow", "http", "lfs", "s3"] }
+odf = { workspace = true, default-features = false, features = ["arrow", "http", "lfs", "s3"] }
 
 event-sourcing = { workspace = true }
 kamu = { workspace = true }
@@ -75,10 +75,10 @@ kamu-flow-system-services = { workspace = true }
 kamu-task-system-inmem = { workspace = true }
 kamu-task-system-services = { workspace = true }
 messaging-outbox = { workspace = true }
+odf = { workspace = true, default-features = false, features = ["testing"] }
 time-source = { workspace = true }
 
 indoc = "2"
-mockall = "0.13"
 pretty_assertions = { version = "1" }
 tempfile = "3"
 test-group = { version = "1" }

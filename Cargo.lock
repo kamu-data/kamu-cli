@@ -5759,7 +5759,6 @@ dependencies = [
  "kamu-task-system-inmem",
  "kamu-task-system-services",
  "messaging-outbox",
- "mockall",
  "opendatafabric",
  "pretty_assertions",
  "secrecy",
