@@ -28,7 +28,7 @@ use kamu_accounts::{
     PROVIDER_PASSWORD,
 };
 use kamu_accounts_services::PasswordLoginCredentials;
-use kamu_adapter_http::{DatasetAuthorizationLayer, FileUploadLimitConfig};
+use kamu_adapter_http::{unknown_handler, DatasetAuthorizationLayer, FileUploadLimitConfig};
 use rust_embed::RustEmbed;
 use serde::Serialize;
 use url::Url;
@@ -210,6 +210,7 @@ impl WebUIServer {
         .layer(axum::extract::Extension(gql_schema))
         .layer(axum::extract::Extension(web_ui_runtime_configuration))
         .layer(axum::extract::Extension(ui_configuration))
+        .fallback(unknown_handler)
         .split_for_parts();
 
         let server_future = Box::pin(

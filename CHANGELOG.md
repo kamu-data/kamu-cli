@@ -17,6 +17,7 @@ Recommendation: for ease of reading, use the following order:
 - SQLite: protection against database locking, in case of parallel execution of `kamu` commands.
   - Based on `journal_mode=WAL`
 ### Fixed
+- API server correctly logs unknown routes
 - GQL: `Search::query()`: fix regression resulting in unstable ordering of search results
 
 ## [0.226.3] - 2025-02-27
