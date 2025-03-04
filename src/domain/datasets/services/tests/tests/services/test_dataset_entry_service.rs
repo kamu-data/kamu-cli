@@ -27,6 +27,7 @@ use kamu_datasets::{
 };
 use kamu_datasets_services::{DatasetEntryIndexer, DatasetEntryServiceImpl};
 use messaging_outbox::{register_message_dispatcher, Outbox, OutboxImmediateImpl};
+use odf::dataset::SetRefOpts;
 use odf::metadata::testing::MetadataFactory;
 use time_source::{FakeSystemTimeSource, SystemTimeSource};
 
@@ -70,6 +71,7 @@ async fn test_indexes_datasets_correctly() {
     // Create 3 datasets
     let mut stored_by_id = HashMap::new();
     for dataset_id in [&dataset_id_1, &dataset_id_2, &dataset_id_3] {
+        // Store the dataset
         let stored = harness
             .dataset_storage_unit_writer
             .store_dataset(
@@ -79,6 +81,21 @@ async fn test_indexes_datasets_correctly() {
                         .build(),
                 )
                 .build_typed(),
+            )
+            .await
+            .unwrap();
+
+        // Set a head, or datasets won't iterate
+        stored
+            .dataset
+            .as_metadata_chain()
+            .set_ref(
+                &odf::BlockRef::Head,
+                &stored.seed,
+                SetRefOpts {
+                    validate_block_present: true,
+                    check_ref_is: None,
+                },
             )
             .await
             .unwrap();

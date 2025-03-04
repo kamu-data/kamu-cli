@@ -186,8 +186,8 @@ impl DatasetStorageUnitWriter for DatasetStorageUnitLocalFs {
         let layout = DatasetLayout::create(&dataset_path).int_err()?;
         let dataset = Self::build_dataset(layout);
 
-        // Set Head
-        let head = match dataset
+        // Write seed block, but don't set a head ref
+        let seed = match dataset
             .as_metadata_chain()
             .append(
                 seed_block.into(),
@@ -195,25 +195,26 @@ impl DatasetStorageUnitWriter for DatasetStorageUnitLocalFs {
                     // We are using head ref CAS to detect previous existence of a dataset
                     // as atomically as possible
                     check_ref_is: Some(None),
+                    update_ref: None,
                     ..AppendOpts::default()
                 },
             )
             .await
         {
-            Ok(head) => head,
+            Ok(seed) => seed,
             Err(err) => return Err(err.int_err().into()),
         };
 
         tracing::info!(
             id = %dataset_id,
-            %head,
+            %seed,
             "Created new dataset",
         );
 
         Ok(StoreDatasetResult {
             dataset_id,
             dataset,
-            head,
+            seed,
         })
     }
 

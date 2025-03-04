@@ -25,11 +25,13 @@ impl DatasetReferenceMessage {
     pub fn updated(
         dataset_id: odf::DatasetID,
         block_ref: odf::BlockRef,
+        maybe_prev_block_hash: Option<odf::Multihash>,
         new_block_hash: odf::Multihash,
     ) -> Self {
         Self::Updated(DatasetReferenceMessageUpdated {
             dataset_id,
             block_ref,
+            maybe_prev_block_hash,
             new_block_hash,
         })
     }
@@ -47,6 +49,7 @@ impl Message for DatasetReferenceMessage {
 pub struct DatasetReferenceMessageUpdated {
     pub dataset_id: odf::DatasetID,
     pub block_ref: odf::BlockRef,
+    pub maybe_prev_block_hash: Option<odf::Multihash>,
     pub new_block_hash: odf::Multihash,
 }
 

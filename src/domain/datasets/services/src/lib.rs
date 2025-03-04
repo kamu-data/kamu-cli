@@ -17,7 +17,7 @@ pub use kamu_datasets as domain;
 mod jobs;
 mod services;
 mod use_cases;
-pub(crate) mod utils;
+pub mod utils;
 
 #[cfg(feature = "testing")]
 pub mod testing;

@@ -86,6 +86,7 @@ impl DatasetReferenceService for DatasetReferenceServiceImpl {
                 DatasetReferenceMessage::updated(
                     dataset_id.clone(),
                     block_ref.clone(),
+                    maybe_prev_block_hash.cloned(),
                     new_block_hash.clone(),
                 ),
             )
@@ -113,17 +114,19 @@ impl MessageConsumerT<DatasetReferenceMessage> for DatasetReferenceServiceImpl {
     ) -> Result<(), InternalError> {
         tracing::debug!(received_message = ?message, "Received dataset reference message");
 
+        let dataset_registry = transactional_catalog
+            .get_one::<dyn DatasetRegistry>()
+            .unwrap();
+
         match message {
             DatasetReferenceMessage::Updated(message) => {
-                let dataset_registry = transactional_catalog
-                    .get_one::<dyn DatasetRegistry>()
-                    .unwrap();
-
+                // Resolve dataset
                 let dataset = dataset_registry
                     .get_dataset_by_id(&message.dataset_id)
                     .await
                     .int_err()?;
 
+                // Update reference at storage level
                 dataset
                     .as_metadata_chain()
                     .set_ref(

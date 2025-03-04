@@ -8,3 +8,6 @@
 // by the Apache License, Version 2.0.
 
 pub(crate) mod access_dataset_helper;
+pub mod dataset_create_helper;
+
+pub use dataset_create_helper::*;

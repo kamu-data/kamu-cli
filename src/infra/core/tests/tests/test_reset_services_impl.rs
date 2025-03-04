@@ -211,7 +211,7 @@ impl ResetTestHarness {
             .unwrap();
 
         let dataset_handle = odf::DatasetHandle::new(stored.dataset_id, dataset_alias);
-        let hash_seed_block = stored.head;
+        let hash_seed_block = stored.seed;
         let hash_polling_source_block = stored
             .dataset
             .commit_event(

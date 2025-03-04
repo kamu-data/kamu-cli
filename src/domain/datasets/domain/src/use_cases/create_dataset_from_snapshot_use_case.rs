@@ -14,6 +14,7 @@ use crate::{
     CreateDatasetError,
     CreateDatasetResult,
     CreateDatasetUseCaseOptions,
+    DatasetReferenceCASError,
     NameCollisionError,
 };
 
@@ -45,6 +46,9 @@ pub enum CreateDatasetFromSnapshotError {
     RefCollision(#[from] odf::dataset::RefCollisionError),
 
     #[error(transparent)]
+    CASFailed(#[from] Box<DatasetReferenceCASError>),
+
+    #[error(transparent)]
     Internal(
         #[from]
         #[backtrace]
@@ -60,6 +64,7 @@ impl From<CreateDatasetError> for CreateDatasetFromSnapshotError {
             CreateDatasetError::EmptyDataset => unreachable!(),
             CreateDatasetError::NameCollision(e) => Self::NameCollision(e),
             CreateDatasetError::RefCollision(e) => Self::RefCollision(e),
+            CreateDatasetError::CASFailed(e) => Self::CASFailed(e),
             CreateDatasetError::Internal(e) => Self::Internal(e),
         }
     }

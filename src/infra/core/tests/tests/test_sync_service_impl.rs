@@ -192,7 +192,7 @@ async fn do_test_sync(
     )
     .await
     .unwrap();
-    let b1 = stored_foo.head;
+    let b1 = stored_foo.seed;
 
     // Initial sync ///////////////////////////////////////////////////////////
     assert_matches!(
