@@ -14,18 +14,11 @@ use kamu_accounts::*;
 use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 use kamu_auth_rebac_services::{RebacDatasetLifecycleMessageConsumer, RebacServiceImpl};
 use kamu_core::*;
-use kamu_datasets::{CreateDatasetFromSnapshotUseCase, CreateDatasetResult};
-use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEntryRepository};
-use kamu_datasets_services::{
-    CreateDatasetFromSnapshotUseCaseImpl,
-    CreateDatasetUseCaseImpl,
-    DatasetEntryServiceImpl,
-    DeleteDatasetUseCaseImpl,
-    DependencyGraphServiceImpl,
-    RenameDatasetUseCaseImpl,
-    ViewDatasetUseCaseImpl,
-};
-use messaging_outbox::DummyOutboxImpl;
+use kamu_datasets::*;
+use kamu_datasets_inmem::*;
+use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
+use kamu_datasets_services::*;
+use messaging_outbox::{register_message_dispatcher, Outbox, OutboxImmediateImpl};
 use odf::metadata::testing::MetadataFactory;
 use time_source::SystemTimeSourceDefault;
 
@@ -750,9 +743,13 @@ impl GraphQLDatasetsHarness {
 
             b.add::<SystemTimeSourceDefault>()
                 .add::<DidGeneratorDefault>()
-                .add::<DummyOutboxImpl>()
+                .add_builder(
+                    messaging_outbox::OutboxImmediateImpl::builder()
+                        .with_consumer_filter(messaging_outbox::ConsumerFilter::AllConsumers),
+                )
+                .bind::<dyn Outbox, OutboxImmediateImpl>()
                 .add::<CreateDatasetFromSnapshotUseCaseImpl>()
-                .add::<CreateDatasetUseCaseImpl>()
+                .add::<CreateDatasetUseCaseHelper>()
                 .add::<RenameDatasetUseCaseImpl>()
                 .add::<DeleteDatasetUseCaseImpl>()
                 .add::<ViewDatasetUseCaseImpl>()
@@ -775,9 +772,21 @@ impl GraphQLDatasetsHarness {
                 .add::<InMemoryRebacRepository>()
                 .add::<DatasetEntryServiceImpl>()
                 .add::<InMemoryDatasetEntryRepository>()
+                .add::<DatasetReferenceServiceImpl>()
+                .add::<InMemoryDatasetReferenceRepository>()
                 .add::<RebacDatasetLifecycleMessageConsumer>();
 
             NoOpDatabasePlugin::init_database_components(&mut b);
+
+            register_message_dispatcher::<DatasetLifecycleMessage>(
+                &mut b,
+                MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
+            );
+
+            register_message_dispatcher::<DatasetReferenceMessage>(
+                &mut b,
+                MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE,
+            );
 
             b.build()
         };

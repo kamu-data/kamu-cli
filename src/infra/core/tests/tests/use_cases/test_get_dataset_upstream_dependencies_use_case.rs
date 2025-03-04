@@ -21,7 +21,7 @@ use kamu_accounts_services::{
 };
 use kamu_core::auth::DatasetAction;
 use kamu_core::*;
-use kamu_datasets::DatasetEntry;
+use kamu_datasets::{DatasetEntry, DatasetEntryCreatedListener};
 use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
 use kamu_datasets_services::testing::FakeDatasetEntryService;
 use kamu_datasets_services::{DependencyGraphServiceImpl, DependencyGraphWriter};
@@ -260,7 +260,7 @@ async fn test_inaccessible_upstream_dependencies_present() {
 struct GetDatasetUpstreamDependenciesUseCaseHarness {
     base_use_case_harness: BaseUseCaseHarness,
     use_case: Arc<dyn GetDatasetUpstreamDependenciesUseCase>,
-    dependency_graph_writer: Arc<dyn DependencyGraphWriter>,
+    dependency_graph_service: Arc<DependencyGraphServiceImpl>,
     fake_dataset_entry_service: Arc<FakeDatasetEntryService>,
     system_time_source: Arc<dyn SystemTimeSource>,
     catalog: Catalog,
@@ -307,7 +307,7 @@ impl GetDatasetUpstreamDependenciesUseCaseHarness {
         Self {
             base_use_case_harness,
             use_case: catalog.get_one().unwrap(),
-            dependency_graph_writer: catalog.get_one().unwrap(),
+            dependency_graph_service: catalog.get_one().unwrap(),
             fake_dataset_entry_service: catalog.get_one().unwrap(),
             system_time_source: catalog.get_one().unwrap(),
             catalog,
@@ -330,8 +330,8 @@ impl GetDatasetUpstreamDependenciesUseCaseHarness {
             name: dataset_handle.alias.dataset_name.clone(),
         });
 
-        self.dependency_graph_writer
-            .create_dataset_node(&dataset_handle.id)
+        self.dependency_graph_service
+            .on_dataset_entry_created(&dataset_handle.id)
             .await
             .unwrap();
 
@@ -355,11 +355,11 @@ impl GetDatasetUpstreamDependenciesUseCaseHarness {
             name: dataset_handle.alias.dataset_name.clone(),
         });
 
-        self.dependency_graph_writer
-            .create_dataset_node(&dataset_handle.id)
+        self.dependency_graph_service
+            .on_dataset_entry_created(&dataset_handle.id)
             .await
             .unwrap();
-        self.dependency_graph_writer
+        self.dependency_graph_service
             .update_dataset_node_dependencies(&self.catalog, &dataset_handle.id, input_ids)
             .await
             .unwrap();

@@ -24,14 +24,12 @@ use kamu_datasets::{
 };
 use kamu_datasets_inmem::InMemoryDatasetReferenceRepository;
 use kamu_datasets_services::testing::TestDatasetOutboxListener;
-use kamu_datasets_services::utils::DatasetCreateHelper;
+use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::{
     CreateDatasetUseCaseImpl,
     DatasetEntryWriter,
     DatasetReferenceServiceImpl,
-    DependencyGraphWriter,
     MockDatasetEntryWriter,
-    MockDependencyGraphWriter,
 };
 use messaging_outbox::{register_message_dispatcher, Outbox, OutboxImmediateImpl};
 use mockall::predicate::{always, eq};
@@ -52,17 +50,7 @@ async fn test_create_root_dataset() {
         .once()
         .returning(|_, _, _| Ok(()));
 
-    let mut mock_dependency_graph_writer = MockDependencyGraphWriter::new();
-    mock_dependency_graph_writer
-        .expect_create_dataset_node()
-        .once()
-        .returning(|_| Ok(()));
-
-    let harness = CreateUseCaseHarness::new(
-        mock_dataset_entry_writer,
-        mock_dependency_graph_writer,
-        predefined_foo_id.clone(),
-    );
+    let harness = CreateUseCaseHarness::new(mock_dataset_entry_writer, predefined_foo_id.clone());
 
     let foo_created = harness
         .use_case
@@ -127,7 +115,6 @@ struct CreateUseCaseHarness {
 impl CreateUseCaseHarness {
     fn new(
         mock_dataset_entry_writer: MockDatasetEntryWriter,
-        mock_dependency_graph_writer: MockDependencyGraphWriter,
         predefined_dataset_id: odf::DatasetID,
     ) -> Self {
         let base_use_case_harness = BaseUseCaseHarness::new(
@@ -150,9 +137,7 @@ impl CreateUseCaseHarness {
         .add::<CreateDatasetUseCaseImpl>()
         .add_value(mock_dataset_entry_writer)
         .bind::<dyn DatasetEntryWriter, MockDatasetEntryWriter>()
-        .add_value(mock_dependency_graph_writer)
-        .bind::<dyn DependencyGraphWriter, MockDependencyGraphWriter>()
-        .add::<DatasetCreateHelper>()
+        .add::<CreateDatasetUseCaseHelper>()
         .add::<DatasetReferenceServiceImpl>()
         .add::<InMemoryDatasetReferenceRepository>()
         .add::<TestDatasetOutboxListener>();

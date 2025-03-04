@@ -10,15 +10,11 @@
 use async_graphql::*;
 use database_common::NoOpDatabasePlugin;
 use kamu_core::*;
-use kamu_datasets::CreateDatasetFromSnapshotUseCase;
-use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEntryRepository};
-use kamu_datasets_services::{
-    CreateDatasetFromSnapshotUseCaseImpl,
-    CreateDatasetUseCaseImpl,
-    DatasetEntryServiceImpl,
-    DependencyGraphServiceImpl,
-};
-use messaging_outbox::DummyOutboxImpl;
+use kamu_datasets::*;
+use kamu_datasets_inmem::*;
+use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
+use kamu_datasets_services::*;
+use messaging_outbox::{register_message_dispatcher, Outbox, OutboxImmediateImpl};
 use odf::metadata::testing::MetadataFactory;
 use time_source::SystemTimeSourceDefault;
 
@@ -287,25 +283,38 @@ impl GqlSearchHarness {
             use dill::Component;
 
             let mut b = dill::CatalogBuilder::new();
-            b.add::<DidGeneratorDefault>()
-                .add::<SystemTimeSourceDefault>()
-                .add::<DummyOutboxImpl>()
-                .add::<DependencyGraphServiceImpl>()
-                .add::<InMemoryDatasetDependencyRepository>()
-                .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
-                .add_value(TenancyConfig::SingleTenant)
-                .add_builder(
-                    odf::dataset::DatasetStorageUnitLocalFs::builder().with_root(datasets_dir),
-                )
-                .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
-                .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>(
-                )
-                .add::<CreateDatasetFromSnapshotUseCaseImpl>()
-                .add::<CreateDatasetUseCaseImpl>()
-                .add::<DatasetEntryServiceImpl>()
-                .add::<InMemoryDatasetEntryRepository>();
+            b.add_builder(
+                messaging_outbox::OutboxImmediateImpl::builder()
+                    .with_consumer_filter(messaging_outbox::ConsumerFilter::AllConsumers),
+            )
+            .bind::<dyn Outbox, OutboxImmediateImpl>()
+            .add::<DidGeneratorDefault>()
+            .add::<SystemTimeSourceDefault>()
+            .add::<DependencyGraphServiceImpl>()
+            .add::<InMemoryDatasetDependencyRepository>()
+            .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
+            .add_value(TenancyConfig::SingleTenant)
+            .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
+            .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
+            .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>()
+            .add::<CreateDatasetFromSnapshotUseCaseImpl>()
+            .add::<CreateDatasetUseCaseHelper>()
+            .add::<DatasetEntryServiceImpl>()
+            .add::<InMemoryDatasetEntryRepository>()
+            .add::<DatasetReferenceServiceImpl>()
+            .add::<InMemoryDatasetReferenceRepository>();
 
             NoOpDatabasePlugin::init_database_components(&mut b);
+
+            register_message_dispatcher::<DatasetLifecycleMessage>(
+                &mut b,
+                MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
+            );
+
+            register_message_dispatcher::<DatasetReferenceMessage>(
+                &mut b,
+                MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE,
+            );
 
             b.build()
         };

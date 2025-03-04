@@ -16,15 +16,10 @@ use indoc::indoc;
 use internal_error::InternalError;
 use kamu_core::utils::metadata_chain_comparator::CompareChainsResult;
 use kamu_core::*;
-use kamu_datasets::CreateDatasetFromSnapshotUseCase;
-use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEntryRepository};
-use kamu_datasets_services::{
-    CreateDatasetFromSnapshotUseCaseImpl,
-    CreateDatasetUseCaseImpl,
-    DatasetEntryServiceImpl,
-    DependencyGraphServiceImpl,
-    ViewDatasetUseCaseImpl,
-};
+use kamu_datasets::*;
+use kamu_datasets_inmem::*;
+use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
+use kamu_datasets_services::*;
 use messaging_outbox::DummyOutboxImpl;
 use odf::metadata::testing::MetadataFactory;
 use tempfile::TempDir;
@@ -159,7 +154,7 @@ impl PushStatusesTestHarness {
                 .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>(
                 )
                 .add::<CreateDatasetFromSnapshotUseCaseImpl>()
-                .add::<CreateDatasetUseCaseImpl>()
+                .add::<CreateDatasetUseCaseHelper>()
                 .add::<ViewDatasetUseCaseImpl>()
                 .add::<SystemTimeSourceDefault>()
                 .add_value(TenancyConfig::SingleTenant)
@@ -169,7 +164,9 @@ impl PushStatusesTestHarness {
                 .add::<DependencyGraphServiceImpl>()
                 .add::<InMemoryDatasetDependencyRepository>()
                 .add::<DatasetEntryServiceImpl>()
-                .add::<InMemoryDatasetEntryRepository>();
+                .add::<InMemoryDatasetEntryRepository>()
+                .add::<DatasetReferenceServiceImpl>()
+                .add::<InMemoryDatasetReferenceRepository>();
 
             NoOpDatabasePlugin::init_database_components(&mut b);
 

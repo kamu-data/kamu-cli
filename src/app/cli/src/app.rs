@@ -528,7 +528,7 @@ pub fn configure_base_catalog(
     b.add::<kamu_datasets_services::DatasetEntryServiceImpl>();
     b.add::<kamu_datasets_services::DependencyGraphServiceImpl>();
     b.add::<kamu_datasets_services::DatasetReferenceServiceImpl>();
-    b.add::<kamu_datasets_services::utils::DatasetCreateHelper>();
+    b.add::<kamu_datasets_services::utils::CreateDatasetUseCaseHelper>();
 
     b.add_builder(
         messaging_outbox::OutboxImmediateImpl::builder()
@@ -547,6 +547,11 @@ pub fn configure_base_catalog(
     register_message_dispatcher::<kamu_datasets::DatasetLifecycleMessage>(
         &mut b,
         kamu_datasets::MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
+    );
+
+    register_message_dispatcher::<kamu_datasets::DatasetReferenceMessage>(
+        &mut b,
+        kamu_datasets::MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE,
     );
 
     b

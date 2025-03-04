@@ -33,15 +33,10 @@ use kamu_core::{
     ResetResult,
     TenancyConfig,
 };
-use kamu_datasets::{CreateDatasetFromSnapshotUseCase, CreateDatasetResult};
-use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEntryRepository};
-use kamu_datasets_services::{
-    CreateDatasetFromSnapshotUseCaseImpl,
-    CreateDatasetUseCaseImpl,
-    DatasetEntryServiceImpl,
-    DependencyGraphServiceImpl,
-    ViewDatasetUseCaseImpl,
-};
+use kamu_datasets::*;
+use kamu_datasets_inmem::*;
+use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
+use kamu_datasets_services::*;
 use kamu_flow_system::{
     Flow,
     FlowAgentConfig,
@@ -3117,7 +3112,7 @@ impl FlowRunsHarness {
             .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>()
             .add::<MetadataQueryServiceImpl>()
             .add::<CreateDatasetFromSnapshotUseCaseImpl>()
-            .add::<CreateDatasetUseCaseImpl>()
+            .add::<CreateDatasetUseCaseHelper>()
             .add::<ViewDatasetUseCaseImpl>()
             .add_value(dataset_changes_mock)
             .bind::<dyn DatasetChangesService, MockDatasetChangesService>()
@@ -3136,11 +3131,21 @@ impl FlowRunsHarness {
             .add::<InMemoryTaskEventStore>()
             .add::<DatasetEntryServiceImpl>()
             .add::<InMemoryDatasetEntryRepository>()
+            .add::<DatasetReferenceServiceImpl>()
+            .add::<InMemoryDatasetReferenceRepository>()
             .add::<DatabaseTransactionRunner>();
 
             NoOpDatabasePlugin::init_database_components(&mut b);
             kamu_flow_system_services::register_dependencies(&mut b);
 
+            register_message_dispatcher::<DatasetLifecycleMessage>(
+                &mut b,
+                MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
+            );
+            register_message_dispatcher::<DatasetReferenceMessage>(
+                &mut b,
+                MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE,
+            );
             register_message_dispatcher::<ts::TaskProgressMessage>(
                 &mut b,
                 ts::MESSAGE_PRODUCER_KAMU_TASK_AGENT,
