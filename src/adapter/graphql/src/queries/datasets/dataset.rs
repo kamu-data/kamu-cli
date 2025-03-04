@@ -207,13 +207,30 @@ impl Dataset {
             .await?;
         let can_read = allowed_actions.contains(&auth::DatasetAction::Read);
         let can_write = allowed_actions.contains(&auth::DatasetAction::Write);
+        let can_maintain = allowed_actions.contains(&auth::DatasetAction::Maintain);
 
         Ok(DatasetPermissions {
-            can_view: can_read,
-            can_delete: can_write,
-            can_rename: can_write,
-            can_commit: can_write,
-            can_schedule: can_write,
+            collaboration: DatasetCollaborationPermissions {
+                can_view: can_maintain,
+                can_update: can_maintain,
+            },
+            env_vars: DatasetEnvVarsPermissions {
+                can_view: can_read,
+                can_update: can_maintain,
+            },
+            flows: DatasetFlowsPermissions {
+                can_view: can_read,
+                can_run: can_maintain,
+            },
+            general: DatasetGeneralPermissions {
+                can_rename: can_maintain,
+                can_set_visibility: can_maintain,
+                // TODO: Private Datasets: replace with is_owner
+                can_delete: can_maintain,
+            },
+            metadata: DatasetMetadataPermissions {
+                can_commit: can_write,
+            },
         })
     }
 
@@ -335,7 +352,7 @@ impl DatasetRequestState {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Union, Debug, Clone, PartialEq, Eq)]
+#[derive(Union, Debug, PartialEq, Eq)]
 pub enum DatasetVisibilityOutput {
     Private(PrivateDatasetVisibility),
     Public(PublicDatasetVisibility),
@@ -353,13 +370,13 @@ impl DatasetVisibilityOutput {
     }
 }
 
-#[derive(SimpleObject, InputObject, Debug, Clone, PartialEq, Eq)]
+#[derive(SimpleObject, InputObject, Debug, PartialEq, Eq)]
 #[graphql(input_name = "PrivateDatasetVisibilityInput")]
 pub struct PrivateDatasetVisibility {
     _dummy: Option<String>,
 }
 
-#[derive(SimpleObject, InputObject, Debug, Clone, PartialEq, Eq)]
+#[derive(SimpleObject, InputObject, Debug, PartialEq, Eq)]
 #[graphql(input_name = "PublicDatasetVisibilityInput")]
 pub struct PublicDatasetVisibility {
     pub anonymous_available: bool,
@@ -367,13 +384,43 @@ pub struct PublicDatasetVisibility {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
+#[derive(SimpleObject)]
 pub struct DatasetPermissions {
+    collaboration: DatasetCollaborationPermissions,
+    env_vars: DatasetEnvVarsPermissions,
+    flows: DatasetFlowsPermissions,
+    general: DatasetGeneralPermissions,
+    metadata: DatasetMetadataPermissions,
+}
+
+#[derive(SimpleObject)]
+pub struct DatasetCollaborationPermissions {
     can_view: bool,
-    can_delete: bool,
+    can_update: bool,
+}
+
+#[derive(SimpleObject)]
+pub struct DatasetEnvVarsPermissions {
+    can_view: bool,
+    can_update: bool,
+}
+
+#[derive(SimpleObject)]
+pub struct DatasetFlowsPermissions {
+    can_view: bool,
+    can_run: bool,
+}
+
+#[derive(SimpleObject)]
+pub struct DatasetGeneralPermissions {
     can_rename: bool,
+    can_set_visibility: bool,
+    can_delete: bool,
+}
+
+#[derive(SimpleObject)]
+pub struct DatasetMetadataPermissions {
     can_commit: bool,
-    can_schedule: bool,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
