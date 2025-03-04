@@ -149,3 +149,18 @@ impl std::fmt::Display for RouteOrUri<'_> {
         }
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[allow(clippy::unused_async)]
+pub async fn unknown_fallback_handler(
+    request: axum::http::Request<axum::body::Body>,
+) -> impl axum::response::IntoResponse {
+    tracing::warn!(
+        uri = %request.uri(),
+        version = ?request.version(),
+        headers = ?request.headers(),
+        "HTTP: fallback request",
+    );
+    (axum::http::StatusCode::NOT_FOUND, "Not Found")
+}

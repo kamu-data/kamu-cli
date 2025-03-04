@@ -5815,6 +5815,7 @@ dependencies = [
  "kamu-ingest-datafusion",
  "messaging-outbox",
  "mockall",
+ "observability",
  "opendatafabric",
  "paste",
  "pretty_assertions",

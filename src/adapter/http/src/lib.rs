@@ -22,13 +22,11 @@ pub mod data;
 pub mod e2e;
 mod simple_protocol;
 pub mod smart_protocol;
-mod unknown_handler;
 mod upload;
 mod ws_common;
 pub use upload::*;
 pub mod general;
 pub mod openapi;
-pub use unknown_handler::*;
 
 pub type SmartTransferProtocolClientWs =
     smart_protocol::ws_tungstenite_client::WsSmartTransferProtocolClient;
