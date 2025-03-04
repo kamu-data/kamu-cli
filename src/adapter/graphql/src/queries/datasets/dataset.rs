@@ -276,50 +276,42 @@ impl DatasetState {
         ctx: &Context<'_>,
     ) -> Result<&HashSet<auth::DatasetAction>> {
         self.allowed_dataset_actions
-            .get_or_try_init(|| self.resolve_allowed_dataset_actions(ctx))
+            .get_or_try_init(|| async {
+                let dataset_action_authorizer =
+                    from_catalog_n!(ctx, dyn auth::DatasetActionAuthorizer);
+
+                let allowed_actions = dataset_action_authorizer
+                    .get_allowed_actions(&self.dataset_handle.id)
+                    .await?;
+
+                Ok(allowed_actions)
+            })
             .await
     }
 
     pub async fn resolved_dataset(&self, ctx: &Context<'_>) -> Result<&ResolvedDataset> {
         self.resolved_dataset
-            .get_or_try_init(|| self.resolve_resolved_dataset(ctx))
+            .get_or_try_init(|| async {
+                let resolved_dataset = get_dataset(ctx, &self.dataset_handle).await;
+
+                Ok(resolved_dataset)
+            })
             .await
     }
 
     pub async fn dataset_summary(&self, ctx: &Context<'_>) -> Result<&odf::DatasetSummary> {
         self.dataset_summary
-            .get_or_try_init(|| self.resolve_dataset_summary(ctx))
+            .get_or_try_init(|| async {
+                let resolved_dataset = self.resolved_dataset(ctx).await?;
+
+                let summary = resolved_dataset
+                    .get_summary(odf::dataset::GetSummaryOpts::default())
+                    .await
+                    .int_err()?;
+
+                Ok(summary)
+            })
             .await
-    }
-
-    async fn resolve_allowed_dataset_actions(
-        &self,
-        ctx: &Context<'_>,
-    ) -> Result<HashSet<auth::DatasetAction>> {
-        let dataset_action_authorizer = from_catalog_n!(ctx, dyn auth::DatasetActionAuthorizer);
-
-        let allowed_actions = dataset_action_authorizer
-            .get_allowed_actions(&self.dataset_handle.id)
-            .await?;
-
-        Ok(allowed_actions)
-    }
-
-    async fn resolve_resolved_dataset(&self, ctx: &Context<'_>) -> Result<ResolvedDataset> {
-        let resolved_dataset = get_dataset(ctx, &self.dataset_handle).await;
-
-        Ok(resolved_dataset)
-    }
-
-    async fn resolve_dataset_summary(&self, ctx: &Context<'_>) -> Result<odf::DatasetSummary> {
-        let resolved_dataset = self.resolved_dataset(ctx).await?;
-
-        let summary = resolved_dataset
-            .get_summary(odf::dataset::GetSummaryOpts::default())
-            .await
-            .int_err()?;
-
-        Ok(summary)
     }
 }
 
