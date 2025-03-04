@@ -18,15 +18,11 @@ use kamu::utils::ipfs_wrapper::IpfsClient;
 use kamu::utils::simple_transfer_protocol::SimpleTransferProtocol;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
-use kamu_datasets_services::{
-    AppendDatasetMetadataBatchUseCaseImpl,
-    CreateDatasetUseCaseImpl,
-    DatasetEntryWriter,
-    DependencyGraphWriter,
-    MockDatasetEntryWriter,
-    MockDependencyGraphWriter,
-};
-use messaging_outbox::DummyOutboxImpl;
+use kamu_datasets::*;
+use kamu_datasets_inmem::*;
+use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
+use kamu_datasets_services::*;
+use messaging_outbox::*;
 use odf::dataset::testing::create_test_dataset_from_snapshot;
 use odf::dataset::{DatasetFactoryImpl, IpfsGateway};
 use odf::metadata::testing::MetadataFactory;
@@ -73,7 +69,8 @@ async fn do_test_sync(
     std::fs::create_dir(&datasets_dir_foo).unwrap();
     std::fs::create_dir(&datasets_dir_bar).unwrap();
 
-    let catalog_foo = dill::CatalogBuilder::new()
+    let mut catalog_foo_builder = dill::CatalogBuilder::new();
+    catalog_foo_builder
         .add::<DidGeneratorDefault>()
         .add::<SystemTimeSourceDefault>()
         .add_value(ipfs_gateway.clone())
@@ -95,13 +92,31 @@ async fn do_test_sync(
         .add::<DummySmartTransferProtocolClient>()
         .add::<SimpleTransferProtocol>()
         .add::<CreateDatasetUseCaseImpl>()
-        .add::<DummyOutboxImpl>()
+        .add::<CreateDatasetUseCaseHelper>()
+        .add_builder(
+            messaging_outbox::OutboxImmediateImpl::builder()
+                .with_consumer_filter(messaging_outbox::ConsumerFilter::AllConsumers),
+        )
+        .bind::<dyn Outbox, OutboxImmediateImpl>()
         .add_value(MockDatasetEntryWriter::new())
         .bind::<dyn DatasetEntryWriter, MockDatasetEntryWriter>()
         .add_value(MockDependencyGraphWriter::new())
         .bind::<dyn DependencyGraphWriter, MockDependencyGraphWriter>()
-        .add::<AppendDatasetMetadataBatchUseCaseImpl>()
-        .build();
+        .add::<DatasetReferenceServiceImpl>()
+        .add::<InMemoryDatasetReferenceRepository>()
+        .add::<AppendDatasetMetadataBatchUseCaseImpl>();
+
+    register_message_dispatcher::<DatasetLifecycleMessage>(
+        &mut catalog_foo_builder,
+        MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
+    );
+
+    register_message_dispatcher::<DatasetReferenceMessage>(
+        &mut catalog_foo_builder,
+        MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE,
+    );
+
+    let catalog_foo = catalog_foo_builder.build();
 
     let mut mock_dataset_entry_writer_bar = MockDatasetEntryWriter::new();
     mock_dataset_entry_writer_bar
@@ -109,13 +124,8 @@ async fn do_test_sync(
         .times(1)
         .returning(|_, _, _| Ok(()));
 
-    let mut mock_dependency_graph_writer_bar = MockDependencyGraphWriter::new();
-    mock_dependency_graph_writer_bar
-        .expect_create_dataset_node()
-        .times(1)
-        .returning(|_| Ok(()));
-
-    let catalog_bar = dill::CatalogBuilder::new()
+    let mut catalog_bar_builder = dill::CatalogBuilder::new();
+    catalog_bar_builder
         .add::<DidGeneratorDefault>()
         .add::<SystemTimeSourceDefault>()
         .add_value(ipfs_gateway.clone())
@@ -137,13 +147,31 @@ async fn do_test_sync(
         .add::<DummySmartTransferProtocolClient>()
         .add::<SimpleTransferProtocol>()
         .add::<CreateDatasetUseCaseImpl>()
-        .add::<DummyOutboxImpl>()
+        .add::<CreateDatasetUseCaseHelper>()
+        .add::<AppendDatasetMetadataBatchUseCaseImpl>()
+        .add_builder(
+            messaging_outbox::OutboxImmediateImpl::builder()
+                .with_consumer_filter(messaging_outbox::ConsumerFilter::AllConsumers),
+        )
+        .bind::<dyn Outbox, OutboxImmediateImpl>()
         .add_value(mock_dataset_entry_writer_bar)
         .bind::<dyn DatasetEntryWriter, MockDatasetEntryWriter>()
-        .add_value(mock_dependency_graph_writer_bar)
+        .add_value(MockDependencyGraphWriter::new())
         .bind::<dyn DependencyGraphWriter, MockDependencyGraphWriter>()
-        .add::<AppendDatasetMetadataBatchUseCaseImpl>()
-        .build();
+        .add::<DatasetReferenceServiceImpl>()
+        .add::<InMemoryDatasetReferenceRepository>();
+
+    register_message_dispatcher::<DatasetLifecycleMessage>(
+        &mut catalog_bar_builder,
+        MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
+    );
+
+    register_message_dispatcher::<DatasetReferenceMessage>(
+        &mut catalog_bar_builder,
+        MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE,
+    );
+
+    let catalog_bar = catalog_bar_builder.build();
 
     let sync_svc_foo = catalog_foo.get_one::<dyn SyncService>().unwrap();
     let sync_request_builder_foo = catalog_foo.get_one::<SyncRequestBuilder>().unwrap();

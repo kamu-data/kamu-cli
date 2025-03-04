@@ -24,9 +24,14 @@ use kamu_accounts_inmem::InMemoryAccountRepository;
 use kamu_accounts_services::*;
 use kamu_adapter_http::{OdfSmtpVersion, SmartTransferProtocolClientWs};
 use kamu_datasets::*;
-use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEntryRepository};
+use kamu_datasets_inmem::{
+    InMemoryDatasetDependencyRepository,
+    InMemoryDatasetEntryRepository,
+    InMemoryDatasetReferenceRepository,
+};
+use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::*;
-use messaging_outbox::DummyOutboxImpl;
+use messaging_outbox::{register_message_dispatcher, Outbox, OutboxImmediateImpl};
 use odf::dataset::{DatasetFactoryImpl, DatasetLayout, IpfsGateway};
 use tempfile::TempDir;
 use time_source::SystemTimeSourceDefault;
@@ -75,7 +80,11 @@ impl ClientSideHarness {
         b.add_value(CacheDir::new(cache_dir));
         b.add_value(RemoteReposDir::new(repos_dir));
 
-        b.add::<DummyOutboxImpl>();
+        b.add_builder(
+            messaging_outbox::OutboxImmediateImpl::builder()
+                .with_consumer_filter(messaging_outbox::ConsumerFilter::AllConsumers),
+        )
+        .bind::<dyn Outbox, OutboxImmediateImpl>();
 
         b.add::<DependencyGraphServiceImpl>();
         b.add::<InMemoryDatasetDependencyRepository>();
@@ -165,6 +174,9 @@ impl ClientSideHarness {
         b.add::<PushDatasetUseCaseImpl>();
         b.add::<ViewDatasetUseCaseImpl>();
 
+        b.add::<DatasetReferenceServiceImpl>();
+        b.add::<InMemoryDatasetReferenceRepository>();
+        b.add::<CreateDatasetUseCaseHelper>();
         b.add::<DatasetEntryServiceImpl>();
         b.add::<InMemoryDatasetEntryRepository>();
         b.add::<AccountServiceImpl>();
@@ -177,6 +189,16 @@ impl ClientSideHarness {
         b.add_value(IpfsGateway::default());
 
         NoOpDatabasePlugin::init_database_components(&mut b);
+
+        register_message_dispatcher::<DatasetLifecycleMessage>(
+            &mut b,
+            MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
+        );
+
+        register_message_dispatcher::<DatasetReferenceMessage>(
+            &mut b,
+            MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE,
+        );
 
         let catalog = b.build();
 

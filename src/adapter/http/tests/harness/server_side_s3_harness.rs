@@ -21,9 +21,14 @@ use kamu_accounts_inmem::{InMemoryAccessTokenRepository, InMemoryAccountReposito
 use kamu_accounts_services::*;
 use kamu_core::{DatasetRegistry, DidGeneratorDefault, TenancyConfig};
 use kamu_datasets::*;
-use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEntryRepository};
+use kamu_datasets_inmem::{
+    InMemoryDatasetDependencyRepository,
+    InMemoryDatasetEntryRepository,
+    InMemoryDatasetReferenceRepository,
+};
+use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::*;
-use messaging_outbox::DummyOutboxImpl;
+use messaging_outbox::{register_message_dispatcher, Outbox, OutboxImmediateImpl};
 use odf::dataset::DatasetLayout;
 use s3_utils::S3Context;
 use test_utils::LocalS3Server;
@@ -95,7 +100,11 @@ impl ServerSideS3Harness {
                 .add::<DidGeneratorDefault>()
                 .add_value(RunInfoDir::new(run_info_dir))
                 .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
-                .add::<DummyOutboxImpl>()
+                .add_builder(
+                    messaging_outbox::OutboxImmediateImpl::builder()
+                        .with_consumer_filter(messaging_outbox::ConsumerFilter::AllConsumers),
+                )
+                .bind::<dyn Outbox, OutboxImmediateImpl>()
                 .add::<DependencyGraphServiceImpl>()
                 .add::<InMemoryDatasetDependencyRepository>()
                 .add_value(options.tenancy_config)
@@ -118,8 +127,11 @@ impl ServerSideS3Harness {
                 .add::<CommitDatasetEventUseCaseImpl>()
                 .add::<ViewDatasetUseCaseImpl>()
                 .add::<EditDatasetUseCaseImpl>()
+                .add::<CreateDatasetUseCaseHelper>()
                 .add::<DatasetEntryServiceImpl>()
                 .add::<InMemoryDatasetEntryRepository>()
+                .add::<DatasetReferenceServiceImpl>()
+                .add::<InMemoryDatasetReferenceRepository>()
                 .add::<AuthenticationServiceImpl>()
                 .add::<AccountServiceImpl>()
                 .add::<InMemoryAccountRepository>()
@@ -131,6 +143,16 @@ impl ServerSideS3Harness {
                 .add_value(predefined_accounts_config);
 
             database_common::NoOpDatabasePlugin::init_database_components(&mut b);
+
+            register_message_dispatcher::<DatasetLifecycleMessage>(
+                &mut b,
+                MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
+            );
+
+            register_message_dispatcher::<DatasetReferenceMessage>(
+                &mut b,
+                MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE,
+            );
 
             (b.build(), listener)
         };

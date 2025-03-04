@@ -15,17 +15,11 @@ use dill::Component;
 use indoc::indoc;
 use kamu_accounts::DEFAULT_ACCOUNT_NAME;
 use kamu_core::*;
-use kamu_datasets::{CreateDatasetFromSnapshotUseCase, CreateDatasetResult, CreateDatasetUseCase};
-use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEntryRepository};
-use kamu_datasets_services::{
-    CommitDatasetEventUseCaseImpl,
-    CreateDatasetFromSnapshotUseCaseImpl,
-    CreateDatasetUseCaseImpl,
-    DatasetEntryServiceImpl,
-    DependencyGraphServiceImpl,
-    ViewDatasetUseCaseImpl,
-};
-use messaging_outbox::DummyOutboxImpl;
+use kamu_datasets::*;
+use kamu_datasets_inmem::*;
+use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
+use kamu_datasets_services::*;
+use messaging_outbox::{register_message_dispatcher, Outbox, OutboxImmediateImpl};
 use odf::metadata::testing::MetadataFactory;
 use time_source::SystemTimeSourceDefault;
 
@@ -625,27 +619,41 @@ impl GraphQLMetadataChainHarness {
         let base_catalog = {
             let mut b = dill::CatalogBuilder::new();
 
-            b.add::<SystemTimeSourceDefault>()
-                .add::<DidGeneratorDefault>()
-                .add::<DummyOutboxImpl>()
-                .add::<CreateDatasetUseCaseImpl>()
-                .add::<CreateDatasetFromSnapshotUseCaseImpl>()
-                .add::<CommitDatasetEventUseCaseImpl>()
-                .add::<ViewDatasetUseCaseImpl>()
-                .add::<DependencyGraphServiceImpl>()
-                .add::<InMemoryDatasetDependencyRepository>()
-                .add_value(tenancy_config)
-                .add_builder(
-                    odf::dataset::DatasetStorageUnitLocalFs::builder().with_root(datasets_dir),
-                )
-                .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
-                .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>(
-                )
-                .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
-                .add::<DatasetEntryServiceImpl>()
-                .add::<InMemoryDatasetEntryRepository>();
+            b.add_builder(
+                messaging_outbox::OutboxImmediateImpl::builder()
+                    .with_consumer_filter(messaging_outbox::ConsumerFilter::AllConsumers),
+            )
+            .bind::<dyn Outbox, OutboxImmediateImpl>()
+            .add::<SystemTimeSourceDefault>()
+            .add::<DidGeneratorDefault>()
+            .add::<CreateDatasetFromSnapshotUseCaseImpl>()
+            .add::<CreateDatasetUseCaseImpl>()
+            .add::<CreateDatasetUseCaseHelper>()
+            .add::<CommitDatasetEventUseCaseImpl>()
+            .add::<ViewDatasetUseCaseImpl>()
+            .add::<DependencyGraphServiceImpl>()
+            .add::<InMemoryDatasetDependencyRepository>()
+            .add_value(tenancy_config)
+            .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
+            .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
+            .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>()
+            .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
+            .add::<DatasetEntryServiceImpl>()
+            .add::<InMemoryDatasetEntryRepository>()
+            .add::<DatasetReferenceServiceImpl>()
+            .add::<InMemoryDatasetReferenceRepository>();
 
             database_common::NoOpDatabasePlugin::init_database_components(&mut b);
+
+            register_message_dispatcher::<DatasetLifecycleMessage>(
+                &mut b,
+                MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
+            );
+
+            register_message_dispatcher::<DatasetReferenceMessage>(
+                &mut b,
+                MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE,
+            );
 
             b.build()
         };

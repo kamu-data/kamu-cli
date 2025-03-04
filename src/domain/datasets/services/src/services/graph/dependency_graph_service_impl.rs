@@ -20,7 +20,12 @@ use kamu_core::{
     DependencyOrder,
     GetDependenciesError,
 };
-use kamu_datasets::{DatasetDependencies, DatasetDependencyRepository};
+use kamu_datasets::{
+    DatasetDependencies,
+    DatasetDependencyRepository,
+    DatasetEntryCreatedListener,
+    DatasetEntryRemovalListener,
+};
 use petgraph::stable_graph::{NodeIndex, StableDiGraph};
 use petgraph::visit::{depth_first_search, Bfs, DfsEvent, Reversed};
 use petgraph::Direction;
@@ -73,6 +78,8 @@ impl State {
 #[component(pub)]
 #[interface(dyn DependencyGraphService)]
 #[interface(dyn DependencyGraphWriter)]
+#[interface(dyn DatasetEntryCreatedListener)]
+#[interface(dyn DatasetEntryRemovalListener)]
 #[scope(Singleton)]
 impl DependencyGraphServiceImpl {
     pub fn new() -> Self {
@@ -372,25 +379,6 @@ impl DependencyGraphService for DependencyGraphServiceImpl {
 
 #[async_trait::async_trait]
 impl DependencyGraphWriter for DependencyGraphServiceImpl {
-    async fn create_dataset_node(&self, dataset_id: &odf::DatasetID) -> Result<(), InternalError> {
-        let mut state = self.state.write().await;
-
-        state.get_or_create_dataset_node(dataset_id);
-
-        Ok(())
-    }
-
-    async fn remove_dataset_node(&self, dataset_id: &odf::DatasetID) -> Result<(), InternalError> {
-        let mut state = self.state.write().await;
-
-        let node_index = state.get_dataset_node(dataset_id).int_err()?;
-
-        state.datasets_graph.remove_node(node_index);
-        state.dataset_node_indices.remove(dataset_id);
-
-        Ok(())
-    }
-
     async fn update_dataset_node_dependencies(
         &self,
         catalog: &Catalog,
@@ -443,6 +431,41 @@ impl DependencyGraphWriter for DependencyGraphServiceImpl {
         for added_id in added_dependencies {
             self.add_dependency(&mut state, added_id, dataset_id);
         }
+
+        Ok(())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait::async_trait]
+impl DatasetEntryCreatedListener for DependencyGraphServiceImpl {
+    async fn on_dataset_entry_created(
+        &self,
+        dataset_id: &odf::DatasetID,
+    ) -> Result<(), InternalError> {
+        let mut state = self.state.write().await;
+
+        state.get_or_create_dataset_node(dataset_id);
+
+        Ok(())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait::async_trait]
+impl DatasetEntryRemovalListener for DependencyGraphServiceImpl {
+    async fn on_dataset_entry_removed(
+        &self,
+        dataset_id: &odf::DatasetID,
+    ) -> Result<(), InternalError> {
+        let mut state = self.state.write().await;
+
+        let node_index = state.get_dataset_node(dataset_id).int_err()?;
+
+        state.datasets_graph.remove_node(node_index);
+        state.dataset_node_indices.remove(dataset_id);
 
         Ok(())
     }

@@ -27,7 +27,7 @@ use crate::{CreateDatasetEntryError, DatasetEntryWriter};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct DatasetCreateHelper {
+pub struct CreateDatasetUseCaseHelper {
     current_account_subject: Arc<CurrentAccountSubject>,
     tenancy_config: Arc<TenancyConfig>,
     dataset_entry_writer: Arc<dyn DatasetEntryWriter>,
@@ -39,7 +39,7 @@ pub struct DatasetCreateHelper {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
-impl DatasetCreateHelper {
+impl CreateDatasetUseCaseHelper {
     pub fn new(
         current_account_subject: Arc<CurrentAccountSubject>,
         tenancy_config: Arc<TenancyConfig>,

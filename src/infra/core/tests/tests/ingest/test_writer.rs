@@ -17,6 +17,7 @@ use indoc::indoc;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::*;
 use kamu_ingest_datafusion::*;
+use odf::dataset::SetRefOpts;
 use odf::metadata::testing::MetadataFactory;
 use odf::utils::testing::{assert_arrow_schema_eq, assert_data_eq, assert_schema_eq};
 use serde_json::json;
@@ -29,7 +30,7 @@ use time_source::SystemTimeSourceDefault;
 // crate.
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(engine, ingest, datafusion)]
+// #[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_data_writer_happy_path() {
     let mut harness = Harness::new(vec![MetadataFactory::set_polling_source()
@@ -1238,6 +1239,17 @@ impl Harness {
                 )
                 .system_time(system_time)
                 .build_typed(),
+            )
+            .await
+            .unwrap();
+
+        foo_stored
+            .dataset
+            .as_metadata_chain()
+            .set_ref(
+                &odf::BlockRef::Head,
+                &foo_stored.seed,
+                SetRefOpts::default(),
             )
             .await
             .unwrap();

@@ -10,7 +10,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use dill::Component;
+use dill::*;
 use futures::{future, StreamExt};
 use internal_error::ResultIntoInternal;
 use kamu::testing::BaseRepoHarness;
@@ -20,7 +20,8 @@ use kamu_datasets_inmem::{
     InMemoryDatasetDependencyRepository,
     InMemoryDatasetReferenceRepository,
 };
-use kamu_datasets_services::utils::DatasetCreateHelper;
+use kamu_datasets_services::testing::FakeConnectingDatasetEntryWriter;
+use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::*;
 use messaging_outbox::{register_message_dispatcher, Outbox, OutboxImmediateImpl};
 use odf::metadata::testing::MetadataFactory;
@@ -29,14 +30,7 @@ use odf::metadata::testing::MetadataFactory;
 
 #[test_log::test(tokio::test)]
 async fn test_single_tenant_repository() {
-    let mut mock_dataset_entry_writer = MockDatasetEntryWriter::new();
-    mock_dataset_entry_writer
-        .expect_create_entry()
-        .times(6)
-        .returning(|_, _, _| Ok(()));
-
-    let harness =
-        DependencyGraphHarness::new(TenancyConfig::SingleTenant, mock_dataset_entry_writer);
+    let harness = DependencyGraphHarness::new(TenancyConfig::SingleTenant);
 
     let all_dependencies: Vec<_> = harness.list_all_dependencies().await;
     assert_eq!(
@@ -65,14 +59,7 @@ async fn test_single_tenant_repository() {
 
 #[test_log::test(tokio::test)]
 async fn test_multi_tenant_repository() {
-    let mut mock_dataset_entry_writer = MockDatasetEntryWriter::new();
-    mock_dataset_entry_writer
-        .expect_create_entry()
-        .times(6)
-        .returning(|_, _, _| Ok(()));
-
-    let harness =
-        DependencyGraphHarness::new(TenancyConfig::MultiTenant, mock_dataset_entry_writer);
+    let harness = DependencyGraphHarness::new(TenancyConfig::MultiTenant);
 
     let all_dependencies: Vec<_> = harness.list_all_dependencies().await;
     assert_eq!(
@@ -101,14 +88,7 @@ async fn test_multi_tenant_repository() {
 
 #[test_log::test(tokio::test)]
 async fn test_service_queries() {
-    let mut mock_dataset_entry_writer = MockDatasetEntryWriter::new();
-    mock_dataset_entry_writer
-        .expect_create_entry()
-        .times(6)
-        .returning(|_, _, _| Ok(()));
-
-    let harness =
-        DependencyGraphHarness::new(TenancyConfig::SingleTenant, mock_dataset_entry_writer);
+    let harness = DependencyGraphHarness::new(TenancyConfig::SingleTenant);
     harness.create_single_tenant_graph().await;
 
     assert_eq!(
@@ -146,14 +126,7 @@ async fn test_service_queries() {
 
 #[test_log::test(tokio::test)]
 async fn test_service_new_datasets() {
-    let mut mock_dataset_entry_writer = MockDatasetEntryWriter::new();
-    mock_dataset_entry_writer
-        .expect_create_entry()
-        .times(8)
-        .returning(|_, _, _| Ok(()));
-
-    let harness =
-        DependencyGraphHarness::new(TenancyConfig::SingleTenant, mock_dataset_entry_writer);
+    let harness = DependencyGraphHarness::new(TenancyConfig::SingleTenant);
     harness.create_single_tenant_graph().await;
 
     harness.create_root_dataset(None, "test-root").await;
@@ -196,14 +169,7 @@ async fn test_service_new_datasets() {
 
 #[test_log::test(tokio::test)]
 async fn test_service_derived_dataset_modifies_links() {
-    let mut mock_dataset_entry_writer = MockDatasetEntryWriter::new();
-    mock_dataset_entry_writer
-        .expect_create_entry()
-        .times(7)
-        .returning(|_, _, _| Ok(()));
-
-    let harness =
-        DependencyGraphHarness::new(TenancyConfig::SingleTenant, mock_dataset_entry_writer);
+    let harness = DependencyGraphHarness::new(TenancyConfig::SingleTenant);
     harness.create_single_tenant_graph().await;
 
     assert_eq!(
@@ -297,18 +263,7 @@ async fn test_service_derived_dataset_modifies_links() {
 
 #[test_log::test(tokio::test)]
 async fn test_service_dataset_deleted() {
-    let mut mock_dataset_entry_writer = MockDatasetEntryWriter::new();
-    mock_dataset_entry_writer
-        .expect_create_entry()
-        .times(6)
-        .returning(|_, _, _| Ok(()));
-    mock_dataset_entry_writer
-        .expect_remove_entry()
-        .times(1)
-        .returning(|_| Ok(()));
-
-    let harness =
-        DependencyGraphHarness::new(TenancyConfig::SingleTenant, mock_dataset_entry_writer);
+    let harness = DependencyGraphHarness::new(TenancyConfig::SingleTenant);
     harness.create_single_tenant_graph().await;
 
     assert_eq!(
@@ -350,13 +305,7 @@ async fn test_service_dataset_deleted() {
 
 #[test_log::test(tokio::test)]
 async fn test_get_recursive_downstream_dependencies() {
-    let mut mock_dataset_entry_writer = MockDatasetEntryWriter::new();
-    mock_dataset_entry_writer
-        .expect_create_entry()
-        .times(24)
-        .returning(|_, _, _| Ok(()));
-
-    let harness = create_large_dataset_graph(mock_dataset_entry_writer).await;
+    let harness = create_large_dataset_graph().await;
 
     // Request downstream dependencies for last element
     // should return only itself
@@ -564,13 +513,7 @@ async fn test_get_recursive_downstream_dependencies() {
 
 #[test_log::test(tokio::test)]
 async fn test_get_recursive_upstream_dependencies() {
-    let mut mock_dataset_entry_writer = MockDatasetEntryWriter::new();
-    mock_dataset_entry_writer
-        .expect_create_entry()
-        .times(23)
-        .returning(|_, _, _| Ok(()));
-
-    let harness = create_large_dataset_graph(mock_dataset_entry_writer).await;
+    let harness = create_large_dataset_graph().await;
 
     // Should return only itself
     let request_datasets = vec!["test-root-foo"];
@@ -626,13 +569,7 @@ async fn test_get_recursive_upstream_dependencies() {
 
 #[test_log::test(tokio::test)]
 async fn test_in_dependency_order() {
-    let mut mock_dataset_entry_writer = MockDatasetEntryWriter::new();
-    mock_dataset_entry_writer
-        .expect_create_entry()
-        .times(23)
-        .returning(|_, _, _| Ok(()));
-
-    let harness = create_large_dataset_graph(mock_dataset_entry_writer).await;
+    let harness = create_large_dataset_graph().await;
 
     // First, millde, last dataset in breadth-first preserve order
     let result = harness
@@ -680,21 +617,18 @@ async fn test_in_dependency_order() {
 #[oop::extend(BaseRepoHarness, base_repo_harness)]
 struct DependencyGraphHarness {
     base_repo_harness: kamu::testing::BaseRepoHarness,
-    catalog: dill::Catalog,
+    catalog: Catalog,
     dependency_graph_service: Arc<dyn DependencyGraphService>,
     dataset_dependency_repo: Arc<dyn DatasetDependencyRepository>,
 }
 
 impl DependencyGraphHarness {
-    fn new(
-        tenancy_config: TenancyConfig,
-        mock_dataset_entry_writer: MockDatasetEntryWriter,
-    ) -> Self {
+    fn new(tenancy_config: TenancyConfig) -> Self {
         let base_repo_harness = BaseRepoHarness::builder()
             .tenancy_config(tenancy_config)
             .build();
 
-        let mut b = dill::CatalogBuilder::new_chained(base_repo_harness.catalog());
+        let mut b = CatalogBuilder::new_chained(base_repo_harness.catalog());
         b.add_builder(
             messaging_outbox::OutboxImmediateImpl::builder()
                 .with_consumer_filter(messaging_outbox::ConsumerFilter::AllConsumers),
@@ -707,9 +641,8 @@ impl DependencyGraphHarness {
         .add::<CommitDatasetEventUseCaseImpl>()
         .add::<DeleteDatasetUseCaseImpl>()
         .add::<ViewDatasetUseCaseImpl>()
-        .add_value(mock_dataset_entry_writer)
-        .bind::<dyn DatasetEntryWriter, MockDatasetEntryWriter>()
-        .add::<DatasetCreateHelper>()
+        .add::<FakeConnectingDatasetEntryWriter>()
+        .add::<CreateDatasetUseCaseHelper>()
         .add::<DatasetReferenceServiceImpl>()
         .add::<InMemoryDatasetReferenceRepository>();
 
@@ -1119,11 +1052,8 @@ impl DependencyGraphHarness {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-async fn create_large_dataset_graph(
-    mock_dataset_entry_writer: MockDatasetEntryWriter,
-) -> DependencyGraphHarness {
-    let dependency_harness =
-        DependencyGraphHarness::new(TenancyConfig::SingleTenant, mock_dataset_entry_writer);
+async fn create_large_dataset_graph() -> DependencyGraphHarness {
+    let dependency_harness = DependencyGraphHarness::new(TenancyConfig::SingleTenant);
     dependency_harness.create_single_tenant_graph().await;
 
     /*

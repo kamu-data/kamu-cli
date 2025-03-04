@@ -24,7 +24,7 @@ use kamu_datasets::{
 };
 use kamu_datasets_inmem::InMemoryDatasetReferenceRepository;
 use kamu_datasets_services::testing::TestDatasetOutboxListener;
-use kamu_datasets_services::utils::DatasetCreateHelper;
+use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::{
     CreateDatasetFromSnapshotUseCaseImpl,
     DatasetEntryWriter,
@@ -52,15 +52,9 @@ async fn test_create_root_dataset_from_snapshot() {
         .once()
         .returning(|_, _, _| Ok(()));
 
-    let mut mock_dependency_graph_writer = MockDependencyGraphWriter::new();
-    mock_dependency_graph_writer
-        .expect_create_dataset_node()
-        .once()
-        .returning(|_| Ok(()));
-
     let harness = CreateFromSnapshotUseCaseHarness::new(
         mock_dataset_entry_writer,
-        mock_dependency_graph_writer,
+        MockDependencyGraphWriter::new(),
         vec![predefined_foo_id],
     );
 
@@ -131,10 +125,6 @@ async fn test_create_derived_dataset_from_snapshot() {
         .returning(|_, _, _| Ok(()));
 
     let mut mock_dependency_graph_writer = MockDependencyGraphWriter::new();
-    mock_dependency_graph_writer
-        .expect_create_dataset_node()
-        .times(2)
-        .returning(|_| Ok(()));
     mock_dependency_graph_writer
         .expect_update_dataset_node_dependencies()
         .times(1)
@@ -262,7 +252,7 @@ impl CreateFromSnapshotUseCaseHarness {
         )
         .bind::<dyn Outbox, OutboxImmediateImpl>()
         .add::<CreateDatasetFromSnapshotUseCaseImpl>()
-        .add::<DatasetCreateHelper>()
+        .add::<CreateDatasetUseCaseHelper>()
         .add_value(mock_dataset_entry_writer)
         .bind::<dyn DatasetEntryWriter, MockDatasetEntryWriter>()
         .add_value(mock_dependency_graph_writer)
