@@ -41,6 +41,7 @@ impl DatasetEnvVarsMut {
         value: String,
         is_secret: bool,
     ) -> Result<UpsertDatasetEnvVarResult> {
+        #[expect(deprecated)]
         utils::check_dataset_write_access(ctx, &self.dataset_handle).await?;
 
         let dataset_env_var_service = from_catalog_n!(ctx, dyn DatasetEnvVarService);
@@ -83,6 +84,7 @@ impl DatasetEnvVarsMut {
         ctx: &Context<'_>,
         id: DatasetEnvVarID<'static>,
     ) -> Result<DeleteDatasetEnvVarResult> {
+        #[expect(deprecated)]
         utils::check_dataset_write_access(ctx, &self.dataset_handle).await?;
 
         let dataset_env_var_service = from_catalog_n!(ctx, dyn DatasetEnvVarService);

@@ -10,7 +10,7 @@
 use kamu_flow_system::{FlowKeyDataset, FlowTriggerService};
 
 use crate::prelude::*;
-use crate::utils::check_dataset_read_access;
+use crate::utils;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -33,7 +33,8 @@ impl DatasetFlowTriggers {
         ctx: &Context<'_>,
         dataset_flow_type: DatasetFlowType,
     ) -> Result<Option<FlowTrigger>> {
-        check_dataset_read_access(ctx, &self.dataset_handle).await?;
+        #[expect(deprecated)]
+        utils::check_dataset_read_access(ctx, &self.dataset_handle).await?;
 
         let flow_trigger_service = from_catalog_n!(ctx, dyn FlowTriggerService);
         let maybe_flow_trigger = flow_trigger_service
@@ -50,7 +51,8 @@ impl DatasetFlowTriggers {
     /// Checks if all triggers of this dataset are disabled
     #[tracing::instrument(level = "info", name = DatasetFlowTriggers_all_paused, skip_all)]
     async fn all_paused(&self, ctx: &Context<'_>) -> Result<bool> {
-        check_dataset_read_access(ctx, &self.dataset_handle).await?;
+        #[expect(deprecated)]
+        utils::check_dataset_read_access(ctx, &self.dataset_handle).await?;
 
         let flow_trigger_service = from_catalog_n!(ctx, dyn FlowTriggerService);
         for dataset_flow_type in kamu_flow_system::DatasetFlowType::all() {

@@ -55,6 +55,7 @@ pub trait DatasetActionAuthorizer: Sync + Send {
 pub enum DatasetAction {
     Read,
     Write,
+    Maintain,
 }
 
 #[cfg(feature = "oso")]
