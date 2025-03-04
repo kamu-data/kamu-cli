@@ -41,6 +41,7 @@ impl DatasetEnvVarsMut {
         value: String,
         is_secret: bool,
     ) -> Result<UpsertDatasetEnvVarResult> {
+        #[expect(deprecated)]
         utils::check_dataset_write_access(ctx, &self.dataset_handle).await?;
 
         let dataset_env_var_service = from_catalog_n!(ctx, dyn DatasetEnvVarService);
@@ -83,6 +84,7 @@ impl DatasetEnvVarsMut {
         ctx: &Context<'_>,
         id: DatasetEnvVarID,
     ) -> Result<DeleteDatasetEnvVarResult> {
+        #[expect(deprecated)]
         utils::check_dataset_write_access(ctx, &self.dataset_handle).await?;
 
         let dataset_env_var_service = from_catalog_n!(ctx, dyn DatasetEnvVarService);
@@ -112,7 +114,7 @@ impl DatasetEnvVarsMut {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Interface, Debug, Clone)]
+#[derive(Interface, Debug)]
 #[graphql(field(name = "message", ty = "String"))]
 pub enum UpsertDatasetEnvVarResult {
     Created(UpsertDatasetEnvVarResultCreated),
@@ -120,7 +122,7 @@ pub enum UpsertDatasetEnvVarResult {
     UpToDate(UpsertDatasetEnvVarUpToDate),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct UpsertDatasetEnvVarUpToDate;
 
 #[Object]
@@ -130,7 +132,7 @@ impl UpsertDatasetEnvVarUpToDate {
     }
 }
 
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct UpsertDatasetEnvVarResultCreated {
     pub env_var: ViewDatasetEnvVar,
@@ -143,7 +145,7 @@ impl UpsertDatasetEnvVarResultCreated {
     }
 }
 
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct UpsertDatasetEnvVarResultUpdated {
     pub env_var: ViewDatasetEnvVar,
@@ -156,7 +158,7 @@ impl UpsertDatasetEnvVarResultUpdated {
     }
 }
 
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct SaveDatasetEnvVarResultDuplicate {
     pub dataset_env_var_key: String,
@@ -175,14 +177,14 @@ impl SaveDatasetEnvVarResultDuplicate {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Interface, Debug, Clone)]
+#[derive(Interface, Debug)]
 #[graphql(field(name = "message", ty = "String"))]
 pub enum DeleteDatasetEnvVarResult {
     Success(DeleteDatasetEnvVarResultSuccess),
     NotFound(DeleteDatasetEnvVarResultNotFound),
 }
 
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct DeleteDatasetEnvVarResultSuccess {
     pub env_var_id: DatasetEnvVarID,
@@ -195,7 +197,7 @@ impl DeleteDatasetEnvVarResultSuccess {
     }
 }
 
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct DeleteDatasetEnvVarResultNotFound {
     pub env_var_id: DatasetEnvVarID,
@@ -210,14 +212,14 @@ impl DeleteDatasetEnvVarResultNotFound {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Interface, Debug, Clone)]
+#[derive(Interface, Debug)]
 #[graphql(field(name = "message", ty = "String"))]
 pub enum ModifyDatasetEnvVarResult {
     Success(ModifyDatasetEnvVarResultSuccess),
     NotFound(ModifyDatasetEnvVarResultNotFound),
 }
 
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct ModifyDatasetEnvVarResultSuccess {
     pub env_var_id: DatasetEnvVarID,
@@ -230,7 +232,7 @@ impl ModifyDatasetEnvVarResultSuccess {
     }
 }
 
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct ModifyDatasetEnvVarResultNotFound {
     pub env_var_id: DatasetEnvVarID,
@@ -239,6 +241,8 @@ pub struct ModifyDatasetEnvVarResultNotFound {
 #[ComplexObject]
 impl ModifyDatasetEnvVarResultNotFound {
     pub async fn message(&self) -> String {
-        format!("Environment variable with {} id not found", self.env_var_id,)
+        format!("Environment variable with {} id not found", self.env_var_id)
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

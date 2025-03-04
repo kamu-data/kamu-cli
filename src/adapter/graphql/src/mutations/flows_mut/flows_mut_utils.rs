@@ -21,6 +21,7 @@ pub(crate) async fn ensure_scheduling_permission(
     ctx: &Context<'_>,
     dataset_handle: &odf::DatasetHandle,
 ) -> Result<()> {
+    #[expect(deprecated)]
     utils::check_dataset_write_access(ctx, dataset_handle).await
 }
 

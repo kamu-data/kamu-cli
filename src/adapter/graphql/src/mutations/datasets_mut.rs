@@ -169,14 +169,14 @@ impl DatasetsMut {
 // CreateDatasetResult
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Interface, Debug, Clone)]
+#[derive(Interface, Debug)]
 #[graphql(field(name = "message", ty = "String"))]
 pub enum CreateDatasetResult {
     Success(CreateDatasetResultSuccess),
     NameCollision(CreateDatasetResultNameCollision),
 }
 
-#[derive(Interface, Debug, Clone)]
+#[derive(Interface, Debug)]
 #[graphql(field(name = "message", ty = "String"))]
 pub enum CreateDatasetFromSnapshotResult {
     Success(CreateDatasetResultSuccess),
@@ -191,7 +191,7 @@ pub enum CreateDatasetFromSnapshotResult {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct CreateDatasetResultSuccess {
     pub dataset: Dataset,

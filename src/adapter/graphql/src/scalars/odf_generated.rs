@@ -1872,10 +1872,11 @@ impl From<odf::metadata::TransformSql> for TransformSql {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// TODO: Private Datasets: update codegen scripts
 /// Describes a derivative transformation input
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#transforminput-schema
-#[derive(Interface, Debug, Clone)]
+#[derive(Interface, Debug)]
 #[graphql(field(name = "message", ty = "String"))]
 pub enum TransformInputDataset {
     Accessible(TransformInputDatasetAccessible),
@@ -1894,7 +1895,7 @@ impl TransformInputDataset {
     }
 }
 
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct TransformInputDatasetAccessible {
     pub dataset: Dataset,
