@@ -14,15 +14,15 @@ use crate::prelude::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct DatasetFlowConfigs {
-    dataset_handle: odf::DatasetHandle,
+    dataset_id: odf::DatasetID,
 }
 
 #[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
 #[Object]
 impl DatasetFlowConfigs {
     #[graphql(skip)]
-    pub fn new(dataset_handle: odf::DatasetHandle) -> Self {
-        Self { dataset_handle }
+    pub fn new(dataset_id: odf::DatasetID) -> Self {
+        Self { dataset_id }
     }
 
     /// Returns defined configuration for a flow of specified type
@@ -35,8 +35,7 @@ impl DatasetFlowConfigs {
         let flow_config_service = from_catalog_n!(ctx, dyn FlowConfigurationService);
         let maybe_flow_config = flow_config_service
             .find_configuration(
-                FlowKeyDataset::new(self.dataset_handle.id.clone(), dataset_flow_type.into())
-                    .into(),
+                FlowKeyDataset::new(self.dataset_id.clone(), dataset_flow_type.into()).into(),
             )
             .await
             .int_err()?;

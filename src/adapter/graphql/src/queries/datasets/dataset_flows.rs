@@ -25,7 +25,7 @@ impl DatasetFlows {
 
     /// Returns interface for flow configurations queries
     async fn configs(&self) -> DatasetFlowConfigs {
-        DatasetFlowConfigs::new(self.dataset_handle.clone())
+        DatasetFlowConfigs::new(self.dataset_handle.id.clone())
     }
 
     /// Returns interface for flow triggers queries
@@ -35,7 +35,7 @@ impl DatasetFlows {
 
     /// Returns interface for flow runs queries
     async fn runs(&self) -> DatasetFlowRuns {
-        DatasetFlowRuns::new(self.dataset_handle.clone())
+        DatasetFlowRuns::new(self.dataset_handle.id.clone())
     }
 }
 

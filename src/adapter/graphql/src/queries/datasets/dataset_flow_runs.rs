@@ -21,7 +21,7 @@ use crate::queries::{Account, Flow};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct DatasetFlowRuns {
-    dataset_handle: odf::DatasetHandle,
+    dataset_id: odf::DatasetID,
 }
 
 #[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
@@ -30,14 +30,14 @@ impl DatasetFlowRuns {
     const DEFAULT_PER_PAGE: usize = 15;
 
     #[graphql(skip)]
-    pub fn new(dataset_handle: odf::DatasetHandle) -> Self {
-        Self { dataset_handle }
+    pub fn new(dataset_id: odf::DatasetID) -> Self {
+        Self { dataset_id }
     }
 
     #[tracing::instrument(level = "info", name = DatasetFlowRuns_get_flow, skip_all, fields(%flow_id))]
     async fn get_flow(&self, ctx: &Context<'_>, flow_id: FlowID) -> Result<GetFlowResult> {
         if let Some(error) =
-            check_if_flow_belongs_to_dataset(ctx, flow_id, &self.dataset_handle).await?
+            check_if_flow_belongs_to_dataset(ctx, flow_id, &self.dataset_id).await?
         {
             return Ok(match error {
                 FlowInDatasetError::NotFound(e) => GetFlowResult::NotFound(e),
@@ -100,7 +100,7 @@ impl DatasetFlowRuns {
 
         let flows_state_listing = flow_query_service
             .list_all_flows_by_dataset(
-                &self.dataset_handle.id,
+                &self.dataset_id,
                 filters,
                 PaginationOpts {
                     offset: page * per_page,
@@ -127,7 +127,7 @@ impl DatasetFlowRuns {
         let flow_query_service = from_catalog_n!(ctx, dyn fs::FlowQueryService);
 
         let flow_initiator_ids: Vec<_> = flow_query_service
-            .list_all_flow_initiators_by_dataset(&self.dataset_handle.id)
+            .list_all_flow_initiators_by_dataset(&self.dataset_id)
             .await
             .int_err()?
             .matched_stream

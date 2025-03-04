@@ -119,7 +119,7 @@ impl DatasetFlowRunsMut {
         ensure_scheduling_permission(ctx, &self.dataset_handle).await?;
 
         if let Some(error) =
-            check_if_flow_belongs_to_dataset(ctx, flow_id, &self.dataset_handle).await?
+            check_if_flow_belongs_to_dataset(ctx, flow_id, &self.dataset_handle.id).await?
         {
             return Ok(match error {
                 FlowInDatasetError::NotFound(e) => CancelScheduledTasksResult::NotFound(e),

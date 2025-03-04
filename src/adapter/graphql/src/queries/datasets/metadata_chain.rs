@@ -12,7 +12,6 @@ use odf::dataset::MetadataChainExt as _;
 
 use crate::prelude::*;
 use crate::queries::Account;
-use crate::utils::get_dataset;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // MetadataRef
@@ -29,7 +28,7 @@ pub struct BlockRef {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct MetadataChain {
-    dataset_handle: odf::DatasetHandle,
+    resolved_dataset: kamu_core::ResolvedDataset,
 }
 
 #[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
@@ -38,17 +37,17 @@ impl MetadataChain {
     const DEFAULT_BLOCKS_PER_PAGE: usize = 20;
 
     #[graphql(skip)]
-    pub fn new(dataset_handle: odf::DatasetHandle) -> Self {
-        Self { dataset_handle }
+    pub fn new(resolved_dataset: kamu_core::ResolvedDataset) -> Self {
+        Self { resolved_dataset }
     }
 
     /// Returns all named metadata block references
     #[tracing::instrument(level = "info", name = MetadataChain_refs, skip_all)]
-    async fn refs(&self, ctx: &Context<'_>) -> Result<Vec<BlockRef>> {
-        let resolved_dataset = get_dataset(ctx, &self.dataset_handle).await;
+    async fn refs(&self) -> Result<Vec<BlockRef>> {
         Ok(vec![BlockRef {
             name: "head".to_owned(),
-            block_hash: resolved_dataset
+            block_hash: self
+                .resolved_dataset
                 .as_metadata_chain()
                 .resolve_ref(&odf::BlockRef::Head)
                 .await
@@ -64,12 +63,12 @@ impl MetadataChain {
         ctx: &Context<'_>,
         hash: Multihash<'static>,
     ) -> Result<Option<MetadataBlockExtended>> {
-        let resolved_dataset = get_dataset(ctx, &self.dataset_handle).await;
-        let block_maybe = resolved_dataset
+        let block_maybe = self
+            .resolved_dataset
             .as_metadata_chain()
             .try_get_block(&hash)
             .await?;
-        let account = Account::from_dataset_alias(ctx, &self.dataset_handle.alias)
+        let account = Account::from_dataset_alias(ctx, self.resolved_dataset.get_alias())
             .await?
             .expect("Account must exist");
         Ok(if let Some(block) = block_maybe {
@@ -90,8 +89,8 @@ impl MetadataChain {
     ) -> Result<Option<String>> {
         use odf::metadata::serde::MetadataBlockSerializer;
 
-        let resolved_dataset = get_dataset(ctx, &self.dataset_handle).await;
-        match resolved_dataset
+        match self
+            .resolved_dataset
             .as_metadata_chain()
             .try_get_block(&hash)
             .await?
@@ -119,12 +118,10 @@ impl MetadataChain {
         page: Option<usize>,
         per_page: Option<usize>,
     ) -> Result<MetadataBlockConnection> {
-        let resolved_dataset = get_dataset(ctx, &self.dataset_handle).await;
-
         let page = page.unwrap_or(0);
         let per_page = per_page.unwrap_or(Self::DEFAULT_BLOCKS_PER_PAGE);
 
-        let chain = resolved_dataset.as_metadata_chain();
+        let chain = self.resolved_dataset.as_metadata_chain();
 
         let head = chain.resolve_ref(&odf::BlockRef::Head).await.int_err()?;
         let total_count =
@@ -137,7 +134,7 @@ impl MetadataChain {
 
         let mut nodes = Vec::new();
         while let Some((hash, block)) = block_stream.try_next().await.int_err()? {
-            let account = Account::from_dataset_alias(ctx, &self.dataset_handle.alias)
+            let account = Account::from_dataset_alias(ctx, self.resolved_dataset.get_alias())
                 .await?
                 .expect("Account must exist");
             let block = MetadataBlockExtended::new(ctx, hash, block, account).await?;

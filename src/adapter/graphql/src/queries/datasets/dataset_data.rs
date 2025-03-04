@@ -10,12 +10,11 @@
 use kamu_core::{self as domain, QueryError};
 
 use crate::prelude::*;
-use crate::utils::get_dataset;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct DatasetData {
-    dataset_handle: odf::DatasetHandle,
+    resolved_dataset: kamu_core::ResolvedDataset,
 }
 
 #[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
@@ -24,15 +23,15 @@ impl DatasetData {
     const DEFAULT_TAIL_LIMIT: u64 = 20;
 
     #[graphql(skip)]
-    pub fn new(dataset_handle: odf::DatasetHandle) -> Self {
-        Self { dataset_handle }
+    pub fn new(resolved_dataset: kamu_core::ResolvedDataset) -> Self {
+        Self { resolved_dataset }
     }
 
     /// Total number of records in this dataset
     #[tracing::instrument(level = "info", name = DatasetData_num_records_total, skip_all)]
-    async fn num_records_total(&self, ctx: &Context<'_>) -> Result<u64> {
-        let resolved_dataset = get_dataset(ctx, &self.dataset_handle).await;
-        let summary = resolved_dataset
+    async fn num_records_total(&self) -> Result<u64> {
+        let summary = self
+            .resolved_dataset
             .get_summary(odf::dataset::GetSummaryOpts::default())
             .await
             .int_err()?;
@@ -42,9 +41,9 @@ impl DatasetData {
     /// An estimated size of data on disk not accounting for replication or
     /// caching
     #[tracing::instrument(level = "info", name = DatasetData_estimated_size, skip_all)]
-    async fn estimated_size(&self, ctx: &Context<'_>) -> Result<u64> {
-        let resolved_dataset = get_dataset(ctx, &self.dataset_handle).await;
-        let summary = resolved_dataset
+    async fn estimated_size(&self) -> Result<u64> {
+        let summary = self
+            .resolved_dataset
             .get_summary(odf::dataset::GetSummaryOpts::default())
             .await
             .int_err()?;
@@ -85,7 +84,7 @@ impl DatasetData {
 
         let tail_result = query_svc
             .tail(
-                &self.dataset_handle.as_local_ref(),
+                &self.resolved_dataset.get_id().as_local_ref(),
                 skip.unwrap_or(0),
                 limit,
             )
