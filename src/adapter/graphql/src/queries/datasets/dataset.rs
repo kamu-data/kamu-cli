@@ -8,8 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::prelude::*;
-use kamu_core::ServerUrlConfig;
-use kamu_datasets::{ViewDatasetUseCase, ViewDatasetUseCaseError};
+use tokio::sync::OnceCell;
 
 use crate::prelude::*;
 use crate::queries::*;
@@ -21,6 +20,7 @@ use crate::utils::{ensure_dataset_env_vars_enabled, get_dataset};
 pub struct Dataset {
     owner: Account,
     dataset_handle: odf::DatasetHandle,
+    resolved_dataset: OnceCell<kamu_core::ResolvedDataset>,
 }
 
 #[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
@@ -31,19 +31,20 @@ impl Dataset {
         Self {
             owner,
             dataset_handle,
+            resolved_dataset: OnceCell::new(),
         }
     }
 
     #[graphql(skip)]
-    pub async fn from_ref(ctx: &Context<'_>, dataset_ref: &odf::DatasetRef) -> Result<Dataset> {
-        let view_dataset_use_case = from_catalog_n!(ctx, dyn ViewDatasetUseCase);
-
-        let handle = view_dataset_use_case.execute(dataset_ref).await.int_err()?;
-        let account = Account::from_dataset_alias(ctx, &handle.alias)
-            .await?
-            .expect("Account must exist");
-
-        Ok(Dataset::new(account, handle))
+    pub fn from_resolved_dataset(
+        owner: Account,
+        resolved_dataset: kamu_core::ResolvedDataset,
+    ) -> Self {
+        Self {
+            owner,
+            dataset_handle: resolved_dataset.get_handle().clone(),
+            resolved_dataset: OnceCell::new_with(Some(resolved_dataset)),
+        }
     }
 
     #[graphql(skip)]
@@ -51,12 +52,12 @@ impl Dataset {
         ctx: &Context<'_>,
         dataset_ref: &odf::DatasetRef,
     ) -> Result<TransformInputDataset> {
-        let view_dataset_use_case = from_catalog_n!(ctx, dyn ViewDatasetUseCase);
+        let view_dataset_use_case = from_catalog_n!(ctx, dyn kamu_datasets::ViewDatasetUseCase);
 
         let handle = match view_dataset_use_case.execute(dataset_ref).await {
             Ok(handle) => Ok(handle),
             Err(e) => match e {
-                ViewDatasetUseCaseError::Access(_) => {
+                kamu_datasets::ViewDatasetUseCaseError::Access(_) => {
                     return Ok(TransformInputDataset::not_accessible(dataset_ref.clone()))
                 }
                 unexpected_error => Err(unexpected_error.int_err()),
@@ -69,6 +70,20 @@ impl Dataset {
         let dataset = Dataset::new(account, handle);
 
         Ok(TransformInputDataset::accessible(dataset))
+    }
+
+    #[graphql(skip)]
+    async fn resolve_dataset(&self, ctx: &Context<'_>) -> Result<kamu_core::ResolvedDataset> {
+        let resolved_dataset = get_dataset(ctx, &self.dataset_handle).await;
+        Ok(resolved_dataset)
+    }
+
+    #[graphql(skip)]
+    #[inline]
+    async fn get_resolved_dataset(&self, ctx: &Context<'_>) -> Result<&kamu_core::ResolvedDataset> {
+        self.resolved_dataset
+            .get_or_try_init(|| self.resolve_dataset(ctx))
+            .await
     }
 
     /// Unique identifier of the dataset
@@ -96,7 +111,7 @@ impl Dataset {
     /// Returns the kind of dataset (Root or Derivative)
     #[tracing::instrument(level = "info", name = Dataset_kind, skip_all)]
     async fn kind(&self, ctx: &Context<'_>) -> Result<DatasetKind> {
-        let resolved_dataset = get_dataset(ctx, &self.dataset_handle).await;
+        let resolved_dataset = self.get_resolved_dataset(ctx).await?;
         let summary = resolved_dataset
             .get_summary(odf::dataset::GetSummaryOpts::default())
             .await
@@ -109,7 +124,7 @@ impl Dataset {
     async fn visibility(&self, ctx: &Context<'_>) -> Result<DatasetVisibilityOutput> {
         let rebac_svc = from_catalog_n!(ctx, dyn kamu_auth_rebac::RebacService);
 
-        let resolved_dataset = get_dataset(ctx, &self.dataset_handle).await;
+        let resolved_dataset = self.get_resolved_dataset(ctx).await?;
         let properties = rebac_svc
             .get_dataset_properties(resolved_dataset.get_id())
             .await
@@ -125,21 +140,22 @@ impl Dataset {
     }
 
     /// Access to the data of the dataset
-    async fn data(&self) -> DatasetData {
-        DatasetData::new(self.dataset_handle.clone())
+    async fn data(&self, ctx: &Context<'_>) -> Result<DatasetData> {
+        let resolved_dataset = self.get_resolved_dataset(ctx).await?;
+        Ok(DatasetData::new(resolved_dataset.clone()))
     }
 
     /// Access to the metadata of the dataset
-    async fn metadata(&self) -> DatasetMetadata {
-        DatasetMetadata::new(self.dataset_handle.clone())
+    async fn metadata(&self, ctx: &Context<'_>) -> Result<DatasetMetadata> {
+        let resolved_dataset = self.get_resolved_dataset(ctx).await?;
+        Ok(DatasetMetadata::new(resolved_dataset.clone()))
     }
 
     /// Access to the environment variable of this dataset
     #[expect(clippy::unused_async)]
     async fn env_vars(&self, ctx: &Context<'_>) -> Result<DatasetEnvVars> {
         ensure_dataset_env_vars_enabled(ctx)?;
-
-        Ok(DatasetEnvVars::new(self.dataset_handle.clone()))
+        Ok(DatasetEnvVars::new(self.dataset_handle.id.clone()))
     }
 
     /// Access to the flow configurations of this dataset
@@ -151,7 +167,7 @@ impl Dataset {
     /// Creation time of the first metadata block in the chain
     #[tracing::instrument(level = "info", name = Dataset_created_at, skip_all)]
     async fn created_at(&self, ctx: &Context<'_>) -> Result<DateTime<Utc>> {
-        let resolved_dataset = get_dataset(ctx, &self.dataset_handle).await;
+        let resolved_dataset = self.get_resolved_dataset(ctx).await?;
 
         use odf::dataset::MetadataChainExt as _;
         Ok(resolved_dataset
@@ -167,7 +183,7 @@ impl Dataset {
     /// Creation time of the most recent metadata block in the chain
     #[tracing::instrument(level = "info", name = Dataset_last_updated_at, skip_all)]
     async fn last_updated_at(&self, ctx: &Context<'_>) -> Result<DateTime<Utc>> {
-        let resolved_dataset = get_dataset(ctx, &self.dataset_handle).await;
+        let resolved_dataset = self.get_resolved_dataset(ctx).await?;
 
         use odf::dataset::MetadataChainExt as __;
         Ok(resolved_dataset
@@ -201,7 +217,7 @@ impl Dataset {
 
     /// Various endpoints for interacting with data
     async fn endpoints(&self, ctx: &Context<'_>) -> DatasetEndpoints<'_> {
-        let config = crate::utils::unsafe_from_catalog_n!(ctx, ServerUrlConfig);
+        let config = crate::utils::unsafe_from_catalog_n!(ctx, kamu_core::ServerUrlConfig);
 
         DatasetEndpoints::new(&self.owner, self.dataset_handle.clone(), config)
     }

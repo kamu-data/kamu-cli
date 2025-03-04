@@ -35,14 +35,14 @@ pub(crate) enum FlowInDatasetError {
 pub(crate) async fn check_if_flow_belongs_to_dataset(
     ctx: &Context<'_>,
     flow_id: FlowID,
-    dataset_handle: &odf::DatasetHandle,
+    dataset_id: &odf::DatasetID,
 ) -> Result<Option<FlowInDatasetError>> {
     let flow_query_service = from_catalog_n!(ctx, dyn fs::FlowQueryService);
 
     match flow_query_service.get_flow(flow_id.into()).await {
         Ok(flow_state) => match flow_state.flow_key {
             fs::FlowKey::Dataset(fk_dataset) => {
-                if fk_dataset.dataset_id != dataset_handle.id {
+                if fk_dataset.dataset_id != *dataset_id {
                     return Ok(Some(FlowInDatasetError::NotFound(FlowNotFound { flow_id })));
                 }
             }

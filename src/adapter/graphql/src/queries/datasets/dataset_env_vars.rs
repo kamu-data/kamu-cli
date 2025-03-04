@@ -16,7 +16,7 @@ use crate::prelude::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct DatasetEnvVars {
-    dataset_handle: odf::DatasetHandle,
+    dataset_id: odf::DatasetID,
 }
 
 #[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
@@ -25,8 +25,8 @@ impl DatasetEnvVars {
     const DEFAULT_PER_PAGE: usize = 15;
 
     #[graphql(skip)]
-    pub fn new(dataset_handle: odf::DatasetHandle) -> Self {
-        Self { dataset_handle }
+    pub fn new(dataset_id: odf::DatasetID) -> Self {
+        Self { dataset_id }
     }
 
     #[tracing::instrument(level = "info", name = DatasetEnvVars_exposed_value, skip_all)]
@@ -63,7 +63,7 @@ impl DatasetEnvVars {
 
         let dataset_env_var_listing = dataset_env_var_service
             .get_all_dataset_env_vars_by_dataset_id(
-                &self.dataset_handle.id,
+                &self.dataset_id,
                 Some(PaginationOpts {
                     offset: (page * per_page),
                     limit: per_page,

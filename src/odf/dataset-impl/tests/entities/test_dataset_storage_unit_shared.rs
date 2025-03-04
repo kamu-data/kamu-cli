@@ -10,6 +10,7 @@
 use std::assert_matches::assert_matches;
 
 use odf::DatasetID;
+use odf_dataset::SetRefOpts;
 use odf_metadata::testing::MetadataFactory;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -47,6 +48,21 @@ pub async fn test_store_dataset<
         .await
         .is_ok());
 
+    // Set head ref
+    store_result
+        .dataset
+        .as_metadata_chain()
+        .set_ref(
+            &odf::BlockRef::Head,
+            &store_result.seed,
+            SetRefOpts {
+                validate_block_present: true,
+                check_ref_is: Some(None),
+            },
+        )
+        .await
+        .unwrap();
+
     // Now test ID collision
     let store_result = storage_unit.store_dataset(seed_block).await;
 
@@ -72,6 +88,21 @@ pub async fn test_delete_dataset<
     .build_typed();
     let store_result = storage_unit
         .store_dataset(seed_block.clone())
+        .await
+        .unwrap();
+
+    // Set head ref
+    store_result
+        .dataset
+        .as_metadata_chain()
+        .set_ref(
+            &odf::BlockRef::Head,
+            &store_result.seed,
+            SetRefOpts {
+                validate_block_present: true,
+                check_ref_is: Some(None),
+            },
+        )
         .await
         .unwrap();
 
@@ -125,6 +156,36 @@ pub async fn test_iterate_datasets<
         .unwrap();
     let store_result_2 = storage_unit
         .store_dataset(seed_block_2.clone())
+        .await
+        .unwrap();
+
+    // Set head refs
+    store_result_1
+        .dataset
+        .as_metadata_chain()
+        .set_ref(
+            &odf::BlockRef::Head,
+            &store_result_1.seed,
+            SetRefOpts {
+                validate_block_present: true,
+                check_ref_is: Some(None),
+            },
+        )
+        .await
+        .unwrap();
+
+    // Set head ref
+    store_result_2
+        .dataset
+        .as_metadata_chain()
+        .set_ref(
+            &odf::BlockRef::Head,
+            &store_result_2.seed,
+            SetRefOpts {
+                validate_block_present: true,
+                check_ref_is: Some(None),
+            },
+        )
         .await
         .unwrap();
 
