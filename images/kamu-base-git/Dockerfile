@@ -16,8 +16,9 @@ RUN apt update  \
       --branch $KAMU_BRANCH  \
       --depth 1 \
       /app/ \
+    && TOOLCHAIN=$(cat rust-toolchain) \
     && curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs  \
-      | sh -s -- --default-toolchain nightly -y \
+      | sh -s -- --default-toolchain ${TOOLCHAIN} -y \
     && cargo build -p kamu-cli
 
 ################################################################################
