@@ -663,6 +663,17 @@ type DatasetCollaboration {
 	accountRoles(page: Int, perPage: Int): AccountWithRoleConnection!
 }
 
+type DatasetCollaborationMut {
+	"""
+	Grant account access as the specified role for the dataset
+	"""
+	setRole(accountId: AccountID!, role: DatasetAccessRole!): SetRoleResult!
+	"""
+	Revoking account accesses for the dataset
+	"""
+	unsetRoles(accountId: [AccountID!]!): UnsetRoleResult!
+}
+
 type DatasetConnection {
 	"""
 	A shorthand for `edges { node { ... } }`
@@ -901,6 +912,10 @@ type DatasetMut {
 	Access to the mutable flow configurations of this dataset
 	"""
 	envVars: DatasetEnvVarsMut!
+	"""
+	Access to collaboration management methods
+	"""
+	collaboration: DatasetCollaborationMut!
 	"""
 	Rename the dataset
 	"""
@@ -2516,7 +2531,6 @@ interface SetDatasetVisibilityResult {
 }
 
 type SetDatasetVisibilityResultSuccess implements SetDatasetVisibilityResult {
-	dummy: String
 	message: String!
 }
 
@@ -2608,6 +2622,14 @@ type SetPollingSource {
 	merge: MergeStrategy!
 }
 
+interface SetRoleResult {
+	message: String!
+}
+
+type SetRoleResultSuccess implements SetRoleResult {
+	message: String!
+}
+
 """
 Defines a transformation that produces data in a derivative dataset.
 
@@ -2657,7 +2679,6 @@ interface SetWatermarkResult {
 }
 
 type SetWatermarkUpToDate implements SetWatermarkResult {
-	dummy: String!
 	message: String!
 }
 
@@ -2903,13 +2924,19 @@ type TriggerFlowSuccess implements TriggerFlowResult {
 	message: String!
 }
 
+interface UnsetRoleResult {
+	message: String!
+}
+
+type UnsetRoleResultSuccess implements UnsetRoleResult {
+	message: String!
+}
+
 type UpdateEmailInvalid implements UpdateEmailResult {
-	dummy: Boolean!
 	message: String!
 }
 
 type UpdateEmailNonUnique implements UpdateEmailResult {
-	dummy: Boolean!
 	message: String!
 }
 
