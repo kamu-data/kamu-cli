@@ -42,11 +42,12 @@ impl ViewDatasetUseCaseImpl {
 // ViewDatasetUseCase
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[common_macros::method_names_consts]
 #[async_trait::async_trait]
 impl ViewDatasetUseCase for ViewDatasetUseCaseImpl {
     #[tracing::instrument(
         level = "info",
-        name = "ViewDatasetUseCase::execute",
+        name = ViewDatasetUseCaseImpl_execute,
         skip_all,
         fields(dataset_ref)
     )]
@@ -65,7 +66,7 @@ impl ViewDatasetUseCase for ViewDatasetUseCaseImpl {
 
     #[tracing::instrument(
         level = "info",
-        name = "ViewDatasetUseCase::execute_multi",
+        name = ViewDatasetUseCaseImpl_execute_multi,
         skip_all,
         fields(dataset_refs)
     )]
