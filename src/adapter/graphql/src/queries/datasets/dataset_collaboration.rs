@@ -8,12 +8,12 @@
 // by the Apache License, Version 2.0.
 
 use crate::prelude::*;
-use crate::queries::DatasetState;
+use crate::queries::DatasetRequestState;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct DatasetCollaboration<'a> {
-    dataset_state: &'a DatasetState,
+    dataset_request_state: &'a DatasetRequestState,
 }
 
 #[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
@@ -22,8 +22,10 @@ impl<'a> DatasetCollaboration<'a> {
     const DEFAULT_RESULTS_PER_PAGE: usize = 15;
 
     #[graphql(skip)]
-    pub fn new(dataset_state: &'a DatasetState) -> Self {
-        Self { dataset_state }
+    pub fn new(dataset_state: &'a DatasetRequestState) -> Self {
+        Self {
+            dataset_request_state: dataset_state,
+        }
     }
 
     /// Accounts (and their roles) that have access to the dataset
@@ -34,7 +36,7 @@ impl<'a> DatasetCollaboration<'a> {
         page: Option<usize>,
         per_page: Option<usize>,
     ) -> Result<AccountWithRoleConnection> {
-        self.dataset_state
+        self.dataset_request_state
             .check_dataset_maintain_access(ctx)
             .await?;
 
