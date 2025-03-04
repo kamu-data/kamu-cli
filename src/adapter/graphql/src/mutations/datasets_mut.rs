@@ -158,6 +158,7 @@ impl DatasetsMut {
                         .collect(),
                 })
             }
+            Err(CreateDatasetFromSnapshotError::CASFailed(e)) => return Err(e.int_err().into()),
             Err(CreateDatasetFromSnapshotError::Internal(e)) => return Err(e.into()),
         };
 

@@ -527,6 +527,8 @@ pub fn configure_base_catalog(
 
     b.add::<kamu_datasets_services::DatasetEntryServiceImpl>();
     b.add::<kamu_datasets_services::DependencyGraphServiceImpl>();
+    b.add::<kamu_datasets_services::DatasetReferenceServiceImpl>();
+    b.add::<kamu_datasets_services::utils::DatasetCreateHelper>();
 
     b.add_builder(
         messaging_outbox::OutboxImmediateImpl::builder()

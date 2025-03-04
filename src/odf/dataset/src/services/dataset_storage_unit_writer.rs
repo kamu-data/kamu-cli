@@ -33,15 +33,15 @@ pub trait DatasetStorageUnitWriter: Sync + Send {
 pub struct StoreDatasetResult {
     pub dataset_id: DatasetID,
     pub dataset: Arc<dyn Dataset>,
-    pub head: Multihash,
+    pub seed: Multihash,
 }
 
 impl StoreDatasetResult {
-    pub fn new(dataset_id: DatasetID, dataset: Arc<dyn Dataset>, head: Multihash) -> Self {
+    pub fn new(dataset_id: DatasetID, dataset: Arc<dyn Dataset>, seed: Multihash) -> Self {
         Self {
             dataset_id,
             dataset,
-            head,
+            seed,
         }
     }
 }
