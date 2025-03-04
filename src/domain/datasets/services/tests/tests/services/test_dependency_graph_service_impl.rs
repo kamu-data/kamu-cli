@@ -16,7 +16,11 @@ use internal_error::ResultIntoInternal;
 use kamu::testing::BaseRepoHarness;
 use kamu_core::*;
 use kamu_datasets::*;
-use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
+use kamu_datasets_inmem::{
+    InMemoryDatasetDependencyRepository,
+    InMemoryDatasetReferenceRepository,
+};
+use kamu_datasets_services::utils::DatasetCreateHelper;
 use kamu_datasets_services::*;
 use messaging_outbox::{register_message_dispatcher, Outbox, OutboxImmediateImpl};
 use odf::metadata::testing::MetadataFactory;
@@ -700,16 +704,23 @@ impl DependencyGraphHarness {
         .add::<DependencyGraphServiceImpl>()
         .add::<InMemoryDatasetDependencyRepository>()
         .add::<CreateDatasetFromSnapshotUseCaseImpl>()
-        .add::<CreateDatasetUseCaseImpl>()
         .add::<CommitDatasetEventUseCaseImpl>()
         .add::<DeleteDatasetUseCaseImpl>()
         .add::<ViewDatasetUseCaseImpl>()
         .add_value(mock_dataset_entry_writer)
-        .bind::<dyn DatasetEntryWriter, MockDatasetEntryWriter>();
+        .bind::<dyn DatasetEntryWriter, MockDatasetEntryWriter>()
+        .add::<DatasetCreateHelper>()
+        .add::<DatasetReferenceServiceImpl>()
+        .add::<InMemoryDatasetReferenceRepository>();
 
         register_message_dispatcher::<DatasetLifecycleMessage>(
             &mut b,
             MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
+        );
+
+        register_message_dispatcher::<DatasetReferenceMessage>(
+            &mut b,
+            MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE,
         );
 
         let catalog = b.build();
