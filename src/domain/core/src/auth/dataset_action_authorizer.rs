@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use std::collections::HashSet;
-use std::str::FromStr;
 
 use dill::*;
 use internal_error::{InternalError, ResultIntoInternal};
@@ -61,6 +60,8 @@ pub enum DatasetAction {
 #[cfg(feature = "oso")]
 impl oso::FromPolar for DatasetAction {
     fn from_polar(polar_value: oso::PolarValue) -> oso::Result<Self> {
+        use std::str::FromStr;
+
         use oso::errors::{OsoError, TypeError};
         use oso::PolarValue;
 
