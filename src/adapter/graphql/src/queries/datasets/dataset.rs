@@ -16,7 +16,7 @@ use tokio::sync::OnceCell;
 
 use crate::prelude::*;
 use crate::queries::*;
-use crate::utils::{ensure_dataset_env_vars_enabled, get_dataset};
+use crate::utils::{ensure_dataset_env_vars_enabled, get_dataset, make_dataset_access_error};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -240,8 +240,38 @@ impl DatasetState {
         }
     }
 
-    // TODO: Private Datasets: add specific read/write/maintain methods
-    pub async fn allowed_dataset_actions(
+    #[expect(dead_code)]
+    pub async fn check_dataset_read_access(&self, ctx: &Context<'_>) -> Result<()> {
+        self.check_dataset_access(ctx, auth::DatasetAction::Read)
+            .await
+    }
+
+    #[expect(dead_code)]
+    pub async fn check_dataset_write_access(&self, ctx: &Context<'_>) -> Result<()> {
+        self.check_dataset_access(ctx, auth::DatasetAction::Write)
+            .await
+    }
+
+    pub async fn check_dataset_maintain_access(&self, ctx: &Context<'_>) -> Result<()> {
+        self.check_dataset_access(ctx, auth::DatasetAction::Maintain)
+            .await
+    }
+
+    async fn check_dataset_access(
+        &self,
+        ctx: &Context<'_>,
+        action: auth::DatasetAction,
+    ) -> Result<()> {
+        let allowed_actions = self.allowed_dataset_actions(ctx).await?;
+
+        if allowed_actions.contains(&action) {
+            Ok(())
+        } else {
+            Err(make_dataset_access_error(&self.dataset_handle))
+        }
+    }
+
+    async fn allowed_dataset_actions(
         &self,
         ctx: &Context<'_>,
     ) -> Result<&HashSet<auth::DatasetAction>> {
